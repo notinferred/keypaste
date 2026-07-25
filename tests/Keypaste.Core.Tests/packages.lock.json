@@ -123,8 +123,14 @@
           "xunit.v3.runner.common": "[3.2.2]"
         }
       },
-      "keypaste.core": {
+      "keepasslib": {
         "type": "Project"
+      },
+      "keypaste.core": {
+        "type": "Project",
+        "dependencies": {
+          "KeePassLib": "[1.0.0, )"
+        }
       }
     }
   }

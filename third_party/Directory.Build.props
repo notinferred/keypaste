@@ -1,0 +1,71 @@
+<Project>
+
+  <!--
+    Quarantine for vendored third-party source.
+
+    This file deliberately does NOT import the repository root Directory.Build.props.
+    MSBuild stops at the first Directory.Build.props found walking up from the project
+    directory, so its presence here is what severs the inheritance — everything the
+    vendored build needs is re-declared below, and nothing else leaks in.
+
+    The repository's build gates (CORE.md §3.6/§3.7 encoded as compiler errors, see
+    DECISIONS.md D-0005) exist to hold *our* code to a standard. Vendored source is
+    held to a different one: it is not edited to taste, it is re-merged from upstream.
+    Turning the gates off here is what keeps them meaningful in src/.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+
+    <!-- KeePassLib predates nullable reference types by about a decade. -->
+    <Nullable>disable</Nullable>
+
+    <!--
+      2007-era C#. Warnings here are not actionable: we do not fix them, because a
+      local fix becomes a merge conflict on every upstream security bump.
+    -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <WarningLevel>0</WarningLevel>
+    <NoWarn>$(NoWarn);CS1591;SYSLIB0014;SYSLIB0021;SYSLIB0022;SYSLIB0023;SYSLIB0041</NoWarn>
+
+    <!--
+      .editorconfig makes IDE0055/IDE0011/IDE0005 and the entire Security analyzer
+      category errors. Vendored code trips all of them by construction.
+    -->
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+    <AnalysisLevel>none</AnalysisLevel>
+    <AnalysisMode>None</AnalysisMode>
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+    <CodeAnalysisTreatWarningsAsErrors>false</CodeAnalysisTreatWarningsAsErrors>
+    <RunAnalyzers>false</RunAnalyzers>
+
+    <!-- No XML docs on vendored public members, and none are wanted. -->
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+
+    <!--
+      AOT/trim analysis is OFF here for now. D-0005 installed those analyzers as a
+      dependency-selection gate; quarantining defeats it, so the AOT verdict must come
+      from a real `dotnet publish -p:PublishAot=true` smoke test instead. Tracked as an
+      open decision in DECISIONS.md — deferred deliberately, not silently.
+    -->
+    <IsAotCompatible>false</IsAotCompatible>
+    <EnableTrimAnalyzer>false</EnableTrimAnalyzer>
+    <EnableSingleFileAnalyzer>false</EnableSingleFileAnalyzer>
+    <EnableAotAnalyzer>false</EnableAotAnalyzer>
+
+    <IsPackable>false</IsPackable>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>low</NuGetAuditLevel>
+
+    <UseArtifactsOutput>true</UseArtifactsOutput>
+    <ArtifactsPath>$(MSBuildThisFileDirectory)../artifacts</ArtifactsPath>
+
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+    <DebugType>portable</DebugType>
+  </PropertyGroup>
+
+</Project>
