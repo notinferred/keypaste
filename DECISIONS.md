@@ -412,6 +412,75 @@ regression test asserts the flag directly rather than looking for leftover files
 in-place save also leaves no debris, so a debris-only assertion would pass with the defect present;
 it was confirmed to fail when the fix is reverted.
 
+## D-0014 - Env sets are one KDBX entry per variable, not custom string fields
+
+**Date:** 2026-07-25 - **Stage:** 1.1 - **Status:** accepted
+
+An environment set is stored as the group `env/<project>`, holding one ordinary entry per
+variable: title = `KEY`, password = value. No custom string fields, no marker attributes, no
+keypaste-only metadata anywhere in the file. The group path is the marker.
+
+**The alternative was one entry per project carrying KEY-to-value as custom string fields, and it
+was ruled out by a single verifiable fact:** `keepassxc-cli add` and `keepassxc-cli edit` have no
+option to write a custom string field. They can read one (`show -a`, `show --all`), but nothing in
+the CLI can create or change one; only the GUI can. Checked against KeePassXC 2.7.10, and against
+2.7.12 on CI.
+
+That matters because the requirement for this stage was not "readable in KeePassXC", it was
+**editable** - a user changes `DATABASE_URL` in KeePassXC and keypaste picks it up. Under the
+custom-field convention that claim could only ever have been demonstrated by a human clicking
+through a GUI, which means CI could not hold it and it would rot. Under one-entry-per-variable,
+KeePassXC has full parity: `ls -R -f` enumerates variables, `edit` changes one, `add` and `rm` add
+and remove them. `scripts/verify-keepassxc-writeback.sh` now proves exactly that on three
+operating systems, in both directions.
+
+Two smaller reasons point the same way. Values land in the `Password` field, so they inherit the
+existing protection rule in `KeePassInterop.SetField` unchanged and are masked in KeePassXC rather
+than shown as plaintext advanced attributes; and `VaultEntry` needs no new members, so
+`keypaste ls` and `keypaste get env/<project>/<KEY>` work on environment variables for free.
+
+**The cost is real and is accepted openly:** a `.env` with forty keys becomes forty KDBX entries,
+and `keypaste ls` gets noisy in a vault that holds several projects. Noise is recoverable; a
+compatibility claim nobody can test is not. PLAN.md previously specified the custom-field shape
+and has been corrected.
+
+**Validation is strict on write and permissive on read.** keypaste refuses to create a project
+name that is empty or contains a separator (group-path resolution discards empty segments, so both
+write to a path no read can reach), and refuses a variable name outside the POSIX
+`[A-Za-z_][A-Za-z0-9_]*` rule, or one differing from an existing name only in case - that pair is
+two variables on Linux and one on Windows. But anything already in the file is listed exactly as
+KeePassXC shows it, with unusable names flagged on stderr rather than hidden, because keypaste and
+KeePassXC disagreeing about the contents of one file is the failure law 4.6 exists to prevent.
+Two entries sharing a name have no correct answer and fail closed (section 3.7).
+
+**Overwriting a value keeps the previous one as KDBX history**, which is what KeePassXC's own
+editor does and what a KeePass user expects to find in the History tab. This sits awkwardly beside
+the rationale on `KeePassInterop.RemoveEntry`, which removes outright rather than to a recycle bin
+so that "a vault the user asked to delete from should not keep a readable copy of the secret". The
+tension is real: rotating a credential *because it leaked* leaves the leaked value in the file,
+encrypted, until the ten-item history cap evicts it - and keypaste has no feature that reads
+history, so it is invisible in `keypaste ls` and `get` while being plainly visible in KeePassXC.
+It is accepted because silently discarding history on an entry the user maintains in KeePassXC
+would be a worse surprise, and because `keypaste env rm` does remove the entry and its history
+together. `env set` says so on the line where it happens rather than only in this file. A
+`--no-history` flag is in ideas.md, not in this stage.
+
+**`keypaste env set <project> KEY=value` takes the value from `argv`**, where it is visible in the
+process list and lands in shell history. This contradicts the comment on `AddCommand`, which
+refuses a `--password` flag for exactly that reason, and the contradiction is deliberate rather
+than overlooked: the piped form exists and is what the compatibility gate uses, but a one-liner is
+what people will reach for, and refusing it outright pushes them to clean up shell history by hand
+or to something worse. It is documented in SECURITY.md instead of warned about on every run, and
+tracked as **O-0009**.
+
+**One primitive was added to the core for this and is not env-shaped:** `Vault.UpdateEntry`. The
+vault had no update path at all - only add and remove - and the GUI's entry editor will need the
+same one. It edits the underlying entry in place rather than removing and re-adding it, so the
+UUID, timestamps, attachments and any custom string fields a user added in KeePassXC survive a
+value change. A unit test asserts the history count directly, because keypaste reads no history
+itself and nothing else in the codebase would notice it disappearing; that test was confirmed to
+fail against a remove-and-re-add implementation.
+
 ---
 
 # Open decisions
@@ -506,3 +575,21 @@ rely on it. The options are a Windows-only Win32 path (three P/Invokes, one
 `[SupportedOSPlatform]` class, and an argument with the trim/AOT analysers), documenting the gap
 and telling Windows users to disable clipboard history, or making `--show` the Windows default.
 Until then SECURITY.md states the gap rather than implying the clear is complete.
+
+## O-0009 - Values on the command line, and case-colliding names on Windows
+
+Two loose ends from D-0014, both of which should be settled before strangers depend on the
+answers.
+
+**`env set p KEY=value` puts a secret in `argv`.** It is world-readable through `/proc` on Linux,
+visible to WMI and Sysmon on Windows, and written to the shell's history file. keypaste ships this
+deliberately, because the alternative is people moving secrets around some other way that is no
+safer. The open question is whether it stays silent: a one-line stderr note costs nothing but
+trains people to ignore warnings, and a flag that silences it (the shape `rm --yes` already uses)
+costs a flag. Decide before Stage 3, when the audience stops being one person.
+
+**Two variables differing only in case are one variable on Windows.** Writing the second is
+refused today. Reading is not: a vault that already contains `PATH` and `Path` lists both, and
+Stage 1.2's `keypaste run` will have to decide whether that is a hard failure, a last-writer-wins
+with a warning, or a platform-conditional. Failing closed is the section 3.7 answer and the likely
+one, but it belongs with the injection code that has to implement it.

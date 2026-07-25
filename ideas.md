@@ -21,6 +21,9 @@
 - Git hooks that block committing plaintext secrets (nice free marketing tool, could be standalone).
 - "Secret leases" for long-running agents with auto-rotation reminders.
 - Passkey storage once KDBX ecosystem support matures (watch KeePassXC's passkey work) — ties back to research report's idea #1 without owning recovery.
+- `keypaste env set --no-history`: overwrite a value without keeping the previous one as KDBX
+  history, for rotating a credential that leaked. Diverges from KeePassXC's own editor, so it
+  has to be opt-in and loud (D-0014).
 - Vault health report: reused passwords, stale entries, weak values, secrets-in-env hygiene score.
 - Team approval quorum ("2 of 3 must approve production credentials") — great enterprise-ish story, Stage 6+.
 - Windows Hello / Touch ID unlock.

@@ -63,6 +63,9 @@ internal static class CliApp
             case "rm":
                 return RemoveCommand.Execute(args, context);
 
+            case "env":
+                return EnvCommand.Execute(args, context);
+
             case "hello":
                 context.Stdout.WriteLine(CoreInfo.Hello());
                 return ExitSuccess;
@@ -95,6 +98,7 @@ internal static class CliApp
         writer.WriteLine("  get <entry>         copy a password to the clipboard, or --show it");
         writer.WriteLine("  ls                  list groups and entries");
         writer.WriteLine("  rm <entry>          remove an entry");
+        writer.WriteLine("  env <ls|set|rm>     manage a project's environment variables");
         writer.WriteLine("  version             print the core version");
         writer.WriteLine();
         writer.WriteLine("the vault:");

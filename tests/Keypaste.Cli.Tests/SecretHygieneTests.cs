@@ -24,6 +24,9 @@ public sealed class SecretHygieneTests
     [InlineData("ls", "--flat")]
     [InlineData("get", "secrets/target")]
     [InlineData("rm", "secrets/target", "--yes")]
+    [InlineData("env", "ls")]
+    [InlineData("env", "ls", "hygiene")]
+    [InlineData("env", "rm", "hygiene", "API_KEY", "--yes")]
     public void NoVerb_LeaksAFieldValue_ToStdoutOrStderr(params string[] verb)
     {
         using var harness = new CliHarness();
@@ -38,6 +41,36 @@ public sealed class SecretHygieneTests
             Assert.DoesNotContain(sentinel, harness.Out, StringComparison.Ordinal);
             Assert.DoesNotContain(sentinel, harness.Err, StringComparison.Ordinal);
         }
+    }
+
+    /// <summary>
+    /// <c>env set</c> is swept separately because it is the one verb that is handed a value
+    /// rather than reading one, and both of its input forms have to stay silent about it. The
+    /// <c>KEY=value</c> form is the likelier accident: the value is right there in the arguments,
+    /// which makes echoing it back in a confirmation message feel harmless.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void EnvSet_NeverEchoesTheValue_FromEitherInputForm(bool inlineValue)
+    {
+        using var harness = new CliHarness();
+        Seed(harness);
+
+        harness.Prompt.Enqueue(Master);
+        if (!inlineValue)
+        {
+            harness.Prompt.Enqueue(SentinelPassword);
+        }
+
+        var exit = harness.Run(
+            "env", "set", "hygiene",
+            inlineValue ? "FRESH_KEY=" + SentinelPassword : "FRESH_KEY",
+            "--vault", harness.VaultPath);
+
+        Assert.Equal(CliApp.ExitSuccess, exit);
+        Assert.DoesNotContain(SentinelPassword, harness.Out, StringComparison.Ordinal);
+        Assert.DoesNotContain(SentinelPassword, harness.Err, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -105,6 +138,11 @@ public sealed class SecretHygieneTests
             "--username", SentinelUsername,
             "--url", SentinelUrl,
             "--notes", SentinelNotes);
+
+        // An env variable whose value is the same sentinel, so `env ls` and `env rm` are swept
+        // against a real secret rather than an empty project.
+        harness.Prompt.Enqueue(Master, SentinelPassword);
+        harness.Run("env", "set", "hygiene", "API_KEY", "--vault", harness.VaultPath);
 
         harness.Stdout.GetStringBuilder().Clear();
         harness.Stderr.GetStringBuilder().Clear();

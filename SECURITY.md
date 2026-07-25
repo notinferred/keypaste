@@ -82,6 +82,22 @@ clipboard history (Win+V) and cloud clipboard sync retain a copy that clearing d
 On Windows, prefer `keypaste get --show` piped where you need it, or disable clipboard history.
 This is tracked as an open decision (O-0008 in `DECISIONS.md`).
 
+**A value passed on the command line is not private.** `keypaste env set project KEY=value` takes
+the value from the arguments, where it is readable by any process on the machine — through
+`/proc/<pid>/cmdline` on Linux, through WMI or Sysmon on Windows — for as long as the command
+runs, and where your shell will also write it to its history file. This form exists because
+scripts need it. When it matters, use `keypaste env set project KEY` instead and let keypaste read
+the value from a prompt or a pipe, which is how every other secret enters the vault. Tracked as an
+open decision (O-0009 in `DECISIONS.md`).
+
+**Overwriting a value does not erase the old one.** `keypaste env set` on a variable that already
+exists keeps the previous value as a KDBX history item, which is what KeePassXC's own editor does
+and where KeePassXC will show it. It stays in the file, encrypted, until KeePass's ten-item
+history limit evicts it. If you are rotating a credential *because it leaked*, that is probably
+not what you want: `keypaste env rm` removes the entry and its history together, and re-adding it
+afterwards starts clean. keypaste itself has no command that reads history, so it is visible in
+KeePassXC and nowhere in keypaste (D-0014).
+
 **Local attackers are out of scope.** Anything running as your user can read your memory, watch
 your keystrokes, and read your clipboard. keypaste protects the vault file at rest and limits what
 an AI agent can reach; it cannot defend a compromised account against itself.

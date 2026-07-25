@@ -102,6 +102,41 @@ internal sealed class KeePassInterop : IDisposable
         group.AddEntry(pwEntry, true);
     }
 
+    /// <summary>Overwrites the fields of an existing entry, matched by its path.</summary>
+    /// <returns>The number of entries updated: 0 if nothing matched, otherwise 1.</returns>
+    /// <remarks>
+    /// The path identifies the entry, so this cannot rename one; it changes field values in place.
+    /// </remarks>
+    internal int UpdateEntry(VaultEntry entry)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (FindEntry(entry.Path) is not { } found)
+        {
+            return 0;
+        }
+
+        PwEntry pwEntry = found.Entry;
+
+        // The existing PwEntry is mutated rather than removed and re-added. Re-adding would mint a
+        // new UUID and discard the entry's timestamps, attachments, and any custom string fields
+        // added in KeePassXC — data keypaste does not model and therefore must not destroy
+        // (CORE.md law 4.6).
+        //
+        // CreateBackup snapshots the pre-change state and trims the history list itself, so a
+        // separate MaintainBackups call would be dead code (third_party/KeePassLib/PwEntry.cs:584).
+        pwEntry.CreateBackup(_database);
+
+        SetField(pwEntry, PwDefs.TitleField, entry.Title);
+        SetField(pwEntry, PwDefs.UserNameField, entry.Username);
+        SetField(pwEntry, PwDefs.PasswordField, entry.Password);
+        SetField(pwEntry, PwDefs.UrlField, entry.Url);
+        SetField(pwEntry, PwDefs.NotesField, entry.Notes);
+
+        pwEntry.Touch(true);
+        return 1;
+    }
+
     /// <summary>Returns every entry in the vault, depth-first from the root group.</summary>
     internal IReadOnlyList<VaultEntry> ReadEntries()
     {
@@ -133,31 +168,18 @@ internal sealed class KeePassInterop : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        int lastSlash = entryPath.LastIndexOf('/');
-        string groupPath = lastSlash < 0 ? string.Empty : entryPath[..lastSlash];
-        string title = lastSlash < 0 ? entryPath : entryPath[(lastSlash + 1)..];
-
-        PwGroup? group = ResolveGroup(groupPath, createMissing: false);
-        if (group is null)
+        if (FindEntry(entryPath) is not { } found)
         {
             return 0;
         }
 
-        foreach (PwEntry candidate in group.Entries)
-        {
-            if (!string.Equals(ReadField(candidate, PwDefs.TitleField), title, StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            // Removed outright rather than moved to the recycle bin: a vault the user asked to
-            // delete from should not keep a readable copy of the secret (CORE.md law 3.4).
-            group.Entries.Remove(candidate);
-            _database.DeletedObjects.Add(new PwDeletedObject(candidate.Uuid, DateTime.UtcNow));
-            return 1;
-        }
-
-        return 0;
+        // Removed outright rather than moved to the recycle bin: a vault the user asked to
+        // delete from should not keep a readable copy of the secret (CORE.md law 3.4). This
+        // takes the entry's history with it, which is the only way a value keypaste previously
+        // wrote can be erased — see DECISIONS.md D-0014.
+        found.Group.Entries.Remove(found.Entry);
+        _database.DeletedObjects.Add(new PwDeletedObject(found.Entry.Uuid, DateTime.UtcNow));
+        return 1;
     }
 
     /// <summary>
@@ -166,6 +188,22 @@ internal sealed class KeePassInterop : IDisposable
     /// because an in-place save also leaves no debris behind.
     /// </summary>
     internal bool UsesFileTransactions => _database.UseFileTransactions;
+
+    /// <summary>
+    /// The number of history items an entry carries, or -1 if no entry has that path.
+    /// </summary>
+    /// <remarks>
+    /// Exists so that "overwriting a value keeps the previous one" can be asserted rather than
+    /// assumed. keypaste has no feature that reads history, so without this seam a change that
+    /// silently stopped retaining it would pass every test while the documentation kept promising
+    /// it (DECISIONS.md D-0014).
+    /// </remarks>
+    internal int CountHistoryItems(string entryPath)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        return FindEntry(entryPath) is { } found ? (int)found.Entry.History.UCount : -1;
+    }
 
     /// <summary>Writes the vault to its backing file.</summary>
     internal void Save()
@@ -283,6 +321,34 @@ internal sealed class KeePassInterop : IDisposable
     private static string ReadField(PwEntry entry, string field)
     {
         return entry.Strings.ReadSafe(field);
+    }
+
+    /// <summary>Locates an entry and its owning group, splitting the path on its last slash.</summary>
+    /// <remarks>
+    /// The first title match wins. KDBX permits sibling entries with the same title, so callers
+    /// that care about ambiguity have to detect it themselves from <see cref="ReadEntries"/>.
+    /// </remarks>
+    private (PwGroup Group, PwEntry Entry)? FindEntry(string entryPath)
+    {
+        int lastSlash = entryPath.LastIndexOf('/');
+        string groupPath = lastSlash < 0 ? string.Empty : entryPath[..lastSlash];
+        string title = lastSlash < 0 ? entryPath : entryPath[(lastSlash + 1)..];
+
+        PwGroup? group = ResolveGroup(groupPath, createMissing: false);
+        if (group is null)
+        {
+            return null;
+        }
+
+        foreach (PwEntry candidate in group.Entries)
+        {
+            if (string.Equals(ReadField(candidate, PwDefs.TitleField), title, StringComparison.Ordinal))
+            {
+                return (group, candidate);
+            }
+        }
+
+        return null;
     }
 
     private PwGroup? ResolveGroup(string groupPath, bool createMissing)

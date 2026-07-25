@@ -41,6 +41,12 @@ public sealed class Vault : IDisposable
     internal bool UsesFileTransactions => _interop.UsesFileTransactions;
 
     /// <summary>
+    /// The number of history items the entry at <paramref name="entryPath"/> carries, or -1 if
+    /// there is no such entry. A test seam; keypaste itself has no feature that reads history.
+    /// </summary>
+    internal int CountHistoryItems(string entryPath) => _interop.CountHistoryItems(entryPath);
+
+    /// <summary>
     /// Creates a new, empty vault protected by <paramref name="masterPassword"/>.
     /// </summary>
     /// <remarks>
@@ -84,6 +90,39 @@ public sealed class Vault : IDisposable
         ArgumentNullException.ThrowIfNull(entry);
 
         _interop.AddEntry(entry);
+    }
+
+    /// <summary>
+    /// Overwrites the fields of the entry at <paramref name="entry"/>'s
+    /// <see cref="VaultEntry.Path"/>. Call <see cref="Save"/> to persist it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The path identifies the entry, so this cannot rename one — an entry with a new title is a
+    /// different entry. Everything the entry carries that <see cref="VaultEntry"/> does not model
+    /// (its UUID, creation time, attachments, and any custom string fields added in KeePassXC) is
+    /// preserved: the underlying entry is edited in place, never replaced.
+    /// </para>
+    /// <para>
+    /// The previous field values are retained as a KeePass history item, which KeePassXC shows in
+    /// the entry's History tab. That is the format's native behaviour, and it means overwriting a
+    /// secret does not erase the old one — see DECISIONS.md D-0014. Only
+    /// <see cref="RemoveEntry"/> removes a value outright.
+    /// </para>
+    /// </remarks>
+    /// <param name="entry">The replacement field values, located by their path.</param>
+    /// <returns>
+    /// <see langword="true"/> if an entry was updated, <see langword="false"/> if no entry has
+    /// that path.
+    /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="entry"/> is null.</exception>
+    /// <exception cref="ObjectDisposedException">The vault has been disposed.</exception>
+    public bool UpdateEntry(VaultEntry entry)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(entry);
+
+        return _interop.UpdateEntry(entry) > 0;
     }
 
     /// <summary>
