@@ -2,10 +2,12 @@
 
 > *"Stop pasting secrets into chats. keypaste is a local-first, KDBX-compatible vault that stores your passwords AND env variables, injects them into your projects, and lets AI agents like Claude request exactly one credential — with your approval, scoped access, and a full audit trail — without ever seeing your vault."*
 
-**Status: Stage 0.3 — the CLI works.** Create a vault, add entries, list them, copy a password to
-the clipboard, remove entries. Verified in CI against a real KeePassXC on Linux, macOS and
-Windows. Env-variable injection and the MCP bridge are still to come. Follow [`PLAN.md`](PLAN.md)
-for what lands next; [`CORE.md`](CORE.md) is the constitution and does not change.
+**Status: Stage 1.1 — the CLI works, and it stores env variables.** Create a vault, add entries,
+list them, copy a password to the clipboard, remove entries, and keep a project's environment
+variables in the same file. Verified in CI against a real KeePassXC on Linux, macOS and Windows,
+in both directions. Injecting those variables into a child process (`keypaste run`) and the MCP
+bridge are still to come. Follow [`PLAN.md`](PLAN.md) for what lands next; [`CORE.md`](CORE.md) is
+the constitution and does not change.
 
 ## Using it
 
@@ -33,15 +35,37 @@ to pipe.
 | 4 | wrong master password |
 
 When stdin is not a terminal each prompt consumes exactly one line, in a fixed order:
-`init` takes the password twice, `add` takes the master password then the entry password, and
+`init` takes the password twice, `add` and `env set` take the master password then the value, and
 everything else takes the master password. That is what makes the CLI scriptable.
+
+## Environment variables
+
+A project's environment variables live in the group `env/<project>`, one ordinary entry per
+variable — title is the name, password is the value. There is nothing keypaste-specific in the
+file, so KeePassXC can read, edit, add and delete them with no knowledge of keypaste at all. CI
+proves that in both directions on all three operating systems; see
+[`DECISIONS.md`](DECISIONS.md) D-0014 for why this shape was chosen over custom string fields.
+
+```sh
+keypaste env set billing DATABASE_URL          # prompts for the value, hidden
+keypaste env set billing STRIPE_KEY=sk_test_x  # or inline, for scripts — see the caveat below
+keypaste env ls                                # projects
+keypaste env ls billing                        # variable names, never values
+keypaste get env/billing/DATABASE_URL --show   # read one value
+keypaste env rm billing STRIPE_KEY --yes
+```
+
+Two things worth knowing before you rely on it, both covered in [`SECURITY.md`](SECURITY.md):
+the `KEY=value` form leaves the value in your shell history and in the process list, so keypaste
+warns when you use it; and setting a variable that already exists keeps the old value in the
+entry's KeePassXC history rather than erasing it.
 
 ## Packages
 
 | Roadmap name | Project | Ships as |
 | --- | --- | --- |
 | `keypaste-core` | `src/Keypaste.Core` | library — all vault logic lives here |
-| `keypaste-cli` | `src/Keypaste.Cli` | `keypaste` (verbs land in Stage 0.3) |
+| `keypaste-cli` | `src/Keypaste.Cli` | `keypaste` |
 | `keypaste-mcp` | `src/Keypaste.Mcp` | `keypaste-mcp` (placeholder until Stage 2) |
 
 ## Vault format
@@ -51,9 +75,11 @@ never invents a format and writes no cryptography of its own (CORE.md §2, §3.6
 is [KeePassLib](third_party/KeePassLib/UPSTREAM.md), vendored from KeePass 2.61 and reached through
 a single file, `src/Keypaste.Core/Internal/KeePassInterop.cs`.
 
-Any vault keypaste writes must open in KeePassXC. That is not a hope — `scripts/verify-keepassxc-compat.sh`
-proves it on every push against a real `keepassxc-cli`, on all three operating systems, and it is
-permanent (CORE.md §4.6, [`DECISIONS.md`](DECISIONS.md) D-0008).
+Any vault keypaste writes must open in KeePassXC, and anything KeePassXC writes back must be
+readable by keypaste. That is not a hope — `scripts/verify-keepassxc-compat.sh` and
+`scripts/verify-keepassxc-writeback.sh` prove both directions on every push against a real
+`keepassxc-cli`, on all three operating systems, and the gate is permanent (CORE.md §4.6,
+[`DECISIONS.md`](DECISIONS.md) D-0008 and D-0014).
 
 Directories and namespaces use .NET's PascalCase convention; the kebab-case names above are the
 roadmap's and survive where they are user-visible, in the shipped binary names.
@@ -88,10 +114,12 @@ pointing at it):
 export KP_COMPAT_PASSWORD=ci-master-pw
 scripts/make-compat-fixture.sh ./artifacts/compat/gen.kdbx
 scripts/verify-keepassxc-compat.sh ./artifacts/compat/gen.kdbx
+scripts/verify-keepassxc-writeback.sh ./artifacts/compat/writeback.kdbx
 ```
 
 The fixture is built by the shipped `keypaste` binary, so the gate covers the CLI as well as the
-vault writer.
+vault writer. The write-back script builds its own vault and drives both tools in turn: keypaste
+modifies an entry, then KeePassXC edits and adds env variables that keypaste has to read back.
 
 ## Security
 

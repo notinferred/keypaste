@@ -199,3 +199,14 @@ jobs:
       - name: Verify it opens in real KeePassXC
         shell: bash
         run: scripts/verify-keepassxc-compat.sh "${{ env.KDBX }}"
+
+      # The other direction, and the other moment in a file's life: keypaste modifying an entry
+      # (which writes KDBX history for the first time), and KeePassXC editing and adding env
+      # variables that keypaste must then read. This is the claim the env convention was chosen
+      # for, so it is gated, not assumed (DECISIONS.md D-0014).
+      #
+      # Builds its own vault: the fixture above is asserted against an exact `ls -R -f` tree, and
+      # mutating it here would couple the two gates.
+      - name: Verify the write-back round trip through real KeePassXC
+        shell: bash
+        run: bash scripts/verify-keepassxc-writeback.sh artifacts/compat/writeback.kdbx

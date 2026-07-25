@@ -25,8 +25,8 @@
 
 ## Stage 1 — Env variables & injection (Week 3–4)
 **Goal: keypaste replaces .env files.**
-- [ ] Entry convention for env sets (KDBX group = project, custom fields = KEY→value) — stays 100% KeePassXC-readable
-- [ ] `keypaste env pull <project>` (import existing .env), `keypaste env ls`
+- [x] Entry convention for env sets (KDBX group `env/<project>`, one entry per variable: title=KEY, password=value) — stays 100% KeePassXC-*editable*, gated in CI in both directions (D-0014)
+- [ ] `keypaste env pull <project>` (import existing .env) — `env ls` / `env set` / `env rm` shipped in 1.1
 - [ ] `keypaste run <project> -- <cmd>`: inject into child process env, nothing written to disk
 - [ ] `keypaste export --dotenv` (with loud warning) for escape-hatch compatibility
 - [ ] Docs: "Replace your .env in 5 minutes" guide

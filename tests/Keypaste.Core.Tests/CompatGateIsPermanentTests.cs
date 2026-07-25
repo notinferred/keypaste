@@ -30,6 +30,10 @@ public sealed class CompatGateIsPermanentTests
         Assert.Contains("scripts/make-compat-fixture.sh", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("Keypaste.CompatFixture", workflow, StringComparison.Ordinal);
 
+        // The write-back direction is a separate script and therefore a separate way to lose the
+        // coverage silently. Both gates enforce the same law and get the same tripwire.
+        Assert.Contains("scripts/verify-keepassxc-writeback.sh", workflow, StringComparison.Ordinal);
+
         foreach (var os in new[] { "ubuntu-latest", "windows-latest", "macos-latest" })
         {
             Assert.Contains(os, workflow, StringComparison.Ordinal);
@@ -59,6 +63,30 @@ public sealed class CompatGateIsPermanentTests
 
         // Absent tooling must fail the build, never skip the gate.
         Assert.Contains("must never be skipped or soft-passed", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The write-back gate proves the two claims the env convention was chosen for: that
+    /// KeePassXC can edit a value keypaste stored, and that keypaste reads what KeePassXC wrote
+    /// (DECISIONS.md D-0014). Losing it would leave the convention resting on an assertion nobody
+    /// makes any more.
+    /// </summary>
+    [Fact]
+    public void WriteBackScript_ExistsAndKeepsItsNegativeControl()
+    {
+        var script = Path.Combine(RepoRoot(), "scripts", "verify-keepassxc-writeback.sh");
+        Assert.True(File.Exists(script), $"The write-back gate script is missing: {script}");
+
+        var text = File.ReadAllText(script);
+
+        Assert.Contains("NEGATIVE CONTROL", text, StringComparison.Ordinal);
+        Assert.Contains("must never be skipped or soft-passed", text, StringComparison.Ordinal);
+
+        // The three directions it exists to cover. Named individually because dropping any one of
+        // them still leaves a script that passes and a gate that has stopped gating.
+        Assert.Contains("keepassxc-cli edit", text, StringComparison.Ordinal);
+        Assert.Contains("env ls", text, StringComparison.Ordinal);
+        Assert.Contains("db-info", text, StringComparison.Ordinal);
     }
 
     /// <summary>
