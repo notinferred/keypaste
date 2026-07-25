@@ -171,8 +171,12 @@ jobs:
             exit 1
           fi
 
-          # bsdtar (C:\Windows\System32\tar.exe) reads zip natively; Git Bash ships no unzip.
-          tar -xf "$zip"
+          # Git Bash ships no unzip, and its own /usr/bin/tar is GNU tar, which cannot read a
+          # zip and wins the PATH lookup under `shell: bash`. Windows' bundled bsdtar reads
+          # zip natively, so call it by absolute path rather than trusting resolution order.
+          bsdtar="/c/Windows/System32/tar.exe"
+          [ -x "$bsdtar" ] || { echo "::error::$bsdtar not found"; exit 1; }
+          "$bsdtar" -xf "$zip"
 
           # $(pwd) rather than $GITHUB_WORKSPACE: Git Bash reports a POSIX path (/d/a/...),
           # whereas GITHUB_WORKSPACE is a backslash path that bash would mangle when quoted.

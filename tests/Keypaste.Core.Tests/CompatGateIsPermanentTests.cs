@@ -54,21 +54,33 @@ public sealed class CompatGateIsPermanentTests
     }
 
     /// <summary>
-    /// Walks up from this source file to the directory holding the solution.
+    /// Walks up from the test binary's location to the directory holding the solution.
     /// </summary>
     /// <remarks>
-    /// <see cref="CallerFilePathAttribute"/> rather than the working directory: the test
-    /// platform runs the test executable from <c>artifacts/bin/</c>, which is nowhere near
-    /// the repository root. This bakes in the build machine's path, which is fine for a
-    /// repository-integrity test and meaningless anywhere the sources do not exist.
+    /// Deliberately <em>not</em> <see cref="CallerFilePathAttribute"/>. The root props set
+    /// <c>ContinuousIntegrationBuild</c> under GitHub Actions, which turns on deterministic
+    /// source paths and rewrites every compile-time path to <c>/_/…</c> — so on CI, and only
+    /// on CI, a <c>CallerFilePath</c> points at a directory that has never existed. The
+    /// output directory is a runtime fact and survives that.
+    /// <para>
+    /// <c>UseArtifactsOutput</c> puts the binary at <c>artifacts/bin/&lt;project&gt;/&lt;config&gt;/</c>
+    /// inside the repository, so walking up finds <c>keypaste.slnx</c>.
+    /// </para>
     /// </remarks>
-    private static string RepoRoot([CallerFilePath] string thisFile = "")
+    private static string RepoRoot()
     {
-        var directory = Path.GetDirectoryName(thisFile)!;
+        var directory = AppContext.BaseDirectory;
         while (!File.Exists(Path.Combine(directory, "keypaste.slnx")))
         {
-            directory = Path.GetDirectoryName(directory)
-                ?? throw new InvalidOperationException("Could not locate the repository root.");
+            var parent = Path.GetDirectoryName(directory.TrimEnd(Path.DirectorySeparatorChar));
+            if (string.IsNullOrEmpty(parent))
+            {
+                throw new InvalidOperationException(
+                    $"Could not locate keypaste.slnx above '{AppContext.BaseDirectory}'. " +
+                    "This test asserts on repository files and must run from inside a checkout.");
+            }
+
+            directory = parent;
         }
 
         return directory;
