@@ -1,0 +1,14 @@
+* text=auto eol=lf
+
+*.sln    text eol=crlf
+*.cmd    text eol=crlf
+*.bat    text eol=crlf
+*.ps1    text eol=crlf
+*.sh     text eol=lf
+
+*.kdbx   binary
+*.png    binary
+*.gif    binary
+*.ico    binary
+
+CORE.md  linguist-documentation

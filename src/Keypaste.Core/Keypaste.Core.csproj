@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Keypaste.Core</RootNamespace>
+    <AssemblyName>Keypaste.Core</AssemblyName>
+    <Description>keypaste core library. All vault logic lives here; CLI, MCP and GUI are thin clients over it.</Description>
+  </PropertyGroup>
+
+  <!-- No PackageReference. Deliberate: see Directory.Packages.props. -->
+
+</Project>

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Keypaste.Cli</RootNamespace>
+    <AssemblyName>keypaste</AssemblyName>
+    <!-- PublishAot flips on in the Stage 3 release pipeline, where CI can install the
+         native toolchain. The AOT analyzers are already on via Directory.Build.props. -->
+    <PublishAot>false</PublishAot>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Keypaste.Core/Keypaste.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Keypaste.Cli.Tests" />
+  </ItemGroup>
+
+</Project>

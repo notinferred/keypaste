@@ -1,0 +1,82 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{json,yml,yaml,props,targets,csproj,slnx,xml,config}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.cs]
+
+# ---------------------------------------------------------------------------
+# Style is a build gate, not a suggestion (EnforceCodeStyleInBuild=true)
+# ---------------------------------------------------------------------------
+dotnet_diagnostic.IDE0055.severity = error
+dotnet_diagnostic.IDE0011.severity = error
+dotnet_diagnostic.IDE0005.severity = error
+
+csharp_prefer_braces = true:error
+csharp_style_namespace_declarations = file_scoped:error
+csharp_using_directive_placement = outside_namespace:error
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_expression_bodied_methods = when_on_single_line:suggestion
+csharp_new_line_before_open_brace = all
+dotnet_style_qualification_for_field = false:warning
+dotnet_style_qualification_for_property = false:warning
+dotnet_style_qualification_for_method = false:warning
+dotnet_style_readonly_field = true:warning
+dotnet_style_require_accessibility_modifiers = for_non_interface_members:error
+
+# ---------------------------------------------------------------------------
+# Security posture. These are the rules that pay off in 0.2 when real crypto
+# and real secret handling arrive — CORE.md laws 3.4, 3.6, 3.7.
+# ---------------------------------------------------------------------------
+dotnet_analyzer_diagnostic.category-Security.severity = error
+dotnet_analyzer_diagnostic.category-Reliability.severity = warning
+
+dotnet_diagnostic.CA2000.severity = error
+dotnet_diagnostic.CA1416.severity = error
+dotnet_diagnostic.CA1307.severity = error
+dotnet_diagnostic.CA1310.severity = error
+dotnet_diagnostic.CA5350.severity = error
+dotnet_diagnostic.CA5351.severity = error
+dotnet_diagnostic.CA5379.severity = error
+dotnet_diagnostic.CA5401.severity = error
+dotnet_diagnostic.CA5404.severity = error
+
+# ---------------------------------------------------------------------------
+# Deliberate suppressions — each one justified, none of them blanket
+# ---------------------------------------------------------------------------
+
+# The CLI is English-only by design; no localisation is planned.
+dotnet_diagnostic.CA1303.severity = none
+
+# Console applications have no synchronisation context to capture.
+dotnet_diagnostic.CA2007.severity = none
+
+# ---------------------------------------------------------------------------
+# Naming
+# ---------------------------------------------------------------------------
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+
+dotnet_naming_style.underscore_camel_case.capitalization = camel_case
+dotnet_naming_style.underscore_camel_case.required_prefix = _
+
+dotnet_naming_rule.private_fields_are_underscore_camel_case.symbols = private_fields
+dotnet_naming_rule.private_fields_are_underscore_camel_case.style = underscore_camel_case
+dotnet_naming_rule.private_fields_are_underscore_camel_case.severity = error
+
+[tests/**/*.cs]
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA1861.severity = none

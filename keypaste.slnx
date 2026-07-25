@@ -1,0 +1,22 @@
+<Solution>
+  <Folder Name="/meta/">
+    <File Path="CORE.md" />
+    <File Path="PLAN.md" />
+    <File Path="DECISIONS.md" />
+    <File Path="SECURITY.md" />
+    <File Path="README.md" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path=".editorconfig" />
+    <File Path=".github/workflows/ci.yml" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Keypaste.Core/Keypaste.Core.csproj" />
+    <Project Path="src/Keypaste.Cli/Keypaste.Cli.csproj" />
+    <Project Path="src/Keypaste.Mcp/Keypaste.Mcp.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Keypaste.Core.Tests/Keypaste.Core.Tests.csproj" />
+    <Project Path="tests/Keypaste.Cli.Tests/Keypaste.Cli.Tests.csproj" />
+  </Folder>
+</Solution>

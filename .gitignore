@@ -1,0 +1,29 @@
+# Build output (UseArtifactsOutput centralises this under artifacts/)
+artifacts/
+[Bb]in/
+[Oo]bj/
+TestResults/
+
+# Tooling
+.vs/
+.idea/
+*.user
+*.suo
+*.DotSettings.user
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Never commit these — keypaste is a secrets tool
+*.kdbx
+*.kdbx.lock
+*.key
+*.keyx
+.env
+.env.*
+!.env.example
+*.pem
+*.pfx
+secrets.json
+.keypaste/
