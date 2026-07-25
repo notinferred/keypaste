@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>keypaste — the safe bridge between your credentials and the AI era</title>
+<meta name="description" content="A local-first, KDBX-compatible vault that stores your passwords and env variables, injects them into your projects, and lets AI agents request exactly one credential — with your approval, scoped access, and a full audit trail.">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔑</text></svg>">
+<style>
+  :root {
+    --bg: #fbfbfa;
+    --fg: #1a1a19;
+    --muted: #6b6b66;
+    --rule: #e4e4e0;
+    --accent: #3d5a80;
+    --card: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141414;
+      --fg: #ececea;
+      --muted: #9a9a94;
+      --rule: #2a2a28;
+      --accent: #8fb0d9;
+      --card: #1b1b1a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 17px/1.65 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Inter, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 42rem; margin: 0 auto; padding: 5rem 1.5rem 4rem; }
+  h1 {
+    font-size: 1.5rem; font-weight: 600; letter-spacing: -0.02em;
+    margin: 0 0 2.5rem;
+  }
+  h1 span { color: var(--muted); font-weight: 400; }
+  .pitch {
+    font-size: 1.375rem; line-height: 1.45; letter-spacing: -0.015em;
+    margin: 0 0 1.5rem; text-wrap: balance;
+  }
+  .pitch strong { font-weight: 600; }
+  .sub { color: var(--muted); margin: 0 0 3rem; }
+  .status {
+    border: 1px solid var(--rule); background: var(--card);
+    border-radius: 10px; padding: 1rem 1.25rem; margin: 0 0 3rem;
+    font-size: 0.95rem; color: var(--muted);
+  }
+  .status b { color: var(--fg); font-weight: 600; }
+  ul { list-style: none; padding: 0; margin: 0 0 3rem; }
+  li { padding: 1rem 0; border-top: 1px solid var(--rule); }
+  li:last-child { border-bottom: 1px solid var(--rule); }
+  li b { display: block; font-weight: 600; margin-bottom: 0.15rem; }
+  li span { color: var(--muted); font-size: 0.95rem; }
+  .cta {
+    display: inline-block; padding: 0.7rem 1.15rem;
+    background: var(--accent); color: var(--bg);
+    border-radius: 8px; text-decoration: none; font-weight: 550;
+    font-size: 0.95rem;
+  }
+  .cta:hover { opacity: 0.9; }
+  footer {
+    margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid var(--rule);
+    color: var(--muted); font-size: 0.875rem;
+  }
+  footer p { margin: 0.4rem 0; }
+  a { color: var(--accent); }
+  @media (max-width: 480px) {
+    main { padding-top: 3rem; }
+    .pitch { font-size: 1.2rem; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>keypaste <span>— the safe bridge between your credentials and the AI era</span></h1>
+
+  <p class="pitch">
+    <strong>Stop pasting secrets into chats.</strong> keypaste is a local-first,
+    KDBX-compatible vault that stores your passwords and env variables, injects them into your
+    projects, and lets AI agents like Claude request exactly one credential — with your approval,
+    scoped access, and a full audit trail — without ever seeing your vault.
+  </p>
+
+  <p class="sub">For developers who are tired of choosing between <code>.env</code> files and trusting an agent with everything.</p>
+
+  <p class="status">
+    <b>Status: early.</b> The repository is public and the foundations are in place, but the vault
+    itself is still being built. Nothing here is ready to hold a real secret yet. Watch the repo if
+    you want to see it land — or read the constitution it's being built against.
+  </p>
+
+  <ul>
+    <li>
+      <b>Local-first, offline</b>
+      <span>Your vault is a file on your disk. No account, no cloud service holding your secrets, no network required. Sync it yourself with whatever you already use.</span>
+    </li>
+    <li>
+      <b>Standard KDBX, not a new format</b>
+      <span>Everything keypaste writes opens in KeePassXC and KeePass. If keypaste disappears tomorrow, your data doesn't.</span>
+    </li>
+    <li>
+      <b>Open source, AGPL</b>
+      <span>Auditable by anyone, forever. A tool that handles secrets shouldn't ask to be trusted on faith.</span>
+    </li>
+  </ul>
+
+  <a class="cta" href="https://github.com/ochoadan/keypaste">Follow along on GitHub →</a>
+
+  <footer>
+    <p>Security reports: <a href="mailto:security@keypaste.com">security@keypaste.com</a></p>
+    <p>This page sets no cookies and loads no third-party scripts.</p>
+  </footer>
+</main>
+</body>
+</html>

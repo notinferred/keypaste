@@ -5,6 +5,8 @@ artifacts/
 TestResults/
 
 # Tooling
+.wrangler/
+node_modules/
 .vs/
 .idea/
 *.user

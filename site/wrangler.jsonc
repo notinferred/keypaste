@@ -1,0 +1,15 @@
+{
+  "name": "keypaste-site",
+  "compatibility_date": "2026-07-25",
+  "assets": {
+    "directory": "./public",
+    "html_handling": "auto-trailing-slash"
+  },
+  "routes": [
+    { "pattern": "keypaste.com", "custom_domain": true },
+    { "pattern": "www.keypaste.com", "custom_domain": true }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}
