@@ -24,6 +24,9 @@
 - `keypaste env set --no-history`: overwrite a value without keeping the previous one as KDBX
   history, for rotating a credential that leaked. Diverges from KeePassXC's own editor, so it
   has to be opt-in and loud (D-0014).
+- Design direction for the GUI, the approval dialog and keypaste.com lives in [DESIGN.md](DESIGN.md)
+  and design.html - proposed only, and it needs the local-first vs hosted-sync question in CORE.md
+  section 2 answered before any of it is built.
 - Vault health report: reused passwords, stale entries, weak values, secrets-in-env hygiene score.
 - Team approval quorum ("2 of 3 must approve production credentials") — great enterprise-ish story, Stage 6+.
 - Windows Hello / Touch ID unlock.
