@@ -143,25 +143,11 @@ ones — the private repository was deleted and recreated rather than rewritten 
 content ever lands in a commit again, recreating the repository is the only reliable remedy; a
 force-push is not.
 
-## D-0007 — GitHub is the source of record; self-hosting was considered and dropped
-
-**Date:** 2026-07-25 · **Stage:** 0.1 · **Status:** accepted
-
-Moving the repository to self-hosted Gitea (`git.ochoa.pro`) was evaluated and rejected. Gitea hosts
-code perfectly well and would satisfy CORE.md §3.8 — the problem is CI. Gitea Actions runners are all
-self-hosted, and §4.4 requires macOS, Linux, and Windows while §4.6 pins the KeePassXC compatibility
-test into CI permanently. macOS needs Apple hardware, so self-hosting would have meant either buying
-a Mac, paying for a hosted one, or shipping a known compliance gap — to replace something the public
-repo provides for free.
-
-Keeping GitHub also preserves the launch-discovery surface the roadmap depends on. Revisit only if
-GitHub's terms or pricing change, or if Apple hardware appears for other reasons.
-
 ## O-0004 — Deferred CI hardening
 
 CodeQL, dependency-review, Dependabot, and SHA-pinned GitHub Actions are deliberately not in the
-Stage 0.1 workflow. Revisit them together when O-0003 is settled: action tags are mutable, so tag
-pinning without Dependabot ages badly, and the first three are free only on public repositories.
+Stage 0.1 workflow. Action tags are mutable, so tag pinning without Dependabot ages badly; all of
+these are free now that the repository is public, so revisit them together.
 
 ## O-0005 — `macos-latest` is arm64
 
