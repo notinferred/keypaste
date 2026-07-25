@@ -86,9 +86,10 @@ This is tracked as an open decision (O-0008 in `DECISIONS.md`).
 the value from the arguments, where it is readable by any process on the machine — through
 `/proc/<pid>/cmdline` on Linux, through WMI or Sysmon on Windows — for as long as the command
 runs, and where your shell will also write it to its history file. This form exists because
-scripts need it. When it matters, use `keypaste env set project KEY` instead and let keypaste read
-the value from a prompt or a pipe, which is how every other secret enters the vault. Tracked as an
-open decision (O-0009 in `DECISIONS.md`).
+scripts need it, and keypaste prints a one-line warning to stderr when you use it. When it
+matters, use `keypaste env set project KEY` instead and let keypaste read the value from a prompt
+or a pipe, which is how every other secret enters the vault. Whether that warning should be
+silenceable is tracked as an open decision (O-0009 in `DECISIONS.md`).
 
 **Overwriting a value does not erase the old one.** `keypaste env set` on a variable that already
 exists keeps the previous value as a KDBX history item, which is what KeePassXC's own editor does

@@ -470,8 +470,13 @@ process list and lands in shell history. This contradicts the comment on `AddCom
 refuses a `--password` flag for exactly that reason, and the contradiction is deliberate rather
 than overlooked: the piped form exists and is what the compatibility gate uses, but a one-liner is
 what people will reach for, and refusing it outright pushes them to clean up shell history by hand
-or to something worse. It is documented in SECURITY.md instead of warned about on every run, and
-tracked as **O-0009**.
+or to something worse.
+
+So it is allowed and it says so, once, on the line where it happens - one sentence on stderr,
+naming no value, only on the inline form. Warning on the prompted form as well would be the fast
+way to teach people that keypaste's warnings are noise. This was first shipped silent and changed
+before the branch merged; the residual question of whether a script should be able to silence it,
+the way `rm --yes` silences a confirmation, is **O-0009**.
 
 **One primitive was added to the core for this and is not env-shaped:** `Vault.UpdateEntry`. The
 vault had no update path at all - only add and remove - and the GUI's entry editor will need the
@@ -582,11 +587,15 @@ Two loose ends from D-0014, both of which should be settled before strangers dep
 answers.
 
 **`env set p KEY=value` puts a secret in `argv`.** It is world-readable through `/proc` on Linux,
-visible to WMI and Sysmon on Windows, and written to the shell's history file. keypaste ships this
-deliberately, because the alternative is people moving secrets around some other way that is no
-safer. The open question is whether it stays silent: a one-line stderr note costs nothing but
-trains people to ignore warnings, and a flag that silences it (the shape `rm --yes` already uses)
-costs a flag. Decide before Stage 3, when the audience stops being one person.
+visible to WMI and Sysmon on Windows, and written to the shell's history file. keypaste allows it
+deliberately and warns once on stderr when it happens (D-0014).
+
+What is still open is the escape hatch. A CI job that uses the inline form on purpose emits that
+line on every run, and a warning nobody can silence is a warning people learn to filter. The
+obvious answer is a flag in the shape `rm --yes` already uses, which trades one flag for a warning
+that stays meaningful. It is not shipped yet because one person running this does not need it, and
+the wrong version of it - a flag that suppresses the message without changing the exposure - is
+worse than nothing. Decide before Stage 3, when the audience stops being one person.
 
 **Two variables differing only in case are one variable on Windows.** Writing the second is
 refused today. Reading is not: a vault that already contains `PATH` and `Path` lists both, and

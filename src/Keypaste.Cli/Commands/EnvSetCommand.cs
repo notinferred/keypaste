@@ -8,8 +8,8 @@ namespace Keypaste.Cli.Commands;
 /// With a bare <c>KEY</c> the value is read the way every other secret is — hidden, or one line of
 /// stdin when piped, after the master password. The <c>KEY=value</c> form is accepted for
 /// scripting; it puts the value in <c>argv</c>, where it is visible in the process list and in
-/// shell history, and that exposure is recorded in SECURITY.md and DECISIONS.md D-0014 rather than
-/// warned about on every run.
+/// shell history, and it says so once on stderr. The warning is one line and names no value: it
+/// exists to be read the first time someone types this, not to be scrolled past.
 /// </para>
 /// <para>
 /// The value is never echoed back, on either form.
@@ -68,6 +68,10 @@ internal static class EnvSetCommand
             if (inlineValue is not null)
             {
                 value = inlineValue;
+
+                // Said once, where it happened, without the value in it.
+                context.Stderr.WriteLine(
+                    "warning: the value came from the command line, where your shell records it");
             }
             else
             {

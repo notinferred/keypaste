@@ -72,6 +72,31 @@ public sealed class EnvVerbTests
         Assert.Equal("inline-value", vault.Find("env/billing/TOKEN")?.Password, StringComparer.Ordinal);
     }
 
+    /// <summary>
+    /// The inline form leaks the value into shell history and the process list, and says so — but
+    /// only when it actually happened. Warning on the prompted form too would train people to
+    /// ignore the line that matters.
+    /// </summary>
+    [Fact]
+    public void Set_WarnsAboutTheCommandLine_OnlyForTheInlineForm()
+    {
+        using var harness = new CliHarness();
+        SeedVault(harness);
+
+        harness.Prompt.Enqueue(Master);
+        harness.Run("env", "set", "billing", "INLINE=v", "--vault", harness.VaultPath);
+        Assert.Contains("command line", harness.Err, StringComparison.Ordinal);
+
+        // The warning must not carry the thing it is warning about.
+        Assert.DoesNotContain("=v", harness.Err, StringComparison.Ordinal);
+        Assert.Empty(harness.Out);
+
+        harness.Stderr.GetStringBuilder().Clear();
+        harness.Prompt.Enqueue(Master, "prompted-value");
+        harness.Run("env", "set", "billing", "PROMPTED", "--vault", harness.VaultPath);
+        Assert.DoesNotContain("command line", harness.Err, StringComparison.Ordinal);
+    }
+
     /// <summary>A connection string is mostly equals signs; only the first one separates.</summary>
     [Fact]
     public void Set_WithAnInlineValue_SplitsOnTheFirstEqualsOnly()

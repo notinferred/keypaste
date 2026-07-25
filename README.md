@@ -56,9 +56,9 @@ keypaste env rm billing STRIPE_KEY --yes
 ```
 
 Two things worth knowing before you rely on it, both covered in [`SECURITY.md`](SECURITY.md):
-the `KEY=value` form leaves the value in your shell history and in the process list, and setting
-a variable that already exists keeps the old value in the entry's KeePassXC history rather than
-erasing it.
+the `KEY=value` form leaves the value in your shell history and in the process list, so keypaste
+warns when you use it; and setting a variable that already exists keeps the old value in the
+entry's KeePassXC history rather than erasing it.
 
 ## Packages
 
