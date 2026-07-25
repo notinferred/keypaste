@@ -2,10 +2,39 @@
 
 > *"Stop pasting secrets into chats. keypaste is a local-first, KDBX-compatible vault that stores your passwords AND env variables, injects them into your projects, and lets AI agents like Claude request exactly one credential — with your approval, scoped access, and a full audit trail — without ever seeing your vault."*
 
-**Status: Stage 0.2 — `keypaste-core` reads and writes real KDBX4 vaults.** Create a vault with a
-master password, add entries, save, reopen, read back. Verified in CI against a real KeePassXC on
-Linux, macOS and Windows. There is no CLI yet — that is Stage 0.3. Follow [`PLAN.md`](PLAN.md) for
-what lands next; [`CORE.md`](CORE.md) is the constitution and does not change.
+**Status: Stage 0.3 — the CLI works.** Create a vault, add entries, list them, copy a password to
+the clipboard, remove entries. Verified in CI against a real KeePassXC on Linux, macOS and
+Windows. Env-variable injection and the MCP bridge are still to come. Follow [`PLAN.md`](PLAN.md)
+for what lands next; [`CORE.md`](CORE.md) is the constitution and does not change.
+
+## Using it
+
+```sh
+keypaste init ~/vault.kdbx           # prompts for a master password, twice
+export KEYPASTE_VAULT=~/vault.kdbx   # or pass --vault to every command
+
+keypaste add github --username me --url https://github.com
+keypaste ls                          # tree of groups and entries, names only
+keypaste get github                  # copies to the clipboard, clears after 20s
+keypaste get github --show           # prints to stdout instead
+keypaste rm github --yes
+```
+
+Passwords are never echoed at a prompt, and `get` never writes a secret to stdout unless you ask
+for `--show`. Data goes to stdout, everything else to stderr, so `keypaste get x --show` is safe
+to pipe.
+
+| exit code | meaning |
+| --- | --- |
+| 0 | success |
+| 1 | usage error |
+| 2 | internal or environment error (including no usable clipboard) |
+| 3 | vault or entry not found |
+| 4 | wrong master password |
+
+When stdin is not a terminal each prompt consumes exactly one line, in a fixed order:
+`init` takes the password twice, `add` takes the master password then the entry password, and
+everything else takes the master password. That is what makes the CLI scriptable.
 
 ## Packages
 
@@ -57,9 +86,12 @@ pointing at it):
 
 ```sh
 export KP_COMPAT_PASSWORD=ci-master-pw
-dotnet run --project tools/Keypaste.CompatFixture -- ./artifacts/compat/gen.kdbx
+scripts/make-compat-fixture.sh ./artifacts/compat/gen.kdbx
 scripts/verify-keepassxc-compat.sh ./artifacts/compat/gen.kdbx
 ```
+
+The fixture is built by the shipped `keypaste` binary, so the gate covers the CLI as well as the
+vault writer.
 
 ## Security
 

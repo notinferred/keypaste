@@ -35,6 +35,12 @@ public sealed class Vault : IDisposable
     public string Path { get; }
 
     /// <summary>
+    /// Whether saves write through a temporary file rather than in place. Internal: this is a
+    /// regression seam for the defect where the flag was applied on create but not on open.
+    /// </summary>
+    internal bool UsesFileTransactions => _interop.UsesFileTransactions;
+
+    /// <summary>
     /// Creates a new, empty vault protected by <paramref name="masterPassword"/>.
     /// </summary>
     /// <remarks>
@@ -110,6 +116,40 @@ public sealed class Vault : IDisposable
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Returns every group path in the vault, excluding the root group, as slash-separated
+    /// paths such as <c>servers/production</c>.
+    /// </summary>
+    /// <remarks>
+    /// Groups holding no entries appear here and nowhere in <see cref="ReadEntries"/>, so a
+    /// listing that wants to match KeePassXC's view of the same file needs both.
+    /// </remarks>
+    /// <returns>The group paths.</returns>
+    public IReadOnlyList<string> ReadGroupPaths()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        return _interop.ReadGroupPaths();
+    }
+
+    /// <summary>
+    /// Removes the entry at <paramref name="entryPath"/>. Call <see cref="Save"/> to persist it.
+    /// </summary>
+    /// <param name="entryPath">The entry's <see cref="VaultEntry.Path"/>.</param>
+    /// <returns>
+    /// <see langword="true"/> if an entry was removed, <see langword="false"/> if nothing matched
+    /// that path. Removing nothing is not an error here; the caller decides whether it is one.
+    /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="entryPath"/> is null.</exception>
+    /// <exception cref="ObjectDisposedException">The vault has been disposed.</exception>
+    public bool RemoveEntry(string entryPath)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(entryPath);
+
+        return _interop.RemoveEntry(entryPath) > 0;
     }
 
     /// <summary>

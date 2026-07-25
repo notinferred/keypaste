@@ -24,16 +24,35 @@ public sealed class CliAppTests
         Assert.Empty(stderr.ToString());
     }
 
+    /// <summary>
+    /// Deliberate change from Stage 0.1, where no arguments greeted you. That was scaffolding;
+    /// a tool with verbs should say what they are. The <c>hello</c> verb itself survives above,
+    /// because it is the CORE.md law 4.3 wiring proof.
+    /// </summary>
     [Fact]
-    public void NoArguments_DefaultsToHello()
+    public void NoArguments_PrintsUsageToStderr_AndExitsNonZero()
     {
         using var stdout = new StringWriter(CultureInfo.InvariantCulture);
         using var stderr = new StringWriter(CultureInfo.InvariantCulture);
 
         var exitCode = CliApp.Run([], stdout, stderr);
 
+        Assert.Equal(CliApp.ExitUsageError, exitCode);
+        Assert.Empty(stdout.ToString());
+        Assert.Contains("usage: keypaste", stderr.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Help_GoesToStdout_AndExitsZero()
+    {
+        using var stdout = new StringWriter(CultureInfo.InvariantCulture);
+        using var stderr = new StringWriter(CultureInfo.InvariantCulture);
+
+        var exitCode = CliApp.Run(["--help"], stdout, stderr);
+
         Assert.Equal(CliApp.ExitSuccess, exitCode);
-        Assert.Equal(CoreInfo.Hello(), stdout.ToString().TrimEnd());
+        Assert.Contains("usage: keypaste", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Empty(stderr.ToString());
     }
 
     [Fact]
