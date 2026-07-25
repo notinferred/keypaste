@@ -143,19 +143,19 @@ ones — the private repository was deleted and recreated rather than rewritten 
 content ever lands in a commit again, recreating the repository is the only reliable remedy; a
 force-push is not.
 
-Still open from the original entry: source of record is moving to self-hosted Gitea at
-git.ochoa.pro, with GitHub retained for the cross-platform CI runners it uniquely provides
-(see O-0006).
+## D-0007 — GitHub is the source of record; self-hosting was considered and dropped
 
-## O-0006 — Source of record moving to self-hosted Gitea
+**Date:** 2026-07-25 · **Stage:** 0.1 · **Status:** accepted
 
-The intent is for `git.ochoa.pro` (Gitea) to become the repository of record. The blocker is CI:
-Gitea Actions runners are self-hosted, and CORE.md §4.4 requires macOS, Linux, and Windows, while
-§4.6 pins the KeePassXC compatibility test into CI permanently. macOS requires Apple hardware that
-does not currently exist in the setup.
+Moving the repository to self-hosted Gitea (`git.ochoa.pro`) was evaluated and rejected. Gitea hosts
+code perfectly well and would satisfy CORE.md §3.8 — the problem is CI. Gitea Actions runners are all
+self-hosted, and §4.4 requires macOS, Linux, and Windows while §4.6 pins the KeePassXC compatibility
+test into CI permanently. macOS needs Apple hardware, so self-hosting would have meant either buying
+a Mac, paying for a hosted one, or shipping a known compliance gap — to replace something the public
+repo provides for free.
 
-Likely resolution: Gitea as the development remote, push-mirrored to GitHub, where the public repo
-serves only as a cross-platform build executor. Revisit at Stage 0.2, when §4.6 forces the issue.
+Keeping GitHub also preserves the launch-discovery surface the roadmap depends on. Revisit only if
+GitHub's terms or pricing change, or if Apple hardware appears for other reasons.
 
 ## O-0004 — Deferred CI hardening
 
