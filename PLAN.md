@@ -6,7 +6,7 @@
 
 ## Decisions — LOCKED (July 2026, founder profile: .NET + Next.js, full-time, portfolio + business)
 - [x] **Language/stack: C#/.NET 8+ for everything server-side** — `keypaste-core` (class library), `keypaste-cli` (console app, published as self-contained/AOT single binaries for macOS/Linux/Windows), `keypaste-mcp` (official ModelContextProtocol C# SDK, stdio transport). Massive tailwind: **KeePass itself is a .NET app** — the KDBX ecosystem is native to this stack.
-- [ ] **KDBX library sub-decision (resolve in prompt 0.2):** `KeePassLib` (the official one, battle-tested, but GPL-2.0 — pulls the whole project toward GPL) vs an MIT-licensed C# KDBX4 implementation vs shelling to keepassxc-cli. Evaluate in DECISIONS.md; GPL is acceptable if KeePassLib wins on maturity (open-source trust strategy is unaffected).
+- [x] **KDBX library sub-decision (resolved in 0.2):** `KeePassLib`, vendored from the KeePass 2.61 netstandard port. No maintained, adopted KDBX4 NuGet package for .NET exists; the two clean-shaped ones had days of commit history. KeePass is GPL-2.0-**or-later**, not GPL-2.0-only, so it combines with AGPL-3.0 and the licence never forced the choice — maturity did. Full survey in DECISIONS.md D-0007.
 - [x] **License:** copyleft core (GPL/AGPL family, finalized alongside the KDBX lib choice for compatibility), MIT for any client SDK snippets. Protects against closed cloud clones.
 - [x] **GUI framework (Stage 4): Next.js frontend + .NET local backend.** Desktop shell via **Photino.NET** (lightweight webview hosting your Next.js static export over the .NET core — one language for logic, your strongest UI stack for the interface) with Electron as fallback if Photino friction appears. The Next.js skills also cover the keypaste.com landing/marketing site directly.
 - [x] **Timeline compression:** founder is full-time → target weeks in this plan are calendar-realistic, not aspirational. Stages 0–3 (launch) in ~6–8 weeks.
@@ -18,8 +18,8 @@
 **Goal: a repo that opens, reads, and writes a real KDBX4 file, verified against KeePassXC.**
 - [ ] Register GitHub org `keypaste`, npm/crates names, point keypaste.com to a one-line landing page with email capture
 - [x] Repo scaffold: `keypaste-core`, `keypaste-cli`, `keypaste-mcp` (monorepo), CI, license, SECURITY.md, this file trio
-- [ ] Pick KDBX library; write round-trip test: create vault → add entry → save → open in KeePassXC → verify
-- [ ] CI job that runs KeePassXC-cli against generated files (compatibility law #6)
+- [x] Pick KDBX library; write round-trip test: create vault → add entry → save → open in KeePassXC → verify — vendored KeePassLib 2.61, see DECISIONS.md D-0007
+- [x] CI job that runs KeePassXC-cli against generated files (compatibility law #6) — all three OSes, permanent, see DECISIONS.md D-0008
 - [ ] `keypaste init`, `keypaste add`, `keypaste get`, `keypaste ls` working in CLI
 - **Exit demo:** terminal clip — create vault, add a secret, open same file in KeePassXC GUI.
 

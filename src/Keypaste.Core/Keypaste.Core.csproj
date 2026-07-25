@@ -8,4 +8,26 @@
 
   <!-- No PackageReference. Deliberate: see Directory.Packages.props. -->
 
+  <ItemGroup>
+    <!--
+      Vendored KDBX4 implementation. Not a NuGet package: no maintained, adopted KDBX4
+      package for .NET exists (DECISIONS.md D-0007). Provenance, licence, and the complete
+      list of local modifications: third_party/KeePassLib/UPSTREAM.md.
+
+      Only Internal/KeePassInterop.cs may reference it. Everything else in this assembly
+      speaks in keypaste's own types.
+    -->
+    <ProjectReference Include="../../third_party/KeePassLib/KeePassLib.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="System.Buffers.Binary" />
+    <Using Include="System.Security.Cryptography" />
+    <Using Include="System.Text" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Keypaste.Core.Tests" />
+  </ItemGroup>
+
 </Project>

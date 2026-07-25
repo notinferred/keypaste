@@ -1,0 +1,81 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Vendored KeePassLib. See UPSTREAM.md for provenance and the full list of local
+    modifications, and DECISIONS.md D-0007 for why this is vendored rather than
+    referenced as a NuGet package.
+
+    Source files are kept VERBATIM wherever possible. Code that keypaste does not use
+    is removed from the *compilation* below rather than deleted from disk, so that
+    re-merging an upstream security patch stays a clean `git diff`. The exclusion list
+    is therefore the single place recording what we do not build, and every entry
+    carries its reason.
+  -->
+
+  <PropertyGroup>
+    <RootNamespace>KeePassLib</RootNamespace>
+    <AssemblyName>KeePassLib</AssemblyName>
+
+    <!--
+      NETSTANDARD2_0 is the port's meta-define: each source file uses it to switch on
+      upstream KeePass's own KeePassUAP (and sometimes KeePassLibSD) flavour, whose
+      `#if !KeePassUAP` guards are what exclude the WinForms/System.Drawing desktop
+      code. We are not building netstandard2.0 — we define it because it is the
+      port's supported switch for "no desktop UI".
+
+      DisableImplicitConfigurationDefines keeps DEBUG undefined even in a Debug build.
+      KeePassLib uses `Debug.Assert(false)` on paths that are reachable in normal
+      operation, and an assert dialog in a test run is not a useful signal.
+    -->
+    <DisableImplicitConfigurationDefines>true</DisableImplicitConfigurationDefines>
+
+    <!--
+      KEYPASTE_NO_DPAPI  drops the port's Microsoft.AspNetCore.DataProtection substitution
+                         (3 packages) in favour of upstream's in-tree managed ChaCha20 for
+                         ProtectedBinary's in-memory protection.
+      KEYPASTE_NO_GFX    drops the System.Drawing.Common decode-PNG-to-Bitmap convenience.
+                         PwCustomIcon.ImageDataPng — the bytes that actually live in the
+                         KDBX file — is untouched, so custom icons still round-trip.
+
+      Both are grep-able markers. Every site they guard is listed in UPSTREAM.md.
+    -->
+    <DefineConstants>TRACE;NETSTANDARD2_0;KEYPASTE_NO_DPAPI;KEYPASTE_NO_GFX</DefineConstants>
+
+    <!--
+      CORE.md §3.9: dependencies on the secret path are minimised. This project has
+      ZERO PackageReference entries, and that is load-bearing rather than incidental —
+      see UPSTREAM.md "Local modifications" for the three substitutions that had to be
+      undone to get here.
+    -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Upstream's UI translation subsystem. Not a library concern. -->
+    <Compile Remove="Translation\**" />
+    <EmbeddedResource Remove="Translation\**" />
+    <None Remove="Translation\**" />
+
+    <!-- Desktop clipboard integration; needs WinForms. keypaste handles its own. -->
+    <Compile Remove="Native\ClipboardU.cs" />
+
+    <!-- We generate assembly attributes from the SDK, not from a checked-in file. -->
+    <Compile Remove="Properties\AssemblyInfo.cs" />
+
+    <!--
+      Image loading/scaling for icon display. Needs System.Drawing.Common, which is
+      Windows-only since .NET 7 and throws PlatformNotSupportedException elsewhere.
+      Called only from PwCustomIcon (see KEYPASTE_NO_GFX). keypaste is a library for a
+      CLI and an MCP bridge; neither renders a bitmap.
+    -->
+    <Compile Remove="Utility\GfxUtil.cs" />
+
+    <!--
+      Derives a key from the Windows user account via DPAPI. keypaste's threat model is
+      a portable vault file (CORE.md §2: KDBX or nothing, the user's file, their sync),
+      and a machine-bound key source is the opposite of that. Excluding it also removes
+      the last consumer of CryptoUtil.ProtectData.
+    -->
+    <Compile Remove="Keys\KcpUserAccount.cs" />
+  </ItemGroup>
+
+</Project>

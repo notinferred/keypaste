@@ -100,29 +100,152 @@ Rather than trusting review to catch these, they are compiler errors from commit
 Test projects inherit all of this except the trim/AOT analyzers, which xUnit's reflection would
 otherwise fill with noise (`tests/Directory.Build.props`).
 
+## D-0007 — KDBX4 via vendored KeePassLib, not a NuGet package
+
+**Date:** 2026-07-25 · **Stage:** 0.2 · **Status:** accepted
+
+**First, O-0001's premise was factually wrong and is retracted.** KeePass 2.x is licensed
+GPL-2.0-**or-later**, not GPL-2.0-only — stated at <https://keepass.info/help/v2/license.html>
+and in the header of every `KeePassLib/*.cs` ("either version 2 of the License, or (at your
+option) any later version"). The "or later" grant permits taking the GPLv3 option, and
+AGPL-3.0 §13 permits combining GPLv3 work with AGPLv3 work. There was never a conflict, no
+relicensing is needed, and the original wording would have pushed a future reader into an
+unnecessary one. Licence compatibility was therefore not the deciding factor here; maturity
+was.
+
+**The .NET KDBX4 ecosystem has no maintained, adopted library.** The full survey: the official
+`KeePassLib` NuGet package is net35 and references `System.Windows.Forms` (last published
+2015). `ModernKeePassLib` is netstandard1.2, dead since 2020, and ships no LICENSE file at all.
+`pt.KeePassLibStd` is the most-downloaded port but dead since 2023 and drags in SkiaSharp's
+per-RID native binaries. `KeePassLib.Standard` requires `System.Drawing.Common` — which throws
+`PlatformNotSupportedException` off Windows — plus an ASP.NET Core data-protection stack.
+`KPCLib` relicenses KeePassLib-derived GPL-2.0-or-later code as LGPL-3.0, which its copyright
+holder cannot have authorised. The only two packages with a clean shape, `DgNet.Keepass` (MIT)
+and `LibKdbx` (GPL-3.0), were at evaluation time 0-star repositories with **six hours** and
+**ten days** of total commit history respectively and roughly 350 downloads each; one credits
+an AI assistant for authorship. CORE.md §3.6 says "mature audited libraries" and §6.5 says
+boring beats clever. Neither qualifies, and the vault format is not where to find out.
+
+So `KeePassLib` is vendored from the `TimothyByrd/KeePassNetStandard` port at tag `v2.61`
+(commit `87c2770`), which tracks upstream KeePass 2.61. Twenty years of field use, a fully
+managed Argon2 with no P/Invoke and no libsodium, no native binaries anywhere — which also
+answers O-0005's arm64 question for the library, if not for `keepassxc-cli`.
+
+**The cost is real and is accepted openly**: we are now the maintainer of roughly 30,000 lines
+of 2007-era C#. Upstream security patches are hand-merged, Dependabot can do nothing for us,
+and "vendored fork of a GPL project" is a harder story to tell than "one MIT package". The
+mitigation is `third_party/KeePassLib/UPSTREAM.md`, which records the exact commit, every local
+modification, and the re-merge procedure. `v2.61` was taken rather than the port's `HEAD`
+because the one commit past the tag adds NuGet packaging metadata and a
+`System.Security.Cryptography.ProtectedData` reference.
+
+**Three dependencies were removed to get to zero.** The port had substituted
+`Microsoft.AspNetCore.DataProtection` (three packages) for Windows DPAPI in `ProtectedBinary`'s
+*in-memory* protection, backed by an *ephemeral* provider that also creates a key directory
+under `%APPDATA%/KeePass2`. Upstream already carries an in-tree, fully managed ChaCha20 path for
+exactly that purpose — it is what real KeePass uses on Linux and macOS. Defining
+`KEYPASTE_NO_DPAPI` makes `ProtectedMemorySupported` report false, which selects upstream's own
+ChaCha20: identical on all three platforms, no dependency, and still not a line of our own
+cryptography (§3.6). `KEYPASTE_NO_GFX` similarly drops `System.Drawing.Common`, which is
+Windows-only since .NET 7; only the decode-PNG-to-`Bitmap` convenience is lost, while
+`PwCustomIcon.ImageDataPng` — the bytes that actually live in the KDBX file — is untouched, so
+custom icons still round-trip. `packages.lock.json` for the vendored project resolves to
+`"net10.0": {}`, keeping D-0004's "src/ has zero PackageReference" claim true in substance.
+
+Code keypaste does not build is removed from the *compilation* in `KeePassLib.csproj` rather
+than deleted from disk, so a re-merge stays a clean `git diff`. `third_party/Directory.Build.props`
+severs inheritance from the root props: MSBuild stops at the first `Directory.Build.props` found
+walking up, so its mere presence turns off the analyzers, nullable, warnings-as-errors and XML
+docs for vendored source only. `dotnet format` is given `--exclude third_party/` for the same
+reason — an `.editorconfig` alone would not do it, since `dotnet format` reads `.editorconfig`
+but is not bound by MSBuild properties.
+
+**The interop boundary is a rule, not a convention:** `src/Keypaste.Core/Internal/KeePassInterop.cs`
+is the only file in the repository permitted to reference KeePassLib. Everything else speaks in
+`VaultEntry` and `VaultException`. That is what makes §4.3 ("one core library") enforceable and
+what would make a future library swap a single-file change.
+
+**Argon2 parameters are stated, not inherited**: Argon2d, 2 iterations, 64 MiB, parallelism 2,
+version 0x13, pinned in `KdbxFormat` and asserted by `keepassxc-cli db-info`. They agree with
+KeePass 2.61's defaults today. Pinning them means that if an upstream default ever changes it
+surfaces as a failing test rather than as a silent change to how every keypaste vault is
+protected.
+
+**No `SecureString`, deliberately.** Master passwords cross the API as `ReadOnlySpan<char>`.
+`SecureString` does not encrypt on Linux or macOS, and Microsoft advises against it in new
+code; using it here would be a gesture that reads as a security guarantee, which is worse than
+its absence. `Vault` copies the span into a UTF-8 buffer, derives the key, and zeroes the buffer
+in a `finally`. Recorded here so nobody "improves" it later.
+
+## D-0008 — The KeePassXC compatibility gate is permanent
+
+**Date:** 2026-07-25 · **Stage:** 0.2 · **Status:** accepted
+
+CORE.md §4.6 makes KeePassXC compatibility sacred, and CORE.md cannot change. The `compat` job
+in `.github/workflows/ci.yml` plus `scripts/verify-keepassxc-compat.sh` are that law's
+enforcement, so they are not subject to the "delete it if it is annoying" latitude that applies
+to every other CI step.
+
+It runs on all three operating systems rather than Linux only, because the interesting failures
+are the OS-specific ones — path handling, text encoding, `SetConsoleCP` on Windows, arm64 on
+macOS — and a Linux-only gate would assert the least interesting third of the surface. The
+marginal cost is roughly eight free minutes; GitHub's 2×/10× Windows/macOS multipliers apply
+only to billed minutes, which public repositories do not consume (D-0006). Were the repository
+ever made private, this job alone would bill about 39 minutes per run — worth knowing as a
+number rather than a vibe.
+
+Three properties are non-negotiable, in increasing order of subtlety:
+
+1. **Argon2 is asserted, and the KDBX major version is read straight from the file.** Argon2
+   cannot be represented in KDBX 3.1, so `KDF: Argon2*` from `db-info` is KeePassXC
+   independently confirming a real KDBX4 container. The raw header byte check is the belt to
+   that braces and survives any change to `keepassxc-cli`'s output format. A silent downgrade
+   to 3.1 would round-trip perfectly and open fine — no other assertion would notice it.
+2. **Absent tooling is a failure, never a skip.** No path through the script exits 0 without
+   having actually talked to KeePassXC.
+3. **The negative control.** A wrong password must be *observed* to fail. Without it, a gate
+   that quietly stopped testing anything would report green forever, and that — not deletion —
+   is the most likely way this law dies.
+
+Expected values are duplicated between `tools/Keypaste.CompatFixture` and the assertion script
+on purpose. Generating the expectations from the writer under test would make them
+self-fulfilling.
+
+What actually prevents removal is branch protection: the three `keepassxc compat (…)` checks
+must be configured as required status checks on `main`. A deleted job never reports, and a pull
+request that never reports can never merge. **This still needs doing in the GitHub UI — it is
+the one part of this decision that does not live in the repository.** The tripwire test in
+`CompatGateIsPermanentTests` is a complement, not a substitute: it converts silent removal into
+deliberate removal and nothing more. CODEOWNERS was considered and skipped — with one
+maintainer, self-approval is ceremony.
+
+Linux (apt) and macOS (Homebrew cask) versions float with the runner image, which is correct
+semantics: the claim is "opens in KeePassXC", not "opens in one build of it", and an older
+reader is free extra coverage. Only the Windows build is pinned by version and SHA-256, because
+there we fetch a binary ourselves; the hash is a repo-side constant rather than the release's
+own `.DIGEST`, which is served from the same origin as the zip and so proves integrity but not
+authenticity.
+
+`tools/Keypaste.CompatFixture` is throwaway. Stage 0.3 replaces it with `keypaste init` +
+`keypaste add`, testing the shipped binary instead, which is strictly stronger. Its contract —
+`argv[0]` is the output path, `KP_COMPAT_PASSWORD` is the master password — is what makes that
+a one-line change, leaving the script, the expected values, and the job untouched.
+
 ---
 
 # Open decisions
-
-## O-0001 — AGPL-3.0 vs the KDBX library licence — **must resolve in Stage 0.2**
-
-The repository ships AGPL-3.0 per `prompts.md` 0.1 and PLAN.md's locked "copyleft core".
-
-**This constrains the 0.2 library choice.** The official `KeePassLib` is **GPL-2.0-only**, which is
-incompatible with AGPL-3.0 — the two cannot be combined in one distributed work. So the 0.2
-evaluation must treat licence compatibility as a hard gate, and should prefer an MIT/BSD-licensed
-KDBX4 implementation. If KeePassLib nevertheless wins on maturity, the project relicenses to
-GPL-2.0-compatible terms *before* taking the dependency, and records it here.
-
-Relicensing is cheap while there is a single copyright holder and stops being cheap the moment the
-first external contribution lands — which makes O-0002 urgent too.
 
 ## O-0002 — Contribution terms: DCO or CLA
 
 Undecided, and it must be decided before the repository accepts its first outside pull request.
 ideas.md notes "clean IP, CLA or DCO from day one". A DCO is lighter and better received in
-open-source communities; a CLA preserves relicensing freedom (see O-0001). Pick one and add
+open-source communities; a CLA preserves relicensing freedom. Pick one and add
 `CONTRIBUTING.md`.
+
+The original O-0001 — "AGPL-3.0 vs the KDBX library licence, must resolve in Stage 0.2" — was
+removed rather than answered: its premise that KeePassLib is GPL-2.0-only was factually wrong.
+See D-0007. Relicensing freedom therefore matters less than it appeared to, but it is still
+cheap only while there is a single copyright holder, which keeps this entry urgent.
 
 ## D-0006 — Repository is public; business notes live outside it
 
@@ -154,3 +277,36 @@ these are free now that the repository is public, so revisit them together.
 Relevant from 0.2 onward: any native dependency (an Argon2 binding, `keepassxc-cli` from Homebrew)
 needs an arm64 story, and Stage 3's AOT publish needs the Xcode command line tools on macOS and
 clang plus zlib headers on Linux.
+
+Partly answered in 0.2. The vault path has **no** native dependency at all: vendored KeePassLib's
+Argon2 is managed C# with no P/Invoke (D-0007), so arm64 needs nothing special. `keepassxc-cli`
+comes from the Homebrew cask, which ships an arm64 build. The AOT half of this entry remains open
+and is now tracked more precisely by O-0006.
+
+## O-0006 — Is vendored KeePassLib AOT-compatible? — **must resolve before Stage 3**
+
+`third_party/Directory.Build.props` sets `IsAotCompatible=false` and turns the trim/AOT analyzers
+off for vendored source. That is a deliberate trade — 2007-era code would otherwise bury the build
+in noise — but it also disarms the dependency-selection gate D-0005 installed for exactly this
+moment, so the answer must come from somewhere else.
+
+That somewhere is a real `dotnet publish -p:PublishAot=true` of `Keypaste.Cli` on all three
+operating systems, followed by *running* the round-trip against the published binary. A compile is
+not enough: the failure mode for reflection-driven code is a runtime `NotSupportedException`, not a
+build error. The known suspects in KeePassLib are `XmlUtilEx`/`KdbxFile`'s XML handling, the
+`Assembly` reflection in `NativeLib`, and static initialisation order in `CryptoRandom`.
+
+Resolve it early rather than at launch. If the answer is no, the options are trimming the vendored
+tree, `rd.xml`-style roots, or dropping the AOT promise in PLAN.md — all cheaper to choose now than
+in Stage 3.
+
+## O-0007 — Trim the vendored tree?
+
+`PwGroup.Search.cs`, `QualityEstimation.cs`, `PopularPasswords.cs`, `PasswordGenerator/**` and
+`HmacOtp.cs` are severable — roughly 3,000 lines keypaste never calls. They are kept because every
+`<Compile Remove>` is a decision a future re-merge must re-justify, and the current cost is only
+build time.
+
+Revisit if O-0006 forces trimming for AOT size, or if `HmacOtp.cs` becomes load-bearing when TOTP
+arrives from ideas.md. Note the exclusion mechanism is already in place and costs nothing to
+extend: files stay on disk, only the compilation changes.

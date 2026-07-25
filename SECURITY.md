@@ -64,6 +64,11 @@ These are constitutional (CORE.md §3) and a violation of any of them is a valid
 
 ## Maintainer note
 
-While the repository is private, `security@keypaste.com` is the only reporting channel. GitHub's
-private vulnerability reporting will be enabled as a second channel when the repository is made
-public.
+`security@keypaste.com` is the primary reporting channel. The repository is public (DECISIONS.md
+D-0006), so GitHub's private vulnerability reporting should be enabled as a second channel.
+
+keypaste vendors KeePassLib for its KDBX4 implementation
+(`third_party/KeePassLib/UPSTREAM.md`). Vulnerabilities in that code are in scope here, and are
+also worth reporting upstream to KeePass — we hand-merge upstream patches rather than receiving
+them through a package manager, so a report to us does not reach Dominik Reichl automatically, or
+the reverse.

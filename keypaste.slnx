@@ -19,4 +19,12 @@
     <Project Path="tests/Keypaste.Core.Tests/Keypaste.Core.Tests.csproj" />
     <Project Path="tests/Keypaste.Cli.Tests/Keypaste.Cli.Tests.csproj" />
   </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/Keypaste.CompatFixture/Keypaste.CompatFixture.csproj" />
+  </Folder>
+  <Folder Name="/third_party/">
+    <Project Path="third_party/KeePassLib/KeePassLib.csproj" />
+    <File Path="third_party/Directory.Build.props" />
+    <File Path="third_party/KeePassLib/UPSTREAM.md" />
+  </Folder>
 </Solution>

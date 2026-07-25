@@ -40,8 +40,13 @@ jobs:
       - name: Restore (locked)
         run: dotnet restore keypaste.slnx --locked-mode
 
+      # third_party/ is excluded because vendored source is re-merged from upstream, not
+      # formatted to our taste; reformatting it would turn every security bump into a
+      # conflict. The quarantine that turns the analyzers off for it is
+      # third_party/Directory.Build.props — an .editorconfig alone would not be enough,
+      # because dotnet format reads .editorconfig but is not bound by MSBuild properties.
       - name: Verify formatting
-        run: dotnet format keypaste.slnx --no-restore --verify-no-changes
+        run: dotnet format keypaste.slnx --no-restore --verify-no-changes --exclude third_party/
 
       - name: Build
         run: dotnet build keypaste.slnx --no-restore -c Release -warnaserror
@@ -74,3 +79,121 @@ jobs:
 
       - name: Test
         run: dotnet test keypaste.slnx --no-build -c Release
+
+  # ===========================================================================
+  # PERMANENT COMPATIBILITY GATE — CORE.md law 4.6:
+  #   "Compatibility is sacred: any KDBX file keypaste writes must open
+  #    correctly in KeePassXC. This is tested in CI against real KeePassXC."
+  #
+  # CORE.md is the one file in this repository that cannot change, so neither
+  # can the existence of this job. It is not subject to the usual "delete it if
+  # it is annoying" latitude that applies to every other CI step.
+  #
+  # If it is failing, keypaste's vault writer is wrong. Do NOT:
+  #   - delete this job,
+  #   - add continue-on-error,
+  #   - add an `if:` that can skip it,
+  #   - or drop an operating system from the matrix,
+  # to make the build green. DECISIONS.md D-0008 records the reasoning and the
+  # three properties that must survive any edit here.
+  # ===========================================================================
+  compat:
+    name: keepassxc compat (${{ matrix.os }})
+    needs: gate
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      # ASCII-only on purpose. keepassxc-cli forces the Windows console code page to the
+      # system ANSI page, so a non-ASCII master password is the one value that could be
+      # mangled in transit. Non-ASCII *entry* values are still asserted, by the fixture.
+      KP_COMPAT_PASSWORD: ci-master-pw
+      # Repo-relative on purpose. github.workspace is a backslash path on Windows, which does
+      # not survive being quoted into a bash script; steps already run from the workspace root.
+      KDBX: artifacts/compat/gen.kdbx
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      # Linux and macOS take the distro/Homebrew build. The version floats with the runner
+      # image, which is correct semantics: the claim is "opens in KeePassXC", not "opens in
+      # one build of it", and a slightly older reader is free extra coverage.
+      - name: Install keepassxc-cli (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends keepassxc
+
+      - name: Install keepassxc-cli (macOS)
+        if: runner.os == 'macOS'
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+          HOMEBREW_NO_INSTALL_CLEANUP: '1'
+        run: brew install --cask keepassxc
+
+      # Windows has no packaged CLI that lands on PATH usefully, so we fetch the official
+      # portable zip and pin it by SHA-256. The MSI would set only the *machine* PATH, which
+      # the already-running job does not observe, so it would buy nothing over an absolute
+      # path while costing an installer.
+      #
+      # The binary is invoked by absolute path rather than added to $GITHUB_PATH because the
+      # portable build resolves Qt5Core.dll / argon2.dll / botan-3.dll from its own directory.
+      - name: Install keepassxc-cli (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          KPXC_VERSION: 2.7.12
+          # Pinned in-repo rather than trusted from the release's own .DIGEST: that file is
+          # served from the same origin as the zip, so it proves integrity but not
+          # authenticity. A constant here changes only through a reviewed diff.
+          # Matches the published DIGEST for KeePassXC-2.7.12-Win64.zip.
+          KPXC_SHA256: 958234b0669d757b53eacf42bdd5de0fa1cc1ab7527709ddf4f7e29c06a8305f
+        run: |
+          set -euo pipefail
+          zip="KeePassXC-${KPXC_VERSION}-Win64.zip"
+          url="https://github.com/keepassxreboot/keepassxc/releases/download/${KPXC_VERSION}/${zip}"
+          curl -fsSL -o "$zip" "$url"
+
+          observed=$(sha256sum "$zip" | cut -d' ' -f1)
+          echo "observed sha256: $observed"
+          if [ "$observed" != "$KPXC_SHA256" ]; then
+            echo "::error::SHA-256 mismatch for ${zip}: expected ${KPXC_SHA256}, got ${observed}"
+            exit 1
+          fi
+
+          # Git Bash ships no unzip, and its own /usr/bin/tar is GNU tar, which cannot read a
+          # zip and wins the PATH lookup under `shell: bash`. Windows' bundled bsdtar reads
+          # zip natively, so call it by absolute path rather than trusting resolution order.
+          bsdtar="/c/Windows/System32/tar.exe"
+          [ -x "$bsdtar" ] || { echo "::error::$bsdtar not found"; exit 1; }
+          "$bsdtar" -xf "$zip"
+
+          # $(pwd) rather than $GITHUB_WORKSPACE: Git Bash reports a POSIX path (/d/a/...),
+          # whereas GITHUB_WORKSPACE is a backslash path that bash would mangle when quoted.
+          echo "KPXC_CLI=$(pwd)/KeePassXC-${KPXC_VERSION}-Win64/keepassxc-cli.exe" >> "$GITHUB_ENV"
+
+      - name: Restore (locked)
+        run: dotnet restore keypaste.slnx --locked-mode
+
+      - name: Build
+        run: dotnet build keypaste.slnx --no-restore -c Release
+
+      # Stage 0.3 replaces this with `keypaste init` + `keypaste add`, which is a strictly
+      # stronger gate because it exercises the shipped binary. Only this line changes.
+      - name: Generate the fixture vault with keypaste's own code
+        run: dotnet run --project tools/Keypaste.CompatFixture --no-build -c Release -- "${{ env.KDBX }}"
+
+      # shell: bash on all three runners, so one assertion script serves the whole matrix.
+      - name: Verify it opens in real KeePassXC
+        shell: bash
+        run: scripts/verify-keepassxc-compat.sh "${{ env.KDBX }}"
