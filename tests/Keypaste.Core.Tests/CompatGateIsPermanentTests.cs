@@ -25,6 +25,11 @@ public sealed class CompatGateIsPermanentTests
         Assert.Contains("scripts/verify-keepassxc-compat.sh", workflow, StringComparison.Ordinal);
         Assert.Contains("keepassxc", workflow, StringComparison.OrdinalIgnoreCase);
 
+        // The fixture must come from the shipped binary. Naming the throwaway generator again
+        // would silently narrow the gate back to the vault writer alone (DECISIONS.md D-0012).
+        Assert.Contains("scripts/make-compat-fixture.sh", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("Keypaste.CompatFixture", workflow, StringComparison.Ordinal);
+
         foreach (var os in new[] { "ubuntu-latest", "windows-latest", "macos-latest" })
         {
             Assert.Contains(os, workflow, StringComparison.Ordinal);
@@ -42,6 +47,9 @@ public sealed class CompatGateIsPermanentTests
     {
         var script = Path.Combine(RepoRoot(), "scripts", "verify-keepassxc-compat.sh");
         Assert.True(File.Exists(script), $"The compatibility gate script is missing: {script}");
+
+        var fixture = Path.Combine(RepoRoot(), "scripts", "make-compat-fixture.sh");
+        Assert.True(File.Exists(fixture), $"The fixture generator is missing: {fixture}");
 
         var text = File.ReadAllText(script);
 

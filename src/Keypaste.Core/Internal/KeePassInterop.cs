@@ -40,6 +40,7 @@ internal sealed class KeePassInterop : IDisposable
         {
             database.New(IOConnectionInfo.FromPath(path), BuildKey(utf8Password));
             ApplyKeypasteFormatSettings(database);
+            ApplyWriteSafety(database);
         }
         catch
         {
@@ -79,6 +80,7 @@ internal sealed class KeePassInterop : IDisposable
                 : new VaultException($"'{path}' could not be opened as a KDBX vault.", ex);
         }
 
+        ApplyWriteSafety(database);
         return new KeePassInterop(database);
     }
 
@@ -109,6 +111,61 @@ internal sealed class KeePassInterop : IDisposable
         Collect(_database.RootGroup, string.Empty, entries);
         return entries;
     }
+
+    /// <summary>Returns every group path in the vault, excluding the root group.</summary>
+    /// <remarks>
+    /// Separate from <see cref="ReadEntries"/> because a group holding no entries is invisible in
+    /// an entry listing, and <c>keepassxc-cli ls -R -f</c> shows it. A listing that silently drops
+    /// empty groups would disagree with KeePassXC about the shape of the same file.
+    /// </remarks>
+    internal IReadOnlyList<string> ReadGroupPaths()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        List<string> paths = [];
+        CollectGroups(_database.RootGroup, string.Empty, paths);
+        return paths;
+    }
+
+    /// <summary>Removes the entry at the given path.</summary>
+    /// <returns>The number of entries removed: 0 if nothing matched, otherwise 1.</returns>
+    internal int RemoveEntry(string entryPath)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        int lastSlash = entryPath.LastIndexOf('/');
+        string groupPath = lastSlash < 0 ? string.Empty : entryPath[..lastSlash];
+        string title = lastSlash < 0 ? entryPath : entryPath[(lastSlash + 1)..];
+
+        PwGroup? group = ResolveGroup(groupPath, createMissing: false);
+        if (group is null)
+        {
+            return 0;
+        }
+
+        foreach (PwEntry candidate in group.Entries)
+        {
+            if (!string.Equals(ReadField(candidate, PwDefs.TitleField), title, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            // Removed outright rather than moved to the recycle bin: a vault the user asked to
+            // delete from should not keep a readable copy of the secret (CORE.md law 3.4).
+            group.Entries.Remove(candidate);
+            _database.DeletedObjects.Add(new PwDeletedObject(candidate.Uuid, DateTime.UtcNow));
+            return 1;
+        }
+
+        return 0;
+    }
+
+    /// <summary>
+    /// Whether saves go through a temporary file. Exists so the regression test for the
+    /// open-path defect can assert the mechanism directly; observing the effect is not practical,
+    /// because an in-place save also leaves no debris behind.
+    /// </summary>
+    internal bool UsesFileTransactions => _database.UseFileTransactions;
 
     /// <summary>Writes the vault to its backing file.</summary>
     internal void Save()
@@ -162,9 +219,22 @@ internal sealed class KeePassInterop : IDisposable
         parameters.SetUInt32(Argon2Kdf.ParamVersion, KdbxFormat.Argon2Version);
 
         database.KdfParameters = parameters;
+    }
 
-        // Write through a temporary file and move it into place, so an interrupted save cannot
-        // truncate a vault that was previously readable.
+    /// <summary>
+    /// Writes through a temporary file and moves it into place, so an interrupted save cannot
+    /// truncate a vault that was previously readable.
+    /// </summary>
+    /// <remarks>
+    /// This must be applied on the <see cref="Open"/> path as well as <see cref="Create"/>, and
+    /// separately from <see cref="ApplyKeypasteFormatSettings"/>. KeePassLib defaults the flag to
+    /// <see langword="false"/> and <c>PwDatabase.Close()</c> — which <c>Open()</c> calls first —
+    /// resets it, so an open-modify-save cycle would otherwise write in place. The format settings
+    /// cannot simply be re-applied on open instead: they re-randomise the KDF salt, which would
+    /// rewrite the key derivation of an existing vault on every save.
+    /// </remarks>
+    private static void ApplyWriteSafety(PwDatabase database)
+    {
         database.UseFileTransactions = true;
     }
 
@@ -197,6 +267,16 @@ internal sealed class KeePassInterop : IDisposable
         {
             string childPath = groupPath.Length == 0 ? child.Name : groupPath + "/" + child.Name;
             Collect(child, childPath, entries);
+        }
+    }
+
+    private static void CollectGroups(PwGroup group, string groupPath, List<string> paths)
+    {
+        foreach (PwGroup child in group.Groups)
+        {
+            string childPath = groupPath.Length == 0 ? child.Name : groupPath + "/" + child.Name;
+            paths.Add(childPath);
+            CollectGroups(child, childPath, paths);
         }
     }
 

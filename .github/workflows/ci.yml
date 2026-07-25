@@ -188,10 +188,12 @@ jobs:
       - name: Build
         run: dotnet build keypaste.slnx --no-restore -c Release
 
-      # Stage 0.3 replaces this with `keypaste init` + `keypaste add`, which is a strictly
-      # stronger gate because it exercises the shipped binary. Only this line changes.
-      - name: Generate the fixture vault with keypaste's own code
-        run: dotnet run --project tools/Keypaste.CompatFixture --no-build -c Release -- "${{ env.KDBX }}"
+      # Driven through the shipped keypaste binary rather than a throwaway harness, so the gate
+      # covers argument parsing, group paths, the redirected-stdin prompt, and add's
+      # open-modify-save cycle as well as the vault writer (DECISIONS.md D-0012).
+      - name: Generate the fixture vault with the keypaste binary
+        shell: bash
+        run: scripts/make-compat-fixture.sh "${{ env.KDBX }}"
 
       # shell: bash on all three runners, so one assertion script serves the whole matrix.
       - name: Verify it opens in real KeePassXC

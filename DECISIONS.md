@@ -231,6 +231,187 @@ authenticity.
 `argv[0]` is the output path, `KP_COMPAT_PASSWORD` is the master password — is what makes that
 a one-line change, leaving the script, the expected values, and the job untouched.
 
+## D-0009 — The CLI contract: exit codes, stream split, one line per prompt
+
+**Date:** 2026-07-25 · **Stage:** 0.3 · **Status:** accepted
+
+The 0.1 contract was "data on stdout, everything else on stderr; 0 success, 1 usage, 2 internal".
+The stream split survives untouched and is now load-bearing: prompts, progress, the clipboard
+countdown and every diagnostic go to stderr, so `keypaste get x --show | tr -d '\n'` is a sane
+thing to write. keepassxc-cli gets this right in `getPassword()` and then throws it away in its
+`clip` verb, whose countdown goes to stdout and corrupts every pipeline it appears in (upstream
+issue #3855). Not repeating that is most of why the split is stated here rather than assumed.
+
+Exit codes gained two entries — **3 not found**, **4 wrong master password**. The 0.3 prompt asks
+for output that is "script-friendly", and `keypaste get x || handle` is only script-friendly if
+the caller can tell "you typed the password wrong" from "that entry does not exist" from "you
+misused the command". Three is where the distinction stops being useful, so there is no separate
+code for a missing clipboard: that is an environment failure, which is what 2 already means.
+
+**When stdin is not a terminal, each prompt consumes exactly one line, in a fixed order that does
+not depend on which flags were given.** `init` takes two lines, `add` takes two, everything else
+takes one. This mirrors keepassxc-cli exactly and kills the whole "my CI hangs waiting for a
+prompt" class of bug. `init` confirms the master password even when piped, because one code path
+means the compatibility gate exercises the branch a human takes, and it costs a script one extra
+`printf` argument. `add` deliberately does **not** confirm the entry password: a typo there is
+recoverable in seconds, a typo in a master password locks you out of the vault forever. Confirm
+where the cost is unrecoverable, nowhere else.
+
+`rm` without `--yes` on a pipe is a usage error rather than a silent delete, because the
+alternative is having an irreversible confirmation answered by whatever the next line of stdin
+happens to be.
+
+**There is no default vault path.** `--vault` beats `KEYPASTE_VAULT`, and absence is a usage error
+naming both. A credential tool that silently picks a vault when you forgot to say which one
+eventually writes a secret into the wrong file, or reports "not found" against a vault the user
+has never seen. An empty environment variable counts as unset.
+
+`ls` prints an indented tree by default and full paths under `--flat`, names only, and is
+**ASCII-only** — a test asserts every character is below U+0080. Box-drawing characters would
+look nicer and would break code pages, CI logs, and the diff against `keepassxc-cli ls -R -f`
+that proves keypaste and KeePassXC agree about the shape of the same file. `--flat` output is
+byte-identical to that command's, which is verified rather than hoped for.
+
+Argument parsing is hand-rolled in `CommandLine.cs`. `System.CommandLine` is a NuGet package and
+`src/` carries none (D-0004); five verbs with at most five options each do not justify one. Option
+values are consumed positionally even when they look like options, so `--notes '--weird'` works.
+
+## D-0010 — Hidden input: stderr prompts, UTF-8 pipes, and no `string`
+
+**Date:** 2026-07-25 · **Stage:** 0.3 · **Status:** accepted
+
+`Console.ReadKey(intercept: true)` is the only BCL way to read a keystroke without echoing it,
+and it throws when stdin is redirected — but the platforms disagree about *when*. Unix pre-checks
+`Console.IsInputRedirected` and throws immediately; Windows does not check, calls
+`ReadConsoleInput`, and throws only after that fails, by which point the prompt has already been
+printed. `ConsoleSecretPrompt` therefore decides for itself, before writing anything, so both
+platforms behave identically and piped runs do not litter stderr with prompts nobody read.
+`Console.SetIn` does **not** intercept `ReadKey`, which is why the keystroke source is an injected
+delegate: without that seam not one password path in the CLI would be testable, and CORE.md §4.5
+does not allow that on the secret path.
+
+The redirected path decodes **UTF-8 explicitly** rather than reading `Console.In`, which on
+Windows decodes with the console input code page — typically an OEM page — and silently mangles a
+non-ASCII password arriving through a pipe. A pipe has no code page and every shell on all three
+platforms writes UTF-8.
+
+**Nothing is echoed, not even asterisks**, which leak the secret's length to anyone reading the
+screen or a recorded terminal session. Backspace therefore has no visible effect; that is sudo's
+trade and it is deliberate. Both backspace encodings are accepted (`\b` from Windows, U+007F from
+most Unix terminals), Ctrl+U clears, and a `KeyChar` of `'\0'` — what Windows sends for modifier
+and navigation keys — is dropped rather than appended as an invisible character. Ctrl+C is
+classified as cancel but rarely reaches the table, since the runtime raises SIGINT or
+`CTRL_C_EVENT` first; **Escape is the cancel key that actually works**, and the usage text says so.
+
+Secrets are carried in `SecretBuffer`, never a `string`. `Vault.Create`/`Open` take a
+`ReadOnlySpan<char>` and zero their UTF-8 copy in a `finally` (D-0007); reading the master password
+into a `string` would make that promise worthless one layer up, because strings are immutable and
+cannot be cleared. **What this does not protect against is stated in the type's own doc comment
+and in SECURITY.md, not glossed over:** the GC may relocate the array and leave an unreachable
+copy, the value can reach swap or a core dump, a debugger or any process running as the same user
+can read it, and it necessarily becomes a `string` later anyway — `VaultEntry.Password` is one such
+place. This narrows the window and reduces copies. It is not a security boundary.
+
+## D-0011 — The clipboard is an OS tool over stdin; auto-clear blocks, behind a seam
+
+**Date:** 2026-07-25 · **Stage:** 0.3 · **Status:** accepted
+
+There is no clipboard in the BCL, and D-0004 leaves two options: P/Invoke into three native APIs,
+or shell out to the tool each platform already ships. Shelling out wins on every axis that matters
+— no `DllImport` for the trim and AOT analyzers to argue with (D-0005), no marshalling of a secret
+through an `IntPtr`, and behaviour a user can reproduce by hand when it misbehaves.
+
+**The secret reaches the child on stdin, never argv.** `/proc/<pid>/cmdline` is world-readable on
+Linux, `Win32_Process.CommandLine` is readable over WMI, and Sysmon ships full command lines to a
+SIEM by default. Windows and macOS tools are invoked by absolute path, because we are piping a
+plaintext password into whatever the name resolves to and a `clip.exe` planted earlier on `PATH`
+would receive it; Linux tools have no fixed location, so that asymmetry is an accepted residual
+risk rather than parity. `clip.exe` reads UTF-16LE and mojibakes anything else, with the BOM
+suppressed so it does not paste a stray U+FEFF. Four process rules are written down because each
+is a hang if forgotten: drain both pipes before writing stdin, `Write` not `WriteLine`, close
+stdin before waiting, and always use the bounded `WaitForExit` — `wl-copy` and `xclip` fork a
+daemon that inherits the pipe, so EOF may never arrive.
+
+**`IClipboard` has no member that returns clipboard text**, only `TryReadHash`. Auto-clear needs
+to know whether the clipboard still holds what keypaste put there, nothing more; returning the
+text would pull the user's entire clipboard — passwords keypaste never wrote included — into this
+process for no benefit. The baseline is taken immediately after the copy, which makes the scheme
+robust rather than tidy: whatever a platform's read-back does to the bytes, it does identically at
+both ends of the wait, so the read-back need only be deterministic, never faithful.
+
+**Auto-clear blocks in the foreground**, and the known cost is recorded here rather than
+discovered later: **`keypaste get x | foo` makes `foo` wait twenty seconds, and the terminal is
+held for the duration.** That is precisely the complaint against `keepassxc-cli clip` (#3855).
+Blocking was chosen anyway because the alternative — a detached clearer, as `pass` and `gopass` do
+— needs a `setsid` P/Invoke on Unix, a separate Windows path, and a hidden `unclip` verb, and
+cannot be tested in-process at all; both of those projects also had to add predecessor-killing as
+a follow-on fix. `--timeout 0` copies without clearing, and `IClipboardClearStrategy` exists with
+exactly one implementation so a detached model can replace it without touching command code. When
+this becomes the top complaint, that seam is where the fix goes.
+
+The clear is **conditional** — SHA-256 plus `FixedTimeEquals`, skipped if the clipboard changed —
+which the KeePassXC GUI does and its own CLI does not, wiping whatever you copied in the meantime.
+**Failing to read the clipboard back means clear anyway**: leaving a password on the clipboard
+indefinitely is the worst outcome available (§3.7). Both `Console.CancelKeyPress` and
+`PosixSignalRegistration` for SIGINT/SIGTERM/SIGHUP are registered, because neither covers
+everything; handlers only set an event so the clear runs once, on the main thread.
+
+**No design here survives SIGKILL**, and two further gaps belong in the same sentence: on X11 and
+Wayland the secret also lives in the forked `wl-copy`/`xclip` daemon, because those clipboards are
+owner-served; and Windows clipboard history retains a copy that clearing does not remove — O-0008.
+
+Headless is a **loud failure**. With no display, nothing is spawned at all, because "install
+xclip" is wrong advice on a server; the message names `--show`. keypaste never prints a secret
+unless asked, and a test asserts the secret appears in neither stdout nor stderr on that path.
+
+## D-0012 — `tools/Keypaste.CompatFixture` retired; the gate runs the shipped binary
+
+**Date:** 2026-07-25 · **Stage:** 0.3 · **Status:** accepted (completes the plan in D-0008)
+
+D-0008 designed the fixture generator to be throwaway and gave it a contract precisely so this
+swap would be cheap. It was: `scripts/make-compat-fixture.sh` drives `keypaste init` and three
+`keypaste add` invocations, one CI step changed, and **`scripts/verify-keepassxc-compat.sh` was
+not touched at all** — not one assertion, not one expected value. D-0008's three non-negotiable
+properties are intact.
+
+The gate is strictly stronger for it. It now covers argument parsing, group-path splitting, the
+non-echoing prompt's redirected-stdin path, `init`'s confirm-twice loop and `add`'s
+open-modify-save cycle, instead of the vault writer alone. It is also the only test in the
+repository that exercises `Vault.Open` followed by `Vault.Save` on all three operating systems.
+
+The binary is invoked **directly** rather than through `dotnet run`, which would put the SDK's
+stdin forwarding between the pipe and the process under test — and D-0008's whole argument is that
+this gate must test the thing that ships.
+
+One new exposure was accepted knowingly and then checked: the non-ASCII entry values now reach
+.NET through argv from Git Bash on `windows-latest`, a hop Stage 0.2 never exercised because its
+Unicode lived in a C# source literal. The chain is UTF-8 in the script, MSYS2's conversion for
+`CreateProcessW`, and .NET's `GetCommandLineW`. It was verified byte-for-byte before the fixture
+project was deleted rather than assumed. `CompatGateIsPermanentTests` now also asserts the
+workflow names `make-compat-fixture.sh` and no longer names `Keypaste.CompatFixture`, so a future
+change cannot quietly narrow the gate back to the writer.
+
+## D-0013 — File transactions apply on open, not only on create
+
+**Date:** 2026-07-25 · **Stage:** 0.3 · **Status:** accepted
+
+A latent defect that Stage 0.3 would have promoted to a live one. `KeePassInterop` set
+`UseFileTransactions = true` inside the method that also configures the KDF, and that method ran
+only on the create path. KeePassLib defaults the flag to `false` and `PwDatabase.Close()` — which
+`Open()` calls first — resets it, and `Save()` passes it straight into `FileTransactionEx`.
+
+Stage 0.2 only ever created a vault and saved it once, so nothing noticed. Every CLI verb except
+`init` is open-modify-save, which means **an interrupted `add` or `rm` would have truncated a
+vault that was previously readable** — data loss on the secret path, and a fail-open write in the
+sense of §3.7.
+
+The flag moved into its own step applied on both paths. It could not simply be fixed by re-running
+the format settings on open: those re-randomise the KDF salt, which would rewrite the key
+derivation of an existing vault on every save — a worse bug than the one being fixed. The
+regression test asserts the flag directly rather than looking for leftover files, because an
+in-place save also leaves no debris, so a debris-only assertion would pass with the defect present;
+it was confirmed to fail when the fix is reverted.
+
 ---
 
 # Open decisions
@@ -310,3 +491,18 @@ build time.
 Revisit if O-0006 forces trimming for AOT size, or if `HmacOtp.cs` becomes load-bearing when TOTP
 arrives from ideas.md. Note the exclusion mechanism is already in place and costs nothing to
 extend: files stay on disk, only the compilation changes.
+
+## O-0008 — Windows clipboard history and cloud sync retain the secret
+
+Clearing the Windows clipboard does not remove the entry from clipboard history (Win+V) or from
+cloud clipboard sync, so a password keypaste copied outlives its twenty seconds on Windows and can
+outlive the machine. Windows provides opt-out clipboard formats —
+`ExcludeClipboardContentFromMonitorProcessing` and `CanIncludeInClipboardHistory` — but setting
+them requires `OpenClipboard`/`SetClipboardData` via P/Invoke, which `clip.exe` cannot express and
+which D-0011 avoided deliberately.
+
+Resolve by Stage 3 at the latest: it is a claim SECURITY.md has to make correctly before strangers
+rely on it. The options are a Windows-only Win32 path (three P/Invokes, one
+`[SupportedOSPlatform]` class, and an argument with the trim/AOT analysers), documenting the gap
+and telling Windows users to disable clipboard history, or making `--show` the Windows default.
+Until then SECURITY.md states the gap rather than implying the clear is complete.

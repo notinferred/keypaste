@@ -20,7 +20,7 @@
 - [x] Repo scaffold: `keypaste-core`, `keypaste-cli`, `keypaste-mcp` (monorepo), CI, license, SECURITY.md, this file trio
 - [x] Pick KDBX library; write round-trip test: create vault → add entry → save → open in KeePassXC → verify — vendored KeePassLib 2.61, see DECISIONS.md D-0007
 - [x] CI job that runs KeePassXC-cli against generated files (compatibility law #6) — all three OSes, permanent, see DECISIONS.md D-0008
-- [ ] `keypaste init`, `keypaste add`, `keypaste get`, `keypaste ls` working in CLI
+- [x] `keypaste init`, `keypaste add`, `keypaste get`, `keypaste ls` (plus `rm`) working in CLI — see DECISIONS.md D-0009..D-0012
 - **Exit demo:** terminal clip — create vault, add a secret, open same file in KeePassXC GUI.
 
 ## Stage 1 — Env variables & injection (Week 3–4)

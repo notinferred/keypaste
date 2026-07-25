@@ -62,6 +62,30 @@ These are constitutional (CORE.md §3) and a violation of any of them is a valid
   cryptography is written here.
 - Every error path in the agent bridge results in denial, not exposure.
 
+## What keypaste does NOT protect against
+
+Stated plainly, because a security tool that overclaims is worse than one that is modest.
+
+**In-memory secrecy is not claimed.** keypaste keeps master passwords in a clearable `char[]`
+rather than a `string`, and zeroes the derived bytes after use. That narrows the window and
+reduces the number of copies; it is not a boundary. The garbage collector may relocate a buffer
+and leave an unreachable copy behind, values can reach swap, hibernation files or a core dump, a
+debugger or any process running as the same user can read them, and some values necessarily
+become immutable strings anyway. `SecureString` is deliberately not used: it does not encrypt on
+Linux or macOS, so it would read as a guarantee it cannot provide.
+
+**The clipboard is not fully recoverable.** `keypaste get` clears the clipboard after twenty
+seconds, and only if it still holds what keypaste put there. But no clearing survives `kill -9`, a
+crash, or a power cut; on X11 and Wayland the clipboard is owner-served, so the secret also lives
+in the `wl-copy`/`xclip` process that keeps serving it after keypaste exits; and on Windows,
+clipboard history (Win+V) and cloud clipboard sync retain a copy that clearing does not remove.
+On Windows, prefer `keypaste get --show` piped where you need it, or disable clipboard history.
+This is tracked as an open decision (O-0008 in `DECISIONS.md`).
+
+**Local attackers are out of scope.** Anything running as your user can read your memory, watch
+your keystrokes, and read your clipboard. keypaste protects the vault file at rest and limits what
+an AI agent can reach; it cannot defend a compromised account against itself.
+
 ## Maintainer note
 
 `security@keypaste.com` is the primary reporting channel. The repository is public (DECISIONS.md
