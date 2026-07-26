@@ -3,11 +3,12 @@
 > *"Stop pasting secrets into chats. keypaste is a local-first, KDBX-compatible vault that stores your passwords AND env variables, injects them into your projects, and lets AI agents like Claude request exactly one credential — with your approval, scoped access, and a full audit trail — without ever seeing your vault."*
 
 **Status: Stage 1.2 — the CLI works, and it replaces your `.env`.** Create a vault, add entries,
-list them, copy a password to the clipboard, remove entries, and keep a project's environment
-variables in the same file — importing them straight from an existing `.env`. Verified in CI
-against a real KeePassXC on Linux, macOS and Windows, in both directions. Injecting those variables
-into a child process (`keypaste run`) and the MCP bridge are still to come. Follow [`PLAN.md`](PLAN.md) for what lands next; [`CORE.md`](CORE.md) is
-the constitution and does not change.
+list them, copy a password to the clipboard, remove entries, keep a project's environment variables
+in the same file — importing them straight from an existing `.env` — and run any command with those
+variables injected, with nothing written to disk. Verified in CI against a real KeePassXC on Linux,
+macOS and Windows, in both directions. The MCP bridge is still to come. Follow
+[`PLAN.md`](PLAN.md) for what lands next; [`CORE.md`](CORE.md) is the constitution and does not
+change.
 
 ## Using it
 
@@ -75,6 +76,31 @@ the `KEY=value` form leaves the value in your shell history and in the process l
 warns when you use it; setting a variable that already exists keeps the old value in the entry's
 KeePassXC history rather than erasing it; and deleting a `.env` is tidying, not erasure — keypaste
 says so rather than offering a "shred" it could not honour.
+
+## Running things with those variables
+
+```sh
+keypaste run dev -- npm start          # no .env on disk, nothing written to one
+keypaste run prod -- ./deploy.sh
+```
+
+The `--` is required. Without it, `keypaste run dev npm start` cannot be told apart from a project
+called `npm`; everything after it belongs to the command, including flags keypaste also understands.
+
+The command inherits your environment with the project's variables merged on top, and it gets
+keypaste's own stdin, stdout and stderr — so colours, prompts and progress bars work exactly as if
+keypaste were not there. **The vault is closed before the command starts**, so a server you leave
+running for hours is not holding a decrypted database open.
+
+Once the command starts, its exit code is keypaste's; keypaste's own failures always print a line
+beginning `keypaste run:` first. A command that does not exist reports 127 and one that is not
+executable reports 126, as in a shell. Ctrl+C reaches the command, and keypaste waits for it rather
+than dying first — `docker stop` and `timeout` work the same way.
+
+It refuses to run rather than inject something ambiguous: a variable whose name is not a legal
+environment variable, or two names differing only in case (two variables on Linux, one on Windows).
+Both are things KeePassXC will let you create and keypaste will not, and both name every offending
+key so one pass in KeePassXC fixes them.
 
 ## Packages
 

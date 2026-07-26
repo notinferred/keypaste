@@ -27,6 +27,14 @@
 - Design direction for the GUI, the approval dialog and keypaste.com lives in [DESIGN.md](DESIGN.md)
   and design.html - proposed only, and it needs the local-first vs hosted-sync question in CORE.md
   section 2 answered before any of it is built.
+- `keypaste run` on Unix could `execve` the child instead of wrapping it: exit status, job control
+  and signals would all be exactly right for free, and the address space holding the secrets would
+  be discarded by the kernel. Not done because Windows has no equivalent, so the wrapper has to
+  exist anyway - two implementations of one feature (D-0016).
+- `keypaste run --no-inherit`: start from an empty environment rather than the current one, the
+  shape `env -i` has. Useful for reproducing exactly what CI sees.
+- `keypaste run --skip-unusable`: inject what can be injected and warn about the rest, instead of
+  refusing. Only if somebody hits it - a partially injected environment fails somewhere else.
 - Vault health report: reused passwords, stale entries, weak values, secrets-in-env hygiene score.
 - Team approval quorum ("2 of 3 must approve production credentials") — great enterprise-ish story, Stage 6+.
 - Windows Hello / Touch ID unlock.
