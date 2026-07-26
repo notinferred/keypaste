@@ -3,18 +3,31 @@ namespace Keypaste.Core.Audit;
 /// <summary>The authorization answer a bridge gave.</summary>
 public enum AuditDecision
 {
-    /// <summary>Nothing was released. Every decision in keypaste 2.1 is this one.</summary>
+    /// <summary>Nothing was released.</summary>
     Denied = 0,
 
-    /// <summary>The request was allowed. Reachable from Stage 2.2 onwards.</summary>
+    /// <summary>The request was allowed.</summary>
     Granted = 1,
 }
 
 /// <summary>How a decision was reached.</summary>
 /// <remarks>
-/// The distinction between <see cref="OutOfScope"/> and <see cref="NotImplemented"/> is worth more
-/// than it looks: the first means "keypaste will never give you that", the second means "keypaste
-/// cannot ask yet". An agent that can tell them apart stops retrying the first.
+/// <para>
+/// The distinctions here are worth more than they look, because an agent reads a refusal and
+/// decides whether to try again. <see cref="OutOfScope"/> means "keypaste will never give you
+/// that"; <see cref="Prompt"/> alongside <see cref="AuditDecision.Denied"/> means a person
+/// considered this one and said no; <see cref="Busy"/> and <see cref="TimedOut"/> mean nobody got
+/// to it at all, and are the only two where trying again later is reasonable. Only
+/// <see cref="Exposure"/>, <see cref="Prompt"/> and <see cref="GrantCache"/> ever accompany
+/// <see cref="AuditDecision.Granted"/>.
+/// </para>
+/// <para>
+/// <b>Adding a member means adding a case to <c>AuditLog.Wire</c>.</b> The switch there used to
+/// fall back to <c>vault-locked</c>, so a new member would have been logged as something it was
+/// not — the quietest possible way to corrupt the record law 3.3 requires. It now falls back to
+/// <c>unknown</c>, and <c>AuditLogTests.EveryAuditMethod_HasItsOwnWireString</c> is what actually
+/// stops the next member slipping through.
+/// </para>
 /// </remarks>
 public enum AuditMethod
 {
@@ -32,10 +45,37 @@ public enum AuditMethod
 
     /// <summary>
     /// Allowed because everything named lay inside the exposure the user configured. Applies to
-    /// listing names, which is the only thing this version can allow — releasing a credential
-    /// always needs a person, and that is Stage 2.2's <c>prompt</c> and Stage 2.3's <c>policy</c>.
+    /// listing names; releasing a credential always needs a person or a policy.
     /// </summary>
     Exposure = 4,
+
+    /// <summary>A person was shown this specific request and answered it (CORE.md law 3.2).</summary>
+    Prompt = 5,
+
+    /// <summary>
+    /// Served from a grant a person had already given, inside its TTL. Still an agent access, so
+    /// still a line of its own (law 3.3) — and the line records the reason given for <em>this</em>
+    /// request, which is the one nobody read.
+    /// </summary>
+    GrantCache = 6,
+
+    /// <summary>Nobody answered inside the window. Silence is a denial.</summary>
+    TimedOut = 7,
+
+    /// <summary>The client gave up on the request, or went away, before anyone answered.</summary>
+    Cancelled = 8,
+
+    /// <summary>No approver was reachable, so there was nobody to ask.</summary>
+    NoApprover = 9,
+
+    /// <summary>Another request was already in front of a person. Refused rather than queued.</summary>
+    Busy = 10,
+
+    /// <summary>The same request was refused a moment ago and has not served its cooldown.</summary>
+    Cooldown = 11,
+
+    /// <summary>Asking, resolving or reading went wrong. Fail closed (CORE.md law 3.7).</summary>
+    Failed = 12,
 }
 
 /// <summary>Who asked.</summary>

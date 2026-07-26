@@ -59,6 +59,48 @@ public sealed class AuditLogTests : IDisposable
         return reader.ReadToEnd().Split('\n', StringSplitOptions.RemoveEmptyEntries);
     }
 
+    /// <summary>
+    /// Every <see cref="AuditMethod"/> is written as itself, and none of them lands on the
+    /// fallback.
+    /// </summary>
+    /// <remarks>
+    /// This is the tripwire for a specific, quiet bug. The wire switch used to fall back to
+    /// <c>vault-locked</c>, so a member added without a matching case — which is exactly what
+    /// happens when a stage adds a new way to say no — would have been recorded as a denial that
+    /// never occurred. A log that lies about which decisions were taken is worse than no log, and
+    /// nothing else in the suite would have noticed.
+    /// </remarks>
+    [Fact]
+    public void EveryAuditMethod_HasItsOwnWireString()
+    {
+        var methods = Enum.GetValues<AuditMethod>();
+        var written = new List<string>();
+
+        using (var log = Open())
+        {
+            foreach (var method in methods)
+            {
+                var record = Denial() with { Method = method };
+                Assert.True(log.TryAppend(record, out var error), error);
+            }
+        }
+
+        foreach (var line in Lines())
+        {
+            using var parsed = JsonDocument.Parse(line);
+            written.Add(parsed.RootElement.GetProperty("method").GetString()!);
+        }
+
+        Assert.Equal(methods.Length, written.Count);
+        Assert.DoesNotContain("unknown", written, StringComparer.Ordinal);
+        Assert.Equal(methods.Length, written.Distinct(StringComparer.Ordinal).Count());
+
+        // The two the approval flow turns on, named outright: a rename would otherwise slip past
+        // the distinctness check above while changing what every existing log line means.
+        Assert.Contains("prompt", written, StringComparer.Ordinal);
+        Assert.Contains("grant-cache", written, StringComparer.Ordinal);
+    }
+
     [Fact]
     public void EachRecord_IsExactlyOneLineOfValidJson()
     {
