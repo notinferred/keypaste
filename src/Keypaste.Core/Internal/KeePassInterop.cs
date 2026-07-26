@@ -216,7 +216,12 @@ internal sealed class KeePassInterop : IDisposable
         }
         catch (Exception ex) when (ex is not VaultException)
         {
-            throw new VaultException($"Could not save '{_database.IOConnectionInfo.Path}'.", ex);
+            // The cause is named, not just kept as an inner exception nobody prints. A save can
+            // fail for reasons the user can act on — the disk is full, the file is open in
+            // KeePassXC, a scanner is holding the transaction's temporary file — and
+            // "Could not save 'vault.kdbx'." on its own tells them none of them.
+            throw new VaultException(
+                $"Could not save '{_database.IOConnectionInfo.Path}': {ex.Message}", ex);
         }
     }
 
