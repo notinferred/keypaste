@@ -34,7 +34,10 @@ public enum AuditMethod
     /// <summary>The vault could not be opened, so there was nothing to answer with.</summary>
     VaultLocked = 0,
 
-    /// <summary>There is no approval path in this version, so the default deny stands.</summary>
+    /// <summary>
+    /// No approval path existed. Written by keypaste 2.1, which denied everything; kept because the
+    /// audit log is append-only and old lines still have to mean what they meant when written.
+    /// </summary>
     NotImplemented = 1,
 
     /// <summary>The entry named lies outside what this server was told it may expose.</summary>
@@ -134,8 +137,11 @@ public sealed record AuditArgs
 
     /// <summary>Lowercase hex SHA-256 of the raw reason.</summary>
     /// <remarks>
-    /// Recorded alongside the excerpt so Stage 2.2 can check that the reason shown to the human in
-    /// the approval dialog is the reason that was recorded, even when the excerpt was truncated.
+    /// Recorded alongside the excerpt so the reason a person was shown can be compared with the one
+    /// that was recorded, even when the excerpt was truncated. It carries most of its weight on a
+    /// <see cref="AuditMethod.GrantCache"/> line, where nobody was shown anything: comparing that
+    /// line's hash with the earlier <see cref="AuditMethod.Prompt"/> line's is how a reason that
+    /// changed after approval becomes visible (THREATS.md T-12).
     /// </remarks>
     public string? ReasonSha256 { get; init; }
 

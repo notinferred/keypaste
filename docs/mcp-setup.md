@@ -3,14 +3,20 @@
 keypaste ships an MCP server, `keypaste-mcp`, that lets an AI agent see the names of things in your
 vault and ask you for one credential at a time.
 
-**Read this first: in this version it grants nothing.** Both tools refuse every call. That is not a
-bug and not a misconfiguration — the human approval flow they would need does not exist yet, and
-keypaste denies by default rather than granting without one. If you set this up expecting it to hand
-Claude a password, it will not, and the refusal will say so.
+**Read this first: `keypaste-mcp` on its own grants nothing.** It holds no vault and makes no
+decision. Everything it can do beyond refusing depends on a second process you start yourself:
 
-What you get today is the shape: the server connects, the two tools appear, every call is refused
-with a reason, and every call is written to an audit log you can read. That is worth having early
-because it is the part that has to be right before anything is ever released.
+```sh
+keypaste agent --vault ~/vaults/personal.kdbx
+```
+
+That is where your master password is typed, and where you are asked about each request. Set this up
+without it and every call is refused with a message telling you — or telling Claude to tell you — to
+start one. See [**Approving an agent's request**](approvals.md) for what you actually see and decide.
+
+The split is deliberate: your MCP client starts `keypaste-mcp`, so `keypaste-mcp` is started by
+software. `keypaste agent` is started by a person, which is what makes it the only thing that ever
+asks for a master password.
 
 ---
 
@@ -142,12 +148,29 @@ jq -c . < ~/.keypaste/audit.jsonl
  "args":{"entry":"env/dev/STRIPE_KEY","entry_kind":"path","field":"password","ttl_seconds":900,
          "reason_excerpt":"deploy the billing service to staging","reason_len":37,
          "reason_sha256":"..."},
- "decision":"denied","method":"not-implemented",
- "reason":"there is no approval path in this version, so the default deny stands",
+ "decision":"granted","method":"prompt",
+ "reason":"a person approved this request for 300 seconds",
  "exposure":["env/**"]}
 ```
 
-Three things worth knowing:
+`decision` is `granted` or `denied`. `method` says how it was reached, and the distinction is the
+useful part when you are reading this back later:
+
+| `method` | What happened |
+|---|---|
+| `prompt` | A person was shown this exact request and answered it. With `denied`, they said no. |
+| `grant-cache` | Served from a grant a person had already given, inside its lifetime. **They did not see this request's reason** — compare it with the earlier `prompt` line for the same entry. |
+| `exposure` | A listing, allowed because everything named was inside your `--expose` globs. |
+| `no-approver` | Nobody was running `keypaste agent`. |
+| `out-of-scope` | The entry was outside your globs, or does not exist — deliberately the same answer, so an agent cannot use the difference to find out what exists. |
+| `timed-out` / `busy` / `cooldown` | Nobody answered in time; somebody was already answering another; or the same request was refused a moment ago. |
+| `vault-locked` / `invalid-request` / `failed` | No vault open; the arguments were wrong; something went wrong. |
+
+Four things worth knowing:
+
+- **The value is never in here.** `field` records *which* field was asked for, never its contents,
+  and no field of this record can hold one. The agent's `entry` argument is recorded, sanitized;
+  entry titles read out of your vault are not.
 
 - **If the log cannot be written, the call is refused.** Not logged-and-continued: refused. The log
   is a precondition, because otherwise breaking it would be the way to get access that leaves no
@@ -183,8 +206,13 @@ CI runs a stricter version of exactly this on all three operating systems
 (`chmod +x`). Then check `~/.keypaste` is writable — an unwritable audit log stops the server on
 purpose.
 
-**Every call says the vault is locked.** Expected in this version. There is no way to unlock a vault
-from an MCP server yet; see the FAQ and [THREATS.md](../THREATS.md) T-7.
+**Every call is refused with "no keypaste agent is running".** Start one:
+`keypaste agent --vault <path>`. It has to be running, and pointed at the same vault, for anything
+to be granted. If it is running and you still see this, the two are looking at different pipe names
+— pass the same `--approver <name>` to both, or set `KEYPASTE_APPROVER` for both.
+
+**Every call says the vault is locked.** The agent is running but has no vault open. That normally
+means it is still asking for the master password, or you got it wrong and it exited.
 
 **Nothing in the audit log.** The server never started. Claude Desktop keeps its own log at
 `%APPDATA%\Claude\logs\mcp-server-keypaste.log` (macOS: `~/Library/Logs/Claude/`), which captures
@@ -196,19 +224,25 @@ profile or a wrapper script that prints a banner.
 
 ## FAQ
 
-**Can the agent see my passwords?** No. No code path in this version reads a field value at all —
-`request_credential` contains no vault access whatsoever, which is checkable by reading one short
-file. When it does, in a later stage, it will be after you have approved that specific request.
+**Can the agent see my passwords?** One field of one entry, after you have said yes to that exact
+request, for as long as the lifetime you were shown. Never more than one field, and never anything
+you did not approve — `keypaste-mcp` itself contains no vault access whatsoever, which is checkable
+by reading one short file.
 
-**Can it see my entry names?** Not yet, because the vault is locked. When it can, only the ones
-inside `--expose`, which defaults to `env/**`.
+**Can it see my entry names?** Only the ones inside `--expose`, which defaults to `env/**`, and only
+while an agent is running with the vault unlocked.
 
-**Why can't it unlock the vault?** An MCP server's stdin and stdout *are* the protocol stream, and
-Claude Desktop starts it with no terminal, so there is nowhere to prompt you. The two obvious
-workarounds are both worse than waiting: putting the master password in the client's config file
-would place the secret that protects every other secret into a plaintext JSON file, and asking the
-client to collect it would route it through the untrusted party. The unlock channel arrives with the
-approval channel, and whatever owns one should own the other.
+**Why does `keypaste-mcp` not just ask me for the master password?** Because your MCP client starts
+it, which means software starts it — and a password prompt that software can cause to appear is a
+prompt any program on your machine can imitate. There is also nowhere to put one: an MCP server's
+stdin and stdout *are* the protocol stream, and Claude Desktop starts it with no terminal. Putting
+the password in the client's config would place the secret that protects every other secret into a
+plaintext JSON file; asking the *client* to collect it would route it through the untrusted party.
+So the prompt lives in a process you start. [DECISIONS.md D-0023](../DECISIONS.md).
+
+**Do I have to approve every single call?** No. A repeat request for the same field of the same
+entry, from the same connection, inside the lifetime you approved, is served without asking again.
+Change that with `--max-ttl` on the agent.
 
 **Does anything leave my machine?** No. `keypaste-mcp` speaks stdio only and opens no sockets, and
 you do not have to take that on faith: its entire dependency list is four packages pinned by content

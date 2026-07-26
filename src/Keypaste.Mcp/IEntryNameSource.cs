@@ -32,11 +32,11 @@ internal sealed record EntryNameListing(
 /// <remarks>
 /// <para>
 /// It yields <see cref="EntryName"/>, which holds a group path and a title and has no other members.
-/// So no implementation — including the real one Stage 2.2 adds — can return a password through the
+/// So no implementation — including the one that reads a real unlocked vault — can return a password through the
 /// listing path even by mistake. That is a structural guarantee, not a promise (THREATS.md T-8).
 /// </para>
 /// <para>
-/// <b><c>request_credential</c> deliberately does not use this.</b> Stage 2.2 adds a separate seam
+/// <b><c>request_credential</c> deliberately does not use this.</b> It is served by a separate seam
 /// for approval and retrieval. Fusing the two into one "vault access" abstraction would hand the
 /// listing path the ability to return a secret, which is the single change most likely to turn
 /// <c>list_entry_names</c> into an exfiltration tool.

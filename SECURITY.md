@@ -79,6 +79,18 @@ debugger or any process running as the same user can read them, and some values 
 become immutable strings anyway. `SecureString` is deliberately not used: it does not encrypt on
 Linux or macOS, so it would read as a guarantee it cannot provide.
 
+**This applies to approved credentials too, and for longer.** When you approve an agent's request,
+`keypaste agent` holds that field's value in a clearable buffer until the grant expires — up to
+`--max-ttl`, five minutes by default — so a repeat request does not have to ask you again. It is
+zeroed the moment the grant expires rather than at the next time something looks, and when the
+agent stops, every live grant goes with it. But the value reached that buffer as an ordinary
+immutable string out of the vault, and that copy cannot be cleared. It also crosses a local pipe in
+plaintext and arrives in the MCP client's process, where keypaste has no say in what happens to it
+at all. A shorter `--max-ttl` is the control keypaste actually offers.
+
+**And `keypaste agent` keeps the vault unlocked for as long as it runs.** There is no idle auto-lock
+in this version; stopping it is the lock. That is stated here rather than left to be discovered.
+
 **The clipboard is not fully recoverable.** `keypaste get` clears the clipboard after twenty
 seconds, and only if it still holds what keypaste put there. But no clearing survives `kill -9`, a
 crash, or a power cut; on X11 and Wayland the clipboard is owner-served, so the secret also lives
