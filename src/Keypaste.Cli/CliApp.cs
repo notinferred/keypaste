@@ -25,6 +25,15 @@ internal static class CliApp
     /// <summary>The master password was wrong, or none was supplied.</summary>
     internal const int ExitAuthFailed = 4;
 
+    /// <summary>
+    /// The command <c>run</c> was given exists but could not be executed. The shell convention,
+    /// used because scripts already branch on it.
+    /// </summary>
+    internal const int ExitCommandNotExecutable = 126;
+
+    /// <summary>There is no such command. The shell convention, as above.</summary>
+    internal const int ExitCommandNotFound = 127;
+
     internal static int Run(string[] args, TextWriter stdout, TextWriter stderr)
     {
         ArgumentNullException.ThrowIfNull(stdout);
@@ -66,6 +75,9 @@ internal static class CliApp
             case "env":
                 return EnvCommand.Execute(args, context);
 
+            case "run":
+                return RunCommand.Execute(args, context);
+
             case "hello":
                 context.Stdout.WriteLine(CoreInfo.Hello());
                 return ExitSuccess;
@@ -99,6 +111,7 @@ internal static class CliApp
         writer.WriteLine("  ls                  list groups and entries");
         writer.WriteLine("  rm <entry>          remove an entry");
         writer.WriteLine("  env <subcommand>    manage a project's environment variables");
+        writer.WriteLine("  run <project> --    run a command with those variables injected");
         writer.WriteLine("  version             print the core version");
         writer.WriteLine();
         writer.WriteLine("the vault:");
@@ -106,6 +119,7 @@ internal static class CliApp
         writer.WriteLine();
         writer.WriteLine("exit codes:");
         writer.WriteLine("  0 ok  1 usage  2 error  3 not found  4 wrong password");
+        writer.WriteLine("  once a `run` command starts, its exit code is keypaste's own.");
         writer.WriteLine();
         writer.WriteLine("passwords are never echoed. Press Escape at a prompt to cancel.");
     }
