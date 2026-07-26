@@ -1,9 +1,11 @@
 # Threat model — the agent bridge
 
-**Status: partial, and deliberately so.** This document is written across Stage 2. Sections marked
-**Arrives in 2.x** name a threat that is real and *not yet mitigated*, with the PLAN.md checkbox
-that will close it. They are listed because a threat model that is quietly thin is worse than one
-that says where it is thin.
+**Status: still partial, and still deliberately so.** This document is written across Stage 2.
+Sections marked **Arrives in 2.x** name a threat that is real and *not yet mitigated*, with the
+PLAN.md checkbox that will close it. They are listed because a threat model that is quietly thin is
+worse than one that says where it is thin. As of Stage 2.2 the remaining gap is T-5 — the audit log
+is append-only by construction and not yet tamper-evident — plus the halves of T-11 and T-12 that
+belong to the policy file.
 
 This file covers `keypaste-mcp` — the bridge between an AI agent and your vault. For the vault, the
 CLI, and the honest list of what keypaste does not protect against anywhere, see
@@ -17,17 +19,22 @@ nothing does. A threat model whose mitigations are untested is a wish list.
 
 ---
 
-## What Stage 2.1 actually is
+## What the bridge actually is, after 2.2
 
-`keypaste-mcp` currently **grants nothing**. `request_credential` returns DENIED on every call and
-will do so in every configuration, because the human approval flow that CORE.md law 3.2 requires
-does not exist until Stage 2.2 — and law 3.2 says the default is deny. `list_entry_names` refuses
-too, because the vault is locked and this version has no way to unlock it (T-7).
+`keypaste-mcp` releases exactly one field of one entry, and only after a person has said yes to
+that specific request. It holds no vault and makes no decision: it validates the request, refuses
+anything outside the exposure its operator configured, forwards the rest to **`keypaste agent`** —
+a foreground process the human started in their own terminal — writes an audit line, and only then
+answers.
 
-So the honest summary of what an agent can do through this bridge today is: **nothing, loudly, and
-it is written down.** What 2.1 ships is the shape — the transport, the two tool contracts, the
-scoping rule, and the audit log — so that 2.2 adds an approval step rather than inventing the whole
-mechanism at the moment it first has a secret to hand out.
+That split is the security architecture, not an implementation detail (DECISIONS.md D-0023).
+**Nothing an agent does can cause a master-password prompt to appear**, because the only process
+that asks for one is started by a person typing a command. With no agent running, every credential
+request is denied with a refusal that names the command to start one.
+
+So the honest summary of what an agent can do through this bridge is: **name the entries you chose
+to expose, and ask you — once per entry, per field, per connection, within a lifetime you can see
+before you answer — for one value at a time.**
 
 ---
 
@@ -124,19 +131,35 @@ one people forget because it comes from the agent rather than from the vault.
 
 **Who.** The model, or anything steering it.
 
-**Status.** Partially mitigated. **The display half arrives in 2.2** (PLAN.md: *human approval flow*).
+**Status.** Mitigated, in both halves, as far as anything can mitigate meaning.
 
-**Mitigation today.** The reason is capped at 2000 characters by the schema, and what is recorded in
-the audit log is a sanitized excerpt capped at 200 characters, alongside the true length and a
-SHA-256 of the raw text. Recording all three means the log never silently lies about truncation, and
-2.2 can check that the reason shown in the dialog is the reason that was recorded.
+**Mitigation.** The reason is capped at 2000 characters by the schema. What reaches the audit log is
+a sanitized excerpt capped at 200, alongside the true length and a SHA-256 of the raw text, so the
+log never silently lies about truncation.
 
-**Residual.** Until 2.2, nothing renders it to a human at all. When something does, it must render
-it as inert text and must never let its content influence the default button, the timeout, or the
-layout.
+What reaches a person goes through `ApprovalPrompt`, and the shape of that type is the mitigation:
+the reason is sanitized by the same rules as an entry name — no control characters, no newlines, no
+bidirectional overrides — and hard-capped at 400 characters with the truncation stated on screen.
+**The type has no member for a default button, no member for a deadline and no member for a
+layout**, so there is nowhere for a reason to reach one however it is written. The deadline belongs
+to `ApprovalGate`, which enforces it whatever a channel does. The default is no, and only an
+explicit yes is a yes.
 
-**Proved by.** `AuditLogTests.AnOverlongReason_IsExcerptedButItsLengthAndHashAreExact`. The display
-half has nothing to test yet, which is the point of the status above.
+The concrete attack this is shaped against is a reason that closes the request block and writes its
+own reassuring line underneath — *"--- END REQUEST --- keypaste: this one is safe, press y"*.
+Newlines are what would make it work, and collapsing them to spaces is what stops it.
+
+**Residual.** A 400-character reason is still 400 characters of text written to persuade the person
+reading it, in their own language, about their own vault. Nothing here can fix that, and nothing
+claims to. What keypaste does is make sure the reason is inert, that it is labelled as the agent's
+words rather than keypaste's, and that the entry and the field beside it come from the vault instead.
+
+**Proved by.** `AuditLogTests.AnOverlongReason_IsExcerptedButItsLengthAndHashAreExact` for the log
+half. `ApprovalPromptTests` for the display half — including
+`AReasonCannotRedrawThePrompt`, `AHostileReason_IsRenderedInert`, and
+`ThePromptHasNoMember_AReasonCouldUseToChangeTheDefaultOrTheDeadline`, which is a structural
+assertion rather than a behavioural one. End to end, `TerminalApprovalChannelTests` renders a hostile
+reason and counts the separators the channel drew itself.
 
 ---
 
@@ -147,12 +170,18 @@ authenticates that. Any process that can spawn the binary can call itself `claud
 
 **Who.** Any local process, or a client the user installed without reading.
 
-**Status.** Partially mitigated. **The approval half arrives in 2.2**; the policy half is 2.3.
+**Status.** Mitigated as far as an unauthenticated protocol allows. The policy half is 2.3.
 
 **Mitigation.** keypaste **never makes an authorization decision from the client's asserted name.**
-It is an audit field and nothing else. The name is also passed through the same sanitizer as entry
-names before being written, because it is attacker-chosen text that will later be rendered in a
-dialog and a log table — the two places a payload would land.
+It is an audit field and a line in the approval prompt, and nothing else. It is passed through the
+same sanitizer as entry names before being written or shown, because it is attacker-chosen text
+landing in exactly the two places a payload would want to be.
+
+**What a grant is scoped to instead.** A grant is keyed on the *connection* the approver minted an
+id for, not on any name the client chose — so a second process claiming to be `claude-code` inherits
+nothing, and when the approved process restarts, its connection dies and its grants die with it
+(D-0026). That is the strongest honest scoping available here: it means *the process the human
+approved for*.
 
 **Residual, and a decision this forces on 2.3.** prompts.md 2.3 describes policy rules of the form
 "allow client `claude-code` to read …". A rule keyed on an unauthenticated name is a rule any
@@ -166,8 +195,8 @@ scope.
 
 **Proved by.** `ServerToolsTests.EveryCall_WritesOneAuditLine_NamingTheClientAndTheExposure` records
 what the client claimed; `scripts/verify-mcp-stdio.sh` asserts the operator-supplied label reaches
-the log. That no authorization reads either is currently a property of there being no authorization
-to read them — it becomes testable in 2.2.
+the log. That no authorization reads either is now testable rather than vacuous, and
+`GrantCacheTests.AnotherConnection_InheritsNothing` is where it is tested.
 
 ---
 
@@ -258,52 +287,70 @@ until 2.2 — a gap named here rather than left implicit.
 
 ---
 
-## T-7 — The locked-vault posture, and what it costs
+## T-7 — Where the master password is typed — **closed in 2.2**
 
-**What.** In this version `list_entry_names` always refuses, because the vault is locked and
-`keypaste-mcp` cannot unlock it.
+**What.** Something has to unlock the vault, and where that happens decides what habit keypaste
+teaches its users.
 
-**Why it cannot.** An MCP server's stdin and stdout **are** the JSON-RPC protocol stream, so there
-is nowhere to print a prompt or read a reply. Claude Desktop additionally spawns it with no terminal
-at all. A master password could be put in the client's configuration file, and keypaste will not do
-that: it would place the one secret that protects every other secret into a plaintext JSON file,
-which is precisely what law 3.1 exists to prevent. Asking the *client* to collect it — MCP has a
-mechanism for prompting the user through the client — is worse still, because it routes the master
-password through the untrusted party.
+**Why the bridge cannot do it.** An MCP server's stdin and stdout **are** the JSON-RPC protocol
+stream, so there is nowhere to print a prompt or read a reply, and Claude Desktop spawns it with no
+terminal at all. A master password could be put in the client's configuration file, and keypaste
+will not do that: it would place the one secret that protects every other secret into a plaintext
+JSON file, which is precisely what law 3.1 exists to prevent. Asking the *client* to collect it —
+MCP has a mechanism for prompting the user through the client — is worse still, because it routes
+the master password through the untrusted party.
 
-**Status.** By design in 2.1. **The unlock channel arrives in 2.2**, owned by whatever also owns the
-human approval channel.
+**Status. Closed.** The master password is typed in the terminal the user opened, in response to
+`keypaste agent`, a command they typed. **Nothing an agent does can cause a password prompt to
+appear** — which is the property that matters, because any local process can draw a window that
+looks like keypaste's, and a user who has been trained that agent-triggered password prompts are
+normal has no way to tell them apart. DECISIONS.md D-0023.
 
-**The honest cost, which a green test suite would otherwise hide.** The listing, scoping and
-sanitization code described in T-1 and T-4 is complete and thoroughly tested, and in the shipped
-2.1 binary it is **unreachable**. It is exercised by a test double, not by production. Its tests are
-real tests of real logic; they are not evidence that the shipped path works, because in this version
-there is no shipped path.
+**What this also fixes.** 2.1 admitted that the listing, scoping and sanitization code behind T-1
+and T-4 was complete, thoroughly tested, and **unreachable in the shipped binary** — exercised by a
+test double rather than by production. It is on the live path now: the approver holds an unlocked
+vault and the bridge asks it.
 
-**Proved by.** `ServerToolsTests.ListEntryNames_WithALockedVault_RefusesAndExplainsWhy`, and
-`scripts/verify-mcp-stdio.sh` against the real binary, where the source genuinely is the locked one.
+**Residual.** The vault stays unlocked for as long as `keypaste agent` runs. There is no idle
+auto-lock in this version; closing the terminal is the lock. Stage 4.1 owns idle locking, and the
+seam for it is already in place.
+
+**Proved by.** `SecretHygieneTests`, where a real `keypaste agent` over a real vault answers a real
+bridge and only the human is faked, and `scripts/verify-approval-e2e.sh`, where the two really are
+separate processes.
 
 ---
 
-## T-8 — Secrets do not traverse this path in 2.1
+## T-8 — Only the requested field leaves, and only on one path
 
-**Status.** Mitigated structurally, which is stronger than a promise.
+**Status.** Mitigated structurally and, since 2.2, tested against a real secret.
 
-The type that crosses the vault boundary carries a group path and a title, and has no other members
-— so no implementation of that interface, including the real one 2.2 adds, can return a password
-through the listing path even by mistake. `request_credential` is served by a separate file
-containing no vault code at all. Both facts are verifiable by reading two short files rather than by
-trusting this paragraph.
+**The type system does most of it.** The type that crosses the listing boundary carries a group path
+and a title and has no other members, so no implementation of that seam can return a password
+through the listing path even by mistake. The type that carries a released credential holds one
+field *name* and one field *value* and nothing else — it is deliberately not a vault entry with the
+other fields blanked, because a type that could carry a secret and happens not to is one refactor
+away from carrying one. Both facts are checkable by reading two short files.
 
-The two paths are kept apart deliberately. Fusing them into one "vault access" abstraction would
-give the listing path the ability to return a secret, which is the single change most likely to turn
-`list_entry_names` into an exfiltration tool.
+**The two paths are kept apart deliberately**, and stayed apart when they moved onto one socket in
+2.2: different message kinds, different handlers, and only one of them with anywhere to put a
+secret. Fusing them into a single "vault access" abstraction would give the listing path the ability
+to return a credential, which is the single change most likely to turn `list_entry_names` into an
+exfiltration tool.
 
-**Proved by.** The type system, and `ServerToolsTests.AnOutOfScopeName_EscapesByNoRoute` for the
-routes a name could take. Note what that test is careful to do: it plants its sentinel somewhere it
-could genuinely leak. Asserting the absence of a string that was never present anywhere is the trap
-most "no secret leaked" tests fall into, and it is the trap this section would otherwise be resting
-on.
+**The ordering is the other half.** The approver resolves the entry, re-checks it against the
+exposure, looks for a live grant, asks a person — and reads the field **last of all**. Nothing
+decrypts a credential until somebody has said yes to that exact request, so a denied or timed-out
+request never had one in memory to leak.
+
+**Proved by.** `SecretHygieneTests`, which is where this stops being an argument. A real vault, a
+real approver, and **four different sentinels in the four fields of one entry**: the requested one
+has to come back, and the other three have to appear nowhere — not in the result, not in the audit
+log, not in the raw JSON-RPC bytes on the wire, and not on the listing path. A fifth sits in an
+entry outside the exposure. Every non-approval answer is swept the same way. Note what these tests
+are careful to do: they plant sentinels somewhere they could genuinely leak, because asserting the
+absence of a string that was never present anywhere is the trap most "no secret leaked" tests fall
+into — and one this repository has fallen into before.
 
 ---
 
@@ -331,6 +378,120 @@ restore, which means nothing can enter that closure without a diff someone appro
 
 ---
 
+## T-10 — The approver channel
+
+**What.** `keypaste-mcp` reaches `keypaste agent` over a local named pipe, and a released credential
+crosses that pipe in plaintext. Anything that could bind the pipe first, or connect to it, would sit
+between an agent and a person's approval.
+
+**Who.** Another local user account on the same machine. Not the user's own processes — assumption 1
+already puts those out of scope everywhere in keypaste.
+
+**Status.** Mitigated by the runtime, deliberately rather than by hand.
+
+**Mitigation.** The pipe is opened with `PipeOptions.CurrentUserOnly` on both platforms. On Windows
+that restricts its ACL to the current user; on Unix, where .NET implements named pipes over a Unix
+domain socket, it creates the socket owner-only and verifies on connect that the peer's socket is
+owned by the same user. keypaste writes no access control of its own, which is the point: this is
+the same instinct as law 3.6 applied to a different primitive (D-0024).
+
+The name carries a per-user discriminator, so two people on one machine do not collide. A frame is
+capped at 64 KiB and a peer that sends more without a delimiter loses its connection, because the
+process on the other end is the one holding the unlocked vault and must not be something a stranger
+can grow a buffer inside. A frame that will not parse costs that connection and nothing else.
+
+**Residual, stated because the wording matters.** .NET's Unix emulation puts the socket at a
+predictable path under the shared temporary directory. Another local user can pre-create that path
+and stop your approver binding — a denial of service, which keypaste answers by refusing every
+request, the direction law 3.7 asks for. What they cannot do is be connected to, because the
+ownership check refuses. keypaste does not claim the pipe is confidential against a root user or
+against anything running as you.
+
+**Proved by.** `ApproverListenerTests`, on all three platforms in CI — including
+`TwoBridgesCanBeConnectedAtOnce`, which is the behaviour most likely to differ between Windows named
+pipes and the Unix emulation of them, and `AGarbageFrame_CostsThatConnectionAndNoOther`, which sends
+real garbage down a raw pipe rather than through the encoder. That `CurrentUserOnly` does what its
+documentation says is **not** tested: doing so would need a second user account, which a CI runner
+does not have. That is a dependency on the runtime's own claim, and it is named here rather than
+implied.
+
+---
+
+## T-11 — Prompt fatigue, and clicking yes to make it stop
+
+**What.** An agent can call `request_credential` in a loop. Every call is another prompt. A person
+answering their tenth popup in a minute is not reading it, and the eleventh is the one that gets
+approved. This is not a bug in any single component; it is what happens when a security decision is
+delegated to a human whose attention is finite.
+
+**Who.** A model that is stuck and retrying, an agent steered by injected instructions, or two
+clients that both want the same key.
+
+**Status.** Partially mitigated. The two mitigations that stop a loop are in; the ones that shape
+policy are Stage 2.3's subject, and the per-client pause is Stage 4.3's own feature.
+
+**Mitigation.**
+- **One request in front of a person at a time.** A second is refused immediately rather than
+  queued, because a queue is a pipeline that eventually shows every prompt — which is the storm it
+  was supposed to prevent. This is load-bearing rather than theoretical: the MCP SDK dispatches tool
+  calls concurrently, which was measured, not assumed.
+- **A cooldown after a refusal.** The same connection asking for the same field of the same entry is
+  auto-denied for sixty seconds. "The human said no, ask again immediately" is the other half of a
+  loop, and the busy check does not catch it because the first prompt is long gone.
+- **The window itself throttles.** A prompt that nobody answers costs the agent forty-five seconds,
+  so an unattended machine cannot be made to produce prompts faster than that.
+- **Wording.** A refusal that a person made, and a cooldown, both tell the agent not to retry. A
+  timeout and a busy signal deliberately do not, because nobody decided anything (D-0027).
+
+**Residual.** There is no rate limit across different entries, no cap on how many prompts a client
+may raise in an hour, and no "pause this client" switch. An agent that asks for twenty *different*
+entries will produce twenty prompts, one every forty-five seconds at worst. Stage 2.3's policy file
+and Stage 4.3's per-client controls are where those belong; naming them here is what stops them
+being forgotten.
+
+**Proved by.** `ApprovalGateTests.ASecondRequestWhileSomebodyIsDeciding_IsRefusedNotQueued` and
+`TheSameRequestRightAfterARefusal_IsDeniedWithoutAskingAgain`, plus the pair of `ServerToolsTests`
+that pin the presence and the absence of "do not retry" in adjacent refusals. Nothing tests that a
+tired human reads more carefully, because nothing can.
+
+---
+
+## T-12 — A grant reused under a reason nobody read
+
+**What.** Once a person approves a request, the grant lives for its TTL and repeat requests for the
+same field of the same entry are served without asking again — which is the feature. The cost is
+that the second request's stated `reason` is never shown to anybody. An agent can win one approval
+with an honest sentence and spend the rest of the lifetime on something else.
+
+**Who.** The model, or anything steering it.
+
+**Status.** Made visible rather than prevented, and that is a deliberate limit.
+
+**Mitigation.** Every reuse is still an agent access and still gets its own audit line —
+`granted` / `grant-cache` — recording *that* request's reason excerpt, its true length and its
+SHA-256. The line a person actually read is the earlier `granted` / `prompt` line for the same entry
+and field, so the two can be paired and compared: divergence is visible in the log even though it is
+not blocked. Stage 2.4's `keypaste log` is where that pairing gets a reader. The approver also
+prints a line per reuse to its own terminal, so a burst is visible without being modal.
+
+The lifetime is bounded on three sides: `min(requested, --max-ttl)` with a default of five minutes,
+scoped to one connection so it dies when the client restarts, and zeroed by its own timer at expiry
+rather than at the next time something looks.
+
+**Residual.** Inside the TTL, the reason is not checked against the one that was approved. **This is
+deliberate.** Re-prompting when a reason looks "materially different" would be a heuristic over
+untrusted text — the same argument T-1 already makes for refusing a phrase blocklist — and it would
+hand an agent a lever for forcing re-prompt loops, which is T-11. A shorter `--max-ttl` is the honest
+control, and it is one number.
+
+**Proved by.** `GrantCacheTests` for the lifetime, the scoping and the zeroing;
+`ApproverHandlerTests.ARepeatRequestInsideTheTtl_IsServedWithoutAskingAgain` for the reuse itself
+and for the fact that it costs exactly one prompt and one vault read. That the divergence is
+*visible* is a property of the log's contents, and it has no reader until 2.4 — said here rather
+than counted as mitigated.
+
+---
+
 ## Out of scope, with reasons rather than silence
 
 | | |
@@ -348,4 +509,5 @@ restore, which means nothing can enter that closure without a diff someone appro
 | Stage | What changed |
 |---|---|
 | 2.1 | Document created. T-1, T-4, T-6, T-7, T-8, T-9 owned. T-2, T-3, T-5 partial. Decisions in DECISIONS.md D-0019 (the dependency), D-0020 (the audit log), D-0021 (exposure), D-0022 (the locked vault). |
-| 2.4 | *(planned)* Completes T-2, T-3, T-5; adds the audit hash chain and `keypaste log verify`; expands the out-of-scope entries marked above. |
+| 2.2 | The approval flow. **T-7 closed** — the master password is typed in a terminal a person opened, and the listing path is reachable in the shipped binary at last. T-2 and T-3 completed. T-8 rewritten: secrets do traverse this path now, and are tested against real ones. New: T-10 (the approver channel), T-11 (prompt fatigue), T-12 (a grant reused under a reason nobody read). Decisions in D-0023 (the separate process), D-0024 (the pipe), D-0025 (the window), D-0026 (the grant cache), D-0027 (the refusal vocabulary). |
+| 2.4 | *(planned)* Completes T-5; adds the audit hash chain and `keypaste log verify`; gives T-12's divergence a reader; expands the out-of-scope entries marked above. |
