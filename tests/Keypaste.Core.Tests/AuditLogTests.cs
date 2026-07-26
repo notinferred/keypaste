@@ -43,7 +43,21 @@ public sealed class AuditLogTests : IDisposable
         return log;
     }
 
-    private string[] Lines() => File.ReadAllLines(LogPath);
+    /// <summary>
+    /// Reads the log the way a reader has to while a server still holds it open.
+    /// </summary>
+    /// <remarks>
+    /// Not <see cref="File.ReadAllLines(string)"/>: that asks for <see cref="FileShare.Read"/>,
+    /// which denies other <em>writers</em>, so on Windows it fails outright while any keypaste-mcp
+    /// has the log open. This is the same constraint <c>keypaste log</c> will be under in Stage 2.4.
+    /// </remarks>
+    private string[] Lines()
+    {
+        using var stream = new FileStream(LogPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        using var reader = new StreamReader(stream);
+
+        return reader.ReadToEnd().Split('\n', StringSplitOptions.RemoveEmptyEntries);
+    }
 
     [Fact]
     public void EachRecord_IsExactlyOneLineOfValidJson()

@@ -34,6 +34,15 @@ namespace Keypaste.Core.Audit;
 /// existence — and the operating system releases that when the process dies.
 /// </para>
 /// <para>
+/// <b>Reading it while a server is running.</b> The file is opened <see cref="FileShare.ReadWrite"/>
+/// so it can be read live, but a reader has to grant the same courtesy back:
+/// <see cref="File.ReadAllLines(string)"/> and friends ask for <see cref="FileShare.Read"/>, which
+/// denies other <em>writers</em> and therefore fails outright on Windows while any keypaste-mcp
+/// holds the log. Stage 2.4's <c>keypaste log</c> must open with
+/// <see cref="FileShare.ReadWrite"/> or it will not work on the platform where people are most
+/// likely to have two clients running at once.
+/// </para>
+/// <para>
 /// <b>Every line is one line.</b> Records are written with the default JSON encoder, which escapes
 /// every non-ASCII character and every control character, so a newline inside a value can never
 /// split a record across two physical lines — which is what keeps the file readable by

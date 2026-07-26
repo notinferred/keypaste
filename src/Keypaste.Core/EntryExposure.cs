@@ -42,8 +42,11 @@ public sealed class EntryExposure
     /// <summary>A title pattern that constrains nothing.</summary>
     internal const string AnyTitle = "*";
 
-    /// <summary>The one glob in force when nobody widened the exposure.</summary>
-    internal const string DefaultGlob = EnvConvention.RootGroup + "/" + DoubleStar;
+    /// <summary>
+    /// The one glob in force when nobody widened the exposure. Public because a front end has to be
+    /// able to say "no <c>--expose</c> was given, so use this" without spelling out the string.
+    /// </summary>
+    public const string DefaultGlob = EnvConvention.RootGroup + "/" + DoubleStar;
 
     /// <summary>
     /// The wildcard character itself. <c>internal</c> rather than <c>private</c> because the
