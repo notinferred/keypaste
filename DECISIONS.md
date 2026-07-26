@@ -755,14 +755,26 @@ attempt and passes at four. `TheRetryHasRoomToAbsorbATransientFailure` pins the 
 quietly reducing them cannot silently restore the old behaviour, and two further tests pin that a
 save which genuinely cannot succeed still fails, and fails promptly rather than hanging.
 
-**The first version of those tests was wrong in a way worth recording.** It simulated the failure by
-holding the vault file open with `FileShare.None`, which is what actually happens in the wild. That
-works on Windows and does nothing on Linux or macOS, where file locking is advisory — the save
-simply succeeds, so `Assert.Throws` found no exception and both tests failed on two of the three
-operating systems. The mechanism is now a directory that is removed and, for the transient case,
-put back: it fails everywhere, through the same retry path, for the same reason. A test that
-asserts real behaviour on one platform and nothing at all on the others is worse than no test,
-because the green tick claims all three.
+**Three earlier versions of those tests were wrong, and each mistake is worth naming.**
+
+The first simulated the failure by holding the vault file open with `FileShare.None`, which is what
+actually happens in the wild. That works on Windows and does nothing on Linux or macOS, where file
+locking is advisory — the save simply succeeded, so `Assert.Throws` found no exception and the
+tests failed on two of the three operating systems. A test that asserts real behaviour on one
+platform and nothing at all on the others is worse than no test, because the green tick claims all
+three. The mechanism is now a directory that is removed and, for the transient case, put back: it
+fails everywhere, through the same retry path, for the same reason.
+
+The second repaired the directory from `Task.Run`. On the Windows runner, with four cores already
+saturated by other test collections, the thread pool did not schedule the repair until after the
+retry window had closed, and the test failed. It now uses a dedicated thread, so the result does
+not depend on how busy the machine is.
+
+The third computed its expected elapsed time *from the constants it was testing*, so at one attempt
+the expectation fell to zero and the assertion passed against a build with no retry at all. It now
+compares against a fixed floor. This is the same failure as the two weak tests caught in Stage 1.1,
+and it is only ever caught by running the test against a deliberately broken build — which is why
+every guard here was A/B'd at one attempt and at four before being trusted.
 
 **Three separate places were hiding the reason, and all three are fixed.** Diagnosing this took two
 CI round trips that it should not have, because at every layer the interesting information was

@@ -50,32 +50,68 @@ public sealed class VaultSaveTests : IDisposable
     /// The point of the retry: a failure that goes away on its own must not reach the user.
     /// </summary>
     /// <remarks>
-    /// Fails against a single attempt — confirmed by setting
-    /// <see cref="KeePassInterop.SaveAttempts"/> to 1, which reports the same
-    /// <c>Access is denied</c> that CI was reporting before the retry existed.
+    /// <para>
+    /// The repair runs on a dedicated thread rather than on the thread pool. The first version of
+    /// this test used <see cref="Task.Run(Action)"/> and failed on the Windows runner: with four
+    /// cores already saturated by other test collections, the pool did not schedule the repair
+    /// until after the retry window had closed. A test whose result depends on how busy the
+    /// machine is tells you about the machine.
+    /// </para>
+    /// <para>
+    /// The delay is a small fraction of the retry window, so the margin is wide in the direction
+    /// that could flake, while the failing direction stays exact: at one attempt there is no
+    /// window at all and this cannot pass.
+    /// </para>
     /// </remarks>
     [Fact]
-    public async Task ATransientFailure_IsAbsorbed()
+    public void ATransientFailure_IsAbsorbed()
     {
         var (vault, home) = NewVaultInItsOwnDirectory("transient");
         using var _ = vault;
 
-        var token = TestContext.Current.CancellationToken;
         Directory.Delete(home, recursive: true);
 
-        var restore = Task.Run(
-            () =>
-            {
-                Thread.Sleep(120);
-                Directory.CreateDirectory(home);
-            },
-            token);
+        var repair = new Thread(() =>
+        {
+            Thread.Sleep(40);
+            Directory.CreateDirectory(home);
+        })
+        { IsBackground = true };
 
+        repair.Start();
         var failure = Record.Exception(vault.Save);
-        await restore;
+        repair.Join();
 
         Assert.True(failure is null, $"a failure that cured itself still reached the caller: {failure?.Message}");
         Assert.True(File.Exists(Path.Combine(home, "vault.kdbx")));
+    }
+
+    /// <summary>
+    /// The retry is real, and not a loop that gives up on the first pass. Asserted on elapsed
+    /// time, which only ever runs long, so this is exact in both directions: the backoff cannot
+    /// take less than the sum of its sleeps, and a single attempt cannot take as long as one.
+    /// </summary>
+    [Fact]
+    public void ADoomedSave_ActuallyRetriesBeforeGivingUp()
+    {
+        var (vault, home) = NewVaultInItsOwnDirectory("retries");
+        using var _ = vault;
+
+        Directory.Delete(home, recursive: true);
+
+        var started = Environment.TickCount64;
+        Assert.Throws<VaultException>(vault.Save);
+        var elapsed = Environment.TickCount64 - started;
+
+        // A fixed floor, deliberately NOT computed from SaveAttempts and SaveRetryDelayMilliseconds.
+        // Deriving the expectation from the values under test makes it follow them down to zero:
+        // the first version of this line did exactly that and passed at one attempt, asserting
+        // nothing. 50ms is comfortably under the 75ms that the minimums pinned by
+        // TheRetryHasRoomToAbsorbATransientFailure already imply, and far above the ~0ms a single
+        // attempt takes.
+        Assert.True(
+            elapsed >= 50,
+            $"a doomed save returned in {elapsed}ms; it cannot have retried");
     }
 
     /// <summary>
