@@ -25,7 +25,12 @@ public sealed class RunCommandTests
         foreach (var (key, value) in variables)
         {
             harness.Prompt.Enqueue(Master, value);
-            harness.Run("env", "set", "dev", key, "--vault", harness.VaultPath);
+
+            // Checked, so a seeding failure says so here rather than surfacing later as an
+            // assertion about something else entirely.
+            harness.AssertExit(
+                CliApp.ExitSuccess,
+                harness.Run("env", "set", "dev", key, "--vault", harness.VaultPath));
         }
 
         harness.Stdout.GetStringBuilder().Clear();

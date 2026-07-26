@@ -252,8 +252,15 @@ internal sealed class FakeProcessLauncher : IProcessLauncher
     internal Action? OnRun { get; set; }
 
     /// <summary>The environment the last child would have been given.</summary>
-    internal IReadOnlyDictionary<string, string> Environment =>
-        Started.Count == 0 ? new Dictionary<string, string>(StringComparer.Ordinal) : Started[^1].Environment;
+    /// <remarks>
+    /// Throws rather than returning an empty dictionary when no child was started. The empty
+    /// version turned "the run failed before reaching the launcher" into
+    /// <c>KeyNotFoundException: 'UNRELATED' was not present</c>, which reads like a merge bug and
+    /// is not one.
+    /// </remarks>
+    internal IReadOnlyDictionary<string, string> Environment => Started.Count == 0
+        ? throw new InvalidOperationException("no child was ever started; the run failed before that")
+        : Started[^1].Environment;
 
     public ChildResult Run(ChildStart start)
     {
