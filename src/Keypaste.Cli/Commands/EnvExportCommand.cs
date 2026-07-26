@@ -285,13 +285,6 @@ internal static class EnvExportCommand
             yield return $"note: {quoted} needed double quotes, and not every .env reader processes " +
                 "the escapes in that form the way keypaste does. Check them if another tool reads this file.";
         }
-
-        var backslash = NamesOf(notes, DotEnvWriteNoteKind.TrailingBackslash);
-        if (backslash.Length > 0)
-        {
-            yield return $"note: {backslash} end in a backslash, which some .env readers run past " +
-                "the closing quote on. Check them if another tool reads this file.";
-        }
     }
 
     private static string NamesOf(IReadOnlyList<DotEnvWriteNote> notes, DotEnvWriteNoteKind kind) =>
