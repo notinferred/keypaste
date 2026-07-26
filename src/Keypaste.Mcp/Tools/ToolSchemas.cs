@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Keypaste.Core.Approval;
 
 namespace Keypaste.Mcp.Tools;
 
@@ -89,10 +90,13 @@ internal static class ToolSchemas
 
     /// <summary>The field names <c>request_credential</c> will accept.</summary>
     /// <remarks>
-    /// A field rather than an inline collection because a constant array passed as an argument is a
-    /// build error in this repository (CA1861).
+    /// Taken from the core rather than written again here, because four things have to agree about
+    /// this list — the schema an agent reads, the server's own re-validation, the approval prompt a
+    /// person reads, and the approver's release path — and CORE.md law 4.3 does not allow that
+    /// written down four times. <c>TheSchemaAndTheCoreAgreeAboutFields</c> is what keeps the JSON
+    /// literal above in step with it.
     /// </remarks>
-    internal static readonly string[] AllowedFields = ["password", "username", "url", "notes"];
+    internal static IReadOnlyList<string> AllowedFields => CredentialFields.All;
 
     /// <summary>
     /// Detaches the element from its document, so the parsed schema outlives the parse without

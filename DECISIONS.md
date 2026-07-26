@@ -1197,6 +1197,228 @@ retrying the first.
 
 ---
 
+## D-0023 - The approver is a separate process the human starts
+
+**Date:** 2026-07-26 · **Stage:** 2.2 · **Status:** accepted
+
+`keypaste agent` is a foreground command. It unlocks the vault, listens on a local named pipe, and
+asks the person who started it about every credential request. `keypaste-mcp` becomes a secretless
+proxy: it validates, scopes, forwards, audits, and returns one field.
+
+Three designs were on the table. Two of them put the approval flow inside `keypaste-mcp`, differing
+only in whether the master password was collected by the approval dialog itself or by a separate
+unlock held as a session. Both were rejected for the same reason, and it is not a technical one.
+
+**keypaste exists to stop people putting secrets where they do not belong.** A window that an AI
+caused to appear, asking for the master password, teaches exactly the habit the product is built to
+break - and any local process can draw an identical one. Under this design the master password is
+typed in a terminal the user opened, in response to a command they typed, using the same
+`ConsoleSecretPrompt` ceremony as `keypaste get`. **Nothing an agent does can raise a password
+prompt.** That is a property worth a whole extra process, and CORE.md tiebreaker 1 settles it on its
+own: if it risks trust, no.
+
+Three things fall out of it that were not the reason but are worth as much:
+
+**It deletes a class of problem rather than solving one.** An MCP server's stdin and stdout *are*
+the JSON-RPC stream, so an in-process prompt would have had to reach the controlling terminal
+directly: `/dev/tty`, two incompatible `termios` struct layouts for Linux and macOS, a P/Invoke
+surface on the exact code path D-0005's AOT gate exists to make expensive, and a `stty -echo` that
+leaves somebody's shell typing invisibly if the process dies mid-prompt. Put the prompt in a process
+whose stdin already *is* a terminal and none of that exists. `CONIN$` on Windows has the same shape
+and the same answer.
+
+**THREATS.md T-7 closes.** The listing, exposure and sanitization code that D-0022 admitted was
+"complete, thoroughly tested, and unreachable in the shipped binary" is on the live path now, because
+the approver has an unlocked vault to list from.
+
+**Stage 4.3 becomes a re-skin.** prompts.md describes an Agent Activity screen with Approve/Deny
+buttons "replacing the OS dialog when the app is open". That is another `IApprovalChannel`, not a
+rewrite - and the seam it needs is the seam this stage had to cut anyway.
+
+### What it costs, stated rather than buried
+
+A second thing to be running, and a new IPC surface (D-0024, THREATS.md T-10). The refusal for "no
+agent is running" therefore names the exact command to run and deliberately omits "do not retry",
+because retrying is the right thing to do once somebody has started one.
+
+**Deliberately not a daemon.** No service, no launch agent, no systemd unit, no PID file, no
+starting itself on demand. Those turn "is anything able to act as me right now?" into a question
+with a complicated answer, and the honest version of that answer is "look at whether the terminal is
+still open".
+
+**No idle auto-lock in 2.2.** The vault stays unlocked for as long as the agent runs; Ctrl+C is the
+lock. It is not in the specification, Stage 4.1 explicitly owns idle locking, and
+`VaultCredentialSource` already takes the vault through a delegate returning null - so adding it
+later changes nothing else. Said in docs/approvals.md rather than left to be discovered.
+
+**One measured finding that shaped the concurrency design.** The MCP SDK dispatches tool calls
+concurrently - `ServerToolsTests.TwoToolCalls_RunAtTheSameTime` pins it. That is good news for the
+demo, because a request parked for forty-five seconds waiting for a person does not stall the
+session. It is bad news for the approver, because two requests really can race two prompts onto one
+screen, which makes single-in-flight a load-bearing rule rather than a precaution and means
+everything the flow mutates has to be thread-safe.
+
+---
+
+## D-0024 - The approver channel is a named pipe with CurrentUserOnly
+
+**Date:** 2026-07-26 · **Stage:** 2.2 · **Status:** accepted
+
+`NamedPipeServerStream` and `NamedPipeClientStream` with `PipeOptions.CurrentUserOnly`, on both
+platforms, one code path.
+
+The runtime does the access check. On Windows the option restricts the pipe's ACL to the current
+user; on Unix, where .NET implements named pipes over a Unix domain socket, it creates the socket
+owner-only and verifies on connect that the peer's socket is owned by the same user. That buys:
+no `System.IO.Pipes.AccessControl` package (which would be the second runtime dependency in `src/`
+and would have to clear D-0019's bar), no hand-written `PipeSecurity`, no
+`UnixDomainSocketEndPoint`, and no `sun_path` length limit to discover on somebody's long home
+directory. CORE.md law 3.9 rewards the option that adds nothing.
+
+The name carries a per-user discriminator - sixteen hex characters of SHA-256 over the user's
+profile path - because .NET's Unix emulation puts the socket at a predictable path under the shared
+temporary directory, and without it two users on one machine would collide. It is a namespacing
+device and not a secret, exactly like `EntryHandle`.
+
+**The residual, for T-10.** That path is predictable, so another local user can pre-create it and
+stop your approver binding. What they cannot do is be connected to, because the ownership check
+refuses. Denial of service against the approver means keypaste denies every request, which is the
+direction law 3.7 asks for.
+
+**Wire format:** one JSON object per line, `Utf8JsonWriter` out and `JsonDocument` in only -
+`JsonSerializer` stays banned for the demonstrated IL2026/IL3050 reason in D-0019. Frames are capped
+at 64 KiB, and a peer that sends more without a delimiter loses its connection rather than growing a
+buffer inside the process that holds the unlocked vault.
+
+**One transport is not one seam.** D-0022 forbids fusing the listing path and the credential path.
+That still holds: they are different message kinds with different handlers, and only
+`CredentialReply` has anywhere to put a secret. Sharing a pipe does not fuse them; sharing an
+interface would have. `CredentialReply.ToString()` is overridden to redact the value, because a
+record prints every member by default and one interpolated string in a log line or an exception
+message would put a live credential somewhere it can never be taken back from.
+
+---
+
+## D-0025 - The approval window is 45 seconds, not the 60 the specification asks for
+
+**Date:** 2026-07-26 · **Stage:** 2.2 · **Status:** accepted
+
+prompts.md 2.2 says "60-second timeout is deny". Shipping that would have been wrong, and the reason
+is measurable rather than aesthetic.
+
+**60 seconds is the MCP client's own request timeout.** The reference SDK's
+`DEFAULT_REQUEST_TIMEOUT_MSEC` is 60000, and both Claude Desktop and Claude Code inherit it. A
+60-second approval window therefore sits exactly on the client's wall: an approval given at second
+55 arrives into a request that has already been abandoned, the user sees an error, and the agent's
+retry raises a **second prompt for something the human has already approved** - which is prompt
+fatigue and a confused deputy in one move.
+
+45 seconds by default, `--approval-timeout` to change it, floor 5 and ceiling 55.
+`ApprovalPromptTests.TheDefaultWindowSitsUnderEveryClientsOwnTimeout` is what stops somebody
+"fixing" it back to 60. The number 60 appears in the documentation only as the client's ceiling and
+the reason ours sits under it.
+
+**Progress notifications were considered and rejected.** They renew the client's timeout only where
+the client opted in with a `progressToken` and honours `resetTimeoutOnProgress`; several do not. A
+design that must be correct against a hard wall anyway gains nothing from them but surface.
+
+**A related finding, measured and not assumed:** with `ModelContextProtocol.Core` 1.4.1, a client
+abandoning a single `tools/call` does not reach the server at all - the token the tool is handed is
+never cancelled. So `AuditMethod.Cancelled` is written by the defensive checks in the bridge and the
+gate, but is not produced by that path. `ServerToolsTests.ACallTheClientAbandons_IsStillAudited_AndCarriesNoCredentialIntoTheLog`
+says so in its own doc comment rather than being named for a branch it never reaches. The consequence
+worth knowing is not a leak - nothing reaches a party that was not already on that stream - but that
+an abandoned request still spends a person's approval, and the agent's retry is then served from the
+grant cache without asking them again.
+
+---
+
+## D-0026 - The grant cache stores the value, keyed on the connection
+
+**Date:** 2026-07-26 · **Stage:** 2.2 · **Status:** accepted
+
+A grant is keyed on `(ConnectionId, EntryHandle, Field)` and holds the released characters until its
+TTL expires.
+
+**Not the client's asserted name.** THREATS.md T-3 says that name is unauthenticated - any process
+that can spawn the bridge can call itself `claude-code` - so it may be an audit field and never an
+authorization input. A connection id is the strongest honest scoping available: it means *the process
+the human approved for*, and when that process restarts its connection dies and its grants die with
+it.
+
+**The field is part of the key.** The specification says "repeat requests for the same entry", and
+that is a bug as written: without the field, an approval a person gave for a user name would silently
+satisfy a request for the password. `GrantCacheTests.AUsernameGrant_DoesNotSatisfyAPasswordRequest`
+pins it.
+
+**The value, not a capability.** A token meaning "you may re-open the vault and read field X" would
+be worse three ways: it keeps a capability alive rather than a datum, it re-enters the vault on every
+hit, and the vault may have changed underneath so the second answer differs from the one the person
+approved. Storing the value makes a grant exactly what was approved, makes expiry an overwrite, and
+lets the approver drop its unlocked vault without invalidating grants a person already gave. A hit
+hands out a *copy*, so one caller cannot zero another's grant.
+
+**Expiry zeroes rather than forgets.** Each grant carries a one-shot timer for its own TTL, so an
+unused grant is cleared at the moment it expires instead of lingering in the heap until something
+happens to look for it.
+
+**The effective TTL is `min(requested, --max-ttl)`, default 300 seconds, and the prompt shows the
+number that will actually apply.** Showing an agent's requested hour when five minutes will be
+granted would make the prompt a worse source of truth than the audit log, which is backwards.
+
+### The residual, which is real (THREATS.md T-12)
+
+On a cache hit the human never sees the second request's stated reason. An agent can win one approval
+honestly and then reuse the grant for the rest of the TTL with reasons nobody reads. What is done
+about it: every hit is still audited, as `granted` / `grant-cache`, recording *that* request's reason
+excerpt, length and SHA-256 - so divergence from the reason a person actually read is visible in the
+log when the two lines are paired. And the approver prints a line per hit to its own terminal, so a
+storm is visible without being modal.
+
+**Deliberately not done:** re-prompting when the reason is "materially different". That is a
+heuristic over untrusted text, which is the same argument T-1 already makes for refusing a phrase
+blocklist, and it would hand an agent a lever for forcing re-prompt loops.
+
+---
+
+## D-0027 - Two ways of saying no are not one way
+
+**Date:** 2026-07-26 · **Stage:** 2.2 · **Status:** accepted
+
+`AuditMethod` gained seven members in this stage: `prompt`, `grant-cache`, `timed-out`, `cancelled`,
+`no-approver`, `busy`, `cooldown`, `failed`. Each one selects both the word written to the audit log
+and the sentence an agent reads, keyed in one place (`ToolText.Refusal`) so the two cannot drift.
+
+The distinction that earns its keep is **whether retrying could ever help**, because an agent reads a
+refusal and decides what to do next:
+
+- *no approver* names the command to run and says to try again after - that refusal is five seconds
+  from being fixed, and the agent is the only party in a position to say so.
+- *a person said no* and *cooldown* say **do not retry**. Without that sentence a capable agent loops
+  on a considered refusal, which is both a token bill and a stream of prompts until somebody clicks
+  the wrong one (T-11).
+- *timed out* and *busy* deliberately **omit** it. Nobody decided anything - they were away from the
+  keyboard, or looking at another request - so one later attempt is reasonable.
+
+`ServerToolsTests` pins the presence and the absence of "do not retry" in adjacent tests, so a change
+that flattened every refusal into the same wording goes red.
+
+**One bug was found doing this.** `AuditLog.Wire(AuditMethod)` fell back to `"vault-locked"` for any
+member it did not name, so each of the seven new ones would have been recorded as a denial that never
+happened - the quietest possible way to make the log law 3.3 requires say something untrue. The
+fallback is now `"unknown"`, and `AuditLogTests.EveryAuditMethod_HasItsOwnWireString` is what
+actually stops the next member slipping through. It does not throw: an audit write must not be the
+thing that takes the server down.
+
+**One information leak was closed.** "There is no such entry" and "that entry is outside your
+exposure" have to be the *same* answer, or the difference is an oracle an agent can use to enumerate
+what exists in parts of the vault it was never allowed to see - the exposure rule undone by an error
+message. Both produce `out-of-scope`, with identical text, an identical decision and an identical
+empty entry field. The audit line still records which it really was, because that reader is the
+human. `ApproverHandlerTests.AMissingEntryAndAForbiddenOne_AreIndistinguishableToTheAgent`.
+
+---
+
 # Open decisions
 
 ## O-0002 — Contribution terms: DCO or CLA

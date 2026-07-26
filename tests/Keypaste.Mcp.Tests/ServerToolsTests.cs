@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Keypaste.Core.Approval;
+using Keypaste.Core.Audit;
 using Keypaste.Mcp.Tools;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
@@ -11,17 +13,19 @@ namespace Keypaste.Mcp.Tests;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Read this before trusting a green run.</b> In this version <c>request_credential</c> is
-/// hard-coded to deny, so every test below that asserts a denial would pass whether or not
-/// validation, scoping and audit logging existed at all. Their value arrives with Stage 2.2's
-/// approval flow. What is genuinely under test today is the listing path, the sanitizer, the
-/// exposure filter and the audit trail — and the listing path is exercised through a fake source,
-/// because the shipped binary's is always locked (THREATS.md T-7).
+/// <b>What changed in Stage 2.2, and what it means for these tests.</b> Until this stage
+/// <c>request_credential</c> was hard-coded to deny, so every denial test here would have passed
+/// whether or not validation, scoping and audit logging existed — DECISIONS.md D-0022 said so
+/// outright and said they would earn their keep in 2.2. They have: a real approver now answers over
+/// a real pipe, so a denial is one outcome among several rather than the only one the code can
+/// produce, and a test that asserts one is distinguishing it from the others.
 /// </para>
 /// <para>
-/// The one assertion that is meaningful in both versions is
-/// <see cref="AnOutOfScopeName_EscapesByNoRoute"/>, which plants its sentinel somewhere it could
-/// genuinely leak rather than asserting the absence of a string that was never anywhere.
+/// The listing path is still driven through a fake source <em>here</em>, because these tests are
+/// about the bridge's own behaviour. The shipped path — names coming from a real vault through a
+/// real approver — is exercised in <see cref="SecretHygieneTests"/>, where nothing is faked but the
+/// human. That is what closes THREATS.md T-7's admission that the sanitizer and exposure filter
+/// were unreachable in the binary keypaste actually ships.
 /// </para>
 /// </remarks>
 public sealed class ServerToolsTests
@@ -45,6 +49,28 @@ public sealed class ServerToolsTests
     private static async Task<IList<McpClientTool>> ToolsAsync(McpClient client) =>
         await client.ListToolsAsync(cancellationToken: Token);
 
+    /// <summary>
+    /// Waits for the audit line to land. The tool writes it after the client has already given up,
+    /// so there is no result to await as a signal that the write has happened.
+    /// </summary>
+    private static async Task<string> AuditLineAsync(McpHarness harness)
+    {
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            var lines = harness.AuditLines();
+
+            if (lines.Length > 0)
+            {
+                return lines[0];
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(50), Token);
+        }
+
+        Assert.Fail("no audit line was written for a cancelled call");
+        return string.Empty;
+    }
+
     private static string TextOf(CallToolResult result) =>
         string.Concat(result.Content.OfType<TextContentBlock>().Select(block => block.Text));
 
@@ -60,6 +86,53 @@ public sealed class ServerToolsTests
             ["reason"] = reason,
             ["ttl_seconds"] = ttl,
         };
+
+    /// <summary>
+    /// The SDK runs two tool calls at the same time, and the approval flow is built on that fact.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Measured rather than assumed, and pinned here because the answer decides two things. It is
+    /// the good news for Stage 2.5's demo: a credential request parked for up to forty-five seconds
+    /// waiting for a human does not stall the session, so the agent can keep working while the
+    /// prompt is up. It is also the bad news for the approver: two requests really can race two
+    /// prompts onto one screen, so single-in-flight is a load-bearing rule rather than a
+    /// precaution, and everything the approval flow mutates has to be thread-safe.
+    /// </para>
+    /// <para>
+    /// If this ever goes red, the approval flow's concurrency design is resting on a premise the
+    /// SDK no longer holds — read it as a finding about the dependency, not as a flaky test.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task TwoToolCalls_RunAtTheSameTime()
+    {
+        await using var harness = new McpHarness();
+        var client = await harness.StartAsync();
+
+        harness.Source.With("env/dev", "STRIPE_KEY");
+        harness.Source.Hold = true;
+
+        var parked = client.CallToolAsync(ToolText.ListToolName, cancellationToken: Token).AsTask();
+
+        Assert.True(
+            harness.Source.Entered.Wait(TimeSpan.FromSeconds(10), Token),
+            "the first call never reached the tool, so nothing was raced against anything");
+
+        var second = client.CallToolAsync(
+            ToolText.CredentialToolName,
+            Credential(),
+            cancellationToken: Token).AsTask();
+
+        var winner = await Task.WhenAny(second, Task.Delay(TimeSpan.FromSeconds(10), Token));
+
+        harness.Source.Held!.Set();
+        await parked;
+
+        Assert.True(
+            winner == second,
+            "the second call did not complete while the first was still inside its tool: dispatch is serial");
+    }
 
     [Fact]
     public async Task TheServerExposes_ExactlyTwoTools()
@@ -196,17 +269,137 @@ public sealed class ServerToolsTests
         Assert.Contains("web-deploy", text, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// With nobody running an approver - the ordinary state of a freshly spawned bridge - the
+    /// refusal has to name the command that fixes it, and must <em>not</em> say "do not retry":
+    /// retrying is exactly right once somebody has started one.
+    /// </summary>
     [Fact]
-    public async Task RequestCredential_Denies_AndTellsTheAgentNotToRetry()
+    public async Task WithNoApproverRunning_TheRefusalNamesTheCommandThatFixesIt()
     {
         await using var harness = new McpHarness();
         var client = await harness.StartAsync();
 
         var result = await CallAsync(client, ToolText.CredentialToolName, Credential());
+        var text = TextOf(result);
 
         Assert.True(result.IsError);
-        Assert.Contains("DENIED", TextOf(result), StringComparison.Ordinal);
-        Assert.Contains("Do not retry", TextOf(result), StringComparison.Ordinal);
+        Assert.Contains("DENIED", text, StringComparison.Ordinal);
+        Assert.Contains("keypaste agent", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Do not retry", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A person said no. Here "do not retry" earns its place: without it a capable agent loops on a
+    /// considered refusal, which is both a token bill and a stream of prompts until somebody clicks
+    /// the wrong one (THREATS.md T-11).
+    /// </summary>
+    [Fact]
+    public async Task WhenAPersonSaysNo_TheAgentIsToldNotToAskAgain()
+    {
+        await using var harness = new McpHarness();
+        harness.Approver.StartRefusing(AuditMethod.Prompt);
+        var client = await harness.StartAsync();
+
+        var result = await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY"));
+        var text = TextOf(result);
+
+        Assert.True(result.IsError);
+        Assert.Contains("said no", text, StringComparison.Ordinal);
+        Assert.Contains("Do not retry", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Nobody decided anything - they were away from the keyboard - so this refusal deliberately
+    /// does not tell the agent to give up. Paired with the test above so a change that made every
+    /// refusal say the same thing goes red rather than quietly flattening the distinction.
+    /// </summary>
+    [Fact]
+    public async Task WhenNobodyAnswers_TheAgentIsNotToldToGiveUp()
+    {
+        await using var harness = new McpHarness();
+        harness.Approver.StartRefusing(AuditMethod.TimedOut, "nobody answered inside the window");
+        var client = await harness.StartAsync();
+
+        var text = TextOf(await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY")));
+
+        Assert.Contains("away from the keyboard", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Do not retry", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The path that did not exist before this stage: a person says yes, and exactly one field
+    /// value reaches the agent.
+    /// </summary>
+    [Fact]
+    public async Task WhenAPersonSaysYes_TheFieldValueReachesTheAgent()
+    {
+        await using var harness = new McpHarness();
+        harness.Approver.StartApproving();
+        var client = await harness.StartAsync();
+
+        var result = await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY"));
+        var text = TextOf(result);
+
+        Assert.False(result.IsError);
+        Assert.Contains(FakeApprover.Sentinel, text, StringComparison.Ordinal);
+        Assert.Contains("APPROVED", text, StringComparison.Ordinal);
+
+        // The terms it came with, which are the only thing standing between a released credential
+        // and a model writing it into a commit message.
+        Assert.Contains("Do not print it", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A grant is one line in the log, saying so, and naming which entry and which method. This is
+    /// the line a person reads afterwards to answer "what did I agree to?".
+    /// </summary>
+    [Fact]
+    public async Task AGrantIsAudited_AsAGrant()
+    {
+        await using var harness = new McpHarness();
+        harness.Approver.StartApproving();
+        var client = await harness.StartAsync();
+
+        await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY"));
+
+        var line = Assert.Single(harness.AuditLines());
+        using var parsed = JsonDocument.Parse(line);
+
+        Assert.Equal("granted", parsed.RootElement.GetProperty("decision").GetString());
+        Assert.Equal("prompt", parsed.RootElement.GetProperty("method").GetString());
+        Assert.Equal("env/dev/STRIPE_KEY", parsed.RootElement.GetProperty("args").GetProperty("entry").GetString());
+
+        // ...and the credential is not in it. The log records that access happened, never what was
+        // handed over.
+        Assert.DoesNotContain(FakeApprover.Sentinel, line, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The agent's stated reason reaches the person who has to judge it, verbatim. If it did not,
+    /// the approval prompt would be asking somebody to decide on less than the agent said.
+    /// </summary>
+    [Fact]
+    public async Task TheAgentsStatedReason_ReachesTheApprover()
+    {
+        await using var harness = new McpHarness();
+        harness.Approver.StartApproving();
+        var client = await harness.StartAsync();
+
+        await CallAsync(client,
+            ToolText.CredentialToolName,
+            Credential(entry: "env/dev/STRIPE_KEY", reason: "roll the billing key before the release"));
+
+        var forwarded = Assert.Single(harness.Approver.Received);
+
+        Assert.Equal("roll the billing key before the release", forwarded.Reason, StringComparer.Ordinal);
+        Assert.Equal("env/dev/STRIPE_KEY", forwarded.Entry, StringComparer.Ordinal);
+        Assert.Equal("password", forwarded.Field, StringComparer.Ordinal);
+        Assert.Equal(McpHarness.ClientName, forwarded.ClientName, StringComparer.Ordinal);
+
+        // The exposure travels with the request, because the approver has to re-apply it after it
+        // resolves a handle - the bridge cannot check one without the vault.
+        Assert.Equal(["env/**"], forwarded.Exposure);
     }
 
     /// <summary>
@@ -230,14 +423,15 @@ public sealed class ServerToolsTests
     }
 
     /// <summary>
-    /// The distinction Stage 2.2 depends on: "keypaste will never discuss that" is a different
-    /// answer from "keypaste cannot ask yet", and an agent needs to tell them apart to stop
-    /// retrying the first.
+    /// An entry outside the exposure never reaches the approver, so it never reaches a person.
+    /// Refusing after prompting would still have let an agent put any entry name it liked in front
+    /// of the user, which is most of what an attempt to mislead them would need.
     /// </summary>
     [Fact]
-    public async Task RequestCredential_SeparatesOutOfScopeFromNotImplemented()
+    public async Task AnEntryOutsideTheExposure_NeverReachesTheApprover()
     {
         await using var harness = new McpHarness();
+        harness.Approver.StartApproving();
         var client = await harness.StartAsync();
 
         await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "personal/bank"));
@@ -250,7 +444,100 @@ public sealed class ServerToolsTests
         using var second = JsonDocument.Parse(lines[1]);
 
         Assert.Equal("out-of-scope", first.RootElement.GetProperty("method").GetString());
-        Assert.Equal("not-implemented", second.RootElement.GetProperty("method").GetString());
+        Assert.Equal("prompt", second.RootElement.GetProperty("method").GetString());
+
+        // One request crossed the wire, not two. Asserting only the audit methods would pass for a
+        // bridge that forwarded both and discarded one answer.
+        var forwarded = Assert.Single(harness.Approver.Received);
+        Assert.Equal("env/dev/STRIPE_KEY", forwarded.Entry, StringComparer.Ordinal);
+    }
+
+    /// <summary>
+    /// A client that stops waiting still leaves exactly one line, and no credential in it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is THREATS.md T-6 at its sharpest: a request that reached the approver is an access
+    /// whether or not anybody collected the answer. The natural way to write the bridge - forward
+    /// the cancellation token to everything, including the audit write - is exactly what would make
+    /// the record disappear at the moment it matters most, so the write deliberately takes no token.
+    /// </para>
+    /// <para>
+    /// <b>What this test does not prove, measured rather than assumed.</b> With
+    /// <c>ModelContextProtocol.Core</c> 1.4.1, a client abandoning one <c>tools/call</c> does not
+    /// reach the server at all: the token the tool is handed is never cancelled, and neither is the
+    /// approver's. So the line below says <c>granted</c>, not <c>cancelled</c> - the person really
+    /// was asked and really did say yes, and the answer went into a reply nobody read. The bridge's
+    /// cancellation branch is written and correct, and it is reachable when the server observes
+    /// cancellation, but this is not the path that produces it. Saying so is the point: a test
+    /// named for a branch it never reaches is worse than no test.
+    /// </para>
+    /// <para>
+    /// The consequence worth knowing is not a leak - nothing reaches a party that was not already
+    /// on that stream - but that an abandoned request still spends a person's approval, and the
+    /// agent's retry is then served from the grant cache without asking them again.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task ACallTheClientAbandons_IsStillAudited_AndCarriesNoCredentialIntoTheLog()
+    {
+        await using var harness = new McpHarness();
+        harness.Approver.Hold = true;
+        harness.Approver.StartApproving();
+        var client = await harness.StartAsync();
+
+        using var giveUp = new CancellationTokenSource();
+
+        var call = client.CallToolAsync(
+            ToolText.CredentialToolName,
+            Credential(entry: "env/dev/STRIPE_KEY"),
+            cancellationToken: giveUp.Token).AsTask();
+
+        await harness.Approver.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10), Token);
+
+        await giveUp.CancelAsync();
+
+        try
+        {
+            await call;
+        }
+        catch (OperationCanceledException)
+        {
+            // Giving up is the point of the test.
+        }
+
+        harness.Approver.Held.TrySetResult();
+
+        var line = await AuditLineAsync(harness);
+        using var parsed = JsonDocument.Parse(line);
+
+        // One line, whatever happened to the caller. That is the claim law 3.3 makes.
+        Assert.Single(harness.AuditLines());
+        Assert.Equal("env/dev/STRIPE_KEY", parsed.RootElement.GetProperty("args").GetProperty("entry").GetString());
+
+        // And never the credential itself, on any path.
+        Assert.DoesNotContain(FakeApprover.Sentinel, line, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The four field names an agent is told about have to be the four the core will release. They
+    /// live in <c>CredentialFields</c>; this is what keeps the hand-written JSON schema in step with
+    /// it, because a schema that advertises a field nothing releases is a contract keypaste breaks.
+    /// </summary>
+    [Fact]
+    public void TheSchemaAndTheCoreAgreeAboutFields()
+    {
+        using var schema = JsonDocument.Parse(ToolSchemas.CredentialInputJson);
+
+        var advertised = schema.RootElement
+            .GetProperty("properties")
+            .GetProperty("field")
+            .GetProperty("enum")
+            .EnumerateArray()
+            .Select(value => value.GetString()!)
+            .ToArray();
+
+        Assert.Equal(CredentialFields.All, advertised);
     }
 
     [Fact]

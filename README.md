@@ -136,19 +136,48 @@ because that is the form those readers disagree about.
 `list_entry_names`, which returns group paths and entry names and never a value, and
 `request_credential`, which asks you to release one field of one entry.
 
-**Every call is refused in this version.** The approval flow is not built yet, and a bridge that
-granted before it could ask is the one bug this project cannot ship. What does work is the shape:
-the server connects, the tools appear, the refusals explain themselves, and every call — allowed or
-denied — appends a line to `~/.keypaste/audit.jsonl`.
+Nothing is released without you saying yes to that specific request. You are asked by
+`keypaste agent`, a command you run in your own terminal:
 
-What the agent may even *name* is default-deny too. Out of the box that is the `env/` subtree and
-nothing else; widening it takes an explicit `--expose` glob in the client's config, which is a file
-you wrote.
+```sh
+keypaste agent --vault ~/vaults/personal.kdbx
+```
 
-[**Connecting keypaste to Claude**](docs/mcp-setup.md) has the config snippets, the audit log format,
-and the honest answers. [**THREATS.md**](THREATS.md) is the threat model for the bridge — prompt
-injection through entry names, clients that cannot be authenticated, and what the locked-vault
-posture does and does not buy.
+```
+keypaste: an agent is asking for a credential.
+
+  client   claude-code
+  entry    env/dev/STRIPE_KEY
+  field    password
+  for      300 seconds
+
+  the agent says it needs this because:
+    deploy the billing service to staging
+
+  That sentence was written by the agent, not by keypaste. Treat it as a claim.
+
+Approve? [y/N]
+```
+
+**Your master password is typed there and nowhere else.** Any program on your machine can pop up a
+window that looks like keypaste asking for it, so keypaste never gives you a reason to expect one:
+no agent, and nothing an agent does, can cause a password prompt to appear. That is why the approver
+is a separate process you start, rather than something the MCP server does.
+
+Say no and the agent is told not to ask again. Say nothing for 45 seconds and that is a no. Ask for
+the same field again within the lifetime you approved and you are not asked twice. Every call —
+granted, denied, or malformed — appends a line to `~/.keypaste/audit.jsonl`, and the value is never
+in it.
+
+What an agent may even *name* is default-deny: out of the box that is the `env/` subtree and nothing
+else, and widening it takes an explicit `--expose` glob in the client's config, which is a file you
+wrote.
+
+[**Approving an agent's request**](docs/approvals.md) is the guide.
+[**Connecting keypaste to Claude**](docs/mcp-setup.md) has the config snippets and the audit log
+format. [**THREATS.md**](THREATS.md) is the threat model — prompt injection through entry names and
+through the agent's stated reason, clients that cannot be authenticated, prompt fatigue, and what a
+reused grant costs.
 
 ## Packages
 
@@ -156,7 +185,7 @@ posture does and does not buy.
 | --- | --- | --- |
 | `keypaste-core` | `src/Keypaste.Core` | library — all vault logic lives here |
 | `keypaste-cli` | `src/Keypaste.Cli` | `keypaste` |
-| `keypaste-mcp` | `src/Keypaste.Mcp` | `keypaste-mcp` — MCP server, stdio, denies everything so far |
+| `keypaste-mcp` | `src/Keypaste.Mcp` | `keypaste-mcp` — MCP server, stdio, holds no vault and decides nothing |
 
 ## Vault format
 

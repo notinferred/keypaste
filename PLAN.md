@@ -35,11 +35,11 @@
 ## Stage 2 — The MCP bridge (Week 5–7) ← the headline feature
 **Goal: Claude can request ONE credential, you approve, it's scoped and logged.**
 - [x] MCP server (`keypaste-mcp`) with tools: `list_entry_names` (names only, never secrets), `request_credential(entry, reason, ttl)` — stdio, `ModelContextProtocol.Core` pinned at 1.4.1 (D-0019); denies every request until the approval flow exists, and the vault stays locked because a server started with no terminal cannot ask for a master password (D-0022)
-- [ ] Human approval flow: OS-native prompt (or CLI confirm) showing agent, entry, reason — default deny, timeout deny
-- [ ] Scoping: response contains only the requested field; TTL after which cached grant expires
+- [x] Human approval flow: `keypaste agent` — a process you start in your own terminal — shows client, entry, field, reason and lifetime; default deny, 45-second timeout deny (under every MCP client's own 60s request timeout, D-0025). A native OS dialog is still to come; the terminal prompt is the channel today
+- [x] Scoping: the response carries one field value and nothing else, proved against four sentinels in one entry (`SecretHygieneTests`); grants expire on a TTL capped by `--max-ttl` and are scoped to one connection (D-0026)
 - [ ] Append-only local audit log (JSONL + `keypaste log` pretty view)
 - [ ] Policy file for pre-approvals (e.g. "Claude Code may read entries in group 'dev/*' without prompting")
-- [ ] Threat-model doc: confused deputy, prompt injection via entry names, log tampering — and mitigations — `THREATS.md` started in 2.1 and explicitly partial; 2.4 completes the sections it marks
+- [ ] Threat-model doc: confused deputy, prompt injection via entry names, log tampering — and mitigations — `THREATS.md` grew T-10, T-11 and T-12 in 2.2 and closed T-7; the remaining gap is T-5, which 2.4 completes
 - [x] Setup guide for Claude Desktop + Claude Code — `docs/mcp-setup.md`, with the audit log format and why the vault cannot be unlocked yet
 - **Exit demo (THE demo):** ask Claude "deploy this, get the API key from my vault" → approval popup → Claude proceeds → `keypaste log` shows the access. 60 seconds.
 
