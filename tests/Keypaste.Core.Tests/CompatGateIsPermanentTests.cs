@@ -34,6 +34,11 @@ public sealed class CompatGateIsPermanentTests
         // coverage silently. Both gates enforce the same law and get the same tripwire.
         Assert.Contains("scripts/verify-keepassxc-writeback.sh", workflow, StringComparison.Ordinal);
 
+        // Injection is the other law with no in-process test that can reach it (CORE.md 3.4 and
+        // 4.5): the child owns the console, so only a real child can be asked what it received.
+        Assert.Contains("scripts/verify-run-injection.sh", workflow, StringComparison.Ordinal);
+        Assert.Contains("scripts/verify-run-signals.sh", workflow, StringComparison.Ordinal);
+
         foreach (var os in new[] { "ubuntu-latest", "windows-latest", "macos-latest" })
         {
             Assert.Contains(os, workflow, StringComparison.Ordinal);
@@ -87,6 +92,32 @@ public sealed class CompatGateIsPermanentTests
         Assert.Contains("keepassxc-cli edit", text, StringComparison.Ordinal);
         Assert.Contains("env ls", text, StringComparison.Ordinal);
         Assert.Contains("db-info", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The injection gates carry the same tripwire as the compatibility ones, for the same
+    /// reason: what they prove — that a child really received the value, and that nothing was
+    /// written to disk doing it — is asserted nowhere else, and SECURITY.md makes both claims in
+    /// prose.
+    /// </summary>
+    [Fact]
+    public void RunGates_ExistAndKeepTheirNegativeControls()
+    {
+        foreach (var name in new[] { "verify-run-injection.sh", "verify-run-signals.sh" })
+        {
+            var script = Path.Combine(RepoRoot(), "scripts", name);
+            Assert.True(File.Exists(script), $"The run gate script is missing: {script}");
+
+            var text = File.ReadAllText(script);
+            Assert.Contains("NEGATIVE CONTROL", text, StringComparison.Ordinal);
+            Assert.Contains("must never be skipped or soft-passed", text, StringComparison.Ordinal);
+        }
+
+        // The no-temp-file check is the narrow, testable half of what SECURITY.md promises about
+        // injection. Losing it would leave the claim resting on nothing.
+        var injection = File.ReadAllText(Path.Combine(RepoRoot(), "scripts", "verify-run-injection.sh"));
+        Assert.Contains("TMPDIR", injection, StringComparison.Ordinal);
+        Assert.Contains("-type f", injection, StringComparison.Ordinal);
     }
 
     /// <summary>
