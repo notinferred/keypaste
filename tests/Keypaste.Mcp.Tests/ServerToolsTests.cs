@@ -61,6 +61,53 @@ public sealed class ServerToolsTests
             ["ttl_seconds"] = ttl,
         };
 
+    /// <summary>
+    /// The SDK runs two tool calls at the same time, and the approval flow is built on that fact.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Measured rather than assumed, and pinned here because the answer decides two things. It is
+    /// the good news for Stage 2.5's demo: a credential request parked for up to forty-five seconds
+    /// waiting for a human does not stall the session, so the agent can keep working while the
+    /// prompt is up. It is also the bad news for the approver: two requests really can race two
+    /// prompts onto one screen, so single-in-flight is a load-bearing rule rather than a
+    /// precaution, and everything the approval flow mutates has to be thread-safe.
+    /// </para>
+    /// <para>
+    /// If this ever goes red, the approval flow's concurrency design is resting on a premise the
+    /// SDK no longer holds — read it as a finding about the dependency, not as a flaky test.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task TwoToolCalls_RunAtTheSameTime()
+    {
+        await using var harness = new McpHarness();
+        var client = await harness.StartAsync();
+
+        harness.Source.With("env/dev", "STRIPE_KEY");
+        harness.Source.Hold = true;
+
+        var parked = client.CallToolAsync(ToolText.ListToolName, cancellationToken: Token).AsTask();
+
+        Assert.True(
+            harness.Source.Entered.Wait(TimeSpan.FromSeconds(10), Token),
+            "the first call never reached the tool, so nothing was raced against anything");
+
+        var second = client.CallToolAsync(
+            ToolText.CredentialToolName,
+            Credential(),
+            cancellationToken: Token).AsTask();
+
+        var winner = await Task.WhenAny(second, Task.Delay(TimeSpan.FromSeconds(10), Token));
+
+        harness.Source.Held!.Set();
+        await parked;
+
+        Assert.True(
+            winner == second,
+            "the second call did not complete while the first was still inside its tool: dispatch is serial");
+    }
+
     [Fact]
     public async Task TheServerExposes_ExactlyTwoTools()
     {

@@ -144,6 +144,7 @@ internal sealed class McpHarness : IAsyncDisposable
         }
 
         _audit?.Dispose();
+        Source.Dispose();
 
         foreach (var owned in _owned)
         {
@@ -161,7 +162,7 @@ internal sealed class McpHarness : IAsyncDisposable
 /// The call count is what makes "the locked path never touched the vault" directly assertable
 /// rather than inferred from the absence of names in the reply.
 /// </remarks>
-internal sealed class FakeEntryNameSource : IEntryNameSource
+internal sealed class FakeEntryNameSource : IEntryNameSource, IDisposable
 {
     private readonly List<EntryName> _names = [];
 
@@ -170,6 +171,15 @@ internal sealed class FakeEntryNameSource : IEntryNameSource
 
     /// <summary>How many times the tool asked.</summary>
     internal int Calls { get; private set; }
+
+    /// <summary>Set to make a call park inside the tool, so a second call can be raced against it.</summary>
+    internal ManualResetEventSlim? Held { get; } = new(initialState: false);
+
+    /// <summary>Signalled once a call has genuinely reached the tool, rather than merely been sent.</summary>
+    internal ManualResetEventSlim Entered { get; } = new(initialState: false);
+
+    /// <summary>Whether calls should park on <see cref="Held"/> until it is released.</summary>
+    internal bool Hold { get; set; }
 
     internal FakeEntryNameSource With(string groupPath, string title)
     {
@@ -181,9 +191,21 @@ internal sealed class FakeEntryNameSource : IEntryNameSource
     public EntryNameListing List()
     {
         Calls++;
+        Entered.Set();
+
+        if (Hold)
+        {
+            Held!.Wait();
+        }
 
         return Availability == VaultAvailability.Available
             ? new EntryNameListing(VaultAvailability.Available, _names, string.Empty)
             : new EntryNameListing(Availability, [], ToolText.VaultLocked);
+    }
+
+    public void Dispose()
+    {
+        Held?.Dispose();
+        Entered.Dispose();
     }
 }
