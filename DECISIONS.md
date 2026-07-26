@@ -724,6 +724,59 @@ test seam moved from `TextReader` to `Stream` so the leftover input is directly 
 
 ---
 
+## D-0017 - Saving a vault retries a transient file error, and says why when it gives up
+
+**Date:** 2026-07-25 - **Stage:** 1.2b - **Status:** accepted
+
+`Vault.Save` now makes up to four attempts, with a short linear backoff, when the write fails with
+`IOException` or `UnauthorizedAccessException`. Everything else fails on the first attempt.
+
+**This was found, not predicted.** Stage 1.2's tests roughly doubled how much vault writing CI
+does, and `test (windows-latest)` began failing intermittently - a different test each time, across
+`VerbTests`, `EnvVerbTests`, `EnvPullTests` and `RunCommandTests`, always exit 2. The first
+occurrence took down a clipboard test written in Stage 0, so the defect predates this stage; the
+extra load only made it visible.
+
+Saving goes through a file transaction - write a temporary file, then replace the original
+(D-0013). On Windows that replace competes with every process that watches the filesystem:
+Defender and the search indexer open a newly written file in order to scan it, and for a few
+milliseconds the replace cannot land. The observed error is `Access is denied`, an
+`UnauthorizedAccessException` rather than the `IOException` one would guess, which is why the
+retry predicate covers both.
+
+**Retrying is safe because the write is transactional.** A failed commit leaves the original file
+untouched, so a second attempt starts from exactly where the first did. A save that never succeeds
+reports what it always reported. The retry can turn a spurious failure into a success and cannot
+turn a real failure into corruption, which is the only property that makes this acceptable on the
+write path of a credential store.
+
+Proved by A/B rather than asserted: a test that holds the vault file open with `FileShare.None` for
+150 ms fails with `Access is denied` at one attempt and passes at four.
+`VaultSaveTests.TheRetryHasRoomToAbsorbATransientFailure` pins the constants so that quietly
+reducing them cannot silently restore the old behaviour, and two further tests pin that a save
+which genuinely cannot succeed still fails, and fails promptly rather than hanging.
+
+**Three separate places were hiding the reason, and all three are fixed.** Diagnosing this took two
+CI round trips that it should not have, because at every layer the interesting information was
+discarded:
+
+- `VaultException` carried the cause as an inner exception that nothing ever printed, so the user
+  saw `Could not save 'vault.kdbx'.` and could not tell a full disk from a file open in KeePassXC.
+  The message now names it.
+- `CliHarness` asserted exit codes with `Assert.Equal`, which reports "expected 0, actual 2" while
+  the line explaining why sits unread in the captured stderr. It now quotes stderr, and
+  `SeedVault` checks its own steps rather than letting a seeding failure surface later as an
+  assertion about something unrelated.
+- `FakeProcessLauncher.Environment` returned an empty dictionary when no child had been started,
+  turning "the run failed before reaching the launcher" into
+  `KeyNotFoundException: 'UNRELATED' was not present`, which reads like a merge bug and is not one.
+  It now throws and says so.
+
+The general rule this stage keeps re-learning: a failure path that discards its reason costs far
+more later than the line it saved.
+
+---
+
 # Open decisions
 
 ## O-0002 — Contribution terms: DCO or CLA

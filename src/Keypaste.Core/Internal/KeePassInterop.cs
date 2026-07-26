@@ -205,25 +205,65 @@ internal sealed class KeePassInterop : IDisposable
         return FindEntry(entryPath) is { } found ? (int)found.Entry.History.UCount : -1;
     }
 
+    /// <summary>How many times a save is attempted before the failure is reported.</summary>
+    internal const int SaveAttempts = 4;
+
+    /// <summary>Base delay between save attempts. Multiplied by the attempt number.</summary>
+    internal const int SaveRetryDelayMilliseconds = 60;
+
     /// <summary>Writes the vault to its backing file.</summary>
+    /// <remarks>
+    /// <para>
+    /// Retried on a transient file error. Saving goes through a file transaction — write a
+    /// temporary file, then replace the original — and on Windows that replace competes with
+    /// every other process that watches the filesystem: Defender and the search indexer open a
+    /// newly written file to scan it, which makes the replace fail for a few milliseconds at a
+    /// time. It is not rare enough to ignore; it showed up as intermittent "Could not save"
+    /// failures across unrelated tests on CI before this existed.
+    /// </para>
+    /// <para>
+    /// Retrying is safe precisely because the write is transactional. A failed commit leaves the
+    /// original file untouched, so a second attempt starts from the same place as the first, and
+    /// a save that never succeeds reports exactly what it reported before — the retry can turn a
+    /// spurious failure into success, and cannot turn a real one into corruption.
+    /// </para>
+    /// </remarks>
     internal void Save()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        try
+        for (int attempt = 1; ; attempt++)
         {
-            _database.Save(null);
-        }
-        catch (Exception ex) when (ex is not VaultException)
-        {
-            // The cause is named, not just kept as an inner exception nobody prints. A save can
-            // fail for reasons the user can act on — the disk is full, the file is open in
-            // KeePassXC, a scanner is holding the transaction's temporary file — and
-            // "Could not save 'vault.kdbx'." on its own tells them none of them.
-            throw new VaultException(
-                $"Could not save '{_database.IOConnectionInfo.Path}': {ex.Message}", ex);
+            try
+            {
+                _database.Save(null);
+                return;
+            }
+            catch (Exception ex) when (attempt < SaveAttempts && IsTransient(ex))
+            {
+                Thread.Sleep(SaveRetryDelayMilliseconds * attempt);
+            }
+            catch (Exception ex) when (ex is not VaultException)
+            {
+                // The cause is named, not merely kept as an inner exception nobody prints. A save
+                // can fail for reasons the user can act on — the disk is full, the file is open in
+                // KeePassXC, permissions changed — and "Could not save 'vault.kdbx'." on its own
+                // tells them none of them.
+                throw new VaultException(
+                    $"Could not save '{_database.IOConnectionInfo.Path}': {ex.Message}", ex);
+            }
         }
     }
+
+    /// <summary>
+    /// Whether a failure is the kind that another attempt might get past.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately narrow. Anything else — a bad path, a full disk, a permission that is simply
+    /// wrong — fails on the first attempt, because retrying it would only delay the message.
+    /// </remarks>
+    private static bool IsTransient(Exception ex) =>
+        ex is IOException or UnauthorizedAccessException;
 
     /// <inheritdoc/>
     public void Dispose()
