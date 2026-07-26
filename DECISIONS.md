@@ -973,6 +973,83 @@ tests red, dropping the size ceiling turns the size test red, restoring the repl
 turns both UTF-16 tests red, and inverting the `--yes` guard, the overwrite refusal and the alarm
 each turn their own CLI test red.
 
+## D-0019 - The first dependency in `src/`: ModelContextProtocol.Core, and nothing more
+
+**Date:** 2026-07-26 - **Stage:** 2.1 - **Status:** accepted
+
+`src/` has carried zero `PackageReference` entries since D-0004, and `Directory.Packages.props` says
+so in a comment. That ends here, on the agent bridge, which is exactly where CORE.md law 3.9 demands
+the justification be written down.
+
+PLAN.md's locked stack decision already names "official ModelContextProtocol C# SDK, stdio
+transport", so the question was never *whether* but *how narrow*.
+
+**Rejected: the main `ModelContextProtocol` package.** About twelve transitive packages on
+`net10.0`, and its documented sample additionally wants `Microsoft.Extensions.Hosting`, which is
+roughly twenty more. What that buys is `AddMcpServer()` DI sugar and attribute-based tool scanning.
+What it costs on the secret path is a configuration system that reads files and environment
+variables, a DI container, and a default console logger that writes to **stdout** - which on a stdio
+MCP server *is* the protocol stream. A dependency whose happy path corrupts the transport is not one
+to take for syntactic sugar.
+
+**Rejected: hand-rolling JSON-RPC.** Roughly four hundred lines re-implementing a versioned protocol,
+wrong in ways nobody would notice until a client bumped. CORE.md §6.5: boring beats clever.
+
+**Taken: `ModelContextProtocol.Core` 1.4.1.** Apache-2.0, the `modelcontextprotocol` org,
+co-maintained with Microsoft, implementing spec revision 2025-11-25. `StdioServerTransport`,
+`McpServer.Create` and the tool types all live in it, so a host-free stdio server needs nothing else.
+The closure is **four packages**, measured from the regenerated lock file rather than quoted from
+documentation: the SDK plus `Microsoft.Extensions.AI.Abstractions`,
+`Microsoft.Extensions.Logging.Abstractions` and `Microsoft.Extensions.DependencyInjection.Abstractions`.
+The lock diff is twenty-eight lines and contains no HTTP client, which is what makes THREATS.md T-9's
+"nothing leaves the machine" a claim a reader can check rather than one they have to believe.
+`Keypaste.Core` - the vault and crypto path - still has zero.
+
+### The AOT gate passes, and the reason it was expected not to was wrong
+
+D-0005 put `IsAotCompatible` and the trim/AOT analysers on `src/` as "a dependency-selection gate
+disguised as a compiler setting", installed for precisely this moment. It fires clean:
+`Keypaste.Mcp` keeps `IsAotCompatible=true` with no scoped suppression and no new open question.
+
+The plan for this stage asserted that `McpServerTool.Create(Delegate, ...)` would trip IL2026 and
+IL3050 and that hand-writing the tools was the escape. **That was checked and it is false** - both
+forms compile clean under all four analysers with warnings as errors, and the SDK assembly carries
+`[AssemblyMetadata("IsTrimmable","True")]` and `("IsAotCompatible","True")`, so its authors have
+vouched for it rather than gone quiet. The analysers were confirmed to be awake rather than asleep by
+a negative control in the same probe project: `JsonSerializer.Serialize` **does** fail there with
+IL2026, IL3050 and CA1869.
+
+Two things follow, and they are recorded because a decision record that repeats a comfortable
+assumption is worse than none:
+
+- The claim the gate actually supports is that no call keypaste *makes* is annotated unsafe. Whether
+  the bridge AOT-**runs** is a different question, answerable only by a real publish and run, which
+  is O-0006's standing remedy - now covering one more component.
+- **`JsonSerializer` is still banned**, now for a demonstrated reason rather than an assumed one.
+  Every JSON byte keypaste writes goes through `Utf8JsonWriter` and every one it reads through
+  `JsonDocument`, which needs no source generator and no partial-class ceremony.
+
+### The tools are still hand-written, for the reason that survived
+
+The delegate path generates a tool schema from the C# signature. Measured against the four arguments
+prompts.md specifies, it drops `additionalProperties`, the `field` enum, the length bounds on
+`reason` and the range on `ttl_seconds`; it leaves `Annotations` **null**, so none of the four
+behaviour hints are set and the spec's defaults - `destructive` and `openWorld` both true - apply;
+and it renames `ttl_seconds` to `ttlSeconds`, because that is what the parameter was called.
+
+A wire contract that is a byproduct of a method signature changes when somebody renames a parameter.
+On a credential bridge the schema *is* the contract with the agent, so it is written down as a
+literal, reviewed in a diff, and pinned by a test.
+
+### Migration cost, agreed in advance
+
+2.0.0 of the SDK was promised on or before 2026-07-28 and is a breaking rewrite: it removes the
+`initialize` handshake and moves client identity to per-request `_meta`, where it is optional. 1.4.1
+is pinned deliberately, and the blast radius of moving is bounded by keeping every rule in
+`Keypaste.Core`, where the SDK cannot be referenced at all: only `src/Keypaste.Mcp/` changes, and
+within it only the files that touch SDK types. The audit schema already models the client's name as
+absent-able, so law 3.3's "every access is logged with who" survives identity becoming optional.
+
 ---
 
 # Open decisions
