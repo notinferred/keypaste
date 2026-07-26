@@ -119,40 +119,66 @@ public static class EntryNameSanitizer
         return builder.ToString().Trim();
     }
 
-    /// <summary>Sanitizes a group path one segment at a time.</summary>
-    /// <param name="groupPath">The slash-separated group path.</param>
+    /// <summary>Sanitizes a slash-separated path one segment at a time.</summary>
+    /// <param name="path">A group path, or an entry path including its title.</param>
     /// <param name="maximumDepth">The most segments to keep. Deeper segments are dropped.</param>
+    /// <param name="maximumLength">The longest result, in UTF-16 code units.</param>
     /// <returns>The safe path, and whether anything changed.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="groupPath"/> is null.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="path"/> is null.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="maximumDepth"/> or <paramref name="maximumLength"/> is not positive.
+    /// </exception>
     /// <remarks>
-    /// Segment by segment, so the separators survive: sanitizing the whole path in one pass would
-    /// replace every <c>/</c> with a space and flatten the hierarchy the reader needs to see.
+    /// <para>
+    /// Segment by segment, so the separators survive: <see cref="Sanitize(string, int)"/> treats
+    /// <c>/</c> as one of the ten structural characters and would replace every one of them with a
+    /// space, flattening <c>env/dev/STRIPE_KEY</c> into <c>env dev STRIPE_KEY</c> — which is
+    /// unreadable in a listing and useless in an audit line, where naming the entry is the point
+    /// (CORE.md law 3.3).
+    /// </para>
+    /// <para>
+    /// The separator is safe to keep here precisely because it is being kept as a separator: what
+    /// makes <c>/</c> dangerous is a title that contains one pretending to be a path, and every
+    /// segment has already had its own slashes removed by the time it is joined back up.
+    /// </para>
     /// </remarks>
-    public static SanitizedName SanitizeGroupPath(string groupPath, int maximumDepth = 16)
+    public static SanitizedName SanitizePath(
+        string path,
+        int maximumDepth = 16,
+        int maximumLength = MaximumLength)
     {
-        ArgumentNullException.ThrowIfNull(groupPath);
+        ArgumentNullException.ThrowIfNull(path);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumDepth);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumLength);
 
-        if (groupPath.Length == 0)
+        if (path.Length == 0)
         {
             return new SanitizedName(string.Empty, false);
         }
 
-        var segments = groupPath.Split('/');
+        var segments = path.Split('/');
         var kept = Math.Min(segments.Length, maximumDepth);
-        var builder = new StringBuilder(Math.Min(groupPath.Length, MaximumLength * kept));
+        var builder = new StringBuilder(Math.Min(path.Length, maximumLength));
         var altered = kept != segments.Length;
 
         for (var i = 0; i < kept; i++)
         {
-            if (i > 0)
+            var separator = i > 0 ? 1 : 0;
+            var budget = maximumLength - builder.Length - separator;
+            if (budget <= 0)
+            {
+                altered = true;
+                break;
+            }
+
+            if (separator == 1)
             {
                 builder.Append('/');
             }
 
             // A segment that sanitizes away leaves an empty segment rather than the placeholder:
             // the placeholder exists so a human can point at an entry, and a path is read whole.
-            var segment = Scrub(segments[i], MaximumLength);
+            var segment = Scrub(segments[i], budget);
             altered |= !string.Equals(segment, segments[i], StringComparison.Ordinal);
             builder.Append(segment);
         }

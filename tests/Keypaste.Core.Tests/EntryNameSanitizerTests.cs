@@ -236,10 +236,47 @@ public sealed class EntryNameSanitizerTests
         }
     }
 
+    /// <summary>
+    /// The two methods are not interchangeable, and using the wrong one is a real bug rather than a
+    /// style choice: <c>/</c> is one of the ten structural characters, so plain sanitization turns
+    /// an entry path into an unreadable phrase. An audit line whose job is to record <em>which
+    /// entry</em> was requested (CORE.md law 3.3) must not do that.
+    /// </summary>
+    [Fact]
+    public void APath_NeedsSanitizePath_BecausePlainSanitizationDestroysIt()
+    {
+        Assert.Equal("env dev STRIPE_KEY", EntryNameSanitizer.Sanitize("env/dev/STRIPE_KEY").Text);
+        Assert.Equal("env/dev/STRIPE_KEY", EntryNameSanitizer.SanitizePath("env/dev/STRIPE_KEY").Text);
+    }
+
+    /// <summary>
+    /// A slash inside a single segment is still removed. The separators that survive are the ones
+    /// that were separators, which is what stops a title from growing extra path levels.
+    /// </summary>
+    [Fact]
+    public void ASlashInsideASegment_IsStillRemoved()
+    {
+        var result = EntryNameSanitizer.SanitizePath("env/dev");
+
+        Assert.Equal("env/dev", result.Text);
+        Assert.Equal(2, result.Text.Split('/').Length);
+    }
+
+    [Fact]
+    public void AnOverlongPath_IsCappedInTotal()
+    {
+        var raw = string.Join('/', Enumerable.Repeat(new string('a', 40), 10));
+
+        var result = EntryNameSanitizer.SanitizePath(raw, maximumLength: 50);
+
+        Assert.True(result.Text.Length <= 50, $"got {result.Text.Length}: {result.Text}");
+        Assert.True(result.WasAltered);
+    }
+
     [Fact]
     public void AGroupPath_KeepsItsSeparators()
     {
-        var result = EntryNameSanitizer.SanitizeGroupPath("env/billing-api");
+        var result = EntryNameSanitizer.SanitizePath("env/billing-api");
 
         Assert.Equal("env/billing-api", result.Text);
         Assert.False(result.WasAltered);
@@ -253,7 +290,7 @@ public sealed class EntryNameSanitizerTests
     [Fact]
     public void AGroupPathSegment_IsScrubbedWithoutFlatteningTheHierarchy()
     {
-        var result = EntryNameSanitizer.SanitizeGroupPath("env/dev\u202eprod");
+        var result = EntryNameSanitizer.SanitizePath("env/dev\u202eprod");
 
         Assert.Equal("env/dev prod", result.Text);
         Assert.True(result.WasAltered);
@@ -264,7 +301,7 @@ public sealed class EntryNameSanitizerTests
     {
         var raw = string.Join('/', Enumerable.Repeat("g", 40));
 
-        var result = EntryNameSanitizer.SanitizeGroupPath(raw, maximumDepth: 4);
+        var result = EntryNameSanitizer.SanitizePath(raw, maximumDepth: 4);
 
         Assert.Equal("g/g/g/g", result.Text);
         Assert.True(result.WasAltered);
@@ -273,7 +310,7 @@ public sealed class EntryNameSanitizerTests
     [Fact]
     public void TheRootGroup_IsLeftAlone()
     {
-        var result = EntryNameSanitizer.SanitizeGroupPath(string.Empty);
+        var result = EntryNameSanitizer.SanitizePath(string.Empty);
 
         Assert.Equal(string.Empty, result.Text);
         Assert.False(result.WasAltered);

@@ -17,12 +17,21 @@ namespace Keypaste.Core.Audit;
 /// THREATS.md T-6 states it as a property of the product.
 /// </para>
 /// <para>
-/// <b>What "append-only" claims.</b> The file is opened with <see cref="FileMode.Append"/> and
-/// written one whole record at a time, and there is no code path anywhere in keypaste that seeks,
-/// truncates, rewrites, or deletes it. That is a statement about keypaste's own behaviour and
+/// <b>What "append-only" claims.</b> Records are only ever added, one whole record at a time, at the
+/// end of the file; no code path in keypaste truncates, rewrites, or deletes it, and the only seek
+/// is to the end immediately before a write. That is a statement about keypaste's own behaviour and
 /// nothing more: the file belongs to the user's account, so anything running as that user can
 /// rewrite it. Append-only by construction within keypaste; tamper-<em>evident</em> from Stage 2.4,
 /// when the per-line hash chain arrives; never tamper-<em>proof</em>.
+/// </para>
+/// <para>
+/// <b>Two servers really do share one file</b> — Claude Desktop and Claude Code each spawn their
+/// own. <see cref="FileMode.Append"/> is not enough to make that safe: .NET's
+/// <see cref="FileStream"/> keeps its own idea of the file's length and writes at that offset, so
+/// two streams opened on one path will happily overwrite each other's records. Appends therefore
+/// take a sidecar lock file for the moment of the write and seek to the real end first. A lock file
+/// left behind by a crash is harmless, because it is the open handle that excludes — not the file's
+/// existence — and the operating system releases that when the process dies.
 /// </para>
 /// <para>
 /// <b>Every line is one line.</b> Records are written with the default JSON encoder, which escapes
@@ -46,6 +55,15 @@ public sealed class AuditLog : IDisposable
 
     internal const string Transport = "stdio";
 
+    /// <summary>The suffix of the sidecar file that serialises writers across processes.</summary>
+    internal const string LockSuffix = ".lock";
+
+    /// <summary>How many times to retry taking the lock before giving up and denying the call.</summary>
+    internal const int LockAttempts = 50;
+
+    /// <summary>How long to wait between attempts, in milliseconds.</summary>
+    internal const int LockWaitMilliseconds = 20;
+
     private static readonly UnixFileMode _ownerOnlyFile = UnixFileMode.UserRead | UnixFileMode.UserWrite;
 
     private static readonly UnixFileMode _ownerOnlyDirectory =
@@ -54,12 +72,14 @@ public sealed class AuditLog : IDisposable
     private readonly Lock _gate = new();
     private readonly FileStream _stream;
     private readonly TimeProvider _clock;
+    private readonly string _lockPath;
     private long _sequence;
     private bool _disposed;
 
     private AuditLog(string path, FileStream stream, TimeProvider clock, bool tightened)
     {
         Path = path;
+        _lockPath = path + LockSuffix;
         _stream = stream;
         _clock = clock;
         TightenedPermissions = tightened;
@@ -170,10 +190,23 @@ public sealed class AuditLog : IDisposable
                 return false;
             }
 
+            // Declared before the try and released unconditionally in the finally: the shape CA2000
+            // insists on, which is also the shape that survives an exception mid-write.
+            FileStream? writeLock = null;
+
             try
             {
-                // One write, then a flush: the record reaches the file whole or not at all, which
-                // is what lets a second keypaste-mcp append to the same log without interleaving.
+                writeLock = AcquireWriteLock();
+                if (writeLock is null)
+                {
+                    error = $"the audit log at '{Path}' is locked by another keypaste process";
+                    return false;
+                }
+
+                // Seek first: another process may have appended since this stream last wrote, and
+                // FileStream would otherwise write at its own stale idea of the end and destroy
+                // that record. Then one write and a flush, so the line lands whole.
+                _stream.Seek(0, SeekOrigin.End);
                 _stream.Write(bytes);
                 _stream.Flush();
             }
@@ -181,6 +214,10 @@ public sealed class AuditLog : IDisposable
             {
                 error = $"the audit log at '{Path}' could not be written: {ex.Message}";
                 return false;
+            }
+            finally
+            {
+                writeLock?.Dispose();
             }
 
             _sequence = sequence;
@@ -199,6 +236,36 @@ public sealed class AuditLog : IDisposable
 
         _disposed = true;
         _stream.Dispose();
+    }
+
+    /// <summary>
+    /// Takes the sidecar lock, or returns null when another process will not let go.
+    /// </summary>
+    /// <remarks>
+    /// Exclusion comes from holding the handle open, not from the file existing, so a lock file left
+    /// behind by a killed process blocks nothing: the operating system closes its handles. That is
+    /// what keeps this free of the stale-lock problem every "delete the lock file on exit" scheme
+    /// eventually has.
+    /// </remarks>
+    private FileStream? AcquireWriteLock()
+    {
+        for (var attempt = 0; attempt < LockAttempts; attempt++)
+        {
+            try
+            {
+                return new FileStream(
+                    _lockPath,
+                    FileMode.OpenOrCreate,
+                    FileAccess.Write,
+                    FileShare.None);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                Thread.Sleep(LockWaitMilliseconds);
+            }
+        }
+
+        return null;
     }
 
     private static void CreateDirectory(string? directory)
