@@ -223,9 +223,14 @@ internal static class EnvExportCommand
         }
 
         context.Stderr.WriteLine($"Wrote {Count(count, "value")} from {groupPath} to {targetPath}.");
-        context.Stderr.WriteLine(OperatingSystem.IsWindows()
-            ? "note: the file inherits its directory's permissions; keypaste does not restrict them on Windows."
-            : "note: the file is readable only by you (mode 600). Delete it when you are done.");
+
+        if (count > 0)
+        {
+            context.Stderr.WriteLine(OperatingSystem.IsWindows()
+                ? "note: the file inherits its directory's permissions; keypaste does not restrict them on Windows."
+                : "note: the file is readable only by you (mode 600).");
+            context.Stderr.WriteLine("      Delete it when you are done; keypaste cannot take it back.");
+        }
 
         return CliApp.ExitSuccess;
     }
