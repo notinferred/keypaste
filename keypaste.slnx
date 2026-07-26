@@ -4,6 +4,7 @@
     <File Path="PLAN.md" />
     <File Path="DECISIONS.md" />
     <File Path="SECURITY.md" />
+    <File Path="THREATS.md" />
     <File Path="README.md" />
     <File Path="Directory.Build.props" />
     <File Path="Directory.Packages.props" />

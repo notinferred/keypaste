@@ -39,6 +39,11 @@ fully — what happened, what was exposed, what changed. No quiet patches for se
 In scope: anything in this repository — the core library, the CLI, the MCP bridge, the build and
 release pipeline, and the dependency chain on the secret path.
 
+The agent bridge has its own threat model in [THREATS.md](THREATS.md): prompt injection through
+entry names, confused-deputy attacks by a client that cannot be authenticated, audit log tampering,
+and what the locked-vault posture of the current version does and does not buy. It is explicit about
+which of those are mitigated today and which are still open, and it does not repeat what is here.
+
 Out of scope for now: the keypaste.com marketing site, and any deployment of keypaste that a third
 party operates. Vulnerabilities in upstream dependencies should be reported upstream first; tell us
 too, so the pinned version can be moved.
@@ -142,6 +147,15 @@ did not apply. Everything under *"Deleting a `.env` does not destroy it"* above 
 file you just made, in advance: your editor's swap file, your backups, snapshots, and git. `keypaste
 run` exists so that you rarely need this; when you do use it, delete the file when you are done and
 treat the values as having been exposed if it ever left the machine.
+
+**The audit log is tamper-evident, not tamper-proof — and not even that yet.** Every agent access is
+recorded locally, and keypaste opens that file only in append mode: no code path in it seeks,
+truncates, rewrites or deletes. That is a guarantee about keypaste's own behaviour and nothing more.
+The file belongs to your user account, so anything running as you can rewrite it at will, and until
+the per-line hash chain ships the rewrite leaves no trace. On Linux and macOS the log is created
+readable only by its owner; **on Windows there is no equivalent** and it inherits its directory's
+permissions, the same gap `env export` has. keypaste never rotates or trims the log — deleting lines
+is the opposite of what it is for — so it grows without bound. See [THREATS.md](THREATS.md) T-5.
 
 **Local attackers are out of scope.** Anything running as your user can read your memory, watch
 your keystrokes, and read your clipboard. keypaste protects the vault file at rest and limits what
