@@ -78,6 +78,9 @@ internal static class CliApp
             case "run":
                 return RunCommand.Execute(args, context);
 
+            case "agent":
+                return AgentCommand.Execute(args, context);
+
             case "hello":
                 context.Stdout.WriteLine(CoreInfo.Hello());
                 return ExitSuccess;
@@ -112,6 +115,7 @@ internal static class CliApp
         writer.WriteLine("  rm <entry>          remove an entry");
         writer.WriteLine("  env <subcommand>    manage a project's environment variables");
         writer.WriteLine("  run <project> --    run a command with those variables injected");
+        writer.WriteLine("  agent               unlock the vault and approve AI agents' requests");
         writer.WriteLine("  version             print the core version");
         writer.WriteLine();
         writer.WriteLine("the vault:");
