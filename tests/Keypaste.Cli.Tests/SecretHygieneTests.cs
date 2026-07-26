@@ -74,6 +74,40 @@ public sealed class SecretHygieneTests
     }
 
     /// <summary>
+    /// <c>env pull</c> handles more values at once than any other verb, and it is the only one
+    /// that reports on input it refused. Both halves are swept.
+    /// </summary>
+    /// <remarks>
+    /// The second half is the one that matters. The obvious phrasing of "line 3: unterminated
+    /// quote" includes the line, and on a malformed <c>.env</c> the line is the secret — so a
+    /// diagnostic is the likeliest place for a value to escape, not the summary.
+    /// </remarks>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void EnvPull_NeverEchoesAValue_FromTheFileOrFromADiagnostic(bool wellFormed)
+    {
+        using var harness = new CliHarness();
+        Seed(harness);
+
+        var body = wellFormed
+            ? $"GOOD={SentinelPassword}\nOTHER={SentinelNotes}\n"
+            : $"BAD-NAME={SentinelPassword}\nno equals {SentinelUsername}\nOPEN=\"{SentinelNotes}\n";
+
+        var path = Path.Combine(harness.Directory, "sweep.env");
+        File.WriteAllText(path, body);
+
+        harness.Prompt.Enqueue(Master);
+        harness.Run("env", "pull", "hygiene", path, "--yes", "--keep", "--vault", harness.VaultPath);
+
+        foreach (var sentinel in new[] { SentinelPassword, SentinelUsername, SentinelNotes, SentinelUrl })
+        {
+            Assert.DoesNotContain(sentinel, harness.Out, StringComparison.Ordinal);
+            Assert.DoesNotContain(sentinel, harness.Err, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>
     /// The master password must never be echoed, and the buffer the CLI was handed must be
     /// zeroed by the time the command returns. That is what keeps D-0007's zeroing promise
     /// honest one layer up, and it is only assertable because the prompt returns a

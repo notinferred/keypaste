@@ -118,6 +118,30 @@ public sealed class EnvStoreTests : IDisposable
         Assert.Equal(2, vault.CountHistoryItems("env/billing/TOKEN"));
     }
 
+    /// <summary>
+    /// Writing a value identical to the one already stored still costs a history item, because
+    /// <see cref="EnvStore.TrySet"/> compares nothing — it is told to set, so it sets.
+    /// </summary>
+    /// <remarks>
+    /// This is why <c>keypaste env pull</c> classifies before it writes and skips the unchanged
+    /// ones: a bulk import re-run after editing a single line would otherwise burn through the
+    /// ten history items the format keeps, evicting the values a user might actually need, and
+    /// touch the modification time of every entry they maintain in KeePassXC. Nothing else in the
+    /// codebase would notice that happening, which is what makes it worth pinning here.
+    /// </remarks>
+    [Fact]
+    public void Set_WithTheValueItAlreadyHas_StillCostsAHistoryItem()
+    {
+        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        var store = new EnvStore(vault);
+
+        store.TrySet("billing", "TOKEN", "same", out _);
+        Assert.Equal(0, vault.CountHistoryItems("env/billing/TOKEN"));
+
+        Assert.Equal(EnvSetOutcome.Updated, store.TrySet("billing", "TOKEN", "same", out _));
+        Assert.Equal(1, vault.CountHistoryItems("env/billing/TOKEN"));
+    }
+
     /// <summary>Removing takes the history with it — the only way to erase a rotated value.</summary>
     [Fact]
     public void Remove_TakesTheHistoryWithIt()
