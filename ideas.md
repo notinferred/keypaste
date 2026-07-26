@@ -35,6 +35,18 @@
   shape `env -i` has. Useful for reproducing exactly what CI sees.
 - `keypaste run --skip-unusable`: inject what can be injected and warn about the rest, instead of
   refusing. Only if somebody hits it - a partially injected environment fails somewhere else.
+- CI gate that reads an exported `.env` with real node `dotenv`, `python-dotenv` and `godotenv` and
+  compares against the vault. It is the only way to keep D-0018's portability claim honest as those
+  readers change; not shipped because it puts an npm and a pip install on the three-OS test job.
+  Checked by hand against dotenv 17.4.2 for now.
+- `keypaste env export --format json` (and a `--format` flag generally), for tools that want
+  structured input. Only once something actually asks for it — `--dotenv` is required today
+  precisely so a second format can be added without changing what the first one means.
+- `keypaste env diff <project> [file]`: what the vault has that the file does not, and the reverse,
+  by name. The natural companion to `pull` and `export`, and it never has to print a value.
+- A `direnv` shim so `cd`ing into a project loads its variables. Tension worth resolving first:
+  `keypaste run` scopes the exposure to one command, and anything `direnv`-shaped puts the values in
+  the interactive shell and everything it launches.
 - Vault health report: reused passwords, stale entries, weak values, secrets-in-env hygiene score.
 - Team approval quorum ("2 of 3 must approve production credentials") — great enterprise-ish story, Stage 6+.
 - Windows Hello / Touch ID unlock.
