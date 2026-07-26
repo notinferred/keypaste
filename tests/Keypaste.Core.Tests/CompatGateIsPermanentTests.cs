@@ -39,6 +39,11 @@ public sealed class CompatGateIsPermanentTests
         Assert.Contains("scripts/verify-run-injection.sh", workflow, StringComparison.Ordinal);
         Assert.Contains("scripts/verify-run-signals.sh", workflow, StringComparison.Ordinal);
 
+        // The agent bridge has the same shape of gap: StdioServerTransport and Main are beyond
+        // every in-process test, and "nothing but protocol reaches stdout" can only be asked of a
+        // real spawned process (CORE.md laws 3.3 and 4.5).
+        Assert.Contains("scripts/verify-mcp-stdio.sh", workflow, StringComparison.Ordinal);
+
         foreach (var os in new[] { "ubuntu-latest", "windows-latest", "macos-latest" })
         {
             Assert.Contains(os, workflow, StringComparison.Ordinal);
@@ -68,6 +73,30 @@ public sealed class CompatGateIsPermanentTests
 
         // Absent tooling must fail the build, never skip the gate.
         Assert.Contains("must never be skipped or soft-passed", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The MCP gate is the agent bridge's equivalent of the injection gate: the only place that
+    /// asks a real spawned server what actually reached its stdout, which is the one thing every
+    /// in-process test is structurally unable to see.
+    /// </summary>
+    [Fact]
+    public void McpStdioScript_ExistsAndKeepsItsNegativeControl()
+    {
+        var script = Path.Combine(RepoRoot(), "scripts", "verify-mcp-stdio.sh");
+        Assert.True(File.Exists(script), $"The MCP stdio gate script is missing: {script}");
+
+        var text = File.ReadAllText(script);
+
+        Assert.Contains("NEGATIVE CONTROL", text, StringComparison.Ordinal);
+        Assert.Contains("must never be skipped or soft-passed", text, StringComparison.Ordinal);
+
+        // The four claims it exists to make. Named individually because dropping any one leaves a
+        // script that still passes and a gate that has stopped gating.
+        Assert.Contains("is not JSON", text, StringComparison.Ordinal);
+        Assert.Contains("expected exactly 2 tools", text, StringComparison.Ordinal);
+        Assert.Contains("isError=true", text, StringComparison.Ordinal);
+        Assert.Contains("no audit log was written", text, StringComparison.Ordinal);
     }
 
     /// <summary>
