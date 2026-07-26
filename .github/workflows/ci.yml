@@ -80,6 +80,22 @@ jobs:
       - name: Test
         run: dotnet test keypaste.slnx --no-build -c Release
 
+      # `keypaste run` hands the child keypaste's real stdin, stdout and stderr, which puts
+      # everything it does beyond CliContext and therefore beyond every in-process test. The unit
+      # tests assert the environment keypaste *builds*; these assert what a real child process
+      # actually received, and that no file was written while doing it (CORE.md law 3.4).
+      - name: Verify run injects a variable and writes nothing to disk
+        shell: bash
+        run: scripts/verify-run-injection.sh
+
+      # Unix only: there is no kill(1) equivalent on Windows and no tty on a runner. That is a gap
+      # in the test, not a relaxation of the gate — the Windows behaviour is stated in SECURITY.md
+      # instead. Do not add an `if:` that can skip the Linux and macOS runs.
+      - name: Verify run forwards signals and exit codes
+        if: runner.os != 'Windows'
+        shell: bash
+        run: scripts/verify-run-signals.sh
+
   # ===========================================================================
   # PERMANENT COMPATIBILITY GATE — CORE.md law 4.6:
   #   "Compatibility is sacred: any KDBX file keypaste writes must open
