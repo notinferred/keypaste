@@ -34,13 +34,13 @@
 
 ## Stage 2 — The MCP bridge (Week 5–7) ← the headline feature
 **Goal: Claude can request ONE credential, you approve, it's scoped and logged.**
-- [ ] MCP server (`keypaste-mcp`) with tools: `list_entry_names` (names only, never secrets), `request_credential(entry, reason, ttl)`
+- [x] MCP server (`keypaste-mcp`) with tools: `list_entry_names` (names only, never secrets), `request_credential(entry, reason, ttl)` — stdio, `ModelContextProtocol.Core` pinned at 1.4.1 (D-0019); denies every request until the approval flow exists, and the vault stays locked because a server started with no terminal cannot ask for a master password (D-0022)
 - [ ] Human approval flow: OS-native prompt (or CLI confirm) showing agent, entry, reason — default deny, timeout deny
 - [ ] Scoping: response contains only the requested field; TTL after which cached grant expires
 - [ ] Append-only local audit log (JSONL + `keypaste log` pretty view)
 - [ ] Policy file for pre-approvals (e.g. "Claude Code may read entries in group 'dev/*' without prompting")
-- [ ] Threat-model doc: confused deputy, prompt injection via entry names, log tampering — and mitigations
-- [ ] Setup guide for Claude Desktop + Claude Code
+- [ ] Threat-model doc: confused deputy, prompt injection via entry names, log tampering — and mitigations — `THREATS.md` started in 2.1 and explicitly partial; 2.4 completes the sections it marks
+- [x] Setup guide for Claude Desktop + Claude Code — `docs/mcp-setup.md`, with the audit log format and why the vault cannot be unlocked yet
 - **Exit demo (THE demo):** ask Claude "deploy this, get the API key from my vault" → approval popup → Claude proceeds → `keypaste log` shows the access. 60 seconds.
 
 ## Stage 3 — Launch (Week 8–9)
