@@ -10,12 +10,6 @@ public enum DotEnvWriteNoteKind
     /// identically by every reader. See <see cref="DotEnvWriter"/>.
     /// </summary>
     EscapeDialect = 1,
-
-    /// <summary>
-    /// The value ends in a backslash, which sits against the closing quote. Some readers let the
-    /// match run past it into the following lines.
-    /// </summary>
-    TrailingBackslash = 2,
 }
 
 /// <summary>Something worth telling the user about one written variable.</summary>
@@ -204,11 +198,6 @@ public static class DotEnvWriter
     private static void Render(EnvVariable variable, StringBuilder builder, List<DotEnvWriteNote> notes)
     {
         var value = variable.Value;
-
-        if (value.EndsWith('\\'))
-        {
-            notes.Add(new DotEnvWriteNote(variable.Key, DotEnvWriteNoteKind.TrailingBackslash));
-        }
 
         if (value.Length == 0 || IsSafeUnquoted(value))
         {

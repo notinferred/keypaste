@@ -851,9 +851,16 @@ actually for. `motdotla/dotenv` post-processes a double-quoted value by expandin
 | `V="say \"hi\""` | `say "hi"` | `say \"hi\"` |
 
 So `WINDOWS_PATH` from the reader's own golden fixture - a file node reads *correctly* today - would
-come back doubled after a pull-then-export, with every keypaste test green. Worse, a value ending in
-a backslash puts one against the closing quote, and node's `"(?:\\"|[^"])*"` alternation runs the
-match on into following lines, corrupting *other* variables.
+come back doubled after a pull-then-export, with every keypaste test green.
+
+A second warning was designed and then **removed**: a value ending in a backslash puts one against
+the closing quote, which older regex-based dotenv releases were reported to run past into following
+lines, corrupting *other* variables. It does not reproduce. dotenv 17.4.2 reads
+`A='trailing\'` and `A="trailing\\"` correctly in both quote styles, with the variables after them
+intact, and so does `sh`. Shipping the note anyway would have meant a warning that fires on a case
+that works, which is how warnings stop being read - the same reasoning that keeps the red alarm off
+an empty export. If a reader that actually gets this wrong turns up, the note comes back with a
+version number attached.
 
 The rule that ships:
 
@@ -869,7 +876,7 @@ Single quotes are literal in keypaste, `motdotla/dotenv`, `python-dotenv`, `joho
 `${VAR}` expansion godotenv and python-dotenv perform by default** - which keeps
 `DotEnvNoteKind.LiteralInterpolation` a note rather than turning it into a live bug in the exported
 file. The escaped form is therefore reached only for a value containing an apostrophe or a CR, and
-those keys are named on stderr, as are values ending in a backslash. Keys, never values.
+those keys are named on stderr. Keys, never values.
 
 **`~` is excluded from the unquoted set** although the reader accepts it there. `~/bin:~/local`
 round-trips through keypaste and then tilde-expands - after every `:` - in any shell that sources

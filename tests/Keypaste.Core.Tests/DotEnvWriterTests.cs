@@ -417,18 +417,20 @@ public sealed class DotEnvWriterTests
     }
 
     /// <summary>
-    /// Flagged in both quote styles, because <c>motdotla/dotenv</c>'s value pattern lets the match
-    /// run past a backslash that sits against the closing quote — in single quotes too.
+    /// A backslash sitting against the closing quote. It round-trips, and it earns no warning: a
+    /// note was written for it and then removed, because the reader it was meant to warn about —
+    /// <c>motdotla/dotenv</c> 17.4.2 — reads it correctly in both quote styles, as does <c>sh</c>.
+    /// A warning that fires on a case that works is how warnings stop being read.
     /// </summary>
     [Theory]
     [InlineData("trailing\\")]
     [InlineData("it's trailing\\")]
-    public void ATrailingBackslashEarnsANote(string value)
+    public void ATrailingBackslash_RoundTripsWithoutComplaint(string value)
     {
-        var file = Format(("SLASHY", value));
-
-        Assert.Contains(file.Notes, n => n.Kind == DotEnvWriteNoteKind.TrailingBackslash);
         AssertRoundTrips(("SLASHY", value));
+
+        var notes = Format(("SLASHY", value)).Notes;
+        Assert.All(notes, n => Assert.Equal(DotEnvWriteNoteKind.EscapeDialect, n.Kind));
     }
 
     [Fact]
