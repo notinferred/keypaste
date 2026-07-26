@@ -5,6 +5,7 @@ using Keypaste.Cli.Clipboard;
 using Keypaste.Cli.Execution;
 using Keypaste.Cli.Prompting;
 using Keypaste.Cli.Styling;
+using Keypaste.Core;
 
 namespace Keypaste.Cli.Tests;
 

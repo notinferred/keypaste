@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Text;
+using Keypaste.Core;
 
 namespace Keypaste.Cli.Prompting;
 
