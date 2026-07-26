@@ -2,11 +2,11 @@
 
 > *"Stop pasting secrets into chats. keypaste is a local-first, KDBX-compatible vault that stores your passwords AND env variables, injects them into your projects, and lets AI agents like Claude request exactly one credential — with your approval, scoped access, and a full audit trail — without ever seeing your vault."*
 
-**Status: Stage 1.1 — the CLI works, and it stores env variables.** Create a vault, add entries,
+**Status: Stage 1.2 — the CLI works, and it replaces your `.env`.** Create a vault, add entries,
 list them, copy a password to the clipboard, remove entries, and keep a project's environment
-variables in the same file. Verified in CI against a real KeePassXC on Linux, macOS and Windows,
-in both directions. Injecting those variables into a child process (`keypaste run`) and the MCP
-bridge are still to come. Follow [`PLAN.md`](PLAN.md) for what lands next; [`CORE.md`](CORE.md) is
+variables in the same file — importing them straight from an existing `.env`. Verified in CI
+against a real KeePassXC on Linux, macOS and Windows, in both directions. Injecting those variables
+into a child process (`keypaste run`) and the MCP bridge are still to come. Follow [`PLAN.md`](PLAN.md) for what lands next; [`CORE.md`](CORE.md) is
 the constitution and does not change.
 
 ## Using it
@@ -47,6 +47,8 @@ proves that in both directions on all three operating systems; see
 [`DECISIONS.md`](DECISIONS.md) D-0014 for why this shape was chosen over custom string fields.
 
 ```sh
+keypaste env pull billing                      # imports ./.env, then offers to delete it
+keypaste env pull billing config/.env.prod --yes --delete-source
 keypaste env set billing DATABASE_URL          # prompts for the value, hidden
 keypaste env set billing STRIPE_KEY=sk_test_x  # or inline, for scripts — see the caveat below
 keypaste env ls                                # projects
@@ -55,10 +57,24 @@ keypaste get env/billing/DATABASE_URL --show   # read one value
 keypaste env rm billing STRIPE_KEY --yes
 ```
 
-Two things worth knowing before you rely on it, both covered in [`SECURITY.md`](SECURITY.md):
+`env pull` reads the whole file before it writes anything: if any line is malformed it reports
+every problem and imports nothing, so you never end up with half a `.env` in the vault and no
+`.env` on disk. It shows a plan first — how many variables are new, updated and unchanged, by name
+— and leaves unchanged ones alone.
+
+It handles `export` prefixes, comments, all three quoting styles, and values that span lines. Two
+rules differ from `dotenv`, both deliberately: a `#` only starts a comment when a space precedes it
+(so `PASSWORD=hunter2#42` keeps its `#`), and a key repeated in one file is an error rather than a
+coin flip. Values are stored **exactly as written** — `${VAR}` and `$VAR` are not expanded, because
+expanding them would bake one machine's environment into a vault you sync to others. Inside double
+quotes `\n`, `\r`, `\t`, `\\` and `\"` expand, so write `'C:\temp'` in single quotes if you mean a
+Windows path.
+
+Three things worth knowing before you rely on it, all covered in [`SECURITY.md`](SECURITY.md):
 the `KEY=value` form leaves the value in your shell history and in the process list, so keypaste
-warns when you use it; and setting a variable that already exists keeps the old value in the
-entry's KeePassXC history rather than erasing it.
+warns when you use it; setting a variable that already exists keeps the old value in the entry's
+KeePassXC history rather than erasing it; and deleting a `.env` is tidying, not erasure — keypaste
+says so rather than offering a "shred" it could not honour.
 
 ## Packages
 

@@ -488,6 +488,122 @@ fail against a remove-and-re-add implementation.
 
 ---
 
+## D-0015 - `env pull` is fail-closed, and it deletes the .env rather than claiming to shred it
+
+**Date:** 2026-07-25 - **Stage:** 1.2a - **Status:** accepted
+
+`keypaste env pull <project> [file]` reads a `.env` file and stores every variable in the project's
+env set. The parser is `src/Keypaste.Core/DotEnv.cs` - public, in the core, because CORE.md law 4.3
+is "no logic duplicated in frontends" and Stage 4's import dialog would otherwise grow a second
+grammar that disagrees with this one on exactly the ambiguous cases below. Two keypaste frontends
+importing one file into different secret sets is law 4.6's failure one layer up. It is also where
+thoroughness is cheap: the grammar has around sixty tests that open no vault, while every
+CLI-level test pays for a key derivation.
+
+**There is no `.env` standard, only implementations that disagree**, so the rules were chosen
+against the two that most likely produced the file being read - `motdotla/dotenv` (JavaScript) and
+`joho/godotenv` (Go). Three divergences are deliberate:
+
+- **An unquoted `#` starts a comment only when a space or tab precedes it.** dotenv truncates at
+  any `#`, which silently turns `PASSWORD=hunter2#42` into `hunter2` - a shortened secret that
+  fails much later somewhere else, with nothing saying why. When a comment *is* removed, `env pull`
+  names the affected keys on stderr.
+- **A key repeated in one file is an error.** dotenv keeps the first, godotenv keeps the last.
+  Since the two disagree there is no answer to give, so it fails closed (law 3.7), exactly as
+  `EnvStore.Read` already does for two entries sharing a name.
+- **A key outside the POSIX rule is an error.** dotenv's key pattern allows `-` and `.`; a variable
+  named that way cannot be exported to a child process, which is the only reason to store it. The
+  message comes from `EnvConvention.IsValidKey`, so the import and `env set` refuse identically.
+
+Backticks are accepted as a third literal quote, because dotenv v16 writes them and excluding them
+would silently store the backticks as part of the value. `KEY: value` is refused although dotenv
+accepts it - guessing at a YAML-ish shape on the secret path is not worth the convenience. Values
+spanning lines are supported for all three quote characters, which is what a PEM private key needs.
+
+Inside double quotes exactly five escapes expand - `\n \r \t \\ \"` - and everything else keeps its
+backslash, so `"C:\logs\app"` survives. The sharp edge is that `"C:\temp"` is `C:` followed by a
+tab, the same as in C, Python, or a shell's `$'...'`. A path-shaped exception to an escape rule
+would be a worse surprise than the rule, so it is documented and tested rather than special-cased;
+single quotes and the unquoted form are both literal and are the fix.
+
+**`${NAME}` and `$NAME` are stored literally, never expanded.** Expanding against the importing
+machine's environment would bake one laptop's `$HOME`, or a CI runner's, into a vault that is then
+synced elsewhere - the same file would mean different things on different machines. Expanding
+against the vault's own variables would invent an evaluation order inside a KDBX group that has
+none and that KeePassXC can neither see nor maintain. Both are guessing about a secret. `env pull`
+names the affected keys on stderr, `--help` says it, and the README says it. There is no `--expand`
+flag: a flag that changes what a secret *means* is the wrong kind of flag.
+
+**The import is all or nothing.** The file is read, decoded and checked completely - and every
+problem reported at once, capped at ten - before the vault is even opened. A half-imported `.env`
+whose original was then deleted is unrecoverable, and this command offers to delete the original,
+so the import has to be atomic or the offer is a trap. It is also free, because `Vault.Save` is one
+transactional write (D-0013) called once at the end. Everything about the file is settled before
+the master password is asked for, so a typo in the path does not cost a password entry and a key
+derivation to discover.
+
+**A problem message may name the line number, the key, and the rule broken - never the value or
+the raw line.** The natural phrasing of "unterminated quote on line 7" includes the line, and on a
+malformed `.env` the line is the secret. A diagnostic is the likeliest place for a value to escape,
+not the summary, and both a core test and the CLI hygiene sweep assert it. The fail-closed
+behaviour was confirmed by breaking it: ignoring the parse result imports the good lines and turns
+`Pull_WithABadLine_WritesNothing_AndReportsEveryProblem` red.
+
+**Collisions print a plan and ask, rather than taking a flag.** The command classifies every
+variable as new, updated, or unchanged, prints the counts and the names, and confirms - reusing
+`rm`'s `--yes`-when-stdin-is-not-a-terminal rule verbatim. **Unchanged variables are not written.**
+`EnvStore.TrySet` compares nothing, so rewriting an identical value spends one of the ten history
+items the format keeps and bumps the modification time of an entry the user also maintains in
+KeePassXC; `Set_WithTheValueItAlreadyHas_StillCostsAHistoryItem` pins why that matters. Two names
+differing only in case - in the file, or against the project - are refused before the confirmation
+rather than halfway through the write loop. The rejected alternative was `--overwrite`: a second
+flag that every script would set unconditionally is noise, and the plan already names the keys.
+
+**The word "shred" does not appear in the product, and there is no overwrite pass.** `prompts.md`
+asked for one; this corrects it in writing, the same way D-0014 corrected PLAN.md. Overwriting a
+file before deleting it does not destroy data on SSDs (the flash translation layer has already
+remapped the block), on copy-on-write filesystems (APFS, btrfs, ZFS, ReFS), on any volume with
+snapshots or backups, on network filesystems, or on NTFS files small enough to live in the MFT.
+`shred(1)`'s own CAUTION section says so. On a 2026 developer machine there is essentially no
+configuration where it works, so the pass would cost code, be untestable, and have exactly one real
+effect: convincing the user the secret is gone when the correct action is to rotate it. SECURITY.md
+already says a tool that overclaims is worse than one that is modest.
+
+What ships instead is `--delete-source`, `--keep`, and a prompt that states plainly what deleting
+does not do. It also warns when the file sits inside a git repository - checking for a `.git`
+directory *or file*, since worktrees and submodules use a file - because history is usually the
+larger exposure of the two. It deliberately does not shell out to `git`: a `.git` entry says the
+file is inside a repository, not that it was ever committed, and claiming history for a
+`.gitignore`d file would be the same overclaim in a smaller font. The note is conditional and hands
+over the command instead.
+
+**A piped run with no `--delete-source` neither deletes nor fails**, and says what it left behind.
+That differs from `env rm --yes` on purpose: there the deletion *is* the command, so refusing to
+guess is refusing to act. Here the import already succeeded and deletion is an optional epilogue,
+so failing the whole run over a cleanup question would be wrong and deleting silently would be
+worse. If the deletion is asked for and fails, the exit code is 2 rather than 0: the user asked for
+two things, got one, and the half that failed is the half that left plaintext on disk.
+
+**No filesystem seam.** `File.Exists`, `ReadAllBytes` and `Delete` are called directly and the
+tests write real files into a temp directory. The existing seams - `ISecretPrompt`, `IClipboard`,
+`IEnvironmentProbe` - exist because those things are untestable in-process: `Console.SetIn`
+provably does not intercept `Console.ReadKey`, and the clipboard needs a subprocess and a
+twenty-second wait. The filesystem has neither problem, `VaultSession.Open` already calls
+`File.Exists` directly, and a fake filesystem would prove nothing about `File.Delete`, which is the
+behaviour that actually matters here.
+
+**Memory hygiene is not overclaimed.** The file's plaintext is an ordinary string from decode
+onward, as is every value, and none of it can be zeroed - `VaultEntry.Password` is a `string`, so a
+`SecretBuffer` here would become one two frames later, which is the case `SecretBuffer`'s own
+documentation already names. No `GC.Collect`, no `SecureString`, no ceremony. What is claimed is
+narrower and true: keypaste writes nothing in plaintext of its own. The file was already on disk;
+the only write this command performs is the encrypted vault.
+
+The compatibility scripts are untouched. `env pull` writes through `EnvStore`, whose shape the gate
+already proves in both directions; a third script would be testing KeePassLib, not the parser.
+
+---
+
 # Open decisions
 
 ## O-0002 — Contribution terms: DCO or CLA

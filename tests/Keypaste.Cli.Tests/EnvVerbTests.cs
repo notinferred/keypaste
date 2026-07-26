@@ -323,6 +323,9 @@ public sealed class EnvVerbTests
     [InlineData("env", "set", "billing", "=novalue")]
     [InlineData("env", "rm", "billing")]
     [InlineData("env", "ls", "a", "b")]
+    [InlineData("env", "pull")]
+    [InlineData("env", "pull", "a", "b", "c")]
+    [InlineData("env", "pull", "a", "--keep", "--delete-source")]
     public void MalformedInvocations_AreUsageErrors_OnStderr(params string[] args)
     {
         using var harness = new CliHarness();
@@ -341,6 +344,7 @@ public sealed class EnvVerbTests
     [InlineData("env", "ls", "--help")]
     [InlineData("env", "set", "--help")]
     [InlineData("env", "rm", "--help")]
+    [InlineData("env", "pull", "--help")]
     public void Help_GoesToStdout_AndExitsZero(params string[] args)
     {
         using var harness = new CliHarness();
