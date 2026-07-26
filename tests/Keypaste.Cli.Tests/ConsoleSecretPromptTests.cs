@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using Keypaste.Cli.Prompting;
 using Xunit;
 
@@ -104,7 +105,7 @@ public sealed class ConsoleSecretPromptTests
     public void Redirected_ReadsOneLinePerPrompt_AndWritesNoPrompt()
     {
         using var prompts = new StringWriter(CultureInfo.InvariantCulture);
-        using var input = new StringReader("first-line\nsecond-line\n");
+        using var input = Piped("first-line\nsecond-line\n");
         var prompt = new ConsoleSecretPrompt(prompts, ThrowingKeySource, () => true, input);
 
         using var first = prompt.ReadSecret("Master password: ");
@@ -116,15 +117,75 @@ public sealed class ConsoleSecretPromptTests
         Assert.False(prompt.IsInteractive);
     }
 
+    /// <summary>
+    /// The read must consume the line and nothing beyond it. A <see cref="StreamReader"/> would
+    /// buffer ahead and swallow the rest, which is invisible until <c>keypaste run</c> hands stdin
+    /// to a child that then receives nothing.
+    /// </summary>
+    [Fact]
+    public void Redirected_LeavesEverythingAfterTheLine_ForWhoeverReadsNext()
+    {
+        using var prompts = new StringWriter(CultureInfo.InvariantCulture);
+        using var input = Piped("master-password\nthis belongs to the child\nand this\n");
+        var prompt = new ConsoleSecretPrompt(prompts, ThrowingKeySource, () => true, input);
+
+        using var secret = prompt.ReadSecret("Master password: ");
+        Assert.Equal("master-password", new string(secret!.Value));
+
+        using var rest = new StreamReader(input, Encoding.UTF8);
+        Assert.Equal("this belongs to the child\nand this\n", rest.ReadToEnd());
+    }
+
+    /// <summary>A pipe written on Windows carries CRLF, and the CR is not part of the password.</summary>
+    [Fact]
+    public void Redirected_StripsACarriageReturn()
+    {
+        using var prompts = new StringWriter(CultureInfo.InvariantCulture);
+        using var input = Piped("hunter2\r\n");
+        var prompt = new ConsoleSecretPrompt(prompts, ThrowingKeySource, () => true, input);
+
+        using var secret = prompt.ReadSecret("Password: ");
+        Assert.Equal("hunter2", new string(secret!.Value));
+    }
+
+    /// <summary>
+    /// A pipe has no code page and every shell writes UTF-8, so the bytes are decoded as UTF-8
+    /// rather than through <c>Console.In</c>. Reading byte-wise must not split a character.
+    /// </summary>
+    [Fact]
+    public void Redirected_DecodesMultiByteCharacters()
+    {
+        using var prompts = new StringWriter(CultureInfo.InvariantCulture);
+        using var input = Piped("pässwörd-é中\n");
+        var prompt = new ConsoleSecretPrompt(prompts, ThrowingKeySource, () => true, input);
+
+        using var secret = prompt.ReadSecret("Password: ");
+        Assert.Equal("pässwörd-é中", new string(secret!.Value));
+    }
+
+    [Fact]
+    public void Redirected_ReadsAFinalLineWithNoNewline()
+    {
+        using var prompts = new StringWriter(CultureInfo.InvariantCulture);
+        using var input = Piped("no-trailing-newline");
+        var prompt = new ConsoleSecretPrompt(prompts, ThrowingKeySource, () => true, input);
+
+        using var secret = prompt.ReadSecret("Password: ");
+        Assert.Equal("no-trailing-newline", new string(secret!.Value));
+    }
+
     [Fact]
     public void Redirected_ReturnsNullAtEndOfInput()
     {
         using var prompts = new StringWriter(CultureInfo.InvariantCulture);
-        using var input = new StringReader(string.Empty);
+        using var input = Piped(string.Empty);
         var prompt = new ConsoleSecretPrompt(prompts, ThrowingKeySource, () => true, input);
 
         Assert.Null(prompt.ReadSecret("Master password: "));
     }
+
+    /// <summary>Stdin as the CLI really sees it: a byte stream, not a decoded reader.</summary>
+    private static MemoryStream Piped(string text) => new(Encoding.UTF8.GetBytes(text));
 
     private static string Type(string keystrokes)
     {

@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Keypaste.Cli.Prompting;
@@ -24,13 +25,21 @@ namespace Keypaste.Cli.Prompting;
 /// <b>Nothing is echoed, not even asterisks</b>, which would leak the secret's length to anyone
 /// reading the screen or a recorded terminal session. Backspace therefore has no visible effect.
 /// </para>
+/// <para>
+/// <b>The redirected path reads one byte at a time and buffers nothing.</b> A
+/// <see cref="StreamReader"/> would be the obvious way to read a line, and it reads ahead — up to
+/// a bufferful of stdin disappears into managed memory that nothing else can reach. For every
+/// verb that is invisible, because nothing downstream wants stdin. For <c>keypaste run</c>, whose
+/// child inherits it, <c>printf 'pw\nhello\n' | keypaste run p -- cat</c> would print nothing at
+/// all. Byte-wise reads cost nothing at the length of a password.
+/// </para>
 /// </remarks>
 internal sealed class ConsoleSecretPrompt : ISecretPrompt
 {
     private readonly TextWriter _prompts;
     private readonly Func<ConsoleKeyInfo> _readKey;
     private readonly Func<bool> _isInputRedirected;
-    private readonly TextReader _redirectedInput;
+    private readonly Stream _redirectedInput;
 
     /// <summary>Creates a prompt writing to <paramref name="prompts"/> (in practice stderr).</summary>
     internal ConsoleSecretPrompt(TextWriter prompts)
@@ -42,15 +51,16 @@ internal sealed class ConsoleSecretPrompt : ISecretPrompt
         TextWriter prompts,
         Func<ConsoleKeyInfo> readKey,
         Func<bool> isInputRedirected,
-        TextReader? redirectedInput)
+        Stream? redirectedInput)
     {
         _prompts = prompts;
         _readKey = readKey;
         _isInputRedirected = isInputRedirected;
 
-        // A UTF-8 reader over the raw stdin stream, bypassing Console.In's code page entirely.
-        _redirectedInput = redirectedInput
-            ?? new StreamReader(Console.OpenStandardInput(), new UTF8Encoding(false));
+        // The raw stdin stream, decoded as UTF-8 by hand below. Console.In would decode with the
+        // console input code page — typically an OEM page on Windows — and silently mangle a
+        // non-ASCII password arriving through a pipe.
+        _redirectedInput = redirectedInput ?? Console.OpenStandardInput();
     }
 
     /// <inheritdoc/>
@@ -61,7 +71,7 @@ internal sealed class ConsoleSecretPrompt : ISecretPrompt
     {
         if (!IsInteractive)
         {
-            var line = _redirectedInput.ReadLine();
+            var line = ReadRedirectedLine();
             if (line is null)
             {
                 return null;
@@ -139,6 +149,49 @@ internal sealed class ConsoleSecretPrompt : ISecretPrompt
             return Console.ReadLine();
         }
 
-        return _redirectedInput.ReadLine();
+        return ReadRedirectedLine();
+    }
+
+    /// <summary>
+    /// Reads exactly one line from the redirected stream, consuming not one byte more.
+    /// </summary>
+    /// <remarks>
+    /// Everything after the newline is left in the pipe for whoever reads next — which for
+    /// <c>keypaste run</c> is the child process. Decoding happens once at the end rather than per
+    /// byte, so a multi-byte character split across the loop still arrives intact.
+    /// </remarks>
+    private string? ReadRedirectedLine()
+    {
+        var bytes = new List<byte>(SecretBuffer.InitialCapacity);
+
+        while (true)
+        {
+            var next = _redirectedInput.ReadByte();
+
+            if (next < 0)
+            {
+                // End of input. A final line with no newline still counts; nothing at all does not.
+                return bytes.Count == 0 ? null : Decode(bytes);
+            }
+
+            if (next == '\n')
+            {
+                return Decode(bytes);
+            }
+
+            bytes.Add((byte)next);
+        }
+    }
+
+    private static string Decode(List<byte> bytes)
+    {
+        // A CRLF pipe leaves the carriage return behind, and it would otherwise become part of
+        // the password.
+        if (bytes.Count > 0 && bytes[^1] == '\r')
+        {
+            bytes.RemoveAt(bytes.Count - 1);
+        }
+
+        return Encoding.UTF8.GetString(CollectionsMarshal.AsSpan(bytes));
     }
 }
