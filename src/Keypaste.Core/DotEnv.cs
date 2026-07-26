@@ -107,8 +107,10 @@ public sealed class DotEnvDocument
 /// <para>
 /// <b>What is not claimed:</b> the file's plaintext exists here as ordinary strings and cannot be
 /// zeroed, which is the same limitation SECURITY.md already states for every value keypaste
-/// handles. What keypaste does promise is narrower and true: it writes nothing in plaintext of its
-/// own: the parser touches no file, and the only write its caller performs is the encrypted vault.
+/// handles. What keypaste does promise is narrower and true: the parser touches no file at all, and
+/// no command writes plaintext of keypaste's own accord. The one command that writes plaintext at
+/// all is <c>env export</c>, which does so only because the user named the format, the destination
+/// and then answered for it — see <see cref="DotEnvWriter"/>.
 /// </para>
 /// </remarks>
 public static class DotEnv

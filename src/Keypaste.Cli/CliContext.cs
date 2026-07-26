@@ -1,6 +1,7 @@
 using Keypaste.Cli.Clipboard;
 using Keypaste.Cli.Execution;
 using Keypaste.Cli.Prompting;
+using Keypaste.Cli.Styling;
 
 namespace Keypaste.Cli;
 
@@ -34,6 +35,9 @@ internal sealed class CliContext
     /// <summary>How <c>run</c> starts, supervises and reaps a child process.</summary>
     internal required IProcessLauncher ProcessLauncher { get; init; }
 
+    /// <summary>How a warning that must not be missed reaches the terminal.</summary>
+    internal required IConsoleStyle ConsoleStyle { get; init; }
+
     /// <summary>Builds the context the real program uses.</summary>
     /// <remarks>
     /// Prompts are wired to <paramref name="stderr"/>, not <paramref name="stdout"/>. That is the
@@ -53,6 +57,7 @@ internal sealed class CliContext
             ClipboardClear = new BlockingClearStrategy(TimeProvider.System),
             Environment = environment,
             ProcessLauncher = new SystemProcessLauncher(),
+            ConsoleStyle = new SystemConsoleStyle(environment),
         };
     }
 }

@@ -335,12 +335,8 @@ internal static class EnvPullCommand
     /// <summary>Offers to remove the file, and says plainly what removing it does not do.</summary>
     private static int Cleanup(string sourcePath, bool deleteSource, bool keep, CliContext context)
     {
-        if (FindRepository(sourcePath) is { } repository)
+        if (GitRepository.Find(sourcePath) is { } repository)
         {
-            // Deliberately conditional, and deliberately not `git log` in a subprocess: a .git
-            // directory says the file is inside a repository, not that it was ever committed.
-            // Claiming history for a .gitignore'd file would be exactly the overclaim the rest of
-            // this command is written to avoid, so it hands over the command instead.
             context.Stderr.WriteLine($"note: '{sourcePath}' is inside a git repository ('{repository}').");
             context.Stderr.WriteLine("      Deleting it does not remove it from git history. If it was ever");
             context.Stderr.WriteLine("      committed, the values are still in the repository and in every clone:");
@@ -404,30 +400,6 @@ internal static class EnvPullCommand
         }
 
         return CliApp.ExitSuccess;
-    }
-
-    /// <summary>The root of the git repository containing <paramref name="sourcePath"/>, if any.</summary>
-    /// <remarks>
-    /// A worktree and a submodule carry a <c>.git</c> <em>file</em> rather than a directory, so
-    /// both are checked; looking only for the directory would miss exactly the setups where the
-    /// history is somebody else's to clean up.
-    /// </remarks>
-    private static string? FindRepository(string sourcePath)
-    {
-        var directory = Path.GetDirectoryName(sourcePath);
-
-        while (!string.IsNullOrEmpty(directory))
-        {
-            var candidate = Path.Combine(directory, ".git");
-            if (Directory.Exists(candidate) || File.Exists(candidate))
-            {
-                return directory;
-            }
-
-            directory = Path.GetDirectoryName(directory);
-        }
-
-        return null;
     }
 
     private static void WriteNames(CliContext context, string label, List<string> names)
