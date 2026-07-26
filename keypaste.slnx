@@ -19,6 +19,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/Keypaste.Core.Tests/Keypaste.Core.Tests.csproj" />
     <Project Path="tests/Keypaste.Cli.Tests/Keypaste.Cli.Tests.csproj" />
+    <Project Path="tests/Keypaste.Mcp.Tests/Keypaste.Mcp.Tests.csproj" />
   </Folder>
   <Folder Name="/third_party/">
     <Project Path="third_party/KeePassLib/KeePassLib.csproj" />
