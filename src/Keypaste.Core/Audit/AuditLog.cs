@@ -400,6 +400,7 @@ public sealed class AuditLog : IDisposable
         AuditMethod.NotImplemented => "not-implemented",
         AuditMethod.OutOfScope => "out-of-scope",
         AuditMethod.InvalidRequest => "invalid-request",
+        AuditMethod.Exposure => "exposure",
         _ => "vault-locked",
     };
 

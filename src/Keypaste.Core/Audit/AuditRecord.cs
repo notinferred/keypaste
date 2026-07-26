@@ -29,6 +29,13 @@ public enum AuditMethod
 
     /// <summary>The arguments did not satisfy the tool's schema.</summary>
     InvalidRequest = 3,
+
+    /// <summary>
+    /// Allowed because everything named lay inside the exposure the user configured. Applies to
+    /// listing names, which is the only thing this version can allow — releasing a credential
+    /// always needs a person, and that is Stage 2.2's <c>prompt</c> and Stage 2.3's <c>policy</c>.
+    /// </summary>
+    Exposure = 4,
 }
 
 /// <summary>Who asked.</summary>
