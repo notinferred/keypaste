@@ -31,6 +31,8 @@ internal sealed class McpHarness : IAsyncDisposable
     private readonly string _directory = Directory.CreateTempSubdirectory("keypaste-mcp-tests-").FullName;
     private readonly List<IDisposable> _owned = [];
 
+    private readonly ApproverConnection _approver;
+
     private AuditLog? _audit;
     private McpServer? _server;
     private McpClient? _client;
@@ -45,12 +47,28 @@ internal sealed class McpHarness : IAsyncDisposable
     /// <summary>What the listing tool will be told the vault contains.</summary>
     internal FakeEntryNameSource Source { get; } = new();
 
+    /// <summary>
+    /// A real <c>keypaste agent</c>, in this process, answering over a real named pipe.
+    /// </summary>
+    /// <remarks>
+    /// A fake handler rather than a fake connection, so the bridge under test builds a genuine
+    /// request, sends it over the wire and decodes a genuine reply. Stubbing the connection would
+    /// have skipped the protocol, which is where a credential actually crosses a process boundary.
+    /// </remarks>
+    internal FakeApprover Approver { get; }
+
+    internal McpHarness()
+    {
+        Approver = new FakeApprover();
+        _approver = new ApproverConnection(Approver.PipeName);
+    }
+
     /// <summary>Starts the server with the given arguments and connects a client to it.</summary>
     internal async Task<McpClient> StartAsync(params string[] argv)
     {
         var arguments = argv.Concat(["--vault", VaultPath, "--audit-log", AuditPath]).ToArray();
 
-        if (!ServerOptions.TryParse(arguments, null, null, out var options, out var error))
+        if (!ServerOptions.TryParse(arguments, null, null, Approver.PipeName, out var options, out var error))
         {
             throw new InvalidOperationException($"the harness could not start the server: {error}");
         }
@@ -80,7 +98,7 @@ internal sealed class McpHarness : IAsyncDisposable
         };
 
         serverOptions.ToolCollection.Add(new ListEntryNamesTool(Source, options, _audit));
-        serverOptions.ToolCollection.Add(new RequestCredentialTool(options, _audit));
+        serverOptions.ToolCollection.Add(new RequestCredentialTool(options, _approver, _audit));
 
         _transport = new StreamServerTransport(toServerRead, toClient, "keypaste");
         _server = McpServer.Create(_transport, serverOptions, loggerFactory: null, serviceProvider: null);
@@ -142,6 +160,9 @@ internal sealed class McpHarness : IAsyncDisposable
         {
             await _transport.DisposeAsync();
         }
+
+        await _approver.DisposeAsync();
+        await Approver.DisposeAsync();
 
         _audit?.Dispose();
         Source.Dispose();
