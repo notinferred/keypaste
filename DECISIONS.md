@@ -750,11 +750,19 @@ reports what it always reported. The retry can turn a spurious failure into a su
 turn a real failure into corruption, which is the only property that makes this acceptable on the
 write path of a credential store.
 
-Proved by A/B rather than asserted: a test that holds the vault file open with `FileShare.None` for
-150 ms fails with `Access is denied` at one attempt and passes at four.
-`VaultSaveTests.TheRetryHasRoomToAbsorbATransientFailure` pins the constants so that quietly
-reducing them cannot silently restore the old behaviour, and two further tests pin that a save
-which genuinely cannot succeed still fails, and fails promptly rather than hanging.
+Proved by A/B rather than asserted: `VaultSaveTests.ATransientFailure_IsAbsorbed` fails at one
+attempt and passes at four. `TheRetryHasRoomToAbsorbATransientFailure` pins the constants so that
+quietly reducing them cannot silently restore the old behaviour, and two further tests pin that a
+save which genuinely cannot succeed still fails, and fails promptly rather than hanging.
+
+**The first version of those tests was wrong in a way worth recording.** It simulated the failure by
+holding the vault file open with `FileShare.None`, which is what actually happens in the wild. That
+works on Windows and does nothing on Linux or macOS, where file locking is advisory — the save
+simply succeeds, so `Assert.Throws` found no exception and both tests failed on two of the three
+operating systems. The mechanism is now a directory that is removed and, for the transient case,
+put back: it fails everywhere, through the same retry path, for the same reason. A test that
+asserts real behaviour on one platform and nothing at all on the others is worse than no test,
+because the green tick claims all three.
 
 **Three separate places were hiding the reason, and all three are fixed.** Diagnosing this took two
 CI round trips that it should not have, because at every layer the interesting information was

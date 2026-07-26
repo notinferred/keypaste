@@ -7,11 +7,21 @@ namespace Keypaste.Core.Tests;
 /// What happens when writing the vault file goes wrong.
 /// </summary>
 /// <remarks>
-/// Saving goes through a file transaction — write a temporary file, replace the original — and on
-/// Windows that replace competes with every process that watches the filesystem. Defender and the
-/// search indexer open a newly written file to scan it, and the replace fails for a few
-/// milliseconds. This showed up as intermittent "Could not save" failures across unrelated tests
-/// on CI, which is what <see cref="KeePassInterop.SaveAttempts"/> exists to absorb.
+/// <para>
+/// Saving goes through a file transaction — write a temporary file, then replace the original —
+/// and on Windows that replace competes with every process that watches the filesystem. Defender
+/// and the search indexer open a newly written file in order to scan it, and for a few
+/// milliseconds the replace cannot land, reporting <c>Access is denied</c>. It showed up as
+/// intermittent "Could not save" failures across unrelated tests on CI, and
+/// <see cref="KeePassInterop.SaveAttempts"/> is what absorbs it (DECISIONS.md D-0017).
+/// </para>
+/// <para>
+/// The failure is simulated by removing the directory the vault lives in, rather than by locking
+/// the file. A lock is what actually happens in the wild, but <c>FileShare.None</c> is advisory on
+/// Linux and macOS — the save simply succeeds there — so a test built on it would assert the real
+/// behaviour on one platform and nothing at all on the other two. A missing directory fails
+/// everywhere, through the same retry path, for the same reason.
+/// </para>
 /// </remarks>
 public sealed class VaultSaveTests : IDisposable
 {
@@ -26,6 +36,48 @@ public sealed class VaultSaveTests : IDisposable
 
     public void Dispose() => Directory.Delete(_directory, recursive: true);
 
+    /// <summary>Creates a saved vault inside its own subdirectory, and returns both.</summary>
+    private (Vault Vault, string Home) NewVaultInItsOwnDirectory(string name)
+    {
+        var home = Directory.CreateDirectory(Path.Combine(_directory, name)).FullName;
+        var vault = Vault.Create(Path.Combine(home, "vault.kdbx"), MasterPassword);
+        vault.AddEntry(new VaultEntry { Title = "T", Password = "p", GroupPath = "env/dev" });
+        vault.Save();
+        return (vault, home);
+    }
+
+    /// <summary>
+    /// The point of the retry: a failure that goes away on its own must not reach the user.
+    /// </summary>
+    /// <remarks>
+    /// Fails against a single attempt — confirmed by setting
+    /// <see cref="KeePassInterop.SaveAttempts"/> to 1, which reports the same
+    /// <c>Access is denied</c> that CI was reporting before the retry existed.
+    /// </remarks>
+    [Fact]
+    public async Task ATransientFailure_IsAbsorbed()
+    {
+        var (vault, home) = NewVaultInItsOwnDirectory("transient");
+        using var _ = vault;
+
+        var token = TestContext.Current.CancellationToken;
+        Directory.Delete(home, recursive: true);
+
+        var restore = Task.Run(
+            () =>
+            {
+                Thread.Sleep(120);
+                Directory.CreateDirectory(home);
+            },
+            token);
+
+        var failure = Record.Exception(vault.Save);
+        await restore;
+
+        Assert.True(failure is null, $"a failure that cured itself still reached the caller: {failure?.Message}");
+        Assert.True(File.Exists(Path.Combine(home, "vault.kdbx")));
+    }
+
     /// <summary>
     /// A save that cannot succeed still reports, and reports <em>why</em>. Without the cause the
     /// user gets "Could not save 'vault.kdbx'." and no way to tell a full disk from a file open in
@@ -34,39 +86,32 @@ public sealed class VaultSaveTests : IDisposable
     [Fact]
     public void ASaveThatCannotSucceed_ReportsTheReasonItFailed()
     {
-        var path = Path.Combine(_directory, "locked.kdbx");
+        var (vault, home) = NewVaultInItsOwnDirectory("doomed");
+        using var _ = vault;
 
-        using var vault = Vault.Create(path, MasterPassword);
-        vault.AddEntry(new VaultEntry { Title = "T", Password = "p" });
-        vault.Save();
-
-        // Held open with no sharing at all, so the transaction's replace cannot possibly land.
-        using var exclusive = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        Directory.Delete(home, recursive: true);
 
         var error = Assert.Throws<VaultException>(vault.Save);
 
-        Assert.Contains("locked.kdbx", error.Message, StringComparison.Ordinal);
+        Assert.Contains("vault.kdbx", error.Message, StringComparison.Ordinal);
         Assert.NotNull(error.InnerException);
 
-        // The message says more than the path: it carries whatever the operating system said.
-        Assert.True(
-            error.Message.Length > $"Could not save '{path}': ".Length,
-            $"the failure named no cause: {error.Message}");
+        // Says more than the path: it carries whatever the operating system said.
+        Assert.Contains(":", error.Message[error.Message.IndexOf("vault.kdbx", StringComparison.Ordinal)..],
+            StringComparison.Ordinal);
     }
 
     /// <summary>
-    /// Retrying must not turn a permanent failure into a hang. Four attempts with a linear
-    /// backoff is well under a second, so a save that will never work still fails promptly.
+    /// Retrying must not turn a permanent failure into a hang. Four attempts with a linear backoff
+    /// is well under a second, so a save that will never work still fails promptly.
     /// </summary>
     [Fact]
     public void ASaveThatCannotSucceed_GivesUpQuickly()
     {
-        var path = Path.Combine(_directory, "give-up.kdbx");
+        var (vault, home) = NewVaultInItsOwnDirectory("give-up");
+        using var _ = vault;
 
-        using var vault = Vault.Create(path, MasterPassword);
-        vault.Save();
-
-        using var exclusive = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        Directory.Delete(home, recursive: true);
 
         var started = Environment.TickCount64;
         Assert.Throws<VaultException>(vault.Save);
@@ -76,9 +121,9 @@ public sealed class VaultSaveTests : IDisposable
     }
 
     /// <summary>
-    /// The retry is not allowed to be a no-op loop: if the delay or the attempt count were
-    /// dropped to nothing, the transient window on Windows would stop being absorbed and the
-    /// intermittent CI failures would come back with no test noticing.
+    /// The retry is not allowed to become a no-op: dropped to one attempt, or to no delay, the
+    /// transient window on Windows would stop being absorbed and the intermittent CI failures
+    /// would come back with nothing noticing.
     /// </summary>
     [Fact]
     public void TheRetryHasRoomToAbsorbATransientFailure()
@@ -91,16 +136,14 @@ public sealed class VaultSaveTests : IDisposable
     [Fact]
     public void AnOrdinarySaveIsUnaffected()
     {
-        var path = Path.Combine(_directory, "ordinary.kdbx");
+        var (vault, home) = NewVaultInItsOwnDirectory("ordinary");
 
-        using (var vault = Vault.Create(path, MasterPassword))
+        using (vault)
         {
-            vault.AddEntry(new VaultEntry { Title = "T", Password = "p", GroupPath = "env/dev" });
-            vault.Save();
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = Vault.Open(Path.Combine(home, "vault.kdbx"), MasterPassword);
         Assert.Equal("p", reopened.Find("env/dev/T")?.Password, StringComparer.Ordinal);
     }
 }
