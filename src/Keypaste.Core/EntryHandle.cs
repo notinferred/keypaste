@@ -1,5 +1,26 @@
 namespace Keypaste.Core;
 
+/// <summary>How an agent chose to name an entry.</summary>
+/// <remarks>
+/// Recorded on every audit line, because "was this request even addressable?" is a question a
+/// reader should be able to answer at a glance, and because the two forms have different safety
+/// properties: a handle is unambiguous, a path may not be.
+/// </remarks>
+public enum EntryAddressKind
+{
+    /// <summary>Not a usable address at all.</summary>
+    Invalid = 0,
+
+    /// <summary>An <see cref="EntryHandle"/>, which resolves to exactly one entry or to none.</summary>
+    Handle = 1,
+
+    /// <summary>
+    /// A slash-separated entry path. Convenient for a human writing a policy, and ambiguous
+    /// whenever a title contains a slash — an ambiguous one is refused rather than guessed at.
+    /// </summary>
+    Path = 2,
+}
+
 /// <summary>
 /// A stable, injection-proof way for an agent to name an entry back to keypaste.
 /// </summary>
@@ -63,6 +84,27 @@ public static class EntryHandle
         return Prefix + Convert.ToHexStringLower(digest[..(DigestLength / 2)]);
     }
 
+    /// <summary>Which form an agent used to name an entry.</summary>
+    /// <param name="entry">The <c>entry</c> argument exactly as it arrived.</param>
+    /// <returns>The form it takes. Says nothing about whether it resolves to anything.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="entry"/> is null.</exception>
+    /// <remarks>
+    /// A vault entry could in principle be titled <c>k1_0123456789abcdef</c>, which would classify
+    /// as a handle. Resolution therefore tries handles first and falls back to an exact path match,
+    /// so such an entry stays reachable.
+    /// </remarks>
+    public static EntryAddressKind Classify(string entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+
+        if (LooksLikeHandle(entry))
+        {
+            return EntryAddressKind.Handle;
+        }
+
+        return entry.Length == 0 ? EntryAddressKind.Invalid : EntryAddressKind.Path;
+    }
+
     /// <summary>Whether a string is shaped like a handle.</summary>
     /// <param name="value">The argument an agent supplied.</param>
     /// <returns>
@@ -70,12 +112,6 @@ public static class EntryHandle
     /// about whether any entry actually has that handle.
     /// </returns>
     /// <exception cref="ArgumentNullException"><paramref name="value"/> is null.</exception>
-    /// <remarks>
-    /// Used to decide whether to resolve an <c>entry</c> argument as a handle or as a path, and to
-    /// record which form was used in the audit log. A vault entry could in principle be titled
-    /// <c>k1_0123456789abcdef</c>; resolution therefore tries handles first and falls back to an
-    /// exact path match, so such an entry is still reachable.
-    /// </remarks>
     public static bool LooksLikeHandle(string value)
     {
         ArgumentNullException.ThrowIfNull(value);

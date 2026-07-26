@@ -52,13 +52,20 @@ public static class EntryNameSanitizer
 
     /// <summary>Sanitizes one name.</summary>
     /// <param name="raw">The untrusted text.</param>
+    /// <param name="maximumLength">
+    /// The longest result, in UTF-16 code units. Defaults to <see cref="MaximumLength"/>, which is
+    /// the right cap for something a human reads in a list; the audit log passes its own, because
+    /// an agent's stated reason is prose rather than a label.
+    /// </param>
     /// <returns>The safe text, and whether anything changed.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="raw"/> is null.</exception>
-    public static SanitizedName Sanitize(string raw)
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="maximumLength"/> is not positive.</exception>
+    public static SanitizedName Sanitize(string raw, int maximumLength = MaximumLength)
     {
         ArgumentNullException.ThrowIfNull(raw);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumLength);
 
-        var text = Scrub(raw);
+        var text = Scrub(raw, maximumLength);
         if (text.Length == 0)
         {
             text = Placeholder;
@@ -72,16 +79,16 @@ public static class EntryNameSanitizer
     /// survived, which is what lets a group path drop a segment rather than spell
     /// <see cref="Placeholder"/> into the middle of itself.
     /// </summary>
-    private static string Scrub(string raw)
+    private static string Scrub(string raw, int maximumLength)
     {
-        var builder = new StringBuilder(Math.Min(raw.Length, MaximumLength));
+        var builder = new StringBuilder(Math.Min(raw.Length, maximumLength));
         Span<char> utf16 = stackalloc char[2];
         var units = 0;
         var lastWasSpace = false;
 
         foreach (var rune in raw.EnumerateRunes())
         {
-            if (units + rune.Utf16SequenceLength > MaximumLength)
+            if (units + rune.Utf16SequenceLength > maximumLength)
             {
                 break;
             }
@@ -145,7 +152,7 @@ public static class EntryNameSanitizer
 
             // A segment that sanitizes away leaves an empty segment rather than the placeholder:
             // the placeholder exists so a human can point at an entry, and a path is read whole.
-            var segment = Scrub(segments[i]);
+            var segment = Scrub(segments[i], MaximumLength);
             altered |= !string.Equals(segment, segments[i], StringComparison.Ordinal);
             builder.Append(segment);
         }
