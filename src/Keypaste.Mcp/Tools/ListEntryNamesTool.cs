@@ -52,26 +52,39 @@ internal sealed class ListEntryNamesTool(
     };
 
     /// <inheritdoc/>
-    public override ValueTask<CallToolResult> InvokeAsync(
+    public override async ValueTask<CallToolResult> InvokeAsync(
         RequestContext<CallToolRequestParams> request,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
 
         var client = McpAudit.ClientOf(request, options);
-        var listing = source.List();
+
+        EntryNameListing listing;
+
+        try
+        {
+            listing = await source.ListAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Still audited. A listing the client stopped waiting for is still an access that was
+            // attempted, and law 3.3 does not make an exception for the ones nobody collected.
+            listing = new EntryNameListing(VaultAvailability.Failed, [], ToolText.Cancelled);
+        }
 
         if (listing.Availability != VaultAvailability.Available)
         {
-            return new ValueTask<CallToolResult>(
-                Record(
-                    McpAudit.Denial(
-                        ToolText.ListToolName,
-                        client,
-                        AuditMethod.VaultLocked,
-                        listing.Reason,
-                        options.Exposure),
-                    ToolResults.Refuse(listing.Reason)));
+            return Record(
+                McpAudit.Denial(
+                    ToolText.ListToolName,
+                    client,
+                    listing.Availability == VaultAvailability.Locked
+                        ? AuditMethod.VaultLocked
+                        : AuditMethod.NoApprover,
+                    listing.Reason,
+                    options.Exposure),
+                ToolResults.Refuse(listing.Reason));
         }
 
         var exposed = new List<EntryName>();
@@ -99,8 +112,7 @@ internal sealed class ListEntryNamesTool(
             Exposure = options.Exposure.Globs,
         };
 
-        return new ValueTask<CallToolResult>(
-            Record(record, Render(exposed, truncated, options.Exposure.Globs)));
+        return Record(record, Render(exposed, truncated, options.Exposure.Globs));
     }
 
     /// <summary>
@@ -161,6 +173,10 @@ internal sealed class ListEntryNamesTool(
 
         return new CallToolResult
         {
+            // Said outright rather than left absent. The specification reads an absent isError as
+            // "not an error", but a credential bridge should not leave a client inferring which of
+            // its answers were refusals.
+            IsError = false,
             Content = [new TextContentBlock { Text = text.ToString() }],
             StructuredContent = Structured(rows, truncated),
         };

@@ -71,6 +71,19 @@ internal static class ToolText
         recorded in the audit log as denied.
         """;
 
+    /// <summary>Why a listing was refused when no approver is running.</summary>
+    /// <remarks>
+    /// Separate from <see cref="NoApprover"/> because the two are asking for different things and a
+    /// listing has no credential in it. Retrying is right here too, once somebody has started one.
+    /// </remarks>
+    internal const string NoApproverForListing = """
+        keypaste: no keypaste agent is running, so there is no unlocked vault to read names from.
+        No entry names were read.
+
+        Ask the person you are working with to run `keypaste agent --vault <their vault>` in a
+        terminal, and then try again. This call was recorded in the audit log as denied.
+        """;
+
     /// <summary>Why a listing was refused when the vault behind the approver is locked.</summary>
     internal const string VaultLocked = """
         keypaste: the keypaste agent is running but no vault is unlocked, so there was nothing to
