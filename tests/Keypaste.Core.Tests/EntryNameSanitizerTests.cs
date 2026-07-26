@@ -148,7 +148,9 @@ public sealed class EntryNameSanitizerTests
 
         Assert.Equal("safe", result.Text);
         Assert.True(result.WasAltered);
-        Assert.False(result.Text.Contains('\U000E0041'.ToString(), StringComparison.Ordinal));
+        // A string literal, not a char one: the whole point is that these are above U+FFFF and so
+        // do not fit in a single UTF-16 code unit.
+        Assert.False(result.Text.Contains("\U000E0041", StringComparison.Ordinal));
     }
 
     /// <summary>
