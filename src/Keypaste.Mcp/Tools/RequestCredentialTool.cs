@@ -1,29 +1,40 @@
 using System.Text.Json;
 using Keypaste.Core;
+using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Ipc;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
 namespace Keypaste.Mcp.Tools;
 
 /// <summary>
-/// The tool an agent uses to ask for one field of one entry. It denies every time.
+/// The tool an agent uses to ask for one field of one entry. A person decides every time.
 /// </summary>
 /// <remarks>
 /// <para>
 /// CORE.md law 3.2: an agent gets one credential, one scope, one TTL, after one explicit human
-/// approval, and the default is deny. The human approval flow arrives in Stage 2.2. Until it does,
-/// the honest implementation of law 3.2 is to refuse — a bridge that grants before it can ask is
-/// the one bug this project cannot ship.
+/// approval, and the default is deny. This file validates the request, checks it against what the
+/// server was configured to expose, forwards it to whoever can ask a person, records the answer,
+/// and only then answers the agent.
 /// </para>
 /// <para>
-/// <b>There is no vault code path in this file.</b> Not "there is one and it is disabled": there is
-/// none, and that is checkable by reading it (THREATS.md T-8). What the file does do is validate,
-/// classify and record, so that Stage 2.2 adds an approval step rather than building the whole
-/// mechanism at the moment it first has a secret to hand out.
+/// <b>There is still no vault code path in this file, and now no decision either.</b> Not "there is
+/// one and it is guarded": there is none, and that is checkable by reading it (THREATS.md T-8). The
+/// credential arrives over a pipe from a process that already asked a human, and leaves in the
+/// result. Nothing here can release anything on its own.
+/// </para>
+/// <para>
+/// <b>Log first, answer second, always.</b> The record is written before the result is returned,
+/// including for a call that was refused before it was understood and for one the client abandoned
+/// — an unlogged denial is still an access that happened without a record (law 3.3, THREATS.md
+/// T-6). If the log refuses, so does the call.
 /// </para>
 /// </remarks>
-internal sealed class RequestCredentialTool(ServerOptions options, AuditLog audit) : McpServerTool
+internal sealed class RequestCredentialTool(
+    ServerOptions options,
+    ApproverConnection approver,
+    AuditLog audit) : McpServerTool
 {
     /// <inheritdoc/>
     public override IReadOnlyList<object> Metadata => [];
@@ -50,7 +61,7 @@ internal sealed class RequestCredentialTool(ServerOptions options, AuditLog audi
     };
 
     /// <inheritdoc/>
-    public override ValueTask<CallToolResult> InvokeAsync(
+    public override async ValueTask<CallToolResult> InvokeAsync(
         RequestContext<CallToolRequestParams> request,
         CancellationToken cancellationToken = default)
     {
@@ -66,35 +77,57 @@ internal sealed class RequestCredentialTool(ServerOptions options, AuditLog audi
 
         var args = AuditArgs.ForCredentialRequest(entry, Recognised(field), ttl, reason);
 
-        var (method, answer) = Judge(entry, field, reason, ttl);
+        Verdict verdict;
 
-        var record = McpAudit.Denial(
+        try
+        {
+            verdict = await DecideAsync(client, entry, field, reason, ttl, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // The client stopped waiting. It will never read this result, and that is exactly why
+            // the line below still gets written: a request that reached a person, or nearly did,
+            // is an access whether or not anybody collected the answer.
+            verdict = new Verdict(AuditDecision.Denied, AuditMethod.Cancelled, "the client withdrew the request");
+        }
+
+        var record = McpAudit.Line(
             ToolText.CredentialToolName,
             client,
-            method,
-            Explain(method),
+            verdict.Decision,
+            verdict.Method,
+            verdict.Reason,
             options.Exposure,
             args);
 
-        // Log first, and refuse if the log refuses. Even a malformed call gets a line: an unlogged
-        // denial is still a denial that happened without a record (CORE.md law 3.3).
-        return new ValueTask<CallToolResult>(
-            audit.TryAppend(record, out _) ? answer : ToolResults.Refuse(ToolText.AuditUnavailable));
+        // No cancellation token reaches this, and there is none to forward: appending is synchronous
+        // and takes none. That is what makes "every call is logged" true even for the calls nobody
+        // is waiting for any more.
+        if (!audit.TryAppend(record, out _))
+        {
+            return ToolResults.Refuse(ToolText.AuditUnavailable);
+        }
+
+        return verdict.Released is { } released
+            ? ToolResults.Release(released.Field, released.Value, released.TtlSeconds)
+            : ToolResults.Refuse(verdict.Refusal ?? ToolText.Refusal(verdict.Method));
     }
 
     /// <summary>
-    /// Decides why the answer is no. Validation first, then scope, then the standing refusal.
+    /// Works out the answer. Validation first, then scope, then a person.
     /// </summary>
     /// <remarks>
-    /// The distinction is what makes Stage 2.2 an added branch rather than a rebuild, and it is what
-    /// an agent needs in order to stop retrying: <c>out-of-scope</c> means keypaste will never
-    /// discuss that entry, <c>not-implemented</c> means keypaste cannot ask yet.
+    /// The order matters twice over: a malformed request never reaches the approver, and an entry
+    /// this server was not configured to expose never reaches a human at all — putting an arbitrary
+    /// entry name in front of somebody is most of what an attempt to mislead them would need.
     /// </remarks>
-    private (AuditMethod Method, CallToolResult Answer) Judge(
+    private async ValueTask<Verdict> DecideAsync(
+        AuditClient client,
         string entry,
         string field,
         string reason,
-        int ttl)
+        int ttl,
+        CancellationToken cancellationToken)
     {
         if (entry.Length is 0 or > ToolSchemas.MaximumEntryLength)
         {
@@ -116,15 +149,58 @@ internal sealed class RequestCredentialTool(ServerOptions options, AuditLog audi
             return Invalid("ttl_seconds", $"must be between 1 and {ToolSchemas.MaximumTtlSeconds}");
         }
 
-        // A path can be checked against the exposure without opening anything. A handle cannot —
-        // resolving one needs the vault — so a handle falls through to the standing refusal rather
-        // than being guessed at in either direction.
+        // A path can be checked here without opening anything. A handle cannot — resolving one needs
+        // the vault — so it is checked again by the approver after it resolves, which is the only
+        // place that check can happen and the reason a handle is not a way around the exposure.
         if (EntryHandle.Classify(entry) == EntryAddressKind.Path && !InScope(entry))
         {
-            return (AuditMethod.OutOfScope, ToolResults.Refuse(ToolText.OutOfScope));
+            return new Verdict(
+                AuditDecision.Denied,
+                AuditMethod.OutOfScope,
+                "the entry is outside this server's configured exposure");
         }
 
-        return (AuditMethod.NotImplemented, ToolResults.Refuse(ToolText.Denied));
+        var (reply, reachable) = await approver.RequestAsync(
+            new CredentialRequest
+            {
+                Entry = entry,
+                Field = field,
+                Reason = reason,
+                TtlSeconds = ttl,
+                Exposure = options.Exposure.Globs,
+                ClientName = client.Name,
+                ClientVersion = client.Version,
+            },
+            cancellationToken).ConfigureAwait(false);
+
+        // Checked after the exchange as well as before it, and this is the important one. A person
+        // can say yes in the moment between the client giving up and the reply arriving, and
+        // without this the bridge would record a grant — and return a credential — for a request
+        // nobody was waiting for. It is the same rule ApprovalGate applies to a late yes from a
+        // channel, one layer further out, and it is also why "no answer" is read as cancelled
+        // rather than as an approver failure: keypaste did not go wrong, the client left.
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return new Verdict(AuditDecision.Denied, AuditMethod.Cancelled, "the client withdrew the request");
+        }
+
+        if (reply is null)
+        {
+            return reachable
+                ? new Verdict(AuditDecision.Denied, AuditMethod.Failed, "the approver could not be asked")
+                : new Verdict(AuditDecision.Denied, AuditMethod.NoApprover, "no keypaste agent is running");
+        }
+
+        if (reply.Decision != AuditDecision.Granted || reply.Value is not { Length: > 0 })
+        {
+            return new Verdict(AuditDecision.Denied, reply.Method, reply.Reason);
+        }
+
+        return new Verdict(
+            AuditDecision.Granted,
+            reply.Method,
+            reply.Reason,
+            new Released(field, reply.Value, reply.TtlSeconds));
     }
 
     /// <summary>Whether a path-shaped argument names something this server may discuss.</summary>
@@ -139,29 +215,16 @@ internal sealed class RequestCredentialTool(ServerOptions options, AuditLog audi
         return options.Exposure.Allows(name);
     }
 
-    private static (AuditMethod Method, CallToolResult Answer) Invalid(string field, string rule) =>
-        (AuditMethod.InvalidRequest, ToolResults.Refuse(ToolText.Invalid(field, rule)));
-
-    private static string Explain(AuditMethod method) => method switch
-    {
-        AuditMethod.InvalidRequest => "the request did not satisfy the tool's schema",
-        AuditMethod.OutOfScope => "the entry is outside this server's configured exposure",
-        _ => "there is no approval path in this version, so the default deny stands",
-    };
+    private static Verdict Invalid(string field, string rule) =>
+        new(
+            AuditDecision.Denied,
+            AuditMethod.InvalidRequest,
+            "the request did not satisfy the tool's schema",
+            Refusal: ToolText.Invalid(field, rule));
 
     /// <summary>The field name if keypaste knows it, or null.</summary>
-    private static string? Recognised(string field)
-    {
-        foreach (var allowed in ToolSchemas.AllowedFields)
-        {
-            if (string.Equals(field, allowed, StringComparison.Ordinal))
-            {
-                return allowed;
-            }
-        }
-
-        return null;
-    }
+    private static string? Recognised(string field) =>
+        CredentialFields.IsReleasable(field) ? field : null;
 
     private static string ReadString(IDictionary<string, JsonElement>? arguments, string name) =>
         arguments is not null
@@ -182,4 +245,26 @@ internal sealed class RequestCredentialTool(ServerOptions options, AuditLog audi
         && element.TryGetInt32(out var value)
             ? value
             : -1;
+
+    /// <summary>One field, released. The only shape in this file that can hold a credential.</summary>
+    private readonly record struct Released(string Field, string Value, int TtlSeconds);
+
+    /// <summary>
+    /// What was decided, in the two forms it is needed: the words for the log and the answer for
+    /// the agent.
+    /// </summary>
+    /// <param name="Decision">Whether anything was released.</param>
+    /// <param name="Method">How it was decided. Also selects the refusal an agent reads.</param>
+    /// <param name="Reason">keypaste's own sentence for the log. Never shown to the agent.</param>
+    /// <param name="Released">The field, on the one path that has one.</param>
+    /// <param name="Refusal">
+    /// An override for the agent-facing text, used only where the method alone is not specific
+    /// enough — a malformed argument has to name which argument.
+    /// </param>
+    private readonly record struct Verdict(
+        AuditDecision Decision,
+        AuditMethod Method,
+        string Reason,
+        Released? Released = null,
+        string? Refusal = null);
 }

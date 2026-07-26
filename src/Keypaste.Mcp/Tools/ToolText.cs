@@ -1,3 +1,5 @@
+using Keypaste.Core.Audit;
+
 namespace Keypaste.Mcp.Tools;
 
 /// <summary>
@@ -54,30 +56,74 @@ internal static class ToolText
         it, not for the model: it is shown to them verbatim.
         """;
 
-    /// <summary>Why a listing was refused in this version.</summary>
-    internal const string VaultLocked = """
-        keypaste: the vault is locked. keypaste-mcp cannot ask for a master password - its stdin and
-        stdout are the MCP protocol stream and it is started with no terminal - so it has no way to
-        unlock a vault. Unlocking through a human channel arrives in keypaste 2.2. No entry names
-        were read. This call was recorded in the audit log as denied.
+    /// <summary>Why a call was refused when no approver is running.</summary>
+    /// <remarks>
+    /// It names the command, because this is the one refusal a person can fix in five seconds and
+    /// the agent is the only party in a position to tell them. Saying "do not retry" here would be
+    /// wrong: retrying is exactly right, once somebody has started it.
+    /// </remarks>
+    internal const string NoApprover = """
+        keypaste: DENIED. No keypaste agent is running, so there is nobody to approve this. keypaste
+        never releases a credential without a person saying yes to that specific request.
+
+        Ask the person you are working with to run `keypaste agent --vault <their vault>` in a
+        terminal, and then try again. Until they do, every request will be refused. This call was
+        recorded in the audit log as denied.
         """;
 
-    /// <summary>
-    /// Why a credential request was refused, and — load-bearing — that retrying will not help.
-    /// </summary>
-    /// <remarks>
-    /// "Do not retry" earns its place. Without it a capable agent loops on a call that denies every
-    /// time, and the first bug report of Stage 2 is about the user's token bill.
-    /// </remarks>
-    internal const string Denied = """
-        keypaste: DENIED. This version of keypaste never grants a credential request. The human
-        approval flow it would need - one credential, one scope, one TTL, after one explicit human
-        approval - is not implemented yet, and keypaste denies by default rather than granting
-        without it.
+    /// <summary>Why a listing was refused when the vault behind the approver is locked.</summary>
+    internal const string VaultLocked = """
+        keypaste: the keypaste agent is running but no vault is unlocked, so there was nothing to
+        read. No entry names were read. This call was recorded in the audit log as denied.
+        """;
 
-        Do not retry: this will deny every time in this version. Ask the person you are working with
-        to supply the value directly, or to run `keypaste get <entry> --show` themselves. This call
-        was recorded in the audit log as denied.
+    /// <summary>Why a request was refused when a person considered it and said no.</summary>
+    /// <remarks>
+    /// "Do not retry" earns its place here specifically. Without it a capable agent loops on a
+    /// refusal, which burns the user's tokens and — worse — turns a considered no into a stream of
+    /// popups until somebody clicks the wrong one (THREATS.md T-11).
+    /// </remarks>
+    internal const string DeniedByHuman = """
+        keypaste: DENIED. A person read this request and said no.
+
+        Do not retry: asking again immediately is refused without troubling them, and asking
+        repeatedly is treated as pressure rather than as a question. Ask them directly what they want
+        you to do instead. This call was recorded in the audit log as denied.
+        """;
+
+    /// <summary>Why a request was refused when nobody answered in time.</summary>
+    /// <remarks>
+    /// Deliberately without "do not retry". Nobody decided anything — they were away from the
+    /// keyboard — so one later attempt is a reasonable thing for an agent to do.
+    /// </remarks>
+    internal const string TimedOut = """
+        keypaste: DENIED. The request was shown to a person and nobody answered before it expired, so
+        keypaste denied it by default.
+
+        They may simply have been away from the keyboard. Say so, and try once more if the task still
+        needs it. This call was recorded in the audit log as denied.
+        """;
+
+    /// <summary>Why a request was refused because a person was already looking at another one.</summary>
+    internal const string Busy = """
+        keypaste: DENIED. Another request is already in front of the person right now, and keypaste
+        shows one at a time rather than queueing them up. Wait until that one is answered and try
+        again. This call was recorded in the audit log as denied.
+        """;
+
+    /// <summary>Why a request was refused because the same one was just refused.</summary>
+    internal const string Cooldown = """
+        keypaste: DENIED. This same request was refused a moment ago, so keypaste answered for them
+        rather than asking again.
+
+        Do not retry. Ask the person you are working with what they would like you to do instead.
+        This call was recorded in the audit log as denied.
+        """;
+
+    /// <summary>Why a request was refused when asking went wrong.</summary>
+    internal const string ApproverFailed = """
+        keypaste: DENIED. Something went wrong while asking a person about this request, so keypaste
+        denied it. Nothing was released. This call was recorded in the audit log as denied.
         """;
 
     /// <summary>Why a request was refused before it was even considered.</summary>
@@ -98,6 +144,53 @@ internal static class ToolText
     /// <summary>Shown when the vault is configured but the listing produced nothing in scope.</summary>
     internal const string NothingExposed =
         "keypaste: no entries are within this server's configured exposure.";
+
+    /// <summary>
+    /// What is said around a released credential. The value itself follows on its own line.
+    /// </summary>
+    /// <remarks>
+    /// The value is in a model's context the moment it is returned, and no wording changes that.
+    /// What the wording can do is narrow what happens next: say plainly that this is a live
+    /// credential, that it expires, and that writing it into a file or a message is the thing
+    /// keypaste exists to stop (CORE.md law 3.4 is about keypaste's own writes; this is the part
+    /// only the model can honour).
+    /// </remarks>
+    internal static string Released(string field, int ttlSeconds) =>
+        $"""
+        keypaste: APPROVED. A person released the "{field}" of this entry, for {ttlSeconds} seconds.
+
+        Use it for the task you gave as your reason and nothing else. Do not print it, do not write
+        it into a file or a commit, and do not repeat it back in a message - it is a live credential.
+        Ask again if you need it after it expires. This release was recorded in the audit log.
+
+        """;
+
+    /// <summary>The refusal an agent reads for each way of saying no.</summary>
+    /// <param name="method">Why the answer was no.</param>
+    /// <returns>The text to return, which always explains whether retrying could ever help.</returns>
+    /// <remarks>
+    /// Keyed on the audit method rather than written at each call site, so the sentence an agent
+    /// reads and the word written to the log cannot drift apart — and so a new way of saying no
+    /// cannot ship with the wrong advice attached.
+    /// </remarks>
+    internal static string Refusal(AuditMethod method) => method switch
+    {
+        AuditMethod.NoApprover => NoApprover,
+        AuditMethod.VaultLocked => VaultLocked,
+        AuditMethod.OutOfScope => OutOfScope,
+        AuditMethod.TimedOut => TimedOut,
+        AuditMethod.Busy => Busy,
+        AuditMethod.Cooldown => Cooldown,
+        AuditMethod.Prompt => DeniedByHuman,
+        AuditMethod.Cancelled => Cancelled,
+        _ => ApproverFailed,
+    };
+
+    /// <summary>Why a request was abandoned. Rarely read: the client has already stopped listening.</summary>
+    internal const string Cancelled = """
+        keypaste: DENIED. The request was withdrawn before anybody answered it, so keypaste denied it
+        by default. This call was recorded in the audit log as denied.
+        """;
 
     /// <summary>
     /// The refusal for a malformed call. Names the field and the rule, and quotes nothing.
