@@ -93,7 +93,7 @@ internal static class Program
         // Registered explicitly rather than by scanning the assembly: two tools is the whole
         // surface, and a bridge that could grow a third by accident is not one to build.
         serverOptions.ToolCollection.Add(
-            new ListEntryNamesTool(new LockedEntryNameSource(), options, audit));
+            new ListEntryNamesTool(new ApproverEntryNameSource(approver, options), options, audit));
         serverOptions.ToolCollection.Add(new RequestCredentialTool(options, approver, audit));
 
         await using var transport = new StdioServerTransport(serverOptions, loggerFactory: null);

@@ -13,17 +13,19 @@ namespace Keypaste.Mcp.Tests;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Read this before trusting a green run.</b> In this version <c>request_credential</c> is
-/// hard-coded to deny, so every test below that asserts a denial would pass whether or not
-/// validation, scoping and audit logging existed at all. Their value arrives with Stage 2.2's
-/// approval flow. What is genuinely under test today is the listing path, the sanitizer, the
-/// exposure filter and the audit trail — and the listing path is exercised through a fake source,
-/// because the shipped binary's is always locked (THREATS.md T-7).
+/// <b>What changed in Stage 2.2, and what it means for these tests.</b> Until this stage
+/// <c>request_credential</c> was hard-coded to deny, so every denial test here would have passed
+/// whether or not validation, scoping and audit logging existed — DECISIONS.md D-0022 said so
+/// outright and said they would earn their keep in 2.2. They have: a real approver now answers over
+/// a real pipe, so a denial is one outcome among several rather than the only one the code can
+/// produce, and a test that asserts one is distinguishing it from the others.
 /// </para>
 /// <para>
-/// The one assertion that is meaningful in both versions is
-/// <see cref="AnOutOfScopeName_EscapesByNoRoute"/>, which plants its sentinel somewhere it could
-/// genuinely leak rather than asserting the absence of a string that was never anywhere.
+/// The listing path is still driven through a fake source <em>here</em>, because these tests are
+/// about the bridge's own behaviour. The shipped path — names coming from a real vault through a
+/// real approver — is exercised in <see cref="SecretHygieneTests"/>, where nothing is faked but the
+/// human. That is what closes THREATS.md T-7's admission that the sanitizer and exposure filter
+/// were unreachable in the binary keypaste actually ships.
 /// </para>
 /// </remarks>
 public sealed class ServerToolsTests

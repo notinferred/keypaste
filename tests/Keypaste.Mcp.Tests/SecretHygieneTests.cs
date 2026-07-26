@@ -344,11 +344,22 @@ public sealed class SecretHygieneTests : IAsyncLifetime
         await using (harness)
         {
             var result = await client.CallToolAsync(ToolText.ListToolName, cancellationToken: Token);
+            var text = TextOf(result);
 
+            // First, that the listing actually listed something. Without this the sweep below would
+            // pass for a listing that refused, which proves nothing at all - the exact trap
+            // THREATS.md T-8 says this repository has already fallen into once.
+            Assert.False(result.IsError, text);
+            Assert.Contains("STRIPE_KEY", text, StringComparison.Ordinal);
+
+            // And that the entry whose name it just showed did not bring its fields along.
             foreach (var sentinel in _everySentinel)
             {
-                AssertNowhere(harness, sentinel, TextOf(result), "the listing path");
+                AssertNowhere(harness, sentinel, text, "the listing path");
             }
+
+            // The out-of-scope entry is not even named, let alone read.
+            Assert.DoesNotContain("bank", text, StringComparison.Ordinal);
         }
     }
 

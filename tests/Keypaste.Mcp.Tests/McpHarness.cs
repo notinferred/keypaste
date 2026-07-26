@@ -126,7 +126,12 @@ internal sealed class McpHarness : IAsyncDisposable
             ToolCollection = [],
         };
 
-        serverOptions.ToolCollection.Add(new ListEntryNamesTool(Source, options, _audit));
+        // Pointed at a real approver, the listing goes through the real source too: the point of
+        // that constructor is to leave nothing faked but the human.
+        serverOptions.ToolCollection.Add(
+            _approverPipeName is null
+                ? new ListEntryNamesTool(Source, options, _audit)
+                : new ListEntryNamesTool(new ApproverEntryNameSource(_approver, options), options, _audit));
         serverOptions.ToolCollection.Add(new RequestCredentialTool(options, _approver, _audit));
 
         _transcript = new TeeStream(toClient);
@@ -251,19 +256,20 @@ internal sealed class FakeEntryNameSource : IEntryNameSource, IDisposable
         return this;
     }
 
-    public EntryNameListing List()
+    public ValueTask<EntryNameListing> ListAsync(CancellationToken cancellationToken)
     {
         Calls++;
         Entered.Set();
 
         if (Hold)
         {
-            Held!.Wait();
+            Held!.Wait(cancellationToken);
         }
 
-        return Availability == VaultAvailability.Available
-            ? new EntryNameListing(VaultAvailability.Available, _names, string.Empty)
-            : new EntryNameListing(Availability, [], ToolText.VaultLocked);
+        return ValueTask.FromResult(
+            Availability == VaultAvailability.Available
+                ? new EntryNameListing(VaultAvailability.Available, _names, string.Empty)
+                : new EntryNameListing(Availability, [], ToolText.VaultLocked));
     }
 
     public void Dispose()
