@@ -99,6 +99,25 @@ not what you want: `keypaste env rm` removes the entry and its history together,
 afterwards starts clean. keypaste itself has no command that reads history, so it is visible in
 KeePassXC and nowhere in keypaste (D-0014).
 
+**An injected variable is visible to anything that can read the child.** `keypaste run` puts your
+values in the child process's environment, which is the only place a program can read them from —
+and which is readable through `/proc/<pid>/environ` on Linux, through `ps eww` and the debugging
+APIs on macOS, and through process inspection tools on Windows. Every grandchild inherits them, and
+a crash reporter or a framework that dumps its environment on error will print them. This is the
+cost of the feature, not a defect in it: it is strictly better than a `.env` file, which has all of
+the same exposure *plus* a copy on disk, in your editor's swap file, and in your backups — but it
+is not a boundary. keypaste's promise here is narrower and testable: **nothing is written to a file
+at any point**, which `scripts/verify-run-injection.sh` proves on every push by running with every
+temporary directory redirected at an empty folder and asserting it stays empty.
+
+**On Windows, closing the console window can orphan the child.** `keypaste run` suppresses its own
+termination on Ctrl+C, Ctrl+Break and SIGTERM so that it stays alive to pass the signal on and
+report the child's exit status. Closing the console window is different: Windows raises
+`CTRL_CLOSE_EVENT` and then terminates the process a few seconds later whether or not it was
+handled, which can leave the child running with no parent. keypaste also never escalates to a hard
+kill — a child that ignores SIGTERM will make keypaste wait, which is deliberate: keypaste does not
+get to decide when your database is allowed to die.
+
 **Deleting a `.env` does not destroy it.** `keypaste env pull` offers to delete the file it just
 imported. Deleting removes the directory entry; it does not overwrite the blocks the file used, and
 keypaste does not try to. On an SSD the flash translation layer has already remapped them, on a

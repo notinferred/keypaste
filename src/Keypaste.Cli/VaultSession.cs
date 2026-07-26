@@ -48,6 +48,49 @@ internal static class VaultSession
     }
 
     /// <summary>
+    /// Opens the vault, runs <paramref name="load"/> to take out what is needed, closes it, and
+    /// only then runs <paramref name="use"/> with what was taken.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// For <c>keypaste run</c>, whose second phase is a child process that may last hours. Holding
+    /// a decrypted database open for the lifetime of something unrelated is not a thing a
+    /// credential tool gets to do, and making that an ordering rule every future verb has to
+    /// remember would be a matter of time.
+    /// </para>
+    /// <para>
+    /// What escapes the callback is <b>data</b> — values the caller already had a right to read —
+    /// never a lifetime. <see cref="Open"/>'s <c>using var vault</c> is untouched, so no
+    /// <see cref="Vault"/> can outlive the method that created it and CA2000 is still satisfied by
+    /// construction rather than by suppression.
+    /// </para>
+    /// </remarks>
+    /// <typeparam name="T">What the first phase takes out of the vault.</typeparam>
+    /// <param name="path">The vault file.</param>
+    /// <param name="context">Where prompts and errors go.</param>
+    /// <param name="load">Reads the vault. Returns an exit code, and what to hand on.</param>
+    /// <param name="use">Runs after the vault has been disposed.</param>
+    internal static int OpenThen<T>(
+        string path,
+        CliContext context,
+        Func<Vault, (int Exit, T? Loaded)> load,
+        Func<T, int> use)
+        where T : class
+    {
+        T? loaded = null;
+
+        var exit = Open(path, context, vault =>
+        {
+            var (code, value) = load(vault);
+            loaded = value;
+            return code;
+        });
+
+        // By this line the vault has been disposed and the master password buffer zeroed.
+        return exit == CliApp.ExitSuccess && loaded is not null ? use(loaded) : exit;
+    }
+
+    /// <summary>
     /// Reads a master password twice and checks the two match.
     /// </summary>
     /// <remarks>

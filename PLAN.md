@@ -27,7 +27,7 @@
 **Goal: keypaste replaces .env files.**
 - [x] Entry convention for env sets (KDBX group `env/<project>`, one entry per variable: title=KEY, password=value) — stays 100% KeePassXC-*editable*, gated in CI in both directions (D-0014)
 - [x] `keypaste env pull <project> [file]` (import existing .env, then offer to delete it) — fail-closed parser in the core, no "shred" claim (D-0015); `env ls` / `env set` / `env rm` shipped in 1.1
-- [ ] `keypaste run <project> -- <cmd>`: inject into child process env, nothing written to disk
+- [x] `keypaste run <project> -- <cmd>`: inject into child process env, nothing written to disk — gated in CI on all three OSes, signals relayed rather than escalated (D-0016)
 - [ ] `keypaste export --dotenv` (with loud warning) for escape-hatch compatibility
 - [ ] Docs: "Replace your .env in 5 minutes" guide
 - **Exit demo:** delete a project's .env, `keypaste run dev -- npm start`, app boots.

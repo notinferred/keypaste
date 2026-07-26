@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using Keypaste.Cli.Clipboard;
+using Keypaste.Cli.Execution;
 using Keypaste.Cli.Prompting;
 
 namespace Keypaste.Cli.Tests;
@@ -37,20 +38,21 @@ internal sealed class CliHarness : IDisposable
 
     internal string Err => Stderr.ToString();
 
-    internal int Run(params string[] args)
-    {
-        var context = new CliContext
-        {
-            Stdout = Stdout,
-            Stderr = Stderr,
-            Prompt = Prompt,
-            Clipboard = Clipboard,
-            ClipboardClear = ClearStrategy,
-            Environment = new FakeEnvironment(Environment),
-        };
+    internal FakeProcessLauncher ProcessLauncher { get; } = new();
 
-        return CliApp.Run(args, context);
-    }
+    internal int Run(params string[] args) => CliApp.Run(args, NewContext());
+
+    /// <summary>The context <see cref="Run"/> uses, for tests that call below the verb layer.</summary>
+    internal CliContext NewContext() => new()
+    {
+        Stdout = Stdout,
+        Stderr = Stderr,
+        Prompt = Prompt,
+        Clipboard = Clipboard,
+        ClipboardClear = ClearStrategy,
+        Environment = new FakeEnvironment(Environment),
+        ProcessLauncher = ProcessLauncher,
+    };
 
     /// <summary>Creates a vault with one entry per supplied spec, via the CLI itself.</summary>
     /// <remarks>
@@ -227,4 +229,43 @@ internal sealed class FakeClearStrategy : IClipboardClearStrategy
 internal sealed class FakeEnvironment(Dictionary<string, string> values) : IEnvironmentProbe
 {
     public string? Get(string name) => values.TryGetValue(name, out var value) ? value : null;
+
+    public IReadOnlyDictionary<string, string> All() => new Dictionary<string, string>(values, EnvironmentMerge.Comparer);
+}
+
+/// <summary>
+/// Records what would have been started, and hands back whatever the test wants to happen.
+/// </summary>
+/// <remarks>
+/// It writes nothing at all, so anything appearing in the harness's output came from keypaste
+/// itself — which is what makes the hygiene sweep over <c>run</c> mean something.
+/// </remarks>
+internal sealed class FakeProcessLauncher : IProcessLauncher
+{
+    /// <summary>Every child that was started, in order.</summary>
+    internal List<ChildStart> Started { get; } = [];
+
+    /// <summary>What <see cref="Run"/> reports back.</summary>
+    internal ChildResult Result { get; set; } = new(ChildOutcome.Exited, 0, string.Empty);
+
+    /// <summary>Runs at the moment the child would start, for assertions about ordering.</summary>
+    internal Action? OnRun { get; set; }
+
+    /// <summary>The environment the last child would have been given.</summary>
+    /// <remarks>
+    /// Throws rather than returning an empty dictionary when no child was started. The empty
+    /// version turned "the run failed before reaching the launcher" into
+    /// <c>KeyNotFoundException: 'UNRELATED' was not present</c>, which reads like a merge bug and
+    /// is not one.
+    /// </remarks>
+    internal IReadOnlyDictionary<string, string> Environment => Started.Count == 0
+        ? throw new InvalidOperationException("no child was ever started; the run failed before that")
+        : Started[^1].Environment;
+
+    public ChildResult Run(ChildStart start)
+    {
+        Started.Add(start);
+        OnRun?.Invoke();
+        return Result;
+    }
 }

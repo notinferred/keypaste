@@ -1,4 +1,5 @@
 using Keypaste.Cli.Clipboard;
+using Keypaste.Cli.Execution;
 using Keypaste.Cli.Prompting;
 
 namespace Keypaste.Cli;
@@ -30,6 +31,9 @@ internal sealed class CliContext
     /// <summary>Environment variable access.</summary>
     internal required IEnvironmentProbe Environment { get; init; }
 
+    /// <summary>How <c>run</c> starts, supervises and reaps a child process.</summary>
+    internal required IProcessLauncher ProcessLauncher { get; init; }
+
     /// <summary>Builds the context the real program uses.</summary>
     /// <remarks>
     /// Prompts are wired to <paramref name="stderr"/>, not <paramref name="stdout"/>. That is the
@@ -48,6 +52,7 @@ internal sealed class CliContext
             Clipboard = new SystemClipboard(new SystemProcessRunner(), environment),
             ClipboardClear = new BlockingClearStrategy(TimeProvider.System),
             Environment = environment,
+            ProcessLauncher = new SystemProcessLauncher(),
         };
     }
 }
