@@ -973,6 +973,228 @@ tests red, dropping the size ceiling turns the size test red, restoring the repl
 turns both UTF-16 tests red, and inverting the `--yes` guard, the overwrite refusal and the alarm
 each turn their own CLI test red.
 
+## D-0019 - The first dependency in `src/`: ModelContextProtocol.Core, and nothing more
+
+**Date:** 2026-07-26 - **Stage:** 2.1 - **Status:** accepted
+
+`src/` has carried zero `PackageReference` entries since D-0004, and `Directory.Packages.props` says
+so in a comment. That ends here, on the agent bridge, which is exactly where CORE.md law 3.9 demands
+the justification be written down.
+
+PLAN.md's locked stack decision already names "official ModelContextProtocol C# SDK, stdio
+transport", so the question was never *whether* but *how narrow*.
+
+**Rejected: the main `ModelContextProtocol` package.** About twelve transitive packages on
+`net10.0`, and its documented sample additionally wants `Microsoft.Extensions.Hosting`, which is
+roughly twenty more. What that buys is `AddMcpServer()` DI sugar and attribute-based tool scanning.
+What it costs on the secret path is a configuration system that reads files and environment
+variables, a DI container, and a default console logger that writes to **stdout** - which on a stdio
+MCP server *is* the protocol stream. A dependency whose happy path corrupts the transport is not one
+to take for syntactic sugar.
+
+**Rejected: hand-rolling JSON-RPC.** Roughly four hundred lines re-implementing a versioned protocol,
+wrong in ways nobody would notice until a client bumped. CORE.md §6.5: boring beats clever.
+
+**Taken: `ModelContextProtocol.Core` 1.4.1.** Apache-2.0, the `modelcontextprotocol` org,
+co-maintained with Microsoft, implementing spec revision 2025-11-25. `StdioServerTransport`,
+`McpServer.Create` and the tool types all live in it, so a host-free stdio server needs nothing else.
+The closure is **four packages**, measured from the regenerated lock file rather than quoted from
+documentation: the SDK plus `Microsoft.Extensions.AI.Abstractions`,
+`Microsoft.Extensions.Logging.Abstractions` and `Microsoft.Extensions.DependencyInjection.Abstractions`.
+The lock diff is twenty-eight lines and contains no HTTP client, which is what makes THREATS.md T-9's
+"nothing leaves the machine" a claim a reader can check rather than one they have to believe.
+`Keypaste.Core` - the vault and crypto path - still has zero.
+
+### The AOT gate passes, and the reason it was expected not to was wrong
+
+D-0005 put `IsAotCompatible` and the trim/AOT analysers on `src/` as "a dependency-selection gate
+disguised as a compiler setting", installed for precisely this moment. It fires clean:
+`Keypaste.Mcp` keeps `IsAotCompatible=true` with no scoped suppression and no new open question.
+
+The plan for this stage asserted that `McpServerTool.Create(Delegate, ...)` would trip IL2026 and
+IL3050 and that hand-writing the tools was the escape. **That was checked and it is false** - both
+forms compile clean under all four analysers with warnings as errors, and the SDK assembly carries
+`[AssemblyMetadata("IsTrimmable","True")]` and `("IsAotCompatible","True")`, so its authors have
+vouched for it rather than gone quiet. The analysers were confirmed to be awake rather than asleep by
+a negative control in the same probe project: `JsonSerializer.Serialize` **does** fail there with
+IL2026, IL3050 and CA1869.
+
+Two things follow, and they are recorded because a decision record that repeats a comfortable
+assumption is worse than none:
+
+- The claim the gate actually supports is that no call keypaste *makes* is annotated unsafe. Whether
+  the bridge AOT-**runs** is a different question, answerable only by a real publish and run, which
+  is O-0006's standing remedy - now covering one more component.
+- **`JsonSerializer` is still banned**, now for a demonstrated reason rather than an assumed one.
+  Every JSON byte keypaste writes goes through `Utf8JsonWriter` and every one it reads through
+  `JsonDocument`, which needs no source generator and no partial-class ceremony.
+
+### The tools are still hand-written, for the reason that survived
+
+The delegate path generates a tool schema from the C# signature. Measured against the four arguments
+prompts.md specifies, it drops `additionalProperties`, the `field` enum, the length bounds on
+`reason` and the range on `ttl_seconds`; it leaves `Annotations` **null**, so none of the four
+behaviour hints are set and the spec's defaults - `destructive` and `openWorld` both true - apply;
+and it renames `ttl_seconds` to `ttlSeconds`, because that is what the parameter was called.
+
+A wire contract that is a byproduct of a method signature changes when somebody renames a parameter.
+On a credential bridge the schema *is* the contract with the agent, so it is written down as a
+literal, reviewed in a diff, and pinned by a test.
+
+### Migration cost, agreed in advance
+
+2.0.0 of the SDK was promised on or before 2026-07-28 and is a breaking rewrite: it removes the
+`initialize` handshake and moves client identity to per-request `_meta`, where it is optional. 1.4.1
+is pinned deliberately, and the blast radius of moving is bounded by keeping every rule in
+`Keypaste.Core`, where the SDK cannot be referenced at all: only `src/Keypaste.Mcp/` changes, and
+within it only the files that touch SDK types. The audit schema already models the client's name as
+absent-able, so law 3.3's "every access is logged with who" survives identity becoming optional.
+
+## D-0020 - The audit log: a precondition, not observability
+
+**Date:** 2026-07-26 - **Stage:** 2.1 - **Status:** accepted
+
+One JSON object per line at `~/.keypaste/audit.jsonl`, appended and never rewritten.
+
+**It lives beside the policy file, not beside the vault.** The vault is a file the user syncs with
+their own tooling - that is the local-first bargain in CORE.md §2. An append-only log that travelled
+with it would produce a conflicted copy on every second machine, break the per-file hash chain Stage
+2.4 adds, and hand anyone with the synced folder a write path into another machine's record. The log
+describes what happened *here*.
+
+**The schema is fixed now, in a fixed key order**, because Stage 2.4 hashes the raw bytes of each
+line and "the bytes of a line" has to be a well-defined thing before anything commits to it. `v` is
+on every line from the first, so 2.4 can write `v:2` and report the earlier prefix as *predates the
+chain* rather than as *tampered with* - the distinction that stops the first `keypaste log verify`
+from crying wolf. `decision` and `method` already carry the vocabulary 2.2 and 2.3 need (`prompt`,
+`policy`), so neither has to migrate a field.
+
+**What is redacted, and what deliberately is not.** No password, user name, URL, note, master
+password, or entry title read *out of the vault* appears at any schema version; `field` records
+which field was asked for and never its contents. The `entry` argument the agent itself supplied
+*is* recorded, sanitized and capped - that is law 3.3's "which entry", and it is sanitized
+segment-wise so that `env/dev/STRIPE_KEY` stays legible instead of collapsing into
+`env dev STRIPE_KEY`. The agent's free-text `reason` is kept three ways: a 200-character sanitized
+excerpt for the human, the true length so truncation is never silent, and a SHA-256 of the raw text
+so 2.2 can prove the sentence shown in the approval dialog is the sentence that was recorded.
+
+**Law 3.5 and law 3.3 do not conflict.** The resolving word is in 3.5 itself: *telemetry*. 3.5
+governs what leaves the machine; 3.3 governs what is recorded on it. A log the user cannot read
+would defeat 3.3; a log that left the machine would defeat 3.5. The separation is architectural
+rather than promised - stdio only, no sockets, four pinned packages with no HTTP client among them -
+and THREATS.md T-9 states it as something a reader can check by grepping the lock file.
+
+### No record, no disclosure
+
+If a line cannot be written, the call is refused - no credential and no entry names, even when
+everything else would have succeeded. If the log cannot be opened at all, the server refuses to
+start.
+
+This looks severe and is not. If a call could succeed with its record unwritten, then *breaking the
+logger becomes the mechanism for invisible access*: fill the disk, remove write permission, point
+`HOME` at a read-only mount. Laws 3.3 and 3.7 together leave one answer. The record is therefore
+written *before* the response is produced, so a crash in between over-reports an access rather than
+under-reporting one, which is the safe direction.
+
+### Two servers share one file, and the obvious implementation loses lines
+
+Claude Desktop and Claude Code each spawn their own `keypaste-mcp`. `FileMode.Append` is **not**
+enough to make that safe, which the tests found rather than the design: .NET's `FileStream` keeps
+its own idea of the file's length and writes at that offset, so two streams on one path overwrite
+each other. Twenty records became ten.
+
+Appends therefore take a sidecar `.lock` file for the moment of the write and seek to the real end
+first. A lock file left behind by a crash blocks nothing, because exclusion comes from holding the
+handle open rather than from the file existing, and the operating system closes handles when a
+process dies - which is what keeps this free of the stale-lock problem every "delete the lock on
+exit" scheme eventually has.
+
+A related trap is recorded for Stage 2.4: `File.ReadAllLines` asks for `FileShare.Read`, which
+denies other *writers* and therefore fails outright on Windows while any server holds the log.
+`keypaste log` must open `FileShare.ReadWrite`.
+
+### What "append-only" claims
+
+Records are only added, one whole record at a time, at the end; nothing in keypaste truncates,
+rewrites or deletes, and the only seek is to the end immediately before a write. That is a statement
+about keypaste's behaviour and nothing else - the file belongs to the user's account, so anything
+running as that user can rewrite it. **Append-only by construction within keypaste; tamper-evident
+from Stage 2.4; never tamper-proof.** There is no rotation, because rotation deletes lines.
+
+## D-0021 - Exposure: the listing surface is default-deny too
+
+**Date:** 2026-07-26 - **Stage:** 2.1 - **Status:** accepted
+
+`list_entry_names` can name the `env/**` subtree and nothing else unless a human writes
+`--expose <glob>` into the MCP client's configuration.
+
+Law 3.2's "default is deny" is usually read as being about credentials. Entry names deserve the same
+treatment: a complete inventory of a personal vault - bank, employer, recovery email - is exactly
+what turns a vague request into a targeted one, even with no secret attached, and law 3.5 singles
+out entry names as never-telemetered for that reason.
+
+**The tool takes no arguments at all.** No `group`, no `prefix`, no `limit`. That is not
+minimalism; it is that any such parameter is a knob the untrusted party turns. Scope is set in a
+file the human wrote, and there is nothing in the protocol surface that can widen it.
+
+**Globs match the group path and the title as two separate values**, never the joined
+`VaultEntry.Path`. This is what stops a title from impersonating a path: an entry titled
+`../../prod/ROOT_TOKEN` sitting in `env/dev` is matched as a *title*, so it cannot satisfy a group
+pattern and cannot escape into `env/prod`. Deciding this now rather than in 2.3 is what stops the
+policy file from defining a second, subtly different matching domain.
+
+Three smaller rules, each of which is a way this could have failed open:
+
+- Matching happens on the **raw** name, before sanitization, so no change to the sanitizer can ever
+  widen what is exposed.
+- Matching is **case-sensitive**. A case-insensitive match is a wider match.
+- An exposure built from **no globs allows nothing**. "The user said nothing" must never collapse
+  into "everything", so applying the default is something the front end does explicitly.
+
+A malformed glob is fatal at startup rather than skipped. Skipping one would leave a *different*
+exposure in force than the one the human wrote, and on this path the difference could be a wider
+one. This is deliberately the opposite of how Stage 2.3 will treat a malformed `policy.toml`, where
+ignoring the file leaves "prompt for everything" - the safe fallback there, and not here.
+
+## D-0022 - The vault stays locked, and the seam that says so
+
+**Date:** 2026-07-26 - **Stage:** 2.1 - **Status:** accepted
+
+`keypaste-mcp` ships with exactly one implementation of its vault seam, and it always answers
+"locked".
+
+An MCP server's stdin and stdout *are* the JSON-RPC stream, and Claude Desktop spawns it with no
+terminal, so there is nowhere to prompt for a master password. Both workarounds are worse than
+waiting: putting it in the client's configuration file would place the secret that protects every
+other secret into plaintext JSON, which is precisely what law 3.1 exists to prevent, and using MCP's
+own facility for asking the user something would route it through the untrusted party. Stage 2.2
+builds a human channel for approval; whatever owns that channel should own the unlocked session, so
+building a throwaway one now means building it twice.
+
+**The seam yields names, never entries.** The type that crosses it carries a group path and a title
+and has no other members, so no implementation - including the real one 2.2 adds - can return a
+password through the listing path even by accident. That is a structural guarantee rather than a
+promise, and it is checkable by reading one short file.
+
+**`request_credential` does not use that seam**, and 2.2 must give it a separate one. Fusing the two
+into a single "vault access" abstraction would hand the listing path the ability to return a secret,
+which is the single change most likely to turn `list_entry_names` into an exfiltration tool.
+
+### The cost, stated rather than hidden
+
+The listing, scoping and sanitizing code is complete and thoroughly tested, and **in the shipped
+binary it is unreachable**. A test double is what exercises it. A green suite therefore says less
+than it appears to, and both THREATS.md T-7 and the test class's own doc comment say so - because a
+suite that looks like it proves the shipped path works, when it proves the type system instead, is
+worse than one test fewer.
+
+The same honesty applies to `request_credential`: every test asserting that it denies would pass
+whether or not validation, scoping and logging existed, because it is hard-coded to deny. Those
+tests earn their keep in 2.2. What is meaningful today is that the two refusals are *distinguishable*
+- `out-of-scope` means keypaste will never discuss that entry, `not-implemented` means it cannot ask
+yet - which is what makes 2.2 an added branch instead of a rebuild, and what lets an agent stop
+retrying the first.
+
 ---
 
 # Open decisions

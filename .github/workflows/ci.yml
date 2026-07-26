@@ -96,6 +96,14 @@ jobs:
         shell: bash
         run: scripts/verify-run-signals.sh
 
+      # The in-process MCP tests drive the server through StreamServerTransport, so they never
+      # exercise StdioServerTransport or Main — and "a client spawns it with redirected stdio and
+      # no terminal" is the premise of the whole bridge. Only a real spawned process can be asked
+      # what actually reached its stdout.
+      - name: Verify keypaste-mcp speaks MCP over stdio and audits every call
+        shell: bash
+        run: scripts/verify-mcp-stdio.sh
+
   # ===========================================================================
   # PERMANENT COMPATIBILITY GATE — CORE.md law 4.6:
   #   "Compatibility is sacred: any KDBX file keypaste writes must open

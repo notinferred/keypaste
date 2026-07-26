@@ -11,6 +11,21 @@
     <ProjectReference Include="../Keypaste.Core/Keypaste.Core.csproj" />
   </ItemGroup>
 
-  <!-- The MCP SDK arrives in Stage 2.1, not before. CORE.md law 3.9. -->
+  <ItemGroup>
+    <!--
+      The first and only runtime dependency in src/ (DECISIONS.md D-0019). ModelContextProtocol.Core
+      rather than the main ModelContextProtocol package: the stdio transport, the server, and the
+      tool types all live here, so the extra packages the main one brings would buy a generic host
+      this server does not want.
+
+      IsAotCompatible stays on for this project. That was verified rather than assumed, against the
+      real assembly and with a negative control — see D-0019.
+    -->
+    <PackageReference Include="ModelContextProtocol.Core" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Keypaste.Mcp.Tests" />
+  </ItemGroup>
 
 </Project>
