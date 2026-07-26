@@ -48,7 +48,7 @@ public sealed class EnvPullTests
         harness.Prompt.Enqueue(Master);
         var exit = harness.Run("env", "pull", "billing", path, "--yes", "--keep", "--vault", harness.VaultPath);
 
-        Assert.Equal(CliApp.ExitSuccess, exit);
+        harness.AssertExit(CliApp.ExitSuccess, exit);
 
         Assert.Equal(
             [new EnvVariable("API_KEY", "sk_live_secret"), new EnvVariable("MESSAGE", "a\nb"), new EnvVariable("PORT", "8080")],
@@ -107,7 +107,7 @@ public sealed class EnvPullTests
         harness.Prompt.Enqueue(Master);
         var exit = harness.Run("env", "pull", "billing", path, "--yes", "--keep", "--vault", harness.VaultPath);
 
-        Assert.Equal(CliApp.ExitSuccess, exit);
+        harness.AssertExit(CliApp.ExitSuccess, exit);
         Assert.Contains("1 new, 1 updated, 1 unchanged", harness.Err, StringComparison.Ordinal);
         Assert.Contains("history", harness.Err, StringComparison.Ordinal);
 
@@ -162,7 +162,7 @@ public sealed class EnvPullTests
         harness.Prompt.Enqueue(Master);
         var exit = harness.Run("env", "pull", "billing", path, "--yes", "--delete-source", "--vault", harness.VaultPath);
 
-        Assert.Equal(CliApp.ExitSuccess, exit);
+        harness.AssertExit(CliApp.ExitSuccess, exit);
         Assert.False(File.Exists(path));
         Assert.Contains("does not overwrite", harness.Err, StringComparison.Ordinal);
         Assert.Contains("rotate", harness.Err, StringComparison.Ordinal);
@@ -182,7 +182,7 @@ public sealed class EnvPullTests
         harness.Prompt.Enqueue(Master);
         var exit = harness.Run("env", "pull", "billing", path, "--yes", "--vault", harness.VaultPath);
 
-        Assert.Equal(CliApp.ExitSuccess, exit);
+        harness.AssertExit(CliApp.ExitSuccess, exit);
         Assert.True(File.Exists(path));
         Assert.Contains("--delete-source", harness.Err, StringComparison.Ordinal);
     }
@@ -215,7 +215,7 @@ public sealed class EnvPullTests
         harness.Prompt.Enqueue(Master);
         var exit = harness.Run("env", "pull", "billing", path, "--yes", "--keep", "--vault", harness.VaultPath);
 
-        Assert.Equal(CliApp.ExitSuccess, exit);
+        harness.AssertExit(CliApp.ExitSuccess, exit);
         Assert.Contains("git history", harness.Err, StringComparison.Ordinal);
         Assert.Contains("every clone", harness.Err, StringComparison.Ordinal);
     }
@@ -280,7 +280,7 @@ public sealed class EnvPullTests
         harness.Prompt.Enqueue(Master);
         var exit = harness.Run("env", "pull", "billing", path, "--yes", "--keep", "--vault", harness.VaultPath);
 
-        Assert.Equal(CliApp.ExitSuccess, exit);
+        harness.AssertExit(CliApp.ExitSuccess, exit);
         Assert.Contains("already matches", harness.Err, StringComparison.Ordinal);
     }
 
@@ -298,7 +298,7 @@ public sealed class EnvPullTests
         harness.Prompt.Enqueue(Master);
         var exit = harness.Run("env", "pull", "billing", path, "--yes", "--keep", "--vault", harness.VaultPath);
 
-        Assert.Equal(CliApp.ExitSuccess, exit);
+        harness.AssertExit(CliApp.ExitSuccess, exit);
         Assert.Equal("café", Assert.Single(Stored(harness, "billing")).Value);
     }
 }

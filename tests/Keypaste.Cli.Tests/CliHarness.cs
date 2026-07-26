@@ -53,20 +53,43 @@ internal sealed class CliHarness : IDisposable
     }
 
     /// <summary>Creates a vault with one entry per supplied spec, via the CLI itself.</summary>
+    /// <remarks>
+    /// Every step is checked. A seeding failure that goes unnoticed here surfaces much later as an
+    /// unrelated assertion — "expected 0, got 3" in a test about clipboard timeouts — and sends
+    /// whoever reads it looking in entirely the wrong place.
+    /// </remarks>
     internal void SeedVault(string masterPassword, params (string Path, string Password)[] entries)
     {
         Prompt.Interactive = false;
         Prompt.Enqueue(masterPassword, masterPassword);
-        Run("init", VaultPath);
+        Check(Run("init", VaultPath) == CliApp.ExitSuccess, "SeedVault: init failed");
 
         foreach (var (path, password) in entries)
         {
             Prompt.Enqueue(masterPassword, password);
-            Run("add", path, "--vault", VaultPath);
+            Check(Run("add", path, "--vault", VaultPath) == CliApp.ExitSuccess, $"SeedVault: add {path} failed");
         }
 
         Stdout.GetStringBuilder().Clear();
         Stderr.GetStringBuilder().Clear();
+    }
+
+    /// <summary>Asserts an exit code, quoting stderr when it does not match.</summary>
+    /// <remarks>
+    /// <c>Assert.Equal(0, exit)</c> reports "expected 0, actual 2" and nothing else, while the one
+    /// line explaining why sits unread in <see cref="Err"/>. That gap cost a CI investigation
+    /// once; it should not cost a second one.
+    /// </remarks>
+    internal void AssertExit(int expected, int actual) =>
+        Check(expected == actual, $"expected exit {expected}, got {actual}");
+
+    private void Check(bool condition, string what)
+    {
+        if (!condition)
+        {
+            throw new InvalidOperationException(
+                $"{what}.{System.Environment.NewLine}stderr:{System.Environment.NewLine}{Err}");
+        }
     }
 
     public void Dispose()
