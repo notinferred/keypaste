@@ -45,7 +45,12 @@ public sealed class EntryExposure
     /// <summary>The one glob in force when nobody widened the exposure.</summary>
     internal const string DefaultGlob = EnvConvention.RootGroup + "/" + DoubleStar;
 
-    private const char Wildcard = '*';
+    /// <summary>
+    /// The wildcard character itself. <c>internal</c> rather than <c>private</c> because the
+    /// naming rule in <c>.editorconfig</c> applies <c>_camelCase</c> to every private field,
+    /// constants included, and this repository has no <c>private const</c> anywhere.
+    /// </summary>
+    internal const char Wildcard = '*';
 
     private static readonly string[] _defaultGlobs = [DefaultGlob];
 
