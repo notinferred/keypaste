@@ -112,7 +112,10 @@ public sealed record AuditArgs
         ArgumentNullException.ThrowIfNull(reason);
 
         var excerpt = EntryNameSanitizer.Sanitize(reason, ReasonExcerptLength).Text;
-        var entryText = EntryNameSanitizer.Sanitize(entry, EntryLength).Text;
+
+        // Segment-wise, so the separators survive. An audit line whose whole job is to say *which
+        // entry* was asked for must not render env/dev/STRIPE_KEY as "env dev STRIPE_KEY".
+        var entryText = EntryNameSanitizer.SanitizePath(entry, maximumLength: EntryLength).Text;
 
         return new AuditArgs
         {
