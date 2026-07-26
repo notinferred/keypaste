@@ -2,13 +2,16 @@
 
 > *"Stop pasting secrets into chats. keypaste is a local-first, KDBX-compatible vault that stores your passwords AND env variables, injects them into your projects, and lets AI agents like Claude request exactly one credential — with your approval, scoped access, and a full audit trail — without ever seeing your vault."*
 
-**Status: Stage 1 complete — the CLI replaces your `.env`.** Create a vault, add entries, list them,
+**Status: Stage 1 complete, and the MCP bridge has started.** Create a vault, add entries, list them,
 copy a password to the clipboard, remove entries, keep a project's environment variables in the same
 file — importing them straight from an existing `.env` — and run any command with those variables
 injected, with nothing written to disk. There is a way back out, too. Verified in CI against a real
-KeePassXC on Linux, macOS and Windows, in both directions. The MCP bridge is next. Follow
-[`PLAN.md`](PLAN.md) for what lands next; [`CORE.md`](CORE.md) is the constitution and does not
-change.
+KeePassXC on Linux, macOS and Windows, in both directions.
+
+`keypaste-mcp` now connects to Claude Desktop and Claude Code and **refuses every request**, by
+design: the human approval flow that CORE.md law 3.2 requires arrives next, and until it does the
+honest implementation of "default is deny" is to deny. Follow [`PLAN.md`](PLAN.md) for what lands
+next; [`CORE.md`](CORE.md) is the constitution and does not change.
 
 **New here?** [**Replace your `.env` in 5 minutes**](docs/replace-dotenv.md) is the guide — import,
 run, CI, and honest answers about lost master passwords and syncing.
@@ -127,13 +130,33 @@ Values are written in single quotes wherever possible, because that form means t
 cannot be — a value containing an apostrophe or a carriage return — are escaped and named on stderr,
 because that is the form those readers disagree about.
 
+## Letting an agent ask for one
+
+`keypaste-mcp` is an MCP server. Point Claude Desktop or Claude Code at it and two tools appear:
+`list_entry_names`, which returns group paths and entry names and never a value, and
+`request_credential`, which asks you to release one field of one entry.
+
+**Every call is refused in this version.** The approval flow is not built yet, and a bridge that
+granted before it could ask is the one bug this project cannot ship. What does work is the shape:
+the server connects, the tools appear, the refusals explain themselves, and every call — allowed or
+denied — appends a line to `~/.keypaste/audit.jsonl`.
+
+What the agent may even *name* is default-deny too. Out of the box that is the `env/` subtree and
+nothing else; widening it takes an explicit `--expose` glob in the client's config, which is a file
+you wrote.
+
+[**Connecting keypaste to Claude**](docs/mcp-setup.md) has the config snippets, the audit log format,
+and the honest answers. [**THREATS.md**](THREATS.md) is the threat model for the bridge — prompt
+injection through entry names, clients that cannot be authenticated, and what the locked-vault
+posture does and does not buy.
+
 ## Packages
 
 | Roadmap name | Project | Ships as |
 | --- | --- | --- |
 | `keypaste-core` | `src/Keypaste.Core` | library — all vault logic lives here |
 | `keypaste-cli` | `src/Keypaste.Cli` | `keypaste` |
-| `keypaste-mcp` | `src/Keypaste.Mcp` | `keypaste-mcp` (placeholder until Stage 2) |
+| `keypaste-mcp` | `src/Keypaste.Mcp` | `keypaste-mcp` — MCP server, stdio, denies everything so far |
 
 ## Vault format
 

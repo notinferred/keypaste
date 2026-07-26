@@ -12,6 +12,9 @@ other.
 
 The governing rules are CORE.md §3, which cannot change.
 
+Each entry below ends with **Proved by**, naming the test that holds it up — or saying plainly that
+nothing does. A threat model whose mitigations are untested is a wish list.
+
 ---
 
 ## What Stage 2.1 actually is
@@ -95,6 +98,14 @@ because a `.env` in a repository is exactly the kind of file that arrives from e
 at the top of this section is plain ASCII, is a legal entry title, and survives every filter here
 unchanged. No filter can decide what a sentence means.
 
+**Proved by.** `EntryNameSanitizerTests` — an invariant over about fifty hostile names asserting no
+control, format, private-use or structural character survives, plus
+`ASplitInstruction_IsNotReassembled` for the replace-don't-delete rule and
+`TagCharacters_AreRemoved_WhichAByCharLoopWouldMiss` for the astral case. The other half —
+ordinary names surviving byte for byte — is `AnOrdinaryName_SurvivesByteForByte`, and without it
+"reject everything" would pass. End to end over the real protocol:
+`ListEntryNames_SanitizesHostileTitles_AndLeavesOrdinaryOnesAlone`.
+
 What keypaste can promise instead is narrower and true: **keypaste itself never acts on that text.**
 Entry names are matched against globs and written to the log; they are never parsed as commands,
 never used to choose a code path, and never grant anything. Reading a name gets an agent no closer
@@ -124,6 +135,9 @@ SHA-256 of the raw text. Recording all three means the log never silently lies a
 it as inert text and must never let its content influence the default button, the timeout, or the
 layout.
 
+**Proved by.** `AuditLogTests.AnOverlongReason_IsExcerptedButItsLengthAndHashAreExact`. The display
+half has nothing to test yet, which is the point of the status above.
+
 ---
 
 ## T-3 — Confused deputy: a malicious or impersonating client
@@ -150,6 +164,11 @@ Note also assumption 2: whoever spawns the server controls its argv and therefor
 real boundary here is "who can start processes as you", which SECURITY.md already places out of
 scope.
 
+**Proved by.** `ServerToolsTests.EveryCall_WritesOneAuditLine_NamingTheClientAndTheExposure` records
+what the client claimed; `scripts/verify-mcp-stdio.sh` asserts the operator-supplied label reaches
+the log. That no authorization reads either is currently a property of there being no authorization
+to read them — it becomes testable in 2.2.
+
 ---
 
 ## T-4 — Over-exposure of the listing surface
@@ -172,6 +191,12 @@ like a path.
 
 **Residual.** A user who writes `--expose "**"` has exposed every name in the vault, and that is
 their decision to make. The documentation states the consequence rather than preventing the choice.
+
+**Proved by.** `EntryExposureTests` — including `ATitleFullOfSlashes_CannotImpersonateAGroup`,
+`AnExposureWithNoGlobs_AllowsNothing` and `MatchingUsesTheRawNameNotTheSanitizedOne`. Over the wire,
+`ServerToolsTests.ListEntryNames_NeverNamesAnythingOutsideTheExposure`, which asserts an
+out-of-scope name is absent from the reply rather than asserting the shape of the filter — the
+latter would pass with the filter wired to nothing.
 
 ---
 
@@ -200,6 +225,11 @@ permissions, and keypaste says so rather than implying a restriction it did not 
 
 The log also grows without bound. That is a deliberate choice over silently discarding history.
 
+**Proved by.** `AuditLogTests` for the append, ordering and one-record-per-line properties, and
+`TwoLogsOverOneFile_BothAppendWithoutLoss` for the case that matters most — two servers sharing one
+file, which the first implementation silently got wrong and which now costs a sidecar lock (D-0020).
+Nothing here detects tampering; that is exactly what 2.4 adds.
+
 ---
 
 ## T-6 — Unlogged access
@@ -218,6 +248,13 @@ over-reports an access rather than under-reporting one; over-reporting is the sa
 
 This is CORE.md law 3.3 and law 3.7 taken together: every agent access is logged, and every error
 path denies.
+
+**Proved by.** `AuditLogTests.AnUnopenableLog_FailsWithAReason` for the refusal itself, and
+`ServerToolsTests.AMalformedCall_IsStillAudited` for the case people forget — a call refused before
+it was understood is still an access. `scripts/verify-mcp-stdio.sh` asserts a real spawned server
+leaves a line for both tools. **Not yet proved:** that a mid-run write failure denies the call. The
+ordering is enforced by the code path rather than by a test, because there is no secret to withhold
+until 2.2 — a gap named here rather than left implicit.
 
 ---
 
@@ -243,6 +280,9 @@ sanitization code described in T-1 and T-4 is complete and thoroughly tested, an
 real tests of real logic; they are not evidence that the shipped path works, because in this version
 there is no shipped path.
 
+**Proved by.** `ServerToolsTests.ListEntryNames_WithALockedVault_RefusesAndExplainsWhy`, and
+`scripts/verify-mcp-stdio.sh` against the real binary, where the source genuinely is the locked one.
+
 ---
 
 ## T-8 — Secrets do not traverse this path in 2.1
@@ -258,6 +298,12 @@ trusting this paragraph.
 The two paths are kept apart deliberately. Fusing them into one "vault access" abstraction would
 give the listing path the ability to return a secret, which is the single change most likely to turn
 `list_entry_names` into an exfiltration tool.
+
+**Proved by.** The type system, and `ServerToolsTests.AnOutOfScopeName_EscapesByNoRoute` for the
+routes a name could take. Note what that test is careful to do: it plants its sentinel somewhere it
+could genuinely leak. Asserting the absence of a string that was never present anywhere is the trap
+most "no secret leaked" tests fall into, and it is the trap this section would otherwise be resting
+on.
 
 ---
 
@@ -280,6 +326,9 @@ That separation is architectural rather than promised, and you can check it your
 - Its entire dependency closure is **four packages**, pinned by version and content hash in
   `src/Keypaste.Mcp/packages.lock.json`. Read it. There is no HTTP client in it.
 
+**Proved by.** The lock file, which is twenty-eight reviewable lines, and CI's `--locked-mode`
+restore, which means nothing can enter that closure without a diff someone approved.
+
 ---
 
 ## Out of scope, with reasons rather than silence
@@ -298,5 +347,5 @@ That separation is architectural rather than promised, and you can check it your
 
 | Stage | What changed |
 |---|---|
-| 2.1 | Document created. T-1, T-4, T-6, T-7, T-8, T-9 owned. T-2, T-3, T-5 partial. |
+| 2.1 | Document created. T-1, T-4, T-6, T-7, T-8, T-9 owned. T-2, T-3, T-5 partial. Decisions in DECISIONS.md D-0019 (the dependency), D-0020 (the audit log), D-0021 (exposure), D-0022 (the locked vault). |
 | 2.4 | *(planned)* Completes T-2, T-3, T-5; adds the audit hash chain and `keypaste log verify`; expands the out-of-scope entries marked above. |
