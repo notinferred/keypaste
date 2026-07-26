@@ -28,6 +28,9 @@ internal static class EnvCommand
             case "rm":
                 return EnvRemoveCommand.Execute(args, context);
 
+            case "pull":
+                return EnvPullCommand.Execute(args, context);
+
             // Handled here rather than left to the subcommand parsers: with no subcommand to
             // dispatch on, `keypaste env --help` would otherwise be reported as an unknown one.
             case "help":
@@ -51,6 +54,7 @@ internal static class EnvCommand
         writer.WriteLine("  ls [project]           list projects, or one project's variable names");
         writer.WriteLine("  set <project> <KEY>    set a variable, prompting for the value");
         writer.WriteLine("  rm <project> <KEY>     remove a variable");
+        writer.WriteLine("  pull <project> [file]  import a .env file, then offer to delete it");
         writer.WriteLine();
         writer.WriteLine($"variables live in the '{Core.EnvConvention.RootGroup}/<project>' group of the vault,");
         writer.WriteLine("one entry per variable, and stay fully editable in KeePassXC.");

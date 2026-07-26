@@ -99,6 +99,18 @@ not what you want: `keypaste env rm` removes the entry and its history together,
 afterwards starts clean. keypaste itself has no command that reads history, so it is visible in
 KeePassXC and nowhere in keypaste (D-0014).
 
+**Deleting a `.env` does not destroy it.** `keypaste env pull` offers to delete the file it just
+imported. Deleting removes the directory entry; it does not overwrite the blocks the file used, and
+keypaste does not try to. On an SSD the flash translation layer has already remapped them, on a
+copy-on-write filesystem (APFS, btrfs, ZFS, ReFS) an overwrite would land elsewhere anyway, and
+snapshots, Time Machine, VSS shadow copies and any backup tool keep their own copy. GNU `shred`'s
+own manual says the same about the filesystems it runs on, which is why keypaste does not offer a
+"shred" and does not use the word. Nor does deletion touch your editor's `.env~` or swap file, your
+backups, your CI logs, or **git history — usually the largest exposure of the three**: if the file
+was ever committed, the values are in the repository and in every clone, and `keypaste env pull`
+says so when it finds a `.git` ancestor. Treat a secret that was committed or shared as leaked and
+rotate it. Deletion is tidying, not erasure.
+
 **Local attackers are out of scope.** Anything running as your user can read your memory, watch
 your keystrokes, and read your clipboard. keypaste protects the vault file at rest and limits what
 an AI agent can reach; it cannot defend a compromised account against itself.
