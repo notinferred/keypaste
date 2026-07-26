@@ -130,6 +130,19 @@ was ever committed, the values are in the repository and in every clone, and `ke
 says so when it finds a `.git` ancestor. Treat a secret that was committed or shared as leaked and
 rotate it. Deletion is tidying, not erasure.
 
+**Exporting puts your secrets back on disk, and that is the whole point of it.** `keypaste env
+export --dotenv` is the one command that writes plaintext. CORE.md §3.4 forbids a secret touching
+disk unencrypted *by keypaste's doing*; here you name the format, name the destination, and answer a
+confirmation, which is the same line `keypaste get --show` sits on. keypaste narrows what it can:
+the file is created only if nothing is already there (`--force` to replace), on Linux and macOS it
+is created readable only by its owner, a `.git` ancestor is pointed out, and the warning is printed
+in red before the question rather than after the fact. **On Windows there is no equivalent** — the
+file inherits its directory's permissions and keypaste says so instead of implying a restriction it
+did not apply. Everything under *"Deleting a `.env` does not destroy it"* above then applies to the
+file you just made, in advance: your editor's swap file, your backups, snapshots, and git. `keypaste
+run` exists so that you rarely need this; when you do use it, delete the file when you are done and
+treat the values as having been exposed if it ever left the machine.
+
 **Local attackers are out of scope.** Anything running as your user can read your memory, watch
 your keystrokes, and read your clipboard. keypaste protects the vault file at rest and limits what
 an AI agent can reach; it cannot defend a compromised account against itself.

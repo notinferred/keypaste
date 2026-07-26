@@ -4,6 +4,7 @@ using System.Text;
 using Keypaste.Cli.Clipboard;
 using Keypaste.Cli.Execution;
 using Keypaste.Cli.Prompting;
+using Keypaste.Cli.Styling;
 
 namespace Keypaste.Cli.Tests;
 
@@ -40,6 +41,8 @@ internal sealed class CliHarness : IDisposable
 
     internal FakeProcessLauncher ProcessLauncher { get; } = new();
 
+    internal FakeConsoleStyle ConsoleStyle { get; } = new();
+
     internal int Run(params string[] args) => CliApp.Run(args, NewContext());
 
     /// <summary>The context <see cref="Run"/> uses, for tests that call below the verb layer.</summary>
@@ -52,6 +55,7 @@ internal sealed class CliHarness : IDisposable
         ClipboardClear = ClearStrategy,
         Environment = new FakeEnvironment(Environment),
         ProcessLauncher = ProcessLauncher,
+        ConsoleStyle = ConsoleStyle,
     };
 
     /// <summary>Creates a vault with one entry per supplied spec, via the CLI itself.</summary>
@@ -222,6 +226,25 @@ internal sealed class FakeClearStrategy : IClipboardClearStrategy
         clipboard.TryClear(out _);
         Cleared = true;
         status.WriteLine("Clipboard cleared.");
+    }
+}
+
+/// <summary>Records what was shouted, and writes it plainly.</summary>
+/// <remarks>
+/// Plain on purpose. Every assertion in this suite looks for substrings in
+/// <see cref="CliHarness.Err"/>, and a fake that emitted real escape sequences would break them all
+/// while proving nothing — whether the escapes are correct is
+/// <c>ConsoleStyleTests</c>'s job, against the real implementation.
+/// </remarks>
+internal sealed class FakeConsoleStyle : IConsoleStyle
+{
+    /// <summary>Every line passed to <see cref="Alarm"/>, in order.</summary>
+    internal List<string> Alarms { get; } = [];
+
+    public void Alarm(TextWriter writer, string text)
+    {
+        Alarms.Add(text);
+        writer.WriteLine(text);
     }
 }
 

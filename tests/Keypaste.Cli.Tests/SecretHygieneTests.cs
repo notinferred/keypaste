@@ -108,6 +108,39 @@ public sealed class SecretHygieneTests
     }
 
     /// <summary>
+    /// <c>env export</c> is the one verb whose job is to put secrets somewhere readable, so the
+    /// sweep asks a narrower question: they belong in the file, and nowhere else.
+    /// </summary>
+    /// <remarks>
+    /// A dedicated fact rather than a row in the theory above, for two reasons. The theory appends
+    /// <c>--vault</c> and cannot carry a per-harness output path; and <c>--stdout</c> is the second
+    /// documented exception after <c>get --show</c> — there the secret on stdout <em>is</em> the
+    /// command, so sweeping it would assert the opposite of what it promises. What is asserted for
+    /// that form instead, in <c>EnvExportTests</c>, is that nothing leaks onto stderr, which is
+    /// what keeps the pipe usable.
+    /// </remarks>
+    [Fact]
+    public void EnvExport_PutsTheValuesInTheFile_AndNowhereOnTheTerminal()
+    {
+        using var harness = new CliHarness();
+        Seed(harness);
+
+        var path = Path.Combine(harness.Directory, "sweep.env");
+
+        harness.Prompt.Enqueue(Master);
+        var exit = harness.Run(
+            "env", "export", "hygiene", path, "--dotenv", "--yes", "--vault", harness.VaultPath);
+
+        Assert.Equal(CliApp.ExitSuccess, exit);
+
+        // The file is the point of the command, so it had better be in there.
+        Assert.Contains(SentinelPassword, File.ReadAllText(path), StringComparison.Ordinal);
+
+        Assert.DoesNotContain(SentinelPassword, harness.Out, StringComparison.Ordinal);
+        Assert.DoesNotContain(SentinelPassword, harness.Err, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// The master password must never be echoed, and the buffer the CLI was handed must be
     /// zeroed by the time the command returns. That is what keeps D-0007's zeroing promise
     /// honest one layer up, and it is only assertable because the prompt returns a

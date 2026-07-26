@@ -107,8 +107,10 @@ public sealed class DotEnvDocument
 /// <para>
 /// <b>What is not claimed:</b> the file's plaintext exists here as ordinary strings and cannot be
 /// zeroed, which is the same limitation SECURITY.md already states for every value keypaste
-/// handles. What keypaste does promise is narrower and true: it writes nothing in plaintext of its
-/// own: the parser touches no file, and the only write its caller performs is the encrypted vault.
+/// handles. What keypaste does promise is narrower and true: the parser touches no file at all, and
+/// no command writes plaintext of keypaste's own accord. The one command that writes plaintext at
+/// all is <c>env export</c>, which does so only because the user named the format, the destination
+/// and then answered for it — see <see cref="DotEnvWriter"/>.
 /// </para>
 /// </remarks>
 public static class DotEnv
@@ -131,8 +133,9 @@ public static class DotEnv
     /// <remarks>
     /// UTF-8 unless a byte order mark says otherwise. UTF-16 is recognised because Windows
     /// PowerShell 5.1 writes it from <c>&gt;</c> and <c>Set-Content</c>, and without that every
-    /// line of such a file would be reported as malformed. Invalid UTF-8 is an error rather than
-    /// being replaced with <c>U+FFFD</c>: a secret quietly rewritten is worse than a refusal.
+    /// line of such a file would be reported as malformed. Ill-formed input is an error in every
+    /// encoding rather than being replaced with <c>U+FFFD</c>: a secret quietly rewritten is worse
+    /// than a refusal.
     /// </remarks>
     public static bool TryDecode(ReadOnlySpan<byte> bytes, out string text, out string error)
     {
@@ -154,15 +157,19 @@ public static class DotEnv
         }
         else if (bytes.Length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE)
         {
-            return TryDecode(Encoding.Unicode, bytes[2..], out text, out error);
+            return TryDecode(Utf16(bigEndian: false), "UTF-16", bytes[2..], out text, out error);
         }
         else if (bytes.Length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF)
         {
-            return TryDecode(Encoding.BigEndianUnicode, bytes[2..], out text, out error);
+            return TryDecode(Utf16(bigEndian: true), "UTF-16", bytes[2..], out text, out error);
         }
 
-        return TryDecode(new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true),
-            bytes, out text, out error);
+        return TryDecode(
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true),
+            "UTF-8",
+            bytes,
+            out text,
+            out error);
     }
 
     /// <summary>Parses the text of a <c>.env</c> file.</summary>
@@ -183,7 +190,23 @@ public static class DotEnv
         return document.Problems.Count == 0;
     }
 
-    private static bool TryDecode(Encoding encoding, ReadOnlySpan<byte> bytes, out string text, out string error)
+    /// <summary>UTF-16 that refuses ill-formed input instead of replacing it.</summary>
+    /// <remarks>
+    /// <see cref="Encoding.Unicode"/> and <see cref="Encoding.BigEndianUnicode"/> use the
+    /// <em>replacement</em> decoder fallback, so a lone surrogate becomes <c>U+FFFD</c> and the
+    /// catch below can never fire for them. That turned the branch written for Windows PowerShell
+    /// 5.1 into the one place a secret could be silently rewritten on the way in — the opposite of
+    /// what the UTF-8 path already promises.
+    /// </remarks>
+    private static UnicodeEncoding Utf16(bool bigEndian) =>
+        new UnicodeEncoding(bigEndian, byteOrderMark: false, throwOnInvalidBytes: true);
+
+    private static bool TryDecode(
+        Encoding encoding,
+        string name,
+        ReadOnlySpan<byte> bytes,
+        out string text,
+        out string error)
     {
         try
         {
@@ -194,7 +217,7 @@ public static class DotEnv
         catch (DecoderFallbackException)
         {
             text = string.Empty;
-            error = "the file is not valid UTF-8 text";
+            error = $"the file is not valid {name} text";
             return false;
         }
     }
@@ -418,7 +441,7 @@ public static class DotEnv
                 // The character before the '#' is read from the file, not from the value, so
                 // `KEY= #c` is an empty value with a comment while `COLOR=#ff0000` is a colour:
                 // in the second the '#' follows the '=' with nothing between them.
-                if (text[_index] == '#' && (text[_index - 1] is ' ' or '\t'))
+                if (text[_index] == '#' && _index > 0 && (text[_index - 1] is ' ' or '\t'))
                 {
                     commentAt = _index;
                     break;
