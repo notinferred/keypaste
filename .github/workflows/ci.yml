@@ -104,6 +104,15 @@ jobs:
         shell: bash
         run: scripts/verify-mcp-stdio.sh
 
+      # Everything else runs the approver and the bridge inside one test host. This is the only
+      # place a real `keypaste agent` unlocks a real vault in one process while a real
+      # keypaste-mcp asks it over a real named pipe from another, and a person's yes or no decides
+      # what comes back. That the credential crosses a process boundary is the premise of the whole
+      # architecture (DECISIONS.md D-0023), and a premise nothing exercises is one nobody checks.
+      - name: Verify a person can approve and refuse across two real processes
+        shell: bash
+        run: scripts/verify-approval-e2e.sh
+
   # ===========================================================================
   # PERMANENT COMPATIBILITY GATE — CORE.md law 4.6:
   #   "Compatibility is sacred: any KDBX file keypaste writes must open

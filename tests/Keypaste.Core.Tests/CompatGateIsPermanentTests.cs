@@ -44,6 +44,10 @@ public sealed class CompatGateIsPermanentTests
         // real spawned process (CORE.md laws 3.3 and 4.5).
         Assert.Contains("scripts/verify-mcp-stdio.sh", workflow, StringComparison.Ordinal);
 
+        // And the approval flow has a third: the credential crossing a process boundary, which by
+        // definition no single-process test can observe (CORE.md law 3.2, DECISIONS.md D-0023).
+        Assert.Contains("scripts/verify-approval-e2e.sh", workflow, StringComparison.Ordinal);
+
         foreach (var os in new[] { "ubuntu-latest", "windows-latest", "macos-latest" })
         {
             Assert.Contains(os, workflow, StringComparison.Ordinal);
@@ -97,6 +101,33 @@ public sealed class CompatGateIsPermanentTests
         Assert.Contains("expected exactly 2 tools", text, StringComparison.Ordinal);
         Assert.Contains("isError=true", text, StringComparison.Ordinal);
         Assert.Contains("no audit log was written", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The approval gate is the only test in the repository where a credential leaves one process
+    /// and arrives in another, which is the thing Stage 2.2's architecture is entirely made of.
+    /// </summary>
+    /// <remarks>
+    /// Its four claims are named individually because dropping any one leaves a script that still
+    /// passes while the flow is broken: a request must be refused when no agent is running, an
+    /// approved one must return the secret, a refused one must not, and the audit log must never
+    /// contain it. The last is the only one a reviewer cannot re-derive from the others.
+    /// </remarks>
+    [Fact]
+    public void ApprovalScript_ExistsAndKeepsItsNegativeControl()
+    {
+        var script = Path.Combine(RepoRoot(), "scripts", "verify-approval-e2e.sh");
+        Assert.True(File.Exists(script), $"The approval gate script is missing: {script}");
+
+        var text = File.ReadAllText(script);
+
+        Assert.Contains("NEGATIVE CONTROL", text, StringComparison.Ordinal);
+        Assert.Contains("must never be skipped or soft-passed", text, StringComparison.Ordinal);
+
+        Assert.Contains("with no agent running, the request was not refused", text, StringComparison.Ordinal);
+        Assert.Contains("an approved request did not return the credential", text, StringComparison.Ordinal);
+        Assert.Contains("a refused request returned the credential", text, StringComparison.Ordinal);
+        Assert.Contains("the audit log contains the released credential", text, StringComparison.Ordinal);
     }
 
     /// <summary>
