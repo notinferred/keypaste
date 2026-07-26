@@ -2,13 +2,16 @@
 
 > *"Stop pasting secrets into chats. keypaste is a local-first, KDBX-compatible vault that stores your passwords AND env variables, injects them into your projects, and lets AI agents like Claude request exactly one credential — with your approval, scoped access, and a full audit trail — without ever seeing your vault."*
 
-**Status: Stage 1.2 — the CLI works, and it replaces your `.env`.** Create a vault, add entries,
-list them, copy a password to the clipboard, remove entries, keep a project's environment variables
-in the same file — importing them straight from an existing `.env` — and run any command with those
-variables injected, with nothing written to disk. Verified in CI against a real KeePassXC on Linux,
-macOS and Windows, in both directions. The MCP bridge is still to come. Follow
+**Status: Stage 1 complete — the CLI replaces your `.env`.** Create a vault, add entries, list them,
+copy a password to the clipboard, remove entries, keep a project's environment variables in the same
+file — importing them straight from an existing `.env` — and run any command with those variables
+injected, with nothing written to disk. There is a way back out, too. Verified in CI against a real
+KeePassXC on Linux, macOS and Windows, in both directions. The MCP bridge is next. Follow
 [`PLAN.md`](PLAN.md) for what lands next; [`CORE.md`](CORE.md) is the constitution and does not
 change.
+
+**New here?** [**Replace your `.env` in 5 minutes**](docs/replace-dotenv.md) is the guide — import,
+run, CI, and honest answers about lost master passwords and syncing.
 
 ## Using it
 
@@ -56,6 +59,7 @@ keypaste env ls                                # projects
 keypaste env ls billing                        # variable names, never values
 keypaste get env/billing/DATABASE_URL --show   # read one value
 keypaste env rm billing STRIPE_KEY --yes
+keypaste env export billing --dotenv --stdout  # the way back out — see below
 ```
 
 `env pull` reads the whole file before it writes anything: if any line is malformed it reports
@@ -101,6 +105,27 @@ It refuses to run rather than inject something ambiguous: a variable whose name 
 environment variable, or two names differing only in case (two variables on Linux, one on Windows).
 Both are things KeePassXC will let you create and keypaste will not, and both name every offending
 key so one pass in KeePassXC fixes them.
+
+## Getting them back out
+
+A vault you cannot leave is a vault nobody should adopt, so there is an escape hatch. It is the one
+command in keypaste that writes plaintext, and it behaves like it.
+
+```sh
+keypaste env export billing .env --dotenv        # writes a file, after confirming
+keypaste env export billing --dotenv --stdout    # prints it instead, for piping
+```
+
+The format has to be named — `--dotenv` is not assumed — and writing a file prints a red warning
+naming the destination and asks before it goes ahead. It will not overwrite an existing file without
+`--force`, it points out a `.git` ancestor, and on Linux and macOS the file is created readable only
+by you. Windows has no equivalent and keypaste says so rather than implying a permission it did not
+set. Prefer `keypaste run`, which needs no file at all.
+
+Values are written in single quotes wherever possible, because that form means the same thing to
+`motdotla/dotenv`, `python-dotenv`, `godotenv`, Docker Compose v2 and `sh` alike. The handful that
+cannot be — a value containing an apostrophe or a carriage return — are escaped and named on stderr,
+because that is the form those readers disagree about.
 
 ## Packages
 

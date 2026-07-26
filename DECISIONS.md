@@ -596,8 +596,15 @@ behaviour that actually matters here.
 onward, as is every value, and none of it can be zeroed - `VaultEntry.Password` is a `string`, so a
 `SecretBuffer` here would become one two frames later, which is the case `SecretBuffer`'s own
 documentation already names. No `GC.Collect`, no `SecureString`, no ceremony. What is claimed is
-narrower and true: keypaste writes nothing in plaintext of its own. The file was already on disk;
-the only write this command performs is the encrypted vault.
+narrower and true: keypaste writes nothing in plaintext of its own accord. The file was already on
+disk; the only write this command performs is the encrypted vault.
+
+> **Amended in 1.3.** That last sentence originally read "keypaste writes nothing in plaintext of
+> its own", full stop, and `env export` made it false. The claim is now "of its own accord" and it
+> is still true: the only command that writes plaintext is one whose entire purpose the user typed,
+> and it is loud about it. See D-0018. The same sentence in `DotEnv.cs`'s remarks was corrected in
+> the same commit — a claim in a doc comment ages exactly as badly as one in a decision record, and
+> it is the one a security auditor reads first.
 
 The compatibility scripts are untouched. `env pull` writes through `EnvStore`, whose shape the gate
 already proves in both directions; a third script would be testing KeePassLib, not the parser.
@@ -794,6 +801,170 @@ discarded:
 
 The general rule this stage keeps re-learning: a failure path that discards its reason costs far
 more later than the line it saved.
+
+---
+
+## D-0018 - `env export` writes plaintext, and single quotes are what make it portable
+
+**Date:** 2026-07-26 - **Stage:** 1.3 - **Status:** accepted
+
+`keypaste env export <project> [file] --dotenv [--stdout]` writes a project's variables back out as
+a `.env` file. It is the first and only command in the product that puts plaintext on disk.
+
+**It is spelled `env export`, not `export`.** `PLAN.md` said the latter; this corrects it in
+writing, the way D-0014 corrected PLAN.md and D-0015 corrected prompts.md. The thing being exported
+is an env set, and a bare `keypaste export` would promise a whole-vault export that does not exist
+and is not planned.
+
+### Why this does not break law 3.4
+
+CORE.md law 3.4 is *"no secret ever touches disk unencrypted **by keypaste's doing**."* The
+qualifier is the whole sentence. This command writes a file only after the user names the format,
+names the destination, and answers a confirmation - the same line `get --show` already sits on,
+where printing a password to stdout is refused right up until somebody asks for it. What law 3.4
+forbids is keypaste deciding on its own to spill: temp files, caches, a `.env` written behind the
+user's back so a child process can read it. None of that is here, and `run` exists precisely so that
+none of it is ever needed.
+
+The alternative was no export at all. Rejected: a vault you cannot leave is a vault nobody should
+adopt, and for a project whose entire pitch is trust, "your data is hostage" is a worse position
+than "here is the door, clearly labelled". Every credible tool has an export; the honest version
+says what it just did.
+
+Two written claims went false the moment this shipped and were corrected in the same PR: the
+`DotEnv.cs` remark and D-0015's memory-hygiene paragraph, both of which said keypaste writes nothing
+in plaintext. Both now say "of its own accord". A claim in a doc comment ages exactly as badly as
+one in a decision record, and the doc comment is the one an auditor reads first.
+
+### Single quotes, not escaped double quotes - the one real correctness decision
+
+The obvious writer double-quotes every value and escapes it. It round-trips perfectly through
+`DotEnv` and it is **wrong**, because the round-trip property does not test the readers the file is
+actually for. `motdotla/dotenv` post-processes a double-quoted value by expanding only `\n` and
+`\r`; it does not unescape `\\`, `\"` or `\t`. Measured against dotenv 17.4.2:
+
+| written | keypaste reads | node dotenv reads |
+|---|---|---|
+| `V='C:\logs\app'` | `C:\logs\app` | `C:\logs\app` |
+| `V="C:\\logs\\app"` | `C:\logs\app` | `C:\\logs\\app` |
+| `V="a\tb"` | `a<TAB>b` | `a\tb` |
+| `V="say \"hi\""` | `say "hi"` | `say \"hi\"` |
+
+So `WINDOWS_PATH` from the reader's own golden fixture - a file node reads *correctly* today - would
+come back doubled after a pull-then-export, with every keypaste test green. Worse, a value ending in
+a backslash puts one against the closing quote, and node's `"(?:\\"|[^"])*"` alternation runs the
+match on into following lines, corrupting *other* variables.
+
+The rule that ships:
+
+| value | form |
+|---|---|
+| empty | `KEY=` |
+| only `A-Za-z0-9` and `_ . / : @ % + , - = ^` | unquoted |
+| no apostrophe and no carriage return | **single-quoted, no escaping at all** |
+| contains an apostrophe or a carriage return | double-quoted with the five escapes, and a note |
+
+Single quotes are literal in keypaste, `motdotla/dotenv`, `python-dotenv`, `joho/godotenv`,
+`compose-go` and `sh` alike, carry newlines so a PEM key stays a readable block, and **suppress the
+`${VAR}` expansion godotenv and python-dotenv perform by default** - which keeps
+`DotEnvNoteKind.LiteralInterpolation` a note rather than turning it into a live bug in the exported
+file. The escaped form is therefore reached only for a value containing an apostrophe or a CR, and
+those keys are named on stderr, as are values ending in a backslash. Keys, never values.
+
+**`~` is excluded from the unquoted set** although the reader accepts it there. `~/bin:~/local`
+round-trips through keypaste and then tilde-expands - after every `:` - in any shell that sources
+the file, baking one machine's home directory into the value. That is the same hazard the parser
+already refuses to accept for `$`, and the fix costs one pair of quotes.
+
+Conformance was checked by hand rather than gated in CI: the golden file read by node `dotenv`
+17.4.2 returns all four values byte-identically, including a multi-line single-quoted value and a
+`#` inside a value. A CI gate reading the file with node, python-dotenv and godotenv is the only way
+to keep that claim honest over time and is parked in `ideas.md`; it was rejected for now because it
+puts an npm and pip install on the three-OS test job for a property the docs can state precisely.
+`docker run --env-file` is named in the docs as explicitly unsupported - it does no quote or escape
+processing at all.
+
+### Fail closed, and the boundary the two ends have to share
+
+`DotEnvWriter.TryFormat` writes nothing and names every offender on: a key `EnvConvention.IsValidKey`
+rejects, keys differing only in case, a key listed twice, a NUL, a lone surrogate, and **a file that
+would exceed `DotEnv.MaximumBytes`**. That last one is the interesting one: the escaped form can
+nearly double a value and non-ASCII costs up to four bytes a character, so without it keypaste could
+write a file keypaste refuses to read - law 4.6's failure with both parties in-house. The writer
+reuses the reader's constant and the reader's comparison, so the two agree on the boundary exactly.
+
+Duplicate keys are the writer's own rule rather than a shared one: injecting the same name twice is
+harmless, while a `.env` that sets a key twice is one `DotEnv.TryParse` rejects outright.
+
+The unusable-name and case-collision checks moved out of `EnvironmentMerge` into
+`Keypaste.Core.EnvNameRules`, now shared by `run` and by the writer. This does not contradict
+D-0016's "the check lives in the CLI, not `EnvStore`": that argument was about `Read` staying
+permissive so `env ls` and `env rm` can still show whatever KeePassXC put in the file, and `Read`
+still does not call it.
+
+### The file it leaves behind
+
+`FileMode.CreateNew`, so an existing file is never followed or truncated; `--force` deletes and
+re-creates rather than truncating in place, because truncation keeps the old file's permissions and
+the mode below would then apply on a first export and silently not on a repeat.
+`FileStreamOptions.UnixCreateMode` sets `0600` on Linux and macOS and must be left null on Windows,
+where the setter throws and there is no equivalent - stated in SECURITY.md rather than papered over.
+A `.git` ancestor is pointed out but does **not** refuse: a `.env` in a gitignored repo root is the
+normal case, and refusing it would train people to reach for `--force`.
+
+`--yes` is allowed, on the same rule as `rm` and `env pull`. prompts.md asked for "an explicit
+interactive confirmation", which read strictly forbids the flag; that was rejected because
+`env export --stdout > .env` defeats it in five characters, and SECURITY.md's own standard is that a
+control which only looks like a control is worse than none. `--stdout` is exempt from the
+confirmation entirely: naming the flag is the consent, exactly as `get --show` is, and nothing is
+left behind to answer for. An empty project gets no warning and no question - shouting when there is
+no secret is how a warning becomes furniture.
+
+### The colour, and why it is not one code path
+
+The warning is red, which required the first colour anywhere in the CLI. `IConsoleStyle.Alarm` takes
+the writer rather than returning a decorated string, and the decision to colour is made once at
+construction: stderr must be a terminal (**stderr**, not stdout, which `--stdout` pipes on purpose),
+`NO_COLOR` must be unset or empty, and `TERM` must not be `dumb`.
+
+The implementation is deliberately platform-split. On Unix the escape goes straight into the target
+writer, because .NET's `Console.ForegroundColor` emits its escape to *stdout* - which would inject
+escape codes into a pipe while trying to colour the terminal beside it. On Windows the reverse holds:
+raw escapes render only when `ENABLE_VIRTUAL_TERMINAL_PROCESSING` is set, which conhost does not do
+for us, while `Console.ForegroundColor` is the console-attribute API that works either way. Two
+`kernel32` P/Invokes to force the mode were rejected under law 3.9: a dependency on the secret path
+is not something to buy for a warning colour. The test harness's fake writes plain text, so every
+existing substring assertion over stderr still holds and no test ever sees an escape.
+
+### A reader bug found while writing the writer
+
+`DotEnv.TryDecode`'s UTF-16 branches used `Encoding.Unicode` and `Encoding.BigEndianUnicode`, which
+use the **replacement** decoder fallback - so the `catch (DecoderFallbackException)` could never fire
+for either, and an ill-formed UTF-16 `.env` decoded to `U+FFFD` with `TryDecode` returning true. A
+secret silently corrupted on the way in, in the branch that exists for Windows PowerShell 5.1, which
+is exactly where an ill-formed file comes from. Now `UnicodeEncoding(bigEndian, false,
+throwOnInvalidBytes: true)`, with a lone-surrogate test per endianness. Fixed here because it is the
+other half of the same round trip, and carried as its own commit so it is reviewable alone - the way
+1.2b carried the `ConsoleSecretPrompt` stdin fix.
+
+### What the tests had to be, to be worth having
+
+The round trip is asserted through the **byte** layer - format, encode, decode, parse - not from
+text straight into `TryParse`. Two failure modes live only in the bytes: `Encoding.UTF8` emits a byte
+order mark, so the obvious `File.WriteAllText(path, text, Encoding.UTF8)` writes one and the reader
+then strips it off the first *key*; and the size ceiling is enforced on bytes. `DotEnvText` therefore
+exposes `Utf8` and the CLI writes bytes, never a string, so the wrong encoding is not reachable.
+
+The property that actually protects the design is **minimality**: double quotes appear only for a
+value containing an apostrophe or a CR. Switching the writer to always-double-quote was tried, and
+`EveryValueInTheCorpus_SurvivesTheRoundTrip` **stayed green** - as did every other round-trip
+assertion. Only the minimality test and the named quoting cases went red. That is the whole argument
+for writing them: the obvious property test cannot see the bug the design exists to avoid.
+
+Each new gate was proved able to fail before being trusted: always-double-quote turns the quoting
+tests red, dropping the size ceiling turns the size test red, restoring the replacement fallback
+turns both UTF-16 tests red, and inverting the `--yes` guard, the overwrite refusal and the alarm
+each turn their own CLI test red.
 
 ---
 
