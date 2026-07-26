@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 
@@ -65,7 +66,7 @@ internal sealed record ServerOptions
         string[] argv,
         string? vaultFromEnvironment,
         string? homeFromEnvironment,
-        out ServerOptions? options,
+        [NotNullWhen(true)] out ServerOptions? options,
         out string error)
     {
         ArgumentNullException.ThrowIfNull(argv);
