@@ -75,6 +75,31 @@ public sealed class DotEnvTests
         Assert.Contains("UTF-8", error, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// The same promise, in the encoding it was hardest to keep. <see cref="Encoding.Unicode"/> and
+    /// <see cref="Encoding.BigEndianUnicode"/> use the <em>replacement</em> decoder fallback, so
+    /// this originally returned <see langword="true"/> with the secret rewritten to
+    /// <c>U+FFFD</c> — in the branch that exists for Windows PowerShell 5.1, which is exactly where
+    /// an ill-formed file comes from.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void InvalidUtf16_IsRejected_NotReplaced(bool bigEndian)
+    {
+        // A high surrogate with nothing after it: well-formed UTF-16 cannot end this way.
+        byte[] body = bigEndian
+            ? [0x00, 0x41, 0x00, 0x3D, 0xD8, 0x00]
+            : [0x41, 0x00, 0x3D, 0x00, 0x00, 0xD8];
+
+        var encoding = bigEndian ? Encoding.BigEndianUnicode : Encoding.Unicode;
+        byte[] bytes = [.. encoding.GetPreamble(), .. body];
+
+        Assert.False(DotEnv.TryDecode(bytes, out var text, out var error));
+        Assert.Empty(text);
+        Assert.Contains("UTF-16", error, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void PlainUtf8_DecodesWithoutABom()
     {
