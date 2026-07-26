@@ -1,4 +1,3 @@
-using Keypaste.Cli.Prompting;
 using Keypaste.Core;
 
 namespace Keypaste.Cli;

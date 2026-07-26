@@ -1,3 +1,5 @@
+using Keypaste.Core;
+
 namespace Keypaste.Cli.Prompting;
 
 /// <summary>
