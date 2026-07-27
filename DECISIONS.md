@@ -2178,7 +2178,7 @@ text to this stage on the grounds that a launch post should not exist before 3.4
 something to install. That is still true of *posting* and it is not true of *writing*: copy drafted
 on the morning sells, and copy drafted cold argues and can be checked. Every factual sentence in
 the six posts was read back against README.md, SECURITY.md, THREATS.md and the source before it was
-kept, which is not a thing anyone does at hour zero of a launch. Two claims did not survive that
+kept, which is not a thing anyone does at hour zero of a launch. Four claims did not survive that
 pass and are recorded below.
 
 **Writing it surfaced a list of published statements that are false right now, and the checklist is
@@ -2209,12 +2209,19 @@ the next person to add a page learns it from the script rather than from a red b
 watched failing - one character changed inside the block, the run refused and named `launch.md` -
 and then reverted.
 
-**Two claims in the draft were wrong and were corrected against the source.** The draft said that if
-the audit log cannot be written the call is refused; `src/Keypaste.Mcp/Program.cs` does the opposite
-deliberately, refusing to *start* rather than surfacing later as a mysterious per-call refusal. And
-the draft said a denied request never reaches the vault, when resolution happens first and it is the
-*field read* that is deferred until after the yes. Both are the failure mode D-0036 exists to catch:
-a claim that sounds like the design and overstates it.
+**Four claims in the draft were wrong, and the checking pass is the only reason they are not in a
+post.** The draft said that if the audit log cannot be written the call is refused;
+`src/Keypaste.Mcp/Program.cs` does the opposite deliberately, refusing to *start* rather than
+surfacing later as a mysterious per-call refusal. It said a denied request never reaches the vault,
+when resolution happens first and it is the *field read* that is deferred until after the yes. It
+told r/KeePass that a red build means nothing merges, which nothing enforces: branch protection is
+unavailable on a private repository on this plan and merges happen locally, so that is a habit
+rather than a rule - the checklist now carries switching it on, and the post claims only that the
+compatibility job is permanent and runs on every push. And the Show HN text opened by saying the
+author had been building keypaste for a couple of months, which no commit supports; the history runs
+from 2026-07-25. The first three are the failure mode D-0036 exists to catch, a claim that sounds
+like the design and overstates it. The fourth is worse, because nothing in the repository would ever
+have contradicted it.
 
 **PLAN.md's launch-posts box stays unchecked.** It says "Launch posts", and no post has been sent.
 The file existing is 3.3; the box is 3.3 going out.
