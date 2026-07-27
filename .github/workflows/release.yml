@@ -490,10 +490,14 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: auto
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
-          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          # Named here rather than hidden in a secret, on purpose. It is not a credential, and
+          # where a release goes is something a reader of this file should be able to see. The
+          # name says "public" because the bucket is served without authentication at
+          # dl.keypaste.com; the allowlist above is what keeps that from being a liability.
+          R2_BUCKET: keypaste-public-dl
         run: |
           set -euo pipefail
-          for v in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY R2_ACCOUNT_ID R2_BUCKET; do
+          for v in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY R2_ACCOUNT_ID; do
             [ -n "${!v}" ] || { echo "::error::secret $v is not set"; exit 1; }
           done
           endpoint="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
