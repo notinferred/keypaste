@@ -17,11 +17,14 @@ each of these is something a stranger hits before they hit the product.
 
 **The product**
 
-- [ ] **3.4 has landed and there is something to install.** O-0006 first — vendored KeePassLib's
-  AOT compatibility has never been tested and `third_party/` has the analyzers disarmed, so the
-  answer has to come from a real `publish` that is then *run*. Then the tag-triggered release
-  workflow, real binaries on a real Release, and the build-from-source blocks in `README.md` and
-  `site/public/index.html` replaced with one-liners verified from scratch on each OS.
+- [ ] **3.4 has landed and there is something to install.** O-0006 is answered — vendored
+  KeePassLib survives NativeAOT, proved by a published binary writing a vault that real KeePassXC
+  opens (D-0040) — and `.github/workflows/release.yml` builds four native binaries, runs every
+  gate against the exact bytes it uploads, and publishes them to `dl.keypaste.com` (D-0041). What
+  is left before this box is ticked: a real `v0.1.0` published, and the build-from-source blocks in
+  `README.md` and `site/public/index.html` replaced with the install one-liners, held to reality by
+  `scripts/verify-install.sh` running them on each OS. Note the posts below still need no
+  rewrite — none of them links an install command, by design.
 - [ ] **The demo GIF exists.** The last thing left in 3.1. `scripts/demo/` is the pipeline, it is
   WSL-only, it needs a real Claude session and a human keystroke, and it budgets three to eight
   takes. Both pages already reserve the slot and nothing else moves when it lands.
@@ -35,10 +38,12 @@ each of these is something a stranger hits before they hit the product.
 - [ ] **The repository is public.** It is private right now, which makes every link in every post
   below a 404. `D-0006` records it as public and describes reasoning — free Actions minutes, the
   three-OS matrix — that does not currently apply. Reconcile the record with reality either way.
-- [ ] **The four stale URLs are corrected.** The account renamed and nothing followed it:
-  `README.md:51` and `site/public/index.html:152`, `:194`, `:299` all still say
-  `github.com/ochoadan/keypaste`. GitHub redirects a renamed owner, but a launch should not spend
-  its primary link on a redirect.
+- [x] **The stale URLs are corrected — there were seven, not four.** Fixed in 3.4. The four this
+  list knew about were `README.md:51` and `site/public/index.html:152`, `:194`, `:299`. The three it
+  missed were `site/public/thanks/index.html:62` and, more importantly,
+  `Directory.Build.props:57` and `:59` — `RepositoryUrl` and `PackageProjectUrl`, which
+  `PublishRepositoryUrl=true` bakes into SourceLink metadata inside the shipped binaries. Those two
+  had to be right before the first tag, because an artifact cannot be edited afterwards.
 - [ ] **The canonical link is `https://github.com/notinferred/keypaste`** and every post below uses
   it. If the `keypaste` org from `PLAN.md:13` is ever registered, that is a move to make before a
   launch, never after.
@@ -70,8 +75,8 @@ each of these is something a stranger hits before they hit the product.
 - [ ] **O-0002 is decided and `CONTRIBUTING.md` exists.** DCO or CLA, undecided, and the record says
   it must be settled *before the repository accepts its first outside pull request*. Labelling good
   first issues is an invitation to exactly that.
-- [ ] **`CHANGELOG.md` exists.** The fourteen-day plan below writes to it weekly and it is not in
-  the repository yet.
+- [x] **`CHANGELOG.md` exists.** Added in 3.4, and the release workflow refuses to publish a tag
+  that has no section in it — CORE.md §4.7 as a gate rather than an intention.
 
 **The venues**
 
@@ -480,7 +485,8 @@ valuable one, because it is the only one where the fix is free.
 is not public while I look at it" and nothing more in public until it is resolved. `CORE.md` §3.10 —
 disclose fast and fully if something real ships.
 
-**Weekly, twice.** A changelog entry in `CHANGELOG.md` and on the GitHub Release. **Not to the email
+**Weekly, twice.** A changelog entry in `CHANGELOG.md`, which is also what the release workflow
+reads for the release notes, so the entry and the announcement cannot drift. **Not to the email
 list.** The page promises one message when there is something to install, and says in as many words
 that it is not a newsletter. Turning the list into a changelog feed would break a promise made in
 writing to people who signed up before there was a product.

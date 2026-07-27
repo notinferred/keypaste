@@ -475,11 +475,26 @@ That separation is architectural rather than promised, and you can check it your
 
 - `keypaste-mcp` speaks **stdio only** and opens no sockets. The MCP security guidance recommends
   exactly this for local servers, to limit access to the spawning client.
-- Its entire dependency closure is **four packages**, pinned by version and content hash in
+- Its entire runtime dependency closure is **four packages** — `ModelContextProtocol.Core` and the
+  three `Microsoft.Extensions.*` abstractions it brings — pinned by version and content hash in
   `src/Keypaste.Mcp/packages.lock.json`. Read it. There is no HTTP client in it.
 
-**Proved by.** The lock file, which is twenty-eight reviewable lines, and CI's `--locked-mode`
-restore, which means nothing can enter that closure without a diff someone approved.
+**Proved by.** The lock file and CI's `--locked-mode` restore, which means nothing can enter that
+closure without a diff someone approved.
+
+**The lock file is no longer twenty-eight lines, and this section used to say it was.** It is 119,
+listing twelve entries across five targets. The extra bulk is build tooling rather than runtime
+code: `Microsoft.NET.ILLink.Tasks` arrived with `IsAotCompatible`, and Stage 3.4 added
+`Microsoft.DotNet.ILCompiler` plus one native compiler package per shipped RID (D-0040). None of
+them is linked into the binary — they are what *produces* it — so the "four packages, no HTTP
+client" claim about the running process is unchanged. But "read it, it is twenty-eight lines" was
+an invitation this file could no longer honour, so it is withdrawn rather than left to rot. Reading
+it is still the right advice; it is now a few minutes rather than one.
+
+**And a reader who installs a prebuilt binary is not the reader this section describes.** The
+argument above is *you can check this yourself*, and its proof is a lock file plus a build. Someone
+who downloads a release verifies a checksum instead, which proves the bytes arrived intact and
+nothing about what is in them. See **T-21**.
 
 ---
 
@@ -925,6 +940,54 @@ passphrase.**
 
 ---
 
+## T-21 — The released binary is not the source you read
+
+**What.** You download `keypaste` from `dl.keypaste.com` instead of building it. Every argument in
+this document rests on properties of the source — the four-package closure, the decision order in
+the approver, the fact that nothing opens a socket. A binary is a claim that those properties were
+compiled faithfully, and you did not watch it happen.
+
+**Who.** Anyone able to change what the release job produces or what it uploads: a compromised
+GitHub Actions runner, a mutated third-party action, a compromised Cloudflare R2 credential, or
+whoever holds the account the bucket lives in. Not a network attacker in transit — that one is
+covered, badly but genuinely, by the checksum.
+
+**Status. Partially mitigated, and the unmitigated part is the interesting one.** What the pipeline
+does hold: the binary that is uploaded is the binary that was tested, because `release.yml` deletes
+`artifacts/bin` and points all nine verify scripts plus both directions of the KeePassXC gate at
+the published artifact, then asserts there is no managed `.dll` or `runtimeconfig.json` beside it.
+The checksum is computed on the machine that produced the bytes and re-verified on the machine that
+uploads them, so artifact-transport corruption fails the release. The four actions on this path are
+pinned to commit SHAs rather than mutable tags (D-0041). Every release publishes its own
+corresponding source, so the thing you are trusting is at least *available* to read.
+
+**What it does not hold.** The binaries are unsigned and un-notarized (O-0010), so nothing ties
+these bytes to this project rather than to whoever served them. The checksum lives on the same
+origin as the archive, so it proves integrity and not authenticity — the same distinction D-0008
+drew about KeePassXC's own `.DIGEST`. The build is not reproducible: NativeAOT link output is not
+byte-identical across runs, so you cannot rebuild it and compare (O-0012). And the runner fleet is
+a third party with the ability to substitute bytes; using one fleet for all four platforms reduces
+that to a single party, which is a smaller surface and not a zero one.
+
+**What follows from it.** T-9 tells you to read a lock file and check for yourself. That advice is
+addressed to somebody building from source, and it does not transfer to somebody running a
+download. These are two different trust models wearing one product name, and the honest statement
+is that **building from source is strictly stronger** and is why the build instructions stay on
+both pages permanently rather than being replaced by the install one-liner.
+
+**Residual.** A compromised runner or R2 credential produces a binary that passes every gate in
+this repository, because the gates run on the compromised machine. Nothing here detects that. A
+signature would narrow it to a compromised signing key; provenance attestation would narrow it to a
+compromised identity token. Neither exists yet, and pretending the checksum does that job would be
+worse than saying this.
+
+**Proved by.** `.github/workflows/release.yml` — specifically the `rm -rf artifacts/bin` before
+the gates, the no-`.dll`-and-no-`runtimeconfig.json` assertion, the version-matches-the-tag check,
+and the checksum re-verification in the `publish` job. Each of those is a step that fails the
+release rather than a sentence in a document.
+
+---
+
 ## Change log
 
 | Stage | What changed |
@@ -933,3 +996,4 @@ passphrase.**
 | 2.2 | The approval flow. **T-7 closed** — the master password is typed in a terminal a person opened, and the listing path is reachable in the shipped binary at last. T-2 and T-3 completed. T-8 rewritten: secrets do traverse this path now, and are tested against real ones. New: T-10 (the approver channel), T-11 (prompt fatigue), T-12 (a grant reused under a reason nobody read). Decisions in D-0023 (the separate process), D-0024 (the pipe), D-0025 (the window), D-0026 (the grant cache), D-0027 (the refusal vocabulary). |
 | 2.3 | The policy file. **T-3 resolved** in the words 2.1 demanded: a rule keys on `--client-label`, and client-scoped policy narrows convenience rather than authority. **T-6's named gap closed**, on the policy path, because that is the one with no human witness. T-11 gained the per-rule hourly allowance. T-12 rewritten: a policy grant is T-12 with the *first* approval removed as well as the second, so the line it could be compared against does not exist. New: T-13 (a rule grants a namespace, not the entries you pictured), T-14 (a standing grant to anything that can reach the approver — **the one place 2.3 is weaker than 2.2**), T-15 (authorization in a possibly-synced directory), T-16 (the audit vocabulary is the only evidence a person was involved), T-17 (a timing oracle). Decisions in D-0028 (the file and its all-or-nothing rule), D-0029 (where the policy sits in the order), D-0030 (keying on the operator's label). |
 | 2.4 | The audit log gets a reader and a chain. **T-5 closed** — every record links to the one before it, `keypaste log verify` recomputes the file, and the three things the chain cannot do are named in T-5 and printed on every passing check rather than only on a failing one. T-12's divergence gained the reader it was promised: `keypaste log` marks a reuse served under a reason nobody read. **T-13's missing mitigation was deferred again, and says so** — showing which entries a rule matches today needs an open vault, and its home is the GUI's Agent Activity screen rather than a password prompt in front of a diagnostic command. New: T-18 (memory dumping), T-19 (clipboard scraping), T-20 (a stolen vault file), promoted out of the out-of-scope table into sections that give reasons instead of one line each. Decisions in D-0031 (the chain) and D-0032 (the reader). |
+| 3.4 | The release pipeline. New: **T-21** (the released binary is not the source you read), promoted to a section rather than an out-of-scope row because a launch turns downloading into the normal path. **T-9 amended twice**: its "twenty-eight reviewable lines" was no longer true and is withdrawn, and its "check it yourself" argument is explicitly scoped to readers who build rather than download. No threat was closed. Decisions in D-0040 (vendored KeePassLib survives NativeAOT, proved by a published binary writing a vault real KeePassXC opens) and D-0041 (what a release is). Open: O-0010 (unsigned, un-notarized), O-0012 (not reproducible, no provenance). |
