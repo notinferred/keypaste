@@ -8,10 +8,11 @@ file — importing them straight from an existing `.env` — and run any command
 injected, with nothing written to disk. There is a way back out, too. Verified in CI against a real
 KeePassXC on Linux, macOS and Windows, in both directions.
 
-`keypaste-mcp` now connects to Claude Desktop and Claude Code and **refuses every request**, by
-design: the human approval flow that CORE.md law 3.2 requires arrives next, and until it does the
-honest implementation of "default is deny" is to deny. Follow [`PLAN.md`](PLAN.md) for what lands
-next; [`CORE.md`](CORE.md) is the constitution and does not change.
+`keypaste-mcp` connects to Claude Desktop and Claude Code, and the approval flow CORE.md law 3.2
+requires is in: an agent asks, you are shown who is asking and why, and one field value goes back.
+You can also pre-approve a narrow pattern in a policy file, which is the one path that releases
+without asking. Follow [`PLAN.md`](PLAN.md) for what lands next; [`CORE.md`](CORE.md) is the
+constitution and does not change.
 
 **New here?** [**Replace your `.env` in 5 minutes**](docs/replace-dotenv.md) is the guide — import,
 run, CI, and honest answers about lost master passwords and syncing.
@@ -136,8 +137,8 @@ because that is the form those readers disagree about.
 `list_entry_names`, which returns group paths and entry names and never a value, and
 `request_credential`, which asks you to release one field of one entry.
 
-Nothing is released without you saying yes to that specific request. You are asked by
-`keypaste agent`, a command you run in your own terminal:
+Nothing is released without you saying yes to that specific request, unless you wrote a rule in
+advance that covers it. You are asked by `keypaste agent`, a command you run in your own terminal:
 
 ```sh
 keypaste agent --vault ~/vaults/personal.kdbx
@@ -172,6 +173,30 @@ in it.
 What an agent may even *name* is default-deny: out of the box that is the `env/` subtree and nothing
 else, and widening it takes an explicit `--expose` glob in the client's config, which is a file you
 wrote.
+
+### Saying yes in advance
+
+If you are approving the same thing every day, you can write it down once in
+`~/.keypaste/policy.toml` and stop being asked about that one case:
+
+```toml
+[[allow]]
+client          = "claude-code"     # the --client-label you gave the bridge
+entries         = ["env/dev/**"]
+fields          = ["password"]
+max_ttl_seconds = 300
+max_per_hour    = 20                # optional
+```
+
+`keypaste policy ls` shows what your rules mean in plain English — and shows what each pattern
+actually *parsed to*, because the obvious way to write one is usually not what it does. There is no
+policy file unless you write one, keypaste never writes it, and **anything at all wrong with it means
+the whole file is ignored and every request comes back to you**.
+
+This is the one path in keypaste that hands an agent a credential with nobody watching. A rule cannot
+reach past `--expose`, cannot raise `--max-ttl`, cannot overturn a "no" you just gave, and cannot
+make an entry listable — but within its pattern, no human sees the request.
+[**Pre-approving with a policy file**](docs/policy.md) is the guide, including what that costs.
 
 [**Approving an agent's request**](docs/approvals.md) is the guide.
 [**Connecting keypaste to Claude**](docs/mcp-setup.md) has the config snippets and the audit log
