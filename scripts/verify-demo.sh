@@ -163,13 +163,28 @@ grep -q 'listening on' "$AGENT_ERR" || die "keypaste agent never started listeni
 
 ask() {
   local id="$1" out="$2" err="$3"
+  : >"$out"
   {
     printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"claude-code","version":"2.0.0"}}}'
+
+    # Wait for the initialize *response* before saying anything else, which is what a real client
+    # does and what the protocol requires. Writing all three messages at once races: the client's
+    # name arrives with initialize and the server reads it off the handshake, so a tools/call that
+    # overtakes it is answered for "an unnamed client" and the dialog no longer matches the page.
+    # That is not hypothetical - it was observed failing on macOS in release run 30319209914 while
+    # the same commit passed on the other three platforms.
+    for _ in $(seq 1 100); do
+      grep -q '"id":1' "$out" 2>/dev/null && break
+      sleep 0.1
+    done
+
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
     printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$id,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"$REASON\",\"ttl_seconds\":900}}}"
     sleep 8
   } | "$MCP" --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" --client-label "$LABEL" \
         >"$out" 2>"$err" || die "keypaste-mcp exited non-zero"
+
+  grep -q '"id":1' "$out" || die "keypaste-mcp never answered initialize"
 }
 
 # ----------------------------------------------------------- B. the dialog, character for character
