@@ -49,6 +49,19 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     /// <summary>A secret in a part of the vault this server was never allowed to name.</summary>
     internal const string SentinelOutOfScope = "SENTINEL-OUT-OF-SCOPE-e51b70";
 
+    /// <summary>
+    /// A secret inside the exposure but outside every policy rule, so it is reachable by asking a
+    /// person and never by a standing rule.
+    /// </summary>
+    /// <remarks>
+    /// This one is load-bearing, and it is why the count went from five to six. "The rule did not
+    /// widen" asserted against <see cref="SentinelOutOfScope"/> alone would be asserted against a
+    /// value the exposure already blocks, so it would pass for a policy check that did nothing at
+    /// all — exactly the vacuous-sentinel trap this class's own doc comment says the repository has
+    /// fallen into before.
+    /// </remarks>
+    internal const string SentinelOutsideTheRule = "SENTINEL-OUTSIDE-THE-RULE-f62c81";
+
     private static readonly string[] _everySentinel =
     [
         SentinelPassword,
@@ -56,7 +69,22 @@ public sealed class SecretHygieneTests : IAsyncLifetime
         SentinelUrl,
         SentinelNotes,
         SentinelOutOfScope,
+        SentinelOutsideTheRule,
     ];
+
+    /// <summary>
+    /// The rule the second approver runs with. It keys on the label the <em>operator</em> gave the
+    /// bridge, never on the name the client asserts (THREATS.md T-3), and it covers one field of one
+    /// subtree — so three of the six sentinels are inside the exposure and outside it.
+    /// </summary>
+    private static string Policy =>
+        $"""
+        [[allow]]
+        client          = "{McpHarness.ClientLabel}"
+        entries         = ["env/dev/**"]
+        fields          = ["password"]
+        max_ttl_seconds = 300
+        """;
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
@@ -69,8 +97,17 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     private CancellationTokenSource? _stop;
     private Task? _serving;
 
+    private GrantCache? _ruleGrants;
+    private ApprovalGate? _ruleGate;
+    private ApproverListener? _ruleListener;
+    private CancellationTokenSource? _ruleStop;
+    private Task? _ruleServing;
+
     private string PipeName { get; } =
         "keypaste-hygiene-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
+
+    private string RulePipeName { get; } =
+        "keypaste-hygiene-rule-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
 
     public ValueTask InitializeAsync()
     {
@@ -96,6 +133,16 @@ public sealed class SecretHygieneTests : IAsyncLifetime
             Password = SentinelOutOfScope,
         });
 
+        // Inside the exposure and outside every rule: reachable by asking a person, never by a
+        // standing one. This is the entry that makes "a rule cannot widen" a claim about the policy
+        // check rather than about the exposure quietly doing all the work.
+        _vault.AddEntry(new VaultEntry
+        {
+            GroupPath = "env/prod",
+            Title = "ROOT_TOKEN",
+            Password = SentinelOutsideTheRule,
+        });
+
         _grants = new GrantCache(TimeProvider.System);
         _gate = new ApprovalGate(_human, TimeProvider.System, ApprovalLimits.Default);
 
@@ -110,21 +157,50 @@ public sealed class SecretHygieneTests : IAsyncLifetime
         _listener = new ApproverListener(PipeName, handler);
         _serving = _listener.RunAsync(_stop.Token);
 
+        // A second approver over the same vault, with a rule in force. Two listeners rather than one
+        // whose policy can be changed per test, because a rule set that shifts under a running
+        // approver is precisely what reading the file once rules out — a fixture that allowed it
+        // would be modelling something the product does not do.
+        Assert.True(Toml.TryParse(Policy, out var syntax, out var syntaxError), syntaxError);
+        Assert.True(PolicyDocument.TryCreate(syntax, out var rules, out var ruleError), ruleError);
+
+        _ruleGrants = new GrantCache(TimeProvider.System);
+        _ruleGate = new ApprovalGate(_human, TimeProvider.System, ApprovalLimits.Default);
+        _ruleStop = new CancellationTokenSource();
+        _ruleListener = new ApproverListener(
+            RulePipeName,
+            new ApproverHandler(
+                new VaultCredentialSource(() => _vault),
+                new VaultEntryNameLister(() => _vault),
+                _ruleGate,
+                _ruleGrants,
+                new PolicyGate(rules, TimeProvider.System)));
+
+        _ruleServing = _ruleListener.RunAsync(_ruleStop.Token);
+
         return ValueTask.CompletedTask;
     }
 
     public async ValueTask DisposeAsync()
     {
-        if (_stop is not null)
+        foreach (var stop in new[] { _stop, _ruleStop })
         {
-            await _stop.CancelAsync();
+            if (stop is not null)
+            {
+                await stop.CancelAsync();
+            }
         }
 
-        if (_serving is not null)
+        foreach (var serving in new[] { _serving, _ruleServing })
         {
+            if (serving is null)
+            {
+                continue;
+            }
+
             try
             {
-                await _serving;
+                await serving;
             }
             catch (Exception ex) when (ex is OperationCanceledException or IOException or ObjectDisposedException)
             {
@@ -133,9 +209,13 @@ public sealed class SecretHygieneTests : IAsyncLifetime
         }
 
         _listener?.Dispose();
+        _ruleListener?.Dispose();
         _stop?.Dispose();
+        _ruleStop?.Dispose();
         _gate?.Dispose();
+        _ruleGate?.Dispose();
         _grants?.Dispose();
+        _ruleGrants?.Dispose();
         _vault?.Dispose();
 
         Directory.Delete(_directory, recursive: true);
@@ -144,6 +224,13 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     private async Task<(McpHarness Harness, McpClient Client)> StartAsync()
     {
         var harness = new McpHarness(PipeName);
+        return (harness, await harness.StartAsync());
+    }
+
+    /// <summary>A bridge talking to the approver that has a standing rule in force.</summary>
+    private async Task<(McpHarness Harness, McpClient Client)> StartPreapprovedAsync()
+    {
+        var harness = new McpHarness(RulePipeName);
         return (harness, await harness.StartAsync());
     }
 
@@ -330,6 +417,125 @@ public sealed class SecretHygieneTests : IAsyncLifetime
 
             // Nobody was even asked. A refusal that had prompted first would still have put an
             // entry name the user never exposed in front of them.
+            Assert.Equal(0, _human.Asked);
+        }
+    }
+
+    /// <summary>
+    /// The second path that produces a credential, and the first in this product that does so with
+    /// nobody watching. The requested field comes back, the other five sentinels do not, and no
+    /// prompt was drawn.
+    /// </summary>
+    [Fact]
+    public async Task OnAPolicyGrant_TheRequestedFieldComesBack_AndOnlyThat()
+    {
+        var (harness, client) = await StartPreapprovedAsync();
+
+        await using (harness)
+        {
+            var result = await client.CallToolAsync(ToolText.CredentialToolName, Ask(), cancellationToken: Token);
+            var text = TextOf(result);
+
+            Assert.False(result.IsError, text);
+            Assert.Contains(SentinelPassword, text, StringComparison.Ordinal);
+
+            // Nobody was asked. Everything else in this class runs through a human who said yes;
+            // this is the one where the count has to be zero.
+            Assert.Equal(0, _human.Asked);
+
+            foreach (var other in _everySentinel.Where(s => !string.Equals(s, SentinelPassword, StringComparison.Ordinal)))
+            {
+                AssertNowhere(harness, other, text, "a policy grant");
+            }
+
+            // The log records that it happened — which, with no human witness, is the only record
+            // that it happened at all — and records it as a policy release, never as an approval.
+            Assert.Contains("\"method\":\"policy\"", harness.AuditText, StringComparison.Ordinal);
+            Assert.DoesNotContain(SentinelPassword, harness.AuditText, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>
+    /// A field the rule does not name is not covered by it, so a person is asked — and if they say
+    /// no, nothing leaves. The rule covers <c>password</c>; this asks for the other three.
+    /// </summary>
+    [Theory]
+    [InlineData("username", SentinelUsername)]
+    [InlineData("url", SentinelUrl)]
+    [InlineData("notes", SentinelNotes)]
+    public async Task ARuleForAFieldTheAgentDidNotAskFor_ReleasesNothing(string field, string sentinel)
+    {
+        _human.Answer = ApprovalAnswer.Denied;
+
+        var (harness, client) = await StartPreapprovedAsync();
+
+        await using (harness)
+        {
+            var result = await client.CallToolAsync(
+                ToolText.CredentialToolName, Ask(field: field), cancellationToken: Token);
+
+            Assert.True(result.IsError);
+            Assert.Equal(1, _human.Asked);
+
+            foreach (var each in _everySentinel)
+            {
+                AssertNowhere(harness, each, TextOf(result), $"a rule that does not cover {field}");
+            }
+
+            Assert.NotEmpty(sentinel);
+        }
+    }
+
+    /// <summary>
+    /// An entry inside the bridge's exposure and outside the rule. This is the sentinel that makes
+    /// "a rule cannot widen" a claim about the policy check: the exposure permits this entry, so
+    /// nothing but the rule's own pattern is standing between the agent and it.
+    /// </summary>
+    [Fact]
+    public async Task AnEntryInsideTheExposureAndOutsideTheRule_StillNeedsAPerson()
+    {
+        _human.Answer = ApprovalAnswer.Denied;
+
+        var (harness, client) = await StartPreapprovedAsync();
+
+        await using (harness)
+        {
+            var result = await client.CallToolAsync(
+                ToolText.CredentialToolName, Ask(entry: "env/prod/ROOT_TOKEN"), cancellationToken: Token);
+
+            Assert.True(result.IsError);
+            Assert.Equal(1, _human.Asked);
+
+            AssertNowhere(harness, SentinelOutsideTheRule, TextOf(result), "outside the rule");
+        }
+    }
+
+    /// <summary>
+    /// A rule reaching past <c>--expose</c>, asked for both ways the entry can be named. The rule
+    /// here covers only <c>env/dev/**</c>, so this also proves a handle is not a way around it.
+    /// </summary>
+    [Fact]
+    public async Task APolicyRuleForAnEntryOutsideTheExposure_YieldsNothingByEitherName()
+    {
+        var (harness, client) = await StartPreapprovedAsync();
+
+        await using (harness)
+        {
+            var byPath = await client.CallToolAsync(
+                ToolText.CredentialToolName, Ask(entry: "personal/bank"), cancellationToken: Token);
+
+            var byHandle = await client.CallToolAsync(
+                ToolText.CredentialToolName,
+                Ask(entry: EntryHandle.For(new EntryName("personal", "bank"))),
+                cancellationToken: Token);
+
+            Assert.True(byPath.IsError);
+            Assert.True(byHandle.IsError);
+
+            AssertNowhere(harness, SentinelOutOfScope, TextOf(byPath) + TextOf(byHandle), "out of scope, with a rule");
+
+            // Not even asked about, exactly as without a policy: the exposure is checked first and
+            // a rule is never a reason to put an unexposed entry name in front of somebody.
             Assert.Equal(0, _human.Asked);
         }
     }
