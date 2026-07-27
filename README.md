@@ -326,6 +326,10 @@ deciding. [**THREATS.md**](THREATS.md) is the threat model — prompt injection 
 and through the agent's stated reason, clients that cannot be authenticated, prompt fatigue, what a
 reused grant costs, and what tampering with the log does and does not achieve.
 
+[**Your KeePass vault can't talk to AI**](docs/keepass-and-agents.md) is the argument behind all of
+this — why vaults were built with no network surface, what changed when agents arrived, and why the
+answer here is the one the KDBX ecosystem already reached for when browsers wanted credentials.
+
 ## Packages
 
 | Roadmap name | Project | Ships as |
