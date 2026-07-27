@@ -142,7 +142,7 @@ jq -c . < ~/.keypaste/audit.jsonl
 ```
 
 ```json
-{"v":1,"ts":"2026-07-26T14:03:11.482Z","seq":1,"pid":48122,
+{"v":2,"ts":"2026-07-26T14:03:11.482Z","seq":1,"pid":48122,
  "client":{"name":"claude-code","version":"1.2.3","label":"claude-code","transport":"stdio"},
  "tool":"request_credential",
  "args":{"entry":"env/dev/STRIPE_KEY","entry_kind":"path","field":"password","ttl_seconds":900,
@@ -150,7 +150,8 @@ jq -c . < ~/.keypaste/audit.jsonl
          "reason_sha256":"..."},
  "decision":"granted","method":"prompt",
  "reason":"a person approved this request for 300 seconds",
- "exposure":["env/**"]}
+ "exposure":["env/**"],
+ "prev":"0000...0000","hash":"0c806dbd...14b3c7"}
 ```
 
 `decision` is `granted` or `denied`. `method` says how it was reached, and the distinction is the
@@ -183,10 +184,77 @@ Four things worth knowing:
   one that is not, saying so on stderr when it does. **On Windows there is no equivalent** — it
   inherits its directory's permissions, the same gap `keypaste env export` has.
 
-`keypaste log`, which renders this as a readable table, and the per-line hash chain that makes
-tampering detectable, both arrive in a later stage. Until then the file is append-only by
-construction and nothing more; [THREATS.md](../THREATS.md) T-5 states exactly what that does and
-does not claim.
+## Reading it
+
+```sh
+keypaste log
+keypaste log --denied
+keypaste log --client claude-code --since 2h
+```
+
+```
+3 records in /home/you/.keypaste/audit.jsonl
+
+time (UTC)           client       entry               decision  method
+2026-07-26 14:03:09  claude-code  -                   granted   exposure
+2026-07-26 14:03:11  claude-code  env/dev/STRIPE_KEY  granted   prompt
+2026-07-26 14:07:44  claude-code  env/dev/STRIPE_KEY  granted   grant-cache (!)
+
+(!) served from an earlier approval, under a reason that person never saw.
+```
+
+`--since` takes a span (`30m`, `2h`, `7d`) or a moment (`2026-07-20`, or a full timestamp), and
+`--client` matches any part of the label or the name. **A filtered view always says so**, with the
+count it is showing out of the count in the file, so a narrow view can never be mistaken for the
+whole log.
+
+## Knowing it has not been edited
+
+Every record carries `prev` — the hash of the record before it — and `hash`, over its own bytes. So a
+record cannot be changed without breaking the link declared by the record after it.
+
+```sh
+keypaste log verify
+```
+
+```
+3 records verified in /home/you/.keypaste/audit.jsonl.
+Latest: seq 3, hash 651f0392457b29f80f3168584758418c71734077577a9c100e83225e1783dde8
+```
+
+It exits `5` if the chain is broken, and names the line and what happened to it — edited, removed,
+inserted, or written by something that is not keypaste. `keypaste log` runs the same check and puts a
+warning in front of the table rather than quietly showing you a file that has been altered.
+
+**Two things it cannot do, and it says both on every pass.** The chain holds no secret, so anyone who
+can write the file can recompute the whole of it; and records deleted from the *end* leave a chain
+that is internally perfect, because nothing follows them to notice. For the second, write down the
+hash it prints and pass it back later:
+
+```sh
+keypaste log verify --expect 651f0392457b29f80f3168584758418c71734077577a9c100e83225e1783dde8
+```
+
+That fails unless a record whose own bytes still hash to it is in the file — not merely that those
+characters appear somewhere in it, which an entry name could be made to say. keypaste keeps no copy
+of the anchor, on purpose: one stored next to the thing it anchors is worth nothing.
+[THREATS.md](../THREATS.md) T-5 states all of this as residuals rather than leaving it to be
+discovered.
+
+Records written before this feature existed carry `"v":1` and no chain. They are reported as
+predating it and are never called tampered — and `keypaste log` marks them, and anything else the
+chain cannot vouch for, with a `?` in the left-hand column:
+
+```
+?  2026-07-26 14:10:00  claude-code  env/prod/PAYROLL_DB  granted   prompt
+
+?  the hash chain does not vouch for this row. Run 'keypaste log verify'.
+```
+
+A line something else appended does not stop keypaste writing: it links past it to the last record
+that is part of the chain, and `keypaste log verify` reports the line. The one thing that does stop
+it is a record from a *newer* keypaste, because appending beneath that would fork the chain — upgrade,
+or move the file aside to start a new log. The old file stays readable and stays verifiable.
 
 ## Checking it works without a client
 

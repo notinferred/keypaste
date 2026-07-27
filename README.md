@@ -198,11 +198,31 @@ reach past `--expose`, cannot raise `--max-ttl`, cannot overturn a "no" you just
 make an entry listable — but within its pattern, no human sees the request.
 [**Pre-approving with a policy file**](docs/policy.md) is the guide, including what that costs.
 
+### Seeing what happened
+
+Every call an agent makes is one line in `~/.keypaste/audit.jsonl`, allowed or refused.
+`keypaste log` reads it back:
+
+```
+3 records in /home/you/.keypaste/audit.jsonl
+
+time (UTC)           client       entry               decision  method
+2026-07-26 14:03:09  claude-code  -                   granted   exposure
+2026-07-26 14:03:11  claude-code  env/dev/STRIPE_KEY  granted   prompt
+2026-07-26 14:07:44  claude-code  env/dev/STRIPE_KEY  denied    out-of-scope
+```
+
+`--denied`, `--client <text>` and `--since 2h` narrow it, and a narrowed view always says so.
+
+Each record carries the hash of the record before it, so `keypaste log verify` tells you whether the
+file is the one keypaste wrote — and tells you, every time it passes, the two things it cannot see:
+a rewrite that recomputed the chain, and records deleted from the end.
+
 [**Approving an agent's request**](docs/approvals.md) is the guide.
-[**Connecting keypaste to Claude**](docs/mcp-setup.md) has the config snippets and the audit log
-format. [**THREATS.md**](THREATS.md) is the threat model — prompt injection through entry names and
-through the agent's stated reason, clients that cannot be authenticated, prompt fatigue, and what a
-reused grant costs.
+[**Connecting keypaste to Claude**](docs/mcp-setup.md) has the config snippets, the audit log format,
+and how to read it. [**THREATS.md**](THREATS.md) is the threat model — prompt injection through entry
+names and through the agent's stated reason, clients that cannot be authenticated, prompt fatigue,
+what a reused grant costs, and what tampering with the log does and does not achieve.
 
 ## Packages
 

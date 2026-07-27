@@ -1628,6 +1628,184 @@ over one optional field. Both mismatched directions degrade the same way instead
 absent, no rule matches, every request is shown to a person. That is the same state a malformed
 policy file produces, and it is the state this whole stage falls back to.
 
+## D-0031 - The audit chain commits to bytes, and forgives the damage a machine does to itself
+
+**Date:** 2026-07-27 · **Stage:** 2.4 · **Status:** accepted
+
+D-0020 froze the audit schema in a fixed key order and put `v` on line one of every record, both for
+this. Schema 2 adds two fields at the end: `prev`, the previous record's `hash`, and `hash`, over
+this record's own bytes. THREATS.md T-5 is what this closes.
+
+**The hash covers raw bytes, not re-serialized fields.** It is the line exactly as it stood
+immediately before the writer appended `hash` - the whole line minus its final
+`,"hash":"<64 hex>"}`, no newline, no carriage return. The alternative, reconstructing the bytes from
+parsed fields to check them, would hand a future change in `Utf8JsonWriter`'s escaping or number
+formatting the power to turn *intact* into *tampered*. That is the worst failure this feature has
+available to it, and no amount of care in the verifier removes it - only not depending on the
+serializer does.
+
+Two consequences are load-bearing and easy to lose. **`prev` comes before `hash`**, so the committed
+bytes include the link; the other order lets a record's link be re-pointed without disturbing its
+hash, which is a chain that only looks like one. **`hash` is last and fixed-width**, so verification
+is a slice rather than a second parse. Classification is by leading bytes - every record begins
+`{"v":1,` or `{"v":2,` - so no JSON parser sits anywhere on the path that produces a verdict. Parsing
+is confined to `AuditReader`, where a failure costs a row in a table.
+
+### The writer reads the file, so it opens the file twice
+
+`prev` cannot come from memory: two servers share one log (D-0020), so a record must link to whatever
+is actually at the end of the file. `FileMode.Append` forbids `FileAccess.Read`, and giving it up was
+rejected. .NET itself throws on a seek before the append start, which makes "no code path in keypaste
+rewrites the log" a runtime invariant rather than a claim about the code - and it is the literal
+sentence T-5's mitigation rests on. So the log keeps a second, read-only handle on the same file,
+opened at startup and pointing at the same inode. The tail is read inside the sidecar lock, which now
+serialises reading the predecessor as well as writing the successor.
+
+The window is `4 × MaximumRecordBytes`. Twice is the minimum that is correct at all - an unterminated
+fragment of up to one record may sit after a last complete line of up to one record - and the rest is
+margin, because a window that fails to contain a complete line is indistinguishable from a corrupt
+log and would deny every credential request.
+
+`MaximumRecordBytes` **stays 4096**. The atomicity argument is about total bytes written, so raising
+the cap to absorb the 148 bytes the chain costs would be a number chosen to hide a change rather than
+to state one. `exposure` remains the one field with no cap of its own, and it is operator-controlled;
+that cliff is 148 bytes closer than it was, and is now covered by a test.
+
+### `seq` becomes the file's, and stays advisory
+
+It counted what one `AuditLog` instance had written, so two servers produced `1, 1, 2, 2` and a
+reopen restarted at 1 - a number that looks like a record index and is not one, in the file whose
+whole job is to be read back afterwards. It is now the record's position in the chain, derived from
+the same tail read that produces `prev`, and it restarts at 1 where the chain starts.
+
+**It is advisory where `hash` is authoritative.** Deriving it means reading a number an attacker may
+have authored, and a predecessor with an absurd `seq` must not be able to deny every subsequent
+credential request. So a `seq` that cannot be read is recorded as unknown, and a discontinuity is a
+warning from `verify`, never a break.
+
+### The writer records around what it did not write, and refuses over one thing
+
+It links to the last *chained* record, stepping back over anything that is not one - the same linking
+rule the verifier applies forwards, because a writer and a verifier that disagreed would make a
+healthy log read as a broken one. The first version looked at exactly one line and refused if that
+line was not a record, on the theory that stepping back could be walked to a line of an attacker's
+choosing. That theory is wrong: the last chained record is the last chained record, and reaching an
+older one means deleting the newer ones, which is the truncation residual rather than a new way in.
+And the cost of the refusal was real - one appended byte, a blank line out of an editor or an `echo`,
+became a permanent denial of every credential request, which under assumption 1 is a cheaper lever
+for an attacker than the one it was meant to close.
+
+**A record from a newer schema is the exception and still refuses.** Appending beneath it would fork
+the chain, and unlike every other unreadable line, "upgrade keypaste" is something the operator can
+act on. A version number too large to hold is *not* treated as newer (it is a torn line), because
+telling somebody to upgrade in answer to garbage is worse than saying nothing.
+
+### Genesis is zeros, and only one path reaches it
+
+`prev` is the previous chained record's hash, or 64 zeros when the chain starts here - written only
+when the whole file was examined and holds no chained record at all. **Never on a read that failed,
+and never on a window that did not reach the start of the file**, because silently starting a fresh
+chain when the end of the file cannot be understood is precisely what somebody who has just truncated
+it wants to happen. It is also why the writer steps back past a planted v1 record rather than
+treating it as the end of the chain: a genesis link after a chained record is the signature of a
+truncation, and manufacturing one would have keypaste report an attack on itself, permanently, in
+answer to one line anybody could append.
+
+Anchoring the first chained record to a hash of the last v1 record was rejected: it gives one field
+two hashing rules for a transition that happens once per installation, protects exactly one legacy
+record, is permanent debt in every future verifier, and cries wolf on a v1 line whose whitespace was
+touched - the exact failure `v` was put on line one to prevent.
+
+### Not crying wolf is half the mitigation
+
+A verifier that reddens after a power cut is ignored within a week, and then the one alarm that
+mattered is the one nobody reads. Four things are reported *and* called intact: records that predate
+the chain, a file that ends mid-line, a file whose line endings or opening bytes were rewritten by
+some tool that copied it, and a record that stops partway.
+
+The last of those is the subtle one. A write cut short is always a *prefix* of a record, so it can be
+told from a foreign line by its first bytes - and the linking rule makes forgiving it free, because
+`prev` links to the nearest preceding *chained* record. Anything not in the chain is stepped over,
+and a record somebody mangled into that shape still breaks the link of the record after it. So the
+forgiveness costs no strength, which is the only reason it is affordable.
+
+**The forgiveness stops at the last line, and that is deliberate.** An unterminated final segment is
+classified like any other line and verified if it is a whole record; only a segment that is *not* a
+record is the interrupted write this forgives. That is what a crash actually leaves, because a record
+and its newline are one write. Skipping the last line because it lacked a terminator would have made
+deleting one byte the way to edit the newest record freely - and the newest record is the one an
+attacker has just caused.
+
+### An unverifiable record is a hole unless it is marked
+
+Inserting a record the chain cannot check - one claiming `v:1`, or a version from the future - breaks
+no link, because nothing before or after it changes. It parses, and it renders in the table exactly
+like a verified record. Two things close that:
+
+1. **A v1 record sitting after a v2 one is a break.** keypaste never writes one there, so it is an
+   insertion rather than a log that grew across an upgrade. The same shape *before* the chain starts
+   is what every upgraded log looks like, and is not condemned.
+2. **Every record the chain cannot vouch for is marked in the rendering**, and the report carries the
+   line numbers so a renderer can do it. Counting them in a footnote is not enough: the question a
+   reader has is "can I believe *this row*", and the chain's answer is per record.
+
+### What is not claimed
+
+The chain holds no secret, so anyone who can write the file can recompute it; and records deleted
+from the end leave a chain that is internally perfect. Both are residuals in T-5 rather than gaps to
+discover, and `keypaste log verify` prints them **on every pass**, not only on a failure. For the
+second there is `--expect <hash>`: keypaste prints the latest hash and keeps no copy of it, because
+an anchor stored beside the thing it anchors is worth nothing.
+
+**`--expect` is answered by the chain, not by searching the file's text.** A hash that merely appears
+somewhere in the log proves nothing: the `entry` argument is text the agent writes, so a substring
+search would accept a hash planted by the very request that destroyed the record it names - no file
+access required, only knowledge of the anchor. It matches a record whose own bytes still hash to it,
+and nothing else.
+
+## D-0032 - `keypaste log` sanitizes on the way out, and fails on a broken chain
+
+**Date:** 2026-07-27 · **Stage:** 2.4 · **Status:** accepted
+
+The table is built in `Keypaste.Core.Audit.AuditText`, not in the CLI, for the reason `PolicyText`
+gives: the GUI's Agent Activity screen (Stage 4) has to say the same thing about the same file, and
+law 4.3 does not allow that sentence to be written twice. ASCII only, and widths from the data with
+no truncation - an audit table whose entry column has been cut short cannot answer the question it
+exists to answer, and the writer already caps every field it records.
+
+**Untrusted text is sanitized in `AuditReader`, not in each renderer.** `entry` and `reason_excerpt`
+are written by the agent and `client.name` is asserted by whoever connected, so a record is the last
+thing between text an attacker chose and a terminal (T-1, T-2). Doing it in the reader means a second
+front end cannot forget. It is done again on the way out even though the writer already scrubbed on
+the way in, because a *tampered* line need not honour anything the writer did - which is the whole
+premise of the command.
+
+**A filtered view always says it is filtered**, with the count it shows out of the count in the file,
+and an empty result says "no records matched" rather than printing nothing. Silence after a filter
+reads as "nothing happened", which is the one conclusion an audit tool must never invite by accident.
+For the same reason `--client` matches a case-insensitive substring of the label or the name:
+matching too much costs noise, and matching too little costs the answer - somebody types `claude`,
+sees an empty table, and concludes nothing happened while `claude-code` read credentials all morning.
+
+**Both commands check the chain, and a break exits 5.** `ExitTamperDetected` is its own code because
+none of usage, not-found or internal-error fits, and because "did anything touch my audit trail"
+has to be answerable from a shell. `keypaste log` still prints the table when the chain is broken,
+with an alarm in front of it: refusing to show an edited log would hand whoever edited it a way to
+make the record unreadable, which is worse than showing it with a warning on it. **A chain that could
+not be checked at all is not a pass** - `keypaste log` reports it and exits non-zero rather than
+handing over a table nothing stands behind, on the same reasoning `verify` refuses to call a missing
+file intact.
+
+**A broken report still carries the observations a passing one would.** They were suppressed at
+first, which was exactly backwards: the counts of unverifiable records, the marked rows, the
+unfinished last line are what tell the person already looking for a problem which rows they can
+believe.
+
+**An absent log is success for `keypaste log` and an error for `keypaste log verify`.** Listing
+nothing is a true answer about a machine no agent has used. Verifying nothing is not an answer at
+all, and a script that read exit 0 from a missing file as "the log is intact" would be taking a
+reassurance out of an absence.
+
 ---
 
 # Open decisions
