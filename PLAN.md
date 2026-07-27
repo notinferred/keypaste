@@ -38,8 +38,8 @@
 - [x] Human approval flow: `keypaste agent` — a process you start in your own terminal — shows client, entry, field, reason and lifetime; default deny, 45-second timeout deny (under every MCP client's own 60s request timeout, D-0025). A native OS dialog is still to come; the terminal prompt is the channel today
 - [x] Scoping: the response carries one field value and nothing else, proved against four sentinels in one entry (`SecretHygieneTests`); grants expire on a TTL capped by `--max-ttl` and are scoped to one connection (D-0026)
 - [ ] Append-only local audit log (JSONL + `keypaste log` pretty view)
-- [ ] Policy file for pre-approvals (e.g. "Claude Code may read entries in group 'dev/*' without prompting")
-- [ ] Threat-model doc: confused deputy, prompt injection via entry names, log tampering — and mitigations — `THREATS.md` grew T-10, T-11 and T-12 in 2.2 and closed T-7; the remaining gap is T-5, which 2.4 completes
+- [x] Policy file for pre-approvals — `~/.keypaste/policy.toml`, read once by `keypaste agent`, evaluated after the exposure re-check so a rule can only ever narrow (D-0029); keyed on the operator's `--client-label` rather than the name an agent asserts (D-0030); anything wrong with the file means the whole of it is ignored and every request prompts (D-0028). `keypaste policy ls` renders what each pattern parsed to rather than the line that was typed
+- [ ] Threat-model doc: confused deputy, prompt injection via entry names, log tampering — and mitigations — `THREATS.md` grew T-10 to T-12 in 2.2 and closed T-7; 2.3 resolved T-3, closed T-6's named gap and added T-13 to T-17, including T-14, the one place the policy file makes keypaste weaker than 2.2; the remaining gap is T-5, which 2.4 completes
 - [x] Setup guide for Claude Desktop + Claude Code — `docs/mcp-setup.md`, with the audit log format and why the vault cannot be unlocked yet
 - **Exit demo (THE demo):** ask Claude "deploy this, get the API key from my vault" → approval popup → Claude proceeds → `keypaste log` shows the access. 60 seconds.
 

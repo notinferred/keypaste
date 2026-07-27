@@ -88,6 +88,22 @@ internal sealed class FakeApprover : IAsyncDisposable
         return Start();
     }
 
+    /// <summary>Starts listening and releases everything under a standing rule, asking nobody.</summary>
+    internal FakeApprover StartPreapproving(int ttlSeconds = 300)
+    {
+        Answer = new CredentialReply
+        {
+            Decision = AuditDecision.Granted,
+            Method = AuditMethod.Policy,
+            Reason = "pre-authorized by policy rule allow#1 (env/dev/**, password)",
+            Entry = "env/dev/STRIPE_KEY",
+            TtlSeconds = ttlSeconds,
+            Value = Sentinel,
+        };
+
+        return Start();
+    }
+
     /// <summary>Starts listening and refuses everything, for the stated reason.</summary>
     internal FakeApprover StartRefusing(AuditMethod method, string reason = "a person refused this request")
     {

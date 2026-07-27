@@ -29,6 +29,15 @@ namespace Keypaste.Core.Ipc;
 public static class ApproverProtocol
 {
     /// <summary>The wire version, so a later change to the shape is unambiguous.</summary>
+    /// <remarks>
+    /// Stage 2.3 added an optional <c>client_label</c> to a credential request and deliberately did
+    /// <b>not</b> bump this. The version guards how a frame is interpreted, and a bump would make
+    /// every mixed-version pair fail at the framing layer — no reply, no audit line beyond
+    /// <see cref="AuditMethod.NoApprover"/> — over one optional field. Both mismatched pairs degrade
+    /// the same way instead: the label is absent, so no rule matches, so every request is shown to a
+    /// person. That is the same state a malformed policy file produces, and it is the state this
+    /// whole stage is built to fall back to.
+    /// </remarks>
     public const int Version = 1;
 
     internal const string NamesKind = "names";
@@ -69,6 +78,7 @@ public static class ApproverProtocol
             WriteStrings(writer, "exposure", request.Exposure);
             WriteOptional(writer, "client", request.ClientName);
             WriteOptional(writer, "client_version", request.ClientVersion);
+            WriteOptional(writer, "client_label", request.ClientLabel);
         });
     }
 
@@ -210,6 +220,7 @@ public static class ApproverProtocol
                 Exposure = exposure,
                 ClientName = Optional(root, "client"),
                 ClientVersion = Optional(root, "client_version"),
+                ClientLabel = Optional(root, "client_label"),
             };
 
             return true;

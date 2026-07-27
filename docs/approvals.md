@@ -1,7 +1,9 @@
 # Approving an agent's request
 
-When an AI agent asks keypaste for a credential, a person decides. This page is about who that
-person is, what they see, and what happens when nobody is there.
+When an AI agent asks keypaste for a credential, a person decides — unless that person already wrote
+a rule saying yes to exactly this. This page is about who that person is, what they see, and what
+happens when nobody is there. [Pre-approving with a policy file](policy.md) is the other half, and
+it is the only path in keypaste where nobody is asked at all.
 
 ## The short version
 
@@ -15,9 +17,10 @@ person is, what they see, and what happens when nobody is there.
                                           • returns one field
 ```
 
-Two processes, on purpose. **`keypaste-mcp` never holds your vault and never decides anything.** It
-is started by your MCP client, which means it is started by software. `keypaste agent` is started by
-you.
+Two processes, on purpose. **`keypaste-mcp` never holds your vault and never decides anything** —
+including whether a policy rule covers a request, which is decided in `keypaste agent` where the
+vault is. It is started by your MCP client, which means it is started by software. `keypaste agent`
+is started by you.
 
 That split exists for one reason above all the others: **nothing an agent does can make keypaste ask
 for your master password.** You type it in a terminal you opened, in answer to a command you typed.
@@ -154,6 +157,10 @@ which entry, which field, who asked, what they said their reason was, and what w
 - **keypaste cannot tell whether the agent's reason is true.** It can only make sure the sentence is
   inert, that it is labelled as the agent's words, and that the entry name beside it came from your
   vault instead.
+- **A policy rule skips this page entirely.** If you wrote one, requests it covers are released with
+  no prompt and nobody reads the reason at all. The agent prints a line per release and the audit log
+  records which rule did it; that is the whole of the signal. [policy.md](policy.md) is honest about
+  what that costs.
 
 ## Verifying it yourself
 

@@ -63,6 +63,26 @@ public sealed record CredentialRequest
 
     /// <summary>What version the client claimed. Same caveat.</summary>
     public string? ClientVersion { get; init; }
+
+    /// <summary>
+    /// The name a human gave this bridge with <c>--client-label</c>, raw and exactly as written.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Unlike <see cref="ClientName"/> this cannot be chosen by whoever <em>connects</em> — whoever
+    /// spawns the bridge chooses it — which is the entire reason a policy rule keys on this and on
+    /// nothing else (THREATS.md T-3). Null when the operator set none, and a null label matches no
+    /// rule, including one written <c>client = "*"</c>.
+    /// </para>
+    /// <para>
+    /// <b>Raw, not sanitized.</b> The operator writes <c>--client-label claude-code</c> in one file
+    /// and <c>client = "claude-code"</c> in another, and those two strings have to compare as
+    /// written. <c>EntryNameSanitizer</c> is lossy, and two distinct labels collapsing into one
+    /// identical display string would be a widening. The audit line keeps using the sanitized form,
+    /// because that one is for reading.
+    /// </para>
+    /// </remarks>
+    public string? ClientLabel { get; init; }
 }
 
 /// <summary>The approver's answer, and — on exactly one path — the field value itself.</summary>

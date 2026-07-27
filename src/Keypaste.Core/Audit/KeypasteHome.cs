@@ -28,6 +28,9 @@ public static class KeypasteHome
     /// <summary>The audit log's file name.</summary>
     public const string AuditFileName = "audit.jsonl";
 
+    /// <summary>The policy file's name.</summary>
+    public const string PolicyFileName = "policy.toml";
+
     /// <summary>Resolves keypaste's home directory.</summary>
     /// <param name="fromEnvironment">The value of <see cref="EnvironmentVariable"/>, or null.</param>
     /// <returns>An absolute path. The directory is not created.</returns>
@@ -53,4 +56,16 @@ public static class KeypasteHome
     /// <returns>An absolute path. The file is not created.</returns>
     public static string AuditPath(string? fromEnvironment) =>
         Path.Combine(Resolve(fromEnvironment), AuditFileName);
+
+    /// <summary>Resolves the policy file's path.</summary>
+    /// <param name="fromEnvironment">The value of <see cref="EnvironmentVariable"/>, or null.</param>
+    /// <returns>An absolute path. The file is not created — keypaste never writes it.</returns>
+    /// <remarks>
+    /// It sits beside the audit log rather than beside the vault for the reason above, and the
+    /// reason is stronger here: the log is a <em>record</em> of this machine, but the policy file is
+    /// an <em>authorization</em> over it. A synced directory would let another machine grant an
+    /// agent silent access to this one's credentials (THREATS.md T-15).
+    /// </remarks>
+    public static string PolicyPath(string? fromEnvironment) =>
+        Path.Combine(Resolve(fromEnvironment), PolicyFileName);
 }

@@ -34,8 +34,11 @@ internal static class ToolSchemas
     internal const int MaximumReasonLength = 2000;
 
     /// <summary>The longest lifetime an agent may ask for, in seconds.</summary>
-    /// <remarks>Mirrors the cap Stage 2.3's policy file will enforce, so the two never disagree.</remarks>
-    internal const int MaximumTtlSeconds = 3600;
+    /// <remarks>
+    /// The same number the policy file's <c>max_ttl_seconds</c> is bounded by, taken from the core
+    /// rather than repeated here, so the schema and the rule reader cannot come to disagree.
+    /// </remarks>
+    internal const int MaximumTtlSeconds = ApprovalLimits.MaximumRequestableTtlSeconds;
 
     /// <summary>
     /// <c>list_entry_names</c> takes nothing at all.

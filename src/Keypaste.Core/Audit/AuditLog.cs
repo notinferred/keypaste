@@ -426,6 +426,8 @@ public sealed class AuditLog : IDisposable
         AuditMethod.Busy => "busy",
         AuditMethod.Cooldown => "cooldown",
         AuditMethod.Failed => "failed",
+        AuditMethod.Policy => "policy",
+        AuditMethod.PolicyLimit => "policy-limit",
         _ => "unknown",
     };
 
