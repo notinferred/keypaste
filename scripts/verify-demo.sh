@@ -190,7 +190,12 @@ case "$rule" in
   *[[:space:][:alnum:]]*) die "the line above the dialog is not a rule: |$rule|" ;;
 esac
 
-grep -qE '^─{60}$' "$DOC" || die "$DOC no longer shows the 60-character rule around the dialog"
+# Built as a literal and matched with -F -x rather than written as `^─{60}$`. A repetition count
+# over a multi-byte character means "sixty of this character" only in a UTF-8 locale; under LC_ALL=C
+# it means sixty of its last byte, and the runners do not all agree about which they are.
+rule_literal="$(printf '─%.0s' $(seq 1 60))"
+grep -qFx -- "$rule_literal" "$DOC" \
+  || die "$DOC no longer shows the 60-character rule around the dialog"
 
 # The one line this harness cannot observe, asserted against the page instead of faked.
 # ConsoleSecretPrompt.ReadLine writes its prompt only when stdin is a terminal, and CI has none -
