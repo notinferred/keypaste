@@ -53,9 +53,32 @@ public sealed class CompatGateIsPermanentTests
         // with one that did (DECISIONS.md D-0028).
         Assert.Contains("scripts/verify-policy-e2e.sh", workflow, StringComparison.Ordinal);
 
-        foreach (var os in new[] { "ubuntu-latest", "windows-latest", "macos-latest" })
+        // Both matrices must still name all three operating systems.
+        //
+        // Matched on the operating system inside the matrix line rather than on a runner label,
+        // because the label belongs to whoever rents the machine and the law does not. Migrating to
+        // Blacksmith renamed `windows-latest` to `blacksmith-4vcpu-windows-2025`, and a tripwire
+        // looking for the old label could not tell that from Windows being dropped - it failed the
+        // build for a change that took nothing away. CORE.md law 4.6 requires the operating system,
+        // not the marketplace.
+        //
+        // Reading the matrix lines rather than the whole file is what keeps this honest: `windows`
+        // appears in half a dozen comments about the gaps Windows has, so a substring check over
+        // the document would pass with the OS gone from CI entirely.
+        var matrices = workflow
+            .Split('\n')
+            .Select(line => line.Trim())
+            .Where(line => line.StartsWith("os: [", StringComparison.Ordinal))
+            .ToList();
+
+        Assert.Equal(2, matrices.Count);
+
+        foreach (var matrix in matrices)
         {
-            Assert.Contains(os, workflow, StringComparison.Ordinal);
+            foreach (var os in new[] { "ubuntu", "windows", "macos" })
+            {
+                Assert.Contains(os, matrix, StringComparison.OrdinalIgnoreCase);
+            }
         }
 
         // A gate that is allowed to fail is not a gate. Matched with the trailing colon so

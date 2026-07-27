@@ -140,6 +140,25 @@ jobs:
         shell: bash
         run: scripts/verify-log-chain.sh
 
+      # docs/demo.md is the marketing (CORE.md law 5.1), and the first thing a stranger does with a
+      # demo page is type it in - so one that has quietly gone stale costs more than no page at all.
+      # Nothing in-process can catch that: what drifts is a Markdown transcript, which no unit test
+      # reads, and the approval dialog it reproduces exists only on the stderr of a second process.
+      # This step drives the page's own fixture and a real agent and bridge, and diffs that dialog
+      # against the block in the document character for character.
+      #
+      # It does not run Claude and says so in its own header and in the page's "Verifying it
+      # yourself": what a model chooses to do is not a thing a gate can hold, and a check this
+      # project asks strangers to trust must not depend on a paid networked service (D-0034).
+      #
+      # The timeout is not decoration - this step starts a `keypaste agent` that blocks until it is
+      # stopped, and one that outlives the script would hold the step open until the job's own
+      # twenty-minute limit, long after every assertion passed.
+      - name: Verify the demo page still matches what the binaries print
+        shell: bash
+        timeout-minutes: 8
+        run: scripts/verify-demo.sh
+
   # ===========================================================================
   # PERMANENT COMPATIBILITY GATE — CORE.md law 4.6:
   #   "Compatibility is sacred: any KDBX file keypaste writes must open

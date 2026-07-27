@@ -38,11 +38,14 @@ It asks for your master password, then waits:
 ```
 Master password:
 keypaste: watching /home/you/vaults/personal.kdbx
+keypaste: policy: no file at /home/you/.keypaste/policy.toml, so every request is shown to you.
 keypaste: listening on keypaste-agent-9f3a1c02b7d54e60, 45 seconds to answer, grants last at most 300 seconds
 keypaste: nothing is released without you saying yes. Press Ctrl+C to stop.
 ```
 
-Leave it running in its own terminal. Ctrl+C locks the vault again and zeroes every live grant.
+The third line reports what the policy file says before anything can use it; with no such file, as
+above, every request comes to you. Leave it running in its own terminal. Ctrl+C locks the vault
+again and zeroes every live grant.
 
 | Option | What it does |
 |---|---|
@@ -168,3 +171,7 @@ which entry, which field, who asked, what they said their reason was, and what w
 vault, a real `keypaste agent`, a real `keypaste-mcp` in a separate process, one approval and one
 refusal — asserting the approved request returns the secret, the refused one does not, and neither
 puts it in the audit log.
+
+`scripts/verify-demo.sh` additionally holds the dialog above to what the shipped binary draws,
+character for character, so the block on this page cannot drift from the one on your screen.
+[**Claude asks for a key, you approve, the deploy runs**](demo.md) is that flow end to end.

@@ -1,11 +1,12 @@
 # Threat model — the agent bridge
 
-**Status: complete for Stage 2, and honest about its edges.** This document is written across
-Stage 2. Sections marked **Arrives in 2.x** name a threat that is real and *not yet mitigated*, with
-the PLAN.md checkbox that will close it. They are listed because a threat model that is quietly thin
-is worse than one that says where it is thin. **2.4 closed the last of them: T-5.** The audit log is
-now tamper-evident as well as append-only, and `keypaste log verify` says so in words — including
-the two things it cannot see, which are stated on a passing check rather than only on a failing one.
+**Status: complete for Stage 2, and honest about its edges.** This document was written across
+Stage 2. While it was being written, a section whose threat was real but not yet mitigated carried
+the marker **Arrives in 2.x** and named the PLAN.md checkbox that would close it — because a threat
+model that is quietly thin is worse than one that says where it is thin. **No section carries that
+marker now: 2.4 closed the last of them, T-5.** The audit log is tamper-evident as well as
+append-only, and `keypaste log verify` says so in words — including the two things it cannot see,
+which are stated on a passing check rather than only on a failing one.
 
 One deferral outlives Stage 2 and is named rather than dropped: **T-13 still has no way to show
 which entries each rule matches *today***, because that needs the vault open, and the place it

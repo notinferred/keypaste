@@ -7,7 +7,10 @@ namespace Keypaste.Mcp;
 /// <summary>Whether the vault could be read at all.</summary>
 internal enum VaultAvailability
 {
-    /// <summary>No unlocked session exists. The only answer this version can give.</summary>
+    /// <summary>
+    /// An approver answered and had no vault open. <see cref="ToolText.VaultLocked"/> is what the
+    /// agent is told.
+    /// </summary>
     Locked = 0,
 
     /// <summary>The names were read.</summary>

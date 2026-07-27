@@ -150,16 +150,36 @@ public sealed class TerminalApprovalChannelTests
     /// When the request is withdrawn the human has to be told, or they answer a question nobody is
     /// listening to any more — and then wonder why nothing happened.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// It queues a "y", so that "the request was withdrawn" has to beat an answer already sitting
+    /// in the buffer rather than merely surviving an empty one.
+    /// </para>
+    /// <para>
+    /// <b>The assertion that carries this test is <c>PromptsSeen</c>, not the message.</b>
+    /// <see cref="Task.WaitAsync(CancellationToken)"/> returns an already completed task without
+    /// ever looking at the token, so before the channel checked cancellation itself the outcome
+    /// here turned on whether the thread pool finished the read first — it passed on developer
+    /// machines for three stages and failed on a Linux CI runner. Asserting on the message alone
+    /// reproduces that coin flip. Asserting that the read was never started does not: an
+    /// already-withdrawn request must not put a question on a person's terminal at all, and that
+    /// is true or false regardless of scheduling.
+    /// </para>
+    /// </remarks>
     [Fact]
     public async Task AWithdrawnRequest_DeniesAndSaysSoToTheHuman()
     {
-        var rig = Build();
+        var rig = Build("y");
         using var withdraw = new CancellationTokenSource();
 
         await withdraw.CancelAsync();
 
         Assert.Equal(ApprovalAnswer.Denied, await rig.Channel.AskAsync(Prompt(), withdraw.Token));
         Assert.Contains("withdrawn", rig.Stderr.ToString(), StringComparison.Ordinal);
+
+        // Never asked, so the queued "y" is still queued and could not have approved anything.
+        Assert.Empty(rig.Prompt.PromptsSeen);
+        Assert.DoesNotContain("keypaste: approved.", rig.Stderr.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]

@@ -46,6 +46,13 @@ internal sealed class TerminalApprovalChannel(ISecretPrompt prompt, TextWriter s
 
         try
         {
+            // Checked here rather than left to WaitAsync, which short-circuits on an already
+            // completed task and never looks at the token. A read that finished before the await
+            // got here would therefore be answered as though nobody had withdrawn the request -
+            // an outcome that depended on how the thread pool happened to schedule the read rather
+            // than on anything the caller did.
+            cancellationToken.ThrowIfCancellationRequested();
+
             // The read blocks and cannot be interrupted, so it runs somewhere else and the wait is
             // what gets cancelled. The abandoned reader is the known cost: it stays parked on the
             // terminal until the next keystroke, which is why the withdrawal notice below tells the
