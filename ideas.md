@@ -53,6 +53,11 @@
 - Import wizards: 1Password, Bitwarden, LastPass exports → KDBX.
 - Anomaly nudges: "an agent asked for prod DB creds at 3am — review?"
 - Public "trust page": reproducible builds, third-party audit fund, bug bounty.
+- Break-glass emergency access: an audited, deliberately-inconvenient emergency-release path for a
+  team credential (7.2 broker) that ALWAYS fires a mandatory after-the-fact review notification — the
+  honest answer to "what if the approver is unreachable at 3am". Convenience never softens the audit.
+- Team sharing models are already drafted as build-prompts in prompts.md → Stage 7 (7.1 copy model /
+  7.2 proxy-broker model / 7.3 SSO / 7.4 team dashboard). Parked and gated there, not duplicated here.
 
 ## Marketing/content ideas
 - Series: "Secrets hygiene for the agent era" (each post = one THREATS.md topic, humanized).
