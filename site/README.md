@@ -45,7 +45,21 @@ npx wrangler hyperdrive get <HYPERDRIVE_ID>
 Step 5 is not a formality. Hyperdrive exists in this design specifically so the connection is
 `verify-full` — a Worker connecting directly has no system CA store, so the honest setting there is
 `require`, which encrypts without authenticating the server. If step 5 does not say `verify-full`,
-the reason for the whole arrangement is gone and `DECISIONS.md` D-0036 is wrong.
+the reason for the whole arrangement is gone and `DECISIONS.md` D-0037 is wrong.
+
+### The config that exists today is not the one described above
+
+**Do not deploy until this is fixed.** Hyperdrive config `9ef85ab258e846fbb2c0d3457b744282` was
+created through the Cloudflare dashboard's PlanetScale integration rather than by the steps above,
+and `wrangler hyperdrive get` shows two problems:
+
+- It connects as `pscale_api_…`, the integration's own credential, **not** as `signup_writer`. That
+  credential can almost certainly `SELECT`, so the property this whole design exists to guarantee —
+  that nothing reachable from the Worker can read the list back — does not currently hold.
+- The output carries no `sslmode` at all, so `verify-full` is unconfirmed.
+
+`schema.sql` has not been applied. Fixing it is steps 1 and 3 above, with
+`wrangler hyperdrive update <id>` in place of `create`, followed by step 5.
 
 ## Deploying
 
