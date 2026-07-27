@@ -47,13 +47,11 @@
 
 ## STAGE 3 — Launch
 
-- [ ] **3.1 — README & landing**
+- [~] **3.1 — README & landing**
 "Rewrite the README as a launch-grade front page: demo GIF first, then the one-sentence pitch, then three trust bullets (local-first & offline, standard KDBX — your vault opens in KeePassXC, open source AGPL), then install one-liners per OS, then the MCP setup snippet, then a comparison table vs plain KeePass / 1Password / Infisical focused only on our wedge. Also produce a single-file static landing page for keypaste.com with the same content plus an email signup, no trackers, no cookies."
-> Done except the GIF (D-0036, D-0037). The install one-liners were **not** written — there is nothing to install yet, so both pages say so and 3.4 below owns the fix. Both pages reserve the GIF slot and both are now held to the binaries by `scripts/verify-demo.sh`; recording the take is a WSL session with a human in it, and it is the only thing between here and checking this box.
 
 - [x] **3.2 — Launch essay**
 "Write the launch essay 'Your password manager can't talk to AI — and everyone is pasting secrets into chats instead': open with the real behavior (people paste API keys into LLM chats and .env files into agents), explain why vaults stayed offline while agents arrived, introduce the scoped-request + approval + audit model, show the demo, and end with the local-first/KDBX/open-source stance. Honest, technical, no marketing fluff, ~1200 words, ready for a blog post and adaptable to a Show HN text."
-> [`docs/keepass-and-agents.md`](docs/keepass-and-agents.md), retitled (D-0038). "Your password manager can't talk to AI" is false — 1Password Environments, Bitwarden's Agent Access SDK and Keeper all approve requests, and the July-2026 research behind D-0036 had already established it. Narrowing to *your KeePass vault* keeps the claim true and aims at the audience Stage 3 is going to. No Show HN text: 3.3 owns the launch posts and should not go out before 3.4 ships something to install. The essay's transcripts are gated by `scripts/verify-demo.sh`.
 
 - [ ] **3.3 — Launch checklist runner**
 "Create launch.md with a checklist and tailored copy for each channel: Show HN title+text, r/selfhosted post, r/KeePass post (respectful, KDBX-compat-focused), MCP community/Discord message, X thread, lobste.rs. Each post is written for its audience's culture, links the demo, and asks one genuine question to invite feedback. Include a 14-day follow-up plan: respond to every issue, label good-first-issues, weekly changelog."
