@@ -13,10 +13,12 @@ namespace Keypaste.Mcp.Tools;
 /// to expose.
 /// </summary>
 /// <remarks>
-/// In this version it always refuses, because the vault is locked (THREATS.md T-7). The filtering,
-/// sanitizing and formatting below are complete and tested, and in the shipped binary they are
-/// unreachable — a test double is what exercises them. That is worth saying out loud rather than
-/// letting a green suite imply the shipped path works.
+/// The names come from <c>keypaste agent</c> over the approver socket
+/// (<see cref="ApproverEntryNameSource"/>); the filtering, sanitizing and formatting below are what
+/// this file adds to them. Until 2.2 that code was unreachable in the shipped binary and this
+/// comment said so — THREATS.md T-7 was the gap. It is on the live path now, and the thing that
+/// makes that checkable rather than asserted is <c>scripts/verify-approval-e2e.sh</c>, which drives
+/// a real bridge against a real approver in another process.
 /// </remarks>
 internal sealed class ListEntryNamesTool(
     IEntryNameSource source,

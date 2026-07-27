@@ -26,10 +26,22 @@ internal sealed class ApproverConnection(string pipeName) : IAsyncDisposable
     /// How long to wait for the approver to answer the door.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Short on purpose. When no approver is running this wait is pure latency in front of a
-    /// refusal, and it happens on every call until somebody starts one.
+    /// refusal, and it happens on every call until somebody starts one — which is the ordinary
+    /// state of a bridge an MCP client spawned at its own convenience.
+    /// </para>
+    /// <para>
+    /// <b>Half a second is a measurement, not a guess (DECISIONS.md D-0035).</b> A whole round trip
+    /// against a running approver — process start, connect, prompt, release — measured 248 ms, while
+    /// the same call with nothing listening measured 2306 ms against the two seconds this used to
+    /// be. Almost none of the budget is spent when somebody is there, because
+    /// <c>ApproverListener</c> always has a pending instance up, so the operating system completes
+    /// the connect with no application involvement. Cutting the ceiling therefore takes 1.8 s off
+    /// every refusal without touching the path that works.
+    /// </para>
     /// </remarks>
-    internal static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(2);
+    internal static readonly TimeSpan ConnectTimeout = TimeSpan.FromMilliseconds(500);
 
     private readonly SemaphoreSlim _oneAtATime = new(1, 1);
     private ApproverClient? _client;

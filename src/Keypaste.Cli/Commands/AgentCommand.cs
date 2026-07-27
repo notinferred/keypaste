@@ -100,9 +100,12 @@ internal static class AgentCommand
             return CliApp.ExitUsageError;
         }
 
-        // Loaded before the vault is opened, so a broken policy is on screen before the master
-        // password prompt rather than after it. Nothing here is fatal: every failure means no rules,
-        // which means every request is shown to a person — the state this command shipped in.
+        // Loaded before the vault is opened, so what the policy file says cannot depend on anything
+        // the vault did, and a file this command will not honour has already been read by the time
+        // anybody types a master password. It is *reported* later, with the rest of the banner in
+        // Announce, because that runs inside VaultSession.Open. Nothing here is fatal: every failure
+        // means no rules, which means every request is shown to a person — the state this command
+        // shipped in.
         var policy = PolicyLoader.Load(
             line.Value(PolicyOption)
             ?? KeypasteHome.PolicyPath(context.Environment.Get(KeypasteHome.EnvironmentVariable)));
