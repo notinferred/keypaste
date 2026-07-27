@@ -19,7 +19,7 @@
       // account-scoped handle, not a secret, and is useless without access to the account. The
       // database password lives in that config and appears nowhere in this repository.
       "binding": "HYPERDRIVE",
-      "id": "REPLACE_WITH_HYPERDRIVE_ID"
+      "id": "9ef85ab258e846fbb2c0d3457b744282"
     }
   ],
   "routes": [
