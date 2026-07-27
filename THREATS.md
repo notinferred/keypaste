@@ -1,11 +1,16 @@
 # Threat model — the agent bridge
 
-**Status: still partial, and still deliberately so.** This document is written across Stage 2.
-Sections marked **Arrives in 2.x** name a threat that is real and *not yet mitigated*, with the
-PLAN.md checkbox that will close it. They are listed because a threat model that is quietly thin is
-worse than one that says where it is thin. As of Stage 2.3 the remaining gap is T-5 — the audit log
-is append-only by construction and not yet tamper-evident — and T-13's missing mitigation, which is
-a way to see what each policy rule covers *today*. Both belong to 2.4.
+**Status: complete for Stage 2, and honest about its edges.** This document is written across
+Stage 2. Sections marked **Arrives in 2.x** name a threat that is real and *not yet mitigated*, with
+the PLAN.md checkbox that will close it. They are listed because a threat model that is quietly thin
+is worse than one that says where it is thin. **2.4 closed the last of them: T-5.** The audit log is
+now tamper-evident as well as append-only, and `keypaste log verify` says so in words — including
+the two things it cannot see, which are stated on a passing check rather than only on a failing one.
+
+One deferral outlives Stage 2 and is named rather than dropped: **T-13 still has no way to show
+which entries each rule matches *today***, because that needs the vault open, and the place it
+belongs is the GUI's Agent Activity screen (PLAN.md Stage 4) rather than a master-password prompt in
+front of a diagnostic command.
 
 **Stage 2.3 made one thing worse on purpose, and it is T-14.** A policy file releases a credential
 with nobody watching. Every other line in this document describes something keypaste defends
@@ -257,30 +262,97 @@ latter would pass with the filter wired to nothing.
 **What.** The audit log is the record of what was done in your name. An attacker who can edit it can
 erase evidence.
 
-**Status.** Partially mitigated. **`keypaste log verify` and the per-line hash chain arrive in 2.4**
-(PLAN.md: *append-only local audit log*).
+**Status.** Mitigated in 2.4, with three residuals named below rather than left to be discovered.
 
-**Mitigation today.** keypaste opens the file with `FileMode.Append`, writes one complete
-pre-composed line per record, and has **no code path anywhere that seeks, truncates, rewrites or
-deletes it**. On Linux and macOS it is created readable and writable only by its owner, inside a
-directory with the same restriction; if an existing log is found with looser permissions, keypaste
-tightens it and says so on stderr rather than doing it silently. There is no log rotation, because
-rotation deletes lines and that is the opposite of law 3.3.
+**Mitigation.** keypaste opens the file with `FileMode.Append`, writes one complete pre-composed line
+per record, and has **no code path anywhere that seeks, truncates, rewrites or deletes it**. On Linux
+and macOS it is created readable and writable only by its owner, inside a directory with the same
+restriction; if an existing log is found with looser permissions, keypaste tightens it and says so on
+stderr rather than doing it silently. There is no log rotation, because rotation deletes lines and
+that is the opposite of law 3.3.
+
+**Since 2.4, every record is linked to the one before it.** Each line carries `prev`, the previous
+record's `hash`, and `hash`, the SHA-256 of that line's own bytes up to the point where `hash` was
+appended. `keypaste log verify` recomputes the whole file. A record cannot be changed without
+changing its own hash; changing its hash too breaks the link declared by the record after it; and
+removing or inserting a record breaks the same link. The chain commits to **raw bytes**, never to a
+re-serialization of parsed fields, so no future change to how JSON is written can turn *intact* into
+*tampered* (D-0031).
+
+**Not crying wolf is half of it.** Three things an ordinary machine does on its own are reported and
+called intact in those words: records written before 2.4, which predate the chain and are never
+condemned for it; a file that ends mid-line, which is what an interrupted write looks like; and a log
+copied through a tool that rewrote its line endings or added a byte-order mark. A checker that
+reddened after a power cut would be ignored within a week, and then the one alarm that mattered is
+the one nobody reads.
+
+**A record the chain cannot check is marked, not merely counted.** A line predating the chain, or one
+from a newer schema, breaks no link when it is inserted — nothing before or after it changes — and it
+parses and renders exactly like a real record. So `keypaste log` marks every such row `?`, and the
+one shape that cannot be innocent is a break outright: keypaste never writes a v1 record after a v2
+one, so a v1 record sitting among chained ones is an insertion rather than an upgraded log. Without
+both halves, "insert a plausible record nobody can check" would be the way to write history into an
+audit trail without breaking anything.
 
 **Residual, stated precisely because the wording matters.** This is **append-only by construction
-within keypaste; tamper-evident from Stage 2.4; never tamper-proof.** It is an ordinary file owned
-by your user, and anything running as you can rewrite it (assumption 1). Filesystem-level
-append-only — `chattr +a` on Linux, an ACL granting append but denying write on Windows — is
-something you may choose to apply; keypaste does not apply it, does not require it, and does not
-imply it. **On Windows there is no owner-only file mode**: the log inherits its directory's
+within keypaste, tamper-evident since 2.4, and never tamper-proof.** It is an ordinary file owned by
+your user, and anything running as you can rewrite it (assumption 1). Three specific limits:
+
+1. **The chain holds no secret, so anyone who can write the file can recompute it.** What it buys is
+   that a record cannot be changed without changing every link after it — so *casual* tampering, the
+   kind that opens the log in an editor and turns a `denied` into a `granted`, is detected. It raises
+   the cost of a convincing edit from one keystroke to a program. No design that keeps a key on the
+   same machine as the attacker can do better, and keypaste does not pretend otherwise.
+2. **Records deleted from the end are invisible.** Cut the last hundred lines off and what remains is
+   internally perfect: there is no later record left to notice that anything is missing, and `verify`
+   will report *intact* while telling the truth about every record it can still see. Catching that
+   needs an anchor kept somewhere the attacker cannot also edit, so `keypaste log verify` prints the
+   record count, the latest position and the latest hash on every pass, and
+   `keypaste log verify --expect <hash>` asserts that a **record whose own bytes still hash to it**
+   is in the file. Not that the characters appear somewhere in it: an entry name is text the agent
+   writes, so a hash searched for as a string could be planted by the request that destroyed the
+   record it names. **keypaste keeps no copy of the anchor, on purpose** — one stored beside the
+   thing it anchors is worth nothing. Mail it to yourself, commit it, write it down.
+3. **The sidecar lock excludes other keypaste processes and nothing else.** A `sed -i` or an editor
+   writing at the same moment as an append is a case the chain reports afterwards rather than one the
+   lock prevents.
+
+Filesystem-level append-only — `chattr +a` on Linux, an ACL granting append but denying write on
+Windows — is something you may choose to apply; keypaste does not apply it, does not require it, and
+does not imply it. **On Windows there is no owner-only file mode**: the log inherits its directory's
 permissions, and keypaste says so rather than implying a restriction it did not apply.
 
 The log also grows without bound. That is a deliberate choice over silently discarding history.
 
-**Proved by.** `AuditLogTests` for the append, ordering and one-record-per-line properties, and
-`TwoLogsOverOneFile_BothAppendWithoutLoss` for the case that matters most — two servers sharing one
-file, which the first implementation silently got wrong and which now costs a sidecar lock (D-0020).
-Nothing here detects tampering; that is exactly what 2.4 adds.
+**What the writer does with a line it did not write: records around it.** It links to the last
+*chained* record, stepping back over an unfinished write or a line something else appended — the same
+linking rule the verifier applies forwards, because a writer and a verifier that disagreed would make
+a healthy log read as a broken one. Stepping back cannot be steered: the last chained record is the
+last chained record, and reaching an older one means deleting the newer ones, which is residual 2
+above rather than a new way in.
+
+**The one thing it refuses over is a schema it cannot read.** A record from a newer keypaste stops
+`keypaste-mcp` starting, naming `keypaste log verify` and the way out, because appending beneath it
+would fork the chain and because "upgrade keypaste" is something the person holding the machine can
+act on. It used to refuse over *any* unreadable last line, and that was worse: one appended byte — a
+blank line out of an editor, an `echo` — became a permanent denial of every credential request, which
+under assumption 1 is a cheaper lever than the one the refusal was meant to close.
+
+**Proved by.** `AuditChainTests`, which does its tampering by editing a file on disk rather than
+through an API that simulates it — a denial edited into a grant, a record removed, a record inserted,
+a record forged as one predating the chain, an edit hidden behind a deleted final newline, a chain
+restarted mid-file, and a foreign line appended — each against the forgiveness it must not extend to:
+an interrupted write, a genuine v1 prefix, CRLF, a byte-order mark.
+`AuditLogTests.ALineSomethingElseAppended_DoesNotStopTheLogWorking` and
+`APlantedLegacyRecord_DoesNotMakeTheWriterStartAgain` hold up the writer's half — a planted record
+must not be able to brick the bridge, and must not be able to make keypaste report a truncation
+against itself.
+`AuditLogTests.TwoLogsOverOneFile_BothAppendWithoutLoss` covers the case that matters most — two
+servers sharing one file, which the first implementation silently got wrong (D-0020) and which now
+has to produce one unbroken chain rather than two interleaved ones. `scripts/verify-log-chain.sh` is
+the only place both halves are the shipped binaries: keypaste-mcp writes the log and keypaste reads
+it back, and the two have to agree byte for byte. `LogVerbTests` covers the exit codes and the
+anchor, including the truncation that verifies perfectly and is caught only by `--expect`.
 
 ---
 
@@ -293,15 +365,19 @@ logger becomes the mechanism for invisible access — fill the disk, remove writ
 **Status.** Mitigated.
 
 **Mitigation.** **The audit log is a precondition, not observability.** If the log cannot be opened
-at startup, the server refuses to start. If a record cannot be appended, the call is denied and
-nothing is returned — no credential and no entry names, even when everything else would have
-succeeded. The record is written *before* the response is produced, so a crash in between
+at startup, the server refuses to start — and since 2.4 that includes a log that opens perfectly
+well and whose last record is not one a new record can be linked onto, because a record that cannot
+be chained is a record that cannot be trusted afterwards. If a record cannot be appended, the call
+is denied and nothing is returned — no credential and no entry names, even when everything else
+would have succeeded. The record is written *before* the response is produced, so a crash in between
 over-reports an access rather than under-reporting one; over-reporting is the safe direction.
 
 This is CORE.md law 3.3 and law 3.7 taken together: every agent access is logged, and every error
 path denies.
 
-**Proved by.** `AuditLogTests.AnUnopenableLog_FailsWithAReason` for the refusal itself, and
+**Proved by.** `AuditLogTests.AnUnopenableLog_FailsWithAReason` for the refusal itself and
+`ALogEndingInSomethingElse_WillNotOpen` for the case 2.4 added — a log that opens fine and cannot be
+appended to honestly is refused on the same terms — and
 `ServerToolsTests.AMalformedCall_IsStillAudited` for the case people forget — a call refused before
 it was understood is still an access. `scripts/verify-mcp-stdio.sh` asserts a real spawned server
 leaves a line for both tools.
@@ -514,7 +590,9 @@ with an honest sentence and spend the rest of the lifetime on something else.
 `granted` / `grant-cache` — recording *that* request's reason excerpt, its true length and its
 SHA-256. The line a person actually read is the earlier `granted` / `prompt` line for the same entry
 and field, so the two can be paired and compared: divergence is visible in the log even though it is
-not blocked. Stage 2.4's `keypaste log` is where that pairing gets a reader. The approver also
+not blocked. **Since 2.4 that pairing has a reader.** `keypaste log` marks a `grant-cache` release
+whose reason hash differs from the `prompt` release it is drawing on, and says what the mark means —
+which matters precisely because nothing else about such a line looks unusual. The approver also
 prints a line per reuse to its own terminal, so a burst is visible without being modal.
 
 The lifetime is bounded on three sides: `min(requested, --max-ttl)` with a default of five minutes,
@@ -542,9 +620,11 @@ display mitigations do not apply, because there is no display. See T-13 and T-14
 `ApproverHandlerTests.ARepeatRequestInsideTheTtl_IsServedWithoutAskingAgain` for the reuse itself
 and for the fact that it costs exactly one prompt and one vault read.
 `ApproverHandlerPolicyTests.APolicyGrant_LeavesNoGrantInTheCache` for the separation, and
-`ServerToolsTests.APolicyRelease_IsAuditedAsPolicyAndNamesTheRule` for the line. That the divergence
-is *visible* is a property of the log's contents, and it has no reader until 2.4 — said here rather
-than counted as mitigated.
+`ServerToolsTests.APolicyRelease_IsAuditedAsPolicyAndNamesTheRule` for the line. The reader is
+`AuditReader`, whose marking rule is what turns "visible in the log's contents" into something a
+person actually sees. **Nothing tests the policy case, because there is nothing to test:** a policy
+release has no earlier approval to diverge from, which is the paragraph above and is worse rather
+than better.
 
 ---
 
@@ -585,9 +665,17 @@ the vault — which T-1 already establishes is not the same set as "people you t
 
 **Residual.** An entry moved into a rule's namespace after the rule was written is released without a
 prompt, and nothing prevents it. The mitigation this wants most — showing which entries each rule
-matches *today* — needs the vault, which would put a master password prompt in front of the one
-command an operator reaches for when something already looks wrong. It is deferred to 2.4 with
-`keypaste log`, and named here so the deferral is visible.
+matches *today* — needs the vault open, which would put a master password prompt in front of the one
+command an operator reaches for when something already looks wrong.
+
+**It was deferred to 2.4 and 2.4 did not take it**, which is said here rather than allowed to lapse
+quietly. `keypaste log` reads a plaintext file and needs no vault; bolting a vault-unlocking mode
+onto it, or onto `keypaste policy ls`, would have bought this mitigation at the cost of the property
+that makes both commands safe to reach for in a hurry. The place it belongs is the GUI's **Agent
+Activity** screen (PLAN.md Stage 4), where a vault is already open because the user opened it. Until
+then, what exists after the fact is the audit log: every release names the rule that made it, so
+`keypaste log` answers "what did this rule actually cover" for everything that has happened, and
+nothing answers it for what has not happened yet.
 
 **Proved by.** `PolicyRuleTests.APolicyRuleWithATrailingStar_ConstrainsTheTitleNotTheGroup`, which
 asserts **both** directions so the test documents the surprise rather than the wish;
@@ -681,6 +769,13 @@ can appear as `grant-cache` — that word keeps meaning "a person already said y
 agent-facing text is keyed on the same method, so a release nobody approved does not tell the model
 that a person released it.
 
+**Since 2.4 the word is also hard to change afterwards.** This threat is about a record asserting a
+human act that did not happen, and until the chain existed the cheapest way to produce one was to
+open the log and edit `policy` into `prompt` — nothing structural stood in the way of that, because
+the structure only governs what gets *written*. Editing a decided word now breaks the record's own
+hash and the link of the record after it (T-5). It is still not tamper-proof, and T-5 says exactly
+what that leaves.
+
 **Proved by.** `AuditLogTests.EveryAuditMethod_HasItsOwnWireString`, which now names `policy` and
 `policy-limit` outright so a rename cannot slip past the distinctness check;
 `ApproverHandlerPolicyTests.APolicyGrant_IsLoggedAsPolicyAndNeverAsPrompt` and
@@ -710,14 +805,121 @@ learns is about the entries it *cannot* have, and that set is already bounded by
 
 ---
 
+## T-18 — Memory dumping
+
+**What.** A credential exists in the memory of a running process between the moment the vault
+decrypts it and the moment the grant holding it expires. Anything that can read that memory — a
+debugger, a core dump, a hibernation file, a page written to swap — has the value, with no prompt, no
+audit line, and nothing keypaste can do about it after the fact.
+
+**Who.** Anything running as your user, and anything that can read a file your user wrote:
+assumption 1, plus the artefacts the operating system produces without being asked.
+
+**Status. Out of scope, and it is worth being exact about what that means.** keypaste narrows the
+window and reduces the number of copies. It does not claim in-memory secrecy, and this section
+exists so that "we use a clearable buffer" is never mistaken for the claim it resembles.
+
+**What is nonetheless done, and what each part is worth.** Master passwords live in a clearable
+`char[]` rather than a `string`, and derived key material is zeroed after use. An approved
+credential is held by `keypaste agent` in a clearable buffer, zeroed by its own timer the moment the
+grant expires rather than at the next time something happens to look, and every live grant dies with
+the agent. `keypaste-mcp` holds no vault at all (D-0023), so the process an untrusted client spawns
+is not the process a secret sits in. Each of those shortens an exposure; none of them is a boundary.
+
+**Residual, stated because there is a great deal behind it.** The garbage collector may relocate a
+buffer and leave an unreachable copy behind. A value reaches the agent's buffer as an ordinary
+immutable string out of the vault, and *that* copy cannot be cleared. It crosses a local pipe on its
+way to the bridge, and it is a string again when the MCP library serializes the response. Any of
+those can reach swap or a crash dump. **`SecureString` is deliberately not used**: it does not
+encrypt on Linux or macOS, so it would read as a guarantee it cannot provide — which is the same
+mistake as claiming this threat is mitigated.
+
+The honest control is the one number: a short `--max-ttl`. It bounds how long the value is anywhere
+at all.
+
+**Proved by.** `GrantCacheTests` for the zeroing and the expiry, and `SecretHygieneTests`, which
+sweeps every byte the server actually sent for four planted sentinels — a claim about what *left* the
+process, which is a different and checkable thing from a claim about what is inside it. **Nothing
+tests in-memory secrecy, and nothing can.** SECURITY.md, *"In-memory secrecy is not claimed"*, is
+the same statement for the vault and the CLI.
+
+---
+
+## T-19 — Clipboard scraping
+
+**What.** A secret on the clipboard is readable by every process on the machine, for as long as it is
+there and often for longer.
+
+**Who.** Any process running as your user, plus — on Windows — clipboard history and cloud clipboard
+sync, which are features of the operating system rather than attackers.
+
+**Status. Out of scope for this bridge, and for a reason stronger than a decision: there is no code
+path here that touches the clipboard.** An agent's request is answered over a pipe, in a response
+carrying one field value, and nothing in `keypaste-mcp` or `keypaste agent` copies anything anywhere.
+The bridge is the one part of keypaste this threat does not reach.
+
+**Where it does apply.** `keypaste get`, which is a person's command and not an agent's. That path
+clears the clipboard after twenty seconds and only if it still holds what keypaste put there, so it
+never clobbers something you copied since.
+
+**Residual.** No clearing survives `kill -9`, a crash, or a power cut. On X11 and Wayland the
+clipboard is owner-served, so the value also lives in the `wl-copy` or `xclip` process that goes on
+serving it after keypaste exits. **On Windows, clipboard history (Win+V) and cloud clipboard sync
+retain a copy that clearing does not remove** — prefer `keypaste get --show` piped where you need it,
+or turn clipboard history off. That gap is unresolved and tracked as an open decision, not closed
+and not quietly dropped (DECISIONS.md O-0008).
+
+**Proved by.** `VerbTests.Get_ClipboardChangedSinceTheCopy_IsLeftAlone` and
+`Get_WithoutShow_CopiesToTheClipboard_AndNeverToStdout`, on the CLI side. On this side the claim is
+an *absence* — there is no clipboard code in the bridge to test — and what holds an absence up is
+`SecretHygieneTests` sweeping every byte the server sent, not a test named after the thing that does
+not exist.
+
+---
+
+## T-20 — A stolen vault file
+
+**What.** Somebody copies `vault.kdbx`. A backup, a synced folder, a stolen laptop, a repository it
+should never have been committed to.
+
+**Who.** Anyone who ends up with the file. This is the one threat here that does not need code
+running on your machine.
+
+**Status. Out of scope in the specific sense that keypaste adds nothing to the defence, and the
+defence is not keypaste's.** The file is KDBX4: AES-256 or ChaCha20 for the contents, Argon2 for the
+key derivation, HMAC for integrity. **keypaste writes no cryptography of its own** (law 3.6) and
+vendors a KDBX implementation rather than inventing a format (law 2.1). What stands between a stolen
+file and its contents is the format and the strength of your passphrase, and saying anything more
+reassuring than that would be inventing a guarantee.
+
+**What follows from it, and is easy to miss.** The vault holds *entry names* as well as values, and
+law 3.5 singles those out as sensitive on their own — so a stolen vault is a disclosure risk even to
+somebody who never breaks the encryption, if the passphrase is ever recovered later. Offline guessing
+is unlimited and unobservable: there is no rate limit, no lockout, and no audit line, because there
+is no keypaste involved. Argon2's parameters are what make each guess expensive, and they are
+properties of the file, fixed when it was created.
+
+**Residual.** A weak passphrase. Nothing in keypaste can compensate for it, and nothing in keypaste
+pretends to. **The audit log is a separate file and is not protected by any of this** — it is
+plaintext by design, because it is the record that has to survive the vault being locked. It names
+entries and never values (T-9), and T-5 covers what happens to it.
+
+**Proved by.** The KeePassXC compatibility gate — `verify-keepassxc-compat.sh` and
+`verify-keepassxc-writeback.sh`, run on all three operating systems against a real `keepassxc-cli`
+— which proves the file keypaste writes is the format it claims to be, and therefore that the
+protections named above are the ones actually applied. **Nothing tests the strength of your
+passphrase.**
+
+---
+
 ## Out of scope, with reasons rather than silence
 
 | | |
 |---|---|
 | **A local attacker running as your user** | Out of scope everywhere in keypaste (assumption 1). It can read the vault's memory while unlocked, the audit log, and your keystrokes. |
-| **Memory dumping** | Out of scope. keypaste narrows the window and reduces copies; it does not claim in-memory secrecy. SECURITY.md, *"In-memory secrecy is not claimed"*, explains why — including why `SecureString` is deliberately unused. **Expanded in 2.4.** |
-| **Clipboard scraping** | Out of scope for the bridge — no code path here touches the clipboard. SECURITY.md, *"The clipboard is not fully recoverable"*, covers the CLI, including the unresolved Windows clipboard-history gap (O-0008). **Expanded in 2.4.** |
-| **A stolen vault file** | The defence is KDBX4 with Argon2 and the strength of your passphrase; there is nothing keypaste adds. **Expanded in 2.4.** |
+| **Memory dumping** | Out of scope. See **T-18**, which states what is narrowed, what is not, and why `SecureString` is deliberately unused. |
+| **Clipboard scraping** | Out of scope for the bridge — no code path here touches the clipboard. See **T-19**, including the unresolved Windows clipboard-history gap (O-0008). |
+| **A stolen vault file** | Out of scope in the sense that keypaste adds nothing to the defence. See **T-20**. |
 | **The model's own behaviour** | keypaste cannot make a model safe. It can make sure that nothing the model reads through this bridge grants it anything, and that everything it asks for is recorded. |
 
 ---
@@ -729,4 +931,4 @@ learns is about the entries it *cannot* have, and that set is already bounded by
 | 2.1 | Document created. T-1, T-4, T-6, T-7, T-8, T-9 owned. T-2, T-3, T-5 partial. Decisions in DECISIONS.md D-0019 (the dependency), D-0020 (the audit log), D-0021 (exposure), D-0022 (the locked vault). |
 | 2.2 | The approval flow. **T-7 closed** — the master password is typed in a terminal a person opened, and the listing path is reachable in the shipped binary at last. T-2 and T-3 completed. T-8 rewritten: secrets do traverse this path now, and are tested against real ones. New: T-10 (the approver channel), T-11 (prompt fatigue), T-12 (a grant reused under a reason nobody read). Decisions in D-0023 (the separate process), D-0024 (the pipe), D-0025 (the window), D-0026 (the grant cache), D-0027 (the refusal vocabulary). |
 | 2.3 | The policy file. **T-3 resolved** in the words 2.1 demanded: a rule keys on `--client-label`, and client-scoped policy narrows convenience rather than authority. **T-6's named gap closed**, on the policy path, because that is the one with no human witness. T-11 gained the per-rule hourly allowance. T-12 rewritten: a policy grant is T-12 with the *first* approval removed as well as the second, so the line it could be compared against does not exist. New: T-13 (a rule grants a namespace, not the entries you pictured), T-14 (a standing grant to anything that can reach the approver — **the one place 2.3 is weaker than 2.2**), T-15 (authorization in a possibly-synced directory), T-16 (the audit vocabulary is the only evidence a person was involved), T-17 (a timing oracle). Decisions in D-0028 (the file and its all-or-nothing rule), D-0029 (where the policy sits in the order), D-0030 (keying on the operator's label). |
-| 2.4 | *(planned)* Completes T-5; adds the audit hash chain and `keypaste log verify`; gives T-12's divergence a reader; shows which entries each rule matches today, which is T-13's missing mitigation; expands the out-of-scope entries marked above. |
+| 2.4 | The audit log gets a reader and a chain. **T-5 closed** — every record links to the one before it, `keypaste log verify` recomputes the file, and the three things the chain cannot do are named in T-5 and printed on every passing check rather than only on a failing one. T-12's divergence gained the reader it was promised: `keypaste log` marks a reuse served under a reason nobody read. **T-13's missing mitigation was deferred again, and says so** — showing which entries a rule matches today needs an open vault, and its home is the GUI's Agent Activity screen rather than a password prompt in front of a diagnostic command. New: T-18 (memory dumping), T-19 (clipboard scraping), T-20 (a stolen vault file), promoted out of the out-of-scope table into sections that give reasons instead of one line each. Decisions in D-0031 (the chain) and D-0032 (the reader). |

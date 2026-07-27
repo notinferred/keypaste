@@ -16,8 +16,11 @@ namespace Keypaste.Cli.Commands;
 /// <b>No <c>policy test &lt;entry&gt;</c>, yet.</b> Showing which entries each rule matches
 /// <em>today</em> is the best mitigation there is for a rule quietly covering more than its author
 /// pictured (THREATS.md T-13) — and it needs the vault, which would put a master password prompt in
-/// front of the one command an operator reaches for when something already looks wrong. It belongs
-/// with <c>keypaste log</c> in Stage 2.4.
+/// front of the one command an operator reaches for when something already looks wrong. It was meant
+/// for 2.4 and 2.4 did not take it: <c>keypaste log</c> reads a plaintext file and needs no vault
+/// either, so putting the two together would have cost both of them the property that makes them
+/// safe to reach for in a hurry. It belongs on the GUI's Agent Activity screen, where a vault is
+/// already open because a person opened it.
 /// </para>
 /// </remarks>
 internal static class PolicyCommand

@@ -205,8 +205,11 @@ to notice.
   `--max-ttl`.
 - **A rule names a client label any process on your machine could claim.** See above.
 - **There is no way to see which entries a rule matches today.** `keypaste policy ls` shows what each
-  rule *means*, not what it currently *covers*. That is the mitigation this feature most wants and it
-  needs the vault, so it belongs with `keypaste log` in Stage 2.4.
+  rule *means*, not what it currently *covers*. That is the mitigation this feature most wants, and
+  it needs an unlocked vault — which would put a master password prompt in front of the command you
+  reach for when something already looks wrong. It waits for the GUI, where a vault is open because
+  you opened it. What you have meanwhile is after the fact: every release names the rule that made
+  it, so `keypaste log` tells you what a rule has actually covered.
 
 THREATS.md T-13 through T-17 are the full versions of these.
 
