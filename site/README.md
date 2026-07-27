@@ -64,15 +64,31 @@ PlanetScale integration.
 **The role: still wrong. Do not deploy.** The config connects as `pscale_api_yq4xhf9tbm3v`, which a
 query through the binding reports is `rolcreaterole`, `rolcreatedb`, `rolbypassrls`, and a member of
 `pg_read_all_data`, `pg_write_all_data` and `postgres`. It can read and write every table in the
-database. **The guarantee `schema.sql` and D-0037 are built on — that nothing reachable from the
+cluster. **The guarantee `schema.sql` and D-0037 are built on — that nothing reachable from the
 Worker can read the list back — is currently false**, and by a wider margin than "it probably has
 SELECT".
 
-`public.signup` does not exist yet either; `schema.sql` has never been applied. The same query
-confirms `rolcreaterole` is available, so `CREATE ROLE signup_writer` will work — the least-
-privilege design is viable, it simply has not been done. Run steps 1 and 3 above, using
-`wrangler hyperdrive update <id> --origin-user signup_writer --origin-password …` in place of
-`create`, then re-run step 5 to confirm `verify-full` survived the update.
+`public.signup` does not exist yet either; `schema.sql` has never been applied.
+
+Two things about PlanetScale usernames, both easy to get wrong:
+
+- `pscale_api_yq4xhf9tbm3v` is not an API or admin credential despite the name. It is the generated
+  username of an ordinary *managed role* — PlanetScale discards the name you type and issues its
+  own. The problem is its inherited roles, not what it is called. `pscale role list <db> <branch>`
+  is the authoritative view of that.
+- The `.jb6eu3wgh2u3` suffix is the **branch id, not part of the credential**. PlanetScale's proxy
+  routes on the username, so you connect as `<role>.<branch-id>` while `current_user` inside the
+  database is the bare `<role>`. A `wrangler hyperdrive update --origin-user` that omits the suffix
+  will fail to authenticate for reasons that look nothing like the cause.
+
+Fixing it is `schema.sql`, which now carries the PlanetScale-idiomatic path — a managed role with
+no inherited roles, then table-level grants — followed by:
+
+```sh
+npx wrangler hyperdrive update 9ef85ab258e846fbb2c0d3457b744282 \
+  --origin-user '<pscale_role_id>.<branch-id>' --origin-password '<generated>'
+npx wrangler hyperdrive get 9ef85ab258e846fbb2c0d3457b744282   # verify-full must survive
+```
 
 ## Deploying
 

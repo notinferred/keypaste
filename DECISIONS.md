@@ -2089,9 +2089,30 @@ binding reports as `rolcreaterole`, `rolcreatedb`, `rolbypassrls`, and a member 
 from the Worker can read the list back - is therefore **false of the deployment**, though true of
 the code and of `schema.sql`. It is stated here rather than left as a mismatch someone finds later.
 
-The fallback this record reserved for "if PlanetScale forbids `CREATE ROLE`" is not needed:
-`rolcreaterole` is present, so the least-privilege role is available and simply has not been
-created. Nothing is deployed and `public.signup` does not exist, so nothing is at risk yet - but
+The fallback this record reserved for "if PlanetScale forbids `CREATE ROLE`" is not needed, but the
+remedy it assumed was wrong in a way worth writing down, because the obvious reading of the
+observed username is the wrong one twice over. `pscale_api_yq4xhf9tbm3v` is **not** an API or admin
+credential; PlanetScale discards the name you type when creating a role and issues a generated one
+in that shape, so the problem is the role's inherited roles and not what it is called. And the
+`.jb6eu3wgh2u3` suffix is the **branch id, not part of the credential** - the proxy routes on the
+username, so a client connects as `<role>.<branch-id>` while `current_user` inside the database is
+the bare `<role>`. That also means the credential pasted into a chat transcript, which was
+`postgres.<branch-id>`, is the cluster's *default* role and is **not** the one this Hyperdrive
+config uses. Rotating it does not break the bridge; it is still disclosed and still wants rotating,
+via `pscale role reset-default`, which the PlanetScale docs warn costs downtime - itself the reason
+their docs say never to point an application at the default role.
+
+`schema.sql` was rewritten accordingly. Raw `CREATE ROLE` works and was the original plan, but
+PlanetScale's documented path is a **managed** role - dashboard, `pscale role create`, or the Roles
+API - which appears in the dashboard, rotates with `pscale role reset`, and can carry a TTL, where
+a role conjured in SQL is invisible to all of that and its lifecycle silently becomes yours. The
+catch is that the managed builder only offers cluster-wide predefined roles and cannot say "INSERT
+on one table". So the shape is both: a managed role created with **no** inherited roles, then the
+table-level grants applied in SQL. Cloudflare's own Hyperdrive guide suggests `pg_read_all_data`
+plus `pg_write_all_data`, which is exactly the posture this record exists to avoid, and is declined
+in a comment next to the grants so nobody re-adds it from that page.
+
+Nothing is deployed and `public.signup` does not exist, so nothing is at risk yet - but
 `site/README.md` says do not deploy until the role is switched, and that is the condition to clear
 before anything on this page is true.
 

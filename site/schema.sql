@@ -14,12 +14,42 @@ CREATE TABLE IF NOT EXISTS public.signup (
 -- access away in the Worker and the page promises privacy, so the column does not exist to tempt
 -- anyone. A row is an address and the moment it arrived.
 
--- The role the Worker actually connects as. It can add an address and cannot read one back, so a
--- fully compromised Worker - or a compromised dependency inside it - cannot dump this list.
--- INSERT ... ON CONFLICT DO NOTHING without RETURNING needs only INSERT; adding RETURNING, or
--- switching to DO UPDATE, would require SELECT and quietly undo this.
-CREATE ROLE signup_writer LOGIN PASSWORD 'set-this-out-of-band-and-never-commit-it';
-GRANT CONNECT ON DATABASE postgres TO signup_writer;
-GRANT USAGE  ON SCHEMA public       TO signup_writer;
-GRANT INSERT ON TABLE public.signup TO signup_writer;
+
+-- ---------------------------------------------------------------- the role the Worker connects as
+--
+-- It must be able to add an address and not to read one back. `INSERT ... ON CONFLICT DO NOTHING`
+-- without `RETURNING` needs only the insert privilege, so a fully compromised Worker - or a
+-- compromised dependency inside it - cannot dump the subscriber list. Adding `RETURNING`, or
+-- switching to `DO UPDATE`, would require SELECT and quietly undo this.
+--
+-- Do NOT create this with a raw `CREATE ROLE`. On PlanetScale the documented path is a *managed*
+-- role, created in the dashboard or with `pscale role create` or the Roles API. A managed role
+-- shows up in the dashboard, rotates with `pscale role reset`, and can carry a TTL; a role created
+-- with raw SQL is invisible to all of that and its lifecycle becomes yours to remember.
+--
+-- The catch is that the managed role builder only offers cluster-wide predefined roles
+-- (`pg_read_all_data` and friends) and cannot express "INSERT on one table". So the path is both:
+-- create the managed role with NO inherited roles, then grant it what it needs here.
+--
+--     pscale role create <database> <branch> keypaste-signup --inherited-roles ''
+--
+-- That prints a generated username - PlanetScale ignores the name you typed - of the form
+-- `pscale_<id>`. Substitute it for <ROLE> below.
+--
+-- **When connecting, append the branch id**: `pscale_<id>.<branch-id>`. PlanetScale's proxy routes
+-- on the username. Inside the database `current_user` is the bare `pscale_<id>`, which is the form
+-- these grants use. Getting this backwards is the most likely reason a correct-looking
+-- `wrangler hyperdrive update` fails to authenticate.
+
+GRANT CONNECT ON DATABASE postgres   TO "<ROLE>";
+GRANT USAGE   ON SCHEMA  public      TO "<ROLE>";
+GRANT INSERT  ON TABLE  public.signup TO "<ROLE>";
 -- No SELECT, no UPDATE, no DELETE. This is the point of the role.
+--
+-- And specifically NOT `pg_write_all_data`, which Cloudflare's generic Hyperdrive guide suggests:
+-- it is cluster-wide rather than per-table, and in practice wants `pg_read_all_data` beside it to
+-- be useful, which is the exact privilege being withheld here.
+
+-- PlanetScale grants CONNECT on a new database to PUBLIC, meaning every current and future role.
+-- Close that, now that the one role that needs it has been granted it explicitly.
+REVOKE CONNECT ON DATABASE postgres FROM PUBLIC;
