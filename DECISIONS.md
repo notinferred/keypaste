@@ -1943,6 +1943,129 @@ publish-time property, CI runs `dotnet build`, `PublishAot` is already booked fo
 flipping it moves the `artifacts/bin/**/release/` layout that six `scripts/verify-*.sh` resolve
 binaries from. Stage 3's release pipeline owns it.
 
+## D-0036 - The launch page claims only what a gate or a citation can hold
+
+**Date:** 2026-07-27 · **Stage:** 3.1 · **Status:** accepted
+
+`README.md` and `site/public/index.html` were rewritten as a front page rather than a manual, and
+the interesting part is not the layout. Three of the things prompts.md 3.1 asks for could not be
+written honestly as asked, and each was resolved by narrowing the claim rather than by softening
+the wording.
+
+**Install one-liners were not written, because there is nothing to install.** There is no release
+workflow, no published artifact, no tap and no bucket; `PublishAot` is still `false` and O-0006 -
+whether vendored KeePassLib survives AOT at all - is unresolved and explicitly gated on Stage 3.
+A `curl | sh` line on a launch page is the single instruction a stranger runs first, and one that
+404s is worse than an honest `dotnet build`. Both pages therefore say there are no prebuilt
+binaries yet and that single-file binaries are next. The release pipeline became its own PLAN.md
+item and its own prompt instead of being smuggled into this one.
+
+**The comparison table names four products, and every cell was read out of that vendor's own
+documentation in July 2026 rather than recalled.** That research changed what the page says. The
+draft assumed the wedge was unoccupied; it is not. Keeper's MCP server prompts a human before
+returning unmasked secret data. Bitwarden published an Agent Access SDK in March 2026 with the
+same request-and-approve shape. 1Password's Environments MCP server asks for approval too and then
+deliberately never hands the credential over - a different answer to the same problem, and on one
+axis a safer one. `kprun` already injects KeePass entries into a child process and writes a local
+JSONL log. So both pages state that outright, immediately under the table, and claim only the
+*combination*: a KDBX file you own, no account and no server, a person answering each request, and
+a log that stays local. Every competitor breaks at least one of those, and that sentence survives
+contact with someone who knows the field. "Nobody does this" would not have.
+
+Three claims were specifically cut as unverifiable from primary sources: that 1Password is closed
+source (they publish no page saying so - the page says only that they do not publish the source),
+that `op` can read a cached vault fully offline, and which Infisical features exactly are behind
+the enterprise licence. Where a vendor does not document something the table says "not documented"
+rather than "no".
+
+**The transcripts on both pages are now held to the binaries by `scripts/verify-demo.sh`.** The
+approval dialog is the first thing on both pages - it stands in for the demo GIF until that is
+recorded - and until now the only gated copy was the one in `docs/demo.md`. README.md and
+docs/approvals.md and docs/mcp-setup.md all carried near-copies that nothing checked, which is how
+the near-copies came to differ from each other in the first place. `DOC` became
+`TRANSCRIPT_PAGES`, the dialog diff and the rule, `Approve? [y/N]` and log-header checks loop over
+it, and `README.md` and `site/public/index.html` are in the list. The HTML page is in it for the
+same reason as the README: `grep` and `diff` do not care about markup, and a marketing page is
+where a stale transcript survives longest. Dropping the block entirely does not evade the gate -
+the extraction is asserted non-empty per page.
+
+Left undone deliberately: `docs/approvals.md` and `docs/mcp-setup.md` also carry the dialog and are
+still ungated. They should join the list, but they are documentation rather than the front page,
+and adding them means reconciling three more copies in a change that is already large.
+
+## D-0037 - keypaste.com collects email addresses, and cannot read them back
+
+**Date:** 2026-07-27 · **Stage:** 3.1 · **Status:** accepted
+
+**keypaste.com stopped being a page and became a page with a database behind it, which is a
+security decision and not a marketing one.** It now accepts an email address at `POST /subscribe`
+and stores it in PlanetScale Postgres. Everything below exists so that the footer's promise stays
+literally true and so that the smallest possible thing is at risk.
+
+**The form works with no JavaScript**, because a page that asks a privacy-minded audience to run a
+script in order to be told about a privacy tool has already lost the argument. It is a plain
+`<form method="post">`; the Worker answers `303` to a static `/thanks/` page. That is also why the
+success page is a real asset rather than markup inside `worker.js`: the site's HTML stays in one
+language and cannot rot in two places. Only the two rare failure paths - a malformed submission and
+a database that does not answer - are rendered by the Worker, from string literals, with nothing a
+visitor typed interpolated into them.
+
+**Hyperdrive rather than a direct connection, and the reason is TLS rather than speed.** The
+connection string asserts `sslmode=verify-full`. A Worker connecting directly has no system CA
+store to verify against, so the practical setting is `require`: encrypted, but the server
+unauthenticated. Silently downgrading a stated `verify-full` would be a poor look anywhere and an
+absurd one here. Hyperdrive takes an uploaded CA and does `verify-full` properly. It also pools
+origin connections, which is what stops a Show HN spike from exhausting PlanetScale's connection
+limit and dropping signups - and, best of all, means the password lives in an account-level
+Cloudflare config rather than in the Worker's environment. There is no `wrangler secret` in this
+design and there should not be one. `site/README.md` step 5 verifies the config's sslmode is the
+one that was asked for; if it is not, the reason for the whole arrangement is gone.
+
+**The role the Worker connects as can `INSERT` into one table and cannot `SELECT` from it.** This
+is the highest-value line in the change. `INSERT ... ON CONFLICT DO NOTHING` without `RETURNING`
+needs only the insert privilege, so a fully compromised Worker - or a compromised dependency inside
+it - cannot dump the subscriber list. Adding `RETURNING`, or switching to `DO UPDATE`, would
+require `SELECT` and quietly undo it, so `schema.sql` says so next to the grants. If PlanetScale
+turns out to forbid `CREATE ROLE` on a managed instance, the fallback is a credential that *can*
+read the list, which is materially worse and must be recorded here rather than quietly accepted.
+
+`postgres` (postgres.js) over `pg`: one package with no transitive dependencies against roughly a
+dozen, on the secret path of a public endpoint, and its tagged-template API is parameterised by
+default where `pg` makes parameterisation opt-in. Both are pinned exactly, with a committed
+lockfile, and everything lives under `site/` so the .NET solution is untouched. `nodejs_compat` is
+required; `compatibility_date` was deliberately **not** bumped, since `2026-07-25` already exceeds
+the point where that flag means what it now means.
+
+Nothing is stored but the address, the timestamp and a source tag. No IP, no user agent, no
+country - `request.cf.country` is one property access away, and the page promises privacy, so the
+column does not exist to tempt anyone. Errors are logged as name, code and message; never the error
+object, whose driver options would print connection parameters, and never the address.
+
+### What was deliberately not shipped
+
+**Turnstile and managed challenges**, both of which inject a script and would falsify the footer
+for exactly the people it was written for. **A form timing check**, which needs a server-rendered
+timestamp and is therefore incompatible with a cached static asset - this is the one abuse control
+that was wanted and could not be had. **Rate limiting in code**: it belongs in a Cloudflare rule,
+and whether the account's plan offers a useful one is unverified, so the honeypot and the body,
+content-type and origin guards are what is genuinely shipped rather than what was intended.
+
+**And there is no CI job for any of this.** Ninety lines of JavaScript deployed by hand did not
+justify one; the consequence is that `site/README.md` carries a written manual checklist, including
+loading the page with JavaScript disabled, because a promise nobody tests is a promise that breaks.
+
+### The commitment this record exists to hold
+
+Anyone can type anyone else's address into a public form. That is harmless while nothing is ever
+sent to the list, and becomes mail-bombing on the day something is. **The list is double opt-in
+before a single message goes to it** - a confirmation first, and no confirmation means no mail.
+`/thanks/` already tells signers this will happen, which makes it a published promise rather than
+an intention. It is written down here so it is not rediscovered on launch day.
+
+`SECURITY.md` previously placed "the keypaste.com marketing site" out of scope. A site that stores
+other people's email addresses is precisely where a report is wanted, so that exclusion was
+narrowed to the static content.
+
 ---
 
 # Open decisions

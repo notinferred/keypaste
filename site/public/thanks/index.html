@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>keypaste — you're on the list</title>
+<meta name="description" content="Your address is on the keypaste launch list.">
+<meta name="robots" content="noindex">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔑</text></svg>">
+<style>
+  :root {
+    --bg: #fbfbfa;
+    --fg: #1a1a19;
+    --muted: #6b6b66;
+    --rule: #e4e4e0;
+    --accent: #3d5a80;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141414;
+      --fg: #ececea;
+      --muted: #9a9a94;
+      --rule: #2a2a28;
+      --accent: #8fb0d9;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 17px/1.65 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Inter, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 34rem; margin: 0 auto; padding: 6rem 1.5rem 4rem; }
+  h1 { font-size: 1.375rem; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 1.25rem; }
+  p { margin: 0 0 1.25rem; }
+  .muted { color: var(--muted); font-size: 0.95rem; }
+  a { color: var(--accent); }
+  footer {
+    margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--rule);
+    color: var(--muted); font-size: 0.875rem;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>You're on the list.</h1>
+
+  <p>
+    One message, when there is something to install. Not a newsletter, and nothing in between.
+  </p>
+
+  <p class="muted">
+    Before that first message goes out you will get one asking you to confirm — anyone can type
+    anyone's address into a public form, and the difference between a mailing list and a nuisance
+    is that somebody said yes to it. If you did not sign up, ignore that mail and nothing further
+    happens.
+  </p>
+
+  <p><a href="/">Back to keypaste.com</a> &middot; <a href="https://github.com/ochoadan/keypaste">the repository</a></p>
+
+  <footer>
+    <p>Your address is stored on a database the maintainer runs, and is used for nothing else.</p>
+  </footer>
+</main>
+</body>
+</html>

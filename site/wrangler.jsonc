@@ -1,10 +1,27 @@
 {
   "name": "keypaste-site",
+  "main": "./src/worker.js",
   "compatibility_date": "2026-07-25",
+  // Required by the Postgres driver. The compatibility_date above already exceeds 2024-09-23, the
+  // point at which this flag started meaning what v2 used to mean, so it does not need bumping.
+  "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "directory": "./public",
-    "html_handling": "auto-trailing-slash"
+    "html_handling": "auto-trailing-slash",
+    // Assets win by default, so the Worker would already see /subscribe - nothing is served from
+    // that path. Stated anyway: relying on "there happens to be no file there" is not a routing
+    // rule, and this removes the question of how the asset router answers a POST.
+    "run_worker_first": ["/subscribe"]
   },
+  "hyperdrive": [
+    {
+      // Created by hand with `wrangler hyperdrive create` - see site/README.md. The id is an
+      // account-scoped handle, not a secret, and is useless without access to the account. The
+      // database password lives in that config and appears nowhere in this repository.
+      "binding": "HYPERDRIVE",
+      "id": "REPLACE_WITH_HYPERDRIVE_ID"
+    }
+  ],
   "routes": [
     { "pattern": "keypaste.com", "custom_domain": true },
     { "pattern": "www.keypaste.com", "custom_domain": true }

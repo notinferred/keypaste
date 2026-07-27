@@ -1,0 +1,16 @@
+{
+  "name": "keypaste-site",
+  "private": true,
+  "type": "module",
+  "description": "keypaste.com - a static page and one form endpoint",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "postgres": "3.4.9"
+  },
+  "devDependencies": {
+    "wrangler": "4.114.0"
+  }
+}
