@@ -46,9 +46,17 @@ public static class PolicyText
             $"   may read the {Fields(rule)} of entries whose",
         };
 
-        foreach (var glob in rule.Scope.Globs)
+        for (var i = 0; i < rule.Scope.Globs.Count; i++)
         {
-            var (group, title) = Halves(glob);
+            // Patterns are alternatives, and four unbroken lines read as one four-part condition
+            // rather than as two two-part ones. On a rule that grants a credential silently, "which
+            // of these did I actually write" is not a question to leave to the layout.
+            if (i > 0)
+            {
+                lines.Add("   ...or whose");
+            }
+
+            var (group, title) = Halves(rule.Scope.Globs[i]);
             lines.Add($"     group path matches   {group}");
             lines.Add($"     title matches        {title}");
         }
