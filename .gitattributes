@@ -21,4 +21,9 @@ third_party/KeePassLib/packages.lock.json  text eol=lf
 *.gif    binary
 *.ico    binary
 
+# The demo recording. Covered by `text=auto` above already, but stated because a cast is JSON with
+# escapes in it and the binary heuristic is not something to leave to chance on a file the
+# recording scripts assert `jq` can parse.
+*.cast   text eol=lf
+
 CORE.md  linguist-documentation

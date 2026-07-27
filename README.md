@@ -2,20 +2,22 @@
 
 > *"Stop pasting secrets into chats. keypaste is a local-first, KDBX-compatible vault that stores your passwords AND env variables, injects them into your projects, and lets AI agents like Claude request exactly one credential — with your approval, scoped access, and a full audit trail — without ever seeing your vault."*
 
-**Status: Stage 1 complete, and the MCP bridge has started.** Create a vault, add entries, list them,
-copy a password to the clipboard, remove entries, keep a project's environment variables in the same
-file — importing them straight from an existing `.env` — and run any command with those variables
-injected, with nothing written to disk. There is a way back out, too. Verified in CI against a real
-KeePassXC on Linux, macOS and Windows, in both directions.
+**Status: Stages 1 and 2 complete.** Create a vault, add entries, list them, copy a password to the
+clipboard, remove entries, keep a project's environment variables in the same file — importing them
+straight from an existing `.env` — and run any command with those variables injected, with nothing
+written to disk. There is a way back out, too. Verified in CI against a real KeePassXC on Linux,
+macOS and Windows, in both directions.
 
-`keypaste-mcp` connects to Claude Desktop and Claude Code, and the approval flow CORE.md law 3.2
-requires is in: an agent asks, you are shown who is asking and why, and one field value goes back.
-You can also pre-approve a narrow pattern in a policy file, which is the one path that releases
-without asking. Follow [`PLAN.md`](PLAN.md) for what lands next; [`CORE.md`](CORE.md) is the
-constitution and does not change.
+The MCP bridge is in, and so is everything CORE.md law 3.2 asks of it. An agent asks; you are shown
+who is asking, for what, and why; one field value goes back for a lifetime you were told about. You
+can pre-approve a narrow pattern in a policy file, which is the one path that releases without
+asking. Every call is one line in a local audit log whose records are hash-chained, so
+`keypaste log verify` can tell you the file is the one keypaste wrote. Follow [`PLAN.md`](PLAN.md)
+for what lands next; [`CORE.md`](CORE.md) is the constitution and does not change.
 
 **New here?** [**Replace your `.env` in 5 minutes**](docs/replace-dotenv.md) is the guide — import,
-run, CI, and honest answers about lost master passwords and syncing.
+run, CI, and honest answers about lost master passwords and syncing. To see the agent bridge
+instead, [**watch Claude ask for a key**](docs/demo.md) — about sixty seconds, end to end.
 
 ## Using it
 
@@ -41,6 +43,7 @@ to pipe.
 | 2 | internal or environment error (including no usable clipboard) |
 | 3 | vault or entry not found |
 | 4 | wrong master password |
+| 5 | the audit log is not the file keypaste wrote |
 
 When stdin is not a terminal each prompt consumes exactly one line, in a fixed order:
 `init` takes the password twice, `add` and `env set` take the master password then the value, and
@@ -206,10 +209,10 @@ Every call an agent makes is one line in `~/.keypaste/audit.jsonl`, allowed or r
 ```
 3 records in /home/you/.keypaste/audit.jsonl
 
-time (UTC)           client       entry               decision  method
-2026-07-26 14:03:09  claude-code  -                   granted   exposure
-2026-07-26 14:03:11  claude-code  env/dev/STRIPE_KEY  granted   prompt
-2026-07-26 14:07:44  claude-code  env/dev/STRIPE_KEY  denied    out-of-scope
+  time (UTC)           client       entry               decision  method
+  2026-07-26 14:03:09  claude-code  -                   granted   exposure
+  2026-07-26 14:03:11  claude-code  env/dev/STRIPE_KEY  granted   prompt
+  2026-07-26 14:07:44  claude-code  env/dev/STRIPE_KEY  denied    out-of-scope
 ```
 
 `--denied`, `--client <text>` and `--since 2h` narrow it, and a narrowed view always says so.
@@ -218,9 +221,10 @@ Each record carries the hash of the record before it, so `keypaste log verify` t
 file is the one keypaste wrote — and tells you, every time it passes, the two things it cannot see:
 a rewrite that recomputed the chain, and records deleted from the end.
 
-[**Approving an agent's request**](docs/approvals.md) is the guide.
-[**Connecting keypaste to Claude**](docs/mcp-setup.md) has the config snippets, the audit log format,
-and how to read it. [**THREATS.md**](THREATS.md) is the threat model — prompt injection through entry
+[**Claude asks for a key, you approve, the deploy runs**](docs/demo.md) is the whole thing end to
+end, in about sixty seconds. [**Approving an agent's request**](docs/approvals.md) is the guide to
+what you are deciding. [**Connecting keypaste to Claude**](docs/mcp-setup.md) has the config
+snippets, the audit log format, and how to read it. [**THREATS.md**](THREATS.md) is the threat model — prompt injection through entry
 names and through the agent's stated reason, clients that cannot be authenticated, prompt fatigue,
 what a reused grant costs, and what tampering with the log does and does not achieve.
 

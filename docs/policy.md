@@ -213,6 +213,9 @@ to notice.
 
 THREATS.md T-13 through T-17 are the full versions of these.
 
+If you have not seen the prompt a rule replaces, [**Claude asks for a key, you approve, the deploy
+runs**](demo.md) is that flow end to end, with nobody's rules in the way.
+
 ## Verifying it yourself
 
 `scripts/verify-policy-e2e.sh` runs a real `keypaste agent` and a real `keypaste-mcp` as separate

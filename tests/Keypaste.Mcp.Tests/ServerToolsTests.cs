@@ -99,7 +99,7 @@ public sealed class ServerToolsTests
     /// <remarks>
     /// <para>
     /// Measured rather than assumed, and pinned here because the answer decides two things. It is
-    /// the good news for Stage 2.5's demo: a credential request parked for up to forty-five seconds
+    /// the good news for the demo in <c>docs/demo.md</c>: a credential request parked for up to forty-five seconds
     /// waiting for a human does not stall the session, so the agent can keep working while the
     /// prompt is up. It is also the bad news for the approver: two requests really can race two
     /// prompts onto one screen, so single-in-flight is a load-bearing rule rather than a

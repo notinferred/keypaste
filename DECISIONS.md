@@ -1806,6 +1806,143 @@ nothing is a true answer about a machine no agent has used. Verifying nothing is
 all, and a script that read exit 0 from a missing file as "the log is intact" would be taking a
 reassurance out of an absence.
 
+## D-0033 - The demo is a recorded real session, and the recording is committed as text
+
+**Date:** 2026-07-27 · **Stage:** 2.5 · **Status:** accepted
+
+CORE.md law 5.1 says the demo is the marketing. This records what the demo *is*, because the tool
+choice is a footnote and the rest is not.
+
+**It is a real session, and a person presses the `y`.** `vhs`, `ttyd` and `asciinema-automation`
+would each produce a shorter, cleaner artefact that CI could regenerate, and every one of them would
+type the approval keystroke. keypaste's entire claim is that a person decides and nothing is
+released without them. A demo whose `y` came from a script is a demo of a mock, and - this is the
+part that makes it a decision rather than a preference - **the difference is invisible in the
+output**. Nobody watching could tell. So it has to be written down instead.
+`scripts/demo/record-demo.sh` drives everything up to the moment a decision is needed and then
+stops and hands over the keyboard; its `--auto-approve` exists for rehearsals and is off by default.
+
+**The `.cast` is committed beside the `.gif` because a recording of a security tool should be
+reviewable.** A GIF is a megabyte of pixels nobody can check. An asciicast is JSON lines: anyone can
+grep it and confirm the master password never appears, that the released value is a sentinel, that
+the dialog on screen is the one `TerminalApprovalChannel` actually emits, and that the audit table
+was not retouched. It is also what lets the asset be re-rendered at another size or theme without
+re-shooting. Same instinct as `keypaste log verify`: the artefact that makes a claim should carry
+the means to check it. `--speed` is a stated transformation and belongs in the caption; editing
+timestamps inside the cast is a fabrication and is forbidden in the renderer's own header.
+
+**The vault holds a sentinel, and `ToolResults.Release` is what forces it.** The released value is
+returned twice - once in the text content and once in `structuredContent`, so that a client reading
+either half works. Any *truthful* recording of a successful request therefore shows the credential
+on screen, and this one is committed to git forever. `make-demo-fixture.sh` refuses to build a vault
+whose value does not match `^sk_test_(EXAMPLE|FAKE)_`, and `record-demo.sh` refuses to hand over a
+cast containing the master password or anything shaped like a real key. It also refuses one where
+the sentinel is **absent**, because a take that released nothing proves nothing - the negative
+controls need a positive one beside them.
+
+**The whole recording lives inside one operating system, and that is not convenience.** The approver
+channel is a .NET named pipe (D-0023): `\\.\pipe\<name>` on Windows, a socket under the temporary
+directory on Unix. A Windows Claude Code spawns a Windows `keypaste-mcp`, which cannot reach a Linux
+`keypaste agent` - the mixed setup does not look subtly wrong, it denies every request. So the
+recording runs entirely in WSL, against Linux binaries published from a clone at `HEAD` (whose SHA
+is written to `BUILT_FROM`, so the GIF traces to a commit), with a WSL-native Claude Code that has
+its own credentials. The cost is a second Claude Code install and a second login, and it is not
+optional.
+
+### The geometry is a measurement
+
+112 columns by 40 rows, panes **stacked** rather than side by side. The widest line that must not
+wrap is the approver's startup banner at 109 characters, then `keypaste log verify`'s hash line at
+84, then the dialog's `That sentence was written by the agent...` disclaimer at 79.
+
+That disclaimer is the reason for the stack. Two 60-column panes fit the 60-character rule
+beautifully and wrap the one sentence in the dialog that tells a viewer the agent's reason is a
+claim rather than a fact - which is the sentence the whole design exists to put in front of them.
+Shortening the banner with `--approver` was rejected for a related reason: the demo must show what a
+reader gets by following `docs/mcp-setup.md`, and that guide does not mention the flag.
+
+### Not a CI gate, and it cannot become one
+
+A gate must be able to be green. A step needing a live model, a paid API and a human keystroke
+cannot be, and one that flakes teaches people to ignore the ones that do not. What is gated is
+`scripts/verify-demo.sh` - see D-0034.
+
+## D-0034 - The demo page is held to the binaries, and Claude is deliberately not in CI
+
+**Date:** 2026-07-27 · **Stage:** 2.5 · **Status:** accepted
+
+`scripts/verify-demo.sh` checks a document against behaviour, which nothing else in the suite does.
+Two things make it necessary. What rots is a Markdown transcript, and no unit test reads Markdown.
+And the artefact the page reproduces - the approval dialog - exists only on the stderr of a second
+process that a human is supposed to be looking at, so no in-process test can see it at all. The
+first thing a stranger does with a demo page is type it in; a stale one costs more than a missing
+one.
+
+**The check runs in both directions.** Every literal output line the page prints must be produced by
+the run, and the dialog block the run produces must appear in the page character for character. It
+also asserts `expires_in_seconds == 300` against a request for 900, because the page prints
+`for      300 seconds` and that number is the `--max-ttl` clamp rather than a constant.
+
+**Claude is not in it, as a decision rather than an omission.** A model's choice is not
+deterministic, and a check this project asks strangers to trust should not depend on a paid,
+networked, non-reproducible service. The stand-in is the same scripted JSON-RPC client
+`verify-approval-e2e.sh` uses: a transport, not an agent - it decides nothing and chooses no wording,
+so everything keypaste renders is fully determined. The boundary is stated in the script's header,
+in the CI step's comment, and in the page's own "Verifying it yourself", because a reader who
+mistakes it for coverage of the agent has been misled by our silence.
+
+### Two things the harness cannot see, and does not pretend to
+
+`ConsoleSecretPrompt.ReadLine` writes its prompt only when stdin is a terminal, and CI has none - so
+`Approve? [y/N] ` and `Master password: ` never reach stderr under redirection. They are still the
+lines a person's screen ends on. The gate therefore asserts the *page* carries them rather than
+claiming to have observed them, and says so where it does it.
+
+The rule drawn around the dialog is checked for shape, not for bytes. .NET encodes stderr for the
+console's code page, so on Windows the `U+2500` arrives as a single `0xC4` in CP850 rather than the
+three UTF-8 bytes this repository stores; it renders correctly on the console it was written for,
+and only a byte comparison cannot survive the trip. That is also why the diffed block stops short of
+the rule and is pure ASCII throughout - which was luck the first time and is now a constraint. A
+related trap, recorded so the next person does not lose an hour to it: those code page bytes make
+`grep` treat the stream as binary and **silently drop context lines**, so `-a` is load-bearing in
+that script rather than decorative.
+
+## D-0035 - The bridge waits half a second for an approver, not two
+
+**Date:** 2026-07-27 · **Stage:** 2.5 · **Status:** accepted
+
+`ApproverConnection.ConnectTimeout` was two seconds. With no approver running that is pure latency
+in front of a refusal, and it is paid on *every* call until somebody starts one - which is the
+ordinary state of a bridge an MCP client spawned at its own convenience, hours before its user
+opens a terminal.
+
+Measured on one machine, ten runs each, medians: a bare `keypaste --help` 71 ms; a full
+`request_credential` round trip against a **running** approver - process start, connect, prompt,
+release - **248 ms**; the same call with **nothing listening**, **2306 ms**. Almost the entire budget
+is spent only when nobody is there, which is the structural point rather than a statistical one:
+`ApproverListener` binds in its constructor and re-creates the pending instance before serving the
+accepted one, so with an approver up the operating system completes the connect with no application
+involvement.
+
+Half a second therefore takes 1.8 s off every refusal without touching the path that works. Measured
+after the change: refusals 756 ms, the working round trip **251 ms** - unmoved, with every request
+still granted. The fail direction is safe: a timeout too short turns a grant into a `no-approver`
+refusal, which is the direction CORE.md law 3.7 asks for, and the refusal names the command that
+fixes it. It also slightly narrows THREATS.md T-10, where another local user pre-creating the socket
+path costs a caller the full timeout per call.
+
+**Recorded separately from D-0033 on purpose.** It is a behaviour change in a shipped binary, found
+while polishing a demo but not part of one, and burying it inside the demo's entry would hide it
+from anyone reading the log for changes to the bridge.
+
+Two other candidates were measured and deliberately **not** acted on. The Argon2 pause after the
+master password is **255 ms** - not a pause, a keypress - and the alternative was adding a line to
+the one screen in the product that should stay quiet. And `PublishReadyToRun` would recover perhaps
+half of the 380 ms gap between a cold start (458 ms) and a warm one (71 ms), but it is a
+publish-time property, CI runs `dotnet build`, `PublishAot` is already booked for Stage 3, and
+flipping it moves the `artifacts/bin/**/release/` layout that six `scripts/verify-*.sh` resolve
+binaries from. Stage 3's release pipeline owns it.
+
 ---
 
 # Open decisions

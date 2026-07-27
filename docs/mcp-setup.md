@@ -123,8 +123,12 @@ so it can never impersonate a deeper group.
 note. It takes no arguments at all, deliberately: there is no parameter an agent could use to widen
 what it sees.
 
-**`request_credential`** takes `entry`, `field`, `reason` and `ttl_seconds`. In this version it
-returns DENIED every time and tells the agent not to retry.
+**`request_credential`** takes `entry`, `field`, `reason` and `ttl_seconds`. It decides nothing
+itself: it forwards the request to `keypaste agent`, where a person answers it or a rule they wrote
+in advance covers it, and returns one field value with a lifetime capped by that approver's
+`--max-ttl`. With no approver running it is refused with a message naming the command that fixes
+it — which is deliberately *not* a "do not retry", because starting one takes five seconds.
+[**Watch it happen**](demo.md) is the sixty-second version.
 
 Entry names come out of your vault, which means they are written by anyone who can edit it. keypaste
 strips control characters, invisible Unicode, and the punctuation that carries structure in what a
@@ -167,7 +171,9 @@ useful part when you are reading this back later:
 | `no-approver` | Nobody was running `keypaste agent`. |
 | `out-of-scope` | The entry was outside your globs, or does not exist — deliberately the same answer, so an agent cannot use the difference to find out what exists. |
 | `timed-out` / `busy` / `cooldown` | Nobody answered in time; somebody was already answering another; or the same request was refused a moment ago. |
+| `cancelled` | The client stopped waiting before anybody answered. Nobody decided anything. |
 | `vault-locked` / `invalid-request` / `failed` | No vault open; the arguments were wrong; something went wrong. |
+| `not-implemented` | Written by keypaste 2.1, when the bridge refused everything because the approval flow did not exist yet. Nothing writes it now, and it is listed because the log is append-only: old records keep the word they were written with. |
 
 Four things worth knowing:
 
@@ -195,10 +201,10 @@ keypaste log --client claude-code --since 2h
 ```
 3 records in /home/you/.keypaste/audit.jsonl
 
-time (UTC)           client       entry               decision  method
-2026-07-26 14:03:09  claude-code  -                   granted   exposure
-2026-07-26 14:03:11  claude-code  env/dev/STRIPE_KEY  granted   prompt
-2026-07-26 14:07:44  claude-code  env/dev/STRIPE_KEY  granted   grant-cache (!)
+  time (UTC)           client       entry               decision  method
+  2026-07-26 14:03:09  claude-code  -                   granted   exposure
+  2026-07-26 14:03:11  claude-code  env/dev/STRIPE_KEY  granted   prompt
+  2026-07-26 14:07:44  claude-code  env/dev/STRIPE_KEY  granted   grant-cache (!)
 
 (!) served from an earlier approval, under a reason that person never saw.
 ```
@@ -246,7 +252,8 @@ predating it and are never called tampered — and `keypaste log` marks them, an
 chain cannot vouch for, with a `?` in the left-hand column:
 
 ```
-?  2026-07-26 14:10:00  claude-code  env/prod/PAYROLL_DB  granted   prompt
+  time (UTC)           client       entry                decision  method
+? 2026-07-26 14:10:00  claude-code  env/prod/PAYROLL_DB  granted   prompt
 
 ?  the hash chain does not vouch for this row. Run 'keypaste log verify'.
 ```
