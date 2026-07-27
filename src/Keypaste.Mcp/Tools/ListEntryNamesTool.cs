@@ -62,6 +62,21 @@ internal sealed class ListEntryNamesTool(
 
         var client = McpAudit.ClientOf(request, options);
 
+        // Before the vault is touched. Listing names is the cheaper call, but entry names are an
+        // asset in their own right (law 3.5) and handing them to a caller whose identity the log
+        // cannot record is the same mistake as releasing a value to one.
+        if (!McpAudit.HandshakeComplete(request))
+        {
+            return Record(
+                McpAudit.Denial(
+                    ToolText.ListToolName,
+                    client,
+                    AuditMethod.NotInitialized,
+                    "the client called a tool before the initialize handshake completed",
+                    options.Exposure),
+                ToolResults.Refuse(ToolText.NotInitialized));
+        }
+
         EntryNameListing listing;
 
         try

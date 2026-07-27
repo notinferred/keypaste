@@ -34,8 +34,19 @@ readonly OUT="$WORK/stdout.txt"
 readonly ERR="$WORK/stderr.txt"
 
 # Newline-delimited JSON-RPC, which is what the stdio transport speaks.
+: >"$OUT"
 {
   printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}'
+
+  # Wait for the initialize response before anything else, as a real client does. Writing the whole
+  # conversation at once races the handshake, and keypaste now refuses a tool call that wins that
+  # race - so without this the script would quietly stop testing the paths it names below and start
+  # testing "not-initialized" instead, while still passing every assertion.
+  for _ in $(seq 1 100); do
+    grep -q '"id":1' "$OUT" 2>/dev/null && break
+    sleep 0.1
+  done
+
   printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
   printf '%s\n' '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
   printf '%s\n' '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"list_entry_names","arguments":{}}}'
@@ -101,4 +112,31 @@ grep -q '"label":"ci-probe"' "$AUDIT" || die "the operator-supplied client label
 #    an entry - but it must never carry a field value. Nothing here had one; assert the shape.
 grep -q '"password"' "$AUDIT" || die "the requested field name was not recorded"
 
-echo "ok: keypaste-mcp speaks MCP over stdio, exposes two tools, denies both calls, and audits them"
+# 7. A tool call that arrives before the handshake is refused, and refused for that reason.
+#
+#    The client's name is read off `initialize`, so a call that overtakes it would otherwise be
+#    answered for "an unnamed client" - putting a request to a person, or matching it against a
+#    policy rule, with the caller missing from both the dialog and the log. That is a law 3.3 gap
+#    and a law 3.7 error path, so it denies (THREATS.md T-3).
+#
+#    This lives here rather than in a unit test on purpose: the in-process tests drive a real
+#    McpClient, which performs the handshake and waits for the response, so the ordering this
+#    checks cannot be produced through them. It was a real defect, observed on a macOS runner
+#    during a release build, not a hypothetical.
+NOINIT_AUDIT="$WORK/noinit.jsonl"
+NOINIT_OUT="$WORK/noinit-stdout.txt"
+{
+  printf '%s\n' '{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"list_entry_names","arguments":{}}}'
+  sleep 3
+} | "$BIN_PATH" --vault "$WORK/noinit.kdbx" --audit-log "$NOINIT_AUDIT" --client-label ci-probe \
+      >"$NOINIT_OUT" 2>/dev/null || true
+
+grep -q '"method":"not-initialized"' "$NOINIT_AUDIT" 2>/dev/null \
+  || die "a tool call before initialize was not denied as not-initialized"
+grep -q '"decision":"denied"' "$NOINIT_AUDIT" \
+  || die "a tool call before initialize was not recorded as denied"
+jq -e 'select(.id == 7) | .result.isError == true' <"$NOINIT_OUT" >/dev/null \
+  || die "a tool call before initialize did not return isError=true"
+
+echo "ok: keypaste-mcp speaks MCP over stdio, exposes two tools, denies both calls, audits them,"
+echo "    and refuses a tool call that arrives before the initialize handshake"

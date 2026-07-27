@@ -51,6 +51,29 @@ internal static class McpAudit
             Clean(options.ClientLabel));
     }
 
+    /// <summary>Whether the <c>initialize</c> handshake has completed for this connection.</summary>
+    /// <param name="request">The tool call in flight.</param>
+    /// <returns><c>true</c> once the client's identity is known.</returns>
+    /// <remarks>
+    /// <para>
+    /// Read off the same place <see cref="ClientOf"/> reads, deliberately: the question "do we know
+    /// who this is" and the answer "here is who this is" must not be able to disagree. The protocol
+    /// makes <c>clientInfo</c> required in <c>initialize</c>, so a null here means either the
+    /// handshake has not happened or the client broke the rule, and both are cases to refuse.
+    /// </para>
+    /// <para>
+    /// This is not authentication. A client can still call itself anything (THREATS.md T-3). It
+    /// only ensures the dialog and the audit line say <em>something</em> about the caller instead
+    /// of falling back to "an unnamed client" because a tool call overtook the handshake.
+    /// </para>
+    /// </remarks>
+    internal static bool HandshakeComplete(RequestContext<CallToolRequestParams> request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return request.Server?.ClientInfo is not null;
+    }
+
     /// <summary>Builds the line for a call that was refused.</summary>
     /// <param name="tool">Which tool was called.</param>
     /// <param name="client">Who called it.</param>

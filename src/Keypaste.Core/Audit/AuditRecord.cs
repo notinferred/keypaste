@@ -104,6 +104,19 @@ public enum AuditMethod
     /// <c>max_per_hour</c> means.
     /// </remarks>
     PolicyLimit = 14,
+
+    /// <summary>
+    /// A tool was called before the <c>initialize</c> handshake completed, so nothing is known
+    /// about who is calling.
+    /// </summary>
+    /// <remarks>
+    /// The protocol forbids this, but a client that ignores the rule still gets its request read.
+    /// Answering it would mean putting a request to a person, or matching it against a policy rule,
+    /// with the caller's identity missing from both the dialog and the log — the one field the
+    /// human has to judge the request by. Fail closed (CORE.md law 3.7) rather than serve a
+    /// credential to nobody in particular.
+    /// </remarks>
+    NotInitialized = 15,
 }
 
 /// <summary>Who asked.</summary>
