@@ -175,9 +175,8 @@ Show HN: Keypaste – a KDBX vault that hands an agent one credential at a time
 
 **Text:**
 
-I've been building keypaste for a couple of months. It is a local-first vault that speaks KDBX —
-the KeePass format — and ships an MCP server, so a coding agent can ask for one credential instead
-of asking you to paste one into the chat.
+keypaste is a local-first vault that speaks KDBX — the KeePass format — and ships an MCP server, so
+a coding agent can ask for one credential instead of asking you to paste one into the chat.
 
 The shape is two processes, and the split is the whole design. `keypaste-mcp` is what the agent
 talks to: it holds no vault and decides nothing. `keypaste agent` is a process you start in your own
@@ -449,7 +448,7 @@ never returns the secret at all. The combination is what is different: an ordina
 own, no account or server anywhere, and a log that stays on your disk.
 
 Pre-1.0, AGPL-3.0, .NET, and the KeePassXC compatibility gate runs on three operating systems every
-push.
+push. The whole exchange end to end, in about sixty seconds: [docs/demo.md].
 
 **The question:** the KDBX library is KeePassLib vendored from KeePass 2.61 rather than a package,
 because nothing maintained exists for .NET and I would rather read the code that touches the secret
