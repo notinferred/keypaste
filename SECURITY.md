@@ -91,6 +91,32 @@ at all. A shorter `--max-ttl` is the control keypaste actually offers.
 **And `keypaste agent` keeps the vault unlocked for as long as it runs.** There is no idle auto-lock
 in this version; stopping it is the lock. That is stated here rather than left to be discovered.
 
+**With a policy rule in force, no human sees the request at all.** A rule you wrote in
+`~/.keypaste/policy.toml` releases the credential it covers without a prompt. The agent's stated
+reason is recorded and read by nobody, so none of the display protections that exist for the
+approval prompt apply — there is no display. What exists instead is one line on the approver's
+terminal per release, one line in the audit log naming which rule did it, and whatever limits you
+put in the rule. If you want a human in the loop, do not write the rule.
+
+**A policy rule is a standing grant over a part of your vault as it is now, not as it was when you
+wrote it.** Whoever can write into that part chooses what the rule covers: a synced vault, a
+colleague on a shared file, a `.env` you imported from somewhere else. Moving an entry into a group
+a rule names is enough. `keypaste policy ls` shows what each rule *means*; it cannot yet show what
+each rule currently *covers*.
+
+**A policy rule names a client label any process on your machine could claim.** `--client-label` is
+chosen by whoever spawns `keypaste-mcp`, not by whoever connects to it. That stops the *agent*
+choosing which rules apply to it, and it does not stop another local program starting a bridge with
+the same argv. Client-scoped policy narrows convenience, not authority — and under the previous
+version that program would still have needed you to press `y`.
+
+**The policy file is authorization, not configuration — keep it out of synced folders.**
+`~/.keypaste` is deliberately not beside your vault; pointing `KEYPASTE_HOME` at Dropbox or iCloud
+means another machine writes this machine's grants. On Linux and macOS keypaste **ignores** a policy
+file writable by anyone but you, and says so rather than repairing it; **on Windows there is no
+equivalent** and it says that instead. The file is read once, at startup, so editing it while the
+agent runs changes nothing until you restart it.
+
 **The clipboard is not fully recoverable.** `keypaste get` clears the clipboard after twenty
 seconds, and only if it still holds what keypaste put there. But no clearing survives `kill -9`, a
 crash, or a power cut; on X11 and Wayland the clipboard is owner-served, so the secret also lives
@@ -168,6 +194,10 @@ the per-line hash chain ships the rewrite leaves no trace. On Linux and macOS th
 readable only by its owner; **on Windows there is no equivalent** and it inherits its directory's
 permissions, the same gap `env export` has. keypaste never rotates or trims the log — deleting lines
 is the opposite of what it is for — so it grows without bound. See [THREATS.md](THREATS.md) T-5.
+
+Since 2.3 this matters more than it did, not less: a credential released by a policy rule has no
+human witness, so the log is not a second record that it happened — it is the only one. That is why
+a release which cannot be written down does not happen at all.
 
 **Local attackers are out of scope.** Anything running as your user can read your memory, watch
 your keystrokes, and read your clipboard. keypaste protects the vault file at rest and limits what

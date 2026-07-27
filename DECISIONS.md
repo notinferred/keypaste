@@ -1419,6 +1419,217 @@ human. `ApproverHandlerTests.AMissingEntryAndAForbiddenOne_AreIndistinguishableT
 
 ---
 
+## D-0028 - The policy file is used whole or ignored whole, and keypaste parses it itself
+
+**Date:** 2026-07-26 · **Stage:** 2.3 · **Status:** accepted
+
+`~/.keypaste/policy.toml` lets a person pre-authorize a narrow pattern so an agent gets that one
+credential without a prompt. CORE.md law 3.2 authorises it in the constitution's own words - "after
+one explicit human approval (or a pre-approved policy the human wrote)" - and it is still the first
+feature in this product that hands an agent a secret with nobody watching. Everything below is about
+bounding that.
+
+### All of the file, or none of it
+
+A section keypaste cannot use invalidates the **whole document**, not just that section. Two good
+rules and one bad line means zero rules, and every request goes back to a person.
+
+The argument is that there is no way to know which direction a partial reading is wrong in. Skipping
+the bad rule leaves a *different* policy in force than the one the human wrote, and on this path
+"different" could be wider. The only safe reading of a file that is partly wrong is that it says
+nothing (law 3.7).
+
+This is the deliberate **opposite** of how `--expose` treats a bad glob, where the front end refuses
+to start, and the difference is which way each failure points. A malformed exposure would leave a
+server running with no scope at all; a malformed policy leaves a human being asked about everything.
+So nothing here is fatal: refusing to start `keypaste agent` on a bad policy file would turn a typo -
+or a planted `chmod 000` - into a denial of service on somebody's own vault.
+
+Six states, all indistinguishable to an agent and all distinct on the operator's terminal: absent,
+empty, in force, malformed, unreadable, writable-by-others. Indistinguishable to the agent is
+required - telling them apart lets a request find out whether a policy exists at all, and invites a
+per-entry diagnostic, which is the enumeration oracle D-0027 closed once already.
+
+### The parser is hand-written, and the strictness is the feature
+
+`Keypaste.Core` has carried zero `PackageReference` entries since D-0004 and D-0019 brags about it.
+That does not change for this. `Policy/Toml.cs` accepts `#` comments, `[[allow]]` headers, and
+`key = value` where the value is a quoted string, a whole number, or an array of quoted strings.
+Everything else a real TOML document may hold - dotted keys, inline tables, literal and multi-line
+strings, floats, booleans, dates, a singular `[table]` header - is a parse error naming the
+construct.
+
+**Taking a TOML package would have been defensible and was rejected on two grounds.** It would be the
+first dependency in `Keypaste.Core` and the second in `src/`, on a file that decides authorization.
+And full compliance is not actually the property wanted here: a policy file is a document keypaste
+*obeys*, so a construct it would have to guess the meaning of is one it must refuse. A strict subset
+is not a limitation of the hand-rolled reader, it is what the reader is for. `CommandLine.cs`,
+`DotEnv.cs` and `MessageFramer.cs` are the precedent.
+
+The cost is real and stated: somebody writes valid TOML keypaste rejects. It is bounded by the reader
+naming the construct and the line, by `keypaste policy ls` printing that message, and by the failure
+being in the direction of prompting.
+
+**Forward compatibility fails closed.** An unknown section - `[[deny]]`, or a rule shape from a later
+keypaste - invalidates the file rather than being skipped while the `[[allow]]` rules stay in force.
+
+### Nothing defaults, and no rule string may lie about what it says
+
+Every key but `max_per_hour` is required. Each default that suggests itself is a way for a rule to
+become silently wider than what was written - an absent `fields` meaning all four, an absent
+`entries` meaning everything, an absent `client` meaning anyone - and a typo in a key name would then
+select one of them.
+
+Every pattern and label must survive `EntryNameSanitizer` byte-identically. `EntryExposure` already
+rejects control characters and backslashes, which is necessary and not sufficient: it accepts U+202E,
+zero-width characters and the Unicode tag block, so a rule that *renders* as `env/dev/**` and *means*
+`env/**` would otherwise be writable. Reusing T-1's tested sanitizer as a validator makes every
+pattern safe to print by construction.
+
+### The trap in the pattern syntax, and why the renderer exists
+
+D-0021 fixed the matching domain in 2.1 specifically so the policy file would not invent a second
+one, and a rule constructs an `EntryExposure` rather than reimplementing its algorithm. That is
+inherited correctness, and it comes with an inherited surprise: unless a pattern's last segment is
+exactly `**`, the last segment is the **title**. `env/dev*` - the example prompts.md itself suggests
+- means *group exactly `env`, title starting `dev`*. It matches nothing under `env/dev/`, and it does
+match an entry sitting directly in `env` called `devops_ROOT_TOKEN`.
+
+Fixing this would mean a second matching language, which D-0021 rules out and which would be worse.
+So `keypaste policy ls` **never echoes the line the user wrote**: it prints the two halves each
+pattern parsed to, on separate lines, so the reader checks the parse instead of confirming their own
+text. `PolicyRuleTests.APolicyRuleWithATrailingStar_ConstrainsTheTitleNotTheGroup` asserts both
+directions, so the test documents the surprise rather than the wish.
+
+### A spent allowance denies rather than escalating
+
+`max_per_hour` is optional, per rule, counted process-wide on a true sliding window rather than
+minute buckets - a bucket lets twice the allowance through across a boundary, and on an authorization
+cap exactness is worth an array of N longs. It is counted per rule and not per connection because a
+client could otherwise reset its own quota by spawning a fresh bridge.
+
+When it is spent, the request is **denied** (`policy-limit`), not escalated to a prompt. Falling
+through looks strictly safer - a human still decides - and it is worse: it turns a quota into a
+prompt generator, which is THREATS.md T-11 with a lever attached, and it would make
+`keypaste policy ls` lie about what the number means. An omitted allowance renders as "No limit on
+how often", out loud, because an unlimited rule should be a thing somebody chose.
+
+### `policy ls` needs no vault, and there is no `policy add`
+
+A policy file names patterns, not entries; reading it resolves nothing and decrypts nothing. A master
+password prompt in front of the one command an operator reaches for when something already looks
+wrong is the wrong trade, so `--vault` is not in its option spec at all - passing it is a usage error
+rather than a flag that looks accepted and does nothing.
+
+There is no command that writes the file. keypaste must not be a writer of its own authorization
+document: a command that edits it is a command an agent could talk somebody into running.
+
+---
+
+## D-0029 - Where the policy sits in the order, and what it deliberately does not touch
+
+**Date:** 2026-07-26 · **Stage:** 2.3 · **Status:** accepted
+
+`ApproverHandler`'s doc comment has said since 2.2 that the order is the security property. This is
+where the policy check goes in it, and every position is an argument.
+
+```
+field releasable -> exposure parses -> resolve -> exposure re-check -> grant cache
+  -> COOLDOWN -> POLICY -> prompt -> read the field, last of all
+```
+
+**After the exposure re-check, never before.** A rule is a *narrowing* of what a person would
+otherwise be asked about, not a parallel grant of authority. Ahead of that check, a rule reading
+`entries = ["**"]` would release an entry the bridge's own `--expose` never permitted - a file in the
+user's home directory overriding the client's configuration. Both gates must pass and the exposure is
+the ceiling. This is what makes "a rule can never widen to secrets outside its pattern" structurally
+true rather than checked.
+
+**After the grant cache.** A live grant is a decision a person made about this exact connection,
+entry and field. Serving it as `policy` would re-attribute human-approved reuse to a machine rule and
+spend allowance on a request that was going to be free.
+
+**After the cooldown, which is new public surface on `ApprovalGate` for this.** A person's explicit
+no is more specific and more recent than a rule they wrote last month. Worth being honest about: no
+shipped path can currently reach that state - a rule that matches never prompts, so it never arms a
+cooldown for its own request, and a spent allowance denies rather than escalating. The check is
+defence in depth for the paths 2.4 and 4.3 add, and the test that pins it arms the state directly
+through the gate rather than pretending to reach it, because a test driven through `RequestAsync`
+would pass whether or not the check existed.
+
+**In `ApproverHandler`, never inside `ApprovalGate`.** The gate is the object that asks a human. A
+policy-matched request evaluated inside it would take the one-at-a-time semaphore and could come back
+`Busy` while somebody was mid-prompt - fail-closed, but it would teach an operator that policy is
+flaky and push them to widen rules.
+
+**Before the read, which stays last of all.** The file's central claim survives intact: nothing has
+decrypted a field until a person said yes to this request, or said yes in advance to a rule covering
+it.
+
+### Both ceilings apply, and the arithmetic is not the caller's
+
+`ApprovalLimits` gained `EffectiveTtlSeconds(requested, ruleCeiling)`. A rule may only lower: one
+saying `max_ttl_seconds = 3600` under an approver started `--max-ttl 60` grants 60. The overload
+exists so the policy branch does no arithmetic of its own - a hand-written `Math.Min` at the call
+site is exactly how a file in `~` would come to raise a ceiling set on the command line, and it is
+one of the negative controls.
+
+A request *over* the rule's ceiling is clamped, not bounced to a person. Bouncing it would hand an
+agent a one-integer lever for manufacturing prompts on demand.
+
+### A policy grant does not seed the grant cache
+
+Four reasons. It would blow a hole in `max_per_hour` by construction, serving every later request
+inside the TTL free and off the count. It would hide releases two onward behind `grant-cache` lines
+that name no rule. There is nothing to suppress, because with a rule in force nobody is being asked
+twice. And it keeps `GrantCache`'s own doc comment - "what a human has already said yes to" - true as
+written. The cost is one vault read per call: CPU spent to buy an accurate log.
+
+### The listing path is not handed the policy at all
+
+Structural rather than behavioural: `ListAsync` does not receive it. A rule can neither make an entry
+listable that the exposure excludes nor hide one.
+
+---
+
+## D-0030 - A rule keys on the label the operator wrote, not the name the agent asserts
+
+**Date:** 2026-07-26 · **Stage:** 2.3 · **Status:** accepted
+
+prompts.md describes rules of the form "allow client `claude-code` to read ...". Taken literally that
+keys authorization on `CredentialRequest.ClientName`, which THREATS.md T-3 says outright is
+unauthenticated: any process that can spawn the binary can call itself `claude-code`. T-3 also left
+2.3 a written instruction - key on something supplied out of band, or say plainly that client-scoped
+policy narrows convenience rather than authority.
+
+**Both.** A rule matches `--client-label`, which the human writes into the MCP client's own
+configuration file. That is a real improvement over the asserted name: whoever *connects* cannot
+choose it. It is also a small one: whoever **spawns** the bridge chooses its argv, which assumption 2
+has always said. So the honest sentence, and the one docs/policy.md gives users in these words, is
+that **client-scoped policy narrows convenience, not authority**. THREATS.md T-14 carries the
+residual, and it is the one paragraph in that document where 2.3 is weaker than 2.2.
+
+**A bridge with no label matches no rule, including one written `client = "*"`.** The star means "any
+client the operator gave a name to", not "any client at all" - a standing grant to something nobody
+named is not something to hand out because a key was left blank. `keypaste policy ls` therefore
+renders it as "Any labelled client", never "any client".
+
+### The label travels raw, and the wire version does not move
+
+`CredentialRequest` gained an optional `ClientLabel`, carried as `client_label`. It is
+`options.ClientLabel`, **not** the sanitized `client.Label` the audit line uses: the operator writes
+one string in the client's config and another in `policy.toml`, and those two have to compare as
+written. `EntryNameSanitizer` is lossy, and two distinct labels collapsing into one identical display
+string would be a widening. The audit line keeps the sanitized copy, because that one is for reading.
+
+`ApproverProtocol.Version` **stays at 1**. It guards frame interpretation, so bumping it would make
+every mixed-version pair fail at the framing layer - no reply, no audit line beyond `no-approver` -
+over one optional field. Both mismatched directions degrade the same way instead: the label is
+absent, no rule matches, every request is shown to a person. That is the same state a malformed
+policy file produces, and it is the state this whole stage falls back to.
+
+---
+
 # Open decisions
 
 ## O-0002 — Contribution terms: DCO or CLA

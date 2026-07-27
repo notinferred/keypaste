@@ -160,6 +160,8 @@ useful part when you are reading this back later:
 |---|---|
 | `prompt` | A person was shown this exact request and answered it. With `denied`, they said no. |
 | `grant-cache` | Served from a grant a person had already given, inside its lifetime. **They did not see this request's reason** — compare it with the earlier `prompt` line for the same entry. |
+| `policy` | Released by a standing rule you wrote in `~/.keypaste/policy.toml`. **Nobody was asked at all**, and no `prompt` line exists to compare against — the `reason` field names which rule did it. See [policy.md](policy.md). |
+| `policy-limit` | A rule covered the request but had spent its `max_per_hour` allowance. |
 | `exposure` | A listing, allowed because everything named was inside your `--expose` globs. |
 | `no-approver` | Nobody was running `keypaste agent`. |
 | `out-of-scope` | The entry was outside your globs, or does not exist — deliberately the same answer, so an agent cannot use the difference to find out what exists. |
@@ -250,9 +252,12 @@ hash in `src/Keypaste.Mcp/packages.lock.json`, and there is no HTTP client among
 
 **Can a malicious MCP client pretend to be Claude?** Yes, and keypaste never makes a decision based
 on the name a client gives itself — it is recorded, not trusted. `--client-label` is the name *you*
-gave the server in your own config, which is why it is the one worth putting in the log.
-[THREATS.md](../THREATS.md) T-3 is explicit about what this does and does not buy.
+gave the server in your own config, which is why it is the one worth putting in the log, and why it
+is the only name a policy rule will match. That stops the *agent* choosing which rules apply to it;
+it does not stop another program on your machine starting a bridge with the same argv.
+[THREATS.md](../THREATS.md) T-3 and T-14 are explicit about what this does and does not buy.
 
-**Is it safe to point this at my personal vault?** In this version, in the narrow sense that nothing
-can be released: yes. The broader answer is that exposure defaults to `env/**` precisely so that the
-question does not depend on your judgement about a glob.
+**Is it safe to point this at my personal vault?** Nothing is released without you saying yes to
+that specific request, unless you wrote a policy rule covering it — and there is no policy file
+unless you make one. Exposure defaults to `env/**` precisely so that the question does not depend on
+your judgement about a glob.
