@@ -24,7 +24,7 @@ jobs:
   # short-circuit the three-OS matrix rather than failing three times over.
   gate:
     name: format + analyzers
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
@@ -57,7 +57,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, blacksmith-4vcpu-windows-2025, macos-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
@@ -163,7 +163,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, blacksmith-4vcpu-windows-2025, macos-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     env:
