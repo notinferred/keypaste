@@ -326,8 +326,18 @@ jobs:
           set -euo pipefail
           out="artifacts/dist"; mkdir -p "$out"
           stage="artifacts/stage"; rm -rf "$stage"; mkdir -p "$stage"
-          cp artifacts/release/${{ matrix.rid }}/keypaste* "$stage"/
-          rm -f "$stage"/*.pdb "$stage"/*.xml "$stage"/*.dbg "$stage"/*.dwarf
+          src="artifacts/release/${{ matrix.rid }}"
+          # Copy the two binaries by name rather than globbing and deleting the debris afterwards.
+          # A glob collects whatever else the platform happened to emit, and the list differs per
+          # platform: macOS writes keypaste.dSYM as a *directory*, which cp refuses without -r and
+          # which has no business in a release archive. Naming what ships means a new kind of
+          # build output cannot silently end up in a download.
+          for n in keypaste keypaste-mcp; do
+            if   [ -f "$src/$n" ];     then cp "$src/$n"     "$stage/"
+            elif [ -f "$src/$n.exe" ]; then cp "$src/$n.exe" "$stage/"
+            else echo "::error::$n is missing from $src"; exit 1
+            fi
+          done
           cp LICENSE THIRD_PARTY_NOTICES.md "$stage"/
           name="keypaste-${VERSION}-${{ matrix.rid }}"
           if [ "${{ matrix.archive }}" = "zip" ]; then
