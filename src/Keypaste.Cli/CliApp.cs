@@ -26,6 +26,17 @@ internal static class CliApp
     internal const int ExitAuthFailed = 4;
 
     /// <summary>
+    /// The audit log is not the file keypaste wrote.
+    /// </summary>
+    /// <remarks>
+    /// Its own code because none of the others fits and because a script has to be able to branch on
+    /// it: a tampered log is not a usage error, not a missing file, and not an internal failure, and
+    /// conflating it with any of them would make "did anything touch my audit trail" unanswerable
+    /// from a shell.
+    /// </remarks>
+    internal const int ExitTamperDetected = 5;
+
+    /// <summary>
     /// The command <c>run</c> was given exists but could not be executed. The shell convention,
     /// used because scripts already branch on it.
     /// </summary>
@@ -84,6 +95,9 @@ internal static class CliApp
             case "policy":
                 return PolicyCommand.Execute(args, context);
 
+            case "log":
+                return LogCommand.Execute(args, context);
+
             case "hello":
                 context.Stdout.WriteLine(CoreInfo.Hello());
                 return ExitSuccess;
@@ -120,13 +134,14 @@ internal static class CliApp
         writer.WriteLine("  run <project> --    run a command with those variables injected");
         writer.WriteLine("  agent               unlock the vault and approve AI agents' requests");
         writer.WriteLine("  policy ls           show the standing rules that skip the approval prompt");
+        writer.WriteLine("  log                 show what agents asked for, and what happened");
         writer.WriteLine("  version             print the core version");
         writer.WriteLine();
         writer.WriteLine("the vault:");
         writer.WriteLine($"  --vault <path>      which vault to use, or set {VaultLocator.EnvironmentVariable}");
         writer.WriteLine();
         writer.WriteLine("exit codes:");
-        writer.WriteLine("  0 ok  1 usage  2 error  3 not found  4 wrong password");
+        writer.WriteLine("  0 ok  1 usage  2 error  3 not found  4 wrong password  5 audit log tampered");
         writer.WriteLine("  once a `run` command starts, its exit code is keypaste's own.");
         writer.WriteLine();
         writer.WriteLine("passwords are never echoed. Press Escape at a prompt to cancel.");
