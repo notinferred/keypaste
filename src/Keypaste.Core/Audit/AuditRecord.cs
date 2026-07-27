@@ -18,8 +18,15 @@ public enum AuditDecision
 /// that"; <see cref="Prompt"/> alongside <see cref="AuditDecision.Denied"/> means a person
 /// considered this one and said no; <see cref="Busy"/> and <see cref="TimedOut"/> mean nobody got
 /// to it at all, and are the only two where trying again later is reasonable. Only
-/// <see cref="Exposure"/>, <see cref="Prompt"/> and <see cref="GrantCache"/> ever accompany
-/// <see cref="AuditDecision.Granted"/>.
+/// <see cref="Exposure"/>, <see cref="Prompt"/>, <see cref="GrantCache"/> and <see cref="Policy"/>
+/// ever accompany <see cref="AuditDecision.Granted"/>.
+/// </para>
+/// <para>
+/// <b><see cref="Policy"/> is the one that means no person was involved at all.</b> Every other
+/// grant traces back to somebody looking at that specific request; a policy grant traces back to a
+/// rule they wrote in advance, and the audit line is the only record that the release happened.
+/// That is why it must never be logged as <see cref="Prompt"/> or <see cref="GrantCache"/>, both of
+/// which claim a person acted.
 /// </para>
 /// <para>
 /// <b>Adding a member means adding a case to <c>AuditLog.Wire</c>.</b> The switch there used to
@@ -79,6 +86,24 @@ public enum AuditMethod
 
     /// <summary>Asking, resolving or reading went wrong. Fail closed (CORE.md law 3.7).</summary>
     Failed = 12,
+
+    /// <summary>
+    /// Pre-authorized by a rule in the user's policy file, so nobody was asked. The record's reason
+    /// names which rule (Stage 2.3, DECISIONS.md D-0028).
+    /// </summary>
+    Policy = 13,
+
+    /// <summary>
+    /// A policy rule covered this request but had spent its hourly allowance.
+    /// </summary>
+    /// <remarks>
+    /// Denied rather than escalated to a person. Falling through to a prompt looks safer — a human
+    /// still decides — but it turns a quota into a prompt generator: an agent that has burned a
+    /// rule's allowance would start producing one prompt per request, which is THREATS.md T-11 with
+    /// a lever attached. It would also make <c>keypaste policy ls</c> lie about what
+    /// <c>max_per_hour</c> means.
+    /// </remarks>
+    PolicyLimit = 14,
 }
 
 /// <summary>Who asked.</summary>
