@@ -299,3 +299,9 @@ checks the refused path returns nothing.
 hold, and a check this project asks strangers to trust should not depend on a paid, networked,
 non-reproducible service. The stand-in sends exactly the calls this page says Claude sends; whether
 Claude sends them is the part you are watching for when you run the demo yourself.
+[DECISIONS.md](../DECISIONS.md) D-0034 is the full argument, including the two lines the harness
+cannot see and does not pretend to.
+
+The recording of this page is made by `scripts/demo/`, and
+[its README](../scripts/demo/README.md) explains how — and why the `y` in it was pressed by a
+person.

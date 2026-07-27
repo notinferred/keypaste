@@ -46,7 +46,7 @@
 
 ## Stage 3 — Launch (Week 8–9)
 **Goal: strangers using it.**
-- [ ] Polish README with the demo GIF at top
+- [ ] Polish README with the demo GIF at top — 2.5 built the recording pipeline (`scripts/demo/`, D-0033); this is the take, the trim to under 2 MB, and the placement
 - [ ] Landing page: the 60-second demo video, install one-liner, "local-first, KDBX, open source" trust bullets
 - [ ] Launch posts: Hacker News (Show HN), r/selfhosted, r/KeePass, MCP community/Discord, lobste.rs, X
 - [ ] Write the launch essay: "Your password manager can't talk to AI. Here's why that's a problem." 
