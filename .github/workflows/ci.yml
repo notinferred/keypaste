@@ -159,6 +159,114 @@ jobs:
         timeout-minutes: 8
         run: scripts/verify-demo.sh
 
+  # The release workflow ships NativeAOT binaries, and AOT's failure mode is a runtime
+  # NotSupportedException rather than a build error — so a compile proves nothing and a tag must
+  # never be the first time this is exercised. One RID here, natively, on every push: enough to
+  # catch an AOT-hostile dependency the day it lands rather than on release day. The other three
+  # RIDs are covered by release.yml, which runs this same suite against every published binary.
+  #
+  # ubuntu-22.04 deliberately, not 24.04: NativeAOT links against the build machine's glibc, and
+  # 22.04's 2.35 is the floor the published Linux binaries are built to. Building the check on a
+  # newer image than the release would make it a weaker test than the thing it is checking.
+  aot:
+    name: aot publish (linux-x64)
+    needs: gate
+    runs-on: blacksmith-4vcpu-ubuntu-2204
+    timeout-minutes: 25
+    env:
+      KEYPASTE_BIN: artifacts/release/linux-x64/keypaste
+      KEYPASTE_MCP_BIN: artifacts/release/linux-x64/keypaste-mcp
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      - name: Install the native toolchain
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang zlib1g-dev
+
+      # Never with -r. A RID on the command line narrows the project's runtime identifier set to
+      # one, which can never match a lock file recording four, and locked mode fails NU1004. The
+      # csproj declares all four so one whole-solution restore covers every publish (D-0040).
+      - name: Restore (locked)
+        run: dotnet restore keypaste.slnx --locked-mode
+
+      - name: Publish both binaries with NativeAOT
+        run: |
+          dotnet publish src/Keypaste.Cli/Keypaste.Cli.csproj -c Release -r linux-x64 \
+            --no-restore -o artifacts/release/linux-x64 2>&1 | tee /tmp/publish-cli.log
+          dotnet publish src/Keypaste.Mcp/Keypaste.Mcp.csproj -c Release -r linux-x64 \
+            --no-restore -o artifacts/release/linux-x64 2>&1 | tee /tmp/publish-mcp.log
+
+      # third_party/Directory.Build.props disarms the trim analyzers for vendored source, which is
+      # what O-0006 objected to. This puts the gate back: the diagnostics are diffed against a
+      # committed baseline, so an upstream re-merge that adds AOT-hostile code is a red build.
+      - name: Verify the AOT trim diagnostics still match the baseline
+        shell: bash
+        run: scripts/verify-aot-trim.sh /tmp/publish-cli.log /tmp/publish-mcp.log
+
+      # Everything below runs against the published native binaries, not the ordinary build. The
+      # rm is load-bearing: artifacts/bin is exactly where the scripts look when the environment
+      # variables are unset, so without it a typo in either name would silently test the JIT build
+      # and pass. The assertions after it are the cheap discriminator between the two.
+      - name: Point the gates at the AOT binaries and prove they are AOT
+        shell: bash
+        run: |
+          rm -rf artifacts/bin
+          test -x "$KEYPASTE_BIN" || { echo "::error::no AOT cli binary"; exit 1; }
+          test -x "$KEYPASTE_MCP_BIN" || { echo "::error::no AOT mcp binary"; exit 1; }
+          for stray in artifacts/release/linux-x64/*.dll artifacts/release/linux-x64/*.runtimeconfig.json; do
+            [ -e "$stray" ] && { echo "::error::$stray exists, so this is a JIT apphost, not AOT"; exit 1; }
+          done
+          "$KEYPASTE_BIN" --version
+          file "$KEYPASTE_BIN"
+
+      - name: Verify run injects a variable and writes nothing to disk
+        shell: bash
+        run: scripts/verify-run-injection.sh
+
+      - name: Verify run forwards signals and exit codes
+        shell: bash
+        run: scripts/verify-run-signals.sh
+
+      - name: Verify keypaste-mcp speaks MCP over stdio and audits every call
+        shell: bash
+        run: scripts/verify-mcp-stdio.sh
+
+      - name: Verify a person can approve and refuse across two real processes
+        shell: bash
+        run: scripts/verify-approval-e2e.sh
+
+      - name: Verify the audit chain catches tampering and forgives a crash
+        shell: bash
+        run: scripts/verify-log-chain.sh
+
+      - name: Verify the demo page still matches what the AOT binaries print
+        shell: bash
+        timeout-minutes: 8
+        run: scripts/verify-demo.sh
+
+      # CORE.md law 4.6 applied to the artifact strangers will actually run. The vault writer goes
+      # through vendored KeePassLib's XML, Argon2 and AES, which is the code most likely to be
+      # broken by trimming — so an AOT binary that has not written a KDBX a real KeePassXC can
+      # open has not been tested at all.
+      - name: Install KeePassXC
+        run: sudo apt-get install -y --no-install-recommends keepassxc
+
+      - name: Verify a vault written by the AOT binary opens in real KeePassXC
+        shell: bash
+        env:
+          KP_COMPAT_PASSWORD: ci-master-pw
+        run: |
+          scripts/make-compat-fixture.sh artifacts/compat/aot.kdbx
+          scripts/verify-keepassxc-compat.sh artifacts/compat/aot.kdbx
+          scripts/verify-keepassxc-writeback.sh artifacts/compat/aot-writeback.kdbx
+
   # ===========================================================================
   # PERMANENT COMPATIBILITY GATE — CORE.md law 4.6:
   #   "Compatibility is sacred: any KDBX file keypaste writes must open

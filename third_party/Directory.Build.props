@@ -54,6 +54,14 @@
     <EnableSingleFileAnalyzer>false</EnableSingleFileAnalyzer>
     <EnableAotAnalyzer>false</EnableAotAnalyzer>
 
+    <!--
+      Mirrors src/. This file severs inheritance from the root, so the list cannot be declared
+      once - and it has to be here, because a RID-specific publish of Keypaste.Cli reaches this
+      project through ProjectReference. The RID sections it adds to packages.lock.json are empty
+      (this project has no PackageReference); that is correct, not debris to tidy away.
+    -->
+    <RuntimeIdentifiers>linux-x64;linux-arm64;osx-arm64;win-x64</RuntimeIdentifiers>
+
     <IsPackable>false</IsPackable>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <NuGetAudit>true</NuGetAudit>
