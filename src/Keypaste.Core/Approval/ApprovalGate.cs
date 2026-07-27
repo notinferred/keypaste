@@ -178,6 +178,23 @@ public sealed class ApprovalGate : IDisposable
         }
     }
 
+    /// <summary>Whether the same request was refused recently enough that asking again is refused.</summary>
+    /// <param name="cooldownKey">What counts as "the same request".</param>
+    /// <returns><see langword="true"/> if a refusal is still in force.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="cooldownKey"/> is null.</exception>
+    /// <remarks>
+    /// Public so the approver can consult it <em>before</em> evaluating the policy, which is what
+    /// makes "a person's explicit no outranks a rule; a rule never resurrects it" a property of the
+    /// ordering rather than an accident of how the branches happen to fall today (DECISIONS.md
+    /// D-0029). <see cref="AskAsync"/> keeps its own check, so removing this one narrows nothing.
+    /// </remarks>
+    public bool IsInCooldown(string cooldownKey)
+    {
+        ArgumentNullException.ThrowIfNull(cooldownKey);
+
+        return InCooldown(cooldownKey);
+    }
+
     private bool InCooldown(string cooldownKey)
     {
         if (!_cooldowns.TryGetValue(cooldownKey, out var until))

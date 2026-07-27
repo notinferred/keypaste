@@ -3,6 +3,7 @@ using Keypaste.Cli.Approval;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Policy;
 
 namespace Keypaste.Cli.Commands;
 
@@ -112,6 +113,7 @@ internal static class AgentCommand
             new VaultEntryNameLister(() => vault),
             gate,
             grants,
+            PolicyGate.None,
             line => context.Stderr.WriteLine($"keypaste: {line}"));
 
         ApproverListener? listener = null;

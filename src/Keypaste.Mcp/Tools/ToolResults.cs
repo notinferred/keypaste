@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Keypaste.Core.Audit;
 using ModelContextProtocol.Protocol;
 
 namespace Keypaste.Mcp.Tools;
@@ -39,6 +40,7 @@ internal static class ToolResults
     /// <param name="field">Which field was released.</param>
     /// <param name="value">Its value, as a person approved it.</param>
     /// <param name="ttlSeconds">How long the grant lasts.</param>
+    /// <param name="method">Whether a person answered this request or a standing rule covered it.</param>
     /// <returns>A success result carrying exactly one field value and nothing else.</returns>
     /// <remarks>
     /// <para>
@@ -53,10 +55,22 @@ internal static class ToolResults
     /// message is the credential and the terms it came with.
     /// </para>
     /// </remarks>
-    internal static CallToolResult Release(string field, string value, int ttlSeconds) => new()
+    internal static CallToolResult Release(string field, string value, int ttlSeconds, AuditMethod method) => new()
     {
         IsError = false,
-        Content = [new TextContentBlock { Text = ToolText.Released(field, ttlSeconds) + value }],
+        Content =
+        [
+            new TextContentBlock
+            {
+                // Keyed on the method the approver actually returned, so the sentence an agent reads
+                // and the word written to the log cannot disagree about whether a person was
+                // involved. Telling a model a human approved something no human saw is exactly the
+                // claim keypaste asks to be trusted on.
+                Text = (method == AuditMethod.Policy
+                    ? ToolText.ReleasedByPolicy(field, ttlSeconds)
+                    : ToolText.Released(field, ttlSeconds)) + value,
+            },
+        ],
         StructuredContent = Structured(field, value, ttlSeconds),
     };
 

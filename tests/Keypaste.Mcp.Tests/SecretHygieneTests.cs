@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Policy;
 using Keypaste.Mcp.Tools;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
@@ -102,7 +103,8 @@ public sealed class SecretHygieneTests : IAsyncLifetime
             new VaultCredentialSource(() => _vault),
             new VaultEntryNameLister(() => _vault),
             _gate,
-            _grants);
+            _grants,
+            PolicyGate.None);
 
         _stop = new CancellationTokenSource();
         _listener = new ApproverListener(PipeName, handler);
