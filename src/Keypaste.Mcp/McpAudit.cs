@@ -66,16 +66,44 @@ internal static class McpAudit
         string reason,
         EntryExposure exposure,
         AuditArgs? args = null) =>
-        new()
+        Line(tool, client, AuditDecision.Denied, method, reason, exposure, args);
+
+    /// <summary>Builds the line for a call, whatever the answer was.</summary>
+    /// <param name="tool">Which tool was called.</param>
+    /// <param name="client">Who called it.</param>
+    /// <param name="decision">Whether anything was released.</param>
+    /// <param name="method">How that was decided.</param>
+    /// <param name="reason">keypaste's own explanation. Trusted text.</param>
+    /// <param name="exposure">What this server was configured to expose.</param>
+    /// <param name="args">What was asked for.</param>
+    /// <returns>The record to append.</returns>
+    /// <remarks>
+    /// A grant and a denial go through the same builder and the same fields. Two shapes would be
+    /// two chances to leave something out of one of them, and the line that matters most to a
+    /// person reading the log later is the one that says yes.
+    /// </remarks>
+    internal static AuditRecord Line(
+        string tool,
+        AuditClient client,
+        AuditDecision decision,
+        AuditMethod method,
+        string reason,
+        EntryExposure exposure,
+        AuditArgs? args = null)
+    {
+        ArgumentNullException.ThrowIfNull(exposure);
+
+        return new AuditRecord
         {
             Tool = tool,
             Client = client,
             Args = args ?? AuditArgs.None,
-            Decision = AuditDecision.Denied,
+            Decision = decision,
             Method = method,
             Reason = reason,
             Exposure = exposure.Globs,
         };
+    }
 
     private static string? Clean(string? value) =>
         value is null ? null : EntryNameSanitizer.Sanitize(value, MaximumClientTextLength).Text;

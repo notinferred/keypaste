@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Ipc;
 
 namespace Keypaste.Mcp;
 
@@ -25,7 +26,8 @@ namespace Keypaste.Mcp;
 internal sealed record ServerOptions
 {
     internal const string Usage = """
-        usage: keypaste-mcp [--vault <path>] [--expose <glob>]... [--client-label <name>] [--audit-log <path>]
+        usage: keypaste-mcp [--vault <path>] [--expose <glob>]... [--client-label <name>]
+                            [--audit-log <path>] [--approver <name>]
 
         An MCP server that lets an AI agent ask for one credential, with your approval and a full
         audit trail. It speaks the protocol on stdin and stdout, so it is started by an MCP client
@@ -35,9 +37,12 @@ internal sealed record ServerOptions
           --expose <glob>       what may be named, repeatable. Defaults to env/**
           --client-label <name> what to call this client in the audit log
           --audit-log <path>    where to append the audit trail, or set KEYPASTE_HOME
+          --approver <name>     which keypaste agent to ask, or set KEYPASTE_APPROVER
 
-        This version grants nothing: every credential request is denied, because the human approval
-        flow it would need does not exist yet.
+        Nothing is released without a person saying yes to that specific request. They are reached
+        through `keypaste agent`, which they start themselves in their own terminal - so no agent
+        can cause a master password prompt to appear. With no agent running, every credential
+        request is denied.
         """;
 
     /// <summary>The vault to expose. Empty when none was configured, which is not fatal.</summary>
@@ -49,6 +54,15 @@ internal sealed record ServerOptions
     /// <summary>Where the audit trail is appended.</summary>
     internal required string AuditPath { get; init; }
 
+    /// <summary>Which pipe <c>keypaste agent</c> is expected on.</summary>
+    /// <remarks>
+    /// Resolved at startup so a malformed name is a startup failure, but nothing connects until a
+    /// call needs an answer: the bridge is spawned by a client long before anybody starts an
+    /// approver, and refusing to start without one would make keypaste look broken in the client's
+    /// log rather than saying so in an answer an agent can act on.
+    /// </remarks>
+    internal required string ApproverName { get; init; }
+
     /// <summary>What to call this client in the audit log, or null.</summary>
     internal string? ClientLabel { get; init; }
 
@@ -59,6 +73,7 @@ internal sealed record ServerOptions
     /// <param name="argv">The arguments, excluding the program name.</param>
     /// <param name="vaultFromEnvironment">The value of <c>KEYPASTE_VAULT</c>, or null.</param>
     /// <param name="homeFromEnvironment">The value of <c>KEYPASTE_HOME</c>, or null.</param>
+    /// <param name="approverFromEnvironment">The value of <c>KEYPASTE_APPROVER</c>, or null.</param>
     /// <param name="options">The parsed options, on success.</param>
     /// <param name="error">A message naming the problem, or empty on success.</param>
     /// <returns><see langword="true"/> when the server may start.</returns>
@@ -66,6 +81,7 @@ internal sealed record ServerOptions
         string[] argv,
         string? vaultFromEnvironment,
         string? homeFromEnvironment,
+        string? approverFromEnvironment,
         [NotNullWhen(true)] out ServerOptions? options,
         out string error)
     {
@@ -77,6 +93,7 @@ internal sealed record ServerOptions
         string? vault = null;
         string? label = null;
         string? auditPath = null;
+        string? approver = null;
         List<string> globs = [];
 
         for (var i = 0; i < argv.Length; i++)
@@ -125,6 +142,14 @@ internal sealed record ServerOptions
                     globs.Add(value);
                     break;
 
+                case "--approver":
+                    if (!Once(ref approver, value, name, out error))
+                    {
+                        return false;
+                    }
+
+                    break;
+
                 default:
                     error = $"unknown option '{name}'";
                     return false;
@@ -145,11 +170,24 @@ internal sealed record ServerOptions
         // configured" is diagnosable, and one that exits leaves the client's log as the only clue.
         VaultLocation.TryResolve(vault, vaultFromEnvironment, out var vaultPath, out _);
 
+        string pipeName;
+
+        try
+        {
+            pipeName = ApproverEndpoint.Resolve(approver, approverFromEnvironment);
+        }
+        catch (ArgumentException ex)
+        {
+            error = $"--approver: {ex.Message}";
+            return false;
+        }
+
         options = new ServerOptions
         {
             VaultPath = vaultPath,
             Exposure = exposure,
             ClientLabel = label,
+            ApproverName = pipeName,
             AuditPath = auditPath is { Length: > 0 }
                 ? Path.GetFullPath(auditPath)
                 : KeypasteHome.AuditPath(homeFromEnvironment),
@@ -163,6 +201,7 @@ internal sealed record ServerOptions
         VaultPath = string.Empty,
         Exposure = EntryExposure.Default,
         AuditPath = string.Empty,
+        ApproverName = string.Empty,
         WantsHelp = true,
     };
 

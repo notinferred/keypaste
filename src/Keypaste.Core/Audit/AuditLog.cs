@@ -404,13 +404,29 @@ public sealed class AuditLog : IDisposable
         _ => "denied",
     };
 
+    /// <remarks>
+    /// Every member is named, and the fallback is <c>unknown</c> rather than any real method. It
+    /// used to be <c>vault-locked</c>, which meant a member added without a case here would have
+    /// been recorded as a denial that never happened — the quietest possible way to make the log
+    /// law 3.3 requires say something untrue. It does not throw, because an audit write must not
+    /// be the thing that takes the server down.
+    /// </remarks>
     private static string Wire(AuditMethod method) => method switch
     {
+        AuditMethod.VaultLocked => "vault-locked",
         AuditMethod.NotImplemented => "not-implemented",
         AuditMethod.OutOfScope => "out-of-scope",
         AuditMethod.InvalidRequest => "invalid-request",
         AuditMethod.Exposure => "exposure",
-        _ => "vault-locked",
+        AuditMethod.Prompt => "prompt",
+        AuditMethod.GrantCache => "grant-cache",
+        AuditMethod.TimedOut => "timed-out",
+        AuditMethod.Cancelled => "cancelled",
+        AuditMethod.NoApprover => "no-approver",
+        AuditMethod.Busy => "busy",
+        AuditMethod.Cooldown => "cooldown",
+        AuditMethod.Failed => "failed",
+        _ => "unknown",
     };
 
     private static string Wire(EntryAddressKind kind) => kind switch

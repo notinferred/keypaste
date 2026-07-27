@@ -1,4 +1,5 @@
 using Keypaste.Core;
+using Keypaste.Core.Ipc;
 using Keypaste.Mcp.Tools;
 
 namespace Keypaste.Mcp;
@@ -31,11 +32,11 @@ internal sealed record EntryNameListing(
 /// <remarks>
 /// <para>
 /// It yields <see cref="EntryName"/>, which holds a group path and a title and has no other members.
-/// So no implementation — including the real one Stage 2.2 adds — can return a password through the
+/// So no implementation — including the one that reads a real unlocked vault — can return a password through the
 /// listing path even by mistake. That is a structural guarantee, not a promise (THREATS.md T-8).
 /// </para>
 /// <para>
-/// <b><c>request_credential</c> deliberately does not use this.</b> Stage 2.2 adds a separate seam
+/// <b><c>request_credential</c> deliberately does not use this.</b> It is served by a separate seam
 /// for approval and retrieval. Fusing the two into one "vault access" abstraction would hand the
 /// listing path the ability to return a secret, which is the single change most likely to turn
 /// <c>list_entry_names</c> into an exfiltration tool.
@@ -44,22 +45,46 @@ internal sealed record EntryNameListing(
 internal interface IEntryNameSource
 {
     /// <summary>Reads every entry name the vault holds.</summary>
+    /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
     /// <returns>The names, or a refusal.</returns>
-    EntryNameListing List();
+    ValueTask<EntryNameListing> ListAsync(CancellationToken cancellationToken);
 }
 
-/// <summary>The only implementation this version ships: there is no unlocked vault.</summary>
+/// <summary>Asks <c>keypaste agent</c> which names may be shown.</summary>
 /// <remarks>
-/// An MCP server's stdin and stdout <em>are</em> the protocol stream, and Claude Desktop starts it
-/// with no terminal, so there is nowhere to ask for a master password. Putting one in the client's
-/// configuration file would place the secret that protects every other secret into plaintext JSON,
-/// which is what CORE.md law 3.1 exists to prevent; asking the client to collect it would route it
-/// through the untrusted party, which is worse. Stage 2.2 builds a human channel, and whatever owns
-/// that channel owns the unlocked session. THREATS.md T-7.
+/// <para>
+/// This is what closes THREATS.md T-7. The bridge still cannot unlock anything — its stdin and
+/// stdout <em>are</em> the protocol stream and Claude Desktop starts it with no terminal — so it
+/// asks the process that a human unlocked in their own terminal. The listing, exposure and
+/// sanitization code that used to be unreachable in the shipped binary is on the live path now.
+/// </para>
+/// <para>
+/// <b>The separation D-0022 asked for survives the move onto a socket.</b> What comes back over the
+/// wire is a group path and a title per entry and nothing else, decoded into <see cref="EntryName"/>
+/// — a type with two members and nowhere to put a secret. Sharing one pipe with the credential
+/// path does not fuse them; sharing an interface would have.
+/// </para>
 /// </remarks>
-internal sealed class LockedEntryNameSource : IEntryNameSource
+internal sealed class ApproverEntryNameSource(ApproverConnection approver, ServerOptions options)
+    : IEntryNameSource
 {
     /// <inheritdoc/>
-    public EntryNameListing List() =>
-        new(VaultAvailability.Locked, [], ToolText.VaultLocked);
+    public async ValueTask<EntryNameListing> ListAsync(CancellationToken cancellationToken)
+    {
+        var (reply, reachable) = await approver
+            .ListAsync(new NamesRequest(options.Exposure.Globs), cancellationToken)
+            .ConfigureAwait(false);
+
+        if (reply is null)
+        {
+            return new EntryNameListing(
+                VaultAvailability.Failed,
+                [],
+                reachable ? ToolText.ApproverFailed : ToolText.NoApproverForListing);
+        }
+
+        return reply.VaultUnlocked
+            ? new EntryNameListing(VaultAvailability.Available, reply.Names, string.Empty)
+            : new EntryNameListing(VaultAvailability.Locked, [], ToolText.VaultLocked);
+    }
 }

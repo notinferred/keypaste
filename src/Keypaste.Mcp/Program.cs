@@ -1,5 +1,6 @@
 using Keypaste.Core;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Ipc;
 using Keypaste.Mcp.Tools;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
@@ -34,6 +35,7 @@ internal static class Program
                 args,
                 Environment.GetEnvironmentVariable(VaultLocation.EnvironmentVariable),
                 Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable),
+                Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable),
                 out var options,
                 out var error))
         {
@@ -74,6 +76,12 @@ internal static class Program
 
     private static async Task ServeAsync(ServerOptions options, AuditLog audit)
     {
+        // Nothing connects here. The approver is reached on the first call that needs an answer,
+        // because a client spawns this server long before anybody starts one, and a bridge that
+        // refused to start would look broken in the client's log rather than saying so in an
+        // answer an agent can act on.
+        await using var approver = new ApproverConnection(options.ApproverName);
+
         var serverOptions = new McpServerOptions
         {
             ServerInfo = new Implementation { Name = "keypaste", Version = CoreInfo.Version },
@@ -85,8 +93,8 @@ internal static class Program
         // Registered explicitly rather than by scanning the assembly: two tools is the whole
         // surface, and a bridge that could grow a third by accident is not one to build.
         serverOptions.ToolCollection.Add(
-            new ListEntryNamesTool(new LockedEntryNameSource(), options, audit));
-        serverOptions.ToolCollection.Add(new RequestCredentialTool(options, audit));
+            new ListEntryNamesTool(new ApproverEntryNameSource(approver, options), options, audit));
+        serverOptions.ToolCollection.Add(new RequestCredentialTool(options, approver, audit));
 
         await using var transport = new StdioServerTransport(serverOptions, loggerFactory: null);
         await using var server = McpServer.Create(transport, serverOptions, loggerFactory: null, serviceProvider: null);

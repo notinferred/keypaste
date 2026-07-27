@@ -3,25 +3,41 @@ namespace Keypaste.Core.Audit;
 /// <summary>The authorization answer a bridge gave.</summary>
 public enum AuditDecision
 {
-    /// <summary>Nothing was released. Every decision in keypaste 2.1 is this one.</summary>
+    /// <summary>Nothing was released.</summary>
     Denied = 0,
 
-    /// <summary>The request was allowed. Reachable from Stage 2.2 onwards.</summary>
+    /// <summary>The request was allowed.</summary>
     Granted = 1,
 }
 
 /// <summary>How a decision was reached.</summary>
 /// <remarks>
-/// The distinction between <see cref="OutOfScope"/> and <see cref="NotImplemented"/> is worth more
-/// than it looks: the first means "keypaste will never give you that", the second means "keypaste
-/// cannot ask yet". An agent that can tell them apart stops retrying the first.
+/// <para>
+/// The distinctions here are worth more than they look, because an agent reads a refusal and
+/// decides whether to try again. <see cref="OutOfScope"/> means "keypaste will never give you
+/// that"; <see cref="Prompt"/> alongside <see cref="AuditDecision.Denied"/> means a person
+/// considered this one and said no; <see cref="Busy"/> and <see cref="TimedOut"/> mean nobody got
+/// to it at all, and are the only two where trying again later is reasonable. Only
+/// <see cref="Exposure"/>, <see cref="Prompt"/> and <see cref="GrantCache"/> ever accompany
+/// <see cref="AuditDecision.Granted"/>.
+/// </para>
+/// <para>
+/// <b>Adding a member means adding a case to <c>AuditLog.Wire</c>.</b> The switch there used to
+/// fall back to <c>vault-locked</c>, so a new member would have been logged as something it was
+/// not — the quietest possible way to corrupt the record law 3.3 requires. It now falls back to
+/// <c>unknown</c>, and <c>AuditLogTests.EveryAuditMethod_HasItsOwnWireString</c> is what actually
+/// stops the next member slipping through.
+/// </para>
 /// </remarks>
 public enum AuditMethod
 {
     /// <summary>The vault could not be opened, so there was nothing to answer with.</summary>
     VaultLocked = 0,
 
-    /// <summary>There is no approval path in this version, so the default deny stands.</summary>
+    /// <summary>
+    /// No approval path existed. Written by keypaste 2.1, which denied everything; kept because the
+    /// audit log is append-only and old lines still have to mean what they meant when written.
+    /// </summary>
     NotImplemented = 1,
 
     /// <summary>The entry named lies outside what this server was told it may expose.</summary>
@@ -32,10 +48,37 @@ public enum AuditMethod
 
     /// <summary>
     /// Allowed because everything named lay inside the exposure the user configured. Applies to
-    /// listing names, which is the only thing this version can allow — releasing a credential
-    /// always needs a person, and that is Stage 2.2's <c>prompt</c> and Stage 2.3's <c>policy</c>.
+    /// listing names; releasing a credential always needs a person or a policy.
     /// </summary>
     Exposure = 4,
+
+    /// <summary>A person was shown this specific request and answered it (CORE.md law 3.2).</summary>
+    Prompt = 5,
+
+    /// <summary>
+    /// Served from a grant a person had already given, inside its TTL. Still an agent access, so
+    /// still a line of its own (law 3.3) — and the line records the reason given for <em>this</em>
+    /// request, which is the one nobody read.
+    /// </summary>
+    GrantCache = 6,
+
+    /// <summary>Nobody answered inside the window. Silence is a denial.</summary>
+    TimedOut = 7,
+
+    /// <summary>The client gave up on the request, or went away, before anyone answered.</summary>
+    Cancelled = 8,
+
+    /// <summary>No approver was reachable, so there was nobody to ask.</summary>
+    NoApprover = 9,
+
+    /// <summary>Another request was already in front of a person. Refused rather than queued.</summary>
+    Busy = 10,
+
+    /// <summary>The same request was refused a moment ago and has not served its cooldown.</summary>
+    Cooldown = 11,
+
+    /// <summary>Asking, resolving or reading went wrong. Fail closed (CORE.md law 3.7).</summary>
+    Failed = 12,
 }
 
 /// <summary>Who asked.</summary>
@@ -94,8 +137,11 @@ public sealed record AuditArgs
 
     /// <summary>Lowercase hex SHA-256 of the raw reason.</summary>
     /// <remarks>
-    /// Recorded alongside the excerpt so Stage 2.2 can check that the reason shown to the human in
-    /// the approval dialog is the reason that was recorded, even when the excerpt was truncated.
+    /// Recorded alongside the excerpt so the reason a person was shown can be compared with the one
+    /// that was recorded, even when the excerpt was truncated. It carries most of its weight on a
+    /// <see cref="AuditMethod.GrantCache"/> line, where nobody was shown anything: comparing that
+    /// line's hash with the earlier <see cref="AuditMethod.Prompt"/> line's is how a reason that
+    /// changed after approval becomes visible (THREATS.md T-12).
     /// </remarks>
     public string? ReasonSha256 { get; init; }
 
