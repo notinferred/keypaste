@@ -55,11 +55,12 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
+      # No NuGet cache here on purpose. This job never restores - it only reads a property and
+      # checks some facts - so the cache-save step at the end of the job would look for
+      # ~/.nuget/packages, not find it, and fail the job after every real check had passed.
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: global.json
-          cache: true
-          cache-dependency-path: '**/packages.lock.json'
 
       # The version lives in Directory.Build.props and the tag only names it. Nothing is passed
       # with -p:Version=, so a local `dotnet publish` at this commit produces the same inputs the
