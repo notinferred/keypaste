@@ -180,7 +180,7 @@ public sealed record AuditArgs
     /// <remarks>
     /// The reason is the hardest call in the schema. It is unbounded text written by the agent whose
     /// whole purpose is to persuade a person, which makes it the likeliest injection payload in the
-    /// protocol (THREATS.md T-2) — and 2.4 renders the log as a table a human reads. Keeping all
+    /// protocol (THREATS.md T-2) — and <c>keypaste log</c> renders it in a table a human reads. Keeping all
     /// three of an excerpt, the true length, and a hash serves the human without letting the log
     /// quietly lie about what was cut.
     /// </remarks>
@@ -232,11 +232,13 @@ public sealed record AuditRecord
 {
     /// <summary>The schema version, written on every line from the first.</summary>
     /// <remarks>
-    /// Present from day one so Stage 2.4 can add the hash-chain fields and report older lines as
-    /// "predates the chain" rather than as "tampered with" — the distinction that keeps the first
-    /// <c>keypaste log verify</c> from crying wolf.
+    /// Present from day one so that Stage 2.4 could add the hash-chain fields and have older lines
+    /// reported as "predates the chain" rather than as "tampered with" — the distinction that keeps
+    /// the first <c>keypaste log verify</c> from crying wolf. Version 2 is that stage: it adds
+    /// <c>prev</c> and <c>hash</c>, and redefines <c>seq</c> as a line's position in the chain
+    /// rather than a count of what one process happened to write.
     /// </remarks>
-    public const int SchemaVersion = 1;
+    public const int SchemaVersion = 2;
 
     /// <summary>The name of the tool that was called.</summary>
     public required string Tool { get; init; }

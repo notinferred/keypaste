@@ -184,7 +184,7 @@ internal sealed class McpHarness : IAsyncDisposable
     /// <remarks>
     /// Not <see cref="File.ReadAllText(string)"/>: that asks for <see cref="FileShare.Read"/>, which
     /// denies other <em>writers</em>, so it fails outright while a server has the log open. The same
-    /// constraint <c>keypaste log</c> is under in Stage 2.4.
+    /// constraint <c>keypaste log</c> is under.
     /// </remarks>
     internal string AuditText => string.Join('\n', AuditLines());
 

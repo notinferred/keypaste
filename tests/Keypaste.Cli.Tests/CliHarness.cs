@@ -44,6 +44,8 @@ internal sealed class CliHarness : IDisposable
 
     internal FakeConsoleStyle ConsoleStyle { get; } = new();
 
+    internal FakeClock Clock { get; } = new();
+
     internal int Run(params string[] args) => CliApp.Run(args, NewContext());
 
     /// <summary>The context <see cref="Run"/> uses, for tests that call below the verb layer.</summary>
@@ -57,6 +59,7 @@ internal sealed class CliHarness : IDisposable
         Environment = new FakeEnvironment(Environment),
         ProcessLauncher = ProcessLauncher,
         ConsoleStyle = ConsoleStyle,
+        Clock = Clock,
     };
 
     /// <summary>Creates a vault with one entry per supplied spec, via the CLI itself.</summary>
@@ -247,6 +250,15 @@ internal sealed class FakeConsoleStyle : IConsoleStyle
         Alarms.Add(text);
         writer.WriteLine(text);
     }
+}
+
+/// <summary>A clock a test can move, for the commands that take a relative span.</summary>
+internal sealed class FakeClock : TimeProvider
+{
+    /// <summary>What time it is. Fixed by default, so a filter's boundary is assertable.</summary>
+    internal DateTimeOffset Now { get; set; } = new(2026, 7, 26, 15, 0, 0, TimeSpan.Zero);
+
+    public override DateTimeOffset GetUtcNow() => Now;
 }
 
 /// <summary>An environment backed by a dictionary.</summary>

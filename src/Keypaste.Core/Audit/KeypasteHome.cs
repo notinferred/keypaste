@@ -12,9 +12,9 @@ namespace Keypaste.Core.Audit;
 /// <para>
 /// <b>Deliberately not beside the vault.</b> The vault is a file the user syncs with their own
 /// tooling — that is the whole local-first bargain in CORE.md §2. An append-only log that travels
-/// with it would produce conflicted copies on every second machine, break the per-file hash chain
-/// Stage 2.4 adds, and hand anyone with the synced folder a write path into another machine's
-/// record. The log describes what happened <em>here</em>.
+/// with it would produce conflicted copies on every second machine, break the per-file hash chain,
+/// and hand anyone with the synced folder a write path into another machine's record. The log
+/// describes what happened <em>here</em>.
 /// </para>
 /// </remarks>
 public static class KeypasteHome
