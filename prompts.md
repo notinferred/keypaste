@@ -86,6 +86,69 @@
 - [ ] **6.2 — Delegation center**
 "Based on feasibility.md, extend Agent Activity into the Delegation Center: unify keypaste agent grants, connected MCP clients, and (as feasible) external OAuth grants into one 'everything that can act as you' view with revoke/deep-link actions and staleness nudges ('unused for 60 days — revoke?'). Update positioning across README/landing to 'the control panel for everything that can act as you' only if Stage 3 and 5 benchmarks in PLAN.md were actually met — otherwise stop and re-read PLAN.md's pivot conditions."
 
+## STAGE 7 — Teams & shared access (PARKED — gated on Stage 5 revenue + PLAN.md pivot conditions)
+
+> Do not start any 7.x until Stage 3 has shipped, Stage 5 has paying users, and PLAN.md's pivot
+> conditions are met — this is future roadmap, not the next sprint (CORE.md law 5.5). The whole
+> stage lives behind the scope walls: zero-knowledge (the server stores only ciphertext, law 3.1),
+> KDBX-or-nothing (law 2 — a shared vault is still a real .kdbx that opens in KeePassXC), self-host
+> stays first-class (section 2), and this is NOT enterprise IAM — if it starts looking like Okta,
+> stop and re-read section 2. Note the two DISTINCT sharing models below: they are different products
+> for different sensitivities, and 7.1 must never silently become 7.2. Numbers/pricing stay in the
+> private business notes, never in this repo (ideas.md preamble).
+
+- [ ] **7.1 — Shared env sets (the COPY model)**
+"Extend the Stage 5.2 zero-knowledge sync into shared env sets for a small team. A shared set is a
+normal KDBX file (law 2 — it still opens in KeePassXC) whose master key is wrapped per-member: each
+member has a keypair, and the set's key is sealed to every member's public key, so the server only
+ever stores the ciphertext blob plus opaque wrapped-key envelopes and can decrypt neither (law 3.1).
+Implement invite (wrap the key to a new member's pubkey), list members, and remove-member — where
+remove MUST rotate the set's key, re-wrap to the remaining members, AND loudly instruct rotation of
+the actual secret values, because a removed member may have cached plaintext. Be honest in THREATS.md:
+this bounds FUTURE access, not past copies. Stays offline-capable against a local cached copy. Design
+first (DECISIONS.md: why per-member key-wrapping OUTSIDE the KDBX rather than inventing a format), then
+code. Tests: a non-member's envelope never decrypts; a removed member's old envelope fails after
+rotation; the shared file still round-trips through real KeePassXC (law 4.6). Best for low-sensitivity
+shared values (staging keys, shared dev creds) where everyone legitimately holds a copy."
+
+- [ ] **7.2 — Team broker: proxy sharing (the ACCESS model — the differentiated one)**
+"Build the team broker: the way to share a HIGH-sensitivity credential (prod DB, prod API key)
+WITHOUT giving anyone a copy. Instead of syncing the secret, a member — or that member's agent —
+requests it from a shared approver (a self-hostable team relay, or a designated owner's running
+`keypaste agent`), and the EXISTING scoped-request + approval + TTL + audit machinery from Stage 2
+decides and releases exactly one field for one use. This is `request_credential` with the requester
+on another machine: the secret lives in one place, revocation is INSTANT at the broker (no rotation
+needed, unlike 7.1), and every release is attributed to a named teammate in the audit log. Reuse the
+Stage 2 approval core verbatim — no second security path (law 4.3, one core). The relay is zero-
+knowledge about the vault: it brokers a request to the holder, it never holds the vault. THREATS.md:
+the confused-deputy story now spans machines — a teammate's compromised agent asking the broker is
+exactly the attack the approval step exists for. Tests: an unauthorized member's request is denied and
+audited; instant revocation at the broker stops the next request with NO key rotation; the secret
+still lands in exactly one response path. This is the moat — nobody else pairs a KDBX file with
+per-request, per-teammate brokered release."
+
+- [ ] **7.3 — Team identity & SSO (service-account auth ONLY, never on the vault path)**
+"Add team accounts with SSO (OIDC) for the HOSTED SERVICE — and draw the invariant in blood: SSO
+authenticates who may PULL a wrapped-key envelope, reach the broker, or view the dashboard. It NEVER
+gates vault decryption and is NEVER on the secret path. Your IdP being compromised must not equal any
+vault being readable — the wrapped keys and the KDBX stay end-to-end encrypted with keys the server
+AND the IdP never see (law 3.1). Implement OIDC login for the account, map members to their key-
+wrapping identity from 7.1/7.2, and SCIM (or a manual deprovision) that, on removing a person,
+AUTOMATICALLY triggers 7.1 re-wrap/rotation and 7.2 broker revocation — deprovisioning that leaves
+access behind is theatre. This is convenience auth for the service, not identity management (section 2:
+NOT enterprise IAM — do not grow scopes toward Okta). Tests: SSO cannot decrypt anything; a
+deprovisioned user loses both pull and broker access and rotation is triggered; a broken IdP fails
+closed — no login, never open access (law 3.7)."
+
+- [ ] **7.4 — Team delegation dashboard**
+"Extend the Stage 6 Delegation Center from 'everything that can act as ME' to 'everything that can act
+as anyone on the TEAM': unify per-member agent grants, standing policy rules, shared-set membership
+(7.1) and live broker grants (7.2) into one view an owner reads at a glance and revokes from in one
+click. This is the Team tier's hero surface and the honest answer to a security-conscious buyer's real
+question — 'who and what can reach our prod credentials right now, and can I cut any of it instantly?'
+Gated exactly like Stage 6: build it only if Stage 5 revenue and PLAN.md benchmarks were actually met;
+otherwise it goes back to ideas.md. Screenshot-worthy or it isn't done (law 5.1)."
+
 ## MAINTENANCE PROMPTS (recurring, any stage)
 
 **M.1 — Security review**
