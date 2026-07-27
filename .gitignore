@@ -29,3 +29,10 @@ Thumbs.db
 *.pfx
 secrets.json
 .keypaste/
+
+# Business notes live outside this repository (D-0006): benchmarks, pivot conditions, the pricing
+# ladder and acquisition notes were deliberately moved to private storage before it was published.
+# Listed here because a file sitting in the working tree is one `git add -A` away from being in it,
+# which is how this rule gets broken by accident rather than by decision.
+keypastebusinessnotes.md
+*businessnotes*.md
