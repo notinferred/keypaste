@@ -376,7 +376,8 @@ Repo, if useful: [repo]. Sixty-second demo: [docs/demo.md].
 ## X
 
 Seven posts. The GIF carries the first one; nobody reads past it otherwise. No hashtags, no thread
-emoji, no "a thread 🧵". Links only in the last two, because the timeline punishes early links.
+emoji, and no announcing that it is a thread. Links only in the last two, because the timeline
+punishes early links.
 
 **1** — GIF attached, the recorded demo.
 
