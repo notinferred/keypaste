@@ -48,7 +48,7 @@ There are no prebuilt binaries yet. Building is one command and needs the .NET S
 [`global.json`](global.json).
 
 ```sh
-git clone https://github.com/ochoadan/keypaste
+git clone https://github.com/notinferred/keypaste
 cd keypaste
 dotnet build keypaste.slnx -c Release
 ```
