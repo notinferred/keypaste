@@ -47,7 +47,12 @@ readonly FIXTURE='scripts/demo/deploy.sh'
 # the dialog is the first thing on it, and a marketing page is exactly where a stale transcript
 # survives longest, and docs/keepass-and-agents.md is here for the same reason again. The checks
 # are grep and diff over a text file, so the markup is no obstacle.
-readonly TRANSCRIPT_PAGES='docs/demo.md README.md site/public/index.html docs/keepass-and-agents.md'
+#
+# launch.md holds the block every launch post pastes, which is the copy most likely to be read by
+# someone who has never run the binary. Note the dialog extraction below is a sed range, so a page
+# in this list must carry exactly one copy of the block: a second, shortened one would be extracted
+# too and the diff would fail. That is why launch.md keeps one copy and its posts reference it.
+readonly TRANSCRIPT_PAGES='docs/demo.md README.md site/public/index.html docs/keepass-and-agents.md launch.md'
 
 die() {
   echo "::error::$*" >&2
