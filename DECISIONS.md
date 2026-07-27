@@ -2116,6 +2116,54 @@ Nothing is deployed and `public.signup` does not exist, so nothing is at risk ye
 `site/README.md` says do not deploy until the role is switched, and that is the condition to clear
 before anything on this page is true.
 
+## D-0038 - The launch essay was retitled because the title PLAN.md gave it was false
+
+**Date:** 2026-07-27 · **Stage:** 3.2 · **Status:** accepted
+
+prompts.md 3.2 and PLAN.md both asked for an essay called "Your password manager can't talk to AI".
+It is `docs/keepass-and-agents.md`, and it is called "Your **KeePass vault** can't talk to AI - and
+everyone is pasting secrets into chats instead" instead.
+
+**The original title is refuted by this project's own research.** D-0036 recorded that reading four
+vendors' documentation in July 2026 killed the draft's assumption that the wedge was unoccupied:
+1Password's Environments MCP server authorises every interaction, Bitwarden's Agent Access SDK has
+the same request-and-approve shape, and Keeper wants a confirmation before it unmasks a field. That
+argument was already fought and lost once inside the README. A title is the part of an essay most
+likely to be quoted and least likely to be read in context, so shipping the losing version of it on
+the front of a launch post would have handed the first commenter the whole thread. Narrowing to
+*your KeePass vault* costs nothing - KDBX genuinely has no agent integration, which is the entire
+reason keypaste exists - and it aims the piece at r/KeePass and the KeePass forums, which PLAN.md
+already names as launch venues. The three vendors are then conceded by name in the second
+paragraph, before a reader can catch us out.
+
+**The essay is in `TRANSCRIPT_PAGES`, so it is held to the binaries like the other three pages.**
+It reproduces the approval dialog and the `keypaste log` header, and D-0036's whole finding was
+that near-copies nothing checks are how near-copies come to differ. Adding it to
+`scripts/verify-demo.sh` cost one word. The gate was then watched failing - one character changed
+inside the dialog, the run refused and named `docs/keepass-and-agents.md` - because a gate never
+observed failing is not known to be a gate.
+
+**Every figure in it was checked against the primary source, and four did not survive.** GitGuardian
+says 28.65 million, not 28.6. The 2,349 credentials came out of 1,079 attacker-created
+*repositories*, not 1,079 machines. The `--yolo` and `--trust-all-tools` flags are real but appear
+in Wiz's write-up, not in the GitGuardian piece the sentence cited, and the draft had also dropped
+the flag belonging to the first tool it named. And the KeePassXC browser-integration document does
+not actually say what the draft leaned on it for - it documents a Confirm Access dialog with an
+optional Remember, but not the transport and not the replacement of KeePassHTTP, which needed the
+2.3.0 release announcement and the keepassxc-browser README instead. Cyberhaven's 2026 report,
+LayerX's 77%, Netskope's regional splits and a widely repeated CVSS 9.4 were all cut for want of a
+verifiable primary source. **Nothing quantifies how often developers hand a `.env` to an agent**, so
+the essay makes that claim qualitatively, out of named incidents, and attaches no number to it.
+
+**No Show HN text was written, though 3.2 asks the essay to be adaptable to one.** 3.3 owns the
+launch posts, and a launch post should not exist before 3.4 gives a stranger something to install.
+The essay's first three paragraphs are written to stand alone so that adaptation is a compression
+rather than a rewrite.
+
+At roughly 1,400 words the essay is over the ~1,200 the prompt asks for. The overage is the
+honest-limits section and the citations; both were judged to be the wrong things to cut from a page
+whose argument is that the project does not overclaim.
+
 ---
 
 # Open decisions

@@ -45,8 +45,9 @@ readonly FIXTURE='scripts/demo/deploy.sh'
 # the binaries print. Adding a page here costs nothing; leaving one out is how a transcript rots.
 # site/public/index.html is keypaste.com, and it is in this list for the same reason the README is:
 # the dialog is the first thing on it, and a marketing page is exactly where a stale transcript
-# survives longest. The checks are grep and diff over a text file, so the markup is no obstacle.
-readonly TRANSCRIPT_PAGES='docs/demo.md README.md site/public/index.html'
+# survives longest, and docs/keepass-and-agents.md is here for the same reason again. The checks
+# are grep and diff over a text file, so the markup is no obstacle.
+readonly TRANSCRIPT_PAGES='docs/demo.md README.md site/public/index.html docs/keepass-and-agents.md'
 
 die() {
   echo "::error::$*" >&2

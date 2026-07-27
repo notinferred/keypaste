@@ -50,7 +50,7 @@
 - [x] Landing page: the 60-second demo video, install one-liner, "local-first, KDBX, open source" trust bullets — `site/public/index.html`, rewritten in place with the same GIF slot, plus the comparison table and the signup form. The install block is build-from-source, not a one-liner, because there is nothing to install yet; see the release pipeline below
 - [ ] Release pipeline: publish self-contained single-file binaries per OS to a GitHub Release, then the install one-liners both pages currently defer — **gated on O-0006** (does vendored KeePassLib survive AOT), and adding a RID collides with `--locked-mode`, so the lock files have to be regenerated first. `PublishAot` flips here (D-0035)
 - [ ] Launch posts: Hacker News (Show HN), r/selfhosted, r/KeePass, MCP community/Discord, lobste.rs, X
-- [ ] Write the launch essay: "Your password manager can't talk to AI. Here's why that's a problem." 
+- [x] Write the launch essay — [`docs/keepass-and-agents.md`](docs/keepass-and-agents.md), retitled "Your **KeePass vault** can't talk to AI — and everyone is pasting secrets into chats instead" because the original title is false: 1Password, Bitwarden and Keeper all ship request-and-approve flows, and all three are named in the essay's second paragraph (D-0038). Its transcripts are in `verify-demo.sh`'s `TRANSCRIPT_PAGES`, so the essay cannot drift from the binaries either
 - [ ] Respond to every issue/comment for 2 weeks straight
 - **Benchmarks:** tracked privately, outside this repo.
 
