@@ -56,9 +56,29 @@ readonly BROKEN="$WORK/broken.toml"
 
 AGENT_PID=""
 AGENT_ERR=""
+AGENT_PIDS=""
+
+# Every agent this script started, not just the current one, and SIGKILL after SIGTERM.
+#
+# This is not tidiness. `keypaste agent` blocks on a pipe until it is stopped, and an agent that
+# outlives the script keeps the CI step's handles open — so the step sits there until the job times
+# out, twenty minutes after every assertion in here has already passed. That failure is silent and
+# looks like a hang in the product rather than a leak in the harness, which is why the cleanup is
+# thorough rather than minimal, and why the step carries its own timeout in ci.yml.
+stop_agents() {
+  local pid
+  for pid in $AGENT_PIDS; do kill "$pid" 2>/dev/null || true; done
+  sleep 1
+  for pid in $AGENT_PIDS; do kill -9 "$pid" 2>/dev/null || true; done
+  wait 2>/dev/null || true
+
+  AGENT_PIDS=""
+  AGENT_PID=""
+}
+
 cleanup() {
-  if [ -n "$AGENT_PID" ]; then kill "$AGENT_PID" 2>/dev/null || true; fi
-  rm -rf "$WORK"
+  stop_agents
+  rm -rf "$WORK" 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -96,7 +116,7 @@ printf '[[allow]]\nclientt = "%s"\n' "$LABEL" >"$BROKEN"
 start_agent() {
   local policy="$1" maxttl="${2:-300}"
 
-  if [ -n "$AGENT_PID" ]; then kill "$AGENT_PID" 2>/dev/null || true; AGENT_PID=""; fi
+  stop_agents
 
   PIPE="keypaste-policy-$$-$(date +%s)-${RANDOM}"
   AGENT_ERR="$WORK/agent-$(date +%s%N).txt"
@@ -105,6 +125,7 @@ start_agent() {
     | "$CLI" agent --vault "$VAULT" --approver "$PIPE" --policy "$policy" \
         --approval-timeout 10 --max-ttl "$maxttl" >/dev/null 2>"$AGENT_ERR" &
   AGENT_PID=$!
+  AGENT_PIDS="$AGENT_PIDS $AGENT_PID"
 
   for _ in $(seq 1 100); do
     grep -q 'listening on' "$AGENT_ERR" && break
@@ -223,5 +244,9 @@ grep -q "allow#1"             "$AUDIT" || die "the audit line does not name whic
 
 # The one thing the log must never contain, on the one path where nobody watched it happen.
 grep -q "$SECRET" "$AUDIT" && die "the audit log contains the policy-released credential"
+
+# Before the success line, not only in the trap: a reader who sees "ok" should be able to take it
+# that nothing is still running.
+stop_agents
 
 echo "ok: a standing rule released one credential with no prompt, refused everything outside its pattern, and the same agent still asked about the rest"
