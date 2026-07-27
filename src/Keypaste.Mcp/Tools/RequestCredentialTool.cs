@@ -170,6 +170,12 @@ internal sealed class RequestCredentialTool(
                 Exposure = options.Exposure.Globs,
                 ClientName = client.Name,
                 ClientVersion = client.Version,
+
+                // options.ClientLabel, not client.Label: the audit line's copy has been through the
+                // sanitizer, and a policy rule has to compare against what the operator actually
+                // wrote in the client's configuration. Two labels collapsing to one display string
+                // would be a widening.
+                ClientLabel = options.ClientLabel,
             },
             cancellationToken).ConfigureAwait(false);
 

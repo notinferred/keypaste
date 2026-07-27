@@ -21,6 +21,7 @@ public sealed class ApproverProtocolTests
         Exposure = ["env/**"],
         ClientName = "claude-code",
         ClientVersion = "1.2.3",
+        ClientLabel = "billing-bot",
     };
 
     private static CredentialReply Granted(string value = "sk_live_sentinel") => new()
@@ -50,6 +51,40 @@ public sealed class ApproverProtocolTests
         Assert.Equal(original.Exposure, decoded.Exposure);
         Assert.Equal(original.ClientName, decoded.ClientName, StringComparer.Ordinal);
         Assert.Equal(original.ClientVersion, decoded.ClientVersion, StringComparer.Ordinal);
+        Assert.Equal(original.ClientLabel, decoded.ClientLabel, StringComparer.Ordinal);
+    }
+
+    /// <summary>
+    /// The two names travel separately and must never be confused for one another. What the client
+    /// asserts about itself is unauthenticated (THREATS.md T-3) and reaches the audit line only;
+    /// what the operator wrote in the client's configuration is the one a policy rule keys on.
+    /// </summary>
+    [Fact]
+    public void ACredentialRequest_CarriesTheOperatorsLabel_SeparatelyFromTheAssertedName()
+    {
+        var request = Request() with { ClientName = "claude-code", ClientLabel = "billing-bot" };
+
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(request), out CredentialRequest? decoded));
+
+        Assert.Equal("claude-code", decoded.ClientName, StringComparer.Ordinal);
+        Assert.Equal("billing-bot", decoded.ClientLabel, StringComparer.Ordinal);
+        Assert.NotEqual(decoded.ClientName, decoded.ClientLabel);
+    }
+
+    /// <summary>
+    /// A bridge from before Stage 2.3, or one started without <c>--client-label</c>, sends no label
+    /// — and that has to decode rather than fail, because the wire version deliberately did not
+    /// change for one optional field. An absent label matches no rule, so the request reaches a
+    /// person: the same fallback a malformed policy file produces.
+    /// </summary>
+    [Fact]
+    public void ARequestFromABridgeWithNoLabel_DecodesWithANullOne()
+    {
+        var frame = ApproverProtocol.Encode(Request() with { ClientLabel = null });
+
+        Assert.DoesNotContain("client_label", Encoding.UTF8.GetString(frame), StringComparison.Ordinal);
+        Assert.True(ApproverProtocol.TryDecode(frame, out CredentialRequest? decoded));
+        Assert.Null(decoded.ClientLabel);
     }
 
     [Fact]
