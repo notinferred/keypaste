@@ -15,6 +15,7 @@
     --rule: #e4e4e0;
     --accent: #3d5a80;
     --card: #ffffff;
+    --code: #f4f4f1;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -24,6 +25,7 @@
       --rule: #2a2a28;
       --accent: #8fb0d9;
       --card: #1b1b1a;
+      --code: #1b1b1a;
     }
   }
   * { box-sizing: border-box; }
@@ -34,29 +36,72 @@
     font: 17px/1.65 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Inter, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
-  main { max-width: 42rem; margin: 0 auto; padding: 5rem 1.5rem 4rem; }
+  main { max-width: 46rem; margin: 0 auto; padding: 5rem 1.5rem 4rem; }
   h1 {
     font-size: 1.5rem; font-weight: 600; letter-spacing: -0.02em;
     margin: 0 0 2.5rem;
   }
   h1 span { color: var(--muted); font-weight: 400; }
+  h2 {
+    font-size: 1.05rem; font-weight: 600; letter-spacing: -0.01em;
+    margin: 3.5rem 0 1rem;
+  }
   .pitch {
     font-size: 1.375rem; line-height: 1.45; letter-spacing: -0.015em;
     margin: 0 0 1.5rem; text-wrap: balance;
   }
   .pitch strong { font-weight: 600; }
-  .sub { color: var(--muted); margin: 0 0 3rem; }
+  .sub { color: var(--muted); margin: 0 0 2.5rem; }
   .status {
     border: 1px solid var(--rule); background: var(--card);
-    border-radius: 10px; padding: 1rem 1.25rem; margin: 0 0 3rem;
+    border-radius: 10px; padding: 1rem 1.25rem; margin: 2.5rem 0 0;
     font-size: 0.95rem; color: var(--muted);
   }
   .status b { color: var(--fg); font-weight: 600; }
-  ul { list-style: none; padding: 0; margin: 0 0 3rem; }
-  li { padding: 1rem 0; border-top: 1px solid var(--rule); }
-  li:last-child { border-bottom: 1px solid var(--rule); }
-  li b { display: block; font-weight: 600; margin-bottom: 0.15rem; }
-  li span { color: var(--muted); font-size: 0.95rem; }
+  ul.bullets { list-style: none; padding: 0; margin: 0; }
+  ul.bullets li { padding: 1rem 0; border-top: 1px solid var(--rule); }
+  ul.bullets li:last-child { border-bottom: 1px solid var(--rule); }
+  ul.bullets b { display: block; font-weight: 600; margin-bottom: 0.15rem; }
+  ul.bullets span { color: var(--muted); font-size: 0.95rem; }
+  pre {
+    background: var(--code); border: 1px solid var(--rule); border-radius: 10px;
+    padding: 1rem 1.15rem; margin: 0 0 1rem; overflow-x: auto;
+    font-size: 0.8125rem; line-height: 1.55;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  p code, td code {
+    background: var(--code); border-radius: 4px; padding: 0.1em 0.35em;
+    font-size: 0.875em;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  .caption { color: var(--muted); font-size: 0.9rem; margin: 0 0 1rem; }
+  .scroll { overflow-x: auto; margin: 0 0 1rem; }
+  table { border-collapse: collapse; font-size: 0.875rem; min-width: 38rem; }
+  th, td {
+    text-align: left; vertical-align: top; padding: 0.6rem 0.9rem 0.6rem 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  thead th { font-weight: 600; border-bottom: 1px solid var(--fg); white-space: nowrap; }
+  tbody th { font-weight: 400; color: var(--muted); }
+  td:first-of-type { font-weight: 550; }
+  form.signup { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 0 0 0.75rem; }
+  form.signup label.field { flex: 1 1 16rem; }
+  form.signup input[type="email"] {
+    width: 100%; padding: 0.7rem 0.85rem; font: inherit; font-size: 0.95rem;
+    color: var(--fg); background: var(--card);
+    border: 1px solid var(--rule); border-radius: 8px;
+  }
+  form.signup input[type="email"]:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 1px;
+  }
+  form.signup button {
+    padding: 0.7rem 1.15rem; font: inherit; font-size: 0.95rem; font-weight: 550;
+    color: var(--bg); background: var(--accent);
+    border: 0; border-radius: 8px; cursor: pointer;
+  }
+  form.signup button:hover { opacity: 0.9; }
+  /* Offscreen rather than hidden: a bot skips type="hidden" and fills this in. */
+  .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
   .cta {
     display: inline-block; padding: 0.7rem 1.15rem;
     background: var(--accent); color: var(--bg);
@@ -73,12 +118,40 @@
   @media (max-width: 480px) {
     main { padding-top: 3rem; }
     .pitch { font-size: 1.2rem; }
+    pre { font-size: 0.75rem; }
   }
 </style>
 </head>
 <body>
 <main>
   <h1>keypaste <span>— the safe bridge between your credentials and the AI era</span></h1>
+
+  <!-- The demo GIF belongs here, as the same docs/demo/keypaste-demo.gif the README uses. Until it
+       is recorded, the dialog below is the hero. Nothing else on this page moves when it lands. -->
+
+<pre>
+────────────────────────────────────────────────────────────
+keypaste: an agent is asking for a credential.
+
+  client   claude-code
+  entry    env/demo/STRIPE_KEY
+  field    password
+  for      300 seconds
+
+  the agent says it needs this because:
+    deploy the billing service to staging
+
+  That sentence was written by the agent, not by keypaste. Treat it as a claim.
+
+Approve? [y/N]
+</pre>
+
+  <p class="caption">
+    That is the whole product in one screen. An agent asked; you were shown who, what and why; one
+    field goes back for a lifetime you were told about.
+    <a href="https://github.com/ochoadan/keypaste/blob/main/docs/demo.md">Watch it end to end</a> —
+    about sixty seconds.
+  </p>
 
   <p class="pitch">
     <strong>Stop pasting secrets into chats.</strong> keypaste is a local-first,
@@ -89,20 +162,14 @@
 
   <p class="sub">For developers who are tired of choosing between <code>.env</code> files and trusting an agent with everything.</p>
 
-  <p class="status">
-    <b>Status: early.</b> The repository is public and the foundations are in place, but the vault
-    itself is still being built. Nothing here is ready to hold a real secret yet. Watch the repo if
-    you want to see it land — or read the constitution it's being built against.
-  </p>
-
-  <ul>
+  <ul class="bullets">
     <li>
       <b>Local-first, offline</b>
       <span>Your vault is a file on your disk. No account, no cloud service holding your secrets, no network required. Sync it yourself with whatever you already use.</span>
     </li>
     <li>
       <b>Standard KDBX, not a new format</b>
-      <span>Everything keypaste writes opens in KeePassXC and KeePass. If keypaste disappears tomorrow, your data doesn't.</span>
+      <span>Everything keypaste writes opens in KeePassXC and KeePass, proved in both directions against a real keepassxc-cli on Linux, macOS and Windows on every push. If keypaste disappears tomorrow, your data doesn't.</span>
     </li>
     <li>
       <b>Open source, AGPL</b>
@@ -110,11 +177,135 @@
     </li>
   </ul>
 
-  <a class="cta" href="https://github.com/ochoadan/keypaste">Follow along on GitHub →</a>
+  <p class="status">
+    <b>Pre-1.0, and it says so.</b> The vault, the environment-variable injection and the agent
+    bridge all work today and are tested on all three operating systems. There are no prebuilt
+    binaries yet, there is no GUI yet, and the approval prompt is a terminal prompt rather than a
+    native dialog.
+  </p>
+
+  <h2>Install</h2>
+
+  <p class="caption">
+    There are no prebuilt binaries yet. Building is one command and needs the .NET SDK pinned in
+    the repository. Single-file binaries for macOS, Linux and Windows are the next thing.
+  </p>
+
+<pre>git clone https://github.com/ochoadan/keypaste
+cd keypaste
+dotnet build keypaste.slnx -c Release</pre>
+
+  <p class="caption">Then a vault, and a project with no <code>.env</code> in it:</p>
+
+<pre>keypaste init ~/vault.kdbx
+export KEYPASTE_VAULT=~/vault.kdbx
+
+keypaste env pull dev            # imports ./.env, then offers to delete it
+keypaste run dev -- npm start    # injected into the child process, nothing on disk</pre>
+
+  <h2>Connecting it to Claude</h2>
+
+  <p class="caption">
+    Two processes, and the split is the whole design. <code>keypaste-mcp</code> is started by your
+    MCP client, holds no vault and decides nothing. <code>keypaste agent</code> is started by you,
+    holds the vault, and asks you the question at the top of this page.
+  </p>
+
+<pre>keypaste agent --vault ~/vault.kdbx</pre>
+
+  <p class="caption">Then point Claude Desktop at the bridge — paths must be absolute:</p>
+
+<pre>{
+  "mcpServers": {
+    "keypaste": {
+      "command": "/absolute/path/to/keypaste-mcp",
+      "args": [
+        "--vault", "/absolute/path/to/vault.kdbx",
+        "--client-label", "claude-desktop"
+      ]
+    }
+  }
+}</pre>
+
+  <p class="caption">
+    <strong>There is no place in that config for a master password, and there never will be.</strong>
+    Every call an agent makes — granted or refused — is one line in a log on your disk, and the
+    value is never in it:
+  </p>
+
+<pre>
+  time (UTC)           client       entry                decision  method
+  2026-07-26 14:03:09  claude-code  -                    granted   exposure
+  2026-07-26 14:03:11  claude-code  env/demo/STRIPE_KEY  granted   prompt
+  2026-07-26 14:07:44  claude-code  env/demo/STRIPE_KEY  denied    out-of-scope
+</pre>
+
+  <h2>How it compares</h2>
+
+  <p class="caption">
+    Only the wedge — where the secrets live, how they reach a process, and what happens when an
+    agent asks for one. Checked against each vendor's own documentation in July 2026.
+  </p>
+
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr><th></th><th>keypaste</th><th>KeePassXC</th><th>1Password</th><th>Infisical</th></tr>
+      </thead>
+      <tbody>
+        <tr><th>Where secrets live</th><td>a KDBX file you own</td><td>a KDBX file you own</td><td>1Password's service</td><td>Postgres, theirs or yours</td></tr>
+        <tr><th>Usable with no account</th><td>yes</td><td>yes</td><td>no — a membership is required</td><td>no — a server, Postgres and Redis</td></tr>
+        <tr><th>Injecting into a child process</th><td><code>keypaste run dev -- npm start</code></td><td>no</td><td><code>op run -- npm start</code></td><td><code>infisical run -- npm start</code></td></tr>
+        <tr><th>An agent can ask for a credential</th><td>yes, over MCP</td><td>no official integration</td><td>yes, over MCP (beta)</td><td>yes, over MCP</td></tr>
+        <tr><th>A person answers each request</th><td>yes, and no is the default</td><td>—</td><td>yes</td><td>not documented</td></tr>
+        <tr><th>What the agent receives</th><td>one field value, for a lifetime you were shown</td><td>—</td><td>no secret — 1Password injects it instead</td><td>not documented</td></tr>
+        <tr><th>Per-access log</th><td>local JSONL, hash-chained</td><td>no</td><td>yes, on Business</td><td>yes, on the paid tiers</td></tr>
+        <tr><th>Licence</th><td>AGPL-3.0</td><td>GPL-2.0-or-later</td><td>source not published</td><td>MIT core, paid features</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="caption">
+    <strong>keypaste is not the only thing in this space, and pretending otherwise would be the
+    fastest way to lose the argument.</strong> Keeper's MCP server prompts a human before it
+    returns unmasked secret data. Bitwarden published an Agent Access SDK in March 2026 with the
+    same request-and-approve shape, though it is alpha and its logging is not there yet.
+    1Password's Environments MCP server asks for approval too, and then deliberately never hands
+    the credential over at all — a different answer to the same problem, not a worse one.
+    What is keypaste's is the combination: an ordinary KDBX file you own, no account and no server
+    anywhere, a person answering each request, and a log that never leaves your disk.
+  </p>
+
+  <h2>Tell me when it ships</h2>
+
+  <p class="caption">
+    One message, when there is something to install. Not a newsletter, and nothing in between.
+  </p>
+
+  <form class="signup" method="post" action="/subscribe">
+    <label class="field">
+      <input type="email" name="email" required autocomplete="email" inputmode="email"
+             spellcheck="false" maxlength="254" placeholder="you@example.com"
+             aria-label="Your email address">
+    </label>
+    <span class="hp" aria-hidden="true">
+      <label for="website">Leave this empty</label>
+      <input id="website" type="text" name="website" tabindex="-1" autocomplete="off">
+    </span>
+    <button type="submit">Notify me</button>
+  </form>
+
+  <p style="margin-top:2rem">
+    <a class="cta" href="https://github.com/ochoadan/keypaste">Read the source on GitHub →</a>
+  </p>
 
   <footer>
     <p>Security reports: <a href="mailto:security@keypaste.com">security@keypaste.com</a></p>
-    <p>This page sets no cookies and loads no third-party scripts.</p>
+    <p>
+      This page sets no cookies, loads no third-party scripts, and runs no JavaScript at all. If
+      you enter your email it is stored on a database the maintainer runs, used only to tell you
+      when keypaste ships, and confirmed with you before anything is sent.
+    </p>
   </footer>
 </main>
 </body>

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Proves docs/demo.md still describes the binaries as they actually are.
+# Proves docs/demo.md and README.md still describe the binaries as they actually are.
 #
 # Everything else in the suite checks behaviour. This checks a document against that behaviour, and
 # nothing in-process can: what goes stale is a Markdown transcript, which no unit test reads, and
@@ -7,6 +7,12 @@
 # supposed to be looking at. docs/demo.md is the marketing (CORE.md law 5.1), and the first thing a
 # stranger does with a demo page is type it in - so a page that has quietly drifted costs more than
 # no page at all.
+#
+# README.md is held to the same standard for the parts it reproduces. The approval dialog is the
+# first thing on it - it stands in for the demo GIF and it is the single block a stranger judges the
+# project by - and an ungated copy of a transcript is a transcript that drifts. It carries the
+# dialog and the log table's header row, so those are what it is checked against; docs/demo.md
+# carries the whole demo and is checked against all of it.
 #
 # It stands in for Claude with the same scripted JSON-RPC client verify-approval-e2e.sh uses. That
 # is a transport, not an agent: it decides nothing and chooses no wording, it sends exactly the
@@ -17,11 +23,11 @@
 # NEGATIVE CONTROL: this script fails if scripts/demo/deploy.sh exits zero with no STRIPE_KEY set,
 # if it exits non-zero with one, if any of the key beyond its masked prefix and suffix reaches its
 # output, if the approval dialog the shipped agent draws differs by one character from the block in
-# docs/demo.md, if the `Approve? [y/N]` line is missing from that page, if an approved request does
-# not return the credential, if a refused one does, if the credential reaches the audit log, if the
-# rendered `keypaste log` table differs from the page's payoff block, if either committed fixture is
-# missing or not executable, or if an option the page tells you to type is absent from the shipped
-# usage text. Removing any one of those leaves a script that passes while the page it defends has
+# EITHER page, if the `Approve? [y/N]` line is missing from either, if either stops carrying the
+# dialog at all, if an approved request does not return the credential, if a refused one does, if
+# the credential reaches the audit log, if the rendered `keypaste log` table header differs from
+# either page's, if either committed fixture is missing or not executable, or if an option the page
+# tells you to type is absent from the shipped usage text. Removing any one of those leaves a script that passes while the page it defends has
 # gone wrong. These checks must never be skipped or soft-passed.
 set -euo pipefail
 
@@ -34,6 +40,13 @@ readonly LABEL='claude-code'
 
 readonly DOC='docs/demo.md'
 readonly FIXTURE='scripts/demo/deploy.sh'
+
+# Every page that reproduces the approval dialog and the log table, and is therefore held to what
+# the binaries print. Adding a page here costs nothing; leaving one out is how a transcript rots.
+# site/public/index.html is keypaste.com, and it is in this list for the same reason the README is:
+# the dialog is the first thing on it, and a marketing page is exactly where a stale transcript
+# survives longest. The checks are grep and diff over a text file, so the markup is no obstacle.
+readonly TRANSCRIPT_PAGES='docs/demo.md README.md site/public/index.html'
 
 die() {
   echo "::error::$*" >&2
@@ -75,14 +88,16 @@ trap cleanup EXIT
 # stripped line: the page indents nothing inside its output blocks, so an exact match is the
 # right test, and a substring match would let a truncated transcript pass.
 in_doc() {
-  local line="$1" what="$2"
-  grep -qFx -- "$line" "$DOC" || die "$what is not in $DOC as the binaries print it: |$line|"
+  local line="$1" what="$2" file="${3:-$DOC}"
+  grep -qFx -- "$line" "$file" || die "$what is not in $file as the binaries print it: |$line|"
 }
 
 # ------------------------------------------------------------ 0. the committed files are usable
 # The -x check is not decoration: scripts/verify-log-chain.sh shipped without its mode bit and was
 # skipped on two operating systems before anybody noticed.
-[ -f "$DOC" ] || die "$DOC is missing"
+for page in $TRANSCRIPT_PAGES; do
+  [ -f "$page" ] || die "$page is missing"
+done
 [ -x "$FIXTURE" ] || die "$FIXTURE is missing or not executable (git update-index --chmod=+x)"
 
 # --------------------------------------------------------------- A. the fixture, and its masking
@@ -165,15 +180,16 @@ block() {
 }
 
 block "$AGENT_ERR" >"$WORK/dialog-actual.txt"
-block "$DOC"       >"$WORK/dialog-doc.txt"
-
 [ -s "$WORK/dialog-actual.txt" ] || die "the approver drew no dialog"
-[ -s "$WORK/dialog-doc.txt" ] || die "$DOC has no approval dialog block"
 
 DIFF="$WORK/dialog.diff"
-if ! diff -u "$WORK/dialog-doc.txt" "$WORK/dialog-actual.txt" >"$DIFF" 2>&1; then
-  die "the approval dialog in $DOC is not what the shipped agent draws"
-fi
+for page in $TRANSCRIPT_PAGES; do
+  block "$page" >"$WORK/dialog-doc.txt"
+  [ -s "$WORK/dialog-doc.txt" ] || die "$page has no approval dialog block"
+  if ! diff -u "$WORK/dialog-doc.txt" "$WORK/dialog-actual.txt" >"$DIFF" 2>&1; then
+    die "the approval dialog in $page is not what the shipped agent draws"
+  fi
+done
 
 # The rule is drawn around the dialog, and the page shows it. Its BYTES are deliberately not
 # compared: .NET encodes stderr for the console's code page, so on Windows the U+2500 arrives as a
@@ -194,14 +210,18 @@ esac
 # over a multi-byte character means "sixty of this character" only in a UTF-8 locale; under LC_ALL=C
 # it means sixty of its last byte, and the runners do not all agree about which they are.
 rule_literal="$(printf '─%.0s' $(seq 1 60))"
-grep -qFx -- "$rule_literal" "$DOC" \
-  || die "$DOC no longer shows the 60-character rule around the dialog"
+for page in $TRANSCRIPT_PAGES; do
+  grep -qFx -- "$rule_literal" "$page" \
+    || die "$page no longer shows the 60-character rule around the dialog"
+done
 
 # The one line this harness cannot observe, asserted against the page instead of faked.
 # ConsoleSecretPrompt.ReadLine writes its prompt only when stdin is a terminal, and CI has none -
 # so `Approve? [y/N] ` and `Master password: ` never reach stderr here. They are still the lines a
 # human's screen ends on, which is why the page must carry them and why this check is not dropped.
-grep -qF 'Approve? [y/N]' "$DOC" || die "$DOC does not show the question a person actually answers"
+for page in $TRANSCRIPT_PAGES; do
+  grep -qF 'Approve? [y/N]' "$page" || die "$page does not show the question a person actually answers"
+done
 grep -qF 'Master password:' "$DOC" || die "$DOC does not show the master password prompt"
 
 # --------------------------------------------------------------- C. what came back, and what was logged
@@ -249,7 +269,9 @@ OUT="$WORK/log.txt"
 
 header="$(grep -m1 'time (UTC)' "$OUT" | tr -d '\r')"
 [ -n "$header" ] || die "keypaste log printed no table header"
-in_doc "$header" "the log table's header row"
+for page in $TRANSCRIPT_PAGES; do
+  in_doc "$header" "the log table's header row" "$page"
+done
 
 # The gutter is what makes this worth asserting: AuditText pads a one-character column onto every
 # row, so a transcript pasted without it is wrong in a way that is invisible to the eye.

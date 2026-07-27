@@ -1,23 +1,145 @@
 # keypaste
 
-> *"Stop pasting secrets into chats. keypaste is a local-first, KDBX-compatible vault that stores your passwords AND env variables, injects them into your projects, and lets AI agents like Claude request exactly one credential — with your approval, scoped access, and a full audit trail — without ever seeing your vault."*
+<!-- The demo GIF belongs here, as docs/demo/keypaste-demo.gif — recorded with scripts/demo/ and
+     kept under 2 MB. Until it exists the dialog below is the hero, and nothing else on this page
+     moves when it lands. -->
 
-**Status: Stages 1 and 2 complete.** Create a vault, add entries, list them, copy a password to the
-clipboard, remove entries, keep a project's environment variables in the same file — importing them
-straight from an existing `.env` — and run any command with those variables injected, with nothing
-written to disk. There is a way back out, too. Verified in CI against a real KeePassXC on Linux,
-macOS and Windows, in both directions.
+```
+────────────────────────────────────────────────────────────
+keypaste: an agent is asking for a credential.
 
-The MCP bridge is in, and so is everything CORE.md law 3.2 asks of it. An agent asks; you are shown
-who is asking, for what, and why; one field value goes back for a lifetime you were told about. You
-can pre-approve a narrow pattern in a policy file, which is the one path that releases without
-asking. Every call is one line in a local audit log whose records are hash-chained, so
-`keypaste log verify` can tell you the file is the one keypaste wrote. Follow [`PLAN.md`](PLAN.md)
-for what lands next; [`CORE.md`](CORE.md) is the constitution and does not change.
+  client   claude-code
+  entry    env/demo/STRIPE_KEY
+  field    password
+  for      300 seconds
 
-**New here?** [**Replace your `.env` in 5 minutes**](docs/replace-dotenv.md) is the guide — import,
-run, CI, and honest answers about lost master passwords and syncing. To see the agent bridge
-instead, [**watch Claude ask for a key**](docs/demo.md) — about sixty seconds, end to end.
+  the agent says it needs this because:
+    deploy the billing service to staging
+
+  That sentence was written by the agent, not by keypaste. Treat it as a claim.
+
+Approve? [y/N]
+```
+
+**Stop pasting secrets into chats.** keypaste is a local-first, KDBX-compatible vault that stores
+your passwords and env variables, injects them into your projects, and lets AI agents like Claude
+request exactly one credential — with your approval, scoped access, and a full audit trail —
+without ever seeing your vault.
+
+[**Claude asks for a key, you approve, the deploy runs**](docs/demo.md) is the whole thing end to
+end, in about sixty seconds.
+
+- **Local-first, offline.** Your vault is a file on your disk. No account, no cloud service holding
+  your secrets, no network required. Sync it yourself with whatever you already use.
+- **Standard KDBX, not a new format.** Everything keypaste writes opens in KeePassXC and KeePass —
+  proved in both directions against a real `keepassxc-cli` on Linux, macOS and Windows on every
+  push. If keypaste disappears tomorrow, your data doesn't.
+- **Open source, AGPL.** Auditable by anyone, forever. A tool that handles secrets shouldn't ask to
+  be trusted on faith.
+
+**Pre-1.0, and it says so.** Everything on this page works today and is tested on all three
+operating systems. There are no prebuilt binaries yet, there is no GUI yet, and the approval prompt
+is a terminal prompt rather than a native dialog. [`PLAN.md`](PLAN.md) is what lands next;
+[`CORE.md`](CORE.md) is the constitution and does not change.
+
+## Install
+
+There are no prebuilt binaries yet. Building is one command and needs the .NET SDK pinned in
+[`global.json`](global.json).
+
+```sh
+git clone https://github.com/ochoadan/keypaste
+cd keypaste
+dotnet build keypaste.slnx -c Release
+```
+
+`keypaste` lands at `artifacts/bin/Keypaste.Cli/release/` and `keypaste-mcp` at
+`artifacts/bin/Keypaste.Mcp/release/` (`.exe` on Windows). Put the first on your `PATH`; note the
+absolute path of the second, because that is what an MCP client needs. Single-file binaries for
+macOS, Linux and Windows are the next thing after this page.
+
+## Sixty seconds to a project with no `.env` in it
+
+```sh
+keypaste init ~/vault.kdbx              # prompts for a master password, twice
+export KEYPASTE_VAULT=~/vault.kdbx      # or pass --vault to every command
+
+keypaste env pull dev                   # imports ./.env, then offers to delete it
+keypaste run dev -- npm start           # injected into the child process, nothing written to disk
+```
+
+[**Replace your `.env` in 5 minutes**](docs/replace-dotenv.md) is the guide — importing, CI,
+syncing, the way back out, and honest answers about lost master passwords.
+
+## Connecting it to Claude
+
+Two processes, and the split is the whole design. `keypaste-mcp` is the MCP server your client
+starts, so software starts it; it holds no vault and decides nothing. `keypaste agent` is the one
+**you** start in your own terminal; it holds the vault and asks you the question at the top of this
+page.
+
+```sh
+keypaste agent --vault ~/vault.kdbx
+```
+
+Then point Claude Desktop at the bridge. Paths must be absolute, and on Windows the backslashes are
+escaped (`"C:\\Users\\you\\keypaste-mcp.exe"`):
+
+```json
+{
+  "mcpServers": {
+    "keypaste": {
+      "command": "/absolute/path/to/keypaste-mcp",
+      "args": [
+        "--vault", "/absolute/path/to/vault.kdbx",
+        "--client-label", "claude-desktop"
+      ]
+    }
+  }
+}
+```
+
+For Claude Code, the same thing in one line:
+
+```sh
+claude mcp add --transport stdio --scope project keypaste \
+  -- /absolute/path/to/keypaste-mcp \
+     --vault /absolute/path/to/vault.kdbx \
+     --client-label claude-code
+```
+
+**There is no place in that config for a master password, and there never will be.**
+[**Connecting keypaste to Claude**](docs/mcp-setup.md) is the full guide, including what
+`--expose` governs and how to read the audit log back.
+
+## How it compares
+
+Only the wedge — where the secrets live, how they reach a process, and what happens when an agent
+asks for one. Everything below was checked against each vendor's own documentation in July 2026.
+
+| | keypaste | KeePassXC | 1Password | Infisical |
+| --- | --- | --- | --- | --- |
+| Where secrets live | a KDBX file you own | a KDBX file you own | 1Password's service | Postgres, theirs or yours |
+| Usable with no account | yes | yes | no — a membership is required | no — a server, Postgres and Redis |
+| Injecting into a child process | `keypaste run dev -- npm start` | no | `op run -- npm start` | `infisical run -- npm start` |
+| An agent can ask for a credential | yes, over MCP | no official integration | yes, over MCP (beta) | yes, over MCP |
+| A person answers each request | yes, and no is the default | — | yes | not documented |
+| What the agent receives | one field value, for a lifetime you were shown | — | no secret — 1Password injects it instead | not documented |
+| Per-access log | local JSONL, hash-chained | no | yes, on Business | yes, on the paid tiers |
+| Licence | AGPL-3.0 | GPL-2.0-or-later | source not published | MIT core, paid features |
+
+**keypaste is not the only thing in this space, and pretending otherwise would be the fastest way
+to lose the argument.** Keeper's MCP server prompts a human before it returns unmasked secret data.
+Bitwarden published an Agent Access SDK in March 2026 with the same request-and-approve shape,
+though it is alpha and its logging is not there yet. 1Password's Environments MCP server asks for
+approval too, and then deliberately never hands the credential over at all — a genuinely different
+answer to the same problem, not a worse one. `kprun` already injects KeePass entries into a child
+process and writes a local JSONL log, without an approval step.
+
+What is keypaste's is the combination: the vault is an ordinary KDBX file you own, there is no
+account and no server anywhere in the picture, a person answers each request unless they wrote a
+rule saying otherwise, and the log never leaves your disk. Each of the others gives up at least one
+of those.
 
 ## Using it
 
@@ -134,39 +256,17 @@ Values are written in single quotes wherever possible, because that form means t
 cannot be — a value containing an apostrophe or a carriage return — are escaped and named on stderr,
 because that is the form those readers disagree about.
 
-## Letting an agent ask for one
+## What an agent can and cannot do
 
-`keypaste-mcp` is an MCP server. Point Claude Desktop or Claude Code at it and two tools appear:
-`list_entry_names`, which returns group paths and entry names and never a value, and
-`request_credential`, which asks you to release one field of one entry.
+Two tools appear in the client: `list_entry_names`, which returns group paths and entry names and
+never a value, and `request_credential`, which asks you to release one field of one entry.
 
 Nothing is released without you saying yes to that specific request, unless you wrote a rule in
-advance that covers it. You are asked by `keypaste agent`, a command you run in your own terminal:
-
-```sh
-keypaste agent --vault ~/vaults/personal.kdbx
-```
-
-```
-keypaste: an agent is asking for a credential.
-
-  client   claude-code
-  entry    env/dev/STRIPE_KEY
-  field    password
-  for      300 seconds
-
-  the agent says it needs this because:
-    deploy the billing service to staging
-
-  That sentence was written by the agent, not by keypaste. Treat it as a claim.
-
-Approve? [y/N]
-```
-
-**Your master password is typed there and nowhere else.** Any program on your machine can pop up a
-window that looks like keypaste asking for it, so keypaste never gives you a reason to expect one:
-no agent, and nothing an agent does, can cause a password prompt to appear. That is why the approver
-is a separate process you start, rather than something the MCP server does.
+advance that covers it. **Your master password is typed at `keypaste agent` and nowhere else.** Any
+program on your machine can pop up a window that looks like keypaste asking for it, so keypaste
+never gives you a reason to expect one: no agent, and nothing an agent does, can cause a password
+prompt to appear. That is why the approver is a separate process you start, rather than something
+the MCP server does.
 
 Say no and the agent is told not to ask again. Say nothing for 45 seconds and that is a no. Ask for
 the same field again within the lifetime you approved and you are not asked twice. Every call —
@@ -209,10 +309,10 @@ Every call an agent makes is one line in `~/.keypaste/audit.jsonl`, allowed or r
 ```
 3 records in /home/you/.keypaste/audit.jsonl
 
-  time (UTC)           client       entry               decision  method
-  2026-07-26 14:03:09  claude-code  -                   granted   exposure
-  2026-07-26 14:03:11  claude-code  env/dev/STRIPE_KEY  granted   prompt
-  2026-07-26 14:07:44  claude-code  env/dev/STRIPE_KEY  denied    out-of-scope
+  time (UTC)           client       entry                decision  method
+  2026-07-26 14:03:09  claude-code  -                    granted   exposure
+  2026-07-26 14:03:11  claude-code  env/demo/STRIPE_KEY  granted   prompt
+  2026-07-26 14:07:44  claude-code  env/demo/STRIPE_KEY  denied    out-of-scope
 ```
 
 `--denied`, `--client <text>` and `--since 2h` narrow it, and a narrowed view always says so.
@@ -221,12 +321,10 @@ Each record carries the hash of the record before it, so `keypaste log verify` t
 file is the one keypaste wrote — and tells you, every time it passes, the two things it cannot see:
 a rewrite that recomputed the chain, and records deleted from the end.
 
-[**Claude asks for a key, you approve, the deploy runs**](docs/demo.md) is the whole thing end to
-end, in about sixty seconds. [**Approving an agent's request**](docs/approvals.md) is the guide to
-what you are deciding. [**Connecting keypaste to Claude**](docs/mcp-setup.md) has the config
-snippets, the audit log format, and how to read it. [**THREATS.md**](THREATS.md) is the threat model — prompt injection through entry
-names and through the agent's stated reason, clients that cannot be authenticated, prompt fatigue,
-what a reused grant costs, and what tampering with the log does and does not achieve.
+[**Approving an agent's request**](docs/approvals.md) is the guide to what you are actually
+deciding. [**THREATS.md**](THREATS.md) is the threat model — prompt injection through entry names
+and through the agent's stated reason, clients that cannot be authenticated, prompt fatigue, what a
+reused grant costs, and what tampering with the log does and does not achieve.
 
 ## Packages
 
