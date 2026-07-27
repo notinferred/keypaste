@@ -2066,6 +2066,35 @@ an intention. It is written down here so it is not rediscovered on launch day.
 other people's email addresses is precisely where a report is wanted, so that exclusion was
 narrowed to the static content.
 
+### What the first configuration actually looked like
+
+Recorded because the gap between this record and the account it describes is the whole risk, and
+because the second half of it is still open.
+
+The Hyperdrive config was created through Cloudflare's PlanetScale integration rather than by the
+steps in `site/README.md`, and it was wrong in both of the ways this record argues about.
+
+**The TLS half is now right, and the API would not let it be otherwise.** Cloudflare refuses
+`verify-full` unless a CA certificate is bound to the config - `ca_certificate_id: cannot be blank`
+- which is a better guarantee than the one assumed above, because the mode cannot be set and then
+silently ignored. PlanetScale serves a Let's Encrypt chain terminating at ISRG Root X2 cross-signed
+by X1; X1 was uploaded and the chain verified against it alone, with hostname checking, before it
+was bound. A query through the binding then succeeded, so `verify-full` is real rather than merely
+accepted.
+
+**The role half is still wrong at the time of writing, and is worse than this record assumed.** The
+config connects as the integration's own `pscale_api_…` credential, which a query through the
+binding reports as `rolcreaterole`, `rolcreatedb`, `rolbypassrls`, and a member of
+`pg_read_all_data`, `pg_write_all_data` and `postgres`. The claim above - that nothing reachable
+from the Worker can read the list back - is therefore **false of the deployment**, though true of
+the code and of `schema.sql`. It is stated here rather than left as a mismatch someone finds later.
+
+The fallback this record reserved for "if PlanetScale forbids `CREATE ROLE`" is not needed:
+`rolcreaterole` is present, so the least-privilege role is available and simply has not been
+created. Nothing is deployed and `public.signup` does not exist, so nothing is at risk yet - but
+`site/README.md` says do not deploy until the role is switched, and that is the condition to clear
+before anything on this page is true.
+
 ---
 
 # Open decisions
