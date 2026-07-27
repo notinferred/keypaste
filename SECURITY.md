@@ -186,11 +186,16 @@ file you just made, in advance: your editor's swap file, your backups, snapshots
 run` exists so that you rarely need this; when you do use it, delete the file when you are done and
 treat the values as having been exposed if it ever left the machine.
 
-**The audit log is tamper-evident, not tamper-proof — and not even that yet.** Every agent access is
-recorded locally, and keypaste opens that file only in append mode: no code path in it seeks,
-truncates, rewrites or deletes. That is a guarantee about keypaste's own behaviour and nothing more.
-The file belongs to your user account, so anything running as you can rewrite it at will, and until
-the per-line hash chain ships the rewrite leaves no trace. On Linux and macOS the log is created
+**The audit log is tamper-evident, not tamper-proof.** Every agent access is recorded locally, and
+keypaste opens that file only in append mode: no code path in it seeks, truncates, rewrites or
+deletes. Each record also carries the hash of the record before it, so `keypaste log verify` can tell
+you whether the file is the file keypaste wrote. That catches careless tampering — a line edited,
+removed, inserted, or written by something else. It does not catch two things, and the command says
+so every time it passes rather than only when it fails: **the chain holds no secret**, so anyone who
+can write the file can recompute it, and **records deleted from the end leave no trace**, because
+nothing follows them. For the second there is `keypaste log verify --expect <hash>`, which checks
+that a hash you wrote down earlier is still in the file; keypaste keeps no copy of it, because an
+anchor stored beside the thing it anchors is worth nothing. On Linux and macOS the log is created
 readable only by its owner; **on Windows there is no equivalent** and it inherits its directory's
 permissions, the same gap `env export` has. keypaste never rotates or trims the log — deleting lines
 is the opposite of what it is for — so it grows without bound. See [THREATS.md](THREATS.md) T-5.

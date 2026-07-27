@@ -703,12 +703,40 @@ public sealed class ServerToolsTests
             using var parsed = JsonDocument.Parse(line);
             var root = parsed.RootElement;
 
-            Assert.Equal(1, root.GetProperty("v").GetInt32());
+            Assert.Equal(AuditRecord.SchemaVersion, root.GetProperty("v").GetInt32());
             Assert.Equal(McpHarness.ClientName, root.GetProperty("client").GetProperty("name").GetString());
             Assert.Equal(McpHarness.ClientVersion, root.GetProperty("client").GetProperty("version").GetString());
             Assert.Equal("denied", root.GetProperty("decision").GetString());
             Assert.Equal("env/**", root.GetProperty("exposure")[0].GetString());
         }
+    }
+
+    /// <summary>
+    /// The log a real server run leaves behind verifies against its own chain.
+    /// </summary>
+    /// <remarks>
+    /// <c>AuditChainTests</c> builds its files through the writer directly, which proves the chain is
+    /// internally consistent but not that the bridge produces one — a server that opened the log
+    /// twice, or wrote through some path of its own, would pass every test there and leave a file
+    /// nobody could verify. This is the cheap in-process half of what
+    /// <c>scripts/verify-log-chain.sh</c> proves against the shipped binaries.
+    /// </remarks>
+    [Fact]
+    public async Task ARealRunLeavesALogThatVerifies()
+    {
+        await using var harness = new McpHarness();
+        var client = await harness.StartAsync();
+
+        await CallAsync(client, ToolText.ListToolName);
+        await CallAsync(client, ToolText.CredentialToolName, Credential());
+        await CallAsync(client, ToolText.ListToolName);
+
+        var report = AuditChainVerifier.Verify(harness.AuditPath);
+
+        Assert.Equal(AuditChainVerdict.Intact, report.Verdict);
+        Assert.Equal(3, report.Records);
+        Assert.Equal(3, report.LatestSequence);
+        Assert.Empty(report.Findings);
     }
 
     /// <summary>

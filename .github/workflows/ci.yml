@@ -129,6 +129,17 @@ jobs:
         timeout-minutes: 8
         run: scripts/verify-policy-e2e.sh
 
+      # The audit log is written by keypaste-mcp and read back by keypaste — two separate programs
+      # that have to agree, byte for byte, about what a record is. That agreement is the whole of
+      # THREATS.md T-5's mitigation, and the in-process tests cannot see it because they only ever
+      # use one of the two. This step edits a real log on a real disk and asserts that the shipped
+      # `keypaste log verify` notices, and, just as importantly, that an interrupted write and a
+      # truncation are reported as what they are rather than as an attack. Without it, the chain
+      # could pass every unit test while the two binaries disagreed about a single byte.
+      - name: Verify the audit chain catches tampering and forgives a crash
+        shell: bash
+        run: scripts/verify-log-chain.sh
+
   # ===========================================================================
   # PERMANENT COMPATIBILITY GATE — CORE.md law 4.6:
   #   "Compatibility is sacred: any KDBX file keypaste writes must open

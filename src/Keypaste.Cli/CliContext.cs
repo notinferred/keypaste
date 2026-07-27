@@ -38,6 +38,9 @@ internal sealed class CliContext
     /// <summary>How a warning that must not be missed reaches the terminal.</summary>
     internal required IConsoleStyle ConsoleStyle { get; init; }
 
+    /// <summary>What time it is, for the commands that take a relative span.</summary>
+    internal TimeProvider Clock { get; init; } = TimeProvider.System;
+
     /// <summary>Builds the context the real program uses.</summary>
     /// <remarks>
     /// Prompts are wired to <paramref name="stderr"/>, not <paramref name="stdout"/>. That is the
