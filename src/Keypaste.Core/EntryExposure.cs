@@ -27,6 +27,11 @@ namespace Keypaste.Core;
 /// case-sensitive: a case-insensitive match is a wider match, and widening is not something this
 /// type is allowed to do by accident.
 /// </para>
+/// <para>
+/// Since Stage 2.3 this is also what a <c>policy.toml</c> rule matches with. That is DECISIONS.md
+/// D-0021 being cashed in: the policy file does not define a second matching domain, it constructs
+/// one of these — so every property above is inherited by a rule rather than re-argued for it.
+/// </para>
 /// </remarks>
 public sealed class EntryExposure
 {

@@ -208,7 +208,7 @@ internal static class AgentCommand
     /// The ceiling the tool schema advertises. Kept in step by
     /// <c>ToolSchemasMatchTheCoreTests</c> rather than by hoping.
     /// </summary>
-    internal const int ToolTtlCeiling = 3600;
+    internal const int ToolTtlCeiling = ApprovalLimits.MaximumRequestableTtlSeconds;
 
     private static bool TrySeconds(
         string? raw,
