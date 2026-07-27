@@ -346,11 +346,28 @@ jobs:
             # COPYFILE_DISABLE keeps macOS from smuggling ._ AppleDouble members into the tarball.
             COPYFILE_DISABLE=1 tar -czf "$out/$name.tar.gz" -C "$stage" .
           fi
-          asset="$out/$name.${{ matrix.archive }}"
+          # Write the checksum file ourselves rather than redirecting the tool's output, because
+          # the tools disagree about the format. Git Bash's sha256sum defaults to binary mode and
+          # emits "<hash> *<name>"; coreutils on Linux emits "<hash>  <name>"; macOS has no
+          # sha256sum at all. The publish job diffs these per-asset files against an aggregate it
+          # computes on Linux, so an asterisk from the Windows runner would fail that diff on the
+          # first real tag - and publish never runs on a dispatch, so nothing else would catch it.
+          # Two spaces, no marker, everywhere. `sha256sum -c` and `shasum -c` both accept it.
+          arch="$name.${{ matrix.archive }}"
+          asset="$out/$arch"
           if command -v sha256sum >/dev/null 2>&1; then
-            (cd "$out" && sha256sum "$name.${{ matrix.archive }}" > "$name.${{ matrix.archive }}.sha256")
+            hash="$(cd "$out" && sha256sum "$arch" | cut -d' ' -f1)"
           else
-            (cd "$out" && shasum -a 256 "$name.${{ matrix.archive }}" > "$name.${{ matrix.archive }}.sha256")
+            hash="$(cd "$out" && shasum -a 256 "$arch" | cut -d' ' -f1)"
+          fi
+          [ "${#hash}" -eq 64 ] || { echo "::error::bad checksum '$hash' for $arch"; exit 1; }
+          printf '%s  %s\n' "$hash" "$arch" > "$asset.sha256"
+
+          # Prove the file we just wrote actually verifies with the tool a reader would use.
+          if command -v sha256sum >/dev/null 2>&1; then
+            (cd "$out" && sha256sum -c "$arch.sha256")
+          else
+            (cd "$out" && shasum -a 256 -c "$arch.sha256")
           fi
           ls -l "$out"; cat "$asset.sha256"
 
