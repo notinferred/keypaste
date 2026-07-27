@@ -47,19 +47,32 @@ Step 5 is not a formality. Hyperdrive exists in this design specifically so the 
 `require`, which encrypts without authenticating the server. If step 5 does not say `verify-full`,
 the reason for the whole arrangement is gone and `DECISIONS.md` D-0037 is wrong.
 
-### The config that exists today is not the one described above
+### The config that exists today is half-fixed
 
-**Do not deploy until this is fixed.** Hyperdrive config `9ef85ab258e846fbb2c0d3457b744282` was
-created through the Cloudflare dashboard's PlanetScale integration rather than by the steps above,
-and `wrangler hyperdrive get` shows two problems:
+Hyperdrive config `9ef85ab258e846fbb2c0d3457b744282` was created through the Cloudflare dashboard's
+PlanetScale integration rather than by the steps above, and it started out wrong in two ways. One
+is fixed; the other is not, and it is the one that matters.
 
-- It connects as `pscale_api_…`, the integration's own credential, **not** as `signup_writer`. That
-  credential can almost certainly `SELECT`, so the property this whole design exists to guarantee —
-  that nothing reachable from the Worker can read the list back — does not currently hold.
-- The output carries no `sslmode` at all, so `verify-full` is unconfirmed.
+**TLS: fixed, and verified against the database.** PlanetScale serves a Let's Encrypt chain, so
+ISRG Root X1 was uploaded (`wrangler cert upload certificate-authority`, id
+`f8411755-7948-4b31-aa11-2a79710ce1d4`) and the config set to `--sslmode verify-full`. Cloudflare
+rejects `verify-full` outright without a CA, so this is not a setting that can be silently ignored.
+A query through the binding then succeeded, which is the part worth trusting: the mode is real and
+it did not break the connection. Note the update appears to have detached the config from the
+PlanetScale integration.
 
-`schema.sql` has not been applied. Fixing it is steps 1 and 3 above, with
-`wrangler hyperdrive update <id>` in place of `create`, followed by step 5.
+**The role: still wrong. Do not deploy.** The config connects as `pscale_api_yq4xhf9tbm3v`, which a
+query through the binding reports is `rolcreaterole`, `rolcreatedb`, `rolbypassrls`, and a member of
+`pg_read_all_data`, `pg_write_all_data` and `postgres`. It can read and write every table in the
+database. **The guarantee `schema.sql` and D-0037 are built on — that nothing reachable from the
+Worker can read the list back — is currently false**, and by a wider margin than "it probably has
+SELECT".
+
+`public.signup` does not exist yet either; `schema.sql` has never been applied. The same query
+confirms `rolcreaterole` is available, so `CREATE ROLE signup_writer` will work — the least-
+privilege design is viable, it simply has not been done. Run steps 1 and 3 above, using
+`wrangler hyperdrive update <id> --origin-user signup_writer --origin-password …` in place of
+`create`, then re-run step 5 to confirm `verify-full` survived the update.
 
 ## Deploying
 
