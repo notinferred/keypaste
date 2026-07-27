@@ -4,9 +4,34 @@
     <OutputType>Exe</OutputType>
     <RootNamespace>Keypaste.Cli</RootNamespace>
     <AssemblyName>keypaste</AssemblyName>
-    <!-- PublishAot flips on in the Stage 3 release pipeline, where CI can install the
-         native toolchain. The AOT analyzers are already on via Directory.Build.props. -->
-    <PublishAot>false</PublishAot>
+    <!--
+      Both of these are restore-time inputs, so both must be committed or a locked-mode restore
+      cannot hold (D-0040). PublishAot adds Microsoft.DotNet.ILCompiler as a package reference the
+      lock file records; RuntimeIdentifiers is the set of targets that reference is resolved for.
+
+      The corollary is a rule the release workflow must obey: NEVER pass `-r` to restore. It
+      narrows the project's RID set to one, which can never match a lock file recording four.
+      Restore the solution whole, then publish per RID with no restore, which is what declaring
+      RuntimeIdentifiers in the plural is for. Plural also leaves the build output where it is;
+      only the singular RuntimeIdentifier appends a pivot to artifacts/bin/<Proj>/release/.
+    -->
+    <PublishAot>true</PublishAot>
+    <RuntimeIdentifiers>linux-x64;linux-arm64;osx-arm64;win-x64</RuntimeIdentifiers>
+
+    <!--
+      ILC analyses IL app-wide from this project, so the quarantine in third_party does not reach
+      it: vendored KeePassLib's eleven reflection sites are reported here, and TreatWarningsAsErrors
+      would fail every publish. Blanket suppression was rejected - SuppressTrimAnalysisWarnings also
+      sets EnableTrimAnalyzer=false, which would disarm D-0005's gate for our own code too.
+
+      Instead the diagnostics stay visible and scripts/verify-aot-trim.sh diffs them against
+      scripts/aot-trim-baseline.txt, so a new one is a red build rather than a silence. That gate
+      also rejects any diagnostic naming src/, which is the rule these two properties would
+      otherwise relax. See D-0040.
+    -->
+    <IlcTreatWarningsAsErrors>false</IlcTreatWarningsAsErrors>
+    <ILLinkTreatWarningsAsErrors>false</ILLinkTreatWarningsAsErrors>
+
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 

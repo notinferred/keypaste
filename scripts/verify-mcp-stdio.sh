@@ -11,7 +11,7 @@
 # audit line each fail this script. These checks must never be skipped or soft-passed.
 set -euo pipefail
 
-readonly BIN="${KEYPASTE_BIN:-artifacts/bin/Keypaste.Mcp/release/keypaste-mcp}"
+readonly BIN="${KEYPASTE_MCP_BIN:-artifacts/bin/Keypaste.Mcp/release/keypaste-mcp}"
 
 die() {
   echo "::error::$*" >&2
