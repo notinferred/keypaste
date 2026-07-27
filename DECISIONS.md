@@ -2166,6 +2166,61 @@ whose argument is that the project does not overclaim.
 
 ---
 
+## D-0039 - The launch copy is written, and the launch is blocked by a list of things that are false
+
+**Date:** 2026-07-27 · **Stage:** 3.3 · **Status:** accepted
+
+`launch.md` holds a preconditions checklist, copy for all six venues PLAN.md names, and a
+fourteen-day follow-up plan. Nothing in it can be sent, and the file says so in its first line.
+
+**The copy was written before the launch was possible, on purpose.** D-0038 deferred the Show HN
+text to this stage on the grounds that a launch post should not exist before 3.4 gives a stranger
+something to install. That is still true of *posting* and it is not true of *writing*: copy drafted
+on the morning sells, and copy drafted cold argues and can be checked. Every factual sentence in
+the six posts was read back against README.md, SECURITY.md, THREATS.md and the source before it was
+kept, which is not a thing anyone does at hour zero of a launch. Two claims did not survive that
+pass and are recorded below.
+
+**Writing it surfaced a list of published statements that are false right now, and the checklist is
+that list.** The repository is private, so every link in every post would 404 - and D-0006 records
+it as public, reasoning from free Actions minutes that do not currently apply. The account renamed
+from `ochoadan` to `notinferred` and four URLs in README.md and `site/public/index.html` did not
+follow. keypaste.com is live and serving, while `site/README.md` says in bold *"The role: still
+wrong. Do not deploy."* and this file said at D-0037 that nothing is deployed - so either the
+Worker writes through a role that can read the list back, falsifying the promise printed in the
+page's own footer, or `public.signup` does not exist and every address entered so far has been
+dropped. None of these were fixed here; each is a checkbox, because a launch checklist whose items
+have already been quietly resolved is a checklist nobody reads twice.
+
+**No post claims novelty, and the file says why in the section every post draws from.** D-0036 lost
+the "nobody does this" argument in private against Keeper, Bitwarden's Agent Access SDK, 1Password
+Environments and `kprun`; losing it again in a comment thread would cost more. The Show HN text
+concedes all four by name, and says of 1Password's never-return-the-secret design that it is
+stronger on that axis - which it is. The ratified claim is the combination, and the fourteen-day
+plan pairs each predictable objection with the file that already concedes it, so the answer at hour
+six is the same as the answer at hour zero.
+
+**`launch.md` is in `TRANSCRIPT_PAGES`, and that constrains its layout rather than just its
+content.** The dialog extraction in `scripts/verify-demo.sh` is a `sed` range, so a second copy in
+the same file is also extracted and the diff fails. A file of six posts naturally wants six copies
+of the dialog, several of them shortened to fit a venue. It gets one, quoted once in a shared
+section that the posts reference by marker, and the script's comment now records the constraint so
+the next person to add a page learns it from the script rather than from a red build. The gate was
+watched failing - one character changed inside the block, the run refused and named `launch.md` -
+and then reverted.
+
+**Two claims in the draft were wrong and were corrected against the source.** The draft said that if
+the audit log cannot be written the call is refused; `src/Keypaste.Mcp/Program.cs` does the opposite
+deliberately, refusing to *start* rather than surfacing later as a mysterious per-call refusal. And
+the draft said a denied request never reaches the vault, when resolution happens first and it is the
+*field read* that is deferred until after the yes. Both are the failure mode D-0036 exists to catch:
+a claim that sounds like the design and overstates it.
+
+**PLAN.md's launch-posts box stays unchecked.** It says "Launch posts", and no post has been sent.
+The file existing is 3.3; the box is 3.3 going out.
+
+---
+
 # Open decisions
 
 ## O-0002 — Contribution terms: DCO or CLA

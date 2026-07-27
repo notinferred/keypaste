@@ -53,7 +53,7 @@
 - [x] **3.2 — Launch essay**
 "Write the launch essay 'Your password manager can't talk to AI — and everyone is pasting secrets into chats instead': open with the real behavior (people paste API keys into LLM chats and .env files into agents), explain why vaults stayed offline while agents arrived, introduce the scoped-request + approval + audit model, show the demo, and end with the local-first/KDBX/open-source stance. Honest, technical, no marketing fluff, ~1200 words, ready for a blog post and adaptable to a Show HN text."
 
-- [ ] **3.3 — Launch checklist runner**
+- [x] **3.3 — Launch checklist runner**
 "Create launch.md with a checklist and tailored copy for each channel: Show HN title+text, r/selfhosted post, r/KeePass post (respectful, KDBX-compat-focused), MCP community/Discord message, X thread, lobste.rs. Each post is written for its audience's culture, links the demo, and asks one genuine question to invite feedback. Include a 14-day follow-up plan: respond to every issue, label good-first-issues, weekly changelog."
 
 - [ ] **3.4 — Release pipeline and the install one-liners** *(land this before 3.3 goes out — strangers arriving from a launch post need something to install)*
