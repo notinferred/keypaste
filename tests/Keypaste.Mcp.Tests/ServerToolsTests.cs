@@ -74,6 +74,12 @@ public sealed class ServerToolsTests
     private static string TextOf(CallToolResult result) =>
         string.Concat(result.Content.OfType<TextContentBlock>().Select(block => block.Text));
 
+    private static string MethodOf(string auditLine)
+    {
+        using var parsed = JsonDocument.Parse(auditLine);
+        return parsed.RootElement.GetProperty("method").GetString()!;
+    }
+
     private static Dictionary<string, object?> Credential(
         string entry = "k1_0123456789abcdef",
         string field = "password",
@@ -348,6 +354,108 @@ public sealed class ServerToolsTests
         // The terms it came with, which are the only thing standing between a released credential
         // and a model writing it into a commit message.
         Assert.Contains("Do not print it", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The path where nobody was asked. The credential arrives, and — the part that matters — the
+    /// wording does not claim a person approved it.
+    /// </summary>
+    /// <remarks>
+    /// keypaste asks a model to be told the truth about who decided and to act accordingly; saying
+    /// "a person released this" about something no person saw is the one untruth a credentials tool
+    /// cannot afford. It also names neither the rule nor the pattern, because an agent that learns
+    /// which parts of a vault are pre-authorized has been handed a map of where to aim.
+    /// </remarks>
+    [Fact]
+    public async Task APolicyRelease_DoesNotClaimAPersonApprovedIt()
+    {
+        await using var harness = new McpHarness();
+        harness.Approver.StartPreapproving();
+        var client = await harness.StartAsync();
+
+        var result = await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY"));
+        var text = TextOf(result);
+
+        Assert.False(result.IsError);
+        Assert.Contains(FakeApprover.Sentinel, text, StringComparison.Ordinal);
+        Assert.Contains("standing rule", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("A person released", text, StringComparison.Ordinal);
+
+        // Neither the rule's name nor its pattern, even though the approver sent both.
+        Assert.DoesNotContain("allow#1", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("env/dev/**", text, StringComparison.Ordinal);
+
+        // And the terms still travel with it, exactly as on the prompted path.
+        Assert.Contains("Do not print it", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A silent release is the one with no human witness, so the audit line is the only evidence it
+    /// happened at all — and it has to say <c>policy</c>, never <c>prompt</c>.
+    /// </summary>
+    [Fact]
+    public async Task APolicyRelease_IsAuditedAsPolicyAndNamesTheRule()
+    {
+        await using var harness = new McpHarness();
+        harness.Approver.StartPreapproving();
+        var client = await harness.StartAsync();
+
+        await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY"));
+
+        var line = Assert.Single(harness.AuditLines());
+        using var parsed = JsonDocument.Parse(line);
+
+        Assert.Equal("granted", parsed.RootElement.GetProperty("decision").GetString());
+        Assert.Equal("policy", parsed.RootElement.GetProperty("method").GetString());
+        Assert.Contains("allow#1", parsed.RootElement.GetProperty("reason").GetString()!, StringComparison.Ordinal);
+
+        // The agent's own stated reason is on the line too, and nobody read it. That is the whole
+        // of THREATS.md T-12 with the first approval removed as well as the second.
+        Assert.NotNull(parsed.RootElement.GetProperty("args").GetProperty("reason_sha256").GetString());
+
+        Assert.DoesNotContain(FakeApprover.Sentinel, line, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The bridge sends the label the operator wrote, not the name the client asserted about itself.
+    /// A rule keys on the first and never on the second (THREATS.md T-3).
+    /// </summary>
+    [Fact]
+    public async Task TheOperatorsLabel_ReachesTheApproverSeparatelyFromTheAssertedName()
+    {
+        await using var harness = new McpHarness();
+        harness.Approver.StartApproving();
+        var client = await harness.StartAsync();
+
+        await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY"));
+
+        var forwarded = Assert.Single(harness.Approver.Received);
+
+        Assert.Equal(McpHarness.ClientName, forwarded.ClientName, StringComparer.Ordinal);
+        Assert.Equal(McpHarness.ClientLabel, forwarded.ClientLabel, StringComparer.Ordinal);
+        Assert.NotEqual(forwarded.ClientName, forwarded.ClientLabel);
+    }
+
+    /// <summary>
+    /// A rule with an hourly allowance that is spent denies rather than escalating to a person, and
+    /// the refusal says so — retrying now cannot help, but the hour rolling forward will.
+    /// </summary>
+    [Fact]
+    public async Task ASpentPolicyAllowance_IsRefusedWithAdviceThatIsActuallyTrue()
+    {
+        await using var harness = new McpHarness();
+        harness.Approver.StartRefusing(AuditMethod.PolicyLimit, "policy rule allow#1 has used its allowance for this hour");
+        var client = await harness.StartAsync();
+
+        var result = await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY"));
+        var text = TextOf(result);
+
+        Assert.True(result.IsError);
+        Assert.DoesNotContain(FakeApprover.Sentinel, text, StringComparison.Ordinal);
+        Assert.Contains("standing rule", text, StringComparison.Ordinal);
+        Assert.Contains("hour", text, StringComparison.Ordinal);
+
+        Assert.Equal("policy-limit", MethodOf(Assert.Single(harness.AuditLines())));
     }
 
     /// <summary>

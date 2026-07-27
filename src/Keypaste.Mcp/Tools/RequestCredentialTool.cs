@@ -109,7 +109,7 @@ internal sealed class RequestCredentialTool(
         }
 
         return verdict.Released is { } released
-            ? ToolResults.Release(released.Field, released.Value, released.TtlSeconds)
+            ? ToolResults.Release(released.Field, released.Value, released.TtlSeconds, verdict.Method)
             : ToolResults.Refuse(verdict.Refusal ?? ToolText.Refusal(verdict.Method));
     }
 
