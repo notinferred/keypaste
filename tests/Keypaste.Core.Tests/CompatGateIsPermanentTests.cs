@@ -48,6 +48,11 @@ public sealed class CompatGateIsPermanentTests
         // definition no single-process test can observe (CORE.md law 3.2, DECISIONS.md D-0023).
         Assert.Contains("scripts/verify-approval-e2e.sh", workflow, StringComparison.Ordinal);
 
+        // The policy path has a fourth, and it is the only one asserting that a prompt did NOT
+        // appear — which cannot be observed in-process at all, and is only worth anything paired
+        // with one that did (DECISIONS.md D-0028).
+        Assert.Contains("scripts/verify-policy-e2e.sh", workflow, StringComparison.Ordinal);
+
         foreach (var os in new[] { "ubuntu-latest", "windows-latest", "macos-latest" })
         {
             Assert.Contains(os, workflow, StringComparison.Ordinal);
@@ -128,6 +133,42 @@ public sealed class CompatGateIsPermanentTests
         Assert.Contains("an approved request did not return the credential", text, StringComparison.Ordinal);
         Assert.Contains("a refused request returned the credential", text, StringComparison.Ordinal);
         Assert.Contains("the audit log contains the released credential", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The policy gate is the only test in the repository that asserts a prompt did <b>not</b>
+    /// happen — an absence no in-process test can see, and one that means nothing unless the same
+    /// agent is shown drawing a prompt seconds later.
+    /// </summary>
+    /// <remarks>
+    /// Its six claims are named individually because dropping any one leaves a script that passes
+    /// while the policy path fails open, and because they fail in different directions: two are
+    /// about a prompt appearing or not, two are about a rule reaching further than it may, one is
+    /// about the all-or-nothing fallback, and one is about the operator's ceiling surviving a file
+    /// the operator also wrote.
+    /// </remarks>
+    [Fact]
+    public void PolicyScript_ExistsAndKeepsItsNegativeControl()
+    {
+        var script = Path.Combine(RepoRoot(), "scripts", "verify-policy-e2e.sh");
+        Assert.True(File.Exists(script), $"The policy gate script is missing: {script}");
+
+        var text = File.ReadAllText(script);
+
+        Assert.Contains("NEGATIVE CONTROL", text, StringComparison.Ordinal);
+        Assert.Contains("must never be skipped or soft-passed", text, StringComparison.Ordinal);
+
+        Assert.Contains("a policy grant put a prompt in front of the human", text, StringComparison.Ordinal);
+        Assert.Contains("a request outside every policy rule did not reach a person", text, StringComparison.Ordinal);
+        Assert.Contains("a policy rule released an entry outside the bridge's exposure", text, StringComparison.Ordinal);
+        Assert.Contains("a rule matched a bridge the operator never labelled", text, StringComparison.Ordinal);
+        Assert.Contains("a malformed policy file still granted a request without asking", text, StringComparison.Ordinal);
+        Assert.Contains("a policy rule raised the TTL ceiling the operator set with --max-ttl", text, StringComparison.Ordinal);
+        Assert.Contains("the audit log contains the policy-released credential", text, StringComparison.Ordinal);
+
+        // The paired positive is the load-bearing part of every absence assertion above, and it is
+        // one `#` away from being silently disabled.
+        Assert.Contains("prompts_drawn", text, StringComparison.Ordinal);
     }
 
     /// <summary>

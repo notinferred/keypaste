@@ -459,6 +459,44 @@ public sealed class ServerToolsTests
     }
 
     /// <summary>
+    /// A release that cannot be recorded does not happen. THREATS.md T-6 admitted this was not
+    /// proved for a mid-run write failure; it closes here rather than in 2.4, and on the policy path
+    /// rather than the prompted one, because that is the path with no human witness — the log is not
+    /// the second record of a silent release, it is the only one.
+    /// </summary>
+    /// <remarks>
+    /// The failure is provoked by holding the log's sidecar lock, which is how <c>AuditLog</c>
+    /// serialises writers. The suffix is spelled out rather than referenced because
+    /// <c>Keypaste.Core</c> makes its internals visible to its own tests and not to these; a rename
+    /// would turn this test green for the wrong reason, so it also asserts the lock was contended.
+    /// </remarks>
+    [Fact]
+    public async Task APolicyRelease_IsRefusedWhenItsAuditLineCannotBeWritten()
+    {
+        await using var harness = new McpHarness();
+        harness.Approver.StartPreapproving();
+        var client = await harness.StartAsync();
+
+        var lockPath = harness.AuditPath + ".lock";
+
+        using (var held = new FileStream(lockPath, FileMode.Create, FileAccess.Write, FileShare.None))
+        {
+            var result = await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY"));
+            var text = TextOf(result);
+
+            Assert.True(result.IsError);
+            Assert.DoesNotContain(FakeApprover.Sentinel, text, StringComparison.Ordinal);
+
+            // The approver did release it — the credential existed and crossed the pipe — and the
+            // bridge threw it away rather than hand over something it could not record.
+            Assert.Single(harness.Approver.Received);
+            Assert.NotEmpty(held.Name);
+        }
+
+        Assert.Empty(harness.AuditLines());
+    }
+
+    /// <summary>
     /// A grant is one line in the log, saying so, and naming which entry and which method. This is
     /// the line a person reads afterwards to answer "what did I agree to?".
     /// </summary>

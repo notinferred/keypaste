@@ -113,6 +113,16 @@ jobs:
         shell: bash
         run: scripts/verify-approval-e2e.sh
 
+      # The step above proves a person's yes and no cross a process boundary. This proves the
+      # opposite, and it is the harder claim: that a rule the human wrote in advance releases a
+      # credential with NO prompt at all, and that the same agent still draws one for anything the
+      # rule does not cover. An absence cannot be observed in-process, and it is worth nothing
+      # unless paired with a presence — which is why every phase here counts prompts before and
+      # after (DECISIONS.md D-0028).
+      - name: Verify a policy rule grants without a prompt, and only inside its pattern
+        shell: bash
+        run: scripts/verify-policy-e2e.sh
+
   # ===========================================================================
   # PERMANENT COMPATIBILITY GATE — CORE.md law 4.6:
   #   "Compatibility is sacred: any KDBX file keypaste writes must open
