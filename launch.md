@@ -44,6 +44,10 @@ each of these is something a stranger hits before they hit the product.
   launch, never after.
 - [ ] **`blacksmith-*` runners have an answer for pull requests from forks.** CI is the first thing
   a contributor meets, and a launch produces pull requests from people with no write access.
+- [ ] **Branch protection on `main` requires the CI checks.** It cannot be set on a private
+  repository on this plan, so today "a red build blocks the merge" is a habit rather than a rule,
+  and merges happen locally where no check is consulted. Once the repository is public this becomes
+  available, and it should be switched on before anyone outside can open a pull request.
 
 **The promises already published**
 
@@ -303,8 +307,8 @@ indistinguishable from files KeePass wrote.
 
 That claim is gated rather than asserted. CI runs a real `keepassxc-cli` against generated files on
 Linux, macOS and Windows on every push, in both directions — keypaste writes and KeePassXC reads,
-KeePassXC writes and keypaste reads. It is a permanent job, it cannot be skipped, and if it goes red
-nothing merges.
+KeePassXC writes and keypaste reads. It was made permanent by decision when it was added rather than
+left as a convenience, and it runs on every push rather than nightly or on demand.
 
 What it adds is an MCP server, so a coding agent can request one credential from the vault instead
 of the current practice, which is that the agent asks you to paste your key into a chat window. A
