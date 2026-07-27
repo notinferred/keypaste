@@ -53,8 +53,38 @@ pinned version can be moved.
 
 ## Supported versions
 
-Pre-1.0, only the latest commit on `main` is supported. Once releases are tagged, this table will
-list the supported release line.
+| Version | Supported | Notes |
+|---|---|---|
+| `main` | Yes | Always the first thing a fix lands on |
+| `0.1.x` | Yes | The current release line |
+| Anything older | No | There is nothing older yet |
+
+Pre-1.0, this is a short table on purpose. There is no long-term support line and there will not be
+one before 1.0; a fix goes onto `main` and into the next tag, and older tags are not patched.
+
+## Verifying a release
+
+Binaries are published to `https://dl.keypaste.com/v<version>/`, with a `SHA256SUMS` file, a
+per-asset `.sha256`, and the corresponding source for that tag (AGPL-3.0 section 6). Every one of
+them is produced by `.github/workflows/release.yml`, which runs this repository's full gate
+suite — including both directions of the KeePassXC compatibility check — against the exact
+binary it uploads, not against a rebuild.
+
+Two things to know before you rely on that:
+
+**The binaries are unsigned and un-notarized.** On macOS this means Gatekeeper quarantines the
+download and the documented install includes a line that removes the quarantine attribute; on
+Windows, SmartScreen warns. This is a known gap, not an oversight — it is tracked as O-0010 in
+[DECISIONS.md](DECISIONS.md), with the costs written down.
+
+**The checksum proves integrity, not authenticity.** It is served from the same origin as the
+archive, so anyone able to replace one can replace the other. It protects against a corrupted or
+truncated download and against nothing else. Verifying provenance needs a signature, which does not
+exist yet. If you want the strongest available assurance today, build from source — the
+instructions are in the README and the dependency closure is pinned by content hash in
+`packages.lock.json`.
+
+The release pipeline is in scope for reports, as the section above says.
 
 ## Design commitments worth knowing before you test
 

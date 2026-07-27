@@ -1,0 +1,442 @@
+name: release
+
+# A tag builds four native binaries, runs every gate this repository has against the exact bytes
+# that will be uploaded, and only then publishes them. Nothing here trusts the build: the binary
+# that gets shipped is the binary that was tested, and the checksum written next to it was computed
+# on the machine that produced it and re-checked on the machine that uploads it.
+#
+# Distribution is Cloudflare R2 behind dl.keypaste.com, not GitHub Releases, because this
+# repository is private and a private repository's release assets return 404 to everyone without a
+# token - which would make the documented install command a published falsehood (D-0041).
+#
+# workflow_dispatch builds and verifies but publishes nothing. Use it to exercise a change to this
+# file without spending a tag.
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+  workflow_dispatch:
+
+# The release path produces bytes strangers download, so a mutated action tag here would
+# substitute an artifact and no gate would notice. O-0004 deferred SHA-pinning for ci.yml; this
+# file does not get the same latitude. Each pin carries the tag it was resolved from.
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  # The deliberate inverse of ci.yml. A cancelled test run costs nothing; a cancelled upload
+  # leaves half a release on a public origin.
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
+  NUGET_XMLDOC_MODE: skip
+
+jobs:
+  guard:
+    name: guard
+    runs-on: blacksmith-4vcpu-ubuntu-2204
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      suffix: ${{ steps.v.outputs.suffix }}
+      publish: ${{ steps.v.outputs.publish }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      # The version lives in Directory.Build.props and the tag only names it. Nothing is passed
+      # with -p:Version=, so a local `dotnet publish` at this commit produces the same inputs the
+      # release did. A tag that disagrees with the source is a mistake, not an override.
+      - name: Resolve and check the version
+        id: v
+        shell: bash
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            tag="${GITHUB_REF_NAME#v}"
+            publish=true
+          else
+            tag="$(dotnet msbuild src/Keypaste.Cli/Keypaste.Cli.csproj -getProperty:VersionPrefix -nologo | tr -d '[:space:]')-dryrun"
+            publish=false
+          fi
+          base="${tag%%-*}"
+          suffix=""
+          case "$tag" in *-*) suffix="${tag#*-}";; esac
+
+          prefix="$(dotnet msbuild src/Keypaste.Cli/Keypaste.Cli.csproj -getProperty:VersionPrefix -nologo | tr -d '[:space:]')"
+          if [ "$publish" = "true" ] && [ "$base" != "$prefix" ]; then
+            echo "::error::tag $GITHUB_REF_NAME says $base but Directory.Build.props says $prefix"
+            echo "::error::the tag names the version, it does not set it - fix VersionPrefix or the tag"
+            exit 1
+          fi
+
+          echo "version=$tag"   >> "$GITHUB_OUTPUT"
+          echo "suffix=$suffix" >> "$GITHUB_OUTPUT"
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          echo "building $tag (suffix='$suffix', publish=$publish)"
+
+      # A tag can point anywhere. These two say it points at something main has seen and CI has
+      # already gone green on, without re-running the whole matrix here.
+      - name: Check the commit is on main and CI is green on it
+        if: github.ref_type == 'tag'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main \
+            || { echo "::error::$GITHUB_SHA is not an ancestor of main"; exit 1; }
+
+          green=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$GITHUB_SHA&status=success" \
+                    --jq '[.workflow_runs[] | select(.name=="ci")] | length')
+          [ "${green:-0}" -ge 1 ] \
+            || { echo "::error::no successful ci run for $GITHUB_SHA - a tag must not ship an untested commit"; exit 1; }
+
+      # CORE.md law 4.7 pairs small releases with real changelogs. Making the release depend on the
+      # entry existing is what turns that from an intention into a rule.
+      - name: Check CHANGELOG.md has a section for this version
+        if: github.ref_type == 'tag'
+        shell: bash
+        run: |
+          grep -qF "## ${{ steps.v.outputs.version }}" CHANGELOG.md \
+            || { echo "::error::CHANGELOG.md has no '## ${{ steps.v.outputs.version }}' section"; exit 1; }
+
+  build:
+    name: build ${{ matrix.rid }}
+    needs: guard
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Cross-OS NativeAOT is not supported, so every RID is built on its own operating system
+          # and, because O-0006 requires the binary to be *run* and not merely compiled, on its own
+          # architecture. Nothing here is cross-compiled or emulated.
+          #
+          # ubuntu-22.04 for both Linux RIDs on purpose: NativeAOT links against the build
+          # machine's glibc, so the image choice *is* the compatibility floor. 22.04 gives glibc
+          # 2.35, which covers Debian 12 and Ubuntu 22.04; 24.04 would silently raise it to 2.39
+          # and break every one of those machines.
+          - rid: linux-x64
+            os: blacksmith-4vcpu-ubuntu-2204
+            archive: tar.gz
+          - rid: linux-arm64
+            os: blacksmith-4vcpu-ubuntu-2204-arm
+            archive: tar.gz
+          - rid: osx-arm64
+            os: blacksmith-6vcpu-macos-15
+            archive: tar.gz
+          - rid: win-x64
+            os: blacksmith-4vcpu-windows-2025
+            archive: zip
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    env:
+      VERSION: ${{ needs.guard.outputs.version }}
+      KEYPASTE_BIN: artifacts/release/${{ matrix.rid }}/keypaste
+      KEYPASTE_MCP_BIN: artifacts/release/${{ matrix.rid }}/keypaste-mcp
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      # O-0005 said Stage 3's AOT publish would need these. It does.
+      - name: Install the native toolchain (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang zlib1g-dev
+
+      - name: Check the native toolchain (macOS)
+        if: runner.os == 'macOS'
+        run: xcode-select -p
+
+      # NEVER add -r to a restore. It narrows the project's runtime identifier set to one, which
+      # can never match a lock file recording four, and locked mode fails NU1004. The csproj files
+      # declare all four precisely so one whole-solution restore covers every publish (D-0040).
+      - name: Restore (locked)
+        run: dotnet restore keypaste.slnx --locked-mode
+
+      - name: Publish both binaries with NativeAOT
+        shell: bash
+        run: |
+          args="-c Release -r ${{ matrix.rid }} --no-restore -o artifacts/release/${{ matrix.rid }}"
+          if [ -n "${{ needs.guard.outputs.suffix }}" ]; then
+            args="$args -p:VersionSuffix=${{ needs.guard.outputs.suffix }}"
+          fi
+          dotnet publish src/Keypaste.Cli/Keypaste.Cli.csproj $args 2>&1 | tee /tmp/publish-cli.log
+          dotnet publish src/Keypaste.Mcp/Keypaste.Mcp.csproj $args 2>&1 | tee /tmp/publish-mcp.log
+
+      - name: Verify the AOT trim diagnostics still match the baseline
+        shell: bash
+        run: scripts/verify-aot-trim.sh /tmp/publish-cli.log /tmp/publish-mcp.log
+
+      # The rm is the most load-bearing line in this job. artifacts/bin is exactly where every
+      # verify script looks when KEYPASTE_BIN is unset, so without it a typo in either variable
+      # would quietly test the ordinary JIT build and report a green release. The two assertions
+      # after it are the cheap discriminator: an AOT binary has no managed dll and no
+      # runtimeconfig.json beside it.
+      - name: Delete the JIT build and prove what is left is native
+        shell: bash
+        run: |
+          rm -rf artifacts/bin
+          for n in keypaste keypaste-mcp; do
+            p="artifacts/release/${{ matrix.rid }}/$n"
+            [ -x "$p" ] || [ -x "$p.exe" ] || { echo "::error::no native $n"; exit 1; }
+          done
+          for stray in artifacts/release/${{ matrix.rid }}/*.dll artifacts/release/${{ matrix.rid }}/*.runtimeconfig.json; do
+            [ -e "$stray" ] && { echo "::error::$stray exists, so this is a JIT apphost, not an AOT binary"; exit 1; }
+          done
+          printed="$("$KEYPASTE_BIN" --version 2>/dev/null || "$KEYPASTE_BIN.exe" --version)"
+          [ "$printed" = "$VERSION" ] \
+            || { echo "::error::binary reports '$printed', tag says '$VERSION'"; exit 1; }
+
+      - name: Verify run injects a variable and writes nothing to disk
+        shell: bash
+        run: scripts/verify-run-injection.sh
+
+      - name: Verify run forwards signals and exit codes
+        if: runner.os != 'Windows'
+        shell: bash
+        run: scripts/verify-run-signals.sh
+
+      - name: Verify keypaste-mcp speaks MCP over stdio and audits every call
+        shell: bash
+        run: scripts/verify-mcp-stdio.sh
+
+      - name: Verify a person can approve and refuse across two real processes
+        shell: bash
+        run: scripts/verify-approval-e2e.sh
+
+      - name: Verify a policy rule grants without a prompt
+        shell: bash
+        timeout-minutes: 10
+        run: scripts/verify-policy-e2e.sh
+
+      - name: Verify the audit chain catches tampering and forgives a crash
+        shell: bash
+        run: scripts/verify-log-chain.sh
+
+      - name: Verify the demo page still matches what the AOT binaries print
+        shell: bash
+        timeout-minutes: 8
+        run: scripts/verify-demo.sh
+
+      # ---------------------------------------------------------------------
+      # CORE.md law 4.6, applied to the artifact strangers actually run. The vault writer goes
+      # through vendored KeePassLib's XML, Argon2 and AES - the code most likely to be broken by
+      # trimming. An AOT binary that has not written a KDBX real KeePassXC can open is untested.
+      # Do not add an `if:` that can skip this. If a runner cannot install keepassxc-cli, drop the
+      # RID from the matrix instead (D-0008).
+      # ---------------------------------------------------------------------
+      - name: Install KeePassXC (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y --no-install-recommends keepassxc
+
+      - name: Install KeePassXC (macOS)
+        if: runner.os == 'macOS'
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+          HOMEBREW_NO_INSTALL_CLEANUP: '1'
+        run: brew install --cask keepassxc
+
+      # Windows has no package manager we would trust here, so the release zip is fetched by hand
+      # and pinned by SHA-256. The hash is a repo-side constant rather than the release's own
+      # .DIGEST, which is served from the same origin as the zip and so proves integrity but not
+      # authenticity (D-0008).
+      - name: Install KeePassXC (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          KPXC_VERSION: 2.7.12
+          KPXC_SHA256: 958234b0669d757b53eacf42bdd5de0fa1cc1ab7527709ddf4f7e29c06a8305f
+        run: |
+          url="https://github.com/keepassxreboot/keepassxc/releases/download/${KPXC_VERSION}/KeePassXC-${KPXC_VERSION}-Win64.zip"
+          curl -fsSL "$url" -o kpxc.zip
+          got="$(sha256sum kpxc.zip | cut -d' ' -f1)"
+          [ "$got" = "$KPXC_SHA256" ] \
+            || { echo "::error::KeePassXC zip hash mismatch: got $got want $KPXC_SHA256"; exit 1; }
+          /c/Windows/System32/tar.exe -xf kpxc.zip
+          echo "KPXC_CLI=$(pwd)/KeePassXC-${KPXC_VERSION}-Win64/keepassxc-cli.exe" >> "$GITHUB_ENV"
+
+      - name: Verify a vault written by the AOT binary opens in real KeePassXC
+        shell: bash
+        env:
+          KP_COMPAT_PASSWORD: ci-master-pw
+        run: |
+          scripts/make-compat-fixture.sh artifacts/compat/aot.kdbx
+          scripts/verify-keepassxc-compat.sh artifacts/compat/aot.kdbx
+          scripts/verify-keepassxc-writeback.sh artifacts/compat/aot-writeback.kdbx
+
+      # macOS refuses to run a downloaded unsigned binary until the quarantine attribute is
+      # removed, and a tar extraction does not set that attribute - so the gates above would pass
+      # on a binary a real user cannot start. This sets it deliberately and checks what happens,
+      # so the README's sixth line is documented from an observation rather than a guess.
+      - name: Check the ad-hoc signature and the quarantine behaviour (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          codesign -dv --verbose=4 "$KEYPASTE_BIN" 2>&1 | sed -n '1,6p' || true
+          xattr -w com.apple.quarantine "0081;00000000;Safari;" "$KEYPASTE_BIN"
+          if "$KEYPASTE_BIN" --version >/dev/null 2>&1; then
+            echo "quarantined binary ran: the README's xattr line may be unnecessary"
+          else
+            echo "quarantined binary was blocked, which is what the README's xattr line is for"
+          fi
+          xattr -d com.apple.quarantine "$KEYPASTE_BIN"
+
+      # Proves self-containment on a machine with no .NET on it at all, which no runner can prove
+      # about itself, and turns the README's glibc floor into a tested claim instead of a guess.
+      - name: Check the glibc floor on a clean Debian 12
+        if: matrix.rid == 'linux-x64'
+        shell: bash
+        run: |
+          docker run --rm -v "$PWD/artifacts/release/linux-x64:/kp:ro" debian:12-slim /kp/keypaste --version \
+            || { echo "::error::the linux-x64 binary does not run on Debian 12 - the glibc floor is higher than documented"; exit 1; }
+          if docker run --rm -v "$PWD/artifacts/release/linux-x64:/kp:ro" alpine:3 /kp/keypaste --version >/dev/null 2>&1; then
+            echo "::error::it ran on Alpine, which contradicts the documented musl gap - re-check the claim"
+            exit 1
+          fi
+          echo "glibc floor confirmed: Debian 12 yes, Alpine no (musl needs linux-musl-x64, O-0013)"
+
+      # Packaged on the machine that produced the bytes, and hashed there too, so the checksum
+      # covers the artifact-transport step as well as the download.
+      - name: Package and hash
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="artifacts/dist"; mkdir -p "$out"
+          stage="artifacts/stage"; rm -rf "$stage"; mkdir -p "$stage"
+          cp artifacts/release/${{ matrix.rid }}/keypaste* "$stage"/
+          rm -f "$stage"/*.pdb "$stage"/*.xml "$stage"/*.dbg "$stage"/*.dwarf
+          cp LICENSE THIRD_PARTY_NOTICES.md "$stage"/
+          name="keypaste-${VERSION}-${{ matrix.rid }}"
+          if [ "${{ matrix.archive }}" = "zip" ]; then
+            (cd "$stage" && /c/Windows/System32/tar.exe -a -c -f "../dist/$name.zip" *)
+          else
+            # COPYFILE_DISABLE keeps macOS from smuggling ._ AppleDouble members into the tarball.
+            COPYFILE_DISABLE=1 tar -czf "$out/$name.tar.gz" -C "$stage" .
+          fi
+          asset="$out/$name.${{ matrix.archive }}"
+          if command -v sha256sum >/dev/null 2>&1; then
+            (cd "$out" && sha256sum "$name.${{ matrix.archive }}" > "$name.${{ matrix.archive }}.sha256")
+          else
+            (cd "$out" && shasum -a 256 "$name.${{ matrix.archive }}" > "$name.${{ matrix.archive }}.sha256")
+          fi
+          ls -l "$out"; cat "$asset.sha256"
+
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: dist-${{ matrix.rid }}
+          path: artifacts/dist/*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: publish to R2
+    needs: [guard, build]
+    if: needs.guard.outputs.publish == 'true'
+    runs-on: blacksmith-4vcpu-ubuntu-2204
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.guard.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          path: dist
+          merge-multiple: true
+
+      # The checksums were computed on four different machines and travelled through artifact
+      # storage to get here. Re-checking them on this one is the control against a corrupted
+      # upload, which is otherwise completely invisible.
+      - name: Re-verify every checksum on this machine
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          ls -l
+          shopt -s nullglob
+          n=0
+          for f in *.sha256; do
+            sha256sum -c "$f" || { echo "::error::checksum mismatch for $f after transport"; exit 1; }
+            n=$((n+1))
+          done
+          [ "$n" -eq 4 ] || { echo "::error::expected 4 assets, found $n"; exit 1; }
+
+      # AGPL-3.0 section 6: conveying object code obliges the corresponding source to every
+      # recipient. Publishing it beside the binaries, from the same place, is option (d).
+      - name: Build the corresponding-source tarball
+        shell: bash
+        run: |
+          git archive --format=tar.gz --prefix="keypaste-${VERSION}/" \
+            -o "dist/keypaste-${VERSION}-source.tar.gz" "$GITHUB_SHA"
+          (cd dist && sha256sum "keypaste-${VERSION}-source.tar.gz" > "keypaste-${VERSION}-source.tar.gz.sha256")
+
+      # Both spellings from one computation, asserted to agree. SHA256SUMS is for anyone verifying
+      # everything or scripting it; the per-asset files exist so the documented command is a bare
+      # `sha256sum -c <file>.sha256` with no flags and no way to pass by accident.
+      - name: Aggregate SHA256SUMS
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum keypaste-*.tar.gz keypaste-*.zip | sort -k2 > SHA256SUMS
+          cat *.sha256 | sort -k2 > /tmp/per-asset
+          diff <(grep -v SHA256SUMS SHA256SUMS) /tmp/per-asset \
+            || { echo "::error::SHA256SUMS disagrees with the per-asset checksum files"; exit 1; }
+          cat SHA256SUMS
+
+      # Versioned prefixes only, never a mutable "latest": the documented command names an exact
+      # version and an exact hash, and both must keep meaning what they meant when they were
+      # written. A tag nobody has been told about is this pipeline's equivalent of a draft.
+      - name: Upload to R2
+        shell: bash
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+        run: |
+          set -euo pipefail
+          for v in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY R2_ACCOUNT_ID R2_BUCKET; do
+            [ -n "${!v}" ] || { echo "::error::secret $v is not set"; exit 1; }
+          done
+          endpoint="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          aws s3 cp dist/ "s3://${R2_BUCKET}/v${VERSION}/" \
+            --endpoint-url "$endpoint" --recursive --no-progress
+          echo "published to v${VERSION}/:"
+          aws s3 ls "s3://${R2_BUCKET}/v${VERSION}/" --endpoint-url "$endpoint"
+
+      - name: Say where it went
+        run: |
+          echo "### keypaste ${VERSION} published" >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo "https://dl.keypaste.com/v${VERSION}/" >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Binaries are unsigned and un-notarized (O-0010).' >> "$GITHUB_STEP_SUMMARY"

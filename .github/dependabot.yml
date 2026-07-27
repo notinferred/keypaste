@@ -1,0 +1,20 @@
+version: 2
+
+# O-0004 deferred Dependabot along with SHA-pinned actions, reasoning that a pin without something
+# to move it ages badly. release.yml is now pinned to commit SHAs because it produces binaries
+# strangers download, so the thing that moves the pins has to exist. This is that thing.
+#
+# github-actions only, deliberately. The nuget ecosystem is not enabled here: every package change
+# in this repository also requires regenerating packages.lock.json with a force-evaluate restore
+# (D-0004), and a bot that bumps a version without the matching lock file produces a pull request
+# that cannot pass CI. Revisit with O-0004.
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ''
+    labels:
+      - dependencies
