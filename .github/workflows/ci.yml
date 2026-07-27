@@ -119,8 +119,14 @@ jobs:
       # rule does not cover. An absence cannot be observed in-process, and it is worth nothing
       # unless paired with a presence — which is why every phase here counts prompts before and
       # after (DECISIONS.md D-0028).
+      #
+      # The timeout is not decoration. This step starts three `keypaste agent` processes, each of
+      # which blocks until it is stopped; one that outlives the script holds this step's handles open
+      # and the job sits there until its own twenty-minute limit, long after every assertion passed.
+      # Eight minutes turns that into a fast, obvious failure instead of a silent one.
       - name: Verify a policy rule grants without a prompt, and only inside its pattern
         shell: bash
+        timeout-minutes: 8
         run: scripts/verify-policy-e2e.sh
 
   # ===========================================================================
