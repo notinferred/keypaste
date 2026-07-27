@@ -76,7 +76,11 @@ printf '%s' "$tools" | jq -e 'all(.[]; .annotations.destructiveHint == false)' >
 printf '%s' "$tools" | jq -e 'all(.[]; .annotations.openWorldHint == false)' >/dev/null \
   || die "a tool is missing openWorldHint=false"
 
-# 4. Both calls refuse. A granted credential in this version is the one unacceptable outcome.
+# 4. Both calls refuse, because this script starts no approver — not because the bridge is unable to
+#    grant. That distinction matters: read as "the bridge cannot release anything" this assertion
+#    would be evidence for a claim it does not make. scripts/verify-approval-e2e.sh is where a
+#    release is proved possible; here, with nobody to ask, a granted credential would mean the
+#    bridge had decided something itself, which is the one unacceptable outcome.
 for id in 3 4; do
   jq -e --argjson id "$id" 'select(.id == $id) | .result.isError == true' <"$OUT" >/dev/null \
     || die "call $id did not return isError=true"
