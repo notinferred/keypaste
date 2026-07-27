@@ -2448,12 +2448,30 @@ publish emits no diagnostics at all, so the gate must run against a clean publis
 than passing vacuously in that case, which is the correct behaviour, but the reason is not obvious
 from the error.
 
-**Measured, on one machine, win-x64.** `keypaste` 10.4 MB and `keypaste-mcp` 9.1 MB as single
-native files with no managed assembly and no `runtimeconfig.json` beside them. `--help` runs in
-54 ms against 75 ms for the framework-dependent build, ten runs each. The AOT binaries are about
-a quarter faster to start and need no .NET installed, which is the entire point of the exercise.
-The same eleven diagnostics appear on linux-x64, byte-identical after path normalisation, so the
-baseline is platform-independent rather than per-RID.
+**Measured on win-x64, locally.** `keypaste` 10.4 MB and `keypaste-mcp` 9.1 MB as single native
+files with no managed assembly and no `runtimeconfig.json` beside them. `--help` runs in 54 ms
+against 75 ms for the framework-dependent build, ten runs each. The AOT binaries are about a
+quarter faster to start and need no .NET installed, which is the entire point of the exercise.
+
+**Then confirmed on all four target platforms in CI, which is the claim that matters.** The first
+end-to-end run of `release.yml` published `linux-x64`, `linux-arm64`, `osx-arm64` and `win-x64`,
+and every one of them passed the whole suite against its own native binary: the nine verify
+scripts, both directions of the KeePassXC gate, and the trim baseline. Packaged archives came out
+at 8.5, 8.0, 7.5 and 7.6 MB compressed. The eleven diagnostics are identical on every platform
+after path normalisation, so the baseline is platform-independent rather than per-RID - which was
+worth checking rather than assuming, because a per-RID baseline would have been four files to keep
+in step.
+
+**Three defects were found by running it, none of which a compile would have shown.** The `guard`
+job failed after every check in it had passed, because `setup-dotnet` was asked to cache a NuGet
+folder in a job that never restores. Packaging failed on macOS alone: it copied `keypaste*` and
+then deleted known debris by extension, which works only as long as every platform's build output
+can be enumerated in advance - macOS writes `keypaste.dSYM` as a *directory*, and `cp` refuses it.
+It now copies the two binaries by name and fails if either is missing. And Git Bash's `sha256sum`
+defaults to binary mode, writing `<hash> *<name>` where coreutils writes two spaces, which would
+have failed the `publish` job's aggregate-versus-per-asset diff on the first real tag - and
+`publish` does not run on a dispatch, so no dry run would ever have caught it. The checksum files
+are now written by hand in one format and verified with `-c` on the machine that wrote them.
 
 **What this does not settle.** O-0007 asked whether the vendored tree needs trimming, and its
 trigger condition was "if O-0006 forces trimming for AOT size". It did not: nothing had to be
