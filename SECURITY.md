@@ -44,9 +44,12 @@ entry names, confused-deputy attacks by a client that cannot be authenticated, a
 and what the locked-vault posture of the current version does and does not buy. It is explicit about
 which of those are mitigated today and which are still open, and it does not repeat what is here.
 
-Out of scope for now: the keypaste.com marketing site, and any deployment of keypaste that a third
-party operates. Vulnerabilities in upstream dependencies should be reported upstream first; tell us
-too, so the pinned version can be moved.
+Also in scope: the signup endpoint on keypaste.com — `site/src/worker.js` and everything it
+touches. It accepts other people's email addresses and stores them, so an injection, an authz
+mistake, or a way to read the list back is exactly the report we want. The static content of that
+site is out of scope, as is any deployment of keypaste that a third party operates.
+Vulnerabilities in upstream dependencies should be reported upstream first; tell us too, so the
+pinned version can be moved.
 
 ## Supported versions
 

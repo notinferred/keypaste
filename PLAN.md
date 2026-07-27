@@ -16,7 +16,7 @@
 
 ## Stage 0 — Foundation & proof of life (Week 1–2)
 **Goal: a repo that opens, reads, and writes a real KDBX4 file, verified against KeePassXC.**
-- [ ] Register GitHub org `keypaste`, npm/crates names, point keypaste.com to a one-line landing page with email capture
+- [ ] Register GitHub org `keypaste`, npm/crates names, point keypaste.com to a one-line landing page with email capture — **the page and the email capture landed in 3.1** (Cloudflare Worker → PlanetScale Postgres, D-0037); the org and the package names are what is still open here
 - [x] Repo scaffold: `keypaste-core`, `keypaste-cli`, `keypaste-mcp` (monorepo), CI, license, SECURITY.md, this file trio
 - [x] Pick KDBX library; write round-trip test: create vault → add entry → save → open in KeePassXC → verify — vendored KeePassLib 2.61, see DECISIONS.md D-0007
 - [x] CI job that runs KeePassXC-cli against generated files (compatibility law #6) — all three OSes, permanent, see DECISIONS.md D-0008
@@ -41,13 +41,14 @@
 - [x] Policy file for pre-approvals — `~/.keypaste/policy.toml`, read once by `keypaste agent`, evaluated after the exposure re-check so a rule can only ever narrow (D-0029); keyed on the operator's `--client-label` rather than the name an agent asserts (D-0030); anything wrong with the file means the whole of it is ignored and every request prompts (D-0028). `keypaste policy ls` renders what each pattern parsed to rather than the line that was typed
 - [x] Threat-model doc: confused deputy, prompt injection via entry names, log tampering — and mitigations — `THREATS.md` grew T-10 to T-12 in 2.2 and closed T-7; 2.3 resolved T-3, closed T-6's named gap and added T-13 to T-17, including T-14, the one place the policy file makes keypaste weaker than 2.2; **2.4 closed T-5**, gave T-12's divergence a reader, and promoted memory dumping, clipboard scraping and a stolen vault file into T-18 to T-20. One deferral outlives the stage and says so: T-13 still cannot show which entries a rule matches today, because that needs an open vault, so it waits for the GUI
 - [x] Setup guide for Claude Desktop + Claude Code — `docs/mcp-setup.md`, with the config snippets for both clients, what `--expose` governs, the audit log format and its `method` vocabulary, and how to read it back
-- [ ] The flagship demo, end to end — `docs/demo.md`: a committed offline fixture (`scripts/demo/deploy.sh`) that refuses without `STRIPE_KEY`, a real `keypaste agent`, a real approval, and `keypaste log` as the payoff. `scripts/verify-demo.sh` holds every transcript on the page to what the shipped binaries actually print, on all three OSes, and says plainly that it does not run Claude and cannot (D-0034). Startup and latency were measured rather than guessed, and exactly one number justified touching code (D-0035)
+- [x] The flagship demo, end to end — `docs/demo.md`: a committed offline fixture (`scripts/demo/deploy.sh`) that refuses without `STRIPE_KEY`, a real `keypaste agent`, a real approval, and `keypaste log` as the payoff. `scripts/verify-demo.sh` holds every transcript on the page to what the shipped binaries actually print, on all three OSes, and says plainly that it does not run Claude and cannot (D-0034). Startup and latency were measured rather than guessed, and exactly one number justified touching code (D-0035)
 - **Exit demo (THE demo):** ask Claude "deploy this, get the API key from my vault" → approval popup → Claude proceeds → `keypaste log` shows the access. 60 seconds.
 
 ## Stage 3 — Launch (Week 8–9)
 **Goal: strangers using it.**
-- [ ] Polish README with the demo GIF at top — 2.5 built the recording pipeline (`scripts/demo/`, D-0033); this is the take, the trim to under 2 MB, and the placement
-- [ ] Landing page: the 60-second demo video, install one-liner, "local-first, KDBX, open source" trust bullets
+- [ ] Polish README with the demo GIF at top — the rewrite is done (D-0036): hero, pitch, trust bullets, honest install, MCP snippet, sourced comparison table, and both pages' transcripts now held to the binaries by `scripts/verify-demo.sh`. **What is left is only the GIF** — the take, the trim to under 2 MB, and dropping it into the slot both pages already reserve. The pipeline is `scripts/demo/` (D-0033) and is WSL-only, needs a real Claude session and a human keystroke, and budgets three to eight takes
+- [x] Landing page: the 60-second demo video, install one-liner, "local-first, KDBX, open source" trust bullets — `site/public/index.html`, rewritten in place with the same GIF slot, plus the comparison table and the signup form. The install block is build-from-source, not a one-liner, because there is nothing to install yet; see the release pipeline below
+- [ ] Release pipeline: publish self-contained single-file binaries per OS to a GitHub Release, then the install one-liners both pages currently defer — **gated on O-0006** (does vendored KeePassLib survive AOT), and adding a RID collides with `--locked-mode`, so the lock files have to be regenerated first. `PublishAot` flips here (D-0035)
 - [ ] Launch posts: Hacker News (Show HN), r/selfhosted, r/KeePass, MCP community/Discord, lobste.rs, X
 - [ ] Write the launch essay: "Your password manager can't talk to AI. Here's why that's a problem." 
 - [ ] Respond to every issue/comment for 2 weeks straight
