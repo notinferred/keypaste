@@ -34,7 +34,7 @@ internal static class McpAudit
     /// <remarks>
     /// Both client-supplied strings go through <see cref="EntryNameSanitizer"/> before they are
     /// recorded. They are attacker-chosen text that Stage 2.2 renders in an approval dialog and
-    /// Stage 2.4 renders in a table — the two places an injection payload would most like to land.
+    /// <c>keypaste log</c> renders in a table — the two places an injection payload would most like to land.
     /// Absent values are recorded as absent rather than as the word "unknown": that a client said
     /// nothing is a different fact from a client calling itself nothing.
     /// </remarks>
