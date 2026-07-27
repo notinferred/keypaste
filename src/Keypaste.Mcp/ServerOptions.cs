@@ -39,10 +39,11 @@ internal sealed record ServerOptions
           --audit-log <path>    where to append the audit trail, or set KEYPASTE_HOME
           --approver <name>     which keypaste agent to ask, or set KEYPASTE_APPROVER
 
-        Nothing is released without a person saying yes to that specific request. They are reached
-        through `keypaste agent`, which they start themselves in their own terminal - so no agent
-        can cause a master password prompt to appear. With no agent running, every credential
-        request is denied.
+        Nothing is released unless a person says yes to that specific request, or a rule they wrote
+        in advance covers it. They are reached through `keypaste agent`, which they start themselves
+        in their own terminal - so no agent can cause a master password prompt to appear. With no
+        agent running, every credential request is denied. `keypaste policy ls` shows the standing
+        rules, if there are any.
         """;
 
     /// <summary>The vault to expose. Empty when none was configured, which is not fatal.</summary>

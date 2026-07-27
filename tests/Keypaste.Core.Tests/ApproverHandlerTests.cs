@@ -1,7 +1,7 @@
-using System.Diagnostics.CodeAnalysis;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Policy;
 using Xunit;
 
 namespace Keypaste.Core.Tests;
@@ -16,7 +16,7 @@ namespace Keypaste.Core.Tests;
 /// </remarks>
 public sealed class ApproverHandlerTests
 {
-    internal const string Sentinel = "sk_live_handler_sentinel";
+    internal const string Sentinel = ApproverFixture.Sentinel;
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
@@ -34,38 +34,10 @@ public sealed class ApproverHandlerTests
             ClientName = "claude-code",
         };
 
-    private sealed class Fixture : IDisposable
-    {
-        internal FakeSource Source { get; } = new();
-
-        internal FakeChannel Channel { get; } = new();
-
-        internal ManualClock Clock { get; } = new();
-
-        internal GrantCache Grants { get; }
-
-        internal ApprovalGate Gate { get; }
-
-        internal ApproverHandler Handler { get; }
-
-        internal Fixture()
-        {
-            Grants = new GrantCache(Clock);
-            Gate = new ApprovalGate(Channel, Clock, ApprovalLimits.Default);
-            Handler = new ApproverHandler(Source, Source, Gate, Grants);
-        }
-
-        public void Dispose()
-        {
-            Gate.Dispose();
-            Grants.Dispose();
-        }
-    }
-
     [Fact]
     public async Task AnApprovedRequest_ReleasesTheFieldAndRecordsWhy()
     {
-        using var fixture = new Fixture();
+        using var fixture = new ApproverFixture();
         fixture.Channel.Answer = ApprovalAnswer.Approved;
 
         var reply = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
@@ -84,7 +56,7 @@ public sealed class ApproverHandlerTests
     [Fact]
     public async Task NothingIsReadFromTheVault_UntilAPersonHasSaidYes()
     {
-        using var fixture = new Fixture();
+        using var fixture = new ApproverFixture();
         fixture.Channel.Answer = ApprovalAnswer.Denied;
 
         var reply = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
@@ -109,7 +81,7 @@ public sealed class ApproverHandlerTests
     [Fact]
     public async Task AnEntryOutsideTheExposure_IsRefusedWithoutAskingAnybody()
     {
-        using var fixture = new Fixture();
+        using var fixture = new ApproverFixture();
         fixture.Channel.Answer = ApprovalAnswer.Approved;
 
         var reply = await fixture.Handler.RequestAsync(Request("personal/bank"), "conn-1", Token);
@@ -128,7 +100,7 @@ public sealed class ApproverHandlerTests
     [Fact]
     public async Task AHandleOutsideTheExposure_IsRefusedNotPrompted()
     {
-        using var fixture = new Fixture();
+        using var fixture = new ApproverFixture();
         fixture.Channel.Answer = ApprovalAnswer.Approved;
 
         var handle = EntryHandle.For(new EntryName("personal", "bank"));
@@ -152,7 +124,7 @@ public sealed class ApproverHandlerTests
     [Fact]
     public async Task AMissingEntryAndAForbiddenOne_AreIndistinguishableToTheAgent()
     {
-        using var fixture = new Fixture();
+        using var fixture = new ApproverFixture();
 
         var missing = await fixture.Handler.RequestAsync(Request("env/dev/NOT_THERE"), "conn-1", Token);
         var forbidden = await fixture.Handler.RequestAsync(Request("personal/bank"), "conn-1", Token);
@@ -173,7 +145,7 @@ public sealed class ApproverHandlerTests
     [InlineData(ApprovalAnswer.Failed, AuditMethod.Failed)]
     public async Task EveryAnswerThatIsNotYes_IsADenialThatSaysWhy(ApprovalAnswer answer, AuditMethod expected)
     {
-        using var fixture = new Fixture();
+        using var fixture = new ApproverFixture();
         fixture.Channel.Answer = answer;
 
         var reply = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
@@ -188,7 +160,7 @@ public sealed class ApproverHandlerTests
     [Fact]
     public async Task ARepeatRequestInsideTheTtl_IsServedWithoutAskingAgain()
     {
-        using var fixture = new Fixture();
+        using var fixture = new ApproverFixture();
         fixture.Channel.Answer = ApprovalAnswer.Approved;
 
         var first = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
@@ -207,7 +179,7 @@ public sealed class ApproverHandlerTests
     [Fact]
     public async Task ARepeatRequestForADifferentField_AsksAgain()
     {
-        using var fixture = new Fixture();
+        using var fixture = new ApproverFixture();
         fixture.Channel.Answer = ApprovalAnswer.Approved;
 
         await fixture.Handler.RequestAsync(Request(field: "password"), "conn-1", Token);
@@ -220,7 +192,7 @@ public sealed class ApproverHandlerTests
     [Fact]
     public async Task AnotherConnection_GetsNothingFromSomebodyElsesGrant()
     {
-        using var fixture = new Fixture();
+        using var fixture = new ApproverFixture();
         fixture.Channel.Answer = ApprovalAnswer.Approved;
 
         await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
@@ -234,7 +206,7 @@ public sealed class ApproverHandlerTests
     [Fact]
     public async Task WhenAConnectionGoesAway_ItsGrantsGoWithIt()
     {
-        using var fixture = new Fixture();
+        using var fixture = new ApproverFixture();
         fixture.Channel.Answer = ApprovalAnswer.Approved;
 
         await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
@@ -252,7 +224,7 @@ public sealed class ApproverHandlerTests
     [Fact]
     public async Task AHandleAndItsPath_ShareOneGrant()
     {
-        using var fixture = new Fixture();
+        using var fixture = new ApproverFixture();
         fixture.Channel.Answer = ApprovalAnswer.Approved;
 
         await fixture.Handler.RequestAsync(Request("env/dev/STRIPE_KEY"), "conn-1", Token);
@@ -271,7 +243,7 @@ public sealed class ApproverHandlerTests
     [Fact]
     public async Task TheGrantedTtl_IsTheCappedOneNotTheRequestedOne()
     {
-        using var fixture = new Fixture();
+        using var fixture = new ApproverFixture();
         fixture.Channel.Answer = ApprovalAnswer.Approved;
 
         var reply = await fixture.Handler.RequestAsync(Request(ttl: 3600), "conn-1", Token);
@@ -283,7 +255,7 @@ public sealed class ApproverHandlerTests
     [Fact]
     public async Task AFieldKeypasteDoesNotRelease_NeverReachesAPerson()
     {
-        using var fixture = new Fixture();
+        using var fixture = new ApproverFixture();
         fixture.Channel.Answer = ApprovalAnswer.Approved;
 
         var reply = await fixture.Handler.RequestAsync(Request(field: "totp"), "conn-1", Token);
@@ -295,7 +267,7 @@ public sealed class ApproverHandlerTests
     [Fact]
     public async Task ALockedVault_IsSaidToBeLockedRatherThanOutOfScope()
     {
-        using var fixture = new Fixture();
+        using var fixture = new ApproverFixture();
         fixture.Source.Locked = true;
 
         var reply = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
@@ -311,7 +283,7 @@ public sealed class ApproverHandlerTests
     [Fact]
     public async Task AVaultThatFailsAfterTheApproval_StillDenies()
     {
-        using var fixture = new Fixture();
+        using var fixture = new ApproverFixture();
         fixture.Channel.Answer = ApprovalAnswer.Approved;
         fixture.Source.FailReads = true;
 
@@ -325,7 +297,7 @@ public sealed class ApproverHandlerTests
     [Fact]
     public async Task ListingYieldsOnlyWhatTheExposureAllows()
     {
-        using var fixture = new Fixture();
+        using var fixture = new ApproverFixture();
 
         var reply = await fixture.Handler.ListAsync(new NamesRequest(["env/**"]), "conn-1", Token);
 
@@ -336,7 +308,7 @@ public sealed class ApproverHandlerTests
     [Fact]
     public async Task ListingALockedVaultSaysSoRatherThanReturningNothingQuietly()
     {
-        using var fixture = new Fixture();
+        using var fixture = new ApproverFixture();
         fixture.Source.Locked = true;
 
         var reply = await fixture.Handler.ListAsync(new NamesRequest(["env/**"]), "conn-1", Token);
@@ -349,103 +321,17 @@ public sealed class ApproverHandlerTests
     [Fact]
     public void TheHandlerRejectsNulls()
     {
-        using var fixture = new Fixture();
+        using var fixture = new ApproverFixture();
 
-        Assert.Throws<ArgumentNullException>(() => new ApproverHandler(null!, fixture.Source, fixture.Gate, fixture.Grants));
-        Assert.Throws<ArgumentNullException>(() => new ApproverHandler(fixture.Source, null!, fixture.Gate, fixture.Grants));
-        Assert.Throws<ArgumentNullException>(() => new ApproverHandler(fixture.Source, fixture.Source, null!, fixture.Grants));
-        Assert.Throws<ArgumentNullException>(() => new ApproverHandler(fixture.Source, fixture.Source, fixture.Gate, null!));
-    }
+        var s = fixture.Source;
+        var g = fixture.Gate;
+        var c = fixture.Grants;
+        var p = PolicyGate.None;
 
-    /// <summary>A vault with two entries, one inside the default exposure and one well outside it.</summary>
-    private sealed class FakeSource : ICredentialSource, IEntryNameLister
-    {
-        private static readonly EntryName[] _entries =
-        [
-            new EntryName("env/dev", "STRIPE_KEY"),
-            new EntryName("personal", "bank"),
-        ];
-
-        internal bool Locked { get; set; }
-
-        internal bool FailReads { get; set; }
-
-        internal int Reads { get; private set; }
-
-        public bool TryResolve(string entryArgument, [NotNullWhen(true)] out EntryName? name, out CredentialFailure failure)
-        {
-            name = null;
-
-            if (Locked)
-            {
-                failure = CredentialFailure.VaultLocked;
-                return false;
-            }
-
-            foreach (var candidate in _entries)
-            {
-                var path = candidate.GroupPath.Length == 0
-                    ? candidate.Title
-                    : candidate.GroupPath + "/" + candidate.Title;
-
-                if (string.Equals(path, entryArgument, StringComparison.Ordinal)
-                    || string.Equals(EntryHandle.For(candidate), entryArgument, StringComparison.Ordinal))
-                {
-                    name = candidate;
-                    failure = CredentialFailure.None;
-                    return true;
-                }
-            }
-
-            failure = CredentialFailure.NotFound;
-            return false;
-        }
-
-        public bool TryRead(EntryName name, string field, [NotNullWhen(true)] out ReleasedField? value, out CredentialFailure failure)
-        {
-            value = null;
-
-            if (FailReads)
-            {
-                failure = CredentialFailure.Failed;
-                return false;
-            }
-
-            Reads++;
-            value = new ReleasedField(field, Sentinel);
-            failure = CredentialFailure.None;
-            return true;
-        }
-
-        public bool TryList(EntryExposure exposure, [NotNullWhen(true)] out IReadOnlyList<EntryName>? names, out CredentialFailure failure)
-        {
-            names = null;
-
-            if (Locked)
-            {
-                failure = CredentialFailure.VaultLocked;
-                return false;
-            }
-
-            names = [.. _entries.Where(exposure.Allows)];
-            failure = CredentialFailure.None;
-            return true;
-        }
-    }
-
-    private sealed class FakeChannel : IApprovalChannel
-    {
-        internal ApprovalAnswer Answer { get; set; } = ApprovalAnswer.Denied;
-
-        internal int Asked { get; private set; }
-
-        internal ApprovalPrompt? LastPrompt { get; private set; }
-
-        public ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken)
-        {
-            Asked++;
-            LastPrompt = prompt;
-            return ValueTask.FromResult(Answer);
-        }
+        Assert.Throws<ArgumentNullException>(() => new ApproverHandler(null!, s, g, c, p));
+        Assert.Throws<ArgumentNullException>(() => new ApproverHandler(s, null!, g, c, p));
+        Assert.Throws<ArgumentNullException>(() => new ApproverHandler(s, s, null!, c, p));
+        Assert.Throws<ArgumentNullException>(() => new ApproverHandler(s, s, g, null!, p));
+        Assert.Throws<ArgumentNullException>(() => new ApproverHandler(s, s, g, c, null!));
     }
 }

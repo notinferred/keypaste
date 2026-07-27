@@ -29,6 +29,13 @@ internal sealed class McpHarness : IAsyncDisposable
     internal const string ClientName = "test-client";
     internal const string ClientVersion = "9.9.9";
 
+    /// <summary>
+    /// What the operator called this bridge. Deliberately different from <see cref="ClientName"/>,
+    /// so a test that confuses the asserted name with the label the operator wrote fails rather
+    /// than passing by coincidence.
+    /// </summary>
+    internal const string ClientLabel = "test-label";
+
     private readonly string _directory = Directory.CreateTempSubdirectory("keypaste-mcp-tests-").FullName;
     private readonly List<IDisposable> _owned = [];
 
@@ -95,7 +102,9 @@ internal sealed class McpHarness : IAsyncDisposable
     /// <summary>Starts the server with the given arguments and connects a client to it.</summary>
     internal async Task<McpClient> StartAsync(params string[] argv)
     {
-        var arguments = argv.Concat(["--vault", VaultPath, "--audit-log", AuditPath]).ToArray();
+        var arguments = argv
+            .Concat(["--vault", VaultPath, "--audit-log", AuditPath, "--client-label", ClientLabel])
+            .ToArray();
 
         if (!ServerOptions.TryParse(arguments, null, null, _approverPipeName ?? Approver.PipeName, out var options, out var error))
         {

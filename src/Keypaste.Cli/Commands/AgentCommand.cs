@@ -2,7 +2,9 @@ using System.Globalization;
 using Keypaste.Cli.Approval;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
+using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Policy;
 
 namespace Keypaste.Cli.Commands;
 
@@ -39,6 +41,7 @@ internal static class AgentCommand
     internal const string ApproverOption = "approver";
     internal const string TimeoutOption = "approval-timeout";
     internal const string MaxTtlOption = "max-ttl";
+    internal const string PolicyOption = "policy";
 
     private static readonly OptionSpec[] _options =
     [
@@ -46,6 +49,7 @@ internal static class AgentCommand
         new(ApproverOption, TakesValue: true),
         new(TimeoutOption, TakesValue: true),
         new(MaxTtlOption, TakesValue: true),
+        new(PolicyOption, TakesValue: true),
     ];
 
     internal static int Execute(string[] args, CliContext context)
@@ -96,10 +100,23 @@ internal static class AgentCommand
             return CliApp.ExitUsageError;
         }
 
-        return VaultSession.Open(vaultPath, context, vault => Serve(vault, vaultPath, pipeName, limits, context));
+        // Loaded before the vault is opened, so a broken policy is on screen before the master
+        // password prompt rather than after it. Nothing here is fatal: every failure means no rules,
+        // which means every request is shown to a person — the state this command shipped in.
+        var policy = PolicyLoader.Load(
+            line.Value(PolicyOption)
+            ?? KeypasteHome.PolicyPath(context.Environment.Get(KeypasteHome.EnvironmentVariable)));
+
+        return VaultSession.Open(vaultPath, context, vault => Serve(vault, vaultPath, pipeName, limits, policy, context));
     }
 
-    private static int Serve(Vault vault, string vaultPath, string pipeName, ApprovalLimits limits, CliContext context)
+    private static int Serve(
+        Vault vault,
+        string vaultPath,
+        string pipeName,
+        ApprovalLimits limits,
+        PolicyLoad policy,
+        CliContext context)
     {
         using var grants = new GrantCache(TimeProvider.System);
         using var gate = new ApprovalGate(
@@ -112,6 +129,7 @@ internal static class AgentCommand
             new VaultEntryNameLister(() => vault),
             gate,
             grants,
+            new PolicyGate(policy.Rules, TimeProvider.System),
             line => context.Stderr.WriteLine($"keypaste: {line}"));
 
         ApproverListener? listener = null;
@@ -145,7 +163,7 @@ internal static class AgentCommand
 
             try
             {
-                Announce(vaultPath, pipeName, limits, context);
+                Announce(vaultPath, pipeName, limits, policy, context);
 
                 // Blocking on the listener is the command. There is no synchronization context in
                 // a console app, so this is a wait rather than a deadlock waiting to happen.
@@ -165,14 +183,57 @@ internal static class AgentCommand
         return CliApp.ExitSuccess;
     }
 
-    private static void Announce(string vaultPath, string pipeName, ApprovalLimits limits, CliContext context)
+    /// <summary>
+    /// The four lines a person reads before leaving this running, one of which changes meaning
+    /// entirely depending on whether a policy is in force.
+    /// </summary>
+    /// <remarks>
+    /// All six states a policy file can be in — absent, empty, in force, malformed, unreadable, too
+    /// permissive — reach an agent as the same thing, which is required: telling them apart would
+    /// let a request work out whether the human has a policy at all. They are distinct <em>here</em>,
+    /// because "I wrote a rule and it is not working" and "I have no rules" need different next
+    /// steps, and a rejected file says so twice as loudly as the rest.
+    /// </remarks>
+    /// <remarks>
+    /// <c>internal</c> so the six states are assertable. The command itself blocks on a pipe until
+    /// Ctrl+C, so the only way to test what it tells a person is to call the part that tells them.
+    /// </remarks>
+    internal static void Announce(
+        string vaultPath,
+        string pipeName,
+        ApprovalLimits limits,
+        PolicyLoad policy,
+        CliContext context)
     {
         context.Stderr.WriteLine($"keypaste: watching {vaultPath}");
+
+        if (policy.Status == PolicyStatus.Rejected)
+        {
+            context.Stderr.WriteLine($"keypaste: policy: {policy.Reason}");
+            context.Stderr.WriteLine(
+                "keypaste: policy: every request will be shown to you. Fix it and restart, or run `keypaste policy ls`.");
+        }
+        else if (policy.HasRules)
+        {
+            context.Stderr.WriteLine($"keypaste: policy: {policy.Reason}. `keypaste policy ls` shows them.");
+        }
+        else
+        {
+            context.Stderr.WriteLine($"keypaste: policy: {policy.Reason}.");
+        }
+
         context.Stderr.WriteLine(
             string.Create(
                 CultureInfo.InvariantCulture,
                 $"keypaste: listening on {pipeName}, {limits.Window.TotalSeconds:0} seconds to answer, grants last at most {limits.MaximumTtlSeconds} seconds"));
-        context.Stderr.WriteLine("keypaste: nothing is released without you saying yes. Press Ctrl+C to stop.");
+
+        // The claim changes when a rule is in force, because with one it is no longer true. Saying
+        // "nothing is released without you saying yes" while a standing rule releases things
+        // silently is the kind of small untruth this product cannot afford to print.
+        context.Stderr.WriteLine(
+            policy.HasRules
+                ? "keypaste: nothing is released without you saying yes, unless a policy rule covers it. Press Ctrl+C to stop."
+                : "keypaste: nothing is released without you saying yes. Press Ctrl+C to stop.");
     }
 
     private static bool TryLimits(CommandLine line, CliContext context, out ApprovalLimits limits)
@@ -208,7 +269,7 @@ internal static class AgentCommand
     /// The ceiling the tool schema advertises. Kept in step by
     /// <c>ToolSchemasMatchTheCoreTests</c> rather than by hoping.
     /// </summary>
-    internal const int ToolTtlCeiling = 3600;
+    internal const int ToolTtlCeiling = ApprovalLimits.MaximumRequestableTtlSeconds;
 
     private static bool TrySeconds(
         string? raw,
@@ -241,6 +302,7 @@ internal static class AgentCommand
     {
         writer.WriteLine("usage: keypaste agent [--vault <path>] [--approver <name>]");
         writer.WriteLine("                      [--approval-timeout <seconds>] [--max-ttl <seconds>]");
+        writer.WriteLine("                      [--policy <path>]");
         writer.WriteLine();
         writer.WriteLine("Unlocks your vault and waits. When an AI agent asks keypaste-mcp for a");
         writer.WriteLine("credential, the request appears here and nothing is released until you say yes.");
@@ -250,6 +312,10 @@ internal static class AgentCommand
         writer.WriteLine($"  --approver <name>          which pipe to listen on, or set {ApproverEndpoint.EnvironmentVariable}");
         writer.WriteLine($"  --approval-timeout <secs>  how long you have to answer, {ApprovalLimits.MinimumWindowSeconds}-{ApprovalLimits.MaximumWindowSeconds}, default {ApprovalLimits.DefaultWindowSeconds}");
         writer.WriteLine($"  --max-ttl <secs>           the longest grant to issue, default {ApprovalLimits.DefaultMaximumTtlSeconds}");
+        writer.WriteLine($"  --policy <path>            standing rules, default ~/{KeypasteHome.DirectoryName}/{KeypasteHome.PolicyFileName}");
+        writer.WriteLine();
+        writer.WriteLine("A rule in the policy file releases a credential without asking. Anything wrong");
+        writer.WriteLine("with that file means the whole of it is ignored and every request asks you.");
         writer.WriteLine();
         writer.WriteLine("Your master password is typed here, never in a window an agent caused to appear.");
     }

@@ -3,9 +3,14 @@
 **Status: still partial, and still deliberately so.** This document is written across Stage 2.
 Sections marked **Arrives in 2.x** name a threat that is real and *not yet mitigated*, with the
 PLAN.md checkbox that will close it. They are listed because a threat model that is quietly thin is
-worse than one that says where it is thin. As of Stage 2.2 the remaining gap is T-5 — the audit log
-is append-only by construction and not yet tamper-evident — plus the halves of T-11 and T-12 that
-belong to the policy file.
+worse than one that says where it is thin. As of Stage 2.3 the remaining gap is T-5 — the audit log
+is append-only by construction and not yet tamper-evident — and T-13's missing mitigation, which is
+a way to see what each policy rule covers *today*. Both belong to 2.4.
+
+**Stage 2.3 made one thing worse on purpose, and it is T-14.** A policy file releases a credential
+with nobody watching. Every other line in this document describes something keypaste defends
+against; that one describes a capability the product now has because CORE.md law 3.2 authorises it
+in so many words, and the rest of the design exists to bound how much it costs.
 
 This file covers `keypaste-mcp` — the bridge between an AI agent and your vault. For the vault, the
 CLI, and the honest list of what keypaste does not protect against anywhere, see
@@ -48,12 +53,14 @@ before you answer — for one value at a time.**
 | The MCP client (Claude Desktop, Claude Code, anything else) | **Semi-trusted, and unauthenticated** | It spawned the server. It says who it is and cannot prove it (T-3). |
 | The model | **Untrusted** | It composes tool calls from context that may include text an attacker wrote. |
 | Entry names, group paths, and the agent's stated `reason` | **Untrusted data** | Never instructions. See T-1 and T-2. |
+| The policy file | Trusted as authorization, as far as its permissions go | You wrote it, and it can release a credential without asking you. Only as trustworthy as who can write it (T-15). |
 
 ## Assets
 
 The master key · field values (passwords, usernames, URLs, notes) · **entry names**, which law 3.5
-singles out as never-telemetered and which are sensitive on their own · the audit log · the policy
-file (from 2.3).
+singles out as never-telemetered and which are sensitive on their own · the audit log · **the policy
+file**, which since 2.3 is not configuration but an authorization document: anything that can write
+it can grant an agent silent access to a credential (T-15).
 
 ## Assumptions
 
@@ -61,8 +68,10 @@ file (from 2.3).
    your files. SECURITY.md says this already and this document does not contradict it. Everything
    below assumes the local user account is not already compromised.
 2. Whoever can start processes as you can also spawn `keypaste-mcp` with arguments of their
-   choosing, which means they control `--expose`. The exposure rule is a boundary against a
-   *connected client*, not against a local attacker.
+   choosing, which means they control `--expose` — and, since 2.3, `--client-label`, which is what a
+   policy rule keys on. The exposure rule and the policy file are boundaries against a *connected
+   client*, not against a local attacker. T-14 states what that costs now that a rule can release
+   without a prompt.
 3. KDBX4 with Argon2 does its job. keypaste writes no cryptography of its own (law 3.6).
 
 ---
@@ -183,11 +192,15 @@ nothing, and when the approved process restarts, its connection dies and its gra
 (D-0026). That is the strongest honest scoping available here: it means *the process the human
 approved for*.
 
-**Residual, and a decision this forces on 2.3.** prompts.md 2.3 describes policy rules of the form
-"allow client `claude-code` to read …". A rule keyed on an unauthenticated name is a rule any
-process can inherit by lying. 2.3 must therefore either key on something the human supplied out of
-band, or state clearly that client-scoped policy narrows convenience rather than authority. Deciding
-that is 2.3's job; recording that it *must be decided* is 2.1's.
+**Resolved in 2.3, and the answer is both halves.** 2.1 wrote that a policy rule keyed on an
+unauthenticated name is a rule any process can inherit by lying, and that 2.3 must either key on
+something the human supplied out of band or say plainly that client-scoped policy narrows
+convenience rather than authority. It does both. A rule keys on `--client-label`, which the human
+writes into the MCP client's configuration and which whoever *connects* cannot choose — and a bridge
+started without one matches no rule at all, including one written `client = "*"`. But whoever
+**spawns** the bridge still chooses its argv, so the honest sentence is the second one:
+**client-scoped policy narrows convenience, not authority.** It is in docs/policy.md in those words.
+The residual that survives is T-14.
 
 Note also assumption 2: whoever spawns the server controls its argv and therefore its exposure. The
 real boundary here is "who can start processes as you", which SECURITY.md already places out of
@@ -196,7 +209,12 @@ scope.
 **Proved by.** `ServerToolsTests.EveryCall_WritesOneAuditLine_NamingTheClientAndTheExposure` records
 what the client claimed; `scripts/verify-mcp-stdio.sh` asserts the operator-supplied label reaches
 the log. That no authorization reads either is now testable rather than vacuous, and
-`GrantCacheTests.AnotherConnection_InheritsNothing` is where it is tested.
+`GrantCacheTests.AnotherConnection_InheritsNothing` is where it is tested. For the policy path,
+`ApproverHandlerPolicyTests.TheClientsAssertedName_CanNeverSatisfyARule` gives the client the exact
+name the rule asks for and watches it reach a person anyway;
+`ApproverProtocolTests.ACredentialRequest_CarriesTheOperatorsLabel_SeparatelyFromTheAssertedName`
+pins that the two travel as different fields; and phase D of `scripts/verify-policy-e2e.sh` asserts
+that a real unlabelled bridge draws a prompt.
 
 ---
 
@@ -220,6 +238,11 @@ like a path.
 
 **Residual.** A user who writes `--expose "**"` has exposed every name in the vault, and that is
 their decision to make. The documentation states the consequence rather than preventing the choice.
+
+**And since 2.3, `--expose` is doing more work than it used to.** A policy rule is evaluated *after*
+the exposure re-check and can only narrow, so the exposure is the ceiling and a rule cannot reach
+past it. The consequence is that a wide `--expose` and a wide rule now compose into a silent release,
+where before 2.3 a wide `--expose` still cost the attacker a human keystroke.
 
 **Proved by.** `EntryExposureTests` — including `ATitleFullOfSlashes_CannotImpersonateAGroup`,
 `AnExposureWithNoGlobs_AllowsNothing` and `MatchingUsesTheRawNameNotTheSanitizedOne`. Over the wire,
@@ -281,9 +304,14 @@ path denies.
 **Proved by.** `AuditLogTests.AnUnopenableLog_FailsWithAReason` for the refusal itself, and
 `ServerToolsTests.AMalformedCall_IsStillAudited` for the case people forget — a call refused before
 it was understood is still an access. `scripts/verify-mcp-stdio.sh` asserts a real spawned server
-leaves a line for both tools. **Not yet proved:** that a mid-run write failure denies the call. The
-ordering is enforced by the code path rather than by a test, because there is no secret to withhold
-until 2.2 — a gap named here rather than left implicit.
+leaves a line for both tools.
+
+**The named gap closed in 2.3, on the path that needed it most.**
+`ServerToolsTests.APolicyRelease_IsRefusedWhenItsAuditLineCannotBeWritten` holds the log's sidecar
+lock, watches the approver genuinely release a credential over the pipe, and asserts the bridge
+throws it away rather than hand over something it could not record. It is written against a *policy*
+release rather than an approved one on purpose: on the prompted path the human is a second witness,
+and on this one the log is not the second record that a release happened — it is the only one.
 
 ---
 
@@ -427,8 +455,8 @@ delegated to a human whose attention is finite.
 **Who.** A model that is stuck and retrying, an agent steered by injected instructions, or two
 clients that both want the same key.
 
-**Status.** Partially mitigated. The two mitigations that stop a loop are in; the ones that shape
-policy are Stage 2.3's subject, and the per-client pause is Stage 4.3's own feature.
+**Status.** Partially mitigated. The two mitigations that stop a loop are in, and 2.3 added the
+per-rule rate limit; the per-client pause is Stage 4.3's own feature.
 
 **Mitigation.**
 - **One request in front of a person at a time.** A second is refused immediately rather than
@@ -442,17 +470,32 @@ policy are Stage 2.3's subject, and the per-client pause is Stage 4.3's own feat
   so an unattended machine cannot be made to produce prompts faster than that.
 - **Wording.** A refusal that a person made, and a cooldown, both tell the agent not to retry. A
   timeout and a busy signal deliberately do not, because nobody decided anything (D-0027).
+- **A per-rule hourly allowance (2.3).** `max_per_hour` bounds how many times a standing rule may
+  release, counted per rule and process-wide on a true sliding window. It is optional, and
+  `keypaste policy ls` says "No limit on how often" out loud when it is omitted, because an
+  unlimited rule is a thing to have chosen rather than a blank somebody did not fill in.
 
-**Residual.** There is no rate limit across different entries, no cap on how many prompts a client
-may raise in an hour, and no "pause this client" switch. An agent that asks for twenty *different*
-entries will produce twenty prompts, one every forty-five seconds at worst. Stage 2.3's policy file
-and Stage 4.3's per-client controls are where those belong; naming them here is what stops them
-being forgotten.
+**A spent allowance denies rather than escalating.** This is the tempting mistake and it is worth
+naming: falling through to a prompt looks strictly safer, since a human still decides. It is worse.
+It converts a quota into a prompt generator — an agent that has burned a rule's allowance would
+start producing one prompt per request, which is this threat with a lever attached — and it would
+make `keypaste policy ls` lie about what `max_per_hour` means.
+
+**Residual.** There is still no rate limit across different entries, no cap on how many prompts a
+client may raise in an hour, and no "pause this client" switch. An agent that asks for twenty
+*different* entries will produce twenty prompts, one every forty-five seconds at worst. Stage 4.3's
+per-client controls are where the rest belongs; naming it here is what stops it being forgotten.
+`max_per_hour` only bounds the *silent* path, which is the one nobody is watching — it does nothing
+about prompt volume, because a request a rule covers never draws a prompt in the first place.
 
 **Proved by.** `ApprovalGateTests.ASecondRequestWhileSomebodyIsDeciding_IsRefusedNotQueued` and
 `TheSameRequestRightAfterARefusal_IsDeniedWithoutAskingAgain`, plus the pair of `ServerToolsTests`
-that pin the presence and the absence of "do not retry" in adjacent refusals. Nothing tests that a
-tired human reads more carefully, because nothing can.
+that pin the presence and the absence of "do not retry" in adjacent refusals.
+`PolicyGateTests.TheAllowanceComesBackOneReleaseAtATime_AnHourAfterEachWasSpent` for the window
+being a sliding one rather than a bucket that resets, and
+`TheAllowanceBelongsToTheRule_NotToTheCaller` for the reason it is counted per rule: a quota the
+constrained party can reset by reconnecting is not a quota. Nothing tests that a tired human reads
+more carefully, because nothing can.
 
 ---
 
@@ -484,11 +527,186 @@ untrusted text — the same argument T-1 already makes for refusing a phrase blo
 hand an agent a lever for forcing re-prompt loops, which is T-11. A shorter `--max-ttl` is the honest
 control, and it is one number.
 
+**2.3 removes the first approval as well as the second, and that is a different threat.** Everything
+above rests on there being an earlier `granted` / `prompt` line for the same entry and field — a
+request a person did read — that the reuse can be paired against and compared with. **A policy grant
+has no such line.** No reason is read by anybody, ever, for any request that rule covers, so the
+comparison target that made this tolerable does not exist. What is done instead: every release gets
+its own `granted` / `policy` line carrying *that* request's reason excerpt, length and SHA-256; the
+line names which rule released it; the approver prints a line per release to its terminal; and a
+policy grant deliberately **does not** seed the grant cache, so no release is ever hidden behind a
+`grant-cache` line that names no rule. What is not done: nothing inspects the reason, and T-2's
+display mitigations do not apply, because there is no display. See T-13 and T-14.
+
 **Proved by.** `GrantCacheTests` for the lifetime, the scoping and the zeroing;
 `ApproverHandlerTests.ARepeatRequestInsideTheTtl_IsServedWithoutAskingAgain` for the reuse itself
-and for the fact that it costs exactly one prompt and one vault read. That the divergence is
-*visible* is a property of the log's contents, and it has no reader until 2.4 — said here rather
+and for the fact that it costs exactly one prompt and one vault read.
+`ApproverHandlerPolicyTests.APolicyGrant_LeavesNoGrantInTheCache` for the separation, and
+`ServerToolsTests.APolicyRelease_IsAuditedAsPolicyAndNamesTheRule` for the line. That the divergence
+is *visible* is a property of the log's contents, and it has no reader until 2.4 — said here rather
 than counted as mitigated.
+
+---
+
+## T-13 — A rule grants a namespace, not the entries you pictured
+
+**What.** Two halves, both of which end with a credential released that the author of the rule never
+had in mind.
+
+The first is the pattern syntax. Unless a pattern's last segment is exactly `**`, that segment is the
+**title**, so `env/dev*` — the obvious way to write "the dev environment" — means *group exactly
+`env`, title starting `dev`*. It matches nothing under `env/dev/` and it does match an entry sitting
+directly in `env` called `devops_ROOT_TOKEN`. Worse than the miss is what happens next: the rule
+appears not to work, and the author reaches for `env/**`.
+
+The second is time. A rule names a namespace, and what is *in* that namespace changes after the rule
+is written. Anything that can write there — a synced vault, a colleague on a shared file, a hostile
+`.env` pulled in with `keypaste env pull` — chooses what the rule covers. Move `personal/bank` into
+`env/dev` and a rule for `env/dev/**` covers it, silently. Under 2.2 the human would have seen
+`personal/bank` on screen and refused.
+
+**Who.** The person writing the rule, for the first half. For the second, anyone with write access to
+the vault — which T-1 already establishes is not the same set as "people you trust with the secrets".
+
+**Status.** Made visible rather than prevented, and the visibility is thinner than T-1's.
+
+**Mitigation.**
+- **`keypaste policy ls` never echoes the line you wrote.** It renders the two halves each pattern
+  actually parsed to, on separate lines, so the reader is checking the parse rather than confirming
+  their own text. That is the whole reason the renderer exists.
+- **The same matcher as `--expose`, not a second one.** D-0021 fixed the matching domain in 2.1
+  precisely so the policy file could not invent a subtly different one, and a rule constructs an
+  `EntryExposure` rather than reimplementing it. So every property that type carries — group and
+  title matched separately, raw, ordinal, case-sensitive — is inherited rather than re-argued.
+- **Ambiguity still denies.** Two entries answering to one name is refused, exactly as on the
+  prompted path. A rule is never a reason to guess which one was meant.
+- **Every release is narrated and logged with the rule that did it**, so the second half is at least
+  discoverable after the fact.
+
+**Residual.** An entry moved into a rule's namespace after the rule was written is released without a
+prompt, and nothing prevents it. The mitigation this wants most — showing which entries each rule
+matches *today* — needs the vault, which would put a master password prompt in front of the one
+command an operator reaches for when something already looks wrong. It is deferred to 2.4 with
+`keypaste log`, and named here so the deferral is visible.
+
+**Proved by.** `PolicyRuleTests.APolicyRuleWithATrailingStar_ConstrainsTheTitleNotTheGroup`, which
+asserts **both** directions so the test documents the surprise rather than the wish;
+`ARuleUsesTheSameMatcherAsTheExposure`, which runs a table of names through a rule and through a real
+`EntryExposure` and requires every verdict to agree; `ATitleFullOfSlashes_CannotSatisfyAGroupPattern`;
+`ApproverHandlerPolicyTests.AnAmbiguousEntry_IsDeniedEvenWhenARuleMatches`; and
+`PolicyVerbTests.ItRendersWhatEachPatternParsedTo_NeverTheLineTheUserWrote`. **Not prevented, and
+nothing tests otherwise:** the vault changing under a standing rule.
+
+---
+
+## T-14 — A rule is a standing grant to anything that can reach the approver
+
+**What.** Both inputs a rule matches on — the client label and the exposure — arrive over the pipe
+from the requester. A local process that can spawn `keypaste-mcp` can spawn it with
+`--client-label claude-code --expose "**"` and drain everything a rule allows, with no prompt, no
+window and nothing on any screen a person is watching except one line on a terminal they may not be
+looking at.
+
+**Who.** Any process running as the user.
+
+**Status.** **This is the paragraph where 2.3 is weaker than 2.2, and it should read that way.**
+
+**Mitigation.** Assumption 1 has always put a process running as your user out of scope, and that has
+not changed. What *has* changed is the consequence. In 2.2 the same attacker still needed you to
+press `y`; now, for anything a rule covers, it does not. The honest mitigations are all limits you
+choose in advance: narrow `entries`, a small `max_per_hour`, a short `--max-ttl`, and not writing a
+rule at all for anything you would not hand over on request. Every release appears on the approver's
+terminal and in the audit log.
+
+**Residual, stated because there is nothing behind it.** The client label is chosen by whoever spawns
+the bridge, so **client-scoped policy narrows convenience, not authority**. That sentence is 2.1's
+own demand in T-3, answered here, and docs/policy.md says it to users in those words.
+
+**Proved by: nothing does, and nothing can.** The tests in
+`ApproverHandlerPolicyTests.TheClientsAssertedName_CanNeverSatisfyARule` and phase D of
+`scripts/verify-policy-e2e.sh` prove the narrower claim — that the *agent* cannot choose which rules
+apply to it. They do not, and cannot, prove anything about a process that starts the bridge itself.
+
+---
+
+## T-15 — The policy file is authorization living in a directory that may be synced
+
+**What.** D-0020 put `~/.keypaste` deliberately away from the vault, and the reasoning was written
+about a *record*. The same directory now holds an *authorization*. `KEYPASTE_HOME` pointed at
+Dropbox or iCloud — or a symlinked `~/.keypaste` — means another machine, or anyone with the share,
+writes rules that silently release this machine's credentials.
+
+**Who.** Anyone who can write the file or its directory, which on a synced folder is a much larger
+set than the local user.
+
+**Status.** Mitigated on Unix, unmitigated on Windows, and said so rather than implied.
+
+**Mitigation.**
+- **A policy file or directory writable by anyone but its owner is refused**, on Linux and macOS.
+  Refused, not repaired: repairing is a race — between the change and the read, whoever had write
+  access still has it — and it would destroy the evidence that something was wrong with an
+  authorization document. `AuditLog` tightens *its* file, which is right for a file keypaste writes
+  and wrong for one keypaste is about to obey.
+- **Read once, from one open, validated in memory.** There is no stat-then-open window, and a file
+  edited mid-session does nothing until the agent is restarted — which means with the human present.
+- **A digest of the exact bytes parsed** is printed by the agent at startup and by
+  `keypaste policy ls`, so "the rules in force" and "the file on disk" can be compared by eye.
+- **The size is checked before the read**, so a wrong path pointed at something enormous costs a stat
+  rather than a read inside the process holding an unlocked vault.
+
+**Residual, stated because the wording matters.** **On Windows there is no check at all** — there is
+no cheap correct equivalent, the honest version is an ACL walk, and a half-check that passes on a
+world-writable directory is worse than none because it implies one happened. This is the same gap the
+audit log and `env export` already state.
+
+**Proved by.** `PolicyLoaderTests.APolicyFileWritableByOthers_IsRefusedAndNotRepaired` and
+`ADirectoryWritableByOthers_IsRefusedToo` — both skipped on Windows with the reason stated in the
+skip message rather than silently passing — plus `TheDigestFollowsTheBytes` and
+`AFileOverTheSizeCap_IsRejectedWithoutBeingRead`.
+
+---
+
+## T-16 — The audit vocabulary is now the only evidence a person was involved
+
+**What.** Before 2.3, every `granted` line traced back to somebody looking at that specific request.
+Now one of them does not. If a policy release were logged as `prompt`, or served from — and therefore
+logged as — `grant-cache`, the record would assert a human act that never happened, and there is no
+second witness to contradict it.
+
+**Status.** Mitigated structurally.
+
+**Mitigation.** `policy` is its own `AuditMethod` with its own wire string, and the record's reason
+names which rule released it. A policy grant **does not seed the grant cache**, so no later release
+can appear as `grant-cache` — that word keeps meaning "a person already said yes to this". The
+agent-facing text is keyed on the same method, so a release nobody approved does not tell the model
+that a person released it.
+
+**Proved by.** `AuditLogTests.EveryAuditMethod_HasItsOwnWireString`, which now names `policy` and
+`policy-limit` outright so a rename cannot slip past the distinctness check;
+`ApproverHandlerPolicyTests.APolicyGrant_IsLoggedAsPolicyAndNeverAsPrompt` and
+`APolicyGrant_LeavesNoGrantInTheCache`;
+`ServerToolsTests.APolicyRelease_DoesNotClaimAPersonApprovedIt`; and
+`scripts/verify-policy-e2e.sh`, which fails if `"method":"prompt"` appears anywhere in a run whose
+only release came from a rule.
+
+---
+
+## T-17 — A timing oracle over the policy
+
+**What.** A policy release returns immediately; a prompted one takes as long as a person takes. An
+agent can time its own requests and learn which parts of the vault are pre-authorized.
+
+**Status.** Not mitigated. Recorded so it is not rediscovered as news.
+
+**Mitigation.** None. Padding every policy release to a human-plausible delay would trade a real
+property — that pre-approval is fast, which is the entire point of it — for an attacker who learns
+the same thing one prompt later.
+
+**Residual.** Low value to the attacker, which is why it is not worth paying for: for the entries a
+rule covers, an agent that can time the response has already been handed the credential. What it
+learns is about the entries it *cannot* have, and that set is already bounded by `--expose`.
+
+**Proved by: nothing does.** There is nothing to test.
 
 ---
 
@@ -510,4 +728,5 @@ than counted as mitigated.
 |---|---|
 | 2.1 | Document created. T-1, T-4, T-6, T-7, T-8, T-9 owned. T-2, T-3, T-5 partial. Decisions in DECISIONS.md D-0019 (the dependency), D-0020 (the audit log), D-0021 (exposure), D-0022 (the locked vault). |
 | 2.2 | The approval flow. **T-7 closed** — the master password is typed in a terminal a person opened, and the listing path is reachable in the shipped binary at last. T-2 and T-3 completed. T-8 rewritten: secrets do traverse this path now, and are tested against real ones. New: T-10 (the approver channel), T-11 (prompt fatigue), T-12 (a grant reused under a reason nobody read). Decisions in D-0023 (the separate process), D-0024 (the pipe), D-0025 (the window), D-0026 (the grant cache), D-0027 (the refusal vocabulary). |
-| 2.4 | *(planned)* Completes T-5; adds the audit hash chain and `keypaste log verify`; gives T-12's divergence a reader; expands the out-of-scope entries marked above. |
+| 2.3 | The policy file. **T-3 resolved** in the words 2.1 demanded: a rule keys on `--client-label`, and client-scoped policy narrows convenience rather than authority. **T-6's named gap closed**, on the policy path, because that is the one with no human witness. T-11 gained the per-rule hourly allowance. T-12 rewritten: a policy grant is T-12 with the *first* approval removed as well as the second, so the line it could be compared against does not exist. New: T-13 (a rule grants a namespace, not the entries you pictured), T-14 (a standing grant to anything that can reach the approver — **the one place 2.3 is weaker than 2.2**), T-15 (authorization in a possibly-synced directory), T-16 (the audit vocabulary is the only evidence a person was involved), T-17 (a timing oracle). Decisions in D-0028 (the file and its all-or-nothing rule), D-0029 (where the policy sits in the order), D-0030 (keying on the operator's label). |
+| 2.4 | *(planned)* Completes T-5; adds the audit hash chain and `keypaste log verify`; gives T-12's divergence a reader; shows which entries each rule matches today, which is T-13's missing mitigation; expands the out-of-scope entries marked above. |
