@@ -140,7 +140,8 @@ internal sealed partial class App : Application, IDisposable
         _shell = new ShellViewModel(
             _session,
             Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable),
-            Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable));
+            Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable),
+            ApplyTheme);
 
         _shell.Current = Navigation.Destinations.All[0];
 
@@ -194,6 +195,17 @@ internal sealed partial class App : Application, IDisposable
             e.Handled = true;
         }
     }
+
+    /// <summary>
+    /// Applies a theme choice. <c>System</c> hands the decision back to the operating system.
+    /// </summary>
+    private void ApplyTheme(Core.Settings.AppTheme theme) =>
+        RequestedThemeVariant = theme switch
+        {
+            Core.Settings.AppTheme.Light => Avalonia.Styling.ThemeVariant.Light,
+            Core.Settings.AppTheme.Dark => Avalonia.Styling.ThemeVariant.Dark,
+            _ => Avalonia.Styling.ThemeVariant.Default,
+        };
 
     /// <summary>Drops the vault and the unlock screen's password buffer.</summary>
     /// <remarks>

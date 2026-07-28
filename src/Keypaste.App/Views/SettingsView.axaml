@@ -1,0 +1,77 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Keypaste.App.ViewModels"
+             x:Class="Keypaste.App.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+
+  <ScrollViewer>
+    <StackPanel Spacing="28" MaxWidth="560" HorizontalAlignment="Left">
+
+      <StackPanel Spacing="6">
+        <TextBlock Text="Lock the vault after" Foreground="{DynamicResource KpTextPrimary}" />
+        <ComboBox ItemsSource="{Binding IdleChoices}"
+                  SelectedItem="{Binding Idle}"
+                  MinWidth="200">
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:IdleChoice">
+              <TextBlock Text="{Binding Label}" />
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+        <TextBlock TextWrapping="Wrap"
+                   FontSize="12"
+                   Foreground="{DynamicResource KpTextMuted}"
+                   Text="Counted from the last key or click. A machine that sleeps for longer than this wakes locked. Ctrl+L locks now." />
+      </StackPanel>
+
+      <StackPanel Spacing="6">
+        <TextBlock Text="Theme" Foreground="{DynamicResource KpTextPrimary}" />
+        <ComboBox ItemsSource="{Binding Themes}" SelectedItem="{Binding Theme}" MinWidth="200" />
+      </StackPanel>
+
+      <CheckBox Content="Lock when the window is minimized"
+                IsChecked="{Binding LockWhenMinimized}" />
+
+      <StackPanel Spacing="8">
+        <TextBlock Text="Recent vaults" Foreground="{DynamicResource KpTextPrimary}" />
+        <TextBlock TextWrapping="Wrap"
+                   FontSize="12"
+                   Foreground="{DynamicResource KpTextMuted}"
+                   Text="keypaste remembers the paths of vaults you have opened on this machine. It holds no entry names and no secrets." />
+        <Button Content="Forget them all" Command="{Binding ForgetAllCommand}" HorizontalAlignment="Left" />
+      </StackPanel>
+
+      <TextBlock Text="{Binding Message}"
+                 IsVisible="{Binding HasMessage}"
+                 TextWrapping="Wrap"
+                 FontSize="12"
+                 Foreground="{DynamicResource KpTextSecondary}" />
+
+      <!-- The cheapest support tool this project will ever build: nearly every "it can't find my
+           vault" is answered by showing which paths are actually in use. -->
+      <Border Background="{DynamicResource KpSurface2}"
+              BorderBrush="{DynamicResource KpBorderSubtle}"
+              BorderThickness="1"
+              CornerRadius="{DynamicResource KpRadiusSm}"
+              Padding="16">
+        <StackPanel Spacing="6">
+          <TextBlock Text="Where things are" FontSize="12" Foreground="{DynamicResource KpTextSecondary}" />
+          <SelectableTextBlock FontFamily="{DynamicResource KpMono}" FontSize="11"
+                               Foreground="{DynamicResource KpTextMuted}"
+                               Text="{Binding VaultPath, StringFormat='vault          {0}'}" />
+          <SelectableTextBlock FontFamily="{DynamicResource KpMono}" FontSize="11"
+                               Foreground="{DynamicResource KpTextMuted}"
+                               Text="{Binding HomePath, StringFormat='keypaste home  {0}'}" />
+          <SelectableTextBlock FontFamily="{DynamicResource KpMono}" FontSize="11"
+                               Foreground="{DynamicResource KpTextMuted}"
+                               Text="{Binding HomeOverride, StringFormat='KEYPASTE_HOME  {0}'}" />
+          <SelectableTextBlock FontFamily="{DynamicResource KpMono}" FontSize="11"
+                               Foreground="{DynamicResource KpTextMuted}"
+                               Text="{Binding Version, StringFormat='version        {0}'}" />
+        </StackPanel>
+      </Border>
+
+    </StackPanel>
+  </ScrollViewer>
+
+</UserControl>
