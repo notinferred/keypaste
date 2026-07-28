@@ -152,8 +152,8 @@ both directions against a real `keepassxc-cli` on all three operating systems, o
 gate nobody is allowed to soften. If keypaste disappears tomorrow, your data does not. It is
 AGPL-3.0, because a tool that handles secrets should not ask to be trusted on faith.
 
-It is also pre-1.0 and says so: no prebuilt binaries yet, no GUI, and a terminal prompt rather than
-a native dialog. And it is not alone out here —
+It is also pre-1.0 and says so: unsigned binaries, no GUI, and a terminal prompt rather than a
+native dialog. And it is not alone out here —
 [`kprun`](https://github.com/numikel/kprun) already injects KeePass entries into a child process
 and writes a local JSONL log, without an approval step. What is keypaste's is the combination: a
 KDBX file you own, no account and no server in the picture, a person answering each request unless
