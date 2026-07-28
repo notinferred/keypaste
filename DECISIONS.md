@@ -2451,9 +2451,179 @@ promising it is on `PATH`, which is honest but leaves the work with the reader. 
 should append the `PATH` line itself is undecided and belongs with O-0011, since a Homebrew tap
 would make the question disappear for most macOS users.
 
+## D-0044 - The desktop shell is Avalonia, and neither of the two shells this repository had already named survived being checked
+
+**Date:** 2026-07-28 · **Stage:** 4.1 · **Status:** accepted
+
+This repository named two different desktop shells and never wrote a record for either. `PLAN.md`
+line 11, in the checked LOCKED block, said *"Desktop shell via **Photino.NET** … with Electron as
+fallback if Photino friction appears."* `PLAN.md` line 60 and prompts.md 4.1 said **Tauri**. Nothing
+in this file mentioned any of them. Stage 4.1 could not start without settling it, so it is settled
+here, with the evidence, because a record that says only "we chose Avalonia" cannot stop somebody
+proposing Photino again next year.
+
+**Tauri was ruled out on what it would cost, before anything was measured.** Its backend is Rust;
+`Keypaste.Core` is .NET 10, and this repository has no FFI, no C-ABI export and no Rust anywhere. A
+Tauri shell means a fourth binary and a wire protocol carrying the master password and released
+field values. That protocol *is* the secret path, so CORE.md law 4.5 makes its tests mandatory —
+and the one that already exists, `src/Keypaste.Core/Ipc/ApproverProtocol.cs`, is 445 hand-written
+lines with no `JsonSerializer` anywhere because reflection trips the trim analyzers this repository
+builds with (D-0019). Paying that a second time to reach a library that is already in-process is
+not a trade; `Keypaste.Cli` and `Keypaste.Mcp` both reach the core through a plain
+`ProjectReference`, and law 4.2 says the GUI calls the same core library the CLI does.
+
+**Photino won the architecture argument and then failed verification.** It has the property that
+mattered — a plain `ProjectReference`, no bridge — so it was the recommendation until it was
+checked. Checked on 2026-07-28:
+
+- Latest release **4.0.16, 2025-01-23**. No code commits to `photino.NET` or `photino.Native`
+  since; the only 2026 commit on either is a README edit. Open issue **#279, "Is this project
+  dead?"**, filed 2026-07-19, unanswered. Effectively three contributors.
+- The package declares **`net8.0;net9.0` only**. There is no `net10.0` asset; a 2025 commit
+  narrowed the target frameworks deliberately.
+- It declares neither `IsAotCompatible` nor `IsTrimmable`, so no trim or AOT analyzer has ever run
+  over it, while `Directory.Build.props` sets `IsAotCompatible` for this whole repository. Its
+  constructor uses `[DllImport]` with `[MarshalAs(UnmanagedType.FunctionPtr)]` delegate fields and
+  a `ByValArray` of `LPStr` — the shape those analyzers exist to flag. The organisation's only AOT
+  sample is Blazor-based and its own ReadMe says trimming makes it fail at runtime; the documented
+  workaround is blocked by open issue #143, because modern SDKs refuse `PublishTrimmed=False` under
+  AOT.
+- Its Linux natives require **`GLIBC_2.38`**, read out of the shipped `.so`. This repository's
+  published floor is **glibc 2.35** — `ci.yml` builds the AOT check on `ubuntu-2204` for exactly
+  that reason and CHANGELOG 0.1.0-rc.1 promises Debian 12. **The GUI would not have run on the
+  oldest Linux the CLI supports.**
+- `RegisterCustomSchemeHandler` never fires for the initial page load (#209, closed *wontfix*),
+  which is how a static frontend would have been served.
+
+CORE.md law 3.9 requires written justification for every new dependency on the secret path. A
+dormant, three-contributor native-interop library running **inside the process that holds the
+unlocked vault** does not have one. The LOCKED line's own escape clause — *"if Photino friction
+appears"* — is what fired, so this amends that line rather than overriding it.
+
+**Avalonia keeps the property that mattered and was checked before it was chosen.** 12.1.0,
+released 2026-07-09, repository pushed the day this was written; MIT, with a Devolutions sponsorship
+of three million dollars over three years that explicitly preserves the licence. `net10.0` is a
+first-class target framework in the shipped package. NativeAOT is officially documented and its
+stated prerequisite is `IsAotCompatible=true` on all libraries — which this repository already sets,
+so the existing AOT posture is the entry ticket rather than an obstacle. On Linux it needs **no GTK
+and no WebKit**: Skia renders directly, the package list is `libx11-6 libice6 libsm6 libfontconfig1`,
+and Skia is built against glibc 2.17 — *below* the CLI's floor, so unlike Photino the app does not
+narrow this project's Linux support. All five published RIDs are covered.
+
+**It also subtracts the webview entirely.** No Chromium, no WebKit, no JavaScript runtime, no CSP,
+no custom-scheme handler in the process holding decrypted secrets — and no serialization boundary at
+all, because the UI calls `Keypaste.Core` objects directly. Worth recording alongside that: Tauri's
+published advisories cluster into one class, the WebView trust boundary leaking, most recently
+CVE-2026-42184 (2026-05-06, origin confusion letting remote pages invoke local-only IPC). That is
+precisely the boundary that would be guarding a vault. Avalonia has no published advisories, which
+partly reflects less scrutiny rather than only fewer defects, and is stated that way on purpose.
+
+**The cost, recorded rather than glossed.** The founder's strongest stack is web and Avalonia is
+XAML. The LOCKED line's other rationale — that the Next.js skills would also cover keypaste.com — was
+already stale: the site is a single hand-written `site/public/index.html` behind a Cloudflare Worker.
+Avalonia's own bundler, Parcel, is a paid Accelerate product whose CLI is not in the free community
+licence; the free path is `dotnet publish` plus hand-rolled `codesign` and `notarytool`. That is
+O-0015 and it does not bite in 4.1, which publishes nothing.
+
+**Four new direct packages** — `Avalonia`, `Avalonia.Desktop`, `Avalonia.Themes.Fluent`,
+`Avalonia.Fonts.Inter`, plus `Avalonia.Headless` for tests — take this repository from two to six,
+with roughly twenty transitive. That is the largest single change to its supply chain. What Avalonia
+is trusted with: rendering the window and delivering the keystrokes of the master password. What it
+is not trusted with: it never touches the KDBX file, never derives a key, never reads the audit log,
+never opens a socket. `Keypaste.Core` still has no `PackageReference` at all, and that is the line
+that matters. `Avalonia.Diagnostics` was deliberately not taken — it has no 12.x release, and a
+runtime visual-tree inspector attached to a process holding an unlocked vault is not something to
+ship even in Debug. `CommunityToolkit.Mvvm` was not taken either, for the reason D-0028 gave for
+writing a TOML parser by hand: sixty lines of `INotifyPropertyChanged` is not a dependency's worth
+of work. Both are worth revisiting when 4.2's entry list produces real evidence.
+
+**The master password is not typed into a `TextBox`, and the reason is specific.** Avalonia's
+`TextBoxAutomationPeer.Value` returns `Owner.Text` with no check for `PasswordChar`, and `TextBox`
+does not override `OnCreateAutomationPeer` to suppress it. `Avalonia.FreeDesktop.AtSpi` is in the
+dependency closure and AT-SPI is a session-bus service, so a master password in a `TextBox` is
+readable by another process on the machine. `TextBox` also keeps an undo stack whose states each
+hold a `string`, which is a retained history of partial passwords that cannot be zeroed. So
+`Keypaste.App.Controls.MaskedInput` holds no secret at all: it raises one event per character, the
+`SecretBuffer` lives in a view model that is disposed on every route out, and its automation peer is
+a plain `ControlAutomationPeer` with no value pattern. Measured limit, stated in SECURITY.md rather
+than glossed: `TextInputEventArgs.Text` is a `string`, one character long when typed and **the whole
+password in one piece when pasted**. Narrower than a field that holds the password for its lifetime;
+not nothing.
+
+**`AppVaultSession` consults two clocks, and a timer alone would not have been enough.** Idle
+locking compares wall-clock and monotonic elapsed time and locks if either exceeds the timeout,
+because monotonic time does not advance across suspend on every platform and wall time can be moved
+backwards by a clock correction. A test then showed that was insufficient on its own: timers are
+scheduled against the monotonic clock, so a machine that slept through the timeout never fires one
+at all. `Reevaluate()` exists for that, and the window calls it on activation — an unattended
+sleeping laptop wakes locked. That hole was found by a test in three seconds and would have been
+found by hand only by suspending three operating systems.
+
+**CA2000 is satisfied the way `GrantCache.Store` satisfies it** — a narrow scoped suppression around
+`Vault.Open`, with a comment naming every route to disposal — because the app's vault must outlive
+the method that created it and `VaultSession`'s callback shape is therefore unavailable.
+`AppVaultSession.TryUnlock` takes a `ReadOnlySpan<char>` exactly as `Vault.Open` does, rather than
+taking ownership of a `SecretBuffer`: ownership transfer reads well but makes CA2000 unprovable at
+every call site, and `.editorconfig` makes CA2000 an error precisely so that disposal is visible
+rather than promised in a comment.
+
+**What 4.1 deliberately does not do.** It does not bind the approver pipe: `keypaste agent` binds it
+at startup and a name already held is a startup failure, so if the app bound it too, whichever
+started second would lose — and the loser would be a *silent* loss of the approval path. Stage 4.3
+owns that hand-off; 4.1 probes and says one true sentence. It sets no `PublishAot`, ships no release
+artifact, changes no line of `release.yml`, and does not adopt `design.html` — which DESIGN.md still
+marks "proposed, not accepted" and whose sign-in-first premise inverts CORE.md §4.1.
+
 ---
 
 # Open decisions
+
+## O-0015 - Bundling and signing a desktop app, when the official bundler is a paid product
+
+**Stage:** 4.1 · Related: O-0010, O-0012
+
+Avalonia's own bundler is **Parcel**, and its documentation states the CLI is not available in the
+free community licence, so using it in CI needs a paid Accelerate tier. The free path is a normal
+`dotnet publish` plus hand-rolled per-OS packaging: WiX or Inno Setup on Windows, an `.app` bundle
+with `Info.plist` and `codesign`/`notarytool` on macOS, `dpkg-deb` or Flatpak on Linux. All of it is
+documented and all of it is real work.
+
+This compounds O-0010 rather than repeating it. An unsigned CLI binary draws a SmartScreen warning;
+an unsigned GUI that a person double-clicks draws the same warning at the moment they are deciding
+whether to trust a password manager. Nothing is decided here because 4.1 publishes nothing — but the
+answer has to exist before the app appears in a `v*` tag, and it is partly a spending decision rather
+than an engineering one.
+
+## O-0016 - The desktop app's size, which is not the CLI's
+
+**Stage:** 4.1 · Related: O-0013
+
+The published CLI binaries are about 10 MB each, NativeAOT, one file. A self-contained non-AOT .NET
+app carrying Avalonia and Skia is substantially larger, and no primary source gives a figure worth
+quoting — it has to be measured. `PublishAot` is deliberately not set in 4.1 (D-0044), so the number
+is not knowable yet either.
+
+Two things follow and both belong in the answer. The install story on `dl.keypaste.com` currently
+promises one file per platform, and the GUI will not match that shape. And whatever the number turns
+out to be, it should be measured and written down before anything claims a size, because D-0036
+already settled that a published page may only say what a gate or a citation can hold.
+
+## O-0017 - Who owns the approver pipe once the app can approve
+
+**Stage:** 4.1, to be answered in 4.3 · Related: D-0023, D-0024
+
+`keypaste agent` binds `keypaste-agent-<user>` at startup, and `ApproverListener` fails to bind a
+name somebody already holds. Stage 4.1 therefore does not bind it at all: the app probes, reports
+one true sentence, and disconnects.
+
+4.3's prompt says the Agent Activity screen replaces the OS dialog "when the app is open", which
+means two processes will want the same name. The options are a hand-off protocol, the app taking the
+pipe and the agent stepping aside, or the agent staying the only approver and the app observing
+through some other channel. Whichever is chosen, the property that must survive is the one D-0023
+was written to protect: the master password is typed somewhere a person chose to open, never in a
+window an agent caused to appear. A design where the losing process fails silently is not
+acceptable, because a silently missing approver denies every request — which is the fail-closed
+direction, but is indistinguishable to the user from the product being broken.
 
 ## O-0002 — Contribution terms: DCO or CLA
 

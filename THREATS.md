@@ -1005,6 +1005,75 @@ release rather than a sentence in a document.
 
 ---
 
+## T-22 — The desktop app's accessibility layer as a read path
+
+**What.** You type your master password into the desktop app. Another process on your machine asks
+the operating system's accessibility service what that field contains, and is told.
+
+**Why it is not theoretical.** This is a default, not an exotic attack. Avalonia's
+`TextBoxAutomationPeer.Value` returns `Owner.Text` with no exception for a field that is displaying
+dots, and `TextBox` does not override `OnCreateAutomationPeer` to suppress it.
+`Avalonia.FreeDesktop.AtSpi` is in the app's dependency closure and AT-SPI is a session-bus service
+that any process in your session can talk to. UI Automation on Windows is likewise process-external.
+An ordinary password field, built the ordinary way, would have published the master password to the
+session bus one keystroke at a time.
+
+**Mitigated by.** The master password is not typed into a `TextBox`.
+`Keypaste.App.Controls.MaskedInput` stores nothing — it reports one character at a time to a buffer
+held by a view model, and what it draws is derived from a count rather than from the password. Its
+automation peer is a plain `ControlAutomationPeer` with no value pattern, so there is no
+accessibility path that returns text, and nothing behind it to return. A test asserts the peer
+implements no value provider, so the day somebody swaps in a `TextBox` for convenience the build
+fails rather than the property quietly disappearing.
+
+**Residual.** Keystrokes still arrive from the toolkit as short-lived strings the runtime will not
+let anyone wipe, and a paste arrives as the whole password in one of them (SECURITY.md). Everything
+below the toolkit — the OS keyboard layer, the input method, a keylogger — is T-18's territory and
+unchanged. Removing the webview from the design removed a whole class this section would otherwise
+have had to cover, because there is no HTML origin to confuse and no script that could be injected
+into one.
+
+## T-23 — What idle auto-lock is for, and what it is not
+
+**What.** The desktop app locks the vault after five minutes of no input, by default.
+
+**What that buys.** An unattended machine. You walk away, somebody sits down, and the vault is shut.
+It also covers the case a timer alone would miss: a laptop that slept through the timeout wakes
+locked, because the deadline is measured against both the wall clock and the monotonic clock and is
+re-checked when the window is activated rather than only when a timer fires.
+
+**What it explicitly does not buy.** It is **not** a mitigation for T-18. While the vault was
+unlocked its contents were in this process's memory, and locking disposes the objects but cannot
+promise the pages are gone — the caveats on `SecretBuffer` survive the lock, and so does anything
+the garbage collector has not yet reclaimed. An attacker who could dump this process's memory while
+it was unlocked is not undone by it locking afterwards.
+
+**It also does not lock `keypaste agent`.** That is a different process holding its own copy, it has
+no idle lock, and closing its terminal is still the only lock it has. `docs/approvals.md` says so
+where somebody reading about approvals will see it.
+
+**Residual.** A five-minute default is a compromise, and a person who raises it to eight hours has
+made their own decision. There is deliberately no "never" — the one setting that would have turned
+the feature off for everybody who was interrupted by it once.
+
+## T-24 — `recent.toml` tells anything that can read `~/.keypaste` where your vaults are
+
+**What.** The desktop app records the path of every vault it successfully opens, so the unlock screen
+can offer them. `~/work/acme-prod.kdbx` is not a secret, but it is information about you.
+
+**Bounded by.** It holds paths and nothing else — no entry names, no counts, no fingerprint of the
+contents. At most ten. Written **only after a vault opens successfully**, so a file somebody sent you
+that you could not open leaves no trace. Owner-only on Linux and macOS; on Windows it inherits the
+profile's permissions, which is the same protection `audit.jsonl` already relies on and no more.
+Removable one row at a time from the app, or entirely from Settings, or by deleting the file.
+
+**Residual.** This is the same trust boundary the audit log already sits behind: anything that can
+read `~/.keypaste` can read both. The app shows a vault's file name rather than its full path, which
+is a defence against a screenshot rather than against a reader — `ideas.md`'s screenshot strategy
+puts this app in marketing images, and a directory layout is not something to publish by accident.
+
+---
+
 ## Change log
 
 | Stage | What changed |
@@ -1014,3 +1083,4 @@ release rather than a sentence in a document.
 | 2.3 | The policy file. **T-3 resolved** in the words 2.1 demanded: a rule keys on `--client-label`, and client-scoped policy narrows convenience rather than authority. **T-6's named gap closed**, on the policy path, because that is the one with no human witness. T-11 gained the per-rule hourly allowance. T-12 rewritten: a policy grant is T-12 with the *first* approval removed as well as the second, so the line it could be compared against does not exist. New: T-13 (a rule grants a namespace, not the entries you pictured), T-14 (a standing grant to anything that can reach the approver — **the one place 2.3 is weaker than 2.2**), T-15 (authorization in a possibly-synced directory), T-16 (the audit vocabulary is the only evidence a person was involved), T-17 (a timing oracle). Decisions in D-0028 (the file and its all-or-nothing rule), D-0029 (where the policy sits in the order), D-0030 (keying on the operator's label). |
 | 2.4 | The audit log gets a reader and a chain. **T-5 closed** — every record links to the one before it, `keypaste log verify` recomputes the file, and the three things the chain cannot do are named in T-5 and printed on every passing check rather than only on a failing one. T-12's divergence gained the reader it was promised: `keypaste log` marks a reuse served under a reason nobody read. **T-13's missing mitigation was deferred again, and says so** — showing which entries a rule matches today needs an open vault, and its home is the GUI's Agent Activity screen rather than a password prompt in front of a diagnostic command. New: T-18 (memory dumping), T-19 (clipboard scraping), T-20 (a stolen vault file), promoted out of the out-of-scope table into sections that give reasons instead of one line each. Decisions in D-0031 (the chain) and D-0032 (the reader). |
 | 3.4 | The release pipeline. New: **T-21** (the released binary is not the source you read), promoted to a section rather than an out-of-scope row because a launch turns downloading into the normal path. **T-9 amended twice**: its "twenty-eight reviewable lines" was no longer true and is withdrawn, and its "check it yourself" argument is explicitly scoped to readers who build rather than download. **T-3 gained a mitigation**: a tool call arriving before the initialize handshake is now denied (`not-initialized`) instead of answered for "an unnamed client", closing a law 3.3 gap where an access was recorded with no caller. No threat was closed. Decisions in D-0040 (vendored KeePassLib survives NativeAOT, proved by a published binary writing a vault real KeePassXC opens) and D-0041 (what a release is). Open: O-0010 (unsigned, un-notarized), O-0012 (not reproducible, no provenance). **T-21 amended** after the fact: `ci.yml` moved onto the same runner fleet as the release when GitHub-hosted billing stopped the jobs starting (D-0042), so tests and builds no longer come from two independent providers. Also open: **O-0014** — the repository is private while CORE.md law 3.8 calls auditable code the trust strategy, which makes the central launch claim unverifiable by the reader it is aimed at. |
+| 4.1 | The desktop app. New: **T-22** (the accessibility layer as a read path for a password field, and why the master password is not typed into a `TextBox`), **T-23** (what idle auto-lock buys, and that it is explicitly not a mitigation for T-18 and does not lock `keypaste agent`), **T-24** (`recent.toml` discloses vault paths inside the boundary the audit log already sits behind). No threat was closed. **T-13's deferral is unchanged**: showing which entries a rule matches still needs an open vault and still belongs to the Agent Activity screen, which 4.1 did not build — the app is not the approver and says so. Choosing a toolkit that draws rather than one that hosts a browser removed a class this document would otherwise have had to carry, since there is no HTML origin to confuse; Tauri's own advisories cluster in exactly that place (D-0044). Decisions in D-0044 (the shell, and why the two shells this repository had already named did not survive being checked). Open: O-0015 (bundling and signing when the official bundler is a paid product), O-0016 (the app's size is not the CLI's), O-0017 (who owns the approver pipe once the app can approve). |

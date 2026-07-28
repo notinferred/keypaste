@@ -8,7 +8,7 @@
 - [x] **Language/stack: C#/.NET 8+ for everything server-side** — `keypaste-core` (class library), `keypaste-cli` (console app, published as self-contained/AOT single binaries for macOS/Linux/Windows), `keypaste-mcp` (official ModelContextProtocol C# SDK, stdio transport). Massive tailwind: **KeePass itself is a .NET app** — the KDBX ecosystem is native to this stack.
 - [x] **KDBX library sub-decision (resolved in 0.2):** `KeePassLib`, vendored from the KeePass 2.61 netstandard port. No maintained, adopted KDBX4 NuGet package for .NET exists; the two clean-shaped ones had days of commit history. KeePass is GPL-2.0-**or-later**, not GPL-2.0-only, so it combines with AGPL-3.0 and the licence never forced the choice — maturity did. Full survey in DECISIONS.md D-0007.
 - [x] **License:** copyleft core (GPL/AGPL family, finalized alongside the KDBX lib choice for compatibility), MIT for any client SDK snippets. Protects against closed cloud clones.
-- [x] **GUI framework (Stage 4): Next.js frontend + .NET local backend.** Desktop shell via **Photino.NET** (lightweight webview hosting your Next.js static export over the .NET core — one language for logic, your strongest UI stack for the interface) with Electron as fallback if Photino friction appears. The Next.js skills also cover the keypaste.com landing/marketing site directly.
+- [x] **GUI framework (Stage 4): Avalonia over `Keypaste.Core`, in one .NET process** *(amended in 4.1 — DECISIONS.md D-0044)*. The original decision here read "Next.js frontend + .NET local backend, desktop shell via Photino.NET … with Electron as fallback if Photino friction appears", and that fallback clause is what fired: Photino's last code commit was January 2025, it targets `net8.0;net9.0` only, and its Linux natives need glibc 2.38 against this project's published floor of 2.35 — the GUI would not have run on the oldest Linux the CLI supports. Avalonia keeps the one property that mattered (a plain `ProjectReference` to the core, no bridge, law 4.3 by construction), targets `net10.0`, needs no GTK or WebKit on Linux, and removes the webview from the process holding the unlocked vault. The cost is that the UI is XAML rather than web; the Next.js-covers-keypaste.com rationale was already stale, since the site is one hand-written HTML file behind a Cloudflare Worker.
 - [x] **Timeline compression:** founder is full-time → target weeks in this plan are calendar-realistic, not aspirational. Stages 0–3 (launch) in ~6–8 weeks.
 - [ ] **Name check:** trademark + NuGet + npm + GitHub org "keypaste" availability — grab all handles in Stage 0, week 1.
 
@@ -57,11 +57,23 @@
 
 ## Stage 4 — Modern GUI (Week 10–14)
 **Goal: the KeePass reskin — a vault UI that doesn't look like 2003.**
-- [ ] Tauri app wrapping keypaste-core: vault unlock, entry browse/search, env-set editor
+- [x] Desktop app (Avalonia) over keypaste-core — **shell and unlock done in 4.1** (D-0044): open a vault by drag, picker or recent list; master password in a control that holds no password and whose automation peer exposes nothing; idle auto-lock on two clocks, defaulting to 5 minutes, that also locks a machine which slept through the timeout; a five-destination sidebar with `Ctrl/Cmd+1..5` and `Ctrl/Cmd+L`; light and dark following the OS. The Log view is real and renders `AuditText` verbatim, so it and `keypaste log` cannot drift (D-0032)
+- [ ] Entry browse/search and the env-set editor — **4.2**. Entries and Env Sets ship in 4.1 as empty states naming the CLI command that already does the job
 - [ ] The differentiating screen: **Agent Activity** — live feed of agent requests, approve/deny buttons, history (this is the delegation dashboard seed)
 - [ ] Approval prompts move from CLI to native windows/tray
 - [ ] Design language: modern, calm, trustworthy (see ideas.md → UI section for direction)
 - **Exit demo:** side-by-side screenshot — KeePass classic vs keypaste — same file, different decade.
+
+**Where 4.1 left it.** The app opens a real KDBX written by the shipped CLI and holds it in a session
+built to the `Func<Vault?>` shape `VaultCredentialSource` already takes, so 4.3 wires the approver in
+without changing it. Three things it deliberately does not do, each stated in the app itself rather
+than left to be discovered: it is **not the approver** — a running `keypaste agent` still answers
+agent requests, and the Agent Activity screen probes for one and says so; it **ships in no release**,
+so `release.yml` is untouched and there is nothing on `dl.keypaste.com` to install; and it sets no
+`PublishAot`, so the CLI's single-file property is not yet claimed for it (O-0016). `keypaste agent`
+still has no idle lock of its own — 4.1's auto-lock is the app's, and `docs/approvals.md` says so.
+CHANGELOG.md is untouched on purpose: it is written for somebody deciding whether to upgrade, and
+there is nothing yet to upgrade to.
 
 ## Stage 5 — Sharing & tiny teams (Month 4–5)
 **Goal: first monetizable surface, without violating local-first.**

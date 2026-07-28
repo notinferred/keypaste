@@ -100,6 +100,42 @@ These are constitutional (CORE.md §3) and a violation of any of them is a valid
   cryptography is written here.
 - Every error path in the agent bridge results in denial, not exposure.
 
+### The desktop app's master password field
+
+The GUI is weaker here than the CLI is, in a way worth stating plainly rather than leaving to be
+discovered.
+
+`ConsoleSecretPrompt` never forms a `string` at all: it reads the terminal a character at a time
+into a buffer that is overwritten when it is done. The desktop app cannot match that exactly, because
+its characters arrive from the toolkit as `string`s the runtime will not let anyone wipe.
+
+What the app does do:
+
+- **The password is not typed into a `TextBox`.** Avalonia's `TextBoxAutomationPeer` returns the
+  control's text through the accessibility layer with no exception for password fields, and
+  `Avalonia.FreeDesktop.AtSpi` — a session-bus service — is in the app's dependency closure. A
+  `TextBox` master password would be readable by another process on the same machine. `TextBox` also
+  keeps an undo stack whose entries each hold a `string`, which is a retained history of partial
+  passwords.
+- **The control holds no password.** `MaskedInput` reports one character at a time and stores
+  nothing; what it draws is derived from a count. Its accessibility peer implements no value
+  pattern, so there is nothing for the accessibility layer to return.
+- **The buffer lives in a view model that is disposed on every path out** — a successful unlock, a
+  wrong password, and locking — and disposal overwrites it. The wrong-password path is the one that
+  happens most and it is covered by a test.
+- **The password reaches Argon2 as a span**, never as a string, so no copy of the whole password is
+  made on the way in.
+
+What remains, measured rather than assumed:
+
+- **Each keystroke arrives as a one-character `string`** that cannot be wiped and lives until the
+  garbage collector reclaims it.
+- **A paste arrives as the entire password in one `string`.** Pasting is supported anyway: refusing
+  it would push people who use a password manager into typing their master password somewhere else,
+  which is worse. keypaste does not clear your clipboard afterwards — that is not its to clear.
+- Anything below the toolkit — the OS keyboard layer, the input method, a keylogger — is outside
+  this boundary and always was.
+
 ## What keypaste does NOT protect against
 
 Stated plainly, because a security tool that overclaims is worse than one that is modest.
