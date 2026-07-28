@@ -14,9 +14,41 @@ the two states you are in; that is all it can honestly do today.
 **It is not published.** There is nothing on `dl.keypaste.com` to install and `release.yml` does not
 build it. Build it from source, below.
 
-**Entries and Env Sets are empty.** They arrive in the next release. Until then `keypaste ls`,
-`keypaste get`, `keypaste env ls` and `keypaste run` read and write the same vault, and the app names
-those commands where the views will be.
+**It does not type passwords for you.** Adding an entry or a variable generates the value; there is
+no field to type a specific one into, because a field that accumulates a secret is a different and
+more dangerous thing than the one the unlock screen uses. `keypaste add` and `keypaste env set`
+prompt for a value without putting it in a window.
+
+## What the screens show
+
+**Entries** lists titles and groups — what `keypaste ls` prints, and nothing more. Selecting one
+shows its username, URL and notes. **A password is never shown**: there is a Copy button, and
+`keypaste get --show` for the times you have to read one. You can edit the username, URL and notes
+inline, add an entry with a generated password, and delete one behind a confirmation, because there
+is no undo.
+
+**Env Sets** shows each project as a card with the `keypaste run <project> -- ` line that injects it,
+and a button to copy that line. Opening a card shows the project's variables as a masked table.
+**Hold a value to reveal it** — one at a time, for as long as you hold it, and gone the moment you let
+go, switch screens or lock. There is a Copy button on every row.
+
+**Copying clears itself.** A copied secret leaves the clipboard after twenty seconds, with a
+countdown in the header and a Clear now button. It is cleared early if you lock, and before the app
+exits if you quit. It is left alone if you have copied something else since. Nothing clears it if the
+app is killed. A copied `keypaste run` line is not a secret and is never cleared.
+
+## Editing your vault
+
+Everything the app writes goes through the same code the CLI writes through, so a change made here is
+visible to `keypaste ls`, `keypaste get`, `keypaste env ls` and `keypaste run` the moment it is saved
+— there is no sync and nothing to refresh. A vault the app writes is a vault the CLI wrote, and the
+KeePassXC compatibility gate that covers one covers the other.
+
+**If something else changes the file while the app has it open, the app refuses to save and says so.**
+The app holds your vault in memory for as long as it is unlocked, so writing it back would revert
+whatever a terminal or KeePassXC wrote in the meantime — silently, and with no history entry to
+recover from, because the change was never in the app's copy. Nothing is written. Lock and unlock to
+pick up the other change, then make yours again.
 
 ## Building and running it
 
@@ -162,3 +194,21 @@ nothing automated has ever seen this app draw. Run these before any release that
 8. The theme follows the OS, and both light and dark read as calm.
 9. The Log screen matches `keypaste log` for the same `~/.keypaste/audit.jsonl`.
 10. Agent Activity says the right thing both with and without a `keypaste agent` running.
+11. Entries lists titles and groups. Selecting one shows a username, a URL and notes, and a row of
+    dots where the password is.
+12. Copy a password. The countdown appears and the bar drains. Paste into an editor — it is there.
+    Wait it out and paste again — it is gone.
+13. Copy, then `Ctrl/Cmd+L`. Paste: nothing.
+14. Copy, then quit the app. Paste: nothing.
+15. **Windows only**: copy a password, then open clipboard history with Win+V. The value is not in
+    it. Repeat with `keypaste get` — it is, which is the difference the app's window buys and the CLI
+    cannot.
+16. Hold a masked value in Env Sets. The characters appear; release and they go. Hold a second row
+    while the first is showing — only one is ever revealed.
+17. Copy a project's run command, paste it in a terminal, finish the line: it runs with the
+    project's variables.
+18. Add, edit and delete an entry, then check `keypaste ls` and `keypaste get` in a terminal.
+19. With the app open on a vault, run `keypaste env set` against the same file in a terminal. Come
+    back and make any edit: the app refuses, says why, and the terminal's write is still there.
+20. Generate a password in the app, then read it back with `keypaste get --show`.
+21. Open the vault the app wrote in KeePassXC.

@@ -8,12 +8,25 @@ namespace Keypaste.Core.Tests;
 /// DECISIONS.md D-0008).
 /// </summary>
 /// <remarks>
+/// <para>
 /// This is a tripwire, not a lock. Anyone deliberately removing the gate will see this test
 /// go red and delete it too. What it buys is converting *silent* removal — a merge-conflict
 /// resolution, an over-eager "let's slim CI" change, an agent tidying YAML — into deliberate
 /// removal, with a failure message that states the stakes. The mechanism that actually
 /// prevents removal is branch protection: the three `keepassxc compat (...)` checks are
 /// required on main, so a deleted job never reports and the pull request can never merge.
+/// </para>
+/// <para>
+/// <b>The desktop app writes vaults too, since 4.2, and this gate still covers them — checked
+/// rather than assumed.</b> It shares the writer: every mutation the app can make goes through
+/// <see cref="Vault.Save"/> into the same vendored KeePassLib, which is the identical path the CLI
+/// takes, and an inline edit's <c>&lt;History&gt;</c> element is exactly what section A of
+/// <c>verify-keepassxc-writeback.sh</c> already opens. That argument is held by
+/// <c>TheAppSharesTheWriterTests</c> in <c>Keypaste.App.Tests</c>, which asserts no app code writes a
+/// file itself and that the app references only <c>Keypaste.Core</c>. The expiry condition is stated
+/// in D-0050: the day the app writes a KDBX by any other route, <c>app.yml</c> needs a KeePassXC job
+/// of its own.
+/// </para>
 /// </remarks>
 public sealed class CompatGateIsPermanentTests
 {

@@ -38,8 +38,10 @@ end, in about sixty seconds.
   be trusted on faith.
 
 **Pre-1.0, and it says so.** Everything on this page works today and is tested on all three
-operating systems. The binaries are unsigned, there is no GUI yet, and the approval prompt is a
-terminal prompt rather than a native dialog. [`PLAN.md`](PLAN.md) is what lands next;
+operating systems. The binaries are unsigned, the desktop app is not among them — it exists, it
+browses and edits the same vaults, and it builds from source rather than shipping in a release
+([`docs/desktop.md`](docs/desktop.md)) — and the approval prompt is a terminal prompt rather than a
+native dialog. [`PLAN.md`](PLAN.md) is what lands next;
 [`CORE.md`](CORE.md) is the constitution and does not change.
 
 ## Install

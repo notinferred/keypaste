@@ -59,7 +59,7 @@ public sealed class ClipboardSourceRulesTests
     /// </para>
     /// <para>
     /// <b>What this does not prove:</b> that Windows honours them. That needs a real Windows session
-    /// with Clipboard History switched on, so it is item 5 on docs/desktop.md's manual checklist.
+    /// with Clipboard History switched on, so it is on docs/desktop.md's manual checklist instead.
     /// This holds the half that a typo breaks, which is the half that actually broke for somebody.
     /// </para>
     /// </remarks>

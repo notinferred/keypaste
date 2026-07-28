@@ -64,7 +64,7 @@
 - [x] **4.1 — Tauri shell & unlock**
 "Scaffold the keypaste desktop app with Tauri using keypaste-core via commands/FFI — zero vault logic in the frontend. Implement: vault open/unlock screen (drag a .kdbx or recent list, master password field), auto-lock after idle, and a main window shell with sidebar navigation (Entries, Env Sets, Agent Activity, Log, Settings). Follow the design direction in ideas.md → 'UI direction': calm, modern, generous spacing, system fonts, light+dark, no security-theater aesthetics. Ship with keyboard-first navigation."
 
-- [ ] **4.2 — Entry & env UIs**
+- [x] **4.2 — Entry & env UIs**
 "Build the Entries view: searchable list with group tree, entry detail pane with copy buttons (auto-clearing clipboard), inline edit, add/delete, password generator. Build the Env Sets view: projects as cards, variables as a masked table with reveal-on-hold, per-project 'copy as run command' helper showing `keypaste run <project> -- `. Everything reads/writes through core so CLI and GUI stay perfectly consistent; add a test that a GUI edit is visible to the CLI immediately."
 
 - [ ] **4.3 — Agent Activity screen (the differentiator)**
