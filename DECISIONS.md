@@ -2127,11 +2127,35 @@ silently dropped and nothing has been stored - every signup since the deploy has
 role must be swapped before, or in the same sitting as, applying `schema.sql`. Creating the table
 first would put the first real signup somewhere this entry's guarantee does not hold.
 
-**And the posture is worse than "it can read the list", established by walking the role graph on
-2026-07-28.** `pscale_api_yq4xhf9tbm3v` inherits `postgres`, which inherits `pscale_superuser`, and
-that brings `pg_create_subscription`, `pg_signal_backend`, `pg_maintain` and `pg_checkpoint`. Logical
-replication plus write access everywhere is continuous exfiltration of the whole cluster, from a
-credential reachable by a public HTTP endpoint. This does not change what to do - the fix was
+**Closed on 2026-07-28. The Worker connects as a role that can insert one row and read nothing.**
+`keypaste_signup_writer` has `INSERT` on `public.signup` and no other privilege - not superuser, not
+`bypassrls`, `NOINHERIT`, zero role memberships - and as that role `select`, `count(*)`,
+`returning`, `update`, `delete` and reading any other table are each refused with 42501. The table
+exists, a live submission stores a row and redirects to `/thanks/`, a duplicate is a no-op, the
+honeypot stores nothing, and a bad address, a foreign `Origin` and a non-form body each get 400.
+CONNECT on the database is no longer held by PUBLIC.
+
+**It is a plain SQL role, not a managed one, which contradicts the paragraph below.** The managed
+path needs the `pscale` CLI and an interactive login; the raw role was the one that could be
+created and verified in a single sitting. The cost is the one this entry already names: it is
+invisible to `pscale role reset` and to TTLs, so rotation is `alter role ... password` plus a
+`wrangler hyperdrive update`. Swapping it for a managed role later changes nothing else and is worth
+doing when the list stops being empty.
+
+**Two things bit while fixing it, both worth keeping.** `wrangler hyperdrive update --origin-user
+--origin-password` silently emptied the `mtls` block, dropping the CA and `verify-full` - so a
+credential swap quietly downgrades the TLS posture this entry exists to guarantee unless the sslmode
+is re-passed and then re-read. And naming the conflict target in `ON CONFLICT (email) DO NOTHING`
+requires SELECT on PostgreSQL 18.4, so the Worker's own statement was incompatible with the role it
+was designed for: correctly configured, every signup still returned 503. The bare
+`ON CONFLICT DO NOTHING` needs only INSERT and is what ships. `schema.sql` claimed the opposite and
+has been corrected in place.
+
+**The posture it replaced was worse than "it can read the list", established by walking the role
+graph on 2026-07-28.** `pscale_api_yq4xhf9tbm3v` inherited `postgres`, which inherits
+`pscale_superuser`, and that brings `pg_create_subscription`, `pg_signal_backend`, `pg_maintain`
+and `pg_checkpoint`. Logical replication plus write access everywhere is continuous exfiltration of
+the whole cluster, from a credential reachable by a public HTTP endpoint. This does not change what to do - the fix was
 already "swap to a role with INSERT on one table" - but it changes how long it is reasonable to
 leave undone, and it is the argument against ever letting a Hyperdrive config keep whatever role an
 integration wizard hands it.
