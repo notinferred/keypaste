@@ -57,7 +57,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, blacksmith-4vcpu-windows-2025, macos-latest]
+        # Three operating systems, all on Blacksmith. Same architectures the GitHub-hosted images
+        # gave (x64 Linux, arm64 macOS) and the same runners release.yml already builds every
+        # shipped binary on, so a tag is tested on the machines that produce it. See D-0042.
+        os: [blacksmith-4vcpu-ubuntu-2404, blacksmith-4vcpu-windows-2025, blacksmith-6vcpu-macos-15]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
@@ -283,6 +286,10 @@ jobs:
   #   - or drop an operating system from the matrix,
   # to make the build green. DECISIONS.md D-0008 records the reasoning and the
   # three properties that must survive any edit here.
+  #
+  # Changing which runner IMAGE hosts an operating system is allowed and has
+  # happened once (D-0042). Removing an operating system is not. All three are
+  # still here.
   # ===========================================================================
   compat:
     name: keepassxc compat (${{ matrix.os }})
@@ -290,7 +297,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, blacksmith-4vcpu-windows-2025, macos-latest]
+        os: [blacksmith-4vcpu-ubuntu-2404, blacksmith-4vcpu-windows-2025, blacksmith-6vcpu-macos-15]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     env:

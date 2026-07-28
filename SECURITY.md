@@ -243,8 +243,10 @@ an AI agent can reach; it cannot defend a compromised account against itself.
 
 ## Maintainer note
 
-`security@keypaste.com` is the primary reporting channel. The repository is public (DECISIONS.md
-D-0006), so GitHub's private vulnerability reporting should be enabled as a second channel.
+`security@keypaste.com` is the primary reporting channel, and for now the only one that works for an
+outside reporter: the repository is private (DECISIONS.md O-0014), so GitHub's private vulnerability
+reporting is not reachable by anyone who cannot see the repository. Enable it as a second channel
+when that changes.
 
 keypaste vendors KeePassLib for its KDBX4 implementation
 (`third_party/KeePassLib/UPSTREAM.md`). Vulnerabilities in that code are in scope here, and are
