@@ -80,8 +80,9 @@ ISRG Root X1 was uploaded (`wrangler cert upload certificate-authority`, id
 `f8411755-7948-4b31-aa11-2a79710ce1d4`) and the config set to `--sslmode verify-full`. Cloudflare
 rejects `verify-full` outright without a CA, so this is not a setting that can be silently ignored.
 A query through the binding then succeeded, which is the part worth trusting: the mode is real and
-it did not break the connection. Note the update appears to have detached the config from the
-PlanetScale integration.
+it did not break the connection. An earlier version of this note guessed that the update had
+detached the config from the PlanetScale integration; `wrangler hyperdrive get` says otherwise —
+`integration_name: planetScale` and the organisation and database names are all still on it.
 
 **The role: still wrong. Do not deploy.** The config connects as `pscale_api_yq4xhf9tbm3v`, which a
 query through the binding reports is `rolcreaterole`, `rolcreatedb`, `rolbypassrls`, and a member of
