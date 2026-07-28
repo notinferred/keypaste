@@ -2407,6 +2407,52 @@ strategy - which is where it always belonged. Tracked as O-0014, along with the 
 
 ---
 
+## D-0043 - The install gate had never run, and neither reason was laziness
+
+**Date:** 2026-07-28 · **Stage:** 3.4 · **Status:** accepted
+
+`v0.1.0-rc.1` and then `v0.1.0` published to `dl.keypaste.com` once the three R2 secrets were set.
+The credential was checked against the real bucket before a tag was spent - list, put and delete,
+then the probe object removed - because the alternative was discovering a read-only token after
+four native builds had already run. `install.yml` then ran for the first time in its life and
+failed on two of three platforms.
+
+**Reason one: `workflow_dispatch` resolves against the default branch, not against the ref.**
+`install.yml` lived only on `stage-3.4-install-docs`, so `gh workflow run --ref
+stage-3.4-install-docs` returned `HTTP 404: workflow install.yml not found on the default branch`.
+A gate written on the branch it gates cannot be dispatched at all until it is on `main` - which
+means the file has to land ahead of the documentation it exists to check. It was committed to
+`main` by itself for exactly that reason. The consequence to remember: a workflow added on a
+feature branch is unrunnable, so its first execution is necessarily after a merge unless it is
+split out first.
+
+**Reason two: the gate was looking in the wrong place.** `run_block()` executes the documented
+block with `HOME` reassigned to a scratch directory, so `mkdir -p ~/.local/bin` resolves under
+`$SCRATCH/home`. The check that followed asked for `"$HOME/.local/bin/keypaste"`, expanded in the
+outer shell where `HOME` is still the runner's own. It installed to one directory and searched
+another, and could never have passed on macOS or Linux. Windows passed throughout, because its
+block deliberately stops after extracting and the binaries were found by the working-directory
+candidate instead. Fixed by naming `$SCRATCH/home`.
+
+**The negative control was already right; what was missing was ever having run it.** Nothing about
+this defect was subtle, and no amount of reading would have been as cheap as one execution. A gate
+that has never executed is an assertion about the world, not a check on it - and it is worth less
+than no gate, because a green file in `.github/workflows` reads as coverage. Both defects were
+found within ten seconds of the first real dispatch.
+
+**What the gate still does not prove, stated so nobody reads more into it than it earns.** It
+locates the installed binary at a known path. It does not resolve `keypaste` through a real user's
+`PATH` in a fresh login shell, and that distinction matters: `~/.local/bin` is not on `PATH` by
+default on macOS, and Ubuntu's `~/.profile` adds it only at login and only if the directory already
+existed at that point - which `mkdir -p` in the install block guarantees it did not. So a stranger
+can follow every documented line, see no errors, and still get `command not found` until they open
+a new terminal or edit a profile. `README.md` says to check with `command -v keypaste` rather than
+promising it is on `PATH`, which is honest but leaves the work with the reader. Whether the block
+should append the `PATH` line itself is undecided and belongs with O-0011, since a Homebrew tap
+would make the question disappear for most macOS users.
+
+---
+
 # Open decisions
 
 ## O-0002 — Contribution terms: DCO or CLA
