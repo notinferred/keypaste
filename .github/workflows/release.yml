@@ -117,6 +117,40 @@ jobs:
           grep -qF "## ${{ steps.v.outputs.version }}" CHANGELOG.md \
             || { echo "::error::CHANGELOG.md has no '## ${{ steps.v.outputs.version }}' section"; exit 1; }
 
+      # Everything the publish job needs, checked here instead of there.
+      #
+      # This job runs on a workflow_dispatch and the publish job does not, so an assumption checked
+      # in publish is an assumption no dry run can ever reach - it gets tested for the first time by
+      # a real tag, after four platform builds have already been paid for. The AWS CLI is the case
+      # in point: nothing in this file installs it, and it is only preinstalled because the runner
+      # image happens to ship it. Same runner label as publish, so what passes here predicts there.
+      #
+      # Secrets are checked only on a tag, because a dispatch has no business needing them, and are
+      # tested for emptiness rather than printed. publish re-checks them; that duplication is
+      # deliberate and free.
+      - name: Check the publish tooling and credentials exist
+        shell: bash
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          set -euo pipefail
+          command -v aws >/dev/null 2>&1 \
+            || { echo "::error::no aws CLI on this runner, and nothing installs it"; exit 1; }
+          aws --version
+
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            missing=0
+            for v in R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY; do
+              [ -n "${!v}" ] || { echo "::error::secret $v is not set"; missing=1; }
+            done
+            [ "$missing" -eq 0 ] || exit 1
+            echo "all three R2 secrets are present"
+          else
+            echo "dispatch: skipping the secret check, this run publishes nothing"
+          fi
+
   build:
     name: build ${{ matrix.rid }}
     needs: guard
