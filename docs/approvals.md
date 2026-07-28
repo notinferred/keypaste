@@ -150,8 +150,10 @@ which entry, which field, who asked, what they said their reason was, and what w
 
 ## The honest limits
 
-- **The vault stays unlocked while the agent runs.** There is no idle auto-lock in this version;
-  closing the terminal is the lock. Auto-locking arrives with the desktop app.
+- **The vault stays unlocked while the agent runs.** There is no idle auto-lock in `keypaste agent`;
+  closing the terminal is the lock. The desktop app does lock on idle, but it is a different process
+  holding a different copy of the vault — it is not the approver, and locking it does not lock this
+  one. An agent left running overnight is still unlocked in the morning.
 - **A released value lives in memory until its grant expires**, and it existed as an ordinary string
   before that. keypaste narrows the window; it does not claim in-memory secrecy, and SECURITY.md
   says so.

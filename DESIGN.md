@@ -41,3 +41,19 @@ conversation required"* is on the page. Two things are still open:
 
 Neither is a blocker for anything currently being built. Both need a decision record before the
 hosted tier exists, because the answer constrains the MCP bridge in Stage 2.
+
+## Stage 4.1 did not adopt this
+
+The desktop shell built in 4.1 took the palette values and the type scale from here, re-derived by
+hand into XAML resources, and nothing else. Two reasons, and the second is the real one.
+
+The mechanical one: `design.html` is a design-tool export that loads a `support.js` this repository
+does not have and uses a non-standard `style-hover` attribute, so there was no markup to carry over
+even before the shell turned out not to be a webview at all (DECISIONS.md D-0044).
+
+The one that matters: the tension above is still open. The exploration's opening move is sign-in,
+and 4.1 had no standing to ship a premise that inverts CORE.md §4.1 while the question of whether
+keypaste is offline-first with optional sync — or something you log into — has never been answered.
+Adopting the visual language would have been the thin end of adopting the framing. The landing page
+and the approval dialog are untouched by this note; the approval dialog is Stage 4.3's, and it is
+the surface this exploration got closest to right.
