@@ -146,50 +146,23 @@ keypaste: an agent is asking for a credential.
 Approve? [y/N]
 </pre>
 
-  <p class="caption">
-    That is the whole product in one screen. An agent asked; you were shown who, what and why; one
-    field goes back for a lifetime you were told about.
-    <a href="https://github.com/notinferred/keypaste/blob/main/docs/demo.md">Watch it end to end</a> —
-    about sixty seconds.
-  </p>
+  <p class="caption">That is the whole product in one screen. An agent asked; you were shown who, what and why; one field goes back for a lifetime you were told about. <a href="https://github.com/notinferred/keypaste/blob/main/docs/demo.md">Watch it end to end</a> — about sixty seconds.</p>
 
-  <p class="pitch">
-    <strong>Stop pasting secrets into chats.</strong> keypaste is a local-first,
-    KDBX-compatible vault that stores your passwords and env variables, injects them into your
-    projects, and lets AI agents like Claude request exactly one credential — with your approval,
-    scoped access, and a full audit trail — without ever seeing your vault.
-  </p>
+  <p class="pitch"><strong>Stop pasting secrets into chats.</strong> keypaste is a local-first, KDBX-compatible vault that stores your passwords and env variables, injects them into your projects, and lets AI agents like Claude request exactly one credential — with your approval, scoped access, and a full audit trail — without ever seeing your vault.</p>
 
   <p class="sub">For developers who are tired of choosing between <code>.env</code> files and trusting an agent with everything.</p>
 
   <ul class="bullets">
-    <li>
-      <b>Local-first, offline</b>
-      <span>Your vault is a file on your disk. No account, no cloud service holding your secrets, no network required. Sync it yourself with whatever you already use.</span>
-    </li>
-    <li>
-      <b>Standard KDBX, not a new format</b>
-      <span>Everything keypaste writes opens in KeePassXC and KeePass, proved in both directions against a real keepassxc-cli on Linux, macOS and Windows on every push. If keypaste disappears tomorrow, your data doesn't.</span>
-    </li>
-    <li>
-      <b>Open source, AGPL</b>
-      <span>Auditable by anyone, forever. A tool that handles secrets shouldn't ask to be trusted on faith.</span>
-    </li>
+    <li><b>Local-first, offline</b> <span>Your vault is a file on your disk. No account, no cloud service holding your secrets, no network required. Sync it yourself with whatever you already use.</span></li>
+    <li><b>Standard KDBX, not a new format</b> <span>Everything keypaste writes opens in KeePassXC and KeePass, proved in both directions against a real keepassxc-cli on Linux, macOS and Windows on every push. If keypaste disappears tomorrow, your data doesn't.</span></li>
+    <li><b>Open source, AGPL</b> <span>Auditable by anyone, forever. A tool that handles secrets shouldn't ask to be trusted on faith.</span></li>
   </ul>
 
-  <p class="status">
-    <b>Pre-1.0, and it says so.</b> The vault, the environment-variable injection and the agent
-    bridge all work today and are tested on all three operating systems. The binaries are unsigned,
-    there is no GUI yet, and the approval prompt is a terminal prompt rather than a native dialog.
-  </p>
+  <p class="status"><b>Pre-1.0, and it says so.</b> The vault, the environment-variable injection and the agent bridge all work today and are tested on all three operating systems. The binaries are unsigned, there is no GUI yet, and the approval prompt is a terminal prompt rather than a native dialog.</p>
 
   <h2>Install</h2>
 
-  <p class="caption">
-    Five lines, and the third one is the reason the other four are worth typing: it checks the
-    archive against a hash published beside it and stops if they disagree. Each binary is a single
-    native file, so nothing needs .NET on your machine. macOS on Apple Silicon:
-  </p>
+  <p class="caption">Five lines, and the third one is the reason the other four are worth typing: it checks the archive against a hash published beside it and stops if they disagree. Each binary is a single native file, so nothing needs .NET on your machine. macOS on Apple Silicon:</p>
 
 <pre>curl -fLO https://dl.keypaste.com/v0.1.0/keypaste-0.1.0-osx-arm64.tar.gz
 curl -fLO https://dl.keypaste.com/v0.1.0/keypaste-0.1.0-osx-arm64.tar.gz.sha256
@@ -205,14 +178,7 @@ sha256sum -c keypaste-0.1.0-linux-x64.tar.gz.sha256
 tar -xzf keypaste-0.1.0-linux-x64.tar.gz
 mkdir -p ~/.local/bin &amp;&amp; mv keypaste keypaste-mcp ~/.local/bin/</pre>
 
-  <p class="caption">
-    Windows, Intel Macs, Alpine and building from source are in the
-    <a href="https://github.com/notinferred/keypaste#install">README</a>. There is deliberately no
-    <code>curl | sh</code>: it asks you to run code you have not read, from an origin that is not the
-    repository. And the checksum proves the bytes arrived intact, not who made them — it is served
-    from the same origin as the archive, so anyone who can replace one can replace both. The binaries
-    are unsigned. Building from source is strictly stronger and is documented permanently.
-  </p>
+  <p class="caption">Windows, Intel Macs, Alpine and building from source are in the <a href="https://github.com/notinferred/keypaste#install">README</a>. There is deliberately no <code>curl | sh</code>: it asks you to run code you have not read, from an origin that is not the repository. And the checksum proves the bytes arrived intact, not who made them — it is served from the same origin as the archive, so anyone who can replace one can replace both. The binaries are unsigned. Building from source is strictly stronger and is documented permanently.</p>
 
   <p class="caption">Then a vault, and a project with no <code>.env</code> in it:</p>
 
@@ -224,11 +190,7 @@ keypaste run dev -- npm start    # injected into the child process, nothing on d
 
   <h2>Connecting it to Claude</h2>
 
-  <p class="caption">
-    Two processes, and the split is the whole design. <code>keypaste-mcp</code> is started by your
-    MCP client, holds no vault and decides nothing. <code>keypaste agent</code> is started by you,
-    holds the vault, and asks you the question at the top of this page.
-  </p>
+  <p class="caption">Two processes, and the split is the whole design. <code>keypaste-mcp</code> is started by your MCP client, holds no vault and decides nothing. <code>keypaste agent</code> is started by you, holds the vault, and asks you the question at the top of this page.</p>
 
 <pre>keypaste agent --vault ~/vault.kdbx</pre>
 
@@ -246,11 +208,7 @@ keypaste run dev -- npm start    # injected into the child process, nothing on d
   }
 }</pre>
 
-  <p class="caption">
-    <strong>There is no place in that config for a master password, and there never will be.</strong>
-    Every call an agent makes — granted or refused — is one line in a log on your disk, and the
-    value is never in it:
-  </p>
+  <p class="caption"><strong>There is no place in that config for a master password, and there never will be.</strong> Every call an agent makes — granted or refused — is one line in a log on your disk, and the value is never in it:</p>
 
 <pre>
   time (UTC)           client       entry                decision  method
@@ -261,10 +219,7 @@ keypaste run dev -- npm start    # injected into the child process, nothing on d
 
   <h2>How it compares</h2>
 
-  <p class="caption">
-    Only the wedge — where the secrets live, how they reach a process, and what happens when an
-    agent asks for one. Checked against each vendor's own documentation in July 2026.
-  </p>
+  <p class="caption">Only the wedge — where the secrets live, how they reach a process, and what happens when an agent asks for one. Checked against each vendor's own documentation in July 2026.</p>
 
   <div class="scroll">
     <table>
@@ -284,22 +239,11 @@ keypaste run dev -- npm start    # injected into the child process, nothing on d
     </table>
   </div>
 
-  <p class="caption">
-    <strong>keypaste is not the only thing in this space, and pretending otherwise would be the
-    fastest way to lose the argument.</strong> Keeper's MCP server prompts a human before it
-    returns unmasked secret data. Bitwarden published an Agent Access SDK in March 2026 with the
-    same request-and-approve shape, though it is alpha and its logging is not there yet.
-    1Password's Environments MCP server asks for approval too, and then deliberately never hands
-    the credential over at all — a different answer to the same problem, not a worse one.
-    What is keypaste's is the combination: an ordinary KDBX file you own, no account and no server
-    anywhere, a person answering each request, and a log that never leaves your disk.
-  </p>
+  <p class="caption"><strong>keypaste is not the only thing in this space, and pretending otherwise would be the fastest way to lose the argument.</strong> Keeper's MCP server prompts a human before it returns unmasked secret data. Bitwarden published an Agent Access SDK in March 2026 with the same request-and-approve shape, though it is alpha and its logging is not there yet. 1Password's Environments MCP server asks for approval too, and then deliberately never hands the credential over at all — a different answer to the same problem, not a worse one. What is keypaste's is the combination: an ordinary KDBX file you own, no account and no server anywhere, a person answering each request, and a log that never leaves your disk.</p>
 
   <h2>Tell me when it ships</h2>
 
-  <p class="caption">
-    One message, when there is something to install. Not a newsletter, and nothing in between.
-  </p>
+  <p class="caption">One message, when there is something to install. Not a newsletter, and nothing in between.</p>
 
   <form class="signup" method="post" action="/subscribe">
     <label class="field">
@@ -307,24 +251,15 @@ keypaste run dev -- npm start    # injected into the child process, nothing on d
              spellcheck="false" maxlength="254" placeholder="you@example.com"
              aria-label="Your email address">
     </label>
-    <span class="hp" aria-hidden="true">
-      <label for="website">Leave this empty</label>
-      <input id="website" type="text" name="website" tabindex="-1" autocomplete="off">
-    </span>
+    <span class="hp" aria-hidden="true"><label for="website">Leave this empty</label> <input id="website" type="text" name="website" tabindex="-1" autocomplete="off"></span>
     <button type="submit">Notify me</button>
   </form>
 
-  <p style="margin-top:2rem">
-    <a class="cta" href="https://github.com/notinferred/keypaste">Read the source on GitHub →</a>
-  </p>
+  <p style="margin-top:2rem"><a class="cta" href="https://github.com/notinferred/keypaste">Read the source on GitHub →</a></p>
 
   <footer>
     <p>Security reports: <a href="mailto:security@keypaste.com">security@keypaste.com</a></p>
-    <p>
-      This page sets no cookies, loads no third-party scripts, and runs no JavaScript at all. If
-      you enter your email it is stored on a database the maintainer runs, used only to tell you
-      when keypaste ships, and confirmed with you before anything is sent.
-    </p>
+    <p>This page sets no cookies, loads no third-party scripts, and runs no JavaScript at all. If you enter your email it is stored on a database the maintainer runs, used only to tell you when keypaste ships, and confirmed with you before anything is sent.</p>
   </footer>
 </main>
 </body>

@@ -1,36 +1,20 @@
 # keypaste.com
 
-A single static page and one form endpoint, deployed to Cloudflare Workers by hand. `public/` is
-the site; `src/worker.js` is the only server-side code, and it is reached for `/subscribe` and
-nothing else.
+A single static page and one form endpoint, deployed to Cloudflare Workers by hand. `public/` is the site; `src/worker.js` is the only server-side code, and it is reached for `/subscribe` and nothing else.
 
-The page loads no third-party scripts, sets no cookies, and runs no JavaScript of its own. The
-signup form is a plain `<form method="post">` that redirects to a static `/thanks/` page, which is
-why all of that is true at once.
+The page loads no third-party scripts, sets no cookies, and runs no JavaScript of its own. The signup form is a plain `<form method="post">` that redirects to a static `/thanks/` page, which is why all of that is true at once.
 
 ## Where the database password is
 
-**Not here, and not in the Worker.** It lives in an account-level Cloudflare Hyperdrive config.
-`wrangler.jsonc` carries only that config's `id`, which is a handle and is useless without access
-to the Cloudflare account. There is no `wrangler secret` in this setup and there should not be one.
+**Not here, and not in the Worker.** It lives in an account-level Cloudflare Hyperdrive config. `wrangler.jsonc` carries only that config's `id`, which is a handle and is useless without access to the Cloudflare account. There is no `wrangler secret` in this setup and there should not be one.
 
-The role behind the connection is `keypaste_signup_writer`, which can `INSERT` into `public.signup`
-and cannot `SELECT` from it, so that a compromised Worker — or a compromised dependency inside it —
-cannot read the list back. `schema.sql` is where that is set up and why, and it is verified rather
-than asserted: as that role, every read is refused with 42501.
+The role behind the connection is `keypaste_signup_writer`, which can `INSERT` into `public.signup` and cannot `SELECT` from it, so that a compromised Worker — or a compromised dependency inside it — cannot read the list back. `schema.sql` is where that is set up and why, and it is verified rather than asserted: as that role, every read is refused with 42501.
 
-It is a plain SQL role rather than a PlanetScale *managed* role, which is a deliberate trade and the
-one thing here with an ongoing cost. A managed role appears in the dashboard, rotates with
-`pscale role reset`, and can carry a TTL; this one is invisible to all of that, so rotating it means
-`alter role ... password` by hand plus a `wrangler hyperdrive update`. Swapping it for a managed
-role later is two commands and changes nothing else.
+It is a plain SQL role rather than a PlanetScale *managed* role, which is a deliberate trade and the one thing here with an ongoing cost. A managed role appears in the dashboard, rotates with `pscale role reset`, and can carry a TTL; this one is invisible to all of that, so rotating it means `alter role ... password` by hand plus a `wrangler hyperdrive update`. Swapping it for a managed role later is two commands and changes nothing else.
 
 ## Setting it up, once
 
-**The order below is not arbitrary and the old version of this list had it wrong.** The role has to
-exist before `schema.sql` can grant anything to it, because the grants name it — and `schema.sql`
-cannot create it, since on PlanetScale a role created with raw SQL is invisible to `pscale role`,
-the dashboard, and rotation. So: role, then table and grants, then swap the connection to it.
+**The order below is not arbitrary and the old version of this list had it wrong.** The role has to exist before `schema.sql` can grant anything to it, because the grants name it — and `schema.sql` cannot create it, since on PlanetScale a role created with raw SQL is invisible to `pscale role`, the dashboard, and rotation. So: role, then table and grants, then swap the connection to it.
 
 ```sh
 # 1. Create the managed role with NO inherited roles. PlanetScale discards the name you type and
@@ -61,60 +45,23 @@ npx wrangler hyperdrive create keypaste-signup \
 npx wrangler hyperdrive get <HYPERDRIVE_ID>
 ```
 
-**Steps 2 and 4 leave a window, and it is worth closing on purpose.** Between them the table exists
-while the Worker still connects as whatever role it connected as before — so a signup that arrives
-in the gap lands in a table that role can read, which is exactly the guarantee this arrangement
-exists to provide. Do the two in one sitting, and check `public.signup` is empty afterwards if the
-gap was longer than a minute. Before step 2 there is no window at all, because a signup against a
-missing table fails and the Worker says so.
+**Steps 2 and 4 leave a window, and it is worth closing on purpose.** Between them the table exists while the Worker still connects as whatever role it connected as before — so a signup that arrives in the gap lands in a table that role can read, which is exactly the guarantee this arrangement exists to provide. Do the two in one sitting, and check `public.signup` is empty afterwards if the gap was longer than a minute. Before step 2 there is no window at all, because a signup against a missing table fails and the Worker says so.
 
-Step 5 is not a formality. Hyperdrive exists in this design specifically so the connection is
-`verify-full` — a Worker connecting directly has no system CA store, so the honest setting there is
-`require`, which encrypts without authenticating the server. If step 5 does not say `verify-full`,
-the reason for the whole arrangement is gone and `DECISIONS.md` D-0037 is wrong.
+Step 5 is not a formality. Hyperdrive exists in this design specifically so the connection is `verify-full` — a Worker connecting directly has no system CA store, so the honest setting there is `require`, which encrypts without authenticating the server. If step 5 does not say `verify-full`, the reason for the whole arrangement is gone and `DECISIONS.md` D-0037 is wrong.
 
 ### How the config was wrong, and how it was found
 
-Hyperdrive config `9ef85ab258e846fbb2c0d3457b744282` was created through the Cloudflare dashboard's
-PlanetScale integration rather than by the steps above, and it started out wrong in two ways. Both
-are fixed now; this section is why, kept because the second is the sort of thing that comes back.
+Hyperdrive config `9ef85ab258e846fbb2c0d3457b744282` was created through the Cloudflare dashboard's PlanetScale integration rather than by the steps above, and it started out wrong in two ways. Both are fixed now; this section is why, kept because the second is the sort of thing that comes back.
 
-**TLS: fixed, and verified against the database.** PlanetScale serves a Let's Encrypt chain, so
-ISRG Root X1 was uploaded (`wrangler cert upload certificate-authority`, id
-`f8411755-7948-4b31-aa11-2a79710ce1d4`) and the config set to `--sslmode verify-full`. Cloudflare
-rejects `verify-full` outright without a CA, so this is not a setting that can be silently ignored.
-A query through the binding then succeeded, which is the part worth trusting: the mode is real and
-it did not break the connection. An earlier version of this note guessed that the update had
-detached the config from the PlanetScale integration; `wrangler hyperdrive get` says otherwise —
-`integration_name: planetScale` and the organisation and database names are all still on it.
+**TLS: fixed, and verified against the database.** PlanetScale serves a Let's Encrypt chain, so ISRG Root X1 was uploaded (`wrangler cert upload certificate-authority`, id `f8411755-7948-4b31-aa11-2a79710ce1d4`) and the config set to `--sslmode verify-full`. Cloudflare rejects `verify-full` outright without a CA, so this is not a setting that can be silently ignored. A query through the binding then succeeded, which is the part worth trusting: the mode is real and it did not break the connection. An earlier version of this note guessed that the update had detached the config from the PlanetScale integration; `wrangler hyperdrive get` says otherwise — `integration_name: planetScale` and the organisation and database names are all still on it.
 
-> **Fixed on 2026-07-28, and verified end to end.** Hyperdrive now connects as
-> `keypaste_signup_writer.jb6eu3wgh2u3`, a role with `INSERT` on `public.signup` and nothing else -
-> no superuser, no `bypassrls`, `NOINHERIT`, zero role memberships. `public.signup` exists. A live
-> submission returns 303 to `/thanks/` and the row lands; a duplicate is a no-op; the honeypot
-> stores nothing; nonsense, a wrong `Origin` and a non-form body each get 400. As that role,
-> `select`, `count(*)`, `returning`, `update`, `delete` and reading any other table are all refused
-> with 42501. The section below is kept as the record of what was wrong and how it was found.
+> **Fixed on 2026-07-28, and verified end to end.** Hyperdrive now connects as `keypaste_signup_writer.jb6eu3wgh2u3`, a role with `INSERT` on `public.signup` and nothing else - no superuser, no `bypassrls`, `NOINHERIT`, zero role memberships. `public.signup` exists. A live submission returns 303 to `/thanks/` and the row lands; a duplicate is a no-op; the honeypot stores nothing; nonsense, a wrong `Origin` and a non-form body each get 400. As that role, `select`, `count(*)`, `returning`, `update`, `delete` and reading any other table are all refused with 42501. The section below is kept as the record of what was wrong and how it was found.
 >
-> Two things bit during the fix and are worth knowing before touching this again. **`wrangler
-> hyperdrive update --origin-user/--origin-password` silently wiped the `mtls` block**, dropping the
-> CA and `verify-full` to empty - the sslmode has to be passed again in the same or a following
-> update, which is exactly why the verification step below is not a formality. And **naming the
-> conflict target requires SELECT**; see `schema.sql`.
+> Two things bit during the fix and are worth knowing before touching this again. **`wrangler hyperdrive update --origin-user/--origin-password` silently wiped the `mtls` block**, dropping the CA and `verify-full` to empty - the sslmode has to be passed again in the same or a following update, which is exactly why the verification step below is not a formality. And **naming the conflict target requires SELECT**; see `schema.sql`.
 
-**The role was wrong, and worse than this file used to say.** The config connected as
-`pscale_api_yq4xhf9tbm3v`, which is `rolcreaterole`, `rolcreatedb`, `rolbypassrls`, and a member of
-`pg_read_all_data`, `pg_write_all_data` and `postgres`. "It can read and write every table in the
-cluster" was an understatement: `postgres` is itself a member of `pscale_superuser`, so walking the
-membership graph gives this role `pg_checkpoint`, `pg_maintain`, `pg_signal_backend`,
-`pg_create_subscription`, `pg_use_reserved_connections` and `pscale_replication_ops` as well.
+**The role was wrong, and worse than this file used to say.** The config connected as `pscale_api_yq4xhf9tbm3v`, which is `rolcreaterole`, `rolcreatedb`, `rolbypassrls`, and a member of `pg_read_all_data`, `pg_write_all_data` and `postgres`. "It can read and write every table in the cluster" was an understatement: `postgres` is itself a member of `pscale_superuser`, so walking the membership graph gives this role `pg_checkpoint`, `pg_maintain`, `pg_signal_backend`, `pg_create_subscription`, `pg_use_reserved_connections` and `pscale_replication_ops` as well.
 
-That last pair is the part to sit with. `pg_create_subscription` plus write access everywhere means
-whatever reaches this credential can set up logical replication and stream the cluster out
-continuously, and `pg_signal_backend` lets it terminate other sessions. **The guarantee `schema.sql`
-and D-0037 are built on — that nothing reachable from the Worker can read the list back — is not
-merely false; the honest description is that a public HTTP endpoint is one dependency compromise
-away from cluster administration.** Verified by query, not inferred:
+That last pair is the part to sit with. `pg_create_subscription` plus write access everywhere means whatever reaches this credential can set up logical replication and stream the cluster out continuously, and `pg_signal_backend` lets it terminate other sessions. **The guarantee `schema.sql` and D-0037 are built on — that nothing reachable from the Worker can read the list back — is not merely false; the honest description is that a public HTTP endpoint is one dependency compromise away from cluster administration.** Verified by query, not inferred:
 
 ```sql
 with recursive chain as (
@@ -124,43 +71,18 @@ with recursive chain as (
 ) select depth, rolname from chain order by depth, rolname;
 ```
 
-`public.signup` does not exist yet either — `schema.sql` has never been applied, and there are no
-tables in `public` at all. Which is the only reason none of the above has cost anything: there is no
-subscriber list on this cluster to steal.
+`public.signup` does not exist yet either — `schema.sql` has never been applied, and there are no tables in `public` at all. Which is the only reason none of the above has cost anything: there is no subscriber list on this cluster to steal.
 
-**On `REVOKE CONNECT ... FROM PUBLIC`, an earlier version of this file warned it might break
-PlanetScale's own components. Checked, and it looks safe.** `pg_database.datacl` for `postgres` is
-currently null, meaning defaults apply and PUBLIC does hold CONNECT implicitly — so the revoke will
-materialise an ACL rather than tighten an existing one. But the only things observed connecting to
-this database are `postgres` (the owner) and `pscale_admin`, which is `rolsuper` and therefore
-bypasses the check entirely; `pscale_exporter` and `pscale_pgbouncer` connect to their own databases
-of the same names. Worth knowing regardless: `postgres` is where Patroni's heartbeat and REST API
-live, so this application's table is going into the cluster's HA control database. That is what the
-PlanetScale integration handed us, not a choice made here.
+**On `REVOKE CONNECT ... FROM PUBLIC`, an earlier version of this file warned it might break PlanetScale's own components. Checked, and it looks safe.** `pg_database.datacl` for `postgres` is currently null, meaning defaults apply and PUBLIC does hold CONNECT implicitly — so the revoke will materialise an ACL rather than tighten an existing one. But the only things observed connecting to this database are `postgres` (the owner) and `pscale_admin`, which is `rolsuper` and therefore bypasses the check entirely; `pscale_exporter` and `pscale_pgbouncer` connect to their own databases of the same names. Worth knowing regardless: `postgres` is where Patroni's heartbeat and REST API live, so this application's table is going into the cluster's HA control database. That is what the PlanetScale integration handed us, not a choice made here.
 
 Two things about PlanetScale usernames, both easy to get wrong:
 
-- `pscale_api_yq4xhf9tbm3v` is not an API or admin credential despite the name. It is the generated
-  username of an ordinary *managed role* — PlanetScale discards the name you type and issues its
-  own. The problem is its inherited roles, not what it is called. `pscale role list <db> <branch>`
-  is the authoritative view of that.
-- The `.jb6eu3wgh2u3` suffix is the **branch id, not part of the credential**. PlanetScale's proxy
-  routes on the username, so you connect as `<role>.<branch-id>` while `current_user` inside the
-  database is the bare `<role>`. A `wrangler hyperdrive update --origin-user` that omits the suffix
-  will fail to authenticate for reasons that look nothing like the cause.
+- `pscale_api_yq4xhf9tbm3v` is not an API or admin credential despite the name. It is the generated username of an ordinary *managed role* — PlanetScale discards the name you type and issues its own. The problem is its inherited roles, not what it is called. `pscale role list <db> <branch>` is the authoritative view of that.
+- The `.jb6eu3wgh2u3` suffix is the **branch id, not part of the credential**. PlanetScale's proxy routes on the username, so you connect as `<role>.<branch-id>` while `current_user` inside the database is the bare `<role>`. A `wrangler hyperdrive update --origin-user` that omits the suffix will fail to authenticate for reasons that look nothing like the cause.
 
-**What is live right now, established by probing it rather than assumed.** The Worker is deployed:
-`GET /subscribe` answers `303` to `/`, which is its own non-POST branch, and an unknown path gets
-the static `404`. So the form reaches real code. That code inserts into `public.signup`, which does
-not exist, so it throws — and the handler catches it and returns a `503` page that says in as many
-words that the address was **not** stored. Nothing is being silently dropped. Nothing is being
-stored either, and every signup since the deploy has failed that way.
+**What is live right now, established by probing it rather than assumed.** The Worker is deployed: `GET /subscribe` answers `303` to `/`, which is its own non-POST branch, and an unknown path gets the static `404`. So the form reaches real code. That code inserts into `public.signup`, which does not exist, so it throws — and the handler catches it and returns a `503` page that says in as many words that the address was **not** stored. Nothing is being silently dropped. Nothing is being stored either, and every signup since the deploy has failed that way.
 
-That ordering is lucky rather than designed, and it is why there is no leak to clean up: the
-over-privileged role can read every table in the cluster, but there is no subscriber table yet for
-it to read. **Which settles the sequencing question — the role must be swapped before, or in the
-same sitting as, the table being created.** Creating the table first would mean the first real
-signup lands somewhere the guarantee does not hold.
+That ordering is lucky rather than designed, and it is why there is no leak to clean up: the over-privileged role can read every table in the cluster, but there is no subscriber table yet for it to read. **Which settles the sequencing question — the role must be swapped before, or in the same sitting as, the table being created.** Creating the table first would mean the first real signup lands somewhere the guarantee does not hold.
 
 So: steps 1, 2 and 4 of the setup list above, in that order, then:
 
@@ -170,16 +92,9 @@ npx wrangler hyperdrive update 9ef85ab258e846fbb2c0d3457b744282 \
 npx wrangler hyperdrive get 9ef85ab258e846fbb2c0d3457b744282   # verify-full must survive
 ```
 
-Then run the by-hand checks below, because a successful signup is the only thing that proves both
-halves at once: the row lands, and the role that landed it cannot read it back.
+Then run the by-hand checks below, because a successful signup is the only thing that proves both halves at once: the row lands, and the role that landed it cannot read it back.
 
-**One thing in `schema.sql` to look at before running it.** Its last line is
-`REVOKE CONNECT ON DATABASE postgres FROM PUBLIC`, which is correct in intent — PlanetScale grants
-CONNECT to PUBLIC on a new database, meaning every current and future role. But this is the
-`postgres` maintenance database on a cluster PlanetScale manages, so anything of theirs that
-connects through PUBLIC rather than an explicit grant loses access at that moment. Run `\du` and
-check which roles exist and what they inherit before revoking, and be ready to grant CONNECT back
-explicitly. It is the one line in the file that can affect something other than this application.
+**One thing in `schema.sql` to look at before running it.** Its last line is `REVOKE CONNECT ON DATABASE postgres FROM PUBLIC`, which is correct in intent — PlanetScale grants CONNECT to PUBLIC on a new database, meaning every current and future role. But this is the `postgres` maintenance database on a cluster PlanetScale manages, so anything of theirs that connects through PUBLIC rather than an explicit grant loses access at that moment. Run `\du` and check which roles exist and what they inherit before revoking, and be ready to grant CONNECT back explicitly. It is the one line in the file that can affect something other than this application.
 
 ## Deploying
 
@@ -194,8 +109,7 @@ npx wrangler deploy
 CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE="postgresql://..." npx wrangler dev
 ```
 
-The environment-variable form, rather than `localConnectionString` in `wrangler.jsonc`, because the
-second one puts a real password in a tracked file. Point it at a scratch database if you have one.
+The environment-variable form, rather than `localConnectionString` in `wrangler.jsonc`, because the second one puts a real password in a tracked file. Point it at a scratch database if you have one.
 
 Worth checking by hand before a deploy, because none of it is in CI:
 
@@ -203,19 +117,13 @@ Worth checking by hand before a deploy, because none of it is in CI:
 - Submitting the same address again still redirects cleanly and adds nothing.
 - Submitting with the `website` field filled redirects to `/thanks/` and adds nothing.
 - Submitting nonsense gets a `400` page that says what was wrong.
-- The page still works with JavaScript disabled in the browser. If it does not, the promise the
-  footer makes is no longer true.
+- The page still works with JavaScript disabled in the browser. If it does not, the promise the footer makes is no longer true.
 - View source: no `<script>` tags, no external origins.
 
 ## What is not here
 
-No CI job. `.github/workflows/ci.yml` is the .NET gate and does not look at this directory, which
-is a deliberate choice for ninety lines of JavaScript deployed by hand — and the reason the manual
-checks above are written down rather than assumed.
+No CI job. `.github/workflows/ci.yml` is the .NET gate and does not look at this directory, which is a deliberate choice for ninety lines of JavaScript deployed by hand — and the reason the manual checks above are written down rather than assumed.
 
-No rate limiting in code. That belongs in a Cloudflare rule on `POST /subscribe`; check whether the
-account's plan actually offers one before treating it as the defence, because the honeypot and the
-body, content-type and origin guards are what is genuinely shipped.
+No rate limiting in code. That belongs in a Cloudflare rule on `POST /subscribe`; check whether the account's plan actually offers one before treating it as the defence, because the honeypot and the body, content-type and origin guards are what is genuinely shipped.
 
-No Turnstile and no managed challenge. Both inject a script, and the page says it does not load
-one. See `DECISIONS.md` D-0036 for the rest of what was deliberately left out.
+No Turnstile and no managed challenge. Both inject a script, and the page says it does not load one. See `DECISIONS.md` D-0036 for the rest of what was deliberately left out.

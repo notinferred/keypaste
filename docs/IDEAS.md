@@ -1,28 +1,18 @@
 # IDEAS.md — the ledger
 
-> Ideas wait here. Most wait forever, and that is the point (`docs/PRODUCT.md` law 5.5).
-> Nothing here is a step. It becomes one only when it can name an accept criterion that can *fail*
-> and a verifier in `docs/verification.md` — the admission rule at the top of `docs/STEPS.md`.
+> Ideas wait here. Most wait forever, and that is the point (`docs/PRODUCT.md` law 5.5). Nothing here is a step. It becomes one only when it can name an accept criterion that can *fail* and a verifier in `docs/verification.md` — the admission rule at the top of `docs/STEPS.md`.
 >
-> **Append-only. Never delete a row; flip its status.** A deleted row destroys the only evidence
-> the idea was ever considered, and a ledger that only contains live ideas cannot tell "never
-> proposed" from "quietly dropped".
+> **Append-only. Never delete a row; flip its status.** A deleted row destroys the only evidence the idea was ever considered, and a ledger that only contains live ideas cannot tell "never proposed" from "quietly dropped".
 >
-> Business, pricing and positioning notes are kept privately, outside this repository — see
-> `docs/ARTIFACTS.md`.
+> Business, pricing and positioning notes are kept privately, outside this repository — see `docs/ARTIFACTS.md`.
 
-Status vocabulary: **open** (no decision) · **parked** (decided: not now, with a reason) ·
-**rejected** (decided: no) · **promoted** (now a step in `docs/STEPS.md`) · **shipped**.
+Status vocabulary: **open** (no decision) · **parked** (decided: not now, with a reason) · **rejected** (decided: no) · **promoted** (now a step in `docs/STEPS.md`) · **shipped**.
 
 ---
 
 ## UI direction
 
-Adopted in 4.1 and 4.2, and standing: calm, precise, bank-lobby-not-hacker-movie. Whitespace, a
-muted palette with one accent, Inter, subtle depth, dark mode first-class. Avoided, deliberately:
-green-on-black terminal cosplay, padlock icons everywhere, red warnings for normal actions, and
-dense 2003-era tree-tables. The signature moment is the approval dialog — who wants what, and why —
-and it is the brand.
+Adopted in 4.1 and 4.2, and standing: calm, precise, bank-lobby-not-hacker-movie. Whitespace, a muted palette with one accent, Inter, subtle depth, dark mode first-class. Avoided, deliberately: green-on-black terminal cosplay, padlock icons everywhere, red warnings for normal actions, and dense 2003-era tree-tables. The signature moment is the approval dialog — who wants what, and why — and it is the brand.
 
 ---
 
@@ -30,15 +20,15 @@ and it is the brand.
 
 | idea | who | status | why |
 |---|---|---|---|
-| One-time encrypted share links, self-hostable relay, key in the URL fragment | founder | parked | Was Stage 5.1. Real, designed, and gated on launch traction that is tracked outside this repo. No verifier today, so not a step. |
-| Multi-vault and vault-per-project ergonomics | founder | parked | Was Stage 5. Wanted, but no accept criterion that can fail has been written. |
-| Git-friendly vault workflows and conflict guidance | founder | parked | Was Stage 5. Blocked on O-0018 — two writers, one KDBX, and no merge. |
-| Hosted relay and sync as the first paid tier | founder | parked | Was Stage 5.2. Convenience never security (law 5.4). Needs the local-first vs hosted-sync tension below resolved first. |
-| Delegation dashboard: aggregate agent grants, MCP connections, external OAuth | founder | parked | Was Stage 6, explicitly gated on benchmarks being hit. A feasibility spike is the first real step and it has not run. |
-| Teams: shared env sets by per-member key wrapping (the copy model) | founder | parked | Was Stage 7.1. Gated on revenue. Bounds future access, not past copies — that honesty has to survive into any build. |
-| Teams: a broker that releases without copying (the access model) | founder | parked | Was Stage 7.2. The differentiated one — instant revocation, no rotation. Reuses the Stage 2 approval core verbatim or it is not this idea. |
-| Team SSO for the hosted service, never on the vault path | founder | parked | Was Stage 7.3. If the IdP being compromised can read a vault, it is the wrong design. |
-| Team delegation dashboard | founder | parked | Was Stage 7.4. Gated exactly like Stage 6. |
+| One-time encrypted share links, self-hostable relay, key in the URL fragment | founder | parked | Gated on 3.2 shipping; the prompt is in `docs/STEPS.md` under Gated. Real, designed, and gated on launch traction that is tracked outside this repo. No verifier today, so not a step. |
+| Multi-vault and vault-per-project ergonomics | founder | parked | The prompt is in `docs/STEPS.md` under Gated. Wanted, but no accept criterion that can fail has been written. |
+| Git-friendly vault workflows and conflict guidance | founder | parked | The prompt is in `docs/STEPS.md` under Gated. Blocked on O-0018 — two writers, one KDBX, and no merge. |
+| Hosted relay and sync as the first paid tier | founder | parked | The prompt is in `docs/STEPS.md` under Gated.2. Convenience never security (law 5.4). Needs the local-first vs hosted-sync tension below resolved first. |
+| Delegation dashboard: aggregate agent grants, MCP connections, external OAuth | founder | parked | Gated on benchmarks being hit; the prompt is in `docs/STEPS.md` under Gated. A feasibility spike is the first real step and it has not run. |
+| Teams: shared env sets by per-member key wrapping (the copy model) | founder | parked | Gated on revenue; the prompt is in `docs/STEPS.md` under Gated. Gated on revenue. Bounds future access, not past copies — that honesty has to survive into any build. |
+| Teams: a broker that releases without copying (the access model) | founder | parked | Gated on revenue; the prompt is in `docs/STEPS.md` under Gated. The differentiated one — instant revocation, no rotation. Reuses the Stage 2 approval core verbatim or it is not this idea. |
+| Team SSO for the hosted service, never on the vault path | founder | parked | Gated on revenue; the prompt is in `docs/STEPS.md` under Gated. If the IdP being compromised can read a vault, it is the wrong design. |
+| Team delegation dashboard | founder | parked | Gated on revenue; the prompt is in `docs/STEPS.md` under Gated. Gated exactly like Stage 6. |
 | "Design language: modern, calm, trustworthy" as a checklist item | founder | rejected | Nothing about it can fail, so it was never a step. The direction above is the durable form. |
 | Sign-in-first landing flow from the design exploration | founder | open | Inverts local-first, which `docs/PRODUCT.md` §2 makes permanent. Must be answered before any hosted-sync work; it is the fork the parked Stage 5 rows sit behind. |
 | Local-first vs a hosted sync tier | founder | open | §2 permits a zero-knowledge hosted tier if self-host stays first-class. Unresolved, and it changes what gets built above. |
