@@ -134,6 +134,9 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
         Content = destination.Kind switch
         {
+            // Real in 4.1, and it needs no unlocked vault: the audit log is machine state, which is
+            // why `keypaste log` reads it without one.
+            DestinationKind.Log => new LogViewModel(Home),
             DestinationKind.AgentActivity => Activity(),
             DestinationKind.Entries => Empty(
                 "Entries",

@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Keypaste.App.ViewModels"
              xmlns:nav="using:Keypaste.App.Navigation"
+             xmlns:views="using:Keypaste.App.Views"
              x:Class="Keypaste.App.Views.ShellView"
              x:DataType="vm:ShellViewModel"
              Background="{DynamicResource KpSurface0}">
@@ -20,6 +21,10 @@
                    FontSize="12"
                    Foreground="{DynamicResource KpTextMuted}" />
       </StackPanel>
+    </DataTemplate>
+
+    <DataTemplate DataType="vm:LogViewModel">
+      <views:LogView />
     </DataTemplate>
 
     <DataTemplate DataType="vm:AgentActivityViewModel">
