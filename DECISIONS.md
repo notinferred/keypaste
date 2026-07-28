@@ -2300,6 +2300,50 @@ glibc floor is 2.35 rather than 2.39, which is the difference between running on
 that floor is asserted on a clean Debian 12 container on every release, with Alpine asserted to
 fail, so it is a tested claim rather than a guess.
 
+## D-0042 - CI runs on one provider now, because billing stopped the other one
+
+**Date:** 2026-07-28 · **Stage:** 3.4 · **Status:** accepted
+
+**This was forced, not preferred.** Every `ubuntu-latest` and `macos-latest` job began failing one
+second after starting, with no runner assigned and no steps recorded - the annotation reads "The job
+was not started because recent account payments have failed or your spending limit needs to be
+increased." Nothing was wrong with the code. Every Blacksmith job in the same run passed, including
+the AOT publish. The three-OS matrix in `ci.yml` therefore moved to
+`blacksmith-4vcpu-ubuntu-2404`, `blacksmith-4vcpu-windows-2025` and `blacksmith-6vcpu-macos-15`.
+
+**D-0006 predicted the mechanism and the prediction came true.** It recorded that publishing the
+repository "makes GitHub Actions free, which is what unblocked CI: the three-OS matrix bills at
+1× / 2× / **10×** per minute on a private repository." The repository is private today, so the
+matrix has been billing at those multipliers, and the macOS row at 10x is what consumed the limit.
+
+**A red `ci` is a hard stop on shipping, not a nuisance.** `release.yml`'s guard job refuses to
+build a tag that has no successful `ci` run on its exact SHA. So this was not a background
+annoyance to fix eventually; with GitHub-hosted runners unable to start, no release could be cut at
+all. That is the guard behaving correctly, and it is also why this decision could not wait.
+
+**All three operating systems survive, which is the part CORE.md law 4.6 cares about.** The
+KeePassXC compatibility gate still runs on Linux, macOS and Windows, and the architectures are
+unchanged - `ubuntu-latest` and the Blacksmith Ubuntu image are both x64, `macos-latest` and
+`blacksmith-6vcpu-macos-15` are both arm64. Changing which image hosts an operating system is a
+different act from dropping one, and `ci.yml`'s standing comment now says so, because the next
+person to read that list should not have to guess which one happened. Every step in both jobs keys
+off `runner.os` rather than the runner label, so the swap needed no other edit - which is the
+reason that convention was worth having.
+
+**What is genuinely lost is a second opinion.** Two providers meant a Blacksmith-specific image
+quirk could show up as a disagreement between them; one provider means it shows up as nothing.
+Against that, `release.yml` already built every shipped binary on these same four Blacksmith
+runners, so `ci` and `release` now test on the machines that produce the artifact instead of
+straddling two fleets. That is a real gain in what a green `ci` implies about a tag. The loss is
+recorded rather than mitigated: if the second provider comes back it belongs as extra matrix rows
+for cross-checking, not as a replacement.
+
+**This removes cost as an argument for publishing the repository.** D-0006's case for going public
+was partly that CI became free; with CI on a flat-rate provider that argument is gone, and
+publication should now be decided on CORE.md §3.8 grounds alone - auditable code as the trust
+strategy - which is where it always belonged. Tracked as O-0014, along with the fact that
+`SECURITY.md` had been asserting the repository was public and no longer does.
+
 ---
 
 # Open decisions
@@ -2318,7 +2362,12 @@ cheap only while there is a single copyright holder, which keeps this entry urge
 
 ## D-0006 — Repository is public; business notes live outside it
 
-**Date:** 2026-07-25 · **Stage:** 0.1 · **Status:** accepted (supersedes the original O-0003)
+**Date:** 2026-07-25 · **Stage:** 0.1 · **Status:** its first clause is currently false — see O-0014
+(supersedes the original O-0003)
+
+**Read O-0014 before this entry.** The repository is private as of 3.4, so the first sentence below
+no longer describes reality. The second half — business notes live outside the repository, and a
+public repository can serve any commit ever pushed — is unaffected and still binding.
 
 The repository is public from the start, per CORE.md §3.8 — auditable code is the trust strategy,
 and it starts paying on day one rather than at launch. Publishing also makes GitHub Actions free,
@@ -2373,6 +2422,10 @@ the load throws `DllNotFoundException`, which is caught at `:230` and `:250`, an
 runs every time. The observed behaviour is what the entry claims; the mechanism is not. Recorded
 rather than quietly edited, because a wrong reason for a right answer is the thing that bites
 later.
+
+This entry's title names a runner `ci.yml` no longer uses (D-0042). The answer is unaffected:
+`blacksmith-6vcpu-macos-15` is arm64 as well, so the arm64 story it asked for is still the one being
+tested.
 
 ## D-0040 - Vendored KeePassLib survives NativeAOT, proved by running the published binaries
 
@@ -2604,3 +2657,29 @@ emulation, which works and is slow.
 
 Reconsider the whole list after the first release, on evidence about who actually downloaded what,
 which is exactly the kind of evidence a download log can supply and CORE.md §3.5 permits.
+
+## O-0014 - The repository is private and CORE.md says the code is open
+
+CORE.md law 3.8 reads "The code is open source (permissive or copyleft — decided once, in PLAN.md)
+and stays open. Auditable code is the trust strategy for an unknown founder." The licence is
+AGPL-3.0 and every release publishes its own corresponding source (D-0041), so the *code* is open in
+the licensing sense. The *repository* is private, so nobody outside can actually read it, and
+"auditable" is the word law 3.8 uses.
+
+D-0006 records the opposite as settled fact - "The repository is public from the start, per CORE.md
+§3.8" - and it is currently wrong. It has not been rewritten, because it also records something that
+is still true and still binding: that GitHub can serve any commit ever pushed once a repository is
+made public, including unreachable ones, so anything sensitive that ever landed in a commit means
+recreating the repository rather than force-pushing. That paragraph is a precondition for whenever
+this question is answered, not a historical note. `SECURITY.md` claimed the repository was public on
+D-0006's authority and no longer does.
+
+**Two things follow, and they pull in opposite directions.** Every launch channel in `launch.md`
+sells an auditable vault tool, and a private repository makes the central claim unverifiable by the
+reader it is aimed at - which is the same defect D-0036 refused to ship on the landing page. Against
+that, publishing is irreversible in the way D-0006 describes, and this is a secrets tool whose
+history has already had one near-miss with private business notes.
+
+D-0042 removed the one argument that was pushing this decision for the wrong reason: CI cost. It is
+now a question about trust and about what is in the history, which is where it belongs. It must be
+answered before 3.3's launch posts go out, not before `v0.1.0` publishes.
