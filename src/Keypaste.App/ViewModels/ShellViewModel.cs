@@ -22,13 +22,18 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     private string _countdown = string.Empty;
     private bool _disposed;
 
-    internal ShellViewModel(AppVaultSession session, string? home, string? approverFromEnvironment)
+    internal ShellViewModel(
+        AppVaultSession session,
+        string? home,
+        string? approverFromEnvironment,
+        Action<Core.Settings.AppTheme>? applyTheme = null)
     {
         ArgumentNullException.ThrowIfNull(session);
 
         _session = session;
         Home = home;
         ApproverFromEnvironment = approverFromEnvironment;
+        ApplyTheme = applyTheme ?? (_ => { });
 
         LockCommand = new RelayCommand(() => _session.Lock(VaultLockReason.Manual));
 
@@ -41,6 +46,13 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>The value of <c>KEYPASTE_APPROVER</c>, or null.</summary>
     internal string? ApproverFromEnvironment { get; }
+
+    /// <summary>How a theme choice reaches the application object.</summary>
+    /// <remarks>
+    /// Passed in rather than reached for, so this class still names no Avalonia type and its tests
+    /// still need no application.
+    /// </remarks>
+    internal Action<Core.Settings.AppTheme> ApplyTheme { get; }
 
     /// <summary>The five places the sidebar offers.</summary>
     /// <remarks>
@@ -137,6 +149,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             // Real in 4.1, and it needs no unlocked vault: the audit log is machine state, which is
             // why `keypaste log` reads it without one.
             DestinationKind.Log => new LogViewModel(Home),
+            DestinationKind.Settings => new SettingsViewModel(_session, Home, ApplyTheme),
             DestinationKind.AgentActivity => Activity(),
             DestinationKind.Entries => Empty(
                 "Entries",

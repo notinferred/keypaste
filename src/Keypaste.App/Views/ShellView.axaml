@@ -27,6 +27,10 @@
       <views:LogView />
     </DataTemplate>
 
+    <DataTemplate DataType="vm:SettingsViewModel">
+      <views:SettingsView />
+    </DataTemplate>
+
     <DataTemplate DataType="vm:AgentActivityViewModel">
       <StackPanel Spacing="12" MaxWidth="560" HorizontalAlignment="Left">
         <TextBlock Text="{Binding Status}"
