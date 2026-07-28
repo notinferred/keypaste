@@ -128,6 +128,18 @@ internal sealed class FakeSecretPrompt : ISecretPrompt
     /// <summary>Prompt strings for which <see cref="ReadSecret"/> — not ReadLine — was used.</summary>
     internal List<string> SecretPrompts { get; } = [];
 
+    /// <summary>
+    /// Runs before each answer is handed back, with the prompt that asked for it.
+    /// </summary>
+    /// <remarks>
+    /// The only seam that lands <em>inside</em> an open vault session. A command's prompts for
+    /// entry fields happen between <c>Vault.Open</c> and <c>vault.Save</c>, so this is where a test
+    /// can be a second writer — which is the whole scenario
+    /// <c>VaultChangedOnDiskException</c> exists for and is otherwise unreachable from a CLI whose
+    /// commands open and save within milliseconds.
+    /// </remarks>
+    internal Action<string>? OnPrompt { get; set; }
+
     internal void Enqueue(params string[] answers)
     {
         foreach (var answer in answers)
@@ -140,6 +152,7 @@ internal sealed class FakeSecretPrompt : ISecretPrompt
     {
         PromptsSeen.Add(prompt);
         SecretPrompts.Add(prompt);
+        OnPrompt?.Invoke(prompt);
 
         if (_answers.Count == 0)
         {

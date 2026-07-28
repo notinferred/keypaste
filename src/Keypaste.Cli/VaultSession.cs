@@ -39,6 +39,16 @@ internal static class VaultSession
             context.Stderr.WriteLine("keypaste: wrong master password");
             return CliApp.ExitAuthFailed;
         }
+        catch (VaultChangedOnDiskException)
+        {
+            // A command opens, edits and saves within milliseconds, so reaching this means
+            // something wrote to the file during that window — a second keypaste, or KeePassXC.
+            // Running the command again is the whole recovery, which is why no verb grows a
+            // --force: an override flag on five commands would buy nothing and be reached for.
+            context.Stderr.WriteLine(
+                "keypaste: that vault changed while keypaste was writing it. Nothing was saved — run the command again.");
+            return CliApp.ExitInternalError;
+        }
         catch (VaultException ex)
         {
             context.Stderr.WriteLine($"keypaste: {ex.Message}");

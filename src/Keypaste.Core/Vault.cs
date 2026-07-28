@@ -23,12 +23,14 @@ namespace Keypaste.Core;
 public sealed class Vault : IDisposable
 {
     private readonly KeePassInterop _interop;
+    private byte[]? _stamp;
     private bool _disposed;
 
-    private Vault(KeePassInterop interop, string path)
+    private Vault(KeePassInterop interop, string path, bool stamp)
     {
         _interop = interop;
         Path = path;
+        _stamp = stamp ? Digest(path) : null;
     }
 
     /// <summary>The path of the file backing this vault.</summary>
@@ -60,7 +62,13 @@ public sealed class Vault : IDisposable
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
 
-        return new Vault(WithUtf8Password(masterPassword, utf8 => KeePassInterop.Create(path, utf8)), path);
+        // No stamp: there is no file yet, and a Create aimed at an occupied path is a caller
+        // saying "make a new vault here" rather than a stale copy of one. `keypaste init` is what
+        // refuses to overwrite, and it does so before reaching this.
+        return new Vault(
+            WithUtf8Password(masterPassword, utf8 => KeePassInterop.Create(path, utf8)),
+            path,
+            stamp: false);
     }
 
     /// <summary>
@@ -75,7 +83,10 @@ public sealed class Vault : IDisposable
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
 
-        return new Vault(WithUtf8Password(masterPassword, utf8 => KeePassInterop.Open(path, utf8)), path);
+        return new Vault(
+            WithUtf8Password(masterPassword, utf8 => KeePassInterop.Open(path, utf8)),
+            path,
+            stamp: true);
     }
 
     /// <summary>
@@ -192,19 +203,118 @@ public sealed class Vault : IDisposable
     }
 
     /// <summary>
-    /// Writes the vault to <see cref="Path"/>, encrypted.
+    /// Whether something else has written to <see cref="Path"/> since this vault read it.
+    /// </summary>
+    /// <returns><see langword="true"/> when the file no longer matches what was last read or written.</returns>
+    /// <remarks>
+    /// <para>
+    /// <b>A detector, not a lock.</b> A write landing between this call and the one that follows it
+    /// is still lost. Closing that window needs a file lock, which KDBX does not define and
+    /// KeePassXC does not take. What this catches is the case that actually happens: a vault held
+    /// open in a window for hours while somebody edits the same file from a terminal.
+    /// </para>
+    /// <para>
+    /// <see langword="false"/> for a vault from <see cref="Create"/> that has never been saved,
+    /// because there is nothing yet to have changed, and <see langword="false"/> for a file that
+    /// could not be read at all — see <see cref="Digest"/> for why absence is not a conflict.
+    /// </para>
+    /// </remarks>
+    public bool HasFileChangedSinceOpen()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        return _stamp is { } stamp
+            && Digest(Path) is { } current
+            && !stamp.AsSpan().SequenceEqual(current);
+    }
+
+    /// <summary>
+    /// Writes the vault to <see cref="Path"/>, encrypted, unless something else wrote there first.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Saving the same content twice produces two files that differ byte for byte: the salt,
     /// the nonces, and the derived key material are regenerated on every write. That is a
-    /// property of the format, not a defect.
+    /// property of the format, not a defect — and it is also what makes the change detector cheap,
+    /// since every save moves the digest whether or not any field moved.
+    /// </para>
+    /// <para>
+    /// On <see cref="VaultChangedOnDiskException"/> <b>nothing is written</b>. A caller that has
+    /// asked a person and been told to go ahead calls <see cref="SaveOverwriting"/>.
+    /// </para>
     /// </remarks>
+    /// <exception cref="VaultChangedOnDiskException">Something else wrote to <see cref="Path"/>.</exception>
     /// <exception cref="VaultException">The vault could not be written.</exception>
     public void Save()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
+        if (HasFileChangedSinceOpen())
+        {
+            throw new VaultChangedOnDiskException();
+        }
+
+        Write();
+    }
+
+    /// <summary>
+    /// Writes the vault to <see cref="Path"/>, discarding whatever else was written there.
+    /// </summary>
+    /// <remarks>
+    /// The escape hatch for a caller that has put the choice to a person and been told to proceed.
+    /// It exists so <see cref="Save"/> can refuse without leaving anyone stuck, and for no other
+    /// reason: a caller reaching for this to avoid handling the exception has turned an audible
+    /// data loss back into a silent one.
+    /// </remarks>
+    /// <exception cref="VaultException">The vault could not be written.</exception>
+    public void SaveOverwriting()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        Write();
+    }
+
+    private void Write()
+    {
         _interop.Save();
+        _stamp = Digest(Path);
+    }
+
+    /// <summary>
+    /// A digest of the file, or <see langword="null"/> when it could not be read.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The whole file rather than its modification time. Several filesystems round mtime to a
+    /// second or two, so a rewrite inside the same second would be missed — and a rewrite inside
+    /// the same second is the common case here, not the exotic one. A vault is kilobytes; hashing
+    /// it is not worth optimising around.
+    /// </para>
+    /// <para>
+    /// <b>A file that cannot be read is not a conflict, and treating it as one was a bug.</b> "This
+    /// changed underneath you" is a claim about a file that exists and now holds something else. A
+    /// file that is missing, locked, or on a directory that momentarily went away is a write
+    /// problem, and the save path already has a retry and an error message naming what the
+    /// operating system said — both of which the first version of this method skipped straight
+    /// past, breaking the transient-failure absorption D-0017 exists for.
+    /// </para>
+    /// <para>
+    /// The cost, stated rather than discovered: on Windows a file another process holds open for
+    /// writing cannot be read, so a save racing a concurrent writer that narrowly is not detected.
+    /// The replace then fails and is retried, so this is loud rather than silent — and it is the
+    /// sub-second window <see cref="HasFileChangedSinceOpen"/> already says it does not close.
+    /// </para>
+    /// </remarks>
+    private static byte[]? Digest(string path)
+    {
+        try
+        {
+            return SHA256.HashData(File.ReadAllBytes(path));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            return null;
+        }
     }
 
     /// <summary>
