@@ -2789,6 +2789,50 @@ agree.
 
 ---
 
+## D-0051 - The documentation is a system with a termination condition, not a pile
+
+**Date:** 2026-07-28 · **Stage:** doc-system · **Status:** accepted · Related: D-0036, D-0043
+
+**The problem is that documents describing *what is* grow without bound.** Every addition is
+describable, nothing is ever subtractive, and a roadmap accumulates stages faster than it retires
+them. This repository had the symptom: a step map whose last three stages were gated on benchmarks
+tracked outside the repository, a prompt library whose 4.1 entry still specified **Tauri** with its
+box ticked, and a parking lot that could not say whether an idea had been rejected or forgotten.
+
+**The fix is an admission rule.** A step may be added to `docs/STEPS.md` only if it has an accept
+criterion that can *fail*, names its verifier, and traces to a claim in `docs/PRODUCT.md`. Anything
+failing one of those is a `docs/IDEAS.md` row. That is the termination condition, and applying it
+cost three stages: sharing, the delegation dashboard and teams are now ledger rows, because none of
+them can name something that would prove them done.
+
+**Open steps declare three lanes, and the split is the highest-value part.** Build is the
+agent-runnable prompt. Owner is what only a human can do. Verify is the id of an independent check.
+Separating them surfaced an Owner Queue of twelve items — registering the org, deciding whether the
+repository goes public, recording the GIF, choosing DCO or CLA, signing the binaries — and the
+launch is blocked on those, not on engineering. That was true before and was not visible anywhere.
+
+**Verification runs cold.** A verifier gets `docs/verification.md` and the repository, never the
+Build lane and never the builder's transcript, because shared context is how a build and its check
+agree with each other while both are wrong. Every verifier carries a falsifier — the specific thing
+to try that would prove the step is *not* done — and it is run first.
+
+**The enforcer is `scripts/verify-docs.sh`**, in `docs.yml`, which runs bash only and needs no
+restore. It holds the lane structure, the two-way agreement between steps and verifiers, the
+presence of a falsifier, the append-only ledger, and the absence of the five pinned pages from
+`ci.yml`'s `paths-ignore` — an assertion about negative space that previously lived in a comment and
+would have failed open. All seven assertions were watched to fail before the green was trusted
+(D-0043). What it cannot check is whether a falsifier can actually fire; that is `[process]` and it
+says so rather than implying a coverage it does not have.
+
+**What was deliberately not done.** No retired-claims tables and no `docs/archive/`. Superseded
+text is rewritten to say what is true now and the old wording is deleted, because git already holds
+it and a was/now narrative in the file is the failure mode this system exists to prevent. That is a
+departure from the source spec, which retires claims in place; it is the right trade here because
+this repository has one author and a complete history, so the evidence a claim was caught is a
+`git log`, not a table that grows forever.
+
+---
+
 # Open decisions
 
 ## O-0015 - Bundling and signing a desktop app, when the official bundler is a paid product
