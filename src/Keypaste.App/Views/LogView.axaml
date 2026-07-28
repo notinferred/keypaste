@@ -1,0 +1,86 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Keypaste.App.ViewModels"
+             x:Class="Keypaste.App.Views.LogView"
+             x:DataType="vm:LogViewModel"
+             Background="{DynamicResource KpSurface0}">
+
+  <!-- The log, exactly as `keypaste log` prints it, in a monospace block a person can select and
+       copy out of. Not a DataGrid: the sentence this screen says is written once, in the core
+       (D-0032), and a re-drawn table would be both a second copy of it and the dense tree-table
+       ideas.md names as the thing this app is not. -->
+
+  <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="{DynamicResource KpCardPadding}">
+
+    <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,16">
+      <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+        <TextBlock Text="Activity"
+                   FontSize="22"
+                   Foreground="{DynamicResource KpTextPrimary}" />
+        <TextBlock Text="{Binding Path}"
+                   FontFamily="{DynamicResource KpMono}"
+                   FontSize="11"
+                   TextTrimming="CharacterEllipsis"
+                   Foreground="{DynamicResource KpTextMuted}" />
+      </StackPanel>
+
+      <Button Grid.Column="1"
+              Content="Verify chain"
+              Margin="0,0,8,0"
+              VerticalAlignment="Center"
+              Command="{Binding VerifyCommand}" />
+
+      <Button Grid.Column="2"
+              Content="Refresh"
+              VerticalAlignment="Center"
+              Command="{Binding RefreshCommand}" />
+    </Grid>
+
+    <!-- One sentence, in the same colour as every other sentence in this app. A log that has never
+         been written to is normal, and a broken chain is grave — but neither is served by red. -->
+    <TextBlock Grid.Row="1"
+               Text="{Binding Message}"
+               IsVisible="{Binding HasMessage}"
+               TextWrapping="Wrap"
+               Margin="0,0,0,16"
+               FontSize="13"
+               Foreground="{DynamicResource KpTextSecondary}" />
+
+    <Border Grid.Row="2"
+            IsVisible="{Binding HasLines}"
+            Background="{DynamicResource KpSurface1}"
+            BorderBrush="{DynamicResource KpBorderSubtle}"
+            BorderThickness="1"
+            CornerRadius="{DynamicResource KpRadiusMd}">
+
+      <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                    VerticalScrollBarVisibility="Auto"
+                    Padding="16">
+        <SelectableTextBlock Text="{Binding Text}"
+                             FontFamily="{DynamicResource KpMono}"
+                             FontSize="12"
+                             Foreground="{DynamicResource KpTextPrimary}" />
+      </ScrollViewer>
+    </Border>
+
+    <Border Grid.Row="3"
+            IsVisible="{Binding VerdictShown}"
+            Margin="0,16,0,0"
+            Background="{DynamicResource KpSurface2}"
+            BorderBrush="{DynamicResource KpBorderSubtle}"
+            BorderThickness="1"
+            CornerRadius="{DynamicResource KpRadiusMd}">
+
+      <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                    MaxHeight="220"
+                    Padding="16">
+        <SelectableTextBlock Text="{Binding VerdictText}"
+                             FontFamily="{DynamicResource KpMono}"
+                             FontSize="12"
+                             Foreground="{DynamicResource KpTextSecondary}" />
+      </ScrollViewer>
+    </Border>
+
+  </Grid>
+
+</UserControl>
