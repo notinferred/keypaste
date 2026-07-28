@@ -4,11 +4,12 @@
         Title="keypaste"
         Width="1000" Height="680"
         MinWidth="720" MinHeight="520"
+        Background="{DynamicResource KpSurface0}"
         WindowStartupLocation="CenterScreen">
 
-  <!-- One window for the app's whole life. Unlock and the shell are two content states of this
-       window, not two windows: re-creating a window on lock loses its position and monitor, steals
-       focus on macOS, and would mean two of every key binding and idle observer. -->
+  <!-- One window for the app's whole life. Unlock and the shell are two content states of it, not
+       two windows: re-creating a window on lock loses its position and monitor, steals focus on
+       macOS, and would mean two of every key binding and idle observer. -->
 
   <ContentControl Name="Root" />
 
