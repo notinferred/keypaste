@@ -10,7 +10,7 @@
 
 **Date:** 2026-07-25 · **Stage:** 0.1 · **Status:** accepted
 
-`docs/STEPS.md` and `prompts.md` name the packages `keypaste-core`, `keypaste-cli`, `keypaste-mcp`. C#
+`docs/STEPS.md` and the build prompt name the packages `keypaste-core`, `keypaste-cli`, `keypaste-mcp`. C#
 namespaces cannot contain hyphens, and a `keypaste-core.csproj` yields the root namespace
 `keypaste_core`, which fights every analyzer naming rule forever.
 
@@ -559,7 +559,7 @@ differing only in case - in the file, or against the project - are refused befor
 rather than halfway through the write loop. The rejected alternative was `--overwrite`: a second
 flag that every script would set unconditionally is noise, and the plan already names the keys.
 
-**The word "shred" does not appear in the product, and there is no overwrite pass.** `prompts.md`
+**The word "shred" does not appear in the product, and there is no overwrite pass.** The build prompt
 asked for one; this corrects it in writing, the same way D-0014 corrected docs/STEPS.md. Overwriting a
 file before deleting it does not destroy data on SSDs (the flash translation layer has already
 remapped the block), on copy-on-write filesystems (APFS, btrfs, ZFS, ReFS), on any volume with
@@ -812,7 +812,7 @@ more later than the line it saved.
 a `.env` file. It is the first and only command in the product that puts plaintext on disk.
 
 **It is spelled `env export`, not `export`.** `docs/STEPS.md` said the latter; this corrects it in
-writing, the way D-0014 corrected docs/STEPS.md and D-0015 corrected prompts.md. The thing being exported
+writing, the way D-0014 corrected docs/STEPS.md and D-0015 corrected the build prompt. The thing being exported
 is an env set, and a bare `keypaste export` would promise a whole-vault export that does not exist
 and is not planned.
 
@@ -919,7 +919,7 @@ where the setter throws and there is no equivalent - stated in SECURITY.md rathe
 A `.git` ancestor is pointed out but does **not** refuse: a `.env` in a gitignored repo root is the
 normal case, and refusing it would train people to reach for `--force`.
 
-`--yes` is allowed, on the same rule as `rm` and `env pull`. prompts.md asked for "an explicit
+`--yes` is allowed, on the same rule as `rm` and `env pull`. The build prompt asked for "an explicit
 interactive confirmation", which read strictly forbids the flag; that was rejected because
 `env export --stdout > .env` defeats it in five characters, and SECURITY.md's own standard is that a
 control which only looks like a control is worse than none. `--stdout` is exempt from the
@@ -1032,7 +1032,7 @@ assumption is worse than none:
 ### The tools are still hand-written, for the reason that survived
 
 The delegate path generates a tool schema from the C# signature. Measured against the four arguments
-prompts.md specifies, it drops `additionalProperties`, the `field` enum, the length bounds on
+the build prompt specifies, it drops `additionalProperties`, the `field` enum, the length bounds on
 `reason` and the range on `ttl_seconds`; it leaves `Annotations` **null**, so none of the four
 behaviour hints are set and the spec's defaults - `destructive` and `openWorld` both true - apply;
 and it renames `ttl_seconds` to `ttlSeconds`, because that is what the parameter was called.
@@ -1231,7 +1231,7 @@ and the same answer.
 "complete, thoroughly tested, and unreachable in the shipped binary" is on the live path now, because
 the approver has an unlocked vault to list from.
 
-**Stage 4.3 becomes a re-skin.** prompts.md describes an Agent Activity screen with Approve/Deny
+**Stage 4.3 becomes a re-skin.** The build prompt describes an Agent Activity screen with Approve/Deny
 buttons "replacing the OS dialog when the app is open". That is another `IApprovalChannel`, not a
 rewrite - and the seam it needs is the seam this stage had to cut anyway.
 
@@ -1303,7 +1303,7 @@ message would put a live credential somewhere it can never be taken back from.
 
 **Date:** 2026-07-26 · **Stage:** 2.2 · **Status:** accepted
 
-prompts.md 2.2 says "60-second timeout is deny". Shipping that would have been wrong, and the reason
+The 2.2 build prompt says "60-second timeout is deny". Shipping that would have been wrong, and the reason
 is measurable rather than aesthetic.
 
 **60 seconds is the MCP client's own request timeout.** The reference SDK's
@@ -1491,7 +1491,7 @@ pattern safe to print by construction.
 D-0021 fixed the matching domain in 2.1 specifically so the policy file would not invent a second
 one, and a rule constructs an `EntryExposure` rather than reimplementing its algorithm. That is
 inherited correctness, and it comes with an inherited surprise: unless a pattern's last segment is
-exactly `**`, the last segment is the **title**. `env/dev*` - the example prompts.md itself suggests
+exactly `**`, the last segment is the **title**. `env/dev*` - the example the build prompt itself suggests
 - means *group exactly `env`, title starting `dev`*. It matches nothing under `env/dev/`, and it does
 match an entry sitting directly in `env` called `devops_ROOT_TOKEN`.
 
@@ -1596,7 +1596,7 @@ listable that the exposure excludes nor hide one.
 
 **Date:** 2026-07-26 · **Stage:** 2.3 · **Status:** accepted
 
-prompts.md describes rules of the form "allow client `claude-code` to read ...". Taken literally that
+The build prompt describes rules of the form "allow client `claude-code` to read ...". Taken literally that
 keys authorization on `CredentialRequest.ClientName`, which THREATS.md T-3 says outright is
 unauthenticated: any process that can spawn the binary can call itself `claude-code`. T-3 also left
 2.3 a written instruction - key on something supplied out of band, or say plainly that client-scoped
@@ -1948,7 +1948,7 @@ binaries from. Stage 3's release pipeline owns it.
 **Date:** 2026-07-27 · **Stage:** 3.1 · **Status:** accepted
 
 `README.md` and `site/public/index.html` were rewritten as a front page rather than a manual, and
-the interesting part is not the layout. Three of the things prompts.md 3.1 asks for could not be
+the interesting part is not the layout. Three of the things the 3.1 build prompt asks for could not be
 written honestly as asked, and each was resolved by narrowing the claim rather than by softening
 the wording.
 
@@ -2164,7 +2164,7 @@ integration wizard hands it.
 
 **Date:** 2026-07-27 · **Stage:** 3.2 · **Status:** accepted
 
-prompts.md 3.2 and docs/STEPS.md both asked for an essay called "Your password manager can't talk to AI".
+The 3.2 build prompt and docs/STEPS.md both asked for an essay called "Your password manager can't talk to AI".
 It is `docs/keepass-and-agents.md`, and it is called "Your **KeePass vault** can't talk to AI - and
 everyone is pasting secrets into chats instead" instead.
 
@@ -2455,9 +2455,9 @@ would make the question disappear for most macOS users.
 
 **Date:** 2026-07-28 · **Stage:** 4.1 · **Status:** accepted
 
-This repository named two different desktop shells and never wrote a record for either. `docs/STEPS.md`
-line 11, in the checked LOCKED block, said *"Desktop shell via **Photino.NET** … with Electron as
-fallback if Photino friction appears."* `docs/STEPS.md` line 60 and prompts.md 4.1 said **Tauri**. Nothing
+This repository named two different desktop shells and never wrote a record for either. `docs/STEPS.md`,
+in the checked LOCKED block, said *"Desktop shell via **Photino.NET** … with Electron as
+fallback if Photino friction appears."* Its Stage 4 line and the 4.1 build prompt said **Tauri**. Nothing
 in this file mentioned any of them. Stage 4.1 could not start without settling it, so it is settled
 here, with the evidence, because a record that says only "we chose Avalonia" cannot stop somebody
 proposing Photino again next year.
@@ -2571,8 +2571,8 @@ rather than promised in a comment.
 at startup and a name already held is a startup failure, so if the app bound it too, whichever
 started second would lose — and the loser would be a *silent* loss of the approval path. Stage 4.3
 owns that hand-off; 4.1 probes and says one true sentence. It sets no `PublishAot`, ships no release
-artifact, changes no line of `release.yml`, and does not adopt `design.html` — which DESIGN.md still
-marks "proposed, not accepted" and whose sign-in-first premise inverts docs/PRODUCT.md §4.1.
+artifact, changes no line of `release.yml`, and does not adopt the design exploration, which was
+never accepted and whose sign-in-first premise inverts docs/PRODUCT.md §4.1.
 
 ---
 
