@@ -20,6 +20,7 @@ internal static class EnvSetCommand
     private static readonly OptionSpec[] _options =
     [
         new("vault", TakesValue: true),
+        .. GenerateOption.Specs,
     ];
 
     internal static int Execute(string[] args, CliContext context)
@@ -33,7 +34,14 @@ internal static class EnvSetCommand
         if (line.WantsHelp)
         {
             context.Stdout.WriteLine("usage: keypaste env set <project> <KEY>[=value]");
+            context.Stdout.WriteLine($"       {GenerateOption.Usage}");
             return CliApp.ExitSuccess;
+        }
+
+        if (!GenerateOption.TryRead(line, out var recipe, out var recipeError))
+        {
+            context.Stderr.WriteLine($"keypaste env set: {recipeError}");
+            return CliApp.ExitUsageError;
         }
 
         if (line.Operands.Count != 2)
@@ -53,6 +61,13 @@ internal static class EnvSetCommand
         if (key.Length == 0)
         {
             context.Stderr.WriteLine("keypaste env set: the variable name cannot be empty");
+            return CliApp.ExitUsageError;
+        }
+
+        if (recipe is not null && inlineValue is not null)
+        {
+            context.Stderr.WriteLine(
+                "keypaste env set: give a value or --generate, not both");
             return CliApp.ExitUsageError;
         }
 
@@ -77,7 +92,10 @@ internal static class EnvSetCommand
             {
                 // Prompted inside the session so the piped protocol stays one line per prompt, in
                 // the order they are asked: master password first, then the value.
-                using var secret = context.Prompt.ReadSecret($"Value for {key}: ");
+                using var secret = recipe is { } wanted
+                    ? GenerateOption.Generate(wanted)
+                    : context.Prompt.ReadSecret($"Value for {key}: ");
+
                 if (secret is null)
                 {
                     context.Stderr.WriteLine("keypaste env set: no value given");
@@ -99,9 +117,13 @@ internal static class EnvSetCommand
             vault.Save();
 
             var entryPath = EnvConvention.EntryPath(project, key);
+            var generated = recipe is { } used
+                ? $" ({used.Length}-character value generated)"
+                : string.Empty;
+
             context.Stderr.WriteLine(outcome == EnvSetOutcome.Created
-                ? $"Set {entryPath}"
-                : $"Updated {entryPath} (previous value kept in entry history)");
+                ? $"Set {entryPath}{generated}"
+                : $"Updated {entryPath} (previous value kept in entry history){generated}");
 
             return CliApp.ExitSuccess;
         });
