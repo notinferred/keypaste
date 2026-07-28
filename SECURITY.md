@@ -136,6 +136,50 @@ What remains, measured rather than assumed:
 - Anything below the toolkit — the OS keyboard layer, the input method, a keylogger — is outside
   this boundary and always was.
 
+### Values the desktop app shows, and values it copies
+
+The app puts vault contents on screen. Which contents, and when, is a decision rather than an
+accident, and it is held by a test rather than by this paragraph.
+
+- **An entry list shows titles and groups.** Not usernames, not URLs — that is what `keypaste ls`
+  prints, and a list is read over shoulders and photographed for marketing.
+- **Selecting an entry shows its username, URL and notes.** One entry, chosen by you.
+- **A password is never shown, anywhere, in any state.** The Copy button reads it out of the open
+  vault at the moment you press it and hands it to the clipboard; it does not become anything the
+  window can draw. To read one, use `keypaste get --show`.
+- **An environment value can be revealed by holding it**, one at a time, for as long as you hold it.
+  Comparing a stored value against a `.env` file is a real task, and a product that could only copy
+  would push people into pasting secrets into a text editor to read them. The control that draws it
+  is not a `TextBlock` — a `TextBlock` publishes its text to the accessibility layer as the element's
+  name, which is the same read path as a `TextBox`'s value with a different label on it. What it
+  cannot defend against is your screen: a screenshot, a recording, a shared call, a remote-desktop
+  session, or somebody behind you.
+
+**Copying, and clearing.** A copied secret is taken back off the clipboard after twenty seconds, and
+only if the clipboard still holds it — something you copied since is left alone. It is also cleared
+the moment the vault locks, and before the app exits when you quit it. None of that survives the app
+being killed: `kill -9`, End Task, an out-of-memory kill, a power cut and a logout all leave the
+value where it is, because nothing is left running to take it away.
+
+**On Windows, the app does something `keypaste get` cannot.** Clipboard History (Win+V) and Cloud
+Clipboard keep a copy that clearing does not remove. A program that owns a window can mark an item to
+be skipped by both, and the app does; `clip.exe`, which the CLI uses, has no way to say it. So a
+password copied from the app stays out of Windows' own clipboard history and one copied by
+`keypaste get` does not. Neither can do anything about a third-party clipboard manager, which decides
+for itself, or about RDP and Citrix redirection, which hand the value to another machine.
+
+### Editing your vault from the app
+
+A vault the app writes is a vault the CLI wrote: the same code, in the same library, producing the
+same format. The KeePassXC compatibility gate that covers one covers the other, and a test asserts
+the app has no other route to a vault file so that stays true.
+
+**If something else changes the file while the app has it open, the app refuses to save.** It holds
+your vault in memory for as long as it is unlocked, and writing it back would revert anything a
+terminal or KeePassXC wrote in the meantime — with no history entry, because the change was never in
+the app's copy. You are told, and nothing is written. Lock and unlock to pick up the other change,
+then make yours again.
+
 ## What keypaste does NOT protect against
 
 Stated plainly, because a security tool that overclaims is worse than one that is modest.

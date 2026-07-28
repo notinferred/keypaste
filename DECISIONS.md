@@ -2576,6 +2576,222 @@ marks "proposed, not accepted" and whose sign-in-first premise inverts CORE.md �
 
 ---
 
+## D-0045 - What a screen may show, decided because a test made somebody decide
+
+**Date:** 2026-07-28 · **Stage:** 4.2 · **Status:** accepted · Related: D-0044, D-0011, D-0014
+
+4.1's `SecretHygieneTests` claimed that no destination surfaced anything from inside the vault, and
+said in as many words that the day 4.2 put an entry list on screen it would fail and whoever wrote
+that list would have to decide what belonged there. It failed. This is the decision.
+
+**A list row carries a title and a group, and no field value.** That is what `keypaste ls` prints. A
+username column was considered and rejected: it is a disclosure surface no CLI verb has, it is
+readable over a shoulder, and `ideas.md`'s screenshot strategy puts this screen in marketing images —
+which is the thing T-24 already worries about for vault paths. **The detail pane widens to username,
+URL and notes for the one entry a person selected**, which is `keypaste get`'s scope minus the
+password. **A password appears nowhere, in any state, including after Copy**: the copy command reads
+it out of the open vault at the moment of the press and hands it to the clipboard, so it is never a
+property, never a binding, and never in the visual tree.
+
+**The blanket claim was not given an allow-set, because that would have retired the test rather than
+narrowed it.** Four of five sentinels would have moved into an allowed column, and the survivor never
+reaches a view model anyway — leaving a gate that passes for an implementation with no list, no
+detail pane and no copy button. It is replaced by four two-sided claims and one new total invariant:
+**after a lock, every surface built while unlocked holds no sentinel of any kind, including the ones
+it was allowed to show a moment earlier.** Two details make that worth something. The sweep holds a
+direct reference captured before the lock, because `Dispose` nulls `Content` and a sweep starting at
+the shell finds an empty graph and passes for an object that is still alive. And it counts properties
+that *refuse* to answer, because a view model reading lazily through a disposed vault throws from
+every getter and sweeps perfectly clean — "found nothing" and "asked nothing" have to be told apart.
+
+**Writing that invariant found a real defect immediately.** `EntryDetailViewModel` went on holding a
+username, a URL and a notes field after the vault that produced them was gone, and could be reached
+by an in-flight continuation long after the shell stopped pointing at it. It is now disposed on
+every selection change and on the lock. A `string` cannot be wiped, so the characters may survive in
+the heap until a collection — T-18's territory, unchanged; what this buys is that no live object
+exposes them, which is exactly what the test asserts.
+
+**The env pane reveals and the entry pane does not, and the asymmetry is deliberate.** An environment
+value gets compared by eye against a `.env` file or a provider's dashboard, so reading it is the
+task. An entry password gets pasted into a login form, so copying it is the task, and `keypaste get
+--show` exists for the times it genuinely has to be read. Adding a reveal to the entry pane later
+means widening the gate's allow-set, which is where that argument belongs.
+
+**The list also shows environment variables, and that is correct.** A variable is an ordinary entry
+under `env/<project>` (D-0014), so `keypaste ls` lists it and so does this. The two screens differ in
+what they do with such an entry, not in whether they can see it.
+
+## D-0046 - The clipboard rule is shared, the transport is not
+
+**Date:** 2026-07-28 · **Stage:** 4.2 · **Status:** accepted · Related: D-0011, O-0008
+
+D-0011 built the clipboard for a CLI and left `IClipboardClearStrategy` as the seam a detached
+implementation would drop into. **That seam held for the policy and not for the shape**, which is a
+more useful thing to record than pretending it held for both: its signature is a blocking call
+taking a `TextWriter`, and a GUI can neither block its UI thread for twenty seconds nor write status
+to a console.
+
+So the **rule** moved to `Keypaste.Core.Clipboard.ClipboardClear.Should` — one function, two callers,
+carrying the whole of D-0011's logic including the fail-closed branch where a read-back that failed
+clears anyway (CORE.md §3.7). It had no test of its own while it lived inside the CLI's blocking
+strategy; it has one now, because it is on two front ends' secret paths and law 4.5 is not optional.
+
+The **transports stay apart, and the app's is the windowing system's rather than a subprocess.** The
+reason is specific and it is the one thing the app can do that the CLI cannot: a data object can
+carry `ExcludeClipboardContentFromMonitorProcessing`, `CanIncludeInClipboardHistory` and
+`CanUploadToCloudClipboard`, which is how a clipboard owner opts out of Windows Clipboard History and
+Cloud Clipboard. `clip.exe` has no way to express them. All three go on in one `SetDataAsync`,
+because the history service acts on the notification raised when the clipboard closes and a second
+pass arrives after the copy has been recorded. **This closes O-0008 for the desktop app and leaves it
+open for the CLI.** It does not touch third-party clipboard managers, which decide independently, or
+RDP and Citrix redirection, which hand the value to another machine.
+
+The cost, stated rather than smoothed over: Avalonia's clipboard has `TryGetTextAsync`, which is
+exactly the member D-0011 refused to declare on `IClipboard`. The equality guard needs a read-back
+and there is no ownership API to use instead, so the call is made in one file, hashed at once, the
+reference dropped — and a test greps the app's sources and fails if it appears anywhere else.
+
+**Two things the app promises that the CLI cannot.** Locking clears the clipboard immediately,
+because a secret on it is derived from an open vault and `ShellViewModel`'s rule is that nothing
+derived from an open vault survives a lock. And an orderly quit clears before the process exits. Both
+are conditional, so a clipboard the user has changed since is left alone. Neither survives `kill -9`,
+End Task, an OOM kill, a power cut or a logout, and THREATS.md T-19 says so.
+
+**The countdown asks the clock rather than counting down.** Subtracting a second per tick makes the
+deadline a function of how many callbacks ran, so a busy UI thread or a suspended machine buys the
+secret more time. It consults both clocks and takes whichever elapsed more — the rule
+`AppVaultSession` already uses, inverted: whichever says more time has passed is the one that clears
+sooner, and sooner is the safe direction for a secret.
+
+## D-0047 - The masked value cell answers a threat T-22 only half described
+
+**Date:** 2026-07-28 · **Stage:** 4.2 · **Status:** accepted · Related: D-0044, T-22
+
+`MaskedInput`'s answer to T-22 is that it holds no password at all, so there is nothing for a peer to
+return. That answer is unavailable to reveal-on-hold, where putting the characters on screen is the
+feature. The claim is narrower and checkable instead: the value exists in the control only between a
+press and its release, it is drawn rather than handed to a control that publishes text, and no
+accessibility path returns it.
+
+**`TextBlock` was ruled out, and not for the reason `TextBox` was.** Avalonia 12.1.0 ships
+`TextBlockAutomationPeer`, whose name comes from the control's text — so a `TextBlock` publishes a
+secret over AT-SPI as the automation *name* rather than through a value pattern. That is a different
+property on the same bus, and **T-22's original wording, which reasons entirely about
+`IValueProvider`, does not cover it.** T-22 has been amended. `SelectableTextBlock` is worse again: it
+adds a selection and a clipboard path nobody asked for.
+
+`RevealedValue` is therefore a `Control` that renders itself, holding the value in a **private field
+rather than a `StyledProperty`** — a styled property is readable through `GetValue`, bindable,
+visible to a diagnostics overlay, and retained for the control's lifetime rather than the hold's. Its
+peer is `NoneAutomationPeer`, which is stronger than `MaskedInput`'s `ControlAutomationPeer` and
+correctly so: the button beside the cell carries the name, and it names the variable rather than what
+the variable holds. The tests assert the peer's properties **while the value is displayed**, because
+checking them at rest is the version every implementation passes.
+
+**The honest limit.** Drawing text needs a `FormattedText`, which takes a `string`, so for the length
+of the hold the value exists as a string the runtime will not let anyone wipe — the same limit
+`MaskedInput` records for keystrokes, T-18 unchanged. A screenshot, a screen recording, a
+remote-desktop session and a shoulder all still see it. SECURITY.md says so.
+
+## D-0048 - A save that would revert somebody else's write is refused
+
+**Date:** 2026-07-28 · **Stage:** 4.2 · **Status:** accepted · Related: D-0017, D-0014, O-0018
+
+4.1's app never wrote. 4.2's does, and it holds a vault for up to eight hours
+(`AppVaultSession.MaximumIdleTimeout`) while `Vault.Save()` writes the whole in-memory tree back. A
+`keypaste env set` from a terminal inside that window was silently reverted — **with no history item,
+because the entry it carried never existed in the saving process's tree for KeePass to snapshot.** Not
+in KeePassXC's History tab. Not anywhere. And the user is doing the thing `docs/desktop.md` describes
+as normal: alt-tabbing to a terminal.
+
+CORE.md §3.7 is fail-closed. Silent data loss with a paragraph in SECURITY.md is fail-quiet, and the
+guard is small: `Vault` digests the file at open and after every save, re-checks before writing, and
+throws `VaultChangedOnDiskException` having written nothing. `SaveOverwriting` exists so a caller who
+has put the choice to a person is not stuck.
+
+**The digest is the whole file, not the modification time.** Several filesystems round mtime to a
+second or two, and a rewrite inside the same second is the common case here rather than the exotic
+one. A vault is kilobytes.
+
+**A file that cannot be read is not a conflict, and the first version of this getting that wrong is
+worth recording.** Treating an absent or locked file as "changed" pre-empted the retry D-0017 exists
+for — the one that absorbs Windows Defender holding a newly written file — and broke four tests that
+had been written precisely to stop that. "This changed underneath you" is a claim about a file that
+exists and now holds something else; anything else is a write problem, and the save path already has
+a retry and an error naming what the operating system said. The residual: on Windows a file another
+process holds open cannot be read, so a save racing a concurrent writer that narrowly is not
+detected. The replace then fails and is retried, so it is loud rather than silent.
+
+**No `FileSystemWatcher`, anywhere.** It is racy, unreliable on network shares and inconsistent on
+macOS, it puts a background thread and a callback near a process holding an unlocked vault, and the
+reload it would trigger discards the user's in-progress edit — trading a silent loss of somebody
+else's write for a silent loss of your own.
+
+**No `--force` on any verb.** A CLI command opens, edits and saves in milliseconds, so it reaches the
+exception only in a genuine race, and re-running is the whole recovery. An override flag on five
+commands would buy nothing and would be reached for.
+
+## D-0049 - The two front ends get one test project, and it is in neither solution
+
+**Date:** 2026-07-28 · **Stage:** 4.2 · **Status:** accepted · Related: D-0040, D-0042, D-0044
+
+4.2's prompt asks for a test that a GUI edit is visible to the CLI immediately. Reopening with
+`Vault.Open` cannot hold that claim: core is the shared path, so a round trip through it proves
+persistence and *assumes* agreement. The mutation that matters is a GUI writing environment variables
+under `envs/<project>/` — it round-trips through `Vault.Open` perfectly and only `keypaste env ls`
+comes back empty. So the test has to ask the CLI.
+
+The obvious move was adding `Keypaste.Cli` to `keypaste.app.slnx`. **Measured before doing it: that
+takes the app solution's restore from 2091 MB to 2580 MB**, because `Keypaste.Cli` sets `PublishAot`
+over four `RuntimeIdentifiers` and both are restore-time inputs (D-0040), so any restore that can see
+it pulls four RID-specific ILCompiler packs whether or not anything is published. `app.yml`'s header
+publishes a cost table promising that a `Keypaste.Core` push pays "the gate job only, one OS, a few
+minutes"; 490 MB of AOT compiler on every such push would have made that table untrue, and CLAUDE.md
+says to ask what a workflow costs on every push before adding it.
+
+`PublishAot` cannot be scoped to one solution — it is recorded in `packages.lock.json` and a restore
+resolving a different set fails `--locked-mode`. The clean fix is splitting the CLI into a library and
+a thin AOT host, which moves `artifacts/bin/Keypaste.Cli/release/keypaste`, a path nine
+`scripts/verify-*.sh` gates, `ci.yml` and `release.yml` all hard-code. Worth doing one day; not worth
+doing inside 4.2.
+
+So `tests/Keypaste.Consistency.Tests` references both front ends, sits in neither solution, and
+`app.yml` restores, formats, builds and runs it in steps guarded by the same `app-changed` check the
+packaging job uses. A `Keypaste.Core` push pays nothing for it. An `App` or `Cli` push pays, which is
+proportionate, because the thing under test is what changed. The CLI harness is **compiled in** rather
+than copied, because two copies of a hundred lines of fakes would drift the first time a seam moved,
+and the point of the project is that two things agree.
+
+## D-0050 - The KeePassXC gate covers the app's writes, and that is checked rather than asserted
+
+**Date:** 2026-07-28 · **Stage:** 4.2 · **Status:** accepted · Related: D-0005, D-0036
+
+CORE.md §4.6 says any KDBX keypaste writes must open in KeePassXC, tested in CI against real
+KeePassXC. That gate lives in `ci.yml` and drives the CLI. 4.2 makes the app a writer, so it needs
+either a gate of its own or an argument.
+
+**The argument.** Every mutation the app can perform goes through `Vault.AddEntry`, `UpdateEntry`,
+`RemoveEntry`, `EnvStore.TrySet` or `EnvStore.Remove`, and every write through `Vault.Save()` into
+the same vendored KeePassLib with the same `KdbxFormat` parameters — the identical set of calls the
+CLI makes. An inline edit calls `UpdateEntry`, whose `<History>` element is exactly what section A of
+`scripts/verify-keepassxc-writeback.sh` already opens in KeePassXC.
+
+**"No new gate is needed" is itself a claim, and D-0036's standard applies to it too.**
+`TheAppSharesTheWriterTests` holds it: one test greps `src/Keypaste.App` for `KeePassLib`,
+`File.WriteAllBytes`, `File.Create`, `new FileStream`, `File.Copy` and `File.Move`, and one asserts
+the app's `ProjectReference` set is exactly `{Keypaste.Core}`. **The expiry condition, stated so it
+can be checked: the day the app writes a KDBX by any route other than `Vault.Save()`, `app.yml` needs
+a KeePassXC job.** A decision without a named expiry is an assumption.
+
+The narrower risk is shapes rather than bytes: the compat fixture's shape is the CLI's, so if the GUI
+could create entries the CLI has no verb to produce, the gate would never have seen them. The answer
+is not to add fixture rows but to not widen what can be written — the GUI validates with
+`EntryNameSanitizer` and `EnvConvention`, the same functions the CLI calls, and
+`GuiEditIsVisibleToTheCliTests` drives a table of names through both and requires every verdict to
+agree.
+
+---
+
 # Open decisions
 
 ## O-0015 - Bundling and signing a desktop app, when the official bundler is a paid product
@@ -2834,6 +3050,12 @@ weaker reason than when it was written.
 
 ## O-0008 — Windows clipboard history and cloud sync retain the secret
 
+> **Closed for the desktop app in 4.2 (D-0046); still open for the CLI.** The app sets all three
+> opt-out formats on one `SetDataAsync`, because it owns a window and Avalonia's clipboard takes a
+> data object. `clip.exe` still cannot express them, so `keypaste get` is unchanged and everything
+> below still describes it. Third-party clipboard managers and RDP redirection are unaffected on
+> both.
+
 Clearing the Windows clipboard does not remove the entry from clipboard history (Win+V) or from
 cloud clipboard sync, so a password keypaste copied outlives its twenty seconds on Windows and can
 outlive the machine. Windows provides opt-out clipboard formats —
@@ -3015,3 +3237,50 @@ history has already had one near-miss with private business notes.
 D-0042 removed the one argument that was pushing this decision for the wrong reason: CI cost. It is
 now a question about trust and about what is in the history, which is where it belongs. It must be
 answered before 3.3's launch posts go out, not before `v0.1.0` publishes.
+
+## O-0018 - Two writers, one KDBX, and no merge
+
+**Stage:** 4.2 · Related: D-0048, D-0014
+
+D-0048 makes a lost write loud. It does not make concurrent editing work. Two people, or one person
+and an agent, cannot both hold the file open and both save: the loser is told to reload and redo,
+and "redo" may be a long edit.
+
+The format is why. KDBX defines no locking and no merge. KeePassXC writes a `.lock` sidecar and
+warns; it does not resolve. A real answer is either advisory locking that keypaste and KeePassXC both
+honour — which needs KeePassXC to agree — or an entry-level three-way merge using the UUIDs and
+timestamps the format already carries, which is a feature rather than a guard and would need its own
+compatibility gate.
+
+Nothing is decided here because the guard covers the case that actually happens. The question becomes
+real when the app can write on somebody else's behalf, which is Stage 5's sharing work.
+
+## O-0019 - macOS could ask its pasteboard to conceal a secret, and does not yet
+
+**Stage:** 4.2 · Related: D-0046, O-0008
+
+`NSPasteboard` has an `org.nspasteboard.ConcealedType` convention that asks clipboard managers not to
+record an item — the macOS counterpart of the Windows exclusion formats D-0046 sets. Avalonia's
+clipboard can carry an arbitrary platform format, so expressing it is probably a few lines.
+
+It is not done because nothing here has been measured: unlike the Windows formats, which have a
+citation and a documented defect to test against (O-0008's KeePassXC trailing space), this is a
+convention that third-party managers opt into, and a format written on the strength of a blog post is
+the kind of thing that looks like a mitigation and is not. Worth doing with a macOS machine, a
+clipboard manager that honours it, and something to check afterwards.
+
+## O-0020 - Nothing automated has ever seen this app draw
+
+**Stage:** 4.2 · Related: D-0043, O-0015
+
+`app.yml` publishes on three operating systems and runs `--selftest`, which constructs no window and
+cannot: a runner has no display. So every claim in this stage about what is *on screen* — that the
+mask shows dots, that the countdown drains, that holding reveals and releasing conceals, that a paste
+after a quit comes back empty — rests on the manual checklist in `docs/desktop.md` rather than on a
+gate. The view models are tested exhaustively; the pixels are not tested at all.
+
+That is stated rather than implied by a green check, which is D-0043's rule. The options are a
+headless render test comparing images, which is brittle across platforms and font stacks; driving the
+published binary under a virtual display, which tests one of the three operating systems; or leaving
+it manual and honest. 4.2 leaves it manual. It should not stay that way through a release, because
+the checklist is only run by somebody who remembers it exists.

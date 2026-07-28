@@ -26,6 +26,10 @@ on:
       - 'LICENSE'
       - 'docs/mcp-setup.md'
       - 'docs/replace-dotenv.md'
+      # The desktop app's page. No gate in this workflow reads it — this workflow does not build the
+      # app at all — and app.yml, which does, has no documentation gate either. It was absent here by
+      # omission rather than by decision, so a docs-only change to it was paying for eight jobs.
+      - 'docs/desktop.md'
       - 'site/README.md'
       - 'site/public/thanks/**'
   # No paths filter on pull_request on purpose: a proposed change gets the full verdict regardless

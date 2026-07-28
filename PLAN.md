@@ -58,7 +58,7 @@
 ## Stage 4 — Modern GUI (Week 10–14)
 **Goal: the KeePass reskin — a vault UI that doesn't look like 2003.**
 - [x] Desktop app (Avalonia) over keypaste-core — **shell and unlock done in 4.1** (D-0044): open a vault by drag, picker or recent list; master password in a control that holds no password and whose automation peer exposes nothing; idle auto-lock on two clocks, defaulting to 5 minutes, that also locks a machine which slept through the timeout; a five-destination sidebar with `Ctrl/Cmd+1..5` and `Ctrl/Cmd+L`; light and dark following the OS. The Log view is real and renders `AuditText` verbatim, so it and `keypaste log` cannot drift (D-0032)
-- [ ] Entry browse/search and the env-set editor — **4.2**. Entries and Env Sets ship in 4.1 as empty states naming the CLI command that already does the job
+- [x] Entry browse/search and the env-set editor — **4.2** (D-0045..D-0050): a searchable entry list with a group tree, showing titles and groups and nothing else; a detail pane with copy buttons whose clipboard clears itself, inline edit, add with a generated password, delete behind a confirmation; env projects as cards carrying their `keypaste run <project> -- ` line, variables in a masked table with reveal-on-hold on a control that publishes nothing to the accessibility bus. Everything reads and writes through core, and a test project referencing both front ends proves the shipped CLI sees a GUI edit at once
 - [ ] The differentiating screen: **Agent Activity** — live feed of agent requests, approve/deny buttons, history (this is the delegation dashboard seed)
 - [ ] Approval prompts move from CLI to native windows/tray
 - [ ] Design language: modern, calm, trustworthy (see ideas.md → UI section for direction)
@@ -74,6 +74,24 @@ so `release.yml` is untouched and there is nothing on `dl.keypaste.com` to insta
 still has no idle lock of its own — 4.1's auto-lock is the app's, and `docs/approvals.md` says so.
 CHANGELOG.md is untouched on purpose: it is written for somebody deciding whether to upgrade, and
 there is nothing yet to upgrade to.
+
+**Where 4.2 left it.** The app now shows vault contents and writes to the file, and both firsts cost
+something the stage had to pay. 4.1's hygiene gate failed the moment an entry list existed, which is
+what it was built to do; what replaced it is four narrower two-sided claims and one total invariant —
+after a lock, nothing built while unlocked holds anything — and writing that invariant immediately
+found a detail pane that went on holding a username and notes after the vault was gone. Three things
+grew outside the app because the GUI could not have them otherwise and CORE.md law 4.2 forbids the
+GUI having them first: a **password generator** in the core with `--generate` on `keypaste add` and
+`keypaste env set`; the **clipboard clear rule** lifted into the core so one function decides for both
+front ends while the transports stay apart; and a **guard against lost writes**, because an app that
+holds a vault for eight hours and writes it back whole was silently reverting anything a terminal
+wrote in the meantime (D-0048). The CLI-visibility test the prompt asks for lives in
+`tests/Keypaste.Consistency.Tests`, which references both front ends and is in **neither solution** —
+putting `Keypaste.Cli` in the app solution was measured at +490 MB of restore and would have falsified
+`app.yml`'s own published cost table (D-0049). Still true from 4.1 and worth repeating: it is not the
+approver, it ships in no release, and it sets no `PublishAot`. **Nothing automated has ever seen this
+app draw** (O-0020) — the view models are tested exhaustively and the pixels are on a manual checklist
+in `docs/desktop.md`, which 4.2 extended from ten items to twenty-one.
 
 ## Stage 5 — Sharing & tiny teams (Month 4–5)
 **Goal: first monetizable surface, without violating local-first.**

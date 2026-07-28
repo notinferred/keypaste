@@ -889,9 +889,23 @@ path here that touches the clipboard.** An agent's request is answered over a pi
 carrying one field value, and nothing in `keypaste-mcp` or `keypaste agent` copies anything anywhere.
 The bridge is the one part of keypaste this threat does not reach.
 
-**Where it does apply.** `keypaste get`, which is a person's command and not an agent's. That path
-clears the clipboard after twenty seconds and only if it still holds what keypaste put there, so it
-never clobbers something you copied since.
+**Where it does apply.** `keypaste get`, which is a person's command and not an agent's, and — since
+4.2 — the desktop app's copy buttons. Both clear the clipboard after twenty seconds and only if it
+still holds what keypaste put there, so neither clobbers something you copied since; the deciding is
+one function in the core that both call (D-0046), so they cannot come to different conclusions.
+
+**What the app promises that the CLI cannot.** Locking the vault clears the clipboard at once, rather
+than at the deadline, because a secret on the clipboard is derived from an open vault and nothing
+derived from an open vault survives a lock. Quitting the app clears before the process exits. And on
+Windows the app sets the three opt-out formats that keep the value out of clipboard history and cloud
+clipboard, which `clip.exe` has no way to express — closing O-0008 for the app and leaving it open for
+the CLI.
+
+**What neither promises.** Nothing survives `kill -9`, End Task, an OOM kill, a power cut or a logout:
+there is no process left to do the clearing. Third-party clipboard managers decide independently of
+the Windows formats and mostly ignore them. RDP and Citrix redirection hand the value to another
+machine's history. Copying a project's `keypaste run <project> --` line is not a secret and is never
+cleared, deliberately.
 
 **Residual.** No clearing survives `kill -9`, a crash, or a power cut. On X11 and Wayland the
 clipboard is owner-served, so the value also lives in the `wl-copy` or `xclip` process that goes on
@@ -1013,6 +1027,13 @@ the operating system's accessibility service what that field contains, and is to
 **Why it is not theoretical.** This is a default, not an exotic attack. Avalonia's
 `TextBoxAutomationPeer.Value` returns `Owner.Text` with no exception for a field that is displaying
 dots, and `TextBox` does not override `OnCreateAutomationPeer` to suppress it.
+
+**Amended in 4.2: a value pattern is only half of it.** Avalonia 12.1.0 also ships
+`TextBlockAutomationPeer`, whose name comes from the control's text — so a `TextBlock` publishes what
+it draws over the same bus as the automation *name*, a different property that everything written
+below about `IValueProvider` does not cover. Anything that draws a secret has to answer both, and
+`AutomationProperties.Name="{Binding Value}"` in a template is a third route that compiles, renders
+identically and is invisible in review. See T-25.
 `Avalonia.FreeDesktop.AtSpi` is in the app's dependency closure and AT-SPI is a session-bus service
 that any process in your session can talk to. UI Automation on Windows is likewise process-external.
 An ordinary password field, built the ordinary way, would have published the master password to the
@@ -1072,6 +1093,39 @@ read `~/.keypaste` can read both. The app shows a vault's file name rather than 
 is a defence against a screenshot rather than against a reader — `ideas.md`'s screenshot strategy
 puts this app in marketing images, and a directory layout is not something to publish by accident.
 
+## T-25 — A value on screen, because somebody asked to see it
+
+**What.** The Env Sets screen shows an environment variable's characters while you hold the reveal
+control. For that moment the value is drawn on your display, and everything that can see your display
+can see it.
+
+**Why it exists at all.** Comparing a stored value against a `.env` file or a provider's dashboard is
+the job, and a product that can only copy makes people paste secrets into a text editor to read them —
+which is worse in every way. The entry detail pane deliberately has no equivalent, because pasting a
+password into a login form is the job there and `keypaste get --show` covers the rest (D-0045).
+
+**Bounded by.** It is on screen between a press and its release, and no longer: releasing, dragging
+off, losing pointer capture, the window losing the pointer, and the control leaving the visual tree
+all end it — the last of which is what a lock does, because the shell replaces its content rather
+than hiding it. **One value at a time**, enforced in the view model rather than in the control, so it
+is assertable without a display. The characters never enter a view model at all: the row reads them
+out of the open vault at the moment of the press and hands them to the control, which keeps them in a
+private field rather than a styled property.
+
+**And by the accessibility answer, which is the non-obvious half.** `RevealedValue` is not a
+`TextBlock` — see T-22's amendment — it is a control that renders text itself, and its automation
+peer is `NoneAutomationPeer`, which contributes nothing to the automation tree. The tests assert the
+peer's name, help text, item status and automation id carry no value **while the value is displayed**,
+and that the attached `AutomationProperties.Name` is unset, because checking any of that at rest is
+the version every implementation passes.
+
+**Residual, and it is not small.** A screenshot, a screen recording, a screen-sharing call, a
+remote-desktop session, an OS-level screenshot service, and a person behind you all see what your
+display shows. None of that is something a password manager can prevent, and the honest framing is
+that this is the same exposure as reading a password aloud: brief, deliberate, and yours to choose.
+Drawing text also needs a `string` the runtime will not let anyone wipe, so for the length of the
+hold the value exists in the process as an unwipeable copy — T-18's territory, unchanged.
+
 ---
 
 ## Change log
@@ -1084,3 +1138,4 @@ puts this app in marketing images, and a directory layout is not something to pu
 | 2.4 | The audit log gets a reader and a chain. **T-5 closed** — every record links to the one before it, `keypaste log verify` recomputes the file, and the three things the chain cannot do are named in T-5 and printed on every passing check rather than only on a failing one. T-12's divergence gained the reader it was promised: `keypaste log` marks a reuse served under a reason nobody read. **T-13's missing mitigation was deferred again, and says so** — showing which entries a rule matches today needs an open vault, and its home is the GUI's Agent Activity screen rather than a password prompt in front of a diagnostic command. New: T-18 (memory dumping), T-19 (clipboard scraping), T-20 (a stolen vault file), promoted out of the out-of-scope table into sections that give reasons instead of one line each. Decisions in D-0031 (the chain) and D-0032 (the reader). |
 | 3.4 | The release pipeline. New: **T-21** (the released binary is not the source you read), promoted to a section rather than an out-of-scope row because a launch turns downloading into the normal path. **T-9 amended twice**: its "twenty-eight reviewable lines" was no longer true and is withdrawn, and its "check it yourself" argument is explicitly scoped to readers who build rather than download. **T-3 gained a mitigation**: a tool call arriving before the initialize handshake is now denied (`not-initialized`) instead of answered for "an unnamed client", closing a law 3.3 gap where an access was recorded with no caller. No threat was closed. Decisions in D-0040 (vendored KeePassLib survives NativeAOT, proved by a published binary writing a vault real KeePassXC opens) and D-0041 (what a release is). Open: O-0010 (unsigned, un-notarized), O-0012 (not reproducible, no provenance). **T-21 amended** after the fact: `ci.yml` moved onto the same runner fleet as the release when GitHub-hosted billing stopped the jobs starting (D-0042), so tests and builds no longer come from two independent providers. Also open: **O-0014** — the repository is private while CORE.md law 3.8 calls auditable code the trust strategy, which makes the central launch claim unverifiable by the reader it is aimed at. |
 | 4.1 | The desktop app. New: **T-22** (the accessibility layer as a read path for a password field, and why the master password is not typed into a `TextBox`), **T-23** (what idle auto-lock buys, and that it is explicitly not a mitigation for T-18 and does not lock `keypaste agent`), **T-24** (`recent.toml` discloses vault paths inside the boundary the audit log already sits behind). No threat was closed. **T-13's deferral is unchanged**: showing which entries a rule matches still needs an open vault and still belongs to the Agent Activity screen, which 4.1 did not build — the app is not the approver and says so. Choosing a toolkit that draws rather than one that hosts a browser removed a class this document would otherwise have had to carry, since there is no HTML origin to confuse; Tauri's own advisories cluster in exactly that place (D-0044). Decisions in D-0044 (the shell, and why the two shells this repository had already named did not survive being checked). Open: O-0015 (bundling and signing when the official bundler is a paid product), O-0016 (the app's size is not the CLI's), O-0017 (who owns the approver pipe once the app can approve). |
+| 4.2 | The app puts vault contents on screen and writes for the first time. New: **T-25** (a value on screen because somebody asked to see it, and what bounds it). **T-19 amended**: it now covers the app's copy buttons as well as `keypaste get`, both deciding through one function in the core, and it records the two promises the app can make that the CLI cannot — a lock clears the clipboard at once, and an orderly quit clears before exit — alongside the five things neither survives. **T-22 amended**: reasoning about `IValueProvider` was only half of it, since `TextBlockAutomationPeer` publishes drawn text as the automation *name* over the same bus, and an attached `AutomationProperties.Name` is a third route. **O-0008 closed for the app**, still open for the CLI: a window can set the Windows opt-out clipboard formats and `clip.exe` cannot. No threat was closed outright. **T-13's deferral is unchanged** — the Agent Activity screen is 4.3's. Decisions in D-0045 (what a screen may show), D-0046 (the clipboard rule is shared, the transport is not), D-0047 (the masked value cell), D-0048 (a save that would revert somebody else's write is refused), D-0049 (one test project for both front ends), D-0050 (why the KeePassXC gate still covers the app's writes). Open: O-0018 (two writers, one KDBX, no merge), O-0019 (macOS could conceal a pasteboard item and does not yet), O-0020 (nothing automated has ever seen this app draw). |
