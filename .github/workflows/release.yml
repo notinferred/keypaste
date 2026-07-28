@@ -535,6 +535,22 @@ jobs:
             [ -n "${!v}" ] || { echo "::error::secret $v is not set"; exit 1; }
           done
           endpoint="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+
+          # A published version is immutable, and until now that was only a comment. `aws s3 cp`
+          # overwrites without asking, so re-running a tag would replace bytes that readers have
+          # already been handed a checksum for - turning a documented `sha256sum -c` line into one
+          # that fails for an honest download, which is indistinguishable from an attack. Refuse
+          # instead. Re-releasing means a new version number, which is what semantic versioning is
+          # for (CORE.md law 4.7). `|| true` because the CLI's exit code for an absent prefix is
+          # not something to depend on; the emptiness of the listing is the signal.
+          prefix="s3://${R2_BUCKET}/v${VERSION}/"
+          existing="$(aws s3 ls "$prefix" --endpoint-url "$endpoint" 2>/dev/null || true)"
+          if [ -n "$existing" ]; then
+            echo "::error::v${VERSION}/ already exists on the bucket and a release is immutable"
+            echo "$existing"
+            exit 1
+          fi
+
           aws s3 cp dist/ "s3://${R2_BUCKET}/v${VERSION}/" \
             --endpoint-url "$endpoint" --recursive --no-progress
           echo "published to v${VERSION}/:"
