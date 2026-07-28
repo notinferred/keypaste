@@ -17,10 +17,22 @@ CREATE TABLE IF NOT EXISTS public.signup (
 
 -- ---------------------------------------------------------------- the role the Worker connects as
 --
--- It must be able to add an address and not to read one back. `INSERT ... ON CONFLICT DO NOTHING`
--- without `RETURNING` needs only the insert privilege, so a fully compromised Worker - or a
--- compromised dependency inside it - cannot dump the subscriber list. Adding `RETURNING`, or
+-- It must be able to add an address and not to read one back, so that a fully compromised Worker -
+-- or a compromised dependency inside it - cannot dump the subscriber list. Adding `RETURNING`, or
 -- switching to `DO UPDATE`, would require SELECT and quietly undo this.
+--
+-- **And so does naming the conflict target.** An earlier version of this comment claimed that
+-- `INSERT ... ON CONFLICT DO NOTHING` without `RETURNING` needs only the insert privilege. That is
+-- true only of the bare form. Measured on PostgreSQL 18.4 against this database:
+--
+--     insert ... values (...)                          -> ok with INSERT alone
+--     insert ... on conflict do nothing                -> ok with INSERT alone
+--     insert ... on conflict (email) do nothing        -> 42501 permission denied for table signup
+--
+-- Resolving an inference specification reads the table's indexes and therefore wants SELECT. The
+-- Worker used the third form, which is why a correctly configured write-only role still produced a
+-- 503 on every signup. It now uses the second. If a future change reintroduces a conflict target,
+-- the symptom is that every submission fails and nothing in the privilege grants looks wrong.
 --
 -- Do NOT create this with a raw `CREATE ROLE`. On PlanetScale the documented path is a *managed*
 -- role, created in the dashboard or with `pscale role create` or the Roles API. A managed role
