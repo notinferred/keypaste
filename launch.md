@@ -4,9 +4,14 @@
 > written early on purpose: written cold it argues, written on the morning it sells. The questions
 > each post asks are real questions, and the answers are wanted whether or not the post does well.
 
-Six channels, in the order `PLAN.md:52` names them and `CORE.md` §5.3 sanctions them: Hacker News,
-r/selfhosted, r/KeePass, the MCP community, lobste.rs, X. One post each. No reposting, no second
-account, no asking anyone to go vote.
+Five channels, in the order `PLAN.md:53` names them and `CORE.md` §5.3 sanctions them: Hacker News,
+r/selfhosted, r/KeePass, the MCP community, X. One post each. No reposting, no second account, no
+asking anyone to go vote.
+
+lobste.rs was dropped rather than deferred. Signup is by invitation from an existing user, which is
+the only item this file ever carried with a lead time measured in weeks, and no invitation is in
+hand. A venue that cannot be reached on the schedule the rest of the launch runs on is not a
+pending task.
 
 ---
 
@@ -17,14 +22,15 @@ each of these is something a stranger hits before they hit the product.
 
 **The product**
 
-- [ ] **3.4 has landed and there is something to install.** O-0006 is answered — vendored
-  KeePassLib survives NativeAOT, proved by a published binary writing a vault that real KeePassXC
-  opens (D-0040) — and `.github/workflows/release.yml` builds four native binaries, runs every
-  gate against the exact bytes it uploads, and publishes them to `dl.keypaste.com` (D-0041). What
-  is left before this box is ticked: a real `v0.1.0` published, and the build-from-source blocks in
-  `README.md` and `site/public/index.html` replaced with the install one-liners, held to reality by
-  `scripts/verify-install.sh` running them on each OS. Note the posts below still need no
-  rewrite — none of them links an install command, by design.
+- [x] **3.4 has landed and there is something to install.** `v0.1.0` is published at
+  `https://dl.keypaste.com/v0.1.0/` — four native binaries plus the corresponding source, each with
+  a checksum (D-0041); O-0006 is answered yes (D-0040). Both pages carry per-OS install one-liners,
+  and `.github/workflows/install.yml` runs them verbatim on Ubuntu 2404, macOS 15 and Windows 2025,
+  weekly and on demand, with a corrupted-download negative control on the two Unix legs. Its first
+  real run failed and found two defects in the gate rather than in the documentation (D-0043). The
+  posts below needed no rewrite — none of them links an install command, by design. One limit the
+  green run does not cover: it finds the binary at a known path, so it does not prove a fresh login
+  shell resolves `keypaste` on `PATH`.
 - [ ] **The demo GIF exists.** The last thing left in 3.1. `scripts/demo/` is the pipeline, it is
   WSL-only, it needs a real Claude session and a human keystroke, and it budgets three to eight
   takes. Both pages already reserve the slot and nothing else moves when it lands.
@@ -99,8 +105,6 @@ each of these is something a stranger hits before they hit the product.
   because a rule copied into this file is a rule that goes stale quietly. Self-promotion policies on
   both subreddits, the Show HN guidelines, and whatever the MCP community asks of people posting
   their own tools.
-- [ ] **A lobste.rs account exists.** Signup is by invitation from an existing user. This cannot be
-  solved on launch morning, and it is the one item here with a lead time measured in weeks.
 
 ---
 
@@ -183,8 +187,7 @@ generous about it, and found before it is found on a front page.
    hold, fix it in the repository before continuing. This step is the reason for the ordering, and
    skipping it wastes it.
 3. **r/selfhosted.** Wider, friendlier, and the first real traffic.
-4. **Show HN and lobste.rs, the same morning**, early in the US working day. Then stay at the
-   keyboard.
+4. **Show HN**, early in the US working day. Then stay at the keyboard.
 5. **X, timed to the Show HN post**, GIF first.
 
 ---
@@ -450,42 +453,9 @@ punishes early links.
 
 ---
 
-## lobste.rs
-
-Minimal editorialising; the site prefers the link to speak. Submitted as the repository with an
-authored-by-me note, not as a blog post.
-
-**URL:** the repository.
-
-**Tags:** chosen at submission time from whatever the site currently offers — likely `security` and
-`dotnet`, possibly `privacy`. Read the tag list rather than trusting this line.
-
-**Authored-by note:**
-
-I wrote this. A local-first KDBX vault with an MCP server, so a coding agent requests one credential
-through a human approval instead of being handed a `.env`. Two processes: the MCP server holds no
-vault and decides nothing, and a separate process the human started holds the vault and does the
-deciding. One field, one TTL, one hash-chained line in a local log, default deny.
-
-Not novel in the space — Keeper, Bitwarden's Agent Access SDK and 1Password's Environments server
-all do request-and-approve, and 1Password's is stronger on the axis that matters most because it
-never returns the secret at all. The combination is what is different: an ordinary KDBX file you
-own, no account or server anywhere, and a log that stays on your disk.
-
-Pre-1.0, AGPL-3.0, .NET, and the KeePassXC compatibility gate runs on three operating systems every
-push. The whole exchange end to end, in about sixty seconds: [docs/demo.md].
-
-**The question:** the KDBX library is KeePassLib vendored from KeePass 2.61 rather than a package,
-because nothing maintained exists for .NET and I would rather read the code that touches the secret
-path than pull it. Whether it survives native AOT is genuinely unresolved — 2007-era reflection and
-XML handling, and the trim analyzers are turned off for the vendored tree. If you have taken old
-reflective .NET through AOT, I would like to know what it cost you.
-
----
-
 ## The fourteen days after
 
-`PLAN.md:54` — respond to every issue and every comment for two weeks straight. That is the whole
+`PLAN.md:55` — respond to every issue and every comment for two weeks straight. That is the whole
 commitment; the rest of this section is what makes it survivable.
 
 **Day 0.** Six hours at the keyboard after the Show HN post, because that is the window. Nothing
