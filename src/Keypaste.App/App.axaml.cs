@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
+using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
@@ -28,6 +29,7 @@ internal sealed partial class App : Application, IDisposable
     private UnlockViewModel? _unlock;
     private ShellViewModel? _shell;
     private DateTimeOffset _lastTouch = DateTimeOffset.MinValue;
+    private bool _shuttingDown;
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
@@ -45,7 +47,7 @@ internal sealed partial class App : Application, IDisposable
             ShowUnlock(home);
 
             desktop.MainWindow = _window;
-            desktop.ShutdownRequested += (_, _) => Dispose();
+            desktop.ShutdownRequested += OnShutdownRequested;
         }
 
         base.OnFrameworkInitializationCompleted();
@@ -102,6 +104,49 @@ internal sealed partial class App : Application, IDisposable
         _session?.Touch();
     }
 
+    /// <summary>
+    /// Takes a secret back off the clipboard before the process goes away.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Cancels the shutdown once, clears, then shuts down for real. Without this a quit two seconds
+    /// after a copy leaves the password on the clipboard with nothing left running to clear it, and
+    /// quitting is the most ordinary thing anybody does with an app.
+    /// </para>
+    /// <para>
+    /// <b>The limit, said out loud:</b> this is the orderly path only. <c>kill -9</c>, End Task, an
+    /// OOM kill, a power cut and a logout each skip it entirely, and nothing can be done about that
+    /// from inside a process that is being killed. THREATS.md T-19 says so rather than implying a
+    /// promise this cannot keep.
+    /// </para>
+    /// </remarks>
+    private void OnShutdownRequested(object? sender, ShutdownRequestedEventArgs e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+
+        if (_shuttingDown || _shell is null)
+        {
+            Dispose();
+            return;
+        }
+
+        _shuttingDown = true;
+        e.Cancel = true;
+
+        var shell = _shell;
+
+        _ = Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            await shell.Clipboard.ClearNowAsync().ConfigureAwait(true);
+            Dispose();
+
+            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            {
+                desktop.Shutdown();
+            }
+        });
+    }
+
     private void OnLocked(object? sender, VaultLockReason reason)
     {
         // Every view that could have held vault-derived data leaves the tree rather than being
@@ -141,9 +186,10 @@ internal sealed partial class App : Application, IDisposable
             _session,
             Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable),
             Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable),
-            ApplyTheme);
-
-        _shell.Current = Navigation.Destinations.All[0];
+            ApplyTheme,
+            new AvaloniaClipboard(_window),
+            TimeProvider.System,
+            action => Dispatcher.UIThread.Post(action));
 
         _window.FindControl<ContentControl>("Root")!.Content =
             new ShellView { DataContext = _shell };

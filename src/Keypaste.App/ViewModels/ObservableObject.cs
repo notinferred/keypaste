@@ -51,9 +51,19 @@ internal sealed class AsyncRelayCommand(Func<Task> execute, Func<bool>? canExecu
 
     public bool CanExecute(object? parameter) => !_running && (canExecute?.Invoke() ?? true);
 
-    public async void Execute(object? parameter)
+    public async void Execute(object? parameter) => await ExecuteAsync().ConfigureAwait(true);
+
+    /// <summary>
+    /// The same work, awaitable.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="ICommand.Execute"/> returns <c>void</c>, so a test that drove the command would
+    /// race whatever it wanted to assert. The same reason <c>UnlockViewModel.UnlockAsync</c> is
+    /// reachable rather than private.
+    /// </remarks>
+    internal async Task ExecuteAsync()
     {
-        if (!CanExecute(parameter))
+        if (!CanExecute(null))
         {
             return;
         }

@@ -23,6 +23,10 @@
       </StackPanel>
     </DataTemplate>
 
+    <DataTemplate DataType="vm:EntriesViewModel">
+      <views:EntriesView />
+    </DataTemplate>
+
     <DataTemplate DataType="vm:LogViewModel">
       <views:LogView />
     </DataTemplate>
@@ -96,14 +100,58 @@
               BorderBrush="{DynamicResource KpBorderSubtle}"
               BorderThickness="0,0,0,1"
               Padding="24,18">
-        <Grid ColumnDefinitions="*,Auto">
+        <Grid ColumnDefinitions="*,Auto,Auto">
           <TextBlock Grid.Column="0"
                      Text="{Binding CurrentTitle}"
                      FontSize="18"
                      Foreground="{DynamicResource KpTextPrimary}" />
 
+          <!-- The clipboard toast, beside the idle countdown because both are quiet statements
+               about time passing. KpAccentQuiet, never KpDanger: a working auto-clear is the most
+               normal thing this feature does. -->
+          <Border Grid.Column="1"
+                  IsVisible="{Binding Clipboard.IsVisible}"
+                  Background="{DynamicResource KpAccentQuiet}"
+                  CornerRadius="{DynamicResource KpRadiusSm}"
+                  Padding="10,6"
+                  Margin="0,0,12,0">
+            <StackPanel Spacing="4">
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBlock VerticalAlignment="Center"
+                           FontSize="12"
+                           Foreground="{DynamicResource KpTextSecondary}"
+                           IsVisible="{Binding Clipboard.IsCounting}"
+                           Text="{Binding Clipboard.Label, StringFormat='{}{0} copied'}" />
+                <TextBlock VerticalAlignment="Center"
+                           FontSize="12"
+                           Foreground="{DynamicResource KpTextMuted}"
+                           IsVisible="{Binding Clipboard.IsCounting}"
+                           Text="{Binding Clipboard.SecondsLeft, StringFormat='clearing in {0}s'}" />
+                <TextBlock VerticalAlignment="Center"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           MaxWidth="320"
+                           Foreground="{DynamicResource KpTextSecondary}"
+                           Text="{Binding Clipboard.Failure}" />
+                <Button Content="Clear now"
+                        Padding="8,2"
+                        FontSize="11"
+                        IsVisible="{Binding Clipboard.IsCounting}"
+                        Command="{Binding Clipboard.ClearNowCommand}" />
+              </StackPanel>
+
+              <ProgressBar Height="2"
+                           Minimum="0"
+                           Maximum="1"
+                           Value="{Binding Clipboard.Fraction}"
+                           IsVisible="{Binding Clipboard.IsCounting}"
+                           Foreground="{DynamicResource KpAccent}"
+                           Background="Transparent" />
+            </StackPanel>
+          </Border>
+
           <!-- Muted, never red. An auto-lock is the most normal thing this app does. -->
-          <TextBlock Grid.Column="1"
+          <TextBlock Grid.Column="2"
                      Text="{Binding Countdown}"
                      IsVisible="{Binding HasCountdown}"
                      VerticalAlignment="Center"

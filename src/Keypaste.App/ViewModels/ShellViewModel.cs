@@ -1,3 +1,4 @@
+using Keypaste.App.Clipboard;
 using Keypaste.App.Navigation;
 using Keypaste.App.Session;
 
@@ -26,7 +27,10 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         AppVaultSession session,
         string? home,
         string? approverFromEnvironment,
-        Action<Core.Settings.AppTheme>? applyTheme = null)
+        Action<Core.Settings.AppTheme>? applyTheme = null,
+        IAppClipboard? clipboard = null,
+        TimeProvider? clock = null,
+        Action<Action>? post = null)
     {
         ArgumentNullException.ThrowIfNull(session);
 
@@ -35,11 +39,27 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         ApproverFromEnvironment = approverFromEnvironment;
         ApplyTheme = applyTheme ?? (_ => { });
 
+        // Owned here rather than by each screen, so a copy made on Entries is still counting down
+        // after a move to Env Sets — and is cleared by the lock, because this is disposed with
+        // everything else the shell built.
+        Clipboard = new ClipboardCountdown(
+            clipboard ?? NoClipboard.Instance,
+            clock ?? TimeProvider.System,
+            post);
+
         LockCommand = new RelayCommand(() => _session.Lock(VaultLockReason.Manual));
 
         _current = Destinations.All[0];
         _session.LockingSoon += OnLockingSoon;
+
+        // Built here rather than left to the first navigation. Assigning Current to the destination
+        // it already holds changes nothing, so Show never ran and the shell opened on a blank pane —
+        // invisible in 4.1, when the first destination was an empty state with nothing to miss.
+        Show(_current);
     }
+
+    /// <summary>The auto-clearing clipboard, and the toast that counts it down.</summary>
+    internal ClipboardCountdown Clipboard { get; }
 
     /// <summary>The value of <c>KEYPASTE_HOME</c>, or null.</summary>
     internal string? Home { get; }
@@ -151,10 +171,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             DestinationKind.Log => new LogViewModel(Home),
             DestinationKind.Settings => new SettingsViewModel(_session, Home, ApplyTheme),
             DestinationKind.AgentActivity => Activity(),
-            DestinationKind.Entries => Empty(
-                "Entries",
-                "Your vault's entries will be here.",
-                "Browsing and editing arrive in the next release. Until then, `keypaste ls` and `keypaste get` read the same vault."),
+            DestinationKind.Entries => new EntriesViewModel(_session, Clipboard),
             DestinationKind.EnvSets => Empty(
                 "Env Sets",
                 "Your projects' environment variables will be here.",
@@ -187,6 +204,11 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         _session.LockingSoon -= OnLockingSoon;
         (Content as IDisposable)?.Dispose();
         Content = null;
+
+        // A secret on the clipboard is derived from an open vault, so it does not survive the lock
+        // either. Disposing clears it, conditionally — a clipboard the user has changed since is
+        // left alone.
+        Clipboard.Dispose();
     }
 }
 
