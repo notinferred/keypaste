@@ -84,14 +84,41 @@ it did not break the connection. An earlier version of this note guessed that th
 detached the config from the PlanetScale integration; `wrangler hyperdrive get` says otherwise —
 `integration_name: planetScale` and the organisation and database names are all still on it.
 
-**The role: still wrong. Do not deploy.** The config connects as `pscale_api_yq4xhf9tbm3v`, which a
-query through the binding reports is `rolcreaterole`, `rolcreatedb`, `rolbypassrls`, and a member of
-`pg_read_all_data`, `pg_write_all_data` and `postgres`. It can read and write every table in the
-cluster. **The guarantee `schema.sql` and D-0037 are built on — that nothing reachable from the
-Worker can read the list back — is currently false**, and by a wider margin than "it probably has
-SELECT".
+**The role: still wrong, and worse than this file used to say.** The config connects as
+`pscale_api_yq4xhf9tbm3v`, which is `rolcreaterole`, `rolcreatedb`, `rolbypassrls`, and a member of
+`pg_read_all_data`, `pg_write_all_data` and `postgres`. "It can read and write every table in the
+cluster" was an understatement: `postgres` is itself a member of `pscale_superuser`, so walking the
+membership graph gives this role `pg_checkpoint`, `pg_maintain`, `pg_signal_backend`,
+`pg_create_subscription`, `pg_use_reserved_connections` and `pscale_replication_ops` as well.
 
-`public.signup` does not exist yet either; `schema.sql` has never been applied.
+That last pair is the part to sit with. `pg_create_subscription` plus write access everywhere means
+whatever reaches this credential can set up logical replication and stream the cluster out
+continuously, and `pg_signal_backend` lets it terminate other sessions. **The guarantee `schema.sql`
+and D-0037 are built on — that nothing reachable from the Worker can read the list back — is not
+merely false; the honest description is that a public HTTP endpoint is one dependency compromise
+away from cluster administration.** Verified by query, not inferred:
+
+```sql
+with recursive chain as (
+  select oid, rolname, 0 as depth from pg_roles where rolname = 'pscale_api_yq4xhf9tbm3v'
+  union all select g.oid, g.rolname, c.depth + 1 from chain c
+    join pg_auth_members a on a.member = c.oid join pg_roles g on g.oid = a.roleid where c.depth < 5
+) select depth, rolname from chain order by depth, rolname;
+```
+
+`public.signup` does not exist yet either — `schema.sql` has never been applied, and there are no
+tables in `public` at all. Which is the only reason none of the above has cost anything: there is no
+subscriber list on this cluster to steal.
+
+**On `REVOKE CONNECT ... FROM PUBLIC`, an earlier version of this file warned it might break
+PlanetScale's own components. Checked, and it looks safe.** `pg_database.datacl` for `postgres` is
+currently null, meaning defaults apply and PUBLIC does hold CONNECT implicitly — so the revoke will
+materialise an ACL rather than tighten an existing one. But the only things observed connecting to
+this database are `postgres` (the owner) and `pscale_admin`, which is `rolsuper` and therefore
+bypasses the check entirely; `pscale_exporter` and `pscale_pgbouncer` connect to their own databases
+of the same names. Worth knowing regardless: `postgres` is where Patroni's heartbeat and REST API
+live, so this application's table is going into the cluster's HA control database. That is what the
+PlanetScale integration handed us, not a choice made here.
 
 Two things about PlanetScale usernames, both easy to get wrong:
 
