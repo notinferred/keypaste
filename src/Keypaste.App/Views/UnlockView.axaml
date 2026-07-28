@@ -1,0 +1,102 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Keypaste.App.ViewModels"
+             xmlns:ctl="using:Keypaste.App.Controls"
+             x:Class="Keypaste.App.Views.UnlockView"
+             x:DataType="vm:UnlockViewModel"
+             Background="{DynamicResource KpSurface0}">
+
+  <!-- The app's first impression. A centred card, generous padding, the vault's file name as the
+       heading, a quiet recent list and one primary button. No key art, no shield, no padlock. -->
+
+  <Border HorizontalAlignment="Center" VerticalAlignment="Center"
+          Width="460"
+          Background="{DynamicResource KpSurface1}"
+          BorderBrush="{DynamicResource KpBorderSubtle}"
+          BorderThickness="1"
+          CornerRadius="{DynamicResource KpRadiusMd}"
+          Padding="{DynamicResource KpCardPadding}"
+          DragDrop.AllowDrop="True">
+
+    <StackPanel Spacing="16">
+
+      <TextBlock Text="keypaste"
+                 FontSize="13"
+                 Foreground="{DynamicResource KpTextMuted}" />
+
+      <TextBlock Text="{Binding SelectedName}"
+                 IsVisible="{Binding HasSelection}"
+                 FontSize="22"
+                 TextTrimming="CharacterEllipsis"
+                 Foreground="{DynamicResource KpTextPrimary}" />
+
+      <TextBlock Text="Open a vault"
+                 IsVisible="{Binding !HasSelection}"
+                 FontSize="22"
+                 Foreground="{DynamicResource KpTextPrimary}" />
+
+      <!-- First run. Points at the CLI rather than growing a second way to make a vault:
+           CORE.md law 4.2 says every feature exists in the CLI before it gets a GUI. -->
+      <StackPanel Spacing="6" IsVisible="{Binding HasNoRecent}">
+        <TextBlock Text="No vaults yet. Drag a .kdbx file here, or browse for one."
+                   TextWrapping="Wrap"
+                   Foreground="{DynamicResource KpTextSecondary}" />
+        <TextBlock Text="To make a new vault, run:  keypaste init"
+                   FontFamily="{DynamicResource KpMono}"
+                   FontSize="12"
+                   Foreground="{DynamicResource KpTextMuted}" />
+      </StackPanel>
+
+      <ListBox ItemsSource="{Binding Recent}"
+               IsVisible="{Binding HasRecent}"
+               MaxHeight="150"
+               Background="Transparent"
+               BorderThickness="0"
+               SelectedItem="{Binding SelectedRecent}"
+               x:Name="RecentList">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:RecentVaultItem">
+            <StackPanel Spacing="1" ToolTip.Tip="{Binding Path}">
+              <TextBlock Text="{Binding Name}"
+                         Foreground="{DynamicResource KpTextPrimary}" />
+              <TextBlock Text="missing"
+                         IsVisible="{Binding !Exists}"
+                         FontSize="11"
+                         Foreground="{DynamicResource KpTextMuted}" />
+            </StackPanel>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+
+      <ctl:MaskedInput x:Name="Password"
+                       MaskedLength="{Binding MaskedLength}"
+                       Placeholder="Master password"
+                       IsEnabled="{Binding HasSelection}" />
+
+      <TextBlock Text="{Binding Message}"
+                 IsVisible="{Binding HasMessage}"
+                 TextWrapping="Wrap"
+                 FontSize="13"
+                 Foreground="{DynamicResource KpTextSecondary}" />
+
+      <Grid ColumnDefinitions="*,Auto" >
+        <Button Grid.Column="0"
+                Content="Browse…"
+                HorizontalAlignment="Left"
+                Click="OnBrowse" />
+        <Button Grid.Column="1"
+                Content="Unlock"
+                IsDefault="True"
+                Command="{Binding UnlockCommand}"
+                Classes="accent" />
+      </Grid>
+
+      <TextBlock Text="Opening…"
+                 IsVisible="{Binding Busy}"
+                 FontSize="12"
+                 Foreground="{DynamicResource KpTextMuted}" />
+
+    </StackPanel>
+  </Border>
+
+</UserControl>

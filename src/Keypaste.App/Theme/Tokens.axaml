@@ -1,0 +1,79 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!--
+    The dark palette was written first and the light one derived from it, which is what "dark mode
+    first-class" means in practice: a dark theme derived from a light one reads as a light theme
+    with the lights off, and this product is looked at in the evening.
+
+    One accent, muted. KpDanger appears only on a destructive confirmation — never on the idle
+    countdown, never on a wrong password. ideas.md names "red scary warnings for normal actions"
+    as an anti-pattern and mistyping a password is the most normal action there is.
+  -->
+
+  <ResourceDictionary.ThemeDictionaries>
+
+    <ResourceDictionary x:Key="Dark">
+      <SolidColorBrush x:Key="KpSurface0" Color="#14161A" />
+      <SolidColorBrush x:Key="KpSurface1" Color="#1A1D22" />
+      <SolidColorBrush x:Key="KpSurface2" Color="#22262C" />
+      <SolidColorBrush x:Key="KpSurface3" Color="#2B3038" />
+
+      <SolidColorBrush x:Key="KpTextPrimary" Color="#E8EAED" />
+      <SolidColorBrush x:Key="KpTextSecondary" Color="#A8AEB8" />
+      <SolidColorBrush x:Key="KpTextMuted" Color="#767D89" />
+
+      <SolidColorBrush x:Key="KpBorderSubtle" Color="#2E333B" />
+      <SolidColorBrush x:Key="KpBorderStrong" Color="#3D444E" />
+
+      <SolidColorBrush x:Key="KpAccent" Color="#7C9CBF" />
+      <SolidColorBrush x:Key="KpAccentQuiet" Color="#26313D" />
+      <SolidColorBrush x:Key="KpAccentContrast" Color="#0F1216" />
+
+      <SolidColorBrush x:Key="KpDanger" Color="#C98A8A" />
+      <SolidColorBrush x:Key="KpFocusRing" Color="#7C9CBF" />
+    </ResourceDictionary>
+
+    <ResourceDictionary x:Key="Light">
+      <SolidColorBrush x:Key="KpSurface0" Color="#FBFBFC" />
+      <SolidColorBrush x:Key="KpSurface1" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="KpSurface2" Color="#F3F4F6" />
+      <SolidColorBrush x:Key="KpSurface3" Color="#E9EBEF" />
+
+      <SolidColorBrush x:Key="KpTextPrimary" Color="#1A1D22" />
+      <SolidColorBrush x:Key="KpTextSecondary" Color="#5A616B" />
+      <SolidColorBrush x:Key="KpTextMuted" Color="#8B929C" />
+
+      <SolidColorBrush x:Key="KpBorderSubtle" Color="#E2E5EA" />
+      <SolidColorBrush x:Key="KpBorderStrong" Color="#C9CED6" />
+
+      <SolidColorBrush x:Key="KpAccent" Color="#3E6087" />
+      <SolidColorBrush x:Key="KpAccentQuiet" Color="#E8EEF5" />
+      <SolidColorBrush x:Key="KpAccentContrast" Color="#FFFFFF" />
+
+      <SolidColorBrush x:Key="KpDanger" Color="#A64B4B" />
+      <SolidColorBrush x:Key="KpFocusRing" Color="#3E6087" />
+    </ResourceDictionary>
+
+  </ResourceDictionary.ThemeDictionaries>
+
+  <!-- Generous on purpose. Fluent's defaults are tuned tighter than "bank lobby". -->
+  <x:Double x:Key="KpSpace1">4</x:Double>
+  <x:Double x:Key="KpSpace2">8</x:Double>
+  <x:Double x:Key="KpSpace3">12</x:Double>
+  <x:Double x:Key="KpSpace4">16</x:Double>
+  <x:Double x:Key="KpSpace5">24</x:Double>
+  <x:Double x:Key="KpSpace6">32</x:Double>
+  <x:Double x:Key="KpSpace7">48</x:Double>
+
+  <CornerRadius x:Key="KpRadiusSm">6</CornerRadius>
+  <CornerRadius x:Key="KpRadiusMd">10</CornerRadius>
+
+  <Thickness x:Key="KpCardPadding">32</Thickness>
+  <Thickness x:Key="KpFieldPadding">12,10</Thickness>
+
+  <!-- Monospace for the log pane and for every file path, so a column lines up and a path is
+       unambiguous about its own characters. -->
+  <FontFamily x:Key="KpMono">ui-monospace,SFMono-Regular,Menlo,Consolas,DejaVu Sans Mono,monospace</FontFamily>
+
+</ResourceDictionary>

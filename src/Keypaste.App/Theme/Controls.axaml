@@ -1,0 +1,51 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:ctl="using:Keypaste.App.Controls">
+
+  <!-- Styles for the controls this app actually uses, and no others. Six components was the
+       budget; a component library in 4.1 would be speculation. -->
+
+  <ControlTheme x:Key="{x:Type ctl:MaskedInput}" TargetType="ctl:MaskedInput">
+    <Setter Property="Focusable" Value="True" />
+    <Setter Property="MinHeight" Value="40" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="Frame"
+                Background="{DynamicResource KpSurface2}"
+                BorderBrush="{DynamicResource KpBorderSubtle}"
+                BorderThickness="1"
+                CornerRadius="{DynamicResource KpRadiusSm}"
+                Padding="{DynamicResource KpFieldPadding}">
+          <Panel>
+            <TextBlock Text="{TemplateBinding Placeholder}"
+                       IsVisible="{TemplateBinding IsEmpty}"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource KpTextMuted}" />
+            <TextBlock Text="{TemplateBinding Display}"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource KpTextPrimary}" />
+          </Panel>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+
+    <!-- A keyboard-first app whose focus is invisible is not keyboard-first. This is never
+         removed, and that is a review rule rather than a preference. -->
+    <Style Selector="^:focus /template/ Border#Frame">
+      <Setter Property="BorderBrush" Value="{DynamicResource KpFocusRing}" />
+      <Setter Property="BorderThickness" Value="2" />
+    </Style>
+
+    <Style Selector="^:disabled /template/ Border#Frame">
+      <Setter Property="Opacity" Value="0.5" />
+    </Style>
+  </ControlTheme>
+
+  <ControlTheme x:Key="KpCard" TargetType="Border">
+    <Setter Property="Background" Value="{DynamicResource KpSurface1}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusMd}" />
+  </ControlTheme>
+
+</ResourceDictionary>

@@ -3,11 +3,20 @@
              x:Class="Keypaste.App.App"
              RequestedThemeVariant="Default">
 
-  <!-- Default follows the operating system. Settings offers System / Light / Dark and writes the
-       choice to ~/.keypaste/app.toml; System resolves through IPlatformSettings.GetColorValues(). -->
+  <!-- Default follows the operating system, through IPlatformSettings.GetColorValues(). Settings
+       offers System / Light / Dark and writes the choice to ~/.keypaste/app.toml. -->
 
   <Application.Styles>
     <FluentTheme />
   </Application.Styles>
+
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="avares://keypaste-app/Theme/Tokens.axaml" />
+        <ResourceInclude Source="avares://keypaste-app/Theme/Controls.axaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
 
 </Application>
