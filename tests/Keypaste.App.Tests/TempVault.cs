@@ -31,6 +31,17 @@ internal sealed class TempVault : IDisposable
     /// <summary>The vault file.</summary>
     internal string Path_ { get; }
 
+    /// <summary>
+    /// A <c>KEYPASTE_HOME</c> pointing inside this fixture, so a test never touches the real one.
+    /// </summary>
+    internal string Home => _directory;
+
+    /// <summary>Writes a recent-vaults list containing this vault.</summary>
+    internal void RememberSelf() =>
+        Core.Recent.RecentVaults.Save(
+            Core.Audit.KeypasteHome.RecentPath(Home),
+            [new Core.Recent.RecentVault(Path_, DateTimeOffset.UtcNow)]);
+
     /// <summary>A path inside the same directory that holds no file at all.</summary>
     internal string MissingPath => Path.Combine(_directory, "absent.kdbx");
 
