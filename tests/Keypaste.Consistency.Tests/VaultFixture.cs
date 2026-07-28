@@ -51,17 +51,42 @@ internal sealed class VaultFixture : IDisposable
     }
 
     /// <summary>Runs a verb, answering the master-password prompt.</summary>
+    internal int Run(params string[] args) => RunAnswering([], args);
+
+    /// <summary>
+    /// Runs a verb, answering the master-password prompt and then <paramref name="answers"/>.
+    /// </summary>
+    /// <param name="answers">What to say to each prompt after the master password, in order.</param>
+    /// <param name="args">The verb and its arguments.</param>
     /// <remarks>
-    /// <c>--vault</c> is appended here so no test can forget it and silently read whatever
-    /// <c>KEYPASTE_VAULT</c> happens to say on the machine running it.
+    /// <para>
+    /// The master password is enqueued <b>first</b>, because it is the first thing every verb asks
+    /// for. A test that enqueued its own answer beforehand would be handing it to the vault as the
+    /// master password and getting exit 4 for reasons that have nothing to do with what it meant to
+    /// check.
+    /// </para>
+    /// <para>
+    /// <c>--vault</c> is added here so no test can forget it and silently read whatever
+    /// <c>KEYPASTE_VAULT</c> says on the machine running it — and it is inserted <b>before</b> any
+    /// bare <c>--</c>, because <c>keypaste run</c> splits there before parsing any option, so an
+    /// appended <c>--vault</c> would become an argument to the child process instead.
+    /// </para>
     /// </remarks>
-    internal int Run(params string[] args)
+    internal int RunAnswering(string[] answers, params string[] args)
     {
+        ArgumentNullException.ThrowIfNull(answers);
+        ArgumentNullException.ThrowIfNull(args);
+
         Cli.Stdout.GetStringBuilder().Clear();
         Cli.Stderr.GetStringBuilder().Clear();
-        Cli.Prompt.Enqueue(Master);
 
-        return Cli.Run([.. args, "--vault", VaultPath]);
+        Cli.Prompt.Enqueue(Master);
+        Cli.Prompt.Enqueue(answers);
+
+        var separator = Array.IndexOf(args, "--");
+        var at = separator < 0 ? args.Length : separator;
+
+        return Cli.Run([.. args[..at], "--vault", VaultPath, .. args[at..]]);
     }
 
     public void Dispose()

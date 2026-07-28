@@ -11,20 +11,12 @@
        4.2 means adding a view model and a template here, and nothing else. -->
   <UserControl.DataTemplates>
 
-    <DataTemplate DataType="vm:EmptyStateViewModel">
-      <StackPanel Spacing="8" MaxWidth="480" HorizontalAlignment="Left">
-        <TextBlock Text="{Binding Line}"
-                   TextWrapping="Wrap"
-                   Foreground="{DynamicResource KpTextSecondary}" />
-        <TextBlock Text="{Binding Aside}"
-                   TextWrapping="Wrap"
-                   FontSize="12"
-                   Foreground="{DynamicResource KpTextMuted}" />
-      </StackPanel>
-    </DataTemplate>
-
     <DataTemplate DataType="vm:EntriesViewModel">
       <views:EntriesView />
+    </DataTemplate>
+
+    <DataTemplate DataType="vm:EnvSetsViewModel">
+      <views:EnvSetsView />
     </DataTemplate>
 
     <DataTemplate DataType="vm:LogViewModel">

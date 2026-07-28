@@ -172,10 +172,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             DestinationKind.Settings => new SettingsViewModel(_session, Home, ApplyTheme),
             DestinationKind.AgentActivity => Activity(),
             DestinationKind.Entries => new EntriesViewModel(_session, Clipboard),
-            DestinationKind.EnvSets => Empty(
-                "Env Sets",
-                "Your projects' environment variables will be here.",
-                "Editing arrives in the next release. Until then, `keypaste env ls` and `keypaste run` read the same vault."),
+            DestinationKind.EnvSets => new EnvSetsViewModel(_session, Clipboard),
             _ => null,
         };
     }
@@ -186,9 +183,6 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         _ = activity.RefreshAsync();
         return activity;
     }
-
-    private static EmptyStateViewModel Empty(string title, string line, string aside) =>
-        new(title, line, aside);
 
     private void OnLockingSoon(object? sender, TimeSpan remaining) =>
         Countdown = $"Locking in {Math.Max(1, (int)remaining.TotalSeconds)} seconds.";
@@ -211,16 +205,3 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         Clipboard.Dispose();
     }
 }
-
-/// <summary>
-/// A destination that has nothing in it yet, and says so without looking broken.
-/// </summary>
-/// <param name="Title">The destination's name.</param>
-/// <param name="Line">What will be here.</param>
-/// <param name="Aside">The CLI command that does the same job today.</param>
-/// <remarks>
-/// A blank pane reads as a bug. Naming the CLI command that already does the job is the honest
-/// middle, and it is true to CORE.md law 4.2 — every feature exists in the CLI before it gets a GUI,
-/// so for each of these there is something a person can already run.
-/// </remarks>
-internal sealed record EmptyStateViewModel(string Title, string Line, string Aside);
