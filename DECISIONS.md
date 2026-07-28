@@ -2,7 +2,9 @@
 
 > One entry per decision that a future contributor (or a future you) would otherwise have to
 > reverse-engineer. docs/PRODUCT.md decides *what* keypaste is; this file records *how*, and why.
-> Append entries; do not rewrite history. Supersede an entry by adding a new one that says so.
+> Add an entry per decision, and when one is superseded, rewrite it to say what is true now and
+> why the earlier answer failed. Keep the reasoning; scrap the was-then-now narration. Git holds
+> what the file used to say.
 
 ---
 
@@ -441,8 +443,7 @@ than shown as plaintext advanced attributes; and `VaultEntry` needs no new membe
 
 **The cost is real and is accepted openly:** a `.env` with forty keys becomes forty KDBX entries,
 and `keypaste ls` gets noisy in a vault that holds several projects. Noise is recoverable; a
-compatibility claim nobody can test is not. docs/STEPS.md previously specified the custom-field shape
-and has been corrected.
+compatibility claim nobody can test is not.
 
 **Validation is strict on write and permissive on read.** keypaste refuses to create a project
 name that is empty or contains a separator (group-path resolution discards empty segments, so both
@@ -559,8 +560,7 @@ differing only in case - in the file, or against the project - are refused befor
 rather than halfway through the write loop. The rejected alternative was `--overwrite`: a second
 flag that every script would set unconditionally is noise, and the plan already names the keys.
 
-**The word "shred" does not appear in the product, and there is no overwrite pass.** The build prompt
-asked for one; this corrects it in writing, the same way D-0014 corrected docs/STEPS.md. Overwriting a
+**The word "shred" does not appear in the product, and there is no overwrite pass.** Overwriting a
 file before deleting it does not destroy data on SSDs (the flash translation layer has already
 remapped the block), on copy-on-write filesystems (APFS, btrfs, ZFS, ReFS), on any volume with
 snapshots or backups, on network filesystems, or on NTFS files small enough to live in the MFT.
@@ -599,12 +599,10 @@ documentation already names. No `GC.Collect`, no `SecureString`, no ceremony. Wh
 narrower and true: keypaste writes nothing in plaintext of its own accord. The file was already on
 disk; the only write this command performs is the encrypted vault.
 
-> **Amended in 1.3.** That last sentence originally read "keypaste writes nothing in plaintext of
-> its own", full stop, and `env export` made it false. The claim is now "of its own accord" and it
-> is still true: the only command that writes plaintext is one whose entire purpose the user typed,
-> and it is loud about it. See D-0018. The same sentence in `DotEnv.cs`'s remarks was corrected in
-> the same commit — a claim in a doc comment ages exactly as badly as one in a decision record, and
-> it is the one a security auditor reads first.
+The claim is "of its own accord", and the qualifier is load-bearing: the one command that writes
+plaintext is `env export`, whose entire purpose the user typed, and it is loud about it (D-0018).
+`DotEnv.cs`'s remarks say the same thing in the same words — a claim in a doc comment ages exactly
+as badly as one in a decision record, and it is the one a security auditor reads first.
 
 The compatibility scripts are untouched. `env pull` writes through `EnvStore`, whose shape the gate
 already proves in both directions; a third script would be testing KeePassLib, not the parser.
@@ -831,10 +829,10 @@ adopt, and for a project whose entire pitch is trust, "your data is hostage" is 
 than "here is the door, clearly labelled". Every credible tool has an export; the honest version
 says what it just did.
 
-Two written claims went false the moment this shipped and were corrected in the same PR: the
-`DotEnv.cs` remark and D-0015's memory-hygiene paragraph, both of which said keypaste writes nothing
-in plaintext. Both now say "of its own accord". A claim in a doc comment ages exactly as badly as
-one in a decision record, and the doc comment is the one an auditor reads first.
+`DotEnv.cs`'s remark and D-0015's memory-hygiene paragraph both say keypaste writes nothing in
+plaintext *of its own accord*, and the qualifier is what this command costs. A claim in a doc
+comment ages exactly as badly as one in a decision record, and the doc comment is the one an
+auditor reads first.
 
 ### Single quotes, not escaped double quotes - the one real correctness decision
 
@@ -2148,8 +2146,7 @@ credential swap quietly downgrades the TLS posture this entry exists to guarante
 is re-passed and then re-read. And naming the conflict target in `ON CONFLICT (email) DO NOTHING`
 requires SELECT on PostgreSQL 18.4, so the Worker's own statement was incompatible with the role it
 was designed for: correctly configured, every signup still returned 503. The bare
-`ON CONFLICT DO NOTHING` needs only INSERT and is what ships. `schema.sql` claimed the opposite and
-has been corrected in place.
+`ON CONFLICT DO NOTHING` needs only INSERT and is what ships, and `schema.sql` says so.
 
 **The posture it replaced was worse than "it can read the list", established by walking the role
 graph on 2026-07-28.** `pscale_api_yq4xhf9tbm3v` inherited `postgres`, which inherits
@@ -2858,24 +2855,17 @@ removed rather than answered: its premise that KeePassLib is GPL-2.0-only was fa
 See D-0007. Relicensing freedom therefore matters less than it appeared to, but it is still
 cheap only while there is a single copyright holder, which keeps this entry urgent.
 
-## D-0006 — Repository is public; business notes live outside it
+## D-0006 — Business notes live outside the repository, and publishing is irreversible
 
-**Date:** 2026-07-25 · **Stage:** 0.1 · **Status:** its first clause is currently false — see O-0014
-(supersedes the original O-0003)
+**Date:** 2026-07-25 · **Stage:** 0.1 · **Status:** accepted
 
-**Read O-0014 before this entry.** The repository is private as of 3.4, so the first sentence below
-no longer describes reality. The second half — business notes live outside the repository, and a
-public repository can serve any commit ever pushed — is unaffected and still binding.
+**The repository is private.** Whether it becomes public is O-0014, and `docs/PRODUCT.md` §3.8 —
+auditable code is the trust strategy — is the claim pulling against the current state. CI cost is
+not part of that argument any more; D-0042 removed it.
 
-The repository is public from the start, per docs/PRODUCT.md §3.8 — auditable code is the trust strategy,
-and it starts paying on day one rather than at launch. Publishing also makes GitHub Actions free,
-which is what unblocked CI: the three-OS matrix bills at 1× / 2× / **10×** per minute on a private
-repository.
-
-Before publishing, the benchmarks, pivot conditions, pricing ladder, and acquisition notes were
-removed from `docs/STEPS.md` and `docs/IDEAS.md` and moved to private storage outside the repository. A public
-repo whose entire pitch is trust should not also publish the conditions under which its author would
-abandon it.
+The benchmarks, pivot conditions, pricing ladder, and acquisition notes are kept in private storage
+outside the repository and are registered in `docs/ARTIFACTS.md` by location. A project whose entire
+pitch is trust should not also publish the conditions under which its author would abandon it.
 
 Because GitHub can serve any commit ever pushed once a repository is public — including unreachable
 ones — the private repository was deleted and recreated rather than rewritten in place. If sensitive
@@ -2885,8 +2875,8 @@ force-push is not.
 ## O-0004 — Deferred CI hardening
 
 CodeQL, dependency-review, Dependabot, and SHA-pinned GitHub Actions are deliberately not in the
-Stage 0.1 workflow. Action tags are mutable, so tag pinning without Dependabot ages badly; all of
-these are free now that the repository is public, so revisit them together.
+Stage 0.1 workflow. Action tags are mutable, so tag pinning without Dependabot ages badly, so
+revisit them together.
 
 **Half-answered in 3.4, and the split is deliberate.** `release.yml` pins all four of its actions
 to commit SHAs, and `.github/dependabot.yml` now exists for the github-actions ecosystem so the
@@ -3050,11 +3040,10 @@ weaker reason than when it was written.
 
 ## O-0008 — Windows clipboard history and cloud sync retain the secret
 
-> **Closed for the desktop app in 4.2 (D-0046); still open for the CLI.** The app sets all three
-> opt-out formats on one `SetDataAsync`, because it owns a window and Avalonia's clipboard takes a
-> data object. `clip.exe` still cannot express them, so `keypaste get` is unchanged and everything
-> below still describes it. Third-party clipboard managers and RDP redirection are unaffected on
-> both.
+**Closed for the desktop app, still open for the CLI.** The app sets all three opt-out formats on
+one `SetDataAsync`, because it owns a window and Avalonia's clipboard takes a data object (D-0046).
+`clip.exe` cannot express them, so `keypaste get` is unchanged and everything below describes it.
+Third-party clipboard managers and RDP redirection are unaffected on both.
 
 Clearing the Windows clipboard does not remove the entry from clipboard history (Win+V) or from
 cloud clipboard sync, so a password keypaste copied outlives its twenty seconds on Windows and can
@@ -3135,9 +3124,9 @@ that stays meaningful. It is not shipped yet because one person running this doe
 the wrong version of it - a flag that suppresses the message without changing the exposure - is
 worse than nothing. Decide before Stage 3, when the audience stops being one person.
 
-**Two variables differing only in case are one variable on Windows.** ~~Reading is not refused~~ -
-**answered in D-0016 (Stage 1.2b): a hard failure on every platform, not a platform-conditional and
-not last-writer-wins.** Reading still lists both, so `env ls` and `env rm` can show and clear what
+**Two variables differing only in case are one variable on Windows.** Injection is a hard failure on
+every platform — not a platform-conditional, and not last-writer-wins (D-0016). Reading still lists
+both, so `env ls` and `env rm` can show and clear what
 KeePassXC put there; only injection refuses. The reasoning, including why the platform-conditional
 is the worst of the three options rather than the safe middle, is in D-0016.
 
@@ -3220,13 +3209,10 @@ AGPL-3.0 and every release publishes its own corresponding source (D-0041), so t
 the licensing sense. The *repository* is private, so nobody outside can actually read it, and
 "auditable" is the word law 3.8 uses.
 
-D-0006 records the opposite as settled fact - "The repository is public from the start, per docs/PRODUCT.md
-§3.8" - and it is currently wrong. It has not been rewritten, because it also records something that
-is still true and still binding: that GitHub can serve any commit ever pushed once a repository is
-made public, including unreachable ones, so anything sensitive that ever landed in a commit means
-recreating the repository rather than force-pushing. That paragraph is a precondition for whenever
-this question is answered, not a historical note. `SECURITY.md` claimed the repository was public on
-D-0006's authority and no longer does.
+D-0006 carries the precondition for answering this: GitHub can serve any commit ever pushed once a
+repository is made public, including unreachable ones, so anything sensitive that ever landed in a
+commit means recreating the repository rather than force-pushing. That is a precondition for
+whenever this question is answered, not a historical note.
 
 **Two things follow, and they pull in opposite directions.** Every launch channel in `launch.md`
 sells an auditable vault tool, and a private repository makes the central claim unverifiable by the
