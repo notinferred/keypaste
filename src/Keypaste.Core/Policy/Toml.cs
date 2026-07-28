@@ -127,6 +127,77 @@ public sealed record TomlDocument(IReadOnlyList<TomlTable> Tables)
 }
 
 /// <summary>
+/// The size ceilings one call to <see cref="Toml"/> enforces.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>Why these are a parameter and not only constants.</b> The numbers below were chosen for a
+/// policy file, where every string is a glob, a field name or a client label and 128 characters is
+/// generous. Stage 4.1 reuses this reader for <c>recent.toml</c>, whose strings are absolute file
+/// paths — and on Windows a perfectly ordinary vault path is longer than that. Writing a second
+/// parser was the alternative and CORE.md law 4.3 forbids it, so the limits move out of the parser
+/// instead. <see cref="Policy"/> holds exactly the values the policy path had before this existed,
+/// and a test asserts that.
+/// </para>
+/// <para>
+/// <b>Only sizes are adjustable. No syntax rule is.</b> A backslash is still refused inside a
+/// value, a literal string is still refused, an inline table is still refused. Those are decisions
+/// about what may be written, made once, and a caller does not get to relax them — which is why a
+/// path stored by <c>recent.toml</c> is written with forward slashes rather than by loosening the
+/// rule that keeps a glob literal.
+/// </para>
+/// </remarks>
+public sealed record TomlLimits
+{
+    /// <summary>The largest file the reader will accept, in bytes.</summary>
+    public required int Bytes { get; init; }
+
+    /// <summary>The most lines a file may have.</summary>
+    public required int Lines { get; init; }
+
+    /// <summary>The longest a single line may be, in UTF-16 code units.</summary>
+    public required int LineLength { get; init; }
+
+    /// <summary>The most sections a file may have.</summary>
+    public required int Tables { get; init; }
+
+    /// <summary>The most keys one section may set.</summary>
+    public required int Pairs { get; init; }
+
+    /// <summary>The most items one array may hold.</summary>
+    public required int Items { get; init; }
+
+    /// <summary>The longest a single string may be, in UTF-16 code units.</summary>
+    public required int StringLength { get; init; }
+
+    /// <summary>What <c>policy.toml</c> has always been held to.</summary>
+    public static TomlLimits Policy { get; } = new()
+    {
+        Bytes = Toml.MaximumBytes,
+        Lines = Toml.MaximumLines,
+        LineLength = Toml.MaximumLineLength,
+        Tables = Toml.MaximumTables,
+        Pairs = Toml.MaximumPairs,
+        Items = Toml.MaximumItems,
+        StringLength = Toml.MaximumStringLength,
+    };
+
+    /// <summary>
+    /// What a file of absolute paths is held to: the same shape, with room for a real path.
+    /// </summary>
+    /// <remarks>
+    /// The line length has to clear the string length plus the key and the quotes, and the byte
+    /// ceiling has to clear ten of those lines with their section headers and timestamps.
+    /// </remarks>
+    public static TomlLimits Paths { get; } = Policy with
+    {
+        StringLength = 4096,
+        LineLength = 4200,
+        Bytes = 64 * 1024,
+    };
+}
+
+/// <summary>
 /// Reads the strict subset of TOML that a policy file is allowed to be written in.
 /// </summary>
 /// <remarks>
@@ -198,13 +269,29 @@ public static class Toml
     /// over, whereas a policy file is written by the person running keypaste, told to write UTF-8,
     /// and safest refused when it is something else.
     /// </remarks>
-    public static bool TryDecode(ReadOnlySpan<byte> bytes, out string text, out string error)
+    public static bool TryDecode(ReadOnlySpan<byte> bytes, out string text, out string error) =>
+        TryDecode(bytes, TomlLimits.Policy, out text, out error);
+
+    /// <summary>Decodes the bytes of a file to text, under the given ceilings.</summary>
+    /// <param name="bytes">The file's contents.</param>
+    /// <param name="limits">The sizes to enforce.</param>
+    /// <param name="text">The decoded text, or an empty string on failure.</param>
+    /// <param name="error">What went wrong, or an empty string on success.</param>
+    /// <returns><see langword="true"/> if the bytes decoded.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="limits"/> is null.</exception>
+    public static bool TryDecode(
+        ReadOnlySpan<byte> bytes,
+        TomlLimits limits,
+        out string text,
+        out string error)
     {
+        ArgumentNullException.ThrowIfNull(limits);
+
         text = string.Empty;
 
-        if (bytes.Length > MaximumBytes)
+        if (bytes.Length > limits.Bytes)
         {
-            error = $"the file is larger than {MaximumBytes / 1024} KiB, which is not a policy file";
+            error = $"the file is larger than {limits.Bytes / 1024} KiB, which is not a policy file";
             return false;
         }
 
@@ -237,18 +324,35 @@ public static class Toml
     /// </param>
     /// <returns><see langword="true"/> only when the whole file was understood.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="text"/> is null.</exception>
-    public static bool TryParse(string text, out TomlDocument document, out string error)
+    public static bool TryParse(string text, out TomlDocument document, out string error) =>
+        TryParse(text, TomlLimits.Policy, out document, out error);
+
+    /// <summary>Parses the text of a file, under the given ceilings.</summary>
+    /// <param name="text">The decoded file contents.</param>
+    /// <param name="limits">The sizes to enforce.</param>
+    /// <param name="document">The sections found, or <see cref="TomlDocument.Empty"/> on failure.</param>
+    /// <param name="error">
+    /// The first problem, in the shape <c>line 7: ...</c>, or an empty string on success.
+    /// </param>
+    /// <returns><see langword="true"/> only when the whole file was understood.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="text"/> or <paramref name="limits"/> is null.</exception>
+    public static bool TryParse(
+        string text,
+        TomlLimits limits,
+        out TomlDocument document,
+        out string error)
     {
         ArgumentNullException.ThrowIfNull(text);
+        ArgumentNullException.ThrowIfNull(limits);
 
         document = TomlDocument.Empty;
         error = string.Empty;
 
         var lines = Normalize(text).Split('\n');
 
-        if (lines.Length > MaximumLines)
+        if (lines.Length > limits.Lines)
         {
-            error = $"the file has more than {MaximumLines} lines";
+            error = $"the file has more than {limits.Lines} lines";
             return false;
         }
 
@@ -262,9 +366,9 @@ public static class Toml
             var line = lines[i];
             var number = i + 1;
 
-            if (line.Length > MaximumLineLength)
+            if (line.Length > limits.LineLength)
             {
-                error = Problem(number, $"the line is longer than {MaximumLineLength} characters");
+                error = Problem(number, $"the line is longer than {limits.LineLength} characters");
                 return false;
             }
 
@@ -280,9 +384,9 @@ public static class Toml
                 // Counting what is already open rather than what has been flushed: the section
                 // being built has not reached the list yet, and the cap is on sections written,
                 // not on sections finished.
-                if (tables.Count + (pairs is null ? 0 : 1) == MaximumTables)
+                if (tables.Count + (pairs is null ? 0 : 1) == limits.Tables)
                 {
-                    error = Problem(number, $"at most {MaximumTables} sections are allowed");
+                    error = Problem(number, $"at most {limits.Tables} sections are allowed");
                     return false;
                 }
 
@@ -308,7 +412,7 @@ public static class Toml
                 return false;
             }
 
-            if (!TryReadPair(line, at, number, out var pair, out error))
+            if (!TryReadPair(line, at, number, limits, out var pair, out error))
             {
                 return false;
             }
@@ -322,9 +426,9 @@ public static class Toml
                 }
             }
 
-            if (pairs.Count == MaximumPairs)
+            if (pairs.Count == limits.Pairs)
             {
-                error = Problem(number, $"a section may set at most {MaximumPairs} keys");
+                error = Problem(number, $"a section may set at most {limits.Pairs} keys");
                 return false;
             }
 
@@ -393,6 +497,7 @@ public static class Toml
         string line,
         int at,
         int number,
+        TomlLimits limits,
         [NotNullWhen(true)] out TomlPair? pair,
         out string error)
     {
@@ -434,7 +539,7 @@ public static class Toml
 
         at = SkipSpaces(line, at + 1);
 
-        if (!TryReadValue(line, at, number, out var value, out at, out error))
+        if (!TryReadValue(line, at, number, limits, out var value, out at, out error))
         {
             return false;
         }
@@ -456,6 +561,7 @@ public static class Toml
         string line,
         int at,
         int number,
+        TomlLimits limits,
         [NotNullWhen(true)] out TomlValue? value,
         out int end,
         out string error)
@@ -472,7 +578,7 @@ public static class Toml
         switch (line[at])
         {
             case '"':
-                if (!TryReadString(line, at, number, out var text, out end, out error))
+                if (!TryReadString(line, at, number, limits, out var text, out end, out error))
                 {
                     return false;
                 }
@@ -481,7 +587,7 @@ public static class Toml
                 return true;
 
             case '[':
-                return TryReadArray(line, at, number, out value, out end, out error);
+                return TryReadArray(line, at, number, limits, out value, out end, out error);
 
             case '\'':
                 error = Problem(number, "a literal string is not allowed; use double quotes");
@@ -528,7 +634,14 @@ public static class Toml
     /// which on a file whose whole job is to be read literally is a way to write one thing and mean
     /// another.
     /// </remarks>
-    private static bool TryReadString(string line, int at, int number, out string text, out int end, out string error)
+    private static bool TryReadString(
+        string line,
+        int at,
+        int number,
+        TomlLimits limits,
+        out string text,
+        out int end,
+        out string error)
     {
         text = string.Empty;
         end = at;
@@ -559,9 +672,9 @@ public static class Toml
             return false;
         }
 
-        if (scan - start > MaximumStringLength)
+        if (scan - start > limits.StringLength)
         {
-            error = Problem(number, $"a value may be at most {MaximumStringLength} characters");
+            error = Problem(number, $"a value may be at most {limits.StringLength} characters");
             return false;
         }
 
@@ -618,6 +731,7 @@ public static class Toml
         string line,
         int at,
         int number,
+        TomlLimits limits,
         [NotNullWhen(true)] out TomlValue? value,
         out int end,
         out string error)
@@ -650,13 +764,13 @@ public static class Toml
                 return false;
             }
 
-            if (items.Count == MaximumItems)
+            if (items.Count == limits.Items)
             {
-                error = Problem(number, $"an array may hold at most {MaximumItems} items");
+                error = Problem(number, $"an array may hold at most {limits.Items} items");
                 return false;
             }
 
-            if (!TryReadString(line, at, number, out var text, out at, out error))
+            if (!TryReadString(line, at, number, limits, out var text, out at, out error))
             {
                 return false;
             }
