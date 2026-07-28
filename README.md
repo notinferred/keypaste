@@ -455,7 +455,34 @@ dotnet run --project src/Keypaste.Cli
 Warnings are errors, code style is enforced at build time, and every dependency is pinned by
 `packages.lock.json`. Adding a package is therefore a two-step: declare it in
 `Directory.Packages.props` and the project, then `dotnet restore --force-evaluate` and commit the
-regenerated lock files.
+regenerated lock files. **The same applies to the `RuntimeIdentifiers` list**, which is a
+restore-time input too: changing it changes the restore graph, and a lock file that has not been
+regenerated fails `--locked-mode` with NU1004.
+
+**Never pass `-r` to a restore.** It narrows the project's runtime identifier set to the single RID
+you named, which can never match a lock file recording four, so locked mode fails — and the failure
+reads like a stale lock file rather than like the flag being wrong. The projects declare all four
+RIDs and `PublishAot=true` is committed, so a plain `dotnet restore --locked-mode` is already
+correct for every target. Only `dotnet publish` takes `-r`.
+
+### Building a native binary yourself
+
+Cross-OS NativeAOT is not supported, so each platform's binary is built on that platform. What the
+compiler needs, per O-0005, is `clang` and `zlib1g-dev` on Linux, the Xcode command line tools on
+macOS, and the MSVC C++ build tools on Windows — and on Windows, `vswhere.exe` has to be findable,
+which is the part that fails confusingly when the toolchain is installed but the build claims it is
+not.
+
+```sh
+dotnet publish src/Keypaste.Cli -c Release -r linux-x64 -p:PublishAot=true -o out
+dotnet publish src/Keypaste.Mcp -c Release -r linux-x64 -p:PublishAot=true -o out
+```
+
+The result is a single native file per project with no runtime to install. Substitute `osx-arm64` or
+`win-x64` for the RID you are on. `third_party/` disarms the trim analyzers because vendored source
+is not ours to annotate, so `scripts/verify-aot-trim.sh` re-arms the check the other way: it diffs
+the publish's trim diagnostics against a committed baseline and fails on anything new. Run it after
+any change under `third_party/`.
 
 `third_party/` is vendored source and is held to different rules — it is re-merged from upstream,
 not formatted or linted to our taste. `third_party/Directory.Build.props` quarantines it, and
