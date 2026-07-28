@@ -439,6 +439,47 @@ jobs:
             || { echo "::error::SHA256SUMS disagrees with the per-asset checksum files"; exit 1; }
           cat SHA256SUMS
 
+      # ---------------------------------------------------------------------
+      # EVERYTHING BELOW THIS LINE BECOMES WORLD-READABLE.
+      #
+      # The destination bucket is served publicly at dl.keypaste.com with no authentication, so an
+      # object put there is published the moment it lands and cannot be unpublished from anyone
+      # who already fetched it. The upload is recursive over dist/, which means the safety of this
+      # step depends entirely on nothing unexpected being in that directory.
+      #
+      # So the allowlist below is not belt-and-braces, it is the actual control: every file is
+      # matched against the exact set a release is allowed to contain, and anything else stops the
+      # release. A stray vault fixture, a build log, a core dump or an .env picked up by a future
+      # edit to the packaging step would otherwise be pushed to a public origin silently.
+      # ---------------------------------------------------------------------
+      - name: Refuse to publish anything that is not a release asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          # dotglob is load-bearing, not tidiness. Bash's * skips dotfiles but `aws s3 cp
+          # --recursive` uploads them, so without this a .env in dist/ walks past the allowlist
+          # and onto a public bucket - the exact file this check exists to stop. Observed: the
+          # first version of this step passed a planted .env.production.
+          shopt -s dotglob nullglob
+          cd dist
+          bad=0
+          for f in *; do
+            case "$f" in
+              keypaste-${VERSION}-linux-x64.tar.gz|keypaste-${VERSION}-linux-arm64.tar.gz|\
+              keypaste-${VERSION}-osx-arm64.tar.gz|keypaste-${VERSION}-win-x64.zip|\
+              keypaste-${VERSION}-source.tar.gz|SHA256SUMS) ;;
+              *.sha256)
+                base="${f%.sha256}"
+                [ -f "$base" ] || { echo "::error::$f has no asset beside it"; bad=1; }
+                ;;
+              *)
+                echo "::error::$f is not a release asset and must not be published"; bad=1 ;;
+            esac
+            [ -f "$f" ] || { echo "::error::$f is not a regular file"; bad=1; }
+          done
+          [ "$bad" -eq 0 ] || { echo "::error::refusing to upload to a public bucket"; exit 1; }
+          echo "every file in dist/ is a release asset:"; ls -1
+
       # Versioned prefixes only, never a mutable "latest": the documented command names an exact
       # version and an exact hash, and both must keep meaning what they meant when they were
       # written. A tag nobody has been told about is this pipeline's equivalent of a draft.
