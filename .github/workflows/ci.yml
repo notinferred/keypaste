@@ -3,6 +3,33 @@ name: ci
 on:
   push:
     branches: [main]
+    # Files that no gate in this workflow reads. A push touching only these skips CI entirely; a
+    # push touching anything else runs it in full, so a file added later is covered by default
+    # rather than by remembering to add it here.
+    #
+    # Deliberately absent, and they must stay absent: README.md, launch.md, docs/demo.md,
+    # docs/keepass-and-agents.md and site/public/index.html. scripts/verify-demo.sh holds all five
+    # to what the shipped binaries actually print (D-0034, D-0036), so editing one of them is a
+    # code change wearing a markdown extension and it costs a build on purpose.
+    paths-ignore:
+      - 'CORE.md'
+      - 'CLAUDE.md'
+      - 'PLAN.md'
+      - 'DECISIONS.md'
+      - 'DESIGN.md'
+      - 'prompts.md'
+      - 'ideas.md'
+      - 'CHANGELOG.md'
+      - 'THREATS.md'
+      - 'SECURITY.md'
+      - 'THIRD_PARTY_NOTICES.md'
+      - 'LICENSE'
+      - 'docs/mcp-setup.md'
+      - 'docs/replace-dotenv.md'
+      - 'site/README.md'
+      - 'site/public/thanks/**'
+  # No paths filter on pull_request on purpose: a proposed change gets the full verdict regardless
+  # of what it touches, because that is the one place a reviewer is deciding on evidence.
   pull_request:
   workflow_dispatch:
 
@@ -11,7 +38,12 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # Now true for main as well as pull requests. Rapid pushes to main used to run to completion in
+  # parallel and every superseded run was paid for; only the newest commit's verdict is acted on.
+  # The cost is that an intermediate commit can land without its own green run, which matters for
+  # bisect and is accepted deliberately - release.yml keeps cancel-in-progress: false, because a
+  # cancelled upload is a different kind of problem entirely.
+  cancel-in-progress: true
 
 env:
   DOTNET_NOLOGO: 'true'
