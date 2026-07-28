@@ -10,7 +10,7 @@ namespace Keypaste.Core.Approval;
 /// The gate exists so that no channel has to be trusted with the rules. A channel that forgets its
 /// own timeout, throws, answers twice, or answers late cannot turn any of those into a release: the
 /// deadline is measured here, and anything that is not a clean
-/// <see cref="ApprovalAnswer.Approved"/> arriving inside the window is a denial (CORE.md laws 3.2
+/// <see cref="ApprovalAnswer.Approved"/> arriving inside the window is a denial (docs/PRODUCT.md laws 3.2
 /// and 3.7).
 /// </para>
 /// <para>
@@ -173,7 +173,7 @@ public sealed class ApprovalGate : IDisposable
         catch (Exception)
         {
             // A channel spawns processes and reads terminals. Anything it can throw has to become
-            // a denial here rather than an exception out of a tool call (CORE.md law 3.7).
+            // a denial here rather than an exception out of a tool call (docs/PRODUCT.md law 3.7).
             return ApprovalAnswer.Failed;
         }
     }

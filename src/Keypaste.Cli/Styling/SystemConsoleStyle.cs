@@ -18,7 +18,7 @@ namespace Keypaste.Cli.Styling;
 /// is true: raw escapes render only when <c>ENABLE_VIRTUAL_TERMINAL_PROCESSING</c> is set on the
 /// console, which conhost does not do for us, and <see cref="Console.ForegroundColor"/> is the
 /// console attribute API that works whether or not it is. Two <c>kernel32</c> P/Invokes to force
-/// the mode would be a dependency on the secret path bought for a warning colour (CORE.md law 3.9).
+/// the mode would be a dependency on the secret path bought for a warning colour (docs/PRODUCT.md law 3.9).
 /// </para>
 /// </remarks>
 internal sealed class SystemConsoleStyle : IConsoleStyle

@@ -2,7 +2,7 @@
 #
 # verify-keepassxc-writeback.sh
 #
-# PERMANENT COMPATIBILITY GATE — CORE.md law 4.6, the write-back half.
+# PERMANENT COMPATIBILITY GATE — docs/PRODUCT.md law 4.6, the write-back half.
 #
 # verify-keepassxc-compat.sh proves that a vault keypaste CREATES opens correctly in
 # KeePassXC. That is one direction, and one moment in a file's life. This script covers the

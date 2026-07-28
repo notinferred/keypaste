@@ -24,7 +24,7 @@ public enum AppTheme
 /// <para>
 /// <b>An unreadable file costs a preference and never costs a lock.</b> Every failure here — no
 /// file, no permission, a half-finished hand edit — produces <see cref="Default"/>, which locks
-/// after five minutes. That is the same direction the policy loader fails in (CORE.md law 3.7): the
+/// after five minutes. That is the same direction the policy loader fails in (docs/PRODUCT.md law 3.7): the
 /// fallback has to be the state that protects the vault, never the state the file happened to ask
 /// for.
 /// </para>

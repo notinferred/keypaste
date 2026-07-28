@@ -5,7 +5,7 @@ namespace Keypaste.Core.Tests;
 /// <summary>
 /// The Stage 0.2 secret-path tests: a vault keypaste writes must be a real KDBX4 container,
 /// must give every field back unchanged when reopened, and must refuse a wrong password.
-/// CORE.md law 4.5 makes tests on this path mandatory; law 3.7 is what the wrong-password
+/// docs/PRODUCT.md law 4.5 makes tests on this path mandatory; law 3.7 is what the wrong-password
 /// test enforces.
 /// </summary>
 /// <remarks>
@@ -96,7 +96,7 @@ public sealed class VaultRoundTripTests : IDisposable
     }
 
     /// <summary>
-    /// CORE.md law 3.7, fail closed. A wrong password must raise, not return an empty vault:
+    /// docs/PRODUCT.md law 3.7, fail closed. A wrong password must raise, not return an empty vault:
     /// a caller that treats "no entries" as "nothing to see" would turn a failed unlock into
     /// a silent success.
     /// </summary>

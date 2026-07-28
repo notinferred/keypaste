@@ -33,7 +33,7 @@
     <EnableAotAnalyzer>true</EnableAotAnalyzer>
   </PropertyGroup>
 
-  <!-- CORE.md law 3.9. Directory.Packages.props pins direct versions; the lock files
+  <!-- docs/PRODUCT.md law 3.9. Directory.Packages.props pins direct versions; the lock files
        pin the whole transitive closure by version and content hash. -->
   <PropertyGroup Label="Supply chain">
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>

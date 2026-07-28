@@ -17,7 +17,7 @@ namespace Keypaste.Core.Ipc;
 /// <para>
 /// <b>Every read is a <c>Try</c>.</b> A malformed frame is a refusal, never an exception: the peer
 /// on the other end of this pipe is a process, and the approver holds the unlocked vault, so a
-/// parse failure must cost that connection and nothing more (CORE.md law 3.7).
+/// parse failure must cost that connection and nothing more (docs/PRODUCT.md law 3.7).
 /// </para>
 /// <para>
 /// <b>One transport is not one seam.</b> DECISIONS.md D-0022 forbids fusing the listing path and

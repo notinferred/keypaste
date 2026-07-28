@@ -5,7 +5,7 @@ namespace Keypaste.App.Session;
 /// <para>
 /// A closed set rather than an exception, because every one of these is an ordinary thing a person
 /// does and none of them is an error the app should present as one. The unlock screen maps each to
-/// one calm sentence; ideas.md names "red scary warnings for normal actions" as an anti-pattern and
+/// one calm sentence; docs/IDEAS.md names "red scary warnings for normal actions" as an anti-pattern and
 /// mistyping a password is the most normal action there is.
 /// </para>
 /// <para>

@@ -37,11 +37,11 @@ it gates has to land on `main` first, by itself.
 
 ## Records
 
-- `PLAN.md` — roadmap status, one line per item.
+- `docs/STEPS.md` — roadmap status, one line per item.
 - `DECISIONS.md` — the reasoning, as `D-NNNN` records and `O-NNNN` open questions.
 - `prompts.md` — the per-stage prompts and their checkboxes. **Tick the box; never add prose under
-  a prompt.** Status commentary goes in `PLAN.md`, reasoning goes in `DECISIONS.md`.
-- `CORE.md` does not change.
+  a prompt.** Status commentary goes in `docs/STEPS.md`, reasoning goes in `DECISIONS.md`.
+- `docs/PRODUCT.md` does not change.
 
 A claim on a published page may only say what a gate or a citation can hold (D-0036). If a check
 has never actually executed, it is an assertion about the world and not a check on it (D-0043) —

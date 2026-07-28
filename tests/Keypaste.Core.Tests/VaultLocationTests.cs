@@ -3,7 +3,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// The rule the CLI and the MCP bridge both have to answer the same way (CORE.md law 4.3). The
+/// The rule the CLI and the MCP bridge both have to answer the same way (docs/PRODUCT.md law 4.3). The
 /// CLI's own tests still exercise it through <c>VaultLocator</c>, which is what proves the move
 /// preserved behaviour rather than merely compiling.
 /// </summary>

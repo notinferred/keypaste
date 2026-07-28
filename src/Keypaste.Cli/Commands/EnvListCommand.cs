@@ -68,7 +68,7 @@ internal static class EnvListCommand
                 context.Stdout.WriteLine(variable.Key);
 
                 // The name is still listed: keypaste does not get to pretend the file says
-                // something other than what KeePassXC shows (CORE.md law 4.6). But it cannot be
+                // something other than what KeePassXC shows (docs/PRODUCT.md law 4.6). But it cannot be
                 // exported to a child process, and the place to say so is where it is seen.
                 if (!variable.IsUsableName)
                 {

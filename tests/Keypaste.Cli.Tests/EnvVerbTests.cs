@@ -259,7 +259,7 @@ public sealed class EnvVerbTests
 
     /// <summary>
     /// A variable KeePassXC created under a name keypaste would refuse is still listed — hiding it
-    /// would make the two tools disagree about one file (CORE.md law 4.6) — but the warning that
+    /// would make the two tools disagree about one file (docs/PRODUCT.md law 4.6) — but the warning that
     /// it cannot be exported goes to stderr, leaving stdout machine-readable.
     /// </summary>
     [Fact]
@@ -292,7 +292,7 @@ public sealed class EnvVerbTests
 
     /// <summary>
     /// Two entries with one name is legal KDBX and KeePassXC will create it. There is no correct
-    /// value to report, so it fails rather than silently picking one (CORE.md law 3.7).
+    /// value to report, so it fails rather than silently picking one (docs/PRODUCT.md law 3.7).
     /// </summary>
     [Fact]
     public void Ls_FailsLoudly_WhenKeePassXcLeftTwoEntriesWithOneName()

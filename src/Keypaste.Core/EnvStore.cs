@@ -25,7 +25,7 @@ public sealed record EnvVariable(string Key, string Value)
     /// False only for variables written by something other than keypaste, since
     /// <see cref="EnvStore.TrySet"/> refuses to create one. Reading them anyway is deliberate:
     /// hiding a variable that KeePassXC displays would make the two tools disagree about the
-    /// contents of one file (CORE.md law 4.6).
+    /// contents of one file (docs/PRODUCT.md law 4.6).
     /// </remarks>
     public bool IsUsableName => EnvConvention.IsValidKey(Key, out _);
 }
@@ -37,7 +37,7 @@ public sealed record EnvVariable(string Key, string Value)
 /// <remarks>
 /// <para>
 /// The convention lives here rather than in the CLI because the MCP bridge and the GUI will store
-/// env sets in exactly the same shape, and CORE.md law 4.3 does not allow that rule to be written
+/// env sets in exactly the same shape, and docs/PRODUCT.md law 4.3 does not allow that rule to be written
 /// down three times. Nothing above this type should know that the group is called <c>env</c>.
 /// </para>
 /// <para>
@@ -116,7 +116,7 @@ public sealed class EnvStore(Vault vault)
     /// <exception cref="VaultException">
     /// Two entries in the project share a name. KDBX allows it and KeePassXC will create it, but
     /// there is no correct answer to "what is the value of that variable", so it fails closed
-    /// rather than silently picking one (CORE.md law 3.7).
+    /// rather than silently picking one (docs/PRODUCT.md law 3.7).
     /// </exception>
     public IReadOnlyList<EnvVariable> Read(string project)
     {

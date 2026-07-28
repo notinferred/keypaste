@@ -7,11 +7,11 @@ namespace Keypaste.Core.Audit;
 /// <para>
 /// One rule, in one place, because the audit log (2.1), the policy file (2.3) and
 /// <c>keypaste log</c> (2.4) all have to agree about it, and three frontends resolving a home
-/// directory independently is exactly what CORE.md law 4.3 forbids.
+/// directory independently is exactly what docs/PRODUCT.md law 4.3 forbids.
 /// </para>
 /// <para>
 /// <b>Deliberately not beside the vault.</b> The vault is a file the user syncs with their own
-/// tooling — that is the whole local-first bargain in CORE.md §2. An append-only log that travels
+/// tooling — that is the whole local-first bargain in docs/PRODUCT.md §2. An append-only log that travels
 /// with it would produce conflicted copies on every second machine, break the per-file hash chain,
 /// and hand anyone with the synced folder a write path into another machine's record. The log
 /// describes what happened <em>here</em>.
@@ -102,7 +102,7 @@ public static class KeypasteHome
     /// Written by keypaste, like <see cref="RecentPath"/> and unlike <see cref="PolicyPath"/>.
     /// Nothing in it is an authorization: the idle timeout it carries is a convenience over a
     /// default that already locks, so a missing or unreadable file costs a preference and never
-    /// costs a lock (CORE.md law 3.7).
+    /// costs a lock (docs/PRODUCT.md law 3.7).
     /// </remarks>
     public static string SettingsPath(string? fromEnvironment) =>
         Path.Combine(Resolve(fromEnvironment), SettingsFileName);

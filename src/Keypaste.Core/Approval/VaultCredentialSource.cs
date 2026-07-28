@@ -16,7 +16,7 @@ namespace Keypaste.Core.Approval;
 /// </para>
 /// <para>
 /// Every failure path returns <see langword="false"/>. Nothing here throws for a request it cannot
-/// satisfy, and nothing here guesses (CORE.md law 3.7).
+/// satisfy, and nothing here guesses (docs/PRODUCT.md law 3.7).
 /// </para>
 /// </remarks>
 /// <param name="unlockedVault">

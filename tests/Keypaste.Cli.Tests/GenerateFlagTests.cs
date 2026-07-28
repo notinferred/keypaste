@@ -7,7 +7,7 @@ namespace Keypaste.Cli.Tests;
 /// <c>--generate</c> on the two verbs that store a secret.
 /// </summary>
 /// <remarks>
-/// CORE.md law 4.2 is why these exist before the desktop app grows a Generate button: the feature
+/// docs/PRODUCT.md law 4.2 is why these exist before the desktop app grows a Generate button: the feature
 /// has to be in the CLI first, and "in the CLI" means driven end to end through the shipped verb,
 /// not through <see cref="PasswordGenerator"/> with a command wrapped around it.
 /// </remarks>

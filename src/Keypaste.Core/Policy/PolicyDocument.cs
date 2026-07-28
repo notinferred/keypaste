@@ -9,7 +9,7 @@ namespace Keypaste.Core.Policy;
 /// document rather than being skipped. Skipping would leave a <em>different</em> policy in force
 /// than the one the human wrote, and on this path there is no way to know whether the difference is
 /// narrower or wider — so the only safe reading of a file that is partly wrong is that it says
-/// nothing (CORE.md law 3.7). Everything then prompts, which is exactly the state Stage 2.2 shipped.
+/// nothing (docs/PRODUCT.md law 3.7). Everything then prompts, which is exactly the state Stage 2.2 shipped.
 /// </para>
 /// <para>
 /// This is the deliberate opposite of how <c>--expose</c> treats a bad glob, where the front end

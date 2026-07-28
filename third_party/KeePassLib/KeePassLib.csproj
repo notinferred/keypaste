@@ -42,7 +42,7 @@
     <DefineConstants>TRACE;NETSTANDARD2_0;KEYPASTE_NO_DPAPI;KEYPASTE_NO_GFX</DefineConstants>
 
     <!--
-      CORE.md §3.9: dependencies on the secret path are minimised. This project has
+      docs/PRODUCT.md §3.9: dependencies on the secret path are minimised. This project has
       ZERO PackageReference entries, and that is load-bearing rather than incidental —
       see UPSTREAM.md "Local modifications" for the three substitutions that had to be
       undone to get here.
@@ -71,7 +71,7 @@
 
     <!--
       Derives a key from the Windows user account via DPAPI. keypaste's threat model is
-      a portable vault file (CORE.md §2: KDBX or nothing, the user's file, their sync),
+      a portable vault file (docs/PRODUCT.md §2: KDBX or nothing, the user's file, their sync),
       and a machine-bound key source is the opposite of that. Excluding it also removes
       the last consumer of CryptoUtil.ProtectData.
     -->

@@ -135,7 +135,7 @@ public sealed record TomlDocument(IReadOnlyList<TomlTable> Tables)
 /// policy file, where every string is a glob, a field name or a client label and 128 characters is
 /// generous. Stage 4.1 reuses this reader for <c>recent.toml</c>, whose strings are absolute file
 /// paths — and on Windows a perfectly ordinary vault path is longer than that. Writing a second
-/// parser was the alternative and CORE.md law 4.3 forbids it, so the limits move out of the parser
+/// parser was the alternative and docs/PRODUCT.md law 4.3 forbids it, so the limits move out of the parser
 /// instead. <see cref="Policy"/> holds exactly the values the policy path had before this existed,
 /// and a test asserts that.
 /// </para>
@@ -210,7 +210,7 @@ public sealed record TomlLimits
 /// </para>
 /// <para>
 /// Hand-rolled rather than taken as a package because <c>Keypaste.Core</c> carries no dependencies
-/// at all (CORE.md law 3.9, DECISIONS.md D-0004 and D-0019), and because the strictness is the
+/// at all (docs/PRODUCT.md law 3.9, DECISIONS.md D-0004 and D-0019), and because the strictness is the
 /// point rather than a limitation: a policy file is an authorization document, so a construct
 /// keypaste would have to guess the meaning of is one it must refuse. The same argument produced
 /// <see cref="DotEnv"/>, <see cref="Keypaste.Core.Ipc.MessageFramer"/> and the CLI's own

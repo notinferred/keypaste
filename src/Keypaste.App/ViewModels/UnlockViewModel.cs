@@ -7,7 +7,7 @@ namespace Keypaste.App.ViewModels;
 
 /// <summary>One remembered vault, as the unlock screen shows it.</summary>
 /// <remarks>
-/// The list shows <see cref="Name"/> and puts <see cref="Path"/> in a tooltip. ideas.md's screenshot
+/// The list shows <see cref="Name"/> and puts <see cref="Path"/> in a tooltip. docs/IDEAS.md's screenshot
 /// strategy puts this app beside classic KeePass in marketing shots, and a screenshot should not
 /// publish somebody's directory layout.
 /// </remarks>
@@ -276,7 +276,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     /// </summary>
     /// <remarks>
     /// None of these is an error state in the UI sense — no red, no icon, no dialog. Every one of
-    /// them is something a person does routinely, and ideas.md names scary warnings for normal
+    /// them is something a person does routinely, and docs/IDEAS.md names scary warnings for normal
     /// actions as an anti-pattern.
     /// </remarks>
     private static string Explain(UnlockOutcome outcome) => outcome switch

@@ -8,7 +8,7 @@ namespace Keypaste.Cli.Tests;
 /// <summary>
 /// The hidden-input loop itself. The keystroke source is injected precisely so this is
 /// reachable: <c>Console.SetIn</c> does not intercept <c>Console.ReadKey</c>, so without the
-/// seam none of this behaviour could be asserted at all (CORE.md law 4.5).
+/// seam none of this behaviour could be asserted at all (docs/PRODUCT.md law 4.5).
 /// </summary>
 /// <remarks>
 /// Control characters are written as <c>(char)0x..</c> rather than escape sequences so they

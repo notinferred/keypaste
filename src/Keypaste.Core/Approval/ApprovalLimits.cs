@@ -42,7 +42,7 @@ public sealed record ApprovalLimits
     /// The ceiling on the <em>request</em>, not on the grant: what is actually issued is this
     /// clamped again by <see cref="MaximumTtlSeconds"/>, and by a rule's own ceiling when one
     /// applies. It lives here rather than in the tool schema or the agent's argument parser because
-    /// all three have to agree about it and CORE.md law 4.3 does not allow a number that means one
+    /// all three have to agree about it and docs/PRODUCT.md law 4.3 does not allow a number that means one
     /// thing to be written down three times.
     /// </remarks>
     public const int MaximumRequestableTtlSeconds = 3600;

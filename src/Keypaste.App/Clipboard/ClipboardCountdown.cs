@@ -13,7 +13,7 @@ namespace Keypaste.App.Clipboard;
 /// to the UI thread arrives as an injected <c>Action&lt;Action&gt;</c> — the same shape
 /// <see cref="ShellViewModel"/> takes <c>applyTheme</c> in, and for the same reason. The whole
 /// countdown is then assertable with a fake clock and no display, which is where the security
-/// assertions live (CORE.md law 4.5).
+/// assertions live (docs/PRODUCT.md law 4.5).
 /// </para>
 /// <para>
 /// <b>The clear rule is not written here.</b>

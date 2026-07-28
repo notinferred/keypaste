@@ -21,7 +21,7 @@ public sealed record RecentVault(string Path, DateTimeOffset OpenedAt);
 /// </para>
 /// <para>
 /// <b>It holds paths and nothing else.</b> No entry names, no counts, no fingerprints of the
-/// contents. CORE.md law 3.5 is about telemetry and this file never leaves the machine, but a vault
+/// contents. docs/PRODUCT.md law 3.5 is about telemetry and this file never leaves the machine, but a vault
 /// path is still information about a person — <c>~/work/acme-prod.kdbx</c> says something — which is
 /// why it is capped, written owner-only, and forgettable from the UI in one click.
 /// </para>

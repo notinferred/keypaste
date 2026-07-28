@@ -122,7 +122,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     /// A quiet line that appears shortly before the vault locks, and disappears on any input.
     /// </summary>
     /// <remarks>
-    /// Muted, not red, and not a dialog. <c>ideas.md</c> names "red scary warnings for normal
+    /// Muted, not red, and not a dialog. <c>docs/IDEAS.md</c> names "red scary warnings for normal
     /// actions" as an anti-pattern, and an auto-lock is the most normal thing this app does.
     /// </remarks>
     internal string Countdown

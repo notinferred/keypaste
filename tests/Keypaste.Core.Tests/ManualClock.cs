@@ -9,7 +9,7 @@ namespace Keypaste.Core.Tests;
 /// <c>FakeTimeProvider</c>, and the reason is supply chain rather than taste: a test-only package
 /// still enters <c>packages.lock.json</c>, still restores under <c>--locked-mode</c>, and still
 /// turns CI red the day it gets a low-severity advisory under <c>NuGetAudit</c>. That is a real
-/// cost for a class with two overrides (CORE.md law 3.9).
+/// cost for a class with two overrides (docs/PRODUCT.md law 3.9).
 /// </para>
 /// <para>
 /// <b>Callbacks fire on the thread that calls <see cref="Advance"/>.</b> Anything they complete

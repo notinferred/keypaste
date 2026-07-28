@@ -4,7 +4,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// The only code in keypaste that turns an entry into a secret on the agent path, so CORE.md law
+/// The only code in keypaste that turns an entry into a secret on the agent path, so docs/PRODUCT.md law
 /// 4.5 applies with full force. What it refuses matters at least as much as what it releases.
 /// </summary>
 /// <remarks>
@@ -272,7 +272,7 @@ public sealed class VaultCredentialSourceTests : IDisposable
     }
 
     /// <summary>
-    /// A vault disposed under the source is an error path, and CORE.md law 3.7 says an error path
+    /// A vault disposed under the source is an error path, and docs/PRODUCT.md law 3.7 says an error path
     /// denies. It must not surface as an exception out of a tool call.
     /// </summary>
     [Fact]

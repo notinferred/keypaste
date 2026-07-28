@@ -11,7 +11,7 @@ namespace Keypaste.App.Tests.ViewModels;
 /// <remarks>
 /// <para>
 /// <b>The first test here is D-0032 as a gate rather than as a comment.</b> The rendering lives in
-/// <see cref="AuditText"/> because CORE.md law 4.3 does not allow the CLI and the GUI to write the
+/// <see cref="AuditText"/> because docs/PRODUCT.md law 4.3 does not allow the CLI and the GUI to write the
 /// same sentence twice, and a doc-comment saying so is an assertion about the world rather than a
 /// check on it. This fails the day somebody re-implements the table in XAML.
 /// </para>

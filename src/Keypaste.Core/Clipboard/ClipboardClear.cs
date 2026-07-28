@@ -43,7 +43,7 @@ public static class ClipboardClear
     /// <para>
     /// <b>A read-back that failed means clear anyway.</b> Skipping the clear because verification
     /// was impossible would leave a password on the clipboard indefinitely, which is the worst
-    /// outcome available here — fail closed, CORE.md law 3.7. Clearing something the user copied
+    /// outcome available here — fail closed, docs/PRODUCT.md law 3.7. Clearing something the user copied
     /// since is recoverable; leaving a secret behind is not.
     /// </para>
     /// <para>

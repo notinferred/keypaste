@@ -13,7 +13,7 @@ namespace Keypaste.Core.Internal;
 /// <para>
 /// <b>This is the only file in the repository permitted to reference KeePassLib.</b>
 /// Everything above it speaks in <see cref="VaultEntry"/> and <see cref="VaultException"/>.
-/// That rule is what keeps CORE.md law 4.3 honest — one core library, with the format
+/// That rule is what keeps docs/PRODUCT.md law 4.3 honest — one core library, with the format
 /// dependency behind a seam narrow enough that replacing it is a single-file change rather
 /// than an archaeology project.
 /// </para>
@@ -74,7 +74,7 @@ internal sealed class KeePassInterop : IDisposable
 
             // KeePassLib reports an unreadable container, a failed HMAC, and a bad key through
             // several exception types. Anything that is not plainly an I/O problem is treated
-            // as "this did not open" and nothing partial is handed back (CORE.md law 3.7).
+            // as "this did not open" and nothing partial is handed back (docs/PRODUCT.md law 3.7).
             throw ex is IOException or UnauthorizedAccessException
                 ? new VaultException($"Could not read '{path}'.", ex)
                 : new VaultException($"'{path}' could not be opened as a KDBX vault.", ex);
@@ -121,7 +121,7 @@ internal sealed class KeePassInterop : IDisposable
         // The existing PwEntry is mutated rather than removed and re-added. Re-adding would mint a
         // new UUID and discard the entry's timestamps, attachments, and any custom string fields
         // added in KeePassXC — data keypaste does not model and therefore must not destroy
-        // (CORE.md law 4.6).
+        // (docs/PRODUCT.md law 4.6).
         //
         // CreateBackup snapshots the pre-change state and trims the history list itself, so a
         // separate MaintainBackups call would be dead code (third_party/KeePassLib/PwEntry.cs:584).
@@ -174,7 +174,7 @@ internal sealed class KeePassInterop : IDisposable
         }
 
         // Removed outright rather than moved to the recycle bin: a vault the user asked to
-        // delete from should not keep a readable copy of the secret (CORE.md law 3.4). This
+        // delete from should not keep a readable copy of the secret (docs/PRODUCT.md law 3.4). This
         // takes the entry's history with it, which is the only way a value keypaste previously
         // wrote can be erased — see DECISIONS.md D-0014.
         found.Group.Entries.Remove(found.Entry);
@@ -326,7 +326,7 @@ internal sealed class KeePassInterop : IDisposable
         // Only the password is marked protected, matching KeePass's own default. The flag
         // controls in-memory protection and the KDBX inner-stream encryption of that field;
         // marking Title or URL protected would make the file open oddly in other KeePass
-        // clients for no security gain (CORE.md law 4.6, compatibility is sacred).
+        // clients for no security gain (docs/PRODUCT.md law 4.6, compatibility is sacred).
         bool protect = string.Equals(field, PwDefs.PasswordField, StringComparison.Ordinal);
         entry.Strings.Set(field, new ProtectedString(protect, value));
     }

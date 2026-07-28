@@ -86,7 +86,7 @@ public sealed class GrantCache : IDisposable
     /// <remarks>
     /// Expiry is checked here as well as by the timer, so a grant can never be used after its TTL
     /// even if a timer has not run yet. A hit is still an agent access and still has to be logged
-    /// by the caller (CORE.md law 3.3).
+    /// by the caller (docs/PRODUCT.md law 3.3).
     /// </remarks>
     public bool TryUse(GrantKey key, [NotNullWhen(true)] out ReleasedField? value, out TimeSpan remaining)
     {

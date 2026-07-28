@@ -106,7 +106,7 @@ public static class EnvConvention
     /// because a name outside it cannot be exported to a child process, which is the entire point
     /// of storing it. It is enforced only on write: a name KeePassXC put in the file is always
     /// listed, never hidden, because keypaste and KeePassXC disagreeing about the contents of the
-    /// same file is the failure CORE.md law 4.6 exists to prevent.
+    /// same file is the failure docs/PRODUCT.md law 4.6 exists to prevent.
     /// </remarks>
     public static bool IsValidKey(string key, out string error)
     {

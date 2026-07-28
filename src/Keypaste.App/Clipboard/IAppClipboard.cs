@@ -23,7 +23,7 @@ namespace Keypaste.App.Clipboard;
 /// <para>
 /// Asynchronous because the platform is. It exists as an interface so
 /// <see cref="ClipboardCountdown"/> can be tested with no window, no display and no clipboard —
-/// which is where the security assertions live (CORE.md law 4.5).
+/// which is where the security assertions live (docs/PRODUCT.md law 4.5).
 /// </para>
 /// </remarks>
 internal interface IAppClipboard

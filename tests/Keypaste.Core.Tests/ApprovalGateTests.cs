@@ -4,7 +4,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// The gate is where CORE.md law 3.2's "default is deny" stops being a sentence and becomes code,
+/// The gate is where docs/PRODUCT.md law 3.2's "default is deny" stops being a sentence and becomes code,
 /// so these tests are mostly about what it refuses rather than what it allows.
 /// </summary>
 /// <remarks>
@@ -94,7 +94,7 @@ public sealed class ApprovalGateTests
 
     /// <summary>
     /// A channel spawns processes and reads terminals, so it can throw for reasons that have
-    /// nothing to do with what the human wanted. CORE.md law 3.7 makes every one of them a denial,
+    /// nothing to do with what the human wanted. docs/PRODUCT.md law 3.7 makes every one of them a denial,
     /// and none of them an exception out of a tool call.
     /// </summary>
     [Fact]

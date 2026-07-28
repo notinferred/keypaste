@@ -10,7 +10,7 @@ namespace Keypaste.Core.Tests;
 /// itself. Every one of them describes something a user can do in KeePassXC — an entry with a
 /// name that is not a legal variable, two entries with the same name, an entry with no title —
 /// and keypaste has to have an answer for each that does not involve pretending the file says
-/// something other than what it says (CORE.md law 4.6).
+/// something other than what it says (docs/PRODUCT.md law 4.6).
 /// </remarks>
 public sealed class EnvStoreTests : IDisposable
 {
@@ -245,7 +245,7 @@ public sealed class EnvStoreTests : IDisposable
 
     /// <summary>
     /// KDBX permits two entries with the same title in one group. There is no correct value to
-    /// return for that name, so reading fails closed instead of picking one (CORE.md law 3.7).
+    /// return for that name, so reading fails closed instead of picking one (docs/PRODUCT.md law 3.7).
     /// </summary>
     [Fact]
     public void Read_FailsClosed_WhenTwoEntriesShareAName()

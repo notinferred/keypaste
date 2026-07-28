@@ -18,7 +18,7 @@ namespace Keypaste.App.Tests;
 /// <b><c>Avalonia.Headless.XUnit</c> is deliberately not referenced.</b> It supplies an
 /// <c>[AvaloniaFact]</c> attribute over this same mechanism, and a spike showed the session drives
 /// xunit.v3 directly under this repository's Microsoft.Testing.Platform runner. One fewer package
-/// on a repository that counts them (CORE.md law 3.9).
+/// on a repository that counts them (docs/PRODUCT.md law 3.9).
 /// </para>
 /// <para>
 /// Most of this stage's tests need none of this. <c>AppVaultSession</c> and the settings and

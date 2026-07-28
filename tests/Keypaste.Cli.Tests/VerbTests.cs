@@ -206,7 +206,7 @@ public sealed class VerbTests
 
     /// <summary>
     /// No clipboard means a loud failure, never a quiet fallback to printing the secret
-    /// (CORE.md law 3.7).
+    /// (docs/PRODUCT.md law 3.7).
     /// </summary>
     [Fact]
     public void Get_NoClipboardTool_FailsAndSuggestsShow_WithoutLeakingTheSecret()

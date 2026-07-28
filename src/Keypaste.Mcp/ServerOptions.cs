@@ -11,7 +11,7 @@ namespace Keypaste.Mcp;
 /// <remarks>
 /// <para>
 /// A hand-written parser rather than <c>Keypaste.Cli.CommandLine</c>. That looks like the kind of
-/// duplication CORE.md law 4.3 forbids and is not: the CLI's parser rejects a repeated option, which
+/// duplication docs/PRODUCT.md law 4.3 forbids and is not: the CLI's parser rejects a repeated option, which
 /// is exactly what <c>--expose</c> needs to allow, and widening it would change behaviour for five
 /// shipped verbs to serve one new caller. Two parsers for two different grammars is not two
 /// implementations of one rule — and every rule this configures (<see cref="EntryExposure"/>,

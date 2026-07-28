@@ -41,8 +41,8 @@ end, in about sixty seconds.
 operating systems. The binaries are unsigned, the desktop app is not among them — it exists, it
 browses and edits the same vaults, and it builds from source rather than shipping in a release
 ([`docs/desktop.md`](docs/desktop.md)) — and the approval prompt is a terminal prompt rather than a
-native dialog. [`PLAN.md`](PLAN.md) is what lands next;
-[`CORE.md`](CORE.md) is the constitution and does not change.
+native dialog. [`docs/STEPS.md`](docs/STEPS.md) is what lands next;
+[`docs/PRODUCT.md`](docs/PRODUCT.md) is the constitution and does not change.
 
 ## Install
 
@@ -427,21 +427,21 @@ answer here is the one the KDBX ecosystem already reached for when browsers want
 ## Vault format
 
 KDBX4 with Argon2d key derivation (2 iterations, 64 MiB, parallelism 2) and AES-256. keypaste
-never invents a format and writes no cryptography of its own (CORE.md §2, §3.6): the format layer
+never invents a format and writes no cryptography of its own (docs/PRODUCT.md §2, §3.6): the format layer
 is [KeePassLib](third_party/KeePassLib/UPSTREAM.md), vendored from KeePass 2.61 and reached through
 a single file, `src/Keypaste.Core/Internal/KeePassInterop.cs`.
 
 Any vault keypaste writes must open in KeePassXC, and anything KeePassXC writes back must be
 readable by keypaste. That is not a hope — `scripts/verify-keepassxc-compat.sh` and
 `scripts/verify-keepassxc-writeback.sh` prove both directions on every push against a real
-`keepassxc-cli`, on all three operating systems, and the gate is permanent (CORE.md §4.6,
+`keepassxc-cli`, on all three operating systems, and the gate is permanent (docs/PRODUCT.md §4.6,
 [`DECISIONS.md`](DECISIONS.md) D-0008 and D-0014).
 
 Directories and namespaces use .NET's PascalCase convention; the kebab-case names above are the
 roadmap's and survive where they are user-visible, in the shipped binary names.
 
 CLI, MCP server, and the eventual GUI are all thin clients over `Keypaste.Core` — no logic is
-duplicated in a frontend (CORE.md §4.3).
+duplicated in a frontend (docs/PRODUCT.md §4.3).
 
 ## Build and test
 
@@ -528,4 +528,4 @@ Please report vulnerabilities privately — see [`SECURITY.md`](SECURITY.md).
 
 ## License
 
-[AGPL-3.0](LICENSE). Auditable code is the trust strategy (CORE.md §3.8).
+[AGPL-3.0](LICENSE). Auditable code is the trust strategy (docs/PRODUCT.md §3.8).

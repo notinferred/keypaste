@@ -8,7 +8,7 @@ namespace Keypaste.Cli.Commands;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>The one command that puts plaintext on disk.</b> CORE.md law 3.4 forbids a secret touching
+/// <b>The one command that puts plaintext on disk.</b> docs/PRODUCT.md law 3.4 forbids a secret touching
 /// disk unencrypted <em>by keypaste's doing</em>; here the user names the format, names the
 /// destination, and answers for it, which is the same distinction that lets <c>get --show</c> exist
 /// beside a clipboard that is otherwise the only way out. It is an escape hatch, and a vault you

@@ -36,7 +36,7 @@
                  Foreground="{DynamicResource KpTextPrimary}" />
 
       <!-- First run. Points at the CLI rather than growing a second way to make a vault:
-           CORE.md law 4.2 says every feature exists in the CLI before it gets a GUI. -->
+           docs/PRODUCT.md law 4.2 says every feature exists in the CLI before it gets a GUI. -->
       <StackPanel Spacing="6" IsVisible="{Binding HasNoRecent}">
         <TextBlock Text="No vaults yet. Drag a .kdbx file here, or browse for one."
                    TextWrapping="Wrap"

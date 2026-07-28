@@ -12,7 +12,7 @@ namespace Keypaste.Core.Audit;
 /// <b>This is a precondition, not observability.</b> If a line cannot be written the call it
 /// describes must be refused — otherwise breaking the logger becomes the way to obtain access that
 /// leaves no trace, and an attacker's first move is to fill the disk or remove write permission.
-/// CORE.md law 3.3 requires every access to be logged and law 3.7 requires every error path to
+/// docs/PRODUCT.md law 3.3 requires every access to be logged and law 3.7 requires every error path to
 /// deny; together they mean no record, no disclosure. Callers are expected to honour that, and
 /// THREATS.md T-6 states it as a property of the product.
 /// </para>

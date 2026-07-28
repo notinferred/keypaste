@@ -5,7 +5,7 @@ namespace Keypaste.Core.Tests;
 /// <summary>
 /// Covers the open-modify-save cycle, which Stage 0.2 never exercised: it only ever created a
 /// vault and saved it once. Every CLI verb except <c>init</c> reopens an existing file, so the
-/// durability of that path is now on the secret path (CORE.md law 4.5).
+/// durability of that path is now on the secret path (docs/PRODUCT.md law 4.5).
 /// </summary>
 public sealed class VaultRemoveTests : IDisposable
 {
@@ -53,7 +53,7 @@ public sealed class VaultRemoveTests : IDisposable
     /// <summary>
     /// A group that holds no entries is invisible to <see cref="Vault.ReadEntries"/> but is
     /// listed by <c>keepassxc-cli ls -R -f</c>. Listing the two separately is what lets keypaste
-    /// agree with KeePassXC about the shape of the same file (CORE.md law 4.6).
+    /// agree with KeePassXC about the shape of the same file (docs/PRODUCT.md law 4.6).
     /// </summary>
     [Fact]
     public void ReadGroupPaths_IncludesNestedAndNowEmptyGroups()
@@ -76,7 +76,7 @@ public sealed class VaultRemoveTests : IDisposable
     /// Guards a real defect: KeePassLib defaults <c>UseFileTransactions</c> to false and
     /// <c>PwDatabase.Close()</c> — which <c>Open()</c> calls first — resets it, so keypaste has
     /// to set it on the open path too. Without that, an interrupted <c>add</c> or <c>rm</c> would
-    /// truncate a vault that was previously readable, which is a fail-open write (CORE.md law 3.7).
+    /// truncate a vault that was previously readable, which is a fail-open write (docs/PRODUCT.md law 3.7).
     /// <para>
     /// The flag is asserted directly. Observing the effect is not enough: an in-place save also
     /// leaves no debris behind, so a debris-only assertion would pass with the defect present.

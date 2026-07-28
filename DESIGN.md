@@ -2,7 +2,7 @@
 
 > **Status: proposed, not accepted.** Nothing here has been built or decided. It is a visual
 > exploration parked in the repo so it does not get lost between now and Stage 3–4, where it
-> becomes relevant. `PLAN.md` says which stage is actually in progress.
+> becomes relevant. `docs/STEPS.md` says which stage is actually in progress.
 
 [`design.html`](design.html) holds the exploration: a landing page, the agent approval dialog, an
 app shell, and six identity marks with one applied example.
@@ -22,7 +22,7 @@ The exploration is themed *"hosted underneath, invisible on top"*, and the landi
 proof point is *"sign in and your keys are there — on your laptop, your other laptop, your
 terminal."*
 
-CORE.md §2 permits this, but conditionally, and the condition is the whole sentence:
+docs/PRODUCT.md §2 permits this, but conditionally, and the condition is the whole sentence:
 
 > **NOT** a cloud service that holds user secrets. Local-first forever. Sync is the user's problem
 > (their file, their Dropbox/Syncthing/whatever) until/unless a **zero-knowledge** hosted tier is
@@ -52,7 +52,7 @@ does not have and uses a non-standard `style-hover` attribute, so there was no m
 even before the shell turned out not to be a webview at all (DECISIONS.md D-0044).
 
 The one that matters: the tension above is still open. The exploration's opening move is sign-in,
-and 4.1 had no standing to ship a premise that inverts CORE.md §4.1 while the question of whether
+and 4.1 had no standing to ship a premise that inverts docs/PRODUCT.md §4.1 while the question of whether
 keypaste is offline-first with optional sync — or something you log into — has never been answered.
 Adopting the visual language would have been the thin end of adopting the framing. The landing page
 and the approval dialog are untouched by this note; the approval dialog is Stage 4.3's, and it is

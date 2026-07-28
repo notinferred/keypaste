@@ -6,7 +6,7 @@ namespace Keypaste.Cli;
 /// repository, not that it was ever committed, so every caller phrases the finding conditionally
 /// and hands the user the command to check. Claiming history for a <c>.gitignore</c>d file would be
 /// the kind of overclaim SECURITY.md exists to avoid, and a subprocess on the secret path would
-/// need its own justification under CORE.md law 3.9.
+/// need its own justification under docs/PRODUCT.md law 3.9.
 /// </remarks>
 internal static class GitRepository
 {

@@ -37,7 +37,7 @@ public enum EntryAddressKind
 /// and an entry titled <c>c</c> in group <c>a/b</c> have the same path and are genuinely
 /// indistinguishable by it. Hashing the two parts with a separator that cannot occur in either
 /// gives them different handles, so each remains uniquely addressable. Addressing by path stays
-/// available and stays ambiguous — a colliding path is refused rather than guessed at (CORE.md law
+/// available and stays ambiguous — a colliding path is refused rather than guessed at (docs/PRODUCT.md law
 /// 3.7).
 /// </para>
 /// <para>

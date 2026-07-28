@@ -45,23 +45,23 @@ falls back to an in-tree, fully managed **ChaCha20** implementation where DPAPI 
 The port replaced that with `Microsoft.AspNetCore.DataProtection`, pulling in three ASP.NET
 packages and constructing an *ephemeral* provider that also creates a key directory under
 `%APPDATA%/KeePass2`. For keypaste that is three unwanted dependencies on the secret path
-(CORE.md §3.9) and a filesystem side effect we did not ask for.
+(docs/PRODUCT.md §3.9) and a filesystem side effect we did not ask for.
 
 Defining `KEYPASTE_NO_DPAPI` makes `ProtectedBinary.ProtectedMemorySupported` report `false`,
 which selects **upstream's own ChaCha20 path** — identical behaviour on all three platforms,
-zero dependencies, and no code of ours anywhere near a cipher (CORE.md §3.6).
+zero dependencies, and no code of ours anywhere near a cipher (docs/PRODUCT.md §3.6).
 
 | File | Change |
 |---|---|
 | `Security/ProtectedBinary.cs` | `ProtectedMemorySupported` returns `false`; the `ProtectedMemory` branches of `Encrypt()`/`Decrypt()` are compiled out |
-| `Cryptography/CryptoUtil.cs` | `IsProtectedDataSupported` returns `false`; `ProtectData`/`UnprotectData` are **removed, not stubbed** — a stub returning plaintext would be a fail-open error path (CORE.md §3.7) |
+| `Cryptography/CryptoUtil.cs` | `IsProtectedDataSupported` returns `false`; `ProtectData`/`UnprotectData` are **removed, not stubbed** — a stub returning plaintext would be a fail-open error path (docs/PRODUCT.md §3.7) |
 | `Utility/StrUtil.cs` | `EncryptString`/`DecryptString` compiled out (they had no callers) |
 | `Keys/CompositeKey.cs` | the `is KcpUserAccount` count in `ValidateUserKeys` compiled out, following the exclusion below |
 
 ### `KEYPASTE_NO_GFX` — drop `System.Drawing.Common`
 
 `System.Drawing.Common` is Windows-only since .NET 7 and throws `PlatformNotSupportedException`
-elsewhere, so it cannot be part of a cross-platform vault library (CORE.md §4.4).
+elsewhere, so it cannot be part of a cross-platform vault library (docs/PRODUCT.md §4.4).
 
 Only the *presentation* surface is affected — decoding a stored PNG into a `Bitmap`.
 `PwCustomIcon.ImageDataPng`, the byte array that actually lives in the KDBX file, is untouched,
@@ -80,7 +80,7 @@ so **custom icons still round-trip through save/load correctly**. keypaste rende
 | `Native/ClipboardU.cs` | desktop clipboard; needs WinForms (upstream port excludes it too) |
 | `Properties/AssemblyInfo.cs` | assembly attributes are SDK-generated (upstream port excludes it too) |
 | `Utility/GfxUtil.cs` | image load/scale; needs `System.Drawing.Common`; called only from `PwCustomIcon` |
-| `Keys/KcpUserAccount.cs` | machine-bound key derived from the Windows account, the opposite of a portable vault file (CORE.md §2); also the last consumer of `CryptoUtil.ProtectData` |
+| `Keys/KcpUserAccount.cs` | machine-bound key derived from the Windows account, the opposite of a portable vault file (docs/PRODUCT.md §2); also the last consumer of `CryptoUtil.ProtectData` |
 
 **Result: zero `PackageReference` entries.** `packages.lock.json` resolves to `"net10.0": {}`.
 That is load-bearing, not incidental — see `DECISIONS.md` D-0004.

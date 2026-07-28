@@ -1,6 +1,6 @@
 # Changelog
 
-> CORE.md law 4.7: small releases, real changelogs, semantic versioning. Written for someone
+> docs/PRODUCT.md law 4.7: small releases, real changelogs, semantic versioning. Written for someone
 > deciding whether to upgrade, not for someone reading commits. The release workflow refuses to
 > publish a tag that has no section here.
 

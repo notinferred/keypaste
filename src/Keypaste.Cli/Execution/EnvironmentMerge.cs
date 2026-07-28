@@ -8,7 +8,7 @@ namespace Keypaste.Cli.Execution;
 /// </summary>
 /// <remarks>
 /// Pure — no vault, no process, no console. This is the code that decides which credential a
-/// program receives, so CORE.md law 4.5 attaches here more than anywhere else in the CLI, and it
+/// program receives, so docs/PRODUCT.md law 4.5 attaches here more than anywhere else in the CLI, and it
 /// is written to be asserted directly rather than inferred from what a child printed.
 /// </remarks>
 internal static class EnvironmentMerge

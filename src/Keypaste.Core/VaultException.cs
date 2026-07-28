@@ -6,7 +6,7 @@ namespace Keypaste.Core;
 /// <remarks>
 /// Every failure on the vault path surfaces as this type or a derived one. Nothing on that
 /// path returns a degraded result — an empty vault, a null entry, a silently unencrypted
-/// file — because a fail-open error path is how a credential leaks (CORE.md law 3.7).
+/// file — because a fail-open error path is how a credential leaks (docs/PRODUCT.md law 3.7).
 /// </remarks>
 public class VaultException : Exception
 {
@@ -39,7 +39,7 @@ public class VaultException : Exception
 /// A vault is held in memory and written back whole, so a save made from a stale copy does not
 /// merge — it reverts. The reverted write leaves no history item either, because the entry it
 /// carried never existed in the saving process's tree, so there is nothing for KeePass to snapshot
-/// and nothing for KeePassXC's History tab to show. That is unrecoverable, and CORE.md law 3.7 is
+/// and nothing for KeePassXC's History tab to show. That is unrecoverable, and docs/PRODUCT.md law 3.7 is
 /// why it is an exception rather than a paragraph in SECURITY.md.
 /// </para>
 /// <para>

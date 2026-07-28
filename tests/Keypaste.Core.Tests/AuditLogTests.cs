@@ -7,7 +7,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// The audit log is a precondition for disclosure, not observability (CORE.md laws 3.3 and 3.7,
+/// The audit log is a precondition for disclosure, not observability (docs/PRODUCT.md laws 3.3 and 3.7,
 /// THREATS.md T-6), so what it does when it cannot write matters as much as what it writes.
 /// </summary>
 public sealed class AuditLogTests : IDisposable

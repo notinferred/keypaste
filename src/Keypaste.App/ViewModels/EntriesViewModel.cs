@@ -218,7 +218,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     /// <see cref="Controls.MaskedInput"/>, whose whole design is that it accumulates nothing —
     /// which is right for a password being checked and wrong for one being composed. Anyone who
     /// needs to type a specific password has <c>keypaste add</c>, which prompts for it without
-    /// putting it in a window (CORE.md law 4.2).
+    /// putting it in a window (docs/PRODUCT.md law 4.2).
     /// </remarks>
     internal bool GeneratePassword
     {

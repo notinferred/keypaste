@@ -1,6 +1,6 @@
-# ideas.md — The Parking Lot
-> Ideas wait here. Most wait forever, and that's the point (CORE.md law 5.5).
-> Nothing here enters a sprint unless it's promoted into PLAN.md with a checkbox.
+# IDEAS.md — The Parking Lot
+> Ideas wait here. Most wait forever, and that's the point (docs/PRODUCT.md law 5.5).
+> Nothing here enters a sprint unless it's promoted into docs/STEPS.md with a checkbox.
 > Business, pricing, and positioning notes are kept privately, outside this repo.
 
 ---
@@ -24,8 +24,8 @@
 - `keypaste env set --no-history`: overwrite a value without keeping the previous one as KDBX
   history, for rotating a credential that leaked. Diverges from KeePassXC's own editor, so it
   has to be opt-in and loud (D-0014).
-- Design direction for the GUI, the approval dialog and keypaste.com lives in [DESIGN.md](DESIGN.md)
-  and design.html - proposed only, and it needs the local-first vs hosted-sync question in CORE.md
+- Design direction for the GUI, the approval dialog and keypaste.com lives in [DESIGN.md](../DESIGN.md)
+  and design.html - proposed only, and it needs the local-first vs hosted-sync question in docs/PRODUCT.md
   section 2 answered before any of it is built.
 - `keypaste run` on Unix could `execve` the child instead of wrapping it: exit status, job control
   and signals would all be exactly right for free, and the address space holding the secrets would

@@ -4,7 +4,7 @@
 > written early on purpose: written cold it argues, written on the morning it sells. The questions
 > each post asks are real questions, and the answers are wanted whether or not the post does well.
 
-Five channels, in the order `PLAN.md:53` names them and `CORE.md` §5.3 sanctions them: Hacker News,
+Five channels, in the order `docs/STEPS.md` Stage 3 names them and `docs/PRODUCT.md` §5.3 sanctions them: Hacker News,
 r/selfhosted, r/KeePass, the MCP community, X. One post each. No reposting, no second account, no
 asking anyone to go vote.
 
@@ -47,7 +47,7 @@ each of these is something a stranger hits before they hit the product.
   a flat-rate provider when GitHub-hosted billing stopped the jobs starting (D-0042), so free
   minutes are no longer a reason to publish anything. And `SECURITY.md` was telling reporters the
   repository was public, which meant pointing them at a vulnerability-reporting channel they cannot
-  reach; that is fixed. What is left is the real question — CORE.md law 3.8 calls auditable code the
+  reach; that is fixed. What is left is the real question — docs/PRODUCT.md law 3.8 calls auditable code the
   trust strategy, and every post below sells exactly that — plus D-0006's warning that publishing is
   irreversible because GitHub can serve any commit ever pushed. Answer it before posting, not before
   tagging.
@@ -58,7 +58,7 @@ each of these is something a stranger hits before they hit the product.
   `PublishRepositoryUrl=true` bakes into SourceLink metadata inside the shipped binaries. Those two
   had to be right before the first tag, because an artifact cannot be edited afterwards.
 - [ ] **The canonical link is `https://github.com/notinferred/keypaste`** and every post below uses
-  it. If the `keypaste` org from `PLAN.md:13` is ever registered, that is a move to make before a
+  it. If the `keypaste` org from the `docs/STEPS.md` Owner Queue is ever registered, that is a move to make before a
   launch, never after.
 - [ ] **`blacksmith-*` runners have an answer for pull requests from forks.** CI is the first thing
   a contributor meets, and a launch produces pull requests from people with no write access.
@@ -84,7 +84,7 @@ each of these is something a stranger hits before they hit the product.
   the handler's 503 saying the address was not stored. No address was ever silently dropped, and
   there was no list for the over-privileged credential to read. Both records were corrected rather
   than quietly edited.
-- [ ] **Double opt-in ships before a single message goes to the list.** `DECISIONS.md:2058` and the
+- [ ] **Double opt-in ships before a single message goes to the list.** `DECISIONS.md` D-0037 and the
   page footer both promise a confirmation first. A launch is exactly the pressure that makes
   someone mail an unconfirmed list once.
 - [ ] **`security@keypaste.com` receives mail**, tested by sending to it, and GitHub's private
@@ -97,7 +97,7 @@ each of these is something a stranger hits before they hit the product.
   it must be settled *before the repository accepts its first outside pull request*. Labelling good
   first issues is an invitation to exactly that.
 - [x] **`CHANGELOG.md` exists.** Added in 3.4, and the release workflow refuses to publish a tag
-  that has no section in it — CORE.md §4.7 as a gate rather than an intention.
+  that has no section in it — docs/PRODUCT.md §4.7 as a gate rather than an intention.
 
 **The venues**
 
@@ -113,7 +113,7 @@ each of these is something a stranger hits before they hit the product.
 Written once here. The posts below reference these rather than restating them, so there is one
 place to correct.
 
-**The pitch, ratified in `CORE.md` §1 and unchanged since:** stop pasting secrets into chats.
+**The pitch, ratified in `docs/PRODUCT.md` §1 and unchanged since:** stop pasting secrets into chats.
 keypaste is a local-first, KDBX-compatible vault that stores your passwords and env variables,
 injects them into your projects, and lets AI agents like Claude request exactly one credential —
 with your approval, scoped access, and a full audit trail — without ever seeing your vault.
@@ -307,7 +307,7 @@ infrastructure than guess.
 
 ## r/KeePass
 
-Respectful, compat-first, and it leads with the gate rather than the product. `ideas.md` already
+Respectful, compat-first, and it leads with the gate rather than the product. `docs/IDEAS.md` already
 carries the standing instruction for this community: contribute compat fixes upstream, never
 fork-and-fight. This post is an ask for critique, not an announcement.
 
@@ -455,7 +455,7 @@ punishes early links.
 
 ## The fourteen days after
 
-`PLAN.md:55` — respond to every issue and every comment for two weeks straight. That is the whole
+`docs/STEPS.md` Stage 3 — respond to every issue and every comment for two weeks straight. That is the whole
 commitment; the rest of this section is what makes it survivable.
 
 **Day 0.** Six hours at the keyboard after the Show HN post, because that is the window. Nothing
@@ -467,7 +467,7 @@ a misunderstanding the docs caused, or a disagreement about the design. The thir
 valuable one, because it is the only one where the fix is free.
 
 **Security reports leave the thread immediately.** "Please send that to security@keypaste.com so it
-is not public while I look at it" and nothing more in public until it is resolved. `CORE.md` §3.10 —
+is not public while I look at it" and nothing more in public until it is resolved. `docs/PRODUCT.md` §3.10 —
 disclose fast and fully if something real ships.
 
 **Weekly, twice.** A changelog entry in `CHANGELOG.md`, which is also what the release workflow
@@ -494,14 +494,14 @@ rather than from memory is what keeps the answers consistent at hour six.
 | "A policy rule means no human sees it." | `README.md`: the one path that hands an agent a credential with nobody watching. The point of the rule and the cost of it. If you want a human, do not write the rule. |
 | "Prompt injection — the reason string is attacker-controlled." | `THREATS.md` T-1 and T-2. Sanitization removes mechanism, not meaning. The dialog labels whose words they are and no filter can decide whether a sentence is true. |
 | "Windows clipboard history keeps the secret." | O-0008, open, and `SECURITY.md` states the gap rather than implying the clear is complete. |
-| "Why AGPL?" | `CORE.md` §3.8. Auditable code is the trust strategy for an unknown founder, and copyleft is what stops a closed cloud clone of a tool whose whole pitch is that it is local. |
+| "Why AGPL?" | `docs/PRODUCT.md` §3.8. Auditable code is the trust strategy for an unknown founder, and copyleft is what stops a closed cloud clone of a tool whose whole pitch is that it is local. |
 | "Why vendor KeePassLib instead of using a package?" | `D-0007` is the survey. Nothing maintained exists for .NET with KDBX4 support; the clean-looking options had days of commit history. Maturity decided it, not licensing. |
 | "This does nothing against malware already on my machine." | True, and it is the blanket concession in `SECURITY.md` and `THREATS.md`. A process running as your user is outside all of it. Do not defend this one — agree. |
 | "How do I know your CI actually checks anything?" | `D-0038`: the gate was watched failing before it was trusted, because a gate never observed failing is not known to be a gate. Point at `scripts/verify-demo.sh`. |
 
 **What not to do, for fourteen days.** No second account, no asking anyone to upvote, no deleting a
 critical comment, no arguing with someone who is right, and no shipping a feature because one
-comment asked for it. New ideas go to `ideas.md` — that is what it is for, and a launch is exactly
+comment asked for it. New ideas go to `docs/IDEAS.md` — that is what it is for, and a launch is exactly
 when that rule is hardest to keep.
 
 ---

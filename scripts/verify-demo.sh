@@ -4,7 +4,7 @@
 # Everything else in the suite checks behaviour. This checks a document against that behaviour, and
 # nothing in-process can: what goes stale is a Markdown transcript, which no unit test reads, and
 # the approval dialog it reproduces exists only on the stderr of a second process that a human is
-# supposed to be looking at. docs/demo.md is the marketing (CORE.md law 5.1), and the first thing a
+# supposed to be looking at. docs/demo.md is the marketing (docs/PRODUCT.md law 5.1), and the first thing a
 # stranger does with a demo page is type it in - so a page that has quietly drifted costs more than
 # no page at all.
 #

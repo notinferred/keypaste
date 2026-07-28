@@ -11,7 +11,7 @@ namespace Keypaste.Core.Ipc;
 /// socket — it creates the socket owner-only and verifies on connect that the peer's socket is
 /// owned by the same user. That is one code path, no
 /// <c>System.IO.Pipes.AccessControl</c> dependency, no hand-rolled <c>PipeSecurity</c>, and no
-/// <c>sun_path</c> length problem to discover on somebody's long home directory (CORE.md law 3.9).
+/// <c>sun_path</c> length problem to discover on somebody's long home directory (docs/PRODUCT.md law 3.9).
 /// </para>
 /// <para>
 /// <b>The name carries a per-user discriminator</b> because .NET's Unix emulation puts the socket
@@ -47,7 +47,7 @@ public static class ApproverEndpoint
     /// <remarks>
     /// The same shape as <see cref="VaultLocation.TryResolve"/> and
     /// <see cref="Audit.KeypasteHome.Resolve"/>: flag, then environment, then a default, with an
-    /// empty value counting as unset. One rule written once (CORE.md law 4.3).
+    /// empty value counting as unset. One rule written once (docs/PRODUCT.md law 4.3).
     /// </remarks>
     public static string Resolve(string? fromFlag, string? fromEnvironment)
     {

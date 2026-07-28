@@ -13,7 +13,7 @@ namespace Keypaste.Core;
 /// <para>
 /// It lives in the core rather than in the CLI because more than one front end needs it now: the
 /// CLI reads a master password with it, and the approval flow's grant cache holds a released field
-/// value in one until the TTL expires (CORE.md law 4.3).
+/// value in one until the TTL expires (docs/PRODUCT.md law 4.3).
 /// </para>
 /// <para>
 /// <b>What this does not protect against, stated plainly so the documentation does not

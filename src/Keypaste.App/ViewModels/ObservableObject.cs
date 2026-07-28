@@ -12,7 +12,7 @@ namespace Keypaste.App.ViewModels;
 /// TOML subset by hand and D-0019 gave for taking the narrow MCP package: this whole file is sixty
 /// lines, and a package still enters <c>packages.lock.json</c>, still restores under
 /// <c>--locked-mode</c>, and still turns the build red the day it draws a low-severity advisory
-/// under <c>NuGetAudit</c> (CORE.md law 3.9). Worth revisiting when 4.2's entry list arrives with
+/// under <c>NuGetAudit</c> (docs/PRODUCT.md law 3.9). Worth revisiting when 4.2's entry list arrives with
 /// real evidence of how many bindings this app actually needs.
 /// </remarks>
 internal abstract class ObservableObject : INotifyPropertyChanged

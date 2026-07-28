@@ -31,7 +31,7 @@ implied by silence.
 
 ## Disclosure commitment
 
-Per CORE.md §3.10: if keypaste is breached, or a serious bug ships, it will be disclosed fast and
+Per docs/PRODUCT.md §3.10: if keypaste is breached, or a serious bug ships, it will be disclosed fast and
 fully — what happened, what was exposed, what changed. No quiet patches for security-relevant bugs.
 
 ## Scope
@@ -88,7 +88,7 @@ The release pipeline is in scope for reports, as the section above says.
 
 ## Design commitments worth knowing before you test
 
-These are constitutional (CORE.md §3) and a violation of any of them is a valid report:
+These are constitutional (docs/PRODUCT.md §3) and a violation of any of them is a valid report:
 
 - The vault master key never leaves the local process.
 - Agents never receive the vault — only one credential, one scope, one TTL, after explicit human
@@ -287,7 +287,7 @@ says so when it finds a `.git` ancestor. Treat a secret that was committed or sh
 rotate it. Deletion is tidying, not erasure.
 
 **Exporting puts your secrets back on disk, and that is the whole point of it.** `keypaste env
-export --dotenv` is the one command that writes plaintext. CORE.md §3.4 forbids a secret touching
+export --dotenv` is the one command that writes plaintext. docs/PRODUCT.md §3.4 forbids a secret touching
 disk unencrypted *by keypaste's doing*; here you name the format, name the destination, and answer a
 confirmation, which is the same line `keypaste get --show` sits on. keypaste narrows what it can:
 the file is created only if nothing is already there (`--force` to replace), on Linux and macOS it

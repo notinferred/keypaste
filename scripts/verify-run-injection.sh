@@ -3,7 +3,7 @@
 # verify-run-injection.sh
 #
 # Proves that `keypaste run` actually injects — and that it writes nothing to disk while doing
-# it (CORE.md law 3.4: "Injection is into process environment memory, not into files").
+# it (docs/PRODUCT.md law 3.4: "Injection is into process environment memory, not into files").
 #
 # This gate exists because `run` streams stdio transparently: the child inherits keypaste's real
 # handles, which puts everything it prints beyond CliContext.Stdout and therefore beyond every
@@ -59,7 +59,7 @@ observed=$(kp_run run gate --vault "$db" -- "$child" -c 'printf %s "$SENTINEL"')
 [ "$observed" = "$sentinel" ] || die "expected the sentinel, got '$observed'"
 echo "ok: the child read the injected value from its environment"
 
-echo "--- (ii) NOTHING is written to disk (CORE.md law 3.4)"
+echo "--- (ii) NOTHING is written to disk (docs/PRODUCT.md law 3.4)"
 
 # Every temp-directory variable the runtime might consult is pointed at an empty directory, so a
 # file written anywhere keypaste would plausibly put one shows up here.
