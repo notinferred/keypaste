@@ -32,8 +32,13 @@ done
 # checkout path, the path separator, the trailing "[project]" attribution MSBuild appends, and
 # ordering (ILC does not promise a stable emission order across parallel compilation).
 normalise() {
-  cat "$@" \
+  # `|| true` on the grep, because no matches is a legitimate outcome to report rather than an error
+  # to die on: under `set -euo pipefail` an empty grep took the whole script down with exit 1 and no
+  # message at all, which is a worse failure than the one it was guarding. The empty case is checked
+  # explicitly below, where it can be explained.
+  { cat "$@" \
     | grep -E 'Trim analysis (error|warning) IL[0-9]+|AOT analysis (error|warning) IL[0-9]+' \
+    || true; } \
     | sed -E 's/\r$//' \
     | sed -E 's/ \[[^][]*\.csproj\]$//' \
     | tr '\134' '/' \
@@ -49,6 +54,17 @@ trap 'rm -f "$ACTUAL" "$EXPECTED"' EXIT
 
 normalise "$@" > "$ACTUAL"
 grep -vE '^\s*#|^\s*$' "$BASELINE" | sed -E 's/\r$//' | sort -u > "$EXPECTED"
+
+# A log with no diagnostics at all is not a pass, it is a log that did not analyse anything. The
+# usual cause is an incremental publish: ILC only re-runs when its inputs changed, so a second
+# publish into a warm obj/ emits none of the eleven and would otherwise read as "the baseline is
+# satisfied". Say what happened instead of diffing eleven lines against nothing.
+if [ ! -s "$ACTUAL" ] && [ -s "$EXPECTED" ]; then
+  echo "::error::no trim or AOT diagnostics in the publish log, and the baseline expects some" >&2
+  echo "This usually means ILC did not re-run because nothing it depends on changed. Delete" >&2
+  echo "artifacts/ (or obj/) and publish again so the analysis is actually performed." >&2
+  exit 1
+fi
 
 # Our own code is held to a stricter rule than the vendored tree: it may not appear here at all.
 # Checked before the diff, because "you broke src/" is a more useful sentence than "the diff moved".
