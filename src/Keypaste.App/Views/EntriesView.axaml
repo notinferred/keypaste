@@ -1,0 +1,213 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Keypaste.App.ViewModels"
+             xmlns:views="using:Keypaste.App.Views"
+             x:Class="Keypaste.App.Views.EntriesView"
+             x:DataType="vm:EntriesViewModel">
+
+  <UserControl.Resources>
+    <views:DepthToIndent x:Key="Indent" />
+  </UserControl.Resources>
+
+  <Grid ColumnDefinitions="180,1,*,1,320" RowDefinitions="Auto,*">
+
+    <!-- The group tree. A flat, indented ListBox rather than a TreeView: arrow keys, Home/End and
+         type-ahead work for free, and a vault three groups deep does not need expand state. -->
+    <TextBlock Grid.Row="0" Grid.Column="0"
+               Text="Groups"
+               FontSize="11"
+               Margin="0,0,0,8"
+               Foreground="{DynamicResource KpTextMuted}" />
+
+    <ListBox Grid.Row="1" Grid.Column="0"
+             Name="Groups"
+             ItemsSource="{Binding Groups}"
+             SelectedItem="{Binding SelectedGroup}"
+             Background="Transparent"
+             BorderThickness="0">
+      <ListBox.ItemTemplate>
+        <DataTemplate x:DataType="vm:GroupNode">
+          <TextBlock Text="{Binding Label}"
+                     Margin="{Binding Depth, Converter={StaticResource Indent}}"
+                     TextTrimming="CharacterEllipsis" />
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
+
+    <Rectangle Grid.Row="0" Grid.RowSpan="2" Grid.Column="1"
+               Width="1" Fill="{DynamicResource KpBorderSubtle}" Margin="12,0" />
+
+    <!-- The list. Titles and groups, and nothing from inside an entry: see EntryRow. -->
+    <Grid Grid.Row="0" Grid.Column="2" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,8">
+      <TextBox Grid.Column="0"
+               Name="Search"
+               Text="{Binding Search}"
+               PlaceholderText="Search entries"
+               BorderThickness="1" />
+      <Button Grid.Column="1" Content="Add" Margin="8,0,0,0" Command="{Binding BeginAddCommand}" />
+      <Button Grid.Column="2" Content="Delete" Margin="8,0,0,0" Command="{Binding DeleteCommand}" />
+    </Grid>
+
+    <Grid Grid.Row="1" Grid.Column="2" RowDefinitions="Auto,Auto,*">
+
+      <!-- Calm, not a dialog. KpDanger is reserved for the destructive confirmation. -->
+      <Border Grid.Row="0"
+              IsVisible="{Binding HasError}"
+              Background="{DynamicResource KpAccentQuiet}"
+              CornerRadius="{DynamicResource KpRadiusSm}"
+              Padding="12,8"
+              Margin="0,0,0,8">
+        <TextBlock Text="{Binding Error}"
+                   TextWrapping="Wrap"
+                   FontSize="12"
+                   Foreground="{DynamicResource KpTextSecondary}" />
+      </Border>
+
+      <!-- The one place KpDanger appears on this screen, because there is no undo: core has no
+           recycle bin and RemoveEntry leaves a tombstone rather than a copy. -->
+      <Border Grid.Row="1"
+              IsVisible="{Binding IsConfirmingDelete}"
+              BorderBrush="{DynamicResource KpDanger}"
+              BorderThickness="1"
+              CornerRadius="{DynamicResource KpRadiusSm}"
+              Padding="12"
+              Margin="0,0,0,8">
+        <StackPanel Spacing="8">
+          <TextBlock Text="{Binding DeletePrompt}"
+                     TextWrapping="Wrap"
+                     Foreground="{DynamicResource KpTextPrimary}" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Content="Delete" Command="{Binding ConfirmDeleteCommand}"
+                    Foreground="{DynamicResource KpDanger}" />
+            <Button Content="Keep it" Command="{Binding CancelDeleteCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <Border Grid.Row="1"
+              IsVisible="{Binding IsAdding}"
+              Background="{DynamicResource KpSurface2}"
+              CornerRadius="{DynamicResource KpRadiusSm}"
+              Padding="12"
+              Margin="0,0,0,8">
+        <StackPanel Spacing="8">
+          <TextBox Text="{Binding NewEntryPath}" PlaceholderText="servers/production" />
+          <CheckBox Content="Generate a password" IsChecked="{Binding GeneratePassword}" />
+          <TextBlock FontSize="11"
+                     TextWrapping="Wrap"
+                     Foreground="{DynamicResource KpTextMuted}"
+                     Text="To type a password instead, run keypaste add — it prompts for one without putting it in a window." />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Content="Create" Command="{Binding ConfirmAddCommand}" />
+            <Button Content="Cancel" Command="{Binding CancelAddCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <ListBox Grid.Row="2"
+               Name="Rows"
+               ItemsSource="{Binding Rows}"
+               SelectedItem="{Binding Selected}"
+               Background="Transparent"
+               BorderThickness="0">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:EntryRow">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Grid.Column="0" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+              <TextBlock Grid.Column="1"
+                         Text="{Binding Where}"
+                         FontSize="11"
+                         Margin="12,0,0,0"
+                         Foreground="{DynamicResource KpTextMuted}" />
+            </Grid>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+
+    </Grid>
+
+    <Rectangle Grid.Row="0" Grid.RowSpan="2" Grid.Column="3"
+               Width="1" Fill="{DynamicResource KpBorderSubtle}" Margin="12,0" />
+
+    <!-- The detail pane. Username, URL and notes for the one entry somebody chose; the password is
+         a row of dots and a copy button, and never a value this view can reach. -->
+    <ContentControl Grid.Row="0" Grid.RowSpan="2" Grid.Column="4" Content="{Binding Detail}">
+      <ContentControl.DataTemplates>
+        <DataTemplate DataType="vm:EntryDetailViewModel">
+          <ScrollViewer>
+            <StackPanel Spacing="12">
+
+              <StackPanel Spacing="2">
+                <TextBlock Text="{Binding Title}" FontSize="16"
+                           TextTrimming="CharacterEllipsis"
+                           Foreground="{DynamicResource KpTextPrimary}" />
+                <TextBlock Text="{Binding Path}" FontSize="11"
+                           FontFamily="{DynamicResource KpMono}"
+                           TextTrimming="CharacterEllipsis"
+                           Foreground="{DynamicResource KpTextMuted}" />
+              </StackPanel>
+
+              <StackPanel Spacing="4" IsVisible="{Binding !IsEditing}">
+                <TextBlock Text="Password" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Grid.Column="0"
+                             Text="{Binding PasswordMask}"
+                             FontFamily="{DynamicResource KpMono}"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource KpTextSecondary}" />
+                  <Button Grid.Column="1" Content="Copy" Command="{Binding CopyPasswordCommand}" />
+                </Grid>
+              </StackPanel>
+
+              <StackPanel Spacing="4" IsVisible="{Binding !IsEditing}">
+                <TextBlock Text="Username" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Grid.Column="0" Text="{Binding Username}"
+                             TextTrimming="CharacterEllipsis"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource KpTextPrimary}" />
+                  <Button Grid.Column="1" Content="Copy" Command="{Binding CopyUsernameCommand}" />
+                </Grid>
+              </StackPanel>
+
+              <StackPanel Spacing="4" IsVisible="{Binding !IsEditing}">
+                <TextBlock Text="URL" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
+                <TextBlock Text="{Binding Url}" TextWrapping="Wrap"
+                           Foreground="{DynamicResource KpTextPrimary}" />
+              </StackPanel>
+
+              <StackPanel Spacing="4" IsVisible="{Binding !IsEditing}">
+                <TextBlock Text="Notes" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
+                <TextBlock Text="{Binding Notes}" TextWrapping="Wrap"
+                           Foreground="{DynamicResource KpTextPrimary}" />
+              </StackPanel>
+
+              <Button Content="Edit" Command="{Binding EditCommand}"
+                      IsVisible="{Binding !IsEditing}"
+                      HorizontalAlignment="Left" />
+
+              <StackPanel Spacing="8" IsVisible="{Binding IsEditing}">
+                <TextBlock Text="Username" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
+                <TextBox Text="{Binding DraftUsername}" />
+                <TextBlock Text="URL" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
+                <TextBox Text="{Binding DraftUrl}" />
+                <TextBlock Text="Notes" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
+                <TextBox Text="{Binding DraftNotes}" AcceptsReturn="True" MinHeight="80" />
+                <TextBlock FontSize="11" TextWrapping="Wrap"
+                           Foreground="{DynamicResource KpTextMuted}"
+                           Text="The password is not edited here. keypaste add --generate makes a new one." />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Content="Save" Command="{Binding SaveCommand}" />
+                  <Button Content="Cancel" Command="{Binding CancelCommand}" />
+                </StackPanel>
+              </StackPanel>
+
+            </StackPanel>
+          </ScrollViewer>
+        </DataTemplate>
+      </ContentControl.DataTemplates>
+    </ContentControl>
+
+  </Grid>
+
+</UserControl>

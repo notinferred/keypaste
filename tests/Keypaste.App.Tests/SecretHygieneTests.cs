@@ -2,6 +2,7 @@ using System.Collections;
 using System.Reflection;
 using Keypaste.App.Navigation;
 using Keypaste.App.Session;
+using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
@@ -10,25 +11,30 @@ using Xunit;
 namespace Keypaste.App.Tests;
 
 /// <summary>
-/// Nothing the desktop app puts on screen in 4.1 contains anything from inside the vault.
+/// What the desktop app puts on screen, now that it puts vault contents on screen.
 /// </summary>
 /// <remarks>
 /// <para>
-/// The same shape as <c>SecretHygieneTests</c> in <c>Keypaste.Mcp.Tests</c>, and for the same
-/// reason: the claim "this surface does not leak a secret" is worth nothing as a sentence and
-/// everything as an assertion against a real vault holding known strings.
+/// In 4.1 this file held one blanket claim — no destination surfaces anything from inside the vault
+/// — and said in as many words that the day 4.2 put an entry list on screen it would fail, and
+/// whoever wrote that list would have to decide what belongs there. This is that decision, written
+/// down as assertions.
 /// </para>
 /// <para>
-/// <b>This is cheap only because 4.1 renders no vault content at all</b> — Entries and Env Sets are
-/// empty states, the Log reads machine state rather than the vault, and Agent Activity probes a pipe.
-/// That is a deliberate property of the stage and this test is what keeps it true: the day 4.2 puts
-/// an entry list on screen, this fails, and whoever is writing it has to decide what belongs there
-/// rather than discovering later that everything did.
+/// <b>The blanket claim was not given an allow-set, and that is the point.</b> Moving four of five
+/// sentinels into an allowed column would leave a test that passes for an implementation with no
+/// list, no detail pane and no copy button — the surviving sentinel never reaches a view model
+/// anyway, because the copy path reads the password out of the open vault and hands it straight to
+/// the clipboard. So the blanket claim is replaced by four two-sided ones, each saying both what
+/// must be present and what must be absent, and by one new invariant that is genuinely total:
+/// <b>after a lock, every surface built while unlocked holds no sentinel of any kind, including the
+/// ones it was allowed to show a moment earlier.</b>
 /// </para>
 /// <para>
-/// It walks every destination and reflects over what each one exposes, rather than checking the
-/// handful of properties known today. A property added in six months is covered without anybody
-/// remembering to add it here.
+/// <b>What may appear where.</b> A list row carries a title and a group, which is what
+/// <c>keypaste ls</c> prints. The detail pane widens to username, URL and notes for the one entry a
+/// person selected — <c>keypaste get</c>'s scope minus the password. A password appears nowhere, in
+/// any state, including after Copy.
 /// </para>
 /// </remarks>
 public sealed class SecretHygieneTests
@@ -50,6 +56,22 @@ public sealed class SecretHygieneTests
     internal const string SentinelUrl = "https://SENTINEL-URL-c39f5e.example";
     internal const string SentinelNotes = "SENTINEL-NOTES-d40a6f";
     internal const string SentinelTitle = "SENTINEL-TITLE-e51b70";
+    internal const string SentinelGroup = "SENTINEL-GROUP-a904c2";
+
+    /// <summary>
+    /// The password of a second entry, in the same group, whose title <em>is</em> on the list.
+    /// </summary>
+    /// <remarks>
+    /// Load-bearing, and the reason the count is not five. "The list shows names and no field
+    /// value" asserted against the selected entry's password alone would pass for an implementation
+    /// that read every entry's password into every row and happened to render only the title — the
+    /// rows would carry it, <c>ToString()</c> would surface it, and a binding typo would put it on
+    /// screen. This entry is never selected, so its password's absence is a claim about the list
+    /// rather than about selection.
+    /// </remarks>
+    internal const string SentinelUnselectedPassword = "SENTINEL-OTHER-PASSWORD-f62c81";
+
+    internal const string SentinelUnselectedTitle = "SENTINEL-OTHER-TITLE-30bd19";
 
     private static readonly string[] _everySentinel =
     [
@@ -58,19 +80,32 @@ public sealed class SecretHygieneTests
         SentinelUrl,
         SentinelNotes,
         SentinelTitle,
+        SentinelGroup,
+        SentinelUnselectedPassword,
+        SentinelUnselectedTitle,
     ];
 
+    /// <summary>The strings with no legitimate surface anywhere, in any state.</summary>
+    private static readonly string[] _neverAnywhere =
+    [
+        SentinelPassword,
+        SentinelUnselectedPassword,
+        Master,
+    ];
+
+    /// <summary>
+    /// No destination surfaces a password, on any screen, in any state.
+    /// </summary>
+    /// <remarks>
+    /// What survives of 4.1's blanket claim, narrowed to the strings that never have a reason to be
+    /// anywhere. Every destination is still walked, and every property is still reflected over, so a
+    /// screen added in six months is covered without anybody remembering this file exists.
+    /// </remarks>
     [Fact]
-    public void No_destination_renders_anything_from_inside_the_vault()
+    public void No_destination_surfaces_a_password()
     {
         using var fixture = new SentinelVault();
-        using var session = new AppVaultSession(new ManualClock());
-
-        using (var master = TempVault.Secret(Master))
-        {
-            Assert.Equal(UnlockOutcome.Opened, session.TryUnlock(fixture.VaultFile, master.Value));
-        }
-
+        using var session = Unlocked(fixture);
         using var shell = new ShellViewModel(session, fixture.Home, approverFromEnvironment: null);
 
         foreach (var destination in Destinations.All)
@@ -79,12 +114,176 @@ public sealed class SecretHygieneTests
 
             foreach (var text in Surface(shell).Concat(Surface(shell.Content)))
             {
+                foreach (var sentinel in _neverAnywhere)
+                {
+                    Assert.DoesNotContain(sentinel, text, StringComparison.Ordinal);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// The list holds names and no field value — including for an entry nobody selected.
+    /// </summary>
+    [Fact]
+    public void The_entry_list_holds_names_and_no_field_value()
+    {
+        using var fixture = new SentinelVault();
+        using var session = Unlocked(fixture);
+        using var shell = new ShellViewModel(session, fixture.Home, approverFromEnvironment: null);
+
+        shell.Current = Destinations.All[0];
+        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
+
+        // First, that the list actually listed something. Without this the sweep below passes for a
+        // screen that renders nothing at all, which is the shape 4.1 already had.
+        Assert.Equal(2, entries.Rows.Count);
+        Assert.Contains(entries.Rows, row => row.Title == SentinelTitle);
+        Assert.Contains(entries.Rows, row => row.Title == SentinelUnselectedTitle);
+        Assert.Contains(entries.Groups, group => group.Name == SentinelGroup);
+
+        // And then that nothing from inside an entry came with them.
+        foreach (var text in Surface(entries))
+        {
+            foreach (var sentinel in new[] { SentinelPassword, SentinelUnselectedPassword, SentinelUsername, SentinelUrl, SentinelNotes })
+            {
+                Assert.DoesNotContain(sentinel, text, StringComparison.Ordinal);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Selecting an entry widens the surface to the fields that were asked for, and no further.
+    /// </summary>
+    [Fact]
+    public void The_detail_pane_shows_the_chosen_entry_and_never_its_password()
+    {
+        using var fixture = new SentinelVault();
+        using var session = Unlocked(fixture);
+        using var shell = new ShellViewModel(session, fixture.Home, approverFromEnvironment: null);
+
+        shell.Current = Destinations.All[0];
+        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
+        entries.Selected = entries.Rows.Single(row => row.Title == SentinelTitle);
+
+        var detail = entries.Detail;
+        Assert.NotNull(detail);
+
+        // The widening, asserted rather than assumed: these are on screen on purpose.
+        Assert.Equal(SentinelUsername, detail.Username);
+        Assert.Equal(SentinelUrl, detail.Url);
+        Assert.Equal(SentinelNotes, detail.Notes);
+
+        // And the line it stops at.
+        foreach (var text in Surface(detail))
+        {
+            Assert.DoesNotContain(SentinelPassword, text, StringComparison.Ordinal);
+            Assert.DoesNotContain(SentinelUnselectedPassword, text, StringComparison.Ordinal);
+        }
+
+        // The mask says how long it is and nothing about what it is.
+        Assert.Equal(SentinelPassword.Length, detail.PasswordLength);
+        Assert.DoesNotContain(SentinelPassword, detail.PasswordMask, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A copied password reaches the clipboard and no view model on the way.
+    /// </summary>
+    /// <remarks>
+    /// The failure this rules out is the friendly one: a toast reading
+    /// <c>Copied — SENTINEL-PASSWORD-a17f3c</c>, or a "last copied" field kept so the button can be
+    /// undone. Both are one line, both look harmless, and both put a password in the visual tree.
+    /// </remarks>
+    [Fact]
+    public async Task A_copied_password_reaches_the_clipboard_and_no_view_model()
+    {
+        using var fixture = new SentinelVault();
+        using var session = Unlocked(fixture);
+
+        var clipboard = new FakeClipboard();
+        using var shell = new ShellViewModel(
+            session, fixture.Home, approverFromEnvironment: null, applyTheme: null,
+            clipboard: clipboard, clock: new ManualClock());
+
+        shell.Current = Destinations.All[0];
+        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
+        entries.Selected = entries.Rows.Single(row => row.Title == SentinelTitle);
+
+        await entries.Detail!.CopyPasswordCommand.ExecuteAsync();
+
+        // The positive half: the copy happened. A sweep for a password that was never copied is a
+        // sweep for a string nothing produced.
+        Assert.Equal(SentinelPassword, clipboard.Content);
+
+        foreach (var text in Surface(shell).Concat(Surface(shell.Content)).Concat(Surface(entries.Detail)))
+        {
+            Assert.DoesNotContain(SentinelPassword, text, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>
+    /// After a lock, nothing built while unlocked holds anything — not even what it was allowed to.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The invariant that replaces 4.1's blanket claim, and the first stage in which it can be
+    /// broken. <c>ShellViewModel</c>'s own rule is that everything it built is disposed on lock, and
+    /// 4.1 asserted that against an empty room.
+    /// </para>
+    /// <para>
+    /// <b>Two details decide whether this is worth anything.</b> The sweep holds a direct reference
+    /// to the entries view model captured <em>before</em> the lock, because <c>Dispose</c> nulls
+    /// <c>Content</c> and a sweep starting at the shell would find an empty graph and pass for an
+    /// object that is still alive. And it counts properties that refuse to answer, because a view
+    /// model reading lazily through a disposed vault throws from every getter and sweeps perfectly
+    /// clean — "found no sentinel" and "asked no question" have to be told apart.
+    /// </para>
+    /// <para>
+    /// The <c>shell.Dispose()</c> below is what <c>App.ShowUnlock</c> does when the session raises
+    /// <c>Locked</c>; there is no application here to do it.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void Nothing_built_while_unlocked_survives_the_lock()
+    {
+        using var fixture = new SentinelVault();
+        using var session = Unlocked(fixture);
+        using var shell = new ShellViewModel(session, fixture.Home, approverFromEnvironment: null);
+
+        shell.Current = Destinations.All[0];
+        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
+        entries.Selected = entries.Rows.Single(row => row.Title == SentinelTitle);
+        var detail = entries.Detail!;
+
+        var (answeredBefore, _) = Probe(entries);
+
+        session.Lock(VaultLockReason.Manual);
+        shell.Dispose();
+
+        foreach (var (model, name) in new (object, string)[] { (entries, "entries"), (detail, "detail") })
+        {
+            var (answered, refused) = Probe(model);
+
+            // "Nothing found" must not be able to mean "nothing asked". A view model that reads
+            // lazily through a disposed vault throws from every getter and sweeps perfectly clean.
+            Assert.True(
+                refused == 0,
+                $"{name} refused {refused} properties after the lock; a silent throw is not an empty screen");
+
+            Assert.True(answered > 0, $"{name} answered nothing at all after the lock");
+
+            foreach (var text in Surface(model))
+            {
                 foreach (var sentinel in _everySentinel)
                 {
                     Assert.DoesNotContain(sentinel, text, StringComparison.Ordinal);
                 }
             }
         }
+
+        // Every property that answered before still answers. The strings they return are shorter —
+        // a cleared list is empty — but no property has gone quiet.
+        Assert.Equal(answeredBefore, Probe(entries).Answered);
     }
 
     /// <summary>
@@ -120,16 +319,38 @@ public sealed class SecretHygieneTests
         Assert.DoesNotContain(Master, written, StringComparison.Ordinal);
     }
 
-    /// <summary>Every string a view model exposes, however it is shaped.</summary>
-    private static IEnumerable<string> Surface(object? model)
+    private static AppVaultSession Unlocked(SentinelVault fixture)
     {
-        if (model is null)
+        var session = new AppVaultSession(new ManualClock());
+
+        using (var master = TempVault.Secret(Master))
         {
-            yield break;
+            Assert.Equal(UnlockOutcome.Opened, session.TryUnlock(fixture.VaultFile, master.Value));
         }
 
+        return session;
+    }
+
+    /// <summary>Every string a view model exposes, however it is shaped.</summary>
+    private static IEnumerable<string> Surface(object? model) =>
+        Walk(model, strict: false, out _);
+
+    /// <summary>
+    /// How many of a model's properties answered, and how many refused.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="Surface"/> skips a property that throws, which is right while the vault is open —
+    /// a view model may legitimately refuse a question in some state. It is wrong after a lock,
+    /// where "no sentinel found" and "no property answered" are indistinguishable, and the second is
+    /// how this whole file would go quietly vacuous.
+    /// </remarks>
+    private static (int Answered, int Refused) Probe(object model)
+    {
         const BindingFlags Flags =
             BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+
+        var answered = 0;
+        var refused = 0;
 
         foreach (var property in model.GetType().GetProperties(Flags))
         {
@@ -138,41 +359,87 @@ public sealed class SecretHygieneTests
                 continue;
             }
 
-            object? value;
-
             try
             {
-                value = property.GetValue(model);
+                property.GetValue(model);
+                answered++;
             }
             catch (TargetInvocationException)
             {
-                continue;
+                refused++;
             }
+        }
 
-            switch (value)
+        return (answered, refused);
+    }
+
+    private static IEnumerable<string> Walk(object? model, bool strict, out Func<int> refused)
+    {
+        var count = 0;
+        refused = () => count;
+
+        return model is null ? [] : Enumerate();
+
+        IEnumerable<string> Enumerate()
+        {
+            const BindingFlags Flags =
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+
+            foreach (var property in model.GetType().GetProperties(Flags))
             {
-                case string text:
-                    yield return text;
-                    break;
+                if (property.GetIndexParameters().Length > 0)
+                {
+                    continue;
+                }
 
-                case IEnumerable items and not string:
-                    foreach (var item in items)
+                object? value;
+
+                try
+                {
+                    value = property.GetValue(model);
+                }
+                catch (TargetInvocationException)
+                {
+                    if (strict)
                     {
-                        if (item is string line)
-                        {
-                            yield return line;
-                        }
-                        else if (item is not null)
-                        {
-                            yield return item.ToString() ?? string.Empty;
-                        }
+                        count++;
                     }
 
-                    break;
+                    continue;
+                }
 
-                case not null:
-                    yield return value.ToString() ?? string.Empty;
-                    break;
+                switch (value)
+                {
+                    case string text:
+                        yield return text;
+                        break;
+
+                    case IEnumerable items and not string:
+                        foreach (var item in items)
+                        {
+                            if (item is string line)
+                            {
+                                yield return line;
+                            }
+                            else if (item is not null)
+                            {
+                                yield return item.ToString() ?? string.Empty;
+
+                                // One level deeper for the things a list holds, because a row is
+                                // exactly where a field value would hide behind a tidy ToString().
+                                foreach (var inner in Walk(item, strict: false, out _))
+                                {
+                                    yield return inner;
+                                }
+                            }
+                        }
+
+                        break;
+
+                    case not null:
+                        yield return value.ToString() ?? string.Empty;
+                        break;
+                }
             }
         }
     }
@@ -197,6 +464,16 @@ public sealed class SecretHygieneTests
                 Password = SentinelPassword,
                 Url = SentinelUrl,
                 Notes = SentinelNotes,
+                GroupPath = SentinelGroup,
+            });
+
+            // A second entry, in the same group, that no test selects. Its title being on the list
+            // is what makes its password's absence a claim about the list.
+            vault.AddEntry(new VaultEntry
+            {
+                Title = SentinelUnselectedTitle,
+                Password = SentinelUnselectedPassword,
+                GroupPath = SentinelGroup,
             });
 
             vault.Save();
