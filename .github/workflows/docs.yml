@@ -1,0 +1,47 @@
+name: docs
+
+# The gate for the documents ci.yml skips. It exists so that a governance-only change is still
+# checked without paying for eight .NET jobs: no setup-dotnet, no restore, no build - bash and the
+# repository. It costs seconds.
+#
+# It also triggers on ci.yml, because scripts/verify-docs.sh asserts things about that file's
+# paths-ignore list, and a gate that cannot see the file it judges is not a gate.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'DECISIONS.md'
+      - 'CLAUDE.md'
+      - 'scripts/verify-docs.sh'
+      - '.github/workflows/docs.yml'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'DECISIONS.md'
+      - 'CLAUDE.md'
+      - 'scripts/verify-docs.sh'
+      - '.github/workflows/docs.yml'
+      - '.github/workflows/ci.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # verify-docs.sh compares docs/IDEAS.md against its previous commit to prove the ledger is
+          # append-only, so a shallow clone of depth 1 would have nothing to compare against.
+          fetch-depth: 2
+
+      - name: The documents agree with each other
+        run: bash scripts/verify-docs.sh

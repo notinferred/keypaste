@@ -32,7 +32,7 @@ and the script is the specification.
 | `scripts/verify-policy-e2e.sh` | a standing rule grants silently; a rule can never widen | not recorded |
 | `scripts/verify-log-chain.sh` | tampering is detected; truncation reads as damage, not attack | not recorded |
 | `scripts/verify-aot-trim.sh` | no new trim diagnostic naming `src/` | yes — an empty log is a failure |
-| `scripts/verify-docs.sh` | this file and `docs/STEPS.md` agree | yes — see its own header |
+| `scripts/verify-docs.sh` | this file and `docs/STEPS.md` agree | yes — all seven assertions watched to fire, 2026-07-28 |
 
 **The "observed failing" column is the point.** A check that has never been watched to fail is an
 assertion about the world, not a check on it (D-0043). Nine of these have never been recorded

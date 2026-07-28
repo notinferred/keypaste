@@ -11,14 +11,19 @@ on:
     # docs/keepass-and-agents.md and site/public/index.html. scripts/verify-demo.sh holds all five
     # to what the shipped binaries actually print (D-0034, D-0036), so editing one of them is a
     # code change wearing a markdown extension and it costs a build on purpose.
+    # scripts/verify-docs.sh now asserts that absence rather than trusting this comment, and it
+    # also refuses a 'docs/**' entry here, which would skip two of the five silently.
+    #
+    # The governance documents below skip this workflow and are gated by docs.yml instead, which
+    # runs bash only and needs no restore.
     paths-ignore:
-      - 'CORE.md'
+      - 'docs/PRODUCT.md'
       - 'CLAUDE.md'
-      - 'PLAN.md'
+      - 'docs/STEPS.md'
+      - 'docs/verification.md'
+      - 'docs/IDEAS.md'
+      - 'docs/ARTIFACTS.md'
       - 'DECISIONS.md'
-      - 'DESIGN.md'
-      - 'prompts.md'
-      - 'ideas.md'
       - 'CHANGELOG.md'
       - 'THREATS.md'
       - 'SECURITY.md'
@@ -122,7 +127,7 @@ jobs:
       # `keypaste run` hands the child keypaste's real stdin, stdout and stderr, which puts
       # everything it does beyond CliContext and therefore beyond every in-process test. The unit
       # tests assert the environment keypaste *builds*; these assert what a real child process
-      # actually received, and that no file was written while doing it (CORE.md law 3.4).
+      # actually received, and that no file was written while doing it (docs/PRODUCT.md law 3.4).
       - name: Verify run injects a variable and writes nothing to disk
         shell: bash
         run: scripts/verify-run-injection.sh
@@ -179,7 +184,7 @@ jobs:
         shell: bash
         run: scripts/verify-log-chain.sh
 
-      # docs/demo.md is the marketing (CORE.md law 5.1), and the first thing a stranger does with a
+      # docs/demo.md is the marketing (docs/PRODUCT.md law 5.1), and the first thing a stranger does with a
       # demo page is type it in - so one that has quietly gone stale costs more than no page at all.
       # Nothing in-process can catch that: what drifts is a Markdown transcript, which no unit test
       # reads, and the approval dialog it reproduces exists only on the stderr of a second process.
@@ -290,7 +295,7 @@ jobs:
         timeout-minutes: 8
         run: scripts/verify-demo.sh
 
-      # CORE.md law 4.6 applied to the artifact strangers will actually run. The vault writer goes
+      # docs/PRODUCT.md law 4.6 applied to the artifact strangers will actually run. The vault writer goes
       # through vendored KeePassLib's XML, Argon2 and AES, which is the code most likely to be
       # broken by trimming — so an AOT binary that has not written a KDBX a real KeePassXC can
       # open has not been tested at all.
@@ -307,11 +312,11 @@ jobs:
           scripts/verify-keepassxc-writeback.sh artifacts/compat/aot-writeback.kdbx
 
   # ===========================================================================
-  # PERMANENT COMPATIBILITY GATE — CORE.md law 4.6:
+  # PERMANENT COMPATIBILITY GATE — docs/PRODUCT.md law 4.6:
   #   "Compatibility is sacred: any KDBX file keypaste writes must open
   #    correctly in KeePassXC. This is tested in CI against real KeePassXC."
   #
-  # CORE.md is the one file in this repository that cannot change, so neither
+  # docs/PRODUCT.md is the one file in this repository that cannot change, so neither
   # can the existence of this job. It is not subject to the usual "delete it if
   # it is annoying" latitude that applies to every other CI step.
   #
