@@ -42,21 +42,16 @@ each of these is something a stranger hits before they hit the product.
 **The links**
 
 - [ ] **The repository is public.** It is private right now, which makes every link in every post
-  below a 404. Now tracked as **O-0014**, and D-0006's first clause is marked false rather than left
-  standing. Two things changed since this bullet was written. The cost argument is gone: CI moved to
-  a flat-rate provider when GitHub-hosted billing stopped the jobs starting (D-0042), so free
-  minutes are no longer a reason to publish anything. And `SECURITY.md` was telling reporters the
-  repository was public, which meant pointing them at a vulnerability-reporting channel they cannot
-  reach; that is fixed. What is left is the real question — docs/PRODUCT.md law 3.8 calls auditable code the
-  trust strategy, and every post below sells exactly that — plus D-0006's warning that publishing is
-  irreversible because GitHub can serve any commit ever pushed. Answer it before posting, not before
-  tagging.
-- [x] **The stale URLs are corrected — there were seven, not four.** Fixed in 3.4. The four this
-  list knew about were `README.md:51` and `site/public/index.html:152`, `:194`, `:299`. The three it
-  missed were `site/public/thanks/index.html:62` and, more importantly,
-  `Directory.Build.props:57` and `:59` — `RepositoryUrl` and `PackageProjectUrl`, which
+  below a 404. Tracked as **O-0014** and as Owner Queue row **H-0003**. CI cost is not part of the
+  argument: it moved to a flat-rate provider when GitHub-hosted billing stopped the jobs starting
+  (D-0042). The real question is that `docs/PRODUCT.md` law 3.8 calls auditable code the trust
+  strategy and every post below sells exactly that, against D-0006's warning that publishing is
+  irreversible because GitHub can serve any commit ever pushed. Answer it before posting, not
+  before tagging.
+- [x] **Every published URL points at something that exists**, on both pages, the thanks page, and
+  in `Directory.Build.props` — `RepositoryUrl` and `PackageProjectUrl`, which
   `PublishRepositoryUrl=true` bakes into SourceLink metadata inside the shipped binaries. Those two
-  had to be right before the first tag, because an artifact cannot be edited afterwards.
+  have to be right before a tag, because an artifact cannot be edited afterwards.
 - [ ] **The canonical link is `https://github.com/notinferred/keypaste`** and every post below uses
   it. If the `keypaste` org from the `docs/STEPS.md` Owner Queue is ever registered, that is a move to make before a
   launch, never after.

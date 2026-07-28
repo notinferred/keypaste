@@ -23,6 +23,12 @@ condition: without it the plan grows forever.
 - **Out, deliberately.** `docs/PRODUCT.md` §2 — a new vault format, a cloud service holding
   secrets, "for everyone", enterprise IAM. That list is locked and is the ratchet.
 
+**Settled, and not re-opened here.** The stack is C#/.NET on `net10.0` (D-0002) with xUnit v3 on
+Microsoft.Testing.Platform (D-0003). The KDBX library is vendored KeePassLib 2.61, chosen on
+maturity rather than licence (D-0007). The licence is AGPL-3.0 — see `LICENSE` — and every release
+publishes its corresponding source (D-0041). The desktop shell is Avalonia, after Photino and Tauri
+were both named in this file and neither survived being checked (D-0044).
+
 ---
 
 ## Owner Queue
