@@ -227,7 +227,17 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         Project();
     }
 
-    private async Task UnlockAsync()
+    /// <summary>
+    /// Opens the selected vault.
+    /// </summary>
+    /// <remarks>
+    /// <c>internal</c> rather than private because <see cref="UnlockCommand"/> is an
+    /// <see cref="System.Windows.Input.ICommand"/>, whose <c>Execute</c> returns void — so a test
+    /// driving the command cannot know when the unlock finished, and would be asserting against a
+    /// race. The command still wraps this; the seam only exists so a test can await the same work
+    /// the button does.
+    /// </remarks>
+    internal async Task UnlockAsync()
     {
         if (_disposed || _selectedPath is not { } path)
         {
