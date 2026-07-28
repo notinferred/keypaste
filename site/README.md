@@ -14,33 +14,55 @@ why all of that is true at once.
 `wrangler.jsonc` carries only that config's `id`, which is a handle and is useless without access
 to the Cloudflare account. There is no `wrangler secret` in this setup and there should not be one.
 
-The role behind the connection is `signup_writer`, which can `INSERT` into `public.signup` and
-cannot `SELECT` from it. A compromised Worker, or a compromised dependency inside it, cannot read
-the list back. `schema.sql` is where that is set up and why.
+The role behind the connection is meant to be one that can `INSERT` into `public.signup` and cannot
+`SELECT` from it, so that a compromised Worker — or a compromised dependency inside it — cannot read
+the list back. `schema.sql` is where that is set up and why. Do not go looking for a role called
+`signup_writer`: PlanetScale discards the name you ask for and issues its own `pscale_<id>`.
+**As of today the deployed config does not use such a role at all** — see "The config that exists
+today is half-fixed" below before trusting the paragraph above.
 
 ## Setting it up, once
 
+**The order below is not arbitrary and the old version of this list had it wrong.** The role has to
+exist before `schema.sql` can grant anything to it, because the grants name it — and `schema.sql`
+cannot create it, since on PlanetScale a role created with raw SQL is invisible to `pscale role`,
+the dashboard, and rotation. So: role, then table and grants, then swap the connection to it.
+
 ```sh
-# 1. Create the table and the write-only role. Uses an admin credential that is not stored
-#    anywhere in this repository, and is not needed again after this.
+# 1. Create the managed role with NO inherited roles. PlanetScale discards the name you type and
+#    prints a generated one of the form pscale_<id>; that generated name is what schema.sql wants.
+pscale role create <database> <branch> keypaste-signup --inherited-roles ''
+
+# 2. Create the table and grant that role INSERT on it, and nothing else. Substitute the generated
+#    name for <ROLE> in schema.sql first - applying the file untouched fails on a role that does
+#    not exist. Uses an admin credential that is not stored anywhere in this repository.
 psql "postgresql://ADMIN@aws-us-east-2-1.pg.psdb.cloud:5432/postgres?sslmode=verify-full" \
      -f schema.sql
 
-# 2. Upload the database's CA chain, so Hyperdrive can verify the server certificate rather than
+# 3. Upload the database's CA chain, so Hyperdrive can verify the server certificate rather than
 #    merely encrypt to it. *.pem is gitignored; keep the file out of the repository anyway.
 npx wrangler cert upload certificate-authority --ca-cert ca.pem --name planetscale-pg-ca
 
-# 3. Create the Hyperdrive config, pointing at signup_writer and NOT at the admin user.
+# 4. Point Hyperdrive at that role and NOT at an admin user. Append the BRANCH ID to the username:
+#    PlanetScale's proxy routes on it, and omitting it fails to authenticate for reasons that look
+#    nothing like the cause. Inside the database current_user is still the bare pscale_<id>.
 npx wrangler hyperdrive create keypaste-signup \
-  --connection-string="postgresql://signup_writer:PASSWORD@aws-us-east-2-1.pg.psdb.cloud:5432/postgres" \
+  --connection-string="postgresql://pscale_<id>.<branch-id>:PASSWORD@aws-us-east-2-1.pg.psdb.cloud:5432/postgres" \
   --ca-certificate-id <CA_CERT_ID> \
   --sslmode verify-full
 
-# 4. Put the returned id into wrangler.jsonc, replacing REPLACE_WITH_HYPERDRIVE_ID.
+# 5. Put the returned id into wrangler.jsonc, replacing REPLACE_WITH_HYPERDRIVE_ID.
 
-# 5. Confirm the config has the sslmode you asked for rather than one it fell back to.
+# 6. Confirm the config has the sslmode you asked for rather than one it fell back to.
 npx wrangler hyperdrive get <HYPERDRIVE_ID>
 ```
+
+**Steps 2 and 4 leave a window, and it is worth closing on purpose.** Between them the table exists
+while the Worker still connects as whatever role it connected as before — so a signup that arrives
+in the gap lands in a table that role can read, which is exactly the guarantee this arrangement
+exists to provide. Do the two in one sitting, and check `public.signup` is empty afterwards if the
+gap was longer than a minute. Before step 2 there is no window at all, because a signup against a
+missing table fails and the Worker says so.
 
 Step 5 is not a formality. Hyperdrive exists in this design specifically so the connection is
 `verify-full` — a Worker connecting directly has no system CA store, so the honest setting there is
@@ -81,14 +103,37 @@ Two things about PlanetScale usernames, both easy to get wrong:
   database is the bare `<role>`. A `wrangler hyperdrive update --origin-user` that omits the suffix
   will fail to authenticate for reasons that look nothing like the cause.
 
-Fixing it is `schema.sql`, which now carries the PlanetScale-idiomatic path — a managed role with
-no inherited roles, then table-level grants — followed by:
+**What is live right now, established by probing it rather than assumed.** The Worker is deployed:
+`GET /subscribe` answers `303` to `/`, which is its own non-POST branch, and an unknown path gets
+the static `404`. So the form reaches real code. That code inserts into `public.signup`, which does
+not exist, so it throws — and the handler catches it and returns a `503` page that says in as many
+words that the address was **not** stored. Nothing is being silently dropped. Nothing is being
+stored either, and every signup since the deploy has failed that way.
+
+That ordering is lucky rather than designed, and it is why there is no leak to clean up: the
+over-privileged role can read every table in the cluster, but there is no subscriber table yet for
+it to read. **Which settles the sequencing question — the role must be swapped before, or in the
+same sitting as, the table being created.** Creating the table first would mean the first real
+signup lands somewhere the guarantee does not hold.
+
+So: steps 1, 2 and 4 of the setup list above, in that order, then:
 
 ```sh
 npx wrangler hyperdrive update 9ef85ab258e846fbb2c0d3457b744282 \
   --origin-user '<pscale_role_id>.<branch-id>' --origin-password '<generated>'
 npx wrangler hyperdrive get 9ef85ab258e846fbb2c0d3457b744282   # verify-full must survive
 ```
+
+Then run the by-hand checks below, because a successful signup is the only thing that proves both
+halves at once: the row lands, and the role that landed it cannot read it back.
+
+**One thing in `schema.sql` to look at before running it.** Its last line is
+`REVOKE CONNECT ON DATABASE postgres FROM PUBLIC`, which is correct in intent — PlanetScale grants
+CONNECT to PUBLIC on a new database, meaning every current and future role. But this is the
+`postgres` maintenance database on a cluster PlanetScale manages, so anything of theirs that
+connects through PUBLIC rather than an explicit grant loses access at that moment. Run `\du` and
+check which roles exist and what they inherit before revoking, and be ready to grant CONNECT back
+explicitly. It is the one line in the file that can affect something other than this application.
 
 ## Deploying
 
