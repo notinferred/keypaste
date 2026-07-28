@@ -1,0 +1,175 @@
+name: app
+
+# The desktop app's gate. It exists as a separate workflow, against a separate solution, for one
+# reason: ci.yml restores and builds keypaste.slnx in eight jobs, and putting Keypaste.App in that
+# solution would make every backend push restore roughly twenty Avalonia packages for a GUI those
+# jobs do not test. CLAUDE.md asks what a workflow costs on every push, not only what it proves.
+#
+# What it costs, stated rather than left to be discovered:
+#   a documentation push        nothing
+#   a Keypaste.Core push        the gate job only, one OS, a few minutes
+#   a Keypaste.App push         gate plus the three-OS package job
+#   any pull request            the gate
+#
+# Keypaste.Core is in the paths filter deliberately. It is the one backend change that can break
+# the app, and without it the GUI stops compiling against the core it wraps and nobody learns until
+# the next GUI-touching commit. The three-OS leg is gated further so a core push does not pay for it.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/Keypaste.App/**'
+      - 'tests/Keypaste.App.Tests/**'
+      - 'src/Keypaste.Core/**'
+      - 'third_party/**'
+      - 'Directory.Build.props'
+      - 'Directory.Packages.props'
+      - 'keypaste.app.slnx'
+      - '.github/workflows/app.yml'
+  # No paths filter here, matching ci.yml and for its stated reason: a proposed change gets the full
+  # verdict regardless of what it touches, because that is the one place a reviewer is deciding on
+  # evidence. Contradicting that one file over would be worse than the minute it saves.
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
+  NUGET_XMLDOC_MODE: skip
+  # MSBuild worker nodes outlive the build that started them and hold handles on artifacts/, which
+  # turns the next build into "Access to the path is denied" — a failure that reads like a
+  # permissions problem and is not one. Reuse buys nothing on a runner that builds once.
+  MSBUILDDISABLENODEREUSE: '1'
+
+jobs:
+  gate:
+    name: format + analyzers + tests
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 15
+    outputs:
+      app-changed: ${{ steps.scope.outputs.app-changed }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          # Two commits, so the diff below has something to compare against.
+          fetch-depth: 2
+
+      # Which of the two reasons this workflow ran. A push that only touched Keypaste.Core has to
+      # prove the app still compiles against it, but does not need to be packaged on three operating
+      # systems — and paying eight minutes to learn nothing is the cost CLAUDE.md asks about. A pull
+      # request always packages, because that is where a reviewer decides on evidence.
+      - name: Decide whether the app itself changed
+        id: scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" != "push" ]; then
+            echo "app-changed=true" >> "$GITHUB_OUTPUT"
+            echo "not a push; packaging"
+            exit 0
+          fi
+          changed=$(git diff --name-only HEAD^ HEAD || true)
+          echo "$changed"
+          if echo "$changed" | grep -qE '^(src/Keypaste\.App/|tests/Keypaste\.App\.Tests/|keypaste\.app\.slnx|\.github/workflows/app\.yml)'; then
+            echo "app-changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "app-changed=false" >> "$GITHUB_OUTPUT"
+            echo "only shared code changed; the gate is the whole verdict"
+          fi
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      - name: Restore (locked)
+        run: dotnet restore keypaste.app.slnx --locked-mode
+
+      # dotnet format does not read XAML, so .axaml style is not gated here. Said out loud rather
+      # than implied by a green check.
+      - name: Verify formatting
+        run: dotnet format keypaste.app.slnx --no-restore --verify-no-changes --exclude third_party/
+
+      - name: Build
+        run: dotnet build keypaste.app.slnx --no-restore -c Release -warnaserror
+
+      # The headless tests need no display and no X server — that is the point of Avalonia.Headless,
+      # and it is why there is no xvfb here. They cover the vault session, the idle policy, the
+      # settings and recent-vault stores, focus landing on the password field, and that the Log view
+      # renders AuditText verbatim rather than a second implementation of it (D-0032).
+      - name: Test
+        run: dotnet test keypaste.app.slnx --no-build -c Release
+
+  package:
+    name: publish + selftest (${{ matrix.os }})
+    needs: gate
+    # Only when the app itself changed. A Keypaste.Core push pays for the gate above and stops there.
+    if: needs.gate.outputs.app-changed == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: blacksmith-4vcpu-ubuntu-2404
+            rid: linux-x64
+          - os: blacksmith-4vcpu-windows-2025
+            rid: win-x64
+          - os: blacksmith-6vcpu-macos-15
+            rid: osx-arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      - name: Restore (locked)
+        run: dotnet restore keypaste.app.slnx --locked-mode
+
+      - name: Publish
+        run: >-
+          dotnet publish src/Keypaste.App/Keypaste.App.csproj
+          -c Release -r ${{ matrix.rid }} --self-contained
+          --no-restore -o artifacts/app/${{ matrix.rid }}
+
+      # Avalonia draws with Skia rather than hosting a browser engine, so what has to be present is
+      # the Skia and HarfBuzz natives for this RID. A publish that quietly produced none of them
+      # would still start here and fail on the first window on a user's machine.
+      - name: Verify the native assets for this RID are there
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="artifacts/app/${{ matrix.rid }}"
+          found=$(find "$out" -iname '*SkiaSharp*' -o -iname '*HarfBuzzSharp*' | wc -l)
+          echo "native asset files: $found"
+          [ "$found" -ge 2 ] || { echo "::error::Skia/HarfBuzz natives missing from $out"; exit 1; }
+
+      # A runner has no display, so the only thing this can honestly assert about the published
+      # binary is that it starts, links its natives, and its own code runs on this operating system.
+      # It constructs no window and cannot. Everything visual is on the manual checklist in
+      # docs/desktop.md, which is where a claim CI cannot hold belongs.
+      - name: Start the published binary and run its selftest
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="artifacts/app/${{ matrix.rid }}"
+          bin="$out/keypaste-app"
+          [ "${{ matrix.rid }}" = "win-x64" ] && bin="$out/keypaste-app.exe"
+          [ -x "$bin" ] || { echo "::error::no binary at $bin"; exit 1; }
+          "$bin" --selftest

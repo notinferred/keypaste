@@ -17,7 +17,16 @@
     <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
 
     <!--
-      Deliberately NOT set in 4.1: PublishAot, RuntimeIdentifiers, IlcTreatWarningsAsErrors and
+      Declared in the plural, and never passed as `-r` to restore, for the reason D-0040 gives: a
+      RID on the restore command line narrows the project's set to one, which can never match a lock
+      file recording four, and locked mode then fails NU1004. Restore the solution whole, publish
+      per RID with no restore. app.yml publishes three of these; the fourth is here so the set
+      matches the CLI's and a lock file does not have to be regenerated to add it later.
+    -->
+    <RuntimeIdentifiers>linux-x64;linux-arm64;osx-arm64;win-x64</RuntimeIdentifiers>
+
+    <!--
+      Deliberately NOT set in 4.1: PublishAot, IlcTreatWarningsAsErrors and
       ILLinkTreatWarningsAsErrors. The app ships no release artifact in this stage, AOT's failure
       mode is a runtime NotSupportedException rather than a build error, and turning it on before
       the shell is proven would make every Avalonia problem look like an AOT problem. The

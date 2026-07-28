@@ -2598,15 +2598,20 @@ than an engineering one.
 
 **Stage:** 4.1 · Related: O-0013
 
-The published CLI binaries are about 10 MB each, NativeAOT, one file. A self-contained non-AOT .NET
-app carrying Avalonia and Skia is substantially larger, and no primary source gives a figure worth
-quoting — it has to be measured. `PublishAot` is deliberately not set in 4.1 (D-0044), so the number
-is not knowable yet either.
+The published CLI binaries are about 10 MB each, NativeAOT, one file.
 
-Two things follow and both belong in the answer. The install story on `dl.keypaste.com` currently
-promises one file per platform, and the GUI will not match that shape. And whatever the number turns
-out to be, it should be measured and written down before anything claims a size, because D-0036
-already settled that a published page may only say what a gate or a citation can hold.
+**Measured, 2026-07-28:** `dotnet publish -c Release -r win-x64 --self-contained`, no trimming and
+no AOT, produces **207 MB**. That is the honest starting number and it is roughly twenty times the
+CLI. Trimming and eventually `PublishAot` will cut it substantially — Avalonia documents AOT support
+and this repository already sets its prerequisite — but nothing will bring it near 10 MB, because
+Skia and HarfBuzz ship as native assets that sit beside the binary under every option. The CLI's
+one-file property is not available to the GUI at all.
+
+Two things follow and both belong in the answer. The install story on `dl.keypaste.com` promises one
+file per platform, and the GUI cannot match that shape — an installer or an archive is the honest
+form, which is the same conversation as O-0015. And 207 MB is large enough that it changes what a
+download costs a person on a slow connection, so whatever appears on a page about it must be the
+measured number rather than an optimistic one (D-0036).
 
 ## O-0017 - Who owns the approver pipe once the app can approve
 
