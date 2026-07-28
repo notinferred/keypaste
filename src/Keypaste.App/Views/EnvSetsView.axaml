@@ -1,0 +1,180 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Keypaste.App.ViewModels"
+             xmlns:ctl="using:Keypaste.App.Controls"
+             x:Class="Keypaste.App.Views.EnvSetsView"
+             x:DataType="vm:EnvSetsViewModel">
+
+  <Grid RowDefinitions="Auto,Auto,*">
+
+    <Border Grid.Row="0"
+            IsVisible="{Binding HasError}"
+            Background="{DynamicResource KpAccentQuiet}"
+            CornerRadius="{DynamicResource KpRadiusSm}"
+            Padding="12,8"
+            Margin="0,0,0,12">
+      <TextBlock Text="{Binding Error}"
+                 TextWrapping="Wrap"
+                 FontSize="12"
+                 Foreground="{DynamicResource KpTextSecondary}" />
+    </Border>
+
+    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
+      <Button Content="New project" Command="{Binding BeginAddCommand}" IsVisible="{Binding !IsAdding}" />
+      <TextBox Text="{Binding NewProject}" PlaceholderText="billing-api" Width="220"
+               IsVisible="{Binding IsAdding}" />
+      <Button Content="Create" Command="{Binding ConfirmAddCommand}" IsVisible="{Binding IsAdding}" />
+      <Button Content="Cancel" Command="{Binding CancelAddCommand}" IsVisible="{Binding IsAdding}" />
+    </StackPanel>
+
+    <!-- The cards. A card knows a project's name and the command that injects it; the values behind
+         it are read only when it is opened. -->
+    <ScrollViewer Grid.Row="2" IsVisible="{Binding !HasOpenProject}">
+      <StackPanel Spacing="12">
+
+        <TextBlock IsVisible="{Binding !HasProjects}"
+                   TextWrapping="Wrap"
+                   MaxWidth="480"
+                   HorizontalAlignment="Left"
+                   Foreground="{DynamicResource KpTextSecondary}"
+                   Text="No projects yet. A project is a group under env/ in your vault — keypaste env set billing-api STRIPE_KEY makes one, and so does New project here." />
+
+        <ItemsControl ItemsSource="{Binding Projects}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="x:String">
+              <Border Theme="{StaticResource KpCard}" Margin="0,0,0,12">
+                <Grid ColumnDefinitions="*,Auto">
+                  <StackPanel Grid.Column="0" Spacing="4">
+                    <TextBlock Text="{Binding}" FontSize="16"
+                               Foreground="{DynamicResource KpTextPrimary}" />
+                    <TextBlock FontSize="11"
+                               FontFamily="{DynamicResource KpMono}"
+                               Foreground="{DynamicResource KpTextMuted}"
+                               Text="{Binding, StringFormat='keypaste run {0} -- '}" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8"
+                              VerticalAlignment="Center">
+                    <Button Content="Copy run command"
+                            Command="{Binding $parent[ItemsControl].((vm:EnvSetsViewModel)DataContext).CopyRunCommandCommand}"
+                            CommandParameter="{Binding}" />
+                    <Button Content="Open"
+                            Command="{Binding $parent[ItemsControl].((vm:EnvSetsViewModel)DataContext).OpenCommand}"
+                            CommandParameter="{Binding}" />
+                  </StackPanel>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+      </StackPanel>
+    </ScrollViewer>
+
+    <!-- The open project's table. Masked, with reveal-on-hold on a control that publishes nothing
+         to the accessibility bus (THREATS.md T-22). -->
+    <ContentControl Grid.Row="2" Content="{Binding OpenProject}" IsVisible="{Binding HasOpenProject}">
+      <ContentControl.DataTemplates>
+        <DataTemplate DataType="vm:EnvProjectViewModel">
+          <Grid RowDefinitions="Auto,Auto,Auto,*">
+
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,0,0,12">
+              <StackPanel Grid.Column="0" Spacing="2">
+                <TextBlock Text="{Binding Name}" FontSize="18"
+                           Foreground="{DynamicResource KpTextPrimary}" />
+                <TextBlock Text="{Binding Summary}" FontSize="11"
+                           Foreground="{DynamicResource KpTextMuted}" />
+              </StackPanel>
+              <Button Grid.Column="1" Content="Copy run command" Margin="8,0,0,0"
+                      Command="{Binding CopyRunCommandCommand}" />
+              <Button Grid.Column="2" Content="Add variable" Margin="8,0,0,0"
+                      Command="{Binding BeginAddCommand}" />
+              <Button Grid.Column="3" Content="Back" Margin="8,0,0,0"
+                      Command="{Binding $parent[ContentControl].((vm:EnvSetsViewModel)DataContext).CloseCommand}" />
+            </Grid>
+
+            <Border Grid.Row="1"
+                    IsVisible="{Binding IsAdding}"
+                    Background="{DynamicResource KpSurface2}"
+                    CornerRadius="{DynamicResource KpRadiusSm}"
+                    Padding="12"
+                    Margin="0,0,0,12">
+              <StackPanel Spacing="8">
+                <TextBox Text="{Binding NewKey}" PlaceholderText="STRIPE_KEY" />
+                <TextBlock FontSize="11" TextWrapping="Wrap"
+                           Foreground="{DynamicResource KpTextMuted}"
+                           Text="A generated value is stored. To set a specific one, run keypaste env set — it prompts for the value without putting it in a window." />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Content="Add" Command="{Binding ConfirmAddCommand}" />
+                  <Button Content="Cancel" Command="{Binding CancelAddCommand}" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <!-- The one place KpDanger appears here. -->
+            <Border Grid.Row="2"
+                    IsVisible="{Binding IsRemoving}"
+                    BorderBrush="{DynamicResource KpDanger}"
+                    BorderThickness="1"
+                    CornerRadius="{DynamicResource KpRadiusSm}"
+                    Padding="12"
+                    Margin="0,0,0,12">
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding RemovePrompt}" TextWrapping="Wrap"
+                           Foreground="{DynamicResource KpTextPrimary}" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Content="Remove" Command="{Binding ConfirmRemoveCommand}"
+                          Foreground="{DynamicResource KpDanger}" />
+                  <Button Content="Keep it" Command="{Binding CancelRemoveCommand}" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <ScrollViewer Grid.Row="3">
+              <ItemsControl ItemsSource="{Binding Variables}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:EnvVariableRow">
+                    <Grid ColumnDefinitions="200,*,Auto,Auto" Margin="0,0,0,8">
+
+                      <StackPanel Grid.Column="0" Spacing="2">
+                        <TextBlock Text="{Binding Key}"
+                                   FontFamily="{DynamicResource KpMono}"
+                                   TextTrimming="CharacterEllipsis"
+                                   Foreground="{DynamicResource KpTextPrimary}" />
+                        <TextBlock Text="{Binding Warning}"
+                                   IsVisible="{Binding !IsUsableName}"
+                                   FontSize="11"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource KpTextMuted}" />
+                      </StackPanel>
+
+                      <!-- Not a TextBlock: its automation peer publishes its text as the element's
+                           name, which is a read path over the same bus a TextBox's value pattern
+                           uses. RevealedValue draws the characters itself and its peer contributes
+                           nothing. -->
+                      <ctl:RevealedValue Grid.Column="1"
+                                         Source="{Binding}"
+                                         MaskedLength="{Binding MaskedLength}"
+                                         FontFamily="{DynamicResource KpMono}"
+                                         FontSize="13"
+                                         VerticalAlignment="Center"
+                                         Margin="12,0"
+                                         Foreground="{DynamicResource KpTextSecondary}" />
+
+                      <Button Grid.Column="2" Content="Copy" Command="{Binding CopyValueCommand}" />
+                      <Button Grid.Column="3" Content="Remove" Margin="8,0,0,0"
+                              Command="{Binding RemoveCommand}" />
+
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+
+          </Grid>
+        </DataTemplate>
+      </ContentControl.DataTemplates>
+    </ContentControl>
+
+  </Grid>
+
+</UserControl>

@@ -73,6 +73,22 @@ public sealed class SecretHygieneTests
 
     internal const string SentinelUnselectedTitle = "SENTINEL-OTHER-TITLE-30bd19";
 
+    internal const string SentinelProject = "SENTINEL-PROJECT-3ac71d";
+    internal const string SentinelEnvKey = "SENTINEL_ENV_KEY_9B2E";
+    internal const string SentinelEnvValue = "SENTINEL-ENV-VALUE-7d5e08";
+
+    /// <summary>
+    /// A variable in a second project, whose card is on screen and never opened.
+    /// </summary>
+    /// <remarks>
+    /// The env half of <see cref="SentinelUnselectedPassword"/>'s argument. A card that read its
+    /// project's values in order to say "3 variables" would carry this one, and "the cards hold
+    /// names and counts" would be a claim about the project somebody happened to open.
+    /// </remarks>
+    internal const string SentinelOtherEnvValue = "SENTINEL-OTHER-ENV-VALUE-11c4b9";
+
+    internal const string SentinelOtherProject = "SENTINEL-OTHER-PROJECT-6e0a44";
+
     private static readonly string[] _everySentinel =
     [
         SentinelPassword,
@@ -83,13 +99,25 @@ public sealed class SecretHygieneTests
         SentinelGroup,
         SentinelUnselectedPassword,
         SentinelUnselectedTitle,
+        SentinelProject,
+        SentinelEnvKey,
+        SentinelEnvValue,
+        SentinelOtherEnvValue,
+        SentinelOtherProject,
     ];
 
     /// <summary>The strings with no legitimate surface anywhere, in any state.</summary>
+    /// <remarks>
+    /// A password, a value in a project nobody opened, and the master password. The one string here
+    /// with a legitimate moment on screen is <see cref="SentinelEnvValue"/>, which appears while
+    /// somebody holds it — so it is asserted separately rather than blanket-forbidden, and its
+    /// transience is what that test checks.
+    /// </remarks>
     private static readonly string[] _neverAnywhere =
     [
         SentinelPassword,
         SentinelUnselectedPassword,
+        SentinelOtherEnvValue,
         Master,
     ];
 
@@ -137,15 +165,29 @@ public sealed class SecretHygieneTests
 
         // First, that the list actually listed something. Without this the sweep below passes for a
         // screen that renders nothing at all, which is the shape 4.1 already had.
-        Assert.Equal(2, entries.Rows.Count);
+        //
+        // Four rows, not two: an environment variable is an ordinary entry under env/<project>, so
+        // `keypaste ls` lists it and so does this. The screens differ in what they do with it, not
+        // in whether they can see it (D-0014).
+        Assert.Equal(4, entries.Rows.Count);
         Assert.Contains(entries.Rows, row => row.Title == SentinelTitle);
+        Assert.Contains(entries.Rows, row => row.Title == SentinelEnvKey);
         Assert.Contains(entries.Rows, row => row.Title == SentinelUnselectedTitle);
         Assert.Contains(entries.Groups, group => group.Name == SentinelGroup);
 
         // And then that nothing from inside an entry came with them.
         foreach (var text in Surface(entries))
         {
-            foreach (var sentinel in new[] { SentinelPassword, SentinelUnselectedPassword, SentinelUsername, SentinelUrl, SentinelNotes })
+            foreach (var sentinel in new[]
+            {
+                SentinelPassword,
+                SentinelUnselectedPassword,
+                SentinelUsername,
+                SentinelUrl,
+                SentinelNotes,
+                SentinelEnvValue,
+                SentinelOtherEnvValue,
+            })
             {
                 Assert.DoesNotContain(sentinel, text, StringComparison.Ordinal);
             }
@@ -184,6 +226,107 @@ public sealed class SecretHygieneTests
         // The mask says how long it is and nothing about what it is.
         Assert.Equal(SentinelPassword.Length, detail.PasswordLength);
         Assert.DoesNotContain(SentinelPassword, detail.PasswordMask, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The project cards hold names and counts, and no value — not even from a project nobody opened.
+    /// </summary>
+    [Fact]
+    public void The_project_cards_hold_names_and_counts_and_no_value()
+    {
+        using var fixture = new SentinelVault();
+        using var session = Unlocked(fixture);
+        using var shell = new ShellViewModel(session, fixture.Home, approverFromEnvironment: null);
+
+        shell.Current = Destinations.All[1];
+        var env = Assert.IsType<EnvSetsViewModel>(shell.Content);
+
+        // First, that there are cards at all.
+        Assert.Contains(SentinelProject, env.Projects);
+        Assert.Contains(SentinelOtherProject, env.Projects);
+        Assert.Equal(1, env.CountIn(SentinelProject));
+
+        foreach (var text in Surface(env))
+        {
+            Assert.DoesNotContain(SentinelEnvValue, text, StringComparison.Ordinal);
+            Assert.DoesNotContain(SentinelOtherEnvValue, text, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>
+    /// An open project shows its variable names and masks, and holds no value at rest.
+    /// </summary>
+    [Fact]
+    public void An_open_project_holds_names_and_masks_and_no_value()
+    {
+        using var fixture = new SentinelVault();
+        using var session = Unlocked(fixture);
+        using var shell = new ShellViewModel(session, fixture.Home, approverFromEnvironment: null);
+
+        shell.Current = Destinations.All[1];
+        var env = Assert.IsType<EnvSetsViewModel>(shell.Content);
+        env.OpenCommand.Execute(SentinelProject);
+
+        var project = env.OpenProject;
+        Assert.NotNull(project);
+
+        var row = Assert.Single(project.Variables);
+        Assert.Equal(SentinelEnvKey, row.Key);
+        Assert.Equal(SentinelEnvValue.Length, row.MaskedLength);
+
+        foreach (var text in Surface(env).Concat(Surface(project)).Concat(Surface(row)))
+        {
+            foreach (var sentinel in new[] { SentinelEnvValue, SentinelOtherEnvValue })
+            {
+                Assert.DoesNotContain(sentinel, text, StringComparison.Ordinal);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Revealing is one value at a time, and it stops the moment the hold does.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The value legitimately reaches a screen here, which is what makes this the one sentinel that
+    /// is not blanket-forbidden. What has to hold instead is narrower: a reveal names which key it
+    /// is showing rather than what it holds, only one row can be revealing, and concealing gives the
+    /// slot back. The characters themselves never enter a view model at all — they go from
+    /// <see cref="EnvProjectViewModel.Reveal"/> straight to the control that draws them.
+    /// </para>
+    /// <para>
+    /// That the control does not publish them to the accessibility bus is
+    /// <c>RevealedValueTests</c>'s job, against a real visual tree.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void Revealing_is_one_value_at_a_time_and_ends_with_the_hold()
+    {
+        using var fixture = new SentinelVault();
+        using var session = Unlocked(fixture);
+        using var shell = new ShellViewModel(session, fixture.Home, approverFromEnvironment: null);
+
+        shell.Current = Destinations.All[1];
+        var env = Assert.IsType<EnvSetsViewModel>(shell.Content);
+        env.OpenCommand.Execute(SentinelProject);
+
+        var project = env.OpenProject!;
+        var row = project.Variables.Single();
+
+        Assert.Null(project.RevealedKey);
+
+        // The value comes back to whoever asked — that is the feature — and the view model records
+        // only which key it was.
+        Assert.Equal(SentinelEnvValue, ((IRevealSource)row).Reveal());
+        Assert.Equal(SentinelEnvKey, project.RevealedKey);
+
+        foreach (var text in Surface(env).Concat(Surface(project)).Concat(Surface(row)))
+        {
+            Assert.DoesNotContain(SentinelEnvValue, text, StringComparison.Ordinal);
+        }
+
+        ((IRevealSource)row).Conceal();
+        Assert.Null(project.RevealedKey);
     }
 
     /// <summary>
@@ -475,6 +618,12 @@ public sealed class SecretHygieneTests
                 Password = SentinelUnselectedPassword,
                 GroupPath = SentinelGroup,
             });
+
+            var store = new EnvStore(vault);
+            store.TrySet(SentinelProject, SentinelEnvKey, SentinelEnvValue, out _);
+
+            // A second project, whose card is drawn and whose table is never opened.
+            store.TrySet(SentinelOtherProject, "OTHER_KEY", SentinelOtherEnvValue, out _);
 
             vault.Save();
         }
