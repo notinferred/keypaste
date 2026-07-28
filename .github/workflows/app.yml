@@ -8,12 +8,21 @@ name: app
 # What it costs, stated rather than left to be discovered:
 #   a documentation push        nothing
 #   a Keypaste.Core push        the gate job only, one OS, a few minutes
-#   a Keypaste.App push         gate plus the three-OS package job
-#   any pull request            the gate
+#   a Keypaste.App push         gate plus the consistency tests plus the three-OS package job
+#   a Keypaste.Cli push         gate plus the consistency tests
+#   any pull request            all of it
 #
 # Keypaste.Core is in the paths filter deliberately. It is the one backend change that can break
 # the app, and without it the GUI stops compiling against the core it wraps and nobody learns until
 # the next GUI-touching commit. The three-OS leg is gated further so a core push does not pay for it.
+#
+# The consistency tests are gated the same way, and for a measured reason. That project is the only
+# one referencing both front ends, and Keypaste.Cli sets PublishAot over four RuntimeIdentifiers —
+# both restore-time inputs (D-0040) — so a restore that can see it pulls four RID-specific ILCompiler
+# packs whether or not anything is published. Measured 2026-07-28: it takes a restore from 2091 MB
+# to 2580 MB. Putting it in keypaste.app.slnx would have made the "a Keypaste.Core push" line above
+# untrue, so it is in neither solution and runs in its own guarded steps. See
+# tests/Keypaste.Consistency.Tests/README.md.
 
 on:
   push:
@@ -21,6 +30,9 @@ on:
     paths:
       - 'src/Keypaste.App/**'
       - 'tests/Keypaste.App.Tests/**'
+      - 'tests/Keypaste.Consistency.Tests/**'
+      - 'src/Keypaste.Cli/**'
+      - 'tests/Keypaste.Cli.Tests/**'
       - 'src/Keypaste.Core/**'
       - 'third_party/**'
       - 'Directory.Build.props'
@@ -80,7 +92,7 @@ jobs:
           fi
           changed=$(git diff --name-only HEAD^ HEAD || true)
           echo "$changed"
-          if echo "$changed" | grep -qE '^(src/Keypaste\.App/|tests/Keypaste\.App\.Tests/|keypaste\.app\.slnx|\.github/workflows/app\.yml)'; then
+          if echo "$changed" | grep -qE '^(src/Keypaste\.App/|src/Keypaste\.Cli/|tests/Keypaste\.App\.Tests/|tests/Keypaste\.Cli\.Tests/|tests/Keypaste\.Consistency\.Tests/|keypaste\.app\.slnx|\.github/workflows/app\.yml)'; then
             echo "app-changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "app-changed=false" >> "$GITHUB_OUTPUT"
@@ -110,6 +122,36 @@ jobs:
       # renders AuditText verbatim rather than a second implementation of it (D-0032).
       - name: Test
         run: dotnet test keypaste.app.slnx --no-build -c Release
+
+      # The only project that references both front ends, so a test can make an edit through the
+      # app's view models and then ask the shipped CLI what it sees. It is in neither solution and
+      # therefore restores separately — which is the whole point, because that restore is the
+      # expensive one and a Keypaste.Core push must not pay for it.
+      #
+      # Formatted here too. Nothing else would: dotnet format takes a solution or a project, and
+      # this project is in no solution, so leaving this step out is how it quietly drifts out of the
+      # style every other file in the repository is held to.
+      - name: Restore the consistency tests (locked)
+        if: steps.scope.outputs.app-changed == 'true'
+        run: dotnet restore tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj --locked-mode
+
+      - name: Verify the consistency tests' formatting
+        if: steps.scope.outputs.app-changed == 'true'
+        run: >-
+          dotnet format tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj
+          --no-restore --verify-no-changes
+
+      - name: Build the consistency tests
+        if: steps.scope.outputs.app-changed == 'true'
+        run: >-
+          dotnet build tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj
+          --no-restore -c Release -warnaserror
+
+      - name: Run the consistency tests
+        if: steps.scope.outputs.app-changed == 'true'
+        run: >-
+          dotnet test tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj
+          --no-build -c Release
 
   package:
     name: publish + selftest (${{ matrix.os }})

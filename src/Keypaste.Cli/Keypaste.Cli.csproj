@@ -41,6 +41,12 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Keypaste.Cli.Tests" />
+    <!--
+      So a test can run a verb against a file the desktop app just wrote, and hear the answer from
+      the CLI rather than from a second implementation of what a verb would say. That project is in
+      neither solution on purpose; tests/Keypaste.Consistency.Tests/README.md says why.
+    -->
+    <InternalsVisibleTo Include="Keypaste.Consistency.Tests" />
   </ItemGroup>
 
 </Project>

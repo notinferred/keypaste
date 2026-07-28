@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Keypaste.Consistency.Tests</RootNamespace>
+    <AssemblyName>Keypaste.Consistency.Tests</AssemblyName>
+    <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+  </ItemGroup>
+
+  <!--
+    The CLI harness is compiled in rather than copied. It is a hundred lines of fakes that already
+    exist and already match what the verbs expect; a second copy here would drift from the first the
+    first time a seam changes, and the whole point of this project is that two things agree.
+  -->
+  <ItemGroup>
+    <Compile Include="../Keypaste.Cli.Tests/CliHarness.cs" Link="CliHarness.cs" />
+  </ItemGroup>
+
+  <!--
+    The only project that references both front ends. See README.md in this directory for why it is
+    in neither solution, and app.yml for the step that runs it.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="../../src/Keypaste.App/Keypaste.App.csproj" />
+    <ProjectReference Include="../../src/Keypaste.Cli/Keypaste.Cli.csproj" />
+  </ItemGroup>
+
+</Project>
