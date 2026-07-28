@@ -33,13 +33,23 @@ namespace Keypaste.App.Tests;
 /// </remarks>
 public sealed class SecretHygieneTests
 {
-    private const string Master = "correct horse battery staple";
+    /// <summary>
+    /// The strings that must never reach a screen.
+    /// </summary>
+    /// <remarks>
+    /// <c>internal</c> rather than <c>private</c> for the reason <see cref="Core.Audit.AuditText"/>
+    /// gives and <c>Keypaste.Mcp.Tests</c>' own sentinels follow: <c>.editorconfig</c> applies
+    /// <c>_camelCase</c> to every private field, constants included, so this repository has no
+    /// <c>private const</c> anywhere. Worth knowing that only <c>dotnet format</c> enforces it —
+    /// <c>dotnet build</c> does not, so a local build can be green while CI is not.
+    /// </remarks>
+    internal const string Master = "correct horse battery staple";
 
-    private const string SentinelPassword = "SENTINEL-PASSWORD-a17f3c";
-    private const string SentinelUsername = "SENTINEL-USERNAME-b28e4d";
-    private const string SentinelUrl = "https://SENTINEL-URL-c39f5e.example";
-    private const string SentinelNotes = "SENTINEL-NOTES-d40a6f";
-    private const string SentinelTitle = "SENTINEL-TITLE-e51b70";
+    internal const string SentinelPassword = "SENTINEL-PASSWORD-a17f3c";
+    internal const string SentinelUsername = "SENTINEL-USERNAME-b28e4d";
+    internal const string SentinelUrl = "https://SENTINEL-URL-c39f5e.example";
+    internal const string SentinelNotes = "SENTINEL-NOTES-d40a6f";
+    internal const string SentinelTitle = "SENTINEL-TITLE-e51b70";
 
     private static readonly string[] _everySentinel =
     [
