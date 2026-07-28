@@ -63,17 +63,21 @@ each of these is something a stranger hits before they hit the product.
 
 **The promises already published**
 
-- [ ] **keypaste.com's signup does what the page says it does.** **Established by probing it, and it
-  is the better of the two possibilities this bullet used to offer.** The Worker *is* deployed
-  (`GET /subscribe` answers 303 from its own non-POST branch), `public.signup` does not exist, so
-  the insert throws and the handler returns a 503 that says the address was not stored. Nobody's
-  address was silently dropped, and there is no list for the over-privileged role to read because
-  there is no table. Both records now say so — `DECISIONS.md` D-0037's "nothing is deployed" was
-  wrong and is corrected, and `site/README.md` carries the deployed state plus a runbook whose steps
-  were in the wrong order. What is left is credentialed work only: create the managed role with no
-  inherited roles, swap Hyperdrive to it, and apply `schema.sql` in that order — exposure starts the
-  moment the table exists, so the role has to be right first. Then the by-hand checks, because a
-  successful signup is the only thing that proves the row lands *and* cannot be read back.
+- [x] **keypaste.com's signup does what the page says it does.** **Fixed and verified end to end on
+  2026-07-28.** Hyperdrive connects as `keypaste_signup_writer`, which holds `INSERT` on
+  `public.signup` and nothing else; as that role every read is refused with 42501. A live submission
+  stores a row and redirects to `/thanks/`, a duplicate is a no-op, the honeypot stores nothing, and
+  a bad address, a foreign `Origin` and a non-form body each get 400. Two defects were found doing
+  it: `wrangler hyperdrive update` silently wipes the `mtls` block on a credential swap, and
+  `ON CONFLICT (email) DO NOTHING` needs SELECT on PostgreSQL 18, which made the Worker's own SQL
+  incompatible with the role it was written for. Details in D-0037 and `site/README.md`. Still open:
+  it is a plain SQL role rather than a managed one, so rotation is by hand.
+
+  For the record of what this item used to fear: the Worker was already deployed while
+  `DECISIONS.md` claimed nothing was, and `public.signup` did not exist — so every submission hit
+  the handler's 503 saying the address was not stored. No address was ever silently dropped, and
+  there was no list for the over-privileged credential to read. Both records were corrected rather
+  than quietly edited.
 - [ ] **Double opt-in ships before a single message goes to the list.** `DECISIONS.md:2058` and the
   page footer both promise a confirmation first. A launch is exactly the pressure that makes
   someone mail an unconfirmed list once.

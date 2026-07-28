@@ -14,12 +14,16 @@ why all of that is true at once.
 `wrangler.jsonc` carries only that config's `id`, which is a handle and is useless without access
 to the Cloudflare account. There is no `wrangler secret` in this setup and there should not be one.
 
-The role behind the connection is meant to be one that can `INSERT` into `public.signup` and cannot
-`SELECT` from it, so that a compromised Worker — or a compromised dependency inside it — cannot read
-the list back. `schema.sql` is where that is set up and why. Do not go looking for a role called
-`signup_writer`: PlanetScale discards the name you ask for and issues its own `pscale_<id>`.
-**As of today the deployed config does not use such a role at all** — see "The config that exists
-today is half-fixed" below before trusting the paragraph above.
+The role behind the connection is `keypaste_signup_writer`, which can `INSERT` into `public.signup`
+and cannot `SELECT` from it, so that a compromised Worker — or a compromised dependency inside it —
+cannot read the list back. `schema.sql` is where that is set up and why, and it is verified rather
+than asserted: as that role, every read is refused with 42501.
+
+It is a plain SQL role rather than a PlanetScale *managed* role, which is a deliberate trade and the
+one thing here with an ongoing cost. A managed role appears in the dashboard, rotates with
+`pscale role reset`, and can carry a TTL; this one is invisible to all of that, so rotating it means
+`alter role ... password` by hand plus a `wrangler hyperdrive update`. Swapping it for a managed
+role later is two commands and changes nothing else.
 
 ## Setting it up, once
 
@@ -69,11 +73,11 @@ Step 5 is not a formality. Hyperdrive exists in this design specifically so the 
 `require`, which encrypts without authenticating the server. If step 5 does not say `verify-full`,
 the reason for the whole arrangement is gone and `DECISIONS.md` D-0037 is wrong.
 
-### The config that exists today is half-fixed
+### How the config was wrong, and how it was found
 
 Hyperdrive config `9ef85ab258e846fbb2c0d3457b744282` was created through the Cloudflare dashboard's
-PlanetScale integration rather than by the steps above, and it started out wrong in two ways. One
-is fixed; the other is not, and it is the one that matters.
+PlanetScale integration rather than by the steps above, and it started out wrong in two ways. Both
+are fixed now; this section is why, kept because the second is the sort of thing that comes back.
 
 **TLS: fixed, and verified against the database.** PlanetScale serves a Let's Encrypt chain, so
 ISRG Root X1 was uploaded (`wrangler cert upload certificate-authority`, id
@@ -84,7 +88,21 @@ it did not break the connection. An earlier version of this note guessed that th
 detached the config from the PlanetScale integration; `wrangler hyperdrive get` says otherwise —
 `integration_name: planetScale` and the organisation and database names are all still on it.
 
-**The role: still wrong, and worse than this file used to say.** The config connects as
+> **Fixed on 2026-07-28, and verified end to end.** Hyperdrive now connects as
+> `keypaste_signup_writer.jb6eu3wgh2u3`, a role with `INSERT` on `public.signup` and nothing else -
+> no superuser, no `bypassrls`, `NOINHERIT`, zero role memberships. `public.signup` exists. A live
+> submission returns 303 to `/thanks/` and the row lands; a duplicate is a no-op; the honeypot
+> stores nothing; nonsense, a wrong `Origin` and a non-form body each get 400. As that role,
+> `select`, `count(*)`, `returning`, `update`, `delete` and reading any other table are all refused
+> with 42501. The section below is kept as the record of what was wrong and how it was found.
+>
+> Two things bit during the fix and are worth knowing before touching this again. **`wrangler
+> hyperdrive update --origin-user/--origin-password` silently wiped the `mtls` block**, dropping the
+> CA and `verify-full` to empty - the sslmode has to be passed again in the same or a following
+> update, which is exactly why the verification step below is not a formality. And **naming the
+> conflict target requires SELECT**; see `schema.sql`.
+
+**The role was wrong, and worse than this file used to say.** The config connected as
 `pscale_api_yq4xhf9tbm3v`, which is `rolcreaterole`, `rolcreatedb`, `rolbypassrls`, and a member of
 `pg_read_all_data`, `pg_write_all_data` and `postgres`. "It can read and write every table in the
 cluster" was an understatement: `postgres` is itself a member of `pscale_superuser`, so walking the
