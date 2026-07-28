@@ -9,6 +9,7 @@ using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Ipc;
 
 namespace Keypaste.App;
 
@@ -25,6 +26,7 @@ internal sealed partial class App : Application, IDisposable
     private AppVaultSession? _session;
     private MainWindow? _window;
     private UnlockViewModel? _unlock;
+    private ShellViewModel? _shell;
     private DateTimeOffset _lastTouch = DateTimeOffset.MinValue;
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
@@ -76,10 +78,16 @@ internal sealed partial class App : Application, IDisposable
         window.AddHandler(InputElement.PointerWheelChangedEvent, OnActivity, RoutingStrategies.Tunnel, handledEventsToo: true);
         window.AddHandler(InputElement.PointerMovedEvent, OnPointerMoved, RoutingStrategies.Tunnel, handledEventsToo: true);
 
+        window.AddHandler(InputElement.KeyDownEvent, OnShortcut, RoutingStrategies.Tunnel, handledEventsToo: true);
+
         window.Activated += (_, _) => _session?.Reevaluate();
     }
 
-    private void OnActivity(object? sender, RoutedEventArgs e) => _session?.Touch();
+    private void OnActivity(object? sender, RoutedEventArgs e)
+    {
+        _session?.Touch();
+        _shell?.ClearCountdown();
+    }
 
     private void OnPointerMoved(object? sender, RoutedEventArgs e)
     {
@@ -109,6 +117,11 @@ internal sealed partial class App : Application, IDisposable
             return;
         }
 
+        // The shell leaves the tree rather than being hidden, and its view models are disposed, so
+        // nothing derived from an open vault can outlive the lock.
+        _shell?.Dispose();
+        _shell = null;
+
         _unlock?.Dispose();
         _unlock = new UnlockViewModel(_session, home, OnUnlocked);
 
@@ -123,13 +136,63 @@ internal sealed partial class App : Application, IDisposable
             return;
         }
 
-        // The shell is Stage 4.1's next step. Until it exists this proves the whole path: a real
-        // KDBX opened by Keypaste.Core, held by a session that will lock it again.
-        _window.FindControl<ContentControl>("Root")!.Content = new TextBlock
+        _shell?.Dispose();
+        _shell = new ShellViewModel(
+            _session,
+            Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable),
+            Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable));
+
+        _shell.Current = Navigation.Destinations.All[0];
+
+        _window.FindControl<ContentControl>("Root")!.Content =
+            new ShellView { DataContext = _shell };
+    }
+
+    /// <summary>
+    /// The chords, built from the platform's own command modifier rather than a hardcoded Ctrl.
+    /// </summary>
+    /// <remarks>
+    /// Handled at the window, on the tunnelling pass, so a focused list or text field cannot eat
+    /// them first. <c>Ctrl/Cmd+L</c> is the honest counterweight to a five-minute idle timeout:
+    /// a default that short is only defensible when locking now is one keystroke.
+    /// </remarks>
+    private void OnShortcut(object? sender, KeyEventArgs e)
+    {
+        if (_shell is null || _window is null)
         {
-            Text = $"Unlocked {System.IO.Path.GetFileName(_session.VaultPath)}",
-            Margin = new Thickness(32),
+            return;
+        }
+
+        // Cmd on macOS, Ctrl everywhere else — which is what a platform hotkey configuration
+        // resolves to, without depending on where Avalonia keeps that configuration this version.
+        var command = OperatingSystem.IsMacOS() ? KeyModifiers.Meta : KeyModifiers.Control;
+
+        if ((e.KeyModifiers & command) != command)
+        {
+            return;
+        }
+
+        if (e.Key == Key.L)
+        {
+            _session?.Lock(VaultLockReason.Manual);
+            e.Handled = true;
+            return;
+        }
+
+        var digit = e.Key switch
+        {
+            Key.D1 or Key.NumPad1 => 1,
+            Key.D2 or Key.NumPad2 => 2,
+            Key.D3 or Key.NumPad3 => 3,
+            Key.D4 or Key.NumPad4 => 4,
+            Key.D5 or Key.NumPad5 => 5,
+            _ => 0,
         };
+
+        if (digit > 0 && _shell.GoTo(digit))
+        {
+            e.Handled = true;
+        }
     }
 
     /// <summary>Drops the vault and the unlock screen's password buffer.</summary>
@@ -140,6 +203,8 @@ internal sealed partial class App : Application, IDisposable
     /// </remarks>
     public void Dispose()
     {
+        _shell?.Dispose();
+        _shell = null;
         _unlock?.Dispose();
         _unlock = null;
         _session?.Dispose();

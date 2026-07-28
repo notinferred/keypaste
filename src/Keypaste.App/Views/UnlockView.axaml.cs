@@ -3,6 +3,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using Keypaste.App.Controls;
 using Keypaste.App.ViewModels;
 
@@ -23,8 +24,11 @@ internal sealed partial class UnlockView : UserControl
         AddHandler(DragDrop.DragOverEvent, OnDragOver);
         AddHandler(DragDrop.DropEvent, OnDrop);
 
-        // Launch, type, Enter — with no mouse. The claim is only true if focus starts here.
-        Loaded += (_, _) => password.Focus();
+        // Launch, type, Enter — with no mouse. The claim is only true if focus starts here, and it
+        // has to be posted rather than set inline: binding the recent list's SelectedItem gives a
+        // ListBoxItem focus after Loaded runs, which silently stole the first keystrokes whenever a
+        // recent list existed. Found by running it, not by reading it.
+        Loaded += (_, _) => Dispatcher.UIThread.Post(() => password.Focus(), DispatcherPriority.Background);
     }
 
     private UnlockViewModel? Model => DataContext as UnlockViewModel;
