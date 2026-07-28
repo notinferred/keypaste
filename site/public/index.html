@@ -179,21 +179,40 @@ Approve? [y/N]
 
   <p class="status">
     <b>Pre-1.0, and it says so.</b> The vault, the environment-variable injection and the agent
-    bridge all work today and are tested on all three operating systems. There are no prebuilt
-    binaries yet, there is no GUI yet, and the approval prompt is a terminal prompt rather than a
-    native dialog.
+    bridge all work today and are tested on all three operating systems. The binaries are unsigned,
+    there is no GUI yet, and the approval prompt is a terminal prompt rather than a native dialog.
   </p>
 
   <h2>Install</h2>
 
   <p class="caption">
-    There are no prebuilt binaries yet. Building is one command and needs the .NET SDK pinned in
-    the repository. Single-file binaries for macOS, Linux and Windows are the next thing.
+    Five lines, and the third one is the reason the other four are worth typing: it checks the
+    archive against a hash published beside it and stops if they disagree. Each binary is a single
+    native file, so nothing needs .NET on your machine. macOS on Apple Silicon:
   </p>
 
-<pre>git clone https://github.com/notinferred/keypaste
-cd keypaste
-dotnet build keypaste.slnx -c Release</pre>
+<pre>curl -fLO https://dl.keypaste.com/v0.1.0/keypaste-0.1.0-osx-arm64.tar.gz
+curl -fLO https://dl.keypaste.com/v0.1.0/keypaste-0.1.0-osx-arm64.tar.gz.sha256
+shasum -a 256 -c keypaste-0.1.0-osx-arm64.tar.gz.sha256
+tar -xzf keypaste-0.1.0-osx-arm64.tar.gz
+mkdir -p ~/.local/bin &amp;&amp; mv keypaste keypaste-mcp ~/.local/bin/</pre>
+
+  <p class="caption">Linux x64 — substitute <code>linux-arm64</code> for arm64:</p>
+
+<pre>curl -fLO https://dl.keypaste.com/v0.1.0/keypaste-0.1.0-linux-x64.tar.gz
+curl -fLO https://dl.keypaste.com/v0.1.0/keypaste-0.1.0-linux-x64.tar.gz.sha256
+sha256sum -c keypaste-0.1.0-linux-x64.tar.gz.sha256
+tar -xzf keypaste-0.1.0-linux-x64.tar.gz
+mkdir -p ~/.local/bin &amp;&amp; mv keypaste keypaste-mcp ~/.local/bin/</pre>
+
+  <p class="caption">
+    Windows, Intel Macs, Alpine and building from source are in the
+    <a href="https://github.com/notinferred/keypaste#install">README</a>. There is deliberately no
+    <code>curl | sh</code>: it asks you to run code you have not read, from an origin that is not the
+    repository. And the checksum proves the bytes arrived intact, not who made them — it is served
+    from the same origin as the archive, so anyone who can replace one can replace both. The binaries
+    are unsigned. Building from source is strictly stronger and is documented permanently.
+  </p>
 
   <p class="caption">Then a vault, and a project with no <code>.env</code> in it:</p>
 

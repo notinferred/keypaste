@@ -1,0 +1,83 @@
+name: install
+
+# Runs the install instructions from README.md on the operating system they are written for, against
+# the real published assets. The commands are not copied into this workflow or into the script it
+# calls: scripts/verify-install.sh extracts them from between sentinel comments in the document and
+# executes them, so what is tested is the text a stranger reads and not a second copy of it.
+#
+# This is the gate D-0036 requires before an install one-liner may appear on a page at all: "a curl
+# line on a launch page is the single instruction a stranger runs first, and one that 404s is worse
+# than an honest dotnet build."
+#
+# The weekly schedule is the part that earns its keep. A release workflow proves the assets existed
+# on the day they were uploaded; only a recurring run notices that one was later deleted, renamed,
+# or served from a bucket whose public access was turned off. That failure mode is silent by nature -
+# nobody reports a 404 they hit before they had any reason to trust the project.
+#
+# Pinned to commit SHAs for the same reason release.yml is: this workflow's verdict decides whether
+# the documented install stays on the page, so a mutated action here could vouch for a broken one.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Mondays, 07:00 UTC. No relation to release timing on purpose - a check that only ever runs
+    # right after a publish tests the day everything was known to be fine.
+    - cron: '0 7 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: install-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  install:
+    name: install (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: blacksmith-4vcpu-ubuntu-2404
+            target: linux
+          - os: blacksmith-6vcpu-macos-15
+            target: macos
+          - os: blacksmith-4vcpu-windows-2025
+            target: windows
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      # No setup-dotnet, and that absence is the point. A published binary is self-contained; if any
+      # step here needed a .NET SDK the claim on the page would be wrong. KEYPASTE_EXPECT_VERSION is
+      # passed in for the same reason - the script's fallback reads VersionPrefix with msbuild, which
+      # would quietly reintroduce the dependency this job exists to disprove.
+      - name: Read the version the documentation installs
+        id: v
+        shell: bash
+        run: |
+          set -euo pipefail
+          v="$(grep -oE 'dl\.keypaste\.com/v[0-9]+\.[0-9]+\.[0-9]+[^/]*/' README.md \
+                 | head -n 1 | sed 's#.*/v##; s#/$##')"
+          [ -n "$v" ] || { echo "::error::no versioned dl.keypaste.com URL found in README.md"; exit 1; }
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "README.md documents installing $v"
+
+      # --negative is not passed on Windows: the script refuses that combination outright rather
+      # than skipping it quietly, because the decoy substitution shims curl and the Windows block
+      # uses Invoke-WebRequest. The Linux and macOS runs both carry it, so the assertion that the
+      # checksum line fails closed is made on every scheduled run and not only on request.
+      - name: Run the documented install commands, verbatim
+        shell: bash
+        env:
+          KEYPASTE_EXPECT_VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          set -euo pipefail
+          if [ "${{ matrix.target }}" = "windows" ]; then
+            scripts/verify-install.sh windows
+          else
+            scripts/verify-install.sh ${{ matrix.target }} --negative
+          fi
