@@ -1,0 +1,28 @@
+<!--
+  The desktop app's solution, deliberately separate from keypaste.slnx.
+
+  ci.yml restores and builds keypaste.slnx in eight jobs (gate, test x3, compat x3, aot). Putting
+  Keypaste.App in that solution would make every backend push restore roughly twenty Avalonia
+  packages for a GUI those jobs do not test — the cost CLAUDE.md asks about before a workflow is
+  added. app.yml builds this solution instead, gated on paths.
+
+  Keypaste.Core appears in both solutions. That is fine: a solution is a view, not ownership.
+  The cost is that the two files have to stay in step, and a project missing from either is a red
+  build in one of the two workflows.
+-->
+<Solution>
+  <Folder Name="/meta/">
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Keypaste.Core/Keypaste.Core.csproj" />
+    <Project Path="src/Keypaste.App/Keypaste.App.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Keypaste.App.Tests/Keypaste.App.Tests.csproj" />
+  </Folder>
+  <Folder Name="/third_party/">
+    <Project Path="third_party/KeePassLib/KeePassLib.csproj" />
+  </Folder>
+</Solution>

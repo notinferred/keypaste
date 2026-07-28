@@ -17,4 +17,34 @@
     <PackageVersion Include="ModelContextProtocol.Core" Version="1.4.1" />
   </ItemGroup>
 
+  <!-- The desktop shell (Stage 4.1). This is the largest single change to this repository's
+       supply chain — four direct packages and roughly twenty transitive ones, in the process that
+       holds the unlocked vault — so CORE.md law 3.9 governs it and DECISIONS.md D-0044 carries the
+       written justification.
+
+       What Avalonia is trusted with: rendering the window and delivering the keystrokes of the
+       master password. What it is NOT trusted with: it never touches the KDBX file, never derives
+       a key, never reads the audit log and never opens a socket. Keypaste.Core still has no
+       PackageReference at all, and that is the line that matters.
+
+       Avalonia.Diagnostics is deliberately absent. It has no 12.x release, and a runtime
+       visual-tree inspector attached to a process holding an unlocked vault is not something to
+       ship even in Debug. CommunityToolkit.Mvvm is absent for the reason D-0028 gave for writing a
+       TOML parser by hand: sixty lines of INotifyPropertyChanged is not a dependency's worth of
+       work. -->
+  <ItemGroup Label="Desktop app">
+    <PackageVersion Include="Avalonia" Version="12.1.0" />
+    <PackageVersion Include="Avalonia.Desktop" Version="12.1.0" />
+    <PackageVersion Include="Avalonia.Themes.Fluent" Version="12.1.0" />
+    <PackageVersion Include="Avalonia.Fonts.Inter" Version="12.1.0" />
+  </ItemGroup>
+
+  <!-- Avalonia.Headless only, not Avalonia.Headless.XUnit: a spike proved HeadlessUnitTestSession
+       drives xunit.v3 directly under this repository's Microsoft.Testing.Platform runner, so the
+       integration package buys an attribute and costs a dependency. One session per process — a
+       second throws on the 'avares' URI parser — so the test project shares one static session. -->
+  <ItemGroup Label="Desktop app tests">
+    <PackageVersion Include="Avalonia.Headless" Version="12.1.0" />
+  </ItemGroup>
+
 </Project>

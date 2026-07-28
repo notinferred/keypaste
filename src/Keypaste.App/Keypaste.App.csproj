@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- WinExe rather than Exe: on Windows this is what stops a console window opening behind the
+         app. It has no effect on Linux or macOS. -->
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>Keypaste.App</RootNamespace>
+    <AssemblyName>keypaste-app</AssemblyName>
+
+    <!--
+      Compiled bindings are not a style preference. They are Avalonia's stated prerequisite for
+      NativeAOT, and they turn a mistyped binding path into a build error rather than a silently
+      blank label — which is the failure mode a repository building with TreatWarningsAsErrors
+      should least tolerate. Setting it now costs nothing and keeps the AOT door open (D-0044).
+    -->
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
+
+    <!--
+      Deliberately NOT set in 4.1: PublishAot, RuntimeIdentifiers, IlcTreatWarningsAsErrors and
+      ILLinkTreatWarningsAsErrors. The app ships no release artifact in this stage, AOT's failure
+      mode is a runtime NotSupportedException rather than a build error, and turning it on before
+      the shell is proven would make every Avalonia problem look like an AOT problem. The
+      repo-wide IsAotCompatible in Directory.Build.props still runs the analyzers over this
+      project's own code, which is the part worth gating today. See DECISIONS.md D-0044.
+    -->
+
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Keypaste.Core/Keypaste.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="Avalonia.Desktop" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
+    <PackageReference Include="Avalonia.Fonts.Inter" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Keypaste.App.Tests" />
+  </ItemGroup>
+
+</Project>

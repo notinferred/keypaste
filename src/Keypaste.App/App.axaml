@@ -1,0 +1,13 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Keypaste.App.App"
+             RequestedThemeVariant="Default">
+
+  <!-- Default follows the operating system. Settings offers System / Light / Dark and writes the
+       choice to ~/.keypaste/app.toml; System resolves through IPlatformSettings.GetColorValues(). -->
+
+  <Application.Styles>
+    <FluentTheme />
+  </Application.Styles>
+
+</Application>
