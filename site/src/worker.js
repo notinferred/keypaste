@@ -82,10 +82,20 @@ async function subscribe(request, env, ctx) {
     // A tagged template, so the address is a bound parameter, never concatenated into SQL. And no
     // RETURNING: that would need SELECT on the table, the one privilege this role deliberately
     // lacks, so asking for it would undo the reason the role exists.
+    //
+    // `on conflict do nothing` with NO inference specification, and that is load-bearing. Naming
+    // the arbiter - `on conflict (email) do nothing` - makes PostgreSQL 18 require SELECT on the
+    // table to resolve it, and the role does not have SELECT, so the insert fails with 42501 and
+    // the visitor gets the 503 page. Measured against the live database, not assumed. The bare
+    // form needs only INSERT.
+    //
+    // The trade is that this swallows a conflict on *any* constraint rather than specifically the
+    // primary key. Today `email` is the only one, so the behaviour is identical; adding a second
+    // constraint later means revisiting this line rather than inheriting a silent no-op.
     await sql`
       insert into public.signup (email, source)
       values (${email}, 'site')
-      on conflict (email) do nothing
+      on conflict do nothing
     `;
   } finally {
     ctx.waitUntil(sql.end());
