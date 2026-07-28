@@ -36,8 +36,15 @@ each of these is something a stranger hits before they hit the product.
 **The links**
 
 - [ ] **The repository is public.** It is private right now, which makes every link in every post
-  below a 404. `D-0006` records it as public and describes reasoning — free Actions minutes, the
-  three-OS matrix — that does not currently apply. Reconcile the record with reality either way.
+  below a 404. Now tracked as **O-0014**, and D-0006's first clause is marked false rather than left
+  standing. Two things changed since this bullet was written. The cost argument is gone: CI moved to
+  a flat-rate provider when GitHub-hosted billing stopped the jobs starting (D-0042), so free
+  minutes are no longer a reason to publish anything. And `SECURITY.md` was telling reporters the
+  repository was public, which meant pointing them at a vulnerability-reporting channel they cannot
+  reach; that is fixed. What is left is the real question — CORE.md law 3.8 calls auditable code the
+  trust strategy, and every post below sells exactly that — plus D-0006's warning that publishing is
+  irreversible because GitHub can serve any commit ever pushed. Answer it before posting, not before
+  tagging.
 - [x] **The stale URLs are corrected — there were seven, not four.** Fixed in 3.4. The four this
   list knew about were `README.md:51` and `site/public/index.html:152`, `:194`, `:299`. The three it
   missed were `site/public/thanks/index.html:62` and, more importantly,
