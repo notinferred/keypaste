@@ -4,7 +4,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// The buffer was internal to the CLI until the approval flow needed it, and it was exercised only
-/// through the prompt. Now that it is public core API on the secret path, CORE.md law 4.5 wants the
+/// through the prompt. Now that it is public core API on the secret path, docs/PRODUCT.md law 4.5 wants the
 /// zeroing asserted directly rather than inferred from a command's behaviour.
 /// </summary>
 public sealed class SecretBufferTests

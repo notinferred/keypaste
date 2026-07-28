@@ -1,6 +1,6 @@
-# PLAN.md — keypaste Roadmap
-> This file evolves. CORE.md does not. Check items off as you go; move finished stages to the bottom.
-> Companion files: `prompts.md` (ready-to-use build prompts per stage) and `ideas.md` (the parking lot).
+# STEPS.md — keypaste Roadmap
+> This file evolves. docs/PRODUCT.md does not. Check items off as you go; move finished stages to the bottom.
+> Companion files: `prompts.md` (ready-to-use build prompts per stage) and `docs/IDEAS.md` (the parking lot).
 
 ---
 
@@ -51,7 +51,7 @@
 - [x] Release pipeline: **`v0.1.0` is published** at `https://dl.keypaste.com/v0.1.0/` — four native binaries plus the corresponding source, each with a checksum, every gate run against the exact bytes uploaded. Distribution is Cloudflare R2 rather than a GitHub Release because this repository is private and private release assets 404 for everyone (D-0041); `osx-x64` was dropped with reasons and O-0006 was answered yes (D-0040). The documented install commands are now executed verbatim on Ubuntu 2404, macOS 15 and Windows 2025 by `.github/workflows/install.yml`, weekly and on demand, with a corrupted-download negative control on the two Unix legs. Its first real run failed and was right to — see D-0043 for the two reasons it had never run at all
 
 - [ ] Launch posts: Hacker News (Show HN), r/selfhosted, r/KeePass, MCP community/Discord, X
-- [x] Write the launch essay — [`docs/keepass-and-agents.md`](docs/keepass-and-agents.md), retitled "Your **KeePass vault** can't talk to AI — and everyone is pasting secrets into chats instead" because the original title is false: 1Password, Bitwarden and Keeper all ship request-and-approve flows, and all three are named in the essay's second paragraph (D-0038). Its transcripts are in `verify-demo.sh`'s `TRANSCRIPT_PAGES`, so the essay cannot drift from the binaries either
+- [x] Write the launch essay — [`docs/keepass-and-agents.md`](keepass-and-agents.md), retitled "Your **KeePass vault** can't talk to AI — and everyone is pasting secrets into chats instead" because the original title is false: 1Password, Bitwarden and Keeper all ship request-and-approve flows, and all three are named in the essay's second paragraph (D-0038). Its transcripts are in `verify-demo.sh`'s `TRANSCRIPT_PAGES`, so the essay cannot drift from the binaries either
 - [ ] Respond to every issue/comment for 2 weeks straight
 - **Benchmarks:** tracked privately, outside this repo.
 
@@ -61,7 +61,7 @@
 - [x] Entry browse/search and the env-set editor — **4.2** (D-0045..D-0050): a searchable entry list with a group tree, showing titles and groups and nothing else; a detail pane with copy buttons whose clipboard clears itself, inline edit, add with a generated password, delete behind a confirmation; env projects as cards carrying their `keypaste run <project> -- ` line, variables in a masked table with reveal-on-hold on a control that publishes nothing to the accessibility bus. Everything reads and writes through core, and a test project referencing both front ends proves the shipped CLI sees a GUI edit at once
 - [ ] The differentiating screen: **Agent Activity** — live feed of agent requests, approve/deny buttons, history (this is the delegation dashboard seed)
 - [ ] Approval prompts move from CLI to native windows/tray
-- [ ] Design language: modern, calm, trustworthy (see ideas.md → UI section for direction)
+- [ ] Design language: modern, calm, trustworthy (see docs/IDEAS.md → UI section for direction)
 - **Exit demo:** side-by-side screenshot — KeePass classic vs keypaste — same file, different decade.
 
 **Where 4.1 left it.** The app opens a real KDBX written by the shipped CLI and holds it in a session
@@ -80,7 +80,7 @@ something the stage had to pay. 4.1's hygiene gate failed the moment an entry li
 what it was built to do; what replaced it is four narrower two-sided claims and one total invariant —
 after a lock, nothing built while unlocked holds anything — and writing that invariant immediately
 found a detail pane that went on holding a username and notes after the vault was gone. Three things
-grew outside the app because the GUI could not have them otherwise and CORE.md law 4.2 forbids the
+grew outside the app because the GUI could not have them otherwise and docs/PRODUCT.md law 4.2 forbids the
 GUI having them first: a **password generator** in the core with `--generate` on `keypaste add` and
 `keypaste env set`; the **clipboard clear rule** lifted into the core so one function decides for both
 front ends while the transports stay apart; and a **guard against lost writes**, because an app that

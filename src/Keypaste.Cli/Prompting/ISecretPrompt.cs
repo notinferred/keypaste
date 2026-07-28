@@ -8,7 +8,7 @@ namespace Keypaste.Cli.Prompting;
 /// <remarks>
 /// A seam rather than direct <see cref="Console"/> use because <c>Console.SetIn</c> provably does
 /// not intercept <c>Console.ReadKey</c>, so there is no way to drive the real prompt from a test.
-/// Every password-handling path in the CLI would otherwise be untestable, which CORE.md law 4.5
+/// Every password-handling path in the CLI would otherwise be untestable, which docs/PRODUCT.md law 4.5
 /// does not allow on the secret path.
 /// </remarks>
 internal interface ISecretPrompt

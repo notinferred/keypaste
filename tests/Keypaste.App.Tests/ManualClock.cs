@@ -8,7 +8,7 @@ namespace Keypaste.App.Tests;
 /// The same shape as <c>ManualClock</c> in <c>Keypaste.Core.Tests</c>, and hand-rolled for the same
 /// reason it gives: a test-only package still enters <c>packages.lock.json</c>, still restores
 /// under <c>--locked-mode</c>, and still turns CI red the day it gets a low-severity advisory
-/// (CORE.md law 3.9).
+/// (docs/PRODUCT.md law 3.9).
 /// </para>
 /// <para>
 /// <b>One thing here that the core's version does not do, and the whole idle policy depends on

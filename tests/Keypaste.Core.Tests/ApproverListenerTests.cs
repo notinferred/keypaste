@@ -128,7 +128,7 @@ public sealed class ApproverListenerTests
     /// <summary>
     /// Nobody listening is the ordinary case — the human has not started the approver — and it has
     /// to be a null answer rather than an exception, because the bridge turns it into a denial with
-    /// a line in the audit log (CORE.md laws 3.3 and 3.7).
+    /// a line in the audit log (docs/PRODUCT.md laws 3.3 and 3.7).
     /// </summary>
     [Fact]
     public async Task WithNoApproverRunning_ConnectingReportsItRatherThanThrowing()

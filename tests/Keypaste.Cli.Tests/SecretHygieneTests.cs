@@ -4,7 +4,7 @@ namespace Keypaste.Cli.Tests;
 
 /// <summary>
 /// The tests that exist to catch a future well-meaning refactor rather than a present bug.
-/// CORE.md law 4.5 makes tests on the secret path mandatory; these are that path's backstop.
+/// docs/PRODUCT.md law 4.5 makes tests on the secret path mandatory; these are that path's backstop.
 /// </summary>
 public sealed class SecretHygieneTests
 {

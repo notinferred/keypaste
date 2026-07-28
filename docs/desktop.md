@@ -88,7 +88,7 @@ Three ways in, and all three end at the same place:
 Whichever you use, the file's header is read before you are asked for a password, so a file that was
 never a vault is refused immediately rather than after you have typed. There is no "create a new
 vault" here: run `keypaste init`. Every feature exists in the CLI before it gets a window
-(CORE.md §4.2), and the empty state says so.
+(docs/PRODUCT.md §4.2), and the empty state says so.
 
 ## Locking
 

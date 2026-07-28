@@ -5,7 +5,7 @@ namespace Keypaste.Core;
 /// </summary>
 /// <remarks>
 /// This is a plain value carrying secret material in managed strings. It is deliberately
-/// simple: the protection that matters is the encrypted container on disk (CORE.md law 3.4),
+/// simple: the protection that matters is the encrypted container on disk (docs/PRODUCT.md law 3.4),
 /// not an in-memory ceremony that .NET cannot honour. Callers should not persist instances
 /// beyond the operation that needed them.
 /// </remarks>

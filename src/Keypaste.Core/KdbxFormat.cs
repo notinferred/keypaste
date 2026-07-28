@@ -11,7 +11,7 @@ namespace Keypaste.Core;
 /// change to how every vault keypaste writes is protected.
 /// </para>
 /// <para>
-/// keypaste implements no cryptography (CORE.md law 3.6). These are configuration, not
+/// keypaste implements no cryptography (docs/PRODUCT.md law 3.6). These are configuration, not
 /// algorithms.
 /// </para>
 /// </remarks>

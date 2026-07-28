@@ -1,7 +1,7 @@
 <Solution>
   <Folder Name="/meta/">
-    <File Path="CORE.md" />
-    <File Path="PLAN.md" />
+    <File Path="docs/PRODUCT.md" />
+    <File Path="docs/STEPS.md" />
     <File Path="DECISIONS.md" />
     <File Path="SECURITY.md" />
     <File Path="THREATS.md" />

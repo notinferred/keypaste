@@ -87,7 +87,7 @@ public sealed class PolicyLoad
 /// produces the same thing as far as an agent is concerned: no rules, so every request reaches a
 /// person. Refusing to start the approver instead would turn a typo, or a planted <c>chmod 000</c>,
 /// into a denial of service on the human's own vault, and the release direction is already the safe
-/// one (CORE.md law 3.7).
+/// one (docs/PRODUCT.md law 3.7).
 /// </para>
 /// <para>
 /// <b>The size is checked before the read and the bytes are validated after it, from memory.</b>

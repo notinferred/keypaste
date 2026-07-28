@@ -26,7 +26,7 @@ public sealed record SanitizedName(string Text, bool WasAltered);
 /// <para>
 /// It lives in the core rather than in the bridge because the same untrusted strings are rendered
 /// in at least four places — the tool result, the approval dialog, <c>keypaste log</c>, and the
-/// GUI's activity feed — and CORE.md law 4.3 does not allow that rule to be written down four
+/// GUI's activity feed — and docs/PRODUCT.md law 4.3 does not allow that rule to be written down four
 /// times.
 /// </para>
 /// <para>
@@ -134,7 +134,7 @@ public static class EntryNameSanitizer
     /// <c>/</c> as one of the ten structural characters and would replace every one of them with a
     /// space, flattening <c>env/dev/STRIPE_KEY</c> into <c>env dev STRIPE_KEY</c> — which is
     /// unreadable in a listing and useless in an audit line, where naming the entry is the point
-    /// (CORE.md law 3.3).
+    /// (docs/PRODUCT.md law 3.3).
     /// </para>
     /// <para>
     /// The separator is safe to keep here precisely because it is being kept as a separator: what

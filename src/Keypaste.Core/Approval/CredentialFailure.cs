@@ -5,7 +5,7 @@ namespace Keypaste.Core.Approval;
 /// </summary>
 /// <remarks>
 /// The values are distinct so the audit line and the agent-facing refusal can say <em>why</em>, not
-/// so any of them can be treated as recoverable. CORE.md law 3.7 makes every one of them a denial;
+/// so any of them can be treated as recoverable. docs/PRODUCT.md law 3.7 makes every one of them a denial;
 /// telling them apart is what stops an agent retrying a request that will never succeed.
 /// </remarks>
 public enum CredentialFailure

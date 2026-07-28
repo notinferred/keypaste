@@ -4,7 +4,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// Asserts that the KeePassXC compatibility gate is still wired into CI (CORE.md law 4.6,
+/// Asserts that the KeePassXC compatibility gate is still wired into CI (docs/PRODUCT.md law 4.6,
 /// DECISIONS.md D-0008).
 /// </summary>
 /// <remarks>
@@ -47,18 +47,18 @@ public sealed class CompatGateIsPermanentTests
         // coverage silently. Both gates enforce the same law and get the same tripwire.
         Assert.Contains("scripts/verify-keepassxc-writeback.sh", workflow, StringComparison.Ordinal);
 
-        // Injection is the other law with no in-process test that can reach it (CORE.md 3.4 and
+        // Injection is the other law with no in-process test that can reach it (docs/PRODUCT.md 3.4 and
         // 4.5): the child owns the console, so only a real child can be asked what it received.
         Assert.Contains("scripts/verify-run-injection.sh", workflow, StringComparison.Ordinal);
         Assert.Contains("scripts/verify-run-signals.sh", workflow, StringComparison.Ordinal);
 
         // The agent bridge has the same shape of gap: StdioServerTransport and Main are beyond
         // every in-process test, and "nothing but protocol reaches stdout" can only be asked of a
-        // real spawned process (CORE.md laws 3.3 and 4.5).
+        // real spawned process (docs/PRODUCT.md laws 3.3 and 4.5).
         Assert.Contains("scripts/verify-mcp-stdio.sh", workflow, StringComparison.Ordinal);
 
         // And the approval flow has a third: the credential crossing a process boundary, which by
-        // definition no single-process test can observe (CORE.md law 3.2, DECISIONS.md D-0023).
+        // definition no single-process test can observe (docs/PRODUCT.md law 3.2, DECISIONS.md D-0023).
         Assert.Contains("scripts/verify-approval-e2e.sh", workflow, StringComparison.Ordinal);
 
         // The policy path has a fourth, and it is the only one asserting that a prompt did NOT
@@ -72,7 +72,7 @@ public sealed class CompatGateIsPermanentTests
         // because the label belongs to whoever rents the machine and the law does not. Migrating to
         // Blacksmith renamed `windows-latest` to `blacksmith-4vcpu-windows-2025`, and a tripwire
         // looking for the old label could not tell that from Windows being dropped - it failed the
-        // build for a change that took nothing away. CORE.md law 4.6 requires the operating system,
+        // build for a change that took nothing away. docs/PRODUCT.md law 4.6 requires the operating system,
         // not the marketplace.
         //
         // Reading the matrix lines rather than the whole file is what keeps this honest: `windows`

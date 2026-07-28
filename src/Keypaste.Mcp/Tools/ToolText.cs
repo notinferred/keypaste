@@ -165,7 +165,7 @@ internal static class ToolText
     /// The value is in a model's context the moment it is returned, and no wording changes that.
     /// What the wording can do is narrow what happens next: say plainly that this is a live
     /// credential, that it expires, and that writing it into a file or a message is the thing
-    /// keypaste exists to stop (CORE.md law 3.4 is about keypaste's own writes; this is the part
+    /// keypaste exists to stop (docs/PRODUCT.md law 3.4 is about keypaste's own writes; this is the part
     /// only the model can honour).
     /// </remarks>
     internal static string Released(string field, int ttlSeconds) =>

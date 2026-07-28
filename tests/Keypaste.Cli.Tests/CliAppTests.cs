@@ -9,7 +9,7 @@ public sealed class CliAppTests
     /// <summary>
     /// The wiring proof: the CLI's greeting must be produced by keypaste-core, not by
     /// the CLI itself. Fails to compile if the reference is dropped and fails at runtime
-    /// if the CLI ever grows its own copy — CORE.md law 4.3 as an executable assertion.
+    /// if the CLI ever grows its own copy — docs/PRODUCT.md law 4.3 as an executable assertion.
     /// </summary>
     [Fact]
     public void Hello_WritesTheCoreGreetingToStdout_AndExitsZero()
@@ -27,7 +27,7 @@ public sealed class CliAppTests
     /// <summary>
     /// Deliberate change from Stage 0.1, where no arguments greeted you. That was scaffolding;
     /// a tool with verbs should say what they are. The <c>hello</c> verb itself survives above,
-    /// because it is the CORE.md law 4.3 wiring proof.
+    /// because it is the docs/PRODUCT.md law 4.3 wiring proof.
     /// </summary>
     [Fact]
     public void NoArguments_PrintsUsageToStderr_AndExitsNonZero()

@@ -10,7 +10,7 @@ namespace Keypaste.App.ViewModels;
 /// <b>No field value is materialised here, and that is the decision 4.1's hygiene gate existed to
 /// force.</b> A username column is a disclosure surface no CLI verb has: <c>keypaste ls</c> prints
 /// titles and groups, and that is what a listing is. It would also be readable over a shoulder and
-/// in the marketing screenshots <c>ideas.md</c> plans and THREATS.md T-24 already worries about.
+/// in the marketing screenshots <c>docs/IDEAS.md</c> plans and THREATS.md T-24 already worries about.
 /// The detail pane widens to username, URL and notes for the one entry a person selected, which is
 /// <c>keypaste get</c>'s scope minus the password.
 /// </para>

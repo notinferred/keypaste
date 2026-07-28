@@ -8,7 +8,7 @@ namespace Keypaste.App.Tests;
 /// </summary>
 /// <remarks>
 /// <para>
-/// CORE.md law 4.6 says any KDBX keypaste writes must open in KeePassXC, and it is tested in CI
+/// docs/PRODUCT.md law 4.6 says any KDBX keypaste writes must open in KeePassXC, and it is tested in CI
 /// against real KeePassXC — but that gate lives in <c>ci.yml</c> and drives the CLI. 4.2 makes the
 /// app a writer for the first time, so either it needs a gate of its own or there is an argument for
 /// why it does not.

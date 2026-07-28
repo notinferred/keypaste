@@ -16,7 +16,7 @@ namespace Keypaste.App.ViewModels;
 /// <para>
 /// <b>The lines are <see cref="AuditText"/>'s, verbatim.</b> Heading, table and notes arrive already
 /// rendered from the core and go into a monospace block untouched. Re-drawing that table as a
-/// <c>DataGrid</c> would write the same sentence twice, which CORE.md law 4.3 forbids and D-0032
+/// <c>DataGrid</c> would write the same sentence twice, which docs/PRODUCT.md law 4.3 forbids and D-0032
 /// decided for this exact pair of front ends: <c>keypaste log</c> and this view must say the same
 /// thing about the same file. <c>LogViewModelTests</c> is what actually holds that.
 /// </para>

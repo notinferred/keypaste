@@ -23,7 +23,7 @@ namespace Keypaste.App.Session;
 /// <para>
 /// <b>It names no Avalonia type, and must not.</b> Everything below is testable with a
 /// <see cref="TimeProvider"/> and no application, no window and no display — which is where the
-/// security assertions live (CORE.md law 4.5). A dispatcher timer would have been fewer lines and
+/// security assertions live (docs/PRODUCT.md law 4.5). A dispatcher timer would have been fewer lines and
 /// would have made the whole idle policy untestable.
 /// </para>
 /// </remarks>
@@ -128,7 +128,7 @@ internal sealed class AppVaultSession : IDisposable
     /// <remarks>
     /// Out of range clamps rather than throwing, and an unreadable settings file is handled by the
     /// caller passing nothing at all. Both roads lead to a number that locks; neither leads to a
-    /// vault that stays open because a file was malformed (CORE.md law 3.7).
+    /// vault that stays open because a file was malformed (docs/PRODUCT.md law 3.7).
     /// </remarks>
     internal static TimeSpan Clamp(TimeSpan value) =>
         value < MinimumIdleTimeout ? MinimumIdleTimeout

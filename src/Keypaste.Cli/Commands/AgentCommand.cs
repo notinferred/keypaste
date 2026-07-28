@@ -13,7 +13,7 @@ namespace Keypaste.Cli.Commands;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The process that makes CORE.md law 3.2 real. It is started by a human, in a terminal a human
+/// The process that makes docs/PRODUCT.md law 3.2 real. It is started by a human, in a terminal a human
 /// opened, and the master password is typed there in response to a command they typed — so nothing
 /// an agent does can raise a password prompt. That property is the whole reason the approval flow
 /// is not built into <c>keypaste-mcp</c> (DECISIONS.md D-0023).

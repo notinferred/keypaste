@@ -2,7 +2,7 @@
 
 **Status: complete for Stage 2, and honest about its edges.** This document was written across
 Stage 2. While it was being written, a section whose threat was real but not yet mitigated carried
-the marker **Arrives in 2.x** and named the PLAN.md checkbox that would close it — because a threat
+the marker **Arrives in 2.x** and named the docs/STEPS.md checkbox that would close it — because a threat
 model that is quietly thin is worse than one that says where it is thin. **No section carries that
 marker now: 2.4 closed the last of them, T-5.** The audit log is tamper-evident as well as
 append-only, and `keypaste log verify` says so in words — including the two things it cannot see,
@@ -10,12 +10,12 @@ which are stated on a passing check rather than only on a failing one.
 
 One deferral outlives Stage 2 and is named rather than dropped: **T-13 still has no way to show
 which entries each rule matches *today***, because that needs the vault open, and the place it
-belongs is the GUI's Agent Activity screen (PLAN.md Stage 4) rather than a master-password prompt in
+belongs is the GUI's Agent Activity screen (docs/STEPS.md Stage 4) rather than a master-password prompt in
 front of a diagnostic command.
 
 **Stage 2.3 made one thing worse on purpose, and it is T-14.** A policy file releases a credential
 with nobody watching. Every other line in this document describes something keypaste defends
-against; that one describes a capability the product now has because CORE.md law 3.2 authorises it
+against; that one describes a capability the product now has because docs/PRODUCT.md law 3.2 authorises it
 in so many words, and the rest of the design exists to bound how much it costs.
 
 This file covers `keypaste-mcp` — the bridge between an AI agent and your vault. For the vault, the
@@ -23,7 +23,7 @@ CLI, and the honest list of what keypaste does not protect against anywhere, see
 [SECURITY.md](SECURITY.md). The two files are meant to be read together and neither repeats the
 other.
 
-The governing rules are CORE.md §3, which cannot change.
+The governing rules are docs/PRODUCT.md §3, which cannot change.
 
 Each entry below ends with **Proved by**, naming the test that holds it up — or saying plainly that
 nothing does. A threat model whose mitigations are untested is a wish list.
@@ -388,7 +388,7 @@ is denied and nothing is returned — no credential and no entry names, even whe
 would have succeeded. The record is written *before* the response is produced, so a crash in between
 over-reports an access rather than under-reporting one; over-reporting is the safe direction.
 
-This is CORE.md law 3.3 and law 3.7 taken together: every agent access is logged, and every error
+This is docs/PRODUCT.md law 3.3 and law 3.7 taken together: every agent access is logged, and every error
 path denies.
 
 **Proved by.** `AuditLogTests.AnUnopenableLog_FailsWithAReason` for the refusal itself and
@@ -703,7 +703,7 @@ command an operator reaches for when something already looks wrong.
 quietly. `keypaste log` reads a plaintext file and needs no vault; bolting a vault-unlocking mode
 onto it, or onto `keypaste policy ls`, would have bought this mitigation at the cost of the property
 that makes both commands safe to reach for in a hurry. The place it belongs is the GUI's **Agent
-Activity** screen (PLAN.md Stage 4), where a vault is already open because the user opened it. Until
+Activity** screen (docs/STEPS.md Stage 4), where a vault is already open because the user opened it. Until
 then, what exists after the fact is the audit log: every release names the rule that made it, so
 `keypaste log` answers "what did this rule actually cover" for everything that has happened, and
 nothing answers it for what has not happened yet.
@@ -1090,7 +1090,7 @@ Removable one row at a time from the app, or entirely from Settings, or by delet
 
 **Residual.** This is the same trust boundary the audit log already sits behind: anything that can
 read `~/.keypaste` can read both. The app shows a vault's file name rather than its full path, which
-is a defence against a screenshot rather than against a reader — `ideas.md`'s screenshot strategy
+is a defence against a screenshot rather than against a reader — `docs/IDEAS.md`'s screenshot strategy
 puts this app in marketing images, and a directory layout is not something to publish by accident.
 
 ## T-25 — A value on screen, because somebody asked to see it
@@ -1136,6 +1136,6 @@ hold the value exists in the process as an unwipeable copy — T-18's territory,
 | 2.2 | The approval flow. **T-7 closed** — the master password is typed in a terminal a person opened, and the listing path is reachable in the shipped binary at last. T-2 and T-3 completed. T-8 rewritten: secrets do traverse this path now, and are tested against real ones. New: T-10 (the approver channel), T-11 (prompt fatigue), T-12 (a grant reused under a reason nobody read). Decisions in D-0023 (the separate process), D-0024 (the pipe), D-0025 (the window), D-0026 (the grant cache), D-0027 (the refusal vocabulary). |
 | 2.3 | The policy file. **T-3 resolved** in the words 2.1 demanded: a rule keys on `--client-label`, and client-scoped policy narrows convenience rather than authority. **T-6's named gap closed**, on the policy path, because that is the one with no human witness. T-11 gained the per-rule hourly allowance. T-12 rewritten: a policy grant is T-12 with the *first* approval removed as well as the second, so the line it could be compared against does not exist. New: T-13 (a rule grants a namespace, not the entries you pictured), T-14 (a standing grant to anything that can reach the approver — **the one place 2.3 is weaker than 2.2**), T-15 (authorization in a possibly-synced directory), T-16 (the audit vocabulary is the only evidence a person was involved), T-17 (a timing oracle). Decisions in D-0028 (the file and its all-or-nothing rule), D-0029 (where the policy sits in the order), D-0030 (keying on the operator's label). |
 | 2.4 | The audit log gets a reader and a chain. **T-5 closed** — every record links to the one before it, `keypaste log verify` recomputes the file, and the three things the chain cannot do are named in T-5 and printed on every passing check rather than only on a failing one. T-12's divergence gained the reader it was promised: `keypaste log` marks a reuse served under a reason nobody read. **T-13's missing mitigation was deferred again, and says so** — showing which entries a rule matches today needs an open vault, and its home is the GUI's Agent Activity screen rather than a password prompt in front of a diagnostic command. New: T-18 (memory dumping), T-19 (clipboard scraping), T-20 (a stolen vault file), promoted out of the out-of-scope table into sections that give reasons instead of one line each. Decisions in D-0031 (the chain) and D-0032 (the reader). |
-| 3.4 | The release pipeline. New: **T-21** (the released binary is not the source you read), promoted to a section rather than an out-of-scope row because a launch turns downloading into the normal path. **T-9 amended twice**: its "twenty-eight reviewable lines" was no longer true and is withdrawn, and its "check it yourself" argument is explicitly scoped to readers who build rather than download. **T-3 gained a mitigation**: a tool call arriving before the initialize handshake is now denied (`not-initialized`) instead of answered for "an unnamed client", closing a law 3.3 gap where an access was recorded with no caller. No threat was closed. Decisions in D-0040 (vendored KeePassLib survives NativeAOT, proved by a published binary writing a vault real KeePassXC opens) and D-0041 (what a release is). Open: O-0010 (unsigned, un-notarized), O-0012 (not reproducible, no provenance). **T-21 amended** after the fact: `ci.yml` moved onto the same runner fleet as the release when GitHub-hosted billing stopped the jobs starting (D-0042), so tests and builds no longer come from two independent providers. Also open: **O-0014** — the repository is private while CORE.md law 3.8 calls auditable code the trust strategy, which makes the central launch claim unverifiable by the reader it is aimed at. |
+| 3.4 | The release pipeline. New: **T-21** (the released binary is not the source you read), promoted to a section rather than an out-of-scope row because a launch turns downloading into the normal path. **T-9 amended twice**: its "twenty-eight reviewable lines" was no longer true and is withdrawn, and its "check it yourself" argument is explicitly scoped to readers who build rather than download. **T-3 gained a mitigation**: a tool call arriving before the initialize handshake is now denied (`not-initialized`) instead of answered for "an unnamed client", closing a law 3.3 gap where an access was recorded with no caller. No threat was closed. Decisions in D-0040 (vendored KeePassLib survives NativeAOT, proved by a published binary writing a vault real KeePassXC opens) and D-0041 (what a release is). Open: O-0010 (unsigned, un-notarized), O-0012 (not reproducible, no provenance). **T-21 amended** after the fact: `ci.yml` moved onto the same runner fleet as the release when GitHub-hosted billing stopped the jobs starting (D-0042), so tests and builds no longer come from two independent providers. Also open: **O-0014** — the repository is private while docs/PRODUCT.md law 3.8 calls auditable code the trust strategy, which makes the central launch claim unverifiable by the reader it is aimed at. |
 | 4.1 | The desktop app. New: **T-22** (the accessibility layer as a read path for a password field, and why the master password is not typed into a `TextBox`), **T-23** (what idle auto-lock buys, and that it is explicitly not a mitigation for T-18 and does not lock `keypaste agent`), **T-24** (`recent.toml` discloses vault paths inside the boundary the audit log already sits behind). No threat was closed. **T-13's deferral is unchanged**: showing which entries a rule matches still needs an open vault and still belongs to the Agent Activity screen, which 4.1 did not build — the app is not the approver and says so. Choosing a toolkit that draws rather than one that hosts a browser removed a class this document would otherwise have had to carry, since there is no HTML origin to confuse; Tauri's own advisories cluster in exactly that place (D-0044). Decisions in D-0044 (the shell, and why the two shells this repository had already named did not survive being checked). Open: O-0015 (bundling and signing when the official bundler is a paid product), O-0016 (the app's size is not the CLI's), O-0017 (who owns the approver pipe once the app can approve). |
 | 4.2 | The app puts vault contents on screen and writes for the first time. New: **T-25** (a value on screen because somebody asked to see it, and what bounds it). **T-19 amended**: it now covers the app's copy buttons as well as `keypaste get`, both deciding through one function in the core, and it records the two promises the app can make that the CLI cannot — a lock clears the clipboard at once, and an orderly quit clears before exit — alongside the five things neither survives. **T-22 amended**: reasoning about `IValueProvider` was only half of it, since `TextBlockAutomationPeer` publishes drawn text as the automation *name* over the same bus, and an attached `AutomationProperties.Name` is a third route. **O-0008 closed for the app**, still open for the CLI: a window can set the Windows opt-out clipboard formats and `clip.exe` cannot. No threat was closed outright. **T-13's deferral is unchanged** — the Agent Activity screen is 4.3's. Decisions in D-0045 (what a screen may show), D-0046 (the clipboard rule is shared, the transport is not), D-0047 (the masked value cell), D-0048 (a save that would revert somebody else's write is refused), D-0049 (one test project for both front ends), D-0050 (why the KeePassXC gate still covers the app's writes). Open: O-0018 (two writers, one KDBX, no merge), O-0019 (macOS could conceal a pasteboard item and does not yet), O-0020 (nothing automated has ever seen this app draw). |

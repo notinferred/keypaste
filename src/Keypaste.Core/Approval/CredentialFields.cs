@@ -4,7 +4,7 @@ namespace Keypaste.Core.Approval;
 /// <remarks>
 /// The list lives in the core because it is a product rule, not a protocol detail: the MCP tool
 /// schema advertises it, the server re-validates against it, the approval prompt names it, and
-/// <c>keypaste log</c> renders it. CORE.md law 4.3 does not allow that written down four times.
+/// <c>keypaste log</c> renders it. docs/PRODUCT.md law 4.3 does not allow that written down four times.
 /// <para>
 /// Custom KDBX string fields are deliberately absent. They are where users keep recovery codes and
 /// notes-to-self, and widening the release surface to "whatever the entry happens to have" is a

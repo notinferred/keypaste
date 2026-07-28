@@ -5,7 +5,7 @@ namespace Keypaste.Core.Approval;
 /// </summary>
 /// <remarks>
 /// Seven of the eight mean deny, and they are distinct only so the audit line and the refusal an
-/// agent reads can say <em>why</em> — never so any of them can be treated as a maybe. CORE.md law
+/// agent reads can say <em>why</em> — never so any of them can be treated as a maybe. docs/PRODUCT.md law
 /// 3.2 makes deny the default and law 3.7 makes every error path a denial, so the safe way to read
 /// this enum is: anything that is not <see cref="Approved"/> is a no.
 /// </remarks>
@@ -38,6 +38,6 @@ public enum ApprovalAnswer
     /// </summary>
     Cooldown = 6,
 
-    /// <summary>Asking went wrong. Fail closed (CORE.md law 3.7).</summary>
+    /// <summary>Asking went wrong. Fail closed (docs/PRODUCT.md law 3.7).</summary>
     Failed = 7,
 }

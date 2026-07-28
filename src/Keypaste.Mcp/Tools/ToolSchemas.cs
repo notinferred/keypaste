@@ -95,7 +95,7 @@ internal static class ToolSchemas
     /// <remarks>
     /// Taken from the core rather than written again here, because four things have to agree about
     /// this list — the schema an agent reads, the server's own re-validation, the approval prompt a
-    /// person reads, and the approver's release path — and CORE.md law 4.3 does not allow that
+    /// person reads, and the approver's release path — and docs/PRODUCT.md law 4.3 does not allow that
     /// written down four times. <c>TheSchemaAndTheCoreAgreeAboutFields</c> is what keeps the JSON
     /// literal above in step with it.
     /// </remarks>

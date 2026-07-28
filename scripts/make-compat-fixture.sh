@@ -3,7 +3,7 @@
 # make-compat-fixture.sh
 #
 # Builds the KDBX fixture that scripts/verify-keepassxc-compat.sh checks against a real
-# KeePassXC (CORE.md law 4.6).
+# KeePassXC (docs/PRODUCT.md law 4.6).
 #
 # This drives the SHIPPED keypaste binary. Until Stage 0.3 the fixture came from a throwaway
 # project that called Keypaste.Core directly; driving the CLI instead means the permanent gate

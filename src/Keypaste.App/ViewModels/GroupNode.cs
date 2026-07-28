@@ -14,7 +14,7 @@ namespace Keypaste.App.ViewModels;
 /// <para>
 /// A group with no entries appears here, because it appears in
 /// <see cref="Core.Vault.ReadGroupPaths"/> and in KeePassXC. A tree that quietly dropped it would be
-/// keypaste disagreeing with KeePassXC about the contents of one file, which is the failure CORE.md
+/// keypaste disagreeing with KeePassXC about the contents of one file, which is the failure docs/PRODUCT.md
 /// law 4.6 exists to prevent.
 /// </para>
 /// </remarks>

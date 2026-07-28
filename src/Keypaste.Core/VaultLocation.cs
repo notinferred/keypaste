@@ -13,7 +13,7 @@ namespace Keypaste.Core;
 /// a product rule, not a command-line one: the MCP bridge has to answer it identically, or Stage
 /// 2.2 will hand an agent a credential out of one file while <c>keypaste ls</c> shows another, and
 /// <c>keypaste log</c> will render history for a vault the user never opened. Two implementations
-/// of one rule is what CORE.md law 4.3 forbids. The CLI keeps a thin adapter that binds its own
+/// of one rule is what docs/PRODUCT.md law 4.3 forbids. The CLI keeps a thin adapter that binds its own
 /// argument parser and environment seam to this.
 /// </para>
 /// </remarks>

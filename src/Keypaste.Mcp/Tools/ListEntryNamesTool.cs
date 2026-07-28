@@ -138,7 +138,7 @@ internal sealed class ListEntryNamesTool(
     /// <remarks>
     /// Log-then-answer, not answer-then-log. If the record cannot be written the call is refused,
     /// because otherwise breaking the logger becomes the way to obtain access that leaves no trace
-    /// (CORE.md laws 3.3 and 3.7, THREATS.md T-6). A crash between the two over-reports an access
+    /// (docs/PRODUCT.md laws 3.3 and 3.7, THREATS.md T-6). A crash between the two over-reports an access
     /// rather than under-reporting one, which is the safe direction.
     /// </remarks>
     private CallToolResult Record(AuditRecord record, CallToolResult answer) =>

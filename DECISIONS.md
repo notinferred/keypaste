@@ -1,7 +1,7 @@
 # DECISIONS.md — engineering decision log
 
 > One entry per decision that a future contributor (or a future you) would otherwise have to
-> reverse-engineer. CORE.md decides *what* keypaste is; this file records *how*, and why.
+> reverse-engineer. docs/PRODUCT.md decides *what* keypaste is; this file records *how*, and why.
 > Append entries; do not rewrite history. Supersede an entry by adding a new one that says so.
 
 ---
@@ -10,7 +10,7 @@
 
 **Date:** 2026-07-25 · **Stage:** 0.1 · **Status:** accepted
 
-`PLAN.md` and `prompts.md` name the packages `keypaste-core`, `keypaste-cli`, `keypaste-mcp`. C#
+`docs/STEPS.md` and `prompts.md` name the packages `keypaste-core`, `keypaste-cli`, `keypaste-mcp`. C#
 namespaces cannot contain hyphens, and a `keypaste-core.csproj` yields the root namespace
 `keypaste_core`, which fights every analyzer naming rule forever.
 
@@ -23,7 +23,7 @@ documents still read true.
 
 **Date:** 2026-07-25 · **Stage:** 0.1 · **Status:** accepted
 
-PLAN.md locks ".NET 8+". .NET 10 is the current LTS and the only SDK on the development machine.
+docs/STEPS.md locks ".NET 8+". .NET 10 is the current LTS and the only SDK on the development machine.
 The SDK is pinned in `global.json` at `10.0.302` with `rollForward: latestPatch`, which keeps the
 compiler and analyzer behaviour inside one feature band while still accepting SDK security patches.
 `LangVersion` is pinned to `14.0` rather than `latest` so language semantics do not drift when the
@@ -35,14 +35,14 @@ SDK rolls forward.
 
 Considered xUnit v2, MSTest 3, NUnit, and TUnit.
 
-xUnit v3 wins on dependency count, which is the deciding factor under CORE.md §3.9: one package
+xUnit v3 wins on dependency count, which is the deciding factor under docs/PRODUCT.md §3.9: one package
 (`xunit.v3`) against v2's three (`xunit` + `Microsoft.NET.Test.Sdk` +
 `xunit.runner.visualstudio`) and their transitive tail. v3 test projects are self-executing
 executables on Microsoft.Testing.Platform, which also matters concretely for what is coming: Stage
 0.2 tests shell out to `keepassxc-cli`, and Stage 1.2 tests spawn child processes and assert on
 signal forwarding. VSTest's testhost proxying makes those flaky; MTP does not.
 
-TUnit is faster and AOT-native but young and single-maintainer. For a security tool, CORE.md §6.5
+TUnit is faster and AOT-native but young and single-maintainer. For a security tool, docs/PRODUCT.md §6.5
 applies: boring beats clever.
 
 Two traps recorded for whoever adds the next test project:
@@ -58,7 +58,7 @@ Two traps recorded for whoever adds the next test project:
 
 **Date:** 2026-07-25 · **Stage:** 0.1 · **Status:** accepted
 
-CORE.md §3.9 requires dependencies to be minimised and *pinned*. Central Package Management
+docs/PRODUCT.md §3.9 requires dependencies to be minimised and *pinned*. Central Package Management
 (`Directory.Packages.props`) pins direct versions; `packages.lock.json` pins the entire transitive
 closure by version and content hash. CI restores with `--locked-mode`, so a dependency cannot enter
 the graph without a reviewable lock-file diff. `NuGetAudit` runs at `all`/`low` and, with warnings
@@ -90,7 +90,7 @@ Rather than trusting review to catch these, they are compiler errors from commit
   compiler, in place *before* the crypto arrives.
 - CA1307/CA1310 (ordinal string comparison) with `InvariantGlobalization` — a culture-sensitive
   match deciding *which* secret an agent receives is a security bug, not a style nit.
-- `IsAotCompatible` and the trim/AOT analyzers on `src/` — PLAN.md commits the CLI to AOT single
+- `IsAotCompatible` and the trim/AOT analyzers on `src/` — docs/STEPS.md commits the CLI to AOT single
   binaries. With the analyzers on now, an AOT-hostile KDBX library surfaces as a build error the day
   it is added in 0.2, not during the Stage 3 launch. This is a dependency-selection gate disguised
   as a compiler setting.
@@ -123,7 +123,7 @@ per-RID native binaries. `KeePassLib.Standard` requires `System.Drawing.Common` 
 holder cannot have authorised. The only two packages with a clean shape, `DgNet.Keepass` (MIT)
 and `LibKdbx` (GPL-3.0), were at evaluation time 0-star repositories with **six hours** and
 **ten days** of total commit history respectively and roughly 350 downloads each; one credits
-an AI assistant for authorship. CORE.md §3.6 says "mature audited libraries" and §6.5 says
+an AI assistant for authorship. docs/PRODUCT.md §3.6 says "mature audited libraries" and §6.5 says
 boring beats clever. Neither qualifies, and the vault format is not where to find out.
 
 So `KeePassLib` is vendored from the `TimothyByrd/KeePassNetStandard` port at tag `v2.61`
@@ -181,7 +181,7 @@ in a `finally`. Recorded here so nobody "improves" it later.
 
 **Date:** 2026-07-25 · **Stage:** 0.2 · **Status:** accepted
 
-CORE.md §4.6 makes KeePassXC compatibility sacred, and CORE.md cannot change. The `compat` job
+docs/PRODUCT.md §4.6 makes KeePassXC compatibility sacred, and docs/PRODUCT.md cannot change. The `compat` job
 in `.github/workflows/ci.yml` plus `scripts/verify-keepassxc-compat.sh` are that law's
 enforcement, so they are not subject to the "delete it if it is annoying" latitude that applies
 to every other CI step.
@@ -287,7 +287,7 @@ and it throws when stdin is redirected — but the platforms disagree about *whe
 printed. `ConsoleSecretPrompt` therefore decides for itself, before writing anything, so both
 platforms behave identically and piped runs do not litter stderr with prompts nobody read.
 `Console.SetIn` does **not** intercept `ReadKey`, which is why the keystroke source is an injected
-delegate: without that seam not one password path in the CLI would be testable, and CORE.md §4.5
+delegate: without that seam not one password path in the CLI would be testable, and docs/PRODUCT.md §4.5
 does not allow that on the secret path.
 
 The redirected path decodes **UTF-8 explicitly** rather than reading `Console.In`, which on
@@ -441,7 +441,7 @@ than shown as plaintext advanced attributes; and `VaultEntry` needs no new membe
 
 **The cost is real and is accepted openly:** a `.env` with forty keys becomes forty KDBX entries,
 and `keypaste ls` gets noisy in a vault that holds several projects. Noise is recoverable; a
-compatibility claim nobody can test is not. PLAN.md previously specified the custom-field shape
+compatibility claim nobody can test is not. docs/STEPS.md previously specified the custom-field shape
 and has been corrected.
 
 **Validation is strict on write and permissive on read.** keypaste refuses to create a project
@@ -463,7 +463,7 @@ history, so it is invisible in `keypaste ls` and `get` while being plainly visib
 It is accepted because silently discarding history on an entry the user maintains in KeePassXC
 would be a worse surprise, and because `keypaste env rm` does remove the entry and its history
 together. `env set` says so on the line where it happens rather than only in this file. A
-`--no-history` flag is in ideas.md, not in this stage.
+`--no-history` flag is in docs/IDEAS.md, not in this stage.
 
 **`keypaste env set <project> KEY=value` takes the value from `argv`**, where it is visible in the
 process list and lands in shell history. This contradicts the comment on `AddCommand`, which
@@ -493,7 +493,7 @@ fail against a remove-and-re-add implementation.
 **Date:** 2026-07-25 - **Stage:** 1.2a - **Status:** accepted
 
 `keypaste env pull <project> [file]` reads a `.env` file and stores every variable in the project's
-env set. The parser is `src/Keypaste.Core/DotEnv.cs` - public, in the core, because CORE.md law 4.3
+env set. The parser is `src/Keypaste.Core/DotEnv.cs` - public, in the core, because docs/PRODUCT.md law 4.3
 is "no logic duplicated in frontends" and Stage 4's import dialog would otherwise grow a second
 grammar that disagrees with this one on exactly the ambiguous cases below. Two keypaste frontends
 importing one file into different secret sets is law 4.6's failure one layer up. It is also where
@@ -560,7 +560,7 @@ rather than halfway through the write loop. The rejected alternative was `--over
 flag that every script would set unconditionally is noise, and the plan already names the keys.
 
 **The word "shred" does not appear in the product, and there is no overwrite pass.** `prompts.md`
-asked for one; this corrects it in writing, the same way D-0014 corrected PLAN.md. Overwriting a
+asked for one; this corrects it in writing, the same way D-0014 corrected docs/STEPS.md. Overwriting a
 file before deleting it does not destroy data on SSDs (the flash translation layer has already
 remapped the block), on copy-on-write filesystems (APFS, btrfs, ZFS, ReFS), on any volume with
 snapshots or backups, on network filesystems, or on NTFS files small enough to live in the MFT.
@@ -811,14 +811,14 @@ more later than the line it saved.
 `keypaste env export <project> [file] --dotenv [--stdout]` writes a project's variables back out as
 a `.env` file. It is the first and only command in the product that puts plaintext on disk.
 
-**It is spelled `env export`, not `export`.** `PLAN.md` said the latter; this corrects it in
-writing, the way D-0014 corrected PLAN.md and D-0015 corrected prompts.md. The thing being exported
+**It is spelled `env export`, not `export`.** `docs/STEPS.md` said the latter; this corrects it in
+writing, the way D-0014 corrected docs/STEPS.md and D-0015 corrected prompts.md. The thing being exported
 is an env set, and a bare `keypaste export` would promise a whole-vault export that does not exist
 and is not planned.
 
 ### Why this does not break law 3.4
 
-CORE.md law 3.4 is *"no secret ever touches disk unencrypted **by keypaste's doing**."* The
+docs/PRODUCT.md law 3.4 is *"no secret ever touches disk unencrypted **by keypaste's doing**."* The
 qualifier is the whole sentence. This command writes a file only after the user names the format,
 names the destination, and answers a confirmation - the same line `get --show` already sits on,
 where printing a password to stdout is refused right up until somebody asks for it. What law 3.4
@@ -886,7 +886,7 @@ already refuses to accept for `$`, and the fix costs one pair of quotes.
 Conformance was checked by hand rather than gated in CI: the golden file read by node `dotenv`
 17.4.2 returns all four values byte-identically, including a multi-line single-quoted value and a
 `#` inside a value. A CI gate reading the file with node, python-dotenv and godotenv is the only way
-to keep that claim honest over time and is parked in `ideas.md`; it was rejected for now because it
+to keep that claim honest over time and is parked in `docs/IDEAS.md`; it was rejected for now because it
 puts an npm and pip install on the three-OS test job for a property the docs can state precisely.
 `docker run --env-file` is named in the docs as explicitly unsupported - it does no quote or escape
 processing at all.
@@ -978,10 +978,10 @@ each turn their own CLI test red.
 **Date:** 2026-07-26 - **Stage:** 2.1 - **Status:** accepted
 
 `src/` has carried zero `PackageReference` entries since D-0004, and `Directory.Packages.props` says
-so in a comment. That ends here, on the agent bridge, which is exactly where CORE.md law 3.9 demands
+so in a comment. That ends here, on the agent bridge, which is exactly where docs/PRODUCT.md law 3.9 demands
 the justification be written down.
 
-PLAN.md's locked stack decision already names "official ModelContextProtocol C# SDK, stdio
+docs/STEPS.md's locked stack decision already names "official ModelContextProtocol C# SDK, stdio
 transport", so the question was never *whether* but *how narrow*.
 
 **Rejected: the main `ModelContextProtocol` package.** About twelve transitive packages on
@@ -993,7 +993,7 @@ MCP server *is* the protocol stream. A dependency whose happy path corrupts the 
 to take for syntactic sugar.
 
 **Rejected: hand-rolling JSON-RPC.** Roughly four hundred lines re-implementing a versioned protocol,
-wrong in ways nobody would notice until a client bumped. CORE.md §6.5: boring beats clever.
+wrong in ways nobody would notice until a client bumped. docs/PRODUCT.md §6.5: boring beats clever.
 
 **Taken: `ModelContextProtocol.Core` 1.4.1.** Apache-2.0, the `modelcontextprotocol` org,
 co-maintained with Microsoft, implementing spec revision 2025-11-25. `StdioServerTransport`,
@@ -1057,7 +1057,7 @@ absent-able, so law 3.3's "every access is logged with who" survives identity be
 One JSON object per line at `~/.keypaste/audit.jsonl`, appended and never rewritten.
 
 **It lives beside the policy file, not beside the vault.** The vault is a file the user syncs with
-their own tooling - that is the local-first bargain in CORE.md §2. An append-only log that travelled
+their own tooling - that is the local-first bargain in docs/PRODUCT.md §2. An append-only log that travelled
 with it would produce a conflicted copy on every second machine, break the per-file hash chain Stage
 2.4 adds, and hand anyone with the synced folder a write path into another machine's record. The log
 describes what happened *here*.
@@ -1214,7 +1214,7 @@ caused to appear, asking for the master password, teaches exactly the habit the 
 break - and any local process can draw an identical one. Under this design the master password is
 typed in a terminal the user opened, in response to a command they typed, using the same
 `ConsoleSecretPrompt` ceremony as `keypaste get`. **Nothing an agent does can raise a password
-prompt.** That is a property worth a whole extra process, and CORE.md tiebreaker 1 settles it on its
+prompt.** That is a property worth a whole extra process, and docs/PRODUCT.md tiebreaker 1 settles it on its
 own: if it risks trust, no.
 
 Three things fall out of it that were not the reason but are worth as much:
@@ -1273,7 +1273,7 @@ owner-only and verifies on connect that the peer's socket is owned by the same u
 no `System.IO.Pipes.AccessControl` package (which would be the second runtime dependency in `src/`
 and would have to clear D-0019's bar), no hand-written `PipeSecurity`, no
 `UnixDomainSocketEndPoint`, and no `sun_path` length limit to discover on somebody's long home
-directory. CORE.md law 3.9 rewards the option that adds nothing.
+directory. docs/PRODUCT.md law 3.9 rewards the option that adds nothing.
 
 The name carries a per-user discriminator - sixteen hex characters of SHA-256 over the user's
 profile path - because .NET's Unix emulation puts the socket at a predictable path under the shared
@@ -1424,7 +1424,7 @@ human. `ApproverHandlerTests.AMissingEntryAndAForbiddenOne_AreIndistinguishableT
 **Date:** 2026-07-26 · **Stage:** 2.3 · **Status:** accepted
 
 `~/.keypaste/policy.toml` lets a person pre-authorize a narrow pattern so an agent gets that one
-credential without a prompt. CORE.md law 3.2 authorises it in the constitution's own words - "after
+credential without a prompt. docs/PRODUCT.md law 3.2 authorises it in the constitution's own words - "after
 one explicit human approval (or a pre-approved policy the human wrote)" - and it is still the first
 feature in this product that hands an agent a secret with nobody watching. Everything below is about
 bounding that.
@@ -1810,7 +1810,7 @@ reassurance out of an absence.
 
 **Date:** 2026-07-27 · **Stage:** 2.5 · **Status:** accepted
 
-CORE.md law 5.1 says the demo is the marketing. This records what the demo *is*, because the tool
+docs/PRODUCT.md law 5.1 says the demo is the marketing. This records what the demo *is*, because the tool
 choice is a footnote and the rest is not.
 
 **It is a real session, and a person presses the `y`.** `vhs`, `ttyd` and `asciinema-automation`
@@ -1927,7 +1927,7 @@ involvement.
 Half a second therefore takes 1.8 s off every refusal without touching the path that works. Measured
 after the change: refusals 756 ms, the working round trip **251 ms** - unmoved, with every request
 still granted. The fail direction is safe: a timeout too short turns a grant into a `no-approver`
-refusal, which is the direction CORE.md law 3.7 asks for, and the refusal names the command that
+refusal, which is the direction docs/PRODUCT.md law 3.7 asks for, and the refusal names the command that
 fixes it. It also slightly narrows THREATS.md T-10, where another local user pre-creating the socket
 path costs a caller the full timeout per call.
 
@@ -1957,7 +1957,7 @@ workflow, no published artifact, no tap and no bucket; `PublishAot` is still `fa
 whether vendored KeePassLib survives AOT at all - is unresolved and explicitly gated on Stage 3.
 A `curl | sh` line on a launch page is the single instruction a stranger runs first, and one that
 404s is worse than an honest `dotnet build`. Both pages therefore say there are no prebuilt
-binaries yet and that single-file binaries are next. The release pipeline became its own PLAN.md
+binaries yet and that single-file binaries are next. The release pipeline became its own docs/STEPS.md
 item and its own prompt instead of being smuggled into this one.
 
 **The comparison table names four products, and every cell was read out of that vendor's own
@@ -2160,11 +2160,11 @@ already "swap to a role with INSERT on one table" - but it changes how long it i
 leave undone, and it is the argument against ever letting a Hyperdrive config keep whatever role an
 integration wizard hands it.
 
-## D-0038 - The launch essay was retitled because the title PLAN.md gave it was false
+## D-0038 - The launch essay was retitled because the title docs/STEPS.md gave it was false
 
 **Date:** 2026-07-27 · **Stage:** 3.2 · **Status:** accepted
 
-prompts.md 3.2 and PLAN.md both asked for an essay called "Your password manager can't talk to AI".
+prompts.md 3.2 and docs/STEPS.md both asked for an essay called "Your password manager can't talk to AI".
 It is `docs/keepass-and-agents.md`, and it is called "Your **KeePass vault** can't talk to AI - and
 everyone is pasting secrets into chats instead" instead.
 
@@ -2176,7 +2176,7 @@ argument was already fought and lost once inside the README. A title is the part
 likely to be quoted and least likely to be read in context, so shipping the losing version of it on
 the front of a launch post would have handed the first commenter the whole thread. Narrowing to
 *your KeePass vault* costs nothing - KDBX genuinely has no agent integration, which is the entire
-reason keypaste exists - and it aims the piece at r/KeePass and the KeePass forums, which PLAN.md
+reason keypaste exists - and it aims the piece at r/KeePass and the KeePass forums, which docs/STEPS.md
 already names as launch venues. The three vendors are then conceded by name in the second
 paragraph, before a reader can catch us out.
 
@@ -2214,7 +2214,7 @@ whose argument is that the project does not overclaim.
 
 **Date:** 2026-07-27 · **Stage:** 3.3 · **Status:** accepted
 
-`launch.md` holds a preconditions checklist, copy for all six venues PLAN.md names, and a
+`launch.md` holds a preconditions checklist, copy for all six venues docs/STEPS.md names, and a
 fourteen-day follow-up plan. Nothing in it can be sent, and the file says so in its first line.
 
 **The copy was written before the launch was possible, on purpose.** D-0038 deferred the Show HN
@@ -2267,7 +2267,7 @@ from 2026-07-25. The first three are the failure mode D-0036 exists to catch, a 
 like the design and overstates it. The fourth is worse, because nothing in the repository would ever
 have contradicted it.
 
-**PLAN.md's launch-posts box stays unchecked.** It says "Launch posts", and no post has been sent.
+**docs/STEPS.md's launch-posts box stays unchecked.** It says "Launch posts", and no post has been sent.
 The file existing is 3.3; the box is 3.3 going out.
 
 ---
@@ -2289,12 +2289,12 @@ private, and a private repository's release assets return 404 to every reader wi
 the documented install command would have been false on the day it was written. That is precisely
 what D-0036 refused to do and what D-0039 catalogued. R2 has no egress charge, an S3-compatible
 API the workflow already knows how to speak, and Cloudflare is already in this project's stack for
-keypaste.com. Serving from a domain the project controls was weighed against CORE.md §3.5 and
+keypaste.com. Serving from a domain the project controls was weighed against docs/PRODUCT.md §3.5 and
 passes: §3.5 forbids telemetry on secret content and entry names, and an HTTP request log for a
 download is neither. The honest cost is a second origin, recorded in THREATS.md rather than
 implied.
 
-**`curl | sh` was rejected.** CORE.md §3.8 makes auditable code the trust strategy, and a pipe to a
+**`curl | sh` was rejected.** docs/PRODUCT.md §3.8 makes auditable code the trust strategy, and a pipe to a
 shell asks the reader to execute code they have not read, from an origin that is not the audited
 repository, in a form where the server can serve different bytes to `curl` than to a browser. The
 documented install is instead a download, a checksum verification that fails closed, and an
@@ -2322,7 +2322,7 @@ which is one fewer party able to substitute bytes strangers download. Tracked as
 `-p:Version=`, so a local publish at the tagged commit produces the same inputs the release did,
 and the guard job fails a tag whose base disagrees with `VersionPrefix`. The same job refuses to
 release a commit that is not an ancestor of `main`, or that has no successful `ci` run, or that has
-no section in `CHANGELOG.md` — CORE.md §4.7 turned into a gate rather than an intention.
+no section in `CHANGELOG.md` — docs/PRODUCT.md §4.7 turned into a gate rather than an intention.
 
 **`release.yml` pins its actions to commit SHAs and `ci.yml` does not, deliberately.** O-0004
 deferred pinning on the reasoning that pins without Dependabot age badly, and that reasoning still
@@ -2382,7 +2382,7 @@ build a tag that has no successful `ci` run on its exact SHA. So this was not a 
 annoyance to fix eventually; with GitHub-hosted runners unable to start, no release could be cut at
 all. That is the guard behaving correctly, and it is also why this decision could not wait.
 
-**All three operating systems survive, which is the part CORE.md law 4.6 cares about.** The
+**All three operating systems survive, which is the part docs/PRODUCT.md law 4.6 cares about.** The
 KeePassXC compatibility gate still runs on Linux, macOS and Windows, and the architectures are
 unchanged - `ubuntu-latest` and the Blacksmith Ubuntu image are both x64, `macos-latest` and
 `blacksmith-6vcpu-macos-15` are both arm64. Changing which image hosts an operating system is a
@@ -2401,7 +2401,7 @@ for cross-checking, not as a replacement.
 
 **This removes cost as an argument for publishing the repository.** D-0006's case for going public
 was partly that CI became free; with CI on a flat-rate provider that argument is gone, and
-publication should now be decided on CORE.md §3.8 grounds alone - auditable code as the trust
+publication should now be decided on docs/PRODUCT.md §3.8 grounds alone - auditable code as the trust
 strategy - which is where it always belonged. Tracked as O-0014, along with the fact that
 `SECURITY.md` had been asserting the repository was public and no longer does.
 
@@ -2455,9 +2455,9 @@ would make the question disappear for most macOS users.
 
 **Date:** 2026-07-28 · **Stage:** 4.1 · **Status:** accepted
 
-This repository named two different desktop shells and never wrote a record for either. `PLAN.md`
+This repository named two different desktop shells and never wrote a record for either. `docs/STEPS.md`
 line 11, in the checked LOCKED block, said *"Desktop shell via **Photino.NET** … with Electron as
-fallback if Photino friction appears."* `PLAN.md` line 60 and prompts.md 4.1 said **Tauri**. Nothing
+fallback if Photino friction appears."* `docs/STEPS.md` line 60 and prompts.md 4.1 said **Tauri**. Nothing
 in this file mentioned any of them. Stage 4.1 could not start without settling it, so it is settled
 here, with the evidence, because a record that says only "we chose Avalonia" cannot stop somebody
 proposing Photino again next year.
@@ -2465,7 +2465,7 @@ proposing Photino again next year.
 **Tauri was ruled out on what it would cost, before anything was measured.** Its backend is Rust;
 `Keypaste.Core` is .NET 10, and this repository has no FFI, no C-ABI export and no Rust anywhere. A
 Tauri shell means a fourth binary and a wire protocol carrying the master password and released
-field values. That protocol *is* the secret path, so CORE.md law 4.5 makes its tests mandatory —
+field values. That protocol *is* the secret path, so docs/PRODUCT.md law 4.5 makes its tests mandatory —
 and the one that already exists, `src/Keypaste.Core/Ipc/ApproverProtocol.cs`, is 445 hand-written
 lines with no `JsonSerializer` anywhere because reflection trips the trim analyzers this repository
 builds with (D-0019). Paying that a second time to reach a library that is already in-process is
@@ -2495,7 +2495,7 @@ checked. Checked on 2026-07-28:
 - `RegisterCustomSchemeHandler` never fires for the initial page load (#209, closed *wontfix*),
   which is how a static frontend would have been served.
 
-CORE.md law 3.9 requires written justification for every new dependency on the secret path. A
+docs/PRODUCT.md law 3.9 requires written justification for every new dependency on the secret path. A
 dormant, three-contributor native-interop library running **inside the process that holds the
 unlocked vault** does not have one. The LOCKED line's own escape clause — *"if Photino friction
 appears"* — is what fired, so this amends that line rather than overriding it.
@@ -2572,7 +2572,7 @@ at startup and a name already held is a startup failure, so if the app bound it 
 started second would lose — and the loser would be a *silent* loss of the approval path. Stage 4.3
 owns that hand-off; 4.1 probes and says one true sentence. It sets no `PublishAot`, ships no release
 artifact, changes no line of `release.yml`, and does not adopt `design.html` — which DESIGN.md still
-marks "proposed, not accepted" and whose sign-in-first premise inverts CORE.md §4.1.
+marks "proposed, not accepted" and whose sign-in-first premise inverts docs/PRODUCT.md §4.1.
 
 ---
 
@@ -2586,7 +2586,7 @@ that list would have to decide what belonged there. It failed. This is the decis
 
 **A list row carries a title and a group, and no field value.** That is what `keypaste ls` prints. A
 username column was considered and rejected: it is a disclosure surface no CLI verb has, it is
-readable over a shoulder, and `ideas.md`'s screenshot strategy puts this screen in marketing images —
+readable over a shoulder, and `docs/IDEAS.md`'s screenshot strategy puts this screen in marketing images —
 which is the thing T-24 already worries about for vault paths. **The detail pane widens to username,
 URL and notes for the one entry a person selected**, which is `keypaste get`'s scope minus the
 password. **A password appears nowhere, in any state, including after Copy**: the copy command reads
@@ -2633,7 +2633,7 @@ to a console.
 
 So the **rule** moved to `Keypaste.Core.Clipboard.ClipboardClear.Should` — one function, two callers,
 carrying the whole of D-0011's logic including the fail-closed branch where a read-back that failed
-clears anyway (CORE.md §3.7). It had no test of its own while it lived inside the CLI's blocking
+clears anyway (docs/PRODUCT.md §3.7). It had no test of its own while it lived inside the CLI's blocking
 strategy; it has one now, because it is on two front ends' secret paths and law 4.5 is not optional.
 
 The **transports stay apart, and the app's is the windowing system's rather than a subprocess.** The
@@ -2704,7 +2704,7 @@ because the entry it carried never existed in the saving process's tree for KeeP
 in KeePassXC's History tab. Not anywhere. And the user is doing the thing `docs/desktop.md` describes
 as normal: alt-tabbing to a terminal.
 
-CORE.md §3.7 is fail-closed. Silent data loss with a paragraph in SECURITY.md is fail-quiet, and the
+docs/PRODUCT.md §3.7 is fail-closed. Silent data loss with a paragraph in SECURITY.md is fail-quiet, and the
 guard is small: `Vault` digests the file at open and after every save, re-checks before writing, and
 throws `VaultChangedOnDiskException` having written nothing. `SaveOverwriting` exists so a caller who
 has put the choice to a person is not stuck.
@@ -2766,7 +2766,7 @@ and the point of the project is that two things agree.
 
 **Date:** 2026-07-28 · **Stage:** 4.2 · **Status:** accepted · Related: D-0005, D-0036
 
-CORE.md §4.6 says any KDBX keypaste writes must open in KeePassXC, tested in CI against real
+docs/PRODUCT.md §4.6 says any KDBX keypaste writes must open in KeePassXC, tested in CI against real
 KeePassXC. That gate lives in `ci.yml` and drives the CLI. 4.2 makes the app a writer, so it needs
 either a gate of its own or an argument.
 
@@ -2849,7 +2849,7 @@ direction, but is indistinguishable to the user from the product being broken.
 ## O-0002 — Contribution terms: DCO or CLA
 
 Undecided, and it must be decided before the repository accepts its first outside pull request.
-ideas.md notes "clean IP, CLA or DCO from day one". A DCO is lighter and better received in
+docs/IDEAS.md notes "clean IP, CLA or DCO from day one". A DCO is lighter and better received in
 open-source communities; a CLA preserves relicensing freedom. Pick one and add
 `CONTRIBUTING.md`.
 
@@ -2867,13 +2867,13 @@ cheap only while there is a single copyright holder, which keeps this entry urge
 no longer describes reality. The second half — business notes live outside the repository, and a
 public repository can serve any commit ever pushed — is unaffected and still binding.
 
-The repository is public from the start, per CORE.md §3.8 — auditable code is the trust strategy,
+The repository is public from the start, per docs/PRODUCT.md §3.8 — auditable code is the trust strategy,
 and it starts paying on day one rather than at launch. Publishing also makes GitHub Actions free,
 which is what unblocked CI: the three-OS matrix bills at 1× / 2× / **10×** per minute on a private
 repository.
 
 Before publishing, the benchmarks, pivot conditions, pricing ladder, and acquisition notes were
-removed from `PLAN.md` and `ideas.md` and moved to private storage outside the repository. A public
+removed from `docs/STEPS.md` and `docs/IDEAS.md` and moved to private storage outside the repository. A public
 repo whose entire pitch is trust should not also publish the conditions under which its author would
 abandon it.
 
@@ -2938,7 +2938,7 @@ through every gate this repository owns: `verify-run-injection`, `verify-run-sig
 and both directions of the KeePassXC compatibility gate. A KDBX file written by the AOT binary
 opens in real KeePassXC with Argon2, AES-256, unicode values, nested groups and history intact,
 and a value KeePassXC writes is read back by the AOT binary. That last one is the whole answer:
-the vault writer is the code most likely to be broken by trimming, and it is the code CORE.md §4.6
+the vault writer is the code most likely to be broken by trimming, and it is the code docs/PRODUCT.md §4.6
 makes constitutional.
 
 **All three of O-0006's named suspects were wrong, and the real list is eleven diagnostics in three
@@ -3037,7 +3037,7 @@ removed and the binaries are around 10 MB. The published binaries are unsigned a
 build time.
 
 Revisit if O-0006 forces trimming for AOT size, or if `HmacOtp.cs` becomes load-bearing when TOTP
-arrives from ideas.md. Note the exclusion mechanism is already in place and costs nothing to
+arrives from docs/IDEAS.md. Note the exclusion mechanism is already in place and costs nothing to
 extend: files stay on disk, only the compilation changes.
 
 **The trigger condition fired in 3.4 and did not fire.** O-0006 is answered (D-0040) and AOT forced
@@ -3154,7 +3154,7 @@ and no gate can fix that from inside the repository.
 
 The prices are known: 99 USD a year for the Apple Developer Program plus a notarization step in
 the release workflow, and an organisation-validated or extended-validation certificate for
-Windows, which is the more expensive and more bureaucratic half. CORE.md §5.4 settles one thing in
+Windows, which is the more expensive and more bureaucratic half. docs/PRODUCT.md §5.4 settles one thing in
 advance - signing is security, so a signed binary can never be the paid tier's artifact while the
 free one is unsigned.
 
@@ -3210,17 +3210,17 @@ nobody has asked and the RID list should not grow on speculation.
 emulation, which works and is slow.
 
 Reconsider the whole list after the first release, on evidence about who actually downloaded what,
-which is exactly the kind of evidence a download log can supply and CORE.md §3.5 permits.
+which is exactly the kind of evidence a download log can supply and docs/PRODUCT.md §3.5 permits.
 
-## O-0014 - The repository is private and CORE.md says the code is open
+## O-0014 - The repository is private and docs/PRODUCT.md says the code is open
 
-CORE.md law 3.8 reads "The code is open source (permissive or copyleft — decided once, in PLAN.md)
+docs/PRODUCT.md law 3.8 reads "The code is open source (permissive or copyleft — decided once, in docs/STEPS.md)
 and stays open. Auditable code is the trust strategy for an unknown founder." The licence is
 AGPL-3.0 and every release publishes its own corresponding source (D-0041), so the *code* is open in
 the licensing sense. The *repository* is private, so nobody outside can actually read it, and
 "auditable" is the word law 3.8 uses.
 
-D-0006 records the opposite as settled fact - "The repository is public from the start, per CORE.md
+D-0006 records the opposite as settled fact - "The repository is public from the start, per docs/PRODUCT.md
 §3.8" - and it is currently wrong. It has not been rewritten, because it also records something that
 is still true and still binding: that GitHub can serve any commit ever pushed once a repository is
 made public, including unreachable ones, so anything sensitive that ever landed in a commit means

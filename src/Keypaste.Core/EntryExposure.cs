@@ -7,7 +7,7 @@ namespace Keypaste.Core;
 /// </summary>
 /// <remarks>
 /// <para>
-/// CORE.md law 3.2 says the default is deny. That is usually read as being about credentials, but
+/// docs/PRODUCT.md law 3.2 says the default is deny. That is usually read as being about credentials, but
 /// entry names are themselves an asset — a complete inventory of a personal vault is what turns a
 /// vague request into a targeted one, even with no secret attached (law 3.5, THREATS.md T-4). So
 /// the listing surface gets the same treatment: <see cref="Default"/> covers the environment

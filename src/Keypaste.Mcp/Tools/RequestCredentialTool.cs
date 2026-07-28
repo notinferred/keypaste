@@ -13,7 +13,7 @@ namespace Keypaste.Mcp.Tools;
 /// </summary>
 /// <remarks>
 /// <para>
-/// CORE.md law 3.2: an agent gets one credential, one scope, one TTL, after one explicit human
+/// docs/PRODUCT.md law 3.2: an agent gets one credential, one scope, one TTL, after one explicit human
 /// approval, and the default is deny. This file validates the request, checks it against what the
 /// server was configured to expose, forwards it to whoever can ask a person, records the answer,
 /// and only then answers the agent.

@@ -54,7 +54,7 @@ public sealed class ReleasedFieldTests
 /// <summary>
 /// The list of releasable fields is a product rule and lives in one place, because the tool schema,
 /// the server's re-validation, the approval prompt and <c>keypaste log</c> all have to agree about
-/// it (CORE.md law 4.3).
+/// it (docs/PRODUCT.md law 4.3).
 /// </summary>
 public sealed class CredentialFieldsTests
 {

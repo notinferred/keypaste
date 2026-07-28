@@ -128,7 +128,7 @@ public readonly record struct PasswordRecipe
 /// <para>
 /// <b>Uniformity comes from <see cref="RandomNumberGenerator"/> and not from arithmetic here.</b>
 /// <c>GetItems</c> is documented as cryptographically strong and free of modulo bias. Writing the
-/// rejection sampling by hand is exactly the sort of thing CORE.md law 3.6 says never to write, so
+/// rejection sampling by hand is exactly the sort of thing docs/PRODUCT.md law 3.6 says never to write, so
 /// the <c>%</c> operator does not appear in this file and this sentence is why.
 /// </para>
 /// </remarks>

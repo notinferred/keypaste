@@ -59,7 +59,7 @@ public enum AuditMethod
     /// </summary>
     Exposure = 4,
 
-    /// <summary>A person was shown this specific request and answered it (CORE.md law 3.2).</summary>
+    /// <summary>A person was shown this specific request and answered it (docs/PRODUCT.md law 3.2).</summary>
     Prompt = 5,
 
     /// <summary>
@@ -84,7 +84,7 @@ public enum AuditMethod
     /// <summary>The same request was refused a moment ago and has not served its cooldown.</summary>
     Cooldown = 11,
 
-    /// <summary>Asking, resolving or reading went wrong. Fail closed (CORE.md law 3.7).</summary>
+    /// <summary>Asking, resolving or reading went wrong. Fail closed (docs/PRODUCT.md law 3.7).</summary>
     Failed = 12,
 
     /// <summary>
@@ -113,7 +113,7 @@ public enum AuditMethod
     /// The protocol forbids this, but a client that ignores the rule still gets its request read.
     /// Answering it would mean putting a request to a person, or matching it against a policy rule,
     /// with the caller's identity missing from both the dialog and the log — the one field the
-    /// human has to judge the request by. Fail closed (CORE.md law 3.7) rather than serve a
+    /// human has to judge the request by. Fail closed (docs/PRODUCT.md law 3.7) rather than serve a
     /// credential to nobody in particular.
     /// </remarks>
     NotInitialized = 15,
@@ -226,7 +226,7 @@ public sealed record AuditArgs
 /// </summary>
 /// <remarks>
 /// <para>
-/// CORE.md law 3.3 requires every agent access to be logged locally, immutably, and readably —
+/// docs/PRODUCT.md law 3.3 requires every agent access to be logged locally, immutably, and readably —
 /// who, which entry, when, granted or denied. This type is that line.
 /// </para>
 /// <para>

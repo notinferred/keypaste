@@ -9,7 +9,7 @@ namespace Keypaste.Cli;
 /// <remarks>
 /// The rule itself — no default path, <c>--vault</c> first, an empty variable counting as unset —
 /// lives in the core, because the MCP bridge and <c>keypaste log</c> have to answer the same
-/// question the same way (CORE.md law 4.3). What is left here is the binding, which is genuinely
+/// question the same way (docs/PRODUCT.md law 4.3). What is left here is the binding, which is genuinely
 /// CLI-shaped: <see cref="CommandLine"/> and <see cref="IEnvironmentProbe"/> mean nothing to a
 /// server that has neither.
 /// </remarks>

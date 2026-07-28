@@ -240,7 +240,7 @@ public sealed class EntryNameSanitizerTests
     /// The two methods are not interchangeable, and using the wrong one is a real bug rather than a
     /// style choice: <c>/</c> is one of the ten structural characters, so plain sanitization turns
     /// an entry path into an unreadable phrase. An audit line whose job is to record <em>which
-    /// entry</em> was requested (CORE.md law 3.3) must not do that.
+    /// entry</em> was requested (docs/PRODUCT.md law 3.3) must not do that.
     /// </summary>
     [Fact]
     public void APath_NeedsSanitizePath_BecausePlainSanitizationDestroysIt()

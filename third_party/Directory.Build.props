@@ -8,7 +8,7 @@
     directory, so its presence here is what severs the inheritance — everything the
     vendored build needs is re-declared below, and nothing else leaks in.
 
-    The repository's build gates (CORE.md §3.6/§3.7 encoded as compiler errors, see
+    The repository's build gates (docs/PRODUCT.md §3.6/§3.7 encoded as compiler errors, see
     DECISIONS.md D-0005) exist to hold *our* code to a standard. Vendored source is
     held to a different one: it is not edited to taste, it is re-merged from upstream.
     Turning the gates off here is what keeps them meaningful in src/.

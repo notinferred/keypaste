@@ -13,7 +13,7 @@ namespace Keypaste.Cli.Execution;
 /// flushing. So keypaste relays what it was sent, and never escalates.
 /// </para>
 /// <para>
-/// This adds no dependency in the sense CORE.md law 3.9 means: no package, nothing to pin, nothing
+/// This adds no dependency in the sense docs/PRODUCT.md law 3.9 means: no package, nothing to pin, nothing
 /// new on the supply chain. <c>src/</c> still carries zero <c>PackageReference</c> entries
 /// (DECISIONS.md D-0004). <see cref="LibraryImportAttribute"/> is source-generated over a fully
 /// blittable signature, so there is no reflection and no marshalling stub, and it stays

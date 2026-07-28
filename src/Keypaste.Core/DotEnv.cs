@@ -82,7 +82,7 @@ public sealed class DotEnvDocument
 /// </description></item>
 /// <item><description>
 /// <b>A key repeated in one file is an error.</b> dotenv keeps the first, godotenv keeps the last;
-/// since they disagree there is no answer to give, so it fails closed (CORE.md law 3.7), exactly
+/// since they disagree there is no answer to give, so it fails closed (docs/PRODUCT.md law 3.7), exactly
 /// as <see cref="EnvStore.Read"/> does for two entries sharing a name.
 /// </description></item>
 /// <item><description>

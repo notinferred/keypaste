@@ -50,7 +50,7 @@ namespace KeePassLib.Cryptography
 		// under %APPDATA%/KeePass2. keypaste needs neither: the only consumer on the vault
 		// path is ProtectedBinary's in-memory protection, which falls back to upstream's
 		// in-tree managed ChaCha20. See UPSTREAM.md "Local modifications".
-		// CORE.md §3.9 (dependencies minimised) and §3.4 (no secret to disk by our doing).
+		// docs/PRODUCT.md §3.9 (dependencies minimised) and §3.4 (no secret to disk by our doing).
 		public static bool IsProtectedDataSupported => false;
 #elif NETSTANDARD2_0
 		private static readonly IDataProtector g_obProtector;
@@ -269,7 +269,7 @@ namespace KeePassLib.Cryptography
 
 #if KEYPASTE_NO_DPAPI
 		// ProtectData/UnprotectData are removed rather than stubbed: a stub that silently
-		// returns the plaintext would be a fail-open error path (CORE.md §3.7), and every
+		// returns the plaintext would be a fail-open error path (docs/PRODUCT.md §3.7), and every
 		// call site is excluded from this build anyway.
 #elif NETSTANDARD2_0
         public static byte[] ProtectData(byte[] pb, byte[] pbOptEntropy,

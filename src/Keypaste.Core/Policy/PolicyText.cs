@@ -17,7 +17,7 @@ namespace Keypaste.Core.Policy;
 /// </para>
 /// <para>
 /// It lives in the core because <c>keypaste policy ls</c> and the approver's startup banner must say
-/// the same thing about the same file, and CORE.md law 4.3 does not allow that sentence to be
+/// the same thing about the same file, and docs/PRODUCT.md law 4.3 does not allow that sentence to be
 /// written twice.
 /// </para>
 /// </remarks>

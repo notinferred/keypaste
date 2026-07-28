@@ -9,7 +9,7 @@ namespace Keypaste.Core;
 /// <para>
 /// The file format is KDBX4 with Argon2d key derivation — see <see cref="KdbxFormat"/> for the
 /// exact parameters. keypaste never invents a format and never writes its own cryptography
-/// (CORE.md laws 2 and 3.6); everything here delegates to the vendored KeePassLib.
+/// (docs/PRODUCT.md laws 2 and 3.6); everything here delegates to the vendored KeePassLib.
 /// </para>
 /// <para>
 /// Master passwords are passed as <see cref="ReadOnlySpan{T}"/> of <see cref="char"/> rather

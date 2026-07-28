@@ -9,7 +9,7 @@ namespace Keypaste.Core.Ipc;
 /// <para>
 /// No approver running, a pipe that closed mid-request, a reply that will not parse — all of them
 /// come back as <see langword="null"/>, which the bridge turns into a denial with a reason an agent
-/// can act on. That is CORE.md law 3.7 expressed as a return type: there is no path through this
+/// can act on. That is docs/PRODUCT.md law 3.7 expressed as a return type: there is no path through this
 /// class that produces a credential by accident, and no exception that could skip the audit line
 /// the bridge writes before answering.
 /// </para>
