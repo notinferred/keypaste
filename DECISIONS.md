@@ -2672,6 +2672,56 @@ rely on it. The options are a Windows-only Win32 path (three P/Invokes, one
 and telling Windows users to disable clipboard history, or making `--show` the Windows default.
 Until then SECURITY.md states the gap rather than implying the clear is complete.
 
+**How KeePassXC does it, read from their source on 2026-07-28 rather than assumed.** There is no
+native Win32 clipboard code in KeePassXC at all - `WinUtils` does not override `setClipboardText`,
+so everything falls through to Qt. `src/gui/Clipboard.cpp` attaches three entries to the
+`QMimeData`: `ExcludeClipboardContentFromMonitorProcessing` = `"1"`,
+`CanIncludeInClipboardHistory` = four zero bytes, and `CanUploadToCloudClipboard` = four zero
+bytes. Qt's `QLastResortMimes` passes unrecognised MIME names through `RegisterClipboardFormat`,
+and publishes the lot as one `IDataObject`. The first arrived in 2.6.3 (Jan 2021), the other two in
+2.7.10 (Mar 2025).
+
+Three details are worth more than the format names. **All formats must be set inside one
+`OpenClipboard`/`EmptyClipboard`/`SetClipboardData`×N/`CloseClipboard` session** - the clipboard-
+update notification the history service acts on fires at `CloseClipboard`, so a second session to
+add the markers has already leaked. **Per Microsoft's own documentation
+`ExcludeClipboardContentFromMonitorProcessing` alone covers both history and cloud sync**; the
+other two are finer-grained and redundant. And **KeePassXC clears rather than overwrites**
+(`QClipboard::clear()`, changed deliberately in 2.7.5), guarded by comparing the current clipboard
+against what it put there, so it cannot wipe something the user copied since.
+
+**Two defects in their implementation that keypaste should not inherit.** Every tagged release that
+has the extra fields - 2.7.10, 2.7.11 and 2.7.12, the current one - spells the third format
+`"CanUploadToCloudClipboard "` with a trailing space, which registers a different and meaningless
+format. It is fixed on `develop` and in no release. It happens to be harmless because the Exclude
+format already covers cloud sync, but the lesson is that a string literal passed to
+`RegisterClipboardFormat` cannot be checked by review: **verify it with a `GetClipboardFormatName`
+round-trip in a test.** Separately, they hold the copied secret in a plain `QString` for the whole
+clear-timeout window purely to power the equality guard. keypaste gets the same guard from a hash
+and should.
+
+**What this can and cannot close, which is the part that decides the SECURITY.md sentence.** The
+formats are a request, not an enforcement boundary - Windows does not restrict who may read the
+clipboard, it only asks well-behaved consumers to abstain. Implementing them closes the
+**first-party** Clipboard History and Cloud Clipboard, which is exactly the defect this record
+names, and closes nothing else. Third-party clipboard managers each decide independently whether to
+honour the formats and most do not, and RDP/Citrix/VDI redirection hands the secret to a peer
+machine whose history keypaste cannot reach. So the honest resolution is: implement the formats,
+and state the residual rather than describing the clipboard as safe. Eliminating the class means
+not using the clipboard - direct injection, or a paste-once broker - which is a Stage 4 design
+question, not a packaging one.
+
+The same defect exists on the other platforms with different vocabulary and is not covered by this
+record: `org.nspasteboard.ConcealedType` on macOS is a community convention rather than an Apple
+API, KeePassXC sets nothing for Universal Clipboard, and Linux is per-clipboard-manager convention
+(`x-kde-passwordManagerHint`) with a `wl-copy -c` shell-out because Wayland forbids an unfocused
+app from touching the clipboard.
+
+**Still open, and narrowed to a decision rather than a research question.** Nothing is implemented.
+Stage 4.2's prompt says "copy buttons (auto-clearing clipboard)", and that phrasing overstates what
+any platform can deliver - it should name the timeout and point here. Settle before that UI is
+written, because the answer decides whether the GUI offers a copy button at all.
+
 ## O-0009 - Values on the command line, and case-colliding names on Windows
 
 Two loose ends from D-0014, both of which should be settled before strangers depend on the
