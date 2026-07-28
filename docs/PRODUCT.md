@@ -1,7 +1,5 @@
 # PRODUCT.md — The keypaste Constitution
-> **DO NOT MODIFY THIS FILE.** Everything else in this repo can change. This cannot.
-> If a decision conflicts with this file, the decision is wrong.
-> Last ratified: July 2026 (v1.0)
+> **DO NOT MODIFY THIS FILE.** Everything else in this repo can change. This cannot. If a decision conflicts with this file, the decision is wrong. Last ratified: July 2026 (v1.0)
 
 ---
 

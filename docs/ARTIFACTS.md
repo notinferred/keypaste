@@ -1,10 +1,8 @@
 # ARTIFACTS.md — what informs the product and is not in git
 
-> Referenced **by location, never linked**, and never by value. Nothing here is a secret; several
-> rows say where a secret lives, which is a different thing and is the point of the row.
+> Referenced **by location, never linked**, and never by value. Nothing here is a secret; several rows say where a secret lives, which is a different thing and is the point of the row.
 >
-> `[process]` — nothing in this repository can check any of it. The only mechanizable column is
-> "last confirmed", and it is a person's word.
+> `[process]` — nothing in this repository can check any of it. The only mechanizable column is "last confirmed", and it is a person's word.
 
 ---
 
@@ -15,9 +13,7 @@
 | Business model, pricing ladder, positioning, acquisition path, launch and revenue benchmarks, pivot and failure conditions | `~/Nextcloud/keypaste/business.md` | 2026-07-28 |
 | Working pricing and licensing notes | `keypastebusinessnotes.md` in the working tree — **gitignored** by `.gitignore` rule `*businessnotes*.md`, and verified never to have been committed | 2026-07-28 |
 
-D-0006 removed this material from the roadmap and the parking lot before the repository was
-published. It must not come back. `docs/STEPS.md` says "tracked privately, outside this repo" where
-a benchmark would otherwise be named, and that is deliberate.
+D-0006 removed this material from the roadmap and the parking lot before the repository was published. It must not come back. `docs/STEPS.md` says "tracked privately, outside this repo" where a benchmark would otherwise be named, and that is deliberate.
 
 ---
 
@@ -34,8 +30,7 @@ a benchmark would otherwise be named, and that is deliberate.
 | DNS for `keypaste.com` and `dl.keypaste.com` | Cloudflare | |
 | CI runners | GitHub Actions, with Blacksmith runners for the three-OS matrix | |
 
-The site has **no CI job**. `ci.yml` is the .NET gate and does not look at `site/`. The pre-deploy
-checklist in `site/README.md` is the whole of the protection, and it is Owner Queue row **H-0011**.
+The site has **no CI job**. `ci.yml` is the .NET gate and does not look at `site/`. The pre-deploy checklist in `site/README.md` is the whole of the protection, and it is Owner Queue row **H-0011**.
 
 ---
 
@@ -47,8 +42,7 @@ checklist in `site/README.md` is the whole of the protection, and it is Owner Qu
 | npm and crates names | npmjs.com, crates.io | **not registered** — **H-0001** |
 | Trademark on "keypaste" | — | **not checked** — **H-0002** |
 
-The repository itself is `notinferred/keypaste` and is **private**. Whether it goes public is
-**H-0003**, and it is the precondition every launch link depends on.
+The repository itself is `notinferred/keypaste` and is **private**. Whether it goes public is **H-0003**, and it is the precondition every launch link depends on.
 
 ---
 
