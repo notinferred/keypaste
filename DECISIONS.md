@@ -2112,9 +2112,20 @@ table-level grants applied in SQL. Cloudflare's own Hyperdrive guide suggests `p
 plus `pg_write_all_data`, which is exactly the posture this record exists to avoid, and is declined
 in a comment next to the grants so nobody re-adds it from that page.
 
-Nothing is deployed and `public.signup` does not exist, so nothing is at risk yet - but
-`site/README.md` says do not deploy until the role is switched, and that is the condition to clear
-before anything on this page is true.
+**Corrected on 2026-07-28: it is deployed, and this entry said otherwise.** The Worker is live on
+keypaste.com - `GET /subscribe` answers 303 to `/`, which is its own non-POST branch, and an unknown
+path gets the static 404, so the form reaches real code. `site/README.md` said "do not deploy" and a
+deploy happened anyway; the record and the reality had drifted apart in the direction that matters.
+
+What is still true is that nothing is at risk, and the reason is worth stating because it is luck
+rather than design: `public.signup` does not exist, so the insert throws, so the handler returns its
+503 page saying in as many words that the address was not stored. The over-privileged role can read
+every table in the cluster and there is simply no subscriber table for it to read. Nothing has been
+silently dropped and nothing has been stored - every signup since the deploy has failed honestly.
+
+**That fixes the order of the fix.** Because the exposure begins the moment the table exists, the
+role must be swapped before, or in the same sitting as, applying `schema.sql`. Creating the table
+first would put the first real signup somewhere this entry's guarantee does not hold.
 
 ## D-0038 - The launch essay was retitled because the title PLAN.md gave it was false
 
