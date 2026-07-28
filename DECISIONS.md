@@ -2228,6 +2228,80 @@ The file existing is 3.3; the box is 3.3 going out.
 
 ---
 
+## D-0041 - A release is four native builds that are run before they are uploaded
+
+**Date:** 2026-07-27 · **Stage:** 3.4 · **Status:** accepted
+
+**The release workflow does not trust its own build.** After publishing, it deletes
+`artifacts/bin` and points every gate at the native binaries through `KEYPASTE_BIN` and
+`KEYPASTE_MCP_BIN`. The deletion is the load-bearing line: `artifacts/bin` is exactly where the
+scripts look when those variables are unset, so without it a typo in either name would silently
+test the ordinary JIT build and report a green release. Two assertions back it up — an AOT binary
+has no managed `.dll` and no `runtimeconfig.json` beside it — and the version the binary prints
+must equal the tag. The binary that ships is the binary that was proved.
+
+**Distribution is Cloudflare R2 behind `dl.keypaste.com`, not GitHub Releases.** The repository is
+private, and a private repository's release assets return 404 to every reader without a token, so
+the documented install command would have been false on the day it was written. That is precisely
+what D-0036 refused to do and what D-0039 catalogued. R2 has no egress charge, an S3-compatible
+API the workflow already knows how to speak, and Cloudflare is already in this project's stack for
+keypaste.com. Serving from a domain the project controls was weighed against CORE.md §3.5 and
+passes: §3.5 forbids telemetry on secret content and entry names, and an HTTP request log for a
+download is neither. The honest cost is a second origin, recorded in THREATS.md rather than
+implied.
+
+**`curl | sh` was rejected.** CORE.md §3.8 makes auditable code the trust strategy, and a pipe to a
+shell asks the reader to execute code they have not read, from an origin that is not the audited
+repository, in a form where the server can serve different bytes to `curl` than to a browser. The
+documented install is instead a download, a checksum verification that fails closed, and an
+extract — five lines, or six on macOS. The third line is the one that makes the other four worth
+typing. Build-from-source stays on both pages permanently, because THREATS.md T-9's argument is
+that a reader can check the dependency closure themselves, and a prebuilt binary is not that.
+
+**The checksum proves integrity, not authenticity.** It is served from the same origin as the
+asset, so anyone who can replace the archive can replace the hash next to it. This is the same
+distinction D-0008 already drew about KeePassXC's `.DIGEST`, and it is stated on the install page
+rather than left for a reader to work out. Authenticity needs signing, which is O-0010. Both
+spellings are published from one computation and asserted to agree: `SHA256SUMS` for anyone
+verifying everything or scripting it, and a per-asset `.sha256` so the documented command is a bare
+`sha256sum -c` with no flags and no way to pass by accident.
+
+**`osx-x64` is not published.** macOS 26 is the last release that runs on Intel Macs, macOS 27 is
+Apple Silicon only, Blacksmith has no Intel Mac at all, and GitHub retires its x86_64 image in
+August 2027. Cross-compiling the slice was possible but would have shipped a binary no gate had
+ever executed, which is exactly what O-0006 forbade. Rosetta runs x64 on Apple Silicon and never
+the reverse, so this costs Intel Mac owners the binary and not the product: they build from source,
+which is documented and works. Dropping it also left all four remaining RIDs on one runner fleet,
+which is one fewer party able to substitute bytes strangers download. Tracked as O-0013.
+
+**The version lives in `Directory.Build.props` and the tag only names it.** Nothing is passed with
+`-p:Version=`, so a local publish at the tagged commit produces the same inputs the release did,
+and the guard job fails a tag whose base disagrees with `VersionPrefix`. The same job refuses to
+release a commit that is not an ancestor of `main`, or that has no successful `ci` run, or that has
+no section in `CHANGELOG.md` — CORE.md §4.7 turned into a gate rather than an intention.
+
+**`release.yml` pins its actions to commit SHAs and `ci.yml` does not, deliberately.** O-0004
+deferred pinning on the reasoning that pins without Dependabot age badly, and that reasoning still
+holds for a workflow that only runs tests. It does not hold here: a mutated action tag on this path
+substitutes a binary a stranger downloads, and no gate in this repository would notice.
+`.github/dependabot.yml` exists now so the pins can move. It covers the github-actions ecosystem
+only — a bot that bumps a NuGet version without regenerating `packages.lock.json` produces a pull
+request that cannot pass CI (D-0004).
+
+**Each release publishes its own source.** AGPL-3.0 section 6 obliges the corresponding source to
+every recipient of a binary, and the workflow satisfies option (d) by `git archive`-ing the tag
+next to the assets. The repository's history, issues and branches stay private; the source of every
+released version does not. That is a consequence of shipping binaries at all, not of choosing R2.
+
+**Left undone deliberately:** signing and notarization (O-0010), package managers (O-0011),
+reproducible builds and provenance attestation (O-0012), `osx-x64`, `win-arm64` and
+`linux-musl-x64` (O-0013). The Linux binaries are built on Ubuntu 22.04 rather than 24.04 so the
+glibc floor is 2.35 rather than 2.39, which is the difference between running on Debian 12 and not;
+that floor is asserted on a clean Debian 12 container on every release, with Alpine asserted to
+fail, so it is a tested claim rather than a guess.
+
+---
+
 # Open decisions
 
 ## O-0002 — Contribution terms: DCO or CLA
@@ -2267,6 +2341,16 @@ CodeQL, dependency-review, Dependabot, and SHA-pinned GitHub Actions are deliber
 Stage 0.1 workflow. Action tags are mutable, so tag pinning without Dependabot ages badly; all of
 these are free now that the repository is public, so revisit them together.
 
+**Half-answered in 3.4, and the split is deliberate.** `release.yml` pins all four of its actions
+to commit SHAs, and `.github/dependabot.yml` now exists for the github-actions ecosystem so the
+pins can move. `ci.yml` is still on tags. The reasoning above holds for a workflow that only runs
+tests, and stops holding for one that produces binaries strangers download: a mutated action tag
+on the release path substitutes an artifact, and nothing in this repository would notice. If time
+pressure ever forces a choice, unpin `ci.yml`, never `release.yml`. CodeQL and dependency-review
+are still deferred, and Dependabot deliberately does not cover NuGet — a version bump without the
+matching regenerated lock file cannot pass CI (D-0004). Note the premise "free now that the
+repository is public" is still false: the repository is private.
+
 ## O-0005 — `macos-latest` is arm64
 
 Relevant from 0.2 onward: any native dependency (an Argon2 binding, `keepassxc-cli` from Homebrew)
@@ -2278,22 +2362,103 @@ Argon2 is managed C# with no P/Invoke (D-0007), so arm64 needs nothing special. 
 comes from the Homebrew cask, which ships an arm64 build. The AOT half of this entry remains open
 and is now tracked more precisely by O-0006.
 
-## O-0006 — Is vendored KeePassLib AOT-compatible? — **must resolve before Stage 3**
+**Fully answered in 3.4, and one sentence above needs correcting.** The toolchain guess was right:
+`clang` and `zlib1g-dev` on Linux, the Xcode command line tools on macOS, and the MSVC linker on
+Windows, all now installed or asserted by `release.yml`. arm64 needed nothing beyond a native
+runner. But "Argon2 is managed C# with no P/Invoke" is not accurate as written -
+`Argon2Kdf.cs:167` calls `Argon2Native` *first* and only falls back to the managed
+`Argon2Transform` at `:172` when it returns null, and the native path holds `DllImport`s for
+`KeePassLibN` and `libargon2`. The conclusion survives because those libraries are not shipped, so
+the load throws `DllNotFoundException`, which is caught at `:230` and `:250`, and the managed path
+runs every time. The observed behaviour is what the entry claims; the mechanism is not. Recorded
+rather than quietly edited, because a wrong reason for a right answer is the thing that bites
+later.
 
-`third_party/Directory.Build.props` sets `IsAotCompatible=false` and turns the trim/AOT analyzers
-off for vendored source. That is a deliberate trade — 2007-era code would otherwise bury the build
-in noise — but it also disarms the dependency-selection gate D-0005 installed for exactly this
-moment, so the answer must come from somewhere else.
+## D-0040 - Vendored KeePassLib survives NativeAOT, proved by running the published binaries
 
-That somewhere is a real `dotnet publish -p:PublishAot=true` of `Keypaste.Cli` on all three
-operating systems, followed by *running* the round-trip against the published binary. A compile is
-not enough: the failure mode for reflection-driven code is a runtime `NotSupportedException`, not a
-build error. The known suspects in KeePassLib are `XmlUtilEx`/`KdbxFile`'s XML handling, the
-`Assembly` reflection in `NativeLib`, and static initialisation order in `CryptoRandom`.
+**Date:** 2026-07-27 · **Stage:** 3.4 · **Status:** accepted (supersedes O-0006)
 
-Resolve it early rather than at launch. If the answer is no, the options are trimming the vendored
-tree, `rd.xml`-style roots, or dropping the AOT promise in PLAN.md — all cheaper to choose now than
-in Stage 3.
+**The answer is yes, and it was established by running the binaries rather than by compiling
+them.** O-0006 asked whether vendored KeePassLib survives NativeAOT and insisted the answer could
+not come from a compile, because the failure mode for reflection-driven code is a runtime
+`NotSupportedException`. So both executables were published with `PublishAot=true` and then put
+through every gate this repository owns: `verify-run-injection`, `verify-run-signals`,
+`verify-mcp-stdio`, `verify-approval-e2e`, `verify-policy-e2e`, `verify-log-chain`, `verify-demo`,
+and both directions of the KeePassXC compatibility gate. A KDBX file written by the AOT binary
+opens in real KeePassXC with Argon2, AES-256, unicode values, nested groups and history intact,
+and a value KeePassXC writes is read back by the AOT binary. That last one is the whole answer:
+the vault writer is the code most likely to be broken by trimming, and it is the code CORE.md §4.6
+makes constitutional.
+
+**All three of O-0006's named suspects were wrong, and the real list is eleven diagnostics in three
+files.** The XML suspicion was misplaced: KDBX read and write are streaming `XmlReader` and
+`XmlWriter` (`KdbxFile.Read.Streamed.cs:101`, `KdbxFile.Write.cs:203`), which AOT handles. The one
+live `XmlSerializer` (`XmlUtilEx.cs:165,180`) is reachable only from `KcpKeyFile.Xml.cs:121,126`,
+the `.keyx` key-file path, and `KeePassInterop.cs:281-289` builds the composite key from
+`KcpPassword` alone, so it trims away. `CryptoRandom`'s static initialisation is clear: the
+reflective parts are behind `#if !KeePassUAP`, and that symbol is defined in the file. What
+actually remains is `SimpleStat.cs` (eight), `NativeLib.cs` (two) and `IOConnection.cs` (one).
+There are **no IL3xxx diagnostics at all** — nothing reachable requires runtime code generation,
+which is the class of failure that cannot be worked around.
+
+**Every one of the eleven is a probe that already treats failure as "feature unavailable".**
+`SimpleStat` loads Mono.Posix to preserve Unix owner and mode across a vault save; under AOT
+`Assembly.Load` fails, the `try`/`catch` at `SimpleStat.cs:107-125` returns false, `Get` returns
+null, and `FileTransactionEx.cs:269` calls `Set` only when non-null. The vault is written either
+way and only the permission copy is skipped — which is already what happens on every machine
+without Mono.Posix installed, meaning all of them since .NET Core. `NativeLib.ProcessArchitecture`
+falls back to `IntPtr.Size` at `:124` and only feeds a native-library loader keypaste does not
+ship. `IOConnection` reaches `HttpWebRequest` internals on remote-vault paths keypaste never takes.
+None of this was assumed; each was traced to a caller.
+
+**Two mechanical claims in the plan for this stage were false, and finding out cost a negative
+control rather than a release.** The first: `-r <rid>` does not add a RID, it *narrows* the
+project's set to one, so a lock file recording four can never satisfy a single-RID restore. The
+release workflow therefore must never pass `-r` to restore; it restores the solution whole and
+publishes per RID with no restore, which is what declaring `RuntimeIdentifiers` in the plural is
+for. The second: `Microsoft.DotNet.ILCompiler` is compared as a package reference, not a package
+download, so lock files do record it — which inverts the conclusion. `PublishAot` had to be
+committed in the csproj rather than passed at publish time, because a property that changes the
+restore graph must be constant or locked mode cannot hold.
+
+**That inversion turned out to be a gain.** The lock files now pin the AOT compiler and each
+per-RID native compiler by content hash, so the toolchain that produces the shipped binary is
+covered by the same discipline D-0004 applies to every other dependency. The costs are real and
+worth stating: roughly 160 MB of ILCompiler packages on a cold restore, and twenty trim feature
+switches added to `runtimeconfig.json` on an ordinary `dotnet build`, including
+`IsDynamicCodeSupported=false`. The second is the more interesting one, and it cuts the right way:
+the JIT build the nine verify scripts exercise is now configured more like the binary that ships.
+
+**The trim diagnostics were not suppressed, because suppressing them would have re-created the
+problem O-0006 was complaining about.** `SuppressTrimAnalysisWarnings` also sets
+`EnableTrimAnalyzer=false`, which would disarm D-0005's gate for our own code as well as the
+vendored tree. Instead `IlcTreatWarningsAsErrors` is off and `scripts/verify-aot-trim.sh` diffs the
+emitted diagnostics against `scripts/aot-trim-baseline.txt` character for character, the same shape
+as `verify-demo.sh` holding the documented transcripts to what the binaries print. The gate rejects
+any diagnostic naming `src/` unconditionally and separately, so our own code keeps the stricter
+rule. The effect is that the quarantine no longer swallows an upstream re-merge that introduces an
+AOT-hostile construct: it becomes a diff and a red build. That is the gate O-0006 said the
+quarantine had disarmed, put back somewhere it can work.
+
+**Observed failing, three ways.** Removing a line from the baseline fails the gate; injecting a
+diagnostic that names `src/` fails it with the stricter message; and a locked restore was watched
+emitting NU1004 on exactly the four projects that declare RIDs, with the three test projects
+restoring clean, before anything was regenerated. Also worth recording as a trap: an *incremental*
+publish emits no diagnostics at all, so the gate must run against a clean publish. It fails rather
+than passing vacuously in that case, which is the correct behaviour, but the reason is not obvious
+from the error.
+
+**Measured, on one machine, win-x64.** `keypaste` 10.4 MB and `keypaste-mcp` 9.1 MB as single
+native files with no managed assembly and no `runtimeconfig.json` beside them. `--help` runs in
+54 ms against 75 ms for the framework-dependent build, ten runs each. The AOT binaries are about
+a quarter faster to start and need no .NET installed, which is the entire point of the exercise.
+The same eleven diagnostics appear on linux-x64, byte-identical after path normalisation, so the
+baseline is platform-independent rather than per-RID.
+
+**What this does not settle.** O-0007 asked whether the vendored tree needs trimming, and its
+trigger condition was "if O-0006 forces trimming for AOT size". It did not: nothing had to be
+removed and the binaries are around 10 MB. The published binaries are unsigned and un-notarized
+(O-0010), not reproducible (O-0012), and `osx-x64` and `linux-musl-x64` are unserved (O-0013).
 
 ## O-0007 — Trim the vendored tree?
 
@@ -2305,6 +2470,14 @@ build time.
 Revisit if O-0006 forces trimming for AOT size, or if `HmacOtp.cs` becomes load-bearing when TOTP
 arrives from ideas.md. Note the exclusion mechanism is already in place and costs nothing to
 extend: files stay on disk, only the compilation changes.
+
+**The trigger condition fired in 3.4 and did not fire.** O-0006 is answered (D-0040) and AOT forced
+no trimming at all: the published binaries are 10.4 MB and 9.1 MB, the ILC trimmer removes the
+unreachable code without any `<Compile Remove>` being added, and none of the eleven trim
+diagnostics comes from the severable files this entry lists. So the size argument for trimming is
+gone - the trimmer already does it. What is left is the original argument, that fewer vendored
+lines are fewer lines to re-justify on re-merge, which was never urgent. Still open, now for a
+weaker reason than when it was written.
 
 ## O-0008 — Windows clipboard history and cloud sync retain the secret
 
@@ -2344,3 +2517,72 @@ KeePassXC put there; only injection refuses. The reasoning, including why the pl
 is the worst of the three options rather than the safe middle, is in D-0016.
 
 Only the `argv` half of this entry is still open.
+
+## O-0010 - The released binaries are unsigned and un-notarized
+
+Nothing signs the artifacts. On macOS that is not cosmetic: Gatekeeper quarantines anything a
+browser downloaded, so the documented install carries a sixth line that removes the quarantine
+attribute. A tool whose entire argument is that a person approves each secret is telling its users
+to strip a security attribute before they can run it, which is a defect with a price rather than a
+quirk of packaging. On Windows, SmartScreen warns on an unsigned executable with Mark-of-the-Web,
+and no gate can fix that from inside the repository.
+
+The prices are known: 99 USD a year for the Apple Developer Program plus a notarization step in
+the release workflow, and an organisation-validated or extended-validation certificate for
+Windows, which is the more expensive and more bureaucratic half. CORE.md §5.4 settles one thing in
+advance - signing is security, so a signed binary can never be the paid tier's artifact while the
+free one is unsigned.
+
+Resolve before, or with, the repository going public. Until then the install page says the binaries
+are unsigned in as many words, and D-0041 records why the checksum beside them proves integrity but
+not authenticity.
+
+## O-0011 - There is no Homebrew tap, no Scoop bucket and no winget manifest
+
+For most developers "install one-liner" means `brew install keypaste`, and keypaste does not have
+that. What it has is five lines of download, verify and extract, which is honest but is not what
+the phrase promises.
+
+Each channel wants a versioned, checksummed artifact - which now exists - plus a maintenance
+commitment on every release, and winget's manifest process in practice assumes a signed installer.
+So O-0010 gates at least the Windows half. A Homebrew tap is the cheapest of the three and the one
+the r/selfhosted and Show HN audiences will ask for first; it is also the one that makes the
+release workflow responsible for a second repository.
+
+Decide after the first real release has been installed by someone who is not the author.
+
+## O-0012 - The builds are not reproducible, and nothing attests to where they came from
+
+`Deterministic=true` governs the managed compile only. NativeAOT link output is not expected to be
+byte-identical across runs or machines, so no reproducibility claim is made anywhere and none
+should be added casually. The practical consequence is that a reader cannot rebuild the published
+binary and compare hashes; they can only check that the bytes they downloaded are the bytes the
+checksum names.
+
+Three options, in rising cost: say nothing further and rely on D-0041's integrity-not-authenticity
+sentence; sign with minisign using a key the maintainer holds, which is cheap and puts the trust
+question on key distribution; or adopt `actions/attest-build-provenance`, which needs
+`id-token: write` and `attestations: write` and gives readers a `gh attestation verify` command -
+but a provenance attestation the documentation does not teach anyone to check is decoration.
+
+Related to O-0010: a signature answers authenticity, an attestation answers origin, and they are
+not the same question. Do not let one be sold as the other.
+
+## O-0013 - osx-x64, win-arm64 and linux-musl-x64 are unserved
+
+The release publishes `linux-x64`, `linux-arm64`, `osx-arm64` and `win-x64`.
+
+`osx-x64` was dropped in 3.4 with reasons in D-0041: macOS 26 is the last release that runs on
+Intel Macs, no runner fleet in use still offers one, and shipping a slice no gate had executed
+would have contradicted O-0006. Intel Mac owners build from source. Revisit only if someone asks.
+
+`linux-musl-x64` is the more likely to be missed. Alpine is common in containers, and the release
+workflow asserts that the glibc binary does *not* run there, so the gap is tested rather than
+assumed. Adding it is one matrix row and one more archive; the reason it is not there is that
+nobody has asked and the RID list should not grow on speculation.
+
+`win-arm64` has no runner in either fleet today. Windows on ARM users can run the x64 binary under
+emulation, which works and is slow.
+
+Reconsider the whole list after the first release, on evidence about who actually downloaded what,
+which is exactly the kind of evidence a download log can supply and CORE.md §3.5 permits.

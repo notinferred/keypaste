@@ -4,6 +4,13 @@
     <RootNamespace>Keypaste.Core</RootNamespace>
     <AssemblyName>Keypaste.Core</AssemblyName>
     <Description>keypaste core library. All vault logic lives here; CLI, MCP and GUI are thin clients over it.</Description>
+    <!--
+      A library needs no RID of its own, but `dotnet publish -r <rid>` flows the RID through
+      ProjectReference as a global property, so restore resolves this project against it too.
+      Without the list here, a locked-mode restore fails on the referenced project rather than
+      the published one - which reads as a mystery. Keep in step with the two exe projects.
+    -->
+    <RuntimeIdentifiers>linux-x64;linux-arm64;osx-arm64;win-x64</RuntimeIdentifiers>
   </PropertyGroup>
 
   <!-- No PackageReference. Deliberate: see Directory.Packages.props. -->
