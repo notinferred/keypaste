@@ -2293,6 +2293,23 @@ every recipient of a binary, and the workflow satisfies option (d) by `git archi
 next to the assets. The repository's history, issues and branches stay private; the source of every
 released version does not. That is a consequence of shipping binaries at all, not of choosing R2.
 
+**Two preflights were added after the fact, and the reason is worth keeping.** The `publish` job is
+the only job a `workflow_dispatch` never runs, so anything asserted there is asserted for the first
+time by a real tag, after four platform builds have been paid for. The AWS CLI was the case in
+point: nothing in the workflow installs it and it was only present because the runner image ships
+it. That check now lives in `guard`, on the same runner label, where a dispatch reaches it -
+observed answering `aws-cli/2.33.5` rather than assumed. The three R2 secrets are checked there too,
+on a tag only, so a missing secret costs one minute instead of twenty.
+
+**A released version is now immutable by refusal rather than by comment.** `aws s3 cp` overwrites
+without asking, so re-running a tag would have replaced bytes that readers already hold a checksum
+for - which turns a documented `sha256sum -c` into a failure for an honest download, and an honest
+failure is indistinguishable from an attack. The publish job now lists the destination prefix first
+and refuses if anything is there. **This control has not been observed firing**, because doing so
+needs a second tag at the same version; by this file's own standard (a gate never observed failing
+is not known to be a gate) it is weaker evidence than the checks around it, and it is recorded that
+way rather than counted as proved.
+
 **Left undone deliberately:** signing and notarization (O-0010), package managers (O-0011),
 reproducible builds and provenance attestation (O-0012), `osx-x64`, `win-arm64` and
 `linux-musl-x64` (O-0013). The Linux binaries are built on Ubuntu 22.04 rather than 24.04 so the
