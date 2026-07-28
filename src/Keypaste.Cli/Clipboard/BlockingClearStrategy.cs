@@ -1,6 +1,6 @@
 using System.Globalization;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography;
+using Keypaste.Core.Clipboard;
 
 namespace Keypaste.Cli.Clipboard;
 
@@ -108,11 +108,9 @@ internal sealed class BlockingClearStrategy : IClipboardClearStrategy
         {
             var read = clipboard.TryReadHash(out var current, out _);
 
-            // Failing to read back means clear anyway. Skipping the clear because verification
-            // failed would leave a password on the clipboard indefinitely, which is the worst
-            // outcome available here — fail closed, CORE.md law 3.7.
-            if (read == ClipboardStatus.Ok
-                && !CryptographicOperations.FixedTimeEquals(current, expectedHash))
+            // The decision is Keypaste.Core.Clipboard.ClipboardClear.Should, not a copy of it: the
+            // desktop app waits entirely differently and must still reach the same conclusion.
+            if (!ClipboardClear.Should(read == ClipboardStatus.Ok, current, expectedHash))
             {
                 status.WriteLine("Clipboard changed since the copy; leaving it alone.");
                 return;

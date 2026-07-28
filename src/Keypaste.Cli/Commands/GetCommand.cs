@@ -11,7 +11,12 @@ namespace Keypaste.Cli.Commands;
 internal static class GetCommand
 {
     /// <summary>How long the secret stays on the clipboard by default.</summary>
-    internal const int DefaultTimeoutSeconds = 20;
+    /// <remarks>
+    /// Read from the core rather than written here, so this and the desktop app's countdown are one
+    /// number rather than two that agree today.
+    /// </remarks>
+    internal static readonly int DefaultTimeoutSeconds =
+        (int)Core.Clipboard.ClipboardClear.DefaultWindow.TotalSeconds;
 
     private static readonly OptionSpec[] _options =
     [
