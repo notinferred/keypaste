@@ -1,4 +1,4 @@
-# CORE.md — The keypaste Constitution
+# PRODUCT.md — The keypaste Constitution
 > **DO NOT MODIFY THIS FILE.** Everything else in this repo can change. This cannot.
 > If a decision conflicts with this file, the decision is wrong.
 > Last ratified: July 2026 (v1.0)
@@ -34,7 +34,7 @@ The product is a **wedge**, not a platform. The wedge is:
 5. **No analytics/telemetry on secret content or entry names. Ever.** Opt-in anonymous usage counts only.
 6. **All crypto is boring.** Use the KDBX4 spec (Argon2, AES-256/ChaCha20) via mature audited libraries. NEVER write custom crypto. NEVER "improve" the format.
 7. **Fail closed.** Any error path in the agent bridge results in denial, not exposure.
-8. **The code is open source (permissive or copyleft — decided once, in PLAN.md) and stays open.** Auditable code is the trust strategy for an unknown founder.
+8. **The code is open source (permissive or copyleft — decided once, in docs/STEPS.md) and stays open.** Auditable code is the trust strategy for an unknown founder.
 9. **Dependencies are minimized and pinned.** Every new dependency on the secret path requires written justification in the PR.
 10. **Vulnerability reports get a security policy, a private contact, and honesty.** If breached or a serious bug ships, disclose fast and fully.
 
@@ -55,12 +55,12 @@ The product is a **wedge**, not a platform. The wedge is:
 2. **Solve your own pain first.** If you (the founder) don't use keypaste daily, don't ship it to others.
 3. **Community before customers.** KeePass forums, MCP ecosystem, HN, r/selfhosted — earn credibility there before any paid tier exists.
 4. **Monetize the convenience, never the security.** Free/self-host tier is fully secure and fully functional. Paid tiers sell hosting, sync convenience, team features, support — never "more encryption."
-5. **One founder, one focus.** New ideas go to ideas.md, not into the sprint. ideas.md is where ideas wait their turn — most wait forever.
+5. **One founder, one focus.** New ideas go to docs/IDEAS.md, not into the sprint. docs/IDEAS.md is where ideas wait their turn — most wait forever.
 
 ## 6. Decision tiebreakers (when stuck, in order)
 
 1. Does it protect user trust? → if it risks trust, no.
-2. Does it serve the wedge (KDBX + env + agent bridge)? → if not, ideas.md.
+2. Does it serve the wedge (KDBX + env + agent bridge)? → if not, docs/IDEAS.md.
 3. Can one person ship it in ≤2 weeks? → if not, cut scope until yes.
 4. Would it make the 60-second demo better? → prefer the option that demos.
 5. Boring beats clever. Shipped beats perfect. Focused beats big.

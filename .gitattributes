@@ -26,4 +26,4 @@ third_party/KeePassLib/packages.lock.json  text eol=lf
 # recording scripts assert `jq` can parse.
 *.cast   text eol=lf
 
-CORE.md  linguist-documentation
+docs/PRODUCT.md  linguist-documentation
