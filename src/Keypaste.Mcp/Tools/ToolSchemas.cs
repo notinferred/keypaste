@@ -51,7 +51,7 @@ internal static class ToolSchemas
     internal const string ListInputJson =
         """{"type":"object","properties":{},"additionalProperties":false}""";
 
-    /// <summary>The four arguments prompts.md specifies for <c>request_credential</c>.</summary>
+    /// <summary>The four arguments the build prompt specifies for <c>request_credential</c>.</summary>
     internal const string CredentialInputJson = """
         {
           "type": "object",

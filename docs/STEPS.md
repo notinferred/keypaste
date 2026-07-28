@@ -1,114 +1,161 @@
-# STEPS.md — keypaste Roadmap
-> This file evolves. docs/PRODUCT.md does not. Check items off as you go; move finished stages to the bottom.
-> Companion files: `prompts.md` (ready-to-use build prompts per stage) and `docs/IDEAS.md` (the parking lot).
+# STEPS.md — every step to the finished product
+
+> This file evolves. `docs/PRODUCT.md` does not.
+> Done steps are one line. Open steps carry **Build**, **Owner** and **Verify**.
+
+**The admission rule.** A step may be added only if it (a) has an accept criterion that can *fail*,
+(b) names its verifier in `docs/verification.md`, and (c) traces to a claim in `docs/PRODUCT.md`.
+Fails any one of those and it is a `docs/IDEAS.md` row, not a step. This is the termination
+condition: without it the plan grows forever.
 
 ---
 
-## Decisions — LOCKED (July 2026, founder profile: .NET + Next.js, full-time, portfolio + business)
-- [x] **Language/stack: C#/.NET 8+ for everything server-side** — `keypaste-core` (class library), `keypaste-cli` (console app, published as self-contained/AOT single binaries for macOS/Linux/Windows), `keypaste-mcp` (official ModelContextProtocol C# SDK, stdio transport). Massive tailwind: **KeePass itself is a .NET app** — the KDBX ecosystem is native to this stack.
-- [x] **KDBX library sub-decision (resolved in 0.2):** `KeePassLib`, vendored from the KeePass 2.61 netstandard port. No maintained, adopted KDBX4 NuGet package for .NET exists; the two clean-shaped ones had days of commit history. KeePass is GPL-2.0-**or-later**, not GPL-2.0-only, so it combines with AGPL-3.0 and the licence never forced the choice — maturity did. Full survey in DECISIONS.md D-0007.
-- [x] **License:** copyleft core (GPL/AGPL family, finalized alongside the KDBX lib choice for compatibility), MIT for any client SDK snippets. Protects against closed cloud clones.
-- [x] **GUI framework (Stage 4): Avalonia over `Keypaste.Core`, in one .NET process** *(amended in 4.1 — DECISIONS.md D-0044)*. The original decision here read "Next.js frontend + .NET local backend, desktop shell via Photino.NET … with Electron as fallback if Photino friction appears", and that fallback clause is what fired: Photino's last code commit was January 2025, it targets `net8.0;net9.0` only, and its Linux natives need glibc 2.38 against this project's published floor of 2.35 — the GUI would not have run on the oldest Linux the CLI supports. Avalonia keeps the one property that mattered (a plain `ProjectReference` to the core, no bridge, law 4.3 by construction), targets `net10.0`, needs no GTK or WebKit on Linux, and removes the webview from the process holding the unlocked vault. The cost is that the UI is XAML rather than web; the Next.js-covers-keypaste.com rationale was already stale, since the site is one hand-written HTML file behind a Cloudflare Worker.
-- [x] **Timeline compression:** founder is full-time → target weeks in this plan are calendar-realistic, not aspirational. Stages 0–3 (launch) in ~6–8 weeks.
-- [ ] **Name check:** trademark + NuGet + npm + GitHub org "keypaste" availability — grab all handles in Stage 0, week 1.
+## Scope
+
+- **Built.** A KDBX4 vault the CLI creates, reads and writes, which KeePassXC opens in both
+  directions. Env sets and `keypaste run` injection. The MCP bridge: scoped request, human approval,
+  TTL, policy pre-approvals, and a hash-chained audit log. `v0.1.0` published as four native
+  binaries. A desktop app that unlocks a vault, browses entries and edits env sets.
+- **Building.** Stage 3's launch, and Stage 4's Agent Activity screen — the one screen that answers
+  "what can act as me right now?"
+- **Later.** Sharing, a hosted tier, the delegation dashboard and teams. All of it is in
+  `docs/IDEAS.md` with a status, because none of it yet has an accept criterion that can fail.
+- **Out, deliberately.** `docs/PRODUCT.md` §2 — a new vault format, a cloud service holding
+  secrets, "for everyone", enterprise IAM. That list is locked and is the ratchet.
 
 ---
 
-## Stage 0 — Foundation & proof of life (Week 1–2)
-**Goal: a repo that opens, reads, and writes a real KDBX4 file, verified against KeePassXC.**
-- [ ] Register GitHub org `keypaste`, npm/crates names, point keypaste.com to a one-line landing page with email capture — **the page and the email capture landed in 3.1** (Cloudflare Worker → PlanetScale Postgres, D-0037); the org and the package names are what is still open here
-- [x] Repo scaffold: `keypaste-core`, `keypaste-cli`, `keypaste-mcp` (monorepo), CI, license, SECURITY.md, this file trio
-- [x] Pick KDBX library; write round-trip test: create vault → add entry → save → open in KeePassXC → verify — vendored KeePassLib 2.61, see DECISIONS.md D-0007
-- [x] CI job that runs KeePassXC-cli against generated files (compatibility law #6) — all three OSes, permanent, see DECISIONS.md D-0008
-- [x] `keypaste init`, `keypaste add`, `keypaste get`, `keypaste ls` (plus `rm`) working in CLI — see DECISIONS.md D-0009..D-0012
-- **Exit demo:** terminal clip — create vault, add a secret, open same file in KeePassXC GUI.
+## Owner Queue
 
-## Stage 1 — Env variables & injection (Week 3–4)
-**Goal: keypaste replaces .env files.**
-- [x] Entry convention for env sets (KDBX group `env/<project>`, one entry per variable: title=KEY, password=value) — stays 100% KeePassXC-*editable*, gated in CI in both directions (D-0014)
-- [x] `keypaste env pull <project> [file]` (import existing .env, then offer to delete it) — fail-closed parser in the core, no "shred" claim (D-0015); `env ls` / `env set` / `env rm` shipped in 1.1
-- [x] `keypaste run <project> -- <cmd>`: inject into child process env, nothing written to disk — gated in CI on all three OSes, signals relayed rather than escalated (D-0016)
-- [x] `keypaste env export <project> --dotenv` (red warning, confirmation, `--stdout` for pipes) — spelled `env export`, not `export`; single-quoted output so other .env readers agree (D-0018)
-- [x] Docs: "Replace your .env in 5 minutes" guide — `docs/replace-dotenv.md`, with CI notes and the FAQ
-- **Exit demo:** delete a project's .env, `keypaste run dev -- npm start`, app boots.
+What only a human can do: decide, register, sign, pay, post, or press a key. Nothing below is
+agent-runnable, and several of them block steps that are otherwise finished.
 
-## Stage 2 — The MCP bridge (Week 5–7) ← the headline feature
-**Goal: Claude can request ONE credential, you approve, it's scoped and logged.**
-- [x] MCP server (`keypaste-mcp`) with tools: `list_entry_names` (names only, never secrets), `request_credential(entry, reason, ttl)` — stdio, `ModelContextProtocol.Core` pinned at 1.4.1 (D-0019). It shipped in 2.1 denying every request, because the approval flow did not exist yet and a server started with no terminal cannot ask for a master password (D-0022); 2.2 gave it somewhere to forward to, and the bridge still holds no vault and decides nothing (D-0023)
-- [x] Human approval flow: `keypaste agent` — a process you start in your own terminal — shows client, entry, field, reason and lifetime; default deny, 45-second timeout deny (under every MCP client's own 60s request timeout, D-0025). A native OS dialog is still to come; the terminal prompt is the channel today
-- [x] Scoping: the response carries one field value and nothing else, proved against four sentinels in one entry (`SecretHygieneTests`); grants expire on a TTL capped by `--max-ttl` and are scoped to one connection (D-0026)
-- [x] Append-only local audit log (JSONL + `keypaste log` pretty view) — a table with `--denied`, `--client` and `--since`, plus a per-record hash chain and `keypaste log verify`, which names what it cannot detect on every pass rather than only on a failure (D-0031, D-0032); a log keypaste cannot link a record onto stops the bridge at startup
-- [x] Policy file for pre-approvals — `~/.keypaste/policy.toml`, read once by `keypaste agent`, evaluated after the exposure re-check so a rule can only ever narrow (D-0029); keyed on the operator's `--client-label` rather than the name an agent asserts (D-0030); anything wrong with the file means the whole of it is ignored and every request prompts (D-0028). `keypaste policy ls` renders what each pattern parsed to rather than the line that was typed
-- [x] Threat-model doc: confused deputy, prompt injection via entry names, log tampering — and mitigations — `THREATS.md` grew T-10 to T-12 in 2.2 and closed T-7; 2.3 resolved T-3, closed T-6's named gap and added T-13 to T-17, including T-14, the one place the policy file makes keypaste weaker than 2.2; **2.4 closed T-5**, gave T-12's divergence a reader, and promoted memory dumping, clipboard scraping and a stolen vault file into T-18 to T-20. One deferral outlives the stage and says so: T-13 still cannot show which entries a rule matches today, because that needs an open vault, so it waits for the GUI
-- [x] Setup guide for Claude Desktop + Claude Code — `docs/mcp-setup.md`, with the config snippets for both clients, what `--expose` governs, the audit log format and its `method` vocabulary, and how to read it back
-- [x] The flagship demo, end to end — `docs/demo.md`: a committed offline fixture (`scripts/demo/deploy.sh`) that refuses without `STRIPE_KEY`, a real `keypaste agent`, a real approval, and `keypaste log` as the payoff. `scripts/verify-demo.sh` holds every transcript on the page to what the shipped binaries actually print, on all three OSes, and says plainly that it does not run Claude and cannot (D-0034). Startup and latency were measured rather than guessed, and exactly one number justified touching code (D-0035)
-- **Exit demo (THE demo):** ask Claude "deploy this, get the API key from my vault" → approval popup → Claude proceeds → `keypaste log` shows the access. 60 seconds.
+| id | What only you can do | Blocks | Where it came from |
+|---|---|---|---|
+| **H-0001** | Register the `keypaste` GitHub org, and the npm and crates names | Stage 0 | Stage 0, still open since week 1 |
+| **H-0002** | Trademark check on the name "keypaste" | H-0001 | the LOCKED decisions block |
+| **H-0003** | Decide whether this repository goes public, knowing the decision is irreversible | **the launch** | O-0014 |
+| **H-0004** | Choose DCO or CLA and write `CONTRIBUTING.md` | first outside PR | O-0002 |
+| **H-0005** | Record the demo GIF — WSL only, a real Claude session, a human keystroke, three to eight takes budgeted | 3.1 | `scripts/demo/README.md`, D-0033 |
+| **H-0006** | Post the launch to the five channels | — | `launch.md` holds the copy and the preconditions |
+| **H-0007** | Answer every issue and comment for two weeks after the launch | — | Stage 3 |
+| **H-0008** | Decide whether the binaries get signed and notarized, and pay for it if so | trust on first run | O-0010, O-0015, THREATS T-21 |
+| **H-0009** | Settle Windows clipboard history and the `argv` exposure before the audience stops being one person | **the launch** | O-0008, O-0009 |
+| **H-0010** | Run the twenty-one item manual checklist in `docs/desktop.md` — nothing automated has ever seen this app draw | any desktop claim | O-0020 |
+| **H-0011** | Run the pre-deploy checklist in `site/README.md` before any keypaste.com deploy | every deploy | `site/README.md`; D-0037 declined to build a CI job for it |
+| **H-0012** | Answer who owns the approver pipe once the app can approve | **4.3** | O-0017 |
 
-## Stage 3 — Launch (Week 8–9)
-**Goal: strangers using it.**
-- [ ] Polish README with the demo GIF at top — the rewrite is done (D-0036): hero, pitch, trust bullets, honest install, MCP snippet, sourced comparison table, and both pages' transcripts now held to the binaries by `scripts/verify-demo.sh`. **What is left is only the GIF** — the take, the trim to under 2 MB, and dropping it into the slot both pages already reserve. The pipeline is `scripts/demo/` (D-0033) and is WSL-only, needs a real Claude session and a human keystroke, and budgets three to eight takes
-- [x] Landing page: the 60-second demo video, install one-liner, "local-first, KDBX, open source" trust bullets — `site/public/index.html`, rewritten in place with the same GIF slot, plus the comparison table and the signup form. The install block became a real per-OS one-liner in 3.4 once there was something to install, held to the published assets by `scripts/verify-install.sh`; build-from-source stays on the page permanently because it is strictly stronger (THREATS.md T-21)
-- [x] Release pipeline: **`v0.1.0` is published** at `https://dl.keypaste.com/v0.1.0/` — four native binaries plus the corresponding source, each with a checksum, every gate run against the exact bytes uploaded. Distribution is Cloudflare R2 rather than a GitHub Release because this repository is private and private release assets 404 for everyone (D-0041); `osx-x64` was dropped with reasons and O-0006 was answered yes (D-0040). The documented install commands are now executed verbatim on Ubuntu 2404, macOS 15 and Windows 2025 by `.github/workflows/install.yml`, weekly and on demand, with a corrupted-download negative control on the two Unix legs. Its first real run failed and was right to — see D-0043 for the two reasons it had never run at all
-
-- [ ] Launch posts: Hacker News (Show HN), r/selfhosted, r/KeePass, MCP community/Discord, X
-- [x] Write the launch essay — [`docs/keepass-and-agents.md`](keepass-and-agents.md), retitled "Your **KeePass vault** can't talk to AI — and everyone is pasting secrets into chats instead" because the original title is false: 1Password, Bitwarden and Keeper all ship request-and-approve flows, and all three are named in the essay's second paragraph (D-0038). Its transcripts are in `verify-demo.sh`'s `TRANSCRIPT_PAGES`, so the essay cannot drift from the binaries either
-- [ ] Respond to every issue/comment for 2 weeks straight
-- **Benchmarks:** tracked privately, outside this repo.
-
-## Stage 4 — Modern GUI (Week 10–14)
-**Goal: the KeePass reskin — a vault UI that doesn't look like 2003.**
-- [x] Desktop app (Avalonia) over keypaste-core — **shell and unlock done in 4.1** (D-0044): open a vault by drag, picker or recent list; master password in a control that holds no password and whose automation peer exposes nothing; idle auto-lock on two clocks, defaulting to 5 minutes, that also locks a machine which slept through the timeout; a five-destination sidebar with `Ctrl/Cmd+1..5` and `Ctrl/Cmd+L`; light and dark following the OS. The Log view is real and renders `AuditText` verbatim, so it and `keypaste log` cannot drift (D-0032)
-- [x] Entry browse/search and the env-set editor — **4.2** (D-0045..D-0050): a searchable entry list with a group tree, showing titles and groups and nothing else; a detail pane with copy buttons whose clipboard clears itself, inline edit, add with a generated password, delete behind a confirmation; env projects as cards carrying their `keypaste run <project> -- ` line, variables in a masked table with reveal-on-hold on a control that publishes nothing to the accessibility bus. Everything reads and writes through core, and a test project referencing both front ends proves the shipped CLI sees a GUI edit at once
-- [ ] The differentiating screen: **Agent Activity** — live feed of agent requests, approve/deny buttons, history (this is the delegation dashboard seed)
-- [ ] Approval prompts move from CLI to native windows/tray
-- [ ] Design language: modern, calm, trustworthy (see docs/IDEAS.md → UI section for direction)
-- **Exit demo:** side-by-side screenshot — KeePass classic vs keypaste — same file, different decade.
-
-**Where 4.1 left it.** The app opens a real KDBX written by the shipped CLI and holds it in a session
-built to the `Func<Vault?>` shape `VaultCredentialSource` already takes, so 4.3 wires the approver in
-without changing it. Three things it deliberately does not do, each stated in the app itself rather
-than left to be discovered: it is **not the approver** — a running `keypaste agent` still answers
-agent requests, and the Agent Activity screen probes for one and says so; it **ships in no release**,
-so `release.yml` is untouched and there is nothing on `dl.keypaste.com` to install; and it sets no
-`PublishAot`, so the CLI's single-file property is not yet claimed for it (O-0016). `keypaste agent`
-still has no idle lock of its own — 4.1's auto-lock is the app's, and `docs/approvals.md` says so.
-CHANGELOG.md is untouched on purpose: it is written for somebody deciding whether to upgrade, and
-there is nothing yet to upgrade to.
-
-**Where 4.2 left it.** The app now shows vault contents and writes to the file, and both firsts cost
-something the stage had to pay. 4.1's hygiene gate failed the moment an entry list existed, which is
-what it was built to do; what replaced it is four narrower two-sided claims and one total invariant —
-after a lock, nothing built while unlocked holds anything — and writing that invariant immediately
-found a detail pane that went on holding a username and notes after the vault was gone. Three things
-grew outside the app because the GUI could not have them otherwise and docs/PRODUCT.md law 4.2 forbids the
-GUI having them first: a **password generator** in the core with `--generate` on `keypaste add` and
-`keypaste env set`; the **clipboard clear rule** lifted into the core so one function decides for both
-front ends while the transports stay apart; and a **guard against lost writes**, because an app that
-holds a vault for eight hours and writes it back whole was silently reverting anything a terminal
-wrote in the meantime (D-0048). The CLI-visibility test the prompt asks for lives in
-`tests/Keypaste.Consistency.Tests`, which references both front ends and is in **neither solution** —
-putting `Keypaste.Cli` in the app solution was measured at +490 MB of restore and would have falsified
-`app.yml`'s own published cost table (D-0049). Still true from 4.1 and worth repeating: it is not the
-approver, it ships in no release, and it sets no `PublishAot`. **Nothing automated has ever seen this
-app draw** (O-0020) — the view models are tested exhaustively and the pixels are on a manual checklist
-in `docs/desktop.md`, which 4.2 extended from ten items to twenty-one.
-
-## Stage 5 — Sharing & tiny teams (Month 4–5)
-**Goal: first monetizable surface, without violating local-first.**
-- [ ] `keypaste share` — one-time encrypted secret links (client-side encrypted, self-hostable relay; the relay never sees plaintext)
-- [ ] Multi-vault + vault-per-project ergonomics
-- [ ] Git-friendly vault workflows / conflict guidance (teams sync the .kdbx via their own git/drive)
-- [ ] Optional hosted relay + sync = first paid tier (convenience, not security — CORE law)
-- **Benchmark:** tracked privately, outside this repo.
-
-## Stage 6 — Delegation dashboard (v2, only after traction)
-**Goal: expand Agent Activity into "everything that can act as you."**
-- [ ] Aggregate: keypaste agent grants + MCP server connections + (feasibility-gated) OAuth grant views for GitHub/Google
-- [ ] Revocation center, stale-grant nudges ("this agent hasn't used this in 60 days")
-- [ ] Position: "the control panel for everything that can act as you" — now earned, anchored to a real product
-- **Gate:** only start once the Stage 3 and Stage 5 benchmarks have actually been hit.
+`[process]` — this queue is a ledger, not a gate. A ticked row is a person's word.
 
 ---
 
-## Definition of "focused"
-At any moment you should be able to answer: *which stage am I in, which checkbox is next?* If you can't, stop, open this file, pick the next unchecked box, ignore everything else.
+## Stage 0 — Foundation (done)
+
+- [x] Repo scaffold: core, CLI and MCP packages, CI, AGPL, `SECURITY.md` — D-0001
+- [x] KDBX library chosen and round-tripped: vendored KeePassLib 2.61 — D-0007
+- [x] KeePassXC compatibility gated in CI on all three OSes, permanently — D-0008
+- [x] `keypaste init`, `add`, `get`, `ls`, `rm` — D-0009..D-0012
+- [ ] **Register the org and the package names** — Owner-only, no build lane. See **H-0001**.
+
+## Stage 1 — Env variables and injection (done)
+
+- [x] Env-set convention: KDBX group `env/<project>`, one entry per variable, KeePassXC-editable — D-0014
+- [x] `keypaste env pull` with a fail-closed parser and no "shred" claim — D-0015
+- [x] `keypaste run <project> -- <cmd>` injects into a real child, writes nothing to disk — D-0016
+- [x] `keypaste env export --dotenv`, single-quoted so other readers agree — D-0018
+- [x] `docs/replace-dotenv.md` — the five-minute guide
+
+## Stage 2 — The MCP bridge (done)
+
+- [x] `keypaste-mcp` with `list_entry_names` and `request_credential` — D-0019, D-0022, D-0023
+- [x] Human approval via `keypaste agent`: default deny, 45-second timeout deny — D-0025
+- [x] One field and nothing else, TTL capped by `--max-ttl`, scoped to one connection — D-0026
+- [x] Hash-chained JSONL audit log and `keypaste log verify` — D-0031, D-0032
+- [x] `policy.toml` pre-approvals, fail-closed, keyed on the operator's label — D-0028..D-0030
+- [x] `THREATS.md` T-1..T-20
+- [x] `docs/mcp-setup.md` for Claude Desktop and Claude Code
+- [x] The 60-second demo, held to the binaries by `scripts/verify-demo.sh` — D-0034, D-0035
+
+## Stage 3 — Launch (building)
+
+- [x] Landing page at keypaste.com with the signup form — D-0037
+- [x] Release pipeline: `v0.1.0` on `dl.keypaste.com`, four binaries, checksums, every gate run
+      against the exact bytes uploaded — D-0040, D-0041, D-0043
+- [x] The launch essay, `docs/keepass-and-agents.md`, retitled because the original title was
+      false — D-0038
+
+### 3.1 — The demo GIF [ ]
+
+The README rewrite and the landing page are done. The GIF is the only thing left, and both pages
+already reserve the slot.
+
+- **Build** — "Trim the recorded cast to under 2 MB, render it to `docs/demo/keypaste-demo.gif`,
+  and drop it into the slot `README.md` and `site/public/index.html` already reserve. Nothing else
+  on either page moves."
+- **Owner** — **H-0005**. The take itself: WSL only, a real Claude session, a human keystroke.
+- **Verify** — `V-0001`
+- Traces to `docs/PRODUCT.md` law 5.1, the demo is the marketing.
+
+### 3.2 — The launch posts [ ]
+
+- **Build** — none. The copy is written and lives in `launch.md`.
+- **Owner** — **H-0006**, and it is blocked by **H-0003** and **H-0009**. `launch.md`'s own
+  "Before anything goes out" list is the precondition set; every item on it is false today.
+- **Verify** — `V-0002`
+- Traces to `docs/PRODUCT.md` law 5.3, community before customers.
+
+### 3.3 — Two weeks of answering [ ]
+
+- **Build** — none.
+- **Owner** — **H-0007**.
+- **Verify** — `V-0003` `[process]`
+- Traces to `docs/PRODUCT.md` law 5.3.
+
+## Stage 4 — The desktop app (building)
+
+- [x] Shell and unlock: drag/picker/recent, a master-password control that holds no password,
+      idle auto-lock on two clocks, five-destination sidebar, light and dark — D-0044
+- [x] Entries and env sets: searchable list, detail pane with self-clearing clipboard, inline edit,
+      generated passwords, masked variables with reveal-on-hold, and a test proving the shipped CLI
+      sees a GUI edit at once — D-0045..D-0050
+
+### 4.3 — Agent Activity [ ]
+
+The seed of the delegation dashboard, and the screen the product is named for.
+
+- **Build** — "Build the Agent Activity screen: a live feed of incoming agent requests with
+  Approve/Deny replacing the terminal prompt while the app is open; a history list read from the
+  audit log; per-client summary cards showing name, total requests, last seen and the standing
+  policy rules affecting it, with a revoke/pause toggle that flips a deny-all rule. Everything
+  reads and writes through core. Screenshot-worthy or it is not done."
+- **Owner** — **H-0012** first. The app and `keypaste agent` cannot both own the approver pipe, and
+  nothing decides which does.
+- **Verify** — `V-0004`
+- Traces to `docs/PRODUCT.md` §1, wedge item 4.
+
+### 4.4 — Approval prompts leave the terminal [ ]
+
+- **Build** — "Move the approval prompt from the terminal to a native window or tray notification,
+  keeping `keypaste agent`'s terminal channel working for headless use. Default deny, timeout deny
+  and every error path deny must hold identically on both channels."
+- **Owner** — none beyond **H-0012**.
+- **Verify** — `V-0005`
+- Traces to `docs/PRODUCT.md` law 3.2 and law 3.7.
+
+---
+
+## What is no longer a step
+
+Sharing, the hosted tier, the delegation dashboard and teams were Stages 5, 6 and 7. None of them
+has an accept criterion that can fail today, and all of them are gated on benchmarks tracked outside
+this repository — so under the admission rule they are `docs/IDEAS.md` rows, not steps. They come
+back as steps when one of them earns a verifier.
+
+"Design language: modern, calm, trustworthy" left for the same reason: nothing about it can fail.
+
+---
+
+## Definition of focused
+
+You should always be able to answer: which step am I on, and what would prove it done? If you
+cannot, open this file, take the first open step, and read its Verify lane first.
