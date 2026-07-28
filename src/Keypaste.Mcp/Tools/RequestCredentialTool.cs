@@ -79,16 +79,30 @@ internal sealed class RequestCredentialTool(
 
         Verdict verdict;
 
-        try
+        // Checked before anything is decided, but after the arguments have been read, so the line
+        // still records what was asked for. A refusal that does not say what was wanted is a worse
+        // audit record than the request deserves (law 3.3).
+        if (!McpAudit.HandshakeComplete(request))
         {
-            verdict = await DecideAsync(client, entry, field, reason, ttl, cancellationToken).ConfigureAwait(false);
+            verdict = new Verdict(
+                AuditDecision.Denied,
+                AuditMethod.NotInitialized,
+                "the client called a tool before the initialize handshake completed",
+                Refusal: ToolText.NotInitialized);
         }
-        catch (OperationCanceledException)
+        else
         {
-            // The client stopped waiting. It will never read this result, and that is exactly why
-            // the line below still gets written: a request that reached a person, or nearly did,
-            // is an access whether or not anybody collected the answer.
-            verdict = new Verdict(AuditDecision.Denied, AuditMethod.Cancelled, "the client withdrew the request");
+            try
+            {
+                verdict = await DecideAsync(client, entry, field, reason, ttl, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                // The client stopped waiting. It will never read this result, and that is exactly why
+                // the line below still gets written: a request that reached a person, or nearly did,
+                // is an access whether or not anybody collected the answer.
+                verdict = new Verdict(AuditDecision.Denied, AuditMethod.Cancelled, "the client withdrew the request");
+            }
         }
 
         var record = McpAudit.Line(

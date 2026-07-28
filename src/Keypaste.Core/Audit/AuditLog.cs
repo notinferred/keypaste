@@ -643,6 +643,7 @@ public sealed class AuditLog : IDisposable
         AuditMethod.Failed => "failed",
         AuditMethod.Policy => "policy",
         AuditMethod.PolicyLimit => "policy-limit",
+        AuditMethod.NotInitialized => "not-initialized",
         _ => "unknown",
     };
 

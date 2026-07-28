@@ -245,6 +245,19 @@ internal static class ToolText
         _ => ApproverFailed,
     };
 
+    /// <summary>The refusal for a tool call that arrived before the handshake finished.</summary>
+    /// <remarks>
+    /// Says what to do about it, because the likely reader is a client author whose ordering is
+    /// wrong rather than an attacker. Names no vault contents: at this point keypaste has not
+    /// looked at any.
+    /// </remarks>
+    internal const string NotInitialized = """
+        keypaste: DENIED. This tool was called before the initialize handshake completed, so
+        keypaste does not yet know what client is asking. It will not put a request to a person
+        without being able to name the caller. Send initialize, wait for its response, then call
+        the tool again. This call was recorded in the audit log as denied.
+        """;
+
     /// <summary>Why a request was abandoned. Rarely read: the client has already stopped listening.</summary>
     internal const string Cancelled = """
         keypaste: DENIED. The request was withdrawn before anybody answered it, so keypaste denied it
