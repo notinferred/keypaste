@@ -56,7 +56,7 @@
 - [x] **3.3 — Launch checklist runner**
 "Create launch.md with a checklist and tailored copy for each channel: Show HN title+text, r/selfhosted post, r/KeePass post (respectful, KDBX-compat-focused), MCP community/Discord message, X thread, lobste.rs. Each post is written for its audience's culture, links the demo, and asks one genuine question to invite feedback. Include a 14-day follow-up plan: respond to every issue, label good-first-issues, weekly changelog."
 
-- [ ] **3.4 — Release pipeline and the install one-liners** *(land this before 3.3 goes out — strangers arriving from a launch post need something to install)*
+- [~] **3.4 — Release pipeline and the install one-liners** *(land this before 3.3 goes out — strangers arriving from a launch post need something to install)*
 "Resolve O-0006 first: publish `Keypaste.Cli` and `Keypaste.Mcp` with `PublishAot=true` for each target RID and actually run the binaries, because vendored KeePassLib's AOT compatibility has never been tested and `third_party/` has the AOT analyzers disarmed. Then add a tag-triggered release workflow that publishes self-contained single-file binaries for linux-x64, linux-arm64, osx-x64, osx-arm64 and win-x64 to a GitHub Release with checksums. Declaring RuntimeIdentifiers collides with `RestorePackagesWithLockFile` — regenerate the lock files with `--force-evaluate` and keep `--locked-mode` working in CI. Finish by replacing the build-from-source block in README.md and site/public/index.html with real per-OS install one-liners, and verify each one from scratch on that OS before committing it."
 
 ## STAGE 4 — Modern GUI (the KeePass reskin)
