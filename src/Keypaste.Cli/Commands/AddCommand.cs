@@ -17,6 +17,7 @@ internal static class AddCommand
         new("url", TakesValue: true),
         new("notes", TakesValue: true),
         new("group", TakesValue: true),
+        .. GenerateOption.Specs,
     ];
 
     internal static int Execute(string[] args, CliContext context)
@@ -31,7 +32,14 @@ internal static class AddCommand
         {
             context.Stdout.WriteLine(
                 "usage: keypaste add <entry> [--group G] [--username U] [--url X] [--notes N]");
+            context.Stdout.WriteLine($"       {GenerateOption.Usage}");
             return CliApp.ExitSuccess;
+        }
+
+        if (!GenerateOption.TryRead(line, out var recipe, out var recipeError))
+        {
+            context.Stderr.WriteLine($"keypaste add: {recipeError}");
+            return CliApp.ExitUsageError;
         }
 
         if (line.Operands.Count != 1)
@@ -80,8 +88,11 @@ internal static class AddCommand
             var notes = line.Value("notes") ?? Ask(context, "Notes: ");
 
             // The entry password is never a flag: it would land in the shell history and in
-            // /proc/<pid>/cmdline. It is prompted, or read from stdin when piped.
-            using var secret = context.Prompt.ReadSecret("Password: ");
+            // /proc/<pid>/cmdline. It is prompted, read from stdin when piped, or generated.
+            using var secret = recipe is { } wanted
+                ? GenerateOption.Generate(wanted)
+                : context.Prompt.ReadSecret("Password: ");
+
             if (secret is null)
             {
                 context.Stderr.WriteLine("keypaste add: no password given");
@@ -99,7 +110,13 @@ internal static class AddCommand
             });
 
             vault.Save();
-            context.Stderr.WriteLine($"Added {entryPath}");
+
+            // A count, never the value. Somebody who wants it runs `keypaste get`, which already
+            // has the clipboard, the --show discipline and the auto-clear.
+            context.Stderr.WriteLine(recipe is { } generated
+                ? $"Added {entryPath} ({generated.Length}-character password generated)"
+                : $"Added {entryPath}");
+
             return CliApp.ExitSuccess;
         });
     }

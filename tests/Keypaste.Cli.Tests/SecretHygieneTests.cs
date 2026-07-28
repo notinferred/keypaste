@@ -14,6 +14,9 @@ public sealed class SecretHygieneTests
     internal const string SentinelNotes = "SENTINEL-NOTES-c08e";
     internal const string SentinelUrl = "https://example.invalid/SENTINEL-URL-2d55";
 
+    /// <summary>Where <c>env set hygiene GENERATED</c> lands, for reading back with <c>get</c>.</summary>
+    internal const string EnvPath = "env/hygiene/GENERATED";
+
     /// <summary>
     /// Sweeps every verb in every shape that is not <c>--show</c> and asserts no field value
     /// appears anywhere in the output. This is what catches the change that helpfully echoes an
@@ -138,6 +141,46 @@ public sealed class SecretHygieneTests
 
         Assert.DoesNotContain(SentinelPassword, harness.Out, StringComparison.Ordinal);
         Assert.DoesNotContain(SentinelPassword, harness.Err, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A generated value is stored and never printed by the command that made it.
+    /// </summary>
+    /// <remarks>
+    /// The only sweep here that cannot use a sentinel: nothing knows the value until it is read
+    /// back. So the value is learned afterwards, from <c>get --show</c>, and the assertion is made
+    /// against what the generating command had already written. The positive half — that a value of
+    /// the right length exists at all — comes first, because a sweep for a string that was never
+    /// produced passes for a <c>--generate</c> that silently did nothing.
+    /// </remarks>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void AGeneratedValue_IsStored_AndNeverPrintedByTheCommandThatMadeIt(bool entry)
+    {
+        using var harness = new CliHarness();
+        Seed(harness);
+
+        var target = entry ? "generated/target" : EnvPath;
+
+        harness.Prompt.Enqueue(Master);
+        var exit = entry
+            ? harness.Run("add", target, "--generate", "--vault", harness.VaultPath)
+            : harness.Run("env", "set", "hygiene", "GENERATED", "--generate", "--vault", harness.VaultPath);
+
+        Assert.Equal(CliApp.ExitSuccess, exit);
+
+        var whileGenerating = harness.Out + harness.Err;
+        harness.Stdout.GetStringBuilder().Clear();
+        harness.Stderr.GetStringBuilder().Clear();
+
+        harness.Prompt.Enqueue(Master);
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("get", target, "--show", "--vault", harness.VaultPath));
+
+        var value = harness.Out.Trim();
+        Assert.Equal(20, value.Length);
+
+        Assert.DoesNotContain(value, whileGenerating, StringComparison.Ordinal);
     }
 
     /// <summary>
