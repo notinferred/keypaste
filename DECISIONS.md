@@ -2127,6 +2127,15 @@ silently dropped and nothing has been stored - every signup since the deploy has
 role must be swapped before, or in the same sitting as, applying `schema.sql`. Creating the table
 first would put the first real signup somewhere this entry's guarantee does not hold.
 
+**And the posture is worse than "it can read the list", established by walking the role graph on
+2026-07-28.** `pscale_api_yq4xhf9tbm3v` inherits `postgres`, which inherits `pscale_superuser`, and
+that brings `pg_create_subscription`, `pg_signal_backend`, `pg_maintain` and `pg_checkpoint`. Logical
+replication plus write access everywhere is continuous exfiltration of the whole cluster, from a
+credential reachable by a public HTTP endpoint. This does not change what to do - the fix was
+already "swap to a role with INSERT on one table" - but it changes how long it is reasonable to
+leave undone, and it is the argument against ever letting a Hyperdrive config keep whatever role an
+integration wizard hands it.
+
 ## D-0038 - The launch essay was retitled because the title PLAN.md gave it was false
 
 **Date:** 2026-07-27 · **Stage:** 3.2 · **Status:** accepted
