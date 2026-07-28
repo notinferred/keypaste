@@ -50,6 +50,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Keypaste.App.Tests" />
+    <InternalsVisibleTo Include="Keypaste.Consistency.Tests" />
   </ItemGroup>
 
 </Project>
