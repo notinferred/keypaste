@@ -122,8 +122,9 @@ WORK="$(cat "$SCRATCH/last-work")"
 # It claimed to install something. Check that from outside the block, not from inside it.
 # ---------------------------------------------------------------------------
 found=""
+# $SCRATCH/home, not $HOME: the block ran with HOME reassigned, so that is where ~ resolved to.
 for cand in "$WORK/keypaste" "$WORK/keypaste.exe" \
-            /usr/local/bin/keypaste "$HOME/.local/bin/keypaste"; do
+            /usr/local/bin/keypaste "$SCRATCH/home/.local/bin/keypaste"; do
   [ -x "$cand" ] && { found="$cand"; break; }
 done
 [ -n "$found" ] || found="$(command -v keypaste 2>/dev/null || true)"

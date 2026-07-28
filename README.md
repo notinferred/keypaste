@@ -38,13 +38,98 @@ end, in about sixty seconds.
   be trusted on faith.
 
 **Pre-1.0, and it says so.** Everything on this page works today and is tested on all three
-operating systems. There are no prebuilt binaries yet, there is no GUI yet, and the approval prompt
-is a terminal prompt rather than a native dialog. [`PLAN.md`](PLAN.md) is what lands next;
+operating systems. The binaries are unsigned, there is no GUI yet, and the approval prompt is a
+terminal prompt rather than a native dialog. [`PLAN.md`](PLAN.md) is what lands next;
 [`CORE.md`](CORE.md) is the constitution and does not change.
 
 ## Install
 
-There are no prebuilt binaries yet. Building is one command and needs the .NET SDK pinned in
+**Five lines on macOS and Linux, six on Windows, and the checksum line is the reason the others are
+worth typing.** It checks the archive against a hash published beside it and stops if they disagree.
+Each binary is a single native file with no runtime to install — nothing needs .NET on your machine.
+The only thing written outside the directory you run this in is the last line, which puts the two
+binaries somewhere your shell can find them.
+
+### macOS — Apple Silicon
+
+<!-- install:macos -->
+```sh
+curl -fLO https://dl.keypaste.com/v0.1.0/keypaste-0.1.0-osx-arm64.tar.gz
+curl -fLO https://dl.keypaste.com/v0.1.0/keypaste-0.1.0-osx-arm64.tar.gz.sha256
+shasum -a 256 -c keypaste-0.1.0-osx-arm64.tar.gz.sha256
+tar -xzf keypaste-0.1.0-osx-arm64.tar.gz
+mkdir -p ~/.local/bin && mv keypaste keypaste-mcp ~/.local/bin/
+```
+<!-- /install:macos -->
+
+Intel Macs are not covered — build from source below. macOS 26 is the last release that runs on
+them and no runner fleet still offers one, so shipping that slice would have meant publishing a
+binary no gate had ever executed.
+
+### Linux — x64 and arm64
+
+<!-- install:linux -->
+```sh
+curl -fLO https://dl.keypaste.com/v0.1.0/keypaste-0.1.0-linux-x64.tar.gz
+curl -fLO https://dl.keypaste.com/v0.1.0/keypaste-0.1.0-linux-x64.tar.gz.sha256
+sha256sum -c keypaste-0.1.0-linux-x64.tar.gz.sha256
+tar -xzf keypaste-0.1.0-linux-x64.tar.gz
+mkdir -p ~/.local/bin && mv keypaste keypaste-mcp ~/.local/bin/
+```
+<!-- /install:linux -->
+
+For arm64, substitute `linux-arm64` in all three filenames. Both are built against glibc 2.35, which
+is checked on a clean Debian 12 container on every release; Alpine and other musl distributions are
+checked to *fail* there rather than assumed to, so the gap is measured. Build from source on musl.
+
+### Windows — x64
+
+<!-- install:windows -->
+```powershell
+$a = "keypaste-0.1.0-win-x64.zip"
+Invoke-WebRequest -OutFile $a "https://dl.keypaste.com/v0.1.0/$a"
+Invoke-WebRequest -OutFile "$a.sha256" "https://dl.keypaste.com/v0.1.0/$a.sha256"
+$want = (Get-Content "$a.sha256" -Raw).Split()[0]
+if ((Get-FileHash $a -Algorithm SHA256).Hash -ne $want) { throw "checksum mismatch" }
+Expand-Archive $a -DestinationPath .
+```
+<!-- /install:windows -->
+
+The Windows block stops after extracting rather than moving the binaries anywhere, because Windows
+has no per-user `bin` directory that is already on `PATH` the way `~/.local/bin` is on Unix. Put
+`keypaste.exe` wherever you keep such things and add that directory to `PATH` yourself. On macOS and
+Linux, `~/.local/bin` may also not be on your `PATH` — check with `command -v keypaste`.
+
+Note the absolute path of `keypaste-mcp` either way, because that is what an MCP client needs; it is
+not something you run yourself.
+
+### What the checksum does and does not prove
+
+**It proves the bytes arrived intact. It does not prove who made them.** The checksum is served from
+the same origin as the archive, so anyone able to replace one can replace both — it defeats a
+corrupted download and a network attacker in transit, and it does not defeat a compromised bucket.
+This is the same limitation [`DECISIONS.md`](DECISIONS.md) records about KeePassXC's own `.DIGEST`
+file, and saying otherwise would be the more comfortable lie. The binaries are also **unsigned and
+un-notarized**, so nothing ties them to this project rather than to whoever served them.
+[`THREATS.md`](THREATS.md) T-21 is the honest version of what you are trusting when you download
+instead of build, and `SECURITY.md` has the verification steps in one place.
+
+There is deliberately no `curl | sh`. It asks you to execute code you have not read, from an origin
+that is not this repository, in a form where the server can serve one thing to `curl` and another to
+a browser. A tool that handles secrets should not open by asking for that.
+
+macOS quarantine: a browser download sets `com.apple.quarantine` and a `tar` extraction does not, so
+these commands should not hit it. On the release runner, setting the attribute deliberately and
+running the binary anyway **worked** — but that is one machine's observation, not a guarantee. If
+your Mac blocks it, `xattr -d com.apple.quarantine ~/.local/bin/keypaste` is the fix, and being told
+to strip a security attribute is a real cost of shipping unsigned binaries rather than a quirk.
+
+### Or build it from source
+
+**This is strictly stronger than downloading, and it stays here permanently for that reason.** The
+argument the rest of this page makes — four dependencies, nothing opening a socket, a decision order
+you can read — is an argument about source you can check. A prebuilt binary is a claim that it was
+compiled faithfully, and you did not watch it happen. Building needs the .NET SDK pinned in
 [`global.json`](global.json).
 
 ```sh
@@ -54,9 +139,8 @@ dotnet build keypaste.slnx -c Release
 ```
 
 `keypaste` lands at `artifacts/bin/Keypaste.Cli/release/` and `keypaste-mcp` at
-`artifacts/bin/Keypaste.Mcp/release/` (`.exe` on Windows). Put the first on your `PATH`; note the
-absolute path of the second, because that is what an MCP client needs. Single-file binaries for
-macOS, Linux and Windows are the next thing after this page.
+`artifacts/bin/Keypaste.Mcp/release/` (`.exe` on Windows). This is also the only supported route on
+Intel Macs, on musl distributions such as Alpine, and on Windows on ARM.
 
 ## Sixty seconds to a project with no `.env` in it
 
@@ -371,7 +455,52 @@ dotnet run --project src/Keypaste.Cli
 Warnings are errors, code style is enforced at build time, and every dependency is pinned by
 `packages.lock.json`. Adding a package is therefore a two-step: declare it in
 `Directory.Packages.props` and the project, then `dotnet restore --force-evaluate` and commit the
-regenerated lock files.
+regenerated lock files. **The same applies to the `RuntimeIdentifiers` list**, which is a
+restore-time input too: changing it changes the restore graph, and a lock file that has not been
+regenerated fails `--locked-mode` with NU1004.
+
+**Never pass `-r` to a restore.** It narrows the project's runtime identifier set to the single RID
+you named, which can never match a lock file recording four, so locked mode fails — and the failure
+reads like a stale lock file rather than like the flag being wrong. The projects declare all four
+RIDs and `PublishAot=true` is committed, so a plain `dotnet restore --locked-mode` is already
+correct for every target. Only `dotnet publish` takes `-r`.
+
+### Building a native binary yourself
+
+Cross-OS NativeAOT is not supported, so each platform's binary is built on that platform. What the
+compiler needs, per O-0005, is `clang` and `zlib1g-dev` on Linux, the Xcode command line tools on
+macOS, and the MSVC C++ build tools on Windows — and on Windows, `vswhere.exe` has to be findable,
+which is the part that fails confusingly when the toolchain is installed but the build claims it is
+not.
+
+```sh
+dotnet restore keypaste.slnx --locked-mode
+dotnet publish src/Keypaste.Cli -c Release -r linux-x64 --no-restore -o out
+dotnet publish src/Keypaste.Mcp -c Release -r linux-x64 --no-restore -o out
+```
+
+**Restore first, then publish with `--no-restore`, and the order is not stylistic.** `dotnet publish`
+restores implicitly, and an implicit restore inherits the `-r` — which narrows the RID set to one and
+rewrites `packages.lock.json` to match, leaving you with two modified lock files you did not ask for
+and a `--locked-mode` failure the next time CI sees them. Observed, not theorised. This is the same
+order `release.yml` uses, for the same reason.
+
+The result is a single native file per project with no runtime to install; `PublishAot=true` is
+already committed, so it does not need passing. Substitute `osx-arm64` or `win-x64` for the RID you
+are on. `third_party/` disarms the trim analyzers because vendored source
+is not ours to annotate, so `scripts/verify-aot-trim.sh` re-arms the check the other way: it reads
+the publish logs and diffs their trim diagnostics against a committed baseline, failing on anything
+new and on anything against `src/` at all. Capture the output to run it after a change under
+`third_party/`:
+
+```sh
+dotnet publish src/Keypaste.Cli -c Release -r linux-x64 --no-restore -o out > cli.log 2>&1
+scripts/verify-aot-trim.sh cli.log
+```
+
+Eleven diagnostics are expected, all from vendored code, each one cleared individually in
+[`DECISIONS.md`](DECISIONS.md) D-0040. ILC only re-analyses when its inputs changed, so a repeat
+publish emits none and the script says so rather than reading that as a pass.
 
 `third_party/` is vendored source and is held to different rules — it is re-merged from upstream,
 not formatted or linted to our taste. `third_party/Directory.Build.props` quarantines it, and
