@@ -474,15 +474,33 @@ which is the part that fails confusingly when the toolchain is installed but the
 not.
 
 ```sh
-dotnet publish src/Keypaste.Cli -c Release -r linux-x64 -p:PublishAot=true -o out
-dotnet publish src/Keypaste.Mcp -c Release -r linux-x64 -p:PublishAot=true -o out
+dotnet restore keypaste.slnx --locked-mode
+dotnet publish src/Keypaste.Cli -c Release -r linux-x64 --no-restore -o out
+dotnet publish src/Keypaste.Mcp -c Release -r linux-x64 --no-restore -o out
 ```
 
-The result is a single native file per project with no runtime to install. Substitute `osx-arm64` or
-`win-x64` for the RID you are on. `third_party/` disarms the trim analyzers because vendored source
-is not ours to annotate, so `scripts/verify-aot-trim.sh` re-arms the check the other way: it diffs
-the publish's trim diagnostics against a committed baseline and fails on anything new. Run it after
-any change under `third_party/`.
+**Restore first, then publish with `--no-restore`, and the order is not stylistic.** `dotnet publish`
+restores implicitly, and an implicit restore inherits the `-r` — which narrows the RID set to one and
+rewrites `packages.lock.json` to match, leaving you with two modified lock files you did not ask for
+and a `--locked-mode` failure the next time CI sees them. Observed, not theorised. This is the same
+order `release.yml` uses, for the same reason.
+
+The result is a single native file per project with no runtime to install; `PublishAot=true` is
+already committed, so it does not need passing. Substitute `osx-arm64` or `win-x64` for the RID you
+are on. `third_party/` disarms the trim analyzers because vendored source
+is not ours to annotate, so `scripts/verify-aot-trim.sh` re-arms the check the other way: it reads
+the publish logs and diffs their trim diagnostics against a committed baseline, failing on anything
+new and on anything against `src/` at all. Capture the output to run it after a change under
+`third_party/`:
+
+```sh
+dotnet publish src/Keypaste.Cli -c Release -r linux-x64 --no-restore -o out > cli.log 2>&1
+scripts/verify-aot-trim.sh cli.log
+```
+
+Eleven diagnostics are expected, all from vendored code, each one cleared individually in
+[`DECISIONS.md`](DECISIONS.md) D-0040. ILC only re-analyses when its inputs changed, so a repeat
+publish emits none and the script says so rather than reading that as a pass.
 
 `third_party/` is vendored source and is held to different rules — it is re-merged from upstream,
 not formatted or linted to our taste. `third_party/Directory.Build.props` quarantines it, and
