@@ -32,7 +32,8 @@ permissions:
 
 jobs:
   gate:
-    runs-on: ubuntu-latest
+    # Blacksmith, not a GitHub-hosted runner: GitHub-hosted billing on this account stops jobs starting (D-0042), and a gate that cannot start is worse than no gate because the red looks like a finding.
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v5
         with:
