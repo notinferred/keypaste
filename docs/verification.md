@@ -109,6 +109,22 @@ Not mechanizable: whether a reply was *useful* is a judgement. This verifier is 
 
 ---
 
+## V-0007 — merge is entry-level, and loses nothing
+
+**Falsifier, run first.** Build a vault holding one entry and note its value. Build a second file carrying the **same entry UUID** with a different value and an **older** `LastModificationTime`. Run `keypaste merge`. If the local value changed, the step is **FAIL** and you are finished — taking the incoming side because it is the incoming side is file-order precedence, not a merge, and no other result changes that.
+
+**Then:**
+1. Run the identical merge a second time. It must report no changes and must not produce two entries sharing one UUID. A merge that is not idempotent cannot be used for a re-sent snapshot, which is the only delivery model the product has.
+2. Construct equal timestamps with differing content. The run must exit nonzero, name every conflicting entry, and leave the vault **byte-identical** — check the mtime and the hash, not just the output.
+3. Merge a four-entry file into a forty-entry vault. All forty must survive. If any are gone, absence was read as deletion, and a subset was allowed to speak for the whole.
+4. Take an entry that lost, and recover its superseded value from that entry's KDBX history. If the old value is unrecoverable, the merge destroyed data it reported having merged.
+5. Rename an incoming entry's title but keep its UUID, and merge. It must update the existing entry, not add one. Then do the reverse — same title, different UUID — and confirm it adds rather than overwrites. This pair is what proves the match key is the UUID and not the name.
+6. `bash scripts/verify-keepassxc-compat.sh` must still be green: a vault this command wrote is a vault law 4.6 covers.
+
+**PASS** needs all six. **BLOCKED** if no `keepassxc-cli` is available — the compatibility half cannot be taken on trust.
+
+---
+
 ## What this file does not do
 
 It does not check that a verifier is any *good*. A falsifier that cannot fire passes every reading and proves nothing — `scripts/verify-docs.sh` can confirm a falsifier is present, never that it bites. Watching a new falsifier fire against the current tree, once, before trusting it, is `[process]` and belongs to whoever writes the verifier.
