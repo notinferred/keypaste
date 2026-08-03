@@ -33,7 +33,8 @@ say ""
 say "==> apt"
 sudo apt-get update -qq
 sudo apt-get install -y -qq --no-install-recommends \
-  asciinema tmux gifsicle fonts-jetbrains-mono fontconfig fonts-dejavu-core libicu76
+  asciinema tmux gifsicle fonts-jetbrains-mono fontconfig fonts-dejavu-core libicu76 \
+  clang zlib1g-dev
 
 # Two of those are not obvious and both were found by a green run that had produced nothing usable.
 #
