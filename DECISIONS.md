@@ -1354,3 +1354,17 @@ Nothing about this is hypothetical or novel: it is T-04 with the direction rever
 Three candidate answers. **Refuse to import into `env/` without an explicit flag**, which is loud and cheap and makes the user name the risk once. **Import into a quarantine group and require a deliberate move**, which is stricter and adds a step to the common case. **Sanitise on import and log it**, which is the weakest, because sanitising a title changes what the sender wrote and the recipient never learns that it happened.
 
 Unanswered, and 5.0 must not be built before it is. Whichever is chosen becomes the default, and a default here is the thing nobody revisits.
+
+## O-0022 - The hosted tier is now an intention, and §2 permits exactly one shape of it
+
+**Stage:** 5.2 · Related: H-0014, D-0041, the two open `docs/IDEAS.md` rows
+
+The founder has stated the plan: a hosted service so the product is seamless, free while it can be afforded, freemium if server costs bite. That is no longer the open musing this repository has carried since week one, and it deserves to be recorded as an intention rather than discovered later in a commit.
+
+**It is not, on its face, a violation.** §2 forbids "a cloud service that holds user secrets" and then names its own exception: a zero-knowledge hosted tier, provided self-host stays first-class. Law 5.4 permits selling convenience and forbids selling security. 5.2 is already written to exactly that shape - the server stores an encrypted `.kdbx` blob and client-side keys, and can decrypt nothing.
+
+**The whole question is one bit: can the server read the blob.** If it cannot, this is 5.2 and no law moves. If it can - if a forgotten master password can be recovered, if a web UI decrypts server-side, if support can look at an entry - then it is a different product, law 3.1 is broken, and the trust argument for an unknown founder goes with it. There is no middle setting, and every hosted password manager that has been breached was breached in the half of that bit that keypaste does not have to occupy.
+
+Two consequences worth naming before anyone builds. **Seamless is the word to watch:** the seams users notice - typing a master password, syncing a file themselves - are mostly the places where the design refuses to hold something. And **free changes the threat model even at zero revenue**, because a server holding blobs for strangers is a target in a way a laptop is not, and it is the first keypaste asset that can be attacked while its owner sleeps.
+
+Unanswered. **H-0014** carries it, and 5.2 stays gated until it has a written answer rather than an assumed one.
