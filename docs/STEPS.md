@@ -29,7 +29,7 @@ What only a human can do. **Split in two, because listing them together is why n
 | id | Do this | Next command | Blocks |
 |---|---|---|---|
 | **H-0001** | Register `keypaste`: **GitHub org and npm are free** (checked 2026-08-04, 404 on both); crates.io is settled by D-0053 and needs nothing | github.com/organizations/new, then transfer this repo | 0.4 |
-| **H-0003** | **Answered 2026-08-04: public, before the launch posts.** §3.8 always required it; only the date was open. History scanned clean — 175 commits, no vault, no key, no `.env`. Two identities appear in the log, one a personal address | Settings → Change visibility, after **H-0004** | **3.2** |
+| **H-0003** | **Answered 2026-08-04: public once a release actually works, and not before.** §3.8 always required open source; only the date was ever open, and the date is now "after a release you would defend", not "before the posts". History is already scanned clean — 175 commits, no vault, no key, no `.env`, nothing over 500 KB. **The identity cleanup happens before the flip, not after:** the log carries a personal address beside the GitHub noreply one, and rewriting that is cheap while nobody has cloned and impossible once they have | rewrite author identities, then Settings → Change visibility | **3.2** |
 | **H-0005** | Record the demo GIF — WSL only, a real Claude session, a human keystroke, three to eight takes budgeted | `scripts/demo/install-recording-tools.sh` (needs sudo), then `record-demo.sh` | 3.1 |
 | **H-0006** | Post the launch to the five channels | `launch.md` holds the copy and the preconditions | — |
 | **H-0007** | Answer every issue and comment for two weeks after the launch | — | — |
