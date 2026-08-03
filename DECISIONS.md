@@ -1342,3 +1342,15 @@ It is not done because nothing here has been measured: unlike the Windows format
 `app.yml` publishes on three operating systems and runs `--selftest`, which constructs no window and cannot: a runner has no display. So every claim in this stage about what is *on screen* — that the mask shows dots, that the countdown drains, that holding reveals and releasing conceals, that a paste after a quit comes back empty — rests on the manual checklist in `docs/desktop.md` rather than on a gate. The view models are tested exhaustively; the pixels are not tested at all.
 
 That is stated rather than implied by a green check, which is D-0043's rule. The options are a headless render test comparing images, which is brittle across platforms and font stacks; driving the published binary under a virtual display, which tests one of the three operating systems; or leaving it manual and honest. 4.2 leaves it manual. It should not stay that way through a release, because the checklist is only run by somebody who remembers it exists.
+
+## O-0021 - An imported bundle is untrusted input, and `env/` is what agents can already see
+
+**Stage:** 5.0 · Related: O-0018, D-0019, D-0022, THREATS T-04
+
+`keypaste-mcp` exposes the `env/` subtree by default, and D-0022 sanitises entry titles on the way out because a title is attacker-controlled text that an agent will read as instructions. A bundle arriving from another person is that same text on the *write* path, and the obvious landing zone for a shared env set is `env/<project>` — which is to say, directly into the one subtree an agent can enumerate without anybody widening a glob.
+
+Nothing about this is hypothetical or novel: it is T-04 with the direction reversed, and the sanitising that exists today runs too late to help, because by then the strings are in the vault and the vault is the thing being trusted.
+
+Three candidate answers. **Refuse to import into `env/` without an explicit flag**, which is loud and cheap and makes the user name the risk once. **Import into a quarantine group and require a deliberate move**, which is stricter and adds a step to the common case. **Sanitise on import and log it**, which is the weakest, because sanitising a title changes what the sender wrote and the recipient never learns that it happened.
+
+Unanswered, and 5.0 must not be built before it is. Whichever is chosen becomes the default, and a default here is the thing nobody revisits.

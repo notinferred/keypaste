@@ -11,7 +11,7 @@
 ## Scope
 
 - **Built.** A KDBX4 vault the CLI creates, reads and writes, which KeePassXC opens in both directions. Env sets and `keypaste run` injection. The MCP bridge: scoped request, human approval, TTL, policy pre-approvals, and a hash-chained audit log. `v0.1.0` published as four native binaries. A desktop app that unlocks a vault, browses entries and edits env sets.
-- **Building.** Stage 3's launch, and Stage 4's Agent Activity screen — the one screen that answers "what can act as me right now?"
+- **Building.** Stage 3's launch, Stage 4's Agent Activity screen — the one screen that answers "what can act as me right now?" — and the entry-level merge two machines and one Dropbox folder already need.
 - **Later, and gated.** Stages 5 to 7: sharing, a hosted tier, the delegation dashboard, teams. Their prompts are below with the condition each is gated on. None is a step until it can name a verifier.
 - **Out, deliberately.** `docs/PRODUCT.md` §2 — a new vault format, a cloud service holding secrets, "for everyone", enterprise IAM. That list is locked and is the ratchet.
 
@@ -82,6 +82,15 @@ What only a human can do: decide, register, sign, pay, post, or press a key. Not
 
 - **Build** — "Implement `keypaste env export <project> --dotenv` that writes a .env file only after an explicit interactive confirmation and prints a red warning that plaintext secrets are now on disk. Add `--stdout` variant for piping. Then write docs/replace-dotenv.md: a 5-minute guide taking a developer from an existing .env to `keypaste run`, including CI notes (KEYPASTE_VAULT + a dedicated CI vault, never the personal one) and a FAQ covering 'what if I lose my master password' (honest answer: it's gone — that's the point) and 'how do I sync' (your file, your sync tool)."
 - **Outcome** — spelled `env export`, single-quoted so other .env readers agree. D-0018.
+
+### 1.4 — Entry-level merge [ ]
+
+`docs/PRODUCT.md` §2 makes sync the user's problem — their file, their Dropbox. Two machines syncing one KDBX is how that instruction ends, and keypaste has no answer for the result: the app refuses to save (D-0050) and the CLI does not notice. This is O-0018, and the merge it names is also what any future share would be delivered into.
+
+- **Build** — "Implement `Vault.Merge` in `Keypaste.Core` and `keypaste merge <other.kdbx>` as a thin CLI over it, resolving O-0018. Match entries by **KDBX entry UUID only** — never by title or group path, because title matching is how the wrong secret is silently overwritten. For each incoming entry: absent locally, add it under its own group path; present and identical, no-op; present and differing, the newer `LastModificationTime` wins **and the superseded value is pushed onto that entry's KDBX history**, so nothing is destroyed and the loser is still readable in KeePassXC. Equal timestamps with differing content is a **conflict: name every conflicting entry, write nothing, exit nonzero** (law 3.7). **Deletions never propagate** — an entry absent from the incoming file is not a deletion, because a scoped file is a subset by construction, and reading absence as intent would let a four-entry file empty a vault. Support `--key <path>` and `--key-b64` for a keyfile-protected source, which means wiring `KcpKeyFile` into `KeePassInterop` — that file stays the only one in the repository permitted to reference KeePassLib (D-0007), and whether vendored KeePassLib 2.61's keyfile path round-trips against real `keepassxc-cli` is the first thing to establish, before anything is built on it. Print the plan and require an explicit confirmation before writing, with `--yes` for scripts and `--dry-run` to print and stop. Add `scripts/verify-merge.sh` proving: a merged vault opens in real `keepassxc-cli`; merging the same file twice is a no-op with no duplicate UUIDs; an older incoming entry does not overwrite a newer local one; and the superseded value survives in history. Record the conflict policy and the deletion decision as **D-0052**, and either close O-0018 or state precisely what remains open."
+- **Owner** — none.
+- **Verify** — `V-0007`
+- Traces to `docs/PRODUCT.md` §2 (sync is the user's problem), law 4.3 and law 4.6.
 
 ## Stage 2 — The MCP bridge
 
@@ -179,9 +188,15 @@ The seed of the delegation dashboard, and the screen the product is named for.
 
 None of these is a step. Each is gated on something that has not happened, and none can name an accept criterion that would fail today, so under the admission rule they are `docs/IDEAS.md` rows carrying their prompt here. They become steps by earning a verifier, not by being wanted.
 
-### 5.1 — One-time encrypted share (gated on 3.2 shipping)
+### 5.0 — The share bundle (gated on 1.4, and on this tracing to anything)
 
-"Implement `keypaste share <entry|env-set>`: encrypt the payload client-side with a random key, upload ciphertext to a relay (build a tiny self-hostable relay server in the repo: store blob, one download, then delete, TTL max 24h), and output a link where the decryption key lives only in the URL fragment so the relay can never read it. Add `keypaste share --burn` verification test proving second fetch fails. Document self-hosting the relay in docs/relay.md and be explicit in THREATS.md about what the relay operator can and cannot see."
+**Gated on the trace, not on the build.** The prompt below could be written tomorrow and its accept criterion can fail, but sharing serves no claim in `docs/PRODUCT.md` §1 — it is not the vault, not env injection, not the agent bridge — so §6.2 sends it here and it stays a `docs/IDEAS.md` row until that is answered rather than assumed. **O-0021 must be answered before any of it is built.**
+
+"Implement `keypaste share <entry|env/project>` writing a bundle: a real KDBX4 file containing **only** the named subtree, with every entry's UUID copied from the source vault unchanged, protected by a freshly generated 32-byte keyfile and **no password**. UUID preservation is the whole mechanism — it is what makes a re-sent bundle an update through `keypaste merge` rather than a second copy of everything. Print the keyfile as base64 to stdout once, say plainly that it must travel by a different channel, and never write it beside the bundle. Add a test that looks in the bundle for the title of an entry outside the named subtree and **fails if it is present**; a bundle that carries a neighbouring entry is the entire failure mode of this feature. Write docs/sharing.md saying, without hedging, that a delivered bundle cannot be recalled, that rotating the secret is the only lever, and that the recipient needs neither an account nor keypaste, because `keepassxc --keyfile` opens it."
+
+### 5.1 — One-time encrypted share relay (gated on 3.2 shipping, and on 5.0)
+
+"Build a tiny self-hostable relay in the repo — store blob, one download, then delete, TTL max 24h — and teach `keypaste share` to upload a 5.0 bundle to it, emitting a link whose fragment carries the bundle's keyfile so the relay holds ciphertext it can never read. The relay learns nothing 5.0 did not already decide, because the key never leaves the fragment. Add a `--burn` test proving the second fetch fails. Document self-hosting in docs/relay.md and be explicit in THREATS.md about what the relay operator can and cannot see."
 
 ### 5.2 — Hosted tier groundwork (gated on 5.1, and on the local-first fork being answered)
 
