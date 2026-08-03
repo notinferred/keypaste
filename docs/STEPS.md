@@ -22,26 +22,33 @@
 
 ## Owner Queue
 
-What only a human can do: decide, register, sign, pay, post, or press a key. Nothing below is agent-runnable, and several of them block steps that are otherwise finished.
+What only a human can do. **Split in two, because listing them together is why none of them cleared:** an action needs doing and has a next command; a decision needs choosing and now carries its options and a default. A row phrased as "decide whether X" with no options is a prompt to agonise, not to decide, and this queue spent weeks proving it.
 
-| id | What only you can do | Blocks | Where it came from |
+### Actions — these have a next command, not a question
+
+| id | Do this | Next command | Blocks |
 |---|---|---|---|
-| **H-0001** | Register the `keypaste` GitHub org, and the npm and crates names | 0.4 | open since week 1 |
-| **H-0002** | Trademark check on the name "keypaste" | H-0001 | the LOCKED decisions block |
-| **H-0003** | Decide whether this repository goes public, knowing the decision is irreversible | **3.2** | O-0014 |
-| **H-0004** | Choose DCO or CLA and write `CONTRIBUTING.md` | first outside PR | O-0002 |
-| **H-0005** | Record the demo GIF — WSL only, a real Claude session, a human keystroke, three to eight takes budgeted | 3.1 | `scripts/demo/README.md`, D-0033 |
-| **H-0006** | Post the launch to the five channels | — | `launch.md` holds the copy and the preconditions |
-| **H-0007** | Answer every issue and comment for two weeks after the launch | — | 3.3 |
-| **H-0008** | Decide whether the binaries get signed and notarized, and pay for it if so | trust on first run | O-0010, O-0015, THREATS T-21 |
-| **H-0009** | Settle Windows clipboard history and the `argv` exposure before the audience stops being one person | **3.2** | O-0008, O-0009 |
-| **H-0010** | Run the twenty-one item manual checklist in `docs/desktop.md` — nothing automated has ever seen this app draw | any desktop claim | O-0020 |
-| **H-0011** | Run the pre-deploy checklist in `site/README.md` before any keypaste.com deploy | every deploy | `site/README.md`; D-0037 declined to build a CI job for it |
-| **H-0012** | Answer who owns the approver pipe once the app can approve | **4.3**, 8.2 | O-0017 |
-| **H-0013** | Re-ratify `docs/PRODUCT.md` as v2.0 admitting autofill, or drop autofill | **8.3** | §2 names "for everyone" a permanent wall; autofill traces to no claim in the locked core |
-| **H-0014** | Answer local-first vs a hosted tier — it is now a stated intention, not a musing | **5.2** | O-0022, and the two open `docs/IDEAS.md` rows it sits behind |
+| **H-0001** | Register `keypaste`: **GitHub org and npm are free** (checked 2026-08-04, 404 on both); crates.io is settled by D-0053 and needs nothing | github.com/organizations/new, then transfer this repo | 0.4 |
+| **H-0003** | **Answered 2026-08-04: public, before the launch posts.** §3.8 always required it; only the date was open. History scanned clean — 175 commits, no vault, no key, no `.env`. Two identities appear in the log, one a personal address | Settings → Change visibility, after **H-0004** | **3.2** |
+| **H-0005** | Record the demo GIF — WSL only, a real Claude session, a human keystroke, three to eight takes budgeted | `scripts/demo/install-recording-tools.sh` (needs sudo), then `record-demo.sh` | 3.1 |
+| **H-0006** | Post the launch to the five channels | `launch.md` holds the copy and the preconditions | — |
+| **H-0007** | Answer every issue and comment for two weeks after the launch | — | — |
+| **H-0010** | Run the twenty-one item checklist in `docs/desktop.md` | 4.6 will strike most of it; run what remains | any desktop claim |
+| **H-0011** | Run the pre-deploy checklist in `site/README.md` before any keypaste.com deploy | `site/README.md`; D-0037 declined to gate it | every deploy |
 
-`[process]` — this queue is a ledger, not a gate. A ticked row is a person's word.
+### Decisions — pick one; the default is what happens if you never do
+
+| id | The question | The options | Default if you never choose |
+|---|---|---|---|
+| **H-0002** | Is "keypaste" defensible as a name? | file a mark · rely on common-law use · accept the risk and move on | **accept the risk.** D-0053 already found one live collision; a second would be the signal to revisit |
+| **H-0004** | DCO or CLA, and what does `CONTRIBUTING.md` say? | DCO — one `Signed-off-by` line, no paperwork · CLA — assignment, enables relicensing later, deters casual PRs | **DCO.** AGPL is chosen and staying (D-0041), so the relicensing option a CLA buys has nothing to buy. **Blocks H-0003** |
+| **H-0008** | Do the binaries get signed and notarized? | pay for both · macOS notarization only · neither, and say so on the download page | **neither, said plainly.** Unsigned and honest beats unsigned and quiet; revisit when a stranger's install fails |
+| **H-0009** | Windows clipboard history and the `argv` exposure | fix before launch · document both in THREATS and launch anyway · restrict the affected paths | **document and launch.** O-0008 has a citation and a reproducible defect; the essay's honesty section is where it belongs |
+| **H-0012** | Who owns the approver pipe — terminal, app, or extension? | terminal keeps it, others observe · app takes it when running, terminal is the headless fallback · first to bind wins | **terminal keeps it.** It is what ships today and what the demo records. Blocks **4.3** and **8.2** |
+| **H-0013** | Re-ratify §2 to admit autofill, or drop it? | ratify v2.0 with a dated reason · drop autofill and keep the wall · defer until the wedge has users | **defer.** Nothing forces this before there are users, and the original rejection stands unrefuted. Blocks **8.3** |
+| **H-0014** | Local-first only, or a zero-knowledge hosted tier? | 5.2 as written — server stores blobs it cannot read · no hosted tier at all · a tier that can recover a password, which breaks law 3.1 | **5.2 as written.** It is the only shape §2 permits, and O-0022 shows the whole question is one bit: can the server read the blob |
+
+`[process]` — this queue is a ledger, not a gate. A ticked row is a person's word. **A default is not consent** — it is what the absence of a decision has already chosen on your behalf, written down so it stops being invisible.
 
 ---
 

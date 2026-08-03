@@ -1343,6 +1343,18 @@ It is not done because nothing here has been measured: unlike the Windows format
 
 That is stated rather than implied by a green check, which is D-0043's rule. The options are a headless render test comparing images, which is brittle across platforms and font stacks; driving the published binary under a virtual display, which tests one of the three operating systems; or leaving it manual and honest. 4.2 leaves it manual. It should not stay that way through a release, because the checklist is only run by somebody who remembers it exists.
 
+## D-0053 — crates.io is somebody else's, and keypaste does not need it
+
+**Date:** 2026-08-04 · **Stage:** 0.4 · **Status:** accepted
+
+V-0006's falsifier was run against all three registries on 2026-08-04. `github.com/keypaste` returns 404 and `registry.npmjs.org/keypaste` returns 404 — both free. **`crates.io/crates/keypaste` is taken**: version 0.1.0, MIT, owned by Trivernis (Julius Riegel), described as a tool to paste clipboard contents by simulating keystrokes.
+
+**No crates.io presence is sought, and no adjacent name is reserved there.** keypaste is C#/.NET and ships native AOT binaries from `dl.keypaste.com` (D-0040). Nothing is or will be distributed through cargo, so the registry is not a channel this product loses — it is a channel it was never on. Publishing a `keypaste-cli` stub to plant a flag would mean owning a Rust crate forever to solve a problem nobody has, and would put a second, not-quite-right name into the world to be explained.
+
+**The collision is closer than a name clash usually is**, and that is recorded rather than waved past: a password manager and a keystroke-simulating clipboard tool are adjacent enough that someone could conflate them. The judgement is that a developer searching cargo for a KDBX vault finds the other crate either way, and reserving a nearby name does not change what they find. This is the first live data point for **H-0002**; a second collision on a registry that matters would be the signal to reconsider the name, and moving now would cost the domain, the site, `dl.keypaste.com`, the five pinned pages and every record in this file.
+
+V-0006 accepts this outcome explicitly — hold all three, or record which were unavailable and what the product is called there instead. It is called nothing there.
+
 ## O-0021 - An imported bundle is untrusted input, and `env/` is what agents can already see
 
 **Stage:** 5.0 · Related: O-0018, D-0019, D-0022, THREATS T-04
