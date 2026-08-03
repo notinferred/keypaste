@@ -125,6 +125,60 @@ Not mechanizable: whether a reply was *useful* is a judgement. This verifier is 
 
 ---
 
+## V-0008 — the bench can fail
+
+**Falsifier, run first.** Take any task in `docs/ux.md` and try to write down a result that **fails** it. If you cannot — because the threshold is a word like "fast", a range, an unqualified success ratio, or absent — the step is **FAIL** and you are finished. A bench every possible outcome passes is the checklist item `docs/IDEAS.md` already rejected, wearing a framework's name.
+
+**Then:**
+1. `bash scripts/verify-ux.sh` is green, and you have watched at least one of its three assertions fire by breaking a task on purpose and putting it back.
+2. Engagement and Retention are **struck on the page** with law 3.5 named as the reason. If they are merely absent, the document claims a completeness it does not have.
+3. Every open step in `docs/STEPS.md` that touches a user-visible surface names at least one `T-NN`. An unnamed surface is a surface nobody agreed to measure.
+4. Each task names the method that produces its number. "Time to complete" without saying who is timing what is not a method.
+5. The five-participant ratio is explained on the page as a discovery heuristic and not as statistics.
+
+**PASS** needs all five. Whether anyone has *run* a session is `[process]` and not checked here — an unrun threshold is D-0043's assertion about the world.
+
+## V-0009 — the app draws, and something other than a person can see it
+
+**Falsifier, run first.** Make the masked value control render its characters in plain text — one property — and run the app suite. If it stays green, the renders are not asserting what this step claims and the step is **FAIL**. Put it back, then do the same to the password field's mask. Both must go red, and red on the *secret-path* assertions specifically, not merely on some unrelated golden.
+
+**Then:**
+1. The suite runs with **no display**: no X server, no `DISPLAY`, no virtual framebuffer. If it needs one, O-0020 is not closed, it has moved.
+2. Goldens are compared on Linux only; macOS and Windows run the same renders and assert structurally. A golden diffed across font stacks fails for reasons nobody caused, and a test like that gets disabled within a month.
+3. A deliberately broken render writes its actual output to the CI artifacts. A pixel diff you cannot look at is a failure you will resolve by deleting the test.
+4. A locked window renders no entry titles. Lock, re-render, assert on the bitmap.
+5. `docs/desktop.md` has struck the checklist items this covers and says which of the twenty-one still need a human. If it still lists all twenty-one, either nothing was covered or nobody updated it, and both matter.
+
+**PASS** needs all five and the tolerance for anti-aliasing stated as a number in the test, not chosen per-image until things pass.
+
+## V-0010 — the host holds nothing, and says no when it cannot ask
+
+**Falsifier, run first.** Stop every `keypaste agent` on the machine. Drive the extension's credential request. **If a password prompt appears anywhere — browser, host, terminal — the step is FAIL**, and it is the most serious failure in this file: any program on the machine can draw a convincing prompt, and the whole architecture rests on nothing in the agent path being able to make a real one appear. A hang is also FAIL; the extension must say no agent is running and name the command that starts one.
+
+**Then:**
+1. `git grep -n 'KeePassLib' src/` returns nothing under the host or the extension. The interop boundary is D-0007's rule, and a second file touching the library ends it.
+2. `keypaste browser install` writes the manifest to the documented per-OS path with the extension ID pinned; `keypaste browser uninstall` removes exactly that and leaves any manifest it did not write alone. Plant a foreign manifest beside it and confirm it survives.
+3. One extension build loads in both Chrome and Firefox. Two builds is two extensions, and two extensions drift.
+4. Malformed framing — a truncated length prefix, a length larger than the payload, a payload that is not JSON — is refused and logged, never parsed optimistically.
+5. THREATS.md names the store auto-update channel as a path that reaches users without a git tag, and says what a compromised extension can and cannot reach.
+
+**PASS** needs all five. **BLOCKED** if no browser is installed to load into — a host with nothing on the other end has not been tested.
+
+## V-0011 — one moment, three surfaces, no disagreement
+
+**Falsifier, run first.** On each of the three surfaces in turn — terminal, desktop, extension popup — raise a request and then do nothing at all until the timeout expires. **Any surface resolving to anything other than deny is FAIL.** Then close the popup while a request is live: if that reads as a cancel rather than a denial, that is also **FAIL**. Run this before comparing a single pixel, because a surface that is beautiful and fails open is not a surface with a UX problem.
+
+**Then:**
+1. The fields, their order and their wording match `docs/ux.md` on all three. Diff them literally. A surface that adds a helpful line has added a field nobody specified.
+2. The agent's reason is labelled as the agent's words on all three, and is defanged on all three: send a reason containing newlines, ANSI escapes and an RTL override, and confirm no surface can be made to draw a second prompt or reverse the entry name.
+3. All three meet the same `T-NN` threshold from `docs/ux.md`. If one is twice as slow, that surface fails — the threshold belongs to the moment, not to the renderer.
+4. Headless screenshots of the popup exist for both browsers and are compared the way 4.6 compares the app's.
+5. The default is deny on all three with no agent running, no policy file, and a malformed policy file.
+
+**PASS** needs all five on all three surfaces. Any behaviour that holds on one surface and not another is **FAIL** — law 4.3 forbids a second security path, and three renderings of one moment is exactly where a second one gets built by accident.
+
+---
+
 ## What this file does not do
 
 It does not check that a verifier is any *good*. A falsifier that cannot fire passes every reading and proves nothing — `scripts/verify-docs.sh` can confirm a falsifier is present, never that it bites. Watching a new falsifier fire against the current tree, once, before trusting it, is `[process]` and belongs to whoever writes the verifier.

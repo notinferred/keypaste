@@ -11,7 +11,8 @@
 ## Scope
 
 - **Built.** A KDBX4 vault the CLI creates, reads and writes, which KeePassXC opens in both directions. Env sets and `keypaste run` injection. The MCP bridge: scoped request, human approval, TTL, policy pre-approvals, and a hash-chained audit log. `v0.1.0` published as four native binaries. A desktop app that unlocks a vault, browses entries and edits env sets.
-- **Building.** Stage 3's launch, Stage 4's Agent Activity screen — the one screen that answers "what can act as me right now?" — and the entry-level merge two machines and one Dropbox folder already need.
+- **Building.** Stage 3's launch, Stage 4's Agent Activity screen — the one screen that answers "what can act as me right now?" — the entry-level merge two machines and one Dropbox folder already need, and Stage 8's browser surface.
+- **Measured, not asserted.** Stage 4.5 and 4.6 are the reason the rest of this list can claim anything about a screen: a task bench with thresholds that can fail, and a renderer in CI so a pixel is evidence rather than a memory of having looked.
 - **Later, and gated.** Stages 5 to 7: sharing, a hosted tier, the delegation dashboard, teams. Their prompts are below with the condition each is gated on. None is a step until it can name a verifier.
 - **Out, deliberately.** `docs/PRODUCT.md` §2 — a new vault format, a cloud service holding secrets, "for everyone", enterprise IAM. That list is locked and is the ratchet.
 
@@ -36,7 +37,9 @@ What only a human can do: decide, register, sign, pay, post, or press a key. Not
 | **H-0009** | Settle Windows clipboard history and the `argv` exposure before the audience stops being one person | **3.2** | O-0008, O-0009 |
 | **H-0010** | Run the twenty-one item manual checklist in `docs/desktop.md` — nothing automated has ever seen this app draw | any desktop claim | O-0020 |
 | **H-0011** | Run the pre-deploy checklist in `site/README.md` before any keypaste.com deploy | every deploy | `site/README.md`; D-0037 declined to build a CI job for it |
-| **H-0012** | Answer who owns the approver pipe once the app can approve | **4.3** | O-0017 |
+| **H-0012** | Answer who owns the approver pipe once the app can approve | **4.3**, 8.2 | O-0017 |
+| **H-0013** | Re-ratify `docs/PRODUCT.md` as v2.0 admitting autofill, or drop autofill | **8.3** | §2 names "for everyone" a permanent wall; autofill traces to no claim in the locked core |
+| **H-0014** | Answer local-first vs a hosted tier — it is now a stated intention, not a musing | **5.2** | O-0022, and the two open `docs/IDEAS.md` rows it sits behind |
 
 `[process]` — this queue is a ledger, not a gate. A ticked row is a person's word.
 
@@ -182,6 +185,44 @@ The seed of the delegation dashboard, and the screen the product is named for.
 - **Verify** — `V-0005`
 - Traces to `docs/PRODUCT.md` law 3.2 and law 3.7.
 
+### 4.5 — The UX bench [ ]
+
+`docs/IDEAS.md` already threw out "design language: modern, calm, trustworthy" for the right reason: nothing about it can fail. This is the same ambition rebuilt so that it can.
+
+- **Build** — "Write `docs/ux.md`: keypaste's UX bench, adapted from Google's HEART and its Goals–Signals–Metrics discipline. **Take three of the five dimensions and strike the other two on the page, with the reason.** Task success, Happiness and Adoption are observable; Engagement and Retention require behavioural telemetry, which law 3.5 forbids forever — so they are struck out in the document itself rather than quietly omitted, because a framework silently missing two fifths reads as a framework that was followed. Define every task as `T-NN`, each with: the surface it runs on, the exact words given to the participant, a **numeric threshold that can fail** (time-to-complete and a success ratio out of five), and the method that produces the number. Cover at minimum first unlock, copy a password, inject an env set into a real command, approve an agent request, deny one, and find out afterwards why something was denied. Then write `scripts/verify-ux.sh` asserting that (a) every task in `docs/ux.md` carries a numeric threshold and a named method, (b) every open step in `docs/STEPS.md` that touches a user-visible surface names at least one `T-NN`, and (c) no task's threshold is written as a range or a word — 'fast' is not a threshold. Nielsen's five-participant finding is why the ratio is out of five; say so on the page so the number is not mistaken for statistics."
+- **Owner** — running the sessions is `[process]`. A threshold nobody has measured against a human is an assertion, exactly as D-0043 says.
+- **Verify** — `V-0008`
+- Traces to `docs/PRODUCT.md` law 5.1 — the demo is the marketing, and a demo nobody can complete in sixty seconds is a claim rather than a demo.
+
+### 4.6 — The app draws in CI [ ]
+
+Closes O-0020. Everything Stage 4 and Stage 8 claim about a screen rests on this existing first.
+
+- **Build** — "Resolve O-0020. Add `Avalonia.Headless` with the Skia backend to `tests/Keypaste.App.Tests` so views render to a bitmap with **no display of any kind**, and assert on the pixels. Golden images are generated and compared on **Linux only** — font stacks and subpixel rendering differ per platform, so cross-platform pixel equality is a test that fails for reasons nobody caused; on macOS and Windows run the same renders and assert structurally (element bounds, visibility, computed colours) instead. **The assertions that matter are secret-path assertions, and they come first:** the password field renders as dots and never as characters; a masked env value renders as dots until held; releasing a hold returns it to dots within one frame; and a locked window renders no entry titles at all. Then the rest: the unlock empty state, both themes, the clipboard countdown mid-drain, and every screen at a narrow and a wide window. Store goldens under `tests/Keypaste.App.Tests/golden/`, fail on any diff above a stated anti-aliasing tolerance, and write the failing render to the CI artifacts so a red build can be looked at rather than guessed at. Add the job to `app.yml`, not `ci.yml` — the app already has its own workflow and its own solution so that backend work does not pay to build it. Update `docs/desktop.md` to strike the checklist items this now covers, and state plainly which of the twenty-one still need a human."
+- **Owner** — none.
+- **Verify** — `V-0009`
+- Traces to `docs/PRODUCT.md` law 4.5 — tests on the secret path are mandatory, and in a GUI the screen *is* a secret path: nothing else can prove a value the user did not ask to reveal was never drawn.
+
+## Stage 8 — The browser
+
+Numbered clear of 5 through 7 deliberately: those are gated on launch and revenue, and this is not. The browser is where agents increasingly live, and `docs/keepass-and-agents.md` already argues that the KDBX ecosystem answered "another program wants a credential" once before, with a local pipe and a Confirm Access dialog.
+
+### 8.1 — Native messaging host [ ]
+
+- **Build** — "Build `keypaste-browser-host`: a native-messaging host speaking Chrome's 32-bit-length-prefixed JSON framing over stdio, and an extension skeleton that loads in both Chrome (MV3 service worker) and Firefox (MV3 with an event page, since Firefox's MV3 differs and a single build must load in both or the story is two extensions). **The host holds no vault and decides nothing** — it relays to a running `keypaste agent` over the same local channel `keypaste-mcp` already uses, preserving the D-0023 split exactly: the only process that ever sees a master password is the one the human started. Add `keypaste browser install [--chrome] [--firefox] [--edge]` writing the native-messaging manifest to the correct per-OS location (registry keys on Windows, `NativeMessagingHosts/` on macOS and Linux) with the extension ID pinned, and `keypaste browser uninstall` removing exactly what it wrote and nothing else. **Fail closed and legibly:** no agent running means the extension says so and offers the command to start one — never a password prompt, never a silent retry, because a convincing prompt is what any program on the machine can already draw. Extend THREATS.md with the new surface: a store's auto-update channel can push code to users without a git tag, which is the first time that has been true of anything keypaste ships; state what is and is not signed, and what a compromised extension can and cannot reach given the host holds no vault."
+- **Owner** — registering on the Chrome Web Store and on AMO, and whatever identity each demands. Extension IDs must exist before the manifest can pin them.
+- **Verify** — `V-0010`
+- Traces to `docs/PRODUCT.md` §1 wedge item 3, law 3.1 and law 3.7.
+
+### 8.2 — The approval moment, one spec, three surfaces [ ]
+
+The signature moment, rendered the same everywhere it appears.
+
+- **Build** — "Write the approval moment once in `docs/ux.md` — the fields, their order, the wording, the defaults, the timeout — and make the terminal prompt, the desktop Agent Activity screen and the browser extension popup all render *that*, with no surface inventing a field or a default of its own. Then build the popup: who is asking, which entry, which field, for how long, and the agent's stated reason **rendered as untrusted text and labelled as the agent's words**, with newlines and terminal escapes and RTL overrides all defanged. Default deny; closing the popup is a denial, not a cancel; the 45-second timeout is a denial and the countdown is visible. Add a task to `docs/ux.md` and hold all three surfaces to the **same** `T-NN` threshold — if approving takes twice as long in one of them, that is a failure of that surface and not a property of it. Screenshot-test the popup in headless Chrome and headless Firefox the way 4.6 does the app."
+- **Owner** — **H-0012**. Three surfaces cannot all own the approver pipe, and O-0017 already could not decide between two.
+- **Verify** — `V-0011`
+- Traces to `docs/PRODUCT.md` law 3.2, law 3.7 and law 4.3 — one core, no second security path.
+
 ---
 
 ## Gated — the prompts are written, the steps are not open
@@ -221,6 +262,12 @@ Do not start any of these until Stage 3 has shipped and Stage 5 has paying users
 **7.3 — Team identity and SSO, service-account auth only, never on the vault path.** "Add team accounts with SSO (OIDC) for the HOSTED SERVICE — and draw the invariant in blood: SSO authenticates who may PULL a wrapped-key envelope, reach the broker, or view the dashboard. It NEVER gates vault decryption and is NEVER on the secret path. Your IdP being compromised must not equal any vault being readable (law 3.1). Implement OIDC login, map members to their key-wrapping identity from 7.1/7.2, and SCIM (or a manual deprovision) that, on removing a person, AUTOMATICALLY triggers 7.1 re-wrap/rotation and 7.2 broker revocation — deprovisioning that leaves access behind is theatre. Tests: SSO cannot decrypt anything; a deprovisioned user loses both pull and broker access and rotation is triggered; a broken IdP fails closed (law 3.7)."
 
 **7.4 — Team delegation dashboard.** "Extend the Stage 6 Delegation Center from 'everything that can act as ME' to 'everything that can act as anyone on the TEAM': unify per-member agent grants, standing policy rules, shared-set membership (7.1) and live broker grants (7.2) into one view an owner reads at a glance and revokes from in one click. Gated exactly like Stage 6: build it only if Stage 5 revenue and the benchmarks were actually met; otherwise it goes back to docs/IDEAS.md. Screenshot-worthy or it isn't done (law 5.1)."
+
+### 8.3 — Autofill (gated on H-0013, and on nothing else)
+
+**This is the one the locked core does not permit today.** `docs/PRODUCT.md` §2 makes "for everyone" a permanent wall, and autofill is the feature that defines the consumer category — it traces to no claim in §1, so under the admission rule it cannot be a step no matter how much it is wanted. `docs/IDEAS.md` rejected it once already, on effort and on incumbents, and neither of those reasons has been refuted by anything since. It sits here, fully written, so that the day §2 is deliberately re-ratified the work is ready and nobody has to re-derive it — and so that until that day, nobody can start it by accident.
+
+"Implement credential autofill in the Stage 8 extension, KeePassXC-parity and no further. **Match on the registrable domain via the Public Suffix List, never on a substring of the URL** — `evil.com/paypal.com` is the entire history of autofill vulnerabilities in one string, and a phishing page that fills is worse than no autofill at all. On a match, show the Confirm Access dialog first: which page, which entry, and Remember offered as an option and never assumed — that dialog is the ecosystem's existing answer and 8.2's spec already describes it. Fill the form fields directly; **never place a credential on the clipboard as a fallback**, because the clipboard is a global read for every process on the machine and D-0046 exists precisely because Windows would otherwise record it. No password capture on submit and no vault writes from the extension in this step: reading is one threat model and writing from inside a page's process is another. Iframes are refused unless same-origin with the top document. Add the phishing-domain cases as tests before the happy path, since the happy path is the one that gets manually checked and the malicious one is not. Then update the comparison table in README.md, because a keypaste with autofill is answering a different question than the one that table currently asks."
 
 ---
 
