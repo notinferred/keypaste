@@ -97,14 +97,29 @@ fi
 # A WSL-native install with its own credentials. The Windows one cannot be used: see
 # refuse_outside_wsl in demo-env.sh, and D-0033.
 say "==> Claude Code"
-# shellcheck disable=SC1090
-[ -s "$HOME/.nvm/nvm.sh" ] && . "$HOME/.nvm/nvm.sh" && nvm use --lts >/dev/null 2>&1 || true
+# The npm route was wrong twice over, and both failures were silent.
+#
+# `command -v npm` finds the WINDOWS npm through WSL's PATH interop, so `npm install -g` installed
+# into AppData\Roaming\npm. The manifest below then asked `claude --version`, the Windows binary
+# answered 2.1.220, and the script exited 0 having installed nothing usable. record-demo.sh caught
+# it one step later, which is the only reason it was caught at all. The package also requires
+# node >= 22 and Debian trixie ships 20, and npm resolved its bin to `claude.exe`.
+#
+# The native installer needs no node and no npm, so neither can be borrowed from the wrong OS.
+curl -fsSL https://claude.ai/install.sh | bash >/dev/null 2>&1 \
+  || die "the Claude Code installer failed. A 'could not resolve downloads.claude.ai' here is WSL's resolver rather than the installer; retry once before investigating."
 
-if command -v npm >/dev/null 2>&1; then
-  npm install -g @anthropic-ai/claude-code || die "npm could not install Claude Code"
-else
-  die "no npm on PATH. Install node (nvm is the easy route), then run this again."
-fi
+export PATH="$HOME/.local/bin:$PATH"
+grep -q 'HOME/.local/bin' "$HOME/.bashrc" 2>/dev/null \
+  || echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
+
+# Asserted here because it is the identical check record-demo.sh makes one script later, where
+# finding out costs a take. agg lives in the same directory, so this PATH line carries both.
+claude_path="$(command -v claude || true)"
+case "$claude_path" in
+  "")     die "Claude Code installed but nothing named claude is on PATH." ;;
+  /mnt/*) die "claude resolves to the Windows install at ${claude_path}. A Windows Claude spawns a Windows keypaste-mcp, which cannot reach a Linux approver - see D-0033." ;;
+esac
 
 # ------------------------------------------------------------------------------------- manifest
 # Printed so it can be pasted beside the recording. A re-record on different versions is a
@@ -127,7 +142,7 @@ esac
 fc-match "JetBrains Mono" 2>/dev/null | grep -qi jetbrainsmono \
   || die "fontconfig cannot resolve JetBrains Mono. render-demo-gif.sh asks agg for it by name, so every take would render in agg's built-in face and nothing would say so."
 
-printf '    claude     %s\n' "$(claude --version 2>&1 | head -1 || echo 'not on PATH yet - open a new shell')"
+printf '    claude     %s  (%s)\n' "$(claude --version 2>&1 | head -1)" "$claude_path"
 say ""
 say "One manual step is left, and it must happen before the first take:"
 say ""
