@@ -33,7 +33,18 @@ say ""
 say "==> apt"
 sudo apt-get update -qq
 sudo apt-get install -y -qq --no-install-recommends \
-  asciinema tmux gifsicle fonts-jetbrains-mono
+  asciinema tmux gifsicle fonts-jetbrains-mono fontconfig fonts-dejavu-core libicu76
+
+# Two of those are not obvious and both were found by a green run that had produced nothing usable.
+#
+# libicu is a hard runtime dependency of the .NET SDK, and `dotnet-install.sh` says in its own
+# output that it does not resolve dependencies. Without it every dotnet invocation dies with
+# "Couldn't find a valid ICU package", which build-demo-binaries.sh then hits, not this script.
+#
+# fontconfig is how agg resolves render-demo-gif.sh's --text-font-family by name. The font package
+# alone puts the .ttf files on disk with nothing able to find them, so agg falls back to its built-in
+# face and the GIF renders in the wrong typeface - silently, and only visible in the finished asset.
+# fonts-dejavu-core is the second name in that fallback list and was equally absent.
 
 have_major=$(asciinema --version 2>&1 | grep -oE '[0-9]+' | head -1 || echo 0)
 [ "$have_major" = "$ASCIINEMA_MAJOR" ] \
@@ -102,7 +113,19 @@ say "==> versions, for the record"
 printf '    asciinema  %s\n' "$(asciinema --version 2>&1 | head -1)"
 printf '    agg        %s\n' "$("$HOME/.local/bin/agg" --version 2>&1 | head -1)"
 printf '    tmux       %s\n' "$(tmux -V)"
-printf '    dotnet     %s\n' "$("$HOME/.dotnet/dotnet" --version 2>&1 | head -1)"
+
+# Asserted, not printed. This block reported "dotnet  Process terminated." and exited 0, which is
+# D-0043's failure exactly: it had the shape of a check and was a label. A manifest that cannot
+# contradict the run it describes is decoration, and the cost lands two scripts later.
+dotnet_version=$("$HOME/.dotnet/dotnet" --version 2>&1 | head -1) || true
+case "$dotnet_version" in
+  [0-9]*) printf '    dotnet     %s\n' "$dotnet_version" ;;
+  *) die "the .NET SDK does not run: ${dotnet_version}. On a minimal Debian that is a missing libicu, which the apt line above now installs; dotnet-install.sh says in its own output that it resolves no dependencies." ;;
+esac
+
+fc-match "JetBrains Mono" 2>/dev/null | grep -qi jetbrainsmono \
+  || die "fontconfig cannot resolve JetBrains Mono. render-demo-gif.sh asks agg for it by name, so every take would render in agg's built-in face and nothing would say so."
+
 printf '    claude     %s\n' "$(claude --version 2>&1 | head -1 || echo 'not on PATH yet - open a new shell')"
 say ""
 say "One manual step is left, and it must happen before the first take:"
