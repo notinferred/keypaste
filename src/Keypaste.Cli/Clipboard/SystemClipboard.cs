@@ -9,9 +9,16 @@ namespace Keypaste.Cli.Clipboard;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Shelling out rather than P/Invoke: there is no clipboard in the BCL, three native APIs would
-/// mean three <c>DllImport</c> surfaces for the trim and AOT analyzers to argue with
-/// (DECISIONS.md D-0005), and a user debugging a problem can reproduce a subprocess by hand.
+/// Shelling out rather than P/Invoke, on macOS and Linux: there is no clipboard in the BCL, native
+/// APIs mean surfaces for the trim and AOT analyzers to argue with (DECISIONS.md D-0005), and a
+/// user debugging a problem can reproduce a subprocess by hand.
+/// </para>
+/// <para>
+/// <b>Windows writing is the exception, and D-0056 is why.</b> <c>clip.exe</c> cannot express the
+/// formats that opt a value out of Clipboard History and Cloud Clipboard, so on Windows the
+/// trade was never subprocess-versus-P/Invoke — it was P/Invoke versus leaving the password in
+/// Win+V after the twenty seconds are up. Writing and clearing go through
+/// <see cref="WindowsClipboardWriter"/>; reading still shells out, because reading leaks nothing.
 /// </para>
 /// <para>
 /// <b>The secret is written to the tool's stdin, never passed as an argument.</b>
@@ -31,11 +38,20 @@ internal sealed class SystemClipboard : IClipboard
 
     private readonly IProcessRunner _runner;
     private readonly IEnvironmentProbe _environment;
+    private readonly WindowsClipboardWriter? _windows;
 
-    internal SystemClipboard(IProcessRunner runner, IEnvironmentProbe environment)
+    internal SystemClipboard(
+        IProcessRunner runner,
+        IEnvironmentProbe environment,
+        WindowsClipboardWriter? windows = null)
     {
         _runner = runner;
         _environment = environment;
+
+        // Constructed only on Windows: Win32Clipboard is [SupportedOSPlatform("windows")] and
+        // building one anywhere else is what the platform analyzer exists to catch.
+        _windows = windows
+            ?? (OperatingSystem.IsWindows() ? new WindowsClipboardWriter(new Win32Clipboard()) : null);
     }
 
     /// <inheritdoc/>
@@ -108,17 +124,33 @@ internal sealed class SystemClipboard : IClipboard
             return Complete(read, ref output, ref error, "powershell.exe");
         }
 
-        // clip.exe reads its stdin as UTF-16LE and mojibakes anything else. The BOM is
-        // suppressed because clip.exe would otherwise place a leading U+FEFF on the clipboard
-        // for the user to paste.
-        var result = _runner.Run(
-            Path.Combine(system, "clip.exe"),
-            [],
-            stdin ?? string.Empty,
-            new UnicodeEncoding(bigEndian: false, byteOrderMark: false),
-            _timeout);
+        // Writing goes native. clip.exe cannot set the opt-out formats at all, so a value it
+        // copied stays in Clipboard History and in Cloud Clipboard after the auto-clear has
+        // run — the clear looks like it worked and the password is still in Win+V (D-0056).
+        if (_windows is null)
+        {
+            error = "no Windows clipboard writer";
+            return ClipboardStatus.Failed;
+        }
 
-        return Complete(result, ref output, ref error, "clip.exe");
+        bool ok;
+        string writeError;
+        if (action == ClipboardAction.Clear)
+        {
+            ok = _windows.TryClear(out writeError);
+        }
+        else
+        {
+            ok = _windows.TrySet(stdin ?? string.Empty, out writeError);
+        }
+
+        if (!ok)
+        {
+            error = writeError;
+            return ClipboardStatus.Failed;
+        }
+
+        return ClipboardStatus.Ok;
     }
 
     private ClipboardStatus RunMacOs(
