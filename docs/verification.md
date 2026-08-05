@@ -192,16 +192,17 @@ Not mechanizable: whether a reply was *useful* is a judgement. This verifier is 
 
 ## V-0013 — the pages do not claim more than the formats deliver
 
-**Falsifier, run first.** Search `SECURITY.md`, `README.md`, `docs/demo.md` and `site/public/index.html` for any sentence that says the clipboard is cleared, safe, or private without naming what still reads it. **One such sentence is FAIL.** This verifier exists because the failure it looks for is invisible: 1.5a going wrong leaves a password in Win+V where anyone can see it, while this one going wrong just reads as reassurance, and nothing turns red.
+**Falsifier, run first.** Grep **all six** of `SECURITY.md`, `THREATS.md`, `launch.md`, `README.md`, `docs/demo.md` and `site/public/index.html` for `O-0008`, `clip.exe` and `clipboard history`. **Any sentence still saying the gap is open, unresolved, or CLI-only is FAIL**, as is any sentence calling the clipboard cleared, safe or private without naming what still reads it. Six files, not four: `THREATS.md` T-19 and `launch.md` both carried the claim and an earlier draft of this verifier could not see either, which would have produced a PASS over a page telling readers to turn Clipboard History off.
 
 **Then:**
-1. `SECURITY.md` says the first-party Clipboard History and Cloud Clipboard are closed on **both** front ends. If it still describes the gap as open for the CLI, it is describing a version that no longer ships.
-2. It names what is *not* covered, in this order of likelihood: third-party clipboard managers, which each decide independently and mostly do not honour the formats, and RDP or Citrix or VDI redirection, which hands the value to a peer machine keypaste cannot reach.
-3. It says the formats are a request to well-behaved consumers rather than an enforcement boundary. A reader who finishes the paragraph believing Windows *prevents* other programs reading the clipboard has been misled by a true sentence.
-4. No other page contradicts it. Grep all four; a corrected `SECURITY.md` beside a stale README is worse than neither, because the two together read as one of them being current.
-5. Every claim traces to something checkable — the formats to O-0008's source reading, the closure to `V-0012`. D-0036 allows only what a gate or a citation can hold.
+1. `SECURITY.md` says first-party Clipboard History and Cloud Clipboard are closed on **both** front ends. If it still describes a divergence between the app and the CLI, it is describing a version that no longer ships.
+2. Every page naming the residual names the same one, in this order: third-party clipboard managers, which decide independently and mostly ignore the formats, then RDP or Citrix or VDI redirection, which hands the value to a peer machine keypaste cannot reach.
+3. Each says the formats are a request to well-behaved consumers rather than an enforcement boundary. A reader who finishes the paragraph believing Windows *prevents* other programs reading the clipboard has been misled by a true sentence.
+4. `THREATS.md` T-19 no longer recommends `keypaste get --show` or turning Clipboard History off as a mitigation for this, and its **Proved by** names the tests that actually hold the claim rather than only the two older `VerbTests`.
+5. No page contradicts another. A corrected `SECURITY.md` beside a stale `launch.md` is worse than neither, because together they read as one of them being current and the reader cannot tell which.
+6. Nothing claims the end-to-end result. The unit tests prove the formats are registered and set in one session; only `V-0012`'s falsifier proves a password is absent from Win+V. Until that has run, a page saying it has been checked on a real machine is asserting something nobody observed — which is the D-0043 failure exactly.
 
-**PASS** needs the falsifier clean and all five. This one is checkable anywhere, unlike `V-0012` — it is a reading task, not a Windows task.
+**PASS** needs the falsifier clean and all six. Unlike `V-0012` this is checkable anywhere: it is a reading task, not a Windows task.
 
 ---
 
