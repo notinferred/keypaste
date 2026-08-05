@@ -1169,15 +1169,13 @@ Two things follow and both belong in the answer. The install story on `dl.keypas
 
 **Stage:** 4.1, to be answered in 4.3 · Related: D-0023, D-0024
 
-`keypaste agent` binds `keypaste-agent-<user>` at startup, and `ApproverListener` fails to bind a name somebody already holds. Stage 4.1 therefore does not bind it at all: the app probes, reports one true sentence, and disconnects.
-
-4.3's prompt says the Agent Activity screen replaces the OS dialog "when the app is open", which means two processes will want the same name. The options are a hand-off protocol, the app taking the pipe and the agent stepping aside, or the agent staying the only approver and the app observing through some other channel. Whichever is chosen, the property that must survive is the one D-0023 was written to protect: the master password is typed somewhere a person chose to open, never in a window an agent caused to appear. A design where the losing process fails silently is not acceptable, because a silently missing approver denies every request — which is the fail-closed direction, but is indistinguishable to the user from the product being broken.
+**Answered by D-0054: the agent owns the pipe and the app is a client of it.** There is no hand-off and no losing process, so the silent-denial failure this record warned about has no way to occur. 4.3 builds the UI-client channel the answer requires.
 
 ## O-0002 — Contribution terms: DCO or CLA
 
-Undecided, and it must be decided before the repository accepts its first outside pull request. docs/IDEAS.md notes "clean IP, CLA or DCO from day one". A DCO is lighter and better received in open-source communities; a CLA preserves relicensing freedom. Pick one and add `CONTRIBUTING.md`.
+**Answered by D-0055: DCO.** Relicensing freedom is the only thing a CLA would have bought, and AGPL-3.0 is chosen and staying (D-0041), so there was nothing to buy. `CONTRIBUTING.md` carries the one `Signed-off-by` line and asks nothing else.
 
-The original O-0001 — "AGPL-3.0 vs the KDBX library licence, must resolve in Stage 0.2" — was removed rather than answered: its premise that KeePassLib is GPL-2.0-only was factually wrong. See D-0007. Relicensing freedom therefore matters less than it appeared to, but it is still cheap only while there is a single copyright holder, which keeps this entry urgent.
+The original O-0001 — "AGPL-3.0 vs the KDBX library licence, must resolve in Stage 0.2" — was removed rather than answered: its premise that KeePassLib is GPL-2.0-only was factually wrong. See D-0007.
 
 ## D-0006 — Business notes live outside the repository, and publishing is irreversible
 
@@ -1257,7 +1255,7 @@ Three details are worth more than the format names. **All formats must be set in
 
 The same defect exists on the other platforms with different vocabulary and is not covered by this record: `org.nspasteboard.ConcealedType` on macOS is a community convention rather than an Apple API, KeePassXC sets nothing for Universal Clipboard, and Linux is per-clipboard-manager convention (`x-kde-passwordManagerHint`) with a `wl-copy -c` shell-out because Wayland forbids an unfocused app from touching the clipboard.
 
-**Still open, and narrowed to a decision rather than a research question.** Nothing is implemented. Stage 4.2's prompt says "copy buttons (auto-clearing clipboard)", and that phrasing overstates what any platform can deliver - it should name the timeout and point here. Settle before that UI is written, because the answer decides whether the GUI offers a copy button at all.
+**Answered by D-0056: the CLI implements the formats.** Step 1.5 does the work and `V-0012` checks it. Everything above stays because it is the specification — the single-session rule, the `GetClipboardFormatName` round-trip that catches the trailing-space defect, and the hash-based clear guard are what the implementation is held to. The residual is unchanged and `SECURITY.md` states it rather than describing the clipboard as safe: third-party clipboard managers decide independently, and RDP and Citrix redirection hand the value to another machine.
 
 ## O-0009 - Values on the command line, and case-colliding names on Windows
 
@@ -1277,7 +1275,7 @@ Nothing signs the artifacts. On macOS that is not cosmetic: Gatekeeper quarantin
 
 The prices are known: 99 USD a year for the Apple Developer Program plus a notarization step in the release workflow, and an organisation-validated or extended-validation certificate for Windows, which is the more expensive and more bureaucratic half. docs/PRODUCT.md §5.4 settles one thing in advance - signing is security, so a signed binary can never be the paid tier's artifact while the free one is unsigned.
 
-Resolve before, or with, the repository going public. Until then the install page says the binaries are unsigned in as many words, and D-0041 records why the checksum beside them proves integrity but not authenticity.
+**Answered by D-0057, and split: macOS is notarized, Windows is not.** The quarantine line leaves the documented install; the Windows half stays open as a price rather than a question, and the pages keep saying so in as many words. D-0041 records why the checksum beside them proves integrity but not authenticity, which notarization changes for macOS only.
 
 ## O-0011 - There is no Homebrew tap, no Scoop bucket and no winget manifest
 
@@ -1379,4 +1377,80 @@ The founder has stated the plan: a hosted service so the product is seamless, fr
 
 Two consequences worth naming before anyone builds. **Seamless is the word to watch:** the seams users notice - typing a master password, syncing a file themselves - are mostly the places where the design refuses to hold something. And **free changes the threat model even at zero revenue**, because a server holding blobs for strangers is a target in a way a laptop is not, and it is the first keypaste asset that can be attacked while its owner sleeps.
 
-Unanswered. **H-0014** carries it, and 5.2 stays gated until it has a written answer rather than an assumed one.
+**Answered by D-0060: 5.2 as written, and the server cannot read the blob.** The two consequences named above are not open questions — they are standing constraints on 5.2's threat model when it is built.
+
+## D-0054 — The agent owns the approver pipe; the app is a client of it
+
+**Date:** 2026-08-06 · **Stage:** 4.3 · **Status:** accepted · Closes O-0017 · Answers H-0012
+
+`keypaste agent` binds `keypaste-agent-<user>` at startup and keeps it. The desktop app never binds that name. Agent Activity connects to the running agent as a UI client, renders the requests it is holding, and sends approve and deny back through the same connection.
+
+Considered the two alternatives O-0017 named. **The app taking the pipe** is what 4.3's prompt literally says — the screen replaces the OS dialog "when the app is open" — and it needs a hand-off protocol on both start and quit. O-0017 already wrote the failure mode: a process that silently loses the pipe denies every request, which is the fail-closed direction and is indistinguishable to a user from the product being broken. **First to bind wins** needs no protocol at all and makes which surface prompts you a function of launch order, so the same action approves in the terminal on Monday and in the app on Tuesday.
+
+The property D-0023 exists to protect survives unchanged and is the reason this shape was chosen: the only process that ever sees a master password is the one the human started. An app that is a client cannot become that process by accident. Headless is not a special case here — it is the same path with no client attached, which is the ordinary state rather than a fallback.
+
+What this costs is a UI-client channel on the agent that does not exist yet, and it is 4.3's work to build. What it buys is that there is no losing process, so there is no silent-denial mode to design around.
+
+## D-0055 — Contribution terms: DCO
+
+**Date:** 2026-08-06 · **Stage:** 3 · **Status:** accepted · Closes O-0002 · Answers H-0004
+
+One `Signed-off-by` line per commit. `CONTRIBUTING.md` says so, and nothing else is asked of a contributor — no signing flow, no bot, no account.
+
+A CLA buys the freedom to relicense later. AGPL-3.0 is chosen and staying (D-0041), so that freedom has nothing to buy, and the price is a real deterrent to the drive-by fix that law 5.3 says to want. O-0002 held that relicensing is "cheap only while there is a single copyright holder", which is true and is an argument for deciding now rather than an argument for the CLA.
+
+This binds the maintainer too: every commit here needs `-s`, including the ones an agent writes.
+
+## D-0056 — The CLI opts out of Windows clipboard history; the `argv` exposure stays documented
+
+**Date:** 2026-08-06 · **Stage:** 3 · **Status:** accepted · Answers H-0009
+
+H-0009 offered one answer for two different defects. They get different ones.
+
+**The clipboard half is fixed.** D-0046 already closed it for the desktop app by setting all three opt-out formats in one `SetDataAsync`; it stayed open for the CLI only because `clip.exe` cannot express them. The CLI gets the Win32 path O-0008 describes — one `OpenClipboard`/`EmptyClipboard`/`SetClipboardData`×N/`CloseClipboard` session, because the notification the history service acts on fires at `CloseClipboard` and a second session to add the markers has already leaked. O-0008's two inherited defects are avoided by construction: the format name is checked with a `GetClipboardFormatName` round-trip in a test rather than by review, and the clear-guard compares a hash rather than holding the secret in memory for the timeout window. The reason this is worth doing before launch is narrow and it is O-0008's own: it is a claim `SECURITY.md` has to make correctly before strangers rely on it, and the CLI is what the install one-liner installs.
+
+**The `argv` half is documented, not fixed.** `env set <project> KEY=value` puts a secret where `/proc`, WMI, Sysmon and the shell history file can read it. D-0014 allowed it deliberately, because the piped form exists but a one-liner is what people reach for, and refusing it pushes them to clean shell history by hand or to something worse. That reasoning has not been refuted, so it stands and `THREATS.md` carries the residual.
+
+**What neither half closes.** The formats are a request, not an enforcement boundary. Third-party clipboard managers decide independently and most do not honour them, and RDP, Citrix and VDI redirection hand the value to a peer machine. `SECURITY.md` states that residual rather than describing the clipboard as safe. O-0009's remaining question — an escape hatch so a CI job using the inline form on purpose can silence a per-run warning — is untouched here and stays open.
+
+## D-0057 — macOS binaries are notarized; Windows binaries are unsigned and say so
+
+**Date:** 2026-08-06 · **Stage:** 3 · **Status:** accepted · Answers H-0008 · Narrows O-0010
+
+Apple Developer Program at 99 USD a year, plus a notarization step in `release.yml`. Windows stays unsigned.
+
+The two platforms are not the same defect. On macOS the documented install carries a line that removes the quarantine attribute, which means a tool whose entire argument is that a person approves each secret opens by telling that person to strip a security attribute. O-0010 called that a defect with a price rather than a quirk of packaging and it is right. Ninety-nine dollars deletes the line.
+
+Windows is the expensive and bureaucratic half — organisation-validated or extended-validation certification — and it buys less than it appears to, because SmartScreen warns until download reputation accrues regardless. The pages already say the binaries are unsigned in as many words, and that sentence stays true for Windows and becomes false for macOS, so both have to be rewritten rather than one.
+
+`docs/PRODUCT.md` §5.4 settled the thing that could have gone wrong here in advance: signing is security, so a notarized binary can never become the paid tier's artifact while a free one is unsigned. Notarization applies to the same binaries everybody gets.
+
+## D-0058 — The name is not defended; the risk is accepted
+
+**Date:** 2026-08-06 · **Stage:** 0.4 · **Status:** accepted · Answers H-0002
+
+No trademark filing. "keypaste" is used and not registered.
+
+D-0053 already found one live collision, and a filing does nothing about a collision that already exists — it is months and money spent on a right that would not clear the thing prompting the question. The GitHub organisation and the npm name are both free (checked 2026-08-04), which is what actually has to be true for 0.4 to close.
+
+The revisit trigger is a second collision, or the first piece of correspondence from the first one. Common-law rights accrue from use either way and are not being disclaimed here; they are simply not being paid for.
+
+## D-0059 — Autofill is deferred behind a condition that can fire
+
+**Date:** 2026-08-06 · **Stage:** 8.3 · **Status:** accepted · Answers H-0013
+
+`docs/PRODUCT.md` §2 is not re-ratified. Autofill stays out, and 8.3 stays a written prompt rather than a step.
+
+The rejection in `docs/IDEAS.md` has not been refuted: huge effort and strong incumbents were true when the row was written and are true now, and wanting the feature more is not an argument against either. What changed is only the shape of the deferral. "Defer until the wedge has users" has no test, so it could never close and the row would sit open forever. The condition is now **8.1 has shipped a native messaging host, and users ask for autofill unprompted anyway** — two things that can be observed to have happened or not.
+
+If it fires, §2 gets a dated re-ratification and 8.3 becomes admissible. If 8.1 ships and nobody asks, the row closes as rejected on evidence rather than on preference, which is the outcome the original rejection predicted and never got to test.
+
+## D-0060 — The hosted tier is 5.2 as written: the server cannot read the blob
+
+**Date:** 2026-08-06 · **Stage:** 5.2 · **Status:** accepted · Closes O-0022 · Answers H-0014
+
+A zero-knowledge hosted tier is the intended shape, exactly as 5.2 already describes it: the server stores an encrypted `.kdbx` blob and client-held keys, and can decrypt nothing. Self-host stays first-class.
+
+This ratifies a plan that was already stated rather than choosing a new one, and §2 permits it by its own named exception. O-0022 reduced the question to one bit — can the server read the blob — and the answer is no, with no middle setting. A forgotten master password is gone. That is the product and not a gap in it, and law 3.1 is what makes it non-negotiable.
+
+Two things O-0022 raised survive as standing constraints rather than open questions. **Seamless is the word to watch:** the seams a user notices are mostly the places the design refuses to hold something, so a proposal to remove one is a proposal to hold something. And **free changes the threat model at zero revenue**, because a server holding blobs for strangers is the first keypaste asset that can be attacked while its owner sleeps. Neither blocks 5.2; both belong in its threat model when it is built.

@@ -177,6 +177,20 @@ Not mechanizable: whether a reply was *useful* is a judgement. This verifier is 
 
 **PASS** needs all five on all three surfaces. Any behaviour that holds on one surface and not another is **FAIL** — law 4.3 forbids a second security path, and three renderings of one moment is exactly where a second one gets built by accident.
 
+## V-0012 — the CLI's copy does not survive in Win+V
+
+**Falsifier, run first.** On a real Windows machine with Clipboard History enabled (Settings → System → Clipboard), run `keypaste get` on an entry so the password reaches the clipboard. Press **Win+V** before the clear timeout expires, and again after it. **If the value appears in the history panel at either moment, the step is FAIL.** Then check the cloud clipboard on a second machine signed into the same account. This is the whole defect; if it still reproduces, nothing else in this list matters. A virtual machine is fine, a Wine or WSL clipboard is not — WSL does not go through the Windows clipboard the way the shipped binary does, and testing there proves nothing.
+
+**Then:**
+1. `GetClipboardFormatName` round-trips every format the code registers, asserted in a test. Read the names back and compare them to the literals. KeePassXC ships `"CanUploadToCloudClipboard "` with a trailing space in every released version, which registers a different and meaningless format that no review would catch — a test that only checks the value was set will pass against that bug.
+2. All formats are set in **one** clipboard session. Instrument or read the call sequence: `OpenClipboard` once, `EmptyClipboard`, every `SetClipboardData`, then `CloseClipboard` once. A second session to add the markers means the history service was already notified, so the value leaked and the test still looks green.
+3. The clear guard holds a hash, not the secret. `git grep` the clear path for a stored plaintext field that lives for the timeout window. Holding the value to compare against it re-creates in the CLI exactly what D-0046 avoided in the app.
+4. The clear still refuses to wipe something the user copied afterwards. Copy the password, copy something else by hand, wait out the timeout, and confirm the hand-copied value survives.
+5. macOS and Linux are untouched — the diff does not alter their clipboard path, and O-0019 is still open in `DECISIONS.md` rather than quietly marked done.
+6. `SECURITY.md` says the first-party Clipboard History and Cloud Clipboard are closed on **both** front ends, and says third-party clipboard managers and RDP or Citrix redirection are not covered. **If it describes the clipboard as safe, that is FAIL** — the formats are a request to well-behaved consumers, not an enforcement boundary, and overstating it is the failure this step exists to avoid rather than a wording nit.
+
+**PASS** needs the falsifier clean and all six. **BLOCKED** without a real Windows machine with clipboard history on — this cannot be checked anywhere else, and a green test suite on Linux is not evidence about a Windows clipboard.
+
 ---
 
 ## What this file does not do

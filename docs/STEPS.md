@@ -35,20 +35,15 @@ What only a human can do. **Split in two, because listing them together is why n
 | **H-0007** | Answer every issue and comment for two weeks after the launch | — | — |
 | **H-0010** | Run the twenty-one item checklist in `docs/desktop.md` | 4.6 will strike most of it; run what remains | any desktop claim |
 | **H-0011** | Run the pre-deploy checklist in `site/README.md` before any keypaste.com deploy | `site/README.md`; D-0037 declined to gate it | every deploy |
+| **H-0015** | Enrol in the Apple Developer Program so macOS binaries can be notarized (**D-0057**) — 99 USD a year, and only a person can accept the agreement | developer.apple.com/programs/enroll, then put the credentials in repository secrets for `release.yml` | the next `v*` tag |
 
-### Decisions — pick one; the default is what happens if you never do
+### Decisions — none open
 
-| id | The question | The options | Default if you never choose |
-|---|---|---|---|
-| **H-0002** | Is "keypaste" defensible as a name? | file a mark · rely on common-law use · accept the risk and move on | **accept the risk.** D-0053 already found one live collision; a second would be the signal to revisit |
-| **H-0004** | DCO or CLA, and what does `CONTRIBUTING.md` say? | DCO — one `Signed-off-by` line, no paperwork · CLA — assignment, enables relicensing later, deters casual PRs | **DCO.** AGPL is chosen and staying (D-0041), so the relicensing option a CLA buys has nothing to buy. **Blocks H-0003** |
-| **H-0008** | Do the binaries get signed and notarized? | pay for both · macOS notarization only · neither, and say so on the download page | **neither, said plainly.** Unsigned and honest beats unsigned and quiet; revisit when a stranger's install fails |
-| **H-0009** | Windows clipboard history and the `argv` exposure | fix before launch · document both in THREATS and launch anyway · restrict the affected paths | **document and launch.** O-0008 has a citation and a reproducible defect; the essay's honesty section is where it belongs |
-| **H-0012** | Who owns the approver pipe — terminal, app, or extension? | terminal keeps it, others observe · app takes it when running, terminal is the headless fallback · first to bind wins | **terminal keeps it.** It is what ships today and what the demo records. Blocks **4.3** and **8.2** |
-| **H-0013** | Re-ratify §2 to admit autofill, or drop it? | ratify v2.0 with a dated reason · drop autofill and keep the wall · defer until the wedge has users | **defer.** Nothing forces this before there are users, and the original rejection stands unrefuted. Blocks **8.3** |
-| **H-0014** | Local-first only, or a zero-knowledge hosted tier? | 5.2 as written — server stores blobs it cannot read · no hosted tier at all · a tier that can recover a password, which breaks law 3.1 | **5.2 as written.** It is the only shape §2 permits, and O-0022 shows the whole question is one bit: can the server read the blob |
+All seven were answered on 2026-08-06 and the reasoning is in `DECISIONS.md`. The name is used and not defended (**D-0058**). Contribution terms are DCO (**D-0055**). macOS binaries are notarized and Windows binaries are not (**D-0057**). The CLI opts out of Windows clipboard history, and the `argv` exposure stays documented (**D-0056**). The agent owns the approver pipe and the app is a client of it (**D-0054**). Autofill is deferred behind a condition that can fire (**D-0059**). The hosted tier is 5.2 as written, and the server cannot read the blob (**D-0060**).
 
-`[process]` — this queue is a ledger, not a gate. A ticked row is a person's word. **A default is not consent** — it is what the absence of a decision has already chosen on your behalf, written down so it stops being invisible.
+Three of them produced work rather than closing it: **H-0015** below, step **1.5**, and the `CONTRIBUTING.md` that D-0055 requires.
+
+`[process]` — a row belongs here only while it is unmade, and **a default is not consent**: it is what the absence of a decision has already chosen on your behalf, written down so it stops being invisible. Nothing mechanical ages a row out of this table, which is how seven of them accumulated. The guard is that an answer must name a trigger, a step or a next command — never a preference.
 
 ---
 
@@ -72,7 +67,7 @@ What only a human can do. **Split in two, because listing them together is why n
 ### 0.4 — The names [ ]
 
 - **Build** — none. Nothing here is agent-runnable.
-- **Owner** — **H-0001** and **H-0002**.
+- **Owner** — **H-0001**. H-0002 is answered by D-0058: the name is used and not defended.
 - **Verify** — `V-0006`
 - Traces to `docs/PRODUCT.md` law 5.2, and to §1 — the product has to be findable under the name it claims.
 
@@ -101,6 +96,15 @@ What only a human can do. **Split in two, because listing them together is why n
 - **Owner** — none.
 - **Verify** — `V-0007`
 - Traces to `docs/PRODUCT.md` §2 (sync is the user's problem), law 4.3 and law 4.6.
+
+### 1.5 — The CLI opts out of Windows clipboard history [ ]
+
+D-0056 split H-0009 and this is the half that gets fixed. D-0046 already closed it for the desktop app, which owns a window and can hand Avalonia a data object; `clip.exe` cannot express the formats, so `keypaste get` on Windows still leaves the secret in Win+V and in cloud clipboard after the twenty seconds are up. The app getting a secret-path fix before the CLI inverts law 4.2, and this restores the ordering.
+
+- **Build** — "Give the Windows CLI clipboard path the three opt-out formats KeePassXC uses, which O-0008 already specifies from their source — `ExcludeClipboardContentFromMonitorProcessing`, `CanIncludeInClipboardHistory` and `CanUploadToCloudClipboard`. **Set every format inside one `OpenClipboard`/`EmptyClipboard`/`SetClipboardData`×N/`CloseClipboard` session**, because the notification the history service acts on fires at `CloseClipboard` and a second session to add the markers has already leaked the value. This replaces the `clip.exe` shell-out on Windows only; macOS and Linux are untouched and O-0019 stays open. Put the P/Invokes in one `[SupportedOSPlatform(\"windows\")]` class and settle the argument with the trim and AOT analysers rather than suppressing it. **Two defects in KeePassXC's implementation must not be inherited:** every released version spells the third format with a trailing space, which registers a different and meaningless format, so assert the registered name with a `GetClipboardFormatName` round-trip in a test rather than trusting the literal; and they hold the copied secret in a plain string for the whole clear-timeout window purely to power the equality guard, where a hash is enough and is what keypaste uses. Then correct `SECURITY.md`: it currently states this gap as open for both front ends. It must now say the first-party Clipboard History and Cloud Clipboard are closed on both, and that third-party clipboard managers and RDP or Citrix redirection are not covered by anything — the formats are a request to well-behaved consumers, not an enforcement boundary."
+- **Owner** — none.
+- **Verify** — `V-0012`
+- Traces to `docs/PRODUCT.md` law 3.4 — clipboard history persists the secret and cloud clipboard sends it off the machine, both by keypaste's doing — and to law 4.2 and law 4.5.
 
 ## Stage 2 — The MCP bridge
 
@@ -153,7 +157,7 @@ The README rewrite and the landing page are done. The GIF is the only thing left
 ### 3.2 — The launch posts [ ]
 
 - **Build** — none. The copy is written and lives in `launch.md`.
-- **Owner** — **H-0006**, blocked by **H-0003** and **H-0009**. `launch.md`'s "Before anything goes out" list is the precondition set, and every item on it is false today.
+- **Owner** — **H-0006**, blocked by **H-0003** and by step **1.5**, which is the work D-0056 left behind when it answered H-0009. `launch.md`'s "Before anything goes out" list is the precondition set, and every item on it is false today.
 - **Verify** — `V-0002`
 - Traces to `docs/PRODUCT.md` law 5.3, community before customers.
 
@@ -181,14 +185,14 @@ The README rewrite and the landing page are done. The GIF is the only thing left
 The seed of the delegation dashboard, and the screen the product is named for.
 
 - **Build** — "Build the Agent Activity screen — the seed of the delegation dashboard: a live feed of incoming agent requests with Approve/Deny buttons replacing the OS dialog when the app is open; a history list from the audit log; per-client summary cards (client name, total requests, last seen, standing policy rules affecting it) with a 'revoke/pause this client' toggle that flips a deny-all policy rule. This screen must make a screenshot-worthy answer to 'what can act as me right now?' — design it like the product's hero feature, because it is."
-- **Owner** — **H-0012** first. The app and `keypaste agent` cannot both own the approver pipe, and nothing decides which does.
+- **Owner** — none. D-0054 settled the pipe: the agent keeps it and this screen is a client of the agent, not a second binder. Building that UI-client channel is part of this step.
 - **Verify** — `V-0004`
 - Traces to `docs/PRODUCT.md` §1, wedge item 4.
 
 ### 4.4 — Approval prompts leave the terminal [ ]
 
 - **Build** — "Move the approval prompt from the terminal to a native window or tray notification, keeping `keypaste agent`'s terminal channel working for headless use. Default deny, timeout deny and every error path deny must hold identically on both channels."
-- **Owner** — none beyond **H-0012**.
+- **Owner** — none. D-0054 applies here too: the terminal channel stays because the agent never stops owning the pipe.
 - **Verify** — `V-0005`
 - Traces to `docs/PRODUCT.md` law 3.2 and law 3.7.
 
@@ -226,7 +230,7 @@ Numbered clear of 5 through 7 deliberately: those are gated on launch and revenu
 The signature moment, rendered the same everywhere it appears.
 
 - **Build** — "Write the approval moment once in `docs/ux.md` — the fields, their order, the wording, the defaults, the timeout — and make the terminal prompt, the desktop Agent Activity screen and the browser extension popup all render *that*, with no surface inventing a field or a default of its own. Then build the popup: who is asking, which entry, which field, for how long, and the agent's stated reason **rendered as untrusted text and labelled as the agent's words**, with newlines and terminal escapes and RTL overrides all defanged. Default deny; closing the popup is a denial, not a cancel; the 45-second timeout is a denial and the countdown is visible. Add a task to `docs/ux.md` and hold all three surfaces to the **same** `T-NN` threshold — if approving takes twice as long in one of them, that is a failure of that surface and not a property of it. Screenshot-test the popup in headless Chrome and headless Firefox the way 4.6 does the app."
-- **Owner** — **H-0012**. Three surfaces cannot all own the approver pipe, and O-0017 already could not decide between two.
+- **Owner** — none. D-0054 answers it for all three: the agent owns the pipe and every surface is a client of it, so the popup is a third renderer rather than a third binder.
 - **Verify** — `V-0011`
 - Traces to `docs/PRODUCT.md` law 3.2, law 3.7 and law 4.3 — one core, no second security path.
 
@@ -270,9 +274,11 @@ Do not start any of these until Stage 3 has shipped and Stage 5 has paying users
 
 **7.4 — Team delegation dashboard.** "Extend the Stage 6 Delegation Center from 'everything that can act as ME' to 'everything that can act as anyone on the TEAM': unify per-member agent grants, standing policy rules, shared-set membership (7.1) and live broker grants (7.2) into one view an owner reads at a glance and revokes from in one click. Gated exactly like Stage 6: build it only if Stage 5 revenue and the benchmarks were actually met; otherwise it goes back to docs/IDEAS.md. Screenshot-worthy or it isn't done (law 5.1)."
 
-### 8.3 — Autofill (gated on H-0013, and on nothing else)
+### 8.3 — Autofill (gated on D-0059's condition, and on nothing else)
 
 **This is the one the locked core does not permit today.** `docs/PRODUCT.md` §2 makes "for everyone" a permanent wall, and autofill is the feature that defines the consumer category — it traces to no claim in §1, so under the admission rule it cannot be a step no matter how much it is wanted. `docs/IDEAS.md` rejected it once already, on effort and on incumbents, and neither of those reasons has been refuted by anything since. It sits here, fully written, so that the day §2 is deliberately re-ratified the work is ready and nobody has to re-derive it — and so that until that day, nobody can start it by accident.
+
+**The gate is a condition that can fire, not a mood.** D-0059 replaced "defer until the wedge has users" — which has no test and so could never close — with two observable things: **8.1 has shipped a native messaging host, and users ask for autofill unprompted anyway.** If both happen, §2 gets a dated re-ratification and this becomes admissible. If 8.1 ships and nobody asks, the row closes as rejected on evidence, which is what the original rejection predicted and never got to test.
 
 "Implement credential autofill in the Stage 8 extension, KeePassXC-parity and no further. **Match on the registrable domain via the Public Suffix List, never on a substring of the URL** — `evil.com/paypal.com` is the entire history of autofill vulnerabilities in one string, and a phishing page that fills is worse than no autofill at all. On a match, show the Confirm Access dialog first: which page, which entry, and Remember offered as an option and never assumed — that dialog is the ecosystem's existing answer and 8.2's spec already describes it. Fill the form fields directly; **never place a credential on the clipboard as a fallback**, because the clipboard is a global read for every process on the machine and D-0046 exists precisely because Windows would otherwise record it. No password capture on submit and no vault writes from the extension in this step: reading is one threat model and writing from inside a page's process is another. Iframes are refused unless same-origin with the top document. Add the phishing-domain cases as tests before the happy path, since the happy path is the one that gets manually checked and the malicious one is not. Then update the comparison table in README.md, because a keypaste with autofill is answering a different question than the one that table currently asks."
 

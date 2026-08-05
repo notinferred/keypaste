@@ -40,7 +40,7 @@ The site has **no CI job**. `ci.yml` is the .NET gate and does not look at `site
 |---|---|---|
 | GitHub org `keypaste` | github.com | **not registered** — Owner Queue **H-0001** |
 | npm and crates names | npmjs.com, crates.io | **not registered** — **H-0001** |
-| Trademark on "keypaste" | — | **not checked** — **H-0002** |
+| Trademark on "keypaste" | — | **not filed, deliberately** — D-0058 accepted the risk. No full clearance search was run, and D-0053's one known live collision is the whole basis; a second one is the trigger to revisit |
 
 The repository itself is `notinferred/keypaste` and is **private**. Whether it goes public is **H-0003**, and it is the precondition every launch link depends on.
 
