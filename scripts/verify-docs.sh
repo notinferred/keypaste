@@ -8,6 +8,8 @@
 #   - every open step traces to docs/PRODUCT.md
 #   - docs/IDEAS.md is append-only: no row that was there last commit has been removed
 #   - the five pages scripts/verify-demo.sh pins are never skipped by ci.yml's paths-ignore
+#   - no open step carries a Build lane over BUILD_WORD_CAP unless it is on the shrinking
+#     GRANDFATHERED list, and nothing stays on that list once it is within the cap
 #
 # WHAT IT DELIBERATELY DOES NOT HOLD: whether a verifier is any good. A falsifier reading "check the file exists" satisfies every assertion below and proves nothing. Watching a new falsifier actually fire against the current tree, once, before trusting it, is [process] and belongs to whoever wrote it (D-0043).
 set -euo pipefail
@@ -29,7 +31,10 @@ done
 
 # --- A. every open step declares all three lanes ------------------------------------------------
 # An open step is a "### <n.n> — <title> [ ]" heading. Done steps are one line and carry no lanes.
-open_steps=$(grep -oE '^### [0-9]+\.[0-9]+ — .*\[ \]$' "$STEPS" | grep -oE '^### [0-9]+\.[0-9]+' \
+# The trailing letter matters: a split produces 1.5a and 1.5b, and a pattern that only accepts
+# <n.n> would drop both out of every check below rather than failing - the split would silently
+# turn the gate off for the steps it just created.
+open_steps=$(grep -oE '^### [0-9]+\.[0-9]+[a-z]? — .*\[ \]$' "$STEPS" | grep -oE '^### [0-9]+\.[0-9]+[a-z]?' \
              | awk '{print $2}' || true)
 [ -n "$open_steps" ] || die "$STEPS declares no open steps. If the product is finished, say so there"
 
@@ -83,6 +88,42 @@ if git rev-parse --verify HEAD >/dev/null 2>&1 && git cat-file -e "HEAD:$IDEAS" 
   missing=$(comm -23 <(printf '%s\n' "$before") <(printf '%s\n' "$after") || true)
   [ -z "$missing" ] || die "$IDEAS lost rows, and it is append-only. Flip a status; never delete a row, because a deleted row cannot tell 'never proposed' from 'quietly dropped': $missing"
 fi
+
+# --- F. a step is one thing, not nine ------------------------------------------------------------
+# Every step that shipped needed 66 to 107 words of Build. The open ones drifted to 165 to 277,
+# which is five to nine deliverables behind a single verifier - and the admission rule asks for "an
+# accept criterion", singular. Bundled, a partial pass has nowhere to be recorded, so sixty percent
+# done reads exactly like not started.
+#
+# GRANDFATHERED is a debt register, not an exemption list, and it ratchets in one direction: an id
+# leaves it by being split, and an id that no longer exceeds the cap MUST be removed or this fails.
+# Nothing may be added to it - a new step over the cap is a new step that should have been two.
+readonly BUILD_WORD_CAP=150
+readonly GRANDFATHERED='1.4 4.5 4.6 8.1 8.2'
+
+for g in $GRANDFATHERED; do
+  printf '%s\n' $open_steps | grep -qx "$g" \
+    || die "GRANDFATHERED in $0 names step $g, which is not an open step in $STEPS. A stale entry is an exemption nobody is reading"
+done
+
+for id in $open_steps; do
+  words=$(awk -v id="$id" '
+    $0 ~ "^### " id " " { inb = 1; next }
+    inb && /^#{2,3} / { exit }
+    inb && /^- \*\*Build\*\*/ { print NF - 2; exit }
+  ' "$STEPS")
+  [ -n "$words" ] || continue
+
+  listed=no
+  for g in $GRANDFATHERED; do [ "$g" = "$id" ] && listed=yes; done
+
+  if [ "$words" -gt "$BUILD_WORD_CAP" ] && [ "$listed" = no ]; then
+    die "step $id in $STEPS has a $words-word Build lane against a cap of $BUILD_WORD_CAP. That is several deliverables behind one verifier: split it into $id-a, $id-b and so on, each with its own accept criterion in $VERIF"
+  fi
+  if [ "$words" -le "$BUILD_WORD_CAP" ] && [ "$listed" = yes ]; then
+    die "step $id in $STEPS is within the $BUILD_WORD_CAP-word cap but is still listed in GRANDFATHERED in $0. Remove it - the list only shrinks, and leaving a split step on it hands a permanent exemption to whatever grows there next"
+  fi
+done
 
 # --- E. the pinned pages are never skipped -------------------------------------------------------
 # NEGATIVE-SPACE CHECK: this asserts an absence. A docs/** entry would disable verify-demo.sh for two of these pages silently and fail open, which is the one failure mode here that goes unnoticed.
