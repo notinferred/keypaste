@@ -97,14 +97,23 @@ Three of them produced work rather than closing it: **H-0015** below, step **1.5
 - **Verify** — `V-0007`
 - Traces to `docs/PRODUCT.md` §2 (sync is the user's problem), law 4.3 and law 4.6.
 
-### 1.5 — The CLI opts out of Windows clipboard history [ ]
+### 1.5a — The Windows CLI copies through one Win32 clipboard session [ ]
 
-D-0056 split H-0009 and this is the half that gets fixed. D-0046 already closed it for the desktop app, which owns a window and can hand Avalonia a data object; `clip.exe` cannot express the formats, so `keypaste get` on Windows still leaves the secret in Win+V and in cloud clipboard after the twenty seconds are up. The app getting a secret-path fix before the CLI inverts law 4.2, and this restores the ordering.
+D-0056 split H-0009 and this is the half that gets fixed. D-0046 closed it for the app, which owns a window and can hand Avalonia a data object; `clip.exe` cannot express the formats, so `keypaste get` still leaves the secret in Win+V and in cloud clipboard after the twenty seconds are up. The app getting a secret-path fix before the CLI inverts law 4.2, and this restores the ordering.
 
-- **Build** — "Give the Windows CLI clipboard path the three opt-out formats KeePassXC uses, which O-0008 already specifies from their source — `ExcludeClipboardContentFromMonitorProcessing`, `CanIncludeInClipboardHistory` and `CanUploadToCloudClipboard`. **Set every format inside one `OpenClipboard`/`EmptyClipboard`/`SetClipboardData`×N/`CloseClipboard` session**, because the notification the history service acts on fires at `CloseClipboard` and a second session to add the markers has already leaked the value. This replaces the `clip.exe` shell-out on Windows only; macOS and Linux are untouched and O-0019 stays open. Put the P/Invokes in one `[SupportedOSPlatform(\"windows\")]` class and settle the argument with the trim and AOT analysers rather than suppressing it. **Two defects in KeePassXC's implementation must not be inherited:** every released version spells the third format with a trailing space, which registers a different and meaningless format, so assert the registered name with a `GetClipboardFormatName` round-trip in a test rather than trusting the literal; and they hold the copied secret in a plain string for the whole clear-timeout window purely to power the equality guard, where a hash is enough and is what keypaste uses. Then correct `SECURITY.md`: it currently states this gap as open for both front ends. It must now say the first-party Clipboard History and Cloud Clipboard are closed on both, and that third-party clipboard managers and RDP or Citrix redirection are not covered by anything — the formats are a request to well-behaved consumers, not an enforcement boundary."
+- **Build** — "Replace the `clip.exe` shell-out in `Keypaste.Cli`'s Windows clipboard path with a Win32 one that can express KeePassXC's three opt-out formats: `ExcludeClipboardContentFromMonitorProcessing`, `CanIncludeInClipboardHistory` and `CanUploadToCloudClipboard`. Set the text and all three inside **one** `OpenClipboard`/`EmptyClipboard`/`SetClipboardData`×N/`CloseClipboard` session — the history service acts on the notification raised at `CloseClipboard`, so a second session to add the markers has already leaked. P/Invokes go in one `[SupportedOSPlatform(\"windows\")]` class; satisfy the trim and AOT analysers rather than suppressing them. macOS and Linux are untouched and O-0019 stays open. Law 4.5 keeps the tests in this step: assert every registered name with a `GetClipboardFormatName` round-trip rather than trusting the literal, and make the clear guard compare a hash so no plaintext copy lives for the timeout window."
 - **Owner** — none.
 - **Verify** — `V-0012`
 - Traces to `docs/PRODUCT.md` law 3.4 — clipboard history persists the secret and cloud clipboard sends it off the machine, both by keypaste's doing — and to law 4.2 and law 4.5.
+
+### 1.5b — The pages say what the formats close, and what they do not [ ]
+
+Split from 1.5a because it fails differently. 1.5a fails by leaving a secret in Win+V; this one fails by claiming a safety the formats cannot deliver, which is the more dangerous of the two because nothing red appears.
+
+- **Build** — "Correct `SECURITY.md`, which states the Windows clipboard-history gap as open on both front ends. It is closed on both — D-0046 for the app, 1.5a for the CLI. Say precisely what that buys: first-party Clipboard History and Cloud Clipboard are closed, and third-party clipboard managers and RDP or Citrix redirection are covered by nothing, because the formats are a request to well-behaved consumers and not an enforcement boundary. Do not write that the clipboard is safe. Then check whether `README.md`, `docs/demo.md` or `site/public/index.html` repeat the old claim, and fix every copy in the same change."
+- **Owner** — none.
+- **Verify** — `V-0013`
+- Traces to `docs/PRODUCT.md` law 3.4, and to D-0036 — a claim on a published page may only say what a gate or a citation can hold.
 
 ## Stage 2 — The MCP bridge
 

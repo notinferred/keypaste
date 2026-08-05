@@ -25,7 +25,7 @@ These hold the steps that are already done. They are not re-derived here — eac
 | `scripts/verify-policy-e2e.sh` | a standing rule grants silently; a rule can never widen | not recorded |
 | `scripts/verify-log-chain.sh` | tampering is detected; truncation reads as damage, not attack | not recorded |
 | `scripts/verify-aot-trim.sh` | no new trim diagnostic naming `src/` | yes — an empty log is a failure |
-| `scripts/verify-docs.sh` | this file and `docs/STEPS.md` agree | yes — all seven assertions watched to fire, 2026-07-28 |
+| `scripts/verify-docs.sh` | this file and `docs/STEPS.md` agree, and no step grows into several | yes — the original seven watched to fire 2026-07-28, and all three branches of the step-size cap on 2026-08-06 |
 
 **The "observed failing" column is the point.** A check that has never been watched to fail is an assertion about the world, not a check on it (D-0043). Nine of these have never been recorded failing. Filling that column in is real work and it is not done.
 
@@ -187,9 +187,21 @@ Not mechanizable: whether a reply was *useful* is a judgement. This verifier is 
 3. The clear guard holds a hash, not the secret. `git grep` the clear path for a stored plaintext field that lives for the timeout window. Holding the value to compare against it re-creates in the CLI exactly what D-0046 avoided in the app.
 4. The clear still refuses to wipe something the user copied afterwards. Copy the password, copy something else by hand, wait out the timeout, and confirm the hand-copied value survives.
 5. macOS and Linux are untouched — the diff does not alter their clipboard path, and O-0019 is still open in `DECISIONS.md` rather than quietly marked done.
-6. `SECURITY.md` says the first-party Clipboard History and Cloud Clipboard are closed on **both** front ends, and says third-party clipboard managers and RDP or Citrix redirection are not covered. **If it describes the clipboard as safe, that is FAIL** — the formats are a request to well-behaved consumers, not an enforcement boundary, and overstating it is the failure this step exists to avoid rather than a wording nit.
 
-**PASS** needs the falsifier clean and all six. **BLOCKED** without a real Windows machine with clipboard history on — this cannot be checked anywhere else, and a green test suite on Linux is not evidence about a Windows clipboard.
+**PASS** needs the falsifier clean and all five. **BLOCKED** without a real Windows machine with clipboard history on — this cannot be checked anywhere else, and a green test suite on Linux is not evidence about a Windows clipboard.
+
+## V-0013 — the pages do not claim more than the formats deliver
+
+**Falsifier, run first.** Search `SECURITY.md`, `README.md`, `docs/demo.md` and `site/public/index.html` for any sentence that says the clipboard is cleared, safe, or private without naming what still reads it. **One such sentence is FAIL.** This verifier exists because the failure it looks for is invisible: 1.5a going wrong leaves a password in Win+V where anyone can see it, while this one going wrong just reads as reassurance, and nothing turns red.
+
+**Then:**
+1. `SECURITY.md` says the first-party Clipboard History and Cloud Clipboard are closed on **both** front ends. If it still describes the gap as open for the CLI, it is describing a version that no longer ships.
+2. It names what is *not* covered, in this order of likelihood: third-party clipboard managers, which each decide independently and mostly do not honour the formats, and RDP or Citrix or VDI redirection, which hands the value to a peer machine keypaste cannot reach.
+3. It says the formats are a request to well-behaved consumers rather than an enforcement boundary. A reader who finishes the paragraph believing Windows *prevents* other programs reading the clipboard has been misled by a true sentence.
+4. No other page contradicts it. Grep all four; a corrected `SECURITY.md` beside a stale README is worse than neither, because the two together read as one of them being current.
+5. Every claim traces to something checkable — the formats to O-0008's source reading, the closure to `V-0012`. D-0036 allows only what a gate or a citation can hold.
+
+**PASS** needs the falsifier clean and all five. This one is checkable anywhere, unlike `V-0012` — it is a reading task, not a Windows task.
 
 ---
 
