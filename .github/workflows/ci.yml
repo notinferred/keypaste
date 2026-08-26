@@ -28,6 +28,7 @@ on:
       - 'THREATS.md'
       - 'SECURITY.md'
       - 'THIRD_PARTY_NOTICES.md'
+      - 'CONTRIBUTING.md'
       - 'LICENSE'
       - 'docs/mcp-setup.md'
       - 'docs/replace-dotenv.md'

@@ -1,0 +1,66 @@
+name: dco
+
+# D-0055 ratified the Developer Certificate of Origin and CONTRIBUTING.md states it. Every other
+# rule in this repository names an enforcer; until this file existed that one named none, which
+# made it aspiration rather than a rule - the same shape launch.md already flags for branch
+# protection, where "a red build blocks the merge" is a habit because nothing consults a check.
+#
+# WHAT IT COSTS ON EVERY PUSH: nothing. There is no `push` trigger. A pull request already pays
+# for ci.yml, and this adds one bash step of a few seconds to that. CLAUDE.md says to ask what a
+# workflow costs on every push before adding it, and this is the answer.
+#
+# IT CHECKS ONLY THE COMMITS THE PULL REQUEST ADDS. Sign-off began at D-0055; the history before
+# it is unsigned and rewriting it is not on the table (see H-0003 for what rewriting this history
+# already cost). A gate that judged the whole log would be red forever and would be switched off
+# within a week, which is worse than no gate.
+on:
+  pull_request:
+
+concurrency:
+  group: dco-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  signed-off:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # The whole PR range plus its base, and nothing older. 0 would fetch the entire history
+          # this gate deliberately does not judge.
+          fetch-depth: ${{ github.event.pull_request.commits }}
+
+      - name: Every commit in this pull request is signed off
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$BASE"
+
+          missing=0
+          while read -r sha; do
+            [ -n "$sha" ] || continue
+
+            # The author as git records it, and the sign-off as the DCO requires it: the trailer
+            # must name the person certifying, so a Signed-off-by belonging to somebody else is
+            # not a sign-off. Compared case-insensitively because mail addresses are.
+            author="$(git show -s --format='%an <%ae>' "$sha")"
+            if git show -s --format='%(trailers:key=Signed-off-by,valueonly=true)' "$sha" \
+                 | grep -qiFx "$author"; then
+              continue
+            fi
+
+            missing=1
+            echo "::error::$(git show -s --format='%h %s' "$sha") is not signed off by its author, $author"
+          done < <(git rev-list "$BASE..$HEAD")
+
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::Sign off with 'git commit -s' (or 'git rebase --signoff $BASE' for a branch). CONTRIBUTING.md and DECISIONS.md D-0055 say why, and it is one line per commit."
+            exit 1
+          fi
+
+          echo "ok: every commit in this pull request carries its author's Signed-off-by."

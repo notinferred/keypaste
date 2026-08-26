@@ -36,7 +36,7 @@ Every one of these is a thing that is false today. The launch is the moment stra
 
 **The contributor path**
 
-- [ ] **O-0002 is decided and `CONTRIBUTING.md` exists.** DCO or CLA, undecided, and the record says it must be settled *before the repository accepts its first outside pull request*. Labelling good first issues is an invitation to exactly that.
+- [x] **O-0002 is decided and `CONTRIBUTING.md` exists.** DCO, not a CLA — **D-0055**, which closed O-0002 on 2026-08-06. AGPL-3.0 is chosen and staying, so the relicensing freedom a CLA buys has nothing to buy here, and its price is a deterrent to the drive-by fix law 5.3 says to want. `CONTRIBUTING.md` says so, and `.github/workflows/dco.yml` checks it on every pull request rather than trusting the page: it judges only the commits a pull request adds, because sign-off began at D-0055 and a gate red against the whole history would be switched off within a week. **One limit, stated rather than discovered:** the workflow's bash is proved against real commit ranges, but no pull request has run it, so the plumbing — the checkout depth, the event context — is unexercised until the first one.
 - [x] **`CHANGELOG.md` exists.** Added in 3.4, and the release workflow refuses to publish a tag that has no section in it — docs/PRODUCT.md §4.7 as a gate rather than an intention.
 
 **The venues**
