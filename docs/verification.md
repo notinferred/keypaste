@@ -25,7 +25,7 @@ These hold the steps that are already done. They are not re-derived here — eac
 | `scripts/verify-policy-e2e.sh` | a standing rule grants silently; a rule can never widen | not recorded |
 | `scripts/verify-log-chain.sh` | tampering is detected; truncation reads as damage, not attack | not recorded |
 | `scripts/verify-aot-trim.sh` | no new trim diagnostic naming `src/` | yes — an empty log is a failure |
-| `scripts/verify-docs.sh` | this file and `docs/STEPS.md` agree, and no step grows into several | yes — the original seven watched to fire 2026-07-28, and all three branches of the step-size cap on 2026-08-06 |
+| `scripts/verify-docs.sh` | this file and `docs/STEPS.md` agree, no step grows into several, and every step reference resolves to a step | yes — the original seven watched to fire 2026-07-28, all three branches of the step-size cap on 2026-08-06, and the step-reference check on 2026-08-26, against the dangling `step 1.5` that splitting it into 1.5a and 1.5b left behind |
 
 **The "observed failing" column is the point.** A check that has never been watched to fail is an assertion about the world, not a check on it (D-0043). Nine of these have never been recorded failing. Filling that column in is real work and it is not done.
 
@@ -189,20 +189,6 @@ Not mechanizable: whether a reply was *useful* is a judgement. This verifier is 
 5. macOS and Linux are untouched — the diff does not alter their clipboard path, and O-0019 is still open in `DECISIONS.md` rather than quietly marked done.
 
 **PASS** needs the falsifier clean and all five. **BLOCKED** without a real Windows machine with clipboard history on — this cannot be checked anywhere else, and a green test suite on Linux is not evidence about a Windows clipboard.
-
-## V-0013 — the pages do not claim more than the formats deliver
-
-**Falsifier, run first.** Grep **all six** of `SECURITY.md`, `THREATS.md`, `launch.md`, `README.md`, `docs/demo.md` and `site/public/index.html` for `O-0008`, `clip.exe` and `clipboard history`. **Any sentence still saying the gap is open, unresolved, or CLI-only is FAIL**, as is any sentence calling the clipboard cleared, safe or private without naming what still reads it. Six files, not four: `THREATS.md` T-19 and `launch.md` both carried the claim and an earlier draft of this verifier could not see either, which would have produced a PASS over a page telling readers to turn Clipboard History off.
-
-**Then:**
-1. `SECURITY.md` says first-party Clipboard History and Cloud Clipboard are closed on **both** front ends. If it still describes a divergence between the app and the CLI, it is describing a version that no longer ships.
-2. Every page naming the residual names the same one, in this order: third-party clipboard managers, which decide independently and mostly ignore the formats, then RDP or Citrix or VDI redirection, which hands the value to a peer machine keypaste cannot reach.
-3. Each says the formats are a request to well-behaved consumers rather than an enforcement boundary. A reader who finishes the paragraph believing Windows *prevents* other programs reading the clipboard has been misled by a true sentence.
-4. `THREATS.md` T-19 no longer recommends `keypaste get --show` or turning Clipboard History off as a mitigation for this, and its **Proved by** names the tests that actually hold the claim rather than only the two older `VerbTests`.
-5. No page contradicts another. A corrected `SECURITY.md` beside a stale `launch.md` is worse than neither, because together they read as one of them being current and the reader cannot tell which.
-6. Nothing claims the end-to-end result. The unit tests prove the formats are registered and set in one session; only `V-0012`'s falsifier proves a password is absent from Win+V. Until that has run, a page saying it has been checked on a real machine is asserting something nobody observed — which is the D-0043 failure exactly.
-
-**PASS** needs the falsifier clean and all six. Unlike `V-0012` this is checkable anywhere: it is a reading task, not a Windows task.
 
 ---
 
