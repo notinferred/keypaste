@@ -13,6 +13,14 @@ node_modules/
 *.suo
 *.DotSettings.user
 
+# A local code index, regenerated with `graphify update .` and never read by any gate.
+graphify-out/
+
+# .claude/settings.json IS committed - it is the permission allowlist, and it is portable.
+# settings.local.json is not: it holds hook commands with absolute paths to a particular machine's
+# binaries, which name that machine's user and work nowhere else.
+.claude/settings.local.json
+
 # OS
 .DS_Store
 Thumbs.db

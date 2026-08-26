@@ -34,3 +34,13 @@ A `v*` tag builds four native binaries and publishes them to `dl.keypaste.com`. 
 **Scrap, don't append.** When something moves, rewrite the section and delete what it replaced. No migration narratives, no was/now, no dead names. Git holds what the file used to say.
 
 A claim on a published page may only say what a gate or a citation can hold (D-0036). If a check has never actually executed, it is an assertion about the world and not a check on it (D-0043) — run it before trusting the green. Every rule here names its enforcer; the ones that cannot be mechanized are tagged `[process]` and are second-class until they can be.
+
+## graphify — optional, local, and not something this repository ships
+
+`graphify-out/` is a symbol index somebody may have generated on their own machine. It is gitignored, no gate reads it, and a fresh clone has none — so everything here is conditional on `graphify-out/graph.json` actually existing, and nothing below is a reason to hold up work when it does not.
+
+- **It indexes `src/`, so use it for questions about `src/`.** `graphify query "<question>"` for a scoped subgraph, `graphify path "<A>" "<B>"` for a relationship, `graphify explain "<concept>"` for one concept. `graphify-out/GRAPH_REPORT.md` is for broad architecture review only.
+- **It is the wrong index for the documents**, which is most of what changes here. Asked for the project's status it returns xUnit method names; `docs/STEPS.md` answers that in one page. Read the governance files directly.
+- `graphify update .` after changing code, if you are using it at all. AST-only, no API cost.
+
+The hook that enforces this lives in `.claude/settings.local.json` and is gitignored with it, because its command is an absolute path to one machine's binary.
