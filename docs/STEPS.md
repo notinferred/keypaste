@@ -41,7 +41,7 @@ What only a human can do. **Split in two, because listing them together is why n
 
 All seven were answered on 2026-08-06 and the reasoning is in `DECISIONS.md`. The name is used and not defended (**D-0058**). Contribution terms are DCO (**D-0055**). macOS binaries are notarized and Windows binaries are not (**D-0057**). The CLI opts out of Windows clipboard history, and the `argv` exposure stays documented (**D-0056**). The agent owns the approver pipe and the app is a client of it (**D-0054**). Autofill is deferred behind a condition that can fire (**D-0059**). The hosted tier is 5.2 as written, and the server cannot read the blob (**D-0060**).
 
-Three of them produced work rather than closing it: **H-0015** below, step **1.5**, and the `CONTRIBUTING.md` that D-0055 requires.
+Three of them produced work rather than closing it: **H-0015** below, step **1.5a**, and the `CONTRIBUTING.md` that D-0055 requires, which is written and gated by `.github/workflows/dco.yml` on every pull request.
 
 `[process]` — a row belongs here only while it is unmade, and **a default is not consent**: it is what the absence of a decision has already chosen on your behalf, written down so it stops being invisible. Nothing mechanical ages a row out of this table, which is how seven of them accumulated. The guard is that an answer must name a trigger, a step or a next command — never a preference.
 
@@ -106,14 +106,10 @@ D-0056 split H-0009 and this is the half that gets fixed. D-0046 closed it for t
 - **Verify** — `V-0012`
 - Traces to `docs/PRODUCT.md` law 3.4 — clipboard history persists the secret and cloud clipboard sends it off the machine, both by keypaste's doing — and to law 4.2 and law 4.5.
 
-### 1.5b — The pages say what the formats close, and what they do not [ ]
-
-Split from 1.5a because it fails differently. 1.5a fails by leaving a secret in Win+V; this one fails by claiming a safety the formats cannot deliver, which is the more dangerous of the two because nothing red appears.
+### 1.5b — The pages say what the formats close, and what they do not [x]
 
 - **Build** — "Correct every page that states the Windows clipboard-history gap as still open for the CLI. It is closed on both front ends — D-0046 for the app, 1.5a for the CLI. Say precisely what that buys: first-party Clipboard History and Cloud Clipboard are closed, while third-party clipboard managers and RDP or Citrix redirection are covered by nothing, because the formats are a request to well-behaved consumers and not an enforcement boundary. Do not write that the clipboard is safe. The claim appears in **`SECURITY.md`, `THREATS.md` T-19 and `launch.md`** — T-19 also recommends a `--show` workaround that is now unnecessary, and `launch.md` carries it twice, as a launch precondition and as an objection answer. Check `README.md`, `docs/demo.md` and `site/public/index.html` for copies too, and fix every one in the same change."
-- **Owner** — none.
-- **Verify** — `V-0013`
-- Traces to `docs/PRODUCT.md` law 3.4, and to D-0036 — a claim on a published page may only say what a gate or a citation can hold.
+- **Outcome** — six pages carried it, not the three the step named: `SECURITY.md`, `THREATS.md` T-19 and `launch.md` stated the claim, and `README.md`, `docs/demo.md` and `site/public/index.html` were checked and never had. Each names one residual in one order — third-party clipboard managers, then RDP and Citrix redirection — and each says the formats are a request to well-behaved consumers rather than an enforcement boundary. T-19 dropped the `--show` workaround. **No page claims the end-to-end result**, because only `V-0012`'s falsifier can hold it. V-0013 ran clean on 2026-08-26, falsifier first, and retired with the step — unbackticked here on purpose, because a live Verify lane is what backticks mark and this is a record of one that has been spent. D-0056.
 
 ## Stage 2 — The MCP bridge
 
@@ -166,7 +162,7 @@ The README rewrite and the landing page are done. The GIF is the only thing left
 ### 3.2 — The launch posts [ ]
 
 - **Build** — none. The copy is written and lives in `launch.md`.
-- **Owner** — **H-0006**, blocked by **H-0003** and by step **1.5**, which is the work D-0056 left behind when it answered H-0009. `launch.md`'s "Before anything goes out" list is the precondition set, and every item on it is false today.
+- **Owner** — **H-0006**, blocked by **H-0003** and by step **1.5a**, which is the half of the work D-0056 left behind that a green test cannot close: the code shipped, and `V-0012`'s falsifier still needs a person at a Windows machine. `launch.md`'s "Before anything goes out" list is the precondition set, and every item on it is false today.
 - **Verify** — `V-0002`
 - Traces to `docs/PRODUCT.md` law 5.3, community before customers.
 

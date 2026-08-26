@@ -139,7 +139,29 @@ for g in $skips; do
   compgen -G "$g" >/dev/null 2>&1 || die "$CI's paths-ignore names '$g', which matches nothing. A stale skip is a skip nobody is reading"
 done
 
+# --- G. a step reference points at a step that exists ------------------------------------------
+# The third application of the rule sections E and F already enforce: a reference that matches
+# nothing is a reference nobody is reading. E rejects a paths-ignore entry matching no file, F
+# rejects a GRANDFATHERED id that is no longer an open step, and this rejects prose pointing at a
+# step number that does not exist.
+#
+# A SPLIT IS EXACTLY WHEN THIS FIRES. Splitting 1.5 into 1.5a and 1.5b left two sentences still
+# saying "step 1.5" - one of them the Owner lane naming what blocks the launch - and nothing went
+# red, because the two halves passed every other check in this file. The prose kept pointing at a
+# step that had stopped existing, which is how a blocker survives the thing that resolved it.
+#
+# Deliberately scoped to step references and not to paths: a Build lane legitimately names a file
+# it is asking somebody to create, so "every backticked path exists" would fail on work not started.
+referenced=$(grep -oiE 'step \*\*[0-9]+\.[0-9]+[a-z]?\*\*|step [0-9]+\.[0-9]+[a-z]?' "$STEPS" \
+             | grep -oE '[0-9]+\.[0-9]+[a-z]?' | sort -u)
+
+for id in $referenced; do
+  grep -qE "^### $id — " "$STEPS" \
+    || die "$STEPS refers to step $id, and no '### $id — ' heading defines it. Either the step was renumbered - a split leaves the old number behind in prose that still reads correctly - or the reference is to something that never existed. Point it at the half that is still open"
+done
+
 echo "ok: every open step in $STEPS declares Build, Owner and Verify and traces to $PRODUCT;"
 echo "ok: $STEPS and $VERIF name the same verifiers; every verifier carries a falsifier and says to"
-echo "ok: run it first; $IDEAS has lost no rows; and $CI skips none of the pinned pages."
+echo "ok: run it first; $IDEAS has lost no rows; every step reference resolves to a step;"
+echo "ok: and $CI skips none of the pinned pages."
 echo "note: whether a falsifier can actually fire is [process] and is not checked here."
