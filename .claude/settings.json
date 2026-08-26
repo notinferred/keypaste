@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git ls-files:*)",
+      "Bash(git check-ignore:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(bash scripts/verify-docs.sh:*)",
+      "Bash(bash scripts/verify-demo.sh:*)",
+      "Bash(bash scripts/verify-aot-trim.sh:*)",
+      "Bash(dotnet build:*)",
+      "Bash(dotnet test:*)",
+      "Bash(dotnet format:*)"
+    ]
+  }
+}
