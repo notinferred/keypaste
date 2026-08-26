@@ -50,8 +50,8 @@ The repository itself is `notinferred/keypaste` and is **private**. Whether it g
 
 | what | where | note |
 |---|---|---|
-| The demo cast | `scripts/demo/` in this repo — committed on purpose so a take is reproducible | the pipeline is WSL-only |
-| The demo GIF | **does not exist yet** — Owner Queue **H-0005** | both pages reserve the slot |
+| The demo cast | the pipeline is `scripts/demo/` in this repo; an accepted take is committed at `docs/demo/keypaste-demo.cast` — **none exists yet**, Owner Queue **H-0005** | the pipeline is WSL-only. A cast is committed as text so anyone can grep it for the master password, the sentinel and the dialog `record-demo.sh` asserts — `scripts/demo/README.md` says why. One take was recorded and **rejected**: the credential was never released in it, which `record-demo.sh`'s positive control refuses, so it proved nothing and was not kept |
+| The demo GIF | **does not exist yet** — Owner Queue **H-0005** | both pages reserve the slot; it renders from the cast above, so it is blocked on the same take |
 | KeePassXC for the Windows compat job | fetched from the official zip, pinned by SHA-256 in `ci.yml` | changing the pin is a security decision |
 | Published `v0.1.0` assets | `https://dl.keypaste.com/v0.1.0/` — four native binaries, the corresponding source, and checksums | immutable; the pipeline will not republish a version |
 
