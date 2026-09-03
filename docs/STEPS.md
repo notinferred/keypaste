@@ -1,22 +1,48 @@
 # STEPS.md — every step to the finished product
 
-> This file evolves. `docs/PRODUCT.md` does not. Every step carries the **Build** prompt that produced it or will; open steps also carry **Owner** and **Verify**.
+> This file evolves. `docs/PRODUCT.md` does not. Every step carries the **Build** prompt that produced it or will; open steps also carry **Owner** and a **Falsifier** — the specific thing to try that would prove the step is *not* done.
 
-**The admission rule.** A step may be added only if it (a) has an accept criterion that can *fail*, (b) names its verifier in `docs/verification.md`, and (c) traces to a claim in `docs/PRODUCT.md`. Fails any one of those and it is a `docs/IDEAS.md` row, not a step. This is the termination condition: without it the plan grows forever.
+**The admission rule.** A step may be added only if it (a) has an accept criterion that can *fail*, (b) carries that falsifier, and (c) traces to a claim in `docs/PRODUCT.md`. Fails any one and it is a `docs/IDEAS.md` row, not a step. This is the termination condition: without it the plan grows forever.
+
+**Run the falsifier first.** If it fires, stop — the step is not done and nothing else you find changes that. Results are **PASS**, **FAIL** or **BLOCKED**; "looks right" is not a result, and BLOCKED is not a pass.
 
 **Every Build prompt runs with `docs/PRODUCT.md` in context.** It is law, and a prompt that has not read it will violate it.
+
+**This file used to be three files and a gate.** `docs/verification.md` held the falsifiers and `scripts/verify-docs.sh` enforced that the two agreed — lane symmetry, word caps, orphan checks — on a list of a dozen items. The falsifiers earned their keep; `V-0012`'s is the only reason anyone knows the Windows clipboard fix is unproven. The bookkeeping around them did not, so the falsifiers moved here and the rest is in git history. **A verifier still gets this file and the repository and not the builder's transcript** — shared context is how a build and its check agree with each other while both are wrong — but that is now a habit rather than a gate, which is honest about what it always was.
 
 ---
 
 ## Scope
 
 - **Built.** A KDBX4 vault the CLI creates, reads and writes, which KeePassXC opens in both directions. Env sets and `keypaste run` injection. The MCP bridge: scoped request, human approval, TTL, policy pre-approvals, and a hash-chained audit log. `v0.1.0` published as four native binaries. A desktop app that unlocks a vault, browses entries and edits env sets.
-- **Building.** Stage 3's launch, Stage 4's Agent Activity screen — the one screen that answers "what can act as me right now?" — the entry-level merge two machines and one Dropbox folder already need, and Stage 8's browser surface.
-- **Measured, not asserted.** Stage 4.5 and 4.6 are the reason the rest of this list can claim anything about a screen: a task bench with thresholds that can fail, and a renderer in CI so a pixel is evidence rather than a memory of having looked.
-- **Later, and gated.** Stages 5 to 7: sharing, a hosted tier, the delegation dashboard, teams. Their prompts are below with the condition each is gated on. None is a step until it can name a verifier.
+- **Building.** Stage 3's launch, Stage 4's Agent Activity screen — the one screen that answers "what can act as me right now?" — and the entry-level merge two machines and one Dropbox folder already need.
+- **Parked until somebody is using this.** The UX bench, headless render gates, and the browser surface — 4.5, 4.6, 8.1 and 8.2. They are `docs/IDEAS.md` rows with their prompts, and the reason is written there: each one measures or extends a product with no users, and a threshold nobody has held a human to is an assertion (D-0043). They come back when there is someone to measure.
+- **Later, and gated.** Stages 5 to 7: sharing, a hosted tier, the delegation dashboard, teams. Their prompts are below with the condition each is gated on. None is a step until it can carry a falsifier.
 - **Out, deliberately.** `docs/PRODUCT.md` §2 — a new vault format, a cloud service holding secrets, "for everyone", enterprise IAM. That list is locked and is the ratchet.
 
 **Settled, and not re-opened here.** The stack is C#/.NET on `net10.0` (D-0002) with xUnit v3 on Microsoft.Testing.Platform (D-0003). The KDBX library is vendored KeePassLib 2.61, chosen on maturity rather than licence (D-0007). The licence is AGPL-3.0 — see `LICENSE` — and every release publishes its corresponding source (D-0041). The desktop shell is Avalonia, after Photino and Tauri were both named in this file and neither survived being checked (D-0044).
+
+---
+
+## The standing gates
+
+These hold the steps that are already done. Each one is a script and the script is the specification, so none is re-derived here. **They run the software** — they build binaries, drive real `keepassxc-cli`, spawn real children, tamper with the audit chain.
+
+| gate | holds | observed failing |
+|---|---|---|
+| `scripts/verify-demo.sh` | every transcript on the five pinned pages matches what the shipped binaries print | yes — caught a mode-bit regression |
+| `scripts/verify-install.sh` | the README install block, executed verbatim, on a scratch `HOME` | yes — `--negative` decoy |
+| `scripts/verify-keepassxc-compat.sh` | the vault opens in a real `keepassxc-cli`. Permanent (law 4.6) | not recorded |
+| `scripts/verify-keepassxc-writeback.sh` | a KeePassXC edit is visible to `keypaste env ls` | not recorded |
+| `scripts/verify-run-injection.sh` | `run` injects into a real child and writes nothing to disk | not recorded |
+| `scripts/verify-run-signals.sh` | SIGTERM reaches the child; exit status is reported. Unix only | not recorded |
+| `scripts/verify-mcp-stdio.sh` | nothing but protocol on stdout; every call audited | not recorded |
+| `scripts/verify-approval-e2e.sh` | approved returns the secret, refused returns nothing, neither is logged | not recorded |
+| `scripts/verify-policy-e2e.sh` | a standing rule grants silently; a rule can never widen | not recorded |
+| `scripts/verify-log-chain.sh` | tampering is detected; truncation reads as damage, not attack | not recorded |
+| `scripts/verify-aot-trim.sh` | no new trim diagnostic naming `src/` | yes — an empty log is a failure |
+
+**The "observed failing" column is the point.** A check nobody has watched fail is an assertion about the world, not a check on it (D-0043). Eight of these have never been recorded failing, and filling that column in is real work that is not done. It is also the cheapest work on this page: break one on purpose, watch it go red, put it back.
 
 ---
 
@@ -33,7 +59,7 @@ What only a human can do. **Split in two, because listing them together is why n
 | **H-0005** | Record the demo GIF — WSL only, a real Claude session, a human keystroke, three to eight takes budgeted | `scripts/demo/install-recording-tools.sh` (needs sudo), then `record-demo.sh` | 3.1 |
 | **H-0006** | Post the launch to the five channels | `launch.md` holds the copy and the preconditions | — |
 | **H-0007** | Answer every issue and comment for two weeks after the launch | — | — |
-| **H-0010** | Run the twenty-one item checklist in `docs/desktop.md` | 4.6 will strike most of it; run what remains | any desktop claim |
+| **H-0010** | Run the twenty-one item checklist in `docs/desktop.md` | run it by hand; the render gates that would have struck most of it are parked | any desktop claim |
 | **H-0011** | Run the pre-deploy checklist in `site/README.md` before any keypaste.com deploy | `site/README.md`; D-0037 declined to gate it | every deploy |
 | **H-0015** | Enrol in the Apple Developer Program so macOS binaries can be notarized (**D-0057**) — 99 USD a year, and only a person can accept the agreement | developer.apple.com/programs/enroll, then put the credentials in repository secrets for `release.yml` | the next `v*` tag |
 
@@ -68,7 +94,7 @@ Three of them produced work rather than closing it: **H-0015** below, step **1.5
 
 - **Build** — none. Nothing here is agent-runnable.
 - **Owner** — **H-0001**. H-0002 is answered by D-0058: the name is used and not defended.
-- **Verify** — `V-0006`
+- **Falsifier** — open `https://github.com/keypaste` **logged out**. If it resolves to somebody else's account or organisation, this is FAIL and the name question is bigger than a registration. Same for `npmjs.com/package/keypaste`. Then: all are held by this project, or `DECISIONS.md` records which were unavailable and what the product is called there instead; `launch.md`'s canonical link matches whatever was registered; and the trademark question has an answer even if the answer is "not worth filing" (D-0058: it is). **BLOCKED** if the registries load but you cannot confirm ownership logged out.
 - Traces to `docs/PRODUCT.md` law 5.2, and to §1 — the product has to be findable under the name it claims.
 
 ## Stage 1 — Env variables and injection
@@ -94,7 +120,7 @@ Three of them produced work rather than closing it: **H-0015** below, step **1.5
 
 - **Build** — "Implement `Vault.Merge` in `Keypaste.Core` and `keypaste merge <other.kdbx>` as a thin CLI over it, resolving O-0018. Match entries by **KDBX entry UUID only** — never by title or group path, because title matching is how the wrong secret is silently overwritten. For each incoming entry: absent locally, add it under its own group path; present and identical, no-op; present and differing, the newer `LastModificationTime` wins **and the superseded value is pushed onto that entry's KDBX history**, so nothing is destroyed and the loser is still readable in KeePassXC. Equal timestamps with differing content is a **conflict: name every conflicting entry, write nothing, exit nonzero** (law 3.7). **Deletions never propagate** — an entry absent from the incoming file is not a deletion, because a scoped file is a subset by construction, and reading absence as intent would let a four-entry file empty a vault. Support `--key <path>` and `--key-b64` for a keyfile-protected source, which means wiring `KcpKeyFile` into `KeePassInterop` — that file stays the only one in the repository permitted to reference KeePassLib (D-0007), and whether vendored KeePassLib 2.61's keyfile path round-trips against real `keepassxc-cli` is the first thing to establish, before anything is built on it. Print the plan and require an explicit confirmation before writing, with `--yes` for scripts and `--dry-run` to print and stop. Add `scripts/verify-merge.sh` proving: a merged vault opens in real `keepassxc-cli`; merging the same file twice is a no-op with no duplicate UUIDs; an older incoming entry does not overwrite a newer local one; and the superseded value survives in history. Record the conflict policy and the deletion decision as **D-0052**, and either close O-0018 or state precisely what remains open."
 - **Owner** — none.
-- **Verify** — `V-0007`
+- **Falsifier** — build a vault holding one entry and note its value. Build a second file carrying the **same entry UUID** with a different value and an **older** `LastModificationTime`. Run `keypaste merge`. **If the local value changed, FAIL** — taking the incoming side because it is the incoming side is file-order precedence, not a merge. Then: (1) the identical merge a second time reports no changes and produces no duplicate UUIDs; (2) equal timestamps with differing content exits nonzero, names every conflict, and leaves the vault **byte-identical** — check the hash, not the output; (3) a four-entry file merged into a forty-entry vault leaves all forty, because absence is not deletion; (4) an entry that lost has its superseded value recoverable from KDBX history; (5) renaming an incoming entry's title but keeping its UUID updates rather than adds, and the reverse adds rather than overwrites — that pair is what proves the match key is the UUID; (6) `scripts/verify-keepassxc-compat.sh` is still green. **BLOCKED** without a real `keepassxc-cli`.
 - Traces to `docs/PRODUCT.md` §2 (sync is the user's problem), law 4.3 and law 4.6.
 
 ### 1.5a — The Windows CLI copies through one Win32 clipboard session [ ]
@@ -103,13 +129,13 @@ D-0056 split H-0009 and this is the half that gets fixed. D-0046 closed it for t
 
 - **Build** — "Replace the `clip.exe` shell-out in `Keypaste.Cli`'s Windows clipboard path with a Win32 one that can express KeePassXC's three opt-out formats: `ExcludeClipboardContentFromMonitorProcessing`, `CanIncludeInClipboardHistory` and `CanUploadToCloudClipboard`. Set the text and all three inside **one** `OpenClipboard`/`EmptyClipboard`/`SetClipboardData`×N/`CloseClipboard` session — the history service acts on the notification raised at `CloseClipboard`, so a second session to add the markers has already leaked. P/Invokes go in one `[SupportedOSPlatform(\"windows\")]` class; satisfy the trim and AOT analysers rather than suppressing them. macOS and Linux are untouched and O-0019 stays open. Law 4.5 keeps the tests in this step: assert every registered name with a `GetClipboardFormatName` round-trip rather than trusting the literal, and make the clear guard compare a hash so no plaintext copy lives for the timeout window."
 - **Owner** — none.
-- **Verify** — `V-0012`
+- **Falsifier** — **the code is written and its unit tests pass; this is all that is left.** On a real Windows machine with Clipboard History enabled (Settings → System → Clipboard), run `keypaste get` on an entry so the password reaches the clipboard. Press **Win+V** before the clear timeout expires, and again after. **If the value appears in the history panel at either moment, FAIL.** Then check cloud clipboard on a second machine signed into the same account. A VM is fine; Wine or WSL is not — WSL does not go through the Windows clipboard the way the shipped binary does, so testing there proves nothing. Then: (1) `GetClipboardFormatName` round-trips every registered format, asserted in a test — KeePassXC ships `"CanUploadToCloudClipboard "` with a trailing space in every released version, which registers a different and meaningless format no review would catch; (2) all formats are set in **one** `OpenClipboard`/`EmptyClipboard`/`SetClipboardData`×N/`CloseClipboard` session, because the history service acts on the notification raised at `CloseClipboard`; (3) the clear guard holds a hash, not the secret; (4) the clear still refuses to wipe something the user copied afterwards; (5) macOS and Linux are untouched and O-0019 is still open. **BLOCKED** without a real Windows machine with clipboard history on — a green Linux suite is not evidence about a Windows clipboard.
 - Traces to `docs/PRODUCT.md` law 3.4 — clipboard history persists the secret and cloud clipboard sends it off the machine, both by keypaste's doing — and to law 4.2 and law 4.5.
 
 ### 1.5b — The pages say what the formats close, and what they do not [x]
 
 - **Build** — "Correct every page that states the Windows clipboard-history gap as still open for the CLI. It is closed on both front ends — D-0046 for the app, 1.5a for the CLI. Say precisely what that buys: first-party Clipboard History and Cloud Clipboard are closed, while third-party clipboard managers and RDP or Citrix redirection are covered by nothing, because the formats are a request to well-behaved consumers and not an enforcement boundary. Do not write that the clipboard is safe. The claim appears in **`SECURITY.md`, `THREATS.md` T-19 and `launch.md`** — T-19 also recommends a `--show` workaround that is now unnecessary, and `launch.md` carries it twice, as a launch precondition and as an objection answer. Check `README.md`, `docs/demo.md` and `site/public/index.html` for copies too, and fix every one in the same change."
-- **Outcome** — six pages carried it, not the three the step named: `SECURITY.md`, `THREATS.md` T-19 and `launch.md` stated the claim, and `README.md`, `docs/demo.md` and `site/public/index.html` were checked and never had. Each names one residual in one order — third-party clipboard managers, then RDP and Citrix redirection — and each says the formats are a request to well-behaved consumers rather than an enforcement boundary. T-19 dropped the `--show` workaround. **No page claims the end-to-end result**, because only `V-0012`'s falsifier can hold it. V-0013 ran clean on 2026-08-26, falsifier first, and retired with the step — unbackticked here on purpose, because a live Verify lane is what backticks mark and this is a record of one that has been spent. D-0056.
+- **Outcome** — six pages carried it, not the three the step named: `SECURITY.md`, `THREATS.md` T-19 and `launch.md` stated the claim, and `README.md`, `docs/demo.md` and `site/public/index.html` were checked and never had. Each names one residual in one order — third-party clipboard managers, then RDP and Citrix redirection — and each says the formats are a request to well-behaved consumers rather than an enforcement boundary. T-19 dropped the `--show` workaround. **No page claims the end-to-end result**, because only step 1.5a's falsifier in `docs/STEPS.md` can hold it. The six-point check ran clean on 2026-08-26, falsifier first, and retired with the step. D-0056.
 
 ## Stage 2 — The MCP bridge
 
@@ -156,21 +182,21 @@ The README rewrite and the landing page are done. The GIF is the only thing left
 
 - **Build** — "Trim the recorded cast to under 2 MB, render it to `docs/demo/keypaste-demo.gif`, and drop it into the slot `README.md` and `site/public/index.html` already reserve. Nothing else on either page moves."
 - **Owner** — **H-0005**. The take itself: WSL only, a real Claude session, a human keystroke.
-- **Verify** — `V-0001`
+- **Falsifier** — `ls -l docs/demo/keypaste-demo.gif`. Absent is FAIL; 2 MB or larger is FAIL, because the budget is what keeps the README usable on a phone. Then: both `README.md` and `site/public/index.html` reference it and neither still carries the reserving HTML comment; the GIF shows, in order, an agent asking, the approval dialog with a reason, a human answering, and the log afterwards — a GIF of a terminal scrolling is not the demo; and `scripts/verify-demo.sh` is still green, so the transcripts around the slot did not move when the image landed. **Before rendering, the cast must pass `record-demo.sh`'s own controls** — one take was rejected on 2026-08-26 for never releasing the credential.
 - Traces to `docs/PRODUCT.md` law 5.1, the demo is the marketing.
 
 ### 3.2 — The launch posts [ ]
 
 - **Build** — none. The copy is written and lives in `launch.md`.
-- **Owner** — **H-0006**, blocked by **H-0003** and by step **1.5a**, which is the half of the work D-0056 left behind that a green test cannot close: the code shipped, and `V-0012`'s falsifier still needs a person at a Windows machine. `launch.md`'s "Before anything goes out" list is the precondition set, and every item on it is false today.
-- **Verify** — `V-0002`
+- **Owner** — **H-0006**, blocked by **H-0003** and by step **1.5a**, which is the half of the work D-0056 left behind that a green test cannot close: the code shipped, and step 1.5a's falsifier in `docs/STEPS.md` still needs a person at a Windows machine. `launch.md`'s "Before anything goes out" list is the precondition set, and every item on it is false today.
+- **Falsifier** — read `launch.md`'s "Before anything goes out" list. **If any box there is unticked, FAIL** regardless of what was posted; each item is something a stranger hits before they hit the product. Then: every one of the five channels has a live URL that loads for a logged-out reader; every link inside every post resolves — if the repository is still private, every repository link is a 404 for the audience the post was written for, and that is FAIL, not a caveat; and the install command in each post matches what `README.md` currently documents. **BLOCKED** if the posts exist but you cannot see them logged out.
 - Traces to `docs/PRODUCT.md` law 5.3, community before customers.
 
 ### 3.3 — Two weeks of answering [ ]
 
 - **Build** — none.
 - **Owner** — **H-0007**.
-- **Verify** — `V-0003` `[process]`
+- **Falsifier** `[process]` — find the oldest issue or comment opened after the launch date with no reply from the maintainer. If one exists and is older than 48 hours, FAIL. Not mechanizable: whether a reply was *useful* is a judgement, so this is a person reading the issue tracker and it is second-class until something better exists.
 - Traces to `docs/PRODUCT.md` law 5.3.
 
 ## Stage 4 — The desktop app
@@ -191,59 +217,19 @@ The seed of the delegation dashboard, and the screen the product is named for.
 
 - **Build** — "Build the Agent Activity screen — the seed of the delegation dashboard: a live feed of incoming agent requests with Approve/Deny buttons replacing the OS dialog when the app is open; a history list from the audit log; per-client summary cards (client name, total requests, last seen, standing policy rules affecting it) with a 'revoke/pause this client' toggle that flips a deny-all policy rule. This screen must make a screenshot-worthy answer to 'what can act as me right now?' — design it like the product's hero feature, because it is."
 - **Owner** — none. D-0054 settled the pipe: the agent keeps it and this screen is a client of the agent, not a second binder. Building that UI-client channel is part of this step.
-- **Verify** — `V-0004`
+- **Falsifier** — start the app with **no `keypaste agent` running** and open Agent Activity. If the screen renders as though it were live — an empty feed presented as "no requests" rather than as "nothing is listening" — **FAIL**. A screen that cannot tell "nobody asked" from "nothing is connected" is worse than no screen, because it reads as a safety claim. Then, with a real agent connected: (1) drive a `request_credential` and watch it appear in the feed *before* it is answered — a screen that only shows history is not this step; (2) approve from the app: the secret reaches the client and the log names the app as the channel; (3) deny from the app: nothing reaches the client; (4) toggle revoke/pause on a client card, request again, and it is refused with `keypaste policy ls` showing the deny-all rule the toggle wrote; (5) kill the app mid-request — it fails closed; (6) lock the vault — the feed stops showing entry names. **All six.** (4) is what makes it a control panel rather than a log viewer.
 - Traces to `docs/PRODUCT.md` §1, wedge item 4.
 
 ### 4.4 — Approval prompts leave the terminal [ ]
 
 - **Build** — "Move the approval prompt from the terminal to a native window or tray notification, keeping `keypaste agent`'s terminal channel working for headless use. Default deny, timeout deny and every error path deny must hold identically on both channels."
 - **Owner** — none. D-0054 applies here too: the terminal channel stays because the agent never stops owning the pipe.
-- **Verify** — `V-0005`
+- **Falsifier** — trigger a request with the native prompt on screen and do nothing until the timeout expires. **If it resolves to anything other than deny, FAIL** — and check the same on the terminal channel, because the defect that matters is the two channels disagreeing. Then, for each channel independently: (1) dismissing the window is a denial, not a cancel; (2) timeout is deny; (3) killing the approver mid-prompt refuses the client; (4) the reason string is the agent's, rendered as untrusted text — send newlines and terminal escapes and confirm neither channel draws a second prompt; (5) headless still works, with no display `keypaste agent` prompts in the terminal. **All five on both channels.** Any behaviour holding on one channel and not the other is FAIL, because two security paths is what law 4.3 forbids.
 - Traces to `docs/PRODUCT.md` law 3.2 and law 3.7.
-
-### 4.5 — The UX bench [ ]
-
-`docs/IDEAS.md` already threw out "design language: modern, calm, trustworthy" for the right reason: nothing about it can fail. This is the same ambition rebuilt so that it can.
-
-- **Build** — "Write `docs/ux.md`: keypaste's UX bench, adapted from Google's HEART and its Goals–Signals–Metrics discipline. **Take three of the five dimensions and strike the other two on the page, with the reason.** Task success, Happiness and Adoption are observable; Engagement and Retention require behavioural telemetry, which law 3.5 forbids forever — so they are struck out in the document itself rather than quietly omitted, because a framework silently missing two fifths reads as a framework that was followed. Define every task as `T-NN`, each with: the surface it runs on, the exact words given to the participant, a **numeric threshold that can fail** (time-to-complete and a success ratio out of five), and the method that produces the number. Cover at minimum first unlock, copy a password, inject an env set into a real command, approve an agent request, deny one, and find out afterwards why something was denied. Then write `scripts/verify-ux.sh` asserting that (a) every task in `docs/ux.md` carries a numeric threshold and a named method, (b) every open step in `docs/STEPS.md` that touches a user-visible surface names at least one `T-NN`, and (c) no task's threshold is written as a range or a word — 'fast' is not a threshold. Nielsen's five-participant finding is why the ratio is out of five; say so on the page so the number is not mistaken for statistics."
-- **Owner** — running the sessions is `[process]`. A threshold nobody has measured against a human is an assertion, exactly as D-0043 says.
-- **Verify** — `V-0008`
-- Traces to `docs/PRODUCT.md` law 5.1 — the demo is the marketing, and a demo nobody can complete in sixty seconds is a claim rather than a demo.
-
-### 4.6 — The app draws in CI [ ]
-
-Closes O-0020. Everything Stage 4 and Stage 8 claim about a screen rests on this existing first.
-
-- **Build** — "Resolve O-0020. Add `Avalonia.Headless` with the Skia backend to `tests/Keypaste.App.Tests` so views render to a bitmap with **no display of any kind**, and assert on the pixels. Golden images are generated and compared on **Linux only** — font stacks and subpixel rendering differ per platform, so cross-platform pixel equality is a test that fails for reasons nobody caused; on macOS and Windows run the same renders and assert structurally (element bounds, visibility, computed colours) instead. **The assertions that matter are secret-path assertions, and they come first:** the password field renders as dots and never as characters; a masked env value renders as dots until held; releasing a hold returns it to dots within one frame; and a locked window renders no entry titles at all. Then the rest: the unlock empty state, both themes, the clipboard countdown mid-drain, and every screen at a narrow and a wide window. Store goldens under `tests/Keypaste.App.Tests/golden/`, fail on any diff above a stated anti-aliasing tolerance, and write the failing render to the CI artifacts so a red build can be looked at rather than guessed at. Add the job to `app.yml`, not `ci.yml` — the app already has its own workflow and its own solution so that backend work does not pay to build it. Update `docs/desktop.md` to strike the checklist items this now covers, and state plainly which of the twenty-one still need a human."
-- **Owner** — none.
-- **Verify** — `V-0009`
-- Traces to `docs/PRODUCT.md` law 4.5 — tests on the secret path are mandatory, and in a GUI the screen *is* a secret path: nothing else can prove a value the user did not ask to reveal was never drawn.
-
-## Stage 8 — The browser
-
-Numbered clear of 5 through 7 deliberately: those are gated on launch and revenue, and this is not. The browser is where agents increasingly live, and `docs/keepass-and-agents.md` already argues that the KDBX ecosystem answered "another program wants a credential" once before, with a local pipe and a Confirm Access dialog.
-
-### 8.1 — Native messaging host [ ]
-
-- **Build** — "Build `keypaste-browser-host`: a native-messaging host speaking Chrome's 32-bit-length-prefixed JSON framing over stdio, and an extension skeleton that loads in both Chrome (MV3 service worker) and Firefox (MV3 with an event page, since Firefox's MV3 differs and a single build must load in both or the story is two extensions). **The host holds no vault and decides nothing** — it relays to a running `keypaste agent` over the same local channel `keypaste-mcp` already uses, preserving the D-0023 split exactly: the only process that ever sees a master password is the one the human started. Add `keypaste browser install [--chrome] [--firefox] [--edge]` writing the native-messaging manifest to the correct per-OS location (registry keys on Windows, `NativeMessagingHosts/` on macOS and Linux) with the extension ID pinned, and `keypaste browser uninstall` removing exactly what it wrote and nothing else. **Fail closed and legibly:** no agent running means the extension says so and offers the command to start one — never a password prompt, never a silent retry, because a convincing prompt is what any program on the machine can already draw. Extend THREATS.md with the new surface: a store's auto-update channel can push code to users without a git tag, which is the first time that has been true of anything keypaste ships; state what is and is not signed, and what a compromised extension can and cannot reach given the host holds no vault."
-- **Owner** — registering on the Chrome Web Store and on AMO, and whatever identity each demands. Extension IDs must exist before the manifest can pin them.
-- **Verify** — `V-0010`
-- Traces to `docs/PRODUCT.md` §1 wedge item 3, law 3.1 and law 3.7.
-
-### 8.2 — The approval moment, one spec, three surfaces [ ]
-
-The signature moment, rendered the same everywhere it appears.
-
-- **Build** — "Write the approval moment once in `docs/ux.md` — the fields, their order, the wording, the defaults, the timeout — and make the terminal prompt, the desktop Agent Activity screen and the browser extension popup all render *that*, with no surface inventing a field or a default of its own. Then build the popup: who is asking, which entry, which field, for how long, and the agent's stated reason **rendered as untrusted text and labelled as the agent's words**, with newlines and terminal escapes and RTL overrides all defanged. Default deny; closing the popup is a denial, not a cancel; the 45-second timeout is a denial and the countdown is visible. Add a task to `docs/ux.md` and hold all three surfaces to the **same** `T-NN` threshold — if approving takes twice as long in one of them, that is a failure of that surface and not a property of it. Screenshot-test the popup in headless Chrome and headless Firefox the way 4.6 does the app."
-- **Owner** — none. D-0054 answers it for all three: the agent owns the pipe and every surface is a client of it, so the popup is a third renderer rather than a third binder.
-- **Verify** — `V-0011`
-- Traces to `docs/PRODUCT.md` law 3.2, law 3.7 and law 4.3 — one core, no second security path.
-
----
 
 ## Gated — the prompts are written, the steps are not open
 
-None of these is a step. Each is gated on something that has not happened, and none can name an accept criterion that would fail today, so under the admission rule they are `docs/IDEAS.md` rows carrying their prompt here. They become steps by earning a verifier, not by being wanted.
+None of these is a step. Each is gated on something that has not happened, and none can name an accept criterion that would fail today, so under the admission rule they are `docs/IDEAS.md` rows carrying their prompt here. They become steps by carrying a falsifier, not by being wanted.
 
 ### 5.0 — The share bundle (gated on 1.4, and on this tracing to anything)
 

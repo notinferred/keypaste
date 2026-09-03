@@ -11,16 +11,16 @@ on:
     # docs/keepass-and-agents.md and site/public/index.html. scripts/verify-demo.sh holds all five
     # to what the shipped binaries actually print (D-0034, D-0036), so editing one of them is a
     # code change wearing a markdown extension and it costs a build on purpose.
-    # scripts/verify-docs.sh now asserts that absence rather than trusting this comment, and it
-    # also refuses a 'docs/**' entry here, which would skip two of the five silently.
+    # A gate used to assert that absence rather than trusting this comment. It was deleted along
+    # with the document ceremony it enforced, so this is a comment again and it is worth knowing
+    # which: NEVER add a 'docs/**' entry here. It would skip docs/demo.md and
+    # docs/keepass-and-agents.md silently, turning verify-demo.sh off without turning anything red.
     #
-    # The governance documents below skip this workflow and are gated by docs.yml instead, which
-    # runs bash only and needs no restore.
+    # The governance documents below skip this workflow because nothing in it reads them.
     paths-ignore:
       - 'docs/PRODUCT.md'
       - 'CLAUDE.md'
       - 'docs/STEPS.md'
-      - 'docs/verification.md'
       - 'docs/IDEAS.md'
       - 'docs/ARTIFACTS.md'
       - 'DECISIONS.md'
