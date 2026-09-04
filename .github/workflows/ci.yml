@@ -90,6 +90,12 @@ jobs:
       - name: Verify formatting
         run: dotnet format keypaste.slnx --no-restore --verify-no-changes --exclude third_party/
 
+      # A step in the job that already runs, rather than a workflow of its own: bash and the
+      # repository, about a second, and nothing new on any push. Only check A is meaningful here -
+      # check B needs a working tree and says so instead of contributing a green it did not earn.
+      - name: The documents point at things that exist
+        run: bash scripts/verify-claims.sh
+
       - name: Build
         run: dotnet build keypaste.slnx --no-restore -c Release -warnaserror
 
