@@ -35,12 +35,15 @@ die() { echo "::error::$*" >&2; exit 1; }
 # --- A. a step reference points at a step that exists --------------------------------------------
 # The trailing letter matters: a split produces 1.5a and 1.5b, and a pattern that only accepted
 # <n.n> would silently stop checking the two steps the split just created.
-referenced=$(grep -oiE 'step \*\*[0-9]+\.[0-9]+[a-z]?\*\*|step [0-9]+\.[0-9]+[a-z]?' "$STEPS" \
-             | grep -oE '[0-9]+.[0-9]+[a-z]?' | sort -u || true)
+# Citations live in every document, not only the plan; the plan itself defines steps rather than citing them.
+readonly CITING='docs/*.md DECISIONS.md launch.md THREATS.md SECURITY.md README.md CHANGELOG.md CONTRIBUTING.md'
+referenced=$(grep -ohiE 'step \*\*[0-9]+\.[0-9]+[a-z]?\*\*|step [0-9]+\.[0-9]+[a-z]?' $CITING \
+             | grep -oE '[0-9]+\.[0-9]+[a-z]?' | sort -u || true)
+[ -n "$referenced" ] || die "no 'step N.N' citation found in any document, which means this check examined nothing"
 
 for id in $referenced; do
   grep -qE "^(### $id — |- \[[ x]\] \*\*$id )" "$STEPS" \
-    || die "$STEPS refers to step $id, and no '### $id — ' heading or '- [ ] **$id ' row defines it. Either the step was renumbered - a split leaves the old number behind in prose that still reads correctly - or the reference is to something that never existed"
+    || die "a document refers to step $id, and no '### $id — ' heading or '- [ ] **$id ' row in $STEPS defines it. Either the step was renumbered - a split leaves the old number behind in prose that still reads correctly - or the reference is to something that never existed"
 done
 
 # --- B. nothing is untracked and unignored -------------------------------------------------------
@@ -57,7 +60,7 @@ else
   fi
 fi
 
-echo "ok: every step reference in $STEPS resolves to a step that exists."
+echo "ok: every step cited in the documents resolves to a step $STEPS defines ($(echo $referenced | wc -w) ids)."
 if [ "$b_ran" = yes ]; then
   echo "ok: nothing is sitting in the working tree untracked and unignored."
 else
