@@ -8,12 +8,14 @@
 > a real machine — are ordinary steps, sequenced inline, keeping the `H-` id other files cite.
 >
 > **Tiers — three, and they are the product's plans seen from the build side** (`docs/PRODUCT.md` §5.6,
-> D-0063; figures live only in the working file `docs/ARTIFACTS.md` names).
-> - `[MVP]` — **the first dollar** (D-0065): what ships today launched to strangers, the desktop app
->   released and signed, and the **Individual** plan — the relay, hosted sync, share links, billing.
->   Nobody is charged before 4.7 and 5.2 have both shipped (D-0065).
-> - `[Launch]` — **the Free plan finished**: the password manager a stranger expects — browser autofill,
->   importers, TOTP, an SSH agent — plus the UX bench and the render gates, paid for by the tier above.
+> D-0063; figures live only in the working file the Not-in-git table in `DECISIONS.md` names).
+> - `[MVP]` — **what a stranger can install this month** (D-0077): the names, the public repository,
+>   the demo GIF, the launch and its two weeks of answering, and the desktop app released and signed.
+>   Nothing new is built here; what exists is finished and shown.
+> - `[Launch]` — **the first dollar, then the Free plan finished**: the relay, hosted sync, share links
+>   and Individual billing — nobody is charged before 4.7 and 5.2 have both shipped (D-0065) — with the
+>   merge that sync needs, Agent Activity with the headline number and the native prompt; then browser
+>   autofill, importers, TOTP, an SSH agent, the UX bench and the render gates.
 > - `[Scale]` — **the Team plan**: shared env sets, the broker, SSO for the hosted service, the delegation
 >   center, the team dashboard.
 >
@@ -23,7 +25,7 @@
 > expanded when its tier opens, and the long prompts this file used to carry are in git at `f27cb56`.
 >
 > **Admission rule.** A step exists only if it (1) has a Verify line that can *fail*, and (2) traces to a
-> claim in `docs/PRODUCT.md`. Otherwise it is a `docs/IDEAS.md` row, not a step.
+> claim in `docs/PRODUCT.md`. Otherwise it is an Ideas row in `DECISIONS.md`, not a step.
 >
 > **This file is mutable; `docs/PRODUCT.md` §3 is not, and its other sections change only by a dated
 > re-ratification** (v1.1, D-0061). Anything that would bend a law stops and becomes a `DECISIONS.md`
@@ -76,7 +78,7 @@ and H-0014 were decisions, answered by D-0054 to D-0060; H-0011 is the site's pr
   KeePassXC gate is permanent on three OSes. D-0007, D-0008.
 - [x] **0.3 `[MVP]` — Core CLI verbs.** `init add get ls rm`; exit codes 0–5; one line per prompt on a
   pipe. D-0009 to D-0012.
-- [ ] **1.4 `[MVP]` — Entry-level merge.** `Vault.Merge` in `Keypaste.Core` and `keypaste merge
+- [ ] **1.4 `[Launch]` — Entry-level merge.** `Vault.Merge` in `Keypaste.Core` and `keypaste merge
   <other.kdbx>` over it: match on entry UUID only; newer `LastModificationTime` wins and the loser goes
   to KDBX history; equal timestamps with differing content is a conflict that names every entry, writes
   nothing and exits nonzero; absence is never a deletion; `--key` wires `KcpKeyFile` into
@@ -142,7 +144,7 @@ and H-0014 were decisions, answered by D-0054 to D-0060; H-0011 is the site's pr
   D-0031, D-0032.
 - [x] **2.5 `[MVP]` — The 60-second demo.** `docs/demo.md`, held to the binaries by `verify-demo.sh`;
   Claude deliberately not in CI. D-0033 to D-0035.
-- [ ] **4.4 `[MVP]` — The approval prompt leaves the terminal.** A native window or tray notification on
+- [ ] **4.4 `[Launch]` — The approval prompt leaves the terminal.** A native window or tray notification on
   the agent, with the terminal channel kept for headless use; both render the same fields in the same
   order with the agent's reason as untrusted text; default deny, timeout deny, every error path deny on
   both. **Verify (V-native-prompt):** with the native prompt on screen, doing nothing until timeout
@@ -162,7 +164,16 @@ and H-0014 were decisions, answered by D-0054 to D-0060; H-0011 is the site's pr
   lock on two clocks. D-0044.
 - [x] **4.2 `[MVP]` — Entry and env screens.** Generator, shared clipboard rule, lost-write guard.
   D-0045 to D-0050.
-- [ ] **4.3 `[MVP]` — Agent Activity and the headline number.** A UI-client message kind on
+- [ ] **4.7 `[MVP]` — The app is released.** `app.yml` publishes `keypaste-app` for `win-x64`,
+  `osx-arm64` and `linux-x64` on a `v*` tag beside the CLI under the same immutability rule: a signed
+  installer on Windows (3.6), a notarized `.dmg` on macOS (3.5), a `.tar.gz` and AppImage on Linux with
+  the four runtime packages asserted on Debian 12; `--selftest` and `--version` on every artifact before
+  upload; the measured size on both pages (O-0016); the "unsigned" sentences rewritten; O-0015 and
+  O-0016 closed in `DECISIONS.md`. **Verify (V-app-release):** on a fresh Windows VM a browser-downloaded
+  installer opens with no SmartScreen wall; on a fresh macOS the `.dmg` opens with no quarantine
+  prompt; `--version` equals the tag; the page's size equals the archive's within 1 MB; the app opens a
+  vault the CLI created; the checksum verifies. *Fails if* either OS shows a wall, or any of the rest.
+- [ ] **4.3 `[Launch]` — Agent Activity and the headline number.** A UI-client message kind on
   `ApproverProtocol` (subscribe, list-pending, answer) so the app is a client of the running agent
   (D-0054). At the top: **what can act as you right now** = live connections + unexpired grants +
   standing `[[allow]]` rules, each shown beside the sum (D-0066); with no agent listening the screen
@@ -174,15 +185,6 @@ and H-0014 were decisions, answered by D-0054 to D-0060; H-0011 is the site's pr
   refused; killing the app mid-request fails closed; locking clears entry names; a 60-second grant moves
   the number up and, at expiry, down without a refresh. *Fails if* an empty feed reads as "no requests",
   or any of the eight.
-- [ ] **4.7 `[MVP]` — The app is released.** `app.yml` publishes `keypaste-app` for `win-x64`,
-  `osx-arm64` and `linux-x64` on a `v*` tag beside the CLI under the same immutability rule: a signed
-  installer on Windows (3.6), a notarized `.dmg` on macOS (3.5), a `.tar.gz` and AppImage on Linux with
-  the four runtime packages asserted on Debian 12; `--selftest` and `--version` on every artifact before
-  upload; the measured size on both pages (O-0016); the "unsigned" sentences rewritten; O-0015 and
-  O-0016 closed in `DECISIONS.md`. **Verify (V-app-release):** on a fresh Windows VM a browser-downloaded
-  installer opens with no SmartScreen wall; on a fresh macOS the `.dmg` opens with no quarantine
-  prompt; `--version` equals the tag; the page's size equals the archive's within 1 MB; the app opens a
-  vault the CLI created; the checksum verifies. *Fails if* either OS shows a wall, or any of the rest.
 - [ ] **4.5 `[Launch]` — The UX bench.** `docs/ux.md`: HEART with Engagement and Retention struck on the
   page (law 3.5); every task `T-NN` with the surface, the exact words, a numeric threshold out of five
   and a method — first unlock, copy, inject, approve, deny, find out why, fill a login;
@@ -223,7 +225,7 @@ and H-0014 were decisions, answered by D-0054 to D-0060; H-0011 is the site's pr
 
 ## F · Sync, relay & billing
 
-- [ ] **5.2 `[MVP]` — The relay binary.** `src/Keypaste.Relay`, one NativeAOT binary with the same gates
+- [ ] **5.2 `[Launch]` — The relay binary.** `src/Keypaste.Relay`, one NativeAOT binary with the same gates
   and lock files as the others (D-0064), over S3-compatible storage and SQLite for accounts and licence
   keys; per-device keys; endpoints put-blob, get-blob with ETag, list-versions, one-download bundle;
   stores ciphertext and metadata only — a test greps the project for every vault type and fails on one;
@@ -233,33 +235,33 @@ and H-0014 were decisions, answered by D-0054 to D-0060; H-0011 is the site's pr
   contain no sentinel, master password or entry title; `strings` over the binary finds no KeePassLib
   type; the script passes against the published binary in `release.yml`. *Fails if* a plaintext byte is
   in either store.
-- [ ] **5.3 `[MVP]` — Sync in the clients.** `keypaste sync` and the app's Sync screen: pull, `Vault.Merge`
+- [ ] **5.3 `[Launch]` — Sync in the clients.** `keypaste sync` and the app's Sync screen: pull, `Vault.Merge`
   (1.4), push with the ETag so a lost write is a refused write; conflicts surface as 1.4 defines them.
   **Verify (V-sync):** two machines editing different entries converge to one vault with both; the same
   entry edited on both with equal timestamps refuses to push and names it; a push with a stale ETag is
   refused and nothing is overwritten. *Fails if* a write is lost or a stale push lands.
-- [ ] **5.4 `[MVP]` — Share links.** `keypaste share <entry|env/project>` writes a real KDBX4 bundle of
+- [ ] **5.4 `[Launch]` — Share links.** `keypaste share <entry|env/project>` writes a real KDBX4 bundle of
   only that subtree with UUIDs preserved, a fresh 32-byte keyfile and no password, uploads it, and
   prints a link whose fragment carries the keyfile; `keepassxc --keyfile` opens the download; an imported
   bundle lands in a quarantine group, never under `env/`, until moved (answers O-0021). **Verify
   (V-share):** the bundle contains no title from outside the subtree; the second fetch is 404; the
   import sits in quarantine and `list_entry_names` does not list it until moved. *Fails if* a
   neighbouring entry is in the bundle or the second fetch succeeds.
-- [ ] **5.5 `[MVP]` — Individual billing.** Stripe Checkout creates an Individual subscription, the
+- [ ] **5.5 `[Launch]` — Individual billing.** Stripe Checkout creates an Individual subscription, the
   webhook issues a licence key, the relay checks it on push; **nothing in any client is gated** and a
   relay with no Stripe configuration accepts any device key (the self-hosted path). Owner: **H-0018**.
   **Verify (V-billing):** removing a key server-side refuses the next push with a message naming the
   plan while `keypaste ls`, `get`, `run` and every app screen behave exactly as before; the
   unconfigured relay accepts a push. *Fails if* a client changes behaviour on licence state.
-- [ ] **5.6 `[MVP]` — Double opt-in.** The relay sends the confirmation mail the thanks page promises;
+- [ ] **5.6 `[Launch]` — Double opt-in.** The relay sends the confirmation mail the thanks page promises;
   no list message goes to an unconfirmed address; `schema.sql` gains the confirmed flag the Worker
   cannot read. **Verify (V-optin):** a signup that never clicked receives no list message; a confirmed
   one does. *Fails if* an unconfirmed address is mailed.
-- [ ] **5.7 `[MVP]` — Sync and relay docs.** `docs/sync.md` for a user and `docs/relay.md` for a
+- [ ] **5.7 `[Launch]` — Sync and relay docs.** `docs/sync.md` for a user and `docs/relay.md` for a
   self-hoster, saying what the operator can see (blob sizes, timestamps, device keys, emails) and cannot
   (anything inside a vault); `THREATS.md` gains the relay as a trusted party. **Verify (V-relay-docs):**
   every claim on both pages names the control or test that holds it. *Fails if* a claim has none.
-- [ ] **5.8 `[MVP]` — The plans page.** `keypaste.com/plans`: Free, Individual, Team with what each
+- [ ] **5.8 `[Launch]` — The plans page.** `keypaste.com/plans`: Free, Individual, Team with what each
   gates, from the working file's figures; no cell names a security property or a signature (law 5.4).
   **Verify (V-plans-page):** every gated cell corresponds to a relay-enforced check and the Free column
   lists every local feature. *Fails if* a cell gates something the client enforces or the free binary
