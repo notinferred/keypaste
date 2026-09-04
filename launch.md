@@ -49,7 +49,7 @@ The unticked ones are things that are false today. The launch is the moment stra
 
 Written once here. The posts below reference these rather than restating them, so there is one place to correct.
 
-**The pitch, ratified in `docs/PRODUCT.md` §1 and unchanged since:** stop pasting secrets into chats. keypaste is a local-first, KDBX-compatible vault that stores your passwords and env variables, injects them into your projects, and lets AI agents like Claude request exactly one credential — with your approval, scoped access, and a full audit trail — without ever seeing your vault.
+**The pitch these posts were written to** — `docs/PRODUCT.md` v1.0 §1; v1.1 (D-0061, D-0075) now says "password manager and secrets manager", and the posts stay on the developer wedge until 3.11 rewrites them for the app: stop pasting secrets into chats. keypaste is a local-first, KDBX-compatible vault that stores your passwords and env variables, injects them into your projects, and lets AI agents like Claude request exactly one credential — with your approval, scoped access, and a full audit trail — without ever seeing your vault.
 
 **The claim, and its exact limits.** The differentiator is the combination, never novelty: an ordinary KDBX file you own, no account and no server anywhere, a person answers each request, and the log never leaves your disk. Each of the others gives up at least one of those. **No post contains "the first", "the only", or "nobody does this"** — `D-0036` lost that argument already, against a field that includes Keeper, Bitwarden's Agent Access SDK, 1Password Environments and `kprun`, and it lost it in private rather than in a comment thread.
 
