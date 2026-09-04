@@ -11,7 +11,7 @@
 > D-0063; figures live only in the working file `docs/ARTIFACTS.md` names).
 > - `[MVP]` — **the first dollar** (D-0065): what ships today launched to strangers, the desktop app
 >   released and signed, and the **Individual** plan — the relay, hosted sync, share links, billing.
->   Nobody is charged until every `[MVP]` row is ticked.
+>   Nobody is charged before 4.7 and 5.2 have both shipped (D-0065).
 > - `[Launch]` — **the Free plan finished**: the password manager a stranger expects — browser autofill,
 >   importers, TOTP, an SSH agent — plus the UX bench and the render gates, paid for by the tier above.
 > - `[Scale]` — **the Team plan**: shared env sets, the broker, SSO for the hosted service, the delegation
@@ -327,7 +327,7 @@ and H-0014 were decisions, answered by D-0054 to D-0060; H-0011 is the site's pr
   (both free on 2026-08-04); crates.io is somebody else's and needs nothing (D-0053, D-0058). **Verify
   (V-names):** `https://github.com/keypaste` and `npmjs.com/package/keypaste`, opened logged out, are
   held by this project; `launch.md`'s canonical link matches. *Fails if* either resolves to someone else.
-- [ ] **3.0 `[MVP]` — The repository goes public (H-0003, H-0020).** Scan the 16 commits after `9d48bd7`
+- [ ] **3.0 `[MVP]` — The repository goes public (H-0003, H-0020).** Scan every commit after the last scan (`9d48bd7`, commit 174 of 191 today)
   with the first scan's grep; then have GitHub Support purge `refs/pull/*` and gc, or push the clean
   history to a fresh repository and delete this one; then Settings → Change visibility. **Verify
   (V-public):** `git ls-remote origin 'refs/pull/*'` returns nothing and `refs/pull/11/head`
