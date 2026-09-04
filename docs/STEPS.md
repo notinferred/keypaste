@@ -7,12 +7,14 @@
 > cannot fail is not a verifier. Human-needed actions — a registration, an enrolment, a keystroke on
 > a real machine — are ordinary steps, sequenced inline, keeping the `H-` id other files cite.
 >
-> **Tiers — three, and they are the product's plans seen from the build side** (`docs/PRODUCT.md` §5.6,
-> D-0063; figures live only in the working file the Not-in-git table in `DECISIONS.md` names).
-> - `[MVP]` — **what a stranger can install this month** (D-0077): the names, the public repository,
->   the demo GIF, the launch and its two weeks of answering, and the desktop app released and signed.
->   Nothing new is built here; what exists is finished and shown.
-> - `[Launch]` — **the first dollar, then the Free plan finished**: the relay, hosted sync, share links
+> **Tiers — three, and they are the product's plans seen from the build side** (D-0063; figures live
+> only in the working file the Not-in-git table in `DECISIONS.md` names).
+> - `[MVP]` — **the CLI launch: what a stranger can install and read about this month** (D-0079): the
+>   names, the public repository, a security contact that receives mail, the demo GIF, the launch and
+>   its two weeks of answering, and the CI a stranger's first pull request meets. Nothing new is built
+>   here; what exists is finished and shown, and the copy says "no released GUI" (D-0069).
+> - `[Launch]` — **the app released, then the first dollar, then the Free plan finished**: signing,
+>   notarization and the desktop app's own release and post; then the relay, hosted sync, share links
 >   and Individual billing — nobody is charged before 4.7 and 5.2 have both shipped (D-0065) — with the
 >   merge that sync needs, Agent Activity with the headline number and the native prompt; then browser
 >   autofill, importers, TOTP, an SSH agent, the UX bench and the render gates.
@@ -20,9 +22,12 @@
 >   center, the team dashboard.
 >
 > Within an area, MVP rows come first, then Launch, then Scale. **Pick up the first unticked step of the
-> lowest tier in the lowest area that has one.** Nothing is deferred out of existence: every step keeps
-> its row, its verifier and its trace. A Launch or Scale step's Build line is a sentence today; it is
-> expanded when its tier opens, and the long prompts this file used to carry are in git at `f27cb56`.
+> lowest tier in the lowest area that has one, skipping any row marked BLOCKED.** A BLOCKED row is
+> neither deferred nor done: it names what would unblock it, and "What exists today" below lists every
+> one, so the rule cannot stall on a row no amount of work in this repository can close. Nothing is
+> deferred out of existence: every step keeps its row, its verifier and its trace. A Launch or Scale
+> step's Build line is a sentence today; it is expanded when its tier opens, and the long prompts this
+> file used to carry are in git at `f27cb56`.
 >
 > **Admission rule.** A step exists only if it (1) has a Verify line that can *fail*, and (2) traces to a
 > claim in `docs/PRODUCT.md`. Otherwise it is an Ideas row in `DECISIONS.md`, not a step.
@@ -47,7 +52,9 @@
 > 8. Any KDBX keypaste writes opens in real KeePassXC, tested in CI; `Keypaste.Core` is the only vault
 >    logic and every front end is thin over it.
 >
-> **Standing checks (every step re-asserts them; each is a script and the script is the specification):**
+> **Standing checks** — each is a script and the script is the specification. A step is not done until
+> the ones its change can break are green; which ones a *push* runs is `scripts/ci-scope.sh`'s decision
+> (D-0078), and a pull request or a tag runs all of them regardless.
 > `verify-keepassxc-compat.sh` + `verify-keepassxc-writeback.sh` — a vault opens and edits in real
 > `keepassxc-cli` on three OSes, *fails if* either direction breaks · `verify-run-injection.sh` — the
 > child sees the value and no file was written · `verify-run-signals.sh` — SIGTERM reaches the child ·
@@ -64,9 +71,20 @@ directions; env sets and `keypaste run` injection; the MCP bridge with a separat
 approver, a 45-second window, policy pre-approvals and a hash-chained audit log; `v0.1.0` published as
 four native binaries on `dl.keypaste.com`; a desktop app that unlocks a vault, browses entries and edits
 env sets, built from source and not released; the launch essay, the landing page, the launch copy.
-The SDK the plan pins runs on the founder's machine (K.1), so every `dotnet` gate can be run locally before a push; the shell gates that need `clang`, Docker or a Linux runner still cannot. H-0002, H-0004, H-0008, H-0009, H-0012, H-0013
-and H-0014 were decisions, answered by D-0054 to D-0060; H-0011 is the site's pre-deploy checklist in
-`site/README.md`, run by hand before every deploy.
+The SDK the plan pins runs on the founder's machine (K.1), so every `dotnet` gate can be run locally before a push; the shell gates that need `clang`, Docker or a Linux runner still cannot.
+
+**BLOCKED rows, and what would unblock each** — the pickup rule skips these, so they are listed here
+rather than discovered one at a time: **1.5a** needs a second Windows machine or a VM where
+`AllowClipboardHistory` is not forced to `0`; **3.5** needs the Apple Developer Program enrolment;
+**3.6** needs Azure Trusted Signing, whose individual eligibility is a review that can refuse; **4.7**
+needs 3.5 and 3.6 and is therefore blocked twice over. Only 1.5a is `[MVP]`, and it does not block the
+launch — the other three moved to `[Launch]` with D-0079 for exactly this reason.
+
+**The `H-` ids** are human actions — a registration, an enrolment, a keystroke on a real machine. Each
+is carried inline by the step that owns it; the Owner Queue that once listed them separately was
+deleted at `9d48bd7` and is not coming back. H-0002, H-0004, H-0008, H-0009, H-0012, H-0013 and H-0014
+were decisions, answered by D-0054 to D-0060; H-0011 is the site's pre-deploy checklist in
+`site/README.md`, run by hand before every deploy. H-0010 was never issued.
 
 ---
 
@@ -123,7 +141,9 @@ and H-0014 were decisions, answered by D-0054 to D-0060; H-0011 is the site's pr
   `Clipboard.GetHistoryItemsAsync()` from PowerShell can script both halves. **Verify (V-winclip):** the
   control appears and the password never does, before or after the clear. *Fails if* the value is in the
   panel at either moment. **BLOCKED** on the founder's machine: policy sets `AllowClipboardHistory=0`,
-  so an empty panel there proves nothing.
+  so an empty panel there proves nothing. Unblocked by a second Windows machine or a VM where the
+  policy is unset. It does not block the launch: `launch.md`'s O-0008 box is ticked with this caveat
+  named, and the pages already say what the formats do and do not close (1.5b).
 - [ ] **9.3 `[Launch]` — SSH agent.** `keypaste ssh` serves private keys stored as KDBX attachments
   (KeePassXC's convention) over the agent protocol — a Unix socket, or OpenSSH for Windows's named pipe;
   keys decrypt into memory on unlock and never touch disk; only ticked keys are served and only while
@@ -164,15 +184,18 @@ and H-0014 were decisions, answered by D-0054 to D-0060; H-0011 is the site's pr
   lock on two clocks. D-0044.
 - [x] **4.2 `[MVP]` — Entry and env screens.** Generator, shared clipboard rule, lost-write guard.
   D-0045 to D-0050.
-- [ ] **4.7 `[MVP]` — The app is released.** `app.yml` publishes `keypaste-app` for `win-x64`,
+- [ ] **4.7 `[Launch]` — The app is released.** `app.yml` publishes `keypaste-app` for `win-x64`,
   `osx-arm64` and `linux-x64` on a `v*` tag beside the CLI under the same immutability rule: a signed
   installer on Windows (3.6), a notarized `.dmg` on macOS (3.5), a `.tar.gz` and AppImage on Linux with
-  the four runtime packages asserted on Debian 12; `--selftest` and `--version` on every artifact before
+  the four runtime packages asserted on Debian 12; `--version` on every artifact, and a `--selftest`
+  that has stopped being a `WriteLine` — it creates a vault through `Keypaste.Core` and reads an entry
+  back, so a published binary whose core or KDBX path is broken exits nonzero — both run before
   upload; the measured size on both pages (O-0016); the "unsigned" sentences rewritten; O-0015 and
   O-0016 closed in `DECISIONS.md`. **Verify (V-app-release):** on a fresh Windows VM a browser-downloaded
   installer opens with no SmartScreen wall; on a fresh macOS the `.dmg` opens with no quarantine
   prompt; `--version` equals the tag; the page's size equals the archive's within 1 MB; the app opens a
   vault the CLI created; the checksum verifies. *Fails if* either OS shows a wall, or any of the rest.
+  **BLOCKED** on 3.5 and 3.6, which are themselves blocked: neither developer account is held.
 - [ ] **4.3 `[Launch]` — Agent Activity and the headline number.** A UI-client message kind on
   `ApproverProtocol` (subscribe, list-pending, answer) so the app is a client of the running agent
   (D-0054). At the top: **what can act as you right now** = live connections + unexpired grants +
@@ -269,6 +292,10 @@ and H-0014 were decisions, answered by D-0054 to D-0060; H-0011 is the site's pr
 
 ## G · Teams & delegation
 
+> Ordered by dependency rather than by number: teams first (7.1-7.3), then the delegation spike and
+> centre (6.1, 6.2), then 7.4, which is the team view of what 6.2 builds. Every row is `[Scale]`, so
+> the pickup rule is unaffected either way.
+
 - [ ] **7.1 `[Scale]` — Shared env sets, the copy model.** A shared set is a KDBX whose key is wrapped
   per member; the relay holds the blob and opaque envelopes; remove-member rotates, re-wraps and tells
   the owner to rotate values; `THREATS.md` says it bounds future access, not past copies. **Verify
@@ -303,14 +330,16 @@ and H-0014 were decisions, answered by D-0054 to D-0060; H-0011 is the site's pr
 
 - [x] **3.4 `[MVP]` — Release pipeline and install one-liners.** Four NativeAOT binaries on
   `dl.keypaste.com`, gates run against the published artifact, immutable versions. D-0040 to D-0043.
-- [ ] **3.5 `[MVP]` — macOS notarization (H-0015).** Enrol in the Apple Developer Program and add the
+- [ ] **3.5 `[Launch]` — macOS notarization (H-0015).** Enrol in the Apple Developer Program and add the
   notarization step to `release.yml` and `app.yml`; the free binary is the notarized one (D-0057).
   **Verify (V-notarize):** `spctl --assess` accepts a browser-downloaded binary on a fresh macOS with no
   quarantine prompt. *Fails if* Gatekeeper refuses it.
-- [ ] **3.6 `[MVP]` — Windows signing (H-0017).** Enrol in Azure Trusted Signing, re-verifying price and
+  **BLOCKED**: the Apple Developer Program enrolment is not held. Unblocked by paying for it.
+- [ ] **3.6 `[Launch]` — Windows signing (H-0017).** Enrol in Azure Trusted Signing, re-verifying price and
   eligibility, and sign the CLI and the app installer in the workflows (D-0070). **Verify (V-sign-win):**
   `Get-AuthenticodeSignature` reports Valid on a downloaded binary; the installer opens on a fresh VM
   with no SmartScreen wall. *Fails if* either.
+  **BLOCKED**: Azure Trusted Signing is not held, and individual eligibility is a review that can refuse.
 - [ ] **3.7 `[Launch]` — Package managers.** A Homebrew tap, a Scoop bucket and a winget manifest,
   published from `release.yml` (closes O-0011). **Verify (V-packages):** `brew install`, `scoop
   install` and `winget install` each put the tagged version on `PATH` in a fresh shell. *Fails if* one
@@ -363,10 +392,20 @@ and H-0014 were decisions, answered by D-0054 to D-0060; H-0011 is the site's pr
 
 - [x] **2.4a `[MVP]` — `SECURITY.md` and `THREATS.md`.** A private contact, the scope, T-1 to T-25 with
   a named residual each. D-0031, D-0032.
-- [ ] **10.1 `[MVP]` — Hostile review before the app's first release.** Act as a hostile reviewer of the
-  whole tree, including the relay: any secret on disk unencrypted, keys outliving their need, a response
-  leaking more than one field, injection through names or reasons, a path that fails open, a plaintext
-  byte the relay could see; findings ranked with patches and a regression test each. **Verify
+- [ ] **2.4b `[MVP]` — The security contact works (H-0021).** `SECURITY.md` names
+  `security@keypaste.com` as the only channel an outside reporter can reach while the repository is
+  private, and nothing has ever tested that the address delivers. Send to it from an address outside
+  the Cloudflare Email Routing rule and read what arrives; once 3.0 lands, switch on GitHub's private
+  vulnerability reporting as the second channel and strike the sentence in `SECURITY.md` that says it
+  is unreachable. **Verify (V-security-contact):** a message sent from an outside address arrives in
+  the destination mailbox, headers intact, within an hour; after 3.0, the repository's Security tab
+  offers private vulnerability reporting to a logged-out-then-logged-in stranger. *Fails if* the mail
+  bounces, silently disappears, or `SECURITY.md` still calls the second channel unreachable after 3.0.
+- [ ] **10.1 `[MVP]` — Hostile review before the repository goes public.** Act as a hostile reviewer of
+  the whole tree as it exists: any secret on disk unencrypted, keys outliving their need, a response
+  leaking more than one field, injection through names or reasons, a path that fails open; findings
+  ranked with patches and a regression test each. The relay does not exist yet and gets its own pass
+  inside 5.2, which is where the "plaintext byte the relay could see" question belongs. **Verify
   (V-review):** every finding has a test that was red before its patch; the review is dated in
   `DECISIONS.md`. *Fails if* a finding has no red-then-green test.
 - [ ] **10.2 `[Scale]` — External pen test.** A paid test of the relay and the bridge, the report
@@ -388,6 +427,6 @@ and H-0014 were decisions, answered by D-0054 to D-0060; H-0011 is the site's pr
   `keepassxc compat` checks on `main` (D-0008 names this as the part outside the repository). **Verify
   (V-protection):** a pull request with a red `compat` check cannot be merged in the UI. *Fails if* it
   can.
-- [ ] **K.5 `[Launch]` — Fork pull requests on Blacksmith runners.** An answer for pull requests from
+- [ ] **K.5 `[MVP]` — Fork pull requests on Blacksmith runners.** An answer for pull requests from
   forks, which have no access to the runner labels. **Verify (V-fork-ci):** a pull request from a fork
   runs `ci.yml` to completion. *Fails if* it stays queued.
