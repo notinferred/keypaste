@@ -10,10 +10,10 @@
 
 | what | where | last confirmed |
 |---|---|---|
-| Business model, pricing ladder, positioning, acquisition path, launch and revenue benchmarks, pivot and failure conditions | `~/Nextcloud/keypaste/business.md` | 2026-07-28 |
-| Working pricing and licensing notes | `keypastebusinessnotes.md` in the working tree — **gitignored** by `.gitignore` rule `*businessnotes*.md`, and verified never to have been committed | 2026-07-28 |
+| Business model, positioning, acquisition path, pivot and failure conditions | `~/Nextcloud/keypaste/business.md` | 2026-09-04 (exists; not read for this audit) |
+| Tier ladder with figures, KPI targets, comparable pricing with sources and fetch dates | `keypastebusinessnotes.md` in the working tree — **gitignored** by `.gitignore` rule `*businessnotes*.md`, `git check-ignore` confirms it, and `git log --all -- keypastebusinessnotes.md` is empty | 2026-09-04 |
 
-D-0006 removed this material from the roadmap and the parking lot before the repository was published. It must not come back. `docs/STEPS.md` says "tracked privately, outside this repo" where a benchmark would otherwise be named, and that is deliberate.
+D-0006 removed this material from the roadmap and the parking lot, and D-0072 keeps it out of every commit. The committed pages carry the tier *shapes* and the decisions (D-0063, D-0071); a number appears only in the working file, and `docs/STEPS.md` says "figures in the working file" where one would otherwise be named.
 
 ---
 
@@ -28,7 +28,11 @@ D-0006 removed this material from the roadmap and the parking lot before the rep
 | Hyperdrive binding id | committed in `site/wrangler.jsonc` — it is a handle, not a credential | |
 | Vulnerability reports | `security@keypaste.com`, routed by Cloudflare Email Routing | the only reporting channel that works today |
 | DNS for `keypaste.com` and `dl.keypaste.com` | Cloudflare | |
-| CI runners | GitHub Actions, with Blacksmith runners for the three-OS matrix | |
+| CI runners | GitHub Actions on Blacksmith runners exclusively; no GitHub-hosted label remains in any workflow | |
+| Sync relay host and its S3-compatible bucket | **not yet held** — Owner Queue **H-0019** | the relay is one binary (D-0064); the hosted instance is that binary on a small VM behind Cloudflare |
+| Stripe account for Individual and Team billing | **not yet held** — **H-0018** | licence keys are issued by the relay, checked by the relay, and never gate a client |
+| Azure Trusted Signing for Windows binaries | **not yet held** — **H-0017** | D-0070; price and eligibility re-verified at enrolment |
+| Apple Developer Program for notarization | **not yet held** — **H-0015** | D-0057 |
 
 The site has **no CI job**. `ci.yml` is the .NET gate and does not look at `site/`. The pre-deploy checklist in `site/README.md` is the whole of the protection, and it is Owner Queue row **H-0011**.
 
