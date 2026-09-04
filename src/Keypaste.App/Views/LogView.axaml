@@ -8,7 +8,7 @@
   <!-- The log, exactly as `keypaste log` prints it, in a monospace block a person can select and
        copy out of. Not a DataGrid: the sentence this screen says is written once, in the core
        (D-0032), and a re-drawn table would be both a second copy of it and the dense tree-table
-       docs/IDEAS.md names as the thing this app is not. -->
+       the Ideas table in DECISIONS.md names as the thing this app is not. -->
 
   <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="{DynamicResource KpCardPadding}">
 

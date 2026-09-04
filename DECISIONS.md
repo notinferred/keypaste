@@ -6,15 +6,16 @@
 
 ## Ledger — one line per decision, newest first
 
-The long-form records below carry the reasoning. From D-0061 a decision is one row here, and gets a record below only when the reasoning would otherwise have to be reverse-engineered. Figures behind D-0063 and D-0071 live in the gitignored working file `docs/ARTIFACTS.md` names, never here.
+The long-form records below carry the reasoning. From D-0061 a decision is one row here, and gets a record below only when the reasoning would otherwise have to be reverse-engineered. Figures behind D-0063 and D-0071 live in the gitignored working file the Not-in-git table in `DECISIONS.md` names, never here.
 
 | id | date | decision | supersedes |
 |---|---|---|---|
+| D-0077 | 2026-09-04 | Scope cut: `[MVP]` is what a stranger can install this month — names, public repository, GIF, launch, the app released and signed; the first dollar (4.7 + 5.2) moves to `[Launch]` with 1.4, 4.3 and 4.4; the ideas and not-in-git tables fold into this file and the long-form records become its archive | D-0065's tier placement, D-0074 |
 | D-0076 | 2026-09-04 | `global.json` rolls forward `disable`, not `latestPatch`: an SDK patch moves the implicit ILCompiler and ILLink versions the lock files pin, so CI was red for nine days with no code change; SDK bumps are deliberate and regenerate the lock files | D-0002's roll-forward choice |
 | D-0075 | 2026-09-04 | §1 names both words: a password manager **and** a secrets manager. Env injection already is one for a single person; the team half arrives with 7.1 and 7.2 and is priced then, not now | §1 wording of D-0061 |
 | D-0074 | 2026-09-04 | Nothing is gated on "revenue" or "benchmarks" any more; every step in `docs/STEPS.md` carries a Verify line and a tier tag, and a tier starts when the one before it has shipped | the "Gated" section of `docs/STEPS.md` |
 | D-0073 | 2026-09-04 | 4.5 (UX bench) and 4.6 (headless render gates) leave the parking lot at the app's first release, because that is when there is somebody to measure | D-0043's parking of both |
-| D-0072 | 2026-09-04 | Business figures live in `keypastebusinessnotes.md`, in the tree and ignored by `*businessnotes*.md`; committed pages carry shapes and decisions, never numbers | makes `docs/ARTIFACTS.md`'s row true; D-0006 unchanged |
+| D-0072 | 2026-09-04 | Business figures live in `keypastebusinessnotes.md`, in the tree and ignored by `*businessnotes*.md`; committed pages carry shapes and decisions, never numbers | makes the Not-in-git table in `DECISIONS.md`'s row true; D-0006 unchanged |
 | D-0071 | 2026-09-04 | KPIs, none from telemetry: downloads per version (R2 logs), list signups, stars and open issues once public, paying subscribers, MRR, monthly churn, weekly active synced vaults (distinct blobs updated in 7 days, server-side count), launch reply latency; targets internal | — |
 | D-0070 | 2026-09-04 | Windows binaries are signed with Azure Trusted Signing from the app's first release; macOS notarized per D-0057; the free binary is the signed one (law 5.4) | D-0057's Windows half |
 | D-0069 | 2026-09-04 | The CLI and agent launch as soon as 3.1 and 3.2 close, with the copy saying "no released GUI"; the app gets its own release and its own post | — |
@@ -27,7 +28,144 @@ The long-form records below carry the reasoning. From D-0061 a decision is one r
 | D-0062 | 2026-09-04 | The first buyer is a solo developer paying for hosted sync; the first user is anyone who keeps a `.kdbx` | — |
 | D-0061 | 2026-09-04 | `docs/PRODUCT.md` re-ratified as v1.1: a KeePass-compatible password manager, freemium, hosted zero-knowledge sync with self-host first-class, the agent bridge as the selling point; §3 byte-identical to v1.0 | v1.0 §1, §2 "for everyone", §4.2 CLI-first |
 
+## Ideas — append-only; flip a status, never delete a row
+
+> Ideas wait here. Most wait forever, and that is the point (`docs/PRODUCT.md` law 5.5). Nothing here is a step; it becomes one only when it can carry a Verify line — the admission rule at the top of `docs/STEPS.md`. A deleted row destroys the only evidence the idea was considered, so rows are never deleted. Business figures are kept out of git — see the table below.
+
+Status vocabulary: **open** (no decision) · **parked** (decided: not now, with a reason) · **rejected** (decided: no) · **promoted** (now a step in `docs/STEPS.md`) · **shipped**.
+
+### UI direction
+
+Adopted in 4.1 and 4.2, and standing: calm, precise, bank-lobby-not-hacker-movie. Whitespace, a muted palette with one accent, Inter, subtle depth, dark mode first-class. Avoided, deliberately: green-on-black terminal cosplay, padlock icons everywhere, red warnings for normal actions, and dense 2003-era tree-tables. The signature moment is the approval dialog — who wants what, and why — and it is the brand.
+
 ---
+
+### The table
+
+| idea | who | status | why |
+|---|---|---|---|
+| One-time encrypted share links, self-hostable relay, key in the URL fragment | founder | promoted | Folded into step 5.2 (D-0064): the relay carries a one-download bundle endpoint, the bundle is a real KDBX holding one subtree with source UUIDs preserved, and the keyfile lives in the URL fragment so the relay moves bytes it can never read. O-0021 (a bundle is untrusted input) is answered inside 5.2 before the endpoint ships. |
+| `keypaste merge` — entry-level reconciliation of two KDBX files by UUID | founder | promoted | 1.4. Not a sharing feature: §2 makes sync the user's problem and then leaves the user holding two divergent copies, which is O-0018 and the reason the app can only refuse to save (D-0050). Sharing turns out to be a free application of it — the bundle is delivered *into* a merge — so the engine is justified even if 5.0 is never built. |
+| Multi-vault and vault-per-project ergonomics | founder | open | No prompt exists for it anywhere. Wanted, but no accept criterion that can fail has been written; the app's recent-vault list is as far as it goes. |
+| Git-friendly vault workflows and conflict guidance | founder | open | No prompt exists for it. Blocked on step 1.4 — two writers, one KDBX, and no merge until then. |
+| Hosted relay and sync as the first paid tier | founder | promoted | Step 5.2, `[MVP]` (D-0064, D-0065). Convenience never security (law 5.4); the local-first vs hosted tension below was settled by D-0060. |
+| Delegation dashboard: aggregate agent grants, MCP connections, external OAuth | founder | promoted | Steps 6.1 and 6.2, `[Scale]` (D-0074). The feasibility spike is the first step and it has not run. |
+| Teams: shared env sets by per-member key wrapping (the copy model) | founder | promoted | Step 7.1, `[Scale]`. Bounds future access, not past copies — that honesty has to survive into the build. |
+| Teams: a broker that releases without copying (the access model) | founder | promoted | Step 7.2, `[Scale]`. The differentiated one — instant revocation, no rotation. Reuses the Stage 2 approval core verbatim or it is not this idea. |
+| Team SSO for the hosted service, never on the vault path | founder | promoted | Step 7.3, `[Scale]`. If the IdP being compromised can read a vault, it is the wrong design. |
+| Team delegation dashboard | founder | promoted | Step 7.4, `[Scale]`. |
+| "Design language: modern, calm, trustworthy" as a checklist item | founder | rejected | Nothing about it can fail, so it was never a step. The direction above is the durable form. |
+| Sign-in-first landing flow from the design exploration | founder | open | Inverts local-first, which `docs/PRODUCT.md` §2 makes permanent. Must be answered before any hosted-sync work; D-0060 answered it for 5.2: the server cannot read the blob, and nothing signs in before a vault exists. |
+| Local-first vs a hosted sync tier | founder | promoted | §2 permits a zero-knowledge hosted tier if self-host stays first-class. **D-0060 settled it: the server cannot read the blob**, so a forgotten master password stays gone; D-0061 made hosted sync the business and D-0064 gave it a shape. It is step 5.2 in `[MVP]`. |
+| TOTP/2FA storage with agent-safe handling — a code, never the seed | founder | promoted | Step 9.2, `[Launch]` (D-0068). |
+| Command palette (Ctrl/Cmd+K) | founder | open | Fits the keyboard-first shell 4.1 shipped. |
+| Onboarding that offers "import your existing .kdbx" first | founder | open | Meets users where they are; new vault second. |
+| SSH key management and a `keypaste ssh` agent integration | founder | promoted | Step 9.3, `[Launch]` (D-0068). |
+| Git hooks that block committing plaintext secrets | founder | open | Could stand alone; free marketing. |
+| Secret leases for long-running agents, with rotation reminders | founder | open | |
+| Passkey storage once KDBX support matures | founder | open | Watch KeePassXC's work; do not own recovery. |
+| `keypaste env set --no-history` for rotating a leaked value | founder | open | Diverges from KeePassXC's editor, so it must be opt-in and loud (D-0014). |
+| `execve` the child on Unix instead of wrapping it | founder | parked | Exit status, job control and signals would be right for free, but Windows has no equivalent, so the wrapper exists anyway — two implementations of one feature (D-0016). |
+| `keypaste run --no-inherit`, the shape `env -i` has | founder | open | Useful for reproducing what CI sees. |
+| `keypaste run --skip-unusable` | founder | parked | Only if somebody hits it. A partially injected environment fails somewhere else, later, worse. |
+| CI gate reading an exported `.env` with real `dotenv`, `python-dotenv` and `godotenv` | founder | parked | The only way to keep D-0018's portability claim honest, but it puts npm and pip on the three-OS job. Checked by hand against dotenv 17.4.2 for now. |
+| `keypaste env export --format json` | founder | parked | Only once something asks. `--dotenv` is required today precisely so a second format can be added without changing what the first means. |
+| `keypaste env diff <project> [file]` | founder | open | The natural companion to `pull` and `export`, and it never has to print a value. |
+| A `direnv` shim | founder | parked | `keypaste run` scopes exposure to one command; anything direnv-shaped puts values in the interactive shell and everything it launches. Resolve that first. |
+| Vault health report: reuse, staleness, weak values | founder | open | |
+| Team approval quorum, "2 of 3 for production" | founder | parked | Good story; waits for `[Scale]` with the rest of teams. |
+| Windows Hello / Touch ID unlock | founder | open | |
+| Import wizards for 1Password, Bitwarden, LastPass | founder | promoted | Step 9.1, `[Launch]` (D-0068); KeePassXC CSV added to the list, because a switcher from the tool this one is cleaner than is the likeliest arrival. |
+| Anomaly nudges — "an agent asked for prod credentials at 3am" | founder | open | |
+| Public trust page: reproducible builds, audit fund, bounty | founder | open | Ties to O-0012; reproducibility is not claimed today. |
+| Break-glass emergency access with mandatory after-the-fact review | founder | parked | Waits for `[Scale]` with the rest of teams. Convenience never softens the audit. |
+| Browser extension with autofill | founder | promoted | Step 8.3, `[Launch]`. Rejected once on effort and incumbents, deferred behind a condition by D-0059, and then overtaken: `docs/PRODUCT.md` v1.1 (D-0061) makes keypaste a password manager, and one without autofill is not one (D-0068). The effort and the incumbents are still real and are why it sits behind the first dollar rather than in `[MVP]`. |
+| Browser extension as an approval surface for agents that live in the browser | founder | promoted | Step 8.1, `[Launch]`, and the native messaging host 8.3 fills through. Native messaging to a running `keypaste agent`, which is what keepassxc-browser replaced its localhost HTTP server with in 2018 — the precedent `docs/keepass-and-agents.md` already cites. |
+| A UX bench: HEART minus the two dimensions law 3.5 forbids measuring | founder | promoted | Step 4.5, `[Launch]` (D-0073). The durable form of the design-language row this table already rejected: same ambition, rebuilt so a result can fail. Engagement and Retention need behavioural telemetry and are struck on the page rather than quietly dropped. It waits for the app's first release because a threshold no human has been held to is an assertion rather than a measurement (D-0043). |
+| Headless render gates so a screenshot is evidence rather than a memory | founder | promoted | Step 4.6, `[Launch]` (D-0073), closing O-0020. `Avalonia.Headless` renders to a bitmap with no display, which makes the masked-value and locked-window claims testable for the first time — in a GUI the screen is a secret path, so law 4.5 applies to it. |
+| Mobile app | founder | parked | Read-only companion first, if ever. |
+| Series: "Secrets hygiene for the agent era", one post per THREATS.md entry | founder | open | Marketing. |
+| Comparison pages vs .env, vs Infisical, vs plain KeePass | founder | open | Honest framing: they are for teams and cloud; keypaste is local-first. |
+| A public demo vault anyone can point Claude at | founder | open | Lets people feel the approval flow safely. |
+| Conference talk: "I let Claude into my password manager — safely" | founder | open | |
+| Contribute KDBX compat fixes upstream to KeePassXC | founder | open | Respectfully. Never fork-and-fight. |
+| Daemon architecture for approvals vs per-invocation unlock | founder | open | UX against attack surface. |
+| Hardware key (YubiKey) unlock | founder | open | Timing unclear. |
+| `policy.toml` inside the vault, synced and encrypted | founder | open | |
+| Product vocabulary: "agents" vs "clients" vs "apps" | founder | open | Needs user testing. |
+
+## Not in git — what informs the product, by location and never by value
+
+> Referenced **by location, never linked**, and never by value. Nothing here is a secret; several rows say where a secret lives, which is a different thing and is the point of the row.
+>
+> `[process]` — nothing in this repository can check any of it. The only mechanizable column is "last confirmed", and it is a person's word.
+
+### Private notes
+
+| what | where | last confirmed |
+|---|---|---|
+| Business model, positioning, acquisition path, pivot and failure conditions | `~/Nextcloud/keypaste/business.md` | 2026-09-04 (exists; not read for this audit) |
+| Tier ladder with figures, KPI targets, comparable pricing with sources and fetch dates | `keypastebusinessnotes.md` in the working tree — **gitignored** by `.gitignore` rule `*businessnotes*.md`, `git check-ignore` confirms it, and `git log --all -- keypastebusinessnotes.md` is empty | 2026-09-04 |
+
+D-0006 removed this material from the roadmap and the parking lot, and D-0072 keeps it out of every commit. The committed pages carry the tier *shapes* and the decisions (D-0063, D-0071); a number appears only in the working file, and `docs/STEPS.md` says "figures in the working file" where one would otherwise be named.
+
+---
+
+### Infrastructure
+
+| what | where | note |
+|---|---|---|
+| keypaste.com landing page | Cloudflare Worker `keypaste-site`; source is `site/` in this repo, deployed with `npx wrangler deploy` from that directory | the only server-side code the project runs |
+| Release downloads | Cloudflare R2, served at `dl.keypaste.com` | `release.yml` refuses to overwrite a version that already exists |
+| Signup database | PlanetScale Postgres, table `public.signup`, reached through Cloudflare Hyperdrive | schema is `site/schema.sql` |
+| The database role's password | **an account-level Cloudflare Hyperdrive config, and nowhere else** — not in the repo, not in the Worker, not in an env var | rotating it means `alter role … password` plus `wrangler hyperdrive update`; see `site/README.md` |
+| Hyperdrive binding id | committed in `site/wrangler.jsonc` — it is a handle, not a credential | |
+| Vulnerability reports | `security@keypaste.com`, routed by Cloudflare Email Routing | the only reporting channel that works today |
+| DNS for `keypaste.com` and `dl.keypaste.com` | Cloudflare | |
+| CI runners | GitHub Actions on Blacksmith runners exclusively; no GitHub-hosted label remains in any workflow | |
+| Sync relay host and its S3-compatible bucket | **not yet held** — step 5.2 (H-0019) | the relay is one binary (D-0064); the hosted instance is that binary on a small VM behind Cloudflare |
+| Stripe account for Individual and Team billing | **not yet held** — **H-0018** | licence keys are issued by the relay, checked by the relay, and never gate a client |
+| Azure Trusted Signing for Windows binaries | **not yet held** — **H-0017** | D-0070; price and eligibility re-verified at enrolment |
+| Apple Developer Program for notarization | **not yet held** — **H-0015** | D-0057 |
+
+The site has **no CI job**. `ci.yml` is the .NET gate and does not look at `site/`. The pre-deploy checklist in `site/README.md` is the whole of the protection, and it is **H-0011**, run by hand before every deploy.
+
+---
+
+### Names not yet held
+
+| what | where | status |
+|---|---|---|
+| GitHub org `keypaste` | github.com | **not registered** — step 0.4 (H-0001) |
+| npm and crates names | npmjs.com, crates.io | **not registered** — **H-0001** |
+| Trademark on "keypaste" | — | **not filed, deliberately** — D-0058 accepted the risk. No full clearance search was run, and D-0053's one known live collision is the whole basis; a second one is the trigger to revisit |
+
+The repository itself is `notinferred/keypaste` and is **private**. Whether it goes public is **H-0003**, and it is the precondition every launch link depends on.
+
+---
+
+### Recordings and fixtures
+
+| what | where | note |
+|---|---|---|
+| The demo cast | the pipeline is `scripts/demo/` in this repo; an accepted take is committed at `docs/demo/keypaste-demo.cast` — **none exists yet**, step 3.1 (H-0005) | the pipeline is WSL-only. A cast is committed as text so anyone can grep it for the master password, the sentinel and the dialog `record-demo.sh` asserts — `scripts/demo/README.md` says why. One take was recorded and **rejected**: the credential was never released in it, which `record-demo.sh`'s positive control refuses, so it proved nothing and was not kept |
+| The demo GIF | **does not exist yet** — step 3.1 (H-0005) | both pages reserve the slot; it renders from the cast above, so it is blocked on the same take |
+| KeePassXC for the Windows compat job | fetched from the official zip, pinned by SHA-256 in `ci.yml` | changing the pin is a security decision |
+| Published `v0.1.0` assets | `https://dl.keypaste.com/v0.1.0/` — four native binaries, the corresponding source, and checksums | immutable; the pipeline will not republish a version |
+
+---
+
+### Upstream
+
+| what | where | note |
+|---|---|---|
+| KeePass source | vendored from the KeePass 2.61 netstandard port, commit and licence recorded in `third_party/KeePassLib/UPSTREAM.md` | GPL-2.0-or-later; two documented `#if` changes, nothing else |
+
+---
+
+# Archive — the reasoning, long form
+
+> Everything below is the record behind a ledger row. It is kept because a future reader would otherwise reverse-engineer it; it is not the place to look for what is true now — the ledger, the step map and the pages are. Rewrite a record when it is superseded; never narrate was/now.
 
 ## D-0001 — Project naming: PascalCase projects, kebab-case binaries
 
@@ -216,7 +354,7 @@ Two smaller reasons point the same way. Values land in the `Password` field, so 
 
 **Validation is strict on write and permissive on read.** keypaste refuses to create a project name that is empty or contains a separator (group-path resolution discards empty segments, so both write to a path no read can reach), and refuses a variable name outside the POSIX `[A-Za-z_][A-Za-z0-9_]*` rule, or one differing from an existing name only in case - that pair is two variables on Linux and one on Windows. But anything already in the file is listed exactly as KeePassXC shows it, with unusable names flagged on stderr rather than hidden, because keypaste and KeePassXC disagreeing about the contents of one file is the failure law 4.6 exists to prevent. Two entries sharing a name have no correct answer and fail closed (section 3.7).
 
-**Overwriting a value keeps the previous one as KDBX history**, which is what KeePassXC's own editor does and what a KeePass user expects to find in the History tab. This sits awkwardly beside the rationale on `KeePassInterop.RemoveEntry`, which removes outright rather than to a recycle bin so that "a vault the user asked to delete from should not keep a readable copy of the secret". The tension is real: rotating a credential *because it leaked* leaves the leaked value in the file, encrypted, until the ten-item history cap evicts it - and keypaste has no feature that reads history, so it is invisible in `keypaste ls` and `get` while being plainly visible in KeePassXC. It is accepted because silently discarding history on an entry the user maintains in KeePassXC would be a worse surprise, and because `keypaste env rm` does remove the entry and its history together. `env set` says so on the line where it happens rather than only in this file. A `--no-history` flag is in docs/IDEAS.md, not in this stage.
+**Overwriting a value keeps the previous one as KDBX history**, which is what KeePassXC's own editor does and what a KeePass user expects to find in the History tab. This sits awkwardly beside the rationale on `KeePassInterop.RemoveEntry`, which removes outright rather than to a recycle bin so that "a vault the user asked to delete from should not keep a readable copy of the secret". The tension is real: rotating a credential *because it leaked* leaves the leaked value in the file, encrypted, until the ten-item history cap evicts it - and keypaste has no feature that reads history, so it is invisible in `keypaste ls` and `get` while being plainly visible in KeePassXC. It is accepted because silently discarding history on an entry the user maintains in KeePassXC would be a worse surprise, and because `keypaste env rm` does remove the entry and its history together. `env set` says so on the line where it happens rather than only in this file. A `--no-history` flag is in the Ideas table in DECISIONS.md, not in this stage.
 
 **`keypaste env set <project> KEY=value` takes the value from `argv`**, where it is visible in the process list and lands in shell history. This contradicts the comment on `AddCommand`, which refuses a `--password` flag for exactly that reason, and the contradiction is deliberate rather than overlooked: the piped form exists and is what the compatibility gate uses, but a one-liner is what people will reach for, and refusing it outright pushes them to clean up shell history by hand or to something worse.
 
@@ -378,7 +516,7 @@ Single quotes are literal in keypaste, `motdotla/dotenv`, `python-dotenv`, `joho
 
 **`~` is excluded from the unquoted set** although the reader accepts it there. `~/bin:~/local` round-trips through keypaste and then tilde-expands - after every `:` - in any shell that sources the file, baking one machine's home directory into the value. That is the same hazard the parser already refuses to accept for `$`, and the fix costs one pair of quotes.
 
-Conformance was checked by hand rather than gated in CI: the golden file read by node `dotenv` 17.4.2 returns all four values byte-identically, including a multi-line single-quoted value and a `#` inside a value. A CI gate reading the file with node, python-dotenv and godotenv is the only way to keep that claim honest over time and is parked in `docs/IDEAS.md`; it was rejected for now because it puts an npm and pip install on the three-OS test job for a property the docs can state precisely. `docker run --env-file` is named in the docs as explicitly unsupported - it does no quote or escape processing at all.
+Conformance was checked by hand rather than gated in CI: the golden file read by node `dotenv` 17.4.2 returns all four values byte-identically, including a multi-line single-quoted value and a `#` inside a value. A CI gate reading the file with node, python-dotenv and godotenv is the only way to keep that claim honest over time and is parked in the Ideas table in `DECISIONS.md`; it was rejected for now because it puts an npm and pip install on the three-OS test job for a property the docs can state precisely. `docker run --env-file` is named in the docs as explicitly unsupported - it does no quote or escape processing at all.
 
 ### Fail closed, and the boundary the two ends have to share
 
@@ -1055,7 +1193,7 @@ docs/PRODUCT.md law 3.9 requires written justification for every new dependency 
 
 4.1's `SecretHygieneTests` claimed that no destination surfaced anything from inside the vault, and said in as many words that the day 4.2 put an entry list on screen it would fail and whoever wrote that list would have to decide what belonged there. It failed. This is the decision.
 
-**A list row carries a title and a group, and no field value.** That is what `keypaste ls` prints. A username column was considered and rejected: it is a disclosure surface no CLI verb has, it is readable over a shoulder, and `docs/IDEAS.md`'s screenshot strategy puts this screen in marketing images — which is the thing T-24 already worries about for vault paths. **The detail pane widens to username, URL and notes for the one entry a person selected**, which is `keypaste get`'s scope minus the password. **A password appears nowhere, in any state, including after Copy**: the copy command reads it out of the open vault at the moment of the press and hands it to the clipboard, so it is never a property, never a binding, and never in the visual tree.
+**A list row carries a title and a group, and no field value.** That is what `keypaste ls` prints. A username column was considered and rejected: it is a disclosure surface no CLI verb has, it is readable over a shoulder, and the Ideas table in `DECISIONS.md`'s screenshot strategy puts this screen in marketing images — which is the thing T-24 already worries about for vault paths. **The detail pane widens to username, URL and notes for the one entry a person selected**, which is `keypaste get`'s scope minus the password. **A password appears nowhere, in any state, including after Copy**: the copy command reads it out of the open vault at the moment of the press and hands it to the clipboard, so it is never a property, never a binding, and never in the visual tree.
 
 **The blanket claim was not given an allow-set, because that would have retired the test rather than narrowed it.** Four of five sentinels would have moved into an allowed column, and the survivor never reaches a view model anyway — leaving a gate that passes for an implementation with no list, no detail pane and no copy button. It is replaced by four two-sided claims and one new total invariant: **after a lock, every surface built while unlocked holds no sentinel of any kind, including the ones it was allowed to show a moment earlier.** Two details make that worth something. The sweep holds a direct reference captured before the lock, because `Dispose` nulls `Content` and a sweep starting at the shell finds an empty graph and passes for an object that is still alive. And it counts properties that *refuse* to answer, because a view model reading lazily through a disposed vault throws from every getter and sweeps perfectly clean — "found nothing" and "asked nothing" have to be told apart.
 
@@ -1141,7 +1279,7 @@ The narrower risk is shapes rather than bytes: the compat fixture's shape is the
 
 **The problem is that documents describing *what is* grow without bound.** Every addition is describable, nothing is ever subtractive, and a roadmap accumulates stages faster than it retires them. This repository had the symptom: a step map whose last three stages were gated on benchmarks tracked outside the repository, a prompt library whose 4.1 entry still specified **Tauri** with its box ticked, and a parking lot that could not say whether an idea had been rejected or forgotten.
 
-**The fix is an admission rule.** A step may be added to `docs/STEPS.md` only if it has an accept criterion that can *fail*, names its verifier, and traces to a claim in `docs/PRODUCT.md`. Anything failing one of those is a `docs/IDEAS.md` row. That is the termination condition, and applying it cost three stages: sharing, the delegation dashboard and teams are now ledger rows, because none of them can name something that would prove them done.
+**The fix is an admission rule.** A step may be added to `docs/STEPS.md` only if it has an accept criterion that can *fail*, names its verifier, and traces to a claim in `docs/PRODUCT.md`. Anything failing one of those is an Ideas row in `DECISIONS.md`. That is the termination condition, and applying it cost three stages: sharing, the delegation dashboard and teams are now ledger rows, because none of them can name something that would prove them done.
 
 **Every step is one row with a Build line and a Verify line, and the Verify line is the highest-value part.** It names what must hold and the observation that fails it. Human actions — registering the org, making the repository public, recording the GIF, signing the binaries — are rows in the same list rather than a queue beside it, so the launch being blocked on people rather than engineering is visible in the order.
 
@@ -1191,7 +1329,7 @@ The original O-0001 — "AGPL-3.0 vs the KDBX library licence, must resolve in S
 
 **The repository is private.** Whether it becomes public is O-0014, and `docs/PRODUCT.md` §3.8 — auditable code is the trust strategy — is the claim pulling against the current state. CI cost is not part of that argument any more; D-0042 removed it.
 
-The benchmarks, pivot conditions, pricing ladder, and acquisition notes are kept in private storage outside git and are registered in `docs/ARTIFACTS.md` by location. The working copy is `keypastebusinessnotes.md` in the tree, ignored by `.gitignore`'s `*businessnotes*.md` rule so that it can never be staged (D-0072). A project whose entire pitch is trust should not also publish the conditions under which its author would abandon it.
+The benchmarks, pivot conditions, pricing ladder, and acquisition notes are kept in private storage outside git and are registered in the Not-in-git table in `DECISIONS.md` by location. The working copy is `keypastebusinessnotes.md` in the tree, ignored by `.gitignore`'s `*businessnotes*.md` rule so that it can never be staged (D-0072). A project whose entire pitch is trust should not also publish the conditions under which its author would abandon it.
 
 Because GitHub can serve any commit ever pushed once a repository is public — including unreachable ones — the private repository was deleted and recreated rather than rewritten in place. If sensitive content ever lands in a commit again, recreating the repository is the only reliable remedy; a force-push is not.
 
@@ -1235,7 +1373,7 @@ CodeQL, dependency-review, Dependabot, and SHA-pinned GitHub Actions are deliber
 
 `PwGroup.Search.cs`, `QualityEstimation.cs`, `PopularPasswords.cs`, `PasswordGenerator/**` and `HmacOtp.cs` are severable — roughly 3,000 lines keypaste never calls. They are kept because every `<Compile Remove>` is a decision a future re-merge must re-justify, and the current cost is only build time.
 
-Revisit if O-0006 forces trimming for AOT size, or if `HmacOtp.cs` becomes load-bearing when TOTP arrives from docs/IDEAS.md. Note the exclusion mechanism is already in place and costs nothing to extend: files stay on disk, only the compilation changes.
+Revisit if O-0006 forces trimming for AOT size, or if `HmacOtp.cs` becomes load-bearing when TOTP arrives from the Ideas table in DECISIONS.md. Note the exclusion mechanism is already in place and costs nothing to extend: files stay on disk, only the compilation changes.
 
 **The trigger condition fired in 3.4 and did not fire.** O-0006 is answered (D-0040) and AOT forced no trimming at all: the published binaries are 10.4 MB and 9.1 MB, the ILC trimmer removes the unreachable code without any `<Compile Remove>` being added, and none of the eleven trim diagnostics comes from the severable files this entry lists. So the size argument for trimming is gone - the trimmer already does it. What is left is the original argument, that fewer vendored lines are fewer lines to re-justify on re-merge, which was never urgent. Still open, now for a weaker reason than when it was written.
 
@@ -1365,7 +1503,7 @@ Unanswered, and 5.0 must not be built before it is. Whichever is chosen becomes 
 
 ## O-0022 - The hosted tier is now an intention, and §2 permits exactly one shape of it
 
-**Stage:** 5.2 · Related: H-0014, D-0041, the two open `docs/IDEAS.md` rows
+**Stage:** 5.2 · Related: H-0014, D-0041, the two open Ideas rows in `DECISIONS.md`
 
 The founder has stated the plan: a hosted service so the product is seamless, free while it can be afforded, freemium if server costs bite. That is no longer the open musing this repository has carried since week one, and it deserves to be recorded as an intention rather than discovered later in a commit.
 

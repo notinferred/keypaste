@@ -21,8 +21,6 @@ on:
       - 'docs/PRODUCT.md'
       - 'CLAUDE.md'
       - 'docs/STEPS.md'
-      - 'docs/IDEAS.md'
-      - 'docs/ARTIFACTS.md'
       - 'DECISIONS.md'
       - 'CHANGELOG.md'
       - 'THREATS.md'

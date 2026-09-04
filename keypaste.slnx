@@ -2,8 +2,6 @@
   <Folder Name="/meta/">
     <File Path="docs/PRODUCT.md" />
     <File Path="docs/STEPS.md" />
-    <File Path="docs/IDEAS.md" />
-    <File Path="docs/ARTIFACTS.md" />
     <File Path="DECISIONS.md" />
     <File Path="CLAUDE.md" />
     <File Path="SECURITY.md" />

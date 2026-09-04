@@ -168,7 +168,7 @@ AGPL-3.0. Pre-1.0 — no released GUI yet, and the approval prompt is a terminal
 
 ## r/KeePass
 
-Respectful, compat-first, and it leads with the gate rather than the product. `docs/IDEAS.md` already carries the standing instruction for this community: contribute compat fixes upstream, never fork-and-fight. This post is an ask for critique, not an announcement.
+Respectful, compat-first, and it leads with the gate rather than the product. the Ideas table in `DECISIONS.md` already carries the standing instruction for this community: contribute compat fixes upstream, never fork-and-fight. This post is an ask for critique, not an announcement.
 
 **Title:**
 
@@ -298,7 +298,7 @@ Every objection below is one the repository already concedes somewhere. Answerin
 | "This does nothing against malware already on my machine." | True, and it is the blanket concession in `SECURITY.md` and `THREATS.md`. A process running as your user is outside all of it. Do not defend this one — agree. |
 | "How do I know your CI actually checks anything?" | `D-0038`: the gate was watched failing before it was trusted, because a gate never observed failing is not known to be a gate. Point at `scripts/verify-demo.sh`. |
 
-**What not to do, for fourteen days.** No second account, no asking anyone to upvote, no deleting a critical comment, no arguing with someone who is right, and no shipping a feature because one comment asked for it. New ideas go to `docs/IDEAS.md` — that is what it is for, and a launch is exactly when that rule is hardest to keep.
+**What not to do, for fourteen days.** No second account, no asking anyone to upvote, no deleting a critical comment, no arguing with someone who is right, and no shipping a feature because one comment asked for it. New ideas go to the Ideas table in `DECISIONS.md` — that is what it is for, and a launch is exactly when that rule is hardest to keep.
 
 ---
 
