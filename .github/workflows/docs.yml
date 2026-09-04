@@ -1,0 +1,62 @@
+name: docs
+
+# Why this exists as its own workflow (D-0080).
+#
+# scripts/verify-claims.sh checks that every step, decision and owner id the documents cite resolves
+# to something that exists. It runs in ci.yml's `gate` job - and every document it reads sits in
+# ci.yml's `paths-ignore`. So a push touching only docs/STEPS.md and DECISIONS.md skipped ci.yml
+# entirely and the check never ran on the one kind of change that can break it. The dangling "step
+# 1.5" that made check A fire in the first place arrived in exactly such a push.
+#
+# The fix is not to delete those paths-ignore entries. That would make every governance edit pay for
+# `gate` - a locked restore, dotnet format and a -warnaserror build, minutes of it - to run a bash
+# script that needs none of them. So the script gets a trigger of its own instead.
+#
+# What this costs on every push, which CLAUDE.md says to ask before adding a workflow: one Linux
+# runner, checkout and bash, no SDK and no restore, on pushes that touch a document and on nothing
+# else. It is cheaper than ci.yml's `scope` job and it is the only gate those pushes run.
+#
+# `paths` below is the same list as CITING inside the script, plus the script and this file. Keep
+# them in step: a document the script reads and this list does not is a document whose citations are
+# checked only when something else happens to trigger ci.yml.
+#
+# Pull requests are deliberately absent. ci.yml has no paths filter on pull_request, so a proposed
+# change already gets `gate` and with it this same script - a reviewer decides on the full verdict.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'DECISIONS.md'
+      - 'README.md'
+      - 'launch.md'
+      - 'THREATS.md'
+      - 'SECURITY.md'
+      - 'CHANGELOG.md'
+      - 'CONTRIBUTING.md'
+      - 'CLAUDE.md'
+      - 'scripts/verify-claims.sh'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  claims:
+    name: the documents point at things that exist
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # No setup-dotnet, and that absence is the point: this gate is bash over the repository.
+      - name: Every step, decision and owner id a document cites resolves
+        run: bash scripts/verify-claims.sh

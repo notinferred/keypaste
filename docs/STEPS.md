@@ -83,7 +83,7 @@ and H-0014 were decisions, answered by D-0054 to D-0060; H-0011 is the site's pr
   to KDBX history; equal timestamps with differing content is a conflict that names every entry, writes
   nothing and exits nonzero; absence is never a deletion; `--key` wires `KcpKeyFile` into
   `KeePassInterop` after the keyfile path is proved against real `keepassxc-cli`; `--dry-run`, `--yes`;
-  `scripts/verify-merge.sh`; the policy recorded as D-0052 and O-0018 closed or narrowed.
+  `scripts/verify-merge.sh`; the merge policy recorded as a new ledger row, and O-0018 closed or narrowed.
   **Verify (V-merge):** an older incoming entry with the same UUID does not overwrite the newer local one;
   the same merge twice is a no-op with no duplicate UUIDs; an equal-timestamp conflict leaves the vault
   byte-identical; a four-entry file into a forty-entry vault leaves forty; the loser is in history;
@@ -329,7 +329,7 @@ and H-0014 were decisions, answered by D-0054 to D-0060; H-0011 is the site's pr
   (both free on 2026-08-04); crates.io is somebody else's and needs nothing (D-0053, D-0058). **Verify
   (V-names):** `https://github.com/keypaste` and `npmjs.com/package/keypaste`, opened logged out, are
   held by this project; `launch.md`'s canonical link matches. *Fails if* either resolves to someone else.
-- [ ] **3.0 `[MVP]` — The repository goes public (H-0003, H-0020).** Scan every commit after the last scan (`9d48bd7`, commit 174 of 191 today)
+- [ ] **3.0 `[MVP]` — The repository goes public (H-0003).** Scan every commit after the last scan (`9d48bd7`, commit 174 of 191 today)
   with the first scan's grep; then have GitHub Support purge `refs/pull/*` and gc, or push the clean
   history to a fresh repository and delete this one; then Settings → Change visibility. **Verify
   (V-public):** `git ls-remote origin 'refs/pull/*'` returns nothing and `refs/pull/11/head`

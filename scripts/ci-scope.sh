@@ -31,12 +31,19 @@ while IFS= read -r p; do
   [ -n "$p" ] || continue
   any=true
   case "$p" in
-    # --- documents that no gate in ci.yml reads: never a reason to run anything -----------------
+    # --- documents and files that no JOB in ci.yml reads: never a reason to run anything ------------
+    # This bucket is deliberately WIDER than ci.yml's paths-ignore, and the two are not drifting.
+    # paths-ignore decides whether the workflow starts at all and stays narrow so a path nobody
+    # thought about still runs everything; this decides which jobs run once it has started. A path
+    # here but not there costs the scope and gate jobs and nothing more. Adding one there instead is
+    # a second list to keep in step, which is the bug D-0080 had to fix between paths-ignore and
+    # scripts/verify-claims.sh. The documents here are gated - docs.yml runs verify-claims.sh on them.
     docs/PRODUCT.md|CLAUDE.md|docs/STEPS.md|DECISIONS.md|CHANGELOG.md|THREATS.md|SECURITY.md|\
     THIRD_PARTY_NOTICES.md|CONTRIBUTING.md|LICENSE|docs/mcp-setup.md|docs/replace-dotenv.md|\
     docs/desktop.md|site/README.md|site/public/thanks/*|.gitignore|.gitattributes|\
     .github/dependabot.yml|.github/workflows/app.yml|.github/workflows/release.yml|\
-    .github/workflows/install.yml|.github/workflows/dco.yml|.claude/*|docs/policy.md|docs/approvals.md|\
+    .github/workflows/install.yml|.github/workflows/dco.yml|.github/workflows/docs.yml|\
+    .claude/*|docs/policy.md|docs/approvals.md|\
     scripts/demo/README.md|scripts/demo/build-demo-binaries.sh|scripts/demo/demo-env.sh|\
     scripts/demo/demo.bashrc|scripts/demo/demo.tmux.conf|scripts/demo/install-recording-tools.sh|\
     scripts/demo/make-demo-fixture.sh|scripts/demo/record-demo.sh|scripts/demo/render-demo-gif.sh|\
