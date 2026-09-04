@@ -430,3 +430,5 @@ were decisions, answered by D-0054 to D-0060; H-0011 is the site's pre-deploy ch
 - [ ] **K.5 `[MVP]` — Fork pull requests on Blacksmith runners.** An answer for pull requests from
   forks, which have no access to the runner labels. **Verify (V-fork-ci):** a pull request from a fork
   runs `ci.yml` to completion. *Fails if* it stays queued.
+
+<!-- Temporary, reverted in the next commit: proving docs.yml goes red. Cites step 9.9 and D-0099, neither of which exists. -->
