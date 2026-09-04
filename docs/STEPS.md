@@ -62,7 +62,7 @@ directions; env sets and `keypaste run` injection; the MCP bridge with a separat
 approver, a 45-second window, policy pre-approvals and a hash-chained audit log; `v0.1.0` published as
 four native binaries on `dl.keypaste.com`; a desktop app that unlocks a vault, browses entries and edits
 env sets, built from source and not released; the launch essay, the landing page, the launch copy.
-**No gate runs on the founder's machine** until K.1 is done. H-0002, H-0004, H-0008, H-0009, H-0012, H-0013
+The SDK the plan pins runs on the founder's machine (K.1), so every `dotnet` gate can be run locally before a push; the shell gates that need `clang`, Docker or a Linux runner still cannot. H-0002, H-0004, H-0008, H-0009, H-0012, H-0013
 and H-0014 were decisions, answered by D-0054 to D-0060; H-0011 is the site's pre-deploy checklist in
 `site/README.md`, run by hand before every deploy.
 
@@ -373,10 +373,9 @@ and H-0014 were decisions, answered by D-0054 to D-0060; H-0011 is the site's pr
 
 ## K · Development environment & CI
 
-- [ ] **K.1 `[MVP]` — The SDK on the founder's machine (H-0016).** Install .NET SDK 10.0.302, the band
-  `global.json` pins; nothing builds without it. **Verify (V-sdk):** `dotnet --version` from the repo
-  root prints `10.0.302` and `dotnet test keypaste.slnx` passes. *Fails if* "A compatible .NET SDK was
-  not found".
+- [x] **K.1 `[MVP]` — The SDK on the founder's machine (H-0016).** .NET SDK 10.0.302, the exact version
+  `global.json` pins (D-0076), installed machine-wide on 2026-09-04; `dotnet --version` in the repo prints
+  `10.0.302` and `dotnet test keypaste.slnx` passes 1,010 tests with 2 skipped.
 - [x] **K.2 `[MVP]` — The docs gate.** `scripts/verify-claims.sh` in `ci.yml`'s gate job; observed
   failing on a dangling step reference.
 - [ ] **K.3 `[MVP]` — Every standing gate observed failing.** Break each of the eight gates marked "not
