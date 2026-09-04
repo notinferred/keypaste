@@ -29,12 +29,12 @@ D-0006 removed this material from the roadmap and the parking lot, and D-0072 ke
 | Vulnerability reports | `security@keypaste.com`, routed by Cloudflare Email Routing | the only reporting channel that works today |
 | DNS for `keypaste.com` and `dl.keypaste.com` | Cloudflare | |
 | CI runners | GitHub Actions on Blacksmith runners exclusively; no GitHub-hosted label remains in any workflow | |
-| Sync relay host and its S3-compatible bucket | **not yet held** — Owner Queue **H-0019** | the relay is one binary (D-0064); the hosted instance is that binary on a small VM behind Cloudflare |
+| Sync relay host and its S3-compatible bucket | **not yet held** — step 5.2 (H-0019) | the relay is one binary (D-0064); the hosted instance is that binary on a small VM behind Cloudflare |
 | Stripe account for Individual and Team billing | **not yet held** — **H-0018** | licence keys are issued by the relay, checked by the relay, and never gate a client |
 | Azure Trusted Signing for Windows binaries | **not yet held** — **H-0017** | D-0070; price and eligibility re-verified at enrolment |
 | Apple Developer Program for notarization | **not yet held** — **H-0015** | D-0057 |
 
-The site has **no CI job**. `ci.yml` is the .NET gate and does not look at `site/`. The pre-deploy checklist in `site/README.md` is the whole of the protection, and it is Owner Queue row **H-0011**.
+The site has **no CI job**. `ci.yml` is the .NET gate and does not look at `site/`. The pre-deploy checklist in `site/README.md` is the whole of the protection, and it is **H-0011**, run by hand before every deploy.
 
 ---
 
@@ -42,7 +42,7 @@ The site has **no CI job**. `ci.yml` is the .NET gate and does not look at `site
 
 | what | where | status |
 |---|---|---|
-| GitHub org `keypaste` | github.com | **not registered** — Owner Queue **H-0001** |
+| GitHub org `keypaste` | github.com | **not registered** — step 0.4 (H-0001) |
 | npm and crates names | npmjs.com, crates.io | **not registered** — **H-0001** |
 | Trademark on "keypaste" | — | **not filed, deliberately** — D-0058 accepted the risk. No full clearance search was run, and D-0053's one known live collision is the whole basis; a second one is the trigger to revisit |
 
@@ -54,8 +54,8 @@ The repository itself is `notinferred/keypaste` and is **private**. Whether it g
 
 | what | where | note |
 |---|---|---|
-| The demo cast | the pipeline is `scripts/demo/` in this repo; an accepted take is committed at `docs/demo/keypaste-demo.cast` — **none exists yet**, Owner Queue **H-0005** | the pipeline is WSL-only. A cast is committed as text so anyone can grep it for the master password, the sentinel and the dialog `record-demo.sh` asserts — `scripts/demo/README.md` says why. One take was recorded and **rejected**: the credential was never released in it, which `record-demo.sh`'s positive control refuses, so it proved nothing and was not kept |
-| The demo GIF | **does not exist yet** — Owner Queue **H-0005** | both pages reserve the slot; it renders from the cast above, so it is blocked on the same take |
+| The demo cast | the pipeline is `scripts/demo/` in this repo; an accepted take is committed at `docs/demo/keypaste-demo.cast` — **none exists yet**, step 3.1 (H-0005) | the pipeline is WSL-only. A cast is committed as text so anyone can grep it for the master password, the sentinel and the dialog `record-demo.sh` asserts — `scripts/demo/README.md` says why. One take was recorded and **rejected**: the credential was never released in it, which `record-demo.sh`'s positive control refuses, so it proved nothing and was not kept |
+| The demo GIF | **does not exist yet** — step 3.1 (H-0005) | both pages reserve the slot; it renders from the cast above, so it is blocked on the same take |
 | KeePassXC for the Windows compat job | fetched from the official zip, pinned by SHA-256 in `ci.yml` | changing the pin is a security decision |
 | Published `v0.1.0` assets | `https://dl.keypaste.com/v0.1.0/` — four native binaries, the corresponding source, and checksums | immutable; the pipeline will not republish a version |
 

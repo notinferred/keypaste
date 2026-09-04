@@ -6,7 +6,8 @@
 # work than it caught. This does not do that. Each check below is a statement about the world that
 # was FALSE at some point in this repository's history, and each one can go red.
 #
-#   A. Every "step N.N" reference in docs/STEPS.md points at a step that exists.
+#   A. Every "step N.N" reference in docs/STEPS.md points at a step that exists, as a "### N.N —"
+#      heading or a "- [ ] **N.N" row.
 #      Fired 2026-08-26 against the dangling "step 1.5" that splitting it into 1.5a and 1.5b left
 #      behind - including in the Owner lane naming what blocks the launch, which still read
 #      correctly and pointed at nothing.
@@ -35,11 +36,11 @@ die() { echo "::error::$*" >&2; exit 1; }
 # The trailing letter matters: a split produces 1.5a and 1.5b, and a pattern that only accepted
 # <n.n> would silently stop checking the two steps the split just created.
 referenced=$(grep -oiE 'step \*\*[0-9]+\.[0-9]+[a-z]?\*\*|step [0-9]+\.[0-9]+[a-z]?' "$STEPS" \
-             | grep -oE '[0-9]+\.[0-9]+[a-z]?' | sort -u)
+             | grep -oE '[0-9]+.[0-9]+[a-z]?' | sort -u || true)
 
 for id in $referenced; do
-  grep -qE "^### $id — " "$STEPS" \
-    || die "$STEPS refers to step $id, and no '### $id — ' heading defines it. Either the step was renumbered - a split leaves the old number behind in prose that still reads correctly - or the reference is to something that never existed"
+  grep -qE "^(### $id — |- \[[ x]\] \*\*$id )" "$STEPS" \
+    || die "$STEPS refers to step $id, and no '### $id — ' heading or '- [ ] **$id ' row defines it. Either the step was renumbered - a split leaves the old number behind in prose that still reads correctly - or the reference is to something that never existed"
 done
 
 # --- B. nothing is untracked and unignored -------------------------------------------------------

@@ -1141,7 +1141,7 @@ The narrower risk is shapes rather than bytes: the compat fixture's shape is the
 
 **The fix is an admission rule.** A step may be added to `docs/STEPS.md` only if it has an accept criterion that can *fail*, names its verifier, and traces to a claim in `docs/PRODUCT.md`. Anything failing one of those is a `docs/IDEAS.md` row. That is the termination condition, and applying it cost three stages: sharing, the delegation dashboard and teams are now ledger rows, because none of them can name something that would prove them done.
 
-**Open steps carry three lanes, and the split is the highest-value part.** Build is the agent-runnable prompt. Owner is what only a human can do. Falsifier is the specific thing to try that would prove the step is *not* done. Separating them surfaced an Owner Queue of twelve items — registering the org, deciding whether the repository goes public, recording the GIF, choosing DCO or CLA, signing the binaries — and the launch is blocked on those, not on engineering. That was true before and was not visible anywhere.
+**Every step is one row with a Build line and a Verify line, and the Verify line is the highest-value part.** It names what must hold and the observation that fails it. Human actions — registering the org, making the repository public, recording the GIF, signing the binaries — are rows in the same list rather than a queue beside it, so the launch being blocked on people rather than engineering is visible in the order.
 
 **Verification runs cold.** A verifier gets `docs/STEPS.md` and the repository, never the Build lane and never the builder's transcript, because shared context is how a build and its check agree with each other while both are wrong. The falsifier is run first; results are PASS, FAIL or BLOCKED, and BLOCKED is not a pass.
 
@@ -1309,7 +1309,7 @@ D-0006 carries the precondition for answering this: GitHub can serve any commit 
 
 D-0042 removed the one argument that was pushing this decision for the wrong reason: CI cost. It is now a question about trust and about what is in the history, which is where it belongs.
 
-**Answered by H-0003 on 2026-08-04: public once a release actually works, and not before the launch posts.** The identity rewrite is done; what blocks the flip is the `refs/pull/*` heads GitHub keeps, which carry the pre-rewrite history and which no push can delete. `docs/STEPS.md`'s Owner Queue holds the next command.
+**Answered by H-0003 on 2026-08-04: public once a release actually works, and not before the launch posts.** The identity rewrite is done; what blocks the flip is the `refs/pull/*` heads GitHub keeps, which carry the pre-rewrite history and which no push can delete. Step 3.0 in `docs/STEPS.md` holds the next command.
 
 ## O-0018 - Two writers, one KDBX, and no merge
 
