@@ -24,6 +24,8 @@
 #      which named a human action whose Owner Queue was deleted at 9d48bd7, and D-0052, a forward
 #      id reserved for a decision that was never written. Check A could not see either, because
 #      neither is a step number, so both read correctly and meant nothing for weeks.
+#      Observed red in CI on 2026-09-04 - GitHub Actions run 33915355068, on a deliberately dangling
+#      "step 9.9" - and green on the commit before it. This gate has been seen to fail (D-0043).
 #
 # HONEST LIMIT ON B, STATED RATHER THAN DISCOVERED: it is meaningful only in a working tree. CI
 # checks out clean, so there every file is tracked by construction and B is green for a reason that
