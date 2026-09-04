@@ -10,6 +10,7 @@ The long-form records below carry the reasoning. From D-0061 a decision is one r
 
 | id | date | decision | supersedes |
 |---|---|---|---|
+| D-0075 | 2026-09-04 | §1 names both words: a password manager **and** a secrets manager. Env injection already is one for a single person; the team half arrives with 7.1 and 7.2 and is priced then, not now | §1 wording of D-0061 |
 | D-0074 | 2026-09-04 | Nothing is gated on "revenue" or "benchmarks" any more; every step in `docs/STEPS.md` carries a Verify line and a tier tag, and a tier starts when the one before it has shipped | the "Gated" section of `docs/STEPS.md` |
 | D-0073 | 2026-09-04 | 4.5 (UX bench) and 4.6 (headless render gates) leave the parking lot at the app's first release, because that is when there is somebody to measure | D-0043's parking of both |
 | D-0072 | 2026-09-04 | Business figures live in `keypastebusinessnotes.md`, in the tree and ignored by `*businessnotes*.md`; committed pages carry shapes and decisions, never numbers | makes `docs/ARTIFACTS.md`'s row true; D-0006 unchanged |

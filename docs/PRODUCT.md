@@ -1,13 +1,13 @@
 # PRODUCT.md — The keypaste Constitution
-> **This file changes only by a dated re-ratification.** §3 does not change at all. Every other section may be rewritten by the founder, once, with a date, and a `D-` row in `DECISIONS.md` saying why. If a decision conflicts with the current text, the decision is wrong. Last ratified: 2026-09-04 (v1.1, D-0061). v1.0 was July 2026 and is in git.
+> **This file changes only by a dated re-ratification.** §3 does not change at all. Every other section may be rewritten by the founder, once, with a date, and a `D-` row in `DECISIONS.md` saying why. If a decision conflicts with the current text, the decision is wrong. Last ratified: 2026-09-04 (v1.1, D-0061; §1 wording D-0075). v1.0 was July 2026 and is in git.
 
 ---
 
 ## 1. What keypaste IS
 
-**keypaste is a KeePass-compatible password manager for people who work with AI agents.**
+**keypaste is a KeePass-compatible password manager and secrets manager for people who work with AI agents.**
 
-One sentence pitch: *"A cleaner KeePassXC: your passwords and env variables in an ordinary KDBX file you own, synced through a service you can pay for or run yourself, and the only vault that lets an AI agent ask for exactly one credential — with your approval, a lifetime you were shown, and a log line — without ever seeing the vault."*
+One sentence pitch: *"A cleaner KeePassXC that is also your secrets manager: passwords, API keys and env variables in an ordinary KDBX file you own, synced through a service you can pay for or run yourself, and the only vault that lets an AI agent ask for exactly one credential — with your approval, a lifetime you were shown, and a log line — without ever seeing the vault."*
 
 The product is **freemium**. Free is the whole password manager. Paid is hosting and teams. In the order they are built and sold:
 
