@@ -66,7 +66,7 @@ internal interface IWin32Clipboard
 [SupportedOSPlatform("windows")]
 internal sealed class Win32Clipboard : IWin32Clipboard
 {
-    private const int GmemMoveable = 0x0002;
+    private const int _gmemMoveable = 0x0002;
 
     /// <inheritdoc/>
     public uint RegisterFormat(string name) => RegisterClipboardFormatW(name);
@@ -107,7 +107,7 @@ internal sealed class Win32Clipboard : IWin32Clipboard
     {
         ArgumentNullException.ThrowIfNull(data);
 
-        var handle = GlobalAlloc(GmemMoveable, (UIntPtr)data.Length);
+        var handle = GlobalAlloc(_gmemMoveable, (UIntPtr)data.Length);
         if (handle == IntPtr.Zero)
         {
             return false;

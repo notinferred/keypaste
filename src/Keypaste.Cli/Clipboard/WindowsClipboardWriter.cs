@@ -33,7 +33,7 @@ namespace Keypaste.Cli.Clipboard;
 internal sealed class WindowsClipboardWriter
 {
     /// <summary>Unicode text. The only format here a paste target actually reads.</summary>
-    private const uint CfUnicodeText = 13;
+    private const uint _cfUnicodeText = 13;
 
     /// <summary>
     /// The opt-out format names, exactly as Windows must see them.
@@ -93,7 +93,7 @@ internal sealed class WindowsClipboardWriter
 
             // Null-terminated UTF-16, which is what CF_UNICODETEXT means by a string.
             var bytes = Encoding.Unicode.GetBytes(text + '\0');
-            if (!_win32.SetData(CfUnicodeText, bytes))
+            if (!_win32.SetData(_cfUnicodeText, bytes))
             {
                 error = "could not write the text to the clipboard";
                 return false;

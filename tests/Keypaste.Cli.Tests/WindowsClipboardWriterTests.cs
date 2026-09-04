@@ -24,7 +24,7 @@ namespace Keypaste.Cli.Tests;
 /// </remarks>
 public sealed class WindowsClipboardWriterTests
 {
-    private const uint CfUnicodeText = 13;
+    private const uint _cfUnicodeText = 13;
 
     [Fact]
     public void Everything_goes_on_in_one_session()
@@ -48,7 +48,7 @@ public sealed class WindowsClipboardWriterTests
 
         Assert.True(new WindowsClipboardWriter(win32).TrySet("sk_live_the_secret", out _));
 
-        Assert.Contains(CfUnicodeText, win32.Written.Keys);
+        Assert.Contains(_cfUnicodeText, win32.Written.Keys);
         foreach (var name in WindowsClipboardWriter.OptOutFormatNames)
         {
             Assert.Contains(win32.IdOf(name), win32.Written.Keys);
@@ -64,7 +64,7 @@ public sealed class WindowsClipboardWriterTests
 
         // CF_UNICODETEXT means a null-terminated UTF-16 string. Omitting the terminator is the
         // classic way to paste the password plus whatever happened to follow it in memory.
-        Assert.Equal(Encoding.Unicode.GetBytes("hi\0"), win32.Written[CfUnicodeText]);
+        Assert.Equal(Encoding.Unicode.GetBytes("hi\0"), win32.Written[_cfUnicodeText]);
     }
 
     [Fact]
