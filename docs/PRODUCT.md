@@ -1,27 +1,29 @@
 # PRODUCT.md — The keypaste Constitution
-> **DO NOT MODIFY THIS FILE.** Everything else in this repo can change. This cannot. If a decision conflicts with this file, the decision is wrong. Last ratified: July 2026 (v1.0)
+> **This file changes only by a dated re-ratification.** §3 does not change at all. Every other section may be rewritten by the founder, once, with a date, and a `D-` row in `DECISIONS.md` saying why. If a decision conflicts with the current text, the decision is wrong. Last ratified: 2026-09-04 (v1.1, D-0061). v1.0 was July 2026 and is in git.
 
 ---
 
 ## 1. What keypaste IS
 
-**keypaste is the safe bridge between your credentials and the AI era.**
+**keypaste is a KeePass-compatible password manager for people who work with AI agents.**
 
-One sentence pitch: *"Stop pasting secrets into chats. keypaste is a local-first, KDBX-compatible vault that stores your passwords AND env variables, injects them into your projects, and lets AI agents like Claude request exactly one credential — with your approval, scoped access, and a full audit trail — without ever seeing your vault."*
+One sentence pitch: *"A cleaner KeePassXC: your passwords and env variables in an ordinary KDBX file you own, synced through a service you can pay for or run yourself, and the only vault that lets an AI agent ask for exactly one credential — with your approval, a lifetime you were shown, and a log line — without ever seeing the vault."*
 
-The product is a **wedge**, not a platform. The wedge is:
-1. KDBX-compatible vault (ride existing KeePass trust, never invent a new format)
-2. Env variable / API key storage + injection (`keypaste run -- npm start`)
-3. A safe MCP server for AI agents (scoped, approved, audited access)
-4. The audit log grows into the delegation dashboard (v2, earned — not built first)
+The product is **freemium**. Free is the whole password manager. Paid is hosting and teams. In the order they are built and sold:
 
-## 2. What keypaste is NOT (permanent scope walls)
+1. The KDBX-compatible vault and the desktop app that opens it (ride existing KeePass trust, never invent a new format)
+2. The agent bridge — scoped, approved, audited access over MCP — which is the selling point no other vault has
+3. Env variable / API key storage and injection (`keypaste run -- npm start`), the developer's reason to arrive
+4. Hosted zero-knowledge sync, which is the business, with self-hosting of the same binary first-class
+5. "What can act as you right now" — the headline number, read from the running agent, which grows into the delegation dashboard
+
+## 2. What keypaste is NOT (the walls that remain)
 
 - **NOT** a new proprietary vault format. KDBX or nothing.
-- **NOT** a cloud service that holds user secrets. Local-first forever. Sync is the user's problem (their file, their Dropbox/Syncthing/whatever) until/unless a zero-knowledge hosted tier is added — and even then, self-host must remain first-class.
-- **NOT** "for everyone." The user is a developer, indie hacker, power user, or tiny team. Consumers with only browser passwords are served by Apple/Google/Bitwarden — do not chase them.
-- **NOT** an enterprise IAM/NHI platform. Do not compete with Descope, Token Security, Okta. If an enterprise wants it, they self-host the open-source version.
-- **NOT** feature-complete-first. Ship the wedge. Say no to everything else until the wedge has users.
+- **NOT** a cloud service that can read your secrets. The hosted tier stores an encrypted blob and client-held keys and can decrypt nothing (D-0060). A forgotten master password is gone. Self-host is the same binary and stays first-class.
+- **NOT** chasing browser-only consumers who have no vault and want none. Apple, Google and the browser serve them. keypaste is for the person who already keeps, or is ready to keep, a file of their own.
+- **NOT** an enterprise IAM/NHI platform. Do not compete with Descope, Token Security, Okta. If an enterprise wants it, they self-host.
+- **NOT** everything at once. `docs/STEPS.md` orders the work in tiers, and a tier is not started until the one before it is sold or shipped.
 
 ## 3. Security laws (violating any of these kills the project's only asset: trust)
 
@@ -38,11 +40,11 @@ The product is a **wedge**, not a platform. The wedge is:
 
 ## 4. Engineering laws
 
-1. **Local-first, offline-capable.** The core works with no network at all.
-2. **CLI-first, UI-second.** Every feature exists in the CLI before it gets a GUI. The GUI calls the same core library the CLI does.
-3. **One core library** (`keypaste-core`) that CLI, GUI, and MCP server all share. No logic duplicated in frontends.
+1. **Local-first, offline-capable.** The core works with no network at all. Sync is an addition to a file that already works, never a precondition.
+2. **Core-first.** Every feature lives in `Keypaste.Core`; the CLI and the desktop app are both thin over it, and neither waits for the other. A feature that exists in one front end and not the other says so on the page.
+3. **One core library** that CLI, GUI, MCP server and relay client all share. No logic duplicated in frontends.
 4. **Cross-platform from day one** (macOS, Linux, Windows) — pick a stack that makes this cheap.
-5. **Tests on the secret path are mandatory.** No untested code touches encryption, injection, or the agent bridge.
+5. **Tests on the secret path are mandatory.** No untested code touches encryption, injection, sync, or the agent bridge.
 6. **Compatibility is sacred:** any KDBX file keypaste writes must open correctly in KeePassXC. This is tested in CI against real KeePassXC.
 7. **Small releases, real changelogs, semantic versioning.**
 8. **Documentation ships with the feature**, not after.
@@ -52,16 +54,17 @@ The product is a **wedge**, not a platform. The wedge is:
 1. **The demo is the marketing.** Every stage must end in something demoable in under 60 seconds.
 2. **Solve your own pain first.** If you (the founder) don't use keypaste daily, don't ship it to others.
 3. **Community before customers.** KeePass forums, MCP ecosystem, HN, r/selfhosted — earn credibility there before any paid tier exists.
-4. **Monetize the convenience, never the security.** Free/self-host tier is fully secure and fully functional. Paid tiers sell hosting, sync convenience, team features, support — never "more encryption."
+4. **Monetize the convenience, never the security.** Free/self-host tier is fully secure and fully functional. Paid tiers sell hosting, sync convenience, team features, support — never "more encryption", and never a signature the free binary lacks.
 5. **One founder, one focus.** New ideas go to docs/IDEAS.md, not into the sprint. docs/IDEAS.md is where ideas wait their turn — most wait forever.
+6. **Free is the whole password manager.** CLI, app, agent bridge, browser extension, TOTP, SSH, importers, and the relay binary to run yourself. Paid is the relay somebody else runs, and what teams need on top of it.
 
 ## 6. Decision tiebreakers (when stuck, in order)
 
 1. Does it protect user trust? → if it risks trust, no.
-2. Does it serve the wedge (KDBX + env + agent bridge)? → if not, docs/IDEAS.md.
+2. Does it serve the order in §1? → if not, docs/IDEAS.md.
 3. Can one person ship it in ≤2 weeks? → if not, cut scope until yes.
 4. Would it make the 60-second demo better? → prefer the option that demos.
 5. Boring beats clever. Shipped beats perfect. Focused beats big.
 
 ---
-*If you are reading this months from now, tired, tempted to pivot to "for everyone" or to add a cloud vault or a new format: the answer is still no. Re-read section 2.*
+*If you are reading this months from now, tired, tempted to add a format, to let the server read a vault, or to build for people who will never keep a file: the answer is still no. Re-read section 2. Everything else in here can be re-ratified, with a date, and that is the only way it changes.*
