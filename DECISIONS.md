@@ -10,6 +10,7 @@ The long-form records below carry the reasoning. From D-0061 a decision is one r
 
 | id | date | decision | supersedes |
 |---|---|---|---|
+| D-0076 | 2026-09-04 | `global.json` rolls forward `disable`, not `latestPatch`: an SDK patch moves the implicit ILCompiler and ILLink versions the lock files pin, so CI was red for nine days with no code change; SDK bumps are deliberate and regenerate the lock files | D-0002's roll-forward choice |
 | D-0075 | 2026-09-04 | §1 names both words: a password manager **and** a secrets manager. Env injection already is one for a single person; the team half arrives with 7.1 and 7.2 and is priced then, not now | §1 wording of D-0061 |
 | D-0074 | 2026-09-04 | Nothing is gated on "revenue" or "benchmarks" any more; every step in `docs/STEPS.md` carries a Verify line and a tier tag, and a tier starts when the one before it has shipped | the "Gated" section of `docs/STEPS.md` |
 | D-0073 | 2026-09-04 | 4.5 (UX bench) and 4.6 (headless render gates) leave the parking lot at the app's first release, because that is when there is somebody to measure | D-0043's parking of both |
@@ -40,7 +41,7 @@ Projects are therefore `Keypaste.Core`, `Keypaste.Cli`, `Keypaste.Mcp`, while th
 
 **Date:** 2026-07-25 · **Stage:** 0.1 · **Status:** accepted
 
-docs/STEPS.md locks ".NET 8+". .NET 10 is the current LTS and the only SDK on the development machine. The SDK is pinned in `global.json` at `10.0.302` with `rollForward: latestPatch`, which keeps the compiler and analyzer behaviour inside one feature band while still accepting SDK security patches. `LangVersion` is pinned to `14.0` rather than `latest` so language semantics do not drift when the SDK rolls forward.
+docs/STEPS.md locks ".NET 8+". .NET 10 is the current LTS and the only SDK on the development machine. The SDK is pinned in `global.json` at `10.0.302` with `rollForward: disable`, and the pin is exact on purpose (D-0076): `latestPatch` let `setup-dotnet` install 10.0.303, whose runtime 10.0.11 changes the implicit `Microsoft.DotNet.ILCompiler` and `Microsoft.NET.ILLink.Tasks` versions the lock files record, so every locked restore failed with NU1004 from 2026-08-26 until the pin was fixed on 2026-09-04. Taking an SDK patch is now a deliberate change: bump the version, `dotnet restore --force-evaluate`, commit the regenerated lock files. `LangVersion` is pinned to `14.0` rather than `latest` so language semantics do not drift when the SDK rolls forward.
 
 ## D-0003 — Test stack: xUnit v3 on Microsoft.Testing.Platform
 
