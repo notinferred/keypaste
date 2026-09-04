@@ -31,7 +31,7 @@ public sealed class Win32ClipboardFormatNameTests
         if (!OperatingSystem.IsWindows())
         {
             // Not a silent pass: there is no clipboard here to ask, and asserting anything about
-            // one would be inventing a result. Step 1.5a's falsifier in docs/STEPS.md says so, and calls itself BLOCKED off
+            // one would be inventing a result. Step 1.5a's Verify line in docs/STEPS.md says so, and calls itself BLOCKED off
             // Windows rather than green.
             return;
         }
