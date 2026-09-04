@@ -10,6 +10,7 @@ The long-form records below carry the reasoning. From D-0061 a decision is one r
 
 | id | date | decision | supersedes |
 |---|---|---|---|
+| D-0078 | 2026-09-04 | `ci.yml` runs each job only when the push touched what that job can catch: `scripts/ci-scope.sh` classifies the diff; pinned-page edits get a Linux build and the demo gate; the three-OS test, the KeePassXC matrix and the AOT publish each carry one relevance `if:`; pull requests, tags and dispatch always run everything; the compat expression is pinned by `CompatGateIsPermanentTests` | D-0008 "on every push" |
 | D-0077 | 2026-09-04 | Scope cut: `[MVP]` is what a stranger can install this month — names, public repository, GIF, launch, the app released and signed; the first dollar (4.7 + 5.2) moves to `[Launch]` with 1.4, 4.3 and 4.4; the ideas and not-in-git tables fold into this file and the long-form records become its archive | D-0065's tier placement, D-0074 |
 | D-0076 | 2026-09-04 | `global.json` rolls forward `disable`, not `latestPatch`: an SDK patch moves the implicit ILCompiler and ILLink versions the lock files pin, so CI was red for nine days with no code change; SDK bumps are deliberate and regenerate the lock files | D-0002's roll-forward choice |
 | D-0075 | 2026-09-04 | §1 names both words: a password manager **and** a secrets manager. Env injection already is one for a single person; the team half arrives with 7.1 and 7.2 and is priced then, not now | §1 wording of D-0061 |
@@ -252,7 +253,7 @@ Code keypaste does not build is removed from the *compilation* in `KeePassLib.cs
 
 docs/PRODUCT.md §4.6 makes KeePassXC compatibility sacred, and docs/PRODUCT.md cannot change. The `compat` job in `.github/workflows/ci.yml` plus `scripts/verify-keepassxc-compat.sh` are that law's enforcement, so they are not subject to the "delete it if it is annoying" latitude that applies to every other CI step.
 
-It runs on all three operating systems rather than Linux only, because the interesting failures are the OS-specific ones — path handling, text encoding, `SetConsoleCP` on Windows, arm64 on macOS — and a Linux-only gate would assert the least interesting third of the surface. It runs on Blacksmith's flat-rate runners (D-0042), so the three-OS matrix costs minutes rather than money.
+It runs on all three operating systems rather than Linux only, because the interesting failures are the OS-specific ones — path handling, text encoding, `SetConsoleCP` on Windows, arm64 on macOS — and a Linux-only gate would assert the least interesting third of the surface. It runs on Blacksmith runners (D-0042), which bill by the minute, and since D-0078 it runs on every push that touches what can change the bytes keypaste writes — the core, the CLI, the vendored library, the compat scripts, the props, the SDK pin, the lock files, the workflow — and on every pull request, tag and dispatch. A push that touches none of those cannot break it, and paying three operating systems to confirm that was the larger part of every bill.
 
 Three properties are non-negotiable, in increasing order of subtlety:
 

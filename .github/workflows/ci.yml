@@ -60,6 +60,43 @@ env:
   NUGET_XMLDOC_MODE: skip
 
 jobs:
+  # What did this push touch, and therefore which of the jobs below can it break? A few seconds on
+  # one Linux runner, no SDK, no restore. scripts/ci-scope.sh is the decision and is exercised
+  # locally with hand-written path lists (D-0078). Pull requests and dispatches always run
+  # everything: a reviewer decides on the full verdict, and a dispatch is somebody asking for it.
+  # A push whose `before` is unknown (a new branch, a force-push) also runs everything, because a
+  # diff that cannot be computed is not a diff that says "nothing relevant".
+  scope:
+    name: what changed
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 5
+    outputs:
+      full_test: ${{ steps.scope.outputs.full_test }}
+      compat: ${{ steps.scope.outputs.compat }}
+      aot: ${{ steps.scope.outputs.aot }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Classify the changed paths
+        id: scope
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" != "push" ] || [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
+             || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            printf 'full_test=true\ncompat=true\naot=true\n' | tee -a "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git diff --name-only "$BEFORE" "$AFTER" | tee /tmp/changed.txt
+          bash scripts/ci-scope.sh < /tmp/changed.txt | tee -a "$GITHUB_OUTPUT"
+
   # Formatting and analyzers are OS-independent, so they run once on Linux and
   # short-circuit the three-OS matrix rather than failing three times over.
   gate:
@@ -97,9 +134,42 @@ jobs:
       - name: Build
         run: dotnet build keypaste.slnx --no-restore -c Release -warnaserror
 
+  # The five pinned pages are held to what the binaries print by scripts/verify-demo.sh, which needs
+  # a build and one operating system, not three. A push that touched only pages - or only things no
+  # gate reads at all - lands here instead of in the matrix below. Anything that could change the
+  # binaries runs the full matrix, which also runs the demo gate on every OS.
+  pages:
+    name: build + demo gate (pages only)
+    needs: [gate, scope]
+    if: needs.scope.outputs.full_test != 'true'
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      - name: Restore (locked)
+        run: dotnet restore keypaste.slnx --locked-mode
+
+      - name: Build
+        run: dotnet build keypaste.slnx --no-restore -c Release
+
+      - name: Verify the demo page still matches what the binaries print
+        shell: bash
+        timeout-minutes: 8
+        run: scripts/verify-demo.sh
+
   test:
     name: test (${{ matrix.os }})
-    needs: gate
+    needs: [gate, scope]
+    if: needs.scope.outputs.full_test == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -219,7 +289,8 @@ jobs:
   # newer image than the release would make it a weaker test than the thing it is checking.
   aot:
     name: aot publish (linux-x64)
-    needs: gate
+    needs: [gate, scope]
+    if: needs.scope.outputs.aot == 'true'
     runs-on: blacksmith-4vcpu-ubuntu-2204
     timeout-minutes: 25
     env:
@@ -328,10 +399,17 @@ jobs:
   # If it is failing, keypaste's vault writer is wrong. Do NOT:
   #   - delete this job,
   #   - add continue-on-error,
-  #   - add an `if:` that can skip it,
+  #   - change or add to the one `if:` below,
   #   - or drop an operating system from the matrix,
   # to make the build green. DECISIONS.md D-0008 records the reasoning and the
   # three properties that must survive any edit here.
+  #
+  # The one `if:` is relevance, not permission (D-0078): the job runs on every push that touches
+  # what can change the bytes keypaste writes or how they are checked - the core, the CLI, the
+  # vendored library, the compat scripts, the props, the SDK pin, the lock files, this file - and
+  # on every pull request, tag and dispatch without exception. scripts/ci-scope.sh is the list,
+  # and CompatGateIsPermanentTests pins this expression character for character, so a second
+  # condition or a different one is a red build.
   #
   # Changing which runner IMAGE hosts an operating system is allowed and has
   # happened once (D-0042). Removing an operating system is not. All three are
@@ -339,7 +417,8 @@ jobs:
   # ===========================================================================
   compat:
     name: keepassxc compat (${{ matrix.os }})
-    needs: gate
+    needs: [gate, scope]
+    if: needs.scope.outputs.compat == 'true'
     strategy:
       fail-fast: false
       matrix:
