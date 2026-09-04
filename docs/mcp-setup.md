@@ -143,6 +143,7 @@ jq -c . < ~/.keypaste/audit.jsonl
 | `timed-out` / `busy` / `cooldown` | Nobody answered in time; somebody was already answering another; or the same request was refused a moment ago. |
 | `cancelled` | The client stopped waiting before anybody answered. Nobody decided anything. |
 | `vault-locked` / `invalid-request` / `failed` | No vault open; the arguments were wrong; something went wrong. |
+| `not-initialized` | The client called a tool before finishing the MCP handshake. Denied, with the fix named; nothing was decided. |
 | `not-implemented` | Written by keypaste 2.1, when the bridge refused everything because the approval flow did not exist yet. Nothing writes it now, and it is listed because the log is append-only: old records keep the word they were written with. |
 
 Four things worth knowing:

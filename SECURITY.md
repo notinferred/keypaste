@@ -29,7 +29,7 @@ Per docs/PRODUCT.md §3.10: if keypaste is breached, or a serious bug ships, it 
 
 ## Scope
 
-In scope: anything in this repository — the core library, the CLI, the MCP bridge, the build and release pipeline, and the dependency chain on the secret path.
+In scope: anything in this repository — the core library, the CLI, the MCP bridge, the desktop app, the build and release pipeline, and the dependency chain on the secret path.
 
 The agent bridge has its own threat model in [THREATS.md](THREATS.md): prompt injection through entry names, confused-deputy attacks by a client that cannot be authenticated, audit log tampering, and what the locked-vault posture of the current version does and does not buy. It is explicit about which of those are mitigated today and which are still open, and it does not repeat what is here.
 
@@ -47,7 +47,7 @@ Pre-1.0, this is a short table on purpose. There is no long-term support line an
 
 ## Verifying a release
 
-Binaries are published to `https://dl.keypaste.com/v<version>/`, with a `SHA256SUMS` file, a per-asset `.sha256`, and the corresponding source for that tag (AGPL-3.0 section 6). Every one of them is produced by `.github/workflows/release.yml`, which runs this repository's full gate suite — including both directions of the KeePassXC compatibility check — against the exact binary it uploads, not against a rebuild.
+Binaries are published to `https://dl.keypaste.com/v<version>/`, with a `SHA256SUMS` file, a per-asset `.sha256`, and the corresponding source for that tag (AGPL-3.0 section 6). Every one of them is produced by `.github/workflows/release.yml`, which runs the eight `scripts/verify-*.sh` gates and both directions of the KeePassXC compatibility check against the exact binary it uploads, not against a rebuild. The unit suites run in `ci.yml` on the same commit, against an ordinary build.
 
 Two things to know before you rely on that:
 
@@ -94,7 +94,7 @@ The app puts vault contents on screen. Which contents, and when, is a decision r
 
 - **An entry list shows titles and groups.** Not usernames, not URLs — that is what `keypaste ls` prints, and a list is read over shoulders and photographed for marketing.
 - **Selecting an entry shows its username, URL and notes.** One entry, chosen by you.
-- **A password is never shown, anywhere, in any state.** The Copy button reads it out of the open vault at the moment you press it and hands it to the clipboard; it does not become anything the window can draw. To read one, use `keypaste get --show`.
+- **An entry's password is never shown on the Entries screen, in any state.** The Copy button reads it out of the open vault at the moment you press it and hands it to the clipboard; it does not become anything the window can draw. To read one, use `keypaste get --show`.
 - **An environment value can be revealed by holding it**, one at a time, for as long as you hold it. Comparing a stored value against a `.env` file is a real task, and a product that could only copy would push people into pasting secrets into a text editor to read them. The control that draws it is not a `TextBlock` — a `TextBlock` publishes its text to the accessibility layer as the element's name, which is the same read path as a `TextBox`'s value with a different label on it. What it cannot defend against is your screen: a screenshot, a recording, a shared call, a remote-desktop session, or somebody behind you.
 
 **Copying, and clearing.** A copied secret is taken back off the clipboard after twenty seconds, and only if the clipboard still holds it — something you copied since is left alone. It is also cleared the moment the vault locks, and before the app exits when you quit it. None of that survives the app being killed: `kill -9`, End Task, an out-of-memory kill, a power cut and a logout all leave the value where it is, because nothing is left running to take it away.

@@ -10,7 +10,7 @@ Versions are the ones published at `https://dl.keypaste.com/v<version>/`. Every 
 
 **What keypaste does at 0.1.0.** A local KDBX4 vault you own, environment variables injected into a child process without touching disk, and an MCP bridge that lets an agent ask for exactly one field of one entry - answered by a person, for a lifetime shown before they answer, with every call appended to a hash-chained local log. No account, no server, no network.
 
-**Known limits, stated rather than discovered.** The binaries are unsigned and un-notarized, so nothing cryptographically ties them to this project (O-0010); the checksum beside each asset proves the bytes arrived intact, not who made them. There is no GUI - approval is a terminal prompt. Linux needs glibc 2.35 or newer; Alpine and other musl distributions are not covered. Intel Macs and Windows on ARM build from source. `THREATS.md` T-21 is the full account of what you trust by downloading instead of building, and building from source remains strictly stronger.
+**Known limits, stated rather than discovered.** The binaries are unsigned and un-notarized, so nothing cryptographically ties them to this project (O-0010); the checksum beside each asset proves the bytes arrived intact, not who made them. There is no released GUI - the desktop app builds from source and is not in this release - and approval is a terminal prompt. Linux needs glibc 2.35 or newer; Alpine and other musl distributions are not covered. Intel Macs and Windows on ARM build from source. `THREATS.md` T-21 is the full account of what you trust by downloading instead of building, and building from source remains strictly stronger.
 
 ## 0.1.0-rc.1
 
