@@ -37,6 +37,14 @@ A CLA would buy the freedom to relicense later. AGPL-3.0 is chosen and staying (
 
 Five pages — `README.md`, `launch.md`, `docs/demo.md`, `docs/keepass-and-agents.md` and `site/public/index.html` — are held by `scripts/verify-demo.sh` to what the shipped binaries actually print. Editing one is a code change wearing a markdown extension, and it runs the full build on purpose.
 
+## Before you commit
+
+```sh
+bash scripts/verify-claims.sh
+```
+
+Two assertions, about a second, and both have caught real defects: that every `step N.N` reference in `docs/STEPS.md` points at a step that exists, and that nothing is sitting in your working tree untracked *and* unignored. The second only works in a working tree — CI checks out clean, so it skips itself there and says so rather than reporting a pass it did not earn.
+
 ## Merging
 
 Maintainer note, recorded here because it is easy to get wrong: **merges happen locally, never with the GitHub merge button**, which stamps its own identity on the merge commit.
@@ -48,11 +56,3 @@ Maintainer note, recorded here because it is easy to get wrong: **merges happen 
 ## Licence
 
 By contributing you agree your work is licensed under [AGPL-3.0](LICENSE), the licence the project ships under and keeps (**D-0041**). Every release publishes its corresponding source.
-
-## Before you commit
-
-```sh
-bash scripts/verify-claims.sh
-```
-
-Two assertions, about a second, and both have caught real defects: that every `step N.N` reference in `docs/STEPS.md` points at a step that exists, and that nothing is sitting in your working tree untracked *and* unignored. The second one only works in a working tree — CI checks out clean, so it skips itself there and says so rather than reporting a pass it did not earn.
