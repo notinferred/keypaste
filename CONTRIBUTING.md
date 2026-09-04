@@ -48,3 +48,11 @@ Maintainer note, recorded here because it is easy to get wrong: **merges happen 
 ## Licence
 
 By contributing you agree your work is licensed under [AGPL-3.0](LICENSE), the licence the project ships under and keeps (**D-0041**). Every release publishes its corresponding source.
+
+## Before you commit
+
+```sh
+bash scripts/verify-claims.sh
+```
+
+Two assertions, about a second, and both have caught real defects: that every `step N.N` reference in `docs/STEPS.md` points at a step that exists, and that nothing is sitting in your working tree untracked *and* unignored. The second one only works in a working tree — CI checks out clean, so it skips itself there and says so rather than reporting a pass it did not earn.
