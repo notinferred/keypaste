@@ -11,7 +11,9 @@ namespace Keypaste.Cli.Tests;
 /// <b>This exists because of a shipped bug in KeePassXC.</b> Every released version — 2.7.10,
 /// 2.7.11 and 2.7.12 — passes <c>"CanUploadToCloudClipboard "</c> with a trailing space to
 /// <c>RegisterClipboardFormat</c>, which silently registers a different and meaningless format.
-/// It is fixed on their develop branch and in no release. Nothing about that literal looks wrong
+/// It is fixed on their develop branch and, as of 2026-09-04, in no release — so this test is a
+/// regression guard rather than a live upstream bug, and there is nothing to contribute upstream.
+/// Verified against the raw source at each tag rather than a summary. Nothing about that literal looks wrong
 /// in a diff, and no test that merely checks the format "was set" would catch it, because a
 /// format genuinely was — just not the one that does anything (O-0008).
 /// </para>
