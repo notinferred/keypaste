@@ -36,9 +36,9 @@ scripts/demo/render-demo-gif.sh
 
 **Never point any of this at a real vault.** A released credential is returned to the agent twice, so it lands in Claude's transcript, in its session file, and in a `.cast` this repository commits to git forever. `make-demo-fixture.sh` refuses to build a vault whose sentinel does not look like an obvious fake, and `record-demo.sh` refuses to hand over a cast containing the master password or anything shaped like a real key.
 
-## Why the cast is committed too
+## Why the cast will be committed too
 
-`docs/demo/keypaste-demo.cast` is JSON lines. Anyone can `grep` it and check that the master password never appears, that the released value is a sentinel, that the dialog on screen is the one `TerminalApprovalChannel` actually emits, and that the audit table was not retouched. A GIF is a megabyte of pixels nobody can check. It is also what lets the asset be re-rendered at another size or theme without re-shooting.
+`docs/demo/keypaste-demo.cast` — not yet recorded; step 3.1 commits it beside the GIF — is JSON lines. Anyone can `grep` it and check that the master password never appears, that the released value is a sentinel, that the dialog on screen is the one `TerminalApprovalChannel` actually emits, and that the audit table was not retouched. A GIF is a megabyte of pixels nobody can check. It is also what lets the asset be re-rendered at another size or theme without re-shooting.
 
 Same instinct as `keypaste log verify`: the artefact that makes a claim should carry the means to check it.
 

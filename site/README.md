@@ -1,6 +1,6 @@
 # keypaste.com
 
-A single static page and one form endpoint, deployed to Cloudflare Workers by hand. `public/` is the site; `src/worker.js` is the only server-side code, and it is reached for `/subscribe` and nothing else.
+Two static pages and one form endpoint, deployed to Cloudflare Workers by hand. `public/` is the site; `src/worker.js` is the only server-side code, and it is reached for `/subscribe` and nothing else.
 
 The page loads no third-party scripts, sets no cookies, and runs no JavaScript of its own. The signup form is a plain `<form method="post">` that redirects to a static `/thanks/` page, which is why all of that is true at once.
 
@@ -55,44 +55,18 @@ Hyperdrive config `9ef85ab258e846fbb2c0d3457b744282` was created through the Clo
 
 **TLS: fixed, and verified against the database.** PlanetScale serves a Let's Encrypt chain, so ISRG Root X1 was uploaded (`wrangler cert upload certificate-authority`, id `f8411755-7948-4b31-aa11-2a79710ce1d4`) and the config set to `--sslmode verify-full`. Cloudflare rejects `verify-full` outright without a CA, so this is not a setting that can be silently ignored. A query through the binding then succeeded, which is the part worth trusting: the mode is real and it did not break the connection. An earlier version of this note guessed that the update had detached the config from the PlanetScale integration; `wrangler hyperdrive get` says otherwise — `integration_name: planetScale` and the organisation and database names are all still on it.
 
-> **Fixed on 2026-07-28, and verified end to end.** Hyperdrive now connects as `keypaste_signup_writer.jb6eu3wgh2u3`, a role with `INSERT` on `public.signup` and nothing else - no superuser, no `bypassrls`, `NOINHERIT`, zero role memberships. `public.signup` exists. A live submission returns 303 to `/thanks/` and the row lands; a duplicate is a no-op; the honeypot stores nothing; nonsense, a wrong `Origin` and a non-form body each get 400. As that role, `select`, `count(*)`, `returning`, `update`, `delete` and reading any other table are all refused with 42501. The section below is kept as the record of what was wrong and how it was found.
->
-> Two things bit during the fix and are worth knowing before touching this again. **`wrangler hyperdrive update --origin-user/--origin-password` silently wiped the `mtls` block**, dropping the CA and `verify-full` to empty - the sslmode has to be passed again in the same or a following update, which is exactly why the verification step below is not a formality. And **naming the conflict target requires SELECT**; see `schema.sql`.
+## What is live, established by probing it
 
-**The role was wrong, and worse than this file used to say.** The config connected as `pscale_api_yq4xhf9tbm3v`, which is `rolcreaterole`, `rolcreatedb`, `rolbypassrls`, and a member of `pg_read_all_data`, `pg_write_all_data` and `postgres`. "It can read and write every table in the cluster" was an understatement: `postgres` is itself a member of `pscale_superuser`, so walking the membership graph gives this role `pg_checkpoint`, `pg_maintain`, `pg_signal_backend`, `pg_create_subscription`, `pg_use_reserved_connections` and `pscale_replication_ops` as well.
+**Hyperdrive connects as `keypaste_signup_writer.jb6eu3wgh2u3`** — the role `keypaste_signup_writer` (a plain SQL role created with `CREATE ROLE`, which is why it kept the name typed; the managed path above would have issued a `pscale_<id>` one) with `INSERT` on `public.signup` and nothing else: no superuser, no `bypassrls`, `NOINHERIT`, zero role memberships. As that role, `select`, `count(*)`, `returning`, `update`, `delete` and reading any other table are refused with 42501. **`public.signup` exists**; `schema.sql` was applied on 2026-07-28. A live submission returns 303 to `/thanks/` and the row lands; a duplicate is a no-op; the honeypot stores nothing; nonsense, a wrong `Origin` and a non-form body each get 400. `CONNECT` on the database is no longer held by PUBLIC. Verified end to end on 2026-07-28, and `D-0037` is the record.
 
-That last pair is the part to sit with. `pg_create_subscription` plus write access everywhere means whatever reaches this credential can set up logical replication and stream the cluster out continuously, and `pg_signal_backend` lets it terminate other sessions. **The guarantee `schema.sql` and D-0037 are built on — that nothing reachable from the Worker can read the list back — is not merely false; the honest description is that a public HTTP endpoint is one dependency compromise away from cluster administration.** Verified by query, not inferred:
+The role the PlanetScale integration first handed the config inherited `postgres` and through it `pscale_superuser` — logical replication plus write access everywhere, reachable from a public HTTP endpoint. It was swapped before the table was created, so no subscriber row was ever reachable by it; every submission before that point returned the handler's 503 saying the address was not stored. **Never let a Hyperdrive config keep whatever role an integration wizard hands it.**
 
-```sql
-with recursive chain as (
-  select oid, rolname, 0 as depth from pg_roles where rolname = 'pscale_api_yq4xhf9tbm3v'
-  union all select g.oid, g.rolname, c.depth + 1 from chain c
-    join pg_auth_members a on a.member = c.oid join pg_roles g on g.oid = a.roleid where c.depth < 5
-) select depth, rolname from chain order by depth, rolname;
-```
+Two things bit during the fix and are worth knowing before touching this again. **`wrangler hyperdrive update --origin-user/--origin-password` silently wipes the `mtls` block**, dropping the CA and `verify-full` — pass the sslmode again in the same or a following update, then re-read it with `wrangler hyperdrive get`; that is why the verification step above is not a formality. And **naming the conflict target in `ON CONFLICT (email) DO NOTHING` requires SELECT** on PostgreSQL 18; the bare form is what ships, and `schema.sql` says so.
 
-`public.signup` does not exist yet either — `schema.sql` has never been applied, and there are no tables in `public` at all. Which is the only reason none of the above has cost anything: there is no subscriber list on this cluster to steal.
+Two things about PlanetScale usernames, both easy to get wrong: a `pscale_<id>` name is an ordinary managed role and not an API credential — the problem with the first one was its inherited roles, not its name; and the `.<branch-id>` suffix is routing, not part of the credential, so `current_user` inside the database is the bare role and a `--origin-user` that omits the suffix fails to authenticate for reasons that look nothing like the cause.
 
-**On `REVOKE CONNECT ... FROM PUBLIC`, an earlier version of this file warned it might break PlanetScale's own components. Checked, and it looks safe.** `pg_database.datacl` for `postgres` is currently null, meaning defaults apply and PUBLIC does hold CONNECT implicitly — so the revoke will materialise an ACL rather than tighten an existing one. But the only things observed connecting to this database are `postgres` (the owner) and `pscale_admin`, which is `rolsuper` and therefore bypasses the check entirely; `pscale_exporter` and `pscale_pgbouncer` connect to their own databases of the same names. Worth knowing regardless: `postgres` is where Patroni's heartbeat and REST API live, so this application's table is going into the cluster's HA control database. That is what the PlanetScale integration handed us, not a choice made here.
+Still open: it is a plain SQL role rather than a managed one, so it is invisible to `pscale role reset` and to TTLs, and rotation is `alter role ... password` plus a `wrangler hyperdrive update` with the sslmode re-passed. Swap it for a managed role — created with no inherited roles, then the grants in `schema.sql` — when the list stops being empty.
 
-Two things about PlanetScale usernames, both easy to get wrong:
-
-- `pscale_api_yq4xhf9tbm3v` is not an API or admin credential despite the name. It is the generated username of an ordinary *managed role* — PlanetScale discards the name you type and issues its own. The problem is its inherited roles, not what it is called. `pscale role list <db> <branch>` is the authoritative view of that.
-- The `.jb6eu3wgh2u3` suffix is the **branch id, not part of the credential**. PlanetScale's proxy routes on the username, so you connect as `<role>.<branch-id>` while `current_user` inside the database is the bare `<role>`. A `wrangler hyperdrive update --origin-user` that omits the suffix will fail to authenticate for reasons that look nothing like the cause.
-
-**What is live right now, established by probing it rather than assumed.** The Worker is deployed: `GET /subscribe` answers `303` to `/`, which is its own non-POST branch, and an unknown path gets the static `404`. So the form reaches real code. That code inserts into `public.signup`, which does not exist, so it throws — and the handler catches it and returns a `503` page that says in as many words that the address was **not** stored. Nothing is being silently dropped. Nothing is being stored either, and every signup since the deploy has failed that way.
-
-That ordering is lucky rather than designed, and it is why there is no leak to clean up: the over-privileged role can read every table in the cluster, but there is no subscriber table yet for it to read. **Which settles the sequencing question — the role must be swapped before, or in the same sitting as, the table being created.** Creating the table first would mean the first real signup lands somewhere the guarantee does not hold.
-
-So: steps 1, 2 and 4 of the setup list above, in that order, then:
-
-```sh
-npx wrangler hyperdrive update 9ef85ab258e846fbb2c0d3457b744282 \
-  --origin-user '<pscale_role_id>.<branch-id>' --origin-password '<generated>'
-npx wrangler hyperdrive get 9ef85ab258e846fbb2c0d3457b744282   # verify-full must survive
-```
-
-Then run the by-hand checks below, because a successful signup is the only thing that proves both halves at once: the row lands, and the role that landed it cannot read it back.
 
 **One thing in `schema.sql` to look at before running it.** Its last line is `REVOKE CONNECT ON DATABASE postgres FROM PUBLIC`, which is correct in intent — PlanetScale grants CONNECT to PUBLIC on a new database, meaning every current and future role. But this is the `postgres` maintenance database on a cluster PlanetScale manages, so anything of theirs that connects through PUBLIC rather than an explicit grant loses access at that moment. Run `\du` and check which roles exist and what they inherit before revoking, and be ready to grant CONNECT back explicitly. It is the one line in the file that can affect something other than this application.
 
@@ -122,7 +96,7 @@ Worth checking by hand before a deploy, because none of it is in CI:
 
 ## What is not here
 
-No CI job. `.github/workflows/ci.yml` is the .NET gate and does not look at this directory, which is a deliberate choice for ninety lines of JavaScript deployed by hand — and the reason the manual checks above are written down rather than assumed.
+No CI job. `.github/workflows/ci.yml` is the .NET gate and does not look at this directory, which is a deliberate choice for about a hundred and sixty lines of JavaScript deployed by hand — and the reason the manual checks above are written down rather than assumed.
 
 No rate limiting in code. That belongs in a Cloudflare rule on `POST /subscribe`; check whether the account's plan actually offers one before treating it as the defence, because the honeypot and the body, content-type and origin guards are what is genuinely shipped.
 

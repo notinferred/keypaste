@@ -2,7 +2,7 @@
 
 > **Nothing in this file is sent until every box in the next section is ticked.** The copy is written early on purpose: written cold it argues, written on the morning it sells. The questions each post asks are real questions, and the answers are wanted whether or not the post does well.
 
-Five channels, in the order `docs/STEPS.md` Stage 3 names them and `docs/PRODUCT.md` §5.3 sanctions them: Hacker News, r/selfhosted, r/KeePass, the MCP community, X. One post each. No reposting, no second account, no asking anyone to go vote.
+Five channels, the ones `docs/PRODUCT.md` §5.3 sanctions: Hacker News, r/selfhosted, r/KeePass, the MCP community, X. One post each. No reposting, no second account, no asking anyone to go vote.
 
 lobste.rs was dropped rather than deferred. Signup is by invitation from an existing user, which is the only item this file ever carried with a lead time measured in weeks, and no invitation is in hand. A venue that cannot be reached on the schedule the rest of the launch runs on is not a pending task.
 
@@ -10,7 +10,7 @@ lobste.rs was dropped rather than deferred. Signup is by invitation from an exis
 
 ## Before anything goes out
 
-Every one of these is a thing that is false today. The launch is the moment strangers arrive, and each of these is something a stranger hits before they hit the product.
+The unticked ones are things that are false today. The launch is the moment strangers arrive, and each of these is something a stranger hits before they hit the product.
 
 **The product**
 
@@ -124,7 +124,7 @@ What it does not do, before anyone has to ask. The credential lands in the model
 
 It is also not alone here, and pretending otherwise would be a poor way to open a thread. Keeper's MCP server prompts before it unmasks. Bitwarden published an Agent Access SDK in March with the same request-and-approve shape, though it is alpha. 1Password's Environments MCP server asks for approval and then never hands the credential over at all — a genuinely different answer, and on that one axis a stronger one. `kprun` already injects KeePass entries into a child process and writes a local JSONL log, without the approval step. What is keypaste's is the combination: an ordinary KDBX file you own, no account and no server anywhere, a person answering each request, and a log that never leaves your disk.
 
-Pre-1.0 and it says so. No GUI yet, and the approval prompt is that terminal rather than a native dialog. AGPL-3.0. Everything it writes opens in KeePassXC, and that is proved in both directions against a real `keepassxc-cli` on Linux, macOS and Windows on every push.
+Pre-1.0 and it says so. No released GUI yet, and the approval prompt is that terminal rather than a native dialog. AGPL-3.0. Everything it writes opens in KeePassXC, and that is proved in both directions against a real `keepassxc-cli` on Linux, macOS and Windows on every push.
 
 Demo, sixty seconds, end to end: [docs/demo.md]. Repo: [repo].
 
@@ -160,7 +160,7 @@ And it ships an MCP server, so Claude or another agent can request one credentia
 
 For this crowd specifically: **there is nothing to self-host.** No server component, no database, no container. That is the point rather than a missing feature — but it does mean the audit log is a file on the same machine as the thing being audited, which is the honest limitation. It is tamper-evident, not tamper-proof: anyone who can write the file can recompute the chain.
 
-AGPL-3.0. Pre-1.0 — no GUI yet, and the approval prompt is a terminal rather than a native dialog. Replacing a `.env` takes about five minutes: [docs/replace-dotenv.md]. The sixty-second version of the agent flow: [docs/demo.md]. Repo: [repo].
+AGPL-3.0. Pre-1.0 — no released GUI yet, and the approval prompt is a terminal rather than a native dialog. Replacing a `.env` takes about five minutes: [docs/replace-dotenv.md]. The sixty-second version of the agent flow: [docs/demo.md]. Repo: [repo].
 
 **The genuine question:** is a hash-chained local JSONL good enough for you, or would you want the log shipped somewhere append-only that the machine cannot rewrite? I have deliberately not built that, because the moment the log leaves your disk keypaste stops being a thing with no network surface — but I would rather hear that I have the trade backwards from people who run their own infrastructure than guess.
 
@@ -258,7 +258,7 @@ Seven posts. The GIF carries the first one; nobody reads past it otherwise. No h
 
 **7**
 
-> Pre-1.0, AGPL, no GUI yet.
+> Pre-1.0, AGPL, no released GUI yet.
 >
 > Sixty seconds end to end: [docs/demo.md] Code: [repo]
 >

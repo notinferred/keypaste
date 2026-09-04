@@ -12,7 +12,7 @@ A window over the same vault the CLI reads. It opens a `.kdbx`, holds it while y
 
 ## What the screens show
 
-**Entries** lists titles and groups — what `keypaste ls` prints, and nothing more. Selecting one shows its username, URL and notes. **A password is never shown**: there is a Copy button, and `keypaste get --show` for the times you have to read one. You can edit the username, URL and notes inline, add an entry with a generated password, and delete one behind a confirmation, because there is no undo.
+**Entries** lists titles and groups — what `keypaste ls` prints, and nothing more. Selecting one shows its username, URL and notes. **An entry's password is never shown on this screen**: there is a Copy button, and `keypaste get --show` for the times you have to read one. You can edit the username, URL and notes inline, add an entry with a generated password, and delete one behind a confirmation, because there is no undo.
 
 **Env Sets** shows each project as a card with the `keypaste run <project> -- ` line that injects it, and a button to copy that line. Opening a card shows the project's variables as a masked table. **Hold a value to reveal it** — one at a time, for as long as you hold it, and gone the moment you let go, switch screens or lock. There is a Copy button on every row.
 
@@ -134,9 +134,11 @@ CI can build the app and run its logic on all three operating systems, but it ha
     Wait it out and paste again — it is gone.
 13. Copy, then `Ctrl/Cmd+L`. Paste: nothing.
 14. Copy, then quit the app. Paste: nothing.
-15. **Windows only**: copy a password, then open clipboard history with Win+V. The value is not in
-    it. Repeat with `keypaste get` — it is, which is the difference the app's window buys and the CLI
-    cannot.
+15. **Windows only, on a machine where Clipboard History is enabled and not disabled by policy**:
+    copy a known harmless string and confirm Win+V shows it — that is the control. Then copy a
+    password from the app and open Win+V: the value is not in it. `keypaste get` sets the same
+    formats since D-0056; whether that holds on a real machine is step 1.5a's falsifier in
+    `docs/STEPS.md`, not this list.
 16. Hold a masked value in Env Sets. The characters appear; release and they go. Hold a second row
     while the first is showing — only one is ever revealed.
 17. Copy a project's run command, paste it in a terminal, finish the line: it runs with the
