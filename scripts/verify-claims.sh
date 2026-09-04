@@ -6,8 +6,8 @@
 # work than it caught. This does not do that. Each check below is a statement about the world that
 # was FALSE at some point in this repository's history, and each one can go red.
 #
-#   A. Every "step N.N" reference in docs/STEPS.md points at a step that exists, as a "### N.N —"
-#      heading or a "- [ ] **N.N" row.
+#   A. Every "step N.N" reference in the documents points at a step docs/STEPS.md defines, as a
+#      "### N.N —" heading or a "- [ ] **N.N" row.
 #      Fired 2026-08-26 against the dangling "step 1.5" that splitting it into 1.5a and 1.5b left
 #      behind - including in the Owner lane naming what blocks the launch, which still read
 #      correctly and pointed at nothing.
