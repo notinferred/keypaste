@@ -1,5 +1,5 @@
 # PRODUCT.md — The keypaste Constitution
-> **This file changes only by a dated re-ratification.** §3 does not change at all. Every other section may be rewritten by the founder, once, with a date, and a `D-` row in `DECISIONS.md` saying why. If a decision conflicts with the current text, the decision is wrong. Last ratified: 2026-09-04 (v1.1, D-0061; §1 wording D-0075). v1.0 was July 2026 and is in git.
+> **This file changes only by a dated re-ratification.** §3 does not change at all. Every other section may be rewritten by the founder, once, with a date, and a `D-` row in `DECISIONS.md` saying why. If a decision conflicts with the current text, the decision is wrong. Last ratified: 2026-09-04 (v1.1, D-0061; §1 wording D-0075; §5.5 and §6.2 wording D-0077). v1.0 was July 2026 and is in git.
 
 ---
 
@@ -55,13 +55,13 @@ The product is **freemium**. Free is the whole password manager. Paid is hosting
 2. **Solve your own pain first.** If you (the founder) don't use keypaste daily, don't ship it to others.
 3. **Community before customers.** KeePass forums, MCP ecosystem, HN, r/selfhosted — earn credibility there before any paid tier exists.
 4. **Monetize the convenience, never the security.** Free/self-host tier is fully secure and fully functional. Paid tiers sell hosting, sync convenience, team features, support — never "more encryption", and never a signature the free binary lacks.
-5. **One founder, one focus.** New ideas go to docs/IDEAS.md, not into the sprint. docs/IDEAS.md is where ideas wait their turn — most wait forever.
+5. **One founder, one focus.** New ideas go to the Ideas table in DECISIONS.md, not into the sprint. That table is where ideas wait their turn — most wait forever.
 6. **Free is the whole password manager.** CLI, app, agent bridge, browser extension, TOTP, SSH, importers, and the relay binary to run yourself. Paid is the relay somebody else runs, and what teams need on top of it.
 
 ## 6. Decision tiebreakers (when stuck, in order)
 
 1. Does it protect user trust? → if it risks trust, no.
-2. Does it serve the order in §1? → if not, docs/IDEAS.md.
+2. Does it serve the order in §1? → if not, the Ideas table in DECISIONS.md.
 3. Can one person ship it in ≤2 weeks? → if not, cut scope until yes.
 4. Would it make the 60-second demo better? → prefer the option that demos.
 5. Boring beats clever. Shipped beats perfect. Focused beats big.

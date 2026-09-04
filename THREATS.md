@@ -498,7 +498,7 @@ The honest control is the one number: a short `--max-ttl`. It bounds how long th
 
 **Bounded by.** It holds paths and nothing else — no entry names, no counts, no fingerprint of the contents. At most ten. Written **only after a vault opens successfully**, so a file somebody sent you that you could not open leaves no trace. Owner-only on Linux and macOS; on Windows it inherits the profile's permissions, which is the same protection `audit.jsonl` already relies on and no more. Removable one row at a time from the app, or entirely from Settings, or by deleting the file.
 
-**Residual.** This is the same trust boundary the audit log already sits behind: anything that can read `~/.keypaste` can read both. The app shows a vault's file name rather than its full path, which is a defence against a screenshot rather than against a reader — `docs/IDEAS.md`'s screenshot strategy puts this app in marketing images, and a directory layout is not something to publish by accident.
+**Residual.** This is the same trust boundary the audit log already sits behind: anything that can read `~/.keypaste` can read both. The app shows a vault's file name rather than its full path, which is a defence against a screenshot rather than against a reader — the Ideas table in `DECISIONS.md`'s screenshot strategy puts this app in marketing images, and a directory layout is not something to publish by accident.
 
 ## T-25 — A value on screen, because somebody asked to see it
 

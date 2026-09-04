@@ -28,7 +28,7 @@ internal enum DestinationKind
 /// <remarks>
 /// <para>
 /// <b>A registry rather than a hard-coded sidebar, and that is a deliberate down-payment.</b>
-/// <c>docs/IDEAS.md</c> wants a command palette for everything, and 4.1 is the wrong stage for it — with
+/// <c>the Ideas table in DECISIONS.md</c> wants a command palette for everything, and 4.1 is the wrong stage for it — with
 /// five navigations and two actions a palette reaches almost nothing, and the version people
 /// actually want searches entries, which is 4.2's data by definition. But building the palette later
 /// against a registry that already exists costs an afternoon, whereas building it against a

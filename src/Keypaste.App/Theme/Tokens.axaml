@@ -7,7 +7,7 @@
     with the lights off, and this product is looked at in the evening.
 
     One accent, muted. KpDanger appears only on a destructive confirmation — never on the idle
-    countdown, never on a wrong password. docs/IDEAS.md names "red scary warnings for normal actions"
+    countdown, never on a wrong password. the Ideas table in DECISIONS.md names "red scary warnings for normal actions"
     as an anti-pattern and mistyping a password is the most normal action there is.
   -->
 
