@@ -31,7 +31,7 @@ Adopted in 4.1 and 4.2, and standing: calm, precise, bank-lobby-not-hacker-movie
 | Team SSO for the hosted service, never on the vault path | founder | promoted | Step 7.3, Tier 3. If the IdP being compromised can read a vault, it is the wrong design. |
 | Team delegation dashboard | founder | promoted | Step 7.4, Tier 3. |
 | "Design language: modern, calm, trustworthy" as a checklist item | founder | rejected | Nothing about it can fail, so it was never a step. The direction above is the durable form. |
-| Sign-in-first landing flow from the design exploration | founder | open | Inverts local-first, which `docs/PRODUCT.md` §2 makes permanent. Must be answered before any hosted-sync work; it is the fork the parked Stage 5 rows sit behind. |
+| Sign-in-first landing flow from the design exploration | founder | open | Inverts local-first, which `docs/PRODUCT.md` §2 makes permanent. Must be answered before any hosted-sync work; D-0060 answered it for 5.2: the server cannot read the blob, and nothing signs in before a vault exists. |
 | Local-first vs a hosted sync tier | founder | promoted | §2 permits a zero-knowledge hosted tier if self-host stays first-class. **D-0060 settled it: the server cannot read the blob**, so a forgotten master password stays gone; D-0061 made hosted sync the business and D-0064 gave it a shape. It is step 5.2 in Tier 1. |
 | TOTP/2FA storage with agent-safe handling — a code, never the seed | founder | promoted | Step 9.2, Tier 2 (D-0068). |
 | Command palette (Ctrl/Cmd+K) | founder | open | Fits the keyboard-first shell 4.1 shipped. |
