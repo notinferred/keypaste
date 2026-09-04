@@ -3,7 +3,7 @@ using System.Reflection;
 namespace Keypaste.Core;
 
 /// <summary>
-/// Identity and liveness information for keypaste-core. Contains no vault logic —
+/// Identity and liveness information for keypaste-core. Contains no vault logic itself —
 /// this type exists to prove the core-to-frontend wiring and will not grow.
 /// </summary>
 public static class CoreInfo
@@ -13,7 +13,7 @@ public static class CoreInfo
 
     /// <summary>Returns a greeting identifying the loaded keypaste-core assembly.</summary>
     /// <returns>A human-readable greeting including <see cref="Version"/>.</returns>
-    public static string Hello() => $"keypaste-core {Version} — no vault logic yet.";
+    public static string Hello() => $"keypaste-core {Version} — loaded.";
 
     private static string ReadVersion()
     {
