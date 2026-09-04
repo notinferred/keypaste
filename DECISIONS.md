@@ -110,7 +110,7 @@ Adopted in 4.1 and 4.2, and standing: calm, precise, bank-lobby-not-hacker-movie
 | what | where | last confirmed |
 |---|---|---|
 | Business model, positioning, acquisition path, pivot and failure conditions | `~/Nextcloud/keypaste/business.md` | 2026-09-04 (exists; not read for this audit) |
-| Tier ladder with figures, KPI targets, comparable pricing with sources and fetch dates | `keypastebusinessnotes.md` in the working tree — **gitignored** by `.gitignore` rule `*businessnotes*.md`, `git check-ignore` confirms it, and `git log --all -- keypastebusinessnotes.md` is empty | 2026-09-04 |
+| Tier ladder with figures, KPI targets, comparable pricing with sources and fetch dates | `~/Nextcloud/keypaste/keypastebusinessnotes-2026-09-04.md`, which is the durable copy; a working copy may also sit as `keypastebusinessnotes.md` in the tree, **gitignored** by `.gitignore` rule `*businessnotes*.md` (`git check-ignore` confirms it, and `git log --all -- keypastebusinessnotes.md` is empty). The tree copy is machine-local: on 2026-09-04 it was 34 lines ahead of every other copy and would have gone with the machine it sat on, so the synced copy is the one to trust | 2026-09-04 |
 
 D-0006 removed this material from the roadmap and the parking lot, and D-0072 keeps it out of every commit. The committed pages carry the tier *shapes* and the decisions (D-0063, D-0071); a number appears only in the working file, and `docs/STEPS.md` says "figures in the working file" where one would otherwise be named.
 
