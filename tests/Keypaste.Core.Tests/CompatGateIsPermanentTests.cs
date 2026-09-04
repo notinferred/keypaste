@@ -99,6 +99,51 @@ public sealed class CompatGateIsPermanentTests
         // names `continue-on-error` as one of the things not to add, and a bare substring
         // check would be tripped by that comment.
         Assert.DoesNotContain("continue-on-error:", workflow, StringComparison.Ordinal);
+
+        // The compat job carries exactly one `if:`, and it is relevance rather than permission
+        // (DECISIONS.md D-0078): the job runs whenever a push touches what can change the bytes
+        // keypaste writes, and always on a pull request or a dispatch, because scripts/ci-scope.sh
+        // answers true for those. A second condition, a different expression, or a step-level skip
+        // is how "permanent" would quietly stop meaning anything, so the expression is pinned
+        // character for character and anything else in the block is a red build.
+        var compat = JobBlock(workflow, "compat");
+        var jobLevel = compat.Where(line => line.StartsWith("    if:", StringComparison.Ordinal) && !line.StartsWith("     ", StringComparison.Ordinal)).ToList();
+        Assert.Equal(["    if: needs.scope.outputs.compat == 'true'"], jobLevel);
+        Assert.Contains("scripts/ci-scope.sh", workflow, StringComparison.Ordinal);
+
+        // A step may carry an `if:` only to pick which operating system installs keepassxc-cli. A
+        // step that could skip the fixture, the compat script or the write-back script is the same
+        // hole as a job-level skip, one indent deeper.
+        var stepLevel = compat.Where(line => line.TrimStart().StartsWith("if:", StringComparison.Ordinal)).Except(jobLevel);
+        Assert.All(stepLevel, line => Assert.StartsWith("if: runner.os", line.Trim(), StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// The raw lines of one top-level job in <c>ci.yml</c>, from the line after its name to the next
+    /// job. Indentation is the only structure YAML gives us here, and two spaces is what the file
+    /// uses for the jobs map; anything at that indent that is not a comment starts the next job.
+    /// Lines are not trimmed, because the indent is what tells a job-level key from a step-level one.
+    /// </summary>
+    private static List<string> JobBlock(string workflow, string job)
+    {
+        var lines = workflow.Split('\n').Select(line => line.TrimEnd('\r')).ToList();
+        var start = lines.FindIndex(line => line == $"  {job}:");
+        Assert.True(start >= 0, $"ci.yml has no job named '{job}'");
+
+        var block = new List<string>();
+        for (var i = start + 1; i < lines.Count; i++)
+        {
+            var line = lines[i];
+            var isNextJob = line.Length > 2 && line[0] == ' ' && line[1] == ' ' && line[2] != ' ' && line[2] != '#';
+            if (isNextJob)
+            {
+                break;
+            }
+
+            block.Add(line);
+        }
+
+        return block;
     }
 
     [Fact]
