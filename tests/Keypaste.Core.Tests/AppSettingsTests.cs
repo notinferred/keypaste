@@ -236,6 +236,7 @@ public sealed class AppSettingsTests : IDisposable
     {
         if (OperatingSystem.IsWindows())
         {
+            Assert.Skip("Windows has no owner-only file mode. SECURITY.md states that gap rather than implying a mode keypaste never set.");
             return;
         }
 

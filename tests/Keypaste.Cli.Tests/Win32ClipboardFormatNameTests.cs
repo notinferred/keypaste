@@ -31,8 +31,9 @@ public sealed class Win32ClipboardFormatNameTests
         if (!OperatingSystem.IsWindows())
         {
             // Not a silent pass: there is no clipboard here to ask, and asserting anything about
-            // one would be inventing a result. Step 1.5a's Verify line in docs/STEPS.md says so, and calls itself BLOCKED off
-            // Windows rather than green.
+            // one would be inventing a result. Reported as a skip rather than a green, because a
+            // test that cannot fail off Windows is the assertion D-0043 refuses to count.
+            Assert.Skip("Registering a clipboard format needs the real Win32 API. Step 1.5a in docs/STEPS.md is the observation this cannot make, and it calls itself BLOCKED rather than green.");
             return;
         }
 
@@ -54,6 +55,7 @@ public sealed class Win32ClipboardFormatNameTests
     {
         if (!OperatingSystem.IsWindows())
         {
+            Assert.Skip("The real Win32 clipboard API is needed to reproduce KeePassXC's trailing-space defect; there is none here.");
             return;
         }
 
