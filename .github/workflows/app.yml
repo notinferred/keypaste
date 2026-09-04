@@ -203,9 +203,10 @@ jobs:
           [ "$found" -ge 2 ] || { echo "::error::Skia/HarfBuzz natives missing from $out"; exit 1; }
 
       # A runner has no display, so the only thing this can honestly assert about the published
-      # binary is that it starts, links its natives, and its own code runs on this operating system.
-      # It constructs no window and cannot. Everything visual is on the manual checklist in
-      # docs/desktop.md, which is where a claim CI cannot hold belongs.
+      # binary is that it starts and its own code runs on this operating system. It does not prove the
+      # Skia and HarfBuzz natives link - those load lazily on first render, and the step above asserts
+      # only that the files are present. It constructs no window and cannot. Everything visual is on
+      # the manual checklist in docs/desktop.md, which is where a claim CI cannot hold belongs.
       - name: Start the published binary and run its selftest
         shell: bash
         run: |
