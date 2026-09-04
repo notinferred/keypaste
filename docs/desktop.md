@@ -137,7 +137,7 @@ CI can build the app and run its logic on all three operating systems, but it ha
 15. **Windows only, on a machine where Clipboard History is enabled and not disabled by policy**:
     copy a known harmless string and confirm Win+V shows it — that is the control. Then copy a
     password from the app and open Win+V: the value is not in it. `keypaste get` sets the same
-    formats since D-0056; whether that holds on a real machine is step 1.5a's falsifier in
+    formats since D-0056; whether that holds on a real machine is step 1.5a's Verify line in
     `docs/STEPS.md`, not this list.
 16. Hold a masked value in Env Sets. The characters appear; release and they go. Hold a second row
     while the first is showing — only one is ever revealed.
