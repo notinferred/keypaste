@@ -40,10 +40,8 @@ Five pages — `README.md`, `launch.md`, `docs/demo.md`, `docs/keepass-and-agent
 ## Before you commit
 
 ```sh
-bash scripts/verify-claims.sh
+dotnet build keypaste.slnx -c Release -warnaserror && dotnet test keypaste.slnx
 ```
-
-Two assertions, about a second, and both have caught real defects: that every `step N.N` reference in `docs/STEPS.md` points at a step that exists, and that nothing is sitting in your working tree untracked *and* unignored. The second only works in a working tree — CI checks out clean, so it skips itself there and says so rather than reporting a pass it did not earn.
 
 ## Merging
 

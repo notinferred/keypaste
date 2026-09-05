@@ -7,9 +7,7 @@ name: app
 #
 # What it costs, stated rather than left to be discovered:
 #   a documentation push        nothing
-#   a Keypaste.Core push        the gate job only, one OS, a few minutes
-#   a Keypaste.App push         gate plus the consistency tests plus the three-OS package job
-#   a Keypaste.Cli push         gate plus the consistency tests
+#   any other push              all of it: gate, consistency tests, three-OS package job
 #   any pull request            all of it
 #   a v* tag                    all of it, and the three archives are kept as workflow artifacts
 #
@@ -22,14 +20,14 @@ name: app
 #
 # Keypaste.Core is in the paths filter deliberately. It is the one backend change that can break
 # the app, and without it the GUI stops compiling against the core it wraps and nobody learns until
-# the next GUI-touching commit. The three-OS leg is gated further so a core push does not pay for it.
+# the next GUI-touching commit.
 #
-# The consistency tests are gated the same way, and for a measured reason. That project is the only
+# The consistency tests restore separately, for a measured reason. That project is the only
 # one referencing both front ends, and Keypaste.Cli sets PublishAot over four RuntimeIdentifiers —
 # both restore-time inputs (D-0040) — so a restore that can see it pulls four RID-specific ILCompiler
 # packs whether or not anything is published. Measured 2026-07-28: it takes a restore from 2091 MB
 # to 2580 MB. Putting it in keypaste.app.slnx would have made the "a Keypaste.Core push" line above
-# untrue, so it is in neither solution and runs in its own guarded steps. See
+# untrue, so it is in neither solution and runs in its own steps. See
 # tests/Keypaste.Consistency.Tests/README.md.
 
 on:
@@ -61,8 +59,8 @@ permissions:
 
 concurrency:
   group: app-${{ github.workflow }}-${{ github.ref }}
-  # A superseded test run costs nothing to cancel; a tag's artifacts are the point of the run.
-  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+  # A superseded pull-request run is cancelled; a run on main or a tag never is.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   DOTNET_NOLOGO: 'true'
@@ -79,37 +77,10 @@ jobs:
     name: format + analyzers + tests
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15
-    outputs:
-      app-changed: ${{ steps.scope.outputs.app-changed }}
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-          # Two commits, so the diff below has something to compare against.
-          fetch-depth: 2
-
-      # Which of the two reasons this workflow ran. A push that only touched Keypaste.Core has to
-      # prove the app still compiles against it, but does not need to be packaged on three operating
-      # systems — and paying eight minutes to learn nothing is the cost CLAUDE.md asks about. A pull
-      # request always packages, because that is where a reviewer decides on evidence.
-      - name: Decide whether the app itself changed
-        id: scope
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ "${{ github.event_name }}" != "push" ] || [ "${{ github.ref_type }}" = "tag" ]; then
-            echo "app-changed=true" >> "$GITHUB_OUTPUT"
-            echo "not a branch push; packaging"
-            exit 0
-          fi
-          changed=$(git diff --name-only HEAD^ HEAD || true)
-          echo "$changed"
-          if echo "$changed" | grep -qE '^(src/Keypaste\.App/|src/Keypaste\.Cli/|tests/Keypaste\.App\.Tests/|tests/Keypaste\.Cli\.Tests/|tests/Keypaste\.Consistency\.Tests/|keypaste\.app\.slnx|\.github/workflows/app\.yml)'; then
-            echo "app-changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "app-changed=false" >> "$GITHUB_OUTPUT"
-            echo "only shared code changed; the gate is the whole verdict"
-          fi
 
       - uses: actions/setup-dotnet@v6
         with:
@@ -144,23 +115,19 @@ jobs:
       # this project is in no solution, so leaving this step out is how it quietly drifts out of the
       # style every other file in the repository is held to.
       - name: Restore the consistency tests (locked)
-        if: steps.scope.outputs.app-changed == 'true'
         run: dotnet restore tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj --locked-mode
 
       - name: Verify the consistency tests' formatting
-        if: steps.scope.outputs.app-changed == 'true'
         run: >-
           dotnet format tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj
           --no-restore --verify-no-changes
 
       - name: Build the consistency tests
-        if: steps.scope.outputs.app-changed == 'true'
         run: >-
           dotnet build tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj
           --no-restore -c Release -warnaserror
 
       - name: Run the consistency tests
-        if: steps.scope.outputs.app-changed == 'true'
         run: >-
           dotnet test tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj
           --no-build -c Release
@@ -168,8 +135,6 @@ jobs:
   package:
     name: publish + selftest (${{ matrix.os }})
     needs: gate
-    # Only when the app itself changed. A Keypaste.Core push pays for the gate above and stops there.
-    if: needs.gate.outputs.app-changed == 'true'
     strategy:
       fail-fast: false
       matrix:

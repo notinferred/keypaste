@@ -1,7 +1,7 @@
 # keypaste
 
-<!-- The demo GIF belongs here, as docs/demo/keypaste-demo.gif — recorded with scripts/demo/ and
-     kept under 2 MB. Until it exists the dialog below is the hero, and nothing else on this page
+<!-- The demo GIF belongs here, as docs/demo/keypaste-demo.gif, a screen recording kept under
+     2 MB. Until it exists the dialog below is the hero, and nothing else on this page
      moves when it lands. -->
 
 ```
