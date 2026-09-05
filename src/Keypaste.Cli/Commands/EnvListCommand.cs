@@ -10,6 +10,9 @@ namespace Keypaste.Cli.Commands;
 /// </remarks>
 internal static class EnvListCommand
 {
+    /// <summary>The longest name drawn. Generous: this is a listing of the reader's own vault.</summary>
+    private const int DisplayLength = 512;
+
     private static readonly OptionSpec[] _options =
     [
         new("vault", TakesValue: true),
@@ -49,11 +52,16 @@ internal static class EnvListCommand
 
             if (project is null)
             {
+                var alteredProject = false;
+
                 foreach (var name in store.Projects())
                 {
-                    context.Stdout.WriteLine(name);
+                    var safe = EntryNameSanitizer.Sanitize(name, DisplayLength);
+                    alteredProject |= safe.WasAltered;
+                    context.Stdout.WriteLine(safe.Text);
                 }
 
+                Note(context, alteredProject);
                 return CliApp.ExitSuccess;
             }
 
@@ -63,9 +71,14 @@ internal static class EnvListCommand
                 return CliApp.ExitNotFound;
             }
 
+            var altered = false;
+
             foreach (var variable in store.Read(project))
             {
-                context.Stdout.WriteLine(variable.Key);
+                var safe = EntryNameSanitizer.Sanitize(variable.Key, DisplayLength);
+                altered |= safe.WasAltered;
+
+                context.Stdout.WriteLine(safe.Text);
 
                 // The name is still listed: keypaste does not get to pretend the file says
                 // something other than what KeePassXC shows (docs/PRODUCT.md law 4.6). But it cannot be
@@ -73,11 +86,27 @@ internal static class EnvListCommand
                 if (!variable.IsUsableName)
                 {
                     context.Stderr.WriteLine(
-                        $"warning: '{variable.Key}' is not a usable environment variable name");
+                        $"warning: '{safe.Text}' is not a usable environment variable name");
                 }
             }
 
+            Note(context, altered);
+
             return CliApp.ExitSuccess;
         });
+    }
+
+    /// <summary>Says on stderr that at least one drawn name is not the name the vault holds.</summary>
+    /// <remarks>
+    /// stderr rather than stdout, and no mark in the listing, because this output is parsed:
+    /// <c>scripts/verify-keepassxc-writeback.sh</c> compares it against what KeePassXC reports. A
+    /// parser does not read stderr, and a person does.
+    /// </remarks>
+    private static void Note(CliContext context, bool altered)
+    {
+        if (altered)
+        {
+            context.Stderr.WriteLine("note: a displayed name is not what the vault holds.");
+        }
     }
 }
