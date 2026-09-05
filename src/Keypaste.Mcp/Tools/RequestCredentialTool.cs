@@ -103,6 +103,14 @@ internal sealed class RequestCredentialTool(
                 // is an access whether or not anybody collected the answer.
                 verdict = new Verdict(AuditDecision.Denied, AuditMethod.Cancelled, "the client withdrew the request");
             }
+            catch (Exception)
+            {
+                // Everything else, for the same reason and one stronger. An exception is the shape
+                // most likely to skip the append below, and skipping it is how an access happens
+                // with no record of it (law 3.3). Denying is already the answer; being seen to deny
+                // is the part that has to survive a failure nobody predicted (law 3.7).
+                verdict = new Verdict(AuditDecision.Denied, AuditMethod.Failed, "the request could not be completed");
+            }
         }
 
         var record = McpAudit.Line(
