@@ -38,11 +38,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: blacksmith-4vcpu-ubuntu-2404
+          - os: ubuntu-24.04
             target: linux
-          - os: blacksmith-6vcpu-macos-15
+          - os: macos-15
             target: macos
-          - os: blacksmith-4vcpu-windows-2025
+          - os: windows-2025
             target: windows
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15

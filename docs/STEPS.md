@@ -368,38 +368,25 @@ were decisions, answered by D-0054 to D-0060; H-0011 is the site's pre-deploy ch
 ## I · Site, docs & launch
 
 - [x] **3.2b `[MVP]` — Launch essay.** `docs/keepass-and-agents.md`, held to the binaries. D-0038.
-- [ ] **3.0 `[MVP]` — The repository goes public (H-0003).** 10.1 is done, so the hostile review of the
-  tree this step publishes has happened and the one action here that cannot be undone is unblocked.
-  **The history scan is done and clean (2026-09-05, all 239 commits, not the range):** no filename
-  `.gitignore`'s "Never commit these" block names has ever been committed — `*.kdbx`, `*.key`, `*.keyx`,
-  `.env`, `.env.*`, `*.pem`, `*.pfx`, `secrets.json`, `.keypaste/`, `*businessnotes*.md` — every
-  credential-shaped string is a synthetic sentinel or a literal placeholder, the largest blob ever
-  committed is `DECISIONS.md` at 260 KB, and `main`'s ancestry carries two identities, `ochoadan
-  <hello@danochoa.com>` and the Blacksmith bot, with no AI attribution in any reachable message. Re-run
-  it against `origin/main` immediately before the flip, deriving the patterns from those two committed
-  lists — `.gitignore`'s block and the Infrastructure table in `DECISIONS.md`, whose named material is
-  the `keypaste_signup_writer` role password, Stripe, Cloudflare, Apple and Azure — rather than
-  recalling them, because the first scan's grep was never recorded and deriving them means the next
-  scan reconstructs itself. **What blocks the flip is `refs/pull/*`, and it is two refs, not one.**
-  Measured 2026-09-05: `git ls-remote origin` returns 29 refs, **21 of them under `refs/pull/*`**. Eight
-  of the eighteen pull heads are off `main`'s line and carry the pre-rewrite `Dan
-  <42155753+ochoadan@users.noreply.github.com>` identity — PRs 5, 6, 7, 8, 9, 10, 11 and 14 — and **two
-  of those also carry `Claude <noreply@anthropic.com>`: `refs/pull/11/head` (`e972225`) and
-  `refs/pull/14/head` (`470340e`).** PRs 1, 2, 3, 4, 16, 17 and 18 are ancestors of `main` and clean; 12,
-  13 and 15 are dependabot. Give Support both Claude-bearing refs by name, or the purge can be closed
-  half-done. Origin's `v0.1.0` and `v0.1.0-rc.1` both point at `c67496a`, which is on `main`'s line and
-  clean; the *local* tags of those names point at `90a68e7`, a stale pre-rewrite commit that was never
-  pushed and must never be — releases are immutable, so re-pushing one burns the version. So: have
-  GitHub Support purge `refs/pull/*` and gc — the route that keeps the repository, its URL and its
-  runner verification — and only if they refuse, push the clean history to a fresh repository and delete
-  this one, which pays again what D-0082 measured. Then Settings → Change visibility. V-public fails
-  today. **Verify (V-public):** `git ls-remote origin 'refs/pull/*'` returns nothing and both
-  `refs/pull/11/head` (`e972225`) and `refs/pull/14/head` (`470340e`) are unreachable; a logged-out
-  browser opens the repository and `docs/demo.md`. *Fails if* a pull ref with the pre-rewrite identity is
-  still served. **BLOCKED by choice (2026-09-05, D-0085):** law 3.8 requires the *code* to be open,
-  and AGPL-3.0 with corresponding source published for every release already satisfies it — O-0014
-  concedes as much. What this row buys is the launch links, a second security channel and branch
-  protection, none of which is the product. Unblocked by the founder deciding to launch.
+- [ ] **3.0 `[MVP]` — The repository is public, and the purge it was supposed to follow is not done
+  (H-0003).** The flip happened on 2026-09-05. The purge that this row put *first* did not, so the
+  exposure the row existed to prevent is live rather than prevented, and V-public fails today.
+  **What is readable right now by anyone, unauthenticated:** the founder's personal name and address
+  on all 239 commits of `main`; `git ls-remote origin 'refs/pull/*'` still returns **21 refs**; eight
+  pull heads carry the pre-rewrite personal identity, and two of them — `refs/pull/11/head`
+  (`e972225`) and `refs/pull/14/head` (`470340e`) — are authored `Claude <noreply@anthropic.com>`,
+  with PR 11 titled for it. The history scan stays clean (2026-09-05, all 239 commits: no vault, no
+  key, no `.env`, no credential, largest blob `DECISIONS.md` at 260 KB), so what is exposed is
+  identity, not secrets — which is why this is now a decision about what the founder wants attached
+  to their name rather than an incident. **Ask GitHub Support to purge `refs/pull/*` and gc, naming
+  both Claude-bearing refs**, or the purge can be closed half-done. Changing `user.email` (D-0087)
+  fixes only what is committed from now on; the 239 commits already published are changed by nothing
+  short of a rewrite and a force-push, which on a public repository changes every hash, breaks every
+  clone, and still leaves the pull refs and GitHub's cached objects behind — so it is not a fix
+  either, and Support is the only route that reaches the refs. **Verify (V-public):** `git ls-remote
+  origin 'refs/pull/*'` returns nothing and both `e972225` and `470340e` are unreachable; a
+  logged-out browser opens the repository and `docs/demo.md`. *Fails if* a pull ref with the
+  pre-rewrite identity is still served.
 - [ ] **3.1 `[MVP]` — The demo GIF (H-0005).** Record the flow on `docs/demo.md` with any screen
   recorder, crop it to under 2 MB, save it as `docs/demo/keypaste-demo.gif`, and fill the slot both
   pages reserve. **Verify (V-gif):** the file exists under 2 MB; both pages reference it and neither
@@ -475,7 +462,8 @@ were decisions, answered by D-0054 to D-0060; H-0011 is the site's pre-deploy ch
   `keepassxc compat` checks on `main` (D-0008 names this as the part outside the repository). **Verify
   (V-protection):** a pull request with a red `compat` check cannot be merged in the UI. *Fails if* it
   can.
-- [ ] **K.5 `[Launch]` — Fork pull requests on Blacksmith runners.** An answer for pull requests from
-  forks, which have no access to the runner labels. **Verify (V-fork-ci):** a pull request from a fork
-  runs `ci.yml` to completion. *Fails if* it stays queued.
+- [ ] **K.5 `[Launch]` — Fork pull requests run CI.** The reason this row existed is gone: forks had
+  no access to Blacksmith's runner labels, and D-0086 moved every job to GitHub-hosted runners, which
+  a fork can reach. What is left is the observation, which no amount of reading settles. **Verify
+  (V-fork-ci):** a pull request from a fork runs `ci.yml` to completion. *Fails if* it stays queued.
 

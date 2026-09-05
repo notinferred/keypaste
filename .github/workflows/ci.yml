@@ -52,7 +52,7 @@ jobs:
   # short-circuit the three-OS matrix rather than failing three times over.
   gate:
     name: format + analyzers
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
@@ -85,10 +85,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Three operating systems, all on Blacksmith. Same architectures the GitHub-hosted images
-        # gave (x64 Linux, arm64 macOS) and the same runners release.yml already builds every
-        # shipped binary on, so a tag is tested on the machines that produce it. See D-0042.
-        os: [blacksmith-4vcpu-ubuntu-2404, blacksmith-4vcpu-windows-2025, blacksmith-6vcpu-macos-15]
+        # Three operating systems on GitHub-hosted runners, which are free for a public
+        # repository. The same runners release.yml builds every shipped binary on, so a tag is
+        # tested on the machines that produce it. See D-0042 and D-0086.
+        os: [ubuntu-24.04, windows-2025, macos-15]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
@@ -202,7 +202,7 @@ jobs:
   aot:
     name: aot publish (linux-x64)
     needs: gate
-    runs-on: blacksmith-4vcpu-ubuntu-2204
+    runs-on: ubuntu-22.04
     timeout-minutes: 25
     env:
       KEYPASTE_BIN: artifacts/release/linux-x64/keypaste
@@ -325,7 +325,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [blacksmith-4vcpu-ubuntu-2404, blacksmith-4vcpu-windows-2025, blacksmith-6vcpu-macos-15]
+        os: [ubuntu-24.04, windows-2025, macos-15]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     env:
