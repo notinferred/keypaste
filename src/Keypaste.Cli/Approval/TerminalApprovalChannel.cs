@@ -108,6 +108,16 @@ internal sealed class TerminalApprovalChannel(ISecretPrompt prompt, TextWriter s
             _stderr.WriteLine("    (cut short — the full text is hashed in the audit log)");
         }
 
+        if (request.EntryWasAltered || request.ReasonWasAltered)
+        {
+            _stderr.WriteLine();
+            _stderr.WriteLine(request.EntryWasAltered && request.ReasonWasAltered
+                ? "  The entry and the reason above are not what the vault holds: both were scrubbed."
+                : request.EntryWasAltered
+                    ? "  The entry above is not what the vault holds: the stored name was scrubbed."
+                    : "  The reason above is not what the agent sent: it was scrubbed.");
+        }
+
         _stderr.WriteLine();
         _stderr.WriteLine("  That sentence was written by the agent, not by keypaste. Treat it as a claim.");
         _stderr.WriteLine();
