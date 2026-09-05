@@ -2,10 +2,10 @@
 
 ## CI
 
-`ci.yml` runs in full on every push to `main`, every pull request, and on dispatch. `app.yml` does the same for the desktop app and packages it on a `v*` tag. **Pushes to a feature branch run nothing.** Runners are Blacksmith at a flat rate, so nothing is scoped by what a push touched, and a run on `main` is never cancelled.
+`ci.yml` runs in full on every push to `main`, every pull request, and on dispatch: nothing in it is scoped by what a push touched, and a run on `main` is never cancelled. **`app.yml` is not its mirror.** On pushes to `main` it runs on a `paths:` allowlist — `src/Keypaste.App/**`, `src/Keypaste.Cli/**`, `src/Keypaste.Core/**`, `third_party/**`, the two `Directory.*.props`, `keypaste.app.slnx`, its own file, and the App/Cli/Consistency test projects — so a push touching only `src/Keypaste.Mcp/`, `scripts/` or `keypaste.slnx` runs **nothing** in it. Pull requests, dispatch and `v*` tags are unfiltered, and a tag packages the app. `app.yml`'s own header carries the cost table. **Pushes to a feature branch run nothing.** Runners are Blacksmith at a flat rate.
 
 - **Commit as you go. Push once per finished, verified unit of work.**
-- **Docs-only pushes skip both workflows** via `paths-ignore`. Five pages must never be in that list: `README.md`, `launch.md`, `docs/demo.md`, `docs/keepass-and-agents.md`, `site/public/index.html`. `scripts/verify-demo.sh` holds them to what the binaries print. Never add a `docs/**` entry.
+- **Docs-only pushes run neither workflow**, by two different mechanisms: `ci.yml` has a `paths-ignore`; `app.yml` has none, and skips docs only because they are not on its allowlist. Five pages must never enter `ci.yml`'s list: `README.md`, `launch.md`, `docs/demo.md`, `docs/keepass-and-agents.md`, `site/public/index.html`. `scripts/verify-demo.sh` holds them to what the binaries print. Never add a `docs/**` entry.
 
 ## Releases are immutable
 
