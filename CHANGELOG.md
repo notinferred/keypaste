@@ -4,6 +4,16 @@
 
 Versions are the ones published at `https://dl.keypaste.com/v<version>/`. Every release carries a `SHA256SUMS` file and a per-asset `.sha256`, plus the corresponding source for that tag. The binaries are unsigned and un-notarized (O-0010).
 
+## Unreleased
+
+**A hostile review of the whole tree before it goes public** (`docs/STEPS.md` 10.1). Three findings, each with a regression test watched failing before its fix.
+
+Names out of a vault are now drawn through the sanitizer everywhere a person reads them, not only where a model does: `keypaste ls`, `keypaste env ls`, the `env pull` rejection message, and the desktop app's entry list, group tree, detail pane and env tables. A KDBX title cannot hold a control character, so what this closes is a name that *reads* as something it is not — a bidirectional override or an invisible code point. A listing says when what it drew is not what the vault holds. What addresses an entry, seeds an edit or reaches the clipboard is unchanged and still exact.
+
+The approval prompt now says when the entry or the reason it shows was scrubbed. It stays silent for an ordinary name, so the dialog is unchanged for everyone whose entries are ordinary.
+
+The agent bridge now records an access that ends in an exception. Previously only cancellation was caught, so an I/O or cryptographic failure out of the vault escaped before the audit line was written — nothing was released, but nothing was recorded either. Relatedly, a connection that fails to accept no longer ends the approver holding your unlocked vault.
+
 ## 0.1.0
 
 **The first release meant to be installed.** Everything below was already true of `0.1.0-rc.1`; what changed is that the pipeline has now been run end to end, an asset has been downloaded and checked by hand off the published origin, and the install commands on the README and on keypaste.com name this version. The rc exists in the open at its own URL and stays there; nothing links it.

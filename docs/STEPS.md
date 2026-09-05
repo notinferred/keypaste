@@ -403,11 +403,27 @@ were decisions, answered by D-0054 to D-0060; H-0011 is the site's pre-deploy ch
   the destination mailbox, headers intact, within an hour; after 3.0, the repository's Security tab
   offers private vulnerability reporting to a logged-out-then-logged-in stranger. *Fails if* the mail
   bounces, silently disappears, or `SECURITY.md` still calls the second channel unreachable after 3.0.
-- [ ] **10.1 `[MVP]` — Hostile review before the repository goes public.** Act as a hostile reviewer of
-  the whole tree as it exists: any secret on disk unencrypted, keys outliving their need, a response
-  leaking more than one field, injection through names or reasons, a path that fails open; findings
-  ranked with patches and a regression test each. The relay does not exist yet and gets its own pass
-  inside 5.2, which is where the "plaintext byte the relay could see" question belongs. **Verify
+- [x] **10.1 `[MVP]` — Hostile review before the repository goes public.** Done 2026-09-05, D-0084.
+  Three findings, each two commits — the test alone with its failing output in the body, then the fix.
+  **Untrusted names reached every renderer but four unsanitized**: `keypaste ls`, `env ls`, the
+  `env pull` rejection message and the whole app display layer now draw through `EntryNameSanitizer`,
+  and a listing says when what it drew is not what the vault holds; what addresses an entry, seeds an
+  edit or reaches the clipboard stays exact, because sanitizing is lossy. The payload is a bidi
+  override rather than an ANSI escape: a KDBX title is stored in XML and U+001B is not legal there, so
+  a control character cannot survive the round trip — measured, and it corrected the finding.
+  **An exception other than cancellation escaped both MCP tools before the audit append**, so an
+  access could happen with no record (law 3.3); nothing was released, so it failed silently rather
+  than open. Both catches are total now, as are the two approver-side filters that let the same
+  exceptions past, and a peer can no longer end the approver by failing its accept. The lone-surrogate
+  route an earlier pass proposed was spiked and falsified — `Utf8JsonWriter` does not throw on one and
+  `JsonDocument.Parse` refuses it at the wire — so it is written up as I/O, not as remote input.
+  **The approval prompt discarded `WasAltered`** and now says when the name or reason drawn is not the
+  stored one, conditionally, so `verify-demo.sh`'s pinned dialog is byte-identical.
+  Eight of the eleven gates were run locally and pass, including both KeePassXC directions against
+  2.7.10 and `verify-demo.sh`; `verify-aot-trim`, `verify-run-signals` and `verify-install` need CI.
+  `THREATS.md` T-1, T-6 and T-14 are rewritten in place — T-14 now says that the approver writes no
+  audit line of its own (D-0020), so a release to a pipe peer that is not `keypaste-mcp` is recorded
+  nowhere. **Verify
   (V-review):** every finding has a test that was red before its patch; the review is dated in
   `DECISIONS.md`. *Fails if* a finding has no red-then-green test.
 - [ ] **10.2 `[Scale]` — External pen test.** A paid test of the relay and the bridge, the report
