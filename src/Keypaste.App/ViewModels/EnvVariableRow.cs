@@ -1,3 +1,5 @@
+using Keypaste.Core;
+
 namespace Keypaste.App.ViewModels;
 
 /// <summary>
@@ -35,8 +37,11 @@ internal sealed class EnvVariableRow : ObservableObject, IRevealSource
         RemoveCommand = new RelayCommand(() => _owner.BeginRemove(this));
     }
 
-    /// <summary>The variable's name.</summary>
+    /// <summary>The variable's name, as the vault holds it. Addresses the row on removal.</summary>
     internal string Key { get; }
+
+    /// <summary>The name as the table draws it.</summary>
+    internal string DisplayKey => EntryNameSanitizer.Sanitize(Key).Text;
 
     /// <summary>How long its value is, for the mask.</summary>
     public int MaskedLength => _maskedLength;
@@ -50,7 +55,7 @@ internal sealed class EnvVariableRow : ObservableObject, IRevealSource
         : "keypaste run cannot export this name.";
 
     /// <summary>What a screen reader is told the reveal button does. Names the key, never the value.</summary>
-    internal string RevealLabel => $"Hold to reveal {Key}";
+    internal string RevealLabel => $"Hold to reveal {DisplayKey}";
 
     /// <summary>Copies the value, with the auto-clearing countdown.</summary>
     internal AsyncRelayCommand CopyValueCommand { get; }

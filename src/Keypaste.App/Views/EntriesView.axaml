@@ -113,7 +113,7 @@
         <ListBox.ItemTemplate>
           <DataTemplate x:DataType="vm:EntryRow">
             <Grid ColumnDefinitions="*,Auto">
-              <TextBlock Grid.Column="0" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+              <TextBlock Grid.Column="0" Text="{Binding DisplayTitle}" TextTrimming="CharacterEllipsis" />
               <TextBlock Grid.Column="1"
                          Text="{Binding Where}"
                          FontSize="11"
@@ -138,10 +138,10 @@
             <StackPanel Spacing="12">
 
               <StackPanel Spacing="2">
-                <TextBlock Text="{Binding Title}" FontSize="16"
+                <TextBlock Text="{Binding DisplayTitle}" FontSize="16"
                            TextTrimming="CharacterEllipsis"
                            Foreground="{DynamicResource KpTextPrimary}" />
-                <TextBlock Text="{Binding Path}" FontSize="11"
+                <TextBlock Text="{Binding DisplayPath}" FontSize="11"
                            FontFamily="{DynamicResource KpMono}"
                            TextTrimming="CharacterEllipsis"
                            Foreground="{DynamicResource KpTextMuted}" />
@@ -162,7 +162,7 @@
               <StackPanel Spacing="4" IsVisible="{Binding !IsEditing}">
                 <TextBlock Text="Username" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
                 <Grid ColumnDefinitions="*,Auto">
-                  <TextBlock Grid.Column="0" Text="{Binding Username}"
+                  <TextBlock Grid.Column="0" Text="{Binding DisplayUsername}"
                              TextTrimming="CharacterEllipsis"
                              VerticalAlignment="Center"
                              Foreground="{DynamicResource KpTextPrimary}" />
@@ -172,13 +172,13 @@
 
               <StackPanel Spacing="4" IsVisible="{Binding !IsEditing}">
                 <TextBlock Text="URL" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBlock Text="{Binding Url}" TextWrapping="Wrap"
+                <TextBlock Text="{Binding DisplayUrl}" TextWrapping="Wrap"
                            Foreground="{DynamicResource KpTextPrimary}" />
               </StackPanel>
 
               <StackPanel Spacing="4" IsVisible="{Binding !IsEditing}">
                 <TextBlock Text="Notes" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBlock Text="{Binding Notes}" TextWrapping="Wrap"
+                <TextBlock Text="{Binding DisplayNotes}" TextWrapping="Wrap"
                            Foreground="{DynamicResource KpTextPrimary}" />
               </StackPanel>
 

@@ -79,7 +79,7 @@
 
             <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,0,0,12">
               <StackPanel Grid.Column="0" Spacing="2">
-                <TextBlock Text="{Binding Name}" FontSize="18"
+                <TextBlock Text="{Binding DisplayName}" FontSize="18"
                            Foreground="{DynamicResource KpTextPrimary}" />
                 <TextBlock Text="{Binding Summary}" FontSize="11"
                            Foreground="{DynamicResource KpTextMuted}" />
@@ -136,7 +136,7 @@
                     <Grid ColumnDefinitions="200,*,Auto,Auto" Margin="0,0,0,8">
 
                       <StackPanel Grid.Column="0" Spacing="2">
-                        <TextBlock Text="{Binding Key}"
+                        <TextBlock Text="{Binding DisplayKey}"
                                    FontFamily="{DynamicResource KpMono}"
                                    TextTrimming="CharacterEllipsis"
                                    Foreground="{DynamicResource KpTextPrimary}" />

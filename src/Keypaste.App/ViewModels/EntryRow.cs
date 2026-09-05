@@ -1,3 +1,5 @@
+using Keypaste.Core;
+
 namespace Keypaste.App.ViewModels;
 
 /// <summary>
@@ -24,8 +26,17 @@ namespace Keypaste.App.ViewModels;
 internal sealed record EntryRow(string Title, string GroupPath)
 {
     /// <summary>The entry's full path, the way core addresses it.</summary>
+    /// <remarks>
+    /// <b>An address, not a label.</b> <c>Find</c>, <c>RemoveEntry</c> and selection matching all go
+    /// through this, so it carries the title the vault holds and is never sanitized. What the screen
+    /// shows is <see cref="DisplayTitle"/> and <see cref="Where"/>.
+    /// </remarks>
     internal string Path => GroupPath.Length == 0 ? Title : GroupPath + "/" + Title;
 
-    /// <summary>The group, for a list that is not grouped by one.</summary>
-    internal string Where => GroupPath.Length == 0 ? "—" : GroupPath;
+    /// <summary>The title as the list draws it, scrubbed of anything that misrepresents it.</summary>
+    internal string DisplayTitle { get; } = EntryNameSanitizer.Sanitize(Title).Text;
+
+    /// <summary>The group, for a list that is not grouped by one. Display only, so scrubbed.</summary>
+    internal string Where { get; } =
+        GroupPath.Length == 0 ? "—" : EntryNameSanitizer.SanitizePath(GroupPath).Text;
 }

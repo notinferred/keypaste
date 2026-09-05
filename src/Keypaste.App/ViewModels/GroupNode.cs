@@ -1,3 +1,5 @@
+using Keypaste.Core;
+
 namespace Keypaste.App.ViewModels;
 
 /// <summary>
@@ -44,8 +46,11 @@ internal sealed class GroupNode
     /// <summary>Whether this is the "everything" row rather than a real group.</summary>
     internal bool IsEverything => Path.Length == 0;
 
-    /// <summary>What the sidebar shows.</summary>
-    internal string Label => IsEverything ? "All entries" : Name;
+    /// <summary>What the sidebar shows, scrubbed: <see cref="Name"/> comes out of the vault.</summary>
+    /// <remarks>
+    /// <see cref="Path"/> stays raw because it selects the group; only the label is drawn.
+    /// </remarks>
+    internal string Label => IsEverything ? "All entries" : EntryNameSanitizer.Sanitize(Name).Text;
 
     /// <summary>
     /// Builds the tree, flattened depth-first into the order a list should draw it.
