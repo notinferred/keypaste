@@ -75,7 +75,7 @@ env:
 jobs:
   gate:
     name: format + analyzers + tests
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
@@ -139,13 +139,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: blacksmith-4vcpu-ubuntu-2404
+          - os: ubuntu-24.04
             rid: linux-x64
             archive: tar.gz
-          - os: blacksmith-4vcpu-windows-2025
+          - os: windows-2025
             rid: win-x64
             archive: zip
-          - os: blacksmith-6vcpu-macos-15
+          - os: macos-15
             rid: osx-arm64
             archive: tar.gz
     runs-on: ${{ matrix.os }}

@@ -40,7 +40,7 @@ env:
 jobs:
   guard:
     name: guard
-    runs-on: blacksmith-4vcpu-ubuntu-2204
+    runs-on: ubuntu-22.04
     timeout-minutes: 10
     permissions:
       contents: read
@@ -167,16 +167,16 @@ jobs:
           # 2.35, which covers Debian 12 and Ubuntu 22.04; 24.04 would silently raise it to 2.39
           # and break every one of those machines.
           - rid: linux-x64
-            os: blacksmith-4vcpu-ubuntu-2204
+            os: ubuntu-22.04
             archive: tar.gz
           - rid: linux-arm64
-            os: blacksmith-4vcpu-ubuntu-2204-arm
+            os: ubuntu-22.04-arm
             archive: tar.gz
           - rid: osx-arm64
-            os: blacksmith-6vcpu-macos-15
+            os: macos-15
             archive: tar.gz
           - rid: win-x64
-            os: blacksmith-4vcpu-windows-2025
+            os: windows-2025
             archive: zip
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
@@ -416,7 +416,7 @@ jobs:
     name: publish to R2
     needs: [guard, build]
     if: needs.guard.outputs.publish == 'true'
-    runs-on: blacksmith-4vcpu-ubuntu-2204
+    runs-on: ubuntu-22.04
     timeout-minutes: 20
     permissions:
       contents: read
