@@ -258,6 +258,12 @@ internal sealed class FakeEntryNameSource : IEntryNameSource, IDisposable
     /// <summary>Whether calls should park on <see cref="Held"/> until it is released.</summary>
     internal bool Hold { get; set; }
 
+    /// <summary>
+    /// Set to make the source throw something other than cancellation, the way a vault on a failing
+    /// disk or a share that went away would.
+    /// </summary>
+    internal bool Throw { get; set; }
+
     internal FakeEntryNameSource With(string groupPath, string title)
     {
         _names.Add(new EntryName(groupPath, title));
@@ -273,6 +279,11 @@ internal sealed class FakeEntryNameSource : IEntryNameSource, IDisposable
         if (Hold)
         {
             Held!.Wait(cancellationToken);
+        }
+
+        if (Throw)
+        {
+            throw new IOException("the vault file went away");
         }
 
         return ValueTask.FromResult(
