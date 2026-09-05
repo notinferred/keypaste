@@ -92,8 +92,12 @@ public sealed class VaultEntryNameLister(Func<Vault?> unlockedVault) : IEntryNam
 
             names = matched;
         }
-        catch (Exception ex) when (ex is VaultException or ObjectDisposedException)
+        catch (Exception)
         {
+            // Anything at all. The narrower filter this replaces named the two it expected, and an
+            // IOException or a cryptographic failure out of the vault is neither - so it escaped the
+            // approver entirely and reached the bridge as an unlogged failure. Failing closed here
+            // is what makes the caller's refusal a decision rather than an accident (law 3.7).
             failure = CredentialFailure.Failed;
             return false;
         }

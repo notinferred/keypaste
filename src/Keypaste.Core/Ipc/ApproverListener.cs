@@ -75,10 +75,19 @@ public sealed class ApproverListener : IDisposable
                 {
                     await pipe.WaitForConnectionAsync(cancellationToken).ConfigureAwait(false);
                 }
-                catch (Exception)
+                catch (OperationCanceledException)
                 {
                     await pipe.DisposeAsync().ConfigureAwait(false);
                     throw;
+                }
+                catch (Exception)
+                {
+                    // One refused connection, not one dead approver. Rethrowing here ends the accept
+                    // loop and with it the only process holding the unlocked vault - which is what
+                    // this type's own summary says must not be reachable from something a peer sent.
+                    // Cancellation still propagates above, because that is how this is asked to stop.
+                    await pipe.DisposeAsync().ConfigureAwait(false);
+                    continue;
                 }
 
                 // The next instance goes up before this one is served, so there is no window in
@@ -135,10 +144,14 @@ public sealed class ApproverListener : IDisposable
                 await framer.WriteAsync(reply, cancellationToken).ConfigureAwait(false);
             }
         }
-        catch (Exception ex) when (ex is IOException or ObjectDisposedException or OperationCanceledException or InvalidOperationException)
+        catch (Exception)
         {
-            // A peer that went away, a frame over the limit, a pipe torn down under us. One
-            // connection's problem, and never the approver's.
+            // A peer that went away, a frame over the limit, a pipe torn down under us - and
+            // anything the handler throws that this list used to miss. The filter was narrower than
+            // the set of things reachable from a peer's bytes, and ServeAsync is fire-and-forget, so
+            // whatever escaped surfaced at shutdown instead of here. One connection's problem, and
+            // never the approver's: this is the outermost boundary between a peer and the process
+            // holding the unlocked vault (law 3.7).
         }
         finally
         {

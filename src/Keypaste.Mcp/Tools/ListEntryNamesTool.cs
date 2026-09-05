@@ -89,6 +89,14 @@ internal sealed class ListEntryNamesTool(
             // attempted, and law 3.3 does not make an exception for the ones nobody collected.
             listing = new EntryNameListing(VaultAvailability.Failed, [], ToolText.Cancelled);
         }
+        catch (Exception)
+        {
+            // Nor for the ones that failed. A vault on a disk that went away throws something this
+            // method has no business enumerating, and an exception that escapes here escapes before
+            // the append below - which would make breaking the source a way to be listed against
+            // with no record of it.
+            listing = new EntryNameListing(VaultAvailability.Failed, [], ToolText.VaultLocked);
+        }
 
         if (listing.Availability != VaultAvailability.Available)
         {

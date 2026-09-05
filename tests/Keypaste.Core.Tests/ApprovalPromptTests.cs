@@ -35,6 +35,16 @@ public sealed class ApprovalPromptTests
     /// carefully written — can reach one. If somebody adds such a member, this goes red and they
     /// have to argue for it.
     /// </summary>
+    /// <remarks>
+    /// <b>The argument for <c>EntryWasAltered</c> and <c>ReasonWasAltered</c>, made because this
+    /// test demanded it.</b> Both are booleans the channel may state, in the same class as
+    /// <c>ReasonWasTruncated</c>, which this list already allowed. Neither carries text, a duration,
+    /// a position or a default: a channel can say that a name was scrubbed, and it still cannot be
+    /// told what the deadline is or which button is pre-selected, because there remains nowhere to
+    /// put either. They are set from the sanitizer's own result rather than from anything the agent
+    /// sends, so a reason cannot choose their value — it can only cause its own to be true by
+    /// containing something that had to be scrubbed, which is precisely the fact being reported.
+    /// </remarks>
     [Fact]
     public void ThePromptHasNoMember_AReasonCouldUseToChangeTheDefaultOrTheDeadline()
     {
@@ -44,7 +54,16 @@ public sealed class ApprovalPromptTests
             .ToArray();
 
         Assert.Equal(
-            ["Client", "Entry", "Field", "Reason", "ReasonWasTruncated", "TtlSeconds"],
+            [
+                "Client",
+                "Entry",
+                "EntryWasAltered",
+                "Field",
+                "Reason",
+                "ReasonWasAltered",
+                "ReasonWasTruncated",
+                "TtlSeconds",
+            ],
             members.Order(StringComparer.Ordinal));
     }
 
