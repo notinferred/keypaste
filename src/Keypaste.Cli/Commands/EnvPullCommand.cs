@@ -159,7 +159,10 @@ internal static class EnvPullCommand
 
         for (var i = 0; i < problems.Count && i < Shown; i++)
         {
-            context.Stderr.WriteLine($"  {problems[i].Message}");
+            // The message quotes the offending key back, and this file arrived from somewhere else
+            // — it is the one place in keypaste where untrusted bytes reach a terminal without
+            // passing through the vault, so a C0 escape really can survive here.
+            context.Stderr.WriteLine($"  {EntryNameSanitizer.Sanitize(problems[i].Message, 512).Text}");
         }
 
         if (problems.Count > Shown)
