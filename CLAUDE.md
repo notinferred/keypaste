@@ -1,16 +1,11 @@
 # Working rules for this repository
 
-## CI costs money, and pushes are what spend it
+## CI
 
-`ci.yml` runs on pushes to `main`, on pull requests, and on dispatch. **Pushes to a feature branch run nothing.** A push of five commits is one CI run, so committing locally is free and only the push is billable.
+`ci.yml` runs in full on every push to `main`, every pull request, and on dispatch. `app.yml` does the same for the desktop app and packages it on a `v*` tag. **Pushes to a feature branch run nothing.** Runners are Blacksmith at a flat rate, so nothing is scoped by what a push touched, and a run on `main` is never cancelled.
 
-- **Commit as you go. Push once per finished, verified unit of work.** Not once per edit, and not once per file. If the work isn't done or isn't checked, it isn't ready to leave the machine.
-- **Docs-only pushes skip `ci.yml`** via `paths-ignore`, and run `docs.yml` instead. The list is deliberately an allow-to-skip: anything not named there triggers the workflow, so a new file is covered by default. The governance documents skip `ci.yml` because no job in it needs a build to judge them — not because nothing reads them. `scripts/verify-claims.sh` reads every one, and `docs.yml` runs it on those paths for about fifteen seconds with no SDK and no restore (D-0080). **A path added to `paths-ignore` must be added to `docs.yml`'s `paths` too**, or its citations stop being checked on the only pushes that can break them. That is precisely the hole D-0080 closed: check A was widened to scan every document while every document it reads sat in `paths-ignore`, so it never ran on a documents-only push.
-- **A triggered run pays only for what the push can break.** The `scope` job classifies the diff with `scripts/ci-scope.sh` (D-0078): a pinned-page edit gets the gate plus one Linux build with the demo gate; a code change gets the three-OS test matrix; only the core, the CLI, the vendored library, the compat scripts, the props, the SDK pin, the lock files or the workflow itself get the KeePassXC matrix and the AOT publish. Pull requests, tags and dispatch always run everything, and a diff that cannot be computed runs everything too. The compat job's `if:` is pinned by `CompatGateIsPermanentTests`; do not add a second condition anywhere.
-- **Five documents are excluded from that skip and must stay excluded:** `README.md`, `launch.md`, `docs/demo.md`, `docs/keepass-and-agents.md`, `site/public/index.html`. `scripts/verify-demo.sh` holds each of them to what the shipped binaries actually print, so editing one is a code change wearing a markdown extension. **Never add a `docs/**` entry to `paths-ignore`** — it would skip two of the five silently, turning that gate off without turning anything red. A script used to assert this rather than trusting the paragraph; it was deleted with the rest of the document ceremony, so the paragraph is what you have.
-- **Superseded runs on `main` are cancelled.** Only the newest commit is tested. `release.yml` is the deliberate exception and never cancels.
-
-Before adding a workflow, ask what it costs on every push, not just what it proves.
+- **Commit as you go. Push once per finished, verified unit of work.**
+- **Docs-only pushes skip both workflows** via `paths-ignore`. Five pages must never be in that list: `README.md`, `launch.md`, `docs/demo.md`, `docs/keepass-and-agents.md`, `site/public/index.html`. `scripts/verify-demo.sh` holds them to what the binaries print. Never add a `docs/**` entry.
 
 ## Releases are immutable
 
@@ -25,14 +20,11 @@ A `v*` tag builds four native binaries and publishes them to `dl.keypaste.com`. 
 
 ## Records
 
-- `docs/PRODUCT.md` — the constitution. §3 does not change. §1, §2 and §4–6 change only by a dated re-ratification recorded as a `D-` row; the current one is v1.1, D-0061. If a decision conflicts with the current text, the decision is wrong. §2 is the "out, deliberately" list and is the ratchet.
-- `docs/STEPS.md` — the whole plan, in one file, grouped by area. Every step is one row: a tier tag (`[MVP]` the first dollar, `[Launch]` the Free plan finished, `[Scale]` the Team plan), a Build line, and a **Verify** line — an id, what must hold, and *fails if*. Human actions are rows too, carrying their `H-` id. Pick up the first unticked row of the lowest tier in the lowest area. **The admission rule:** a step may be added only if it has an accept criterion that can *fail*, carries that Verify line, and traces to a claim in `docs/PRODUCT.md`. Fails any one → it is an Ideas row in `DECISIONS.md`, not a step. This is what stops the plan growing forever.
-- **Run the Verify line first**, and a verifier gets that file and the repo — **never the builder's transcript**, because shared context is how a build and its check agree with each other while both are wrong. Results are PASS / FAIL / BLOCKED; "looks right" is not a result and BLOCKED is not a pass. Whether a Verify line can actually fire is `[process]`: no script checks it. What is mechanized is narrower and lives in `scripts/verify-claims.sh` — every step, decision and owner id a document cites resolves, and nothing sits untracked and unignored.
-- `DECISIONS.md` — the ledger (one line per decision, newest first), the **Ideas** table (append-only: flip a status, never delete a row), the **Not in git** table (by location, never by value), and below the archive line the long-form `D-NNNN` records and `O-NNNN` questions.
+- `docs/PRODUCT.md` — the constitution. §3 does not change; the rest changes only by a dated re-ratification. If a decision conflicts with it, the decision is wrong.
+- `docs/STEPS.md` — the plan. One row per step: tier tag, Build line, Verify line with *fails if*. Pick up the first unticked row of the lowest tier in the lowest area, skipping BLOCKED. A step exists only if its Verify line can fail and it traces to `docs/PRODUCT.md`; otherwise it is an Ideas line.
+- `DECISIONS.md` — one line per decision, and only when architecture, security or money changes. Ideas are one line each. The archive below the line is frozen.
 
-**Scrap, don't append.** When something moves, rewrite the section and delete what it replaced. No migration narratives, no was/now, no dead names. Git holds what the file used to say.
-
-A claim on a published page may only say what a gate or a citation can hold (D-0036). If a check has never actually executed, it is an assertion about the world and not a check on it (D-0043) — run it before trusting the green. Every rule here names its enforcer; the ones that cannot be mechanized are tagged `[process]` and are second-class until they can be.
+**Rewrite, don't append.** When something changes, say what is true now and delete the old text. Git holds history. A claim on a published page may only say what a gate holds (D-0036).
 
 ## graphify — optional, local, and not something this repository ships
 
