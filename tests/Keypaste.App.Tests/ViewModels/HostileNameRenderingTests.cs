@@ -36,10 +36,10 @@ namespace Keypaste.App.Tests.ViewModels;
 /// </remarks>
 public sealed class HostileNameRenderingTests : IDisposable
 {
-    private const string Master = "correct horse battery staple";
+    private const string _master = "correct horse battery staple";
 
-    private static readonly string Bidi = ((char)0x202E).ToString();
-    private static readonly string Zwsp = ((char)0x200B).ToString();
+    private static readonly string _bidi = ((char)0x202E).ToString();
+    private static readonly string _zwsp = ((char)0x200B).ToString();
 
     private readonly string _directory;
     private readonly string _vaultPath;
@@ -49,15 +49,15 @@ public sealed class HostileNameRenderingTests : IDisposable
         _directory = Directory.CreateTempSubdirectory("keypaste-hostile-app-").FullName;
         _vaultPath = Path.Combine(_directory, "vault.kdbx");
 
-        using var vault = Vault.Create(_vaultPath, Master);
+        using var vault = Vault.Create(_vaultPath, _master);
         vault.AddEntry(new VaultEntry
         {
-            Title = "prod" + Bidi + "token" + Zwsp,
-            Username = "user" + Bidi + "name",
-            Url = "https://example.test/" + Bidi,
-            Notes = "note" + Zwsp + "s",
+            Title = "prod" + _bidi + "token" + _zwsp,
+            Username = "user" + _bidi + "name",
+            Url = "https://example.test/" + _bidi,
+            Notes = "note" + _zwsp + "s",
             Password = "p",
-            GroupPath = "servers" + Bidi + "live",
+            GroupPath = "servers" + _bidi + "live",
         });
         vault.Save();
     }
@@ -75,13 +75,13 @@ public sealed class HostileNameRenderingTests : IDisposable
 
     private static void AssertSafe(string drawn)
     {
-        Assert.DoesNotContain(Bidi, drawn, StringComparison.Ordinal);
-        Assert.DoesNotContain(Zwsp, drawn, StringComparison.Ordinal);
+        Assert.DoesNotContain(_bidi, drawn, StringComparison.Ordinal);
+        Assert.DoesNotContain(_zwsp, drawn, StringComparison.Ordinal);
     }
 
     private EntryRow Row()
     {
-        using var vault = Vault.Open(_vaultPath, Master);
+        using var vault = Vault.Open(_vaultPath, _master);
         var entry = vault.ReadEntries().Single();
         return new EntryRow(entry.Title, entry.GroupPath);
     }
@@ -95,7 +95,7 @@ public sealed class HostileNameRenderingTests : IDisposable
     [Fact]
     public void The_sidebar_label_does_not_draw_a_name_that_can_misrepresent_itself()
     {
-        using var vault = Vault.Open(_vaultPath, Master);
+        using var vault = Vault.Open(_vaultPath, _master);
 
         foreach (var node in GroupNode.Flatten(vault.ReadGroupPaths()))
         {
@@ -123,9 +123,9 @@ public sealed class HostileNameRenderingTests : IDisposable
         AssertSafe(detail.DisplayNotes);
 
         // The counterweight: what the editor and the clipboard read is still what the vault holds.
-        Assert.Contains(Bidi, detail.Username, StringComparison.Ordinal);
-        Assert.Contains(Bidi, detail.Url, StringComparison.Ordinal);
-        Assert.Contains(Zwsp, detail.Notes, StringComparison.Ordinal);
+        Assert.Contains(_bidi, detail.Username, StringComparison.Ordinal);
+        Assert.Contains(_bidi, detail.Url, StringComparison.Ordinal);
+        Assert.Contains(_zwsp, detail.Notes, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -135,8 +135,8 @@ public sealed class HostileNameRenderingTests : IDisposable
         // the search filter, and there is a separate display member for what the screen shows.
         var row = Row();
 
-        Assert.Contains(Bidi, row.Title, StringComparison.Ordinal);
-        Assert.Contains(Bidi, row.Path, StringComparison.Ordinal);
+        Assert.Contains(_bidi, row.Title, StringComparison.Ordinal);
+        Assert.Contains(_bidi, row.Path, StringComparison.Ordinal);
     }
 
     private Context New() => new(_vaultPath);
@@ -148,7 +148,7 @@ public sealed class HostileNameRenderingTests : IDisposable
         {
             Session = new AppVaultSession(new ManualClock());
 
-            using (var master = TempVault.Secret(Master))
+            using (var master = TempVault.Secret(_master))
             {
                 Assert.Equal(UnlockOutcome.Opened, Session.TryUnlock(vaultPath, master.Value));
             }
