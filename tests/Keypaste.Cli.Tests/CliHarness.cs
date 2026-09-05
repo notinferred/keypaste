@@ -42,6 +42,8 @@ internal sealed class CliHarness : IDisposable
 
     internal FakeProcessLauncher ProcessLauncher { get; } = new();
 
+    internal FakeProcessRunner ProcessRunner { get; } = new();
+
     internal FakeConsoleStyle ConsoleStyle { get; } = new();
 
     internal FakeClock Clock { get; } = new();
@@ -58,6 +60,7 @@ internal sealed class CliHarness : IDisposable
         ClipboardClear = ClearStrategy,
         Environment = new FakeEnvironment(Environment),
         ProcessLauncher = ProcessLauncher,
+        ProcessRunner = ProcessRunner,
         ConsoleStyle = ConsoleStyle,
         Clock = Clock,
     };

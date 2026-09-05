@@ -92,6 +92,9 @@ internal static class CliApp
             case "agent":
                 return AgentCommand.Execute(args, context);
 
+            case "setup":
+                return SetupCommand.Execute(args, context);
+
             case "policy":
                 return PolicyCommand.Execute(args, context);
 
@@ -133,6 +136,7 @@ internal static class CliApp
         writer.WriteLine("  env <subcommand>    manage a project's environment variables");
         writer.WriteLine("  run <project> --    run a command with those variables injected");
         writer.WriteLine("  agent               unlock the vault and approve AI agents' requests");
+        writer.WriteLine("  setup               point the AI clients on this machine at your vault");
         writer.WriteLine("  policy ls           show the standing rules that skip the approval prompt");
         writer.WriteLine("  log                 show what agents asked for, and what happened");
         writer.WriteLine("  version             print the core version");

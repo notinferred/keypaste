@@ -35,6 +35,17 @@ internal sealed class CliContext
     /// <summary>How <c>run</c> starts, supervises and reaps a child process.</summary>
     internal required IProcessLauncher ProcessLauncher { get; init; }
 
+    /// <summary>
+    /// Runs a short-lived external tool and captures what it said.
+    /// </summary>
+    /// <remarks>
+    /// Distinct from <see cref="ProcessLauncher"/>, which exists to hand a child a set of secrets
+    /// and then supervise it. This one runs a tool that is not ours, waits, and reads the result —
+    /// and its <c>ToolFound</c> is how <c>setup</c> tells "this client is not installed" from
+    /// "this client failed", which are answered very differently.
+    /// </remarks>
+    internal required IProcessRunner ProcessRunner { get; init; }
+
     /// <summary>How a warning that must not be missed reaches the terminal.</summary>
     internal required IConsoleStyle ConsoleStyle { get; init; }
 
@@ -50,16 +61,18 @@ internal sealed class CliContext
     internal static CliContext CreateDefault(TextWriter stdout, TextWriter stderr)
     {
         var environment = new SystemEnvironmentProbe();
+        var processRunner = new SystemProcessRunner();
 
         return new CliContext
         {
             Stdout = stdout,
             Stderr = stderr,
             Prompt = new ConsoleSecretPrompt(stderr),
-            Clipboard = new SystemClipboard(new SystemProcessRunner(), environment),
+            Clipboard = new SystemClipboard(processRunner, environment),
             ClipboardClear = new BlockingClearStrategy(TimeProvider.System),
             Environment = environment,
             ProcessLauncher = new SystemProcessLauncher(),
+            ProcessRunner = processRunner,
             ConsoleStyle = new SystemConsoleStyle(environment),
         };
     }
