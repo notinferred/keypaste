@@ -9,7 +9,9 @@ namespace Keypaste.Core;
 /// </param>
 /// <param name="WasAltered">
 /// Whether <paramref name="Text"/> differs from the input in any way, including truncation. Shown to
-/// the caller so a listing can mark an entry whose displayed name is not what the vault holds.
+/// the caller so a listing can mark an entry whose displayed name is not what the vault holds — which
+/// <c>keypaste ls</c>, <c>keypaste env ls</c> and the approval prompt all now do, and none of them
+/// did when this sentence was first written.
 /// </param>
 public sealed record SanitizedName(string Text, bool WasAltered);
 
@@ -18,16 +20,23 @@ public sealed record SanitizedName(string Text, bool WasAltered);
 /// </summary>
 /// <remarks>
 /// <para>
-/// Entry titles are attacker-reachable: anything with write access to the vault chooses them, and
-/// <c>keypaste env pull</c> will happily import names from a <c>.env</c> that arrived from
-/// elsewhere. When the MCP bridge lists them, they land in a model's context window as ordinary
-/// tool output. THREATS.md T-1 is the full argument; this type is its implementation.
+/// Entry titles are attacker-reachable: anything with write access to the vault chooses them —
+/// KeePassXC, a colleague on a shared file, a synced copy. <c>keypaste env pull</c> is <b>not</b> one
+/// of them, though this paragraph used to say it was: <c>DotEnv</c> refuses any key outside
+/// <c>EnvConvention.IsValidKey</c>, so an imported name is always
+/// <c>[A-Za-z_][A-Za-z0-9_]*</c>. What a hostile <c>.env</c> reaches is a terminal, through the
+/// message that quotes the rejected key back. When the MCP bridge lists titles, they land in a
+/// model's context window as ordinary tool output. THREATS.md T-1 is the full argument; this type is
+/// its implementation.
 /// </para>
 /// <para>
 /// It lives in the core rather than in the bridge because the same untrusted strings are rendered
-/// in at least four places — the tool result, the approval dialog, <c>keypaste log</c>, and the
-/// GUI's activity feed — and docs/PRODUCT.md law 4.3 does not allow that rule to be written down four
-/// times.
+/// everywhere a person or a model reads them — the tool result, the approval dialog,
+/// <c>keypaste log</c>, <c>keypaste ls</c>, <c>keypaste env ls</c>, the <c>env pull</c> rejection
+/// message, and the app's entry list, group tree, detail pane and env tables — and
+/// docs/PRODUCT.md law 4.3 does not allow that rule to be written down once per surface. The list is
+/// deliberately exhaustive rather than "at least four": it was four, the other surfaces were drawing
+/// raw text, and an undercount is how that went unnoticed.
 /// </para>
 /// <para>
 /// <b>What this does not do.</b> It removes <em>mechanism</em>, not <em>meaning</em>. A title
