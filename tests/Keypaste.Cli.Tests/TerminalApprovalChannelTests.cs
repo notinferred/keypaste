@@ -31,6 +31,39 @@ public sealed class TerminalApprovalChannelTests
         return new Rig(new TerminalApprovalChannel(prompt, stderr), prompt, stderr);
     }
 
+    /// <summary>
+    /// A name the sanitizer had to change must say so, or the one line the person is being asked to
+    /// judge is quietly not the one in the vault.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="ApprovalPrompt"/> already documents that its <c>Entry</c> is "not an address:
+    /// sanitizing is lossy", and <c>ListEntryNamesTool</c> tells the model <c>altered</c> per row.
+    /// The human deciding was told nothing. The note appears only when something was actually
+    /// changed, which is what keeps the dialog that <c>scripts/verify-demo.sh</c> pins byte-identical
+    /// for an ordinary entry.
+    /// </remarks>
+    [Fact]
+    public async Task AnEntryNameTheSanitizerChanged_SaysSo()
+    {
+        var rig = Build("n");
+        var spoofed = new EntryName("env/dev", "STRIPE" + ((char)0x202E) + "KEY");
+
+        await rig.Channel.AskAsync(
+            ApprovalPrompt.For("claude-code", spoofed, "password", "deploy", 300), Token);
+
+        Assert.Contains("not what the vault holds", rig.Stderr.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AnOrdinaryEntryName_SaysNothingExtra()
+    {
+        var rig = Build("n");
+
+        await rig.Channel.AskAsync(Prompt(), Token);
+
+        Assert.DoesNotContain("not what the vault holds", rig.Stderr.ToString(), StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("y")]
     [InlineData("Y")]
