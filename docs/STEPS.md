@@ -11,7 +11,7 @@
 > only in the working file the Not-in-git table in `DECISIONS.md` names).
 > - `[MVP]` — **the CLI launch: what a stranger can install and read about this month** (D-0079): the
 >   public repository, a security contact that receives mail, the demo GIF, the launch and
->   its two weeks of answering, and the CI a stranger's first pull request meets. Nothing new is built
+>   its two weeks of answering. Nothing new is built
 >   here; what exists is finished and shown, and the copy says "no released GUI" (D-0069).
 > - `[Launch]` — **the app released, then the first dollar, then the Free plan finished**: signing,
 >   notarization and the desktop app's own release and post; then the relay, hosted sync, share links
@@ -37,9 +37,8 @@
 > ledger row for the founder.
 >
 > **Done means:** `dotnet build` and `dotnet test` green on `keypaste.slnx` and `keypaste.app.slnx` ·
-> the step's own `scripts/verify-*.sh` green and **observed failing once** (D-0043) · behaviour on the
-> pages it touches, transcripts held by `scripts/verify-demo.sh` · the decision as a ledger row in
-> `DECISIONS.md` · the Verify line passes cold.
+> the step's own `scripts/verify-*.sh` green · the pages it touches still pass `scripts/verify-demo.sh`
+> · the Verify line passes cold.
 >
 > **Invariants (every step, `docs/PRODUCT.md` §3):**
 > 1. The master key never leaves the local process; the relay stores ciphertext it cannot read.
@@ -53,8 +52,7 @@
 >    logic and every front end is thin over it.
 >
 > **Standing checks** — each is a script and the script is the specification. A step is not done until
-> the ones its change can break are green; which ones a *push* runs is `scripts/ci-scope.sh`'s decision
-> (D-0078), and a pull request or a tag runs all of them regardless.
+> the ones its change can break are green; every push to `main`, pull request and tag runs all of them.
 > `verify-keepassxc-compat.sh` + `verify-keepassxc-writeback.sh` — a vault opens and edits in real
 > `keepassxc-cli` on three OSes, *fails if* either direction breaks · `verify-run-injection.sh` — the
 > child sees the value and no file was written · `verify-run-signals.sh` — SIGTERM reaches the child ·
@@ -63,8 +61,7 @@
 > a rule grants silently and can never widen · `verify-log-chain.sh` — tampering is detected, truncation
 > reads as damage · `verify-aot-trim.sh` — no new trim diagnostic names `src/` · `verify-demo.sh` — the
 > five pinned pages match what the binaries print · `verify-install.sh` — the README install block runs
-> verbatim on a scratch `HOME` · `verify-claims.sh` — every step a document cites exists, nothing sits
-> untracked and unignored.
+> verbatim on a scratch `HOME`.
 
 **What exists today:** a KDBX4 vault the CLI creates, reads and writes, which KeePassXC opens in both
 directions; env sets and `keypaste run` injection; the MCP bridge with a separate `keypaste agent`
@@ -360,13 +357,11 @@ were decisions, answered by D-0054 to D-0060; H-0011 is the site's pre-deploy ch
   (V-public):** `git ls-remote origin 'refs/pull/*'` returns nothing and `refs/pull/11/head`
   (`e972225`) is unreachable; a logged-out browser opens the repository and `docs/demo.md`. *Fails if* a
   pull ref with the pre-rewrite identity is still served.
-- [ ] **3.1 `[MVP]` — The demo GIF (H-0005).** Record in WSL with a real Claude session and a human
-  keystroke, after `record-demo.sh`'s own controls pass; render under 2 MB to
-  `docs/demo/keypaste-demo.gif`, commit the cast beside it, fill the slot both pages reserve. **Verify
-  (V-gif):** the file exists under 2 MB; both pages reference it and neither carries the reserving
-  comment; the cast holds the sentinel once and the master password never; the GIF shows an agent
-  asking, the dialog with a reason, a human answering, the log; `verify-demo.sh` is green. *Fails if*
-  absent, 2 MB or over, or a take that never released.
+- [ ] **3.1 `[MVP]` — The demo GIF (H-0005).** Record the flow on `docs/demo.md` with any screen
+  recorder, crop it to under 2 MB, save it as `docs/demo/keypaste-demo.gif`, and fill the slot both
+  pages reserve. **Verify (V-gif):** the file exists under 2 MB; both pages reference it and neither
+  carries the reserving comment; the GIF shows an agent asking, the dialog with a reason, a human
+  answering, and the log. *Fails if* absent, 2 MB or over, or missing a beat.
 - [ ] **3.2 `[MVP]` — The launch posts (H-0006).** Post `launch.md`'s copy to r/KeePass and the MCP
   community, wait 48 hours, then r/selfhosted, Show HN, X. **Verify (V-launch):** every box in
   `launch.md`'s "Before anything goes out" is ticked first; each post has a live URL logged out; every
@@ -413,17 +408,11 @@ were decisions, answered by D-0054 to D-0060; H-0011 is the site's pre-deploy ch
 - [x] **K.1 `[MVP]` — The SDK on the founder's machine (H-0016).** .NET SDK 10.0.302, the exact version
   `global.json` pins (D-0076), installed machine-wide on 2026-09-04; `dotnet --version` in the repo prints
   `10.0.302` and `dotnet test keypaste.slnx` passes 1,010 tests with 2 skipped.
-- [x] **K.2 `[MVP]` — The docs gate.** `scripts/verify-claims.sh` in `ci.yml`'s gate job; observed
-  failing on a dangling step reference.
-- [ ] **K.3 `[MVP]` — Every standing gate observed failing.** Break each of the eight gates marked "not
-  recorded" on purpose, watch it go red, put it back; record the date beside each in this file's header
-  (D-0043). **Verify (V-gates-red):** each of the eight has a dated red run linked from `DECISIONS.md`.
-  *Fails if* any gate has never been seen red.
-- [ ] **K.4 `[MVP]` — Branch protection.** Once 3.0 lands, require the `ci` checks and the three
+- [ ] **K.4 `[Launch]` — Branch protection.** Once 3.0 lands, require the `ci` checks and the three
   `keepassxc compat` checks on `main` (D-0008 names this as the part outside the repository). **Verify
   (V-protection):** a pull request with a red `compat` check cannot be merged in the UI. *Fails if* it
   can.
-- [ ] **K.5 `[MVP]` — Fork pull requests on Blacksmith runners.** An answer for pull requests from
+- [ ] **K.5 `[Launch]` — Fork pull requests on Blacksmith runners.** An answer for pull requests from
   forks, which have no access to the runner labels. **Verify (V-fork-ci):** a pull request from a fork
   runs `ci.yml` to completion. *Fails if* it stays queued.
 

@@ -1,15 +1,16 @@
 # DECISIONS.md — engineering decision log
 
-> One entry per decision that a future contributor (or a future you) would otherwise have to reverse-engineer. docs/PRODUCT.md decides *what* keypaste is; this file records *how*, and why. Add an entry per decision, and when one is superseded, rewrite it to say what is true now and why the earlier answer failed. Keep the reasoning; scrap the was-then-now narration. Git holds what the file used to say.
+> One line per decision, and only when architecture, security or money changes. docs/PRODUCT.md decides *what* keypaste is; this file records *how*. The archive below the line is frozen.
 
 ---
 
 ## Ledger — one line per decision, newest first
 
-The long-form records below carry the reasoning. From D-0061 a decision is one row here, and gets a record below only when the reasoning would otherwise have to be reverse-engineered. Figures behind D-0063 and D-0071 live in the gitignored working file the Not-in-git table in `DECISIONS.md` names, never here.
+One row, one line, and a row only when architecture, security or money changes. Figures behind D-0063 and D-0071 live in the gitignored working file the Not-in-git table names, never here.
 
 | id | date | decision | supersedes |
 |---|---|---|---|
+| D-0083 | 2026-09-05 | The process is cut to what a launch needs. Gone: the citation gate and its workflow (`verify-claims.sh`, `docs.yml`), the CI classifier (`ci-scope.sh`) and every job-level `if:` it fed, cancellation of runs on `main`, the recording pipeline under `scripts/demo/` (the GIF is a screen recording now), K.3 and the observed-failing rule, and the launch precondition list beyond three boxes. Decisions are one line and only for architecture, security or money; ideas are one line; the archive is frozen | D-0043's rule, D-0078, D-0080, D-0033's recorded-cast requirement, D-0051's document ceremony |
 | D-0082 | 2026-09-05 | There is no names step. The repository is `notinferred/keypaste` and stays there: a standalone organisation gives a one-person project nothing, and the one day the repository spent inside `github.com/keypaste` (moved 2026-09-04, back 2026-09-05) cost a runner re-verification and a URL rewrite in both directions. The organisation exists, is empty, and is kept only so the name is not taken by someone else. npm is not sought, for D-0053's reason: nothing ships through it. The names row (0.4) and the human action it carried are deleted; the name is the domain and the download origin | the names row 0.4 and its human action, the registration half of D-0053 |
 | D-0081 | 2026-09-05 | `app.yml` is the app's release gate: a `v*` tag packages `keypaste-app` for `linux-x64`, `win-x64` and `osx-arm64`, and every archive is held to `--version` equalling the tag and to a `--selftest` that creates a vault through `Keypaste.Core`, saves it, reopens it and reads an entry back, before it is packaged and hashed. The archives are workflow artifacts and nothing reaches `dl.keypaste.com`: the free binary is the signed one (D-0070), so the R2 publish waits on 3.5 and 3.6, and 4.7 stays open on exactly those | the `--selftest` that was one `WriteLine`; the app workflow that had no tag path |
 | D-0080 | 2026-09-04 | The citation gate gets a workflow that its own inputs can trigger: `docs.yml` runs `scripts/verify-claims.sh` on one Linux runner with no SDK and no restore, on pushes touching the documents `ci.yml`'s `paths-ignore` excludes. Check A had been widened to scan every document while the paths it reads stayed ignored, so it never ran on a documents-only push — the exact change that made it fire in the first place | D-0078's `paths-ignore`, and the claim in `CLAUDE.md` that no gate reads the governance documents |
@@ -33,9 +34,9 @@ The long-form records below carry the reasoning. From D-0061 a decision is one r
 | D-0062 | 2026-09-04 | The first buyer is a solo developer paying for hosted sync; the first user is anyone who keeps a `.kdbx` | — |
 | D-0061 | 2026-09-04 | `docs/PRODUCT.md` re-ratified as v1.1: a KeePass-compatible password manager, freemium, hosted zero-knowledge sync with self-host first-class, the agent bridge as the selling point; §3 byte-identical to v1.0 | v1.0 §1, §2 "for everyone", §4.2 CLI-first |
 
-## Ideas — append-only; flip a status, never delete a row
+## Ideas
 
-> Ideas wait here. Most wait forever, and that is the point (`docs/PRODUCT.md` law 5.5). Nothing here is a step; it becomes one only when it can carry a Verify line — the admission rule at the top of `docs/STEPS.md`. A deleted row destroys the only evidence the idea was considered, so rows are never deleted. Business figures are kept out of git — see the table below.
+> One line each. Delete a row when it ships or is rejected. Nothing here is a step; it becomes one only when it can carry a Verify line. Business figures are kept out of git — see the table below.
 
 Status vocabulary: **open** (no decision) · **parked** (decided: not now, with a reason) · **rejected** (decided: no) · **promoted** (now a step in `docs/STEPS.md`) · **shipped**.
 
@@ -99,7 +100,6 @@ Adopted in 4.1 and 4.2, and standing: calm, precise, bank-lobby-not-hacker-movie
 | `policy.toml` inside the vault, synced and encrypted | founder | open | |
 | Product vocabulary: "agents" vs "clients" vs "apps" | founder | open | Needs user testing. |
 | Windows vault saves without Transactional NTFS | founder | open | KeePassLib saves through TxF, which Microsoft deprecated and advises against. On 2026-09-04 ten vault-save tests failed one Windows leg of run 33915931104 with "the function attempted to use a name that is reserved for use by another transaction", and the same commit passed both the push-triggered run before it and a re-run of the failed job after it — so it is flaky rather than broken, and a contributor's first pull request can meet it. Not a step: the code is inside `third_party/KeePassLib`, and a local patch there costs the clean upstream `diff -r` the quarantine in `third_party/Directory.Build.props` exists to protect (D-0007). |
-| Scope a superseded CI run against the last green commit, not the push's own diff | founder | open | D-0078 computes scope from `before..after`, and `cancel-in-progress` kills the run of the commit a rapid second push supersedes. Observed on 2026-09-04: a push touching `src/Keypaste.Core` was cancelled, and the next push — documents only — computed `compat=false, aot=false`, so that core change met neither the KeePassXC matrix nor the AOT publish on any run. A `workflow_dispatch` closed it by hand, which is a habit and not a gate. Two shapes exist — scope against the newest commit with a green `ci` rather than the push's parent, or refuse to cancel a run whose scope is wider than its successor's — and neither has a Verify line yet. |
 | A standalone GitHub organisation, and moving the repository into it | founder | rejected | Tried on 2026-09-04 and undone the next day (D-0082). Runners are installed per account, so a fresh organisation is a fresh customer to them and every workflow queued until it was verified; meanwhile eight published URLs had to move and move back. A one-person project gains nothing from it. The organisation is held and empty; revisit only when there is a second maintainer who needs a role. |
 
 ## Not in git — what informs the product, by location and never by value
@@ -156,8 +156,7 @@ The repository itself is `notinferred/keypaste` and is **private**. Whether it g
 
 | what | where | note |
 |---|---|---|
-| The demo cast | the pipeline is `scripts/demo/` in this repo; an accepted take is committed at `docs/demo/keypaste-demo.cast` — **none exists yet**, step 3.1 (H-0005) | the pipeline is WSL-only. A cast is committed as text so anyone can grep it for the master password, the sentinel and the dialog `record-demo.sh` asserts — `scripts/demo/README.md` says why. One take was recorded and **rejected**: the credential was never released in it, which `record-demo.sh`'s positive control refuses, so it proved nothing and was not kept |
-| The demo GIF | **does not exist yet** — step 3.1 (H-0005) | both pages reserve the slot; it renders from the cast above, so it is blocked on the same take |
+| The demo GIF | **does not exist yet** — step 3.1 (H-0005) | both pages reserve the slot; any screen recorder, under 2 MB |
 | KeePassXC for the Windows compat job | fetched from the official zip, pinned by SHA-256 in `ci.yml` | changing the pin is a security decision |
 | Published `v0.1.0` assets | `https://dl.keypaste.com/v0.1.0/` — four native binaries, the corresponding source, and checksums | immutable; the pipeline will not republish a version |
 
@@ -173,7 +172,7 @@ The repository itself is `notinferred/keypaste` and is **private**. Whether it g
 
 # Archive — the reasoning, long form
 
-> Everything below is the record behind a ledger row. It is kept because a future reader would otherwise reverse-engineer it; it is not the place to look for what is true now — the ledger, the step map and the pages are. Rewrite a record when it is superseded; never narrate was/now.
+> Frozen on 2026-09-05 (D-0083). Kept for the reasoning behind older rows; not maintained, not rewritten. What is true now is the ledger, the step map and the pages.
 
 ## D-0001 — Project naming: PascalCase projects, kebab-case binaries
 

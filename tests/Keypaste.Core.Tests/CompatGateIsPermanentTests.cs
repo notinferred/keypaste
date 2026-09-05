@@ -100,16 +100,12 @@ public sealed class CompatGateIsPermanentTests
         // check would be tripped by that comment.
         Assert.DoesNotContain("continue-on-error:", workflow, StringComparison.Ordinal);
 
-        // The compat job carries exactly one `if:`, and it is relevance rather than permission
-        // (DECISIONS.md D-0078): the job runs whenever a push touches what can change the bytes
-        // keypaste writes, and always on a pull request or a dispatch, because scripts/ci-scope.sh
-        // answers true for those. A second condition, a different expression, or a step-level skip
-        // is how "permanent" would quietly stop meaning anything, so the expression is pinned
-        // character for character and anything else in the block is a red build.
+        // The compat job carries no job-level `if:` at all: it runs on every push to main, every pull
+        // request, every tag and every dispatch. A condition here is how "permanent" would quietly
+        // stop meaning anything, so any job-level `if:` is a red build.
         var compat = JobBlock(workflow, "compat");
         var jobLevel = compat.Where(line => line.StartsWith("    if:", StringComparison.Ordinal) && !line.StartsWith("     ", StringComparison.Ordinal)).ToList();
-        Assert.Equal(["    if: needs.scope.outputs.compat == 'true'"], jobLevel);
-        Assert.Contains("scripts/ci-scope.sh", workflow, StringComparison.Ordinal);
+        Assert.Empty(jobLevel);
 
         // A step may carry an `if:` only to pick which operating system installs keepassxc-cli. A
         // step that could skip the fixture, the compat script or the write-back script is the same

@@ -10,38 +10,13 @@ lobste.rs was dropped rather than deferred. Signup is by invitation from an exis
 
 ## Before anything goes out
 
-The unticked ones are things that are false today. The launch is the moment strangers arrive, and each of these is something a stranger hits before they hit the product.
+Three things, each false today, each something a stranger hits before they hit the product.
 
-**The product**
+- [ ] **The repository is public.** Step 3.0. Until it is, every link in every post below is a 404.
+- [ ] **The demo GIF exists** at `docs/demo/keypaste-demo.gif`, under 2 MB, in the slot both pages reserve. Step 3.1.
+- [ ] **`security@keypaste.com` receives mail**, tested by sending to it from an outside address. Step 2.4b.
 
-- [x] **3.4 has landed and there is something to install.** `v0.1.0` is published at `https://dl.keypaste.com/v0.1.0/` — four native binaries plus the corresponding source, each with a checksum (D-0041); O-0006 is answered yes (D-0040). Both pages carry per-OS install one-liners, and `.github/workflows/install.yml` runs them verbatim on Ubuntu 2404, macOS 15 and Windows 2025, weekly and on demand, with a corrupted-download negative control on the two Unix legs. Its first real run failed and found two defects in the gate rather than in the documentation (D-0043). The posts below needed no rewrite — none of them links an install command, by design. One limit the green run does not cover: it finds the binary at a known path, so it does not prove a fresh login shell resolves `keypaste` on `PATH`.
-- [ ] **The demo GIF exists.** The last thing left in 3.1. `scripts/demo/` is the pipeline, it is WSL-only, it needs a real Claude session and a human keystroke, and it budgets three to eight takes. Both pages already reserve the slot and nothing else moves when it lands.
-- [x] **O-0008 and O-0009 are closed or deliberately deferred in writing.** Both were settled by **D-0056**, and they were settled differently because they are different defects. O-0008 is **closed on both front ends**: the CLI now writes through Win32 and sets the formats that keep a copied password out of Clipboard History and Cloud Clipboard, which `clip.exe` could not express. O-0009's `argv` exposure is **deliberately deferred**, in writing and with reasons — `env set p KEY=value` still puts a value where `/proc`, WMI and shell history can read it, because D-0014 judged that refusing the one-liner pushes people to clean shell history by hand or to something worse, and it warns on stderr when it happens. Its one loose end, an escape hatch so a CI job using the inline form on purpose can silence a per-run warning, is stated as still open rather than quietly dropped. **One caveat before this line is used as an answer:** the Windows fix passes its unit tests and has not yet been checked against the actual defect on a real machine — that is step 1.5a's Verify line in `docs/STEPS.md` and it needs a person to press Win+V.
-
-**The links**
-
-- [ ] **The repository is public.** It is private right now, which makes every link in every post below a 404. Tracked as **O-0014** and as step 3.0 (H-0003). CI cost is not part of the argument: it moved to a flat-rate provider when GitHub-hosted billing stopped the jobs starting (D-0042). The real question is that `docs/PRODUCT.md` law 3.8 calls auditable code the trust strategy and every post below sells exactly that, against D-0006's warning that publishing is irreversible because GitHub can serve any commit ever pushed. Answer it before posting, not before tagging.
-- [x] **Every published URL points at something that exists**, on both pages, the thanks page, and in `Directory.Build.props` — `RepositoryUrl` and `PackageProjectUrl`, which `PublishRepositoryUrl=true` bakes into SourceLink metadata inside the shipped binaries. Those two have to be right before a tag, because an artifact cannot be edited afterwards.
-- [x] **The canonical link is `https://github.com/notinferred/keypaste`** and every post below uses it. Both pages, the thanks page and `Directory.Build.props` point there, and there is no organisation to move to: the repository stays under the founder's account (D-0082).
-- [ ] **`blacksmith-*` runners have an answer for pull requests from forks.** CI is the first thing a contributor meets, and a launch produces pull requests from people with no write access. Step **K.5**, which D-0079 moved into `[MVP]` for exactly this reason.
-- [ ] **Branch protection on `main` requires the CI checks.** It cannot be set on a private repository on this plan, so today "a red build blocks the merge" is a habit rather than a rule, and merges happen locally where no check is consulted. Once the repository is public this becomes available, and it should be switched on before anyone outside can open a pull request. Step **K.4**.
-
-**The promises already published**
-
-- [x] **keypaste.com's signup does what the page says it does.** **Fixed and verified end to end on 2026-07-28.** Hyperdrive connects as `keypaste_signup_writer`, which holds `INSERT` on `public.signup` and nothing else; as that role every read is refused with 42501. A live submission stores a row and redirects to `/thanks/`, a duplicate is a no-op, the honeypot stores nothing, and a bad address, a foreign `Origin` and a non-form body each get 400. Two defects were found doing it: `wrangler hyperdrive update` silently wipes the `mtls` block on a credential swap, and `ON CONFLICT (email) DO NOTHING` needs SELECT on PostgreSQL 18, which made the Worker's own SQL incompatible with the role it was written for. Details in D-0037 and `site/README.md`. Still open: it is a plain SQL role rather than a managed one, so rotation is by hand.
-
- For the record of what this item used to fear: the Worker was already deployed while `DECISIONS.md` claimed nothing was, and `public.signup` did not exist — so every submission hit the handler's 503 saying the address was not stored. No address was ever silently dropped, and there was no list for the over-privileged credential to read. Both records were corrected rather than quietly edited.
-- [x] **Nothing goes to the list until double opt-in ships.** `DECISIONS.md` D-0037 and the page footer both promise a confirmation first, and the confirmation mail is the relay's job — step **5.6**, `[Launch]`, which does not exist yet. So this box is not "5.6 has shipped"; it is the decision that **no list message is sent at launch at all**. Signups accumulate and are mailed once 5.6 lands. It is tickable today because it is a promise not to act, and a launch is exactly the pressure that breaks such a promise: D-0079 narrowed the box rather than dragging the whole relay into `[MVP]` to satisfy it.
-- [ ] **`security@keypaste.com` receives mail**, tested by sending to it, and GitHub's private vulnerability reporting is switched on. `SECURITY.md` names both, and a security contact that bounces on launch day is worse than no security contact. Step **2.4b**, added by D-0079 because this box had a falsifiable criterion and no step behind it.
-
-**The contributor path**
-
-- [x] **O-0002 is decided and `CONTRIBUTING.md` exists.** DCO, not a CLA — **D-0055**, which closed O-0002 on 2026-08-06. AGPL-3.0 is chosen and staying, so the relicensing freedom a CLA buys has nothing to buy here, and its price is a deterrent to the drive-by fix law 5.3 says to want. `CONTRIBUTING.md` says so, and `.github/workflows/dco.yml` checks it on every pull request rather than trusting the page: it judges only the commits a pull request adds, because sign-off began at D-0055 and a gate red against the whole history would be switched off within a week. **One limit, stated rather than discovered:** the workflow's bash is proved against real commit ranges, but no pull request has run it, so the plumbing — the checkout depth, the event context — is unexercised until the first one.
-- [x] **`CHANGELOG.md` exists.** Added in 3.4, and the release workflow refuses to publish a tag that has no section in it — docs/PRODUCT.md §4.7 as a gate rather than an intention.
-
-**The venues**
-
-- [ ] **Each venue's current rules have been read in the week before posting.** Not summarised here, because a rule copied into this file is a rule that goes stale quietly. Self-promotion policies on both subreddits, the Show HN guidelines, and whatever the MCP community asks of people posting their own tools.
+Everything else — fork runners, branch protection, venue rules — happens during the fourteen days after. No message goes to the signup list until 5.6 ships; the page promises a confirmation first.
 
 ---
 

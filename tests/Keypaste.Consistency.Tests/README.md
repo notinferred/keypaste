@@ -10,7 +10,7 @@ The one project that references both front ends, so a test can make an edit thro
 
 `PublishAot` cannot simply be turned off for one solution: it is recorded in `src/Keypaste.Cli/packages.lock.json`, and a restore resolving a different set fails `--locked-mode`. The clean fix is splitting the CLI into a library and a thin AOT host, which moves `artifacts/bin/Keypaste.Cli/release/keypaste` — a path seven `scripts/verify-*.sh` gates, `make-compat-fixture.sh`, `ci.yml` and `release.yml` all hard-code. That is worth doing one day and is not worth doing inside 4.2.
 
-So this project sits outside both, and `app.yml` restores, builds, formats and runs it in steps guarded by the same `app-changed` check the packaging job uses. A `Keypaste.Core` push still pays nothing for it; an `App` or `Cli` push pays, which is proportionate, because the thing under test is what changed.
+So this project sits outside both, and `app.yml` restores, builds, formats and runs it in steps of its own. A `Keypaste.Core` push still pays nothing for it; an `App` or `Cli` push pays, which is proportionate, because the thing under test is what changed.
 
 ## What must stay true
 
