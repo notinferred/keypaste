@@ -184,14 +184,14 @@ were decisions, answered by D-0054 to D-0060; H-0011 is the site's pre-deploy ch
   lock on two clocks. D-0044.
 - [x] **4.2 `[MVP]` — Entry and env screens.** Generator, shared clipboard rule, lost-write guard.
   D-0045 to D-0050.
-- [ ] **4.7 `[Launch]` — The app is released.** `app.yml` publishes `keypaste-app` for `win-x64`,
-  `osx-arm64` and `linux-x64` on a `v*` tag beside the CLI under the same immutability rule: a signed
-  installer on Windows (3.6), a notarized `.dmg` on macOS (3.5), a `.tar.gz` and AppImage on Linux with
-  the four runtime packages asserted on Debian 12; `--version` on every artifact, and a `--selftest`
-  that has stopped being a `WriteLine` — it creates a vault through `Keypaste.Core` and reads an entry
-  back, so a published binary whose core or KDBX path is broken exits nonzero — both run before
-  upload; the measured size on both pages (O-0016); the "unsigned" sentences rewritten; O-0015 and
-  O-0016 closed in `DECISIONS.md`. **Verify (V-app-release):** on a fresh Windows VM a browser-downloaded
+- [ ] **4.7 `[Launch]` — The app is released.** `app.yml` already packages `keypaste-app` for `win-x64`,
+  `osx-arm64` and `linux-x64` on a `v*` tag, holding every archive to `--version` equalling the tag
+  and to a `--selftest` that creates a vault through `Keypaste.Core` and reads an entry back (D-0081);
+  what remains is what turns those artifacts into a release: a signed installer on Windows (3.6), a
+  notarized `.dmg` on macOS (3.5), an AppImage on Linux with the four runtime packages asserted on
+  Debian 12, the R2 publish beside the CLI under the same immutability rule, the measured size on
+  both pages (O-0016), the "unsigned" sentences rewritten, and O-0015 and O-0016 closed in
+  `DECISIONS.md`. **Verify (V-app-release):** on a fresh Windows VM a browser-downloaded
   installer opens with no SmartScreen wall; on a fresh macOS the `.dmg` opens with no quarantine
   prompt; `--version` equals the tag; the page's size equals the archive's within 1 MB; the app opens a
   vault the CLI created; the checksum verifies. *Fails if* either OS shows a wall, or any of the rest.
