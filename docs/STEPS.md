@@ -351,9 +351,20 @@ were decisions, answered by D-0054 to D-0060; H-0011 is the site's pre-deploy ch
 ## I · Site, docs & launch
 
 - [x] **3.2b `[MVP]` — Launch essay.** `docs/keepass-and-agents.md`, held to the binaries. D-0038.
-- [ ] **3.0 `[MVP]` — The repository goes public (H-0003).** Scan every commit after the last scan (`9d48bd7`, commit 174 of 191 today)
-  with the first scan's grep; then have GitHub Support purge `refs/pull/*` and gc, or push the clean
-  history to a fresh repository and delete this one; then Settings → Change visibility. **Verify
+- [ ] **3.0 `[MVP]` — The repository goes public (H-0003).** **10.1 first** — that row is the hostile
+  review of the very tree this step publishes, and publishing is the one action here that cannot be
+  undone. Then scan `9d48bd7..HEAD` — a revision range, never a commit count, which was already wrong by
+  thirty-five when it was last written down — for anything `.gitignore`'s "Never commit these" block
+  names: `*.kdbx`, `*.key`, `*.keyx`, `.env`, `.env.*`, `*.pem`, `*.pfx`, `secrets.json`, `.keypaste/`,
+  `*businessnotes*.md`; and for the credentials the Infrastructure table in `DECISIONS.md` names — the
+  `keypaste_signup_writer` role password, Stripe, Cloudflare, Apple and Azure material. The patterns are
+  derived from those two committed lists rather than recalled, because the first scan's grep was never
+  recorded anywhere and cannot be recovered; deriving them means the next scan reconstructs itself.
+  Then have GitHub Support purge `refs/pull/*` and gc — the route that keeps the repository, its URL and
+  its runner verification — and only if they refuse, push the clean history to a fresh repository and
+  delete this one, which pays again what D-0082 measured. Then Settings → Change visibility. Measured
+  2026-09-05: `refs/pull/11/head` (`e972225`) is still served and `git ls-remote` returns twenty pull
+  refs in all, so V-public fails today. **Verify
   (V-public):** `git ls-remote origin 'refs/pull/*'` returns nothing and `refs/pull/11/head`
   (`e972225`) is unreachable; a logged-out browser opens the repository and `docs/demo.md`. *Fails if* a
   pull ref with the pre-rewrite identity is still served.
