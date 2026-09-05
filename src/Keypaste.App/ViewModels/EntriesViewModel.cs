@@ -149,7 +149,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
     /// <summary>What the confirmation asks, naming what goes.</summary>
     internal string DeletePrompt => Selected is { } row
-        ? $"Delete {row.Path}? There is no undo."
+        ? $"Delete {EntryNameSanitizer.SanitizePath(row.Path).Text}? There is no undo."
         : string.Empty;
 
     /// <summary>The selected entry's fields, or null when nothing is selected.</summary>
@@ -341,7 +341,10 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         var sanitized = EntryNameSanitizer.Sanitize(title);
         if (sanitized.WasAltered)
         {
-            Error = $"'{title}' is not a name keypaste will create. Try '{sanitized.Text}'.";
+            // The rejected name is not echoed: it was rejected precisely because it does not
+            // render as what it is, so quoting it back would put the trickery on screen and read
+            // as identical to the suggestion beside it.
+            Error = $"That is not a name keypaste will create. Try '{sanitized.Text}'.";
             return;
         }
 
@@ -349,7 +352,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
         if (vault.Find(path) is not null)
         {
-            Error = $"'{path}' already exists.";
+            Error = $"'{EntryNameSanitizer.SanitizePath(path).Text}' already exists.";
             return;
         }
 

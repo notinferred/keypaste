@@ -1,3 +1,6 @@
+using Keypaste.App.Clipboard;
+using Keypaste.App.Session;
+using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Xunit;
@@ -101,6 +104,31 @@ public sealed class HostileNameRenderingTests : IDisposable
     }
 
     [Fact]
+    public void The_entry_list_column_does_not_draw_a_title_that_can_misrepresent_itself()
+    {
+        AssertSafe(Row().DisplayTitle);
+    }
+
+    [Fact]
+    public void The_detail_pane_draws_no_field_that_can_misrepresent_itself()
+    {
+        using var context = New();
+        context.Entries.Selected = context.Entries.Rows.Single();
+        var detail = context.Entries.Detail!;
+
+        AssertSafe(detail.DisplayTitle);
+        AssertSafe(detail.DisplayPath);
+        AssertSafe(detail.DisplayUsername);
+        AssertSafe(detail.DisplayUrl);
+        AssertSafe(detail.DisplayNotes);
+
+        // The counterweight: what the editor and the clipboard read is still what the vault holds.
+        Assert.Contains(Bidi, detail.Username, StringComparison.Ordinal);
+        Assert.Contains(Bidi, detail.Url, StringComparison.Ordinal);
+        Assert.Contains(Zwsp, detail.Notes, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Title_is_left_alone_because_it_addresses_the_entry()
     {
         // The counterweight to every case above: sanitizing this would break Find, RemoveEntry and
@@ -109,5 +137,40 @@ public sealed class HostileNameRenderingTests : IDisposable
 
         Assert.Contains(Bidi, row.Title, StringComparison.Ordinal);
         Assert.Contains(Bidi, row.Path, StringComparison.Ordinal);
+    }
+
+    private Context New() => new(_vaultPath);
+
+    /// <summary>An unlocked session and the entries screen over it, mirroring EntriesViewModelTests.</summary>
+    private sealed class Context : IDisposable
+    {
+        internal Context(string vaultPath)
+        {
+            Session = new AppVaultSession(new ManualClock());
+
+            using (var master = TempVault.Secret(Master))
+            {
+                Assert.Equal(UnlockOutcome.Opened, Session.TryUnlock(vaultPath, master.Value));
+            }
+
+            Clipboard = new FakeClipboard();
+            Countdown = new ClipboardCountdown(Clipboard, new ManualClock());
+            Entries = new EntriesViewModel(Session, Countdown);
+        }
+
+        internal AppVaultSession Session { get; }
+
+        internal ClipboardCountdown Countdown { get; }
+
+        internal EntriesViewModel Entries { get; }
+
+        internal FakeClipboard Clipboard { get; }
+
+        public void Dispose()
+        {
+            Entries.Dispose();
+            Countdown.Dispose();
+            Session.Dispose();
+        }
     }
 }

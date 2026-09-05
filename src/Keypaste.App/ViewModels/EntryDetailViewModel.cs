@@ -70,6 +70,12 @@ internal sealed class EntryDetailViewModel : ObservableObject, IDisposable
         SaveCommand = new RelayCommand(SaveEdit, () => IsEditing);
     }
 
+    /// <summary>The longest single-line field drawn.</summary>
+    private const int DisplayLength = 512;
+
+    /// <summary>The longest notes body drawn. Notes is the largest free-text field in a vault.</summary>
+    private const int DisplayNotesLength = 8192;
+
     /// <summary>Where a failure goes. Owned by the entries screen, which draws the banner.</summary>
     internal Action<string?> Report { get; }
 
@@ -80,7 +86,30 @@ internal sealed class EntryDetailViewModel : ObservableObject, IDisposable
     internal string GroupPath => _groupPath;
 
     /// <summary>The entry's path, for the header and for the CLI hint.</summary>
+    /// <remarks>An address: it is what <c>Find</c> and the save path use. Drawn as
+    /// <see cref="DisplayPath"/>.</remarks>
     internal string Path => _entryPath;
+
+    /// <summary>The title as the pane draws it.</summary>
+    internal string DisplayTitle => EntryNameSanitizer.Sanitize(_title).Text;
+
+    /// <summary>The path as the pane draws it.</summary>
+    internal string DisplayPath => EntryNameSanitizer.SanitizePath(_entryPath).Text;
+
+    /// <summary>The username as the pane draws it.</summary>
+    /// <remarks>
+    /// <b>Separate from <see cref="Username"/> on purpose.</b> That one seeds
+    /// <c>DraftUsername</c> when editing begins and is what the Copy button puts on the clipboard,
+    /// so scrubbing it in place would write scrubbed text back into the vault, or paste it. Only
+    /// the <c>TextBlock</c> reads this.
+    /// </remarks>
+    internal string DisplayUsername => EntryNameSanitizer.Sanitize(Username, DisplayLength).Text;
+
+    /// <summary>The URL as the pane draws it. Separate from <see cref="Url"/> for the same reason.</summary>
+    internal string DisplayUrl => EntryNameSanitizer.Sanitize(Url, DisplayLength).Text;
+
+    /// <summary>The notes as the pane draws it. Separate from <see cref="Notes"/> likewise.</summary>
+    internal string DisplayNotes => EntryNameSanitizer.Sanitize(Notes, DisplayNotesLength).Text;
 
     internal string Username
     {
@@ -89,6 +118,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IDisposable
         {
             if (Set(ref _username, value))
             {
+                Raise(nameof(DisplayUsername));
                 CopyUsernameCommand.RaiseCanExecuteChanged();
             }
         }
@@ -97,13 +127,25 @@ internal sealed class EntryDetailViewModel : ObservableObject, IDisposable
     internal string Url
     {
         get => _url;
-        private set => Set(ref _url, value);
+        private set
+        {
+            if (Set(ref _url, value))
+            {
+                Raise(nameof(DisplayUrl));
+            }
+        }
     }
 
     internal string Notes
     {
         get => _notes;
-        private set => Set(ref _notes, value);
+        private set
+        {
+            if (Set(ref _notes, value))
+            {
+                Raise(nameof(DisplayNotes));
+            }
+        }
     }
 
     /// <summary>

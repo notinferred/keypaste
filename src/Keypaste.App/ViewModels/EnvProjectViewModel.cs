@@ -58,8 +58,17 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         Reload();
     }
 
-    /// <summary>The project's name.</summary>
+    /// <summary>The project's name, as the vault holds it. Addresses the set, and must stay
+    /// executable in <see cref="RunCommand"/>.</summary>
     internal string Name { get; }
+
+    /// <summary>The name as the card draws it.</summary>
+    /// <remarks>
+    /// <see cref="RunCommand"/> deliberately keeps <see cref="Name"/> instead: it is a line somebody
+    /// pastes into a shell, and a scrubbed one would not run. A group whose name needs scrubbing can
+    /// only have been made outside keypaste, and the card above the command shows the drawn form.
+    /// </remarks>
+    internal string DisplayName => EntryNameSanitizer.Sanitize(Name).Text;
 
     /// <summary>The clipboard a row copies through.</summary>
     internal ClipboardCountdown Clipboard { get; }
@@ -118,7 +127,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
 
     /// <summary>What the confirmation asks.</summary>
     internal string RemovePrompt => _removing is { } row
-        ? $"Remove {row.Key} from {Name}? There is no undo."
+        ? $"Remove {row.DisplayKey} from {DisplayName}? There is no undo."
         : string.Empty;
 
     internal bool IsAdding
