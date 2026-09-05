@@ -354,9 +354,8 @@ were decisions, answered by D-0054 to D-0060; H-0011 is the site's pre-deploy ch
 ## I · Site, docs & launch
 
 - [x] **3.2b `[MVP]` — Launch essay.** `docs/keepass-and-agents.md`, held to the binaries. D-0038.
-- [ ] **0.4 `[MVP]` — The names (H-0001).** The `keypaste` GitHub organisation was registered and the
-  repository moved into it on 2026-09-04; the npm name is still free and still unregistered; crates.io
-  is somebody else's and needs nothing (D-0053, D-0058). **Verify
+- [ ] **0.4 `[MVP]` — The names (H-0001).** Register the `keypaste` GitHub organisation and the npm name
+  (both free on 2026-08-04); crates.io is somebody else's and needs nothing (D-0053, D-0058). **Verify
   (V-names):** `https://github.com/keypaste` and `npmjs.com/package/keypaste`, opened logged out, are
   held by this project; `launch.md`'s canonical link matches. *Fails if* either resolves to someone else.
 - [ ] **3.0 `[MVP]` — The repository goes public (H-0003).** Scan every commit after the last scan (`9d48bd7`, commit 174 of 191 today)

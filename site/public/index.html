@@ -146,7 +146,7 @@ keypaste: an agent is asking for a credential.
 Approve? [y/N]
 </pre>
 
-  <p class="caption">That is the whole product in one screen. An agent asked; you were shown who, what and why; one field goes back for a lifetime you were told about. <a href="https://github.com/keypaste/keypaste/blob/main/docs/demo.md">Watch it end to end</a> — about sixty seconds.</p>
+  <p class="caption">That is the whole product in one screen. An agent asked; you were shown who, what and why; one field goes back for a lifetime you were told about. <a href="https://github.com/notinferred/keypaste/blob/main/docs/demo.md">Watch it end to end</a> — about sixty seconds.</p>
 
   <p class="pitch"><strong>Stop pasting secrets into chats.</strong> keypaste is a local-first, KDBX-compatible vault that stores your passwords and env variables, injects them into your projects, and lets AI agents like Claude request exactly one credential — with your approval, scoped access, and a full audit trail — without ever seeing your vault.</p>
 
@@ -178,7 +178,7 @@ sha256sum -c keypaste-0.1.0-linux-x64.tar.gz.sha256
 tar -xzf keypaste-0.1.0-linux-x64.tar.gz
 mkdir -p ~/.local/bin &amp;&amp; mv keypaste keypaste-mcp ~/.local/bin/</pre>
 
-  <p class="caption">Windows, Intel Macs, Alpine and building from source are in the <a href="https://github.com/keypaste/keypaste#install">README</a>. There is deliberately no <code>curl | sh</code>: it asks you to run code you have not read, from an origin that is not the repository. And the checksum proves the bytes arrived intact, not who made them — it is served from the same origin as the archive, so anyone who can replace one can replace both. The binaries are unsigned. Building from source is strictly stronger and is documented permanently.</p>
+  <p class="caption">Windows, Intel Macs, Alpine and building from source are in the <a href="https://github.com/notinferred/keypaste#install">README</a>. There is deliberately no <code>curl | sh</code>: it asks you to run code you have not read, from an origin that is not the repository. And the checksum proves the bytes arrived intact, not who made them — it is served from the same origin as the archive, so anyone who can replace one can replace both. The binaries are unsigned. Building from source is strictly stronger and is documented permanently.</p>
 
   <p class="caption">Then a vault, and a project with no <code>.env</code> in it:</p>
 
@@ -255,7 +255,7 @@ keypaste run dev -- npm start    # injected into the child process, nothing on d
     <button type="submit">Notify me</button>
   </form>
 
-  <p style="margin-top:2rem"><a class="cta" href="https://github.com/keypaste/keypaste">Read the source on GitHub →</a></p>
+  <p style="margin-top:2rem"><a class="cta" href="https://github.com/notinferred/keypaste">Read the source on GitHub →</a></p>
 
   <footer>
     <p>Security reports: <a href="mailto:security@keypaste.com">security@keypaste.com</a></p>
