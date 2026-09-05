@@ -176,6 +176,32 @@ public sealed class ServerToolsTests
         }
     }
 
+    /// <summary>
+    /// An access attempt that ends in an exception is still an access attempt, and law 3.3 makes no
+    /// exception for it.
+    /// </summary>
+    /// <remarks>
+    /// The catch around the source only names <see cref="OperationCanceledException"/>, so anything
+    /// else — an <see cref="IOException"/> out of a vault on a failing disk or a share that went
+    /// away, a cryptographic failure out of KeePassLib — escapes before the audit line is appended.
+    /// Nothing is released, so law 3.7 holds; the bridge fails silently rather than open, and this
+    /// file's own documentation claims the opposite: "Log first, answer second, always."
+    /// </remarks>
+    [Fact]
+    public async Task ListEntryNames_WhenTheSourceThrows_IsStillRefusedAndStillAudited()
+    {
+        await using var harness = new McpHarness();
+        harness.Source.With("env/dev", "STRIPE_KEY");
+        harness.Source.Throw = true;
+
+        var client = await harness.StartAsync();
+        var result = await CallAsync(client, ToolText.ListToolName);
+
+        Assert.True(result.IsError);
+        Assert.DoesNotContain("STRIPE_KEY", TextOf(result), StringComparison.Ordinal);
+        Assert.NotEmpty(harness.AuditLines());
+    }
+
     [Fact]
     public async Task ListEntryNames_WithALockedVault_RefusesAndExplainsWhy()
     {
