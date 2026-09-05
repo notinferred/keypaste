@@ -22,7 +22,32 @@ Build the binary:
 dotnet build keypaste.slnx -c Release
 ```
 
-It lands at `artifacts/bin/Keypaste.Mcp/release/keypaste-mcp` (`keypaste-mcp.exe` on Windows). There is no installer yet, so note the absolute path — you will need it twice below.
+It lands at `artifacts/bin/Keypaste.Mcp/release/keypaste-mcp` (`keypaste-mcp.exe` on Windows).
+
+## The short way
+
+```sh
+keypaste setup --vault ~/vaults/personal.kdbx
+```
+
+That finds the AI clients installed on this machine and points each one at that vault. Clients that ship a command of their own — Claude Code, Codex — are configured with it. Clients that do not — Cursor, Claude Desktop — have their block printed for you to paste, because writing a format keypaste has not verified against a real install, and then telling you it worked, would waste more of your time than asking.
+
+```
+keypaste-mcp   /home/you/.local/bin/keypaste-mcp
+vault          /home/you/vaults/personal.kdbx
+exposure       env/** (the default; nothing else in the vault can even be named)
+
+  claude-code      configured
+  codex            configured
+  cursor           has no command of its own; add this by hand:
+  ...
+```
+
+`--dry-run` prints the exact commands and changes nothing. `--remove` takes keypaste back out, leaving every other server in place. Running it again is the same as running it once, which is how you repoint it after moving a vault.
+
+**It grants nothing.** `setup` writes a path into a configuration file. What that path may release is still bounded by the exposure default below, still needs `keypaste agent` running, and still needs you to say yes.
+
+The rest of this page is the same thing by hand — worth reading once, because it is what `setup` is doing on your behalf, and it is the only route for a client keypaste does not know about.
 
 ## Claude Desktop
 
