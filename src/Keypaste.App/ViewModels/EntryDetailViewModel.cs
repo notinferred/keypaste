@@ -71,10 +71,10 @@ internal sealed class EntryDetailViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>The longest single-line field drawn.</summary>
-    private const int DisplayLength = 512;
+    private const int _displayLength = 512;
 
     /// <summary>The longest notes body drawn. Notes is the largest free-text field in a vault.</summary>
-    private const int DisplayNotesLength = 8192;
+    private const int _displayNotesLength = 8192;
 
     /// <summary>Where a failure goes. Owned by the entries screen, which draws the banner.</summary>
     internal Action<string?> Report { get; }
@@ -103,13 +103,13 @@ internal sealed class EntryDetailViewModel : ObservableObject, IDisposable
     /// so scrubbing it in place would write scrubbed text back into the vault, or paste it. Only
     /// the <c>TextBlock</c> reads this.
     /// </remarks>
-    internal string DisplayUsername => EntryNameSanitizer.Sanitize(Username, DisplayLength).Text;
+    internal string DisplayUsername => EntryNameSanitizer.Sanitize(Username, _displayLength).Text;
 
     /// <summary>The URL as the pane draws it. Separate from <see cref="Url"/> for the same reason.</summary>
-    internal string DisplayUrl => EntryNameSanitizer.Sanitize(Url, DisplayLength).Text;
+    internal string DisplayUrl => EntryNameSanitizer.Sanitize(Url, _displayLength).Text;
 
     /// <summary>The notes as the pane draws it. Separate from <see cref="Notes"/> likewise.</summary>
-    internal string DisplayNotes => EntryNameSanitizer.Sanitize(Notes, DisplayNotesLength).Text;
+    internal string DisplayNotes => EntryNameSanitizer.Sanitize(Notes, _displayNotesLength).Text;
 
     internal string Username
     {

@@ -30,7 +30,7 @@ namespace Keypaste.Cli.Commands;
 internal static class ListCommand
 {
     /// <summary>The mark put in front of a row whose displayed name is not what the vault holds.</summary>
-    private const string AlteredMark = "?";
+    private const string _alteredMark = "?";
 
     /// <summary>How deep a path may be before segments are dropped.</summary>
     /// <remarks>
@@ -38,10 +38,10 @@ internal static class ListCommand
     /// reader's own vault, where silently dropping a real group would be the worse failure; the cap
     /// is here to bound one absurd name, not to trim ordinary ones.
     /// </remarks>
-    private const int DisplayDepth = 32;
+    private const int _displayDepth = 32;
 
     /// <summary>The longest path drawn, for the same reason.</summary>
-    private const int DisplayLength = 512;
+    private const int _displayLength = 512;
 
     private static readonly OptionSpec[] _options =
     [
@@ -111,14 +111,14 @@ internal static class ListCommand
                 var body = flat ? text : Indent(text);
 
                 context.Stdout.WriteLine(
-                    flat || !anyAltered ? body : (altered ? AlteredMark : " ") + " " + body);
+                    flat || !anyAltered ? body : (altered ? _alteredMark : " ") + " " + body);
             }
 
             if (anyAltered)
             {
                 context.Stderr.WriteLine(flat
                     ? "note: a displayed name is not what the vault holds. Run without --flat to see which."
-                    : $"{AlteredMark}  the displayed name is not what the vault holds.");
+                    : $"{_alteredMark}  the displayed name is not what the vault holds.");
             }
 
             return CliApp.ExitSuccess;
@@ -137,8 +137,8 @@ internal static class ListCommand
 
         var sanitized = EntryNameSanitizer.SanitizePath(
             body,
-            maximumDepth: DisplayDepth,
-            maximumLength: DisplayLength);
+            maximumDepth: _displayDepth,
+            maximumLength: _displayLength);
 
         return (isGroup ? sanitized.Text + "/" : sanitized.Text, sanitized.WasAltered);
     }

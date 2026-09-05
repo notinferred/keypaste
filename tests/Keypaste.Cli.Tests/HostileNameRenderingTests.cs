@@ -37,35 +37,35 @@ namespace Keypaste.Cli.Tests;
 /// </remarks>
 public sealed class HostileNameRenderingTests : IDisposable
 {
-    private const string Master = "correct horse battery staple";
+    private const string _master = "correct horse battery staple";
 
     /// <summary>RIGHT-TO-LEFT OVERRIDE. Legal XML, so it survives a KDBX round trip.</summary>
-    private static readonly string Bidi = ((char)0x202E).ToString();
+    private static readonly string _bidi = ((char)0x202E).ToString();
 
     /// <summary>ZERO WIDTH SPACE. Legal XML, invisible, so two distinct names can look identical.</summary>
-    private static readonly string Zwsp = ((char)0x200B).ToString();
+    private static readonly string _zwsp = ((char)0x200B).ToString();
 
     /// <summary>ESC. Stripped by the KDBX round trip, so it is only a threat off the vault path.</summary>
-    private static readonly string Esc = ((char)27).ToString();
+    private static readonly string _esc = ((char)27).ToString();
 
     private readonly CliHarness _cli = new();
 
     public void Dispose() => _cli.Dispose();
 
-    private static string Spoofed(string name) => "prod" + Bidi + name + Zwsp;
+    private static string Spoofed(string name) => "prod" + _bidi + name + _zwsp;
 
     private static void AssertRenderedSafely(string stream)
     {
-        Assert.DoesNotContain(Bidi, stream, StringComparison.Ordinal);
-        Assert.DoesNotContain(Zwsp, stream, StringComparison.Ordinal);
+        Assert.DoesNotContain(_bidi, stream, StringComparison.Ordinal);
+        Assert.DoesNotContain(_zwsp, stream, StringComparison.Ordinal);
         Assert.Contains("prod", stream, StringComparison.Ordinal);
     }
 
     [Fact]
     public void Ls_DoesNotRenderAnEntryTitleThatCanMisrepresentItself()
     {
-        _cli.SeedVault(Master, ($"personal/{Spoofed("token")}", "value"));
-        _cli.Prompt.Enqueue(Master);
+        _cli.SeedVault(_master, ($"personal/{Spoofed("token")}", "value"));
+        _cli.Prompt.Enqueue(_master);
 
         _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("ls", "--vault", _cli.VaultPath));
 
@@ -76,8 +76,8 @@ public sealed class HostileNameRenderingTests : IDisposable
     [Fact]
     public void LsFlat_DoesNotRenderAnEntryTitleThatCanMisrepresentItself()
     {
-        _cli.SeedVault(Master, ($"personal/{Spoofed("token")}", "value"));
-        _cli.Prompt.Enqueue(Master);
+        _cli.SeedVault(_master, ($"personal/{Spoofed("token")}", "value"));
+        _cli.Prompt.Enqueue(_master);
 
         _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("ls", "--flat", "--vault", _cli.VaultPath));
 
@@ -88,8 +88,8 @@ public sealed class HostileNameRenderingTests : IDisposable
     [Fact]
     public void EnvLs_DoesNotRenderAProjectNameThatCanMisrepresentItself()
     {
-        _cli.SeedVault(Master, ($"env/{Spoofed("staging")}/API_KEY", "value"));
-        _cli.Prompt.Enqueue(Master);
+        _cli.SeedVault(_master, ($"env/{Spoofed("staging")}/API_KEY", "value"));
+        _cli.Prompt.Enqueue(_master);
 
         _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("env", "ls", "--vault", _cli.VaultPath));
 
@@ -100,8 +100,8 @@ public sealed class HostileNameRenderingTests : IDisposable
     public void EnvLsProject_DoesNotRenderAVariableNameThatCanMisrepresentItself()
     {
         const string project = "demo";
-        _cli.SeedVault(Master, ($"env/{project}/{Spoofed("KEY")}", "value"));
-        _cli.Prompt.Enqueue(Master);
+        _cli.SeedVault(_master, ($"env/{project}/{Spoofed("KEY")}", "value"));
+        _cli.Prompt.Enqueue(_master);
 
         _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("env", "ls", project, "--vault", _cli.VaultPath));
 
@@ -115,14 +115,14 @@ public sealed class HostileNameRenderingTests : IDisposable
         // The one place an ANSI escape genuinely reaches a terminal: the key is refused by
         // EnvConvention.IsValidKey, the refusal quotes it back, and it never went near the vault.
         var dotenv = Path.Combine(_cli.Directory, "from-elsewhere.env");
-        File.WriteAllText(dotenv, "A" + Esc + "[31mB=whatever\n");
+        File.WriteAllText(dotenv, "A" + _esc + "[31mB=whatever\n");
 
-        _cli.SeedVault(Master);
-        _cli.Prompt.Enqueue(Master);
+        _cli.SeedVault(_master);
+        _cli.Prompt.Enqueue(_master);
 
         _cli.Run("env", "pull", "demo", dotenv, "--yes", "--vault", _cli.VaultPath);
 
-        Assert.DoesNotContain(Esc, _cli.Err, StringComparison.Ordinal);
-        Assert.DoesNotContain(Esc, _cli.Out, StringComparison.Ordinal);
+        Assert.DoesNotContain(_esc, _cli.Err, StringComparison.Ordinal);
+        Assert.DoesNotContain(_esc, _cli.Out, StringComparison.Ordinal);
     }
 }

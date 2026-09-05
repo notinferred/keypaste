@@ -11,7 +11,7 @@ namespace Keypaste.Cli.Commands;
 internal static class EnvListCommand
 {
     /// <summary>The longest name drawn. Generous: this is a listing of the reader's own vault.</summary>
-    private const int DisplayLength = 512;
+    private const int _displayLength = 512;
 
     private static readonly OptionSpec[] _options =
     [
@@ -56,7 +56,7 @@ internal static class EnvListCommand
 
                 foreach (var name in store.Projects())
                 {
-                    var safe = EntryNameSanitizer.Sanitize(name, DisplayLength);
+                    var safe = EntryNameSanitizer.Sanitize(name, _displayLength);
                     alteredProject |= safe.WasAltered;
                     context.Stdout.WriteLine(safe.Text);
                 }
@@ -75,7 +75,7 @@ internal static class EnvListCommand
 
             foreach (var variable in store.Read(project))
             {
-                var safe = EntryNameSanitizer.Sanitize(variable.Key, DisplayLength);
+                var safe = EntryNameSanitizer.Sanitize(variable.Key, _displayLength);
                 altered |= safe.WasAltered;
 
                 context.Stdout.WriteLine(safe.Text);
