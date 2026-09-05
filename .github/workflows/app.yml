@@ -11,6 +11,14 @@ name: app
 #   a Keypaste.App push         gate plus the consistency tests plus the three-OS package job
 #   a Keypaste.Cli push         gate plus the consistency tests
 #   any pull request            all of it
+#   a v* tag                    all of it, and the three archives are kept as workflow artifacts
+#
+# A tag is the app's release gate (D-0081), and today it stops short of a release on purpose. Each
+# published binary must answer --version with the tag's version and pass --selftest, which creates
+# a vault through Keypaste.Core, saves it, reopens it and reads an entry back; only then is it
+# archived and hashed, the same way release.yml does the CLI. Nothing is uploaded to R2: the free
+# binary is the signed one (D-0070), so the publish step arrives with the notarization (3.5) and
+# the Windows signature (3.6), and until then a tag proves the artifacts and keeps them for seven days.
 #
 # Keypaste.Core is in the paths filter deliberately. It is the one backend change that can break
 # the app, and without it the GUI stops compiling against the core it wraps and nobody learns until
@@ -39,6 +47,9 @@ on:
       - 'Directory.Packages.props'
       - 'keypaste.app.slnx'
       - '.github/workflows/app.yml'
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
   # No paths filter here, matching ci.yml and for its stated reason: a proposed change gets the full
   # verdict regardless of what it touches, because that is the one place a reviewer is deciding on
   # evidence. Contradicting that one file over would be worse than the minute it saves.
@@ -50,7 +61,8 @@ permissions:
 
 concurrency:
   group: app-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # A superseded test run costs nothing to cancel; a tag's artifacts are the point of the run.
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
 
 env:
   DOTNET_NOLOGO: 'true'
@@ -85,9 +97,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ "${{ github.event_name }}" != "push" ]; then
+          if [ "${{ github.event_name }}" != "push" ] || [ "${{ github.ref_type }}" = "tag" ]; then
             echo "app-changed=true" >> "$GITHUB_OUTPUT"
-            echo "not a push; packaging"
+            echo "not a branch push; packaging"
             exit 0
           fi
           changed=$(git diff --name-only HEAD^ HEAD || true)
@@ -164,10 +176,13 @@ jobs:
         include:
           - os: blacksmith-4vcpu-ubuntu-2404
             rid: linux-x64
+            archive: tar.gz
           - os: blacksmith-4vcpu-windows-2025
             rid: win-x64
+            archive: zip
           - os: blacksmith-6vcpu-macos-15
             rid: osx-arm64
+            archive: tar.gz
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
@@ -202,11 +217,13 @@ jobs:
           echo "native asset files: $found"
           [ "$found" -ge 2 ] || { echo "::error::Skia/HarfBuzz natives missing from $out"; exit 1; }
 
-      # A runner has no display, so the only thing this can honestly assert about the published
-      # binary is that it starts and its own code runs on this operating system. It does not prove the
-      # Skia and HarfBuzz natives link - those load lazily on first render, and the step above asserts
-      # only that the files are present. It constructs no window and cannot. Everything visual is on
-      # the manual checklist in docs/desktop.md, which is where a claim CI cannot hold belongs.
+      # A runner has no display, so what this can honestly assert about the published binary is
+      # that it starts, that its own code runs on this operating system, and that the KDBX path it
+      # wraps works there: --selftest creates a vault through Keypaste.Core in a scratch directory,
+      # saves it, reopens it and reads an entry back. It does not prove the Skia and HarfBuzz natives
+      # link - those load lazily on first render, and the step above asserts only that the files are
+      # present. It constructs no window and cannot. Everything visual is on the manual checklist in
+      # docs/desktop.md, which is where a claim CI cannot hold belongs.
       - name: Start the published binary and run its selftest
         shell: bash
         run: |
@@ -216,3 +233,69 @@ jobs:
           [ "${{ matrix.rid }}" = "win-x64" ] && bin="$out/keypaste-app.exe"
           [ -x "$bin" ] || { echo "::error::no binary at $bin"; exit 1; }
           "$bin" --selftest
+
+      # The version lives in Directory.Build.props and a tag only names it, exactly as release.yml
+      # holds the CLI. The binary is asked rather than the property file, because the binary is what
+      # ships: a stale build or a wrong -p:Version would pass a property check and fail this one.
+      - name: Check the version the binary reports
+        id: v
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="artifacts/app/${{ matrix.rid }}"
+          bin="$out/keypaste-app"
+          [ "${{ matrix.rid }}" = "win-x64" ] && bin="$out/keypaste-app.exe"
+          reported="$("$bin" --version | tr -d '[:space:]')"
+          echo "binary reports $reported"
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            want="${GITHUB_REF_NAME#v}"
+            [ "$reported" = "$want" ] \
+              || { echo "::error::tag $GITHUB_REF_NAME says $want but the binary reports $reported"; exit 1; }
+            version="$want"
+          else
+            version="$reported-dryrun"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      # The same shape as release.yml's step for the CLI, for the same reasons: name what ships
+      # instead of globbing the publish directory, keep macOS AppleDouble members out of the tarball,
+      # and write a checksum file in the one format sha256sum -c and shasum -c both accept.
+      - name: Package and hash
+        shell: bash
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          set -euo pipefail
+          out="artifacts/dist"; mkdir -p "$out"
+          stage="artifacts/stage"; rm -rf "$stage"; mkdir -p "$stage"
+          src="artifacts/app/${{ matrix.rid }}"
+          cp -R "$src"/. "$stage"/
+          rm -rf "$stage"/*.pdb "$stage"/*.dSYM
+          cp LICENSE THIRD_PARTY_NOTICES.md "$stage"/
+          name="keypaste-app-${VERSION}-${{ matrix.rid }}"
+          if [ "${{ matrix.archive }}" = "zip" ]; then
+            (cd "$stage" && /c/Windows/System32/tar.exe -a -c -f "../dist/$name.zip" *)
+          else
+            COPYFILE_DISABLE=1 tar -czf "$out/$name.tar.gz" -C "$stage" .
+          fi
+          arch="$name.${{ matrix.archive }}"
+          if command -v sha256sum >/dev/null 2>&1; then
+            hash="$(cd "$out" && sha256sum "$arch" | cut -d' ' -f1)"
+          else
+            hash="$(cd "$out" && shasum -a 256 "$arch" | cut -d' ' -f1)"
+          fi
+          [ "${#hash}" -eq 64 ] || { echo "::error::bad checksum '$hash' for $arch"; exit 1; }
+          printf '%s  %s\n' "$hash" "$arch" > "$out/$arch.sha256"
+          if command -v sha256sum >/dev/null 2>&1; then
+            (cd "$out" && sha256sum -c "$arch.sha256")
+          else
+            (cd "$out" && shasum -a 256 -c "$arch.sha256")
+          fi
+          ls -l "$out"
+
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: app-${{ matrix.rid }}
+          path: artifacts/dist/*
+          if-no-files-found: error
+          retention-days: 7
