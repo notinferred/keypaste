@@ -6,6 +6,14 @@ Versions are the ones published at `https://dl.keypaste.com/v<version>/`. Every 
 
 ## Unreleased
 
+**`keypaste setup` wires your AI clients for you.** One command finds the clients installed on this
+machine and points each at a vault: Claude Code and Codex are configured through their own
+`mcp add` commands, and Cursor and Claude Desktop — which have none — get their block printed for
+you to paste. `--dry-run` shows the exact commands and changes nothing; `--remove` takes keypaste
+out again and leaves every other server alone. Running it twice is the same as running it once,
+which matters because re-running is how you fix a vault that moved. This replaces the page of
+by-hand instructions that stood between installing keypaste and using it.
+
 **A hostile review of the whole tree before it goes public** (`docs/STEPS.md` 10.1). Three findings, each with a regression test watched failing before its fix.
 
 Names out of a vault are now drawn through the sanitizer everywhere a person reads them, not only where a model does: `keypaste ls`, `keypaste env ls`, the `env pull` rejection message, and the desktop app's entry list, group tree, detail pane and env tables. A KDBX title cannot hold a control character, so what this closes is a name that *reads* as something it is not — a bidirectional override or an invisible code point. A listing says when what it drew is not what the vault holds. What addresses an entry, seeds an edit or reaches the clipboard is unchanged and still exact.

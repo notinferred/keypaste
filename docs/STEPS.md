@@ -161,6 +161,23 @@ were decisions, answered by D-0054 to D-0060; H-0011 is the site's pre-deploy ch
   D-0031, D-0032.
 - [x] **2.5 `[MVP]` — The 60-second demo.** `docs/demo.md`, held to the binaries by `verify-demo.sh`;
   Claude deliberately not in CI. D-0033 to D-0035.
+- [x] **2.6 `[MVP]` — One command wires the clients.** Done 2026-09-05, D-0085. `keypaste setup`
+  finds the AI clients on this machine and points each at a vault. **Where a client ships its own
+  command, keypaste calls it** — `claude mcp add`, `codex mcp add` — rather than editing its
+  configuration file: those files hold state that is not ours, and a running Claude Code rewrites
+  `~/.claude.json` continuously, so a read-modify-write from another process can lose data it never
+  meant to touch. A client with no such command (Cursor, Claude Desktop) has its block printed for
+  pasting, because writing a schema keypaste has not verified against a real install and then
+  reporting success is the failure that costs a user the most to diagnose. It clears any previous
+  entry before adding, because the clients disagree about what adding twice means — Codex
+  overwrites, Claude Code refuses — and re-running is the ordinary way a moved vault is fixed.
+  Knowledge in `Keypaste.Core.Clients`, doing in `SetupCommand`, per law 4.2, so the app's future
+  "Connect to…" button (4.3) reuses the argument grammar rather than copying it. **Verify
+  (V-setup):** `keypaste setup --dry-run` names each installed client and prints the exact command
+  and changes nothing; a real run leaves each client's own listing showing one `keypaste` server and
+  every other server untouched; a second run leaves exactly one. *Fails if* an absent client is
+  reported as configured, a present one is missed, a second run duplicates or errors, or anything
+  outside the `keypaste` entry changes.
 - [ ] **4.4 `[Launch]` — The approval prompt leaves the terminal.** A native window or tray notification on
   the agent, with the terminal channel kept for headless use; both render the same fields in the same
   order with the agent's reason as untrusted text; default deny, timeout deny, every error path deny on
@@ -379,20 +396,27 @@ were decisions, answered by D-0054 to D-0060; H-0011 is the site's pre-deploy ch
   today. **Verify (V-public):** `git ls-remote origin 'refs/pull/*'` returns nothing and both
   `refs/pull/11/head` (`e972225`) and `refs/pull/14/head` (`470340e`) are unreachable; a logged-out
   browser opens the repository and `docs/demo.md`. *Fails if* a pull ref with the pre-rewrite identity is
-  still served.
+  still served. **BLOCKED by choice (2026-09-05, D-0085):** law 3.8 requires the *code* to be open,
+  and AGPL-3.0 with corresponding source published for every release already satisfies it — O-0014
+  concedes as much. What this row buys is the launch links, a second security channel and branch
+  protection, none of which is the product. Unblocked by the founder deciding to launch.
 - [ ] **3.1 `[MVP]` — The demo GIF (H-0005).** Record the flow on `docs/demo.md` with any screen
   recorder, crop it to under 2 MB, save it as `docs/demo/keypaste-demo.gif`, and fill the slot both
   pages reserve. **Verify (V-gif):** the file exists under 2 MB; both pages reference it and neither
   carries the reserving comment; the GIF shows an agent asking, the dialog with a reason, a human
-  answering, and the log. *Fails if* absent, 2 MB or over, or missing a beat.
+  answering, and the log. *Fails if* absent, 2 MB or over, or missing a beat. **BLOCKED by choice
+  (2026-09-05, D-0085):** the launch waits on the founder using keypaste daily, per law 5.2.
+  Unblocked by that, and by 3.0.
 - [ ] **3.2 `[MVP]` — The launch posts (H-0006).** Post `launch.md`'s copy to r/KeePass and the MCP
   community, wait 48 hours, then r/selfhosted, Show HN, X. **Verify (V-launch):** every box in
   `launch.md`'s "Before anything goes out" is ticked first; each post has a live URL logged out; every
   link in every post resolves; each post says "no released GUI". *Fails if* a box is unticked or a link
-  404s.
+  404s. **BLOCKED by choice (2026-09-05, D-0085):** law 5.2 puts the founder's own daily use before
+  the launch. Unblocked by that, and by 3.0 and 3.1.
 - [ ] **3.3 `[MVP]` — Two weeks of answering (H-0007).** Every issue and comment answered for fourteen
   days; security reports moved to `security@keypaste.com` at once. **Verify (V-answering):** the oldest
   unanswered issue opened after launch day is under 48 hours old. *Fails if* one is older.
+  **BLOCKED by choice (2026-09-05, D-0085):** there is nothing to answer until 3.2. Unblocked by it.
 - [ ] **3.10 `[Launch]` — Product docs for the password manager.** Install, import, autofill, TOTP, SSH,
   sync, what the agent can and cannot do, deletion of an account. **Verify (V-docs):** every app screen
   links to its page and every page's commands run as written. *Fails if* a screen has no page or a
