@@ -26,7 +26,7 @@ Approve? [y/N]
 [**Claude asks for a key, you approve, the deploy runs**](docs/demo.md) is the whole thing end to end, in about sixty seconds.
 
 - **Local-first, offline.** Your vault is a file on your disk. No account, no cloud service holding your secrets, no network required. Sync it yourself with whatever you already use.
-- **Standard KDBX, not a new format.** Everything keypaste writes opens in KeePassXC and KeePass — proved in both directions against a real `keepassxc-cli` on Linux, macOS and Windows on every push to `main` that touches code. If keypaste disappears tomorrow, your data doesn't.
+- **Standard KDBX, not a new format.** Everything keypaste writes opens in KeePassXC and KeePass — proved in both directions against a real `keepassxc-cli` on Linux, macOS and Windows on every push to `main` and every pull request. If keypaste disappears tomorrow, your data doesn't.
 - **Open source, AGPL.** Auditable by anyone, forever. A tool that handles secrets shouldn't ask to be trusted on faith.
 
 **Pre-1.0, and it says so.** Everything on this page works today and is tested on all three operating systems. The binaries are unsigned, the desktop app is not among them — it exists, it browses and edits the same vaults, and it builds from source rather than shipping in a release ([`docs/desktop.md`](docs/desktop.md)) — and the approval prompt is a terminal prompt rather than a native dialog. [`docs/STEPS.md`](docs/STEPS.md) is the plan in tiers — the first open step is what lands next; [`docs/PRODUCT.md`](docs/PRODUCT.md) is the constitution and does not change.
@@ -302,7 +302,7 @@ Each record carries the hash of the record before it, so `keypaste log verify` t
 
 KDBX4 with Argon2d key derivation (2 iterations, 64 MiB, parallelism 2) and AES-256. keypaste never invents a format and writes no cryptography of its own (docs/PRODUCT.md §2, §3.6): the format layer is [KeePassLib](third_party/KeePassLib/UPSTREAM.md), vendored from KeePass 2.61 and reached through a single file, `src/Keypaste.Core/Internal/KeePassInterop.cs`.
 
-Any vault keypaste writes must open in KeePassXC, and anything KeePassXC writes back must be readable by keypaste. That is not a hope — `scripts/verify-keepassxc-compat.sh` and `scripts/verify-keepassxc-writeback.sh` prove both directions on every push to `main` that touches code, against a real `keepassxc-cli`, on all three operating systems, and the gate is permanent (docs/PRODUCT.md §4.6, [`DECISIONS.md`](DECISIONS.md) D-0008 and D-0014).
+Any vault keypaste writes must open in KeePassXC, and anything KeePassXC writes back must be readable by keypaste. That is not a hope — `scripts/verify-keepassxc-compat.sh` and `scripts/verify-keepassxc-writeback.sh` prove both directions on every push to `main` and every pull request, against a real `keepassxc-cli`, on all three operating systems, and the gate is permanent (docs/PRODUCT.md §4.6, [`DECISIONS.md`](DECISIONS.md) D-0008 and D-0014).
 
 Directories and namespaces use .NET's PascalCase convention; the kebab-case names above are the roadmap's and survive where they are user-visible, in the shipped binary names.
 
