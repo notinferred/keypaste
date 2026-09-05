@@ -54,9 +54,9 @@
     <Product>keypaste</Product>
     <Authors>Dan Ochoa</Authors>
     <Copyright>Copyright (c) 2026 Dan Ochoa</Copyright>
-    <RepositoryUrl>https://github.com/notinferred/keypaste</RepositoryUrl>
+    <RepositoryUrl>https://github.com/keypaste/keypaste</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageProjectUrl>https://github.com/notinferred/keypaste</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/keypaste/keypaste</PackageProjectUrl>
     <PackageLicenseExpression>AGPL-3.0-only</PackageLicenseExpression>
     <VersionPrefix>0.1.0</VersionPrefix>
     <IsPackable>false</IsPackable>

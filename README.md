@@ -93,7 +93,7 @@ macOS quarantine: a browser download sets `com.apple.quarantine` and a `tar` ext
 **This is strictly stronger than downloading, and it stays here permanently for that reason.** The argument the rest of this page makes — four dependencies, nothing opening a socket, a decision order you can read — is an argument about source you can check. A prebuilt binary is a claim that it was compiled faithfully, and you did not watch it happen. Building needs the .NET SDK pinned in [`global.json`](global.json).
 
 ```sh
-git clone https://github.com/notinferred/keypaste
+git clone https://github.com/keypaste/keypaste
 cd keypaste
 dotnet build keypaste.slnx -c Release
 ```
