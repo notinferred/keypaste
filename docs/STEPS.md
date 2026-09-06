@@ -368,25 +368,21 @@ were decisions, answered by D-0054 to D-0060; H-0011 is the site's pre-deploy ch
 ## I · Site, docs & launch
 
 - [x] **3.2b `[MVP]` — Launch essay.** `docs/keepass-and-agents.md`, held to the binaries. D-0038.
-- [ ] **3.0 `[MVP]` — The repository is public, and the purge it was supposed to follow is not done
-  (H-0003).** The flip happened on 2026-09-05. The purge that this row put *first* did not, so the
-  exposure the row existed to prevent is live rather than prevented, and V-public fails today.
-  **What is readable right now by anyone, unauthenticated:** the founder's personal name and address
-  on all 239 commits of `main`; `git ls-remote origin 'refs/pull/*'` still returns **21 refs**; eight
-  pull heads carry the pre-rewrite personal identity, and two of them — `refs/pull/11/head`
-  (`e972225`) and `refs/pull/14/head` (`470340e`) — are authored `Claude <noreply@anthropic.com>`,
-  with PR 11 titled for it. The history scan stays clean (2026-09-05, all 239 commits: no vault, no
-  key, no `.env`, no credential, largest blob `DECISIONS.md` at 260 KB), so what is exposed is
-  identity, not secrets — which is why this is now a decision about what the founder wants attached
-  to their name rather than an incident. **Ask GitHub Support to purge `refs/pull/*` and gc, naming
-  both Claude-bearing refs**, or the purge can be closed half-done. Changing `user.email` (D-0087)
-  fixes only what is committed from now on; the 239 commits already published are changed by nothing
-  short of a rewrite and a force-push, which on a public repository changes every hash, breaks every
-  clone, and still leaves the pull refs and GitHub's cached objects behind — so it is not a fix
-  either, and Support is the only route that reaches the refs. **Verify (V-public):** `git ls-remote
-  origin 'refs/pull/*'` returns nothing and both `e972225` and `470340e` are unreachable; a
-  logged-out browser opens the repository and `docs/demo.md`. *Fails if* a pull ref with the
-  pre-rewrite identity is still served.
+- [x] **3.0 `[MVP]` — The repository is public (H-0003).** Done 2026-09-06, D-0089. Not by the route
+  this row spent three rewrites describing. GitHub Support was never asked: `refs/pull/*` is a
+  namespace no push can reach, and deleting a ref would not have removed the objects anyway, since
+  GitHub keeps unreachable commits fetchable by SHA until it collects them. The repository was
+  renamed to `keypaste-bc` first, which moved every pull ref with it and changed nothing — a rename
+  is not a purge. What worked was pushing `main` to a fresh `notinferred/keypaste` and deleting the
+  old one: no pull refs, no pre-rewrite identity, and the same URL, so no published link moved.
+  D-0082's price for a fresh repository had already been paid off by D-0086 — runners are
+  GitHub-hosted, so there was nothing to re-verify — which is why the route it rejected became the
+  cheap one. History was re-authored to `keypaste <contact@keypaste.com>` in the same move (D-0087),
+  with commit dates untouched; the tree hash is byte-identical before and after. The old repository
+  is mirrored at `keypaste-archive/` off-repo, pull refs included. **Verify (V-public):**
+  `git ls-remote origin 'refs/pull/*'` serves no pre-rewrite ref and both `e972225` and `470340e` are
+  unreachable; a logged-out browser opens the repository and `docs/demo.md`. *Fails if* a pull ref
+  with the pre-rewrite identity is still served.
 - [x] **3.1 `[MVP]` — The demo GIF (H-0005).** Done 2026-09-06, D-0088. `docs/demo/keypaste-demo.gif`
   (62 KB, 1040x583, 25s), referenced by `README.md` and `site/public/index.html`, both reserving
   comments deleted. **It is a rendered terminal, not a desktop capture**, and the distinction is on
