@@ -93,7 +93,9 @@ public sealed record ApprovalPrompt
         ArgumentNullException.ThrowIfNull(reason);
 
         var shownEntry = Display(entry);
-        var shownReason = EntryNameSanitizer.Sanitize(reason, MaximumReasonLength);
+        // Prose, not a name: a slash in a reason impersonates nothing, and scrubbing it fired
+        // the altered-warning on every ordinary request. See SanitizeProse.
+        var shownReason = EntryNameSanitizer.SanitizeProse(reason, MaximumReasonLength);
 
         return new ApprovalPrompt
         {

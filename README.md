@@ -1,8 +1,6 @@
 # keypaste
 
-<!-- The demo GIF belongs here, as docs/demo/keypaste-demo.gif, a screen recording kept under
-     2 MB. Until it exists the dialog below is the hero, and nothing else on this page
-     moves when it lands. -->
+![An agent asks keypaste for one credential; a person approves it; the audit log records it.](docs/demo/keypaste-demo.gif)
 
 ```
 ────────────────────────────────────────────────────────────

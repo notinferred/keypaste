@@ -6,6 +6,10 @@ Versions are the ones published at `https://dl.keypaste.com/v<version>/`. Every 
 
 ## Unreleased
 
+**The approval dialog stops mangling the agent's reason.** A reason naming an entry — `env/demo/STRIPE_KEY`, the ordinary thing for an agent to say — had its slashes replaced and was then labelled as having been scrubbed. Reasons now keep the path separator; markup, fences and pipes are still stripped, so a hostile reason is as inert as it ever was.
+
+**The audit log names the entry, not the handle.** Agents are told to prefer an opaque handle, so most real requests logged as `k1_…` — unreadable, in the one record whose job is saying which entry was asked for. It now records the entry the approver resolved.
+
 **`keypaste setup` wires your AI clients for you.** One command finds the clients installed on this
 machine and points each at a vault: Claude Code and Codex are configured through their own
 `mcp add` commands, and Cursor and Claude Desktop — which have none — get their block printed for
