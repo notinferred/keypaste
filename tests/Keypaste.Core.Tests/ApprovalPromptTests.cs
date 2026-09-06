@@ -101,8 +101,12 @@ public sealed class ApprovalPromptTests
             Assert.False(
                 category is UnicodeCategory.Format or UnicodeCategory.PrivateUse,
                 $"{category} survived: {reason}");
+            // The path separator is the one exemption, and only in prose: an agent naming
+            // env/demo/STRIPE_KEY in its sentence is the ordinary case, and flattening it fired the
+            // altered-warning on every request. The other nine stay out of a reason entirely.
             Assert.False(
-                EntryNameSanitizerTests.Structural.Contains(rune.ToString(), StringComparison.Ordinal),
+                rune.Value != '/'
+                && EntryNameSanitizerTests.Structural.Contains(rune.ToString(), StringComparison.Ordinal),
                 $"a structural character survived: {reason}");
         }
     }

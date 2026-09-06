@@ -387,13 +387,18 @@ were decisions, answered by D-0054 to D-0060; H-0011 is the site's pre-deploy ch
   origin 'refs/pull/*'` returns nothing and both `e972225` and `470340e` are unreachable; a
   logged-out browser opens the repository and `docs/demo.md`. *Fails if* a pull ref with the
   pre-rewrite identity is still served.
-- [ ] **3.1 `[MVP]` — The demo GIF (H-0005).** Record the flow on `docs/demo.md` with any screen
-  recorder, crop it to under 2 MB, save it as `docs/demo/keypaste-demo.gif`, and fill the slot both
-  pages reserve. **Verify (V-gif):** the file exists under 2 MB; both pages reference it and neither
-  carries the reserving comment; the GIF shows an agent asking, the dialog with a reason, a human
-  answering, and the log. *Fails if* absent, 2 MB or over, or missing a beat. **BLOCKED by choice
-  (2026-09-05, D-0085):** the launch waits on the founder using keypaste daily, per law 5.2.
-  Unblocked by that, and by 3.0.
+- [x] **3.1 `[MVP]` — The demo GIF (H-0005).** Done 2026-09-06, D-0088. `docs/demo/keypaste-demo.gif`
+  (62 KB, 1040x583, 25s), referenced by `README.md` and `site/public/index.html`, both reserving
+  comments deleted. **It is a rendered terminal, not a desktop capture**, and the distinction is on
+  the record rather than glossed: every line in it is either the dialog block `verify-demo.sh` diffs
+  character-for-character against the shipped binary, or output captured from a session driven by
+  **real Claude Code** — its own sentence, its own decision to ask. Rendering rather than screen-
+  recording is what a headless agent can do; a human with a screen recorder can replace it without
+  changing either page. Recording it found two defects, both fixed first (D-0088), which is the
+  argument for doing it before the launch rather than after. **Verify (V-gif):** the file exists
+  under 2 MB; both pages reference it and neither carries the reserving comment; the GIF shows an
+  agent asking, the dialog with a reason, a human answering, and the log. *Fails if* absent, 2 MB or
+  over, or missing a beat.
 - [ ] **3.2 `[MVP]` — The launch posts (H-0006).** Post `launch.md`'s copy to r/KeePass and the MCP
   community, wait 48 hours, then r/selfhosted, Show HN, X. **Verify (V-launch):** every box in
   `launch.md`'s "Before anything goes out" is ticked first; each post has a live URL logged out; every

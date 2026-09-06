@@ -113,6 +113,22 @@ internal sealed class RequestCredentialTool(
             }
         }
 
+        // The agent is told to prefer a handle, so for the ordinary request `entry` above is an
+        // opaque k1_… and an audit line that repeats it cannot answer the one question the log
+        // exists for. The approver resolved it against the unlocked vault and sent the name back in
+        // CredentialReply.Entry; until now nothing read it. Measured with real Claude Code, which
+        // sent a handle and produced a line reading `k1_6f91aa064e192942` where docs/demo.md
+        // promises `env/demo/STRIPE_KEY`.
+        if (verdict.ResolvedEntry is { Length: > 0 } resolved)
+        {
+            args = args with
+            {
+                Entry = EntryNameSanitizer.SanitizePath(
+                    resolved, maximumLength: AuditArgs.EntryLength).Text,
+                EntryKind = EntryAddressKind.Path,
+            };
+        }
+
         var record = McpAudit.Line(
             ToolText.CredentialToolName,
             client,
@@ -221,14 +237,16 @@ internal sealed class RequestCredentialTool(
 
         if (reply.Decision != AuditDecision.Granted || reply.Value is not { Length: > 0 })
         {
-            return new Verdict(AuditDecision.Denied, reply.Method, reply.Reason);
+            return new Verdict(
+                AuditDecision.Denied, reply.Method, reply.Reason, ResolvedEntry: reply.Entry);
         }
 
         return new Verdict(
             AuditDecision.Granted,
             reply.Method,
             reply.Reason,
-            new Released(field, reply.Value, reply.TtlSeconds));
+            new Released(field, reply.Value, reply.TtlSeconds),
+            ResolvedEntry: reply.Entry);
     }
 
     /// <summary>Whether a path-shaped argument names something this server may discuss.</summary>
@@ -289,10 +307,16 @@ internal sealed class RequestCredentialTool(
     /// An override for the agent-facing text, used only where the method alone is not specific
     /// enough — a malformed argument has to name which argument.
     /// </param>
+    /// <param name="ResolvedEntry">
+    /// What the approver resolved the request to, when it got far enough to resolve anything. The
+    /// audit line prefers this over the argument the agent sent, because that argument is usually
+    /// an opaque handle and a log that repeats it answers nothing.
+    /// </param>
     private readonly record struct Verdict(
         AuditDecision Decision,
         AuditMethod Method,
         string Reason,
         Released? Released = null,
-        string? Refusal = null);
+        string? Refusal = null,
+        string? ResolvedEntry = null);
 }

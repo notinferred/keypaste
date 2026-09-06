@@ -819,4 +819,29 @@ public sealed class ServerToolsTests
         using var parsed = JsonDocument.Parse(lines[0]);
         Assert.Equal("invalid-request", parsed.RootElement.GetProperty("method").GetString());
     }
+
+    /// <summary>
+    /// The audit line names the entry, not the opaque handle the agent sent.
+    /// </summary>
+    /// <remarks>
+    /// <c>request_credential</c>'s schema tells an agent to prefer a handle, so the handle is the
+    /// ordinary case rather than the exotic one. Recording it verbatim leaves a log that cannot
+    /// answer the only question it exists for. Found by running real Claude Code, which sent a
+    /// handle and produced a line reading <c>k1_6f91aa064e192942</c> where <c>docs/demo.md</c>
+    /// promises <c>env/demo/STRIPE_KEY</c>. The approver had resolved it and sent the name back in
+    /// <c>CredentialReply.Entry</c> the whole time; nothing read it.
+    /// </remarks>
+    [Fact]
+    public async Task TheAuditLineNamesTheEntryRatherThanTheHandleTheAgentSent()
+    {
+        await using var harness = new McpHarness();
+        harness.Approver.StartApproving();
+        var client = await harness.StartAsync();
+
+        await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "k1_0123456789abcdef"));
+
+        var audit = harness.AuditText;
+        Assert.Contains("env/dev/STRIPE_KEY", audit, StringComparison.Ordinal);
+        Assert.DoesNotContain("k1_0123456789abcdef", audit, StringComparison.Ordinal);
+    }
 }

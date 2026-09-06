@@ -83,12 +83,48 @@ public static class EntryNameSanitizer
         return new SanitizedName(text, !string.Equals(text, raw, StringComparison.Ordinal));
     }
 
+
+    /// <summary>
+    /// Sanitizes free text a person reads, such as an agent's stated reason.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Everything that can misrepresent what is on screen still goes: control characters, bidi
+    /// overrides and the rest of the Format category, private use, and the line and paragraph
+    /// separators. Those are why this method exists.
+    /// </para>
+    /// <para>
+    /// <b>The path separator is kept, and only that.</b> A slash carries power in a <em>name</em>, where a
+    /// title containing a slash can impersonate a group path — that is the whole argument in
+    /// <see cref="Sanitize"/> and it does not transfer here. A reason is prose, displayed beside an
+    /// entry name that came from the vault rather than from the agent, so a slash in it impersonates
+    /// nothing. The other nine stay out: a reason still carries no markup, no fence and no pipe.
+    /// Scrubbing the slash too was measured, not theorised: real Claude Code asked for
+    /// <c>env/demo/STRIPE_KEY</c> and the dialog drew "env demo STRIPE_KEY" over a warning that the
+    /// reason had been tampered with. A warning that fires on the ordinary case is not a warning;
+    /// it teaches the person approving to ignore the line that exists to stop them.
+    /// </para>
+    /// </remarks>
+    public static SanitizedName SanitizeProse(string raw, int maximumLength = MaximumLength)
+    {
+        ArgumentNullException.ThrowIfNull(raw);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumLength);
+
+        var text = Scrub(raw, maximumLength, allowPathSeparator: true);
+        if (text.Length == 0)
+        {
+            text = Placeholder;
+        }
+
+        return new SanitizedName(text, WasAltered: !string.Equals(text, raw, StringComparison.Ordinal));
+    }
+
     /// <summary>
     /// The scan itself, without the empty-name placeholder. Returns an empty string when nothing
     /// survived, which is what lets a group path drop a segment rather than spell
     /// <see cref="Placeholder"/> into the middle of itself.
     /// </summary>
-    private static string Scrub(string raw, int maximumLength)
+    private static string Scrub(string raw, int maximumLength, bool allowPathSeparator = false)
     {
         var builder = new StringBuilder(Math.Min(raw.Length, maximumLength));
         Span<char> utf16 = stackalloc char[2];
@@ -104,7 +140,7 @@ public static class EntryNameSanitizer
 
             units += rune.Utf16SequenceLength;
 
-            if (IsSafe(rune))
+            if (IsSafe(rune, allowPathSeparator))
             {
                 var written = rune.EncodeToUtf16(utf16);
                 builder.Append(utf16[..written]);
@@ -203,7 +239,7 @@ public static class EntryNameSanitizer
     /// tag block U+E0000–U+E007F can carry an entire ASCII sentence inside what renders as a single
     /// glyph, and every character in it is astral. A loop over <c>char</c> misses all of them.
     /// </remarks>
-    private static bool IsSafe(Rune rune)
+    private static bool IsSafe(Rune rune, bool allowPathSeparator)
     {
         // EnumerateRunes yields this for an unpaired surrogate, and a genuine U+FFFD is already
         // a broken character, so neither is worth showing.
@@ -221,7 +257,10 @@ public static class EntryNameSanitizer
             return false;
         }
 
-        return !IsStructural(rune);
+        // Only the separator is ever let back in, and only for prose. Everything else in the
+        // structural set stays out of every field: ApprovalPromptTests pins that a reason
+        // carries no markup, no fence and no pipe, and that hardening is deliberate.
+        return !IsStructural(rune) || (allowPathSeparator && rune.Value == '/');
     }
 
     /// <summary>
