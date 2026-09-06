@@ -92,8 +92,12 @@ printf '%s' "$tools" | jq -e 'all(.[]; .annotations.openWorldHint == false)' >/d
 #    would be evidence for a claim it does not make. scripts/verify-approval-e2e.sh is where a
 #    release is proved possible; here, with nobody to ask, a granted credential would mean the
 #    bridge had decided something itself, which is the one unacceptable outcome.
+# Slurped deliberately. `select(...) | ...` over a stream leaves jq's -e status depending on
+# whether the LAST input produced output, and jq 1.6 (ubuntu-22.04) and 1.7+ disagree when it
+# did not. `any` over one slurped array yields exactly one value, so the status means the same
+# thing on every runner image.
 for id in 3 4; do
-  jq -e --argjson id "$id" 'select(.id == $id) | .result.isError == true' <"$OUT" >/dev/null \
+  jq -se --argjson id "$id" 'any(.[]; .id == $id and .result.isError == true)' <"$OUT" >/dev/null \
     || die "call $id did not return isError=true"
 done
 
@@ -135,7 +139,7 @@ grep -q '"method":"not-initialized"' "$NOINIT_AUDIT" 2>/dev/null \
   || die "a tool call before initialize was not denied as not-initialized"
 grep -q '"decision":"denied"' "$NOINIT_AUDIT" \
   || die "a tool call before initialize was not recorded as denied"
-jq -e 'select(.id == 7) | .result.isError == true' <"$NOINIT_OUT" >/dev/null \
+jq -se 'any(.[]; .id == 7 and .result.isError == true)' <"$NOINIT_OUT" >/dev/null \
   || die "a tool call before initialize did not return isError=true"
 
 echo "ok: keypaste-mcp speaks MCP over stdio, exposes two tools, denies both calls, audits them,"
