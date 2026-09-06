@@ -17,6 +17,12 @@ A `v*` tag builds four native binaries and publishes them to `dl.keypaste.com`. 
 
 - **Merge locally. Never the GitHub merge button** — it stamps its own identity on the merge commit.
 - Commit messages are a subject line only, no body unless asked.
+- **Every commit is authored as the project: `keypaste <contact@keypaste.com>`.** This is a
+  pseudonymous project and no individual's name or personal address belongs in its history, its
+  pages, or its metadata. Set globally, enforced locally by `.git/hooks/pre-commit`, and required to
+  match the `Signed-off-by` trailer by `dco.yml`. If a commit is ever authored otherwise, fix it
+  before it is pushed — after a push it is public and only deleting the repository takes it back,
+  which is what D-0087 cost once already.
 
 ## Records
 
