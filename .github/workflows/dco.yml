@@ -27,7 +27,7 @@ jobs:
   signed-off:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # The whole PR range plus its base, and nothing older. 0 would fetch the entire history
           # this gate deliberately does not judge.
