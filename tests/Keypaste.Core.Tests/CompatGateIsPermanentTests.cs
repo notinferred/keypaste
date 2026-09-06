@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 using Xunit;
 
 namespace Keypaste.Core.Tests;
@@ -329,5 +330,60 @@ public sealed class CompatGateIsPermanentTests
         }
 
         return directory;
+    }
+
+    /// <summary>
+    /// Every third-party action is pinned to a commit, never to a tag.
+    /// </summary>
+    /// <remarks>
+    /// A tag is a name its owner can move. Pinning to one means the workflows that build and publish
+    /// this project's binaries run whatever that owner points it at tomorrow, which is a supply-chain
+    /// hole in the one place a secrets tool can least afford one — <c>release.yml</c> is what puts
+    /// bytes on <c>dl.keypaste.com</c>. Most of the repository already pinned by commit; thirteen
+    /// references did not, and drifted back because dependabot proposes whatever form it finds. This
+    /// is the check that makes the convention hold rather than being re-remembered.
+    /// </remarks>
+    [Fact]
+    public void EveryActionIsPinnedToACommitAndNotToATag()
+    {
+        var workflows = Directory.GetFiles(
+            Path.Combine(RepoRoot(), ".github", "workflows"), "*.yml");
+
+        Assert.NotEmpty(workflows);
+
+        List<string> unpinned = [];
+        foreach (var file in workflows)
+        {
+            var lines = File.ReadAllLines(file);
+            for (var i = 0; i < lines.Length; i++)
+            {
+                var match = Regex.Match(lines[i], @"uses:\s*(?<ref>[^\s#]+)");
+                if (!match.Success)
+                {
+                    continue;
+                }
+
+                var reference = match.Groups["ref"].Value;
+
+                // A local composite action is this repository's own file, versioned with it.
+                if (reference.StartsWith('.'))
+                {
+                    continue;
+                }
+
+                var at = reference.LastIndexOf('@');
+                var pin = at < 0 ? string.Empty : reference[(at + 1)..];
+
+                if (!Regex.IsMatch(pin, "^[0-9a-f]{40}$"))
+                {
+                    unpinned.Add($"{Path.GetFileName(file)}:{i + 1} {reference}");
+                }
+            }
+        }
+
+        Assert.True(
+            unpinned.Count == 0,
+            "these actions are pinned to something mutable:\n  "
+            + string.Join("\n  ", unpinned));
     }
 }
