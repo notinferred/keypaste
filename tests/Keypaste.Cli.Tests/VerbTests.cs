@@ -339,6 +339,32 @@ public sealed class VerbTests
         Assert.Equal(CliApp.ExitNotFound, exit);
     }
 
+    /// <summary>
+    /// A joined path is not an identity. An entry titled <c>b/c</c> in group <c>a</c> and an entry
+    /// titled <c>c</c> in group <c>a/b</c> are both <c>a/b/c</c>, so there is nothing for the
+    /// command to delete that would not be a guess (docs/PRODUCT.md law 3.7). The digest is the
+    /// assertion that nothing was written: <see cref="Vault.Save"/> re-randomises salt and nonces,
+    /// so an unchanged digest proves no save happened rather than that the contents matched.
+    /// </summary>
+    [Fact]
+    public void Rm_ACollidingPath_IsRefused_AndTheVaultIsNotWritten()
+    {
+        using var harness = new CliHarness();
+        harness.SeedVault(Master, ("a/b/c", "nested"));
+        Author(harness, "a", "b/c", "slashed");
+
+        var before = Digest(harness.VaultPath);
+
+        harness.Prompt.Enqueue(Master);
+        var exit = harness.Run("rm", "a/b/c", "--vault", harness.VaultPath, "--yes");
+
+        Assert.NotEqual(CliApp.ExitSuccess, exit);
+        Assert.Equal(before, Digest(harness.VaultPath), StringComparer.Ordinal);
+
+        using var vault = Vault.Open(harness.VaultPath, Master);
+        Assert.Equal(2, vault.ReadEntries().Count);
+    }
+
     [Fact]
     public void Rm_AGroupPath_IsRejectedWithAGroupSpecificMessage()
     {
@@ -421,5 +447,21 @@ public sealed class VerbTests
         var exit = harness.Run("ls", "--vault", Path.Combine(harness.Directory, "nope.kdbx"));
 
         Assert.Equal(CliApp.ExitNotFound, exit);
+    }
+
+    /// <summary>
+    /// Writes an entry the CLI itself cannot create: <c>add</c> reads a separator in the argument
+    /// as a group, so a title containing one has to come through the core, the way KeePassXC does.
+    /// </summary>
+    private static void Author(CliHarness harness, string groupPath, string title, string password)
+    {
+        using var vault = Vault.Open(harness.VaultPath, Master);
+        vault.AddEntry(new VaultEntry { Title = title, Password = password, GroupPath = groupPath });
+        vault.Save();
+    }
+
+    private static string Digest(string path)
+    {
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
     }
 }

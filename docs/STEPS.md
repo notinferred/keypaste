@@ -10,12 +10,12 @@
 The local vault, CLI/env workflow and approval bridge are implemented, with known defects in
 data preservation, authorization timing and release checks. The desktop is a source build with
 partial entry/env screens and ineffective settings/clipboard behavior identified in the 2026-09-07
-code review. The F.1–F.4 repair tasks below remain open even though existing tests pass.
+code review. The remaining F.1–F.4 repair tasks below are open even though existing tests pass.
 Everyday password-management workflows, browser integration and desktop
 publication remain unfinished. No hosted service, web vault, mobile integration or organization
 credential service is available.
 
-**Next: F.1a — prevent env removal from deleting a different entry.** Complete the ready repairs
+**Next: F.1b — refuse dotenv export onto its source vault.** Complete the ready repairs
 below before new feature work. Release foundations follow: R.0a makes release identity and supported
 targets executable, R.0b/3.8 make distribution verifiable, and 4.7a prepares desktop packages without
 waiting for signing enrollment. A new CLI/MCP patch requires the core/CLI/bridge and release repairs;
@@ -49,6 +49,7 @@ A completed source task does not mean that it is present in the current download
 | 3.4 | Published | CLI/MCP pipeline and public archives; [release inventory](RELEASE.md) |
 | 4.1 | Complete in source | Desktop unlock and idle lock; [session tests](../tests/Keypaste.App.Tests/Session/AppVaultSessionTests.cs) |
 | 4.2 | Complete in source | Basic search, generated entries, env screens and lost-write protection; [entry tests](../tests/Keypaste.App.Tests/ViewModels/EntriesViewModelTests.cs) |
+| F.1a | Complete | One entry identity for selection and mutation, ambiguity refused; [identity tests](../tests/Keypaste.Core.Tests/EntryIdentityTests.cs) and [write-back gate](../scripts/verify-keepassxc-writeback.sh) D, D-0091 |
 | 10.1 | Complete | Initial hostile review/remediation; D-0084 in [DECISIONS](../DECISIONS.md) |
 | K.1 | Complete | Pinned SDK installed; [global.json](../global.json), D-0076 |
 
@@ -114,10 +115,6 @@ before the fix and verifies the corrected behavior. Keep the shared core and mat
 these tasks repair existing behavior and do not require a product rewrite. Record reproductions
 in repository fixtures/tests, so completion does not depend on a maintainer's temporary files.
 
-- [ ] **F.1a — Remove the selected env entry without deleting a neighbor.** Needs: 1.1, 4.2.
-  **Build:** Replace ambiguous slash-delimited selection/mutation in [EnvStore](../src/Keypaste.Core/EnvStore.cs) and its core/CLI/desktop removal callers with an unambiguous entry identity, refusing unresolved ambiguity. An externally authored title `nested/TOKEN` directly in `env/dev` currently resolves to the different `TOKEN` in `env/dev/nested`; propagate failed removal instead of reporting success.
-  **Verify (V-F.1a):** A KeePass-authored fixture containing both entries removes only the selected identity through the core and desktop path; duplicate titles require explicit selection or refusal. Save/reopen preserves every neighboring entry; a failed CLI removal exits nonzero and leaves the vault unchanged.
-
 - [ ] **F.1b — Refuse dotenv export onto its source vault.** Needs: 1.3.
   **Build:** Guard source/destination identity in [EnvExportCommand](../src/Keypaste.Cli/Commands/EnvExportCommand.cs) before any destructive write, including supported path aliases. `--force --yes` currently permits replacing the source KDBX with plaintext dotenv; it must not override this guard.
   **Verify (V-F.1b):** Same-path, relative/absolute, applicable case and supported link-alias fixtures refuse export without changing the vault's bytes or entries. A distinct destination still exports correctly under the existing explicit plaintext-consent rules.
@@ -125,6 +122,10 @@ in repository fixtures/tests, so completion does not depend on a maintainer's te
 - [ ] **F.1c — Preserve source edits made during env import.** Needs: 1.2.
   **Build:** Bind [EnvPullCommand](../src/Keypaste.Cli/Commands/EnvPullCommand.cs) cleanup to the imported source identity and content snapshot, covering the final check/delete boundary as well as prompts. The current gap permits deletion of changed/replaced source content that was never imported. Retain the file and explain when unchanged-source cleanup cannot be established safely.
   **Verify (V-F.1c):** Modify and replace the source during password, import and deletion prompts and between the final check and cleanup in separate fixtures: new bytes remain on disk and are not claimed as imported. Unchanged-source confirmed cleanup works; cancellation, `--keep`, failed vault save and uncertain identity never delete the source.
+
+- [ ] **F.1e — Refuse an ambiguous entry path on read.** Needs: F.1a.
+  **Build:** Route [GetCommand](../src/Keypaste.Cli/Commands/GetCommand.cs), [AddCommand](../src/Keypaste.Cli/Commands/AddCommand.cs)'s duplicate check and [EntryDetailViewModel](../src/Keypaste.App/ViewModels/EntryDetailViewModel.cs) through the identity resolution F.1a built. `Vault.Find(string)` still returns the first entry whose joined path matches, so `keypaste get env/dev/nested/TOKEN` releases whichever of two colliding entries the file lists first, and an inline edit writes to it. F.1a left these deliberately: it repaired removal, and a read that serves the wrong secret is its own bounded task.
+  **Verify (V-F.1e):** A colliding fixture makes `get` refuse rather than release either secret; `add` cannot create a third entry answering to a path that already names two; an inline edit writes the selected identity's fields and no neighbour's. Removal behaviour from F.1a is unchanged.
 
 - [ ] **F.2a — Apply saved desktop preferences to a fresh application session.** Needs: 4.1.
   **Build:** Load and apply saved idle timeout and theme during [App composition](../src/Keypaste.App/App.axaml.cs), keeping displayed and effective settings consistent. [SettingsViewModel](../src/Keypaste.App/ViewModels/SettingsViewModel.cs) currently displays a saved 60-second timeout while a new session still uses 300 seconds; the stored theme is also unapplied.
@@ -176,7 +177,7 @@ in repository fixtures/tests, so completion does not depend on a maintainer's te
   **Build:** Generate build attestations for every distributable, source archive and release manifest; bind verification to this repository and its release workflow. Publish a copyable verification procedure and retain the evidence with the release; make no reproducible-build claim from attestation alone.
   **Verify (V-3.8):** The documented procedure accepts an anonymously downloaded genuine release and rejects a changed byte, wrong repository identity or unrelated workflow. Every advertised asset is covered after temporary CI artifacts expire.
 
-- [ ] **R.0c — Publish and installation-verify the next CLI/MCP patch.** Needs: R.0b, 3.8, F.1a, F.1b, F.1c, F.3a, F.3b, F.3c, F.4b.
+- [ ] **R.0c — Publish and installation-verify the next CLI/MCP patch.** Needs: R.0b, 3.8, F.1a, F.1b, F.1c, F.1e, F.3a, F.3b, F.3c, F.4b.
   **Build:** Select the next version containing the existing Unreleased work, update version-specific install/setup instructions, and run tag publication plus automatic public-download checks on all four supported native CLI targets. Exercise setup and the advertised CLI/MCP approval/env workflows without an SDK; promote the CLI channel only after retained evidence passes, with the current signing limitation disclosed where it still applies.
   **Verify (V-R.0c):** A clean machine on every promised OS/CPU follows the published instructions successfully, including setup; binaries report the selected tag and match authenticated hashes. A failed target leaves the previous CLI release advertised; unfinished desktop/browser work cannot prevent an otherwise valid CLI patch.
 
@@ -202,7 +203,7 @@ in repository fixtures/tests, so completion does not depend on a maintainer's te
   **Build:** Sign and timestamp CLI/MCP/app executable payloads and the final Windows installer through the release environment, then verify the transported files before publication. Capture actual installation prompts instead of promising that a valid signature eliminates SmartScreen reputation prompts.
   **Verify (V-3.6b):** Downloaded candidates report valid Authenticode signatures, the expected publisher and timestamp; changing a signed payload fails verification. A clean supported Windows installation succeeds and its actual prompts are retained.
 
-- [ ] **4.7b — Exercise native desktop installation candidates.** Needs: 4.7a, 4.6, 4.8, 4.9, 4.4b, 4.3b, E.1, F.1a, F.1b, F.1c, F.2a, F.2b, F.2c, F.2d, F.3a, F.3b, F.3c.
+- [ ] **4.7b — Exercise native desktop installation candidates.** Needs: 4.7a, 4.6, 4.8, 4.9, 4.4b, 4.3b, E.1, F.1a, F.1b, F.1c, F.1e, F.2a, F.2b, F.2c, F.2d, F.3a, F.3b, F.3c.
   **Build:** Add native candidate installation checks without a development SDK: first render, vault creation/open, existing-secret editing, env execution, native credential approval and activity inspection. Test Linux on the declared compatibility floor and record manual observations for UI/platform behavior automation cannot establish.
   **Verify (V-4.7b):** Each supported OS/CPU starts the installed GUI and completes these workflows using retained fixture/evidence records. A vault-only selftest, missing native library or unobserved GUI path cannot pass the desktop installation check.
 

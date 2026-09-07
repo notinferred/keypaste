@@ -43,10 +43,10 @@ public sealed class Vault : IDisposable
     internal bool UsesFileTransactions => _interop.UsesFileTransactions;
 
     /// <summary>
-    /// The number of history items the entry at <paramref name="entryPath"/> carries, or -1 if
+    /// The number of history items the entry called <paramref name="name"/> carries, or -1 if
     /// there is no such entry. A test seam; keypaste itself has no feature that reads history.
     /// </summary>
-    internal int CountHistoryItems(string entryPath) => _interop.CountHistoryItems(entryPath);
+    internal int CountHistoryItems(EntryName name) => _interop.CountHistoryItems(name);
 
     /// <summary>
     /// Creates a new, empty vault protected by <paramref name="masterPassword"/>.
@@ -109,7 +109,7 @@ public sealed class Vault : IDisposable
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The path identifies the entry, so this cannot rename one — an entry with a new title is a
+    /// The name identifies the entry, so this cannot rename one — an entry with a new title is a
     /// different entry. Everything the entry carries that <see cref="VaultEntry"/> does not model
     /// (its UUID, creation time, attachments, and any custom string fields added in KeePassXC) is
     /// preserved: the underlying entry is edited in place, never replaced.
@@ -118,16 +118,17 @@ public sealed class Vault : IDisposable
     /// The previous field values are retained as a KeePass history item, which KeePassXC shows in
     /// the entry's History tab. That is the format's native behaviour, and it means overwriting a
     /// secret does not erase the old one — see DECISIONS.md D-0014. Only
-    /// <see cref="RemoveEntry"/> removes a value outright.
+    /// <see cref="RemoveEntry(EntryName)"/> removes a value outright.
     /// </para>
     /// </remarks>
-    /// <param name="entry">The replacement field values, located by their path.</param>
+    /// <param name="entry">The replacement values, located by their group path and title.</param>
     /// <returns>
     /// <see langword="true"/> if an entry was updated, <see langword="false"/> if no entry has
-    /// that path.
+    /// that name.
     /// </returns>
     /// <exception cref="ArgumentNullException"><paramref name="entry"/> is null.</exception>
     /// <exception cref="ObjectDisposedException">The vault has been disposed.</exception>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
     public bool UpdateEntry(VaultEntry entry)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -148,10 +149,37 @@ public sealed class Vault : IDisposable
     }
 
     /// <summary>
+    /// Finds the one entry with this group path and title.
+    /// </summary>
+    /// <param name="name">The entry's identity.</param>
+    /// <returns>The entry, or <see langword="null"/> if no entry has that name.</returns>
+    /// <remarks>
+    /// <b>The unambiguous form, and the one every mutation goes through.</b>
+    /// <see cref="Find(string)"/> takes the two joined, and joining is lossy: an entry titled
+    /// <c>b/c</c> in group <c>a</c> and an entry titled <c>c</c> in group <c>a/b</c> produce the
+    /// same string. A caller already holding both parts should never put them together.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="name"/> is null.</exception>
+    /// <exception cref="ObjectDisposedException">The vault has been disposed.</exception>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    public VaultEntry? Find(EntryName name)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+
+        return _interop.FindEntry(name);
+    }
+
+    /// <summary>
     /// Finds a single entry by its full path, for example <c>servers/production</c>.
     /// </summary>
     /// <param name="entryPath">The entry's <see cref="VaultEntry.Path"/>.</param>
     /// <returns>The entry, or <see langword="null"/> if no entry has that path.</returns>
+    /// <remarks>
+    /// A path is what a person types and what a policy file holds, so it stays addressable. It is
+    /// not an identity: the first entry whose path matches is returned, and two entries can share
+    /// one. <see cref="Find(EntryName)"/> is the form that tells them apart.
+    /// </remarks>
     public VaultEntry? Find(string entryPath)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -185,6 +213,25 @@ public sealed class Vault : IDisposable
     }
 
     /// <summary>
+    /// Removes the one entry with this name. Call <see cref="Save"/> to persist it.
+    /// </summary>
+    /// <param name="name">The entry's identity.</param>
+    /// <returns>
+    /// <see langword="true"/> if an entry was removed, <see langword="false"/> if nothing has that
+    /// name. Removing nothing is not an error here; the caller decides whether it is one.
+    /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="name"/> is null.</exception>
+    /// <exception cref="ObjectDisposedException">The vault has been disposed.</exception>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    public bool RemoveEntry(EntryName name)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+
+        return _interop.RemoveEntry(name) > 0;
+    }
+
+    /// <summary>
     /// Removes the entry at <paramref name="entryPath"/>. Call <see cref="Save"/> to persist it.
     /// </summary>
     /// <param name="entryPath">The entry's <see cref="VaultEntry.Path"/>.</param>
@@ -194,12 +241,36 @@ public sealed class Vault : IDisposable
     /// </returns>
     /// <exception cref="ArgumentNullException"><paramref name="entryPath"/> is null.</exception>
     /// <exception cref="ObjectDisposedException">The vault has been disposed.</exception>
+    /// <exception cref="VaultException">More than one entry answers to that path.</exception>
+    /// <remarks>
+    /// For a path someone typed. It resolves to an identity first and refuses when two entries
+    /// answer to it, because deleting either would be a guess (docs/PRODUCT.md law 3.7).
+    /// </remarks>
     public bool RemoveEntry(string entryPath)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(entryPath);
 
-        return _interop.RemoveEntry(entryPath) > 0;
+        VaultEntry? found = null;
+
+        foreach (VaultEntry entry in _interop.ReadEntries())
+        {
+            if (!string.Equals(entry.Path, entryPath, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (found is not null)
+            {
+                throw new VaultException(
+                    $"'{entryPath}' names more than one entry: a title containing a separator and " +
+                    "a group of that name produce the same path. Rename one of them in KeePassXC.");
+            }
+
+            found = entry;
+        }
+
+        return found is not null && _interop.RemoveEntry(EntryName.Of(found)) > 0;
     }
 
     /// <summary>

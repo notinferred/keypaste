@@ -89,8 +89,7 @@ internal sealed class KeePassInterop : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        PwGroup group = ResolveGroup(entry.GroupPath, createMissing: true)
-            ?? throw new VaultException($"Could not create group '{entry.GroupPath}'.");
+        PwGroup group = EnsureGroup(entry.GroupPath);
 
         PwEntry pwEntry = new(true, true);
         SetField(pwEntry, PwDefs.TitleField, entry.Title);
@@ -102,16 +101,18 @@ internal sealed class KeePassInterop : IDisposable
         group.AddEntry(pwEntry, true);
     }
 
-    /// <summary>Overwrites the fields of an existing entry, matched by its path.</summary>
+    /// <summary>Overwrites the fields of the one entry with this entry's name.</summary>
     /// <returns>The number of entries updated: 0 if nothing matched, otherwise 1.</returns>
     /// <remarks>
-    /// The path identifies the entry, so this cannot rename one; it changes field values in place.
+    /// The name identifies the entry, so this cannot rename one or move it; it changes field
+    /// values in place.
     /// </remarks>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
     internal int UpdateEntry(VaultEntry entry)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (FindEntry(entry.Path) is not { } found)
+        if (Locate(EntryName.Of(entry)) is not { } found)
         {
             return 0;
         }
@@ -147,6 +148,15 @@ internal sealed class KeePassInterop : IDisposable
         return entries;
     }
 
+    /// <summary>Returns the one entry with this name, or null when the vault holds none.</summary>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal VaultEntry? FindEntry(EntryName name)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        return Locate(name) is { } found ? Read(found.Entry, name.GroupPath) : null;
+    }
+
     /// <summary>Returns every group path in the vault, excluding the root group.</summary>
     /// <remarks>
     /// Separate from <see cref="ReadEntries"/> because a group holding no entries is invisible in
@@ -162,13 +172,14 @@ internal sealed class KeePassInterop : IDisposable
         return paths;
     }
 
-    /// <summary>Removes the entry at the given path.</summary>
+    /// <summary>Removes the one entry with this name.</summary>
     /// <returns>The number of entries removed: 0 if nothing matched, otherwise 1.</returns>
-    internal int RemoveEntry(string entryPath)
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal int RemoveEntry(EntryName name)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (FindEntry(entryPath) is not { } found)
+        if (Locate(name) is not { } found)
         {
             return 0;
         }
@@ -190,7 +201,7 @@ internal sealed class KeePassInterop : IDisposable
     internal bool UsesFileTransactions => _database.UseFileTransactions;
 
     /// <summary>
-    /// The number of history items an entry carries, or -1 if no entry has that path.
+    /// The number of history items an entry carries, or -1 if no entry has that name.
     /// </summary>
     /// <remarks>
     /// Exists so that "overwriting a value keeps the previous one" can be asserted rather than
@@ -198,11 +209,11 @@ internal sealed class KeePassInterop : IDisposable
     /// silently stopped retaining it would pass every test while the documentation kept promising
     /// it (DECISIONS.md D-0014).
     /// </remarks>
-    internal int CountHistoryItems(string entryPath)
+    internal int CountHistoryItems(EntryName name)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        return FindEntry(entryPath) is { } found ? (int)found.Entry.History.UCount : -1;
+        return Locate(name) is { } found ? (int)found.Entry.History.UCount : -1;
     }
 
     /// <summary>How many times a save is attempted before the failure is reported.</summary>
@@ -335,21 +346,12 @@ internal sealed class KeePassInterop : IDisposable
     {
         foreach (PwEntry entry in group.Entries)
         {
-            entries.Add(new VaultEntry
-            {
-                Title = ReadField(entry, PwDefs.TitleField),
-                Username = ReadField(entry, PwDefs.UserNameField),
-                Password = ReadField(entry, PwDefs.PasswordField),
-                Url = ReadField(entry, PwDefs.UrlField),
-                Notes = ReadField(entry, PwDefs.NotesField),
-                GroupPath = groupPath,
-            });
+            entries.Add(Read(entry, groupPath));
         }
 
         foreach (PwGroup child in group.Groups)
         {
-            string childPath = groupPath.Length == 0 ? child.Name : groupPath + "/" + child.Name;
-            Collect(child, childPath, entries);
+            Collect(child, ChildPath(groupPath, child.Name), entries);
         }
     }
 
@@ -357,10 +359,23 @@ internal sealed class KeePassInterop : IDisposable
     {
         foreach (PwGroup child in group.Groups)
         {
-            string childPath = groupPath.Length == 0 ? child.Name : groupPath + "/" + child.Name;
+            string childPath = ChildPath(groupPath, child.Name);
             paths.Add(childPath);
             CollectGroups(child, childPath, paths);
         }
+    }
+
+    private static VaultEntry Read(PwEntry entry, string groupPath)
+    {
+        return new VaultEntry
+        {
+            Title = ReadField(entry, PwDefs.TitleField),
+            Username = ReadField(entry, PwDefs.UserNameField),
+            Password = ReadField(entry, PwDefs.PasswordField),
+            Url = ReadField(entry, PwDefs.UrlField),
+            Notes = ReadField(entry, PwDefs.NotesField),
+            GroupPath = groupPath,
+        };
     }
 
     private static string ReadField(PwEntry entry, string field)
@@ -368,35 +383,78 @@ internal sealed class KeePassInterop : IDisposable
         return entry.Strings.ReadSafe(field);
     }
 
-    /// <summary>Locates an entry and its owning group, splitting the path on its last slash.</summary>
-    /// <remarks>
-    /// The first title match wins. KDBX permits sibling entries with the same title, so callers
-    /// that care about ambiguity have to detect it themselves from <see cref="ReadEntries"/>.
-    /// </remarks>
-    private (PwGroup Group, PwEntry Entry)? FindEntry(string entryPath)
+    private static string ChildPath(string groupPath, string name)
     {
-        int lastSlash = entryPath.LastIndexOf('/');
-        string groupPath = lastSlash < 0 ? string.Empty : entryPath[..lastSlash];
-        string title = lastSlash < 0 ? entryPath : entryPath[(lastSlash + 1)..];
-
-        PwGroup? group = ResolveGroup(groupPath, createMissing: false);
-        if (group is null)
-        {
-            return null;
-        }
-
-        foreach (PwEntry candidate in group.Entries)
-        {
-            if (string.Equals(ReadField(candidate, PwDefs.TitleField), title, StringComparison.Ordinal))
-            {
-                return (group, candidate);
-            }
-        }
-
-        return null;
+        return groupPath.Length == 0 ? name : groupPath + "/" + name;
     }
 
-    private PwGroup? ResolveGroup(string groupPath, bool createMissing)
+    /// <summary>Locates the one entry with this name, and the group holding it.</summary>
+    /// <returns>The entry and its group, or null when no entry has that name.</returns>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    /// <remarks>
+    /// <para>
+    /// <b>The same traversal as <see cref="Collect"/>, and that is the whole point.</b> An entry's
+    /// group path is what walking the tree and joining names produces. Re-splitting a joined path
+    /// on its last slash is a second rule, and the two disagreed: an entry titled
+    /// <c>nested/TOKEN</c> in <c>env/dev</c> and an entry titled <c>TOKEN</c> in
+    /// <c>env/dev/nested</c> are both <c>env/dev/nested/TOKEN</c>, so a listing found one and a
+    /// removal deleted the other. Resolving the group by name instead would move the same defect
+    /// one level up: KDBX permits two sibling groups called <c>nested</c>, and the walker sees
+    /// entries in both while a name lookup sees only the first.
+    /// </para>
+    /// <para>
+    /// Two entries answering to one name are refused rather than resolved to whichever came first,
+    /// because there is no answer that is not a guess (docs/PRODUCT.md law 3.7). KDBX permits that
+    /// within one group and KeePassXC will make it; <see cref="EntryHandle"/> is what keeps each of
+    /// them individually addressable.
+    /// </para>
+    /// </remarks>
+    private (PwGroup Group, PwEntry Entry)? Locate(EntryName name)
+    {
+        (PwGroup Group, PwEntry Entry)? found = null;
+        var matches = 0;
+
+        Search(_database.RootGroup, string.Empty);
+
+        if (matches > 1)
+        {
+            string where = name.GroupPath.Length == 0 ? "the root group" : name.GroupPath;
+            throw new VaultException(
+                $"'{name.Title}' in '{where}' names {matches} entries. keypaste will not guess " +
+                "which one you meant; rename one of them in KeePassXC.");
+        }
+
+        return found;
+
+        void Search(PwGroup group, string groupPath)
+        {
+            if (string.Equals(groupPath, name.GroupPath, StringComparison.Ordinal))
+            {
+                foreach (PwEntry candidate in group.Entries)
+                {
+                    if (string.Equals(ReadField(candidate, PwDefs.TitleField), name.Title, StringComparison.Ordinal))
+                    {
+                        matches++;
+                        found ??= (group, candidate);
+                    }
+                }
+            }
+
+            foreach (PwGroup child in group.Groups)
+            {
+                Search(child, ChildPath(groupPath, child.Name));
+            }
+        }
+    }
+
+    /// <summary>Resolves a group path, creating any segment that does not exist yet.</summary>
+    /// <remarks>
+    /// The first child of a matching name wins, which is right here and nowhere else: this answers
+    /// "where should a new entry go", and a person holding two sibling groups of one name in
+    /// KeePassXC gets the one KeePassXC also lists first. Finding an entry that already exists is
+    /// <see cref="Locate"/>'s question, and that one is answered by traversal.
+    /// </remarks>
+    private PwGroup EnsureGroup(string groupPath)
     {
         PwGroup current = _database.RootGroup;
         if (groupPath.Length == 0)
@@ -418,11 +476,6 @@ internal sealed class KeePassInterop : IDisposable
 
             if (next is null)
             {
-                if (!createMissing)
-                {
-                    return null;
-                }
-
                 next = new PwGroup(true, true, segment, PwIcon.Folder);
                 current.AddGroup(next, true);
             }

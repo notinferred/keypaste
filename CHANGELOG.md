@@ -8,6 +8,22 @@ Versions are the ones published at `https://dl.keypaste.com/v<version>/`. Every 
 
 These changes are available in source on `main`, **not in the `v0.1.0` downloads**. The source version still reports `0.1.0`; its version string alone does not identify the published bytes.
 
+**Deleting a variable can no longer take its neighbour with it.** A KeePassXC user can title an
+entry `nested/TOKEN` and put it in `env/dev`, and that entry has the same path as an ordinary
+`TOKEN` in `env/dev/nested` — `env/dev/nested/TOKEN`, for both. keypaste had two rules for taking
+that path back apart and they disagreed, so `keypaste env rm dev nested/TOKEN` listed one entry,
+deleted the other, and said `Removed`. An entry is now addressed by its group and its title, never
+by the two joined, everywhere a vault is written. The same defect was in `env set`: a title of
+`billing/TOKEN` sitting directly in `env` could receive a value meant for `env/billing/TOKEN`.
+
+**A name that two entries answer to is refused rather than guessed at.** KDBX allows two entries
+with one title in one group and KeePassXC will make them. Removing or updating either would be a
+guess, so keypaste declines, names the collision and writes nothing; `keypaste rm` and `keypaste
+env rm` exit nonzero and leave the file untouched, and the desktop says so on the screen you were
+on. `keypaste ls` and `env ls` still show both, because a listing that hid one would be keypaste
+and KeePassXC disagreeing about the same file. A removal that finds nothing to remove no longer
+reports success — it exits 3 and does not rewrite the vault.
+
 **The approval dialog stops mangling the agent's reason.** A reason naming an entry — `env/demo/STRIPE_KEY`, the ordinary thing for an agent to say — had its slashes replaced and was then labelled as having been scrubbed. Reasons now keep the path separator; markup, fences and pipes are still stripped, so a hostile reason is as inert as it ever was.
 
 **The audit log names the entry, not the handle.** Agents are told to prefer an opaque handle, so most real requests logged as `k1_…` — unreadable, in the one record whose job is saying which entry was asked for. It now records the entry the approver resolved.

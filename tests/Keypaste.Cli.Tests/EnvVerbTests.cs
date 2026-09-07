@@ -184,6 +184,52 @@ public sealed class EnvVerbTests
         Assert.NotNull(vault.Find("env/billing/B"));
     }
 
+    /// <summary>
+    /// The entry titled <c>nested/TOKEN</c> is one KeePassXC authored: it shares its path with
+    /// <c>env/dev/nested/TOKEN</c>, and removing it must not take that neighbour instead.
+    /// </summary>
+    [Fact]
+    public void Rm_RemovesTheNamedVariable_WhenANestedGroupSharesItsPath()
+    {
+        using var harness = new CliHarness();
+        SeedVault(harness);
+        Author(harness, ("env/dev", "nested/TOKEN", "slashed"), ("env/dev/nested", "TOKEN", "nested"));
+
+        harness.Prompt.Enqueue(Master);
+        var exit = harness.Run("env", "rm", "dev", "nested/TOKEN", "--yes", "--vault", harness.VaultPath);
+
+        Assert.Equal(CliApp.ExitSuccess, exit);
+
+        using var vault = Vault.Open(harness.VaultPath, Master);
+        var survivor = Assert.Single(vault.ReadEntries());
+        Assert.Equal("nested", survivor.Password, StringComparer.Ordinal);
+    }
+
+    /// <summary>
+    /// Two entries in one project answering to one name. Removing either would be a guess, so the
+    /// command refuses, exits nonzero and leaves the file exactly as it found it — which is why
+    /// this asserts on the bytes: <see cref="Vault.Save"/> re-randomises salt and nonces, so an
+    /// unchanged digest proves no save happened rather than that the contents matched.
+    /// </summary>
+    [Fact]
+    public void Rm_ADuplicatedVariableName_IsRefused_AndTheVaultIsNotWritten()
+    {
+        using var harness = new CliHarness();
+        SeedVault(harness);
+        Author(harness, ("env/billing", "TOKEN", "first"), ("env/billing", "TOKEN", "second"));
+
+        var before = Digest(harness.VaultPath);
+
+        harness.Prompt.Enqueue(Master);
+        var exit = harness.Run("env", "rm", "billing", "TOKEN", "--yes", "--vault", harness.VaultPath);
+
+        Assert.NotEqual(CliApp.ExitSuccess, exit);
+        Assert.Equal(before, Digest(harness.VaultPath), StringComparer.Ordinal);
+
+        using var vault = Vault.Open(harness.VaultPath, Master);
+        Assert.Equal(2, vault.ReadEntries().Count);
+    }
+
     [Fact]
     public void Rm_WithoutYes_AndRedirectedStdin_IsAUsageError()
     {
@@ -373,6 +419,33 @@ public sealed class EnvVerbTests
         harness.Run("env", "--help");
 
         Assert.All(harness.Out, c => Assert.True(c < 128, $"non-ASCII character '{c}' in env usage"));
+    }
+
+    /// <summary>
+    /// Writes entries the CLI itself refuses to create, the way KeePassXC would. Takes the vault
+    /// through the core directly, because <c>env set</c> rejects a key containing a separator and
+    /// <c>add</c> would read the same separator as a group.
+    /// </summary>
+    private static void Author(CliHarness harness, params (string GroupPath, string Title, string Password)[] entries)
+    {
+        using var vault = Vault.Open(harness.VaultPath, Master);
+
+        foreach (var entry in entries)
+        {
+            vault.AddEntry(new VaultEntry
+            {
+                Title = entry.Title,
+                Password = entry.Password,
+                GroupPath = entry.GroupPath,
+            });
+        }
+
+        vault.Save();
+    }
+
+    private static string Digest(string path)
+    {
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
     }
 
     private static void SeedVault(CliHarness harness)

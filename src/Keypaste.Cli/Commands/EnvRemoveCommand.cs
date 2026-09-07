@@ -4,8 +4,8 @@ namespace Keypaste.Cli.Commands;
 
 /// <summary>Removes one variable: <c>keypaste env rm &lt;project&gt; &lt;KEY&gt;</c>.</summary>
 /// <remarks>
-/// The path is always built through <see cref="EnvConvention"/>, so this verb cannot reach an
-/// entry outside the project's group however it is called.
+/// The variable is addressed by its group and its title, never by the two joined, so this verb
+/// cannot reach an entry outside the project's group however it is called.
 /// </remarks>
 internal static class EnvRemoveCommand
 {
@@ -63,8 +63,10 @@ internal static class EnvRemoveCommand
                 return CliApp.ExitNotFound;
             }
 
+            var name = new EntryName(EnvConvention.GroupPath(project), key);
             var entryPath = EnvConvention.EntryPath(project, key);
-            if (vault.Find(entryPath) is null)
+
+            if (vault.Find(name) is null)
             {
                 context.Stderr.WriteLine($"keypaste env rm: '{project}' has no variable '{key}'");
                 return CliApp.ExitNotFound;
@@ -80,7 +82,15 @@ internal static class EnvRemoveCommand
                 }
             }
 
-            store.Remove(project, key);
+            // Nothing removed means nothing to save. Something wrote to the file between the
+            // check above and here, and the honest answer is that this run did not do it.
+            if (!store.Remove(project, key))
+            {
+                context.Stderr.WriteLine(
+                    $"keypaste env rm: '{entryPath}' was not removed; the vault is unchanged");
+                return CliApp.ExitNotFound;
+            }
+
             vault.Save();
 
             context.Stderr.WriteLine($"Removed {entryPath}");
