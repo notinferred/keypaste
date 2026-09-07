@@ -31,7 +31,7 @@ Source routes are not promises of tested downloadable support. Minimum OS versio
 ## What exists
 
 - [`release.yml`](../.github/workflows/release.yml) builds CLI/MCP natively on each of four targets. A tag must match the source version, point to a commit on `main` with passing CI, and have a changelog section. The workflow exercises the actual NativeAOT binaries, including real KeePassXC compatibility, before packaging. It checks Linux x64 on Debian 12 and rejects Alpine execution; the arm64 container equivalent is absent.
-- The publish job rechecks transported hashes, includes corresponding source and license notices, allows only release files, and uploads to a versioned R2 prefix. It refuses any nonempty destination prefix. Manual dispatch builds and verifies without publishing. GitHub Releases are not the current download channel.
+- The publish job rechecks transported hashes, includes corresponding source and license notices, allows only release files, and uploads to a versioned R2 prefix. It refuses a destination when listing returns existing objects, but currently suppresses listing errors; F.4a in STEPS must close that fail-open path before any new publication. Manual dispatch builds and verifies without publishing. GitHub Releases are not the current download channel.
 - [`app.yml`](../.github/workflows/app.yml) packages three desktop targets, checks the version, runs a vault selftest and retains archives for seven days. It does not publish them. The selftest renders no window; checking that native library files exist does not prove they load on first render. Prerelease suffix handling also needs alignment with the CLI workflow before desktop release candidates can pass.
 - [`install.yml`](../.github/workflows/install.yml) runs the README install blocks weekly or manually for Linux x64, macOS ARM64 and Windows x64. It checks the installed CLI version and presence of MCP. It does not cover Linux ARM64, the subsequent setup/use instructions, desktop installation or automatic post-publication verification. A retained successful run is required to claim its result for a specific release.
 
@@ -56,6 +56,9 @@ requirements to implementation; all remain open until their own evidence passes.
 
 | Delivery | Owning tasks |
 |---|---|
+| Existing data-preservation, approval and transport repairs before the CLI/MCP patch | F.1a–c, F.3a–c; required by R.0c |
+| Existing desktop preference, lock, clipboard and automation checks | F.2a–d; required by 4.7b |
+| Release destination error handling and first-party publisher metadata | F.4a/b; required by the relevant release paths |
 | Executable version/platform definition, complete publication, provenance | R.0a, R.0b, 3.8 |
 | Public CLI/MCP patch and native installation | R.0c |
 | Desktop candidate packaging, installation and data-preserving upgrades | 4.7a, 4.7b, 4.7d |

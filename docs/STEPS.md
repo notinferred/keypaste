@@ -7,13 +7,19 @@
 ## Current status
 
 **Working proposition: incomplete. Hosted pilot: not ready. Paid release: not ready.**
-The local vault, CLI/env workflow and approval bridge work. The desktop is a source build with
-partial entry/env screens. Everyday password-management workflows, browser integration and desktop
+The local vault, CLI/env workflow and approval bridge are implemented, with known defects in
+data preservation, authorization timing and release checks. The desktop is a source build with
+partial entry/env screens and ineffective settings/clipboard behavior identified in the 2026-09-07
+code review. The F.1–F.4 repair tasks below remain open even though existing tests pass.
+Everyday password-management workflows, browser integration and desktop
 publication remain unfinished. No hosted service, web vault, mobile integration or organization
 credential service is available.
 
-**Next: R.0a — make release identity and supported targets executable.** Then R.0b/3.8 make public
-distribution verifiable; 4.7a prepares desktop packages without waiting for signing enrollment.
+**Next: F.1a — prevent env removal from deleting a different entry.** Complete the ready repairs
+below before new feature work. Release foundations follow: R.0a makes release identity and supported
+targets executable, R.0b/3.8 make distribution verifiable, and 4.7a prepares desktop packages without
+waiting for signing enrollment. A new CLI/MCP patch requires the core/CLI/bridge and release repairs;
+desktop release checks additionally require the desktop repairs.
 The first new user workflow is **4.8 — create a vault in the app**, followed by **4.9 — enter and
 edit an existing password or API value**. Dependencies below determine what can actually start.
 
@@ -48,6 +54,8 @@ A completed source task does not mean that it is present in the current download
 
 Completed rows preserve their original bounded scope. For example, 4.2 does not include entering
 an existing secret, undoing deletion or restoring history. Those gaps have their own unchecked tasks.
+The F tasks record defects and missing coverage discovered after those original checks; historical
+completion does not waive the new repair dependencies or certify the current implementation.
 
 **External prerequisites:** 3.5a needs Apple enrollment (H-0015); 3.6a needs an eligible Windows
 signing account (H-0017); 8.4a needs extension-store accounts; H.7 needs hosted infrastructure
@@ -98,13 +106,69 @@ recover mistakes, inject a project's env and approve or deny agent access. Build
 core; desktop, CLI and browser tasks explicitly name their surfaces. No account is required.
 R.1 closes the milestone only after the published product passes its complete user journey.
 
-### Release foundations — first ready work
+### Repair existing behavior — first ready work
+
+The bounded 2026-09-07 review found these issues while the local Windows suites reported 1,169
+passed and five platform-specific skips. Each task needs a regression that demonstrates its failure
+before the fix and verifies the corrected behavior. Keep the shared core and mature KDBX library;
+these tasks repair existing behavior and do not require a product rewrite. Record reproductions
+in repository fixtures/tests, so completion does not depend on a maintainer's temporary files.
+
+- [ ] **F.1a — Remove the selected env entry without deleting a neighbor.** Needs: 1.1, 4.2.
+  **Build:** Replace ambiguous slash-delimited selection/mutation in [EnvStore](../src/Keypaste.Core/EnvStore.cs) and its core/CLI/desktop removal callers with an unambiguous entry identity, refusing unresolved ambiguity. An externally authored title `nested/TOKEN` directly in `env/dev` currently resolves to the different `TOKEN` in `env/dev/nested`; propagate failed removal instead of reporting success.
+  **Verify (V-F.1a):** A KeePass-authored fixture containing both entries removes only the selected identity through the core and desktop path; duplicate titles require explicit selection or refusal. Save/reopen preserves every neighboring entry; a failed CLI removal exits nonzero and leaves the vault unchanged.
+
+- [ ] **F.1b — Refuse dotenv export onto its source vault.** Needs: 1.3.
+  **Build:** Guard source/destination identity in [EnvExportCommand](../src/Keypaste.Cli/Commands/EnvExportCommand.cs) before any destructive write, including supported path aliases. `--force --yes` currently permits replacing the source KDBX with plaintext dotenv; it must not override this guard.
+  **Verify (V-F.1b):** Same-path, relative/absolute, applicable case and supported link-alias fixtures refuse export without changing the vault's bytes or entries. A distinct destination still exports correctly under the existing explicit plaintext-consent rules.
+
+- [ ] **F.1c — Preserve source edits made during env import.** Needs: 1.2.
+  **Build:** Bind [EnvPullCommand](../src/Keypaste.Cli/Commands/EnvPullCommand.cs) cleanup to the imported source identity and content snapshot, covering the final check/delete boundary as well as prompts. The current gap permits deletion of changed/replaced source content that was never imported. Retain the file and explain when unchanged-source cleanup cannot be established safely.
+  **Verify (V-F.1c):** Modify and replace the source during password, import and deletion prompts and between the final check and cleanup in separate fixtures: new bytes remain on disk and are not claimed as imported. Unchanged-source confirmed cleanup works; cancellation, `--keep`, failed vault save and uncertain identity never delete the source.
+
+- [ ] **F.2a — Apply saved desktop preferences to a fresh application session.** Needs: 4.1.
+  **Build:** Load and apply saved idle timeout and theme during [App composition](../src/Keypaste.App/App.axaml.cs), keeping displayed and effective settings consistent. [SettingsViewModel](../src/Keypaste.App/ViewModels/SettingsViewModel.cs) currently displays a saved 60-second timeout while a new session still uses 300 seconds; the stored theme is also unapplied.
+  **Verify (V-F.2a):** Save preferences, dispose the complete application/session and create a fresh one: the effective timeout, displayed choice and actual theme agree without editing Settings again. A one-minute fixture locks at one minute; invalid/unreadable settings use documented defaults without overwriting the original file.
+
+- [ ] **F.2b — Enforce the minimize-lock setting.** Needs: F.2a.
+  **Build:** Connect the existing LockWhenMinimized setting to native window-state handling and the normal session/clipboard lock path. Its checkbox currently persists a value with no consumer. Apply changes immediately and on startup; omit the control on any explicitly unsupported surface rather than offering an inactive security setting.
+  **Verify (V-F.2b):** With the setting enabled, native minimize locks the vault and restore shows the locked screen; disabled minimize leaves the ordinary idle policy in force. Repeat after restart and retain observations for each advertised desktop OS. Persistence-only tests cannot pass this task.
+
+- [ ] **F.2c — Prevent clipboard writes from outliving lock or shutdown.** Needs: 4.2.
+  **Build:** Serialize [ClipboardCountdown](../src/Keypaste.App/Clipboard/ClipboardCountdown.cs) operations and invalidate/drain pending writes during lock, disposal and orderly shutdown. A copy suspended in an awaited clipboard write currently resumes after disposal, installs the secret and revives its timer. Preserve unrelated clipboard content while completing owned cleanup.
+  **Verify (V-F.2c):** A genuinely asynchronous fixture delays the write across lock/disposal and quit: completing it cannot leave an owned secret or revive a timer. Cover overlapping secret/plain copies, explicit clear, clipboard failure and unrelated replacement; synchronous fake clipboard methods alone cannot pass.
+
+- [ ] **F.2d — Verify master-password automation cannot expose input.** Needs: 4.1.
+  **Build:** Add the missing dedicated [MaskedInput](../src/Keypaste.App/Controls/MaskedInput.cs) regression identified in THREATS T-22. Exercise typed/pasted fixture input and inspect its actual automation peer, properties and attached metadata. This moves the existing security check forward from the later 4.6 rendering task.
+  **Verify (V-F.2d):** No value provider or automation name, help, status, ID or attached property exposes the fixture password; deliberately attaching it or substituting a value-exposing control fails. A RevealedValue test cannot substitute for the master-password input check.
+
+- [ ] **F.3a — Keep approval expiry bounded when the wall clock changes.** Needs: 2.2.
+  **Build:** Correct [GrantCache](../src/Keypaste.Core/Approval/GrantCache.cs) lookup and timer expiry using elapsed-time bounds with explicit suspension behavior. A backward wall-clock correction currently keeps a grant usable after its one-shot timer fires and can report a remaining lifetime longer than the approved TTL.
+  **Verify (V-F.3a):** Independently move wall and elapsed clocks backward/forward and simulate suspension: a 250 ms grant is unusable after 600 ms elapsed despite a one-hour wall-clock rollback. Remaining lifetime never exceeds the approved TTL; expiry/disconnect/disposal clear owned buffers and leave no orphan timer. Client-held copies remain outside this guarantee.
+
+- [ ] **F.3b — Refuse concurrent prompt requests at the MCP boundary.** Needs: 2.1, 2.2.
+  **Build:** Remove the unbounded prompt backlog created by [ApproverConnection](../src/Keypaste.Mcp/ApproverConnection.cs) queuing exchanges before the approval gate's Busy check. Return a bounded, auditable Busy refusal for additional decision requests and handle cancellation/disconnection without corrupting the framed transport or releasing a credential.
+  **Verify (V-F.3b):** Through one real MCP connection, hold a prompt open and request several different entries concurrently: later calls receive Busy promptly and never become delayed prompts. Cancellation/disconnect discards pending work; a fresh request after resolution succeeds. Calling ApprovalGate directly is insufficient evidence.
+
+- [ ] **F.3c — Bound entry-name listing by encoded IPC size.** Needs: 2.1, 2.2.
+  **Build:** Bound names before [ApproverProtocol](../src/Keypaste.Core/Ipc/ApproverProtocol.cs) serialization using byte-aware truncation or pagination with an explicit completeness indicator. The current 1,000-entry cap can encode beyond [MessageFramer](../src/Keypaste.Core/Ipc/MessageFramer.cs)'s 64 KiB limit and close the connection. Preserve exposure filtering and never substitute secret values into names.
+  **Verify (V-F.3c):** The reproduced 1,000-name/76,060-byte case, longer Unicode/escaped names and a larger vault return bounded valid frames with truthful completeness information through the real transport. No silent omission claim or unexpected connection close; subsequent approved requests remain usable.
+
+- [ ] **F.4a — Fail closed when checking an existing release destination.** Needs: 3.4.
+  **Build:** Fix [release.yml](../.github/workflows/release.yml)'s suppressed listing errors: require a successful destination check before upload and refuse an occupied version. A denied or failed `aws s3 ls` currently becomes an empty result and reaches upload. Fix this before any new publication, independently of desktop progress.
+  **Verify (V-F.4a):** A controlled publisher fixture covers empty, occupied, denied, unavailable and malformed/incomplete listing responses. Only a successfully verified empty destination reaches upload; all other cases make zero write calls and preserve existing assets. Exercise this on a dry run without production credentials.
+
+- [ ] **F.4b — Align generated first-party publisher metadata.** Needs: 0.1, 3.0.
+  **Build:** Review and align the first-party Authors/Company/Copyright outputs from [Directory.Build.props](../Directory.Build.props) with the documented project identity and accurate attribution. Current Windows output exposes a personal identity despite the project-metadata rule. Apply the chosen fields consistently to CLI/MCP/app packages and retain required third-party notices.
+  **Verify (V-F.4b):** Inspect built and packaged executable metadata on each claimed target: first-party identity matches the recorded project choice and required attribution remains intact. Source-property inspection alone cannot pass; changing future metadata makes no claim to remove previously published artifacts or history.
+
+### Release foundations
 
 - [ ] **R.0a — Pin release identity and the supported platform contract.** Needs: 3.4.
   **Build:** Add one checked release definition for component, version, source commit, supported OS floor/CPU, package format and signing policy; drive workflow matrices and download documentation from it. Start with the four current CLI/MCP targets and three desktop targets in RELEASE; distinguish supported downloads from source-only routes and retain an explicit unsigned policy for CLI patches until signing is available.
   **Verify (V-R.0a):** Every advertised target has a matching package/check job; a missing target, conflicting version or unsupported OS claim fails validation. A release candidate keeps its full prerelease version across CLI, MCP, desktop, archives and changelog lookup.
 
-- [ ] **R.0b — Publish complete, immutable component releases.** Needs: R.0a.
+- [ ] **R.0b — Publish complete, immutable component releases.** Needs: R.0a, F.4a.
   **Build:** Implement a per-component manifest containing tag, commit, file hashes, URLs and signature/provenance references; upload immutable assets, verify them anonymously at the public origin, and write completion evidence only after all required checks pass. Maintain the last verified advertised version separately; a partial upload uses a new version for recovery, and cannot promote or overwrite the failed version.
   **Verify (V-R.0b):** Interrupt an upload, corrupt one public asset and omit one target in separate fixtures: none creates a complete release or changes the advertised version. A successful run's recorded public bytes match the manifest; a repeated publication cannot replace them.
 
@@ -112,13 +176,13 @@ R.1 closes the milestone only after the published product passes its complete us
   **Build:** Generate build attestations for every distributable, source archive and release manifest; bind verification to this repository and its release workflow. Publish a copyable verification procedure and retain the evidence with the release; make no reproducible-build claim from attestation alone.
   **Verify (V-3.8):** The documented procedure accepts an anonymously downloaded genuine release and rejects a changed byte, wrong repository identity or unrelated workflow. Every advertised asset is covered after temporary CI artifacts expire.
 
-- [ ] **R.0c — Publish and installation-verify the next CLI/MCP patch.** Needs: R.0b, 3.8.
+- [ ] **R.0c — Publish and installation-verify the next CLI/MCP patch.** Needs: R.0b, 3.8, F.1a, F.1b, F.1c, F.3a, F.3b, F.3c, F.4b.
   **Build:** Select the next version containing the existing Unreleased work, update version-specific install/setup instructions, and run tag publication plus automatic public-download checks on all four supported native CLI targets. Exercise setup and the advertised CLI/MCP approval/env workflows without an SDK; promote the CLI channel only after retained evidence passes, with the current signing limitation disclosed where it still applies.
   **Verify (V-R.0c):** A clean machine on every promised OS/CPU follows the published instructions successfully, including setup; binaries report the selected tag and match authenticated hashes. A failed target leaves the previous CLI release advertised; unfinished desktop/browser work cannot prevent an otherwise valid CLI patch.
 
 ### Desktop packages and platform signing
 
-- [ ] **4.7a — Prepare desktop installers and prerelease candidates.** Needs: R.0a.
+- [ ] **4.7a — Prepare desktop installers and prerelease candidates.** Needs: R.0a, F.4b.
   **Build:** Turn the existing three-target app archives into the selected Windows installer, a proper macOS app bundle/DMG and Linux AppImage; include required native libraries, licenses, CLI integration and uninstall ownership. Run candidate packaging with full prerelease versions and wire signing hooks that can be prepared without account credentials; label unsigned outputs as internal candidates.
   **Verify (V-4.7a):** Native package inspections find the expected entry point, version, libraries and notices on all three targets. A candidate tag survives packaging unchanged; missing signing credentials cannot produce a package labeled publicly signed or trigger promotion.
 
@@ -138,7 +202,7 @@ R.1 closes the milestone only after the published product passes its complete us
   **Build:** Sign and timestamp CLI/MCP/app executable payloads and the final Windows installer through the release environment, then verify the transported files before publication. Capture actual installation prompts instead of promising that a valid signature eliminates SmartScreen reputation prompts.
   **Verify (V-3.6b):** Downloaded candidates report valid Authenticode signatures, the expected publisher and timestamp; changing a signed payload fails verification. A clean supported Windows installation succeeds and its actual prompts are retained.
 
-- [ ] **4.7b — Exercise native desktop installation candidates.** Needs: 4.7a, 4.6, 4.8, 4.9, 4.4b, 4.3b, E.1.
+- [ ] **4.7b — Exercise native desktop installation candidates.** Needs: 4.7a, 4.6, 4.8, 4.9, 4.4b, 4.3b, E.1, F.1a, F.1b, F.1c, F.2a, F.2b, F.2c, F.2d, F.3a, F.3b, F.3c.
   **Build:** Add native candidate installation checks without a development SDK: first render, vault creation/open, existing-secret editing, env execution, native credential approval and activity inspection. Test Linux on the declared compatibility floor and record manual observations for UI/platform behavior automation cannot establish.
   **Verify (V-4.7b):** Each supported OS/CPU starts the installed GUI and completes these workflows using retained fixture/evidence records. A vault-only selftest, missing native library or unobserved GUI path cannot pass the desktop installation check.
 
@@ -360,9 +424,9 @@ R.1 closes the milestone only after the published product passes its complete us
 
 ### Product acceptance
 
-- [ ] **4.6 — Exercise actual desktop rendering.** Needs: 4.9, V.2b, V.3b, 4.3b, 4.4.
-  **Build:** Add Skia-backed headless render tests with Linux goldens and platform structural checks; cover masking, lock, history, native approval and narrow/wide layouts. Add the missing dedicated MaskedInput automation regression identified in THREATS T-22: type a fixture master password and inspect its actual automation peer, properties and attached metadata. Retain failing renders without secret fixture values.
-  **Verify (V-4.6):** Deliberately exposing a typed character fails; while the fixture password is entered, MaskedInput exposes no value provider and no automation name, help, status, ID or attached property contains that password. Lock removes sensitive content; native-library loading and a real first render are checked separately from non-rendering selftests. A RevealedValue test cannot substitute for the master-password input check.
+- [ ] **4.6 — Exercise actual desktop rendering.** Needs: 4.9, V.2b, V.3b, 4.3b, 4.4, F.2d.
+  **Build:** Add Skia-backed headless render tests with Linux goldens and platform structural checks; cover masking, lock, history, native approval and narrow/wide layouts. Extend the F.2d automation protection across the completed secret-entry screens. Retain failing renders without secret fixture values.
+  **Verify (V-4.6):** Deliberately exposing a typed character in rendering or automation fails; the F.2d master-password check still passes alongside all secret-entry screens. Lock removes sensitive content; native-library loading and a real first render are checked separately from non-rendering selftests.
 
 - [ ] **9.4 — Publish a versioned compatibility result.** Needs: V.1b, V.7, V.8b, 9.1f, 9.2b, 1.4c.
   **Build:** Extend both KeePassXC gate directions for the completed workflows, recording the upstream version, supported formats and tested platforms in FEATURES. A newer upstream release opens review work rather than invalidating a dated historical result.
