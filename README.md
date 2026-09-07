@@ -27,7 +27,7 @@ Approve? [y/N]
 - **Standard KDBX, not a new format.** Everything keypaste writes opens in KeePassXC and KeePass — proved in both directions against a real `keepassxc-cli` on Linux, macOS and Windows on every push to `main` and every pull request. If keypaste disappears tomorrow, your data doesn't.
 - **Open source, AGPL.** Auditable by anyone, forever. A tool that handles secrets shouldn't ask to be trusted on faith.
 
-**Pre-1.0, and it says so.** Everything on this page works today and is tested on all three operating systems. The binaries are unsigned, the desktop app is not among them — it exists, it browses and edits the same vaults, and it builds from source rather than shipping in a release ([`docs/desktop.md`](docs/desktop.md)) — and the approval prompt is a terminal prompt rather than a native dialog. [`docs/STEPS.md`](docs/STEPS.md) is the plan in tiers — the first open step is what lands next; [`docs/PRODUCT.md`](docs/PRODUCT.md) is the constitution and does not change.
+**Pre-1.0.** The download below is **CLI/MCP `v0.1.0`**. Current `main` also includes `keypaste setup` and the fixes under [Unreleased](CHANGELOG.md#unreleased); those changes require a source build. The desktop app browses and edits the same vaults but has no public release ([desktop guide](docs/desktop.md)), and credential approvals still happen in the terminal. The [release contract and platform matrix](docs/RELEASE.md) distinguish source, packaged artifacts and public installs. [STEPS](docs/STEPS.md) is the delivery plan; [PRODUCT](docs/PRODUCT.md) defines the product commitments.
 
 ## Install
 
@@ -45,7 +45,7 @@ mkdir -p ~/.local/bin && mv keypaste keypaste-mcp ~/.local/bin/
 ```
 <!-- /install:macos -->
 
-Intel Macs are not covered — build from source below. macOS 26 is the last release that runs on them and no runner fleet still offers one, so shipping that slice would have meant publishing a binary no gate had ever executed.
+Intel Macs have no published binary; build from source below. Native Intel runners are [available from GitHub](https://docs.github.com/en/actions/reference/runners/github-hosted-runners), but this project's release matrix does not yet build and test that target.
 
 ### Linux — x64 and arm64
 
@@ -59,7 +59,7 @@ mkdir -p ~/.local/bin && mv keypaste keypaste-mcp ~/.local/bin/
 ```
 <!-- /install:linux -->
 
-For arm64, substitute `linux-arm64` in all three filenames. Both are built against glibc 2.35, which is checked on a clean Debian 12 container on every release; Alpine and other musl distributions are checked to *fail* there rather than assumed to, so the gap is measured. Build from source on musl.
+For arm64, substitute `linux-arm64` in all three filenames. Both are built against glibc 2.35. The release workflow checks the **x64** binary on a clean Debian 12 container and checks that it fails on Alpine; the equivalent container check is not implemented for arm64. Alpine and other musl distributions have no published binary; build from source there.
 
 ### Windows — x64
 
@@ -80,7 +80,7 @@ Note the absolute path of `keypaste-mcp` either way, because that is what an MCP
 
 ### What the checksum does and does not prove
 
-**It proves the bytes arrived intact. It does not prove who made them.** The checksum is served from the same origin as the archive, so anyone able to replace one can replace both — it defeats a corrupted download and a network attacker in transit, and it does not defeat a compromised bucket. This is the same limitation [`DECISIONS.md`](DECISIONS.md) records about KeePassXC's own `.DIGEST` file, and saying otherwise would be the more comfortable lie. The binaries are also **unsigned and un-notarized**, so nothing ties them to this project rather than to whoever served them. [`THREATS.md`](THREATS.md) T-21 is the honest version of what you are trusting when you download instead of build, and `SECURITY.md` has the verification steps in one place.
+**The checksum detects a corrupted or incomplete download. It does not authenticate the publisher.** The checksum is served from the same origin as the archive, so anyone able to replace one can replace both. The published binaries are **unsigned and un-notarized**. [`THREATS.md`](THREATS.md) T-21 describes the download trust boundary, and [`SECURITY.md`](SECURITY.md#verifying-a-release) has the verification steps in one place.
 
 There is deliberately no `curl | sh`. It asks you to execute code you have not read, from an origin that is not this repository, in a form where the server can serve one thing to `curl` and another to a browser. A tool that handles secrets should not open by asking for that.
 
@@ -118,13 +118,15 @@ Two processes, and the split is the whole design. `keypaste-mcp` is the MCP serv
 keypaste agent --vault ~/vault.kdbx
 ```
 
-Then point your AI clients at it:
+If you installed **`v0.1.0`**, configure the client using the manual [Claude Code](docs/mcp-setup.md#claude-code) or [Claude Desktop](docs/mcp-setup.md#claude-desktop) instructions, with the absolute path of the downloaded `keypaste-mcp`.
+
+If you **built current `main` from source**, you can configure clients with the unreleased setup command:
 
 ```sh
 keypaste setup --vault ~/vault.kdbx
 ```
 
-That finds the clients installed on this machine and configures each through its own `mcp add`. A client that has no such command gets its block printed for you to paste. `--dry-run` shows the exact commands and changes nothing; `--remove` takes keypaste back out.
+That finds the clients installed on this machine and configures each through its own `mcp add`. A client that has no such command gets its block printed for you to paste. `--dry-run` shows the exact commands and changes nothing; `--remove` takes keypaste back out. **`v0.1.0` does not contain `setup`.**
 
 **Nothing keypaste writes into a client's configuration holds a master password, and nothing ever will.** [**Connecting keypaste to Claude**](docs/mcp-setup.md) is the full guide, including what `--expose` governs and how to read the audit log back.
 
@@ -139,7 +141,7 @@ Only the wedge — where the secrets live, how they reach a process, and what ha
 | Injecting into a child process | `keypaste run dev -- npm start` | no | `op run -- npm start` | `infisical run -- npm start` |
 | An agent can ask for a credential | yes, over MCP | no official integration | yes, over MCP (beta) | yes, over MCP |
 | A person answers each request | yes, and no is the default | — | yes | not documented |
-| What the agent receives | one field value, for a lifetime you were shown | — | no secret — 1Password injects it instead | not documented |
+| What the agent receives | one field value; TTL limits approval reuse, not retained copies | — | no secret — 1Password injects it instead | not documented |
 | Per-access log | local JSONL, hash-chained | no | yes, on Business | yes, on the paid tiers |
 | Licence | AGPL-3.0 | GPL-2.0-or-later | source not published | MIT core, paid features |
 
@@ -231,6 +233,8 @@ Nothing is released without you saying yes to that specific request, unless you 
 
 Say no and the agent is told not to ask again. Say nothing for 45 seconds and that is a no. Ask for the same field again within the lifetime you approved and you are not asked twice. Every call — granted, denied, or malformed — appends a line to `~/.keypaste/audit.jsonl`, and the value is never in it.
 
+The TTL expires keypaste's cached approval. It does not erase the client's copies or revoke the password at its issuer. The bridge does not add the released value to its audit record, but agent-written arguments can themselves contain sensitive text; treat the local log as sensitive data. [SECURITY.md](SECURITY.md) states these boundaries in full.
+
 What an agent may even *name* is default-deny: out of the box that is the `env/` subtree and nothing else, and widening it takes an explicit `--expose` glob in the client's config, which is a file you wrote.
 
 ### Saying yes in advance
@@ -278,6 +282,7 @@ Each record carries the hash of the record before it, so `keypaste log verify` t
 | `keypaste-core` | `src/Keypaste.Core` | library — all vault logic lives here |
 | `keypaste-cli` | `src/Keypaste.Cli` | `keypaste` |
 | `keypaste-mcp` | `src/Keypaste.Mcp` | `keypaste-mcp` — MCP server, stdio, holds no vault and decides nothing |
+| `keypaste-app` | `src/Keypaste.App` | desktop app — source builds and CI packages; no public release |
 
 ## Vault format
 
@@ -287,7 +292,7 @@ Any vault keypaste writes must open in KeePassXC, and anything KeePassXC writes 
 
 Directories and namespaces use .NET's PascalCase convention; the kebab-case names above are the roadmap's and survive where they are user-visible, in the shipped binary names.
 
-CLI, MCP server, and the eventual GUI are all thin clients over `Keypaste.Core` — no logic is duplicated in a frontend (docs/PRODUCT.md §4.3).
+CLI, MCP server, and the source-built desktop app are thin clients over `Keypaste.Core` — vault and authorization logic belong in the shared core (docs/PRODUCT.md §4.3).
 
 ## Build and test
 

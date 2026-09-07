@@ -12,9 +12,9 @@ The two processes are not interchangeable, and the split is the whole design. **
 dotnet build keypaste.slnx -c Release
 ```
 
-The two binaries land at `artifacts/bin/Keypaste.Cli/release/keypaste` and `artifacts/bin/Keypaste.Mcp/release/keypaste-mcp` (`.exe` on Windows). Note both absolute paths; you need them below. You also need Claude Code, and two terminals you can see at once.
+The two binaries land at `artifacts/bin/Keypaste.Cli/release/keypaste` and `artifacts/bin/Keypaste.Mcp/release/keypaste-mcp` (`.exe` on Windows). Make these build directories available on `PATH`, or replace the commands below with their full paths; an older installed `keypaste` will otherwise still run. You also need Claude Code, and two terminals you can see at once. This page verifies the source build; [RELEASE](RELEASE.md) owns published availability.
 
-**Use a throwaway vault for this.** A released credential is returned to the agent twice — once as text and once as structured data, so that a client reading either half works — which means it is rendered in Claude's transcript and stored in its session file. That is inherent to the protocol, not something keypaste can wrap. The vault built below holds a value that is worth nothing.
+**Use a throwaway vault for this.** The current tool returns a released credential twice — once as text and once as structured data, so that a client reading either half works. Claude can render and retain the result in its transcript and session file. This is a consequence of returning a raw credential; a different tool that executes a bounded action would require a different implementation. The vault built below holds a value that is worth nothing.
 
 ## Building the demo vault
 
@@ -139,7 +139,7 @@ keypaste: an agent is asking for a credential.
 Approve? [y/N]
 ```
 
-**Exactly one line of that will read differently on your screen, and it is the indented one.** Claude writes that sentence itself, so it changes every run. Everything above it is keypaste's: `client` is the `--client-label` *you* put in your own config, not a name the agent chose; `entry` and `field` came out of your vault; and `for` is what will actually apply — Claude asked for 900 seconds and 300 is the ceiling the approver was started with.
+**This is the captured request; Claude may choose different arguments in your run.** Claude writes the reason. `client` is the sanitized name the MCP client supplied during its handshake; it is unauthenticated and can differ from the `--client-label` you configured for audit and policy matching. `entry` identifies the resolved vault entry, `field` is the requested allowed field, and `for` is the actual grant lifetime after the approver's ceiling — this request asked for 900 seconds and received 300.
 
 Claude may call `list_entry_names` first to find the entry, or go straight to the credential. Either is fine, and both appear in the log.
 
@@ -201,7 +201,7 @@ keypaste log --since 5m
   2026-07-27 09:57:42  claude-code  env/demo/STRIPE_KEY  granted   prompt
 ```
 
-Two calls, because Claude listed the names before it asked for one. `exposure` means a listing allowed by your `--expose` globs; `prompt` means a person was shown that exact request and answered it. **The value is not in the file and no field of a record can hold one.**
+Two calls, because Claude listed the names before it asked for one. `exposure` means a listing allowed by your `--expose` globs; `prompt` means a person was shown that exact request and answered it. **The returned field value is not added to the log.** Names and reason excerpts are recorded, so keep secrets out of that metadata.
 
 A filtered view always says it is filtered, with the count it is showing out of the count in the file, so a narrow view can never be mistaken for the whole log.
 
@@ -216,7 +216,7 @@ Latest: seq 2, hash d1845344153201c850ac949d108d24d4243931aa38c82f909558910aac78
 
 It then prints, on every pass rather than only on a failure, the two things it cannot see: a rewrite that recomputed the chain, and records deleted from the end. `--expect <hash>` closes the second — [**Connecting keypaste to Claude**](mcp-setup.md) has the detail.
 
-Run the demo twice inside five minutes and the second release reads `grant-cache (!)` instead of `prompt`. That mark means the credential was served from the approval you already gave, under a reason nobody read. [THREATS.md](../THREATS.md) T-12 is the argument about what that costs.
+Repeat the credential request on the same MCP connection while its approval remains live and the second release reads `grant-cache (!)` instead of `prompt`. Restarting the client creates a new connection and requires a new approval. That mark means the credential was served from the approval you already gave, under a reason nobody read. [THREATS.md](../THREATS.md) T-12 explains the limit.
 
 ## When it does not go like this
 
@@ -231,7 +231,7 @@ Run the demo twice inside five minutes and the second release reads `grant-cache
 ## The honest limits
 
 - **The credential is in Claude's context, twice.** `request_credential` returns it as text and as structured data so a client reading either half works, so your MCP client renders it and stores it in its session file. That is why this page uses a fake value.
-- **And then the agent puts it on a command line.** To run the deploy it has to set the variable for a child process. keypaste's guarantee ends at the moment of release; what happens next belongs to the agent and to the machine it runs on. The TTL and the audit log are what keypaste offers instead of a promise it could not keep.
+- **The agent may put it on a command line.** To run the deploy it sets the variable for a child process; how it does so and what it retains are outside keypaste's control. TTL limits cached approval reuse; it cannot erase returned values from the client's context or session files, or revoke the credential at its provider.
 - **The reason is always a claim.** keypaste can strip the control characters, cap the length, label whose words they are, and put the entry name beside it from a source the agent does not control. It cannot tell you whether the sentence is true.
 - **Nothing here proves Claude will behave this way.** It is a model, not a script. It may pick a different entry, ask a clarifying question first, or read the deploy script before running it.
 - **The vault stays unlocked while the approver runs.** There is no idle auto-lock in this version; Ctrl+C is the lock.

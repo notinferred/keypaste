@@ -5,9 +5,9 @@ name: release
 # that gets shipped is the binary that was tested, and the checksum written next to it was computed
 # on the machine that produced it and re-checked on the machine that uploads it.
 #
-# Distribution is Cloudflare R2 behind dl.keypaste.com, not GitHub Releases, because this
-# repository is private and a private repository's release assets return 404 to everyone without a
-# token - which would make the documented install command a published falsehood (D-0041).
+# Distribution is Cloudflare R2 behind dl.keypaste.com. R2 was chosen while this repository was
+# private, so downloads would work without a GitHub token (D-0041). The repository is now public;
+# the existing versioned download URLs remain on R2 rather than GitHub Releases.
 #
 # workflow_dispatch builds and verifies but publishes nothing. Use it to exercise a change to this
 # file without spending a tag.

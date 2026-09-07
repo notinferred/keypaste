@@ -2,9 +2,11 @@
 
 > docs/PRODUCT.md law 4.7: small releases, real changelogs, semantic versioning. Written for someone deciding whether to upgrade, not for someone reading commits. The release workflow refuses to publish a tag that has no section here.
 
-Versions are the ones published at `https://dl.keypaste.com/v<version>/`. Every release carries a `SHA256SUMS` file and a per-asset `.sha256`, plus the corresponding source for that tag. The binaries are unsigned and un-notarized (O-0010).
+Versions are the ones published at `https://dl.keypaste.com/v<version>/`. Every release carries a `SHA256SUMS` file and a per-asset `.sha256`, plus the corresponding source for that tag. The published CLI/MCP binaries are unsigned and un-notarized (O-0010); there is no public desktop release. The [release contract](docs/RELEASE.md) records the platform matrix and the requirements for an installed, publicly available release.
 
 ## Unreleased
+
+These changes are available in source on `main`, **not in the `v0.1.0` downloads**. The source version still reports `0.1.0`; its version string alone does not identify the published bytes.
 
 **The approval dialog stops mangling the agent's reason.** A reason naming an entry — `env/demo/STRIPE_KEY`, the ordinary thing for an agent to say — had its slashes replaced and was then labelled as having been scrubbed. Reasons now keep the path separator; markup, fences and pipes are still stripped, so a hostile reason is as inert as it ever was.
 
@@ -38,10 +40,10 @@ The agent bridge now records an access that ends in an exception. Previously onl
 
 First tag, and the first time anything has been published. It exists to run the release pipeline end to end rather than to be installed; treat it as a dry run with real bytes.
 
-**Native binaries for four platforms.** `linux-x64`, `linux-arm64`, `osx-arm64` and `win-x64`, compiled with NativeAOT: one file each, no .NET runtime to install, about 10 MB per binary and a little under half the startup time of the framework-dependent build. `osx-x64` is not published - macOS 26 is the last release that runs on Intel Macs, and neither runner fleet still offers one to build on (O-0013). Intel Macs build from source.
+**Native binaries for four platforms.** `linux-x64`, `linux-arm64`, `osx-arm64` and `win-x64`, compiled with NativeAOT: one file each, no .NET runtime to install, about 10 MB per binary and a little under half the startup time of the framework-dependent build. `osx-x64` is not published (O-0013). Intel Macs build from source. Documentation correction, 2026-09-07: [GitHub provides Intel macOS runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners); their absence is not a current reason to exclude this target. It still requires its own build and verification in this project's release matrix.
 
 **Every gate runs against the published binary, not a rebuild.** The release workflow deletes the ordinary build before testing, so the artifact that gets uploaded is the artifact that was proved: credential approval and refusal across two real processes, MCP over real pipes, the audit chain's tamper detection, environment injection, the demo transcripts, and - on all four platforms - a KDBX written by that exact binary opening in real KeePassXC.
 
-**The Linux binaries need glibc 2.35 or newer** (Debian 12, Ubuntu 22.04 and later). This is checked on a clean Debian 12 container on every release. Alpine and other musl distributions are not covered.
+**The Linux binaries need glibc 2.35 or newer** (Debian 12, Ubuntu 22.04 and later). The release workflow checks the x64 binary on a clean Debian 12 container; there is no equivalent arm64 container check. Alpine and other musl distributions are not covered.
 
 Nothing about the vault format, the approval flow or the audit log changed in this release.

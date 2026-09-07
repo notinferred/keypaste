@@ -1,18 +1,25 @@
 # Keypaste.Consistency.Tests
 
-The one project that references both front ends, so a test can make an edit through the desktop app's view models and then ask the shipped CLI what it sees in the file that edit produced.
+This project references both front ends. Tests edit a vault through desktop view models, then invoke the CLI implementation through `CliApp.Run` to inspect the saved file. They verify shared behavior, not a downloaded executable, native GUI rendering or installation.
 
 ## Why it is in neither solution
 
-`keypaste.slnx` cannot hold it: that solution is restored eight times by `ci.yml`, and this project pulls in Avalonia through `Keypaste.App`, which is the exact cost `keypaste.app.slnx` was split off to avoid.
+Putting it in `keypaste.slnx` would bring Avalonia into ordinary backend restores. Putting it in `keypaste.app.slnx` would bring the CLI's AOT compiler packs into ordinary desktop restores: `PublishAot` and four `RuntimeIdentifiers` are restore-time inputs (D-0040).
 
-`keypaste.app.slnx` cannot hold it either, and the reason is measured rather than assumed. `Keypaste.Cli` sets `PublishAot` with four `RuntimeIdentifiers`, and both are restore-time inputs (D-0040), so a restore that can see the CLI pulls four RID-specific ILCompiler packs whether or not anything is ever published. Measured on 2026-07-28: restoring `keypaste.app.slnx` goes from **2091 MB to 2580 MB** when `Keypaste.Cli` joins it. `app.yml`'s header publishes a cost table promising that a `Keypaste.Core` push pays "the gate job only, one OS, a few minutes", and 490 MB of AOT compiler on every such push would make that table untrue.
+A measurement on 2026-07-28 found desktop restore size increased from 2091 MB to 2580 MB when the CLI joined the solution. That historical measurement explains the separation; it is not a current benchmark.
 
-`PublishAot` cannot simply be turned off for one solution: it is recorded in `src/Keypaste.Cli/packages.lock.json`, and a restore resolving a different set fails `--locked-mode`. The clean fix is splitting the CLI into a library and a thin AOT host, which moves `artifacts/bin/Keypaste.Cli/release/keypaste` — a path seven `scripts/verify-*.sh` gates, `make-compat-fixture.sh`, `ci.yml` and `release.yml` all hard-code. That is worth doing one day and is not worth doing inside 4.2.
+`.github/workflows/app.yml` restores, formats, builds and runs this project in separate gate steps on every qualifying workflow run, including pushes that touch `Keypaste.Core`. After the gate, the workflow packages on three operating systems. Its push path filters, pull-request runs and tag triggers are documented in [CLAUDE.md](../../CLAUDE.md); the YAML is the executable authority.
 
-So this project sits outside both, and `app.yml` restores, builds, formats and runs it in steps of its own. A `Keypaste.Core` push still pays nothing for it; an `App` or `Cli` push pays, which is proportionate, because the thing under test is what changed.
+To run the consistency gate locally with the repository's selected SDK:
+
+```sh
+dotnet restore tests/Keypaste.Consistency.Tests --locked-mode
+dotnet format tests/Keypaste.Consistency.Tests --no-restore --verify-no-changes --severity warn
+dotnet build tests/Keypaste.Consistency.Tests -c Release --no-restore
+dotnet test tests/Keypaste.Consistency.Tests -c Release --no-build
+```
 
 ## What must stay true
 
-- **It is not the place for tests that fit in one front end.** A test that does not need both `CliApp.Run` and a view model belongs in `Keypaste.App.Tests` or `Keypaste.Cli.Tests`, where it runs on every push rather than on the guarded ones.
-- **Every test asserts the CLI succeeded and printed something before asserting what it printed.** A `CliApp.Run` that exits non-zero on every invocation would otherwise pass this whole project.
+- A test that does not need both `CliApp.Run` and a view model belongs in `Keypaste.App.Tests` or `Keypaste.Cli.Tests`, so it runs with that front end's own checks.
+- Every test asserts that the CLI succeeded and printed something before asserting what it printed. A CLI that always exits with an error must not make a cross-frontend test pass.

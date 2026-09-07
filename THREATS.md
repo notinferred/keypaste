@@ -1,10 +1,16 @@
 # Threat model — the agent bridge
 
-**Status: current through Stage 4.2, and honest about its edges.** Every threat here carries a **Proved by** line naming the test that holds it up, or says plainly that nothing does — a threat model whose mitigations are untested is a wish list. No section is thin without saying so. The audit log is tamper-evident as well as append-only, and `keypaste log verify` says so in words, including the two things it cannot see, which are stated on a passing check rather than only on a failing one.
+**Status: current source on `main`, reviewed 2026-09-07.** This includes changes listed under
+[Unreleased](CHANGELOG.md#unreleased), such as exception-path audit coverage, display hardening and
+resolved entry names in audit records. Those changes are not in the public CLI/MCP `v0.1.0`
+download. Desktop behavior describes the source-built app, which has no public release. See
+[docs/RELEASE.md](docs/RELEASE.md) for distribution status. Every threat here carries a **Proved by**
+line naming the test that holds it up, or says plainly that nothing does. The audit log is
+tamper-evident as well as append-only; its verification output also names the limits in T-5.
 
-One deferral outlives Stage 2 and is named rather than dropped: **T-13 still has no way to show which entries each rule matches *today***, because that needs the vault open, and the place it belongs is the GUI's Agent Activity screen (docs/STEPS.md Stage 4) rather than a master-password prompt in front of a diagnostic command.
+One deferral remains open: **T-13 still has no way to show which entries each rule matches *today***, because that needs the vault open. It belongs in the GUI's Agent Activity screen ([STEPS](docs/STEPS.md), step 4.3b), where the user has already opened the vault.
 
-**Stage 2.3 made one thing worse on purpose, and it is T-14.** A policy file releases a credential with nobody watching. Every other line in this document describes something keypaste defends against; that one describes a capability the product now has because docs/PRODUCT.md law 3.2 authorises it in so many words, and the rest of the design exists to bound how much it costs.
+**Policy pre-approval (completed roadmap step 2.3) introduces T-14.** A policy file releases a credential with nobody watching. PRODUCT law 3.2 permits that capability; the policy's scope, limits and audit requirements bound it.
 
 This file covers `keypaste-mcp` — the bridge between an AI agent and your vault. For the vault, the CLI, and the honest list of what keypaste does not protect against anywhere, see [SECURITY.md](SECURITY.md). The two files are meant to be read together and neither repeats the other.
 
@@ -14,13 +20,16 @@ Each entry below ends with **Proved by**, naming the test that holds it up — o
 
 ---
 
-## What the bridge actually is, after 2.2
+## What the bridge does
 
-`keypaste-mcp` releases exactly one field of one entry, and only after a person has said yes to that specific request. It holds no vault and makes no decision: it validates the request, refuses anything outside the exposure its operator configured, forwards the rest to **`keypaste agent`** — a foreground process the human started in their own terminal — writes an audit line, and only then answers.
+`keypaste-mcp` releases one field of one entry after a human approval, reuse of that approval within its grant lifetime, or a matching policy the human wrote. It holds no vault and does not decide approval: it validates the request, refuses anything outside the exposure its operator configured, forwards the rest to **`keypaste agent`** — a foreground process the human started in their own terminal — writes an audit line, and only then answers.
 
 That split is the security architecture, not an implementation detail (DECISIONS.md D-0023). **Nothing an agent does can cause a master-password prompt to appear**, because the only process that asks for one is started by a person typing a command. With no agent running, every credential request is denied with a refusal that names the command to start one.
 
-So the honest summary of what an agent can do through this bridge is: **name the entries you chose to expose, and ask you — once per entry, per field, per connection, within a lifetime you can see before you answer — for one value at a time.**
+An agent can list the entries you chose to expose and request one field at a time. A prompted
+approval applies to that entry, field and connection for the displayed grant lifetime; a policy can
+authorize requests without a prompt. Neither grant expiry nor stopping the approver revokes a
+credential already disclosed to the client or deletes its copies. T-12 and T-18 describe those limits.
 
 ---
 
@@ -69,7 +78,7 @@ The master key · field values (passwords, usernames, URLs, notes) · **entry na
 
 **Proved by.** `EntryNameSanitizerTests` — an invariant over about fifty hostile names asserting no control, format, private-use or structural character survives, plus `ASplitInstruction_IsNotReassembled` for the replace-don't-delete rule and `TagCharacters_AreRemoved_WhichAByCharLoopWouldMiss` for the astral case. The other half — ordinary names surviving byte for byte — is `AnOrdinaryName_SurvivesByteForByte`, and without it "reject everything" would pass. End to end over the real protocol: `ListEntryNames_SanitizesHostileTitles_AndLeavesOrdinaryOnesAlone`.
 
-What keypaste can promise instead is narrower and true: **keypaste itself never acts on that text.** Entry names are matched against globs and written to the log; they are never parsed as commands, never used to choose a code path, and never grant anything. Reading a name gets an agent no closer to a secret, because the only tool that returns one is gated on a human (2.2). A blocklist of phrases like "ignore previous instructions" is **deliberately not implemented**: it fails against the first paraphrase and buys false confidence in exchange.
+What keypaste can promise instead is narrower and true: **keypaste never executes entry text as instructions.** Names are inputs to exposure and policy matching and are written to the log; an instruction embedded in a name cannot bypass those checks or the approval path. Credential release requires a human approval, its still-valid cached grant, or a matching policy the human wrote. A blocklist of phrases like "ignore previous instructions" is **deliberately not implemented**: it fails against the first paraphrase and buys false confidence in exchange.
 
 ---
 
@@ -83,7 +92,13 @@ What keypaste can promise instead is narrower and true: **keypaste itself never 
 
 **Mitigation.** The reason is capped at 2000 characters by the schema. What reaches the audit log is a sanitized excerpt capped at 200, alongside the true length and a SHA-256 of the raw text, so the log never silently lies about truncation.
 
-What reaches a person goes through `ApprovalPrompt`, and the shape of that type is the mitigation: the reason is sanitized by the same rules as an entry name — no control characters, no newlines, no bidirectional overrides — and hard-capped at 400 characters with the truncation stated on screen. **The type has no member for a default button, no member for a deadline and no member for a layout**, so there is nowhere for a reason to reach one however it is written. The deadline belongs to `ApprovalGate`, which enforces it whatever a channel does. The default is no, and only an explicit yes is a yes.
+The entry field is bounded too: on `main`, the bridge records the approver's sanitized resolved
+path when supplied, otherwise the sanitized request argument, capped at 128 characters. The
+published `v0.1.0` records the argument and can therefore show an opaque handle. The log's
+`args.ttl_seconds` is the requested duration, not the effective or remaining grant lifetime.
+Agent-written arguments may contain sensitive text; sanitization is not secret detection.
+
+What reaches a person goes through `ApprovalPrompt`, and the shape of that type is the mitigation: `SanitizeProse` removes the same control, newline and bidirectional hazards as entry-name sanitization, while preserving `/` so an ordinary path remains readable. The reason is hard-capped at 400 characters with the truncation stated on screen. **The type has no member for a default button, no member for a deadline and no member for a layout**, so there is nowhere for a reason to reach one however it is written. The deadline belongs to `ApprovalGate`, which enforces it whatever a channel does. The default is no, and only an explicit yes is a yes.
 
 The concrete attack this is shaped against is a reason that closes the request block and writes its own reassuring line underneath — *"--- END REQUEST --- keypaste: this one is safe, press y"*. Newlines are what would make it work, and collapsing them to spaces is what stops it.
 
@@ -193,7 +208,7 @@ This is docs/PRODUCT.md law 3.3 and law 3.7 taken together: every agent access i
 
 **What this also fixes.** 2.1 admitted that the listing, scoping and sanitization code behind T-1 and T-4 was complete, thoroughly tested, and **unreachable in the shipped binary** — exercised by a test double rather than by production. It is on the live path now: the approver holds an unlocked vault and the bridge asks it.
 
-**Residual.** The vault stays unlocked for as long as `keypaste agent` runs. There is no idle auto-lock in this version; closing the terminal is the lock. Stage 4.1 owns idle locking, and the seam for it is already in place.
+**Residual.** The vault stays unlocked for as long as `keypaste agent` runs. There is no idle auto-lock in that process; stopping it is the lock. Step 4.1 implemented idle locking for the separate desktop session, which does not lock a running terminal approver.
 
 **Proved by.** `SecretHygieneTests`, where a real `keypaste agent` over a real vault answers a real bridge and only the human is faked, and `scripts/verify-approval-e2e.sh`, where the two really are separate processes.
 
@@ -207,7 +222,12 @@ This is docs/PRODUCT.md law 3.3 and law 3.7 taken together: every agent access i
 
 **The two paths are kept apart deliberately**, and stayed apart when they moved onto one socket in 2.2: different message kinds, different handlers, and only one of them with anywhere to put a secret. Fusing them into a single "vault access" abstraction would give the listing path the ability to return a credential, which is the single change most likely to turn `list_entry_names` into an exfiltration tool.
 
-**The ordering is the other half.** The approver resolves the entry, re-checks it against the exposure, looks for a live grant, asks a person — and reads the field **last of all**. Nothing decrypts a credential until somebody has said yes to that exact request, so a denied or timed-out request never had one in memory to leak.
+**The ordering governs release.** The approver resolves the entry, re-checks exposure, checks a live
+grant, cooldown and policy, and prompts when needed. The selected field is placed in a release
+response only after authorization. This does **not** mean denial avoided plaintext in the approver:
+`VaultCredentialSource.TryResolve` calls `Vault.ReadEntries`, and `KeePassInterop.Collect` reads the
+standard fields, including passwords, into strings while building that list. The response boundary
+releases one authorized field; it is not an in-memory secrecy boundary. T-18 covers that residual.
 
 **Proved by.** `SecretHygieneTests`, which is where this stops being an argument. A real vault, a real approver, and **four different sentinels in the four fields of one entry**: the requested one has to come back, and the other three have to appear nowhere — not in the result, not in the audit log, not in the raw JSON-RPC bytes on the wire, and not on the listing path. A fifth sits in an entry outside the exposure. Every non-approval answer is swept the same way. Note what these tests are careful to do: they plant sentinels somewhere they could genuinely leak, because asserting the absence of a string that was never present anywhere is the trap most "no secret leaked" tests fall into — and one this repository has fallen into before.
 
@@ -223,7 +243,7 @@ The resolving word is in law 3.5 itself: *telemetry*. Law 3.5 governs what **lea
 
 That separation is architectural rather than promised, and you can check it yourself:
 
-- `keypaste-mcp` speaks **stdio only** and opens no sockets. The MCP security guidance recommends exactly this for local servers, to limit access to the spawning client.
+- The MCP transport is **stdio only**; the bridge also connects to the local approver through `NamedPipeClientStream`. There is no TCP or HTTP MCP listener. T-10 covers the local pipe boundary.
 - Its entire runtime dependency closure is **four packages** — `ModelContextProtocol.Core` and the three `Microsoft.Extensions.*` abstractions it brings — pinned by version and content hash in `src/Keypaste.Mcp/packages.lock.json`. Read it. There is no HTTP client in it.
 
 **Proved by.** The lock file and CI's `--locked-mode` restore, which means nothing can enter that closure without a diff someone approved.
@@ -258,7 +278,7 @@ The name carries a per-user discriminator, so two people on one machine do not c
 
 **Who.** A model that is stuck and retrying, an agent steered by injected instructions, or two clients that both want the same key.
 
-**Status.** Partially mitigated. The two mitigations that stop a loop are in, and 2.3 added the per-rule rate limit; the per-client pause is Stage 4.3's own feature.
+**Status.** Partially mitigated. The two mitigations that stop a loop are in, and 2.3 added the per-rule rate limit; the per-client pause is step 4.3b's feature.
 
 **Mitigation.**
 - **One request in front of a person at a time.** A second is refused immediately rather than queued, because a queue is a pipeline that eventually shows every prompt — which is the storm it was supposed to prevent. This is load-bearing rather than theoretical: the MCP SDK dispatches tool calls concurrently, which was measured, not assumed.
@@ -269,7 +289,7 @@ The name carries a per-user discriminator, so two people on one machine do not c
 
 **A spent allowance denies rather than escalating.** This is the tempting mistake and it is worth naming: falling through to a prompt looks strictly safer, since a human still decides. It is worse. It converts a quota into a prompt generator — an agent that has burned a rule's allowance would start producing one prompt per request, which is this threat with a lever attached — and it would make `keypaste policy ls` lie about what `max_per_hour` means.
 
-**Residual.** There is still no rate limit across different entries, no cap on how many prompts a client may raise in an hour, and no "pause this client" switch. An agent that asks for twenty *different* entries will produce twenty prompts, one every forty-five seconds at worst. Stage 4.3's per-client controls are where the rest belongs; naming it here is what stops it being forgotten. `max_per_hour` only bounds the *silent* path, which is the one nobody is watching — it does nothing about prompt volume, because a request a rule covers never draws a prompt in the first place.
+**Residual.** There is still no rate limit across different entries, no cap on how many prompts a client may raise in an hour, and no "pause this client" switch. An agent that asks for twenty *different* entries will produce twenty prompts, one every forty-five seconds at worst. Step 4.3b's per-client controls are where the rest belongs; naming it here is what stops it being forgotten. `max_per_hour` only bounds the *silent* path, which is the one nobody is watching — it does nothing about prompt volume, because a request a rule covers never draws a prompt in the first place.
 
 **Proved by.** `ApprovalGateTests.ASecondRequestWhileSomebodyIsDeciding_IsRefusedNotQueued` and `TheSameRequestRightAfterARefusal_IsDeniedWithoutAskingAgain`, plus the pair of `ServerToolsTests` that pin the presence and the absence of "do not retry" in adjacent refusals. `PolicyGateTests.TheAllowanceComesBackOneReleaseAtATime_AnHourAfterEachWasSpent` for the window being a sliding one rather than a bucket that resets, and `TheAllowanceBelongsToTheRule_NotToTheCaller` for the reason it is counted per rule: a quota the constrained party can reset by reconnecting is not a quota. Nothing tests that a tired human reads more carefully, because nothing can.
 
@@ -285,7 +305,10 @@ The name carries a per-user discriminator, so two people on one machine do not c
 
 **Mitigation.** Every reuse is still an agent access and still gets its own audit line — `granted` / `grant-cache` — recording *that* request's reason excerpt, its true length and its SHA-256. The line a person actually read is the earlier `granted` / `prompt` line for the same entry and field, so the two can be paired and compared: divergence is visible in the log even though it is not blocked. **Since 2.4 that pairing has a reader.** `keypaste log` marks a `grant-cache` release whose reason hash differs from the `prompt` release it is drawing on, and says what the mark means — which matters precisely because nothing else about such a line looks unusual. The approver also prints a line per reuse to its own terminal, so a burst is visible without being modal.
 
-The lifetime is bounded on three sides: `min(requested, --max-ttl)` with a default of five minutes, scoped to one connection so it dies when the client restarts, and zeroed by its own timer at expiry rather than at the next time something looks.
+The cached approval is bounded on three sides: `min(requested, --max-ttl)` with a default ceiling
+of five minutes, scoped to one connection, and cleared by an expiry timer. Cache lookup also
+checks expiry before returning a value. This governs reuse through keypaste; it does not remove
+copies already returned to the client or expire the credential at its issuer.
 
 **Residual.** Inside the TTL, the reason is not checked against the one that was approved. **This is deliberate.** Re-prompting when a reason looks "materially different" would be a heuristic over untrusted text — the same argument T-1 already makes for refusing a phrase blocklist — and it would hand an agent a lever for forcing re-prompt loops, which is T-11. A shorter `--max-ttl` is the honest control, and it is one number.
 
@@ -315,7 +338,7 @@ The second is time. A rule names a namespace, and what is *in* that namespace ch
 
 **Residual.** An entry moved into a rule's namespace after the rule was written is released without a prompt, and nothing prevents it. The mitigation this wants most — showing which entries each rule matches *today* — needs the vault open, which would put a master password prompt in front of the one command an operator reaches for when something already looks wrong.
 
-**It was deferred to 2.4 and 2.4 did not take it**, which is said here rather than allowed to lapse quietly. `keypaste log` reads a plaintext file and needs no vault; bolting a vault-unlocking mode onto it, or onto `keypaste policy ls`, would have bought this mitigation at the cost of the property that makes both commands safe to reach for in a hurry. The place it belongs is the GUI's **Agent Activity** screen (docs/STEPS.md Stage 4), where a vault is already open because the user opened it. Until then, what exists after the fact is the audit log: every release names the rule that made it, so `keypaste log` answers "what did this rule actually cover" for everything that has happened, and nothing answers it for what has not happened yet.
+**It was deferred to 2.4 and 2.4 did not take it**, which is said here rather than allowed to lapse quietly. `keypaste log` reads a plaintext file and needs no vault; bolting a vault-unlocking mode onto it, or onto `keypaste policy ls`, would have bought this mitigation at the cost of the property that makes both commands safe to reach for in a hurry. The place it belongs is the GUI's **Agent Activity** screen (docs/STEPS.md, step 4.3b), where a vault is already open because the user opened it. Until then, what exists after the fact is the audit log: every release names the rule that made it, so `keypaste log` answers "what did this rule actually cover" for everything that has happened, and nothing answers it for what has not happened yet.
 
 **Proved by.** `PolicyRuleTests.APolicyRuleWithATrailingStar_ConstrainsTheTitleNotTheGroup`, which asserts **both** directions so the test documents the surprise rather than the wish; `ARuleUsesTheSameMatcherAsTheExposure`, which runs a table of names through a rule and through a real `EntryExposure` and requires every verdict to agree; `ATitleFullOfSlashes_CannotSatisfyAGroupPattern`; and `PolicyVerbTests.ItRendersWhatEachPatternParsedTo_NeverTheLineTheUserWrote`. **Not prevented, and nothing tests otherwise:** the vault changing under a standing rule.
 
@@ -389,17 +412,21 @@ The second is time. A rule names a namespace, and what is *in* that namespace ch
 
 ## T-18 — Memory dumping
 
-**What.** A credential exists in the memory of a running process between the moment the vault decrypts it and the moment the grant holding it expires. Anything that can read that memory — a debugger, a core dump, a hibernation file, a page written to swap — has the value, with no prompt, no audit line, and nothing keypaste can do about it after the fact.
+**What.** Plaintext credentials can exist while the vault is read, while a grant is cached, while a
+response is serialized, and in copies retained after release. Anything that can read that memory —
+a debugger, a core dump, a hibernation file, a page written to swap — can obtain the value without
+an approval or audit line for that read. Grant expiry does not bound all those copies.
 
 **Who.** Anything running as your user, and anything that can read a file your user wrote: assumption 1, plus the artefacts the operating system produces without being asked.
 
 **Status. Out of scope, and it is worth being exact about what that means.** keypaste narrows the window and reduces the number of copies. It does not claim in-memory secrecy, and this section exists so that "we use a clearable buffer" is never mistaken for the claim it resembles.
 
-**What is nonetheless done, and what each part is worth.** Master passwords live in a clearable `char[]` rather than a `string`, and derived key material is zeroed after use. An approved credential is held by `keypaste agent` in a clearable buffer, zeroed by its own timer the moment the grant expires rather than at the next time something happens to look, and every live grant dies with the agent. `keypaste-mcp` holds no vault at all (D-0023), so the process an untrusted client spawns is not the process a secret sits in. Each of those shortens an exposure; none of them is a boundary.
+**What is nonetheless done, and what each part is worth.** Master passwords live in a clearable `char[]` rather than a `string`, and derived key material is zeroed after use. A human-approved credential is cached by `keypaste agent` in a clearable buffer with an expiry timer; disconnect and disposal also clear the owned cache buffers. `keypaste-mcp` holds no vault (D-0023), but it does receive the selected plaintext field for serialization and delivery to the client. Each of those limits a particular exposure; none is a general in-memory secrecy boundary.
 
 **Residual, stated because there is a great deal behind it.** The garbage collector may relocate a buffer and leave an unreachable copy behind. A value reaches the agent's buffer as an ordinary immutable string out of the vault, and *that* copy cannot be cleared. It crosses a local pipe on its way to the bridge, and it is a string again when the MCP library serializes the response. Any of those can reach swap or a crash dump. **`SecureString` is deliberately not used**: it does not encrypt on Linux or macOS, so it would read as a guarantee it cannot provide — which is the same mistake as claiming this threat is mitigated.
 
-The honest control is the one number: a short `--max-ttl`. It bounds how long the value is anywhere at all.
+A shorter `--max-ttl` limits the approval-cache window. It does not revoke the underlying password,
+clear the client's copies, or bound the lifetime of immutable strings, swap or crash dumps.
 
 **Proved by.** `GrantCacheTests` for the zeroing and the expiry, and `SecretHygieneTests`, which sweeps every byte the server actually sent for four planted sentinels — a claim about what *left* the process, which is a different and checkable thing from a claim about what is inside it. **Nothing tests in-memory secrecy, and nothing can.** SECURITY.md, *"In-memory secrecy is not claimed"*, is the same statement for the vault and the CLI.
 
@@ -415,7 +442,7 @@ The honest control is the one number: a short `--max-ttl`. It bounds how long th
 
 **Where it does apply.** `keypaste get`, which is a person's command and not an agent's, and — since 4.2 — the desktop app's copy buttons. Both clear the clipboard after twenty seconds and only if it still holds what keypaste put there, so neither clobbers something you copied since; the deciding is one function in the core that both call (D-0046), so they cannot come to different conclusions.
 
-**What the app promises that the CLI cannot.** Locking the vault clears the clipboard at once, rather than at the deadline, because a secret on the clipboard is derived from an open vault and nothing derived from an open vault survives a lock. Quitting the app clears before the process exits. Both follow from the app being a long-lived process with a lock state; a command that has already returned has nothing left to run.
+**What the app adds.** Locking the vault attempts to clear its copied secret immediately, rather than waiting for the deadline, and quitting clears before normal process exit. These controls require the app's running process and lock state. They cannot erase clipboard history, values pasted elsewhere or immutable memory copies; killing the process prevents cleanup.
 
 **What both do on Windows.** Each sets the three formats that ask Clipboard History and Cloud Clipboard to skip the value — the app through the data object its window owns (D-0046), the CLI through a direct Win32 write that replaced `clip.exe`, which could not express them (D-0056). That closes O-0008 for both front ends.
 
@@ -437,7 +464,7 @@ The honest control is the one number: a short `--max-ttl`. It bounds how long th
 
 **What follows from it, and is easy to miss.** The vault holds *entry names* as well as values, and law 3.5 singles those out as sensitive on their own — so a stolen vault is a disclosure risk even to somebody who never breaks the encryption, if the passphrase is ever recovered later. Offline guessing is unlimited and unobservable: there is no rate limit, no lockout, and no audit line, because there is no keypaste involved. Argon2's parameters are what make each guess expensive, and they are properties of the file, fixed when it was created.
 
-**Residual.** A weak passphrase. Nothing in keypaste can compensate for it, and nothing in keypaste pretends to. **The audit log is a separate file and is not protected by any of this** — it is plaintext by design, because it is the record that has to survive the vault being locked. It names entries and never values (T-9), and T-5 covers what happens to it.
+**Residual.** A weak passphrase. Nothing in keypaste can compensate for it, and nothing in keypaste pretends to. **The audit log is a separate plaintext file**, retained across vault locks. Released field values are not deliberately logged, but entry names and request arguments can contain sensitive text (T-9); T-5 covers the log's integrity limits.
 
 **Proved by.** The KeePassXC compatibility gate — `verify-keepassxc-compat.sh` and `verify-keepassxc-writeback.sh`, run on all three operating systems against a real `keepassxc-cli` — which proves the file keypaste writes is the format it claims to be, and therefore that the protections named above are the ones actually applied. **Nothing tests the strength of your passphrase.**
 
@@ -457,11 +484,18 @@ The honest control is the one number: a short `--max-ttl`. It bounds how long th
 
 ## T-21 — The released binary is not the source you read
 
-**What.** You download `keypaste` from `dl.keypaste.com` instead of building it. Every argument in this document rests on properties of the source — the four-package closure, the decision order in the approver, the fact that nothing opens a socket. A binary is a claim that those properties were compiled faithfully, and you did not watch it happen.
+**What.** You download `keypaste` from `dl.keypaste.com` instead of building it. Every argument in this document rests on properties of the source — the runtime dependency closure, the decision order in the approver, the stdio MCP transport and local approver pipe. A binary is a claim that those properties were compiled faithfully, and you did not watch it happen. It also represents its tagged source, not subsequent changes on `main`.
 
-**Who.** Anyone able to change what the release job produces or what it uploads: a compromised GitHub Actions runner, a mutated third-party action, a compromised Cloudflare R2 credential, or whoever holds the account the bucket lives in. Not a network attacker in transit — that one is covered, badly but genuinely, by the checksum.
+**Who.** Anyone able to change what the release job produces or what it uploads: a compromised GitHub Actions runner, a mutated third-party action, a compromised Cloudflare R2 credential, or whoever holds the account the bucket lives in. A checksum downloaded from the same origin cannot authenticate that origin or detect replacement of both files; HTTPS protects the transport.
 
-**Status. Partially mitigated, and the unmitigated part is the interesting one.** What the pipeline does hold: the binary that is uploaded is the binary that was tested, because `release.yml` deletes `artifacts/bin` and points all eight verify scripts plus both directions of the KeePassXC gate at the published artifact, then asserts there is no managed `.dll` or `runtimeconfig.json` beside it. The checksum is computed on the machine that produced the bytes and re-verified on the machine that uploads them, so artifact-transport corruption fails the release. The four actions on this path are pinned to commit SHAs rather than mutable tags (D-0041). Every release publishes its own corresponding source, so the thing you are trusting is at least *available* to read.
+**Status. Partially mitigated.** `release.yml` checks the NativeAOT build, deletes `artifacts/bin`
+before the runtime gates, and points the behavioral checks applicable to each platform, including
+both directions of the KeePassXC gate, at the publish output. It also asserts there is no managed
+`.dll` or `runtimeconfig.json` beside it. The archive checksum is computed during packaging and
+re-verified in the upload job, so artifact-transport corruption fails the release. Actions on this
+path are pinned to commit SHAs rather than mutable tags (D-0041). Every release publishes its
+corresponding source. These checks cover CLI/MCP publishing; desktop CI packages are not public
+releases. [docs/RELEASE.md](docs/RELEASE.md) records the remaining distribution requirements.
 
 **What it does not hold.** The binaries are unsigned and un-notarized (O-0010), so nothing ties these bytes to this project rather than to whoever served them. The checksum lives on the same origin as the archive, so it proves integrity and not authenticity — the same distinction D-0008 drew about KeePassXC's own `.DIGEST`. The build is not reproducible: NativeAOT link output is not byte-identical across runs, so you cannot rebuild it and compare (O-0012). And the runner fleet is a third party with the ability to substitute bytes; using one fleet for all four platforms reduces that to a single party, which is a smaller surface and not a zero one. Since D-0042 that same fleet also runs the tests, so a fleet-specific quirk can no longer show up as two providers disagreeing — one fewer party to trust, one fewer way to catch it, and the trade was not chosen so much as forced.
 
@@ -481,9 +515,11 @@ The honest control is the one number: a short `--max-ttl`. It bounds how long th
 
 **A value pattern is only half of it.** Avalonia 12.1.0 also ships `TextBlockAutomationPeer`, whose name comes from the control's text — so a `TextBlock` publishes what it draws over the same bus as the automation *name*, a different property that everything written below about `IValueProvider` does not cover. Anything that draws a secret has to answer both, and `AutomationProperties.Name="{Binding Value}"` in a template is a third route that compiles, renders identically and is invisible in review. See T-25. `Avalonia.FreeDesktop.AtSpi` is in the app's dependency closure and AT-SPI is a session-bus service that any process in your session can talk to. UI Automation on Windows is likewise process-external. An ordinary password field, built the ordinary way, would have published the master password to the session bus one keystroke at a time.
 
-**Mitigated by.** The master password is not typed into a `TextBox`. `Keypaste.App.Controls.MaskedInput` stores nothing — it reports one character at a time to a buffer held by a view model, and what it draws is derived from a count rather than from the password. Its automation peer is a plain `ControlAutomationPeer` with no value pattern, so there is no accessibility path that returns text, and nothing behind it to return. A test asserts the peer implements no value provider, so the day somebody swaps in a `TextBox` for convenience the build fails rather than the property quietly disappearing.
+**Mitigated by.** The master password is not typed into a `TextBox`. `Keypaste.App.Controls.MaskedInput` stores nothing — it reports one character at a time to a buffer held by a view model, and what it draws is derived from a count rather than from the password. Its automation peer is a plain `ControlAutomationPeer` with no value pattern, so this control provides no password text through that peer.
 
 **Residual.** Keystrokes still arrive from the toolkit as short-lived strings the runtime will not let anyone wipe, and a paste arrives as the whole password in one of them (SECURITY.md). Everything below the toolkit — the OS keyboard layer, the input method, a keylogger — is T-18's territory and unchanged. Removing the webview from the design removed a whole class this section would otherwise have had to cover, because there is no HTML origin to confuse and no script that could be injected into one.
+
+**Proved by.** `MaskedInput.OnCreateAutomationPeer` is the implementation evidence. `UnlockFocusTests` exercises the custom input's focus and keyboard behavior, but there is no dedicated test asserting this input's automation peer cannot expose a password. The earlier claim that such a test existed was incorrect. T-25 has a separate peer test for the revealed environment-value control; it does not cover master-password input.
 
 ## T-23 — What idle auto-lock is for, and what it is not
 
@@ -497,6 +533,8 @@ The honest control is the one number: a short `--max-ttl`. It bounds how long th
 
 **Residual.** A five-minute default is a compromise, and a person who raises it to eight hours has made their own decision. There is deliberately no "never" — the one setting that would have turned the feature off for everybody who was interrupted by it once.
 
+**Proved by.** `AppVaultSessionTests.It_locks_when_the_timeout_passes`, `A_suspended_machine_wakes_locked_even_though_the_timer_never_fired` and `There_is_no_never` cover timeout, resume and the setting's lower boundary. These are session tests, not proof of memory erasure.
+
 ## T-24 — `recent.toml` tells anything that can read `~/.keypaste` where your vaults are
 
 **What.** The desktop app records the path of every vault it successfully opens, so the unlock screen can offer them. `~/work/acme-prod.kdbx` is not a secret, but it is information about you.
@@ -504,6 +542,8 @@ The honest control is the one number: a short `--max-ttl`. It bounds how long th
 **Bounded by.** It holds paths and nothing else — no entry names, no counts, no fingerprint of the contents. At most ten. Written **only after a vault opens successfully**, so a file somebody sent you that you could not open leaves no trace. Owner-only on Linux and macOS; on Windows it inherits the profile's permissions, which is the same protection `audit.jsonl` already relies on and no more. Removable one row at a time from the app, or entirely from Settings, or by deleting the file.
 
 **Residual.** This is the same trust boundary the audit log already sits behind: anything that can read `~/.keypaste` can read both. The app shows a vault's file name rather than its full path, which is a defence against a screenshot rather than against a reader — the Ideas table in `DECISIONS.md`'s screenshot strategy puts this app in marketing images, and a directory layout is not something to publish by accident.
+
+**Proved by.** `RecentVaultsTests` covers persistence, capacity and removal; `Keypaste.App.Tests.SecretHygieneTests.The_recent_list_holds_the_path_and_no_field_value` checks the stored record for field-value leakage.
 
 ## T-25 — A value on screen, because somebody asked to see it
 
@@ -517,3 +557,4 @@ The honest control is the one number: a short `--max-ttl`. It bounds how long th
 
 **Residual, and it is not small.** A screenshot, a screen recording, a screen-sharing call, a remote-desktop session, an OS-level screenshot service, and a person behind you all see what your display shows. None of that is something a password manager can prevent, and the honest framing is that this is the same exposure as reading a password aloud: brief, deliberate, and yours to choose. Drawing text also needs a `string` the runtime will not let anyone wipe, so for the length of the hold the value exists in the process as an unwipeable copy — T-18's territory, unchanged.
 
+**Proved by.** `RevealedValueTests` covers hold/release, leaving the visual tree, styled properties and `No_automation_property_carries_the_value_while_it_is_shown`; `SecretHygieneTests.Revealing_is_one_value_at_a_time_and_ends_with_the_hold` checks the session behavior. Screen capture remains outside those guarantees.

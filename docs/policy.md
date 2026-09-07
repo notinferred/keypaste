@@ -1,8 +1,8 @@
 # Pre-approving with a policy file
 
-Everything in keypaste up to now asks you. A policy file is how you say yes in advance to a narrow, repeating case — so `keypaste agent` releases that one credential without drawing a prompt.
+Normally keypaste asks you before creating an approval, then reuses it for matching requests while it remains live. A policy file is how you say yes in advance to a narrow, repeating case — so `keypaste agent` releases that one credential without an initial prompt.
 
-**This is the only feature in keypaste that hands an agent a secret with nobody watching.** That is the point of it, and it is also the reason every part of it is built to fail towards asking you. There is no policy file unless you write one, and anything at all wrong with the one you wrote means the whole of it is ignored and every request comes back to you.
+**This is the path that requires no per-request human approval at any point.** It is built to fail towards asking you. There is no policy file unless you write one, and anything wrong with it disables all of its rules. Requests then follow the ordinary prompt and cached-approval path.
 
 ## The short version
 
@@ -81,7 +81,7 @@ A bridge started with no `--client-label` matches **no rule at all**, including 
 
 ## Anything wrong means everything asks you
 
-There are six states the file can be in. To an *agent* they are all the same thing — no rules, so every request is shown to you — and that is deliberate: a request must not be able to work out whether you have a policy at all. To you they are six different messages, because "I wrote a rule and it is not working" and "I have no rules" need different next steps.
+There are six states the file can be in. Only **Usable** supplies rules. The other five supply none and follow the ordinary approval path; the requester is not given the policy-loading error. Your terminal distinguishes them so you can tell an absent policy from one that failed to load. A usable rule's releases identify it in the audit and response, so policy use is not hidden from the requester.
 
 | State | What `keypaste agent` says |
 | --- | --- |
@@ -148,6 +148,7 @@ That line and the audit log are the only signals that a silent release happened.
 
 - **A rule is a standing grant over a part of your vault as it is now, not as it was when you wrote it.** Anything that can write into that part — a synced vault, a colleague on a shared file, a hostile `.env` you imported — chooses what the rule covers. Move `personal/bank` into `env/dev` and a rule for `env/dev/**` covers it.
 - **With a rule in force, no human sees the request.** The agent's stated reason is recorded and read by nobody. The controls that exist are narrow `entries`, a small `max_per_hour`, and a short `--max-ttl`.
+- **TTL does not revoke a released credential.** Policy releases do not populate the prompt's grant cache: each request is checked against the rule and its allowance. The lifetime returned to the client cannot erase its copies or enforce expiry at the credential's provider.
 - **A rule names a client label any process on your machine could claim.** See above.
 - **There is no way to see which entries a rule matches today.** `keypaste policy ls` shows what each rule *means*, not what it currently *covers*. That is the mitigation this feature most wants, and it needs an unlocked vault — which would put a master password prompt in front of the command you reach for when something already looks wrong. It waits for the GUI, where a vault is open because you opened it. What you have meanwhile is after the fact: every release names the rule that made it, so `keypaste log` tells you what a rule has actually covered.
 

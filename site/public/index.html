@@ -147,7 +147,7 @@ keypaste: an agent is asking for a credential.
 Approve? [y/N]
 </pre>
 
-  <p class="caption">That is the whole product in one screen. An agent asked; you were shown who, what and why; one field goes back for a lifetime you were told about. <a href="https://github.com/notinferred/keypaste/blob/main/docs/demo.md">Watch it end to end</a> — about sixty seconds.</p>
+  <p class="caption">The agent approval flow in one screen. An agent asked; you were shown who, what and why; one field goes back, with a time limit on reusing that approval. Expiry does not erase the client's copies or revoke the credential. <a href="https://github.com/notinferred/keypaste/blob/main/docs/demo.md">Watch it end to end</a> — about sixty seconds.</p>
 
   <p class="pitch"><strong>Stop pasting secrets into chats.</strong> keypaste is a local-first, KDBX-compatible vault that stores your passwords and env variables, injects them into your projects, and lets AI agents like Claude request exactly one credential — with your approval, scoped access, and a full audit trail — without ever seeing your vault.</p>
 
@@ -195,9 +195,11 @@ keypaste run dev -- npm start    # injected into the child process, nothing on d
 
 <pre>keypaste agent --vault ~/vault.kdbx</pre>
 
-  <p class="caption">Then point your AI clients at it. This finds the ones installed on the
-     machine and configures each through its own <code>mcp add</code>; a client without one gets
-     its block printed to paste.</p>
+  <p class="caption">The downloads above are <strong>v0.1.0</strong>, which does not include
+     <code>setup</code>. Use the <a href="https://github.com/notinferred/keypaste/blob/main/docs/mcp-setup.md#claude-code">manual client instructions</a>
+     with those binaries. The command below requires a source build of current <code>main</code>:
+     it finds installed clients and configures each through its own <code>mcp add</code>;
+     a client without one gets its block printed to paste.</p>
 
 <pre>keypaste setup --vault ~/vault.kdbx</pre>
 
@@ -225,7 +227,7 @@ keypaste run dev -- npm start    # injected into the child process, nothing on d
         <tr><th>Injecting into a child process</th><td><code>keypaste run dev -- npm start</code></td><td>no</td><td><code>op run -- npm start</code></td><td><code>infisical run -- npm start</code></td></tr>
         <tr><th>An agent can ask for a credential</th><td>yes, over MCP</td><td>no official integration</td><td>yes, over MCP (beta)</td><td>yes, over MCP</td></tr>
         <tr><th>A person answers each request</th><td>yes, and no is the default</td><td>—</td><td>yes</td><td>not documented</td></tr>
-        <tr><th>What the agent receives</th><td>one field value, for a lifetime you were shown</td><td>—</td><td>no secret — 1Password injects it instead</td><td>not documented</td></tr>
+        <tr><th>What the agent receives</th><td>one field value; TTL limits approval reuse, not retained copies</td><td>—</td><td>no secret — 1Password injects it instead</td><td>not documented</td></tr>
         <tr><th>Per-access log</th><td>local JSONL, hash-chained</td><td>no</td><td>yes, on Business</td><td>yes, on the paid tiers</td></tr>
         <tr><th>Licence</th><td>AGPL-3.0</td><td>GPL-2.0-or-later</td><td>source not published</td><td>MIT core, paid features</td></tr>
       </tbody>
@@ -234,9 +236,9 @@ keypaste run dev -- npm start    # injected into the child process, nothing on d
 
   <p class="caption"><strong>keypaste is not the only thing in this space, and pretending otherwise would be the fastest way to lose the argument.</strong> Keeper's MCP server prompts a human before it returns unmasked secret data. Bitwarden published an Agent Access SDK in March 2026 with the same request-and-approve shape, though it is alpha and its logging is not there yet. 1Password's Environments MCP server asks for approval too, and then deliberately never hands the credential over at all — a different answer to the same problem, not a worse one. What is keypaste's is the combination: an ordinary KDBX file you own, no account and no server anywhere, a person answering each request, and a log that never leaves your disk.</p>
 
-  <h2>Tell me when it ships</h2>
+  <h2>Tell me about the next release</h2>
 
-  <p class="caption">One message, when there is something to install. Not a newsletter, and nothing in between.</p>
+  <p class="caption">CLI/MCP downloads are available above. Leave your email for one future release announcement; we will ask you to confirm your subscription before sending it. Not a newsletter.</p>
 
   <form class="signup" method="post" action="/subscribe">
     <label class="field">

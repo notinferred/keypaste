@@ -37,6 +37,12 @@ Also in scope: the signup endpoint on keypaste.com — `site/src/worker.js` and 
 
 ## Supported versions
 
+The behavior described below is the current source on `main`. The public CLI/MCP release is
+`v0.1.0`; changes listed under [Unreleased](CHANGELOG.md#unreleased), including the broader
+exception-path audit coverage and resolved entry names in audit records, are not in that download.
+The desktop app is available from source and has no public release. See the
+[release contract](docs/RELEASE.md) for platform and publication status.
+
 | Version | Supported | Notes |
 |---|---|---|
 | `main` | Yes | Always the first thing a fix lands on |
@@ -47,11 +53,11 @@ Pre-1.0, this is a short table on purpose. There is no long-term support line an
 
 ## Verifying a release
 
-Binaries are published to `https://dl.keypaste.com/v<version>/`, with a `SHA256SUMS` file, a per-asset `.sha256`, and the corresponding source for that tag (AGPL-3.0 section 6). Every one of them is produced by `.github/workflows/release.yml`, which runs the eight `scripts/verify-*.sh` gates and both directions of the KeePassXC compatibility check against the exact binary it uploads, not against a rebuild. The unit suites run in `ci.yml` on the same commit, against an ordinary build.
+CLI/MCP binaries are published to `https://dl.keypaste.com/v<version>/`, with a `SHA256SUMS` file, a per-asset `.sha256`, and the corresponding source for that tag (AGPL-3.0 section 6). They are produced by `.github/workflows/release.yml`, which checks the NativeAOT build and runs the behavioral gates applicable to each platform, including both directions of the KeePassXC compatibility check against the exact binary it uploads. The unit suites run in `ci.yml` on the same commit, against an ordinary build. Desktop CI artifacts are not public releases; their remaining distribution work is recorded in [docs/RELEASE.md](docs/RELEASE.md).
 
 Two things to know before you rely on that:
 
-**The binaries are unsigned and un-notarized.** On macOS this means Gatekeeper quarantines the download and the documented install includes a line that removes the quarantine attribute; on Windows, SmartScreen warns. This is a known gap, not an oversight — it is tracked as O-0010 in [DECISIONS.md](DECISIONS.md), with the costs written down.
+**The binaries are unsigned and un-notarized.** macOS Gatekeeper and Windows SmartScreen may warn or block them; the observed result depends on the download path, machine and reputation. The README describes the macOS quarantine limitation and a manual workaround; its install blocks do not remove quarantine. Signing and notarization remain O-0010 in [DECISIONS.md](DECISIONS.md), with publication requirements in [docs/RELEASE.md](docs/RELEASE.md). A future valid Windows signature will identify the publisher but cannot guarantee the absence of reputation prompts.
 
 **The checksum proves integrity, not authenticity.** It is served from the same origin as the archive, so anyone able to replace one can replace the other. It protects against a corrupted or truncated download and against nothing else. Verifying provenance needs a signature, which does not exist yet. If you want the strongest available assurance today, build from source — the instructions are in the README and the dependency closure is pinned by content hash in `packages.lock.json`.
 
@@ -113,7 +119,18 @@ Stated plainly, because a security tool that overclaims is worse than one that i
 
 **In-memory secrecy is not claimed.** keypaste keeps master passwords in a clearable `char[]` rather than a `string`, and zeroes the derived bytes after use. That narrows the window and reduces the number of copies; it is not a boundary. The garbage collector may relocate a buffer and leave an unreachable copy behind, values can reach swap, hibernation files or a core dump, a debugger or any process running as the same user can read them, and some values necessarily become immutable strings anyway. `SecureString` is deliberately not used: it does not encrypt on Linux or macOS, so it would read as a guarantee it cannot provide.
 
-**This applies to approved credentials too, and for longer.** When you approve an agent's request, `keypaste agent` holds that field's value in a clearable buffer until the grant expires — up to `--max-ttl`, five minutes by default — so a repeat request does not have to ask you again. It is zeroed the moment the grant expires rather than at the next time something looks, and when the agent stops, every live grant goes with it. But the value reached that buffer as an ordinary immutable string out of the vault, and that copy cannot be cleared. It also crosses a local pipe in plaintext and arrives in the MCP client's process, where keypaste has no say in what happens to it at all. A shorter `--max-ttl` is the control keypaste actually offers.
+**This applies to approved credentials too, and for longer.** When you approve an agent's request, `keypaste agent` caches that field's value in a clearable buffer for the grant lifetime — up to `--max-ttl`, five minutes by default — so a repeat request does not have to ask you again. An expiry timer clears the owned buffer, and cache lookup checks expiry before returning a value; disconnect and disposal also clear the cache. But the value reached that buffer as an ordinary immutable string out of the vault, and that copy cannot be cleared. It also crosses a local pipe in plaintext and arrives in the MCP client's process, where keypaste has no say in what happens to it at all. A shorter `--max-ttl` reduces the cache window.
+
+**TTL limits reuse of keypaste's approval, not the lifetime of a disclosed password.** Expiry stops
+the cached grant serving another request and clears its owned buffer. It does not erase copies in
+the bridge or client, revoke the credential at its issuer, or invalidate a session created with it.
+A policy release is evaluated on each request and does not populate the human-approval cache.
+
+**Authorization controls release, not whether plaintext has existed inside the approver.** Resolving
+an entry currently calls `Vault.ReadEntries`, which materializes the standard fields, including
+passwords, as strings before an approval decision. Only the selected authorized field is released
+over the credential response. Denial does not imply that no secret was read into the approver's
+memory; [THREATS.md](THREATS.md) T-8 and T-18 state that boundary.
 
 **And `keypaste agent` keeps the vault unlocked for as long as it runs.** There is no idle auto-lock in this version; stopping it is the lock. That is stated here rather than left to be discovered.
 
@@ -141,7 +158,16 @@ Stated plainly, because a security tool that overclaims is worse than one that i
 
 **The audit log is tamper-evident, not tamper-proof.** Every agent access is recorded locally, and keypaste opens that file only in append mode: no code path in it seeks, truncates, rewrites or deletes. Each record also carries the hash of the record before it, so `keypaste log verify` can tell you whether the file is the file keypaste wrote. That catches careless tampering — a line edited, removed, inserted, or written by something else. It does not catch two things, and the command says so every time it passes rather than only when it fails: **the chain holds no secret**, so anyone who can write the file can recompute it, and **records deleted from the end leave no trace**, because nothing follows them. For the second there is `keypaste log verify --expect <hash>`, which checks that a hash you wrote down earlier is still in the file; keypaste keeps no copy of it, because an anchor stored beside the thing it anchors is worth nothing. On Linux and macOS the log is created readable only by its owner; **on Windows there is no equivalent** and it inherits its directory's permissions, the same gap `env export` has. keypaste never rotates or trims the log — deleting lines is the opposite of what it is for — so it grows without bound. See [THREATS.md](THREATS.md) T-5.
 
-Since 2.3 this matters more than it did, not less: a credential released by a policy rule has no human witness, so the log is not a second record that it happened — it is the only one. That is why a release which cannot be written down does not happen at all.
+**Audit arguments are a bounded record, not a raw request transcript.** On current `main`,
+`args.entry` prefers the approver's sanitized resolved path when supplied; otherwise it retains the
+sanitized request argument. It is capped at 128 characters. `args.ttl_seconds` records the requested
+TTL, not the effective grant duration after limits or the remaining cache lifetime. The reason is a
+sanitized 200-character excerpt with its original length and SHA-256. The released field's value is
+not deliberately added to the record, but agent-written arguments can themselves contain sensitive
+text. The log remains local sensitive data. The resolved-path behavior is unreleased; `v0.1.0`
+records the sanitized entry argument, which may be an opaque handle.
+
+Policy pre-approval, implemented in roadmap step 2.3, makes the audit essential: a silent release has no human witness. If keypaste cannot append the required record, it refuses the credential response.
 
 **Local attackers are out of scope.** Anything running as your user can read your memory, watch your keystrokes, and read your clipboard. keypaste protects the vault file at rest and limits what an AI agent can reach; it cannot defend a compromised account against itself.
 

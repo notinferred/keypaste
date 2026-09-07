@@ -1,6 +1,6 @@
 # launch.md — the launch, and what has to be true first
 
-> **Nothing in this file is sent until every box in the next section is ticked.** The copy is written early on purpose: written cold it argues, written on the morning it sells. The questions each post asks are real questions, and the answers are wanted whether or not the post does well.
+> **Prepared CLI-era copy; the initial community introduction now follows the working-product gate.** [STEPS](docs/STEPS.md), step 3.2, requires R.1 and founder daily use before posting. Refresh the component/version claims below for the actual released product first; the old “no released GUI” wording is not a permanent launch requirement.
 
 Five channels, the ones `docs/PRODUCT.md` §5.3 sanctions: Hacker News, r/selfhosted, r/KeePass, the MCP community, X. One post each. No reposting, no second account, no asking anyone to go vote.
 
@@ -10,14 +10,14 @@ lobste.rs was dropped rather than deferred. Signup is by invitation from an exis
 
 ## Before anything goes out
 
-Three things, each false today, each something a stranger hits before they hit the product.
+These three prerequisites were completed on 2026-09-06. They do not close the current product, daily-use and version-correct-copy requirements in [STEPS](docs/STEPS.md), step 3.2.
 
 - [x] **The repository is public.** Step 3.0, done 2026-09-06 at github.com/notinferred/keypaste.
 - [x] **The demo GIF exists** at `docs/demo/keypaste-demo.gif`, 62 KB, in the slot both pages
   reserve. Step 3.1, done 2026-09-06.
 - [x] **`security@keypaste.com` receives mail**, tested from an outside address 2026-09-06.
 
-Everything else — fork runners, branch protection, venue rules — happens during the fourteen days after. No message goes to the signup list until 5.6 ships; the page promises a confirmation first.
+The remaining prerequisites and ordering belong to [STEPS](docs/STEPS.md); this historical checklist does not defer release safeguards until after launch. Recheck each venue's current rules before posting. No release announcement goes to the signup list until 5.6's consent flow ships and the recipient confirms.
 
 ---
 
@@ -25,7 +25,7 @@ Everything else — fork runners, branch protection, venue rules — happens dur
 
 Written once here. The posts below reference these rather than restating them, so there is one place to correct.
 
-**The pitch these posts were written to** — `docs/PRODUCT.md` v1.0 §1; v1.1 (D-0061, D-0075) now says "password manager and secrets manager", and the posts stay on the developer wedge until 3.11 rewrites them for the app: stop pasting secrets into chats. keypaste is a local-first, KDBX-compatible vault that stores your passwords and env variables, injects them into your projects, and lets AI agents like Claude request exactly one credential — with your approval, scoped access, and a full audit trail — without ever seeing your vault.
+**Historical CLI pitch these drafts use.** PRODUCT v1.2 now covers the broader password manager, managed hosting and organizations; step 3.2 refreshes these drafts for the actual initial product release, and 3.11 follows the hosted-release gate. The original developer pitch: stop pasting secrets into chats. keypaste is a local-first, KDBX-compatible vault that stores your passwords and env variables, injects them into your projects, and lets AI agents like Claude request exactly one credential — with your approval, scoped access, and a full audit trail — without ever seeing your vault.
 
 **The claim, and its exact limits.** The differentiator is the combination, never novelty: an ordinary KDBX file you own, no account and no server anywhere, a person answers each request, and the log never leaves your disk. Each of the others gives up at least one of those. **No post contains "the first", "the only", or "nobody does this"** — `D-0036` lost that argument already, against a field that includes Keeper, Bitwarden's Agent Access SDK, 1Password Environments and `kprun`, and it lost it in private rather than in a comment thread.
 
@@ -184,7 +184,7 @@ Built an MCP server for a local KDBX vault and want to put one design question t
 
 The shape: two processes. `keypaste-mcp` is the stdio server the client spawns, and it holds no vault and decides nothing — it forwards. A separate process the human started holds the vault and does the deciding. The split exists so that nothing the agent does can cause a master-password prompt to appear; if the bridge could ask for a password, a malicious client could ask for one too, and the human would have no way to tell them apart.
 
-Two tools. `list_entry_names` returns names, never values, and only within a default-deny glob. `request_credential(entry, reason, ttl)` prompts a human. The order the request is evaluated in is the security property: resolve the entry, re-check it against the exposure globs, then the grant cache, then the cooldown, then the policy file, then ask a person — and read the field out of the vault last of all, after the yes. A request that is going to be refused never has its field read, so a secret is never in memory for a call that was about to be denied.
+Two tools. `list_entry_names` returns names, never values, and only within a default-deny glob. `request_credential(entry, reason, ttl)` requests a release. The approver resolves the entry, re-checks exposure, checks a cached approval, cooldown and policy, then asks a person when needed. Only an authorized field is returned. Resolution already materializes standard fields inside the approver, so denial is not a promise that plaintext never existed in its memory; THREATS.md T-8 and T-18 explain that boundary.
 
 **The question.** MCP tool results come back into the model's context, so a credential this returns is in the transcript and in the client's session file, twice over — text content and structured content. 1Password's Environments server sidesteps this by never returning the secret: it injects into the child process instead. I cannot do that from a stdio server that does not own the process tree.
 
@@ -202,7 +202,7 @@ Seven posts. The GIF carries the first one; nobody reads past it otherwise. No h
 
 > Your coding agent needs an API key. It asks you to paste one into the chat.
 >
-> Here is the other version: it asks the vault, you get one prompt, one credential goes out for five minutes, and there is a line in a log about it.
+> Here is the other version: it asks the vault, you get one prompt, one credential goes out, and there is a line in a log about it. The five-minute limit controls approval reuse; it cannot erase the agent's copy.
 
 **2**
 
@@ -244,7 +244,7 @@ Seven posts. The GIF carries the first one; nobody reads past it otherwise. No h
 
 ## The fourteen days after
 
-`docs/STEPS.md` Stage 3 — respond to every issue and every comment for two weeks straight. That is the whole commitment; the rest of this section is what makes it survivable.
+`docs/STEPS.md` step 3.3 — respond to every issue and every comment for two weeks straight. That is the whole commitment; the rest of this section is what makes it survivable.
 
 **Day 0.** Six hours at the keyboard after the Show HN post, because that is the window. Nothing else scheduled that day. Do not ship code during it — write the issue down and answer the person.
 
@@ -280,6 +280,6 @@ Every objection below is one the repository already concedes somewhere. Answerin
 
 ## What this file is not
 
-It is not a public page. It links nothing and nothing links it; the audience is one person on one morning.
+This is a maintainer runbook in the public repository, not a published campaign. Its draft posts require the release and copy checks above before use.
 
 The dialog and the log above are held to the shipped binaries by `scripts/verify-demo.sh`, the same gate that holds `docs/demo.md`, `README.md`, `site/public/index.html` and `docs/keepass-and-agents.md`. That is why each appears exactly once here. If a post needs a shorter version, it does not get one — it links the demo instead.

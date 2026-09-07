@@ -10,6 +10,7 @@ One row, one line, and a row only when architecture, security or money changes. 
 
 | id | date | decision | supersedes |
 |---|---|---|---|
+| D-0090 | 2026-09-07 | PRODUCT re-ratified as v1.2 under the founder's requested direction: an everyday KeePass-compatible password manager with environments and controlled agent access, managed hosting for nontechnical users, and organization-owned credentials. Full KeePassXC coverage is staged accepted work. PRODUCT §3 is byte-identical to v1.1. STEPS adopts the sibling notinferred model: current status, dependency-based Build/Verify tasks and Working proposition → Pilot ready → Paid release gates, followed by advanced coverage and teams in Expansion and evidence-triggered Scale. Public desktop/extension distribution and daily-use recovery precede hosted reliance; hosted beta, a supported phone workflow and review precede payment. Pricing plans are separate from delivery milestones; account recovery cannot imply vault decryption. PRODUCT, STEPS, CLAUDE and ALIGNMENT change together; ALIGNMENT is an adopted-direction map, not another queue | D-0061 audience/order, D-0062 first-user boundary, D-0063 team scope, D-0065 payment sufficiency, D-0069 mandatory no-GUI launch copy, D-0074/D-0077/D-0079 tier and pickup rules |
 | D-0089 | 2026-09-06 | The repository went public by replacement, not by purge. GitHub Support was never asked and should not have been the plan: `refs/pull/*` is a namespace no push can write, and deleting a ref would not have removed the objects, which stay fetchable by SHA until GitHub collects them — and the SHA was written in this repository's own `docs/STEPS.md`. A rename to `keypaste-bc` was tried first and moved all 21 pull refs with it, changing nothing. Pushing `main` to a fresh `notinferred/keypaste` and deleting the old one removed every pull ref, both Claude-authored commits and the pre-rewrite identity at once, kept the URL so no published link moved, and cost only three R2 secrets to re-add. D-0082 had priced this route as expensive on runner re-verification and URL rewrites; D-0086 had already removed the first and the same-name recreate removes the second, so the rejected route had quietly become the cheap one. The old repository, pull refs included, is mirrored off-repo | D-0082's price for a fresh repository; 3.0's Support-ticket route |
 | D-0088 | 2026-09-06 | Recording the demo GIF against real Claude Code found two defects in the approval surface, both fixed before the GIF was cut. **The agent's reason was run through the entry-name sanitizer**, which replaces the path separator, so Claude asking for `env/demo/STRIPE_KEY` drew "env demo STRIPE_KEY" under the warning that the reason had been scrubbed — a warning firing on the most ordinary request there is, which teaches the person approving to ignore the one line meant to stop them. `SanitizeProse` exempts the separator and **only** the separator: markup, fences, pipes, braces and brackets still never reach a reason, which is what `AHostileReason_IsRenderedInert` holds. **The audit line recorded the opaque handle**, because `request_credential`'s schema tells agents to prefer one, so the log could not answer the single question it exists for; the approver had resolved it and sent the name back in `CredentialReply.Entry` all along and nothing read it. Neither was reachable by the gates: `verify-demo.sh`'s stand-in sends a path, never a handle, and writes no slash into a reason. The GIF itself is a rendered terminal, not a desktop capture, composed only of gate-verified output and that captured session | the claim that `verify-demo.sh` covers the reason and entry fields |
 | D-0087 | 2026-09-05 | Commits are authored `keypaste <contact@keypaste.com>`, set globally so it is the default rather than something to remember per repository. Pseudonymous maintainership is ordinary in open source and the project, not a person, is what the trust argument in law 3.8 rests on. **It is forward-only.** The 239 commits already published carry the founder's personal name and address, publicly and unauthenticated, and no configuration change reaches them; a rewrite plus force-push would change every hash, break every clone, and still leave `refs/pull/*` and GitHub's cached objects untouched, so it would not even achieve the thing it costs so much for. The purge in 3.0 is the only route that reaches those refs. `contact@keypaste.com` needs a Cloudflare Email Routing rule of its own; only `security@keypaste.com` has one today | the author identity on every future commit |
@@ -56,27 +57,27 @@ Adopted in 4.1 and 4.2, and standing: calm, precise, bank-lobby-not-hacker-movie
 
 | idea | who | status | why |
 |---|---|---|---|
-| One-time encrypted share links, self-hostable relay, key in the URL fragment | founder | promoted | Folded into step 5.2 (D-0064): the relay carries a one-download bundle endpoint, the bundle is a real KDBX holding one subtree with source UUIDs preserved, and the keyfile lives in the URL fragment so the relay moves bytes it can never read. O-0021 (a bundle is untrusted input) is answered inside 5.2 before the endpoint ships. |
-| `keypaste merge` — entry-level reconciliation of two KDBX files by UUID | founder | promoted | 1.4. Not a sharing feature: §2 makes sync the user's problem and then leaves the user holding two divergent copies, which is O-0018 and the reason the app can only refuse to save (D-0050). Sharing turns out to be a free application of it — the bundle is delivered *into* a merge — so the engine is justified even if 5.0 is never built. |
+| One-time encrypted share links, self-hostable relay, key in the URL fragment | founder | promoted | 5.4a/b own the reviewed key-transfer design, bundle endpoint and quarantine import; 5.2 owns the underlying relay. O-0021 (a bundle is untrusted input) is answered before the sharing endpoint ships. |
+| `keypaste merge` — entry-level reconciliation of two KDBX files by UUID | founder | promoted | 1.4a–1.4c. Local reconciliation and managed sync both need recoverable divergent edits; the external-write refusal in D-0050 is only the existing safety boundary. Sharing can reuse the same engine. |
 | GitHub private vulnerability reporting as a second channel | founder | open | `security@keypaste.com` is tested and works, and law 3.10 asks for *a* private contact, not two. One toggle if it is ever wanted. |
-| Multi-vault and vault-per-project ergonomics | founder | open | No prompt exists for it anywhere. Wanted, but no accept criterion that can fail has been written; the app's recent-vault list is as far as it goes. |
+| Multi-vault and vault-per-project ergonomics | founder | promoted | P.2 extends the current recent-vault list; accepted KeePassXC coverage under D-0090. |
 | Git-friendly vault workflows and conflict guidance | founder | open | No prompt exists for it. Blocked on step 1.4 — two writers, one KDBX, and no merge until then. |
-| Hosted relay and sync as the first paid tier | founder | promoted | Step 5.2, `[Launch]` (D-0064, D-0065, D-0077). Convenience never security (law 5.4); the local-first vs hosted tension below was settled by D-0060. |
-| Delegation dashboard: aggregate agent grants, MCP connections, external OAuth | founder | promoted | Steps 6.1 and 6.2, `[Scale]` (D-0074). The feasibility spike is the first step and it has not run. |
-| Teams: shared env sets by per-member key wrapping (the copy model) | founder | promoted | Step 7.1, `[Scale]`. Bounds future access, not past copies — that honesty has to survive into the build. |
-| Teams: a broker that releases without copying (the access model) | founder | promoted | Step 7.2, `[Scale]`. The differentiated one — instant revocation, no rotation. Reuses the Stage 2 approval core verbatim or it is not this idea. |
-| Team SSO for the hosted service, never on the vault path | founder | promoted | Step 7.3, `[Scale]`. If the IdP being compromised can read a vault, it is the wrong design. |
-| Team delegation dashboard | founder | promoted | Step 7.4, `[Scale]`. |
+| Hosted relay and sync as the first paid offering | founder | promoted | Step 5.2 and the Pilot ready/Paid release gates in STEPS (D-0090). Convenience never security (law 5.4); relay implementation alone is insufficient evidence to charge. |
+| Delegation dashboard: aggregate agent grants, MCP connections, external OAuth | founder | promoted | Steps 6.1 and 6.2. External grant feasibility must be demonstrated before promising provider coverage. |
+| Teams: organization-owned credentials including shared env sets (the copy model) | founder | promoted | Step 7.1 and its team prerequisites. Key handling requires review against PRODUCT §3; revocation bounds future access and cannot erase past copies. D-0090 broadens ownership beyond environments. |
+| Teams: a broker that grants controlled credential access (the access model) | founder | promoted | Step 7.2 reuses the approved-release core. Revocation denies the next broker request; retained static credentials remain usable until the provider rotates or expires them. |
+| Team SSO for the hosted service, never on the vault path | founder | promoted | Step 7.3. Account authentication and provisioning do not inherently confer vault decryption authority. |
+| Team delegation dashboard | founder | promoted | Step 7.4; depends on the underlying membership, broker and audit contracts. |
 | "Design language: modern, calm, trustworthy" as a checklist item | founder | rejected | Nothing about it can fail, so it was never a step. The direction above is the durable form. |
-| Sign-in-first landing flow from the design exploration | founder | open | Inverts local-first, which `docs/PRODUCT.md` §2 makes permanent. Must be answered before any hosted-sync work; D-0060 answered it for 5.2: the server cannot read the blob, and nothing signs in before a vault exists. |
-| Local-first vs a hosted sync tier | founder | promoted | §2 permits a zero-knowledge hosted tier if self-host stays first-class. **D-0060 settled it: the server cannot read the blob**, so a forgotten master password stays gone; D-0061 made hosted sync the business and D-0064 gave it a shape. It is step 5.2 in `[Launch]` (D-0077). |
-| TOTP/2FA storage with agent-safe handling — a code, never the seed | founder | promoted | Step 9.2, `[Launch]` (D-0068). |
+| Managed onboarding with account creation before file management | founder | promoted | The Pilot ready flow may create an account first; local use stays account-free. D-0090 removes the user-managed-file requirement without allowing server decryption. |
+| Local-first and managed encrypted sync | founder | promoted | D-0060 keeps server-side decryption out of scope; D-0090 permits managed onboarding and distinguishes account recovery from explicitly configured vault recovery. Step 5.2 and the hosted gates own delivery. |
+| TOTP/2FA storage with agent-safe handling — a code, never the seed | founder | promoted | Steps 9.2a and 9.2b; provisioning and display must preserve the interoperable parameters. |
 | Command palette (Ctrl/Cmd+K) | founder | open | Fits the keyboard-first shell 4.1 shipped. |
-| Onboarding that offers "import your existing .kdbx" first | founder | open | Meets users where they are; new vault second. |
-| SSH key management and a `keypaste ssh` agent integration | founder | promoted | Step 9.3, `[Launch]` (D-0068). |
+| Onboarding that offers creation and existing-vault import | founder | promoted | 4.8 and 9.1a–9.1f cover newcomers and existing vault users without terminal/file-format expertise. |
+| SSH key management and a `keypaste ssh` agent integration | founder | promoted | Step 9.3; integration behavior must be compared explicitly with the KeePassXC baseline. |
 | Git hooks that block committing plaintext secrets | founder | open | Could stand alone; free marketing. |
 | Secret leases for long-running agents, with rotation reminders | founder | open | |
-| Passkey storage once KDBX support matures | founder | open | Watch KeePassXC's work; do not own recovery. |
+| Passkey storage and browser use | founder | promoted | 8.5a and 8.5b; accepted KeePassXC coverage under D-0090, with interoperable storage and relying-party behavior to verify. |
 | `keypaste env set --no-history` for rotating a leaked value | founder | open | Diverges from KeePassXC's editor, so it must be opt-in and loud (D-0014). |
 | `execve` the child on Unix instead of wrapping it | founder | parked | Exit status, job control and signals would be right for free, but Windows has no equivalent, so the wrapper exists anyway — two implementations of one feature (D-0016). |
 | `keypaste run --no-inherit`, the shape `env -i` has | founder | open | Useful for reproducing what CI sees. |
@@ -85,25 +86,25 @@ Adopted in 4.1 and 4.2, and standing: calm, precise, bank-lobby-not-hacker-movie
 | `keypaste env export --format json` | founder | parked | Only once something asks. `--dotenv` is required today precisely so a second format can be added without changing what the first means. |
 | `keypaste env diff <project> [file]` | founder | open | The natural companion to `pull` and `export`, and it never has to print a value. |
 | A `direnv` shim | founder | parked | `keypaste run` scopes exposure to one command; anything direnv-shaped puts values in the interactive shell and everything it launches. Resolve that first. |
-| Vault health report: reuse, staleness, weak values | founder | open | |
-| Team approval quorum, "2 of 3 for production" | founder | parked | Good story; waits for `[Scale]` with the rest of teams. |
-| Windows Hello / Touch ID unlock | founder | open | |
-| Import wizards for 1Password, Bitwarden, LastPass | founder | promoted | Step 9.1, `[Launch]` (D-0068); KeePassXC CSV added to the list, because a switcher from the tool this one is cleaner than is the likeliest arrival. |
+| Vault health report: reuse, expiry and weak values | founder | promoted | V.9 performs local checks; P.8 separately verifies an opt-in breach-check design that respects PRODUCT §3.5. |
+| Team approval quorum, "2 of 3 for production" | founder | parked | Requires a concrete team-pilot need after the base approval and membership contracts. |
+| Windows Hello / Touch ID unlock | founder | promoted | 4.10a/b; quick unlock must preserve full vault unlocking and recovery requirements. |
+| Import wizards for 1Password, Bitwarden, LastPass | founder | promoted | 9.1a–9.1f include KeePassXC CSV; migration needs visible loss reporting and preserves the source until verification. |
 | Anomaly nudges — "an agent asked for prod credentials at 3am" | founder | open | |
 | Public trust page: reproducible builds, audit fund, bounty | founder | open | Ties to O-0012; reproducibility is not claimed today. |
-| Break-glass emergency access with mandatory after-the-fact review | founder | parked | Waits for `[Scale]` with the rest of teams. Convenience never softens the audit. |
-| Browser extension with autofill | founder | promoted | Step 8.3, `[Launch]`. Rejected once on effort and incumbents, deferred behind a condition by D-0059, and then overtaken: `docs/PRODUCT.md` v1.1 (D-0061) makes keypaste a password manager, and one without autofill is not one (D-0068). The effort and the incumbents are still real and are why it sits behind the first dollar rather than in `[MVP]`. |
-| Browser extension as an approval surface for agents that live in the browser | founder | promoted | Step 8.1, `[Launch]`, and the native messaging host 8.3 fills through. Native messaging to a running `keypaste agent`, which is what keepassxc-browser replaced its localhost HTTP server with in 2018 — the precedent `docs/keepass-and-agents.md` already cites. |
-| A UX bench: HEART minus the two dimensions law 3.5 forbids measuring | founder | promoted | Step 4.5, `[Launch]` (D-0073). The durable form of the design-language row this table already rejected: same ambition, rebuilt so a result can fail. Engagement and Retention need behavioural telemetry and are struck on the page rather than quietly dropped. It waits for the app's first release because a threshold no human has been held to is an assertion rather than a measurement (D-0043). |
-| Headless render gates so a screenshot is evidence rather than a memory | founder | promoted | Step 4.6, `[Launch]` (D-0073), closing O-0020. `Avalonia.Headless` renders to a bitmap with no display, which makes the masked-value and locked-window claims testable for the first time — in a GUI the screen is a secret path, so law 4.5 applies to it. |
-| Mobile app | founder | parked | Read-only companion first, if ever. |
+| Break-glass emergency access with mandatory after-the-fact review | founder | parked | Requires a concrete organization recovery design and pilot need; convenience never softens the audit or PRODUCT §3. |
+| Browser extension with autofill, save and update | founder | promoted | 8.3 and its browser children belong to the daily-use Working proposition. D-0090 supersedes the former ordering behind the first payment; store publication and native pairing are release work. |
+| Browser extension as an approval surface for agents that live in the browser | founder | promoted | 8.1 supplies the native messaging foundation for browser integration and approvals; only approved scopes reach the running agent. |
+| A UX bench: HEART minus the two dimensions law 3.5 forbids measuring | founder | promoted | 4.5 makes task success and usability falsifiable before reliance; engagement and retention telemetry remain excluded by law 3.5. |
+| Headless render gates so a screenshot is evidence rather than a memory | founder | promoted | 4.6 closes the GUI secret-display gap described in O-0020; native platform installation still needs independent release evidence. |
+| Supported phone workflow and mobile delivery decision | founder | promoted | M.1, M.2a–c and M.3; D-0090 requires a supported phone workflow before paid consumer release. Third-party KDBX compatibility is not proof of keypaste account/sync support. |
 | Series: "Secrets hygiene for the agent era", one post per THREATS.md entry | founder | open | Marketing. |
-| Comparison pages vs .env, vs Infisical, vs plain KeePass | founder | open | Honest framing: they are for teams and cloud; keypaste is local-first. |
+| Comparison pages vs .env, vs Infisical, vs plain KeePass | founder | open | Compare dated, evidenced workflows and availability; local use, managed hosting and teams each need accurate scope. |
 | A public demo vault anyone can point Claude at | founder | open | Lets people feel the approval flow safely. |
 | Conference talk: "I let Claude into my password manager — safely" | founder | open | |
 | Contribute KDBX compat fixes upstream to KeePassXC | founder | open | Respectfully. Never fork-and-fight. |
-| Daemon architecture for approvals vs per-invocation unlock | founder | open | UX against attack surface. |
-| Hardware key (YubiKey) unlock | founder | open | Timing unclear. |
+| Daemon architecture for approvals vs per-invocation unlock | founder | promoted | D-0054 chooses the running agent as pipe owner and the app as client; 4.3 completes the native approval surface. |
+| Hardware-key challenge-response unlock | founder | promoted | P.1; accepted KeePassXC coverage under D-0090, with platform/device verification and recovery limits. |
 | `policy.toml` inside the vault, synced and encrypted | founder | open | |
 | Product vocabulary: "agents" vs "clients" vs "apps" | founder | open | Needs user testing. |
 | Windows vault saves without Transactional NTFS | founder | open | KeePassLib saves through TxF, which Microsoft deprecated and advises against. On 2026-09-04 ten vault-save tests failed one Windows leg of run 33915931104 with "the function attempted to use a name that is reserved for use by another transaction", and the same commit passed both the push-triggered run before it and a re-run of the failed job after it — so it is flaky rather than broken, and a contributor's first pull request can meet it. Not a step: the code is inside `third_party/KeePassLib`, and a local patch there costs the clean upstream `diff -r` the quarantine in `third_party/Directory.Build.props` exists to protect (D-0007). |
@@ -122,7 +123,7 @@ Adopted in 4.1 and 4.2, and standing: calm, precise, bank-lobby-not-hacker-movie
 | Business model, positioning, acquisition path, pivot and failure conditions | `~/Nextcloud/keypaste/business.md` | 2026-09-04 (exists; not read for this audit) |
 | Tier ladder with figures, KPI targets, comparable pricing with sources and fetch dates | `~/Nextcloud/keypaste/keypastebusinessnotes-2026-09-04.md`, which is the durable copy; a working copy may also sit as `keypastebusinessnotes.md` in the tree, **gitignored** by `.gitignore` rule `*businessnotes*.md` (`git check-ignore` confirms it, and `git log --all -- keypastebusinessnotes.md` is empty). The tree copy is machine-local: on 2026-09-04 it was 34 lines ahead of every other copy and would have gone with the machine it sat on, so the synced copy is the one to trust | 2026-09-04 |
 
-D-0006 removed this material from the roadmap and the parking lot, and D-0072 keeps it out of every commit. The committed pages carry the tier *shapes* and the decisions (D-0063, D-0071); a number appears only in the working file, and `docs/STEPS.md` says "figures in the working file" where one would otherwise be named.
+D-0006 removed this material from the roadmap and the parking lot, and D-0072 keeps it out of every commit. PRODUCT owns the current commercial shape; the working file holds dated financial assumptions, and STEPS requires owner-approved prices before paid publication. Earlier assumptions do not override PRODUCT v1.2 or its release gates.
 
 ---
 
@@ -138,12 +139,12 @@ D-0006 removed this material from the roadmap and the parking lot, and D-0072 ke
 | Vulnerability reports | `security@keypaste.com`, routed by Cloudflare Email Routing | the only reporting channel that works today |
 | DNS for `keypaste.com` and `dl.keypaste.com` | Cloudflare | |
 | CI runners | GitHub-hosted runners exclusively — `ubuntu-24.04`, `ubuntu-22.04`, `ubuntu-22.04-arm`, `windows-2025`, `macos-15`; no Blacksmith label remains in any workflow | free for a public repository (D-0086) |
-| Sync relay host and its S3-compatible bucket | **not yet held** — step 5.2 (H-0019) | the relay is one binary (D-0064); the hosted instance is that binary on a small VM behind Cloudflare |
-| Stripe account for Individual and Team billing | **not yet held** — **H-0018** | licence keys are issued by the relay, checked by the relay, and never gate a client |
-| Azure Trusted Signing for Windows binaries | **not yet held** — **H-0017** | D-0070; price and eligibility re-verified at enrolment |
+| Sync relay host and its S3-compatible bucket | **not yet held** — H.7 enrollment (H-0019), H.8 deployment | the relay is one binary (D-0064); the hosted instance is that binary on a small VM behind Cloudflare |
+| Stripe account for Individual and Team billing | **not yet held** — 5.5a enrollment (**H-0018**) | 5.5b/c implement relay-side entitlements and cancellation; payment never gates local client functionality |
+| Microsoft Artifact Signing for Windows binaries (formerly Azure Trusted Signing) | **not yet held** — 3.6a enrollment (**H-0017**) | D-0070; eligibility and the selected signing route are verified at enrollment |
 | Apple Developer Program for notarization | **not yet held** — **H-0015** | D-0057 |
 
-The site has **no CI job**. `ci.yml` is the .NET gate and does not look at `site/`. The pre-deploy checklist in `site/README.md` is the whole of the protection, and it is **H-0011**, run by hand before every deploy.
+The site has **no dedicated build or deployment CI job**. The .NET `ci.yml` workflow does check the dialog and log examples in `site/public/index.html` through `scripts/verify-demo.sh`; it does not validate the Worker's deployment or signup flow. The pre-deploy checklist in `site/README.md` covers those checks as **H-0011**, run by hand before every deploy.
 
 ---
 
@@ -155,7 +156,7 @@ The site has **no CI job**. `ci.yml` is the .NET gate and does not look at `site
 | npm and crates names | npmjs.com, crates.io | **not registered, not sought** — nothing ships through either (D-0053, D-0082) |
 | Trademark on "keypaste" | — | **not filed, deliberately** — D-0058 accepted the risk. No full clearance search was run, and D-0053's one known live collision is the whole basis; a second one is the trigger to revisit |
 
-The repository itself is `notinferred/keypaste` and is **private**. Whether it goes public is **H-0003**, and it is the precondition every launch link depends on.
+The repository itself is `notinferred/keypaste` and is **public**, recreated at the same URL on 2026-09-06 (D-0089). The earlier H-0003 publication precondition is complete; current launch readiness lives in `docs/STEPS.md`.
 
 ---
 
@@ -163,7 +164,7 @@ The repository itself is `notinferred/keypaste` and is **private**. Whether it g
 
 | what | where | note |
 |---|---|---|
-| The demo GIF | **does not exist yet** — step 3.1 (H-0005) | both pages reserve the slot; any screen recorder, under 2 MB |
+| The demo GIF | `docs/demo/keypaste-demo.gif`, mirrored at `site/public/demo/keypaste-demo.gif` | exists: 63,614 bytes (about 62 KiB); rendered from verified output and a captured Claude Code session, D-0088; step 3.1 is complete |
 | KeePassXC for the Windows compat job | fetched from the official zip, pinned by SHA-256 in `ci.yml` | changing the pin is a security decision |
 | Published `v0.1.0` assets | `https://dl.keypaste.com/v0.1.0/` — four native binaries, the corresponding source, and checksums | immutable; the pipeline will not republish a version |
 
