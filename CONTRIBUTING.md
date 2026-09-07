@@ -18,13 +18,13 @@ A CLA would buy the freedom to relicense later. AGPL-3.0 is chosen and staying (
 
 ## Before you open a pull request
 
-**Read [`docs/PRODUCT.md`](docs/PRODUCT.md).** It is the locked core, sections 1–6 do not change, and a change that conflicts with it is wrong no matter how good it is. Section 2 in particular is a list of things this project will not become, and it is deliberately permanent.
+**Read [`docs/PRODUCT.md`](docs/PRODUCT.md).** §3's security laws are immutable. Other sections change only by a dated founder re-ratification recorded in `DECISIONS.md`; a proposal does not override the current text. [CLAUDE.md](CLAUDE.md#records) defines document ownership, and [docs/STEPS.md](docs/STEPS.md) owns the active build plan.
 
 **A change on the secret path needs a test** — encryption, injection, the agent bridge, or anything a secret is drawn on (law 4.5). "It obviously works" is what the tests are for.
 
 **A new dependency on the secret path needs written justification in the pull request** (law 3.9). Dependencies here are minimized and pinned, and every package change also needs `packages.lock.json` regenerated with a `--force-evaluate` restore or a locked-mode CI restore cannot hold (**D-0004**).
 
-**Never write cryptography** (law 3.6). KDBX4 via the vendored library, and nothing invented. `third_party/KeePassLib` is the only place in the repository permitted to reference KeePassLib directly (**D-0007**); everything else goes through the interop boundary.
+**Never write cryptography** (law 3.6). KDBX4 via the vendored library, and nothing invented. Outside `third_party/KeePassLib`, only `src/Keypaste.Core/Internal/KeePassInterop.cs` may reference KeePassLib types directly (**D-0007**); other application code goes through the core's interop boundary.
 
 **Any KDBX file keypaste writes must open in real KeePassXC** (law 4.6). This is gated in CI in both directions and the gate is permanent.
 
@@ -33,9 +33,9 @@ A CLA would buy the freedom to relicense later. AGPL-3.0 is chosen and staying (
 - **Commit messages are a subject line, 72 characters or fewer**, no body. `Signed-off-by` is the one trailer that belongs below it.
 - **Small and focused.** One change, one reason.
 - **Documentation ships with the feature**, not after (law 4.8).
-- **CLI before GUI.** Every feature exists in the CLI first, and the GUI calls the same core library (law 4.2).
+- **Core-first.** Shared feature logic lives in `Keypaste.Core`; the CLI and desktop app use it and neither waits for the other. Document when a feature is available in only one front end (laws 4.2–4.3).
 
-Five pages — `README.md`, `launch.md`, `docs/demo.md`, `docs/keepass-and-agents.md` and `site/public/index.html` — are held by `scripts/verify-demo.sh` to what the shipped binaries actually print. Editing one is a code change wearing a markdown extension, and it runs the full build on purpose.
+Five pages — `README.md`, `launch.md`, `docs/demo.md`, `docs/keepass-and-agents.md` and `site/public/index.html` — are held by `scripts/verify-demo.sh` to what the built binaries print. Editing one triggers the full CLI CI workflow on a push to `main`; documentation pull requests also run both CLI and app workflows. This verifies source behavior, not whether the latest published release includes it; check [docs/RELEASE.md](docs/RELEASE.md) before changing installation claims.
 
 ## Before you commit
 

@@ -6,8 +6,8 @@ name: app
 # jobs do not test. CLAUDE.md asks what a workflow costs on every push, not only what it proves.
 #
 # What it costs, stated rather than left to be discovered:
-#   a documentation push        nothing
-#   any other push              all of it: gate, consistency tests, three-OS package job
+#   a main push outside paths   nothing
+#   a main push matching paths  all of it: gate, consistency tests, three-OS package job
 #   any pull request            all of it
 #   a v* tag                    all of it, and the three archives are kept as workflow artifacts
 #
@@ -26,8 +26,8 @@ name: app
 # one referencing both front ends, and Keypaste.Cli sets PublishAot over four RuntimeIdentifiers —
 # both restore-time inputs (D-0040) — so a restore that can see it pulls four RID-specific ILCompiler
 # packs whether or not anything is published. Measured 2026-07-28: it takes a restore from 2091 MB
-# to 2580 MB. Putting it in keypaste.app.slnx would have made the "a Keypaste.Core push" line above
-# untrue, so it is in neither solution and runs in its own steps. See
+# to 2580 MB. Keeping it outside both solutions avoids that cost for ordinary solution restores;
+# every qualifying run of this workflow still restores and runs it in separate steps. See
 # tests/Keypaste.Consistency.Tests/README.md.
 
 on:

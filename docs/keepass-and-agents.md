@@ -1,18 +1,23 @@
 # Your KeePass vault can't talk to AI — and everyone is pasting secrets into chats instead
 
+> CLI launch essay. The cited reports and announcements describe their stated 2025–2026 periods;
+> they are not an exhaustive current market inventory. Recheck comparisons before publishing a new
+> campaign. [PRODUCT](PRODUCT.md) owns the broader password-manager direction, [FEATURES](FEATURES.md)
+> owns the dated capability comparison, and [RELEASE](RELEASE.md) owns current downloads.
+
 The failure mode is not the one people picture. Ask a coding agent to deploy something and it does not usually go rummaging through your disk for credentials. It does something far more ordinary: it stops, and it politely asks *you* to paste the key into the chat window.
 
 And you do. [Harmonic Security](https://www.harmonic.security/resources/what-22-million-enterprise-ai-prompts-reveal-about-shadow-ai-in-2025), a data-loss-prevention vendor watching its customers' browsers, found 5,903 instances of credentials in 22.4 million enterprise AI prompts sent during 2025; among exposures from coding tools, 12.8% were API keys or tokens. The supply side matches. GitGuardian counted [28.65 million new hardcoded secrets](https://blog.gitguardian.com/the-state-of-secrets-sprawl-2026/) in public GitHub commits that year, with secrets for AI services up 81%. Further down that report is the number aimed squarely at this crowd: 24,008 secrets sitting in MCP configuration files, 2,117 of them still valid — largely because the setup guides tell you to put the key in the config.
 
 ## Your password manager probably can, actually
 
-**The title above is narrower than it looks, and the exceptions are the interesting part.** [1Password's Environments MCP server](https://www.1password.dev/environments/mcp-server) requires your authorization on every interaction and then never returns the secret to the client at all — the credential goes into the process, not into the conversation. Bitwarden's [Agent Access SDK](https://bitwarden.com/blog/introducing-agent-access-sdk/), March 2026, Apache 2.0, has the same request-and-approve shape and says plainly that it is alpha. [Keeper's MCP server](https://github.com/Keeper-Security/keeper-mcp-golang-docker) masks secret fields by default and wants a confirmation before unmasking one.
+**Password managers already offer agent integrations.** The linked materials describe [1Password's Environments MCP server](https://www.1password.dev/environments/mcp-server), [Bitwarden's March 2026 Agent Access SDK announcement](https://bitwarden.com/blog/introducing-agent-access-sdk/) and [Keeper's MCP server](https://github.com/Keeper-Security/keeper-mcp-golang-docker). Their approval and secret-delivery models differ; evaluate the version and deployment you would actually use before comparing them.
 
-So password managers can talk to AI, and the good ones ask permission first. The catch is uniform: each needs an account, and your secrets live on that company's servers. If your passwords are a `.kdbx` file on your own disk — which is what a password manager is to a great many developers — none of it applies to you. There is no official KDBX agent integration. There is the chat window.
+These integrations do not establish that an existing `.kdbx` file can be used directly with the same workflow. Hosting also varies: [Bitwarden supports self-hosted organizations](https://bitwarden.com/help/self-host-an-organization/), so vendor-held storage is not a universal requirement. keypaste's concrete contribution is a local, account-free approval bridge over the KDBX file you already own; it does not depend on claiming that no other agent integration exists.
 
 ## Why the vault stayed offline
 
-**That gap is not an oversight, and it is worth understanding before filling it.** Read [KeePass's own security documentation](https://keepass.info/help/base/security.html) and you find a threat model built entirely from local adversaries: keyloggers, clipboard monitors, memory dump analysers, attacks on the database file at rest. A network attacker never appears, because there is no network. KeePassXC will still [build with `-DWITH_XC_NETWORKING=OFF`](https://keepassxc.org/docs/#faq-security-no-network), compiling networking out of the binary. A password manager that ships a flag to remove its own network stack has told you what it thinks of network surface.
+Local vault ownership comes with an established security model. [KeePass's security documentation](https://keepass.info/help/base/security.html) discusses keyloggers, clipboard monitoring, process memory and attacks on encrypted database files. KeePassXC also documents a [build option to disable networking](https://keepassxc.org/docs/#faq-security-no-network). That option is distinct from claiming that every default build has no network functionality.
 
 But the ecosystem already answered this essay's question once. When browsers needed credentials out of a KeePassXC vault, the first attempt was an HTTP server on localhost. KeePassXC [replaced it in 2018](https://keepassxc.org/blog/2018-02-28-2.3-released/) with an extension that reaches the vault [through a Unix domain socket or a named pipe](https://github.com/keepassxreboot/keepassxc-browser) — no network, no port — and a [Confirm Access dialog](https://github.com/keepassxreboot/keepassxc/blob/develop/docs/topics/BrowserIntegration.adoc) where you tick which credentials the page may have, with Remember offered as an option rather than assumed.
 
@@ -30,9 +35,9 @@ None of that is an argument that agents are bad. It is an argument about blast r
 
 An agent cannot even *name* an entry you did not expose: the default is the `env/` subtree and nothing else, and widening it takes a glob you typed into your own client config.
 
-Inside the approver, the order is the security property. Resolve the entry, re-check it against the exposure globs, look for a live grant, honour a refusal you just gave, consult your policy file if you wrote one — and read the field out of the vault last of all, after the yes. A request that is going to be refused never decrypts anything.
+Inside the approver, the order is the security property. Resolve the entry, re-check it against the exposure globs, look for a live grant, honour a refusal you just gave, consult your policy file if you wrote one — and read the field for release only after authorization succeeds. The vault is already unlocked in this process; refusing authorization avoids reading the requested field for release, not all prior vault decryption.
 
-What you approve is one field of one entry, for a lifetime shown to you before you answer, scoped to that one client connection. The default answer is no, and so is silence: forty-five seconds and it is denied. Every call — granted, denied, malformed — appends a hash-chained line to `~/.keypaste/audit.jsonl` before the answer goes back, and no field of a record can hold a secret. If the log cannot be written, the call is refused.
+What you approve is one field of one entry, with cached reuse scoped to that connection and lifetime. The default answer is no, and so is silence: forty-five seconds and it is denied. Every tool call — granted, denied, malformed — appends a hash-chained line to `~/.keypaste/audit.jsonl` before the answer goes back. The returned field value is not added to the log; names and reason excerpts are logged metadata, so keep secrets out of them. If the log cannot be written, the call is refused.
 
 ## What it looks like
 
@@ -67,7 +72,7 @@ One keystroke later the deploy runs, and the exchange is two lines you can read 
 
 ## What this does not do
 
-**A security tool that overclaims is worse than one that is modest**, so: the credential lands in the model's context twice, because `request_credential` returns it as text and as structured data, and your client stores both in its session file. Then the agent puts it on a command line. keypaste's guarantee ends at the moment of release; the TTL and the log are what it offers instead of a promise it could not keep.
+`request_credential` returns the credential as text and structured data. A client may send those results to a remote model, retain them in its session file and put the value on a command line. TTL bounds cached approval reuse; it cannot erase those copies or revoke the credential at its provider. The local audit records the release, not every later use.
 
 The reason the agent gives you is a claim. keypaste strips the control characters, caps the length and labels whose words they are — it cannot tell you whether the sentence is true. Write a policy rule to stop being asked about a routine case and no human sees those requests at all: the point of the rule, and the cost of it. The audit log is tamper-evident, not tamper-proof — anyone who can write the file can recompute the chain. And a process already running as your user is outside all of this, everywhere in keypaste.
 
@@ -75,6 +80,6 @@ The reason the agent gives you is a claim. keypaste strips the control character
 
 Your vault is a file on your disk. No account to create, no service holding your secrets, and nothing here needs a network. It is an ordinary KDBX4 file, so it opens in KeePassXC — proved in both directions against a real `keepassxc-cli` on all three operating systems, on every push, by a gate nobody is allowed to soften. If keypaste disappears tomorrow, your data does not. It is AGPL-3.0, because a tool that handles secrets should not ask to be trusted on faith.
 
-It is also pre-1.0 and says so: unsigned binaries, no released GUI, and a terminal prompt rather than a native dialog. And it is not alone out here — [`kprun`](https://github.com/numikel/kprun) already injects KeePass entries into a child process and writes a local JSONL log, without an approval step. What is keypaste's is the combination: a KDBX file you own, no account and no server in the picture, a person answering each request unless they wrote a rule saying otherwise, and a log that never leaves your disk.
+It is also pre-1.0 and says so: unsigned binaries, no released GUI, and a terminal prompt rather than a native dialog; [RELEASE](RELEASE.md) records that dated status. [`kprun`](https://github.com/numikel/kprun) is another KDBX-oriented project to evaluate for process injection. keypaste combines a KDBX file you own, account-free local use, explicit approvals with bounded reuse or rules you wrote, and a local audit. Managed hosting is planned as an optional experience; it does not remove that local path.
 
 The vault stayed offline for good reasons. The agents did not wait. This is an attempt to connect the two without giving up the reasons.

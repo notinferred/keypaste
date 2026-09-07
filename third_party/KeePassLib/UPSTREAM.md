@@ -12,7 +12,7 @@
 
 `KeePassNetStandard` is a source port of upstream KeePass's `KeePassLib/` to .NET Standard. Only the `KeePassLib/` directory is vendored; `KeePassLib.csproj` and `KeePassLib.pfx` were not copied (we supply our own project file and do not sign the assembly).
 
-Why vendored rather than referenced as a package: see `DECISIONS.md` D-0007. In short, no maintained, adopted KDBX4 NuGet package for .NET exists, and the port publishes no package at this tag.
+The vendoring review selected this source port instead of a published package; see [DECISIONS.md](../../DECISIONS.md) D-0007 for that historical selection. The selected tag did not publish a NuGet package. This is provenance for the pinned version, not a current survey of .NET KDBX libraries.
 
 ## Licence
 
@@ -45,7 +45,7 @@ Defining `KEYPASTE_NO_DPAPI` makes `ProtectedBinary.ProtectedMemorySupported` re
 
 `System.Drawing.Common` is Windows-only since .NET 7 and throws `PlatformNotSupportedException` elsewhere, so it cannot be part of a cross-platform vault library (docs/PRODUCT.md §4.4).
 
-Only the *presentation* surface is affected — decoding a stored PNG into a `Bitmap`. `PwCustomIcon.ImageDataPng`, the byte array that actually lives in the KDBX file, is untouched, so **custom icons still round-trip through save/load correctly**. keypaste renders nothing.
+Only the *presentation* surface is affected — decoding a stored PNG into a `Bitmap`. `PwCustomIcon.ImageDataPng`, the byte array that actually lives in the KDBX file, is untouched, so **custom icons still round-trip through save/load correctly**. This vendored library does not render images; the desktop app's rendering is separate.
 
 | File | Change |
 |---|---|

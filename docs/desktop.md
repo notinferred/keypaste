@@ -4,15 +4,15 @@ A window over the same vault the CLI reads. It opens a `.kdbx`, holds it while y
 
 ## What it is not, yet
 
-**It is not the approver.** When an AI agent asks `keypaste-mcp` for a credential, the request still goes to a `keypaste agent` you started in your own terminal, and you still answer it there. This app does not bind the approver pipe and never will while both exist without a hand-off design (DECISIONS.md O-0017). The Agent Activity screen probes for a running agent and tells you which of the two states you are in; that is all it can honestly do today.
+**Approvals still happen in the terminal.** When an AI agent asks `keypaste-mcp` for a credential, the request goes to a `keypaste agent` you started in your own terminal. The Agent Activity screen currently reports whether that agent is running. The design is settled: the agent owns the approver pipe and the app will connect as a UI client (D-0054 in [DECISIONS.md](../DECISIONS.md#d-0054--the-agent-owns-the-approver-pipe-the-app-is-a-client-of-it)). The client channel and approval controls remain step 4.3 in [STEPS](STEPS.md).
 
-**It is not published.** There is nothing on `dl.keypaste.com` to install and `release.yml` does not build it. Build it from source, below.
+**The desktop app is not published.** Build it from source, below. `app.yml` can package desktop archives on version tags, but keeps them as workflow artifacts; `release.yml` publishes the CLI/MCP downloads. See [RELEASE](RELEASE.md) for the distribution matrix and remaining desktop publication requirements.
 
-**It does not type passwords for you.** Adding an entry or a variable generates the value; there is no field to type a specific one into, because a field that accumulates a secret is a different and more dangerous thing than the one the unlock screen uses. `keypaste add` and `keypaste env set` prompt for a value without putting it in a window.
+**Entering an existing password or variable value still requires the CLI.** Adding one in the app generates its value. `keypaste add` and `keypaste env set` prompt for an existing value; secure desktop input is scheduled in step 4.9 of [STEPS](STEPS.md).
 
 ## What the screens show
 
-**Entries** lists titles and groups — what `keypaste ls` prints, and nothing more. Selecting one shows its username, URL and notes. **An entry's password is never shown on this screen**: there is a Copy button, and `keypaste get --show` for the times you have to read one. You can edit the username, URL and notes inline, add an entry with a generated password, and delete one behind a confirmation, because there is no undo.
+**Entries** lists titles and groups. The group tree filters the list, and the search box matches titles and group paths case-insensitively; it does not search secret values. Selecting an entry shows its username, URL and notes. **An entry's password is never shown on this screen**: there is a Copy button, and `keypaste get --show` for the times you have to read one. You can edit the username, URL and notes inline, add an entry with a generated password, and delete one behind a confirmation, because there is no undo.
 
 **Env Sets** shows each project as a card with the `keypaste run <project> -- ` line that injects it, and a button to copy that line. Opening a card shows the project's variables as a masked table. **Hold a value to reveal it** — one at a time, for as long as you hold it, and gone the moment you let go, switch screens or lock. There is a Copy button on every row.
 
@@ -20,13 +20,13 @@ A window over the same vault the CLI reads. It opens a `.kdbx`, holds it while y
 
 ## Editing your vault
 
-Everything the app writes goes through the same code the CLI writes through, so a change made here is visible to `keypaste ls`, `keypaste get`, `keypaste env ls` and `keypaste run` the moment it is saved — there is no sync and nothing to refresh. A vault the app writes is a vault the CLI wrote, and the KeePassXC compatibility gate that covers one covers the other.
+Everything the app writes goes through the same core as the CLI. A fresh `keypaste ls`, `keypaste get`, `keypaste env ls` or `keypaste run` invocation reads the saved change from the same file. An already unlocked process, including a terminal approver, retains its in-memory copy until reopened. Both front ends use the serialization code exercised by the KeePassXC compatibility gate.
 
 **If something else changes the file while the app has it open, the app refuses to save and says so.** The app holds your vault in memory for as long as it is unlocked, so writing it back would revert whatever a terminal or KeePassXC wrote in the meantime — silently, and with no history entry to recover from, because the change was never in the app's copy. Nothing is written. Lock and unlock to pick up the other change, then make yours again.
 
 ## Building and running it
 
-The app lives in its own solution so that ordinary backend work does not pay to build it:
+Install the .NET SDK version selected by the repository's `global.json`. The app lives in its own solution so that ordinary backend work does not pay to build it:
 
 ```
 dotnet restore keypaste.app.slnx --locked-mode
@@ -34,17 +34,19 @@ dotnet build   keypaste.app.slnx -c Release
 dotnet run --project src/Keypaste.App -c Release
 ```
 
-If a build fails with `Access to the path 'artifacts\...' is denied`, that is not a permissions problem: an MSBuild worker node or a still-running copy of the app is holding a file. Pass `-nodeReuse:false`, and close the app before rebuilding it.
+If a build fails with `Access to the path 'artifacts\...' is denied`, an MSBuild worker node or a still-running app may be holding a file. Close the app and pass `-nodeReuse:false` when rebuilding. If the failure persists, also check the path's permissions.
 
 ## What it needs on each platform
 
-| | |
+These are the native GUI prerequisites for the current packaging targets. Building from source also requires the SDK above; CI archives include the .NET runtime but are not published installers.
+
+| Platform | Native prerequisites |
 |---|---|
-| **Windows** | Nothing. No WebView2, no runtime to install |
-| **macOS** | Nothing |
+| **Windows** | No separate browser engine or .NET runtime for a self-contained archive |
+| **macOS** | No separate browser engine or .NET runtime for a self-contained archive |
 | **Linux** | `libx11-6 libice6 libsm6 libfontconfig1`, and an X11 or XWayland session |
 
-There is no browser engine involved — Avalonia draws with Skia — so there is no WebKit or Chromium to install and none in the process holding your vault. Skia is built against glibc 2.17, which is below the 2.35 floor the published CLI binaries need, so the app does not narrow which Linux this project supports.
+Avalonia draws with Skia; the app does not embed WebKit or Chromium. The supported OS versions and Linux distribution baseline still need whole-package native verification in step 4.7b. A renderer's glibc baseline alone does not establish the app's support range.
 
 ## Opening a vault
 
@@ -54,7 +56,7 @@ Three ways in, and all three end at the same place:
 - **Browse** (`Ctrl/Cmd+O`) for one.
 - **Pick one you have opened before** from the recent list.
 
-Whichever you use, the file's header is read before you are asked for a password, so a file that was never a vault is refused immediately rather than after you have typed. There is no "create a new vault" here: run `keypaste init`. Every feature exists in the CLI before it gets a window (docs/PRODUCT.md §4.2), and the empty state says so.
+Whichever you use, the file's header is read before you are asked for a password, so a file that was never a vault is refused immediately rather than after you have typed. Vault creation currently uses `keypaste init`; the desktop app has no creation screen yet. [PRODUCT](PRODUCT.md#4-engineering-laws) §4.2 requires shared core logic, with neither front end waiting for the other.
 
 ## Locking
 
@@ -69,11 +71,11 @@ Two behaviours worth knowing:
 - **Switching to another window does not lock**, and does not pause the countdown either. Alt-tabbing to a terminal is normal; leaving for ten minutes is not.
 - **A machine that slept through the timeout wakes locked.** The countdown reads both the wall clock and the monotonic clock and takes whichever says longer, and it is re-checked when the window is activated — because a timer scheduled on a monotonic clock that slept too would simply never fire.
 
-Locking disposes the vault, so nothing derived from it survives. You type your password again.
+Locking disposes the desktop vault session and clears its visible entry state. You type your password again to reopen it. This does not lock a separate terminal approver or erase immutable strings and external copies; see [SECURITY](../SECURITY.md) for memory and clipboard limits.
 
 ## Keyboard
 
-Everything is reachable without the mouse. On launch, focus is on the password field, so the common case is: start the app, type, press Enter.
+The app provides these shortcuts and focus navigation. Verify the full keyboard-only journey on each native platform using the checklist below; logic tests alone do not establish accessibility. When a vault is selected, the unlock field accepts the password followed by Enter.
 
 | | |
 |---|---|
@@ -106,7 +108,7 @@ Paths in `recent.toml` are written with forward slashes, including on Windows. T
 
 It shows the same table `keypaste log` prints, from the same `~/.keypaste/audit.jsonl`, rendered by the same code — not a second implementation that could drift (DECISIONS.md D-0032). It needs no unlocked vault, because the audit log is a record of this machine rather than of your vault. "Verify chain" shows what the hash chain says about the file.
 
-If the log does not exist yet, that is normal: nothing writes to it until an agent has asked `keypaste-mcp` for something.
+A missing log is normal before the MCP bridge has initialized one. Requests and bridge events populate it; opening the desktop Log screen does not require a prior credential release.
 
 ## What you should know about the master password
 
@@ -116,7 +118,7 @@ The field you type it into is not a text box, and that is deliberate: Avalonia's
 
 ## Checking a build by hand
 
-CI can build the app and run its logic on all three operating systems, but it has no display, so nothing automated has ever seen this app draw. Run these before any release that includes it:
+CI builds and packages on three operating systems; the current desktop logic tests do not verify rendered pixels. Rendering coverage remains step 4.6, and native installation checks remain step 4.7b. Use a disposable vault with harmless test values for this manual checklist before any release that includes the app:
 
 1. Launch with no `recent.toml`: the empty state names `keypaste init` and does not look broken.
 2. Open a vault by drag, and again by the picker. A non-`.kdbx` file is refused **before** the password field.
@@ -128,8 +130,7 @@ CI can build the app and run its logic on all three operating systems, but it ha
 8. The theme follows the OS, and both light and dark read as calm.
 9. The Log screen matches `keypaste log` for the same `~/.keypaste/audit.jsonl`.
 10. Agent Activity says the right thing both with and without a `keypaste agent` running.
-11. Entries lists titles and groups. Selecting one shows a username, a URL and notes, and a row of
-    dots where the password is.
+11. Entries lists titles and groups. Filter by a group and search for part of a title or group path; case changes still match. Selecting an entry shows a username, a URL and notes, and a row of dots where the password is.
 12. Copy a password. The countdown appears and the bar drains. Paste into an editor — it is there.
     Wait it out and paste again — it is gone.
 13. Copy, then `Ctrl/Cmd+L`. Paste: nothing.

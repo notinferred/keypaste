@@ -1,29 +1,34 @@
 # PRODUCT.md — The keypaste Constitution
-> **This file changes only by a dated re-ratification.** §3 does not change at all. Every other section may be rewritten by the founder, once, with a date, and a `D-` row in `DECISIONS.md` saying why. If a decision conflicts with the current text, the decision is wrong. Last ratified: 2026-09-04 (v1.1, D-0061; §1 wording D-0075; §5.5 and §6.2 wording D-0077). v1.0 was July 2026 and is in git.
+> **This file changes only by a dated re-ratification.** §3 does not change at all. The other sections may be amended under explicit founder direction, with a date and a `D-` row in `DECISIONS.md` saying why. Update the owning documents together; a decision that conflicts with the current text does not silently override it. Last ratified: **2026-09-07 (v1.2, D-0090)**. Earlier versions remain in git. §3 is byte-identical to v1.1.
 
 ---
 
 ## 1. What keypaste IS
 
-**keypaste is a KeePass-compatible password manager and secrets manager for people who work with AI agents.**
+**keypaste is a KeePass-compatible password manager for personal and work credentials, with environments and controlled agent access built in.**
 
-One sentence pitch: *"A cleaner KeePassXC that is also your secrets manager: passwords, API keys and env variables in an ordinary KDBX file you own, synced through a service you can pay for or run yourself, and the only vault that lets an AI agent ask for exactly one credential — with your approval, a lifetime you were shown, and a log line — without ever seeing the vault."*
+One sentence pitch: *"Your logins, API keys and environments in a vault you own, available locally or through managed sync, with explicit control over what an app or AI agent can use."*
 
-The product is **freemium**. Free is the whole password manager. Paid is hosting and teams. In the order they are built and sold:
+People should be able to create or import a vault, save and fill logins, update credentials, recover mistakes and move between devices without learning a terminal or managing file paths. Existing KeePass users retain direct access to ordinary KDBX files. Developers can map entries into environments and approve bounded agent requests within the same product. Organizations can own and govern shared passwords, API credentials and other work secrets.
 
-1. The KDBX-compatible vault and the desktop app that opens it (ride existing KeePass trust, never invent a new format)
-2. The agent bridge — scoped, approved, audited access over MCP — which is the selling point no other vault has
-3. Env variable / API key storage and injection (`keypaste run -- npm start`), the developer's reason to arrive
-4. Hosted zero-knowledge sync, which is the business, with self-hosting of the same binary first-class
-5. "What can act as you right now" — the headline number, read from the running agent, which grows into the delegation dashboard
+The complete KeePassXC feature baseline is a tracked product objective. Daily-use workflows come first; advanced capabilities follow as explicit, verified work. [FEATURES.md](FEATURES.md) owns the dated baseline and gaps. KDBX compatibility, source implementation and complete feature coverage are different claims.
+
+The product is **freemium**. Free is the whole local password manager and the self-hosted relay; paid plans sell managed hosting and organization capabilities. Commercial plans do not determine engineering milestones. [STEPS.md](STEPS.md) owns the build order:
+
+1. **Working proposition:** a publicly released daily-use desktop password manager and browser extension, with environment and agent workflows integrated.
+2. **Pilot ready:** managed encrypted sync and account/device operations that invited nontechnical users can complete and operators can restore.
+3. **Paid release:** a validated consumer hosting experience, a supported phone workflow, reviewed trust boundaries and complete commercial/support operations.
+4. **Expansion:** complete the remaining accepted KeePassXC baseline after the Working proposition gate; begin organization credential management after the Pilot ready gate and selection of a pilot scope. These tracks can progress alongside the later release work when their dependencies hold.
+5. **Scale:** operational capacity and reliability work activated by measured demands.
 
 ## 2. What keypaste is NOT (the walls that remain)
 
 - **NOT** a new proprietary vault format. KDBX or nothing.
-- **NOT** a cloud service that can read your secrets. The hosted tier stores an encrypted blob and client-held keys and can decrypt nothing (D-0060). A forgotten master password is gone. Self-host is the same binary and stays first-class.
-- **NOT** chasing browser-only consumers who have no vault and want none. Apple, Google and the browser serve them. keypaste is for the person who already keeps, or is ready to keep, a file of their own.
-- **NOT** an enterprise IAM/NHI platform. Do not compete with Descope, Token Security, Okta. If an enterprise wants it, they self-host.
-- **NOT** everything at once. `docs/STEPS.md` orders the work in tiers, and a tier is not started until the one before it is sold or shipped.
+- **NOT** a cloud service that can read your secrets. Hosted and self-hosted services store encrypted vault data and cannot unlock it. Account authentication and account recovery are separate from vault unlocking and vault recovery. Support cannot reconstruct a lost vault secret; any previously configured recovery or organization authority requires an explicit reviewed design consistent with §3.
+- **NOT** an account requirement for local use. Create/open a vault and use the local product offline without signing up. Managed onboarding handles storage and sync for people who do not want to manage files; KDBX export preserves portability.
+- **NOT** a proprietary hosted-only service. Hosted and self-hosted relay deployments use the same binary; self-hosting remains a supported option for individuals and organizations.
+- **NOT** a general identity or privileged-access platform. Organization-owned credentials, access policy, provisioning integrations, audit and offboarding are in scope. Replacing an identity provider or promising universal downstream privilege control is outside this build plan. Credential rotation and temporary provider credentials need explicit integrations and separate verifiers.
+- **NOT** everything in one release. Work follows the dependencies and milestone gates in STEPS. Earlier preparation of a named later task does not waive the intervening user-experience, security or publication gates.
 
 ## 3. Security laws (violating any of these kills the project's only asset: trust)
 
@@ -40,31 +45,32 @@ The product is **freemium**. Free is the whole password manager. Paid is hosting
 
 ## 4. Engineering laws
 
-1. **Local-first, offline-capable.** The core works with no network at all. Sync is an addition to a file that already works, never a precondition.
-2. **Core-first.** Every feature lives in `Keypaste.Core`; the CLI and the desktop app are both thin over it, and neither waits for the other. A feature that exists in one front end and not the other says so on the page.
-3. **One core library** that CLI, GUI, MCP server and relay client all share. No logic duplicated in frontends.
-4. **Cross-platform from day one** (macOS, Linux, Windows) — pick a stack that makes this cheap.
+1. **Local-first, offline-capable.** Local vault workflows work with no network or account. Managed sync adds convenience and device continuity; it is never a prerequisite for local access or export.
+2. **Core-first.** Vault, environment, policy and credential-release behavior lives in `Keypaste.Core`; CLI, desktop and integration surfaces are thin adapters. A feature available in one surface and absent in another says so in its guide and feature inventory.
+3. **One shared domain implementation.** CLI, GUI, MCP server and relay client reuse the core. A web or mobile client must first prove a supported core/runtime path and mature KDBX handling under §3. Do not promise a browser port or introduce a second secret-handling implementation without a recorded architecture and security review. Browser-delivered code is a separate trust boundary even when encryption runs in the client.
+4. **Cross-platform distribution** for macOS, Linux and Windows, with supported architectures, browser channels and phone workflows explicitly recorded. Build success does not establish installation support. Every advertised platform must satisfy [RELEASE.md](RELEASE.md).
 5. **Tests on the secret path are mandatory.** No untested code touches encryption, injection, sync, or the agent bridge.
 6. **Compatibility is sacred:** any KDBX file keypaste writes must open correctly in KeePassXC. This is tested in CI against real KeePassXC.
-7. **Small releases, real changelogs, semantic versioning.**
-8. **Documentation ships with the feature**, not after.
+7. **Small releases, real changelogs, semantic versioning.** Preserve published artifacts. Packaging, public distribution, native installation and upgrade/data-preservation proof are part of release work; a temporary CI artifact is not a released app.
+8. **Documentation ships with the feature**, with one owner per fact and version-correct instructions. Distinguish implemented, packaged, published and installation-verified behavior.
 
 ## 5. Product laws
 
-1. **The demo is the marketing.** Every stage must end in something demoable in under 60 seconds.
-2. **Solve your own pain first.** If you (the founder) don't use keypaste daily, don't ship it to others.
-3. **Community before customers.** KeePass forums, MCP ecosystem, HN, r/selfhosted — earn credibility there before any paid tier exists.
+1. **The demo is the marketing.** Each delivery slice produces a short, demonstrable user outcome. A demo does not substitute for the milestone's acceptance evidence.
+2. **Daily use precedes public reliance.** The founder uses the supported workflow daily before asking others to rely on it. New users must be able to create or migrate, use credentials and recover ordinary mistakes without developer assistance.
+3. **Validated use before payment.** Publish and support the local product, then validate managed hosting with invited users. Paid consumer release requires the pilot gates, a supported phone workflow and independent review of the new hosted/client trust boundaries. Marketing announcements follow the release they describe.
 4. **Monetize the convenience, never the security.** Free/self-host tier is fully secure and fully functional. Paid tiers sell hosting, sync convenience, team features, support — never "more encryption", and never a signature the free binary lacks.
-5. **One founder, one focus.** New ideas go to the Ideas table in DECISIONS.md, not into the sprint. That table is where ideas wait their turn — most wait forever.
-6. **Free is the whole password manager.** CLI, app, agent bridge, browser extension, TOTP, SSH, importers, and the relay binary to run yourself. Paid is the relay somebody else runs, and what teams need on top of it.
+5. **One founder, one executable plan.** STEPS owns the active work and its dependencies. Accepted product changes update PRODUCT, STEPS and the decision record together. Unaccepted ideas stay in DECISIONS; a strategy note is not a second queue.
+6. **Free is the whole local password manager.** CLI, app, agent bridge, browser extension, TOTP, SSH, importers and the relay binary to run yourself. Paid is managed hosting and organization capabilities such as shared ownership, administrative policy and lifecycle management. Plan labels do not excuse an incomplete Free workflow or alter the release gates.
+7. **Recovery and exit are product features.** Show what account recovery can restore and what vault recovery requires. Test backups, supported recovery paths, device revocation, export and deletion. Cancellation must preserve access to a user's local vault. Offboarding stops future authorized access; it cannot erase credentials or snapshots a person already retained.
 
 ## 6. Decision tiebreakers (when stuck, in order)
 
 1. Does it protect user trust? → if it risks trust, no.
-2. Does it serve the order in §1? → if not, the Ideas table in DECISIONS.md.
-3. Can one person ship it in ≤2 weeks? → if not, cut scope until yes.
-4. Would it make the 60-second demo better? → prefer the option that demos.
+2. Does it close a required user workflow or gate in the current STEPS milestone? → prefer that work; later work follows its recorded dependencies and activation conditions.
+3. Can one person build and verify the task in ≤2 weeks? → if not, split it into bounded children without dropping the parent's acceptance requirements.
+4. Can a user demonstrate the outcome and recover from an ordinary mistake? → prefer the option with clearer, tested behavior.
 5. Boring beats clever. Shipped beats perfect. Focused beats big.
 
 ---
-*If you are reading this months from now, tired, tempted to add a format, to let the server read a vault, or to build for people who will never keep a file: the answer is still no. Re-read section 2. Everything else in here can be re-ratified, with a date, and that is the only way it changes.*
+*The vault remains portable, local use remains account-free, and the service cannot read secrets. A managed experience may hide file management without taking ownership away from the user. Scope changes require the dated decision and owner updates above; §3 remains unchanged.*

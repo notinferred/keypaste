@@ -1,6 +1,6 @@
 # Replace your `.env` in 5 minutes
 
-You have a `.env` file. By the end of this page it is in an encrypted vault you can open in KeePassXC, your app still boots, and there is no plaintext copy on disk.
+You have a `.env` file. By the end of this page its variables are in an encrypted vault you can open in KeePassXC, and your app starts without requiring that plaintext file. Removing the original file does not erase copies in backups, snapshots or git history.
 
 Nothing here is keypaste-specific magic: the vault is an ordinary KDBX4 file, and every variable is an ordinary entry. If you stop using keypaste tomorrow, everything is still there and still readable by other tools.
 
@@ -15,14 +15,14 @@ export KEYPASTE_VAULT=~/keypaste.kdbx
 
 Put that `export` in your shell profile. Otherwise every command needs `--vault ~/keypaste.kdbx`.
 
-**Back the `.kdbx` file up now, before you put anything in it.** It is encrypted, so a backup is useless to anyone who steals it and is the only thing standing between you and the FAQ at the bottom of this page.
+**Set up backups for the `.kdbx` now, and keep them current after changes.** A backup protects against losing the file; it does not recover a forgotten master password. Anyone who obtains the encrypted file can attempt offline password guessing, so use a strong master password and protect your backups.
 
 ## Minute 1 — import what you already have
 
 From the directory holding your `.env`:
 
 ```sh
-keypaste env pull dev
+keypaste env pull dev --keep
 ```
 
 `dev` is the project name — anything you like, one per app or per environment. It reads `./.env` by default; pass a path for anything else (`keypaste env pull prod config/.env.production`).
@@ -36,7 +36,7 @@ Import 4 variables into env/dev? [y/N]
 
 You get the plan before anything is written, by name — values are never printed. Two things worth knowing:
 
-- **If any line is malformed, nothing is imported.** You get every problem at once and an unchanged vault. There is no half-import.
+- **If any line is malformed, nothing is imported.** The error report lists up to ten problems and counts any remaining ones; the vault is unchanged. There is no half-import.
 - **`${VAR}` and `$VAR` are stored exactly as written, never expanded.** Expanding them would bake this machine's environment into a vault you may sync to another one.
 
 ## Minute 2 — check it, then delete the file
@@ -46,7 +46,7 @@ keypaste env ls dev                        # names only
 keypaste get env/dev/DATABASE_URL --show   # one value, when you want to see it
 ```
 
-Once you are satisfied, say yes to the deletion prompt (or pass `--delete-source` up front). keypaste tells you what deleting does and does not do:
+The import above used `--keep` so you can inspect the result before deletion. Once satisfied, run `keypaste env pull dev` again; unchanged values are left alone, and you can answer its deletion prompt. keypaste tells you what deleting does and does not do:
 
 ```
 Deleting removes the file from the directory. It does not overwrite the blocks it
@@ -69,7 +69,7 @@ Full detail in [`../SECURITY.md`](../SECURITY.md).
 keypaste run dev -- npm start
 ```
 
-That is the whole point. The variables go straight into the child process's environment; no file is written at any stage, and CI proves it on every push by running with every temporary directory pointed at an empty folder and checking it stays empty.
+That is the whole point. keypaste places the variables in the child process's environment without writing a plaintext env file. The CI injection check points temporary directories at an empty folder and checks that the fixture leaves it empty. Your app can still write or forward the values it receives; review its logging and behavior separately.
 
 - **The `--` is required.** Without it, `keypaste run dev npm start` cannot be told apart from a project called `npm`. Everything after `--` belongs to your command, including flags keypaste also understands.
 - Your command gets keypaste's real stdin, stdout and stderr, so colours, prompts and progress bars behave exactly as if keypaste were not there.
@@ -148,25 +148,25 @@ It refuses to overwrite an existing file unless you pass `--force`, and on Linux
 
 ### What if I lose my master password?
 
-**It is gone. Everything in that vault is gone.** There is no recovery, no reset, no support address that can help, and no backdoor — because keypaste never had a copy to lose. The master key never leaves your machine; that is the first line of the project's constitution, and it is the property you are choosing when you use this instead of a hosted vault.
+**Without the master password or another usable copy of the credentials, current keypaste cannot recover the vault's contents.** There is no master-password reset or support backdoor. The planned hosted service also stores encrypted data without the keys needed to decrypt it. Any future trusted-device or user-held recovery mechanism requires the reviewed design in [STEPS](STEPS.md); it is not available today. [PRODUCT](PRODUCT.md) §2 separates account recovery from vault recovery.
 
 That is not a reason to be casual about it:
 
 - **Write the master password down and keep the paper somewhere physical.** A safe, a wallet, a sealed envelope with someone you trust. The threat model here is a remote attacker, not your desk drawer.
-- **Back up the `.kdbx`.** It is one encrypted file. Copy it anywhere. A backup is useless to a thief and everything to you.
-- **Consider a key file.** KDBX supports a key file alongside the password; KeePassXC can add one. Then losing the password *and* the key file is what it takes, and you can store them apart.
+- **Back up the `.kdbx`.** Keep current copies in protected locations. Encryption protects their contents subject to the strength of your master password; it does not make a stolen copy harmless.
+- **Key files are not supported by current keypaste.** KeePassXC can require a key file alongside the master password, but keypaste cannot open that configuration today. When a vault requires both factors, losing either required factor without a backup can make it inaccessible; a key file is not a substitute for remembering the password.
 
 Rotating what was in a vault you can no longer open means rotating every credential at its source. That is a bad afternoon, and it is the only exit.
 
 ### How do I sync it between machines?
 
-**Your file, your sync tool.** Syncthing, Dropbox, iCloud Drive, OneDrive, a private git repo, a USB stick. The `.kdbx` is a single encrypted blob and none of those services can read it, which is exactly why keypaste does not offer hosted sync — a service that holds your secrets is the thing this project exists not to be.
+**keypaste has no built-in sync today.** You can copy or synchronize the encrypted `.kdbx` with an existing file-sync service or a USB drive; keep the master password separate. [PRODUCT](PRODUCT.md) includes optional hosted encrypted sync and the same relay for self-hosting, with client-held keys. That service is planned, not available; [STEPS](STEPS.md) owns its delivery status.
 
-One caveat: **KDBX has no merge.** If two machines edit the vault while offline, your sync tool will produce a conflicted copy, and the loser's changes are in that copy rather than merged in. Edit in one place at a time, and let the sync settle before you switch machines. For a team, treat the vault as a document rather than a database.
+One caveat: **keypaste does not merge concurrent vault edits today.** If two machines edit offline, the sync tool may leave conflicting copies or overwrite one version. KDBX itself does not prohibit merging; the missing feature is in keypaste. Keep every conflicting copy, edit in one place at a time, and let synchronization finish before switching machines.
 
 ### Can my teammate use the same vault?
 
-Yes — share the file and the master password out of band, and everyone gets the same variables. It works, and it is how small teams start. Its limits are real: one shared password, no per-person revocation, and the merge caveat above. Anything more than that wants a vault per person with overlapping content, or a tool built for teams.
+Someone with the file and master password can read everything in that vault. If you choose to share one, use a dedicated work vault and transfer its password through a separate trusted channel. This gives no per-person revocation or individual accountability and has the concurrent-edit limitation above. Organization-owned credentials and offboarding are planned in [STEPS](STEPS.md), not implemented. Removing file access cannot invalidate values someone already copied; that requires changing them at their providers.
 
 ### Does it work offline?
 
@@ -182,10 +182,10 @@ Yes. Put `keypaste run` inside whatever `direnv` starts, or have your `.envrc` s
 
 ### Why did my value change when I imported it?
 
-It almost certainly did not — but two rules differ from `motdotla/dotenv` on purpose, and both are cases where dotenv silently loses data:
+Check the import plan and the parser rules. Two deliberate differences from `motdotla/dotenv` are:
 
 - A `#` starts a comment only when a space precedes it, so `PASSWORD=hunter2#42` keeps its `#`. dotenv truncates it to `hunter2`.
-- A key set twice in one file is an error. dotenv keeps the first, godotenv keeps the last; since they disagree, keypaste refuses to pick.
+- A key set twice in one file is an error. `motdotla/dotenv`'s parser overwrites the earlier value with the later one; keypaste rejects duplicates so you must resolve the ambiguity before import. See the [upstream parser](https://github.com/motdotla/dotenv/blob/master/lib/main.js).
 
 Inside double quotes, `\n`, `\r`, `\t`, `\\` and `\"` expand, as they do in C or Python. If you mean a literal Windows path, write `'C:\temp'` in single quotes.
 

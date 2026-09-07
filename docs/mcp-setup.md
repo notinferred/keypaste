@@ -22,9 +22,11 @@ Build the binary:
 dotnet build keypaste.slnx -c Release
 ```
 
-It lands at `artifacts/bin/Keypaste.Mcp/release/keypaste-mcp` (`keypaste-mcp.exe` on Windows).
+It lands at `artifacts/bin/Keypaste.Mcp/release/keypaste-mcp` (`keypaste-mcp.exe` on Windows). The CLI is under `artifacts/bin/Keypaste.Cli/release/`; make both built executables available on `PATH` for the examples below, or use their full paths. Published downloads are listed in [RELEASE](RELEASE.md).
 
 ## The short way
+
+**`setup` requires a current source build.** It was added after the published CLI/MCP `v0.1.0` release. If you installed that release, use the manual client configuration below; building `main` does not replace an older `keypaste` already on your `PATH`.
 
 ```sh
 keypaste setup --vault ~/vaults/personal.kdbx
@@ -103,7 +105,7 @@ claude mcp add --transport stdio --scope project keypaste \
 }
 ```
 
-A project-scoped `.mcp.json` is **committed to your repository**. Paths are fine in it. Nothing else about keypaste belongs in it, and there is nothing secret to put there anyway.
+A project-scoped `.mcp.json` is a file in the repository that you can commit; the command does not commit it. Absolute local paths usually differ between teammates and can reveal usernames or directory names. Keep master passwords and credentials out of it.
 
 Use `--scope local` instead if you would rather keep it to your own machine.
 
@@ -169,11 +171,11 @@ jq -c . < ~/.keypaste/audit.jsonl
 | `cancelled` | The client stopped waiting before anybody answered. Nobody decided anything. |
 | `vault-locked` / `invalid-request` / `failed` | No vault open; the arguments were wrong; something went wrong. |
 | `not-initialized` | The client called a tool before finishing the MCP handshake. Denied, with the fix named; nothing was decided. |
-| `not-implemented` | Written by keypaste 2.1, when the bridge refused everything because the approval flow did not exist yet. Nothing writes it now, and it is listed because the log is append-only: old records keep the word they were written with. |
+| `not-implemented` | Written by the early implementation of roadmap step 2.1, before approval existed; this is a step ID, not a released version. Nothing writes it now, and it is listed because the log is append-only: old records keep the word they were written with. |
 
 Four things worth knowing:
 
-- **The value is never in here.** `field` records *which* field was asked for, never its contents, and no field of this record can hold one. The agent's `entry` argument is recorded, sanitized; entry titles read out of your vault are not.
+- **The returned credential value is not added to the log.** `field` records which field was requested. Current source records the sanitized entry path returned by the approver when available, including when the agent requested an opaque handle; otherwise it retains the sanitized request argument. Published `v0.1.0` records the request argument. Entry names and reason excerpts are metadata in the log, so do not put secret values in either.
 
 - **If the log cannot be written, the call is refused.** Not logged-and-continued: refused. The log is a precondition, because otherwise breaking it would be the way to get access that leaves no trace. If the server will not start, check that `~/.keypaste` is writable.
 - **It grows without bound.** keypaste never rotates or trims it, because deleting lines is the opposite of what it is for.
@@ -252,24 +254,24 @@ You should get two JSON lines back, the second listing `list_entry_names` and `r
 
 **Every call is refused with "no keypaste agent is running".** Start one: `keypaste agent --vault <path>`. It has to be running, and pointed at the same vault, for anything to be granted. If it is running and you still see this, the two are looking at different pipe names — pass the same `--approver <name>` to both, or set `KEYPASTE_APPROVER` for both.
 
-**Every call says the vault is locked.** The agent is running but has no vault open. That normally means it is still asking for the master password, or you got it wrong and it exited.
+**A call says the vault is locked.** The approver reported that no vault was available. Check its terminal and restart it with the intended vault if needed. The current CLI approver opens its pipe after successful unlock; a failed unlock and exit normally produce `no-approver` instead.
 
-**Nothing in the audit log.** The server never started. Claude Desktop keeps its own log at `%APPDATA%\Claude\logs\mcp-server-keypaste.log` (macOS: `~/Library/Logs/Claude/`), which captures everything keypaste writes to stderr.
+**Nothing in the audit log.** Confirm that the client actually called a tool, then check whether `KEYPASTE_HOME` or `--audit-log` changed the destination. A startup or write failure is another possibility; inspect the client's MCP server log for keypaste's stderr.
 
 **The client reports a protocol error.** Something is writing to stdout, which on a stdio MCP server is the protocol stream. keypaste is careful never to do this and CI asserts it, so suspect a shell profile or a wrapper script that prints a banner.
 
 ## FAQ
 
-**Can the agent see my passwords?** One field of one entry, after you have said yes to that exact request, for as long as the lifetime you were shown. Never more than one field, and never anything you did not approve — `keypaste-mcp` itself contains no vault access whatsoever, which is checkable by reading one short file.
+**Can the agent see my passwords?** Each successful request returns one field of one entry under a human approval, its still-live cached grant, or a matching policy rule. Repeated approved requests can accumulate credentials. TTL bounds cached approval reuse; it cannot erase values already returned to the client or expire them at their provider. `keypaste-mcp` holds no vault, but it does receive and forward the released value.
 
 **Can it see my entry names?** Only the ones inside `--expose`, which defaults to `env/**`, and only while an agent is running with the vault unlocked.
 
 **Why does `keypaste-mcp` not just ask me for the master password?** Because your MCP client starts it, which means software starts it — and a password prompt that software can cause to appear is a prompt any program on your machine can imitate. There is also nowhere to put one: an MCP server's stdin and stdout *are* the protocol stream, and Claude Desktop starts it with no terminal. Putting the password in the client's config would place the secret that protects every other secret into a plaintext JSON file; asking the *client* to collect it would route it through the untrusted party. So the prompt lives in a process you start. [DECISIONS.md D-0023](../DECISIONS.md).
 
-**Do I have to approve every single call?** No. A repeat request for the same field of the same entry, from the same connection, inside the lifetime you approved, is served without asking again. Change that with `--max-ttl` on the agent.
+**Do I have to approve every single call?** No. A repeat request for the same field of the same entry, from the same connection, inside the lifetime you approved, is served without asking again. Change that with `--max-ttl` on the agent. A [policy rule](policy.md) can authorize matching releases without an initial prompt.
 
-**Does anything leave my machine?** No. `keypaste-mcp` speaks stdio only and opens no sockets, and you do not have to take that on faith: its entire dependency list is four packages pinned by content hash in `src/Keypaste.Mcp/packages.lock.json`, and there is no HTTP client among them. Read it.
+**Does anything leave my machine?** The keypaste bridge uses local stdio and local IPC; it does not send vault data to a hosted service. Your MCP client receives the tool result and may send it to a remote model and retain it in transcripts or session files. The local bridge does not make the rest of that client workflow local. See [the demo's limits](demo.md#the-honest-limits).
 
 **Can a malicious MCP client pretend to be Claude?** Yes, and keypaste never makes a decision based on the name a client gives itself — it is recorded, not trusted. `--client-label` is the name *you* gave the server in your own config, which is why it is the one worth putting in the log, and why it is the only name a policy rule will match. That stops the *agent* choosing which rules apply to it; it does not stop another program on your machine starting a bridge with the same argv. [THREATS.md](../THREATS.md) T-3 and T-14 are explicit about what this does and does not buy.
 
-**Is it safe to point this at my personal vault?** Nothing is released without you saying yes to that specific request, unless you wrote a policy rule covering it — and there is no policy file unless you make one. Exposure defaults to `env/**` precisely so that the question does not depend on your judgement about a glob.
+**Should I point this at my personal vault?** The default exposure is `env/**`; only entries inside it are available through this bridge. Review that subtree, any policy rules and the client's retention behavior before using real credentials. An approval permits cached reuse on the same connection until expiry, and returned values are outside keypaste's control. Keep unrelated or high-impact credentials in a separate vault when they need a different access boundary.

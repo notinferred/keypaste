@@ -1,6 +1,6 @@
 # Approving an agent's request
 
-When an AI agent asks keypaste for a credential, a person decides — unless that person already wrote a rule saying yes to exactly this. This page is about who that person is, what they see, and what happens when nobody is there. [Pre-approving with a policy file](policy.md) is the other half, and it is the only path in keypaste where nobody is asked at all.
+When an AI agent asks keypaste for a credential, a person decides — unless an existing approval still covers the request or that person wrote a matching policy rule. This page is about who that person is, what they see, and what happens when nobody is there. [Pre-approving with a policy file](policy.md) is the path that requires no per-request human approval at any point.
 
 ## The short version
 
@@ -110,12 +110,12 @@ This is the ordinary state of things — your MCP client starts `keypaste-mcp` w
 
 `keypaste-mcp` — not the approver — appends one line to `~/.keypaste/audit.jsonl` for **every** call, granted or denied, including the ones that were malformed and the ones nobody waited for. It records which entry, which field, who asked, what they said their reason was, and what was decided.
 
-**It never records the value.** See [docs/mcp-setup.md](mcp-setup.md) for the format.
+**It does not add the returned field value to the log.** Names and reason excerpts are logged metadata, so do not put secret values in them. See [docs/mcp-setup.md](mcp-setup.md) for the format.
 
 ## The honest limits
 
 - **The vault stays unlocked while the agent runs.** There is no idle auto-lock in `keypaste agent`; closing the terminal is the lock. The desktop app does lock on idle, but it is a different process holding a different copy of the vault — it is not the approver, and locking it does not lock this one. An agent left running overnight is still unlocked in the morning.
-- **A released value lives in memory until its grant expires**, and it existed as an ordinary string before that. keypaste narrows the window; it does not claim in-memory secrecy, and SECURITY.md says so.
+- **TTL bounds reuse of keypaste's cached approval, not the lifetime of the credential.** Expiry clears the cache's buffer; ordinary string copies and values already returned to a client can remain in memory, transcripts or session files. Expiry and stopping the approver cannot revoke those copies; invalidate a credential at its provider when that is needed. [SECURITY.md](../SECURITY.md) describes the memory limits.
 - **There is no native dialog yet.** The approval prompt is your terminal. If your MCP client runs somewhere you are not looking, you will not see the request until you look.
 - **keypaste cannot tell whether the agent's reason is true.** It can only make sure the sentence is inert, that it is labelled as the agent's words, and that the entry name beside it came from your vault instead.
 - **A policy rule skips this page entirely.** If you wrote one, requests it covers are released with no prompt and nobody reads the reason at all. The agent prints a line per release and the audit log records which rule did it; that is the whole of the signal. [policy.md](policy.md) is honest about what that costs.
@@ -124,4 +124,4 @@ This is the ordinary state of things — your MCP client starts `keypaste-mcp` w
 
 `scripts/verify-approval-e2e.sh` runs the whole thing in CI on Linux, macOS and Windows: a real vault, a real `keypaste agent`, a real `keypaste-mcp` in a separate process, one approval and one refusal — asserting the approved request returns the secret, the refused one does not, and neither puts it in the audit log.
 
-`scripts/verify-demo.sh` additionally holds the dialog above to what the shipped binary draws, character for character, so the block on this page cannot drift from the one on your screen. [**Claude asks for a key, you approve, the deploy runs**](demo.md) is that flow end to end.
+`scripts/verify-demo.sh` checks the corresponding dialog in [**Claude asks for a key, you approve, the deploy runs**](demo.md) and four other public pages against the built binaries. It does not read this page, so edits to the examples above need review against that verified demo.
