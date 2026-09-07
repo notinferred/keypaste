@@ -15,7 +15,7 @@ Three things, each false today, each something a stranger hits before they hit t
 - [x] **The repository is public.** Step 3.0, done 2026-09-06 at github.com/notinferred/keypaste.
 - [x] **The demo GIF exists** at `docs/demo/keypaste-demo.gif`, 62 KB, in the slot both pages
   reserve. Step 3.1, done 2026-09-06.
-- [ ] **`security@keypaste.com` receives mail**, tested by sending to it from an outside address. Step 2.4b.
+- [x] **`security@keypaste.com` receives mail**, tested from an outside address 2026-09-06.
 
 Everything else — fork runners, branch protection, venue rules — happens during the fourteen days after. No message goes to the signup list until 5.6 ships; the page promises a confirmation first.
 

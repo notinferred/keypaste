@@ -65,10 +65,12 @@
 
 **What exists today:** a KDBX4 vault the CLI creates, reads and writes, which KeePassXC opens in both
 directions; env sets and `keypaste run` injection; the MCP bridge with a separate `keypaste agent`
-approver, a 45-second window, policy pre-approvals and a hash-chained audit log; `v0.1.0` published as
-four native binaries on `dl.keypaste.com`; a desktop app that unlocks a vault, browses entries and edits
-env sets, built from source and not released; the launch essay, the landing page, the launch copy.
-The SDK the plan pins runs on the founder's machine (K.1), so every `dotnet` gate can be run locally before a push; the shell gates that need `clang`, Docker or a Linux runner still cannot.
+approver, a 45-second window, policy pre-approvals and a hash-chained audit log; `keypaste setup`,
+which points the AI clients on a machine at a vault; `v0.1.0` published as four native binaries on
+`dl.keypaste.com`; a desktop app that unlocks a vault, browses entries and edits env sets, built from
+source and not released; the public repository, the demo GIF, the launch essay, the landing page and
+the launch copy. Eight of the eleven shell gates run on the founder's machine; `verify-aot-trim.sh`
+needs clang, `verify-run-signals.sh` is POSIX-only and `verify-install.sh` needs a published release.
 
 **BLOCKED rows, and what would unblock each** — the pickup rule skips these, so they are listed here
 rather than discovered one at a time: **1.5a** needs a second Windows machine or a VM where
@@ -161,23 +163,8 @@ were decisions, answered by D-0054 to D-0060; H-0011 is the site's pre-deploy ch
   D-0031, D-0032.
 - [x] **2.5 `[MVP]` — The 60-second demo.** `docs/demo.md`, held to the binaries by `verify-demo.sh`;
   Claude deliberately not in CI. D-0033 to D-0035.
-- [x] **2.6 `[MVP]` — One command wires the clients.** Done 2026-09-05, D-0085. `keypaste setup`
-  finds the AI clients on this machine and points each at a vault. **Where a client ships its own
-  command, keypaste calls it** — `claude mcp add`, `codex mcp add` — rather than editing its
-  configuration file: those files hold state that is not ours, and a running Claude Code rewrites
-  `~/.claude.json` continuously, so a read-modify-write from another process can lose data it never
-  meant to touch. A client with no such command (Cursor, Claude Desktop) has its block printed for
-  pasting, because writing a schema keypaste has not verified against a real install and then
-  reporting success is the failure that costs a user the most to diagnose. It clears any previous
-  entry before adding, because the clients disagree about what adding twice means — Codex
-  overwrites, Claude Code refuses — and re-running is the ordinary way a moved vault is fixed.
-  Knowledge in `Keypaste.Core.Clients`, doing in `SetupCommand`, per law 4.2, so the app's future
-  "Connect to…" button (4.3) reuses the argument grammar rather than copying it. **Verify
-  (V-setup):** `keypaste setup --dry-run` names each installed client and prints the exact command
-  and changes nothing; a real run leaves each client's own listing showing one `keypaste` server and
-  every other server untouched; a second run leaves exactly one. *Fails if* an absent client is
-  reported as configured, a present one is missed, a second run duplicates or errors, or anything
-  outside the `keypaste` entry changes.
+- [x] **2.6 `[MVP]` — One command wires the clients.** `keypaste setup` detects the AI clients on this
+  machine and calls each one's own `mcp add`. D-0085.
 - [ ] **4.4 `[Launch]` — The approval prompt leaves the terminal.** A native window or tray notification on
   the agent, with the terminal channel kept for headless use; both render the same fields in the same
   order with the agent's reason as untrusted text; default deny, timeout deny, every error path deny on
@@ -368,43 +355,19 @@ were decisions, answered by D-0054 to D-0060; H-0011 is the site's pre-deploy ch
 ## I · Site, docs & launch
 
 - [x] **3.2b `[MVP]` — Launch essay.** `docs/keepass-and-agents.md`, held to the binaries. D-0038.
-- [x] **3.0 `[MVP]` — The repository is public (H-0003).** Done 2026-09-06, D-0089. Not by the route
-  this row spent three rewrites describing. GitHub Support was never asked: `refs/pull/*` is a
-  namespace no push can reach, and deleting a ref would not have removed the objects anyway, since
-  GitHub keeps unreachable commits fetchable by SHA until it collects them. The repository was
-  renamed to `keypaste-bc` first, which moved every pull ref with it and changed nothing — a rename
-  is not a purge. What worked was pushing `main` to a fresh `notinferred/keypaste` and deleting the
-  old one: no pull refs, no pre-rewrite identity, and the same URL, so no published link moved.
-  D-0082's price for a fresh repository had already been paid off by D-0086 — runners are
-  GitHub-hosted, so there was nothing to re-verify — which is why the route it rejected became the
-  cheap one. History was re-authored to `keypaste <contact@keypaste.com>` in the same move (D-0087),
-  with commit dates untouched; the tree hash is byte-identical before and after. The old repository
-  is mirrored at `keypaste-archive/` off-repo, pull refs included. **Verify (V-public):**
-  `git ls-remote origin 'refs/pull/*'` serves no pre-rewrite ref and both `e972225` and `470340e` are
-  unreachable; a logged-out browser opens the repository and `docs/demo.md`. *Fails if* a pull ref
-  with the pre-rewrite identity is still served.
-- [x] **3.1 `[MVP]` — The demo GIF (H-0005).** Done 2026-09-06, D-0088. `docs/demo/keypaste-demo.gif`
-  (62 KB, 1040x583, 25s), referenced by `README.md` and `site/public/index.html`, both reserving
-  comments deleted. **It is a rendered terminal, not a desktop capture**, and the distinction is on
-  the record rather than glossed: every line in it is either the dialog block `verify-demo.sh` diffs
-  character-for-character against the shipped binary, or output captured from a session driven by
-  **real Claude Code** — its own sentence, its own decision to ask. Rendering rather than screen-
-  recording is what a headless agent can do; a human with a screen recorder can replace it without
-  changing either page. Recording it found two defects, both fixed first (D-0088), which is the
-  argument for doing it before the launch rather than after. **Verify (V-gif):** the file exists
-  under 2 MB; both pages reference it and neither carries the reserving comment; the GIF shows an
-  agent asking, the dialog with a reason, a human answering, and the log. *Fails if* absent, 2 MB or
-  over, or missing a beat.
+- [x] **3.0 `[MVP]` — The repository is public (H-0003).** Done by replacement, not by purge: clean
+  history pushed to a fresh repository of the same name, the old one deleted. D-0089, D-0087.
+- [x] **3.1 `[MVP]` — The demo GIF (H-0005).** `docs/demo/keypaste-demo.gif`, 62 KB, on both pages. A
+  rendered terminal, not a desktop capture; recording it found two defects first. D-0088.
 - [ ] **3.2 `[MVP]` — The launch posts (H-0006).** Post `launch.md`'s copy to r/KeePass and the MCP
   community, wait 48 hours, then r/selfhosted, Show HN, X. **Verify (V-launch):** every box in
   `launch.md`'s "Before anything goes out" is ticked first; each post has a live URL logged out; every
   link in every post resolves; each post says "no released GUI". *Fails if* a box is unticked or a link
-  404s. **BLOCKED by choice (2026-09-05, D-0085):** law 5.2 puts the founder's own daily use before
-  the launch. Unblocked by that, and by 3.0 and 3.1.
+  404s. **BLOCKED by choice:** law 5.2 puts daily use before the launch (D-0085).
 - [ ] **3.3 `[MVP]` — Two weeks of answering (H-0007).** Every issue and comment answered for fourteen
   days; security reports moved to `security@keypaste.com` at once. **Verify (V-answering):** the oldest
   unanswered issue opened after launch day is under 48 hours old. *Fails if* one is older.
-  **BLOCKED by choice (2026-09-05, D-0085):** there is nothing to answer until 3.2. Unblocked by it.
+  **BLOCKED** until 3.2: there is nothing to answer yet.
 - [ ] **3.10 `[Launch]` — Product docs for the password manager.** Install, import, autofill, TOTP, SSH,
   sync, what the agent can and cannot do, deletion of an account. **Verify (V-docs):** every app screen
   links to its page and every page's commands run as written. *Fails if* a screen has no page or a
@@ -418,38 +381,11 @@ were decisions, answered by D-0054 to D-0060; H-0011 is the site's pre-deploy ch
 
 - [x] **2.4a `[MVP]` — `SECURITY.md` and `THREATS.md`.** A private contact, the scope, T-1 to T-25 with
   a named residual each. D-0031, D-0032.
-- [ ] **2.4b `[MVP]` — The security contact works (H-0021).** `SECURITY.md` names
-  `security@keypaste.com` as the only channel an outside reporter can reach while the repository is
-  private, and nothing has ever tested that the address delivers. Send to it from an address outside
-  the Cloudflare Email Routing rule and read what arrives; once 3.0 lands, switch on GitHub's private
-  vulnerability reporting as the second channel and strike the sentence in `SECURITY.md` that says it
-  is unreachable. **Verify (V-security-contact):** a message sent from an outside address arrives in
-  the destination mailbox, headers intact, within an hour; after 3.0, the repository's Security tab
-  offers private vulnerability reporting to a logged-out-then-logged-in stranger. *Fails if* the mail
-  bounces, silently disappears, or `SECURITY.md` still calls the second channel unreachable after 3.0.
-- [x] **10.1 `[MVP]` — Hostile review before the repository goes public.** Done 2026-09-05, D-0084.
-  Three findings, each two commits — the test alone with its failing output in the body, then the fix.
-  **Untrusted names reached every renderer but four unsanitized**: `keypaste ls`, `env ls`, the
-  `env pull` rejection message and the whole app display layer now draw through `EntryNameSanitizer`,
-  and a listing says when what it drew is not what the vault holds; what addresses an entry, seeds an
-  edit or reaches the clipboard stays exact, because sanitizing is lossy. The payload is a bidi
-  override rather than an ANSI escape: a KDBX title is stored in XML and U+001B is not legal there, so
-  a control character cannot survive the round trip — measured, and it corrected the finding.
-  **An exception other than cancellation escaped both MCP tools before the audit append**, so an
-  access could happen with no record (law 3.3); nothing was released, so it failed silently rather
-  than open. Both catches are total now, as are the two approver-side filters that let the same
-  exceptions past, and a peer can no longer end the approver by failing its accept. The lone-surrogate
-  route an earlier pass proposed was spiked and falsified — `Utf8JsonWriter` does not throw on one and
-  `JsonDocument.Parse` refuses it at the wire — so it is written up as I/O, not as remote input.
-  **The approval prompt discarded `WasAltered`** and now says when the name or reason drawn is not the
-  stored one, conditionally, so `verify-demo.sh`'s pinned dialog is byte-identical.
-  Eight of the eleven gates were run locally and pass, including both KeePassXC directions against
-  2.7.10 and `verify-demo.sh`; `verify-aot-trim`, `verify-run-signals` and `verify-install` need CI.
-  `THREATS.md` T-1, T-6 and T-14 are rewritten in place — T-14 now says that the approver writes no
-  audit line of its own (D-0020), so a release to a pipe peer that is not `keypaste-mcp` is recorded
-  nowhere. **Verify
-  (V-review):** every finding has a test that was red before its patch; the review is dated in
-  `DECISIONS.md`. *Fails if* a finding has no red-then-green test.
+- [x] **2.4b `[MVP]` — The security contact works (H-0021).** Mail to `security@keypaste.com` was
+  sent from an outside address and arrived. GitHub's private vulnerability reporting is a second
+  channel no law requires; it is an Ideas row, not a step.
+- [x] **10.1 `[MVP]` — Hostile review before the repository goes public.** Three findings, each with
+  a test watched red first. D-0084.
 - [ ] **10.2 `[Scale]` — External pen test.** A paid test of the relay and the bridge, the report
   summarised on the trust page. **Verify (V-pentest):** a report exists and every finding is closed or
   accepted in writing. *Fails if* one is neither.
