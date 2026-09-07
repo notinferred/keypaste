@@ -118,32 +118,15 @@ Two processes, and the split is the whole design. `keypaste-mcp` is the MCP serv
 keypaste agent --vault ~/vault.kdbx
 ```
 
-Then point Claude Desktop at the bridge. Paths must be absolute, and on Windows the backslashes are escaped (`"C:\\Users\\you\\keypaste-mcp.exe"`):
-
-```json
-{
-  "mcpServers": {
-    "keypaste": {
-      "command": "/absolute/path/to/keypaste-mcp",
-      "args": [
-        "--vault", "/absolute/path/to/vault.kdbx",
-        "--client-label", "claude-desktop"
-      ]
-    }
-  }
-}
-```
-
-For Claude Code, the same thing in one line:
+Then point your AI clients at it:
 
 ```sh
-claude mcp add --transport stdio --scope project keypaste \
-  -- /absolute/path/to/keypaste-mcp \
-     --vault /absolute/path/to/vault.kdbx \
-     --client-label claude-code
+keypaste setup --vault ~/vault.kdbx
 ```
 
-**There is no place in that config for a master password, and there never will be.** [**Connecting keypaste to Claude**](docs/mcp-setup.md) is the full guide, including what `--expose` governs and how to read the audit log back.
+That finds the clients installed on this machine and configures each through its own `mcp add`. A client that has no such command gets its block printed for you to paste. `--dry-run` shows the exact commands and changes nothing; `--remove` takes keypaste back out.
+
+**Nothing keypaste writes into a client's configuration holds a master password, and nothing ever will.** [**Connecting keypaste to Claude**](docs/mcp-setup.md) is the full guide, including what `--expose` governs and how to read the audit log back.
 
 ## How it compares
 
