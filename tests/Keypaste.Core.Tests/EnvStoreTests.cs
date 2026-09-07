@@ -109,13 +109,13 @@ public sealed class EnvStoreTests : IDisposable
         var store = new EnvStore(vault);
 
         store.TrySet("billing", "TOKEN", "first", out _);
-        Assert.Equal(0, vault.CountHistoryItems("env/billing/TOKEN"));
+        Assert.Equal(0, vault.CountHistoryItems(new EntryName("env/billing", "TOKEN")));
 
         store.TrySet("billing", "TOKEN", "second", out _);
-        Assert.Equal(1, vault.CountHistoryItems("env/billing/TOKEN"));
+        Assert.Equal(1, vault.CountHistoryItems(new EntryName("env/billing", "TOKEN")));
 
         store.TrySet("billing", "TOKEN", "third", out _);
-        Assert.Equal(2, vault.CountHistoryItems("env/billing/TOKEN"));
+        Assert.Equal(2, vault.CountHistoryItems(new EntryName("env/billing", "TOKEN")));
     }
 
     /// <summary>
@@ -136,10 +136,10 @@ public sealed class EnvStoreTests : IDisposable
         var store = new EnvStore(vault);
 
         store.TrySet("billing", "TOKEN", "same", out _);
-        Assert.Equal(0, vault.CountHistoryItems("env/billing/TOKEN"));
+        Assert.Equal(0, vault.CountHistoryItems(new EntryName("env/billing", "TOKEN")));
 
         Assert.Equal(EnvSetOutcome.Updated, store.TrySet("billing", "TOKEN", "same", out _));
-        Assert.Equal(1, vault.CountHistoryItems("env/billing/TOKEN"));
+        Assert.Equal(1, vault.CountHistoryItems(new EntryName("env/billing", "TOKEN")));
     }
 
     /// <summary>Removing takes the history with it — the only way to erase a rotated value.</summary>
@@ -153,8 +153,104 @@ public sealed class EnvStoreTests : IDisposable
         store.TrySet("billing", "TOKEN", "second", out _);
 
         Assert.True(store.Remove("billing", "TOKEN"));
-        Assert.Equal(-1, vault.CountHistoryItems("env/billing/TOKEN"));
+        Assert.Equal(-1, vault.CountHistoryItems(new EntryName("env/billing", "TOKEN")));
         Assert.Empty(store.Read("billing"));
+    }
+
+    /// <summary>
+    /// An entry titled <c>nested/TOKEN</c> in <c>env/dev</c> and an entry titled <c>TOKEN</c> in
+    /// <c>env/dev/nested</c> have the same <see cref="VaultEntry.Path"/>. KeePassXC makes the first
+    /// of those; keypaste has to remove the one it was asked for and leave the other alone.
+    /// </summary>
+    [Fact]
+    public void Remove_TheProjectsOwnVariable_LeavesANestedEntrySharingItsPath()
+    {
+        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        vault.AddEntry(new VaultEntry { Title = "nested/TOKEN", Password = "slashed", GroupPath = "env/dev" });
+        vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "nested", GroupPath = "env/dev/nested" });
+
+        Assert.True(new EnvStore(vault).Remove("dev", "nested/TOKEN"));
+
+        var survivors = vault.ReadEntries();
+        var survivor = Assert.Single(survivors);
+        Assert.Equal("env/dev/nested", survivor.GroupPath, StringComparer.Ordinal);
+        Assert.Equal("nested", survivor.Password, StringComparer.Ordinal);
+    }
+
+    [Fact]
+    public void Remove_ANestedEntry_LeavesTheSlashedTitleSharingItsPath()
+    {
+        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        vault.AddEntry(new VaultEntry { Title = "nested/TOKEN", Password = "slashed", GroupPath = "env/dev" });
+        vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "nested", GroupPath = "env/dev/nested" });
+
+        Assert.True(new EnvStore(vault).Remove("dev/nested", "TOKEN"));
+
+        var survivor = Assert.Single(vault.ReadEntries());
+        Assert.Equal("env/dev", survivor.GroupPath, StringComparer.Ordinal);
+        Assert.Equal("slashed", survivor.Password, StringComparer.Ordinal);
+    }
+
+    [Fact]
+    public void Remove_SurvivesAReopen_WithEveryNeighbourIntact()
+    {
+        var path = NewVaultPath();
+
+        using (var vault = Vault.Create(path, MasterPassword))
+        {
+            vault.AddEntry(new VaultEntry { Title = "nested/TOKEN", Password = "slashed", GroupPath = "env/dev" });
+            vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "nested", GroupPath = "env/dev/nested" });
+            vault.AddEntry(new VaultEntry { Title = "KEEP", Password = "keep", GroupPath = "env/dev" });
+            new EnvStore(vault).Remove("dev", "nested/TOKEN");
+            vault.Save();
+        }
+
+        using var reopened = Vault.Open(path, MasterPassword);
+        var rows = reopened.ReadEntries()
+            .Select(entry => (entry.GroupPath, entry.Title, entry.Password))
+            .Order();
+
+        Assert.Equal(
+            new[] { ("env/dev", "KEEP", "keep"), ("env/dev/nested", "TOKEN", "nested") },
+            rows);
+    }
+
+    /// <summary>
+    /// A project holding two entries with one title: KDBX permits it and KeePassXC will make it.
+    /// <see cref="EnvStore.Read"/> already refuses to answer "what is the value of that variable";
+    /// removal must refuse for the same reason rather than delete whichever came first.
+    /// </summary>
+    [Fact]
+    public void Remove_ADuplicatedVariableName_IsRefused_AndRemovesNothing()
+    {
+        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "first", GroupPath = "env/billing" });
+        vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "second", GroupPath = "env/billing" });
+
+        Assert.Throws<VaultException>(() => new EnvStore(vault).Remove("billing", "TOKEN"));
+        Assert.Equal(2, vault.ReadEntries().Count);
+    }
+
+    /// <summary>
+    /// The write half of the same defect, and the worse one: an entry titled <c>billing/TOKEN</c>
+    /// sitting directly in <c>env</c> shares the path of the real <c>env/billing/TOKEN</c>, so a
+    /// set could write the project's secret into an entry outside the project and report success.
+    /// </summary>
+    [Fact]
+    public void Set_UpdatesTheProjectsOwnEntry_NotAnEntryWhosePathCollidesWithIt()
+    {
+        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        vault.AddEntry(new VaultEntry { Title = "billing/TOKEN", Password = "foreign", GroupPath = "env" });
+        vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "mine", GroupPath = "env/billing" });
+
+        var store = new EnvStore(vault);
+        Assert.Equal(EnvSetOutcome.Updated, store.TrySet("billing", "TOKEN", "rotated", out _));
+
+        Assert.Equal("rotated", Assert.Single(store.Read("billing")).Value, StringComparer.Ordinal);
+        Assert.Equal(
+            "foreign",
+            vault.ReadEntries().Single(entry => entry.Title == "billing/TOKEN").Password,
+            StringComparer.Ordinal);
     }
 
     [Fact]
@@ -181,8 +277,9 @@ public sealed class EnvStoreTests : IDisposable
     /// <summary>
     /// Each of these would otherwise write to a path no read could reach: an empty or
     /// separator-bearing project resolves somewhere the project listing never looks, and a key
-    /// containing a slash produces an entry that can be created and found but never removed,
-    /// because removal splits the path on its last slash.
+    /// containing a slash produces an entry whose path is also some other entry's. Removal now
+    /// tells those apart, so a name KeePassXC authored is still clearable; keypaste declines to
+    /// author one itself.
     /// </summary>
     [Theory]
     [InlineData("", "TOKEN")]

@@ -76,7 +76,15 @@ internal static class RemoveCommand
                 }
             }
 
-            vault.RemoveEntry(entryPath);
+            // Nothing removed means nothing to save. Something wrote to the file between the
+            // check above and here, and the honest answer is that this run did not do it.
+            if (!vault.RemoveEntry(entryPath))
+            {
+                context.Stderr.WriteLine(
+                    $"keypaste rm: '{entryPath}' was not removed; the vault is unchanged");
+                return CliApp.ExitNotFound;
+            }
+
             vault.Save();
 
             context.Stderr.WriteLine($"Removed {entryPath}");

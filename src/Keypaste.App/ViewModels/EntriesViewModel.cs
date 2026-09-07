@@ -131,7 +131,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     /// A second click rather than a modal, and the one place in this screen where
     /// <c>KpDanger</c> appears — <c>Tokens.axaml</c> reserves it for exactly this. The confirmation
     /// exists because there is nothing to undo: core has no recycle bin, and
-    /// <see cref="Vault.RemoveEntry"/> leaves a tombstone rather than a copy.
+    /// <see cref="Vault.RemoveEntry(EntryName)"/> leaves a tombstone rather than a copy.
     /// </remarks>
     internal bool IsConfirmingDelete
     {
@@ -412,7 +412,15 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         {
             // No recycle bin, because core has none: RemoveEntry writes a tombstone and the value
             // is gone. The confirmation is the view's job, and it is the one place KpDanger appears.
-            vault.RemoveEntry(row.Path);
+            // The row is addressed by its name rather than its path: two entries can share a path.
+            if (!vault.RemoveEntry(row.Name))
+            {
+                Error = "That entry is not in this vault any more.";
+                IsConfirmingDelete = false;
+                Reload();
+                return;
+            }
+
             vault.Save();
         }
         catch (VaultChangedOnDiskException)

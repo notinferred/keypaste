@@ -44,6 +44,10 @@ public static class EnvConvention
     /// <param name="project">The project name.</param>
     /// <param name="key">The variable name.</param>
     /// <returns>The entry path.</returns>
+    /// <remarks>
+    /// For showing a person where a variable lives and for scoping a policy, not for addressing
+    /// one: joining is lossy, and <see cref="EntryName"/> is the identity that survives it.
+    /// </remarks>
     /// <exception cref="ArgumentNullException"><paramref name="project"/> or <paramref name="key"/> is null.</exception>
     public static string EntryPath(string project, string key)
     {

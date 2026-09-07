@@ -193,8 +193,8 @@ public sealed class EnvStore(Vault vault)
             }
         }
 
-        string entryPath = EnvConvention.EntryPath(project, key);
-        VaultEntry? current = _vault.Find(entryPath);
+        EntryName name = new(EnvConvention.GroupPath(project), key);
+        VaultEntry? current = _vault.Find(name);
 
         if (current is null)
         {
@@ -202,13 +202,18 @@ public sealed class EnvStore(Vault vault)
             {
                 Title = key,
                 Password = value,
-                GroupPath = EnvConvention.GroupPath(project),
+                GroupPath = name.GroupPath,
             });
 
             return EnvSetOutcome.Created;
         }
 
-        _vault.UpdateEntry(current with { Password = value });
+        if (!_vault.UpdateEntry(current with { Password = value }))
+        {
+            error = $"'{key}' could not be found in '{name.GroupPath}' to update.";
+            return EnvSetOutcome.Rejected;
+        }
+
         return EnvSetOutcome.Updated;
     }
 
@@ -223,14 +228,19 @@ public sealed class EnvStore(Vault vault)
     /// </returns>
     /// <exception cref="ArgumentNullException"><paramref name="project"/> or <paramref name="key"/> is null.</exception>
     /// <exception cref="ObjectDisposedException">The vault has been disposed.</exception>
+    /// <exception cref="VaultException">
+    /// The project contains more than one entry with that name. <see cref="Read"/> refuses the same
+    /// file for the same reason: there is no correct answer to which of them was meant.
+    /// </exception>
     /// <remarks>
     /// The name is not validated: a variable KeePassXC created under a name keypaste would refuse
-    /// still has to be removable, or the vault would contain something only another tool can
-    /// clear. The path is always built through <see cref="EnvConvention"/>, so this can never
-    /// reach an entry outside the project's group.
+    /// still has to be removable, or the vault would contain something only another tool can clear.
+    /// The variable is addressed by group path and title rather than by the two joined, which is
+    /// what keeps a KeePassXC-authored title of <c>nested/TOKEN</c> in <c>env/dev</c> distinct from
+    /// a <c>TOKEN</c> in <c>env/dev/nested</c>: they share a path and are different entries.
     /// </remarks>
     public bool Remove(string project, string key)
     {
-        return _vault.RemoveEntry(EnvConvention.EntryPath(project, key));
+        return _vault.RemoveEntry(new EntryName(EnvConvention.GroupPath(project), key));
     }
 }

@@ -25,11 +25,19 @@ namespace Keypaste.App.ViewModels;
 /// </remarks>
 internal sealed record EntryRow(string Title, string GroupPath)
 {
-    /// <summary>The entry's full path, the way core addresses it.</summary>
+    /// <summary>The row's identity, which is what core reads and writes through.</summary>
     /// <remarks>
-    /// <b>An address, not a label.</b> <c>Find</c>, <c>RemoveEntry</c> and selection matching all go
-    /// through this, so it carries the title the vault holds and is never sanitized. What the screen
-    /// shows is <see cref="DisplayTitle"/> and <see cref="Where"/>.
+    /// Carries the title the vault holds and is never sanitized. <see cref="Path"/> is the two
+    /// joined, and joining is lossy: a title containing a separator and a group of that name
+    /// produce the same string, so a mutation addressed by path can reach the wrong entry.
+    /// </remarks>
+    internal EntryName Name => new(GroupPath, Title);
+
+    /// <summary>The entry's full path, as a person reads and types it.</summary>
+    /// <remarks>
+    /// <b>A label and a lookup, not an identity</b> — see <see cref="Name"/>. It carries the title
+    /// the vault holds and is never sanitized, because selection matching goes through it. What the
+    /// screen shows is <see cref="DisplayTitle"/> and <see cref="Where"/>.
     /// </remarks>
     internal string Path => GroupPath.Length == 0 ? Title : GroupPath + "/" + Title;
 

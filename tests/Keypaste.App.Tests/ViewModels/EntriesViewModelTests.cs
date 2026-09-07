@@ -220,6 +220,61 @@ public sealed class EntriesViewModelTests : IDisposable
         Assert.Null(reopened.Find("servers/staging"));
     }
 
+    /// <summary>
+    /// Two entries can share a path: <c>nested/TOKEN</c> in <c>env/dev</c> and <c>TOKEN</c> in
+    /// <c>env/dev/nested</c> are both <c>env/dev/nested/TOKEN</c>. The row a person selected is a
+    /// group and a title, and deleting has to take that one.
+    /// </summary>
+    [Fact]
+    public void Deleting_takes_the_selected_row_when_another_entry_shares_its_path()
+    {
+        var path = CollidingVault();
+        using var context = new Context(path);
+
+        context.Entries.Selected = context.Entries.Rows.Single(row => row.Title == "nested/TOKEN");
+        context.Entries.DeleteCommand.Execute(null);
+        context.Entries.ConfirmDeleteCommand.Execute(null);
+
+        Assert.Null(context.Entries.Error);
+
+        using var reopened = Vault.Open(path, Master);
+        var survivors = reopened.ReadEntries()
+            .Select(entry => (entry.GroupPath, entry.Title))
+            .Order();
+
+        Assert.Equal(new[] { ("env/dev", "KEEP"), ("env/dev/nested", "TOKEN") }, survivors);
+    }
+
+    /// <summary>
+    /// Two entries with one title in one group. Deleting either would be a guess, so the screen
+    /// says so and writes nothing — asserted on the file's bytes, because <see cref="Vault.Save"/>
+    /// re-randomises salt and nonces and an unchanged digest is what proves no save happened.
+    /// </summary>
+    [Fact]
+    public void Deleting_a_name_two_entries_answer_to_is_refused_and_says_so()
+    {
+        var path = Path.Combine(_directory, "duplicated.kdbx");
+        using (var vault = Vault.Create(path, Master))
+        {
+            vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "first", GroupPath = "env/dev" });
+            vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "second", GroupPath = "env/dev" });
+            vault.Save();
+        }
+
+        var before = Digest(path);
+
+        using var context = new Context(path);
+        context.Entries.Selected = context.Entries.Rows[0];
+        context.Entries.DeleteCommand.Execute(null);
+        context.Entries.ConfirmDeleteCommand.Execute(null);
+
+        Assert.NotNull(context.Entries.Error);
+        Assert.Equal(before, Digest(path), StringComparer.Ordinal);
+
+        using var reopened = Vault.Open(path, Master);
+        Assert.Equal(2, reopened.ReadEntries().Count);
+    }
+
     [Fact]
     public void Changing_the_mind_about_a_delete_keeps_the_entry()
     {
@@ -325,6 +380,28 @@ public sealed class EntriesViewModelTests : IDisposable
 
         Assert.Empty(context.Entries.Rows);
         Assert.Null(context.Entries.Detail);
+    }
+
+    /// <summary>
+    /// A vault holding two entries with one path, the way only KeePassXC can author it: a title
+    /// containing a separator, beside a group of that name.
+    /// </summary>
+    private string CollidingVault()
+    {
+        var path = Path.Combine(_directory, "colliding.kdbx");
+
+        using var vault = Vault.Create(path, Master);
+        vault.AddEntry(new VaultEntry { Title = "nested/TOKEN", Password = "slashed", GroupPath = "env/dev" });
+        vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "nested", GroupPath = "env/dev/nested" });
+        vault.AddEntry(new VaultEntry { Title = "KEEP", Password = "keep", GroupPath = "env/dev" });
+        vault.Save();
+
+        return path;
+    }
+
+    private static string Digest(string path)
+    {
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
     }
 
     private Context New() => new(_vaultPath);

@@ -338,7 +338,14 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
 
         try
         {
-            new EnvStore(vault).Remove(Name, row.Key);
+            if (!new EnvStore(vault).Remove(Name, row.Key))
+            {
+                _report($"{row.DisplayKey} is not in {DisplayName} any more.");
+                Removing = null;
+                Reload();
+                return;
+            }
+
             vault.Save();
         }
         catch (VaultChangedOnDiskException)

@@ -216,6 +216,37 @@ public sealed class GuiEditIsVisibleToTheCliTests
     }
 
     /// <summary>
+    /// A title containing a separator and a group of that name produce one path between them, so
+    /// the GUI has to remove the row a person picked rather than the entry that path resolves to.
+    /// Only KeePassXC authors the first of those, which is why the fixture is written through core.
+    /// </summary>
+    [Fact]
+    public void Removing_a_variable_in_the_gui_leaves_a_nested_entry_sharing_its_path()
+    {
+        using var fixture = new VaultFixture(("seed", "seed-password"));
+
+        using (var vault = Vault.Open(fixture.VaultPath, VaultFixture.Master))
+        {
+            vault.AddEntry(new VaultEntry { Title = "nested/TOKEN", Password = "slashed", GroupPath = "env/dev" });
+            vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "nested", GroupPath = "env/dev/nested" });
+            vault.Save();
+        }
+
+        using var screen = EnvSets(fixture);
+        screen.Model.OpenCommand.Execute("dev");
+        var project = screen.Model.OpenProject!;
+
+        project.BeginRemove(project.Variables.Single(row => row.Key == "nested/TOKEN"));
+        project.ConfirmRemoveCommand.Execute(null);
+
+        Assert.Null(screen.Model.Error);
+
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "env/dev/nested/TOKEN", "--show"));
+        Assert.Contains("nested", fixture.Cli.Out, StringComparison.Ordinal);
+        Assert.DoesNotContain("slashed", fixture.Cli.Out, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// The GUI refuses every variable name the CLI refuses, for the same reason.
     /// </summary>
     /// <remarks>
