@@ -147,6 +147,6 @@ Since 2.3 this matters more than it did, not less: a credential released by a po
 
 ## Maintainer note
 
-`security@keypaste.com` is the primary reporting channel, and for now the only one that works for an outside reporter: the repository is private (DECISIONS.md O-0014), so GitHub's private vulnerability reporting is not reachable by anyone who cannot see the repository. Enable it as a second channel when that changes.
+`security@keypaste.com` is the reporting channel, and mail to it has been tested from an outside address. GitHub's private vulnerability reporting is not switched on; if it ever is, it becomes a second channel and this paragraph says so.
 
 keypaste vendors KeePassLib for its KDBX4 implementation (`third_party/KeePassLib/UPSTREAM.md`). Vulnerabilities in that code are in scope here, and are also worth reporting upstream to KeePass — we hand-merge upstream patches rather than receiving them through a package manager, so a report to us does not reach Dominik Reichl automatically, or the reverse.
