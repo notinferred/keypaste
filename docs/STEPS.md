@@ -40,28 +40,13 @@
 > the step's own `scripts/verify-*.sh` green · the pages it touches still pass `scripts/verify-demo.sh`
 > · the Verify line passes cold.
 >
-> **Invariants (every step, `docs/PRODUCT.md` §3):**
-> 1. The master key never leaves the local process; the relay stores ciphertext it cannot read.
-> 2. An agent gets one field, one TTL, after one human approval or one rule the human wrote; default deny.
-> 3. Every agent access is logged locally, hash-chained, before the agent is answered.
-> 4. No secret touches disk unencrypted by keypaste's doing; injection is into process memory.
-> 5. No telemetry on secret content or entry names, ever.
-> 6. Crypto is KDBX4 through vendored KeePassLib; never a line of our own.
-> 7. Every error path on the bridge denies.
-> 8. Any KDBX keypaste writes opens in real KeePassXC, tested in CI; `Keypaste.Core` is the only vault
->    logic and every front end is thin over it.
+> **Invariants.** `docs/PRODUCT.md` §3, unabridged and not restated here. A step that would bend
+> one stops and becomes a `DECISIONS.md` row.
 >
-> **Standing checks** — each is a script and the script is the specification. A step is not done until
-> the ones its change can break are green; every push to `main`, pull request and tag runs all of them.
-> `verify-keepassxc-compat.sh` + `verify-keepassxc-writeback.sh` — a vault opens and edits in real
-> `keepassxc-cli` on three OSes, *fails if* either direction breaks · `verify-run-injection.sh` — the
-> child sees the value and no file was written · `verify-run-signals.sh` — SIGTERM reaches the child ·
-> `verify-mcp-stdio.sh` — nothing but protocol on stdout, every call audited · `verify-approval-e2e.sh`
-> — approved returns the secret, refused returns nothing, neither is logged · `verify-policy-e2e.sh` —
-> a rule grants silently and can never widen · `verify-log-chain.sh` — tampering is detected, truncation
-> reads as damage · `verify-aot-trim.sh` — no new trim diagnostic names `src/` · `verify-demo.sh` — the
-> five pinned pages match what the binaries print · `verify-install.sh` — the README install block runs
-> verbatim on a scratch `HOME`.
+> **Standing checks.** `scripts/verify-*.sh` — each is a script and the script is the
+> specification, so the list of what they assert lives in them, not here. A step is not done
+> until the ones its change can break are green; every push to `main`, pull request and tag runs
+> all of them.
 
 **What exists today:** a KDBX4 vault the CLI creates, reads and writes, which KeePassXC opens in both
 directions; env sets and `keypaste run` injection; the MCP bridge with a separate `keypaste agent`

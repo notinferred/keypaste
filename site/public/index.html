@@ -195,21 +195,13 @@ keypaste run dev -- npm start    # injected into the child process, nothing on d
 
 <pre>keypaste agent --vault ~/vault.kdbx</pre>
 
-  <p class="caption">Then point Claude Desktop at the bridge — paths must be absolute:</p>
+  <p class="caption">Then point your AI clients at it. This finds the ones installed on the
+     machine and configures each through its own <code>mcp add</code>; a client without one gets
+     its block printed to paste.</p>
 
-<pre>{
-  "mcpServers": {
-    "keypaste": {
-      "command": "/absolute/path/to/keypaste-mcp",
-      "args": [
-        "--vault", "/absolute/path/to/vault.kdbx",
-        "--client-label", "claude-desktop"
-      ]
-    }
-  }
-}</pre>
+<pre>keypaste setup --vault ~/vault.kdbx</pre>
 
-  <p class="caption"><strong>There is no place in that config for a master password, and there never will be.</strong> Every call an agent makes — granted or refused — is one line in a log on your disk, and the value is never in it:</p>
+  <p class="caption"><strong>Nothing keypaste writes into a client's configuration holds a master password, and nothing ever will.</strong> Every call an agent makes — granted or refused — is one line in a log on your disk, and the value is never in it:</p>
 
 <pre>
   time (UTC)           client       entry                decision  method
