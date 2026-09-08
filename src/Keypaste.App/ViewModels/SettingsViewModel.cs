@@ -130,10 +130,27 @@ internal sealed class SettingsViewModel : ObservableObject
         }
     }
 
+    /// <summary>Whether this platform can tell the app that its window was minimized.</summary>
+    /// <remarks>
+    /// The checkbox is omitted where the answer is no, rather than offered and inert — which is the
+    /// defect F.2b repairs, and it would be no better for being platform-shaped. An instance
+    /// property because a binding needs one, in the shape <see cref="ShellViewModel"/> already uses.
+    /// </remarks>
+#pragma warning disable CA1822
+    internal bool MinimizeLockSupported => MinimizeLock.IsSupported;
+#pragma warning restore CA1822
+
     /// <summary>Whether minimizing counts as leaving.</summary>
     /// <remarks>
+    /// <para>
     /// Off by default. Minimizing is not a security event for most people, and for the few for whom
     /// it is the gesture that means "I am leaving", it is one checkbox.
+    /// </para>
+    /// <para>
+    /// Writing it is applying it. <see cref="MinimizeLock"/> asks the same
+    /// <see cref="DesktopPreferences"/> this screen writes through, at each minimize, so there is
+    /// no second step here and no restart between ticking the box and being protected by it.
+    /// </para>
     /// </remarks>
     internal bool LockWhenMinimized
     {

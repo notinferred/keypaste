@@ -29,8 +29,14 @@
         <ComboBox ItemsSource="{Binding Themes}" SelectedItem="{Binding Theme}" MinWidth="200" />
       </StackPanel>
 
-      <CheckBox Content="Lock when the window is minimized"
-                IsChecked="{Binding LockWhenMinimized}" />
+      <StackPanel Spacing="6" IsVisible="{Binding MinimizeLockSupported}">
+        <CheckBox Content="Lock when the window is minimized"
+                  IsChecked="{Binding LockWhenMinimized}" />
+        <TextBlock TextWrapping="Wrap"
+                   FontSize="12"
+                   Foreground="{DynamicResource KpTextMuted}"
+                   Text="Takes effect at once, and at every launch. Switching to another window is not minimizing and still does not lock; on macOS, hiding the app with Cmd+H is not minimizing either." />
+      </StackPanel>
 
       <StackPanel Spacing="8">
         <TextBlock Text="Recent vaults" Foreground="{DynamicResource KpTextPrimary}" />
