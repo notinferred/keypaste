@@ -20,7 +20,7 @@ Everyday password-management workflows, browser integration and desktop
 publication remain unfinished. No hosted service, web vault, mobile integration or organization
 credential service is available.
 
-**Next: F.4a — fail closed when checking an existing release destination.** F.2b2 is BLOCKED on
+**Next: F.3d — refuse a release that cannot be delivered, and record it as one.** F.2b2 is BLOCKED on
 hardware this project does not have; it is deferred to the desktop candidate run, and 4.7b lists
 it, so the desktop gate still cannot pass without it. F.4b's change is in source and checked on
 the four targets this machine can build; its three remaining NativeAOT targets need one CI run,
@@ -138,6 +138,10 @@ passed and five platform-specific skips. Each task needs a regression that demon
 before the fix and verifies the corrected behavior. Keep the shared core and mature KDBX library;
 these tasks repair existing behavior and do not require a product rewrite. Record reproductions
 in repository fixtures/tests, so completion does not depend on a maintainer's temporary files.
+
+- [ ] **F.3d — Refuse a release that cannot be delivered, and record it as approved but undelivered.** Needs: 2.2, F.3c.
+  **Build:** [ApproverProtocol](../src/Keypaste.Core/Ipc/ApproverProtocol.cs)'s `Encode(CredentialReply)` is unbounded exactly as the listing reply was before F.3c. `notes` is a releasable field and a KDBX note has no length limit, so a **granted** reply can pass `MessageFramer`'s 64 KiB frame: the write throws, `ApproverListener.ServeAsync` swallows it into its outermost `catch`, and the `finally` revokes that connection's grants *after* a person approved. The bridge reconnects on a fresh connection id and puts a second prompt in front of the same person, and the audit line records `denied`/`failed` — "the approver could not be asked" — for a request somebody said yes to. Make the encode total: refuse an over-size reply with a bounded frame carrying no part of the value, deliver that refusal on the connection that is still open, keep that connection's grants, and give the refusal its own audit word and a reason saying the release was authorized and could not be delivered. Truncating a credential is not an option.
+  **Verify (V-F.3d):** Through the real transport, a vault entry whose releasable field exceeds one frame is approved by a person and yields a bounded valid frame the connection survives: the tool returns a refusal saying the release was authorized and could not be delivered, the audit line records that word and that reason rather than `failed` and "the approver could not be asked", no byte of the field value appears in the result, the transcript or the log, the connection's existing grants remain usable and a subsequent approved request on it succeeds, and a person is asked once rather than twice. A refusal whose own reason is over-size stays a refusal under its own method. Evidence against the encoder alone cannot pass; the reproduction runs over a real pipe against a real vault.
 
 - [ ] **F.4a — Fail closed when checking an existing release destination.** Needs: 3.4.
   **Build:** Fix [release.yml](../.github/workflows/release.yml)'s suppressed listing errors: require a successful destination check before upload and refuse an occupied version. A denied or failed `aws s3 ls` currently becomes an empty result and reaches upload. Fix this before any new publication, independently of desktop progress.
