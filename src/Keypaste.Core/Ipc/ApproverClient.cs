@@ -3,7 +3,7 @@ using System.IO.Pipes;
 namespace Keypaste.Core.Ipc;
 
 /// <summary>
-/// The bridge's end of the pipe. Every failure is a null answer, never an exception.
+/// The bridge's end of the pipe. Every failure is a null answer, with one deliberate exception.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -17,6 +17,15 @@ namespace Keypaste.Core.Ipc;
 /// Requests are serialised, one at a time per connection, because the protocol is a plain
 /// request-and-reply over one duplex stream with nothing to correlate two replies by. The MCP SDK
 /// dispatches tool calls concurrently, so this genuinely happens rather than being theoretical.
+/// </para>
+/// <para>
+/// <b>The one thing that throws is a second exchange arriving while the first is still running.</b>
+/// The caller that owns this connection refuses that before it reaches here (F.3b), so contention
+/// means the guarantee above has already been broken and two exchanges are about to interleave
+/// frames on a stream that cannot tell their replies apart. Returning null would hand that to the
+/// bridge as an ordinary failed exchange — one more refusal an agent is invited to retry — and a
+/// broken invariant must not be answerable. It is thrown so it is audited as a failure and read as
+/// a bug.
 /// </para>
 /// </remarks>
 public sealed class ApproverClient : IAsyncDisposable
@@ -105,13 +114,24 @@ public sealed class ApproverClient : IAsyncDisposable
             return null;
         }
 
+        bool taken;
+
         try
         {
-            await _oneAtATime.WaitAsync(cancellationToken).ConfigureAwait(false);
+            taken = _oneAtATime.Wait(0, CancellationToken.None);
         }
-        catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
+        catch (ObjectDisposedException)
         {
             return null;
+        }
+
+        // Outside the try below on purpose, twice over. Its finally would release a slot this
+        // never took, and its catch turns InvalidOperationException into a null answer - which is
+        // exactly the laundering a broken invariant must not go through.
+        if (!taken)
+        {
+            throw new InvalidOperationException(
+                "two exchanges were started on one approver connection; the caller must serialise them");
         }
 
         try

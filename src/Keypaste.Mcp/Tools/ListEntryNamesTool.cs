@@ -104,9 +104,7 @@ internal sealed class ListEntryNamesTool(
                 McpAudit.Denial(
                     ToolText.ListToolName,
                     client,
-                    listing.Availability == VaultAvailability.Locked
-                        ? AuditMethod.VaultLocked
-                        : AuditMethod.NoApprover,
+                    Method(listing.Availability),
                     listing.Reason,
                     options.Exposure),
                 ToolResults.Refuse(listing.Reason));
@@ -139,6 +137,21 @@ internal sealed class ListEntryNamesTool(
 
         return Record(record, Render(exposed, truncated, options.Exposure.Globs));
     }
+
+    /// <summary>Which word the log gets for a listing that produced no names.</summary>
+    /// <remarks>
+    /// <c>Failed</c> has recorded itself as <see cref="AuditMethod.NoApprover"/> since 2.2, which
+    /// reads as "nobody was running one" when the truth may be that the source threw. That is
+    /// pre-existing and left alone here; what F.3b adds is
+    /// <see cref="VaultAvailability.Busy"/>, which has a word of its own precisely so it is not
+    /// filed under either of the other two.
+    /// </remarks>
+    private static AuditMethod Method(VaultAvailability availability) => availability switch
+    {
+        VaultAvailability.Locked => AuditMethod.VaultLocked,
+        VaultAvailability.Busy => AuditMethod.Busy,
+        _ => AuditMethod.NoApprover,
+    };
 
     /// <summary>
     /// Writes the audit line first, and turns a failure to write into a refusal.

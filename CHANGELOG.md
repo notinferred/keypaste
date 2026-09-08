@@ -8,6 +8,18 @@ Versions are the ones published at `https://dl.keypaste.com/v<version>/`. Every 
 
 These changes are available in source on `main`, **not in the `v0.1.0` downloads**. The source version still reports `0.1.0`; its version string alone does not identify the published bytes.
 
+**An agent can no longer stack up prompts for you to clear.** keypaste has always said it shows
+one request at a time and refuses a second rather than queueing it, and the part of it that decides
+did exactly that. The bridge in front of that part did not: it held the second request until you
+had answered the first, and then sent it on — so the promise held for two agents at once and failed
+for one agent asking twice, which is the case it was written for. Ten requests meant ten prompts,
+one after another, each waiting for the last. They are refused where they arrive now. The agent is
+told `BUSY` rather than `DENIED`, because you did not refuse anything and an agent that reads a
+refusal learns the wrong thing about what you want; it is told the wait may be as long as a person
+takes, so it waits instead of retrying in a loop; and it is not told which of its own calls is in
+the way. Asking for the names of your entries goes down the same connection, so it is refused the
+same way while you are deciding. Every refusal is still one line in the audit log.
+
 **Changing your computer's clock is no longer a way to extend an agent's access.** When you
 approve a request, keypaste remembers that answer for the lifetime it showed you, so the agent's
 next request for the same thing does not ask you again. That lifetime was measured against your

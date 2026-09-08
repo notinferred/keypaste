@@ -92,7 +92,7 @@ The grant belongs to that one connection. If the client restarts, the grant is g
 
 The agent is told plainly, and told not to ask again. Asking again for the same thing inside a minute is refused without bothering you at all. If a request times out because you were away from the keyboard, the agent is *not* told to give up — nobody decided anything.
 
-Only one request is ever in front of you at a time. A second one arriving while you are reading the first is refused immediately rather than queued behind it, so a misbehaving agent cannot build a stack of prompts you have to clear.
+Only one request is ever in front of you at a time. A second one arriving while you are reading the first is refused immediately rather than queued behind it, so a misbehaving agent cannot build a stack of prompts you have to clear. The agent is told `BUSY` rather than `DENIED`, because you did not refuse anything — and it is not told which of its calls is in the way, only that the wait may be as long as you take. Listing entry names shares the same connection, so it is refused the same way while you are deciding.
 
 ## When no agent is running
 
