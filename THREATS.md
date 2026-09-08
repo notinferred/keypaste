@@ -307,14 +307,19 @@ The name carries a per-user discriminator, so two people on one machine do not c
 
 The cached approval is bounded on three sides: `min(requested, --max-ttl)` with a default ceiling
 of five minutes, scoped to one connection, and cleared by an expiry timer. Cache lookup also
-checks expiry before returning a value. This governs reuse through keypaste; it does not remove
-copies already returned to the client or expire the credential at its issuer.
+checks expiry before returning a value. **That lifetime is held on two clocks and ends on whichever
+has run further** — the wall clock, which a correction can move backwards, and the monotonic clock,
+which cannot move but does not advance across suspend on every platform. Neither a clock moved by
+hand nor a machine that slept through the TTL extends a grant, and the remaining lifetime reported
+to the agent and to the log can never exceed the TTL that was approved (D-0100). This governs reuse
+through keypaste; it does not remove copies already returned to the client or expire the credential
+at its issuer.
 
 **Residual.** Inside the TTL, the reason is not checked against the one that was approved. **This is deliberate.** Re-prompting when a reason looks "materially different" would be a heuristic over untrusted text — the same argument T-1 already makes for refusing a phrase blocklist — and it would hand an agent a lever for forcing re-prompt loops, which is T-11. A shorter `--max-ttl` is the honest control, and it is one number.
 
 **2.3 removes the first approval as well as the second, and that is a different threat.** Everything above rests on there being an earlier `granted` / `prompt` line for the same entry and field — a request a person did read — that the reuse can be paired against and compared with. **A policy grant has no such line.** No reason is read by anybody, ever, for any request that rule covers, so the comparison target that made this tolerable does not exist. What is done instead: every release gets its own `granted` / `policy` line carrying *that* request's reason excerpt, length and SHA-256; the line names which rule released it; the approver prints a line per release to its terminal; and a policy grant deliberately **does not** seed the grant cache, so no release is ever hidden behind a `grant-cache` line that names no rule. What is not done: nothing inspects the reason, and T-2's display mitigations do not apply, because there is no display. See T-13 and T-14.
 
-**Proved by.** `GrantCacheTests` for the lifetime, the scoping and the zeroing; `ApproverHandlerTests.ARepeatRequestInsideTheTtl_IsServedWithoutAskingAgain` for the reuse itself and for the fact that it costs exactly one prompt and one vault read. `ApproverHandlerPolicyTests.APolicyGrant_LeavesNoGrantInTheCache` for the separation, and `ServerToolsTests.APolicyRelease_IsAuditedAsPolicyAndNamesTheRule` for the line. The reader is `AuditReader`, whose marking rule is what turns "visible in the log's contents" into something a person actually sees. **Nothing tests the policy case, because there is nothing to test:** a policy release has no earlier approval to diverge from, which is the paragraph above and is worse rather than better.
+**Proved by.** `GrantCacheTests` for the lifetime, the scoping and the zeroing, including the clock cases — a rollback that used to resurrect an expired grant, a machine that slept through the TTL, and the lookup refusing without waiting for the timer; `DeadlineTests` for the rule those rest on, and `ApproverHandlerTests.AReusedGrant_NeverReportsMoreTimeThanWasApproved` for the number the agent and the log are given; `ApproverHandlerTests.ARepeatRequestInsideTheTtl_IsServedWithoutAskingAgain` for the reuse itself and for the fact that it costs exactly one prompt and one vault read. `ApproverHandlerPolicyTests.APolicyGrant_LeavesNoGrantInTheCache` for the separation, and `ServerToolsTests.APolicyRelease_IsAuditedAsPolicyAndNamesTheRule` for the line. The reader is `AuditReader`, whose marking rule is what turns "visible in the log's contents" into something a person actually sees. **Nothing tests the policy case, because there is nothing to test:** a policy release has no earlier approval to diverge from, which is the paragraph above and is worse rather than better.
 
 ---
 

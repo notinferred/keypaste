@@ -32,7 +32,7 @@ public sealed class ApprovalGate : IDisposable
     private readonly IApprovalChannel _channel;
     private readonly TimeProvider _clock;
     private readonly SemaphoreSlim _oneAtATime = new(1, 1);
-    private readonly ConcurrentDictionary<string, DateTimeOffset> _cooldowns = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, Deadline> _cooldowns = new(StringComparer.Ordinal);
     private bool _disposed;
 
     /// <summary>Builds a gate over one channel.</summary>
@@ -95,7 +95,7 @@ public sealed class ApprovalGate : IDisposable
 
             if (answer == ApprovalAnswer.Denied)
             {
-                _cooldowns[cooldownKey] = _clock.GetUtcNow() + Limits.DenialCooldown;
+                _cooldowns[cooldownKey] = Deadline.Starting(_clock, Limits.DenialCooldown);
             }
 
             return answer;
@@ -195,14 +195,24 @@ public sealed class ApprovalGate : IDisposable
         return InCooldown(cooldownKey);
     }
 
+    /// <summary>
+    /// Whether a refusal still stands, on whichever clock has run <em>least</em>.
+    /// </summary>
+    /// <remarks>
+    /// The opposite of the rule a grant uses, and deliberately. A grant expires on whichever clock
+    /// ran furthest, because both kinds of clock error should cost at most another prompt. A
+    /// cooldown is a person's "no", so the failure to avoid is ending it early: a wall clock nudged
+    /// forward, or a machine that suspended, must not become a way to ask the same question again.
+    /// <see cref="Deadline"/> holds both readings so each side can pick its own direction.
+    /// </remarks>
     private bool InCooldown(string cooldownKey)
     {
-        if (!_cooldowns.TryGetValue(cooldownKey, out var until))
+        if (!_cooldowns.TryGetValue(cooldownKey, out var refusal))
         {
             return false;
         }
 
-        if (_clock.GetUtcNow() < until)
+        if (refusal.StillInForce(_clock))
         {
             return true;
         }

@@ -176,6 +176,27 @@ public sealed class ApproverHandlerTests
         Assert.Equal(1, fixture.Source.Reads);
     }
 
+    /// <summary>
+    /// The number an agent and the audit log are told. Remaining lifetime is asked of the clock
+    /// rather than counted down, so a wall clock moved backwards used to report more time left
+    /// than the person had approved — a lifetime longer than the ceiling SECURITY.md names.
+    /// </summary>
+    [Fact]
+    public async Task AReusedGrant_NeverReportsMoreTimeThanWasApproved()
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Channel.Answer = ApprovalAnswer.Approved;
+
+        var approved = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
+
+        fixture.Clock.RewindWallOnly(TimeSpan.FromHours(1));
+
+        var reused = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
+
+        Assert.Equal(AuditMethod.GrantCache, reused.Method);
+        Assert.InRange(reused.TtlSeconds, 0, approved.TtlSeconds);
+    }
+
     [Fact]
     public async Task ARepeatRequestForADifferentField_AsksAgain()
     {

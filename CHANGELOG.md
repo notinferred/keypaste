@@ -8,6 +8,19 @@ Versions are the ones published at `https://dl.keypaste.com/v<version>/`. Every 
 
 These changes are available in source on `main`, **not in the `v0.1.0` downloads**. The source version still reports `0.1.0`; its version string alone does not identify the published bytes.
 
+**Changing your computer's clock is no longer a way to extend an agent's access.** When you
+approve a request, keypaste remembers that answer for the lifetime it showed you, so the agent's
+next request for the same thing does not ask you again. That lifetime was measured against your
+computer's calendar clock — the one an NTP correction, a timezone tool or a person with the
+settings open can move. Moving it back an hour made an approval that had already run out work
+again, told the agent it had another hour on it, and left the password sitting in memory with
+nothing left to clear it, because the timer that should have wiped it had already fired and found
+the deadline "not yet". An approval is now measured against both your clock and one that cannot be
+moved, and whichever says more time has passed wins — so a correction, and a laptop that slept
+through the whole lifetime, both end it. A refusal is measured the same way in the opposite
+direction: if you say no, moving the clock forward will not cut the pause short and let the same
+question through.
+
 **What your master password field tells the rest of your computer is now a test, not a
 description.** Windows and Linux both run an accessibility service any program on the machine can
 ask questions of, and an ordinary password box answers them with the password — the dots are

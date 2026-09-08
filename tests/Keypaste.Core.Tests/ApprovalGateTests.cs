@@ -222,6 +222,27 @@ public sealed class ApprovalGateTests
     }
 
     /// <summary>
+    /// A refusal is bounded by the clock too, and its safe direction is the opposite one. For a
+    /// grant, either clock saying more time has passed must expire it; for a cooldown that same
+    /// rule would let a wall clock moved forward end a person's "no" early, so the shorter elapsed
+    /// decides and a refusal survives both a clock correction and a suspend.
+    /// </summary>
+    [Fact]
+    public async Task ACooldown_IsNotEndedByTheWallClockMovingForward()
+    {
+        var channel = new ScriptedChannel(ApprovalAnswer.Denied);
+        var (gate, clock) = Build(channel);
+        using var owned = gate;
+
+        await owned.AskAsync("same", Prompt(), TestContext.Current.CancellationToken);
+
+        clock.AdvanceWallOnly(TimeSpan.FromHours(1));
+
+        Assert.Equal(ApprovalAnswer.Cooldown, await owned.AskAsync("same", Prompt(), TestContext.Current.CancellationToken));
+        Assert.Equal(1, channel.Asked);
+    }
+
+    /// <summary>
     /// An approval does not start a cooldown: a human who says yes should be able to say yes again
     /// to the next request rather than having their own answer held against them.
     /// </summary>
