@@ -9,13 +9,14 @@
 **Working proposition: incomplete. Hosted pilot: not ready. Paid release: not ready.**
 The local vault, CLI/env workflow and approval bridge are implemented, with known defects in
 data preservation, authorization timing and release checks. The desktop is a source build with
-partial entry/env screens and ineffective settings/clipboard behavior identified in the 2026-09-07
-code review. The remaining F.1–F.4 repair tasks below are open even though existing tests pass.
+partial entry/env screens and an ineffective minimize-lock setting and clipboard lifetime identified
+in the 2026-09-07 code review. Saved preferences now reach a fresh session (F.2a). The remaining
+F.2–F.4 repair tasks below are open even though existing tests pass.
 Everyday password-management workflows, browser integration and desktop
 publication remain unfinished. No hosted service, web vault, mobile integration or organization
 credential service is available.
 
-**Next: F.2a — apply saved desktop preferences to a fresh application session.** Complete the ready repairs
+**Next: F.2b — enforce the minimize-lock setting.** Complete the ready repairs
 below before new feature work. Release foundations follow: R.0a makes release identity and supported
 targets executable, R.0b/3.8 make distribution verifiable, and 4.7a prepares desktop packages without
 waiting for signing enrollment. A new CLI/MCP patch requires the core/CLI/bridge and release repairs;
@@ -53,6 +54,7 @@ A completed source task does not mean that it is present in the current download
 | F.1b | Complete | Export refuses its source vault and any KDBX destination, `--force` included; [export tests](../tests/Keypaste.Cli.Tests/EnvExportTests.cs), [path rule tests](../tests/Keypaste.Core.Tests/PathIdentityTests.cs), D-0092 |
 | F.1c | Complete | Cleanup is bound to the bytes that were imported and the path they came from; a source changed during any prompt or at the delete boundary is kept; [pull tests](../tests/Keypaste.Cli.Tests/EnvPullTests.cs), [snapshot tests](../tests/Keypaste.Core.Tests/SourceSnapshotTests.cs), D-0093 |
 | F.1e | Complete | One path resolver for reads and removals; an ambiguous path is refused rather than served, and `add` cannot deepen a collision; [identity tests](../tests/Keypaste.Core.Tests/EntryIdentityTests.cs), [verb tests](../tests/Keypaste.Cli.Tests/VerbTests.cs), [entry tests](../tests/Keypaste.App.Tests/ViewModels/EntriesViewModelTests.cs) and [write-back gate](../scripts/verify-keepassxc-writeback.sh) D, D-0094 |
+| F.2a | Complete | Launch reads `app.toml` once and arms the session and the palette from it; the Settings screen shows the same record, and a timeout the list does not offer is named rather than snapped or rewritten; [startup tests](../tests/Keypaste.App.Tests/StartupSettingsTests.cs), [settings tests](../tests/Keypaste.App.Tests/ViewModels/SettingsViewModelTests.cs), D-0095 |
 | 10.1 | Complete | Initial hostile review/remediation; D-0084 in [DECISIONS](../DECISIONS.md) |
 | K.1 | Complete | Pinned SDK installed; [global.json](../global.json), D-0076 |
 
@@ -117,10 +119,6 @@ passed and five platform-specific skips. Each task needs a regression that demon
 before the fix and verifies the corrected behavior. Keep the shared core and mature KDBX library;
 these tasks repair existing behavior and do not require a product rewrite. Record reproductions
 in repository fixtures/tests, so completion does not depend on a maintainer's temporary files.
-
-- [ ] **F.2a — Apply saved desktop preferences to a fresh application session.** Needs: 4.1.
-  **Build:** Load and apply saved idle timeout and theme during [App composition](../src/Keypaste.App/App.axaml.cs), keeping displayed and effective settings consistent. [SettingsViewModel](../src/Keypaste.App/ViewModels/SettingsViewModel.cs) currently displays a saved 60-second timeout while a new session still uses 300 seconds; the stored theme is also unapplied.
-  **Verify (V-F.2a):** Save preferences, dispose the complete application/session and create a fresh one: the effective timeout, displayed choice and actual theme agree without editing Settings again. A one-minute fixture locks at one minute; invalid/unreadable settings use documented defaults without overwriting the original file.
 
 - [ ] **F.2b — Enforce the minimize-lock setting.** Needs: F.2a.
   **Build:** Connect the existing LockWhenMinimized setting to native window-state handling and the normal session/clipboard lock path. Its checkbox currently persists a value with no consumer. Apply changes immediately and on startup; omit the control on any explicitly unsupported surface rather than offering an inactive security setting.

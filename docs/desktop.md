@@ -60,7 +60,7 @@ Whichever you use, the file's header is read before you are asked for a password
 
 ## Locking
 
-**The vault locks after five minutes of no keyboard and no mouse.** Change it in Settings, between one minute and eight hours. There is deliberately no "never" — a setting that turned the feature off would be the one everybody chose the first time the countdown interrupted them, and an unattended machine is the threat idle locking exists for.
+**The vault locks after five minutes of no keyboard and no mouse.** Change it in Settings, between one minute and eight hours; the choice is read back at every launch, so it is the timeout in force rather than the one on the screen. There is deliberately no "never" — a setting that turned the feature off would be the one everybody chose the first time the countdown interrupted them, and an unattended machine is the threat idle locking exists for.
 
 Thirty seconds before it locks, a quiet line appears in the header. Any key or click cancels it.
 
@@ -125,27 +125,28 @@ CI builds and packages on three operating systems; the current desktop logic tes
 3. Wrong password: a calm message, still locked, and nothing added to `recent.toml`.
 4. Right password: the shell appears, and the vault is now in `recent.toml`.
 5. **Keyboard only** — launch, type, Enter, reach all five destinations, lock with `Ctrl/Cmd+L`, without touching the mouse.
-6. Set the timeout to one minute and wait: the countdown appears, typing cancels it, leaving it alone returns you to the unlock screen.
+6. Set the timeout to one minute and wait: the countdown appears, typing cancels it, leaving it alone returns you to the unlock screen. Quit, relaunch and wait again without opening Settings — still one minute.
 7. Suspend the machine for longer than the timeout. It wakes locked.
-8. The theme follows the OS, and both light and dark read as calm.
-9. The Log screen matches `keypaste log` for the same `~/.keypaste/audit.jsonl`.
-10. Agent Activity says the right thing both with and without a `keypaste agent` running.
-11. Entries lists titles and groups. Filter by a group and search for part of a title or group path; case changes still match. Selecting an entry shows a username, a URL and notes, and a row of dots where the password is.
-12. Copy a password. The countdown appears and the bar drains. Paste into an editor — it is there.
+8. The theme follows the OS, and both light and dark read as calm. Choose Dark, quit and relaunch: the first frame is dark, with no flash of the light one on the way.
+9. Put a number the list does not offer into `app.toml` by hand — `idle_timeout_seconds = 137` — and relaunch. Settings names it, the countdown arrives at 137 seconds, and the file is unchanged afterwards.
+10. The Log screen matches `keypaste log` for the same `~/.keypaste/audit.jsonl`.
+11. Agent Activity says the right thing both with and without a `keypaste agent` running.
+12. Entries lists titles and groups. Filter by a group and search for part of a title or group path; case changes still match. Selecting an entry shows a username, a URL and notes, and a row of dots where the password is.
+13. Copy a password. The countdown appears and the bar drains. Paste into an editor — it is there.
     Wait it out and paste again — it is gone.
-13. Copy, then `Ctrl/Cmd+L`. Paste: nothing.
-14. Copy, then quit the app. Paste: nothing.
-15. **Windows only, on a machine where Clipboard History is enabled and not disabled by policy**:
+14. Copy, then `Ctrl/Cmd+L`. Paste: nothing.
+15. Copy, then quit the app. Paste: nothing.
+16. **Windows only, on a machine where Clipboard History is enabled and not disabled by policy**:
     copy a known harmless string and confirm Win+V shows it — that is the control. Then copy a
     password from the app and open Win+V: the value is not in it. `keypaste get` sets the same
     formats since D-0056; whether that holds on a real machine is step 1.5a's Verify line in
     `docs/STEPS.md`, not this list.
-16. Hold a masked value in Env Sets. The characters appear; release and they go. Hold a second row
+17. Hold a masked value in Env Sets. The characters appear; release and they go. Hold a second row
     while the first is showing — only one is ever revealed.
-17. Copy a project's run command, paste it in a terminal, finish the line: it runs with the
+18. Copy a project's run command, paste it in a terminal, finish the line: it runs with the
     project's variables.
-18. Add, edit and delete an entry, then check `keypaste ls` and `keypaste get` in a terminal.
-19. With the app open on a vault, run `keypaste env set` against the same file in a terminal. Come
+19. Add, edit and delete an entry, then check `keypaste ls` and `keypaste get` in a terminal.
+20. With the app open on a vault, run `keypaste env set` against the same file in a terminal. Come
     back and make any edit: the app refuses, says why, and the terminal's write is still there.
-20. Generate a password in the app, then read it back with `keypaste get --show`.
-21. Open the vault the app wrote in KeePassXC.
+21. Generate a password in the app, then read it back with `keypaste get --show`.
+22. Open the vault the app wrote in KeePassXC.

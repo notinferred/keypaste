@@ -1,3 +1,4 @@
+using System.Globalization;
 using Keypaste.App.Session;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Recent;
@@ -29,6 +30,7 @@ internal sealed class SettingsViewModel : ObservableObject
 {
     private readonly AppVaultSession _session;
     private readonly string? _home;
+    private readonly DesktopPreferences _preferences;
     private readonly Action<AppTheme> _applyTheme;
 
     private AppSettings _settings;
@@ -37,32 +39,42 @@ internal sealed class SettingsViewModel : ObservableObject
     private bool _lockWhenMinimized;
     private string _message = string.Empty;
 
-    internal SettingsViewModel(AppVaultSession session, string? home, Action<AppTheme> applyTheme)
+    internal SettingsViewModel(
+        AppVaultSession session,
+        string? home,
+        DesktopPreferences preferences,
+        Action<AppTheme> applyTheme)
     {
         ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(preferences);
         ArgumentNullException.ThrowIfNull(applyTheme);
 
         _session = session;
         _home = home;
+        _preferences = preferences;
         _applyTheme = applyTheme;
 
-        _settings = AppSettings.Load(KeypasteHome.SettingsPath(home));
+        // The preferences the app was composed from, not a second read of the same file: what is
+        // shown here is what is in force.
+        _settings = preferences.Current;
         _theme = _settings.Theme;
         _lockWhenMinimized = _settings.LockWhenMinimized;
-        _idle = Nearest(_settings.IdleTimeoutSeconds);
+
+        IdleChoices = ChoicesFor(_settings.IdleTimeoutSeconds);
+        _idle = IdleChoices.Single(choice => choice.Seconds == _settings.IdleTimeoutSeconds);
 
         ForgetAllCommand = new RelayCommand(ForgetAll);
     }
 
     /// <summary>
-    /// The timeouts on offer. There is deliberately no "never".
+    /// The timeouts every vault is offered. There is deliberately no "never".
     /// </summary>
     /// <remarks>
     /// A "never" option would be the one setting everybody chose the first time the countdown
     /// interrupted them, and it would turn off the feature this stage exists to ship. Eight hours
     /// covers a working day, which is the honest version of the same wish.
     /// </remarks>
-    internal static IReadOnlyList<IdleChoice> IdleChoices { get; } =
+    internal static IReadOnlyList<IdleChoice> Offered { get; } =
     [
         new(60, "1 minute"),
         new(5 * 60, "5 minutes"),
@@ -71,6 +83,20 @@ internal sealed class SettingsViewModel : ObservableObject
         new(60 * 60, "1 hour"),
         new(8 * 60 * 60, "8 hours"),
     ];
+
+    /// <summary>
+    /// What this screen's list shows: <see cref="Offered"/>, plus the timeout in force when the
+    /// file asked for a number none of them names.
+    /// </summary>
+    /// <remarks>
+    /// A hand-edited <c>idle_timeout_seconds</c> is honoured and named rather than snapped to the
+    /// nearest offering. Snapping the label would put a number on the screen that the vault is not
+    /// using, which is the defect this task exists to close; snapping the session would discard a
+    /// legitimate edit; rewriting the file to match the list would clobber it (D-0095). Whatever
+    /// the file asked for, <see cref="AppSettings.IdleTimeoutSeconds"/> has already clamped it into
+    /// a range that locks.
+    /// </remarks>
+    internal IReadOnlyList<IdleChoice> IdleChoices { get; }
 
     /// <summary>The three theme choices; System follows the operating system.</summary>
     internal static IReadOnlyList<AppTheme> Themes { get; } =
@@ -171,23 +197,51 @@ internal sealed class SettingsViewModel : ObservableObject
     {
         _settings = settings;
 
-        Message = AppSettings.Save(KeypasteHome.SettingsPath(_home), settings)
+        Message = _preferences.Update(settings)
             ? string.Empty
             : "That preference could not be saved, so it will not survive a restart.";
     }
 
-    private static IdleChoice Nearest(int seconds)
+    /// <summary>The offered timeouts, widened by the one in force if it is not among them.</summary>
+    private static IReadOnlyList<IdleChoice> ChoicesFor(int seconds)
     {
-        var best = IdleChoices[1];
-
-        foreach (var choice in IdleChoices)
+        foreach (var choice in Offered)
         {
-            if (Math.Abs(choice.Seconds - seconds) < Math.Abs(best.Seconds - seconds))
+            if (choice.Seconds == seconds)
             {
-                best = choice;
+                return Offered;
             }
         }
 
-        return best;
+        var widened = new List<IdleChoice>(Offered) { new(seconds, Label(seconds)) };
+        widened.Sort((left, right) => left.Seconds.CompareTo(right.Seconds));
+
+        return widened;
     }
+
+    /// <summary>Names a number of seconds the way the offered labels read.</summary>
+    private static string Label(int seconds)
+    {
+        var parts = new List<string>(3);
+
+        if (seconds / 3600 is var hours and > 0)
+        {
+            parts.Add(Counted(hours, "hour"));
+        }
+
+        if (seconds % 3600 / 60 is var minutes and > 0)
+        {
+            parts.Add(Counted(minutes, "minute"));
+        }
+
+        if (seconds % 60 is var rest and > 0)
+        {
+            parts.Add(Counted(rest, "second"));
+        }
+
+        return parts.Count > 0 ? string.Join(' ', parts) : Counted(seconds, "second");
+    }
+
+    private static string Counted(int count, string unit) =>
+        string.Create(CultureInfo.InvariantCulture, $"{count} {unit}{(count == 1 ? string.Empty : "s")}");
 }

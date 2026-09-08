@@ -30,7 +30,8 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         Action<Core.Settings.AppTheme>? applyTheme = null,
         IAppClipboard? clipboard = null,
         TimeProvider? clock = null,
-        Action<Action>? post = null)
+        Action<Action>? post = null,
+        DesktopPreferences? preferences = null)
     {
         ArgumentNullException.ThrowIfNull(session);
 
@@ -38,6 +39,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         Home = home;
         ApproverFromEnvironment = approverFromEnvironment;
         ApplyTheme = applyTheme ?? (_ => { });
+        Preferences = preferences ?? new DesktopPreferences(home);
 
         // Owned here rather than by each screen, so a copy made on Entries is still counting down
         // after a move to Env Sets — and is cleared by the lock, because this is disposed with
@@ -73,6 +75,15 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     /// still need no application.
     /// </remarks>
     internal Action<Core.Settings.AppTheme> ApplyTheme { get; }
+
+    /// <summary>The preferences the app was composed from.</summary>
+    /// <remarks>
+    /// Held here rather than re-read by the Settings screen, so the screen shows the timeout and
+    /// theme that are actually in force. Two independent reads of one file agree only until they
+    /// do not, and the moment they disagree is the moment a person is looking at a security
+    /// setting that is not the one protecting them.
+    /// </remarks>
+    internal DesktopPreferences Preferences { get; }
 
     /// <summary>The five places the sidebar offers.</summary>
     /// <remarks>
@@ -169,7 +180,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             // Real in 4.1, and it needs no unlocked vault: the audit log is machine state, which is
             // why `keypaste log` reads it without one.
             DestinationKind.Log => new LogViewModel(Home),
-            DestinationKind.Settings => new SettingsViewModel(_session, Home, ApplyTheme),
+            DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme),
             DestinationKind.AgentActivity => Activity(),
             DestinationKind.Entries => new EntriesViewModel(_session, Clipboard),
             DestinationKind.EnvSets => new EnvSetsViewModel(_session, Clipboard),
