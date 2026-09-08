@@ -25,6 +25,7 @@ namespace Keypaste.App;
 internal sealed partial class App : Application, IDisposable
 {
     private AppVaultSession? _session;
+    private DesktopPreferences? _preferences;
     private MainWindow? _window;
     private UnlockViewModel? _unlock;
     private ShellViewModel? _shell;
@@ -39,7 +40,8 @@ internal sealed partial class App : Application, IDisposable
         {
             var home = Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable);
 
-            _session = new AppVaultSession(TimeProvider.System, AppVaultSession.DefaultIdleTimeout);
+            _preferences = new DesktopPreferences(home);
+            _session = Compose(_preferences, TimeProvider.System);
             _session.Locked += OnLocked;
 
             _window = new MainWindow();
@@ -51,6 +53,34 @@ internal sealed partial class App : Application, IDisposable
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    /// <summary>
+    /// Turns the saved preferences into behaviour: the palette the app paints in and the timeout
+    /// its session locks on.
+    /// </summary>
+    /// <param name="preferences">The preferences this process was composed from.</param>
+    /// <param name="clock">The clock the session measures idleness against.</param>
+    /// <returns>A session armed for <paramref name="preferences"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="preferences"/> is null.</exception>
+    /// <remarks>
+    /// <para>
+    /// <b>The theme is applied before the window is built</b>, so the first frame is painted in the
+    /// saved palette rather than flashing the default one on the way to it.
+    /// </para>
+    /// <para>
+    /// <c>internal</c> so a test can run exactly what launch runs. Starting a second Avalonia
+    /// application to check this is not available — the test assembly's headless session is one per
+    /// process and says why — so the seam is this method rather than the process.
+    /// </para>
+    /// </remarks>
+    internal AppVaultSession Compose(DesktopPreferences preferences, TimeProvider clock)
+    {
+        ArgumentNullException.ThrowIfNull(preferences);
+
+        ApplyTheme(preferences.Current.Theme);
+
+        return new AppVaultSession(clock, preferences.IdleTimeout);
     }
 
     /// <summary>
@@ -189,7 +219,8 @@ internal sealed partial class App : Application, IDisposable
             ApplyTheme,
             new AvaloniaClipboard(_window),
             TimeProvider.System,
-            action => Dispatcher.UIThread.Post(action));
+            action => Dispatcher.UIThread.Post(action),
+            _preferences);
 
         _window.FindControl<ContentControl>("Root")!.Content =
             new ShellView { DataContext = _shell };
@@ -245,7 +276,7 @@ internal sealed partial class App : Application, IDisposable
     /// <summary>
     /// Applies a theme choice. <c>System</c> hands the decision back to the operating system.
     /// </summary>
-    private void ApplyTheme(Core.Settings.AppTheme theme) =>
+    internal void ApplyTheme(Core.Settings.AppTheme theme) =>
         RequestedThemeVariant = theme switch
         {
             Core.Settings.AppTheme.Light => Avalonia.Styling.ThemeVariant.Light,

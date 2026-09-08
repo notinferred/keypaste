@@ -17,29 +17,37 @@ public sealed class SettingsViewModelTests
     {
         using var fixture = new TempVault();
         using var session = new AppVaultSession(new ManualClock(), TimeSpan.FromHours(4));
-        var model = new SettingsViewModel(session, fixture.Home, _ => { });
+        var model = Screen(session, fixture);
 
-        model.Idle = SettingsViewModel.IdleChoices.Single(c => c.Seconds == 60);
+        model.Idle = model.IdleChoices.Single(c => c.Seconds == 60);
 
         Assert.Equal(TimeSpan.FromMinutes(1), session.IdleTimeout);
     }
 
+    /// <summary>
+    /// A restart is a fresh read of the file and a fresh session armed from it — not a second view
+    /// model over the same run. The old version of this test built one, which is why it passed
+    /// throughout the whole time launch was ignoring the file (F.2a).
+    /// </summary>
     [Fact]
     public void A_choice_survives_a_restart()
     {
         using var fixture = new TempVault();
-        using var session = new AppVaultSession(new ManualClock());
+        using var first = new AppVaultSession(new ManualClock());
 
-        var first = new SettingsViewModel(session, fixture.Home, _ => { });
-        first.Idle = SettingsViewModel.IdleChoices.Single(c => c.Seconds == 900);
-        first.Theme = AppTheme.Dark;
-        first.LockWhenMinimized = true;
+        var screen = Screen(first, fixture);
+        screen.Idle = screen.IdleChoices.Single(c => c.Seconds == 900);
+        screen.Theme = AppTheme.Dark;
+        screen.LockWhenMinimized = true;
 
-        var second = new SettingsViewModel(session, fixture.Home, _ => { });
+        var restarted = new DesktopPreferences(fixture.Home);
+        using var second = new AppVaultSession(new ManualClock(), restarted.IdleTimeout);
+        var after = new SettingsViewModel(second, fixture.Home, restarted, _ => { });
 
-        Assert.Equal(900, second.Idle.Seconds);
-        Assert.Equal(AppTheme.Dark, second.Theme);
-        Assert.True(second.LockWhenMinimized);
+        Assert.Equal(TimeSpan.FromMinutes(15), second.IdleTimeout);
+        Assert.Equal(900, after.Idle.Seconds);
+        Assert.Equal(AppTheme.Dark, after.Theme);
+        Assert.True(after.LockWhenMinimized);
     }
 
     [Fact]
@@ -49,7 +57,11 @@ public sealed class SettingsViewModelTests
         using var session = new AppVaultSession(new ManualClock());
 
         AppTheme? applied = null;
-        var model = new SettingsViewModel(session, fixture.Home, theme => applied = theme);
+        var model = new SettingsViewModel(
+            session,
+            fixture.Home,
+            new DesktopPreferences(fixture.Home),
+            theme => applied = theme);
 
         model.Theme = AppTheme.Light;
 
@@ -63,15 +75,49 @@ public sealed class SettingsViewModelTests
     [Fact]
     public void Every_offered_timeout_actually_locks()
     {
-        Assert.NotEmpty(SettingsViewModel.IdleChoices);
+        Assert.NotEmpty(SettingsViewModel.Offered);
 
-        foreach (var choice in SettingsViewModel.IdleChoices)
+        foreach (var choice in SettingsViewModel.Offered)
         {
             Assert.InRange(
                 choice.Seconds,
                 AppSettings.MinimumIdleTimeoutSeconds,
                 AppSettings.MaximumIdleTimeoutSeconds);
         }
+    }
+
+    /// <summary>
+    /// A number the list does not offer is named rather than rounded off, because the alternative
+    /// is a screen showing a timeout the vault is not using — which is the whole of F.2a.
+    /// </summary>
+    [Fact]
+    public void A_timeout_the_list_does_not_offer_is_shown_as_the_one_in_force()
+    {
+        using var fixture = new TempVault();
+        Written(fixture, seconds: 137);
+
+        var preferences = new DesktopPreferences(fixture.Home);
+        using var session = new AppVaultSession(new ManualClock(), preferences.IdleTimeout);
+        var model = new SettingsViewModel(session, fixture.Home, preferences, _ => { });
+
+        Assert.Equal(TimeSpan.FromSeconds(137), session.IdleTimeout);
+        Assert.Equal(137, model.Idle.Seconds);
+        Assert.Equal("2 minutes 17 seconds", model.Idle.Label);
+        Assert.Equal(SettingsViewModel.Offered.Count + 1, model.IdleChoices.Count);
+    }
+
+    [Fact]
+    public void An_offered_timeout_adds_nothing_to_the_list()
+    {
+        using var fixture = new TempVault();
+        Written(fixture, seconds: 1800);
+
+        var preferences = new DesktopPreferences(fixture.Home);
+        using var session = new AppVaultSession(new ManualClock(), preferences.IdleTimeout);
+        var model = new SettingsViewModel(session, fixture.Home, preferences, _ => { });
+
+        Assert.Equal("30 minutes", model.Idle.Label);
+        Assert.Equal(SettingsViewModel.Offered.Count, model.IdleChoices.Count);
     }
 
     [Fact]
@@ -83,7 +129,7 @@ public sealed class SettingsViewModelTests
         Assert.NotEmpty(RecentVaults.Load(KeypasteHome.RecentPath(fixture.Home)));
 
         using var session = new AppVaultSession(new ManualClock());
-        var model = new SettingsViewModel(session, fixture.Home, _ => { });
+        var model = Screen(session, fixture);
 
         model.ForgetAllCommand.Execute(null);
 
@@ -102,11 +148,19 @@ public sealed class SettingsViewModelTests
         File.WriteAllText(KeypasteHome.SettingsPath(fixture.Home), "[[settings]]\nnot a pair\n");
 
         using var session = new AppVaultSession(new ManualClock());
-        var model = new SettingsViewModel(session, fixture.Home, _ => { });
+        var model = Screen(session, fixture);
 
         Assert.InRange(
             model.Idle.Seconds,
             AppSettings.MinimumIdleTimeoutSeconds,
             AppSettings.MaximumIdleTimeoutSeconds);
     }
+
+    private static SettingsViewModel Screen(AppVaultSession session, TempVault fixture) =>
+        new(session, fixture.Home, new DesktopPreferences(fixture.Home), _ => { });
+
+    private static void Written(TempVault fixture, int seconds) =>
+        AppSettings.Save(
+            KeypasteHome.SettingsPath(fixture.Home),
+            AppSettings.Default with { IdleTimeoutSeconds = seconds });
 }

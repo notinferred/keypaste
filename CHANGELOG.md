@@ -8,6 +8,18 @@ Versions are the ones published at `https://dl.keypaste.com/v<version>/`. Every 
 
 These changes are available in source on `main`, **not in the `v0.1.0` downloads**. The source version still reports `0.1.0`; its version string alone does not identify the published bytes.
 
+**The app now launches with the settings you chose.** Pick a one-minute idle timeout, quit, and
+the next launch held your vault open for five — Settings said "1 minute" while the session ran on
+the default it had never been told to replace. The theme did the same: `theme = "dark"` was
+written, and every launch painted itself in whatever the operating system said until you went back
+to Settings and picked Dark again. The preferences are read once now, at startup, and the screen
+shows the record that armed the session rather than a second read that only agreed by luck. The
+palette is applied before the window is built, so there is no flash of the wrong one. A timeout you
+typed into `app.toml` by hand that is not one of the six offered — `137`, say — is honoured and the
+list names it, rather than being rounded off to a number the vault is not using; the file is not
+rewritten. A file keypaste cannot read still costs a preference and never a lock, and is still left
+exactly as it is. Minimizing the window is still not wired to the lock setting.
+
 **A path two entries answer to no longer hands out one of their secrets.** F.1a stopped
 `keypaste env rm` deleting the wrong entry, and left the reading half alone. So `keypaste get
 env/dev/nested/TOKEN` still served whichever of `nested/TOKEN` in `env/dev` and `TOKEN` in
