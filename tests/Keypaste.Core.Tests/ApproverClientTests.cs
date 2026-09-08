@@ -18,7 +18,7 @@ public sealed class ApproverClientTests
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
-    private static readonly TimeSpan Promptly = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan _promptly = TimeSpan.FromSeconds(10);
 
     private static CredentialRequest Request(string entry = "env/dev/STRIPE_KEY") => new()
     {
@@ -46,19 +46,19 @@ public sealed class ApproverClientTests
         await using var host = new Host(handler);
 
         await using var client =
-            await ApproverClient.TryConnectAsync(host.PipeName, Promptly, Token)
+            await ApproverClient.TryConnectAsync(host.PipeName, _promptly, Token)
             ?? throw new InvalidOperationException("the test could not connect to its own listener");
 
         var parked = client.RequestAsync(Request(), Token).AsTask();
 
-        await handler.Entered.Task.WaitAsync(Promptly, Token);
+        await handler.Entered.Task.WaitAsync(_promptly, Token);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await client.RequestAsync(Request("env/dev/OTHER"), Token));
 
         handler.Release.TrySetResult();
 
-        Assert.NotNull(await parked.WaitAsync(Promptly, Token));
+        Assert.NotNull(await parked.WaitAsync(_promptly, Token));
 
         // The one that threw never reached the wire, which is the point: it was refused before it
         // could put a second frame on a stream already carrying one.

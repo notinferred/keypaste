@@ -31,15 +31,15 @@ namespace Keypaste.Mcp.Tests;
 /// </remarks>
 public sealed class LargeCredentialTests : IAsyncLifetime
 {
-    private const string Master = "correct horse battery staple";
+    private const string _master = "correct horse battery staple";
 
     /// <summary>Planted where a truncating fix would keep it: at the front of the note.</summary>
-    private const string NoteSentinel = "NOTE-SENTINEL-LARGE-4c71fa";
+    private const string _noteSentinel = "NOTE-SENTINEL-LARGE-4c71fa";
 
-    private const string PasswordSentinel = "sk_live_SENTINEL-SMALL-8b20de";
+    private const string _passwordSentinel = "sk_live_SENTINEL-SMALL-8b20de";
 
     /// <summary>Comfortably past one sixty-four kibibyte frame, and a plausible pasted key.</summary>
-    private const int NoteBytes = 200_000;
+    private const int _noteBytes = 200_000;
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
@@ -58,21 +58,21 @@ public sealed class LargeCredentialTests : IAsyncLifetime
     public ValueTask InitializeAsync()
     {
         _directory = Directory.CreateTempSubdirectory("keypaste-huge-").FullName;
-        _vault = Vault.Create(Path.Combine(_directory, "vault.kdbx"), Master);
+        _vault = Vault.Create(Path.Combine(_directory, "vault.kdbx"), _master);
 
         _vault.AddEntry(new VaultEntry
         {
             GroupPath = "env/dev",
             Title = "DEPLOY_CERT",
             Password = "not-the-one-under-test",
-            Notes = NoteSentinel + new string('n', NoteBytes),
+            Notes = _noteSentinel + new string('n', _noteBytes),
         });
 
         _vault.AddEntry(new VaultEntry
         {
             GroupPath = "env/dev",
             Title = "STRIPE_KEY",
-            Password = PasswordSentinel,
+            Password = _passwordSentinel,
         });
 
         _grants = new GrantCache(TimeProvider.System);
@@ -213,9 +213,9 @@ public sealed class LargeCredentialTests : IAsyncLifetime
         var result = await client.CallToolAsync(
             ToolText.CredentialToolName, AskForTheNote(), cancellationToken: Token);
 
-        Assert.DoesNotContain(NoteSentinel, TextOf(result), StringComparison.Ordinal);
-        Assert.DoesNotContain(NoteSentinel, harness.Transcript, StringComparison.Ordinal);
-        Assert.DoesNotContain(NoteSentinel, harness.AuditText, StringComparison.Ordinal);
+        Assert.DoesNotContain(_noteSentinel, TextOf(result), StringComparison.Ordinal);
+        Assert.DoesNotContain(_noteSentinel, harness.Transcript, StringComparison.Ordinal);
+        Assert.DoesNotContain(_noteSentinel, harness.AuditText, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -240,7 +240,7 @@ public sealed class LargeCredentialTests : IAsyncLifetime
             ToolText.CredentialToolName, AskForThePassword(), cancellationToken: Token);
 
         Assert.False(next.IsError);
-        Assert.Contains(PasswordSentinel, TextOf(next), StringComparison.Ordinal);
+        Assert.Contains(_passwordSentinel, TextOf(next), StringComparison.Ordinal);
 
         Assert.Equal(["undeliverable", "prompt"], LinesOf(harness).Select(line => line.Method));
     }

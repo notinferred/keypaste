@@ -35,7 +35,7 @@ public sealed class ConcurrentRequestsTests
     /// bounded by <c>ApprovalLimits.Window</c> at forty-five seconds, so ten seconds separates the
     /// two answers without making the test a stopwatch.
     /// </remarks>
-    private static readonly TimeSpan Promptly = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan _promptly = TimeSpan.FromSeconds(10);
 
     private static string TextOf(CallToolResult result) =>
         string.Concat(result.Content.OfType<TextContentBlock>().Select(block => block.Text));
@@ -58,7 +58,7 @@ public sealed class ConcurrentRequestsTests
 
     /// <summary>Waits until a call has genuinely reached the approver and parked there.</summary>
     private static async Task HoldingAsync(FakeApprover approver) =>
-        await approver.Entered.Task.WaitAsync(Promptly, Token);
+        await approver.Entered.Task.WaitAsync(_promptly, Token);
 
     /// <summary>
     /// Awaits a call that must not be waiting on a person, and says so when it is.
@@ -70,7 +70,7 @@ public sealed class ConcurrentRequestsTests
     /// </remarks>
     private static async Task<CallToolResult> PromptlyAsync(Task<CallToolResult> call, string queued)
     {
-        var winner = await Task.WhenAny(call, Task.Delay(Promptly, Token));
+        var winner = await Task.WhenAny(call, Task.Delay(_promptly, Token));
 
         Assert.True(winner == call, queued);
 
