@@ -183,6 +183,32 @@ internal static class ToolText
     internal const string NothingExposed =
         "keypaste: no entries are within this server's configured exposure.";
 
+    /// <summary>Said when a listing left names out, which it must never do silently.</summary>
+    /// <remarks>
+    /// <para>
+    /// <b>No number, and no way to ask for the rest.</b> Any count of what was left out would be
+    /// measured before the exposure filter runs and would be wrong by the time it was read; and
+    /// telling an agent how many names a vault holds describes the shape of somebody's life, which
+    /// is the thing a bounded listing exists to withhold (docs/PRODUCT.md law 3.5, THREATS.md T-4).
+    /// </para>
+    /// <para>
+    /// It closes the door on paging explicitly. <c>list_entry_names</c> takes no arguments — that is
+    /// what stops an agent widening its own view — so an agent told only "some are missing" would
+    /// otherwise spend its next turn looking for the parameter that would fetch them.
+    /// </para>
+    /// <para>
+    /// No "try again": a retry returns the same answer, because nothing about the vault has changed.
+    /// </para>
+    /// </remarks>
+    internal const string ListingIncomplete = """
+        keypaste: this is not the whole list. More entry names are inside this server's exposure than
+        fit in one reply, so some were left out. keypaste does not say how many, and there is no way
+        to ask for the rest: list_entry_names takes no arguments. Retrying returns the same names.
+
+        If what you need is not here, ask the person you are working with for it by name, or ask them
+        to narrow the exposure in the MCP client's configuration.
+        """;
+
     /// <summary>
     /// What is said around a released credential. The value itself follows on its own line.
     /// </summary>

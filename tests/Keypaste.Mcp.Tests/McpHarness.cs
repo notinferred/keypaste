@@ -246,6 +246,9 @@ internal sealed class FakeEntryNameSource : IEntryNameSource, IDisposable
     /// <summary>How the fake vault answers. Locked by default, like the real one.</summary>
     internal VaultAvailability Availability { get; set; } = VaultAvailability.Locked;
 
+    /// <summary>Whether the fake vault claims it gave every name it had.</summary>
+    internal bool Complete { get; set; } = true;
+
     /// <summary>How many times the tool asked.</summary>
     internal int Calls { get; private set; }
 
@@ -288,8 +291,8 @@ internal sealed class FakeEntryNameSource : IEntryNameSource, IDisposable
 
         return ValueTask.FromResult(
             Availability == VaultAvailability.Available
-                ? new EntryNameListing(VaultAvailability.Available, _names, string.Empty)
-                : new EntryNameListing(Availability, [], ToolText.VaultLocked));
+                ? new EntryNameListing(VaultAvailability.Available, _names, string.Empty, Complete)
+                : new EntryNameListing(Availability, [], ToolText.VaultLocked, true));
     }
 
     public void Dispose()

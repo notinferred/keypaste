@@ -12,14 +12,15 @@ data preservation, authorization timing and release checks. The desktop is a sou
 partial entry/env screens, identified in the 2026-09-07 code review; the clipboard lifetime that
 review found is repaired (F.2c). Saved preferences now reach a fresh session (F.2a) and minimizing enforces
 the setting that names it (F.2b1), observed on Windows only. An approval's lifetime no longer moves
-when the clock does (F.3a), and a second agent request no longer queues in front of the check that
-was supposed to refuse it (F.3b). The remaining F.2–F.4 repair tasks below are open even though existing
-tests pass.
+when the clock does (F.3a), a second agent request no longer queues in front of the check that
+was supposed to refuse it (F.3b), and a vault with more names than one reply can carry is listed and
+bounded rather than dropping the connection and its grants (F.3c). The remaining F.2–F.4 repair tasks
+below are open even though existing tests pass.
 Everyday password-management workflows, browser integration and desktop
 publication remain unfinished. No hosted service, web vault, mobile integration or organization
 credential service is available.
 
-**Next: F.3c — bound entry-name listing by encoded IPC size.** F.2b2 is BLOCKED on
+**Next: F.4a — fail closed when checking an existing release destination.** F.2b2 is BLOCKED on
 hardware this project does not have; it is deferred to the desktop candidate run, and 4.7b lists
 it, so the desktop gate still cannot pass without it. F.4b's change is in source and checked on
 the four targets this machine can build; its three remaining NativeAOT targets need one CI run,
@@ -67,6 +68,7 @@ A completed source task does not mean that it is present in the current download
 | F.2d | Complete | The master-password field publishes its length and never its characters; [automation tests](../tests/Keypaste.App.Tests/Controls/MaskedInputAutomationTests.cs), four substituted leaks turn them red; D-0099 |
 | F.3a | Complete | Grant expiry and the denial cooldown are held on both clocks, each taking the reading that fails closed for it; [Deadline tests](../tests/Keypaste.Core.Tests/DeadlineTests.cs), [grant tests](../tests/Keypaste.Core.Tests/GrantCacheTests.cs), [gate tests](../tests/Keypaste.Core.Tests/ApprovalGateTests.cs), [handler tests](../tests/Keypaste.Core.Tests/ApproverHandlerTests.cs), five red first; D-0100 |
 | F.3b | Complete | A second call on one MCP connection is refused where it arrives instead of queueing in front of the gate's check; [concurrency tests](../tests/Keypaste.Mcp.Tests/ConcurrentRequestsTests.cs) through a real MCP connection, [connection tests](../tests/Keypaste.Mcp.Tests/ApproverConnectionTests.cs), [client tests](../tests/Keypaste.Core.Tests/ApproverClientTests.cs), five red first with "queued behind the prompt"; D-0101 |
+| F.3c | Complete | One listing reply is bounded by encoded bytes rather than by an entry count, and a reply that left names out says so before the list and after it; [protocol tests](../tests/Keypaste.Core.Tests/ApproverProtocolTests.cs) including the reproduced 1,000-name/76,060-byte case and hostile Unicode, [framer tests](../tests/Keypaste.Core.Tests/MessageFramerTests.cs) asserting nothing the protocol encodes can be refused, [listener tests](../tests/Keypaste.Core.Tests/ApproverListenerTests.cs) for the surviving connection and its grants, [listing-size tests](../tests/Keypaste.Mcp.Tests/ListingSizeTests.cs) and [large-vault tests](../tests/Keypaste.Mcp.Tests/LargeVaultListingTests.cs) over a real vault, a real pipe and a real MCP client; twenty red first; the reproduction is the documented 1,000-name case at 75 encoded bytes each — 76,060 bytes on the wire shape that failed and 76,077 with the completeness field, against a 65,535-byte payload budget; `verify-mcp-stdio.sh` and `verify-approval-e2e.sh` re-run green; D-0102 |
 | 10.1 | Complete | Initial hostile review/remediation; D-0084 in [DECISIONS](../DECISIONS.md) |
 | K.1 | Complete | Pinned SDK installed; [global.json](../global.json), D-0076 |
 
@@ -136,10 +138,6 @@ passed and five platform-specific skips. Each task needs a regression that demon
 before the fix and verifies the corrected behavior. Keep the shared core and mature KDBX library;
 these tasks repair existing behavior and do not require a product rewrite. Record reproductions
 in repository fixtures/tests, so completion does not depend on a maintainer's temporary files.
-
-- [ ] **F.3c — Bound entry-name listing by encoded IPC size.** Needs: 2.1, 2.2.
-  **Build:** Bound names before [ApproverProtocol](../src/Keypaste.Core/Ipc/ApproverProtocol.cs) serialization using byte-aware truncation or pagination with an explicit completeness indicator. The current 1,000-entry cap can encode beyond [MessageFramer](../src/Keypaste.Core/Ipc/MessageFramer.cs)'s 64 KiB limit and close the connection. Preserve exposure filtering and never substitute secret values into names.
-  **Verify (V-F.3c):** The reproduced 1,000-name/76,060-byte case, longer Unicode/escaped names and a larger vault return bounded valid frames with truthful completeness information through the real transport. No silent omission claim or unexpected connection close; subsequent approved requests remain usable.
 
 - [ ] **F.4a — Fail closed when checking an existing release destination.** Needs: 3.4.
   **Build:** Fix [release.yml](../.github/workflows/release.yml)'s suppressed listing errors: require a successful destination check before upload and refuse an occupied version. A denied or failed `aws s3 ls` currently becomes an empty result and reaches upload. Fix this before any new publication, independently of desktop progress.

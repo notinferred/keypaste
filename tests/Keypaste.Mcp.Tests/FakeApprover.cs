@@ -49,7 +49,7 @@ internal sealed class FakeApprover : IAsyncDisposable
     internal CredentialReply Answer { get; set; } = Denial(AuditMethod.Prompt, "a person refused this request");
 
     /// <summary>What the approver says the vault contains.</summary>
-    internal NamesReply Names { get; set; } = new(false, [], "no vault is unlocked");
+    internal NamesReply Names { get; set; } = new(false, [], "no vault is unlocked", true);
 
     /// <summary>Every request that reached the approver, in the order it arrived.</summary>
     internal ConcurrentBag<CredentialRequest> Received { get; } = [];

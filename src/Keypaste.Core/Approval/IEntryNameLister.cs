@@ -39,14 +39,25 @@ public interface IEntryNameLister
 /// </param>
 public sealed class VaultEntryNameLister(Func<Vault?> unlockedVault) : IEntryNameLister
 {
-    /// <summary>The most names one listing will produce.</summary>
+    /// <summary>The most names one listing will walk out of a vault.</summary>
     /// <remarks>
-    /// An unbounded listing is a cost problem and an injection amplifier both: enough entries will
-    /// push a system prompt out of a context window as effectively as any jailbreak (THREATS.md
-    /// T-1). The bridge caps again on its own side, because two caps are cheaper than one that has
-    /// to be right.
+    /// <para>
+    /// <b>This bounds the work, not the answer.</b> What an agent actually sees is bounded by what
+    /// one frame can carry, decided in <see cref="Ipc.ApproverProtocol"/> — the only place that
+    /// knows what a name costs once it is escaped. An unbounded walk is still a cost problem, so a
+    /// ceiling stays here; it is no longer the thing standing between a large vault and a context
+    /// window (THREATS.md T-1).
+    /// </para>
+    /// <para>
+    /// <b>It sits deliberately above the most names any frame could hold.</b> The smallest possible
+    /// element is twenty-three bytes, so no frame carries more than about two thousand seven
+    /// hundred. A cap below that would drop names the encoder never sees, and the encoder would then
+    /// report as complete a listing that was not — which is the defect this replaced, moved one
+    /// layer up. <c>ApproverProtocolTests.NoFrameCanHoldMoreNamesThanTheListersCap</c> keeps the two
+    /// numbers apart.
+    /// </para>
     /// </remarks>
-    public const int MaximumNames = 1000;
+    public const int MaximumNames = 4096;
 
     private readonly Func<Vault?> _unlockedVault =
         unlockedVault ?? throw new ArgumentNullException(nameof(unlockedVault));

@@ -84,17 +84,21 @@ public sealed class ApproverHandler : IApproverHandler
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        // Complete on all three paths: this handler hands on every name the lister gave it, and a
+        // refusal that names nothing has left nothing out. What one frame can carry is decided in
+        // ApproverProtocol, which is the only place that knows what a name costs to encode.
         if (!EntryExposure.TryCreate(request.Exposure, out var exposure, out _))
         {
-            return ValueTask.FromResult(new NamesReply(false, [], "the exposure this bridge was configured with is not usable"));
+            return ValueTask.FromResult(
+                new NamesReply(false, [], "the exposure this bridge was configured with is not usable", true));
         }
 
         if (!_lister.TryList(exposure, out var names, out var failure))
         {
-            return ValueTask.FromResult(new NamesReply(false, [], Explain(failure)));
+            return ValueTask.FromResult(new NamesReply(false, [], Explain(failure), true));
         }
 
-        return ValueTask.FromResult(new NamesReply(true, names, string.Empty));
+        return ValueTask.FromResult(new NamesReply(true, names, string.Empty, true));
     }
 
     /// <inheritdoc/>

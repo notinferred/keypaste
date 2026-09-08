@@ -138,6 +138,59 @@ public sealed class ApproverListenerTests
         Assert.Null(client);
     }
 
+    /// <summary>Names shaped as an ordinary vault's are, and far more of them than one frame holds.</summary>
+    private static IReadOnlyList<EntryName> Crowd(int count) =>
+        [.. Enumerable.Range(0, count)
+            .Select(i => new EntryName("env/dev/services", $"SERVICE_ACCOUNT_ACCESS_TOKEN_AB_{i:D4}"))];
+
+    /// <summary>
+    /// A vault with more names than one frame can carry is answered, and the connection lives.
+    /// </summary>
+    /// <remarks>
+    /// The inverse of <see cref="AGarbageFrame_CostsThatConnectionAndNoOther"/>. There, ending the
+    /// connection is the right answer to a peer's nonsense. Here nobody did anything wrong — the
+    /// person simply has a thousand entries — and until the reply was bounded the write threw,
+    /// <see cref="ApproverListener"/> swallowed it, and the agent was told only that
+    /// something had gone wrong.
+    /// </remarks>
+    [Fact]
+    public async Task AHugeListing_IsAnsweredAndTheConnectionSurvives()
+    {
+        var handler = new RecordingHandler { Names = Crowd(1000) };
+        await using var host = Host.Start(handler);
+        await using var client = await ConnectAsync(host.PipeName);
+
+        var reply = await client.ListAsync(new NamesRequest(["env/**"]), Token);
+
+        Assert.NotNull(reply);
+        Assert.False(reply.Complete);
+        Assert.NotEmpty(reply.Names);
+
+        // The connection is still there, which is the half a reply on its own would not have shown.
+        Assert.NotNull(await client.RequestAsync(Request(), Token));
+    }
+
+    /// <summary>
+    /// ...and it does not cost the connection its grants.
+    /// </summary>
+    /// <remarks>
+    /// Asserted separately because it fails for a different reason and it is the harm a person would
+    /// actually notice: a torn-down connection takes <c>Disconnected</c> with it, and a grant is
+    /// scoped to the connection the approver minted it for. Listing your own vault would have
+    /// silently revoked the approval you gave a minute ago, and the next request would ask again.
+    /// </remarks>
+    [Fact]
+    public async Task AHugeListing_DoesNotRevokeThisConnectionsGrants()
+    {
+        var handler = new RecordingHandler { Names = Crowd(1000) };
+        await using var host = Host.Start(handler);
+        await using var client = await ConnectAsync(host.PipeName);
+
+        await client.ListAsync(new NamesRequest(["env/**"]), Token);
+
+        Assert.Empty(handler.Disconnections);
+    }
+
     /// <summary>
     /// A peer that sends nonsense costs its own connection and nothing else. The approver holds the
     /// unlocked vault, so it is the last process in keypaste that may be taken down by something
@@ -245,12 +298,14 @@ public sealed class ApproverListenerTests
 
         internal TaskCompletionSource Gone { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+        /// <summary>What the approver has to say. One ordinary entry unless a test says otherwise.</summary>
+        internal IReadOnlyList<EntryName> Names { get; set; } = [new EntryName("env/dev", "STRIPE_KEY")];
+
         public ValueTask<NamesReply> ListAsync(NamesRequest request, string connectionId, CancellationToken cancellationToken)
         {
             ConnectionIds.Add(connectionId);
 
-            return ValueTask.FromResult(
-                new NamesReply(true, [new EntryName("env/dev", "STRIPE_KEY")], string.Empty));
+            return ValueTask.FromResult(new NamesReply(true, Names, string.Empty, true));
         }
 
         public ValueTask<CredentialReply> RequestAsync(CredentialRequest request, string connectionId, CancellationToken cancellationToken)
