@@ -9,14 +9,15 @@
 **Working proposition: incomplete. Hosted pilot: not ready. Paid release: not ready.**
 The local vault, CLI/env workflow and approval bridge are implemented, with known defects in
 data preservation, authorization timing and release checks. The desktop is a source build with
-partial entry/env screens and an ineffective minimize-lock setting and clipboard lifetime identified
-in the 2026-09-07 code review. Saved preferences now reach a fresh session (F.2a). The remaining
-F.2–F.4 repair tasks below are open even though existing tests pass.
+partial entry/env screens and a clipboard lifetime that can outlive a lock, identified in the
+2026-09-07 code review. Saved preferences now reach a fresh session (F.2a) and minimizing enforces
+the setting that names it (F.2b1), observed on Windows only. The remaining F.2–F.4 repair tasks
+below are open even though existing tests pass.
 Everyday password-management workflows, browser integration and desktop
 publication remain unfinished. No hosted service, web vault, mobile integration or organization
 credential service is available.
 
-**Next: F.2b — enforce the minimize-lock setting.** Complete the ready repairs
+**Next: F.2c — prevent clipboard writes from outliving lock or shutdown.** Complete the ready repairs
 below before new feature work. Release foundations follow: R.0a makes release identity and supported
 targets executable, R.0b/3.8 make distribution verifiable, and 4.7a prepares desktop packages without
 waiting for signing enrollment. A new CLI/MCP patch requires the core/CLI/bridge and release repairs;
@@ -55,6 +56,7 @@ A completed source task does not mean that it is present in the current download
 | F.1c | Complete | Cleanup is bound to the bytes that were imported and the path they came from; a source changed during any prompt or at the delete boundary is kept; [pull tests](../tests/Keypaste.Cli.Tests/EnvPullTests.cs), [snapshot tests](../tests/Keypaste.Core.Tests/SourceSnapshotTests.cs), D-0093 |
 | F.1e | Complete | One path resolver for reads and removals; an ambiguous path is refused rather than served, and `add` cannot deepen a collision; [identity tests](../tests/Keypaste.Core.Tests/EntryIdentityTests.cs), [verb tests](../tests/Keypaste.Cli.Tests/VerbTests.cs), [entry tests](../tests/Keypaste.App.Tests/ViewModels/EntriesViewModelTests.cs) and [write-back gate](../scripts/verify-keepassxc-writeback.sh) D, D-0094 |
 | F.2a | Complete | Launch reads `app.toml` once and arms the session and the palette from it; the Settings screen shows the same record, and a timeout the list does not offer is named rather than snapped or rewritten; [startup tests](../tests/Keypaste.App.Tests/StartupSettingsTests.cs), [settings tests](../tests/Keypaste.App.Tests/ViewModels/SettingsViewModelTests.cs), D-0095 |
+| F.2b1 | Complete | Minimizing calls the same session lock the timeout and `Ctrl/Cmd+L` call, from launch and from the moment the box is ticked; the checkbox is omitted where a platform cannot report the state; [minimize tests](../tests/Keypaste.App.Tests/MinimizeLockTests.cs), and observed by hand on Windows 10 Pro 19045 on 2026-09-08 — enabled locked and restored to the unlock screen, disabled did not, a copied password left the clipboard, `app.toml` unchanged; D-0096 |
 | 10.1 | Complete | Initial hostile review/remediation; D-0084 in [DECISIONS](../DECISIONS.md) |
 | K.1 | Complete | Pinned SDK installed; [global.json](../global.json), D-0076 |
 
@@ -66,7 +68,7 @@ completion does not waive the new repair dependencies or certify the current imp
 **External prerequisites:** 3.5a needs Apple enrollment (H-0015); 3.6a needs an eligible Windows
 signing account (H-0017); 8.4a needs extension-store accounts; H.7 needs hosted infrastructure
 (H-0019); 5.5a needs a payment account (H-0018). Only the operations that need those accounts wait.
-The 1.5a clipboard observation needs a suitable Windows machine; an enforced-disabled history panel
+F.2b2 needs a macOS machine and a Linux desktop session. The 1.5a clipboard observation needs a suitable Windows machine; an enforced-disabled history panel
 is not evidence. It is a named residual, not a reason to stop independent development.
 
 ## Build order
@@ -120,9 +122,9 @@ before the fix and verifies the corrected behavior. Keep the shared core and mat
 these tasks repair existing behavior and do not require a product rewrite. Record reproductions
 in repository fixtures/tests, so completion does not depend on a maintainer's temporary files.
 
-- [ ] **F.2b — Enforce the minimize-lock setting.** Needs: F.2a.
-  **Build:** Connect the existing LockWhenMinimized setting to native window-state handling and the normal session/clipboard lock path. Its checkbox currently persists a value with no consumer. Apply changes immediately and on startup; omit the control on any explicitly unsupported surface rather than offering an inactive security setting.
-  **Verify (V-F.2b):** With the setting enabled, native minimize locks the vault and restore shows the locked screen; disabled minimize leaves the ordinary idle policy in force. Repeat after restart and retain observations for each advertised desktop OS. Persistence-only tests cannot pass this task.
+- [ ] **F.2b2 — Observe minimize-lock on macOS and Linux.** Needs: F.2b1.
+  **Build:** Run F.2b1's behavior on the remaining two advertised desktop targets and record what each actually did, including any window manager that does not report a minimize. Change [MinimizeLock](../src/Keypaste.App/MinimizeLock.cs)'s supported-surface answer if an observation contradicts it, rather than leaving the checkbox offered where it does nothing.
+  **Verify (V-F.2b2):** Current status holds a dated macOS and a dated Linux result for the enabled, disabled and after-restart cases, each naming the OS version, session type and build. An untested target keeps its unobserved status; a passing headless suite cannot substitute. **External prerequisite:** a macOS machine and a Linux desktop session.
 
 - [ ] **F.2c — Prevent clipboard writes from outliving lock or shutdown.** Needs: 4.2.
   **Build:** Serialize [ClipboardCountdown](../src/Keypaste.App/Clipboard/ClipboardCountdown.cs) operations and invalidate/drain pending writes during lock, disposal and orderly shutdown. A copy suspended in an awaited clipboard write currently resumes after disposal, installs the secret and revives its timer. Preserve unrelated clipboard content while completing owned cleanup.
@@ -192,7 +194,7 @@ in repository fixtures/tests, so completion does not depend on a maintainer's te
   **Build:** Sign and timestamp CLI/MCP/app executable payloads and the final Windows installer through the release environment, then verify the transported files before publication. Capture actual installation prompts instead of promising that a valid signature eliminates SmartScreen reputation prompts.
   **Verify (V-3.6b):** Downloaded candidates report valid Authenticode signatures, the expected publisher and timestamp; changing a signed payload fails verification. A clean supported Windows installation succeeds and its actual prompts are retained.
 
-- [ ] **4.7b — Exercise native desktop installation candidates.** Needs: 4.7a, 4.6, 4.8, 4.9, 4.4b, 4.3b, E.1, F.1a, F.1b, F.1c, F.1e, F.2a, F.2b, F.2c, F.2d, F.3a, F.3b, F.3c.
+- [ ] **4.7b — Exercise native desktop installation candidates.** Needs: 4.7a, 4.6, 4.8, 4.9, 4.4b, 4.3b, E.1, F.1a, F.1b, F.1c, F.1e, F.2a, F.2b1, F.2b2, F.2c, F.2d, F.3a, F.3b, F.3c.
   **Build:** Add native candidate installation checks without a development SDK: first render, vault creation/open, existing-secret editing, env execution, native credential approval and activity inspection. Test Linux on the declared compatibility floor and record manual observations for UI/platform behavior automation cannot establish.
   **Verify (V-4.7b):** Each supported OS/CPU starts the installed GUI and completes these workflows using retained fixture/evidence records. A vault-only selftest, missing native library or unobserved GUI path cannot pass the desktop installation check.
 
@@ -849,6 +851,7 @@ large open rows now select their first ready child when requested by their old I
 | 9.2 | 9.2a/b |
 | 9.3 | 9.3a/b |
 | 10.2 | Independent review before paid release; its earlier Scale placement no longer defers it |
+| F.2b | F.2b1/F.2b2; the wiring closed with F.2b1, the remaining per-OS observation is F.2b2 |
 
 An ID that still names an explicit row selects that row: historical 3.2b is the completed essay,
 not a child of the future announcement. H-0015/H-0017 are signing enrollment, H-0018 payment,

@@ -8,6 +8,17 @@ Versions are the ones published at `https://dl.keypaste.com/v<version>/`. Every 
 
 These changes are available in source on `main`, **not in the `v0.1.0` downloads**. The source version still reports `0.1.0`; its version string alone does not identify the published bytes.
 
+**Minimizing the window can lock your vault, which is what the checkbox always claimed.** "Lock
+when the window is minimized" has been in Settings since the entry screens shipped. It saved your
+choice, showed it ticked on every later visit, and nothing anywhere read it: no part of the app
+watched the window's state, so the one gesture you had chosen to mean "I am leaving" left the vault
+open. It locks now, through the same lock `Ctrl/Cmd+L` and the idle timeout go through — the shell
+leaves the window, a password you copied comes off the clipboard, and restoring shows the unlock
+screen rather than the entries. Ticking the box takes effect on the next minimize rather than the
+next launch, and unticking it stops at once. It is a minimize and only a minimize: another window
+taking focus is not one, and on macOS hiding the app with Cmd+H is not one either. Observed on
+Windows; macOS and Linux are still to be watched by hand.
+
 **The app now launches with the settings you chose.** Pick a one-minute idle timeout, quit, and
 the next launch held your vault open for five — Settings said "1 minute" while the session ran on
 the default it had never been told to replace. The theme did the same: `theme = "dark"` was
@@ -18,7 +29,7 @@ palette is applied before the window is built, so there is no flash of the wrong
 typed into `app.toml` by hand that is not one of the six offered — `137`, say — is honoured and the
 list names it, rather than being rounded off to a number the vault is not using; the file is not
 rewritten. A file keypaste cannot read still costs a preference and never a lock, and is still left
-exactly as it is. Minimizing the window is still not wired to the lock setting.
+exactly as it is.
 
 **A path two entries answer to no longer hands out one of their secrets.** F.1a stopped
 `keypaste env rm` deleting the wrong entry, and left the reading half alone. So `keypaste get

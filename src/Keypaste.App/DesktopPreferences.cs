@@ -47,6 +47,13 @@ internal sealed class DesktopPreferences
     /// </remarks>
     internal TimeSpan IdleTimeout => TimeSpan.FromSeconds(Current.IdleTimeoutSeconds);
 
+    /// <summary>Whether minimizing the window counts as leaving.</summary>
+    /// <remarks>
+    /// Read at each minimize rather than handed out once, so ticking the box in Settings arms
+    /// <see cref="MinimizeLock"/> on the spot instead of at the next launch.
+    /// </remarks>
+    internal bool LockWhenMinimized => Current.LockWhenMinimized;
+
     /// <summary>Takes a change and writes it.</summary>
     /// <param name="settings">The new preferences.</param>
     /// <returns><see langword="false"/> when the file could not be written.</returns>

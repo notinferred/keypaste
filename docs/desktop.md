@@ -66,6 +66,8 @@ Thirty seconds before it locks, a quiet line appears in the header. Any key or c
 
 **Locking now is always one keystroke:** `Ctrl/Cmd+L`, or the button at the bottom of the sidebar. That is the honest counterweight to a five-minute default.
 
+**Minimizing can lock too, if you ask it to.** The checkbox in Settings is off by default, because minimizing is not a security event for most people; for the few whose minimize means "I am leaving", it is one tick and it takes effect at once and at every launch afterwards. It is the ordinary lock, not a special one: the shell leaves the window, a copied password comes off the clipboard, and restoring shows the unlock screen. It is only a minimize — switching to another window is not one, and on macOS hiding the app with `Cmd+H` is not one either.
+
 Two behaviours worth knowing:
 
 - **Switching to another window does not lock**, and does not pause the countdown either. Alt-tabbing to a terminal is normal; leaving for ten minutes is not.
@@ -129,24 +131,30 @@ CI builds and packages on three operating systems; the current desktop logic tes
 7. Suspend the machine for longer than the timeout. It wakes locked.
 8. The theme follows the OS, and both light and dark read as calm. Choose Dark, quit and relaunch: the first frame is dark, with no flash of the light one on the way.
 9. Put a number the list does not offer into `app.toml` by hand — `idle_timeout_seconds = 137` — and relaunch. Settings names it, the countdown arrives at 137 seconds, and the file is unchanged afterwards.
-10. The Log screen matches `keypaste log` for the same `~/.keypaste/audit.jsonl`.
-11. Agent Activity says the right thing both with and without a `keypaste agent` running.
-12. Entries lists titles and groups. Filter by a group and search for part of a title or group path; case changes still match. Selecting an entry shows a username, a URL and notes, and a row of dots where the password is.
-13. Copy a password. The countdown appears and the bar drains. Paste into an editor — it is there.
+10. **Minimize-lock, with the idle timeout set long enough that it cannot be what locked you.** Tick
+    "Lock when the window is minimized", minimize from the taskbar and restore: the unlock screen.
+    Untick it, minimize and restore: still unlocked, and the countdown still arrives on time. Quit,
+    relaunch without opening Settings and minimize again: it locks. Copy a password first and paste
+    after a minimize-lock — nothing. `docs/STEPS.md` F.2b2 records what each operating system did;
+    macOS and Linux are still unobserved.
+11. The Log screen matches `keypaste log` for the same `~/.keypaste/audit.jsonl`.
+12. Agent Activity says the right thing both with and without a `keypaste agent` running.
+13. Entries lists titles and groups. Filter by a group and search for part of a title or group path; case changes still match. Selecting an entry shows a username, a URL and notes, and a row of dots where the password is.
+14. Copy a password. The countdown appears and the bar drains. Paste into an editor — it is there.
     Wait it out and paste again — it is gone.
-14. Copy, then `Ctrl/Cmd+L`. Paste: nothing.
-15. Copy, then quit the app. Paste: nothing.
-16. **Windows only, on a machine where Clipboard History is enabled and not disabled by policy**:
+15. Copy, then `Ctrl/Cmd+L`. Paste: nothing.
+16. Copy, then quit the app. Paste: nothing.
+17. **Windows only, on a machine where Clipboard History is enabled and not disabled by policy**:
     copy a known harmless string and confirm Win+V shows it — that is the control. Then copy a
     password from the app and open Win+V: the value is not in it. `keypaste get` sets the same
     formats since D-0056; whether that holds on a real machine is step 1.5a's Verify line in
     `docs/STEPS.md`, not this list.
-17. Hold a masked value in Env Sets. The characters appear; release and they go. Hold a second row
+18. Hold a masked value in Env Sets. The characters appear; release and they go. Hold a second row
     while the first is showing — only one is ever revealed.
-18. Copy a project's run command, paste it in a terminal, finish the line: it runs with the
+19. Copy a project's run command, paste it in a terminal, finish the line: it runs with the
     project's variables.
-19. Add, edit and delete an entry, then check `keypaste ls` and `keypaste get` in a terminal.
-20. With the app open on a vault, run `keypaste env set` against the same file in a terminal. Come
+20. Add, edit and delete an entry, then check `keypaste ls` and `keypaste get` in a terminal.
+21. With the app open on a vault, run `keypaste env set` against the same file in a terminal. Come
     back and make any edit: the app refuses, says why, and the terminal's write is still there.
-21. Generate a password in the app, then read it back with `keypaste get --show`.
-22. Open the vault the app wrote in KeePassXC.
+22. Generate a password in the app, then read it back with `keypaste get --show`.
+23. Open the vault the app wrote in KeePassXC.

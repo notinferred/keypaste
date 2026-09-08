@@ -26,6 +26,7 @@ internal sealed partial class App : Application, IDisposable
 {
     private AppVaultSession? _session;
     private DesktopPreferences? _preferences;
+    private MinimizeLock? _minimize;
     private MainWindow? _window;
     private UnlockViewModel? _unlock;
     private ShellViewModel? _shell;
@@ -46,6 +47,7 @@ internal sealed partial class App : Application, IDisposable
 
             _window = new MainWindow();
             Observe(_window);
+            _minimize = Watch(_window, _preferences, _session);
             ShowUnlock(home);
 
             desktop.MainWindow = _window;
@@ -81,6 +83,35 @@ internal sealed partial class App : Application, IDisposable
         ApplyTheme(preferences.Current.Theme);
 
         return new AppVaultSession(clock, preferences.IdleTimeout);
+    }
+
+    /// <summary>
+    /// Arms the minimize-lock setting against a window.
+    /// </summary>
+    /// <param name="window">The window a person minimizes.</param>
+    /// <param name="preferences">The preferences this process was composed from.</param>
+    /// <param name="session">The session a minimize locks.</param>
+    /// <returns>The watch, which the application owns for its lifetime.</returns>
+    /// <exception cref="ArgumentNullException">Any argument is null.</exception>
+    /// <remarks>
+    /// <c>internal</c> for the same reason <see cref="Compose"/> is: the defect F.2b repairs was
+    /// that composition never introduced the saved setting to any behaviour at all, so a test has
+    /// to run this method rather than a hand-built equivalent, which would have passed against the
+    /// broken app throughout (D-0095). The setting is passed as a function rather than a value, so
+    /// a change in Settings is in force at the next minimize rather than at the next launch.
+    /// </remarks>
+    internal static MinimizeLock Watch(
+        Window window,
+        DesktopPreferences preferences,
+        AppVaultSession session)
+    {
+        ArgumentNullException.ThrowIfNull(preferences);
+        ArgumentNullException.ThrowIfNull(session);
+
+        return new MinimizeLock(
+            window,
+            () => preferences.LockWhenMinimized,
+            () => session.Lock(VaultLockReason.Minimized));
     }
 
     /// <summary>
@@ -292,6 +323,8 @@ internal sealed partial class App : Application, IDisposable
     /// </remarks>
     public void Dispose()
     {
+        _minimize?.Dispose();
+        _minimize = null;
         _shell?.Dispose();
         _shell = null;
         _unlock?.Dispose();

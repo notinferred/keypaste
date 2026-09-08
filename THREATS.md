@@ -521,19 +521,21 @@ releases. [docs/RELEASE.md](docs/RELEASE.md) records the remaining distribution 
 
 **Proved by.** `MaskedInput.OnCreateAutomationPeer` is the implementation evidence. `UnlockFocusTests` exercises the custom input's focus and keyboard behavior, but there is no dedicated test asserting this input's automation peer cannot expose a password. The earlier claim that such a test existed was incorrect. T-25 has a separate peer test for the revealed environment-value control; it does not cover master-password input.
 
-## T-23 — What idle auto-lock is for, and what it is not
+## T-23 — What auto-lock is for, and what it is not
 
-**What.** The desktop app locks the vault after five minutes of no input, by default.
+**What.** The desktop app locks the vault after five minutes of no input, by default. Minimizing the window locks it too, for anybody who turns that on in Settings.
 
-**What that buys.** An unattended machine. You walk away, somebody sits down, and the vault is shut. It also covers the case a timer alone would miss: a laptop that slept through the timeout wakes locked, because the deadline is measured against both the wall clock and the monotonic clock and is re-checked when the window is activated rather than only when a timer fires.
+**What that buys.** An unattended machine. You walk away, somebody sits down, and the vault is shut. It also covers the case a timer alone would miss: a laptop that slept through the timeout wakes locked, because the deadline is measured against both the wall clock and the monotonic clock and is re-checked when the window is activated rather than only when a timer fires. Minimize-lock is the same threat answered sooner, for people whose "I am leaving" is a gesture rather than five minutes of stillness: it goes through the identical lock, so it disposes the vault, empties the screen and clears a copied secret exactly as the timeout and `Ctrl/Cmd+L` do.
+
+**What minimize-lock is not.** It is not a general "the window went away" lock. Switching to another window does not minimize it and does not lock; on macOS, hiding the app with `Cmd+H` is not a minimize either; and a window covered by another window has not moved at all. The setting says what it does and no more, and the checkbox is omitted rather than offered where a platform cannot report the state at all.
 
 **What it explicitly does not buy.** It is **not** a mitigation for T-18. While the vault was unlocked its contents were in this process's memory, and locking disposes the objects but cannot promise the pages are gone — the caveats on `SecretBuffer` survive the lock, and so does anything the garbage collector has not yet reclaimed. An attacker who could dump this process's memory while it was unlocked is not undone by it locking afterwards.
 
 **It also does not lock `keypaste agent`.** That is a different process holding its own copy, it has no idle lock, and closing its terminal is still the only lock it has. `docs/approvals.md` says so where somebody reading about approvals will see it.
 
-**Residual.** A five-minute default is a compromise, and a person who raises it to eight hours has made their own decision. There is deliberately no "never" — the one setting that would have turned the feature off for everybody who was interrupted by it once.
+**Residual.** A five-minute default is a compromise, and a person who raises it to eight hours has made their own decision. There is deliberately no "never" — the one setting that would have turned the feature off for everybody who was interrupted by it once. Minimize-lock is off by default, and until F.2b it was a checkbox that saved a preference nothing read: anybody who ticked it before this version had a vault that stayed open (D-0096).
 
-**Proved by.** `AppVaultSessionTests.It_locks_when_the_timeout_passes`, `A_suspended_machine_wakes_locked_even_though_the_timer_never_fired` and `There_is_no_never` cover timeout, resume and the setting's lower boundary. These are session tests, not proof of memory erasure.
+**Proved by.** `AppVaultSessionTests.It_locks_when_the_timeout_passes`, `A_suspended_machine_wakes_locked_even_though_the_timer_never_fired` and `There_is_no_never` cover timeout, resume and the setting's lower boundary. `MinimizeLockTests` drives a real window's state through the composition launch runs, covering on, off, after a restart, both directions of a change in Settings, restore, the other window states and a locked session. These are session tests, not proof of memory erasure. **Native minimize is observed rather than assumed**, and only Windows 10 has been observed so far; macOS and Linux are STEPS F.2b2.
 
 ## T-24 — `recent.toml` tells anything that can read `~/.keypaste` where your vaults are
 
