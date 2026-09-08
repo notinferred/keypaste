@@ -8,6 +8,16 @@ Versions are the ones published at `https://dl.keypaste.com/v<version>/`. Every 
 
 These changes are available in source on `main`, **not in the `v0.1.0` downloads**. The source version still reports `0.1.0`; its version string alone does not identify the published bytes.
 
+**`env export` will not write a `.env` over your vault.** `keypaste env export billing vault.kdbx
+--dotenv --force --yes` deleted the vault and wrote one project's variables into its place, in
+plaintext — every other entry, every other project and all of the entry history gone, with nothing
+to recover from. Without `--force` it was worse than useless: the refusal it printed named `--force`
+as the way past itself. The destination is now compared against the vault before anything is
+written, through symbolic links and junctions, including one in a directory above the file, and
+`--force` does not lift it. A destination that is *any* KeePass vault is refused as well — wider
+than the defect, deliberately, because a hard link and a bind mount reach one file by a path no
+check can resolve, and losing somebody else's vault costs the same.
+
 **Deleting a variable can no longer take its neighbour with it.** A KeePassXC user can title an
 entry `nested/TOKEN` and put it in `env/dev`, and that entry has the same path as an ordinary
 `TOKEN` in `env/dev/nested` — `env/dev/nested/TOKEN`, for both. keypaste had two rules for taking

@@ -97,7 +97,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     internal RecentVaultItem? SelectedRecent
     {
         get => Recent.FirstOrDefault(item =>
-            string.Equals(item.Path, _selectedPath, StringComparison.OrdinalIgnoreCase));
+            string.Equals(item.Path, _selectedPath, PathIdentity.Comparison));
 
         set
         {
@@ -197,11 +197,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
             return false;
         }
 
-        try
-        {
-            _ = KdbxHeader.Read(path);
-        }
-        catch (VaultException)
+        if (!KdbxHeader.IsVaultFile(path))
         {
             Message = "That isn't a KeePass vault.";
             return false;
@@ -219,7 +215,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         _remembered = RecentVaults.Forget(_remembered, path);
         RecentVaults.Save(KeypasteHome.RecentPath(_home), _remembered);
 
-        if (_selectedPath is not null && string.Equals(_selectedPath, System.IO.Path.GetFullPath(path), StringComparison.OrdinalIgnoreCase))
+        if (_selectedPath is not null && string.Equals(_selectedPath, System.IO.Path.GetFullPath(path), PathIdentity.Comparison))
         {
             SelectedPath = null;
         }

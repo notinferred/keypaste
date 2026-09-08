@@ -90,4 +90,27 @@ public readonly record struct KdbxHeader
             FormatMajorVersion = BinaryPrimitives.ReadUInt16LittleEndian(prefix[10..12]),
         };
     }
+
+    /// <summary>Whether the file at <paramref name="path"/> carries the KDBX signature.</summary>
+    /// <param name="path">Path of the file to inspect.</param>
+    /// <returns><see langword="true"/> when the first twelve bytes are a KDBX header.</returns>
+    /// <remarks>
+    /// The question <see cref="Read"/> answers, asked by a caller that has somewhere to go when the
+    /// answer is no. A file that cannot be read at all answers <see langword="false"/>: whoever
+    /// could not open it is about to fail on it anyway, with a better message than a guess.
+    /// </remarks>
+    public static bool IsVaultFile(string path)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(path);
+
+        try
+        {
+            _ = Read(path);
+            return true;
+        }
+        catch (Exception ex) when (ex is VaultException or IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
 }
