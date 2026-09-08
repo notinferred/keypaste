@@ -135,11 +135,20 @@ internal sealed class FakeSecretPrompt : ISecretPrompt
     /// Runs before each answer is handed back, with the prompt that asked for it.
     /// </summary>
     /// <remarks>
-    /// The only seam that lands <em>inside</em> an open vault session. A command's prompts for
-    /// entry fields happen between <c>Vault.Open</c> and <c>vault.Save</c>, so this is where a test
-    /// can be a second writer — which is the whole scenario
-    /// <c>VaultChangedOnDiskException</c> exists for and is otherwise unreachable from a CLI whose
-    /// commands open and save within milliseconds.
+    /// <para>
+    /// The only seam that lands <em>inside</em> a running command. A command's prompts for entry
+    /// fields happen between <c>Vault.Open</c> and <c>vault.Save</c>, so this is where a test can be
+    /// a second writer — which is the whole scenario <c>VaultChangedOnDiskException</c> exists for
+    /// and is otherwise unreachable from a CLI whose commands open and save within milliseconds.
+    /// </para>
+    /// <para>
+    /// It fires from <see cref="ReadLine"/> as well as <see cref="ReadSecret"/>, because the
+    /// confirmations are where a person is standing still: <c>env pull</c> asks whether to import
+    /// and then whether to delete the file it read, and the seconds spent answering either one are
+    /// seconds in which that file can be edited (docs/STEPS.md F.1c). This is a prompt seam and not
+    /// a filesystem one — <c>File.Delete</c> is still the real thing, which is the half of D-0015
+    /// that matters.
+    /// </para>
     /// </remarks>
     internal Action<string>? OnPrompt { get; set; }
 
@@ -171,6 +180,8 @@ internal sealed class FakeSecretPrompt : ISecretPrompt
     public string? ReadLine(string prompt)
     {
         PromptsSeen.Add(prompt);
+        OnPrompt?.Invoke(prompt);
+
         return _answers.Count == 0 ? null : _answers.Dequeue();
     }
 }

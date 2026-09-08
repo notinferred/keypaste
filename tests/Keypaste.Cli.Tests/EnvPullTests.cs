@@ -288,6 +288,292 @@ public sealed class EnvPullTests
     /// PowerShell 5.1 writes UTF-16 from <c>&gt;</c> and <c>Set-Content</c>, so this is not an
     /// exotic file — it is what a Windows user's redirect produces.
     /// </summary>
+    /// <summary>
+    /// The seconds a person spends answering a prompt are seconds their editor can save in, and
+    /// keypaste offered to delete the file at the end of them without ever looking again
+    /// (docs/STEPS.md F.1c). Each of these plants the second writer at a different prompt.
+    /// </summary>
+    /// <remarks>
+    /// The refusal comes before the deletion question rather than after it, so nobody is asked
+    /// whether to delete bytes keypaste did not import. Nothing was requested and nothing was lost,
+    /// so the run still succeeds — the exit code is about the deletion, and there was none.
+    /// </remarks>
+    [Theory]
+    [InlineData("Master password")]
+    [InlineData("Import")]
+    public void Pull_WhenTheSourceChangesDuringAPrompt_KeepsIt_AndNeverOffersToDeleteIt(string atPrompt)
+    {
+        using var harness = Seeded();
+        var path = WriteEnvFile(harness, "A=1\n");
+
+        harness.Prompt.Interactive = true;
+        harness.Prompt.OnPrompt = ChangeTheFile(harness, path, atPrompt, "A=1\nB=2\n");
+        harness.Prompt.Enqueue(Master, "y", "y");
+
+        var exit = harness.Run("env", "pull", "billing", path, "--vault", harness.VaultPath);
+
+        harness.AssertExit(CliApp.ExitSuccess, exit);
+
+        // The bytes the second writer put there, byte for byte. A=1 was imported; B=2 never was.
+        Assert.Equal("A=1\nB=2\n", File.ReadAllText(path));
+        Assert.Contains("changed after keypaste read it", harness.Err, StringComparison.Ordinal);
+        Assert.DoesNotContain("Delete '", string.Join("\n", harness.Prompt.PromptsSeen), StringComparison.Ordinal);
+        Assert.DoesNotContain("Deleted ", harness.Err, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The boundary the other tests cannot reach: the check passed, the person said yes, and the
+    /// file changed in between. Here the deletion <em>was</em> asked for and did not happen, so the
+    /// run exits nonzero — D-0015's rule that the half which failed is the half that left plaintext
+    /// on disk.
+    /// </summary>
+    [Fact]
+    public void Pull_WhenTheSourceChangesDuringTheDeletionPrompt_KeepsIt_AndFails()
+    {
+        using var harness = Seeded();
+        var path = WriteEnvFile(harness, "A=1\n");
+
+        harness.Prompt.Interactive = true;
+        harness.Prompt.OnPrompt = ChangeTheFile(harness, path, "Delete '", "A=1\nB=2\n");
+        harness.Prompt.Enqueue(Master, "y", "y");
+
+        var exit = harness.Run("env", "pull", "billing", path, "--vault", harness.VaultPath);
+
+        Assert.Equal(CliApp.ExitInternalError, exit);
+        Assert.Equal("A=1\nB=2\n", File.ReadAllText(path));
+        Assert.Contains("changed", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("The file still contains the values.", harness.Err, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// `--delete-source` never prompts, so its window is short — but a key derivation is hundreds
+    /// of milliseconds and the check has to exist on this path too.
+    /// </summary>
+    [Fact]
+    public void Pull_DeleteSource_WhenTheSourceChanged_KeepsIt_AndFails()
+    {
+        using var harness = Seeded();
+        var path = WriteEnvFile(harness, "A=1\n");
+
+        harness.Prompt.OnPrompt = ChangeTheFile(harness, path, "Master password", "A=1\nB=2\n");
+        harness.Prompt.Enqueue(Master);
+
+        var exit = harness.Run(
+            "env", "pull", "billing", path, "--yes", "--delete-source", "--vault", harness.VaultPath);
+
+        Assert.Equal(CliApp.ExitInternalError, exit);
+        Assert.Equal("A=1\nB=2\n", File.ReadAllText(path));
+        Assert.Contains("The file still contains the values.", harness.Err, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Same content, different file. The digest cannot see this one and the path rule can.
+    /// </summary>
+    [Fact]
+    public void Pull_WhenTheSourceIsReplacedByASymlinkElsewhere_LeavesTheOtherFileAlone()
+    {
+        using var harness = Seeded();
+        var path = WriteEnvFile(harness, "A=1\n");
+        var elsewhere = WriteEnvFile(harness, "A=1\n", "elsewhere.env");
+
+        // Probed before the run, so a machine that cannot make links skips here rather than
+        // throwing out of a prompt with a vault open.
+        RequireSymbolicLinks(harness, elsewhere);
+
+        harness.Prompt.OnPrompt = prompt =>
+        {
+            if (!prompt.StartsWith("Master password", StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            harness.Prompt.OnPrompt = null;
+            File.Delete(path);
+            File.CreateSymbolicLink(path, elsewhere);
+        };
+        harness.Prompt.Enqueue(Master);
+
+        var exit = harness.Run(
+            "env", "pull", "billing", path, "--yes", "--delete-source", "--vault", harness.VaultPath);
+
+        harness.AssertExit(CliApp.ExitInternalError, exit);
+        Assert.True(File.Exists(elsewhere));
+        Assert.Equal("A=1\n", File.ReadAllText(elsewhere));
+    }
+
+    /// <summary>
+    /// `File.Delete` does not throw for a file that is not there, so the old code reported a
+    /// deletion it had not performed.
+    /// </summary>
+    [Fact]
+    public void Pull_WhenSomethingElseRemovedTheSource_SaysSo_RatherThanClaimingItDeletedIt()
+    {
+        using var harness = Seeded();
+        var path = WriteEnvFile(harness, "A=1\n");
+
+        harness.Prompt.OnPrompt = prompt =>
+        {
+            if (prompt.StartsWith("Master password", StringComparison.Ordinal))
+            {
+                harness.Prompt.OnPrompt = null;
+                File.Delete(path);
+            }
+        };
+        harness.Prompt.Enqueue(Master);
+
+        var exit = harness.Run(
+            "env", "pull", "billing", path, "--yes", "--delete-source", "--vault", harness.VaultPath);
+
+        harness.AssertExit(CliApp.ExitSuccess, exit);
+        Assert.DoesNotContain("Deleted ", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("already gone", harness.Err, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The positive control for the whole set: an untouched file is still deleted on confirmation,
+    /// or the tests above would pass just as well against a command that never deletes anything.
+    /// </summary>
+    [Fact]
+    public void Pull_WithAnUnchangedSource_StillDeletesItOnConfirmation()
+    {
+        using var harness = Seeded();
+        var path = WriteEnvFile(harness, "A=1\n");
+
+        harness.Prompt.Interactive = true;
+        harness.Prompt.Enqueue(Master, "y", "y");
+
+        var exit = harness.Run("env", "pull", "billing", path, "--vault", harness.VaultPath);
+
+        harness.AssertExit(CliApp.ExitSuccess, exit);
+        Assert.False(File.Exists(path));
+        Assert.Contains($"Deleted {path}.", harness.Err, StringComparison.Ordinal);
+
+        // And nothing was left beside it under a temporary name.
+        Assert.Empty(Directory.GetFiles(harness.Directory, "*.keypaste-*"));
+    }
+
+    /// <summary>
+    /// `--keep` is the flag the guide tells people to import with, and it must not depend on any
+    /// of this: the file is kept whether or not it changed, and it is never even inspected.
+    /// </summary>
+    [Fact]
+    public void Pull_WithKeep_LeavesAChangedSourceAlone_WithoutComplaining()
+    {
+        using var harness = Seeded();
+        var path = WriteEnvFile(harness, "A=1\n");
+
+        harness.Prompt.OnPrompt = ChangeTheFile(harness, path, "Master password", "A=1\nB=2\n");
+        harness.Prompt.Enqueue(Master);
+
+        var exit = harness.Run("env", "pull", "billing", path, "--yes", "--keep", "--vault", harness.VaultPath);
+
+        harness.AssertExit(CliApp.ExitSuccess, exit);
+        Assert.Equal("A=1\nB=2\n", File.ReadAllText(path));
+        Assert.DoesNotContain("changed after keypaste read it", harness.Err, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A vault that another process wrote to fails the save, and a failed import must not reach the
+    /// deletion at all — the values are in neither place.
+    /// </summary>
+    [Fact]
+    public void Pull_WhenTheVaultSaveFails_NeverTouchesTheSource()
+    {
+        using var harness = Seeded();
+        var path = WriteEnvFile(harness, "A=1\n");
+
+        // The import confirmation is the prompt that sits between Vault.Open and vault.Save, so it
+        // is the only one at which a second writer makes the save refuse.
+        harness.Prompt.Interactive = true;
+        harness.Prompt.OnPrompt = prompt =>
+        {
+            if (!prompt.StartsWith("Import", StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            harness.Prompt.OnPrompt = null;
+            using var elsewhere = Vault.Open(harness.VaultPath, Master);
+            elsewhere.AddEntry(new VaultEntry { Title = "from-the-terminal", Password = "second" });
+            elsewhere.Save();
+        };
+        harness.Prompt.Enqueue(Master, "y", "y");
+
+        var exit = harness.Run("env", "pull", "billing", path, "--delete-source", "--vault", harness.VaultPath);
+
+        Assert.NotEqual(CliApp.ExitSuccess, exit);
+        Assert.True(File.Exists(path));
+        Assert.Equal("A=1\n", File.ReadAllText(path));
+    }
+
+    /// <summary>
+    /// The import succeeded and the file could not be removed, so it is sitting under a temporary
+    /// name beside where it was. Naming it is the whole of the obligation: it is plaintext, it is
+    /// the user's, and a run that quietly left it there would be worse than one that never tried.
+    /// </summary>
+    /// <remarks>
+    /// Windows only. The read-only attribute is what makes <c>File.Delete</c> refuse there; on
+    /// Linux and macOS the directory governs deletion and the file goes without complaint.
+    /// </remarks>
+    [Fact]
+    public void Pull_WhenTheSourceCannotBeDeleted_NamesWhereItLeftIt_AndFails()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Skip("on this platform the read-only attribute does not prevent deletion.");
+        }
+
+        using var harness = Seeded();
+        var path = WriteEnvFile(harness, "A=1\n");
+        File.SetAttributes(path, FileAttributes.ReadOnly);
+
+        harness.Prompt.Enqueue(Master);
+        var exit = harness.Run(
+            "env", "pull", "billing", path, "--yes", "--delete-source", "--vault", harness.VaultPath);
+
+        var left = Assert.Single(Directory.GetFiles(harness.Directory, "*.keypaste-*"));
+        foreach (var file in Directory.GetFiles(harness.Directory))
+        {
+            File.SetAttributes(file, FileAttributes.Normal);
+        }
+
+        Assert.Equal(CliApp.ExitInternalError, exit);
+        Assert.Equal("A=1\n", File.ReadAllText(left));
+        Assert.Contains(left, harness.Err, StringComparison.Ordinal);
+        Assert.DoesNotContain("Deleted ", harness.Err, StringComparison.Ordinal);
+    }
+
+    /// <summary>Plants a rewrite of the source at the named prompt, once.</summary>
+    private static Action<string> ChangeTheFile(
+        CliHarness harness,
+        string path,
+        string atPrompt,
+        string contents) =>
+        prompt =>
+        {
+            if (!prompt.StartsWith(atPrompt, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            harness.Prompt.OnPrompt = null;
+            File.WriteAllText(path, contents);
+        };
+
+    private static void RequireSymbolicLinks(CliHarness harness, string target)
+    {
+        var probe = Path.Combine(harness.Directory, "probe.link");
+        try
+        {
+            File.CreateSymbolicLink(probe, target);
+            File.Delete(probe);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Assert.Skip($"this machine cannot create symbolic links: {ex.Message}");
+        }
+    }
+
     [Fact]
     public void Pull_ReadsAUtf16File()
     {

@@ -8,6 +8,17 @@ Versions are the ones published at `https://dl.keypaste.com/v<version>/`. Every 
 
 These changes are available in source on `main`, **not in the `v0.1.0` downloads**. The source version still reports `0.1.0`; its version string alone does not identify the published bytes.
 
+**`env pull` deletes the file it imported, not whatever is at that path when it finishes.** Add a
+variable to your `.env` while keypaste is asking for your master password — or while it is asking
+whether to import, or whether to delete — and the old code deleted it anyway, having read the file
+minutes earlier. The new variable was in neither the vault nor the directory, and nothing else on
+your machine had a copy. keypaste now records what it read, by path and by content, and deletes only
+that: a file that changed is kept, said so, and re-importable by running the command again. The
+check happens before you are asked, so you are never offered the deletion of bytes keypaste did not
+import, and again at the removal itself, where the file is moved out of the way and verified under a
+name nothing else can reach — so an editor saving between your `y` and the delete cannot lose the
+save. A source that something else removed no longer reports `Deleted`.
+
 **`env export` will not write a `.env` over your vault.** `keypaste env export billing vault.kdbx
 --dotenv --force --yes` deleted the vault and wrote one project's variables into its place, in
 plaintext — every other entry, every other project and all of the entry history gone, with nothing

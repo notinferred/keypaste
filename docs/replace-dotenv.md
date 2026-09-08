@@ -55,6 +55,11 @@ backups, the old contents can outlive the file. If these values were exposed, ro
 Delete '/repo/app/.env'? [y/N]
 ```
 
+keypaste deletes the file it read and nothing else. If you edit the `.env` while it is asking — any
+of its three questions — it keeps the file, says the new content was not imported, and exits
+nonzero if you had asked for the deletion. Run `keypaste env pull dev` again and the edit goes in
+like any other change.
+
 If the file is inside a git repository, keypaste says so too. **Git history is usually the larger exposure.** Deleting the file does nothing about it:
 
 ```sh
