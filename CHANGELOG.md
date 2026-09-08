@@ -8,6 +8,17 @@ Versions are the ones published at `https://dl.keypaste.com/v<version>/`. Every 
 
 These changes are available in source on `main`, **not in the `v0.1.0` downloads**. The source version still reports `0.1.0`; its version string alone does not identify the published bytes.
 
+**What your master password field tells the rest of your computer is now a test, not a
+description.** Windows and Linux both run an accessibility service any program on the machine can
+ask questions of, and an ordinary password box answers them with the password — the dots are
+drawn, not enforced. keypaste has never used an ordinary password box, but nothing checked that,
+and the security page said so. It is checked now: what leaves that field is the placeholder and a
+row of dots, and two different passwords of the same length produce exactly the same answer.
+Nothing about the field changed; what changed is that it can no longer quietly stop being true.
+Two things the check turned up and did not fix: `Ctrl/Cmd+V` does nothing in that field, which
+`SECURITY.md` used to imply it did, and the field has no name for a screen reader. Both are
+written down.
+
 **A password copied at the instant you lock no longer arrives after the lock.** Copying goes
 through the windowing system, and that takes a moment. If the vault locked, or you quit, or you
 pressed Clear now while it was still in progress, the copy finished afterwards: the password
