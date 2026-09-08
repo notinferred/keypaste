@@ -164,6 +164,37 @@ internal static class ToolText
         denied it. Nothing was released. This call was recorded in the audit log as denied.
         """;
 
+    /// <summary>Why nothing came back for a request that was authorized.</summary>
+    /// <remarks>
+    /// <para>
+    /// <b>It says the value is too large, and that is deliberate.</b> The agent had just been
+    /// authorized to receive the whole of that value, so telling it the value is large discloses
+    /// strictly less than the release it was granted. The reticence THREATS.md T-4 asks for governs
+    /// what an agent learns about entries it may <em>not</em> have.
+    /// </para>
+    /// <para>
+    /// <b>It never says a person approved it.</b> A standing rule reaches this same sentence, and
+    /// nobody is asked on that path (T-16). Which authority it was belongs in the audit line's
+    /// reason, where the reader is the user; the agent only needs to know the answer was yes and the
+    /// value still did not arrive.
+    /// </para>
+    /// <para>
+    /// "Do not retry" earns its place the way <see cref="DeniedByHuman"/>'s does, and for a second
+    /// reason: inside the grant's lifetime a retry is answered without troubling anybody, and after
+    /// it a retry puts the same question in front of a person for the same result.
+    /// </para>
+    /// </remarks>
+    internal const string Undeliverable = """
+        keypaste: DENIED. This request was authorized, and then keypaste could not return the value:
+        it is too large to send in one reply. Nothing was released - not part of it, and not a
+        shortened copy.
+
+        Do not retry. Nothing about the answer changes on a second attempt, and asking again later
+        puts the same question in front of a person for the same result. If your task needs this
+        value, ask the person you are working with to give it to you another way. This call was
+        recorded in the audit log as denied.
+        """;
+
     /// <summary>Why a request was refused before it was even considered.</summary>
     internal const string OutOfScope = """
         keypaste: DENIED. That entry is outside what this server was configured to expose, so
@@ -293,6 +324,7 @@ internal static class ToolText
         AuditMethod.Prompt => DeniedByHuman,
         AuditMethod.Cancelled => Cancelled,
         AuditMethod.PolicyLimit => PolicyLimit,
+        AuditMethod.Undeliverable => Undeliverable,
         _ => ApproverFailed,
     };
 

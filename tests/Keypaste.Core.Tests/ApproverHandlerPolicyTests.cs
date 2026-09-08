@@ -384,6 +384,32 @@ public sealed class ApproverHandlerPolicyTests
         max_ttl_seconds = 300
         """;
 
+    /// <summary>
+    /// A rule's release that cannot be delivered is not written up as a person's act.
+    /// </summary>
+    /// <remarks>
+    /// The undeliverable refusal is the one denial in keypaste that follows an authorization, so it
+    /// has to name which authority that was — and on this path nobody was asked at all. Saying "a
+    /// person approved this" here would assert a human act that never happened, with no second
+    /// witness to contradict it, which is exactly THREATS.md T-16.
+    /// </remarks>
+    [Fact]
+    public async Task AnUndeliverablePolicyRelease_DoesNotClaimAPersonApprovedIt()
+    {
+        using var fixture = new ApproverFixture(Policy());
+        fixture.Source.Value = new string('n', 100_000);
+
+        var reply = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
+
+        Assert.Equal(AuditDecision.Denied, reply.Decision);
+        Assert.Equal(AuditMethod.Undeliverable, reply.Method);
+        Assert.Equal(
+            ApproverProtocol.UndeliverableReason(AuditMethod.Policy), reply.Reason, StringComparer.Ordinal);
+        Assert.DoesNotContain("person", reply.Reason, StringComparison.Ordinal);
+        Assert.Equal(0, fixture.Channel.Asked);
+        Assert.Null(reply.Value);
+    }
+
     private static PolicyDocument Policy(
         string client = "\"billing-bot\"",
         string entries = "[\"env/dev/**\"]",

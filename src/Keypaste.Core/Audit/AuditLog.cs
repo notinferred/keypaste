@@ -644,6 +644,7 @@ public sealed class AuditLog : IDisposable
         AuditMethod.Policy => "policy",
         AuditMethod.PolicyLimit => "policy-limit",
         AuditMethod.NotInitialized => "not-initialized",
+        AuditMethod.Undeliverable => "undeliverable",
         _ => "unknown",
     };
 

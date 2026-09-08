@@ -339,6 +339,91 @@ public sealed class ApproverHandlerTests
         Assert.NotEmpty(reply.Reason);
     }
 
+    // ------------------------------------------------------- a release nobody could send (F.3d)
+
+    /// <summary>
+    /// A field too large for one frame is refused, and the refusal says the release was approved.
+    /// </summary>
+    /// <remarks>
+    /// <c>notes</c> is releasable and a KDBX note has no length limit, so this is an ordinary entry
+    /// somebody pasted a certificate into. Before F.3d the reply was built and handed to the
+    /// encoder anyway; the write threw, the connection went down and took its grants with it, and
+    /// the agent was told the approver could not be asked — about a request a person had answered.
+    /// </remarks>
+    [Fact]
+    public async Task AReleaseTooBigToDeliver_IsRefusedAndSaysAPersonApprovedIt()
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Channel.Answer = ApprovalAnswer.Approved;
+        fixture.Source.Value = new string('n', 100_000);
+
+        var reply = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
+
+        Assert.Equal(AuditDecision.Denied, reply.Decision);
+        Assert.Equal(AuditMethod.Undeliverable, reply.Method);
+        Assert.Equal(ApproverProtocol.UndeliverableReason(AuditMethod.Prompt), reply.Reason, StringComparer.Ordinal);
+        Assert.Null(reply.Value);
+        Assert.Equal(0, reply.TtlSeconds);
+        Assert.Equal("env/dev/STRIPE_KEY", reply.Entry, StringComparer.Ordinal);
+
+        // A person did answer, and the field was read. The record says denied because nothing
+        // reached the agent, not because the procedure stopped early.
+        Assert.Equal(1, fixture.Channel.Asked);
+        Assert.Equal(1, fixture.Source.Reads);
+    }
+
+    /// <summary>
+    /// The same request twice costs one prompt, even though neither answer can be delivered.
+    /// </summary>
+    /// <remarks>
+    /// The size is a property of the entry, not of the request, so every retry would produce the
+    /// same refusal — and re-prompting for each one is THREATS.md T-11 with a lever attached. The
+    /// grant is stored exactly as a deliverable release stores one, so the second request is
+    /// answered from the cache without troubling anybody, and the reason says so.
+    /// </remarks>
+    [Fact]
+    public async Task AReleaseTooBigToDeliver_AsksAPersonOnce()
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Channel.Answer = ApprovalAnswer.Approved;
+        fixture.Source.Value = new string('n', 100_000);
+
+        await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
+        var again = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
+
+        Assert.Equal(1, fixture.Channel.Asked);
+        Assert.Equal(AuditMethod.Undeliverable, again.Method);
+        Assert.Equal(
+            ApproverProtocol.UndeliverableReason(AuditMethod.GrantCache), again.Reason, StringComparer.Ordinal);
+        Assert.Null(again.Value);
+    }
+
+    /// <summary>The operator's terminal never says a credential was released when none was.</summary>
+    /// <remarks>
+    /// The approver writes no audit line, so its narration is the only record it produces itself
+    /// (THREATS.md T-14). It printed <c>released …</c> before the reply had left the process, which
+    /// on this path is a claim nothing else would ever contradict.
+    /// </remarks>
+    [Fact]
+    public async Task AnUndeliverableRelease_NeverTellsTheOperatorItWasReleased()
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Channel.Answer = ApprovalAnswer.Approved;
+        fixture.Source.Value = new string('n', 100_000);
+
+        await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
+
+        Assert.DoesNotContain(fixture.Narration, line => line.StartsWith("released ", StringComparison.Ordinal));
+        Assert.Contains(fixture.Narration, line => line.Contains("could not deliver", StringComparison.Ordinal));
+
+        // ...and it does say "released" when the reply actually leaves, so this is not passing
+        // because the narration stopped working.
+        fixture.Source.Value = ApproverFixture.Sentinel;
+        await fixture.Handler.RequestAsync(Request("env/dev/STRIPE_KEY"), "conn-2", Token);
+
+        Assert.Contains(fixture.Narration, line => line.StartsWith("released ", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void TheHandlerRejectsNulls()
     {

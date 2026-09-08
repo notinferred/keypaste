@@ -192,6 +192,60 @@ public sealed class ApproverListenerTests
     }
 
     /// <summary>
+    /// A release too large to send is answered with a refusal, and the connection lives.
+    /// </summary>
+    /// <remarks>
+    /// The credential half of <see cref="AHugeListing_IsAnsweredAndTheConnectionSurvives"/>, and the
+    /// worse of the two: a listing that fails costs a person their approval, while this one fails
+    /// <em>after</em> they gave it. The refusal fits by construction — it carries no value — so it
+    /// travels the connection that is still open rather than arriving as a hangup.
+    /// </remarks>
+    [Fact]
+    public async Task AnUndeliverableRelease_IsAnsweredAndTheConnectionSurvives()
+    {
+        var handler = new RecordingHandler { Value = new string('n', 100_000) };
+        await using var host = Host.Start(handler);
+        await using var client = await ConnectAsync(host.PipeName);
+
+        var reply = await client.RequestAsync(Request(), Token);
+
+        Assert.NotNull(reply);
+        Assert.Equal(AuditDecision.Denied, reply.Decision);
+        Assert.Equal(AuditMethod.Undeliverable, reply.Method);
+        Assert.Null(reply.Value);
+
+        // The connection is still usable, which is the half a reply on its own would not have shown.
+        handler.Value = RecordingHandler.Sentinel;
+
+        var next = await client.RequestAsync(Request(), Token);
+
+        Assert.NotNull(next);
+        Assert.Equal(RecordingHandler.Sentinel, next.Value, StringComparer.Ordinal);
+    }
+
+    /// <summary>
+    /// ...and it does not cost the connection its grants.
+    /// </summary>
+    /// <remarks>
+    /// Asserted separately, for the reason
+    /// <see cref="AHugeListing_DoesNotRevokeThisConnectionsGrants"/> gives. Here the revoked grant is
+    /// the one that was minted for this very request: the write threw, the <c>finally</c> ran
+    /// <c>Disconnected</c>, and the approval a person had just given was thrown away before anybody
+    /// could use it.
+    /// </remarks>
+    [Fact]
+    public async Task AnUndeliverableRelease_DoesNotRevokeThisConnectionsGrants()
+    {
+        var handler = new RecordingHandler { Value = new string('n', 100_000) };
+        await using var host = Host.Start(handler);
+        await using var client = await ConnectAsync(host.PipeName);
+
+        await client.RequestAsync(Request(), Token);
+
+        Assert.Empty(handler.Disconnections);
+    }
+
+    /// <summary>
     /// A peer that sends nonsense costs its own connection and nothing else. The approver holds the
     /// unlocked vault, so it is the last process in keypaste that may be taken down by something
     /// somebody sent it.
@@ -301,6 +355,9 @@ public sealed class ApproverListenerTests
         /// <summary>What the approver has to say. One ordinary entry unless a test says otherwise.</summary>
         internal IReadOnlyList<EntryName> Names { get; set; } = [new EntryName("env/dev", "STRIPE_KEY")];
 
+        /// <summary>What a release carries. Settable so a test can hand back a field no frame holds.</summary>
+        internal string Value { get; set; } = Sentinel;
+
         public ValueTask<NamesReply> ListAsync(NamesRequest request, string connectionId, CancellationToken cancellationToken)
         {
             ConnectionIds.Add(connectionId);
@@ -320,7 +377,7 @@ public sealed class ApproverListenerTests
                 Reason = "a person approved this request",
                 Entry = request.Entry,
                 TtlSeconds = 300,
-                Value = Sentinel,
+                Value = Value,
             });
         }
 
