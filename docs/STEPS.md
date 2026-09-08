@@ -11,13 +11,14 @@ The local vault, CLI/env workflow and approval bridge are implemented, with know
 data preservation, authorization timing and release checks. The desktop is a source build with
 partial entry/env screens, identified in the 2026-09-07 code review; the clipboard lifetime that
 review found is repaired (F.2c). Saved preferences now reach a fresh session (F.2a) and minimizing enforces
-the setting that names it (F.2b1), observed on Windows only. The remaining F.2–F.4 repair tasks
-below are open even though existing tests pass.
+the setting that names it (F.2b1), observed on Windows only. An approval's lifetime no longer moves
+when the clock does (F.3a). The remaining F.2–F.4 repair tasks below are open even though existing
+tests pass.
 Everyday password-management workflows, browser integration and desktop
 publication remain unfinished. No hosted service, web vault, mobile integration or organization
 credential service is available.
 
-**Next: F.3a — keep approval expiry bounded when the wall clock changes.** F.2b2 is BLOCKED on
+**Next: F.3b — refuse concurrent prompt requests at the MCP boundary.** F.2b2 is BLOCKED on
 hardware this project does not have; it is deferred to the desktop candidate run, and 4.7b lists
 it, so the desktop gate still cannot pass without it. F.4b's change is in source and checked on
 the four targets this machine can build; its three remaining NativeAOT targets need one CI run,
@@ -63,6 +64,7 @@ A completed source task does not mean that it is present in the current download
 | F.2b1 | Complete | Minimizing calls the same session lock as the timeout and `Ctrl/Cmd+L`; [minimize tests](../tests/Keypaste.App.Tests/MinimizeLockTests.cs); observed by hand on Windows 10 Pro 19045, 2026-09-08 — enabled locked, disabled did not, the clipboard cleared, `app.toml` unchanged; D-0096 |
 | F.2c | Complete | A clipboard write that lands after a lock or a quit is taken back, not installed; [in-flight tests](../tests/Keypaste.App.Tests/Clipboard/ClipboardWritesDoNotOutliveTheAppTests.cs), seven red first; D-0098 |
 | F.2d | Complete | The master-password field publishes its length and never its characters; [automation tests](../tests/Keypaste.App.Tests/Controls/MaskedInputAutomationTests.cs), four substituted leaks turn them red; D-0099 |
+| F.3a | Complete | Grant expiry and the denial cooldown are held on both clocks, each taking the reading that fails closed for it; [Deadline tests](../tests/Keypaste.Core.Tests/DeadlineTests.cs), [grant tests](../tests/Keypaste.Core.Tests/GrantCacheTests.cs), [gate tests](../tests/Keypaste.Core.Tests/ApprovalGateTests.cs), [handler tests](../tests/Keypaste.Core.Tests/ApproverHandlerTests.cs), five red first; D-0100 |
 | 10.1 | Complete | Initial hostile review/remediation; D-0084 in [DECISIONS](../DECISIONS.md) |
 | K.1 | Complete | Pinned SDK installed; [global.json](../global.json), D-0076 |
 
@@ -132,10 +134,6 @@ passed and five platform-specific skips. Each task needs a regression that demon
 before the fix and verifies the corrected behavior. Keep the shared core and mature KDBX library;
 these tasks repair existing behavior and do not require a product rewrite. Record reproductions
 in repository fixtures/tests, so completion does not depend on a maintainer's temporary files.
-
-- [ ] **F.3a — Keep approval expiry bounded when the wall clock changes.** Needs: 2.2.
-  **Build:** Correct [GrantCache](../src/Keypaste.Core/Approval/GrantCache.cs) lookup and timer expiry using elapsed-time bounds with explicit suspension behavior. A backward wall-clock correction currently keeps a grant usable after its one-shot timer fires and can report a remaining lifetime longer than the approved TTL.
-  **Verify (V-F.3a):** Independently move wall and elapsed clocks backward/forward and simulate suspension: a 250 ms grant is unusable after 600 ms elapsed despite a one-hour wall-clock rollback. Remaining lifetime never exceeds the approved TTL; expiry/disconnect/disposal clear owned buffers and leave no orphan timer. Client-held copies remain outside this guarantee.
 
 - [ ] **F.3b — Refuse concurrent prompt requests at the MCP boundary.** Needs: 2.1, 2.2.
   **Build:** Remove the unbounded prompt backlog created by [ApproverConnection](../src/Keypaste.Mcp/ApproverConnection.cs) queuing exchanges before the approval gate's Busy check. Return a bounded, auditable Busy refusal for additional decision requests and handle cancellation/disconnection without corrupting the framed transport or releasing a credential.

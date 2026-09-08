@@ -48,6 +48,13 @@ public readonly record struct GrantKey(string ConnectionId, string Handle, strin
 /// <see cref="SecretBuffer"/> already states: the value existed as an unclearable
 /// <see cref="string"/> before it arrived here, and SECURITY.md says so.
 /// </para>
+/// <para>
+/// <b>A TTL is not a wall-clock instant.</b> Expiry is a <see cref="Deadline"/>, which holds both
+/// clocks and lets whichever ran furthest decide — so an hour's wall-clock rollback cannot make an
+/// expired grant usable again, and a machine that slept through its TTL wakes with nothing. The
+/// timer is scheduled by the same <see cref="TimeProvider"/> and therefore on the same monotonic
+/// footing.
+/// </para>
 /// </remarks>
 public sealed class GrantCache : IDisposable
 {
@@ -100,16 +107,14 @@ public sealed class GrantCache : IDisposable
                 return false;
             }
 
-            var now = _clock.GetUtcNow();
-
-            if (now >= grant.ExpiresAt)
+            if (grant.Expires.HasExpired(_clock))
             {
                 Forget(key, grant);
                 return false;
             }
 
             value = new ReleasedField(grant.Value.Field, grant.Value.Value);
-            remaining = grant.ExpiresAt - now;
+            remaining = grant.Expires.Remaining(_clock);
             return true;
         }
     }
@@ -124,15 +129,17 @@ public sealed class GrantCache : IDisposable
     {
         ArgumentNullException.ThrowIfNull(value);
 
-        // The copy's ownership transfers to the dictionary, and every route out of it — Forget,
-        // Revoke, Expire, Dispose — zeroes it. CA2000 cannot see a lifetime that leaves the method.
-#pragma warning disable CA2000
-        var grant = new Grant(new ReleasedField(value.Field, value.Value), _clock.GetUtcNow() + ttl);
-#pragma warning restore CA2000
-
         lock (_gate)
         {
+            // Before the copy, not after: a copy taken and then abandoned by the throw would be a
+            // secret nothing is left holding to zero.
             ObjectDisposedException.ThrowIf(_disposed, this);
+
+            // The copy's ownership transfers to the dictionary, and every route out of it — Forget,
+            // Revoke, Expire, Dispose — zeroes it. CA2000 cannot see a lifetime that leaves the method.
+#pragma warning disable CA2000
+            var grant = new Grant(new ReleasedField(value.Field, value.Value), Deadline.Starting(_clock, ttl));
+#pragma warning restore CA2000
 
             if (_grants.TryGetValue(key, out var replaced))
             {
@@ -143,7 +150,7 @@ public sealed class GrantCache : IDisposable
 
             // Inside the lock, so a grant can never be replaced between being stored and being
             // given its timer — that window would leak a timer and leave a grant that never zeroes.
-            grant.Expiry = _clock.CreateTimer(_ => Expire(key), null, ttl, Timeout.InfiniteTimeSpan);
+            grant.Expiry = _clock.CreateTimer(_ => Expire(key, grant), null, ttl, Timeout.InfiniteTimeSpan);
         }
     }
 
@@ -167,11 +174,25 @@ public sealed class GrantCache : IDisposable
         }
     }
 
-    private void Expire(GrantKey key)
+    /// <summary>Zeroes the grant a timer was armed for, if it is still the one under that key.</summary>
+    /// <remarks>
+    /// <para>
+    /// <b>No second deadline check.</b> The timer is armed for the TTL on the same
+    /// <see cref="TimeProvider"/> the deadline was taken from, so its firing <em>is</em> the elapsed
+    /// bound. Re-asking a wall clock here is what let a backward correction turn a one-shot timer
+    /// into a no-op and leave behind a grant nothing would ever clear.
+    /// </para>
+    /// <para>
+    /// <b>The grant, not the key.</b> A callback that has already passed its timer's disposal check
+    /// can be waiting on <c>_gate</c> while a re-approval replaces what is under the key, and
+    /// removing whatever it found there would zero a grant a person had just given.
+    /// </para>
+    /// </remarks>
+    private void Expire(GrantKey key, Grant armed)
     {
         lock (_gate)
         {
-            if (_grants.TryGetValue(key, out var grant) && _clock.GetUtcNow() >= grant.ExpiresAt)
+            if (_grants.TryGetValue(key, out var grant) && ReferenceEquals(grant, armed))
             {
                 Forget(key, grant);
             }
@@ -205,11 +226,11 @@ public sealed class GrantCache : IDisposable
         }
     }
 
-    private sealed class Grant(ReleasedField value, DateTimeOffset expiresAt) : IDisposable
+    private sealed class Grant(ReleasedField value, Deadline expires) : IDisposable
     {
         internal ReleasedField Value { get; } = value;
 
-        internal DateTimeOffset ExpiresAt { get; } = expiresAt;
+        internal Deadline Expires { get; } = expires;
 
         internal ITimer? Expiry { get; set; }
 

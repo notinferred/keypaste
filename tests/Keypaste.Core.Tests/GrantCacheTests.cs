@@ -221,4 +221,179 @@ public sealed class GrantCacheTests
         Assert.Throws<ArgumentNullException>(() => cache.Store(Key(), null!, _ttl));
         Assert.Throws<ArgumentNullException>(() => cache.Revoke(null!));
     }
+
+    /// <summary>
+    /// V-F.3a's own case. Expiry was measured on the wall clock alone, so an hour's rollback made
+    /// an already-expired grant usable again — and the one-shot timer that should have zeroed it
+    /// had already been spent. Both clocks are consulted now, and for a permission whichever says
+    /// more time has passed is the one that decides.
+    /// </summary>
+    [Fact]
+    public void AWallClockRollback_DoesNotResurrectAnExpiredGrant()
+    {
+        var clock = new ManualClock();
+        using var cache = new GrantCache(clock);
+        Store(cache, Key(), ttl: TimeSpan.FromMilliseconds(250));
+
+        clock.AdvanceMonotonicOnly(TimeSpan.FromMilliseconds(600));
+        clock.RewindWallOnly(TimeSpan.FromHours(1));
+
+        AssertNoGrant(cache, Key());
+    }
+
+    /// <summary>
+    /// The same case with the timer taken away, which is where the lookup rule is actually pinned.
+    /// The class remark promises that a grant can never be used after its TTL "even if a timer has
+    /// not run yet", and a wall-clock lookup breaks that promise the moment the wall clock moves
+    /// backwards: it would report this grant live with its full 250 ms still to run.
+    /// </summary>
+    [Fact]
+    public void TheLookupAlone_RefusesAnExpiredGrant_WithoutWaitingForTheTimer()
+    {
+        var clock = new CapturingClock();
+        using var cache = new GrantCache(clock);
+        Store(cache, Key(), ttl: TimeSpan.FromMilliseconds(250));
+
+        clock.AdvanceMonotonicOnly(TimeSpan.FromMilliseconds(600));
+        clock.RewindWallOnly(TimeSpan.FromHours(1));
+
+        AssertNoGrant(cache, Key());
+    }
+
+    /// <summary>
+    /// The other direction, and why the monotonic clock alone is not the answer either: it does not
+    /// advance across suspend on every platform, so a machine asleep for an hour would wake with a
+    /// five-minute grant still live and nobody in the room.
+    /// </summary>
+    [Fact]
+    public void AMachineThatSleptThroughTheTtl_WakesWithNoGrant()
+    {
+        var clock = new ManualClock();
+        using var cache = new GrantCache(clock);
+        Store(cache, Key(), ttl: TimeSpan.FromSeconds(300));
+
+        clock.AdvanceWallOnly(TimeSpan.FromHours(1));
+
+        AssertNoGrant(cache, Key());
+    }
+
+    /// <summary>
+    /// The half an agent and the audit log actually see: <c>ApproverHandler</c> puts this number in
+    /// <c>CredentialReply.TtlSeconds</c>, so a wall clock moved backwards made keypaste report a
+    /// remaining lifetime longer than the one a person approved — the bound THREATS.md T-12 claims.
+    /// </summary>
+    [Fact]
+    public void TheRemainingLifetime_NeverExceedsTheApprovedTtl()
+    {
+        var clock = new ManualClock();
+        using var cache = new GrantCache(clock);
+        var ttl = TimeSpan.FromSeconds(60);
+        Store(cache, Key(), ttl: ttl);
+
+        clock.RewindWallOnly(TimeSpan.FromHours(1));
+
+        Assert.True(cache.TryUse(Key(), out var value, out var remaining));
+
+        using (value)
+        {
+            Assert.InRange(remaining, TimeSpan.Zero, ttl);
+        }
+    }
+
+    /// <summary>
+    /// The timer half of the same defect, and the worse half. Expiry re-checked the wall clock
+    /// before forgetting anything, so a rollback turned the one-shot timer into a no-op — nothing
+    /// would ever clear that grant again, and the plaintext stayed in the cache for as long as the
+    /// process lived.
+    /// </summary>
+    [Fact]
+    public void AnUnusedGrant_IsStillClearedByItsTimer_WhenTheWallClockRunsBackwards()
+    {
+        var clock = new ManualClock();
+        using var cache = new GrantCache(clock);
+        Store(cache, Key(), ttl: TimeSpan.FromSeconds(60));
+
+        clock.RewindWallOnly(TimeSpan.FromHours(1));
+
+        // Nothing looks the grant up. The timer alone has to clear it.
+        clock.AdvanceMonotonicOnly(TimeSpan.FromSeconds(61));
+
+        Assert.Equal(0, cache.Count);
+    }
+
+    /// <summary>
+    /// Not a defect this file found, but the one the fix could have introduced. Once expiry stops
+    /// re-checking a deadline before forgetting, a callback that had already passed its timer's
+    /// disposal check and is waiting on the cache's lock would remove whatever it found under the
+    /// key — which, after a re-approval, is somebody else's live grant.
+    /// </summary>
+    [Fact]
+    public void AnExpiryAlreadyInFlight_DoesNotZeroTheGrantThatReplacedIt()
+    {
+        var clock = new CapturingClock();
+        using var cache = new GrantCache(clock);
+
+        Store(cache, Key(), "first", TimeSpan.FromSeconds(60));
+        var inFlight = clock.LastCallback!;
+
+        Store(cache, Key(), "second", TimeSpan.FromSeconds(60));
+
+        // What the blocked callback does when it finally takes the lock.
+        inFlight(null);
+
+        Assert.True(cache.TryUse(Key(), out var value, out _));
+
+        using (value)
+        {
+            Assert.Equal("second", value.Value.ToString(), StringComparer.Ordinal);
+        }
+    }
+
+    /// <summary>
+    /// A clock whose timers never fire, and whose two clocks move apart.
+    /// </summary>
+    /// <remarks>
+    /// Two things <see cref="ManualClock"/> cannot do, both needed here. It fires due timers inline
+    /// as it is moved, so a test cannot hold an expiry callback and run it at a moment of its
+    /// choosing; and it cannot show what the <em>lookup</em> decides on its own, because the timer
+    /// gets there first and clears the grant either way. Expiry has to hold without the timer, or
+    /// the guarantee is only as good as a callback having run.
+    /// </remarks>
+    private sealed class CapturingClock : TimeProvider
+    {
+        private DateTimeOffset _now = new(2026, 7, 26, 14, 3, 11, TimeSpan.Zero);
+        private long _stamp;
+
+        internal TimerCallback? LastCallback { get; private set; }
+
+        public override long TimestampFrequency => 1_000_000_000;
+
+        public override DateTimeOffset GetUtcNow() => _now;
+
+        public override long GetTimestamp() => _stamp;
+
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+        {
+            ArgumentNullException.ThrowIfNull(callback);
+
+            LastCallback = callback;
+            return new IdleTimer();
+        }
+
+        internal void AdvanceMonotonicOnly(TimeSpan by) =>
+            _stamp += (long)(by.TotalSeconds * TimestampFrequency);
+
+        internal void RewindWallOnly(TimeSpan by) => _now -= by;
+
+        private sealed class IdleTimer : ITimer
+        {
+            public bool Change(TimeSpan dueTime, TimeSpan period) => true;
+
+            public void Dispose()
+            {
+            }
+
+            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        }
+    }
 }
