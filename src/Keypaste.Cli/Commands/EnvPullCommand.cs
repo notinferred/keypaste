@@ -76,7 +76,7 @@ internal static class EnvPullCommand
 
         // Everything about the file is settled before the master password is asked for: a typo in
         // the path should not cost a password entry and a key derivation to discover.
-        if (!TryReadFile(sourcePath, context, out var document, out var readExit))
+        if (!TryReadFile(sourcePath, context, out var document, out var source, out var readExit))
         {
             return readExit;
         }
@@ -94,7 +94,7 @@ internal static class EnvPullCommand
             return exit;
         }
 
-        return Cleanup(sourcePath, deleteSource, keep, context);
+        return Cleanup(sourcePath, source, deleteSource, keep, context);
     }
 
     /// <summary>Reads and checks the file, reporting everything wrong with it at once.</summary>
@@ -102,9 +102,11 @@ internal static class EnvPullCommand
         string sourcePath,
         CliContext context,
         out DotEnvDocument document,
+        out SourceSnapshot source,
         out int exit)
     {
         document = null!;
+        source = null!;
 
         if (!File.Exists(sourcePath))
         {
@@ -143,6 +145,10 @@ internal static class EnvPullCommand
             exit = ReportProblems(document.Problems, context);
             return false;
         }
+
+        // Taken from the bytes just read, not from a second read of the file: what the cleanup at
+        // the end is allowed to delete is exactly what the import above acted on.
+        source = SourceSnapshot.Take(sourcePath, bytes);
 
         exit = CliApp.ExitSuccess;
         return true;
@@ -336,7 +342,29 @@ internal static class EnvPullCommand
     }
 
     /// <summary>Offers to remove the file, and says plainly what removing it does not do.</summary>
-    private static int Cleanup(string sourcePath, bool deleteSource, bool keep, CliContext context)
+    /// <remarks>
+    /// <para>
+    /// The offer is bound to what was imported, not to the path it came from. Between the read and
+    /// this point sit a master-password prompt, a key derivation and two confirmations, and a
+    /// person answering them is a person with an editor open — so the file is checked twice, the
+    /// same shape <c>env export</c>'s vault guard has (D-0092): once here, so nobody is asked
+    /// whether to delete bytes keypaste never imported, and once inside
+    /// <see cref="SourceSnapshot.DeleteIfUnchanged"/>, where the answer cannot go stale between the
+    /// check and the removal.
+    /// </para>
+    /// <para>
+    /// A refusal exits nonzero only when the deletion was actually asked for — by
+    /// <c>--delete-source</c>, or by a <c>y</c> at the prompt. D-0015's rule: the user asked for
+    /// two things and got one, and the half that failed is the half that left plaintext on disk. A
+    /// file that changed before anyone was asked cost nothing and says so on the way past.
+    /// </para>
+    /// </remarks>
+    private static int Cleanup(
+        string sourcePath,
+        SourceSnapshot source,
+        bool deleteSource,
+        bool keep,
+        CliContext context)
     {
         if (GitRepository.Find(sourcePath) is { } repository)
         {
@@ -350,6 +378,11 @@ internal static class EnvPullCommand
         if (keep)
         {
             return CliApp.ExitSuccess;
+        }
+
+        if (!source.Matches(sourcePath))
+        {
+            return Kept(sourcePath, requested: deleteSource, context);
         }
 
         if (!deleteSource)
@@ -379,18 +412,41 @@ internal static class EnvPullCommand
             }
         }
 
-        try
+        switch (source.DeleteIfUnchanged(sourcePath, out var detail))
         {
-            File.Delete(sourcePath);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // The import is already committed, so this is a partial success, and the half that
-            // failed is the half that left plaintext on disk. A script should be able to see that.
-            context.Stderr.WriteLine(
-                $"keypaste env pull: imported, but could not delete '{sourcePath}': {ex.Message}");
-            context.Stderr.WriteLine("The file still contains the values.");
-            return CliApp.ExitInternalError;
+            case SourceCleanup.Deleted:
+                break;
+
+            case SourceCleanup.Missing:
+                return AlreadyGone(sourcePath, context);
+
+            case SourceCleanup.Stranded:
+                // Moved out of the way and then neither deletable nor returnable — because the
+                // removal failed, or because something took the original name while it was held.
+                // It is the user's plaintext either way, so it is named rather than dropped, and
+                // whatever is at the original path is left alone.
+                context.Stderr.WriteLine(
+                    $"keypaste env pull: imported, but '{sourcePath}' could not be removed.");
+                context.Stderr.WriteLine(
+                    $"The file keypaste read is now at '{detail}'; delete it yourself when you are ready.");
+                context.Stderr.WriteLine("The file still contains the values.");
+                return CliApp.ExitInternalError;
+
+            case SourceCleanup.Unreadable:
+                // The import is already committed, so this is a partial success, and the half that
+                // failed is the half that left plaintext on disk. A script should be able to see that.
+                context.Stderr.WriteLine(
+                    $"keypaste env pull: imported, but '{sourcePath}' could not be established as" +
+                    $" unchanged ({detail}), so it was not deleted.");
+                context.Stderr.WriteLine("The file still contains the values.");
+                return CliApp.ExitInternalError;
+
+            default:
+                context.Stderr.WriteLine(
+                    $"keypaste env pull: imported, but '{sourcePath}' changed while keypaste was asking,");
+                context.Stderr.WriteLine("so it was not deleted and what it holds now was not imported.");
+                context.Stderr.WriteLine("The file still contains the values.");
+                return CliApp.ExitInternalError;
         }
 
         context.Stderr.WriteLine($"Deleted {sourcePath}.");
@@ -402,6 +458,40 @@ internal static class EnvPullCommand
                 "If these values were exposed, rotate them.");
         }
 
+        return CliApp.ExitSuccess;
+    }
+
+    /// <summary>Says why the file is still there, and whether that failed anything.</summary>
+    private static int Kept(string sourcePath, bool requested, CliContext context)
+    {
+        if (!File.Exists(sourcePath))
+        {
+            return AlreadyGone(sourcePath, context);
+        }
+
+        if (!requested)
+        {
+            context.Stderr.WriteLine(
+                $"note: '{sourcePath}' changed after keypaste read it, so what it holds now was");
+            context.Stderr.WriteLine(
+                "      not imported. Leaving it in place; run keypaste env pull again to import it.");
+            return CliApp.ExitSuccess;
+        }
+
+        context.Stderr.WriteLine(
+            $"keypaste env pull: imported, but '{sourcePath}' changed after keypaste read it, so what");
+        context.Stderr.WriteLine("it holds now was not imported and it was not deleted.");
+        context.Stderr.WriteLine("The file still contains the values.");
+        return CliApp.ExitInternalError;
+    }
+
+    /// <summary>
+    /// Something else removed the file. <c>File.Delete</c> does not complain about a path that is
+    /// not there, so the old code reported a deletion it had not performed.
+    /// </summary>
+    private static int AlreadyGone(string sourcePath, CliContext context)
+    {
+        context.Stderr.WriteLine($"note: '{sourcePath}' was already gone; keypaste deleted nothing.");
         return CliApp.ExitSuccess;
     }
 

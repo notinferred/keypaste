@@ -30,7 +30,7 @@ public sealed class Vault : IDisposable
     {
         _interop = interop;
         Path = path;
-        _stamp = stamp ? Digest(path) : null;
+        _stamp = stamp ? SourceSnapshot.Digest(path) : null;
     }
 
     /// <summary>The path of the file backing this vault.</summary>
@@ -287,7 +287,14 @@ public sealed class Vault : IDisposable
     /// <para>
     /// <see langword="false"/> for a vault from <see cref="Create"/> that has never been saved,
     /// because there is nothing yet to have changed, and <see langword="false"/> for a file that
-    /// could not be read at all — see <see cref="Digest"/> for why absence is not a conflict.
+    /// could not be read at all — see <see cref="SourceSnapshot.Digest"/> for why absence is not a
+    /// conflict, and D-0017 for the transient-failure absorption that depends on it.
+    /// </para>
+    /// <para>
+    /// The cost, stated rather than discovered: on Windows a file another process holds open for
+    /// writing cannot be read, so a save racing a concurrent writer that narrowly is not detected.
+    /// The replace then fails and is retried, so this is loud rather than silent — and it is the
+    /// sub-second window this method already says it does not close.
     /// </para>
     /// </remarks>
     public bool HasFileChangedSinceOpen()
@@ -295,7 +302,7 @@ public sealed class Vault : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         return _stamp is { } stamp
-            && Digest(Path) is { } current
+            && SourceSnapshot.Digest(Path) is { } current
             && !stamp.AsSpan().SequenceEqual(current);
     }
 
@@ -348,44 +355,7 @@ public sealed class Vault : IDisposable
     private void Write()
     {
         _interop.Save();
-        _stamp = Digest(Path);
-    }
-
-    /// <summary>
-    /// A digest of the file, or <see langword="null"/> when it could not be read.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// The whole file rather than its modification time. Several filesystems round mtime to a
-    /// second or two, so a rewrite inside the same second would be missed — and a rewrite inside
-    /// the same second is the common case here, not the exotic one. A vault is kilobytes; hashing
-    /// it is not worth optimising around.
-    /// </para>
-    /// <para>
-    /// <b>A file that cannot be read is not a conflict, and treating it as one was a bug.</b> "This
-    /// changed underneath you" is a claim about a file that exists and now holds something else. A
-    /// file that is missing, locked, or on a directory that momentarily went away is a write
-    /// problem, and the save path already has a retry and an error message naming what the
-    /// operating system said — both of which the first version of this method skipped straight
-    /// past, breaking the transient-failure absorption D-0017 exists for.
-    /// </para>
-    /// <para>
-    /// The cost, stated rather than discovered: on Windows a file another process holds open for
-    /// writing cannot be read, so a save racing a concurrent writer that narrowly is not detected.
-    /// The replace then fails and is retried, so this is loud rather than silent — and it is the
-    /// sub-second window <see cref="HasFileChangedSinceOpen"/> already says it does not close.
-    /// </para>
-    /// </remarks>
-    private static byte[]? Digest(string path)
-    {
-        try
-        {
-            return SHA256.HashData(File.ReadAllBytes(path));
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException)
-        {
-            return null;
-        }
+        _stamp = SourceSnapshot.Digest(Path);
     }
 
     /// <summary>
