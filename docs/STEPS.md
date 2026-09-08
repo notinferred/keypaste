@@ -17,9 +17,11 @@ Everyday password-management workflows, browser integration and desktop
 publication remain unfinished. No hosted service, web vault, mobile integration or organization
 credential service is available.
 
-**Next: F.4b — align generated first-party publisher metadata.** F.2b2 is BLOCKED on hardware this
-project does not have; it is deferred to the desktop candidate run, and 4.7b lists it, so the
-desktop gate still cannot pass without it. Complete the ready repairs below before new feature
+**Next: F.2c — prevent clipboard writes from outliving lock or shutdown.** F.2b2 is BLOCKED on
+hardware this project does not have; it is deferred to the desktop candidate run, and 4.7b lists
+it, so the desktop gate still cannot pass without it. F.4b's change is in source and checked on
+the four targets this machine can build; its three remaining NativeAOT targets need one CI run,
+because NativeAOT does not cross-compile. Complete the ready repairs below before new feature
 work. Release foundations follow: R.0a makes release identity and supported
 targets executable, R.0b/3.8 make distribution verifiable, and 4.7a prepares desktop packages without
 waiting for signing enrollment. A new CLI/MCP patch requires the core/CLI/bridge and release repairs;
@@ -156,6 +158,8 @@ in repository fixtures/tests, so completion does not depend on a maintainer's te
 - [ ] **F.4b — Align generated first-party publisher metadata.** Needs: 0.1, 3.0.
   **Build:** Review and align the first-party Authors/Company/Copyright outputs from [Directory.Build.props](../Directory.Build.props) with the documented project identity and accurate attribution. Current Windows output exposes a personal identity despite the project-metadata rule. Apply the chosen fields consistently to CLI/MCP/app packages and retain required third-party notices.
   **Verify (V-F.4b):** Inspect built and packaged executable metadata on each claimed target: first-party identity matches the recorded project choice and required attribution remains intact. Source-property inspection alone cannot pass; changing future metadata makes no claim to remove previously published artifacts or history.
+  **Done 2026-09-08:** first-party binaries publish as `keypaste` and the vendored assembly as upstream; [attribute tests](../tests/Keypaste.Core.Tests/PublisherMetadata.cs) in all four front-end suites and a [packaged gate](../scripts/verify-publisher-metadata.sh) wired into `release.yml` and `app.yml`. Observed by hand on Windows 10 Pro 19045: the NativeAOT `keypaste.exe`/`keypaste-mcp.exe` and the desktop win-x64, linux-x64 and osx-arm64 packages all report CompanyName/LegalCopyright/ProductName `keypaste` where a version resource exists and carry the line where one does not, `KeePassLib.dll` reports Dominik Reichl, and restoring a personal name fails both the attribute test and the gate. D-0097.
+  **Remaining:** the linux-x64, linux-arm64 and osx-arm64 CLI/MCP binaries. NativeAOT does not cross-compile, so those three need one `release.yml` dispatch, which needs a push.
 
 ### Release foundations
 

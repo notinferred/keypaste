@@ -52,8 +52,10 @@
 
   <PropertyGroup Label="Identity">
     <Product>keypaste</Product>
-    <Authors>Dan Ochoa</Authors>
-    <Copyright>Copyright (c) 2026 Dan Ochoa</Copyright>
+    <Authors>keypaste</Authors>
+    <!-- Set rather than inherited: unset, the SDK fills CompanyName from Authors. -->
+    <Company>keypaste</Company>
+    <Copyright>Copyright (c) 2026 keypaste</Copyright>
     <RepositoryUrl>https://github.com/notinferred/keypaste</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageProjectUrl>https://github.com/notinferred/keypaste</PackageProjectUrl>

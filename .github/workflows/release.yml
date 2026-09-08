@@ -405,6 +405,14 @@ jobs:
           fi
           ls -l "$out"; cat "$asset.sha256"
 
+      # The bytes that were just staged, on the machine that built them. The assembly-attribute
+      # tests in each front end's suite cover the managed side on every operating system; this is
+      # the packaged side, including the NativeAOT binaries that have no managed assembly left to
+      # reflect over. F.4b in docs/STEPS.md is why it exists.
+      - name: Verify the packaged binaries publish as the project
+        shell: bash
+        run: scripts/verify-publisher-metadata.sh artifacts/stage
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: dist-${{ matrix.rid }}

@@ -8,6 +8,15 @@ Versions are the ones published at `https://dl.keypaste.com/v<version>/`. Every 
 
 These changes are available in source on `main`, **not in the `v0.1.0` downloads**. The source version still reports `0.1.0`; its version string alone does not identify the published bytes.
 
+**The programs now say keypaste published them.** Open the properties of a downloaded
+`keypaste.exe` and the company and copyright named a person — on a project whose whole public
+identity is the project. The value came from a field nobody had set: `Company` was blank, the
+build filled it in from `Authors`, and what shipped appeared in no file you could search for. It
+is set on purpose now, and the copyright reads `Copyright (c) 2026 keypaste`. `KeePassLib.dll`,
+the vendored KDBX library the app ships beside it, had a blank copyright where it should carry
+Dominik Reichl's; it carries his now, which is what its licence asks for. The `v0.1.0` downloads
+are unchanged and cannot be changed — this is what the next release will say.
+
 **Minimizing the window can lock your vault, which is what the checkbox always claimed.** "Lock
 when the window is minimized" has been in Settings since the entry screens shipped. It saved your
 choice, showed it ticked on every later visit, and nothing anywhere read it: no part of the app
