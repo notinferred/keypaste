@@ -105,6 +105,10 @@ not block unrelated ready work. Record the missing external action and move to t
 
 Each checkbox is one bounded task. **Needs** lists prerequisite IDs; **Build** describes the change;
 **Verify** describes observable acceptance and must fail if that behavior or its evidence is absent.
+An optional **Status** line records blockage or partial evidence; it never softens the Verify line
+above it, and a task with one is still unchecked. **Within a section, order by readiness rather than
+by ID:** work that can start today first, then work waiting on an action, then BLOCKED work last, so
+the first bullet is the one the pickup rule will actually choose.
 Keep IDs stable. Split large tasks into lettered children; a parent request selects its first ready
 child, while a dependency on a split parent means all of its children. The ID map at the end
 preserves historical references. An explicit numbered gate lists everything required for its outcome.
@@ -129,10 +133,6 @@ before the fix and verifies the corrected behavior. Keep the shared core and mat
 these tasks repair existing behavior and do not require a product rewrite. Record reproductions
 in repository fixtures/tests, so completion does not depend on a maintainer's temporary files.
 
-- [ ] **F.2b2 — Observe minimize-lock on macOS and Linux. BLOCKED:** no macOS machine and no Linux desktop session are available (2026-09-08); run it during the 4.7a/4.7b desktop candidate work, when an archive for each target exists anyway. Needs: F.2b1.
-  **Build:** Run F.2b1's behavior on the remaining two advertised desktop targets and record what each actually did, including any window manager that does not report a minimize. Change [MinimizeLock](../src/Keypaste.App/MinimizeLock.cs)'s supported-surface answer if an observation contradicts it, rather than leaving the checkbox offered where it does nothing.
-  **Verify (V-F.2b2):** Current status holds a dated macOS and a dated Linux result for the enabled, disabled and after-restart cases, each naming the OS version, session type and build. An untested target keeps its unobserved status; a passing headless suite cannot substitute. **External prerequisite:** a macOS machine and a Linux desktop session. The procedure is written down in the [desktop checklist](desktop.md#observing-minimize-lock-on-macos-and-linux) so the observation does not have to be re-derived.
-
 - [ ] **F.3a — Keep approval expiry bounded when the wall clock changes.** Needs: 2.2.
   **Build:** Correct [GrantCache](../src/Keypaste.Core/Approval/GrantCache.cs) lookup and timer expiry using elapsed-time bounds with explicit suspension behavior. A backward wall-clock correction currently keeps a grant usable after its one-shot timer fires and can report a remaining lifetime longer than the approved TTL.
   **Verify (V-F.3a):** Independently move wall and elapsed clocks backward/forward and simulate suspension: a 250 ms grant is unusable after 600 ms elapsed despite a one-hour wall-clock rollback. Remaining lifetime never exceeds the approved TTL; expiry/disconnect/disposal clear owned buffers and leave no orphan timer. Client-held copies remain outside this guarantee.
@@ -152,8 +152,12 @@ in repository fixtures/tests, so completion does not depend on a maintainer's te
 - [ ] **F.4b — Align generated first-party publisher metadata.** Needs: 0.1, 3.0.
   **Build:** Review and align the first-party Authors/Company/Copyright outputs from [Directory.Build.props](../Directory.Build.props) with the documented project identity and accurate attribution. Current Windows output exposes a personal identity despite the project-metadata rule. Apply the chosen fields consistently to CLI/MCP/app packages and retain required third-party notices.
   **Verify (V-F.4b):** Inspect built and packaged executable metadata on each claimed target: first-party identity matches the recorded project choice and required attribution remains intact. Source-property inspection alone cannot pass; changing future metadata makes no claim to remove previously published artifacts or history.
-  **Done 2026-09-08:** first-party binaries publish as `keypaste` and the vendored assembly as upstream; [attribute tests](../tests/Keypaste.Core.Tests/PublisherMetadata.cs) in all four front-end suites and a [packaged gate](../scripts/verify-publisher-metadata.sh) wired into `release.yml` and `app.yml`. Observed by hand on Windows 10 Pro 19045: the NativeAOT `keypaste.exe`/`keypaste-mcp.exe` and the desktop win-x64, linux-x64 and osx-arm64 packages all report CompanyName/LegalCopyright/ProductName `keypaste` where a version resource exists and carry the line where one does not, `KeePassLib.dll` reports Dominik Reichl, and restoring a personal name fails both the attribute test and the gate. D-0097.
-  **Remaining:** the linux-x64, linux-arm64 and osx-arm64 CLI/MCP binaries. NativeAOT does not cross-compile, so those three need one `release.yml` dispatch, which needs a push.
+  **Status:** Built, and checked on the four targets this machine can produce (2026-09-08). First-party binaries publish as `keypaste` and the vendored assembly as upstream; [attribute tests](../tests/Keypaste.Core.Tests/PublisherMetadata.cs) in all four front-end suites and a [packaged gate](../scripts/verify-publisher-metadata.sh) wired into `release.yml` and `app.yml`. Observed by hand on Windows 10 Pro 19045: the NativeAOT `keypaste.exe`/`keypaste-mcp.exe` and the desktop win-x64, linux-x64 and osx-arm64 packages all report CompanyName/LegalCopyright/ProductName `keypaste` where a version resource exists and carry the line where one does not, `KeePassLib.dll` reports Dominik Reichl, and restoring a personal name fails both the attribute test and the gate (D-0097). Waiting on the linux-x64, linux-arm64 and osx-arm64 CLI/MCP binaries: NativeAOT does not cross-compile, so those three need one `release.yml` dispatch, which needs a push.
+
+- [ ] **F.2b2 — Observe minimize-lock on macOS and Linux.** Needs: F.2b1.
+  **Build:** Run F.2b1's behavior on the remaining two advertised desktop targets and record what each actually did, including any window manager that does not report a minimize. Change [MinimizeLock](../src/Keypaste.App/MinimizeLock.cs)'s supported-surface answer if an observation contradicts it, rather than leaving the checkbox offered where it does nothing.
+  **Verify (V-F.2b2):** Current status holds a dated macOS and a dated Linux result for the enabled, disabled and after-restart cases, each naming the OS version, session type and build. An untested target keeps its unobserved status; a passing headless suite cannot substitute. **External prerequisite:** a macOS machine and a Linux desktop session. The procedure is written down in the [desktop checklist](desktop.md#observing-minimize-lock-on-macos-and-linux) so the observation does not have to be re-derived.
+  **Status:** BLOCKED — neither machine is available (2026-09-08). Run it during the 4.7a/4.7b desktop candidate work, when an archive for each target exists anyway.
 
 ### Release foundations
 
