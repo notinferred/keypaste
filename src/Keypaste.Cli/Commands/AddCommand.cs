@@ -76,12 +76,22 @@ internal static class AddCommand
 
         return VaultSession.Open(path, context, vault =>
         {
+            var name = new EntryName(groupPath, title);
             var entryPath = groupPath.Length == 0 ? title : groupPath + "/" + title;
-            if (vault.Find(entryPath) is not null)
+
+            // An entry is its group and its title. Asking the joined form whether one exists said
+            // "already exists" about identities nothing had — a title of `b/c` in `a` refused a
+            // genuinely different `c` in `a/b` (docs/STEPS.md F.1e).
+            if (vault.Find(name) is not null)
             {
                 context.Stderr.WriteLine($"keypaste add: '{entryPath}' already exists");
                 return CliApp.ExitUsageError;
             }
+
+            // Throws when the path already names two: a third would deepen a collision `get`
+            // already refuses, and nothing keypaste writes gets to make that worse. Asked before
+            // any prompt, so a refusal costs nobody a password.
+            var sharesPath = vault.Find(entryPath) is not null;
 
             var username = line.Value("username") ?? Ask(context, "Username: ");
             var url = line.Value("url") ?? Ask(context, "URL: ");
@@ -116,6 +126,15 @@ internal static class AddCommand
             context.Stderr.WriteLine(recipe is { } generated
                 ? $"Added {entryPath} ({generated.Length}-character password generated)"
                 : $"Added {entryPath}");
+
+            // KeePassXC would make this entry, so keypaste does — and says what it costs, because
+            // from here on nothing can address either one by the path they share.
+            if (sharesPath)
+            {
+                context.Stderr.WriteLine(
+                    $"note: '{entryPath}' now names two entries. Address them by group and title; " +
+                    "keypaste get will refuse that path until one is renamed.");
+            }
 
             return CliApp.ExitSuccess;
         });

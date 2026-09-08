@@ -123,6 +123,63 @@ public sealed class VerbTests
         Assert.Equal(CliApp.ExitUsageError, exit);
     }
 
+    /// <summary>
+    /// Three identities can answer to <c>a/b/c</c>: the title in the root group, <c>b/c</c> in
+    /// <c>a</c>, and <c>c</c> in <c>a/b</c>. With the first two present, the third is a different
+    /// identity that no existing-entry check would catch — and creating it would deepen a
+    /// collision <c>get</c> already refuses. The digest is the assertion that nothing was written:
+    /// <see cref="Vault.Save"/> re-randomises salt and nonces, so an unchanged one proves no save
+    /// happened rather than that the contents matched.
+    /// </summary>
+    [Fact]
+    public void Add_APathThatAlreadyNamesTwo_IsRefused_AndTheVaultIsNotWritten()
+    {
+        using var harness = new CliHarness();
+        harness.SeedVault(Master);
+        Author(harness, string.Empty, "a/b/c", "root-titled");
+        Author(harness, "a", "b/c", "slashed");
+
+        var before = Digest(harness.VaultPath);
+
+        harness.Prompt.Enqueue(Master, "third");
+        var exit = harness.Run("add", "a/b/c", "--vault", harness.VaultPath);
+
+        Assert.NotEqual(CliApp.ExitSuccess, exit);
+        Assert.Equal(before, Digest(harness.VaultPath), StringComparer.Ordinal);
+
+        // Why it refused matters: "already exists" would be a false statement about an identity
+        // no entry has, and it is the answer the old joined-path check gave.
+        Assert.Contains("names more than one entry", harness.Err, StringComparison.Ordinal);
+        Assert.DoesNotContain("already exists", harness.Err, StringComparison.Ordinal);
+
+        using var vault = Vault.Open(harness.VaultPath, Master);
+        Assert.Equal(2, vault.ReadEntries().Count);
+    }
+
+    /// <summary>
+    /// The false refusal F.1e removes. An entry titled <c>b/c</c> in <c>a</c> makes the *path*
+    /// <c>a/b/c</c> taken, and that alone used to refuse a genuinely different entry called
+    /// <c>c</c> in <c>a/b</c>. KeePassXC would make it, so keypaste does — and says what it costs,
+    /// because the path is ambiguous from that moment on.
+    /// </summary>
+    [Fact]
+    public void Add_ADistinctIdentityWhosePathIsTaken_IsAllowed_AndSaysWhatItCosts()
+    {
+        using var harness = new CliHarness();
+        harness.SeedVault(Master);
+        Author(harness, "a", "b/c", "slashed");
+
+        harness.Prompt.Enqueue(Master, "fresh");
+        var exit = harness.Run("add", "c", "--group", "a/b", "--vault", harness.VaultPath);
+
+        harness.AssertExit(CliApp.ExitSuccess, exit);
+        Assert.Contains("names two entries", harness.Err, StringComparison.Ordinal);
+
+        using var vault = Vault.Open(harness.VaultPath, Master);
+        Assert.Equal("fresh", vault.Find(new EntryName("a/b", "c"))?.Password);
+        Assert.Equal("slashed", vault.Find(new EntryName("a", "b/c"))?.Password);
+    }
+
     [Fact]
     public void Get_WithShow_WritesOnlyThePasswordToStdout()
     {
@@ -235,6 +292,35 @@ public sealed class VerbTests
 
         Assert.Equal(CliApp.ExitNotFound, exit);
         Assert.Empty(harness.Out);
+    }
+
+    /// <summary>
+    /// The read half of D-0091. Two entries answer to <c>a/b/c</c>, so serving either would be a
+    /// guess — and unlike a guessed removal, a guessed read hands the wrong secret over and says
+    /// nothing about having done it. Both ways out of the verb are checked: <c>--show</c> must
+    /// print no password, and the default must put none on the clipboard.
+    /// </summary>
+    [Fact]
+    public void Get_ACollidingPath_IsRefused_AndReleasesNeitherSecret()
+    {
+        using var harness = new CliHarness();
+        harness.SeedVault(Master, ("a/b/c", "nested-secret"));
+        Author(harness, "a", "b/c", "slashed-secret");
+
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(
+            CliApp.ExitInternalError,
+            harness.Run("get", "a/b/c", "--vault", harness.VaultPath, "--show"));
+
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(
+            CliApp.ExitInternalError,
+            harness.Run("get", "a/b/c", "--vault", harness.VaultPath));
+
+        Assert.Empty(harness.Out);
+        Assert.Equal(0, harness.Clipboard.SetCount);
+        Assert.DoesNotContain("nested-secret", harness.Err, StringComparison.Ordinal);
+        Assert.DoesNotContain("slashed-secret", harness.Err, StringComparison.Ordinal);
     }
 
     [Fact]

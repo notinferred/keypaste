@@ -8,6 +8,21 @@ Versions are the ones published at `https://dl.keypaste.com/v<version>/`. Every 
 
 These changes are available in source on `main`, **not in the `v0.1.0` downloads**. The source version still reports `0.1.0`; its version string alone does not identify the published bytes.
 
+**A path two entries answer to no longer hands out one of their secrets.** F.1a stopped
+`keypaste env rm` deleting the wrong entry, and left the reading half alone. So `keypaste get
+env/dev/nested/TOKEN` still served whichever of `nested/TOKEN` in `env/dev` and `TOKEN` in
+`env/dev/nested` the file listed first — the wrong password, on your clipboard or your screen,
+with nothing saying it had chosen. The desktop's Copy button did the same, and an inline edit
+read the wrong entry and then wrote your change into it. All three now refuse and name the
+collision, and the desktop pane addresses the entry you selected by its group and its title
+rather than by the two joined. Removing is unchanged.
+
+**`keypaste add` no longer refuses an entry that does not exist.** A title of `b/c` in group `a`
+made the *path* `a/b/c` taken, and that was enough to reject a genuinely different `c` in `a/b`
+with "already exists". It checks the identity now, so that entry can be created — and says
+afterwards that the path names two things, because that is what you have just made. What it
+still refuses is a third entry on a path that already names two.
+
 **`env pull` deletes the file it imported, not whatever is at that path when it finishes.** Add a
 variable to your `.env` while keypaste is asking for your master password — or while it is asking
 whether to import, or whether to delete — and the old code deleted it anyway, having read the file
