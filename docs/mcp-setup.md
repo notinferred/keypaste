@@ -164,6 +164,7 @@ jq -c . < ~/.keypaste/audit.jsonl
 | `grant-cache` | Served from a grant a person had already given, inside its lifetime. **They did not see this request's reason** — compare it with the earlier `prompt` line for the same entry. |
 | `policy` | Released by a standing rule you wrote in `~/.keypaste/policy.toml`. **Nobody was asked at all**, and no `prompt` line exists to compare against — the `reason` field names which rule did it. See [policy.md](policy.md). |
 | `policy-limit` | A rule covered the request but had spent its `max_per_hour` allowance. |
+| `undeliverable` | The request was authorized — by a person or by a rule — and the value was too large to return in one reply, so nothing was released. The `reason` names which of the two it was. Nothing partial is ever sent. |
 | `exposure` | A listing, allowed because everything named was inside your `--expose` globs. |
 | `no-approver` | Nobody was running `keypaste agent`. |
 | `out-of-scope` | The entry was outside your globs, or does not exist — deliberately the same answer, so an agent cannot use the difference to find out what exists. |

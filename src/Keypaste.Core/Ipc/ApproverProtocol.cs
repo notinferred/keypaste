@@ -52,6 +52,32 @@ public static class ApproverProtocol
     /// </remarks>
     internal const string Undersized = "the reply did not fit one message";
 
+    /// <summary>Stands in for a refusal whose own explanation will not fit a frame.</summary>
+    /// <remarks>
+    /// Reachable through <c>ApproverHandler</c>'s glob failure, which interpolates an
+    /// operator-supplied parse error into its reason with no cap of its own. The refusal keeps its
+    /// method and loses only the detail: nothing was authorized on that path, so it must not borrow
+    /// <see cref="UndeliverableReason"/>'s sentence.
+    /// </remarks>
+    internal const string Oversized = "the reason for this refusal did not fit one message";
+
+    /// <summary>What the log and the bridge are told when an authorized release will not fit.</summary>
+    /// <param name="authority">The method the release was granted under.</param>
+    /// <returns>keypaste's own words, naming which authority allowed it.</returns>
+    /// <remarks>
+    /// Selected by the authority rather than written once, because a release a standing rule allowed
+    /// must never be recorded as a human act (THREATS.md T-16). This is the only path in keypaste
+    /// where a denial follows an authorization, so it is the only place where naming the authority
+    /// on a denied line is meaningful at all.
+    /// </remarks>
+    internal static string UndeliverableReason(AuditMethod authority) => authority switch
+    {
+        AuditMethod.Prompt => "a person approved this release and it was too large to send in one reply",
+        AuditMethod.GrantCache => "a person had already approved this release and it was too large to send in one reply",
+        AuditMethod.Policy => "a standing rule authorized this release and it was too large to send in one reply",
+        _ => "this release was authorized and it was too large to send in one reply",
+    };
+
     /// <summary>Encodes a request for entry names.</summary>
     /// <param name="request">What to ask for.</param>
     /// <returns>The frame's bytes, without a delimiter.</returns>
@@ -203,15 +229,90 @@ public static class ApproverProtocol
         writer.WriteEndObject();
     }
 
-    /// <summary>Encodes a reply to a credential request.</summary>
+    /// <summary>Encodes a reply to a credential request, bounded to what one frame can carry.</summary>
     /// <param name="reply">The decision, and the value on the one path that has one.</param>
-    /// <returns>The frame's bytes, without a delimiter.</returns>
+    /// <returns>The frame's bytes, without a delimiter. Never over <see cref="MessageFramer.MaximumPayloadBytes"/>.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
+    /// <remarks>
+    /// <para>
+    /// <b>This method is total</b>, for the reason <see cref="Encode(NamesReply)"/> gives and one
+    /// more: <c>notes</c> is a releasable field and a KDBX note has no length limit, so a
+    /// <em>granted</em> reply could exceed a frame. The write then threw,
+    /// <see cref="ApproverListener"/>'s outermost <c>catch</c> ended the connection, and the
+    /// <c>finally</c> revoked the grants scoped to it — after a person had approved the release,
+    /// which the agent was then told had gone wrong.
+    /// </para>
+    /// <para>
+    /// <b>A credential is refused whole, never trimmed.</b> A shortened secret is not a shorter
+    /// secret, it is a different one, and a prefix of a live credential on the wire is most of what
+    /// this bound exists to prevent. The substitute is built from scratch and has no value member at
+    /// all, so no part of one can survive into it.
+    /// </para>
+    /// <para>
+    /// <b>The substitution reads the original decision.</b> A refusal that was already a refusal —
+    /// the reachable case is an uncapped glob error — keeps its own method and loses only its
+    /// detail, because nothing was authorized there and borrowing
+    /// <see cref="UndeliverableReason"/>'s sentence would put one untrue record in place of another.
+    /// </para>
+    /// </remarks>
     public static byte[] Encode(CredentialReply reply)
     {
         ArgumentNullException.ThrowIfNull(reply);
 
-        return Write(writer =>
+        var frame = WriteCredential(reply);
+
+        if (frame.Length <= MessageFramer.MaximumPayloadBytes)
+        {
+            return frame;
+        }
+
+        var refusal = WriteCredential(Bounded(reply, reply.Entry));
+
+        // Belt and braces, as on the listing path: the entry is capped by EntryNameSanitizer long
+        // before it gets here, and this is what stops an error in that reasoning costing a
+        // connection and its grants rather than one release (docs/PRODUCT.md law 3.7).
+        return refusal.Length <= MessageFramer.MaximumPayloadBytes
+            ? refusal
+            : WriteCredential(Bounded(reply, entry: null));
+    }
+
+    /// <summary>Whether a reply would reach the peer as itself, rather than as a refusal.</summary>
+    /// <param name="reply">The reply the handler is about to return.</param>
+    /// <returns><see langword="true"/> when it fits one frame.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
+    /// <remarks>
+    /// The same question <see cref="Encode(CredentialReply)"/> asks, through the same writer and the
+    /// same budget, so the two cannot answer it differently. The encoder needs it because the method
+    /// must be total for any input; <c>ApproverHandler</c> needs it because it narrates a release to
+    /// the operator's terminal before the reply has left the process, and that line is the only
+    /// record the approver produces itself.
+    /// </remarks>
+    internal static bool Fits(CredentialReply reply)
+    {
+        ArgumentNullException.ThrowIfNull(reply);
+
+        return WriteCredential(reply).Length <= MessageFramer.MaximumPayloadBytes;
+    }
+
+    private static CredentialReply Bounded(CredentialReply reply, string? entry) =>
+        reply.Decision == AuditDecision.Granted
+            ? new CredentialReply
+            {
+                Decision = AuditDecision.Denied,
+                Method = AuditMethod.Undeliverable,
+                Reason = UndeliverableReason(reply.Method),
+                Entry = entry,
+            }
+            : new CredentialReply
+            {
+                Decision = AuditDecision.Denied,
+                Method = reply.Method,
+                Reason = Oversized,
+                Entry = entry,
+            };
+
+    private static byte[] WriteCredential(CredentialReply reply) =>
+        Write(writer =>
         {
             writer.WriteNumber("v", Version);
             writer.WriteString("kind", CredentialKind);
@@ -222,7 +323,6 @@ public static class ApproverProtocol
             WriteOptional(writer, "entry", reply.Entry);
             WriteOptional(writer, "value", reply.Value);
         });
-    }
 
     /// <summary>Which kind of message a frame is, without committing to parsing it.</summary>
     /// <param name="frame">The frame's bytes.</param>

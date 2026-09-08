@@ -366,6 +366,7 @@ public sealed class ApproverProtocolTests
                  {
                      ApproverProtocol.Encode(Request(hostile)),
                      ApproverProtocol.Encode(Granted() with { Reason = hostile }),
+                     ApproverProtocol.Encode(Granted(hostile + new string('n', 100_000))),
                      ApproverProtocol.Encode(new NamesReply(true, [new EntryName(hostile, hostile)], hostile, true)),
                  })
         {
@@ -464,6 +465,198 @@ public sealed class ApproverProtocolTests
         using var parsed = JsonDocument.Parse(ApproverProtocol.Encode(Request()));
 
         Assert.Equal(ApproverProtocol.Version, parsed.RootElement.GetProperty("v").GetInt32());
+    }
+
+    /// <summary>A note nobody could send is answered with a refusal, not with an unsendable frame.</summary>
+    /// <remarks>
+    /// <c>notes</c> is a releasable field and a KDBX note has no length limit, so this is an
+    /// ordinary vault entry rather than a hostile one. Before F.3d the frame was written anyway,
+    /// <see cref="MessageFramer"/> threw on the write, and the connection went down with the grants
+    /// scoped to it — after a person had already approved the release.
+    /// </remarks>
+    [Fact]
+    public void AGrantedReplyTooBigForOneFrame_IsEncodedAsARefusal()
+    {
+        var frame = ApproverProtocol.Encode(Granted(new string('n', 100_000)));
+
+        Assert.True(frame.Length <= MessageFramer.MaximumPayloadBytes);
+        Assert.True(ApproverProtocol.TryDecode(frame, out CredentialReply? reply));
+
+        Assert.Equal(AuditDecision.Denied, reply.Decision);
+        Assert.Equal(AuditMethod.Undeliverable, reply.Method);
+        Assert.Null(reply.Value);
+        Assert.Equal(0, reply.TtlSeconds);
+
+        // The entry survives, because the audit line the bridge writes out of this reply exists to
+        // answer which entry it was.
+        Assert.Equal("env/dev/STRIPE_KEY", reply.Entry, StringComparer.Ordinal);
+    }
+
+    /// <summary>
+    /// The refusal carries no part of the value. This is the test that catches "truncate it instead".
+    /// </summary>
+    /// <remarks>
+    /// A shortened credential is not a shorter credential, it is a different one — and a prefix of a
+    /// live secret on the wire is most of what a bounded reply exists to prevent. The sentinel sits
+    /// at the front of the value, which is where a truncation would keep it.
+    /// </remarks>
+    [Fact]
+    public void AnUndeliverableReply_CarriesNoByteOfTheValue()
+    {
+        const string sentinel = "sk_live_SENTINEL_9a3e21";
+
+        var frame = ApproverProtocol.Encode(Granted(sentinel + new string('n', 100_000)));
+
+        Assert.DoesNotContain(sentinel, Encoding.UTF8.GetString(frame), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The refusal says which authority the release had, and never invents one it did not have.
+    /// </summary>
+    /// <remarks>
+    /// THREATS.md T-16: a release a standing rule authorized must never be written up as a human
+    /// act, and this is the one path where a denial follows an authorization — so the sentence has
+    /// to be chosen by the method the reply arrived with rather than written once for all three.
+    /// </remarks>
+    [Theory]
+    [InlineData(AuditMethod.Prompt)]
+    [InlineData(AuditMethod.GrantCache)]
+    [InlineData(AuditMethod.Policy)]
+    public void AnUndeliverableReply_NamesTheAuthorityItHad(AuditMethod authority)
+    {
+        var frame = ApproverProtocol.Encode(
+            Granted(new string('n', 100_000)) with { Method = authority });
+
+        Assert.True(ApproverProtocol.TryDecode(frame, out CredentialReply? reply));
+        Assert.Equal(AuditMethod.Undeliverable, reply.Method);
+        Assert.Equal(ApproverProtocol.UndeliverableReason(authority), reply.Reason, StringComparer.Ordinal);
+
+        Assert.Equal(
+            authority != AuditMethod.Policy,
+            reply.Reason.Contains("person", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// A refusal too long to send stays a refusal under its own method, rather than being reported
+    /// as a release that could not be delivered.
+    /// </summary>
+    /// <remarks>
+    /// The reachable case is <c>ApproverHandler</c>'s glob failure, which interpolates an
+    /// operator-supplied parse error into its reason with no cap of its own. Nothing was authorized
+    /// there and nothing was read, so borrowing the undeliverable-release sentence would put one
+    /// untrue record in place of another.
+    /// </remarks>
+    [Fact]
+    public void AnOverlongRefusal_StaysARefusalAndKeepsItsMethod()
+    {
+        var frame = ApproverProtocol.Encode(new CredentialReply
+        {
+            Decision = AuditDecision.Denied,
+            Method = AuditMethod.Failed,
+            Reason = new string('e', 100_000),
+            Entry = "env/dev/STRIPE_KEY",
+        });
+
+        Assert.True(frame.Length <= MessageFramer.MaximumPayloadBytes);
+        Assert.True(ApproverProtocol.TryDecode(frame, out CredentialReply? reply));
+
+        Assert.Equal(AuditDecision.Denied, reply.Decision);
+        Assert.Equal(AuditMethod.Failed, reply.Method);
+        Assert.Equal(ApproverProtocol.Oversized, reply.Reason, StringComparer.Ordinal);
+    }
+
+    /// <summary>
+    /// The budget is spent in encoded bytes, not in characters somebody counted beforehand.
+    /// </summary>
+    /// <remarks>
+    /// The default encoder escapes every non-ASCII UTF-16 code unit to <c>\uXXXX</c>, so one astral
+    /// rune costs twelve bytes on the wire and two characters in memory. The two values here are the
+    /// same number of <see cref="string"/> characters and differ by a factor of six once encoded,
+    /// which is why any count taken outside this writer is a second answer waiting to disagree.
+    /// </remarks>
+    [Fact]
+    public void AValueOfAstralRunes_IsMeasuredAsEncodedNotAsCharacters()
+    {
+        const int characters = 12_000;
+
+        var astral = string.Concat(Enumerable.Repeat("\U0001F600", characters / 2));
+        var ascii = new string('a', characters);
+
+        Assert.Equal(astral.Length, ascii.Length);
+
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(Granted(astral)), out CredentialReply? refused));
+        Assert.Equal(AuditMethod.Undeliverable, refused.Method);
+
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(Granted(ascii)), out CredentialReply? delivered));
+        Assert.Equal(ascii, delivered.Value, StringComparer.Ordinal);
+    }
+
+    /// <summary>
+    /// A reply that exactly fills a frame is still delivered, and one byte more is not.
+    /// </summary>
+    /// <remarks>
+    /// Both halves in one test on purpose: the first fails if the bound is applied a byte early or
+    /// the refusal becomes unconditional, and the second fails if it is applied a byte late. A
+    /// credential is the one payload where "nearly" is not something this protocol can say.
+    /// </remarks>
+    [Fact]
+    public void AReplyThatExactlyFillsAFrame_IsDeliveredAndOneByteMoreIsNot()
+    {
+        var envelope = ApproverProtocol.Encode(Granted(string.Empty)).Length;
+        var exact = new string('a', MessageFramer.MaximumPayloadBytes - envelope);
+
+        var fits = ApproverProtocol.Encode(Granted(exact));
+
+        Assert.Equal(MessageFramer.MaximumPayloadBytes, fits.Length);
+        Assert.True(ApproverProtocol.TryDecode(fits, out CredentialReply? delivered));
+        Assert.Equal(exact, delivered.Value, StringComparer.Ordinal);
+
+        Assert.True(
+            ApproverProtocol.TryDecode(ApproverProtocol.Encode(Granted(exact + "a")), out CredentialReply? refused));
+        Assert.Equal(AuditMethod.Undeliverable, refused.Method);
+        Assert.Null(refused.Value);
+    }
+
+    /// <summary>
+    /// No credential reply, however it is built, encodes to a frame this transport cannot send.
+    /// </summary>
+    /// <remarks>
+    /// The property rather than the cases: every member that can grow is grown here, including two
+    /// that grow together, and each has to come back as a frame inside the budget that still
+    /// decodes. <c>MessageFramerTests.WhatTheProtocolEncodes_IsAlwaysWritable</c> ties the same
+    /// claim to the guard that would otherwise end the connection.
+    /// </remarks>
+    [Fact]
+    public void EveryCredentialReplyThisVersionEncodes_FitsOneFrame()
+    {
+        var huge = new string('n', 100_000);
+        var hostile = string.Concat(Enumerable.Repeat("\"<&> \U0001F600", 20_000));
+
+        foreach (var reply in new[]
+                 {
+                     Granted(huge),
+                     Granted(hostile),
+                     Granted(huge) with { Entry = huge },
+                     Granted(huge) with { Reason = huge },
+                     Granted(string.Empty) with { Entry = huge, Reason = huge },
+                     new CredentialReply
+                     {
+                         Decision = AuditDecision.Denied,
+                         Method = AuditMethod.OutOfScope,
+                         Reason = hostile,
+                         Entry = huge,
+                     },
+                 })
+        {
+            var frame = ApproverProtocol.Encode(reply);
+
+            Assert.True(
+                frame.Length <= MessageFramer.MaximumPayloadBytes,
+                $"encoded {frame.Length} bytes, over the {MessageFramer.MaximumPayloadBytes}-byte budget");
+
+            Assert.True(ApproverProtocol.TryDecode(frame, out CredentialReply? decoded));
+            Assert.NotNull(decoded);
+        }
     }
 
     [Fact]

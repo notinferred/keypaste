@@ -117,6 +117,26 @@ public enum AuditMethod
     /// credential to nobody in particular.
     /// </remarks>
     NotInitialized = 15,
+
+    /// <summary>
+    /// The request was authorized and the reply carrying the field would not fit one message, so
+    /// nothing was returned.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A word of its own rather than a reuse, and the choice is the whole of D-0103.
+    /// <see cref="Failed"/> says asking went wrong, and on this path asking went right — a person
+    /// said yes, or a rule did, and a field was decrypted. <see cref="Prompt"/> beside
+    /// <see cref="AuditDecision.Denied"/> already means a person considered this and said no, which
+    /// is the one distinction T-16 exists to protect. And the decision stays denied, because
+    /// nothing was released, which is exactly what that word means.
+    /// </para>
+    /// <para>
+    /// The record's reason names which authority the release had, so a rule's release is never
+    /// written up as a human act. This is the only method where a denial follows an authorization.
+    /// </para>
+    /// </remarks>
+    Undeliverable = 16,
 }
 
 /// <summary>Who asked.</summary>

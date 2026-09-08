@@ -8,6 +8,20 @@ Versions are the ones published at `https://dl.keypaste.com/v<version>/`. Every 
 
 These changes are available in source on `main`, **not in the `v0.1.0` downloads**. The source version still reports `0.1.0`; its version string alone does not identify the published bytes.
 
+**A password you approved and never received is now said out loud, and it no longer costs you the
+rest of your approvals.** Some entries carry a long note — a certificate, a private key somebody
+pasted in, a page of instructions. If an agent asked for one of those and you said yes, keypaste
+could not send the answer: the reply was bigger than one message. The connection dropped, everything
+else you had approved on it was thrown away, the agent tried again and you were asked the same
+question a second time — and after all that the log recorded it as though nobody had approved
+anything and the agent had never reached a person at all. Now the answer arrives. It says the
+release was approved and the value was too large to send, it says so in the log in those words, and
+it tells the agent not to ask again because nothing about it will change. Nothing partial is ever
+sent: keypaste will not hand over a shortened copy of a secret, because a shortened secret is a
+different secret. Asking twice costs one question rather than two, the connection stays up, and the
+next thing you approve on it works normally. If you need a value that large, copy it yourself — that
+is the honest answer, and it is now the one you are given.
+
 **A vault with a lot of entries in it can be listed now, and it costs you nothing to do it.** If an
 agent asked for the names of your entries and there were too many of them to send in one go — around
 a thousand ordinary ones, or far fewer if they are long or written in a script other than English —

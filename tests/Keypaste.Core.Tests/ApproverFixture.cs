@@ -32,6 +32,14 @@ internal sealed class ApproverFixture : IDisposable
     /// <summary>What is pre-authorized, on the same clock as everything else.</summary>
     internal PolicyGate Policy { get; }
 
+    /// <summary>Every line the handler printed to the operator's terminal, in order.</summary>
+    /// <remarks>
+    /// The approver writes no audit line (D-0020), so this is the only record it produces itself.
+    /// A line claiming a release that never left the process is therefore the only place that
+    /// claim would ever be made, which is why it is worth asserting on.
+    /// </remarks>
+    internal List<string> Narration { get; } = [];
+
     /// <summary>Builds a fixture.</summary>
     /// <param name="policy">
     /// The rules in force. Defaults to none, so every test written before this feature existed
@@ -49,7 +57,7 @@ internal sealed class ApproverFixture : IDisposable
         Grants = new GrantCache(Clock);
         Gate = new ApprovalGate(Channel, Clock, limits ?? ApprovalLimits.Default);
         Policy = new PolicyGate(policy ?? PolicyDocument.None, Clock);
-        Handler = new ApproverHandler(Source, Source, Gate, Grants, Policy);
+        Handler = new ApproverHandler(Source, Source, Gate, Grants, Policy, Narration.Add);
     }
 
     public void Dispose()
@@ -73,6 +81,9 @@ internal sealed class FakeSource : ICredentialSource, IEntryNameLister
     internal bool FailReads { get; set; }
 
     internal int Reads { get; private set; }
+
+    /// <summary>What a read returns. Settable so a test can hand over a field no frame can carry.</summary>
+    internal string Value { get; set; } = ApproverFixture.Sentinel;
 
     public bool TryResolve(string entryArgument, [NotNullWhen(true)] out EntryName? name, out CredentialFailure failure)
     {
@@ -114,7 +125,7 @@ internal sealed class FakeSource : ICredentialSource, IEntryNameLister
         }
 
         Reads++;
-        value = new ReleasedField(field, ApproverFixture.Sentinel);
+        value = new ReleasedField(field, Value);
         failure = CredentialFailure.None;
         return true;
     }

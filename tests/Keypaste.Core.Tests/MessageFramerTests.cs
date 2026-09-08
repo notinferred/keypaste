@@ -1,3 +1,4 @@
+using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
 using Xunit;
 
@@ -21,6 +22,16 @@ public sealed class MessageFramerTests
 
     private static EntryName Astral(int runes) =>
         new("env/dev", string.Concat(Enumerable.Repeat("\U000E0041", runes)));
+
+    private static CredentialReply Released(string value) => new()
+    {
+        Decision = AuditDecision.Granted,
+        Method = AuditMethod.Prompt,
+        Reason = "a person approved this request",
+        Entry = "env/dev/STRIPE_KEY",
+        TtlSeconds = 300,
+        Value = value,
+    };
 
     /// <summary>Ordinary names, encoding to seventy-six bytes each. See <see cref="ApproverProtocolTests"/>.</summary>
     private static IReadOnlyList<EntryName> Ordinary(int count) =>
@@ -55,17 +66,25 @@ public sealed class MessageFramerTests
     }
 
     /// <summary>
-    /// Nothing <see cref="ApproverProtocol"/> encodes can be too big to send, for any input.
+    /// Nothing <see cref="ApproverProtocol"/> encodes can be too big to send, for any input, on
+    /// either of the two reply paths.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// The single assertion this whole bound exists for. It is written as "the framer accepts it"
     /// rather than as a length comparison so that the two files cannot drift: if the ceiling moves,
     /// this still tests the real question.
+    /// </para>
+    /// <para>
+    /// Both kinds, because they failed the same way and are fixed differently: a listing keeps the
+    /// names that fit, and a credential cannot be trimmed at all, so an over-size one comes back as
+    /// a refusal. Neither may reach the guard below.
+    /// </para>
     /// </remarks>
     [Fact]
     public async Task WhatTheProtocolEncodes_IsAlwaysWritable()
     {
-        NamesReply[] adversarial =
+        NamesReply[] listings =
         [
             // The reproduced case: a thousand ordinary names, which encode past sixty-four kibibytes.
             new(true, Ordinary(1000), string.Empty, true),
@@ -82,10 +101,34 @@ public sealed class MessageFramerTests
             new(false, [], "no vault is unlocked", true),
         ];
 
+        // A KDBX note is a releasable field with no length limit, so this is not a hostile peer —
+        // it is somebody who pasted a certificate into an entry and then approved a request for it.
+        CredentialReply[] releases =
+        [
+            Released(new string('n', 100_000)),
+            Released(string.Concat(Enumerable.Repeat("\U000E0041", 100_000))),
+            Released(string.Concat(Enumerable.Repeat("\"<&> ", 40_000))),
+            Released("sk_live_short"),
+
+            // A refusal whose own explanation is over-size: the operator's glob error, uncapped.
+            new()
+            {
+                Decision = AuditDecision.Denied,
+                Method = AuditMethod.Failed,
+                Reason = new string('e', 100_000),
+                Entry = "env/dev/STRIPE_KEY",
+            },
+        ];
+
         using var sink = new MemoryStream();
         using var framer = new MessageFramer(sink, ownsStream: false);
 
-        foreach (var reply in adversarial)
+        foreach (var reply in listings)
+        {
+            await framer.WriteAsync(ApproverProtocol.Encode(reply), Token);
+        }
+
+        foreach (var reply in releases)
         {
             await framer.WriteAsync(ApproverProtocol.Encode(reply), Token);
         }

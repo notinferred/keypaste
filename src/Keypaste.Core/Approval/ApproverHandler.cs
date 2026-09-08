@@ -152,17 +152,18 @@ public sealed class ApproverHandler : IApproverHandler
         {
             if (_grants.TryUse(key, out live, out var remaining))
             {
-                _narrate?.Invoke($"reused an approval for {display} ({(int)remaining.TotalSeconds}s left)");
-
-                return new CredentialReply
-                {
-                    Decision = AuditDecision.Granted,
-                    Method = AuditMethod.GrantCache,
-                    Reason = "served from a grant a person had already given, inside its lifetime",
-                    Entry = display,
-                    TtlSeconds = (int)remaining.TotalSeconds,
-                    Value = live.Value.ToString(),
-                };
+                return Deliver(
+                    new CredentialReply
+                    {
+                        Decision = AuditDecision.Granted,
+                        Method = AuditMethod.GrantCache,
+                        Reason = "served from a grant a person had already given, inside its lifetime",
+                        Entry = display,
+                        TtlSeconds = (int)remaining.TotalSeconds,
+                        Value = live.Value.ToString(),
+                    },
+                    display,
+                    $"reused an approval for {display} ({(int)remaining.TotalSeconds}s left)");
             }
         }
         finally
@@ -216,18 +217,24 @@ public sealed class ApproverHandler : IApproverHandler
 
         using (released)
         {
+            // Stored even when the reply below turns out not to fit. The size belongs to the entry
+            // rather than to the request, so every retry would end the same way — and re-prompting
+            // for each one is THREATS.md T-11 with a lever attached. From the cache, the second ask
+            // is refused without troubling anybody, and the copy is zeroed at its ordinary TTL.
             _grants.Store(key, released, TimeSpan.FromSeconds(ttl));
-            _narrate?.Invoke($"released {display} to {prompt.Client} for {ttl}s");
 
-            return new CredentialReply
-            {
-                Decision = AuditDecision.Granted,
-                Method = AuditMethod.Prompt,
-                Reason = "a person approved this request",
-                Entry = display,
-                TtlSeconds = ttl,
-                Value = released.Value.ToString(),
-            };
+            return Deliver(
+                new CredentialReply
+                {
+                    Decision = AuditDecision.Granted,
+                    Method = AuditMethod.Prompt,
+                    Reason = "a person approved this request",
+                    Entry = display,
+                    TtlSeconds = ttl,
+                    Value = released.Value.ToString(),
+                },
+                display,
+                $"released {display} to {prompt.Client} for {ttl}s");
         }
     }
 
@@ -267,19 +274,20 @@ public sealed class ApproverHandler : IApproverHandler
 
         using (released)
         {
-            // Unconditional on the operator's terminal, and the only live signal that this
+            // One line on the operator's terminal either way, and the only live signal that this
             // happened at all: no prompt was drawn and nobody was asked (THREATS.md T-12).
-            _narrate?.Invoke($"released {display} to {rule.Id} for {ttl}s without asking");
-
-            return new CredentialReply
-            {
-                Decision = AuditDecision.Granted,
-                Method = AuditMethod.Policy,
-                Reason = $"pre-authorized by policy rule {rule.Cite()}",
-                Entry = display,
-                TtlSeconds = ttl,
-                Value = released.Value.ToString(),
-            };
+            return Deliver(
+                new CredentialReply
+                {
+                    Decision = AuditDecision.Granted,
+                    Method = AuditMethod.Policy,
+                    Reason = $"pre-authorized by policy rule {rule.Cite()}",
+                    Entry = display,
+                    TtlSeconds = ttl,
+                    Value = released.Value.ToString(),
+                },
+                display,
+                $"released {display} to {rule.Id} for {ttl}s without asking");
         }
     }
 
@@ -289,6 +297,39 @@ public sealed class ApproverHandler : IApproverHandler
         ArgumentNullException.ThrowIfNull(connectionId);
 
         _grants.Revoke(connectionId);
+    }
+
+    /// <summary>Hands back a release the peer can actually be sent, or a refusal saying why not.</summary>
+    /// <param name="granted">The release, already authorized and already read.</param>
+    /// <param name="display">The sanitized entry, for the refusal and the terminal.</param>
+    /// <param name="narration">What to tell the operator when the release does leave.</param>
+    /// <returns><paramref name="granted"/>, or a denial under <see cref="AuditMethod.Undeliverable"/>.</returns>
+    /// <remarks>
+    /// <para>
+    /// The check is <see cref="ApproverProtocol"/>'s, because only the writer knows what a value
+    /// costs once escaped. Asking here as well as there is not a second answer to one question — it
+    /// is the same function and the same budget — it is that <b>this method narrates</b>, and a line
+    /// saying a credential was released before the reply has left the process is a claim nothing
+    /// else in keypaste would ever contradict. The approver writes no audit line (D-0020).
+    /// </para>
+    /// <para>
+    /// The refusal names which authority the release had, so a rule's release is never written up
+    /// as a person's (THREATS.md T-16). It is the one denial in keypaste that follows a yes.
+    /// </para>
+    /// </remarks>
+    private CredentialReply Deliver(CredentialReply granted, string display, string narration)
+    {
+        if (!ApproverProtocol.Fits(granted))
+        {
+            _narrate?.Invoke($"could not deliver {display}: the reply is larger than one message");
+
+            return Refused(
+                AuditMethod.Undeliverable, ApproverProtocol.UndeliverableReason(granted.Method), display);
+        }
+
+        _narrate?.Invoke(narration);
+
+        return granted;
     }
 
     /// <summary>
