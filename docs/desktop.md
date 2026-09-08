@@ -116,7 +116,9 @@ A missing log is normal before the MCP bridge has initialized one. Requests and 
 
 The field you type it into is not a text box, and that is deliberate: Avalonia's `TextBox` exposes its contents through the accessibility layer with no exception for password fields, and keeps an undo history of `string`s that cannot be wiped. The control here holds no password at all — it reports one character at a time to a buffer that is wiped on every path out, and its accessibility peer exposes nothing.
 
-**One honest limit.** Each keystroke arrives as a short-lived string the runtime will not let us wipe, and a **paste** arrives as the whole password in one such string. That is narrower than a field holding your password for as long as the window is open, and it is not nothing. `SECURITY.md` carries the full account.
+What reaches the accessibility layer is the placeholder and the row of dots — the number of characters you have typed, never which ones — and that is a test rather than a claim.
+
+**One honest limit, and one gap.** Each keystroke arrives as a short-lived string the runtime will not let us wipe, and an input method can deliver several at once. That is narrower than a field holding your password for as long as the window is open, and it is not nothing. The gap: `Ctrl/Cmd+V` does nothing in this field, because nothing in the app reads clipboard text. `SECURITY.md` carries the full account.
 
 ## Checking a build by hand
 
