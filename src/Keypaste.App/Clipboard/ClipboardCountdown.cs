@@ -27,22 +27,18 @@ namespace Keypaste.App.Clipboard;
 /// for the whole timeout window purely to power the same guard (O-0008); there is no reason to.
 /// </para>
 /// <para>
-/// <b>One operation at a time, and one point where ownership changes hands.</b> Writing to the
-/// clipboard is a round trip through the windowing system, and a lock, a quit, a Clear now or a
-/// second copy can all arrive while it is outstanding. Every operation therefore runs through
-/// <see cref="Run"/>, one after another; <see cref="Take"/> ends the current countdown
-/// <i>synchronously</i> and hands whatever was owned to the caller; and a continuation that comes
-/// back to find its <c>epoch</c> superseded gives the clipboard back instead of installing a secret
-/// nothing is counting down any more. Locking never waits for that — it takes the countdown away
-/// at once and the giving back happens behind it (F.2c, D-0098).
+/// <b>One operation at a time, and one point where ownership changes hands.</b> A lock, a quit or
+/// a second copy can arrive while a write is still inside the windowing system, so operations run
+/// through <see cref="Run"/> in order, <see cref="Take"/> ends the countdown synchronously, and a
+/// continuation that finds its epoch superseded gives the clipboard back rather than installing a
+/// secret nothing is counting down (D-0098).
 /// </para>
 /// <para>
-/// <b>What it can promise, and what it cannot.</b> It clears at the deadline, on a lock, and on an
-/// orderly quit, in each case only if the clipboard still holds the secret. A write the platform
-/// has not handed back yet is taken back as soon as it does, which is not the same as before the
-/// lock. It promises <i>nothing</i> against <c>kill -9</c>, End Task, an OOM kill, a power cut or a
-/// logout — nothing running is left to do the clearing. THREATS.md T-19 and docs/desktop.md say
-/// that rather than implying otherwise.
+/// <b>What it can promise, and what it cannot.</b> It clears at the deadline, on a lock and on an
+/// orderly quit, in each case only if the clipboard still holds the secret; a write the platform
+/// has not handed back is taken back as soon as it does, which is not the same as before the lock.
+/// It promises <i>nothing</i> against <c>kill -9</c>, a power cut or a logout. THREATS.md T-19 says
+/// so rather than implying otherwise.
 /// </para>
 /// </remarks>
 internal sealed class ClipboardCountdown : ObservableObject, IDisposable
