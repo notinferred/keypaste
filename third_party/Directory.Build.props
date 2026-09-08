@@ -62,6 +62,20 @@
     -->
     <RuntimeIdentifiers>linux-x64;linux-arm64;osx-arm64;win-x64</RuntimeIdentifiers>
 
+    <!--
+      Upstream's attribution, on upstream's assembly. GPL-2.0 s1 requires the copyright notice to
+      survive distribution, and the desktop packages ship KeePassLib.dll as a file somebody can
+      open the properties of. THIRD_PARTY_NOTICES.md and third_party/KeePassLib/LICENSE say the
+      same thing where a reader looks; this says it in the bytes.
+
+      keypaste's own identity must never appear here. The severing at the top of this file is what
+      keeps it out, and restating it here would defeat the point of the severing.
+    -->
+    <Product>KeePassLib</Product>
+    <Authors>Dominik Reichl</Authors>
+    <Company>Dominik Reichl</Company>
+    <Copyright>Copyright (c) 2003-2021 Dominik Reichl</Copyright>
+
     <IsPackable>false</IsPackable>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <NuGetAudit>true</NuGetAudit>

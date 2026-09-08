@@ -15,4 +15,13 @@
     <ProjectReference Include="../../src/Keypaste.Cli/Keypaste.Cli.csproj" />
   </ItemGroup>
 
+  <!--
+    Compiled in rather than copied, for the reason Keypaste.Consistency.Tests gives about
+    CliHarness.cs: one statement of who publishes this project, checked in every front end's
+    own suite.
+  -->
+  <ItemGroup>
+    <Compile Include="../Keypaste.Core.Tests/PublisherMetadata.cs" Link="PublisherMetadata.cs" />
+  </ItemGroup>
+
 </Project>
