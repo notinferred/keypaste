@@ -30,7 +30,24 @@ public sealed record NamesRequest(IReadOnlyList<string> Exposure);
 /// <param name="VaultUnlocked">Whether a vault was open at all.</param>
 /// <param name="Names">The raw, unsanitized names inside the exposure. Sanitizing is the bridge's job.</param>
 /// <param name="Reason">Why the list is empty, when it is. keypaste's own words, not an agent's.</param>
-public sealed record NamesReply(bool VaultUnlocked, IReadOnlyList<EntryName> Names, string Reason);
+/// <param name="Complete">Whether these are all the names there were.</param>
+/// <remarks>
+/// <para>
+/// <b><paramref name="Complete"/> has no default, deliberately.</b> One reply fits one frame, so a
+/// listing can be cut short by how long its names are, and a reply that leaves names out must say
+/// so — an agent told nothing assumes it has the lot. A defaulted <c>true</c> would compile every
+/// existing construction unchanged, which is precisely how a future path forgets to say otherwise.
+/// </para>
+/// <para>
+/// Each layer may lower it and none may raise it: the encoder drops what will not fit and clears
+/// this, and the bridge reports whatever it was told.
+/// </para>
+/// </remarks>
+public sealed record NamesReply(
+    bool VaultUnlocked,
+    IReadOnlyList<EntryName> Names,
+    string Reason,
+    bool Complete);
 
 /// <summary>An agent's credential request, forwarded to whoever can ask a human about it.</summary>
 /// <remarks>

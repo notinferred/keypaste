@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
 using Xunit;
@@ -100,7 +101,7 @@ public sealed class ApproverProtocolTests
     [Fact]
     public void ANamesReplySurvivesTheRoundTrip()
     {
-        var reply = new NamesReply(true, [new EntryName("env/dev", "STRIPE_KEY"), new EntryName("", "LOOSE")], "");
+        var reply = new NamesReply(true, [new EntryName("env/dev", "STRIPE_KEY"), new EntryName("", "LOOSE")], "", true);
 
         Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(reply), out NamesReply? decoded));
 
@@ -117,6 +118,204 @@ public sealed class ApproverProtocolTests
         Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(request), out NamesRequest? decoded));
 
         Assert.Equal(request.Exposure, decoded.Exposure);
+    }
+
+    /// <summary>An ordinary name, encoding to seventy-six bytes with its separating comma.</summary>
+    private static EntryName Ordinary(int i) =>
+        new("env/dev/services", $"SERVICE_ACCOUNT_ACCESS_TOKEN_AB_{i:D4}");
+
+    /// <summary>A title made of astral runes, each costing twelve encoded bytes.</summary>
+    /// <remarks>
+    /// The Unicode tag block. <see cref="System.Text.Json.Utf8JsonWriter"/>'s default encoder emits
+    /// <c>\uXXXX</c> per UTF-16 code unit, and an astral rune is two of them — so what is four bytes
+    /// in UTF-8 is twelve on the wire, and the budget is spent at a few dozen names rather than a
+    /// thousand. Escaping, not length, is what makes a count-based cap unable to do this job.
+    /// </remarks>
+    private static EntryName Astral(int runes) =>
+        new("env/dev", string.Concat(Enumerable.Repeat("\U000E0041", runes)));
+
+    /// <summary>
+    /// The reproduced case: a thousand ordinary names, which cost 76,060 bytes to encode whole.
+    /// </summary>
+    /// <remarks>
+    /// The sixty-one byte envelope plus a thousand seventy-five byte elements and their nine hundred
+    /// and ninety-nine commas. That is over <see cref="MessageFramer.MaximumPayloadBytes"/>, so
+    /// before this bound existed the write threw, <see cref="ApproverListener"/> swallowed it, and
+    /// the connection went down carrying its grants with it.
+    /// </remarks>
+
+    [Fact]
+    public void AThousandNames_EncodeToAFrameTheFramerWillSend()
+    {
+        var reply = new NamesReply(true, [.. Enumerable.Range(0, 1000).Select(Ordinary)], string.Empty, true);
+
+        Assert.True(ApproverProtocol.Encode(reply).Length <= MessageFramer.MaximumPayloadBytes);
+    }
+
+    /// <summary>A listing that did not all fit says so, and still carries what did.</summary>
+    [Fact]
+    public void AnOversizeListing_SaysItIsNotComplete()
+    {
+        var reply = new NamesReply(true, [.. Enumerable.Range(0, 1000).Select(Ordinary)], string.Empty, true);
+
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(reply), out NamesReply? decoded));
+
+        Assert.False(decoded.Complete);
+
+        // Both bounds, so neither "return nothing" nor "return everything" could pass this.
+        Assert.NotEmpty(decoded.Names);
+        Assert.True(decoded.Names.Count < 1000);
+    }
+
+    /// <summary>And one that did fit says that instead. Without this, "always incomplete" would pass.</summary>
+    [Fact]
+    public void AListingThatFits_SaysItIsComplete()
+    {
+        var reply = new NamesReply(true, [Ordinary(1), Ordinary(2)], string.Empty, true);
+
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(reply), out NamesReply? decoded));
+
+        Assert.True(decoded.Complete);
+        Assert.Equal(reply.Names, decoded.Names);
+    }
+
+    /// <summary>
+    /// A names reply from before this field existed decodes as incomplete, not as complete.
+    /// </summary>
+    /// <remarks>
+    /// The mixed-version case, and the reason the field is named for completeness rather than for
+    /// truncation. That older approver capped its listing at a thousand entries and said nothing
+    /// about it; reading its silence as "you have the lot" would turn it into a claim it never made.
+    /// </remarks>
+    [Fact]
+    public void AReplyWithNoCompleteField_DecodesAsIncomplete()
+    {
+        var older = """{"v":1,"kind":"names","unlocked":true,"reason":"","names":[]}"""u8;
+
+        Assert.True(ApproverProtocol.TryDecode(older, out NamesReply? decoded));
+
+        Assert.False(decoded.Complete);
+    }
+
+    /// <summary>This version always says, so a bridge never has to infer it.</summary>
+    [Fact]
+    public void EveryNamesReplyThisVersionWrites_CarriesComplete()
+    {
+        foreach (var reply in new[]
+                 {
+                     new NamesReply(true, [Ordinary(1)], string.Empty, true),
+                     new NamesReply(true, [.. Enumerable.Range(0, 1000).Select(Ordinary)], string.Empty, true),
+                     new NamesReply(false, [], "no vault is unlocked", true),
+                 })
+        {
+            using var document = JsonDocument.Parse(ApproverProtocol.Encode(reply));
+
+            Assert.True(document.RootElement.TryGetProperty("complete", out var complete));
+            Assert.True(complete.ValueKind is JsonValueKind.True or JsonValueKind.False);
+        }
+    }
+
+    /// <summary>
+    /// Adding it did not bump the wire version, and must not.
+    /// </summary>
+    /// <remarks>
+    /// The same argument <c>client_label</c> settled in 2.3: a bump makes every mixed-version pair
+    /// fail at the framing layer, with no reply and no audit line beyond <c>no-approver</c>, over
+    /// one optional field. Both sides degrade to "assume incomplete" instead, which is true.
+    /// </remarks>
+    [Fact]
+    public void AddingCompleteDidNotBumpTheWireVersion()
+    {
+        Assert.Equal(1, ApproverProtocol.Version);
+
+        using var document = JsonDocument.Parse(
+            ApproverProtocol.Encode(new NamesReply(true, [Ordinary(1)], string.Empty, true)));
+
+        Assert.Equal(1, document.RootElement.GetProperty("v").GetInt32());
+    }
+
+    /// <summary>
+    /// The lister's ceiling sits above the most names any frame could carry, so it can never be the
+    /// reason a name is missing from a reply that calls itself complete.
+    /// </summary>
+    /// <remarks>
+    /// Two bounds that must not overlap: the lister caps how much work the approver does, and the
+    /// encoder caps what an agent sees. Were the lister's the tighter of the two, it would drop
+    /// names the encoder never saw — and the encoder would then honestly report a complete listing
+    /// that was not one. That is the original defect, moved one layer up, so it is asserted with the
+    /// smallest element the format admits rather than argued about.
+    /// </remarks>
+    [Fact]
+    public void NoFrameCanHoldMoreNamesThanTheListersCap()
+    {
+        var smallest = new NamesReply(
+            true,
+            [.. Enumerable.Repeat(new EntryName(string.Empty, string.Empty), VaultEntryNameLister.MaximumNames)],
+            string.Empty,
+            true);
+
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(smallest), out NamesReply? decoded));
+
+        Assert.False(decoded.Complete);
+        Assert.True(decoded.Names.Count < VaultEntryNameLister.MaximumNames);
+    }
+
+    /// <summary>
+    /// A name that escapes to six bytes per code unit spends the budget long before any entry count
+    /// does, and what survives is still exactly what the vault holds.
+    /// </summary>
+    [Theory]
+    [InlineData("\U000E0041")]
+    [InlineData("\U0001F468\u200D\U0001F4BB")]
+    [InlineData("\"\\<>&+")]
+    [InlineData("\u2028\u2029")]
+    [InlineData("\u202E")]
+    public void NamesThatEscapeToSixBytesEach_StillFitOneFrame(string hostile)
+    {
+        var name = new EntryName("env/dev", string.Concat(Enumerable.Repeat(hostile, 128)));
+        var frame = ApproverProtocol.Encode(new NamesReply(true, [.. Enumerable.Repeat(name, 500)], string.Empty, true));
+
+        Assert.True(frame.Length <= MessageFramer.MaximumPayloadBytes);
+        Assert.True(ApproverProtocol.TryDecode(frame, out NamesReply? decoded));
+
+        // Non-vacuous in both directions: something was dropped, and what survived is unaltered.
+        Assert.False(decoded.Complete);
+        Assert.NotEmpty(decoded.Names);
+        Assert.True(decoded.Names.Count < 500);
+        Assert.All(decoded.Names, kept => Assert.Equal(name, kept));
+    }
+
+    /// <summary>
+    /// One name no frame could hold yields a valid, empty frame rather than an unsendable one.
+    /// </summary>
+    /// <remarks>
+    /// A name is dropped whole or not at all. Shortening it would put the approver in the business
+    /// of altering names — which <see cref="Approval.IEntryNameLister"/> deliberately leaves to
+    /// whoever renders them — and would hand the bridge a string that is not the vault's.
+    /// </remarks>
+    [Fact]
+    public void OneNameTooBigForAnyFrame_YieldsAnEmptyReply()
+    {
+        var frame = ApproverProtocol.Encode(new NamesReply(true, [Astral(100_000)], "the vault is open", true));
+
+        Assert.True(frame.Length <= MessageFramer.MaximumPayloadBytes);
+        Assert.True(ApproverProtocol.TryDecode(frame, out NamesReply? decoded));
+
+        Assert.Empty(decoded.Names);
+        Assert.False(decoded.Complete);
+        Assert.True(decoded.VaultUnlocked);
+    }
+
+    /// <summary>What arrives is a prefix of what was asked for: dropped from the end, never the middle.</summary>
+    [Fact]
+    public void TheNamesThatFit_AreAPrefixOfWhatWasAsked()
+    {
+        var asked = Enumerable.Range(0, 1000).Select(Ordinary).ToArray();
+
+        Assert.True(ApproverProtocol.TryDecode(
+            ApproverProtocol.Encode(new NamesReply(true, asked, string.Empty, true)), out NamesReply? decoded));
+
+        Assert.Equal(asked.Take(decoded.Names.Count), decoded.Names);
     }
 
     /// <summary>
@@ -167,7 +366,7 @@ public sealed class ApproverProtocolTests
                  {
                      ApproverProtocol.Encode(Request(hostile)),
                      ApproverProtocol.Encode(Granted() with { Reason = hostile }),
-                     ApproverProtocol.Encode(new NamesReply(true, [new EntryName(hostile, hostile)], hostile)),
+                     ApproverProtocol.Encode(new NamesReply(true, [new EntryName(hostile, hostile)], hostile, true)),
                  })
         {
             Assert.DoesNotContain((byte)'\n', frame);

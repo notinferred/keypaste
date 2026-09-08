@@ -8,6 +8,20 @@ Versions are the ones published at `https://dl.keypaste.com/v<version>/`. Every 
 
 These changes are available in source on `main`, **not in the `v0.1.0` downloads**. The source version still reports `0.1.0`; its version string alone does not identify the published bytes.
 
+**A vault with a lot of entries in it can be listed now, and it costs you nothing to do it.** If an
+agent asked for the names of your entries and there were too many of them to send in one go — around
+a thousand ordinary ones, or far fewer if they are long or written in a script other than English —
+keypaste could not send the answer at all. What happened instead was worse than an error message.
+The connection between the agent and the vault was dropped; the agent tried once more and it was
+dropped again; and any approval you had already given on that connection went with it, so the next
+time the agent asked for a password you had just released, you were asked about it all over again.
+What the agent was told, after all that, was that something had gone wrong. The reply is now sized
+to what will actually fit. When some names are left out it says so before the list and again after
+it, it does not pretend to be an inventory of your vault, and it tells the agent there is no way to
+ask for the rest — so it stops looking, and asks you instead. Nothing else changes: the same part of
+your vault is exposed, the names are still the only thing that comes back, and your approvals stay
+where you left them.
+
 **An agent can no longer stack up prompts for you to clear.** keypaste has always said it shows
 one request at a time and refuses a second rather than queueing it, and the part of it that decides
 did exactly that. The bridge in front of that part did not: it held the second request until you

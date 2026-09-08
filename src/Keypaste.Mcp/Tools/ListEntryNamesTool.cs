@@ -25,13 +25,6 @@ internal sealed class ListEntryNamesTool(
     ServerOptions options,
     AuditLog audit) : McpServerTool
 {
-    /// <summary>The most entries returned in one listing.</summary>
-    /// <remarks>
-    /// A cap, because an unbounded listing is an injection amplifier as much as a cost: enough
-    /// entries will push a system prompt out of a context window as effectively as any jailbreak.
-    /// </remarks>
-    internal const int MaximumEntries = 1000;
-
     /// <inheritdoc/>
     public override IReadOnlyList<object> Metadata => [];
 
@@ -87,7 +80,7 @@ internal sealed class ListEntryNamesTool(
         {
             // Still audited. A listing the client stopped waiting for is still an access that was
             // attempted, and law 3.3 does not make an exception for the ones nobody collected.
-            listing = new EntryNameListing(VaultAvailability.Failed, [], ToolText.Cancelled);
+            listing = new EntryNameListing(VaultAvailability.Failed, [], ToolText.Cancelled, true);
         }
         catch (Exception)
         {
@@ -95,7 +88,7 @@ internal sealed class ListEntryNamesTool(
             // method has no business enumerating, and an exception that escapes here escapes before
             // the append below - which would make breaking the source a way to be listed against
             // with no record of it.
-            listing = new EntryNameListing(VaultAvailability.Failed, [], ToolText.VaultLocked);
+            listing = new EntryNameListing(VaultAvailability.Failed, [], ToolText.VaultLocked, true);
         }
 
         if (listing.Availability != VaultAvailability.Available)
@@ -110,6 +103,12 @@ internal sealed class ListEntryNamesTool(
                 ToolResults.Refuse(listing.Reason));
         }
 
+        // The exposure is applied a second time on purpose: two things enforcing one rule, where a
+        // name either matches a glob or does not and the two cannot disagree (THREATS.md T-4).
+        // What is deliberately not here is a second *cap*. That was two things authoring one claim,
+        // and this side's was wrong in both directions — it called a vault of exactly a thousand
+        // in-scope entries truncated, and called a listing the approver had already cut short
+        // complete, because filtering some out moved the count off the boundary it compared to.
         var exposed = new List<EntryName>();
         foreach (var name in listing.Names)
         {
@@ -117,14 +116,9 @@ internal sealed class ListEntryNamesTool(
             {
                 exposed.Add(name);
             }
-
-            if (exposed.Count == MaximumEntries)
-            {
-                break;
-            }
         }
 
-        var truncated = exposed.Count == MaximumEntries;
+        var truncated = !listing.Complete;
         var record = new AuditRecord
         {
             Tool = ToolText.ListToolName,
@@ -178,9 +172,12 @@ internal sealed class ListEntryNamesTool(
         // pretend that whatever follows it came from keypaste.
         var nonce = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(4));
 
+        // The header says so too, not only the trailer. This is the line a model summarizes from,
+        // and "812 entries, exposed by env/**" reads as an inventory; whatever follows a long block
+        // of untrusted names is the half most likely to be skimmed past.
         var text = new StringBuilder();
-        text.Append("keypaste: ").Append(names.Count).Append(" entries, exposed by: ")
-            .AppendLine(string.Join(", ", globs));
+        text.Append("keypaste: ").Append(names.Count).Append(truncated ? " entry names — not all of them" : " entries")
+            .Append(", exposed by: ").AppendLine(string.Join(", ", globs));
 
         var rows = new List<(string Handle, string Group, string Name, bool Altered)>(names.Count);
         foreach (var name in names)
@@ -206,7 +203,7 @@ internal sealed class ListEntryNamesTool(
 
         if (truncated)
         {
-            text.AppendLine($"keypaste: the listing was cut off at {MaximumEntries} entries.");
+            text.AppendLine(ToolText.ListingIncomplete);
         }
 
         return new CallToolResult

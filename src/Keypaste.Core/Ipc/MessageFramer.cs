@@ -25,6 +25,14 @@ public sealed class MessageFramer : IDisposable
     /// <summary>The largest frame either side will send or accept.</summary>
     public const int MaximumFrameBytes = 64 * 1024;
 
+    /// <summary>The largest payload one frame can carry, once the delimiter is paid for.</summary>
+    /// <remarks>
+    /// Whoever has to fit a message into a frame needs this number, and deriving it a second time
+    /// somewhere else is how the two drift by the one byte that costs a connection. It is written
+    /// here, next to the guard, and the guard is written in terms of it.
+    /// </remarks>
+    public const int MaximumPayloadBytes = MaximumFrameBytes - 1;
+
     internal const byte Delimiter = (byte)'\n';
     internal const int ReadChunkBytes = 4096;
 
@@ -56,7 +64,7 @@ public sealed class MessageFramer : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (payload.Length + 1 > MaximumFrameBytes)
+        if (payload.Length > MaximumPayloadBytes)
         {
             throw new InvalidOperationException(
                 $"a frame of {payload.Length} bytes is over the {MaximumFrameBytes}-byte limit");

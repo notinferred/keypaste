@@ -109,7 +109,7 @@ public sealed class ApproverClientTests
         internal TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public ValueTask<NamesReply> ListAsync(NamesRequest request, string connectionId, CancellationToken cancellationToken) =>
-            ValueTask.FromResult(new NamesReply(true, [], string.Empty));
+            ValueTask.FromResult(new NamesReply(true, [], string.Empty, true));
 
         public async ValueTask<CredentialReply> RequestAsync(
             CredentialRequest request,

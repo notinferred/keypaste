@@ -30,10 +30,17 @@ internal enum VaultAvailability
 /// <param name="Availability">Whether there was anything to say.</param>
 /// <param name="Names">The names, unsanitized and unfiltered. Empty unless available.</param>
 /// <param name="Reason">A human-readable explanation, used when the answer is a refusal.</param>
+/// <param name="Complete">Whether these are all the names there were.</param>
+/// <remarks>
+/// <paramref name="Complete"/> is what the approver said, carried rather than recomputed. The
+/// bridge cannot work it out for itself: it sees only the names that survived one frame, so a
+/// listing cut short upstream and a listing that was always this size look identical from here.
+/// </remarks>
 internal sealed record EntryNameListing(
     VaultAvailability Availability,
     IReadOnlyList<EntryName> Names,
-    string Reason);
+    string Reason,
+    bool Complete);
 
 /// <summary>
 /// The seam between the bridge and an unlocked vault.
@@ -87,9 +94,12 @@ internal sealed class ApproverEntryNameSource(ApproverConnection approver, Serve
         // Sharing the pipe with the credential path means sharing its one-at-a-time rule. A
         // listing is not what anybody is looking at, but it cannot be sent while a request is on
         // the wire, and refusing is the answer that does not queue.
+        // The refusals below say they are complete because they are: each returns before anything is
+        // rendered, so nothing was left out of anything. Saying otherwise would attach "some names
+        // are missing" to an answer that never claimed to have any.
         if (outcome == ApproverOutcome.Busy)
         {
-            return new EntryNameListing(VaultAvailability.Busy, [], ToolText.Busy);
+            return new EntryNameListing(VaultAvailability.Busy, [], ToolText.Busy, true);
         }
 
         if (reply is null)
@@ -99,11 +109,12 @@ internal sealed class ApproverEntryNameSource(ApproverConnection approver, Serve
                 [],
                 outcome == ApproverOutcome.Failed
                     ? ToolText.ApproverFailed
-                    : ToolText.NoApproverForListing);
+                    : ToolText.NoApproverForListing,
+                true);
         }
 
         return reply.VaultUnlocked
-            ? new EntryNameListing(VaultAvailability.Available, reply.Names, string.Empty)
-            : new EntryNameListing(VaultAvailability.Locked, [], ToolText.VaultLocked);
+            ? new EntryNameListing(VaultAvailability.Available, reply.Names, string.Empty, reply.Complete)
+            : new EntryNameListing(VaultAvailability.Locked, [], ToolText.VaultLocked, true);
     }
 }

@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using Keypaste.Core.Audit;
@@ -43,6 +44,14 @@ public static class ApproverProtocol
     internal const string NamesKind = "names";
     internal const string CredentialKind = "credential";
 
+    /// <summary>Stands in for a reply whose own envelope will not fit a frame.</summary>
+    /// <remarks>
+    /// Only reachable through a <see cref="NamesReply.Reason"/> longer than a frame, which nothing
+    /// in this repository writes. It exists so that case has an answer that is a message rather than
+    /// an exception.
+    /// </remarks>
+    internal const string Undersized = "the reply did not fit one message";
+
     /// <summary>Encodes a request for entry names.</summary>
     /// <param name="request">What to ask for.</param>
     /// <returns>The frame's bytes, without a delimiter.</returns>
@@ -82,32 +91,116 @@ public static class ApproverProtocol
         });
     }
 
-    /// <summary>Encodes a reply carrying entry names.</summary>
+    /// <summary>Encodes a reply carrying entry names, bounded to what one frame can carry.</summary>
     /// <param name="reply">The names, or the reason there are none.</param>
-    /// <returns>The frame's bytes, without a delimiter.</returns>
+    /// <returns>The frame's bytes, without a delimiter. Never over <see cref="MessageFramer.MaximumPayloadBytes"/>.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
+    /// <remarks>
+    /// <para>
+    /// <b>This method is total: no reply, however large, can produce a frame the framer will
+    /// refuse.</b> That refusal is correct where it is — a truncated frame is a message that says
+    /// something other than what was sent — but it reaches
+    /// <see cref="ApproverListener"/>'s outermost <c>catch</c>, which ends the connection and
+    /// revokes the grants scoped to it. So an ordinary thousand-entry vault could cost a person the
+    /// approval they had already given, and the agent was told only that something went wrong.
+    /// </para>
+    /// <para>
+    /// <b>The bound is bytes, and it is measured here because only here knows what a name costs.</b>
+    /// <see cref="Utf8JsonWriter"/>'s default encoder escapes every non-ASCII UTF-16 code unit to
+    /// <c>\uXXXX</c>, so one astral rune is twelve bytes on the wire and a hundred short names can
+    /// overflow where a thousand long ones would not. Any count outside this writer reimplements
+    /// that escaping policy, and the day the two disagree by one byte the connection dies again.
+    /// </para>
+    /// <para>
+    /// Names are dropped from the end and dropped whole. Shortening one would hand the bridge a
+    /// string that is not the vault's, and could collapse two entries into one row;
+    /// <see cref="Approval.IEntryNameLister"/> leaves altering names to whoever renders them.
+    /// </para>
+    /// </remarks>
     public static byte[] Encode(NamesReply reply)
     {
         ArgumentNullException.ThrowIfNull(reply);
 
-        return Write(writer =>
+        var kept = Fit(reply);
+        var frame = WriteNames(reply, kept, reply.Complete && kept == reply.Names.Count);
+
+        // Belt and braces. Everything above says this cannot happen; this is what stops an error in
+        // that reasoning costing a connection and its grants rather than a listing (law 3.7).
+        return frame.Length <= MessageFramer.MaximumPayloadBytes
+            ? frame
+            : WriteNames(new NamesReply(reply.VaultUnlocked, [], Undersized, false), 0, false);
+    }
+
+    /// <summary>How many of a reply's names fit one frame.</summary>
+    /// <remarks>
+    /// Counted before anything is written, because <see cref="Utf8JsonWriter"/> is forward-only and
+    /// cannot take an element back. The envelope is measured by encoding it with no names and the
+    /// <c>false</c> spelling of <c>complete</c> — the longer of the two, and the only one a
+    /// truncated reply carries — so a reply that turns out to be complete is a byte under its own
+    /// budget rather than a byte over. Each element is then measured on its own, which is exact
+    /// because default encoding is context-free: an object encodes to identical bytes standalone and
+    /// nested in an array.
+    /// </remarks>
+    private static int Fit(NamesReply reply)
+    {
+        var budget = MessageFramer.MaximumPayloadBytes - WriteNames(reply, 0, false).Length;
+
+        if (budget < 0)
+        {
+            return 0;
+        }
+
+        var buffer = new ArrayBufferWriter<byte>(256);
+        using var writer = new Utf8JsonWriter(buffer);
+
+        var used = 0;
+        var kept = 0;
+
+        foreach (var name in reply.Names)
+        {
+            buffer.Clear();
+            writer.Reset(buffer);
+            WriteName(writer, name);
+            writer.Flush();
+
+            var cost = buffer.WrittenCount + (kept == 0 ? 0 : 1);
+
+            if (used + cost > budget)
+            {
+                break;
+            }
+
+            used += cost;
+            kept++;
+        }
+
+        return kept;
+    }
+
+    private static byte[] WriteNames(NamesReply reply, int count, bool complete) =>
+        Write(writer =>
         {
             writer.WriteNumber("v", Version);
             writer.WriteString("kind", NamesKind);
             writer.WriteBoolean("unlocked", reply.VaultUnlocked);
             writer.WriteString("reason", reply.Reason);
+            writer.WriteBoolean("complete", complete);
             writer.WriteStartArray("names");
 
-            foreach (var name in reply.Names)
+            for (var i = 0; i < count; i++)
             {
-                writer.WriteStartObject();
-                writer.WriteString("group", name.GroupPath);
-                writer.WriteString("title", name.Title);
-                writer.WriteEndObject();
+                WriteName(writer, reply.Names[i]);
             }
 
             writer.WriteEndArray();
         });
+
+    private static void WriteName(Utf8JsonWriter writer, EntryName name)
+    {
+        writer.WriteStartObject();
+        writer.WriteString("group", name.GroupPath);
+        writer.WriteString("title", name.Title);
+        writer.WriteEndObject();
     }
 
     /// <summary>Encodes a reply to a credential request.</summary>
@@ -267,7 +360,12 @@ public static class ApproverProtocol
                 decoded.Add(new EntryName(group, title));
             }
 
-            reply = new NamesReply(unlocked.GetBoolean(), decoded, Optional(root, "reason") ?? string.Empty);
+            reply = new NamesReply(
+                unlocked.GetBoolean(),
+                decoded,
+                Optional(root, "reason") ?? string.Empty,
+                TrueOnly(root, "complete"));
+
             return true;
         }
     }
@@ -438,6 +536,19 @@ public static class ApproverProtocol
         values = decoded;
         return true;
     }
+
+    /// <summary>Reads a flag that only an explicit <c>true</c> may set.</summary>
+    /// <remarks>
+    /// <b>Absence is the negative, and the field is named for the answer that has to be earned.</b>
+    /// <c>complete</c> is optional so the version need not bump (see <see cref="Version"/>), which
+    /// means an approver from before this field existed sends a names reply without it — and that
+    /// approver capped its listing at a thousand entries and said nothing. Reading absence as
+    /// "complete" would turn its silence into a claim it never made. Read as "not complete" it is
+    /// merely true. A field named <c>truncated</c> would have needed absence to mean <c>true</c>,
+    /// which every later reader would have to relearn.
+    /// </remarks>
+    private static bool TrueOnly(JsonElement root, string name) =>
+        root.TryGetProperty(name, out var element) && element.ValueKind == JsonValueKind.True;
 
     private static string? Optional(JsonElement root, string name) =>
         TryString(root, name, out var value) ? value : null;
