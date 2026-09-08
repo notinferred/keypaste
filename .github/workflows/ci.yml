@@ -79,6 +79,15 @@ jobs:
       - name: Build
         run: dotnet build keypaste.slnx --no-restore -c Release -warnaserror
 
+      # F.4a. The release destination check is a script precisely so something other than a tag can
+      # run it: this drives it against a fake `aws` through every answer a listing can give, with no
+      # credential and no bucket, and --with-real-aws additionally asks this runner's real AWS CLI
+      # how it actually fails. It runs here rather than in the three-OS matrix because the publish
+      # job is Linux-only; Git Bash portability is a developer's local run, not a claim CI makes.
+      - name: Verify the release destination check fails closed
+        shell: bash
+        run: scripts/verify-release-destination.sh --with-real-aws
+
   test:
     name: test (${{ matrix.os }})
     needs: gate
