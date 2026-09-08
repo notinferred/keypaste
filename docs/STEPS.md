@@ -17,8 +17,10 @@ Everyday password-management workflows, browser integration and desktop
 publication remain unfinished. No hosted service, web vault, mobile integration or organization
 credential service is available.
 
-**Next: F.2c — prevent clipboard writes from outliving lock or shutdown.** Complete the ready repairs
-below before new feature work. Release foundations follow: R.0a makes release identity and supported
+**Next: F.4b — align generated first-party publisher metadata.** F.2b2 is BLOCKED on hardware this
+project does not have; it is deferred to the desktop candidate run, and 4.7b lists it, so the
+desktop gate still cannot pass without it. Complete the ready repairs below before new feature
+work. Release foundations follow: R.0a makes release identity and supported
 targets executable, R.0b/3.8 make distribution verifiable, and 4.7a prepares desktop packages without
 waiting for signing enrollment. A new CLI/MCP patch requires the core/CLI/bridge and release repairs;
 desktop release checks additionally require the desktop repairs.
@@ -68,7 +70,8 @@ completion does not waive the new repair dependencies or certify the current imp
 **External prerequisites:** 3.5a needs Apple enrollment (H-0015); 3.6a needs an eligible Windows
 signing account (H-0017); 8.4a needs extension-store accounts; H.7 needs hosted infrastructure
 (H-0019); 5.5a needs a payment account (H-0018). Only the operations that need those accounts wait.
-F.2b2 needs a macOS machine and a Linux desktop session. The 1.5a clipboard observation needs a suitable Windows machine; an enforced-disabled history panel
+F.2b2 needs a macOS machine and a Linux desktop session, and is deferred until 4.7a produces a
+candidate archive for each of those targets. The 1.5a clipboard observation needs a suitable Windows machine; an enforced-disabled history panel
 is not evidence. It is a named residual, not a reason to stop independent development.
 
 ## Build order
@@ -122,9 +125,9 @@ before the fix and verifies the corrected behavior. Keep the shared core and mat
 these tasks repair existing behavior and do not require a product rewrite. Record reproductions
 in repository fixtures/tests, so completion does not depend on a maintainer's temporary files.
 
-- [ ] **F.2b2 — Observe minimize-lock on macOS and Linux.** Needs: F.2b1.
+- [ ] **F.2b2 — Observe minimize-lock on macOS and Linux. BLOCKED:** no macOS machine and no Linux desktop session are available (2026-09-08); run it during the 4.7a/4.7b desktop candidate work, when an archive for each target exists anyway. Needs: F.2b1.
   **Build:** Run F.2b1's behavior on the remaining two advertised desktop targets and record what each actually did, including any window manager that does not report a minimize. Change [MinimizeLock](../src/Keypaste.App/MinimizeLock.cs)'s supported-surface answer if an observation contradicts it, rather than leaving the checkbox offered where it does nothing.
-  **Verify (V-F.2b2):** Current status holds a dated macOS and a dated Linux result for the enabled, disabled and after-restart cases, each naming the OS version, session type and build. An untested target keeps its unobserved status; a passing headless suite cannot substitute. **External prerequisite:** a macOS machine and a Linux desktop session.
+  **Verify (V-F.2b2):** Current status holds a dated macOS and a dated Linux result for the enabled, disabled and after-restart cases, each naming the OS version, session type and build. An untested target keeps its unobserved status; a passing headless suite cannot substitute. **External prerequisite:** a macOS machine and a Linux desktop session. The procedure is written down in the [desktop checklist](desktop.md#observing-minimize-lock-on-macos-and-linux) so the observation does not have to be re-derived.
 
 - [ ] **F.2c — Prevent clipboard writes from outliving lock or shutdown.** Needs: 4.2.
   **Build:** Serialize [ClipboardCountdown](../src/Keypaste.App/Clipboard/ClipboardCountdown.cs) operations and invalidate/drain pending writes during lock, disposal and orderly shutdown. A copy suspended in an awaited clipboard write currently resumes after disposal, installs the secret and revives its timer. Preserve unrelated clipboard content while completing owned cleanup.
