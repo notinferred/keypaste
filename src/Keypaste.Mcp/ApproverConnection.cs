@@ -2,6 +2,29 @@ using Keypaste.Core.Ipc;
 
 namespace Keypaste.Mcp;
 
+/// <summary>What became of an exchange, beyond whether it produced a reply.</summary>
+/// <remarks>
+/// Three of these used to be a <c>bool Reachable</c>. <see cref="Busy"/> is the one that needed a
+/// name: it is not a failure and not an absent approver, it is keypaste declining to stack a second
+/// request behind one a person has not answered yet.
+/// </remarks>
+internal enum ApproverOutcome
+{
+    /// <summary>The approver answered. The reply is not null.</summary>
+    Answered = 0,
+
+    /// <summary>No approver could be reached at all. The refusal for this names the command to run.</summary>
+    Unreachable = 1,
+
+    /// <summary>One was reached and the exchange failed.</summary>
+    Failed = 2,
+
+    /// <summary>
+    /// This connection was already carrying an exchange, so this one was refused rather than queued.
+    /// </summary>
+    Busy = 3,
+}
+
 /// <summary>
 /// The bridge's link to <c>keypaste agent</c>: connects on demand, and reconnects once when the
 /// approver has been restarted underneath it.
@@ -50,11 +73,8 @@ internal sealed class ApproverConnection(string pipeName) : IAsyncDisposable
     /// <summary>Asks the approver to decide one credential request.</summary>
     /// <param name="request">What the agent asked for.</param>
     /// <param name="cancellationToken">Cancelled when the client gives up on the call.</param>
-    /// <returns>
-    /// The approver's answer; or null with <c>Reachable</c> false when no approver could be reached
-    /// at all, and null with <c>Reachable</c> true when one was reached and the exchange failed.
-    /// </returns>
-    internal async ValueTask<(CredentialReply? Reply, bool Reachable)> RequestAsync(
+    /// <returns>The approver's answer, and what became of the exchange.</returns>
+    internal async ValueTask<(CredentialReply? Reply, ApproverOutcome Outcome)> RequestAsync(
         CredentialRequest request,
         CancellationToken cancellationToken) =>
         await ExchangeAsync(
@@ -64,26 +84,42 @@ internal sealed class ApproverConnection(string pipeName) : IAsyncDisposable
     /// <summary>Asks the approver which entry names may be shown.</summary>
     /// <param name="request">The exposure to apply.</param>
     /// <param name="cancellationToken">Cancelled when the client gives up on the call.</param>
-    /// <returns>The reply, and whether an approver was reachable at all.</returns>
-    internal async ValueTask<(NamesReply? Reply, bool Reachable)> ListAsync(
+    /// <returns>The reply, and what became of the exchange.</returns>
+    internal async ValueTask<(NamesReply? Reply, ApproverOutcome Outcome)> ListAsync(
         NamesRequest request,
         CancellationToken cancellationToken) =>
         await ExchangeAsync(
             (client, token) => client.ListAsync(request, token),
             cancellationToken).ConfigureAwait(false);
 
-    private async ValueTask<(T? Reply, bool Reachable)> ExchangeAsync<T>(
+    private async ValueTask<(T? Reply, ApproverOutcome Outcome)> ExchangeAsync<T>(
         Func<ApproverClient, CancellationToken, ValueTask<T?>> exchange,
         CancellationToken cancellationToken)
         where T : class
     {
+        bool taken;
+
         try
         {
-            await _oneAtATime.WaitAsync(cancellationToken).ConfigureAwait(false);
+            // Wait(0), not WaitAsync: taking the slot must either succeed now or refuse now. The
+            // pipe carries one exchange at a time and the protocol has nothing to correlate two
+            // replies by, so waiting here queued a request behind a prompt nobody had answered yet
+            // and then delivered it as a second prompt once they had. ApprovalGate refuses exactly
+            // this, one layer in, and until F.3b this queue sat in front of that check and made it
+            // unreachable for two calls on one connection (THREATS.md T-11).
+            taken = _oneAtATime.Wait(0, CancellationToken.None);
         }
-        catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
+        catch (ObjectDisposedException)
         {
-            return (null, false);
+            return (null, ApproverOutcome.Unreachable);
+        }
+
+        // Deliberately above the try below, whose finally releases the slot. A refusal never took
+        // one, and releasing a slot it never held would admit two exchanges onto the stream from
+        // then on - the precise failure this method exists to prevent.
+        if (!taken)
+        {
+            return (null, ApproverOutcome.Busy);
         }
 
         try
@@ -92,14 +128,27 @@ internal sealed class ApproverConnection(string pipeName) : IAsyncDisposable
 
             if (client is null)
             {
-                return (null, false);
+                return (null, ApproverOutcome.Unreachable);
             }
 
             var reply = await exchange(client, cancellationToken).ConfigureAwait(false);
 
             if (reply is not null)
             {
-                return (reply, true);
+                return (reply, ApproverOutcome.Answered);
+            }
+
+            // A caller that gave up is not an approver that died, and the difference decides
+            // whether to send the request again. The reply to the exchange it abandoned may still
+            // be in flight and a frame it stopped mid-write may be on the wire, so this connection
+            // is finished either way - but re-sending would put a request nobody is waiting for in
+            // front of a person, on a fresh connection whose id scopes a different grant and a
+            // different cooldown.
+            if (cancellationToken.IsCancellationRequested)
+            {
+                await DropAsync().ConfigureAwait(false);
+
+                return (null, ApproverOutcome.Failed);
             }
 
             // One reconnect, and one retry. The ordinary cause of a dead exchange is an approver
@@ -111,10 +160,12 @@ internal sealed class ApproverConnection(string pipeName) : IAsyncDisposable
 
             if (reconnected is null)
             {
-                return (null, false);
+                return (null, ApproverOutcome.Unreachable);
             }
 
-            return (await exchange(reconnected, cancellationToken).ConfigureAwait(false), true);
+            var retried = await exchange(reconnected, cancellationToken).ConfigureAwait(false);
+
+            return (retried, retried is not null ? ApproverOutcome.Answered : ApproverOutcome.Failed);
         }
         finally
         {

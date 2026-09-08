@@ -18,6 +18,12 @@ internal enum VaultAvailability
 
     /// <summary>Something went wrong. Treated exactly like <see cref="Locked"/>: deny.</summary>
     Failed = 2,
+
+    /// <summary>
+    /// The connection to the approver was already carrying an exchange, so this listing was refused
+    /// rather than queued behind it. <see cref="ToolText.Busy"/> is what the agent is told.
+    /// </summary>
+    Busy = 3,
 }
 
 /// <summary>What the vault had to say when asked for its entry names.</summary>
@@ -74,16 +80,26 @@ internal sealed class ApproverEntryNameSource(ApproverConnection approver, Serve
     /// <inheritdoc/>
     public async ValueTask<EntryNameListing> ListAsync(CancellationToken cancellationToken)
     {
-        var (reply, reachable) = await approver
+        var (reply, outcome) = await approver
             .ListAsync(new NamesRequest(options.Exposure.Globs), cancellationToken)
             .ConfigureAwait(false);
+
+        // Sharing the pipe with the credential path means sharing its one-at-a-time rule. A
+        // listing is not what anybody is looking at, but it cannot be sent while a request is on
+        // the wire, and refusing is the answer that does not queue.
+        if (outcome == ApproverOutcome.Busy)
+        {
+            return new EntryNameListing(VaultAvailability.Busy, [], ToolText.Busy);
+        }
 
         if (reply is null)
         {
             return new EntryNameListing(
                 VaultAvailability.Failed,
                 [],
-                reachable ? ToolText.ApproverFailed : ToolText.NoApproverForListing);
+                outcome == ApproverOutcome.Failed
+                    ? ToolText.ApproverFailed
+                    : ToolText.NoApproverForListing);
         }
 
         return reply.VaultUnlocked

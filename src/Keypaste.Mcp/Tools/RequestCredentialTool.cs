@@ -198,7 +198,7 @@ internal sealed class RequestCredentialTool(
                 "the entry is outside this server's configured exposure");
         }
 
-        var (reply, reachable) = await approver.RequestAsync(
+        var (reply, outcome) = await approver.RequestAsync(
             new CredentialRequest
             {
                 Entry = entry,
@@ -228,9 +228,20 @@ internal sealed class RequestCredentialTool(
             return new Verdict(AuditDecision.Denied, AuditMethod.Cancelled, "the client withdrew the request");
         }
 
+        // Returned from here rather than short-circuited out of InvokeAsync, so it goes through the
+        // one audit append every other answer does. The refusal an agent reads for this says the
+        // call was recorded; that sentence is only true while this verdict travels the normal path.
+        if (outcome == ApproverOutcome.Busy)
+        {
+            return new Verdict(
+                AuditDecision.Denied,
+                AuditMethod.Busy,
+                "another exchange was already in flight on this connection");
+        }
+
         if (reply is null)
         {
-            return reachable
+            return outcome == ApproverOutcome.Failed
                 ? new Verdict(AuditDecision.Denied, AuditMethod.Failed, "the approver could not be asked")
                 : new Verdict(AuditDecision.Denied, AuditMethod.NoApprover, "no keypaste agent is running");
         }

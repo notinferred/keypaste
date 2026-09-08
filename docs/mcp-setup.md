@@ -167,7 +167,7 @@ jq -c . < ~/.keypaste/audit.jsonl
 | `exposure` | A listing, allowed because everything named was inside your `--expose` globs. |
 | `no-approver` | Nobody was running `keypaste agent`. |
 | `out-of-scope` | The entry was outside your globs, or does not exist — deliberately the same answer, so an agent cannot use the difference to find out what exists. |
-| `timed-out` / `busy` / `cooldown` | Nobody answered in time; somebody was already answering another; or the same request was refused a moment ago. |
+| `timed-out` / `busy` / `cooldown` | Nobody answered in time; the connection was already carrying another call, so this one was refused rather than queued behind it; or the same request was refused a moment ago. |
 | `cancelled` | The client stopped waiting before anybody answered. Nobody decided anything. |
 | `vault-locked` / `invalid-request` / `failed` | No vault open; the arguments were wrong; something went wrong. |
 | `not-initialized` | The client called a tool before finishing the MCP handshake. Denied, with the fix named; nothing was decided. |

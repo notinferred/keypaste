@@ -117,11 +117,36 @@ internal static class ToolText
         needs it. This call was recorded in the audit log as denied.
         """;
 
-    /// <summary>Why a request was refused because a person was already looking at another one.</summary>
+    /// <summary>Why a call was refused because this connection was already carrying one.</summary>
+    /// <remarks>
+    /// <para>
+    /// <b>BUSY rather than DENIED, and that word is the point.</b> Every other refusal here is a
+    /// decision — a person's no, a cooldown, an entry outside the exposure. This one is keypaste
+    /// saying "not now", and an agent that reads it as a refusal learns the wrong thing about what
+    /// the user wants.
+    /// </para>
+    /// <para>
+    /// It does not say which call holds the connection. A listing and a credential request share
+    /// one pipe, so either can be the one in the way, and naming it would tell an agent which of
+    /// its own calls is still running — or worse, imply a person is looking at something when
+    /// nobody is.
+    /// </para>
+    /// <para>
+    /// No "do not retry", by the same rule as <see cref="TimedOut"/>: nobody decided anything
+    /// (D-0027). But it says the wait may be human-length, because an agent told only "try again"
+    /// will try again immediately, and a tight retry loop against a held prompt is the storm this
+    /// refusal exists to prevent. No number: the approver's window is configurable between five and
+    /// fifty-five seconds and the bridge is not told which.
+    /// </para>
+    /// </remarks>
     internal const string Busy = """
-        keypaste: DENIED. Another request is already in front of the person right now, and keypaste
-        shows one at a time rather than queueing them up. Wait until that one is answered and try
-        again. This call was recorded in the audit log as denied.
+        keypaste: BUSY. keypaste handles one request at a time on this connection and is already
+        handling another, so this one was not queued behind it. Nothing was decided and nothing was
+        released.
+
+        The other request may be waiting on a person, so it can take as long as they take to
+        answer. Wait for it to finish rather than retrying in a loop. This call was recorded in the
+        audit log.
         """;
 
     /// <summary>Why a request was refused because the same one was just refused.</summary>
