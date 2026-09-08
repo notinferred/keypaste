@@ -198,7 +198,7 @@ internal sealed partial class App : Application, IDisposable
 
         _ = Dispatcher.UIThread.InvokeAsync(async () =>
         {
-            await shell.Clipboard.ClearNowAsync().ConfigureAwait(true);
+            await shell.Clipboard.CloseAsync().ConfigureAwait(true);
             Dispose();
 
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)

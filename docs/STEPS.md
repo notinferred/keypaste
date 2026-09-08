@@ -9,15 +9,15 @@
 **Working proposition: incomplete. Hosted pilot: not ready. Paid release: not ready.**
 The local vault, CLI/env workflow and approval bridge are implemented, with known defects in
 data preservation, authorization timing and release checks. The desktop is a source build with
-partial entry/env screens and a clipboard lifetime that can outlive a lock, identified in the
-2026-09-07 code review. Saved preferences now reach a fresh session (F.2a) and minimizing enforces
+partial entry/env screens, identified in the 2026-09-07 code review; the clipboard lifetime that
+review found is repaired (F.2c). Saved preferences now reach a fresh session (F.2a) and minimizing enforces
 the setting that names it (F.2b1), observed on Windows only. The remaining F.2–F.4 repair tasks
 below are open even though existing tests pass.
 Everyday password-management workflows, browser integration and desktop
 publication remain unfinished. No hosted service, web vault, mobile integration or organization
 credential service is available.
 
-**Next: F.2c — prevent clipboard writes from outliving lock or shutdown.** F.2b2 is BLOCKED on
+**Next: F.2d — verify master-password automation cannot expose input.** F.2b2 is BLOCKED on
 hardware this project does not have; it is deferred to the desktop candidate run, and 4.7b lists
 it, so the desktop gate still cannot pass without it. F.4b's change is in source and checked on
 the four targets this machine can build; its three remaining NativeAOT targets need one CI run,
@@ -61,6 +61,7 @@ A completed source task does not mean that it is present in the current download
 | F.1e | Complete | One path resolver for reads and removals; an ambiguous path is refused rather than served, and `add` cannot deepen a collision; [identity tests](../tests/Keypaste.Core.Tests/EntryIdentityTests.cs), [verb tests](../tests/Keypaste.Cli.Tests/VerbTests.cs), [entry tests](../tests/Keypaste.App.Tests/ViewModels/EntriesViewModelTests.cs) and [write-back gate](../scripts/verify-keepassxc-writeback.sh) D, D-0094 |
 | F.2a | Complete | Launch reads `app.toml` once and arms the session and the palette from it; the Settings screen shows the same record, and a timeout the list does not offer is named rather than snapped or rewritten; [startup tests](../tests/Keypaste.App.Tests/StartupSettingsTests.cs), [settings tests](../tests/Keypaste.App.Tests/ViewModels/SettingsViewModelTests.cs), D-0095 |
 | F.2b1 | Complete | Minimizing calls the same session lock the timeout and `Ctrl/Cmd+L` call, from launch and from the moment the box is ticked; the checkbox is omitted where a platform cannot report the state; [minimize tests](../tests/Keypaste.App.Tests/MinimizeLockTests.cs), and observed by hand on Windows 10 Pro 19045 on 2026-09-08 — enabled locked and restored to the unlock screen, disabled did not, a copied password left the clipboard, `app.toml` unchanged; D-0096 |
+| F.2c | Complete | One queue and one ownership hand-off: a clipboard write the platform finishes after a lock, a quit or a Clear now is taken back rather than installed, no timer is created after that point, quitting awaits the hand-off and locking does not block on it, and a `keypaste run` line that lands late is left where it is; the read-back that fails at the copy now clears at the deadline instead of never; [in-flight tests](../tests/Keypaste.App.Tests/Clipboard/ClipboardWritesDoNotOutliveTheAppTests.cs) over a [clipboard whose writes can be held open](../tests/Keypaste.App.Tests/Clipboard/HeldClipboard.cs) — seven of them observed failing against the previous implementation on 2026-09-08 — and the unchanged [countdown tests](../tests/Keypaste.App.Tests/Clipboard/ClipboardCountdownTests.cs); D-0098 |
 | 10.1 | Complete | Initial hostile review/remediation; D-0084 in [DECISIONS](../DECISIONS.md) |
 | K.1 | Complete | Pinned SDK installed; [global.json](../global.json), D-0076 |
 
@@ -130,10 +131,6 @@ in repository fixtures/tests, so completion does not depend on a maintainer's te
 - [ ] **F.2b2 — Observe minimize-lock on macOS and Linux. BLOCKED:** no macOS machine and no Linux desktop session are available (2026-09-08); run it during the 4.7a/4.7b desktop candidate work, when an archive for each target exists anyway. Needs: F.2b1.
   **Build:** Run F.2b1's behavior on the remaining two advertised desktop targets and record what each actually did, including any window manager that does not report a minimize. Change [MinimizeLock](../src/Keypaste.App/MinimizeLock.cs)'s supported-surface answer if an observation contradicts it, rather than leaving the checkbox offered where it does nothing.
   **Verify (V-F.2b2):** Current status holds a dated macOS and a dated Linux result for the enabled, disabled and after-restart cases, each naming the OS version, session type and build. An untested target keeps its unobserved status; a passing headless suite cannot substitute. **External prerequisite:** a macOS machine and a Linux desktop session. The procedure is written down in the [desktop checklist](desktop.md#observing-minimize-lock-on-macos-and-linux) so the observation does not have to be re-derived.
-
-- [ ] **F.2c — Prevent clipboard writes from outliving lock or shutdown.** Needs: 4.2.
-  **Build:** Serialize [ClipboardCountdown](../src/Keypaste.App/Clipboard/ClipboardCountdown.cs) operations and invalidate/drain pending writes during lock, disposal and orderly shutdown. A copy suspended in an awaited clipboard write currently resumes after disposal, installs the secret and revives its timer. Preserve unrelated clipboard content while completing owned cleanup.
-  **Verify (V-F.2c):** A genuinely asynchronous fixture delays the write across lock/disposal and quit: completing it cannot leave an owned secret or revive a timer. Cover overlapping secret/plain copies, explicit clear, clipboard failure and unrelated replacement; synchronous fake clipboard methods alone cannot pass.
 
 - [ ] **F.2d — Verify master-password automation cannot expose input.** Needs: 4.1.
   **Build:** Add the missing dedicated [MaskedInput](../src/Keypaste.App/Controls/MaskedInput.cs) regression identified in THREATS T-22. Exercise typed/pasted fixture input and inspect its actual automation peer, properties and attached metadata. This moves the existing security check forward from the later 4.6 rendering task.
