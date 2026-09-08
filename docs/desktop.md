@@ -136,7 +136,7 @@ CI builds and packages on three operating systems; the current desktop logic tes
     Untick it, minimize and restore: still unlocked, and the countdown still arrives on time. Quit,
     relaunch without opening Settings and minimize again: it locks. Copy a password first and paste
     after a minimize-lock — nothing. `docs/STEPS.md` F.2b2 records what each operating system did;
-    macOS and Linux are still unobserved.
+    macOS and Linux are still unobserved, and the section below is how to observe them.
 11. The Log screen matches `keypaste log` for the same `~/.keypaste/audit.jsonl`.
 12. Agent Activity says the right thing both with and without a `keypaste agent` running.
 13. Entries lists titles and groups. Filter by a group and search for part of a title or group path; case changes still match. Selecting an entry shows a username, a URL and notes, and a row of dots where the password is.
@@ -158,3 +158,43 @@ CI builds and packages on three operating systems; the current desktop logic tes
     back and make any edit: the app refuses, says why, and the terminal's write is still there.
 22. Generate a password in the app, then read it back with `keypaste get --show`.
 23. Open the vault the app wrote in KeePassXC.
+
+## Observing minimize-lock on macOS and Linux
+
+Item 10 above has been run on Windows. The same three cases have to be run on the other two
+advertised targets, because a headless suite can drive a window's state and cannot tell you what a
+window manager reports. `docs/STEPS.md` F.2b2 is the task and owns the result; this is the recipe,
+written down so nobody has to work it out twice.
+
+**Get a build onto the machine.** Either download the seven-day `app-<rid>` artifact from an
+`app.yml` run, or publish one:
+
+```
+dotnet restore keypaste.app.slnx --locked-mode
+dotnet publish src/Keypaste.App -c Release -r osx-arm64 --self-contained --no-restore -o artifacts/app/osx-arm64
+```
+
+`linux-x64` for the other. Never pass `-r` to `restore`: it narrows the project's RID set to one and
+a locked restore then fails (D-0040). Linux also needs `libx11-6 libice6 libsm6 libfontconfig1` and
+an X11 or XWayland session.
+
+**Run these three, with the idle timeout set long enough that it cannot be what locked you.** Use a
+disposable vault.
+
+1. **Enabled.** Tick "Lock when the window is minimized". Minimize the way somebody actually would
+   on that desktop — the yellow button on macOS, the titlebar button or the window menu on Linux —
+   and restore. Expected: the unlock screen, and a password copied beforehand no longer pastes.
+2. **Disabled.** Untick it, minimize and restore. Expected: still unlocked, and the idle countdown
+   still arrives on time.
+3. **After a restart.** Tick it, quit, relaunch without opening Settings, minimize. Expected: it
+   locks, and `app.toml` is unchanged afterwards.
+
+**Also confirm what it is not.** Switching to another window is not a minimize. On macOS, `Cmd+H`
+is not a minimize either — `Cmd+M` is. Neither should lock.
+
+**Record, in the F.2b2 row, the shape the F.2b1 row already uses:** the operating system's name,
+version and build; the session type (macOS, X11, or Wayland with XWayland, and the desktop
+environment); the app build or tag; and what each of the three cases actually did. If a window
+manager reports no minimize at all, that is the result — say so, and change
+`MinimizeLock.IsSupported` so the checkbox is omitted there rather than offered where it does
+nothing. An untested target keeps its unobserved status.
