@@ -277,7 +277,20 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
     private EntryDetailViewModel? Build(EntryRow row)
     {
-        if (_session.Unlocked?.Find(row.Path) is not { } entry)
+        VaultEntry? found;
+        try
+        {
+            // By name, not by path: two rows can share a path, and building the pane from the
+            // wrong one is what made its copy button serve a secret nobody selected.
+            found = _session.Unlocked?.Find(row.Name);
+        }
+        catch (VaultException e)
+        {
+            Error = e.Message;
+            return null;
+        }
+
+        if (found is not { } entry)
         {
             Error = "That entry could not be read. The vault may have locked.";
             return null;
@@ -348,11 +361,25 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
             return;
         }
 
+        var name = new EntryName(groupPath, title);
         var path = groupPath.Length == 0 ? title : groupPath + "/" + title;
 
-        if (vault.Find(path) is not null)
+        try
         {
-            Error = $"'{EntryNameSanitizer.SanitizePath(path).Text}' already exists.";
+            // The identity, so this cannot claim an entry exists that nothing has.
+            if (vault.Find(name) is not null)
+            {
+                Error = $"'{EntryNameSanitizer.SanitizePath(path).Text}' already exists.";
+                return;
+            }
+
+            // The joined form, reached for its refusal alone: it throws when the path already
+            // names two, and a third would deepen a collision the detail pane then has to refuse.
+            _ = vault.Find(path);
+        }
+        catch (VaultException e)
+        {
+            Error = e.Message;
             return;
         }
 
@@ -392,7 +419,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         Error = null;
 
         Reload();
-        Selected = Rows.FirstOrDefault(row => string.Equals(row.Path, path, StringComparison.Ordinal));
+        Selected = Rows.FirstOrDefault(row => row.Name == name);
     }
 
     private void Delete()

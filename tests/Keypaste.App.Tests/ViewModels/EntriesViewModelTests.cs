@@ -316,6 +316,50 @@ public sealed class EntriesViewModelTests : IDisposable
         Assert.Equal("gh", written?.Password);
     }
 
+    /// <summary>
+    /// The same collision, on the read side. The pane resolved its entry by the joined path, so
+    /// selecting <c>TOKEN</c> in <c>env/dev/nested</c> and editing it wrote to whichever of the two
+    /// the file listed first — which could be <c>nested/TOKEN</c> in <c>env/dev</c>, an entry the
+    /// person never selected (docs/STEPS.md F.1e).
+    /// </summary>
+    [Fact]
+    public void An_inline_edit_writes_the_selected_identity_and_not_its_colliding_neighbour()
+    {
+        var path = CollidingVault();
+        using var context = new Context(path);
+
+        context.Entries.Selected = context.Entries.Rows.Single(row => row.GroupPath == "env/dev/nested");
+        var detail = context.Entries.Detail!;
+
+        detail.EditCommand.Execute(null);
+        detail.DraftUsername = "chosen";
+        detail.SaveCommand.Execute(null);
+
+        Assert.Null(context.Entries.Error);
+
+        using var reopened = Vault.Open(path, Master);
+        Assert.Equal("chosen", reopened.Find(new EntryName("env/dev/nested", "TOKEN"))?.Username);
+        Assert.Equal(string.Empty, reopened.Find(new EntryName("env/dev", "nested/TOKEN"))?.Username);
+    }
+
+    /// <summary>
+    /// Copy reads the password out of the open vault at the moment of the press, so the same
+    /// resolution defect put the wrong secret on the clipboard — with nothing on screen saying so,
+    /// because the pane never draws a password.
+    /// </summary>
+    [Fact]
+    public async Task Copying_a_password_takes_the_selected_identity_when_another_entry_shares_its_path()
+    {
+        var path = CollidingVault();
+        using var context = new Context(path);
+
+        context.Entries.Selected = context.Entries.Rows.Single(row => row.GroupPath == "env/dev/nested");
+
+        await context.Entries.Detail!.CopyPasswordCommand.ExecuteAsync();
+
+        Assert.Equal("nested", context.Clipboard.Content);
+    }
+
     [Fact]
     public void Cancelling_an_edit_writes_nothing()
     {

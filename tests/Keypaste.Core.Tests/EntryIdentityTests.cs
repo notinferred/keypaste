@@ -80,6 +80,33 @@ public sealed class EntryIdentityTests : IDisposable
         Assert.Null(vault.Find(new EntryName("env/dev", "TOKEN")));
     }
 
+    /// <summary>
+    /// The joined form stays addressable — a person types it and a policy file holds it — so it
+    /// refuses a collision rather than resolving to whichever entry the file happens to list
+    /// first. F.1a left this one: it repaired removal, and until F.1e this returned
+    /// <c>slashed</c> and <c>keypaste get</c> handed that secret out (docs/PRODUCT.md law 3.7).
+    /// </summary>
+    [Fact]
+    public void Finding_ByPath_WhenTwoEntriesAnswerToIt_IsRefused()
+    {
+        using var vault = Collision(NewVaultPath());
+
+        Assert.Throws<VaultException>(() => vault.Find("env/dev/nested/TOKEN"));
+    }
+
+    /// <summary>
+    /// The other half, without which refusing everything would pass: a path only one entry
+    /// answers to still resolves, and one no entry answers to is still absence rather than error.
+    /// </summary>
+    [Fact]
+    public void Finding_ByPath_WhenOneEntryAnswersToIt_StillResolves()
+    {
+        using var vault = Collision(NewVaultPath());
+
+        Assert.Equal("keep", vault.Find("env/dev/KEEP")?.Password);
+        Assert.Null(vault.Find("env/dev/NOTHING"));
+    }
+
     [Fact]
     public void Removing_AName_ThatIsNotThere_ChangesNothing()
     {

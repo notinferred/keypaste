@@ -171,29 +171,26 @@ public sealed class Vault : IDisposable
     }
 
     /// <summary>
-    /// Finds a single entry by its full path, for example <c>servers/production</c>.
+    /// Finds the one entry at <paramref name="entryPath"/>, for example <c>servers/production</c>.
     /// </summary>
     /// <param name="entryPath">The entry's <see cref="VaultEntry.Path"/>.</param>
     /// <returns>The entry, or <see langword="null"/> if no entry has that path.</returns>
     /// <remarks>
     /// A path is what a person types and what a policy file holds, so it stays addressable. It is
-    /// not an identity: the first entry whose path matches is returned, and two entries can share
-    /// one. <see cref="Find(EntryName)"/> is the form that tells them apart.
+    /// still not an identity — joining is lossy — so a path two entries answer to is refused rather
+    /// than resolved to whichever one the file happens to list first, because serving either would
+    /// be a guess (docs/PRODUCT.md law 3.7). <see cref="Find(EntryName)"/> is the form that tells
+    /// them apart, and a caller already holding both halves should use it.
     /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="entryPath"/> is null.</exception>
+    /// <exception cref="ObjectDisposedException">The vault has been disposed.</exception>
+    /// <exception cref="VaultException">More than one entry answers to that path.</exception>
     public VaultEntry? Find(string entryPath)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(entryPath);
 
-        foreach (VaultEntry entry in _interop.ReadEntries())
-        {
-            if (string.Equals(entry.Path, entryPath, StringComparison.Ordinal))
-            {
-                return entry;
-            }
-        }
-
-        return null;
+        return ResolveByPath(entryPath);
     }
 
     /// <summary>
@@ -251,26 +248,7 @@ public sealed class Vault : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(entryPath);
 
-        VaultEntry? found = null;
-
-        foreach (VaultEntry entry in _interop.ReadEntries())
-        {
-            if (!string.Equals(entry.Path, entryPath, StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            if (found is not null)
-            {
-                throw new VaultException(
-                    $"'{entryPath}' names more than one entry: a title containing a separator and " +
-                    "a group of that name produce the same path. Rename one of them in KeePassXC.");
-            }
-
-            found = entry;
-        }
-
-        return found is not null && _interop.RemoveEntry(EntryName.Of(found)) > 0;
+        return ResolveByPath(entryPath) is { } found && _interop.RemoveEntry(EntryName.Of(found)) > 0;
     }
 
     /// <summary>
@@ -350,6 +328,39 @@ public sealed class Vault : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         Write();
+    }
+
+    /// <summary>
+    /// The one entry whose <see cref="VaultEntry.Path"/> is <paramref name="entryPath"/>.
+    /// </summary>
+    /// <remarks>
+    /// The whole of what a typed path means, in one place. Reading and removing ask this same
+    /// question so they cannot reach different answers about the same file — three resolvers that
+    /// disagreed is the defect D-0091 found, and a fourth would be the same mistake again.
+    /// </remarks>
+    /// <exception cref="VaultException">More than one entry answers to that path.</exception>
+    private VaultEntry? ResolveByPath(string entryPath)
+    {
+        VaultEntry? found = null;
+
+        foreach (VaultEntry entry in _interop.ReadEntries())
+        {
+            if (!string.Equals(entry.Path, entryPath, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (found is not null)
+            {
+                throw new VaultException(
+                    $"'{entryPath}' names more than one entry: a title containing a separator and " +
+                    "a group of that name produce the same path. Rename one of them in KeePassXC.");
+            }
+
+            found = entry;
+        }
+
+        return found;
     }
 
     private void Write()

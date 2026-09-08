@@ -85,9 +85,19 @@ internal sealed class EntryDetailViewModel : ObservableObject, IDisposable
     /// <summary>The entry's group.</summary>
     internal string GroupPath => _groupPath;
 
+    /// <summary>
+    /// The entry this pane is looking at: its group and its title, which is what addresses it.
+    /// </summary>
+    /// <remarks>
+    /// The pane used to reach for <see cref="Path"/>, and two entries can answer to one of those —
+    /// so a copy served a secret the person had not selected and an edit wrote to its neighbour
+    /// (docs/STEPS.md F.1e). Every vault access below goes through this instead.
+    /// </remarks>
+    internal EntryName Name => new(_groupPath, _title);
+
     /// <summary>The entry's path, for the header and for the CLI hint.</summary>
-    /// <remarks>An address: it is what <c>Find</c> and the save path use. Drawn as
-    /// <see cref="DisplayPath"/>.</remarks>
+    /// <remarks>A label, not an identity: joining is lossy, so nothing here looks an entry up by
+    /// it. Drawn as <see cref="DisplayPath"/>.</remarks>
     internal string Path => _entryPath;
 
     /// <summary>The title as the pane draws it.</summary>
@@ -208,7 +218,18 @@ internal sealed class EntryDetailViewModel : ObservableObject, IDisposable
     /// <summary>Refreshes from the vault after a save.</summary>
     internal void Reload()
     {
-        if (_session.Unlocked?.Find(_entryPath) is not { } entry)
+        VaultEntry? found;
+        try
+        {
+            found = _session.Unlocked?.Find(Name);
+        }
+        catch (VaultException e)
+        {
+            Report(e.Message);
+            return;
+        }
+
+        if (found is not { } entry)
         {
             return;
         }
@@ -262,7 +283,20 @@ internal sealed class EntryDetailViewModel : ObservableObject, IDisposable
     {
         // Read at the moment of the press, from the open vault, and handed straight on. The value
         // is a local for the length of this method and is in no field of this object.
-        if (_session.Unlocked?.Find(_entryPath)?.Password is not { Length: > 0 } password)
+        string? found;
+        try
+        {
+            found = _session.Unlocked?.Find(Name)?.Password;
+        }
+        catch (VaultException e)
+        {
+            // Two entries with one title in one group. Copying either would put a secret nobody
+            // chose on the clipboard, and this pane never draws one, so nothing would show it.
+            Report(e.Message);
+            return;
+        }
+
+        if (found is not { Length: > 0 } password)
         {
             Report("That entry could not be read. The vault may have locked.");
             return;
@@ -297,24 +331,28 @@ internal sealed class EntryDetailViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (vault.Find(_entryPath) is not { } existing)
-        {
-            Report($"'{_entryPath}' is no longer in this vault.");
-            return;
-        }
-
-        // The password is carried across untouched rather than re-typed into the record: this pane
-        // does not edit it, and reading it here only to write it back would put it in a local for
-        // no reason. `keypaste get` and the generator are how a password changes.
-        var updated = existing with
-        {
-            Username = DraftUsername,
-            Url = DraftUrl,
-            Notes = DraftNotes,
-        };
-
         try
         {
+            if (vault.Find(Name) is not { } existing)
+            {
+                Report($"'{_entryPath}' is no longer in this vault.");
+                return;
+            }
+
+            // The password is carried across untouched rather than re-typed into the record: this
+            // pane does not edit it, and reading it here only to write it back would put it in a
+            // local for no reason. `keypaste get` and the generator are how a password changes.
+            //
+            // Title and GroupPath come across too, which is why the read has to be the identity
+            // one: `UpdateEntry` locates by them, so an `existing` from the wrong entry writes the
+            // draft into that entry.
+            var updated = existing with
+            {
+                Username = DraftUsername,
+                Url = DraftUrl,
+                Notes = DraftNotes,
+            };
+
             vault.UpdateEntry(updated);
             vault.Save();
         }

@@ -13,7 +13,9 @@
 #   B. KeePassXC modifies a value -> keypaste must read what KeePassXC wrote.
 #   C. KeePassXC adds a variable -> keypaste env ls must list it.
 #   D. KeePassXC titles an entry with a SEPARATOR in it -> keypaste env rm must remove that
-#      entry and not the one whose path it shares (docs/STEPS.md F.1a).
+#      entry and not the one whose path it shares (docs/STEPS.md F.1a), and while both are
+#      present keypaste get must refuse that path rather than release either secret, and
+#      keypaste add must refuse to put a third entry on it (docs/STEPS.md F.1e).
 #
 # B, C and D are the claim DECISIONS.md D-0014 rests on: the env convention was chosen over
 # custom string fields precisely BECAUSE keepassxc-cli can perform them. If this file ever
@@ -201,6 +203,28 @@ esac
 case "$keys" in
   *'nested/NESTED_KEY'*) die "env ls drew a slash in a title unsanitized";;
 esac
+
+# F.1e, and this is the only moment in the script where the collision exists: two entries now
+# answer to env/<project>/nested/NESTED_KEY. A read of that path cannot pick one — whichever the
+# file lists first is a guess, and unlike a guessed removal a guessed read hands the wrong secret
+# over and says nothing. Neither the read nor the refused add may write, so the bytes say so.
+before_ambiguous=$(od -An -v -tx1 "$db" | tr -d ' \n')
+
+set +e
+collide_out=$(printf '%s\n' "$pw" | "$kp" get "env/${project}/nested/NESTED_KEY" --show --vault "$db" 2>/dev/null | tr -d '\r')
+collide_rc=$?
+set -e
+[ "$collide_rc" -ne 0 ] || die "keypaste get exited 0 on a path TWO entries answer to"
+[ -z "$collide_out" ] || die "keypaste get released a secret for an ambiguous path: '${collide_out}'"
+
+set +e
+printf '%s\n' "$pw" | "$kp" add "env/${project}/nested/NESTED_KEY" --generate --vault "$db" >/dev/null 2>&1
+collide_add_rc=$?
+set -e
+[ "$collide_add_rc" -ne 0 ] || die "keypaste add exited 0 on a path TWO entries already answer to"
+
+[ "$(od -An -v -tx1 "$db" | tr -d ' \n')" = "$before_ambiguous" ] || die "a refused read or a refused add rewrote the vault"
+printf 'ambiguous read refused (get exit %s, add exit %s, vault byte-identical)\n' "$collide_rc" "$collide_add_rc"
 
 printf '%s\n' "$pw" | "$kp" env rm "$project" 'nested/NESTED_KEY' --yes --vault "$db" >/dev/null 2>&1 \
   || die "keypaste env rm refused a name KeePassXC authored and keypaste listed"

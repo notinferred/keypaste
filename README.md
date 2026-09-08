@@ -168,7 +168,7 @@ Passwords are never echoed at a prompt, and `get` never writes a secret to stdou
 | --- | --- |
 | 0 | success |
 | 1 | usage error |
-| 2 | internal or environment error (including no usable clipboard) |
+| 2 | internal or environment error (including no usable clipboard, and an entry name two entries answer to) |
 | 3 | vault or entry not found |
 | 4 | wrong master password |
 | 5 | the audit log is not the file keypaste wrote |

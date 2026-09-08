@@ -15,7 +15,7 @@ Everyday password-management workflows, browser integration and desktop
 publication remain unfinished. No hosted service, web vault, mobile integration or organization
 credential service is available.
 
-**Next: F.1e — refuse an ambiguous entry path on read.** Complete the ready repairs
+**Next: F.2a — apply saved desktop preferences to a fresh application session.** Complete the ready repairs
 below before new feature work. Release foundations follow: R.0a makes release identity and supported
 targets executable, R.0b/3.8 make distribution verifiable, and 4.7a prepares desktop packages without
 waiting for signing enrollment. A new CLI/MCP patch requires the core/CLI/bridge and release repairs;
@@ -52,6 +52,7 @@ A completed source task does not mean that it is present in the current download
 | F.1a | Complete | One entry identity for selection and mutation, ambiguity refused; [identity tests](../tests/Keypaste.Core.Tests/EntryIdentityTests.cs) and [write-back gate](../scripts/verify-keepassxc-writeback.sh) D, D-0091 |
 | F.1b | Complete | Export refuses its source vault and any KDBX destination, `--force` included; [export tests](../tests/Keypaste.Cli.Tests/EnvExportTests.cs), [path rule tests](../tests/Keypaste.Core.Tests/PathIdentityTests.cs), D-0092 |
 | F.1c | Complete | Cleanup is bound to the bytes that were imported and the path they came from; a source changed during any prompt or at the delete boundary is kept; [pull tests](../tests/Keypaste.Cli.Tests/EnvPullTests.cs), [snapshot tests](../tests/Keypaste.Core.Tests/SourceSnapshotTests.cs), D-0093 |
+| F.1e | Complete | One path resolver for reads and removals; an ambiguous path is refused rather than served, and `add` cannot deepen a collision; [identity tests](../tests/Keypaste.Core.Tests/EntryIdentityTests.cs), [verb tests](../tests/Keypaste.Cli.Tests/VerbTests.cs), [entry tests](../tests/Keypaste.App.Tests/ViewModels/EntriesViewModelTests.cs) and [write-back gate](../scripts/verify-keepassxc-writeback.sh) D, D-0094 |
 | 10.1 | Complete | Initial hostile review/remediation; D-0084 in [DECISIONS](../DECISIONS.md) |
 | K.1 | Complete | Pinned SDK installed; [global.json](../global.json), D-0076 |
 
@@ -116,10 +117,6 @@ passed and five platform-specific skips. Each task needs a regression that demon
 before the fix and verifies the corrected behavior. Keep the shared core and mature KDBX library;
 these tasks repair existing behavior and do not require a product rewrite. Record reproductions
 in repository fixtures/tests, so completion does not depend on a maintainer's temporary files.
-
-- [ ] **F.1e — Refuse an ambiguous entry path on read.** Needs: F.1a.
-  **Build:** Route [GetCommand](../src/Keypaste.Cli/Commands/GetCommand.cs), [AddCommand](../src/Keypaste.Cli/Commands/AddCommand.cs)'s duplicate check and [EntryDetailViewModel](../src/Keypaste.App/ViewModels/EntryDetailViewModel.cs) through the identity resolution F.1a built. `Vault.Find(string)` still returns the first entry whose joined path matches, so `keypaste get env/dev/nested/TOKEN` releases whichever of two colliding entries the file lists first, and an inline edit writes to it. F.1a left these deliberately: it repaired removal, and a read that serves the wrong secret is its own bounded task.
-  **Verify (V-F.1e):** A colliding fixture makes `get` refuse rather than release either secret; `add` cannot create a third entry answering to a path that already names two; an inline edit writes the selected identity's fields and no neighbour's. Removal behaviour from F.1a is unchanged.
 
 - [ ] **F.2a — Apply saved desktop preferences to a fresh application session.** Needs: 4.1.
   **Build:** Load and apply saved idle timeout and theme during [App composition](../src/Keypaste.App/App.axaml.cs), keeping displayed and effective settings consistent. [SettingsViewModel](../src/Keypaste.App/ViewModels/SettingsViewModel.cs) currently displays a saved 60-second timeout while a new session still uses 300 seconds; the stored theme is also unapplied.

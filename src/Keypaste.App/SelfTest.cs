@@ -44,7 +44,7 @@ internal static class SelfTest
 
             using (var vault = Vault.Open(path, _masterPassword))
             {
-                var entry = vault.Find(_groupPath + "/" + _title);
+                var entry = vault.Find(new EntryName(_groupPath, _title));
 
                 if (entry is null || !string.Equals(entry.Password, _sentinel, StringComparison.Ordinal))
                 {
