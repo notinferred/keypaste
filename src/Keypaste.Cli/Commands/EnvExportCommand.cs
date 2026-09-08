@@ -94,6 +94,13 @@ internal static class EnvExportCommand
         {
             targetPath = Path.GetFullPath(line.Operands.Count == 2 ? line.Operands[1] : DefaultFileName);
 
+            // Before the check below, which would otherwise answer a vault with the one sentence
+            // that must never be said about it: pass --force to overwrite it.
+            if (!TryRefuseTheVault(vaultPath, targetPath, context, out var guardExit))
+            {
+                return guardExit;
+            }
+
             // Settled before the master password is asked for: an unwritable destination should not
             // cost a password entry and a key derivation to discover.
             if (!TryClearTheWay(targetPath, force, context, out var prepareExit))
@@ -103,7 +110,48 @@ internal static class EnvExportCommand
         }
 
         return VaultSession.Open(vaultPath, context, vault =>
-            Export(vault, project, targetPath, force, assumeYes, context));
+            Export(vault, vaultPath, project, targetPath, force, assumeYes, context));
+    }
+
+    /// <summary>Refuses a destination that is the vault this export reads from.</summary>
+    /// <remarks>
+    /// <para>
+    /// It takes no <c>force</c> parameter, and that is the point: there is no argument in scope for
+    /// a later edit to thread an override through, so a bypass cannot be added without a diff that
+    /// says out loud what it is doing. <c>--force</c> is for a stale <c>.env</c>; there is no
+    /// version of "yes, replace my vault with a plaintext file" worth offering.
+    /// </para>
+    /// <para>
+    /// Two rules, because one of them cannot see everything. <see cref="PathIdentity.SameFile"/>
+    /// resolves links, including one in an ancestor directory, and it is the rule that produces the
+    /// message naming the vault. It cannot see through a hard link or a bind mount, so a
+    /// destination that is already a KDBX file is refused as well — which also declines to write a
+    /// <c>.env</c> over some <em>other</em> vault, an accident with the same cost.
+    /// </para>
+    /// </remarks>
+    private static bool TryRefuseTheVault(string vaultPath, string targetPath, CliContext context, out int exit)
+    {
+        exit = CliApp.ExitSuccess;
+
+        if (PathIdentity.SameFile(vaultPath, targetPath))
+        {
+            context.Stderr.WriteLine(string.Equals(targetPath, vaultPath, StringComparison.Ordinal)
+                ? $"keypaste env export: '{targetPath}' is the vault this export reads from"
+                : $"keypaste env export: '{targetPath}' is the vault at '{vaultPath}'");
+        }
+        else if (File.Exists(targetPath) && KdbxHeader.IsVaultFile(targetPath))
+        {
+            context.Stderr.WriteLine($"keypaste env export: '{targetPath}' is a KeePass vault");
+        }
+        else
+        {
+            return true;
+        }
+
+        context.Stderr.WriteLine("Writing it would leave you with a .env and no vault.");
+        context.Stderr.WriteLine("Nothing was written. --force does not lift this; name another file.");
+        exit = CliApp.ExitUsageError;
+        return false;
     }
 
     /// <summary>Checks the destination is writable, and refuses to clobber anything by default.</summary>
@@ -131,6 +179,7 @@ internal static class EnvExportCommand
 
     private static int Export(
         Vault vault,
+        string vaultPath,
         string project,
         string? targetPath,
         bool force,
@@ -162,7 +211,7 @@ internal static class EnvExportCommand
 
         return targetPath is null
             ? ToStdout(file, variables.Count, groupPath, context)
-            : ToFile(file, variables.Count, groupPath, targetPath, force, assumeYes, context);
+            : ToFile(file, variables.Count, groupPath, vaultPath, targetPath, force, assumeYes, context);
     }
 
     private static int ToStdout(DotEnvText file, int count, string groupPath, CliContext context)
@@ -183,6 +232,7 @@ internal static class EnvExportCommand
         DotEnvText file,
         int count,
         string groupPath,
+        string vaultPath,
         string targetPath,
         bool force,
         bool assumeYes,
@@ -214,6 +264,13 @@ internal static class EnvExportCommand
                 context.Stderr.WriteLine("Cancelled.");
                 return CliApp.ExitUsageError;
             }
+        }
+
+        // Asked again, because the answer can have changed: the password prompt sits between the
+        // first check and this line, and it is the destination being deleted that has to be safe.
+        if (!TryRefuseTheVault(vaultPath, targetPath, context, out var guardExit))
+        {
+            return guardExit;
         }
 
         if (!TryWrite(targetPath, file.Utf8.Span, force, out var writeError))

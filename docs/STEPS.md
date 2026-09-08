@@ -15,7 +15,7 @@ Everyday password-management workflows, browser integration and desktop
 publication remain unfinished. No hosted service, web vault, mobile integration or organization
 credential service is available.
 
-**Next: F.1b — refuse dotenv export onto its source vault.** Complete the ready repairs
+**Next: F.1c — preserve source edits made during env import.** Complete the ready repairs
 below before new feature work. Release foundations follow: R.0a makes release identity and supported
 targets executable, R.0b/3.8 make distribution verifiable, and 4.7a prepares desktop packages without
 waiting for signing enrollment. A new CLI/MCP patch requires the core/CLI/bridge and release repairs;
@@ -50,6 +50,7 @@ A completed source task does not mean that it is present in the current download
 | 4.1 | Complete in source | Desktop unlock and idle lock; [session tests](../tests/Keypaste.App.Tests/Session/AppVaultSessionTests.cs) |
 | 4.2 | Complete in source | Basic search, generated entries, env screens and lost-write protection; [entry tests](../tests/Keypaste.App.Tests/ViewModels/EntriesViewModelTests.cs) |
 | F.1a | Complete | One entry identity for selection and mutation, ambiguity refused; [identity tests](../tests/Keypaste.Core.Tests/EntryIdentityTests.cs) and [write-back gate](../scripts/verify-keepassxc-writeback.sh) D, D-0091 |
+| F.1b | Complete | Export refuses its source vault and any KDBX destination, `--force` included; [export tests](../tests/Keypaste.Cli.Tests/EnvExportTests.cs), [path rule tests](../tests/Keypaste.Core.Tests/PathIdentityTests.cs), D-0092 |
 | 10.1 | Complete | Initial hostile review/remediation; D-0084 in [DECISIONS](../DECISIONS.md) |
 | K.1 | Complete | Pinned SDK installed; [global.json](../global.json), D-0076 |
 
@@ -114,10 +115,6 @@ passed and five platform-specific skips. Each task needs a regression that demon
 before the fix and verifies the corrected behavior. Keep the shared core and mature KDBX library;
 these tasks repair existing behavior and do not require a product rewrite. Record reproductions
 in repository fixtures/tests, so completion does not depend on a maintainer's temporary files.
-
-- [ ] **F.1b — Refuse dotenv export onto its source vault.** Needs: 1.3.
-  **Build:** Guard source/destination identity in [EnvExportCommand](../src/Keypaste.Cli/Commands/EnvExportCommand.cs) before any destructive write, including supported path aliases. `--force --yes` currently permits replacing the source KDBX with plaintext dotenv; it must not override this guard.
-  **Verify (V-F.1b):** Same-path, relative/absolute, applicable case and supported link-alias fixtures refuse export without changing the vault's bytes or entries. A distinct destination still exports correctly under the existing explicit plaintext-consent rules.
 
 - [ ] **F.1c — Preserve source edits made during env import.** Needs: 1.2.
   **Build:** Bind [EnvPullCommand](../src/Keypaste.Cli/Commands/EnvPullCommand.cs) cleanup to the imported source identity and content snapshot, covering the final check/delete boundary as well as prompts. The current gap permits deletion of changed/replaced source content that was never imported. Retain the file and explain when unchanged-source cleanup cannot be established safely.

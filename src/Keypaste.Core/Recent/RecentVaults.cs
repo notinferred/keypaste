@@ -269,14 +269,11 @@ public static class RecentVaults
     /// Whether two paths name the same file, by the rules of this platform.
     /// </summary>
     /// <remarks>
-    /// Case-insensitive on Windows and on macOS, where the default file systems are; case-sensitive
-    /// on Linux, where it is not. Getting this wrong shows up as the same vault appearing twice in
-    /// the list, which is cosmetic — but it is the same question <c>env set</c> had to answer about
-    /// colliding names, and answering it the same way here costs one line.
+    /// The rule is <see cref="PathIdentity.Comparison"/>, not a second copy of it. Not
+    /// <see cref="PathIdentity.SameFile"/>: this list is compared on every load, resolving links
+    /// would put filesystem calls on that path, and two remembered entries that reach one file by
+    /// different names are two things a person picked and should keep seeing.
     /// </remarks>
     private static bool Same(string left, string right) =>
-        string.Equals(
-            left,
-            right,
-            OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase);
+        string.Equals(left, right, PathIdentity.Comparison);
 }
