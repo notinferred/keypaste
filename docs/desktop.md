@@ -16,7 +16,7 @@ A window over the same vault the CLI reads. It opens a `.kdbx`, holds it while y
 
 **Env Sets** shows each project as a card with the `keypaste run <project> -- ` line that injects it, and a button to copy that line. Opening a card shows the project's variables as a masked table. **Hold a value to reveal it** — one at a time, for as long as you hold it, and gone the moment you let go, switch screens or lock. There is a Copy button on every row.
 
-**Copying clears itself.** A copied secret leaves the clipboard after twenty seconds, with a countdown in the header and a Clear now button. It is cleared early if you lock, and before the app exits if you quit. It is left alone if you have copied something else since. Nothing clears it if the app is killed. A copied `keypaste run` line is not a secret and is never cleared.
+**Copying clears itself.** A copied secret leaves the clipboard after twenty seconds, with a countdown in the header and a Clear now button. It is cleared early if you lock, and before the app exits if you quit. It is left alone if you have copied something else since. Copying is a round trip through the windowing system, so if you lock or quit in the middle of one, the secret is taken back as soon as that round trip finishes — quitting waits for it, locking does not make you wait. Nothing clears it if the app is killed. A copied `keypaste run` line is not a secret and is never cleared, including when it lands after a lock.
 
 ## Editing your vault
 

@@ -8,6 +8,16 @@ Versions are the ones published at `https://dl.keypaste.com/v<version>/`. Every 
 
 These changes are available in source on `main`, **not in the `v0.1.0` downloads**. The source version still reports `0.1.0`; its version string alone does not identify the published bytes.
 
+**A password copied at the instant you lock no longer arrives after the lock.** Copying goes
+through the windowing system, and that takes a moment. If the vault locked, or you quit, or you
+pressed Clear now while it was still in progress, the copy finished afterwards: the password
+landed on the clipboard *after* the vault had shut, and started its own twenty-second countdown
+in a window that was no longer there. It is taken back now the moment the system hands it over,
+quitting waits for that rather than exiting around it, and a `keypaste run` line caught the same
+way is still left where it landed, because that was never a secret. One quieter case went with
+it: when keypaste could not read the clipboard back after copying, the countdown ran and then
+cleared nothing at all, leaving the password there indefinitely. It clears.
+
 **The programs now say keypaste published them.** Open the properties of a downloaded
 `keypaste.exe` and the company and copyright named a person — on a project whose whole public
 identity is the project. The value came from a field nobody had set: `Company` was blank, the

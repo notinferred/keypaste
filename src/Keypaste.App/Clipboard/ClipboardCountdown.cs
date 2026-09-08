@@ -27,10 +27,22 @@ namespace Keypaste.App.Clipboard;
 /// for the whole timeout window purely to power the same guard (O-0008); there is no reason to.
 /// </para>
 /// <para>
+/// <b>One operation at a time, and one point where ownership changes hands.</b> Writing to the
+/// clipboard is a round trip through the windowing system, and a lock, a quit, a Clear now or a
+/// second copy can all arrive while it is outstanding. Every operation therefore runs through
+/// <see cref="Run"/>, one after another; <see cref="Take"/> ends the current countdown
+/// <i>synchronously</i> and hands whatever was owned to the caller; and a continuation that comes
+/// back to find its <c>epoch</c> superseded gives the clipboard back instead of installing a secret
+/// nothing is counting down any more. Locking never waits for that — it takes the countdown away
+/// at once and the giving back happens behind it (F.2c, D-0098).
+/// </para>
+/// <para>
 /// <b>What it can promise, and what it cannot.</b> It clears at the deadline, on a lock, and on an
-/// orderly quit, in each case only if the clipboard still holds the secret. It promises <i>nothing</i>
-/// against <c>kill -9</c>, End Task, an OOM kill, a power cut or a logout — nothing running is left
-/// to do the clearing. THREATS.md T-19 and docs/desktop.md say that rather than implying otherwise.
+/// orderly quit, in each case only if the clipboard still holds the secret. A write the platform
+/// has not handed back yet is taken back as soon as it does, which is not the same as before the
+/// lock. It promises <i>nothing</i> against <c>kill -9</c>, End Task, an OOM kill, a power cut or a
+/// logout — nothing running is left to do the clearing. THREATS.md T-19 and docs/desktop.md say
+/// that rather than implying otherwise.
 /// </para>
 /// </remarks>
 internal sealed class ClipboardCountdown : ObservableObject, IDisposable
@@ -40,6 +52,9 @@ internal sealed class ClipboardCountdown : ObservableObject, IDisposable
     private readonly Action<Action> _post;
     private readonly TimeSpan _window;
 
+    private Task _queue = Task.CompletedTask;
+    private long _epoch;
+    private bool _owns;
     private byte[]? _expected;
     private ITimer? _timer;
     private DateTimeOffset _startedWall;
@@ -125,86 +140,74 @@ internal sealed class ClipboardCountdown : ObservableObject, IDisposable
     /// <summary>Copies a secret and starts the countdown.</summary>
     /// <param name="secret">The value. Never stored on this object.</param>
     /// <param name="label">What it was — "Password", "STRIPE_KEY". Never a value.</param>
+    /// <returns>A task that completes when the copy has been attempted.</returns>
     /// <remarks>
-    /// A second copy supersedes the first: the running countdown is stopped without clearing,
-    /// because what is on the clipboard now is the new secret and the new countdown owns it.
+    /// A second copy supersedes the first: the running countdown ends without clearing, because
+    /// what is on the clipboard once this returns is the new secret and the new countdown owns it.
     /// </remarks>
-    internal async Task CopyAsync(string secret, string label)
+    internal Task CopyAsync(string secret, string label)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        Stop();
-        _failure = null;
-
-        if (!await _clipboard.TrySetSecretAsync(secret).ConfigureAwait(true))
-        {
-            Fail("Could not reach the clipboard. Hold to reveal the value and copy it yourself.");
-            return;
-        }
-
-        // The baseline is read straight after the copy, so whatever the platform's read-back does
-        // to the bytes it does identically at both ends of the wait.
-        _expected = await _clipboard.TryReadHashAsync().ConfigureAwait(true);
-        _label = label;
-        _startedWall = _clock.GetUtcNow();
-        _startedStamp = _clock.GetTimestamp();
-
-        _timer = _clock.CreateTimer(
-            _ => _post(Tick),
-            null,
-            TimeSpan.FromSeconds(1),
-            TimeSpan.FromSeconds(1));
-
-        RaiseEverything();
+        return Run(() => CopyCoreAsync(secret, label));
     }
 
     /// <summary>Copies something that is not a secret, with no countdown and no clear.</summary>
     /// <param name="text">The text.</param>
     /// <param name="label">What it was.</param>
+    /// <returns>A task that completes when the copy has been attempted.</returns>
     /// <remarks>
     /// The <c>keypaste run &lt;project&gt; --</c> helper. Taking a command line back twenty seconds
-    /// after somebody asked for it would be a small hostility, and there is nothing to protect.
+    /// after somebody asked for it would be a small hostility, and there is nothing to protect. It
+    /// is not owned, so a lock arriving a moment later leaves it exactly where it landed.
     /// </remarks>
-    internal async Task CopyPlainAsync(string text, string label)
+    internal Task CopyPlainAsync(string text, string label)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        Stop();
-        _failure = null;
-        _label = label;
-
-        if (!await _clipboard.TrySetPlainAsync(text).ConfigureAwait(true))
-        {
-            Fail("Could not reach the clipboard.");
-            return;
-        }
-
-        RaiseEverything();
+        return Run(() => PlainCoreAsync(text, label));
     }
 
     /// <summary>
     /// Clears the clipboard if it still holds what keypaste put there, and stops the countdown.
     /// </summary>
-    /// <remarks>Idempotent, and a no-op when nothing is counting.</remarks>
-    internal async Task ClearNowAsync()
+    /// <returns>A task that completes when the clipboard has been given back.</returns>
+    /// <remarks>Idempotent, and a no-op when nothing is owned.</remarks>
+    internal Task ClearNowAsync()
     {
-        if (_expected is not { } expected)
-        {
-            Stop();
-            RaiseEverything();
-            return;
-        }
-
-        var current = await _clipboard.TryReadHashAsync().ConfigureAwait(true);
-
-        if (ClipboardClear.Should(current is not null, current ?? [], expected))
-        {
-            await _clipboard.TryClearAsync().ConfigureAwait(true);
-        }
-
-        Stop();
+        var owned = Take();
         RaiseEverything();
+
+        return Run(() => ReleaseAsync(owned));
     }
+
+    /// <summary>
+    /// Ends the countdown for good and waits for the clipboard to be given back.
+    /// </summary>
+    /// <returns>A task that completes when nothing keypaste wrote is left on the clipboard.</returns>
+    /// <remarks>
+    /// The orderly-quit path, and the one caller that can afford to wait: the process is about to
+    /// exit, so a write the platform has not finished handing over has to be finished and taken
+    /// back before it does. A lock calls <see cref="Dispose"/> instead, which starts the same work
+    /// and does not block the unlock screen behind it.
+    /// </remarks>
+    internal Task CloseAsync()
+    {
+        if (_disposed)
+        {
+            return _queue;
+        }
+
+        _disposed = true;
+        var owned = Take();
+        RaiseEverything();
+
+        return Run(() => ReleaseAsync(owned));
+    }
+
+    /// <summary>Everything queued so far, for a test that has to wait for a drain.</summary>
+    /// <returns>A task that completes when the current queue is empty.</returns>
+    internal Task SettledAsync() => _queue;
 
     /// <summary>
     /// Stops counting and clears, because the vault has locked or the app is going away.
@@ -223,12 +226,142 @@ internal sealed class ClipboardCountdown : ObservableObject, IDisposable
             return;
         }
 
-        _disposed = true;
+        // Dispose cannot await, and it must not: a lock that waited on the windowing system would
+        // hold the unlock screen behind whichever process currently owns the clipboard. Ending the
+        // countdown is synchronous inside CloseAsync; only the giving back is queued.
+        _ = CloseAsync();
+    }
 
-        // Fire and forget: Dispose cannot await, and a clipboard implementation that completes
-        // synchronously — which the fake in the tests does — runs this to completion inline. The
-        // orderly-quit path calls ClearNowAsync directly and awaits it before the process exits.
-        _ = ClearNowAsync();
+    /// <summary>
+    /// Runs operations one at a time, in the order they were asked for.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="IAppClipboard"/> is contracted not to throw — <see cref="AvaloniaClipboard"/>
+    /// turns the platform's failures into <see langword="false"/> and <see langword="null"/> — so
+    /// this chain has no failure to swallow, and swallowing one would hide the seam breaking its
+    /// own contract.
+    /// </remarks>
+    private Task Run(Func<Task> work) => _queue = Chain(_queue, work);
+
+    private static async Task Chain(Task previous, Func<Task> work)
+    {
+        await previous.ConfigureAwait(true);
+        await work().ConfigureAwait(true);
+    }
+
+    /// <summary>
+    /// Ends the current countdown and hands back what it owned, synchronously.
+    /// </summary>
+    /// <remarks>
+    /// The epoch is what makes a late continuation harmless: it reads the value it was given at the
+    /// start, compares it here, and installs nothing if it has moved. Timer creation happens in one
+    /// place and only after that comparison, so "no timer is revived" is structural rather than a
+    /// check somebody has to remember to repeat.
+    /// </remarks>
+    private (bool Owns, byte[]? Hash) Take()
+    {
+        _epoch++;
+        _timer?.Dispose();
+        _timer = null;
+
+        var owned = (_owns, _expected);
+        _owns = false;
+        _expected = null;
+
+        return owned;
+    }
+
+    private bool Stale(long epoch) => _disposed || epoch != _epoch;
+
+    private async Task ReleaseAsync((bool Owns, byte[]? Hash) owned)
+    {
+        if (!owned.Owns)
+        {
+            return;
+        }
+
+        var current = await _clipboard.TryReadHashAsync().ConfigureAwait(true);
+
+        // A hash we never got is a read-back that failed, which ClipboardClear.Should answers with
+        // "clear anyway" — the same fail-closed direction as a read that fails at the deadline.
+        if (ClipboardClear.Should(current is not null && owned.Hash is not null, current ?? [], owned.Hash ?? []))
+        {
+            await _clipboard.TryClearAsync().ConfigureAwait(true);
+        }
+    }
+
+    private async Task CopyCoreAsync(string secret, string label)
+    {
+        var previous = Take();
+        var epoch = _epoch;
+
+        _failure = null;
+        RaiseEverything();
+
+        if (!await _clipboard.TrySetSecretAsync(secret).ConfigureAwait(true))
+        {
+            // The previous secret is still where it was, and nothing is counting it down any more.
+            await ReleaseAsync(previous).ConfigureAwait(true);
+
+            if (!Stale(epoch))
+            {
+                Fail("Could not reach the clipboard. Hold to reveal the value and copy it yourself.");
+            }
+
+            return;
+        }
+
+        // The baseline is read straight after the copy, so whatever the platform's read-back does
+        // to the bytes it does identically at both ends of the wait. Owning it is not conditional
+        // on the read succeeding: a hash we could not take still has to be taken back.
+        var mine = (Owns: true, Hash: await _clipboard.TryReadHashAsync().ConfigureAwait(true));
+
+        if (Stale(epoch))
+        {
+            await ReleaseAsync(mine).ConfigureAwait(true);
+            return;
+        }
+
+        _owns = true;
+        _expected = mine.Hash;
+        _label = label;
+        _startedWall = _clock.GetUtcNow();
+        _startedStamp = _clock.GetTimestamp();
+
+        _timer = _clock.CreateTimer(
+            _ => _post(Tick),
+            null,
+            TimeSpan.FromSeconds(1),
+            TimeSpan.FromSeconds(1));
+
+        RaiseEverything();
+    }
+
+    private async Task PlainCoreAsync(string text, string label)
+    {
+        var previous = Take();
+        var epoch = _epoch;
+
+        _failure = null;
+        _label = label;
+        RaiseEverything();
+
+        if (!await _clipboard.TrySetPlainAsync(text).ConfigureAwait(true))
+        {
+            await ReleaseAsync(previous).ConfigureAwait(true);
+
+            if (!Stale(epoch))
+            {
+                Fail("Could not reach the clipboard.");
+            }
+
+            return;
+        }
+
+        if (!Stale(epoch))
+        {
+            RaiseEverything();
+        }
     }
 
     private void Tick()
@@ -251,15 +384,9 @@ internal sealed class ClipboardCountdown : ObservableObject, IDisposable
     private void Fail(string message)
     {
         _failure = message;
+        _owns = false;
         _expected = null;
         RaiseEverything();
-    }
-
-    private void Stop()
-    {
-        _timer?.Dispose();
-        _timer = null;
-        _expected = null;
     }
 
     private void RaiseEverything()
