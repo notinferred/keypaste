@@ -138,14 +138,26 @@ count_keys() {
 # Dies rather than returning a sentinel, so every caller must propagate: `die` inside a command
 # substitution only ends the subshell (verify-publisher-metadata.sh:82).
 keys_at() {
-  local prefix="$1" rc=0
+  local prefix="$1" rc=0 keys
   listing "$prefix" >"$WORK/out.json" 2>"$WORK/err.txt" || rc=$?
   if [ "$rc" -ne 0 ]; then
     sed -n '1,10p' "$WORK/err.txt" >&2
     die "listing $prefix failed (aws exited $rc); refusing without a verified answer"
   fi
-  count_keys "$prefix" <"$WORK/out.json" \
+
+  keys="$(count_keys "$prefix" <"$WORK/out.json")" \
     || die "the answer for $prefix is not a listing this can act on; refusing"
+
+  # The count has to be a number here, not wherever it is next used. jq 1.6 exits 0 for empty
+  # input, so on ubuntu-22.04 - the runner the publish job actually uses - an empty answer about
+  # the destination came back as an empty string with a success status, sailed past the positive
+  # control, failed `[ "$occupied" -ne 0 ]` with "integer expression expected", and was read as a
+  # free destination. Trusting an exit code to say "no answer" is the assumption F.4a was about.
+  case "$keys" in
+    ''|*[!0-9]*) die "the answer for $prefix is not a listing this can act on; refusing" ;;
+  esac
+
+  printf '%s\n' "$keys"
 }
 
 # ---- 2. the positive control. Something known to be there has to be found.
