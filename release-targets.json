@@ -1,0 +1,199 @@
+{
+  "schema": 1,
+  "components": {
+    "cli": {
+      "binaries": [
+        "keypaste",
+        "keypaste-mcp"
+      ],
+      "projects": [
+        "src/Keypaste.Cli/Keypaste.Cli.csproj",
+        "src/Keypaste.Mcp/Keypaste.Mcp.csproj"
+      ],
+      "runtime_identifiers": [
+        "linux-x64",
+        "linux-arm64",
+        "osx-arm64",
+        "win-x64"
+      ],
+      "declared_not_packaged": {},
+      "archive_pattern": "keypaste-{version}-{rid}.{ext}",
+      "origin": "https://dl.keypaste.com/v{version}/",
+      "workflow": ".github/workflows/release.yml",
+      "signing": {
+        "policy": "none",
+        "reason": "O-0010",
+        "until": [
+          "3.5a",
+          "3.6a"
+        ],
+        "disclosed_in": [
+          "README.md",
+          "site/public/index.html",
+          "CHANGELOG.md",
+          "SECURITY.md",
+          "docs/RELEASE.md"
+        ]
+      },
+      "targets": [
+        {
+          "rid": "linux-x64",
+          "runner": "ubuntu-22.04",
+          "archive": "tar.gz",
+          "cpu": "x64",
+          "advertised": true,
+          "os_floor": "glibc 2.35",
+          "floor_evidence": "container-check",
+          "install_check": "linux",
+          "advertised_on": [
+            "README.md",
+            "site/public/index.html"
+          ]
+        },
+        {
+          "rid": "linux-arm64",
+          "runner": "ubuntu-22.04-arm",
+          "archive": "tar.gz",
+          "cpu": "arm64",
+          "advertised": true,
+          "os_floor": "glibc 2.35",
+          "floor_evidence": "unverified",
+          "floor_caveat": "the equivalent container check is not implemented for arm64",
+          "install_check": null,
+          "install_check_absent": "verify-install.sh takes linux|macos|windows and has no arm64 runner; README.md tells the reader to substitute the filename. 3.9d and R.0c own closing this."
+        },
+        {
+          "rid": "osx-arm64",
+          "runner": "macos-15",
+          "archive": "tar.gz",
+          "cpu": "arm64",
+          "advertised": true,
+          "os_floor": null,
+          "floor_evidence": "none",
+          "install_check": "macos",
+          "advertised_on": [
+            "README.md",
+            "site/public/index.html"
+          ]
+        },
+        {
+          "rid": "win-x64",
+          "runner": "windows-2025",
+          "archive": "zip",
+          "cpu": "x64",
+          "advertised": true,
+          "os_floor": null,
+          "floor_evidence": "none",
+          "install_check": "windows",
+          "advertised_on": [
+            "README.md"
+          ]
+        }
+      ]
+    },
+    "app": {
+      "binaries": [
+        "keypaste-app"
+      ],
+      "projects": [
+        "src/Keypaste.App/Keypaste.App.csproj"
+      ],
+      "runtime_identifiers": [
+        "linux-x64",
+        "linux-arm64",
+        "osx-arm64",
+        "win-x64"
+      ],
+      "declared_not_packaged": {
+        "linux-arm64": "No desktop arm64 package job exists. 3.9d owns adding one; docs/RELEASE.md records the RID as declared but absent from the package matrix."
+      },
+      "archive_pattern": "keypaste-app-{version}-{rid}.{ext}",
+      "origin": null,
+      "workflow": ".github/workflows/app.yml",
+      "signing": {
+        "policy": "none",
+        "reason": "O-0010, O-0015",
+        "until": [
+          "3.5b",
+          "3.6b"
+        ],
+        "disclosed_in": [
+          "docs/RELEASE.md"
+        ]
+      },
+      "targets": [
+        {
+          "rid": "linux-x64",
+          "runner": "ubuntu-24.04",
+          "archive": "tar.gz",
+          "cpu": "x64",
+          "advertised": false,
+          "os_floor": "glibc 2.39",
+          "floor_evidence": "runner-image",
+          "install_check": null,
+          "install_check_absent": "There is no public desktop release to install. 4.7a packages candidates and 4.7b exercises them."
+        },
+        {
+          "rid": "osx-arm64",
+          "runner": "macos-15",
+          "archive": "tar.gz",
+          "cpu": "arm64",
+          "advertised": false,
+          "os_floor": null,
+          "floor_evidence": "none",
+          "install_check": null,
+          "install_check_absent": "There is no public desktop release to install. 4.7a packages candidates and 4.7b exercises them."
+        },
+        {
+          "rid": "win-x64",
+          "runner": "windows-2025",
+          "archive": "zip",
+          "cpu": "x64",
+          "advertised": false,
+          "os_floor": null,
+          "floor_evidence": "none",
+          "install_check": null,
+          "install_check_absent": "There is no public desktop release to install. 4.7a packages candidates and 4.7b exercises them."
+        }
+      ]
+    }
+  },
+  "shared_projects": [
+    "src/Keypaste.Core/Keypaste.Core.csproj"
+  ],
+  "source_only": [
+    "osx-x64",
+    "win-arm64",
+    "linux-musl-x64"
+  ],
+  "published": [
+    {
+      "version": "0.1.0-rc.1",
+      "tag": "v0.1.0-rc.1",
+      "component": "cli",
+      "date": "2026-07-28",
+      "origin": "https://dl.keypaste.com/v0.1.0-rc.1/",
+      "rids": [
+        "linux-x64",
+        "linux-arm64",
+        "osx-arm64",
+        "win-x64"
+      ],
+      "advertised": false
+    },
+    {
+      "version": "0.1.0",
+      "tag": "v0.1.0",
+      "component": "cli",
+      "date": "2026-07-28",
+      "origin": "https://dl.keypaste.com/v0.1.0/",
+      "rids": [
+        "linux-x64",
+        "linux-arm64",
+        "osx-arm64",
+        "win-x64"
+      ],
+      "advertised": true
+    }
+  ]
+}

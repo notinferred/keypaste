@@ -114,6 +114,13 @@ jobs:
           [ "${green:-0}" -ge 1 ] \
             || { echo "::error::no successful ci run for $GITHUB_SHA - a tag must not ship an untested commit"; exit 1; }
 
+      # R.0a. A tag must not start publishing while the definition and the download pages already
+      # disagree about what is being published. The public-origin half is deliberately not run here:
+      # an unreachable dl.keypaste.com would block a release for weather rather than for a fault.
+      - name: Verify one release definition answers for every target
+        shell: bash
+        run: scripts/verify-release-matrix.sh
+
       # docs/PRODUCT.md law 4.7 pairs small releases with real changelogs. Making the release depend on the
       # entry existing is what turns that from an intention into a rule.
       - name: Check CHANGELOG.md has a section for this version
