@@ -37,6 +37,26 @@ A CLA would buy the freedom to relicense later. AGPL-3.0 is chosen and staying (
 
 Five pages — `README.md`, `launch.md`, `docs/demo.md`, `docs/keepass-and-agents.md` and `site/public/index.html` — are held by `scripts/verify-demo.sh` to what the built binaries print. Editing one triggers the full CLI CI workflow on a push to `main`; documentation pull requests also run both CLI and app workflows. This verifies source behavior, not whether the latest published release includes it; check [docs/RELEASE.md](docs/RELEASE.md) before changing installation claims.
 
+## Two things to say before you write a comment
+
+`src` reached 36% comment lines by answering "would somebody editing this get it wrong?" and nothing
+else. Both steps below produce a sentence you either can or cannot say; neither is a matter of taste.
+
+**Say who owns the claim before you write it.** If another file carries it, link and stop — the owner
+is a document's charter, not whether its text can still be amended, so a claim [DECISIONS](DECISIONS.md)
+records in its frozen archive is still owned. A comment repeating what the line below it does restates
+the code: a `<summary>`, `<param>`, `<returns>` or `<exception>` that only echoes the signature is the
+common case, while one carrying a contract the signature does not — "more than one entry answers to that
+name" — is not. A second telling in the same file restates the file. A comment naming the test that
+enforces it restates the test, though a comment may state a claim a test also asserts when it names a
+wrong turn still available to the next editor: the test names the symptom after the edit, and the
+comment has to name the edit before it. None of the rest get written.
+
+**Say each mistake in one sentence before you write the comment.** The comment is those sentences. If
+you cannot say one, it does not get written; if the comment is longer than the sentences, it is longer
+than the mistake. Length is whatever the mistakes take — three mistakes are three sentences, not three
+paragraphs.
+
 ## Before you commit
 
 ```sh
