@@ -51,8 +51,71 @@ internal static class McpAudit
             Clean(options.ClientLabel));
     }
 
+    /// <summary>How long a tool call waits for a handshake that is already in flight.</summary>
+    /// <remarks>
+    /// Enormous next to the gap it covers, which is thread scheduling, and small next to the three
+    /// seconds <c>verify-mcp-stdio.sh</c> gives a client that never initializes at all. A client
+    /// that sent nothing still waits this out and is still refused.
+    /// </remarks>
+    internal static readonly TimeSpan HandshakeGrace = TimeSpan.FromSeconds(1);
+
+    /// <summary>How often the identity is re-read while waiting.</summary>
+    internal static readonly TimeSpan HandshakePoll = TimeSpan.FromMilliseconds(10);
+
+    /// <summary>Waits, bounded, for a condition that a message already in flight will satisfy.</summary>
+    /// <param name="complete">The question, re-asked until it answers yes or the budget runs out.</param>
+    /// <param name="grace">How long to wait.</param>
+    /// <param name="clock">The clock to measure it on.</param>
+    /// <param name="cancellationToken">The caller giving up.</param>
+    /// <returns>The last answer, which is <c>false</c> if the budget ran out.</returns>
+    /// <remarks>
+    /// Split out from <see cref="HandshakeCompleteAsync"/> because the thing worth testing is the
+    /// waiting, and the thing that cannot be tested in process is the SDK's dispatch order: a real
+    /// <c>McpClient</c> performs the handshake and waits for its response, so no in-process test
+    /// can produce the ordering this exists for. A predicate that flips can.
+    /// </remarks>
+    internal static async ValueTask<bool> AwaitCompletionAsync(
+        Func<bool> complete,
+        TimeSpan grace,
+        TimeProvider clock,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(complete);
+        ArgumentNullException.ThrowIfNull(clock);
+
+        // Asked once before any waiting, so the ordinary call pays nothing for this.
+        if (complete())
+        {
+            return true;
+        }
+
+        var started = clock.GetTimestamp();
+
+        while (clock.GetElapsedTime(started) < grace)
+        {
+            try
+            {
+                await Task.Delay(HandshakePoll, clock, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                // The caller stopped waiting. Answer with what is known rather than throwing: the
+                // call still needs a verdict, and an unanswered one is recorded as nothing at all.
+                return complete();
+            }
+
+            if (complete())
+            {
+                return true;
+            }
+        }
+
+        return complete();
+    }
+
     /// <summary>Whether the <c>initialize</c> handshake has completed for this connection.</summary>
     /// <param name="request">The tool call in flight.</param>
+    /// <param name="cancellationToken">The caller giving up.</param>
     /// <returns><c>true</c> once the client's identity is known.</returns>
     /// <remarks>
     /// <para>
@@ -62,16 +125,31 @@ internal static class McpAudit
     /// handshake has not happened or the client broke the rule, and both are cases to refuse.
     /// </para>
     /// <para>
-    /// This is not authentication. A client can still call itself anything (THREATS.md T-3). It
-    /// only ensures the dialog and the audit line say <em>something</em> about the caller instead
-    /// of falling back to "an unnamed client" because a tool call overtook the handshake.
+    /// <b>It waits, and the reason is F.5.</b> A client that writes <c>initialize</c>,
+    /// <c>notifications/initialized</c> and a tool call in one go — which is legal, and which
+    /// <c>verify-approval-e2e.sh</c> and <c>verify-policy-e2e.sh</c> both do — was being refused as
+    /// though it had never introduced itself, because nothing orders the tool call after the
+    /// handler that publishes <c>ClientInfo</c>. Observed on macOS NativeAOT twice in two attempts
+    /// of release dispatch 34387033087, and once before that, when the response was to make
+    /// <c>verify-mcp-stdio.sh</c> wait for the initialize response rather than to fix this.
+    /// </para>
+    /// <para>
+    /// The guarantee is unchanged: a request is never answered for a client that cannot be named.
+    /// Waiting only stops a client that <em>did</em> name itself from being told it did not. This
+    /// is not authentication — a client can still call itself anything (THREATS.md T-3).
     /// </para>
     /// </remarks>
-    internal static bool HandshakeComplete(RequestContext<CallToolRequestParams> request)
+    internal static ValueTask<bool> HandshakeCompleteAsync(
+        RequestContext<CallToolRequestParams> request,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return request.Server?.ClientInfo is not null;
+        return AwaitCompletionAsync(
+            () => request.Server?.ClientInfo is not null,
+            HandshakeGrace,
+            TimeProvider.System,
+            cancellationToken);
     }
 
     /// <summary>Builds the line for a call that was refused.</summary>
