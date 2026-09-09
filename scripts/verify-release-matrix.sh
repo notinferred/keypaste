@@ -567,19 +567,26 @@ validate_prerelease_path() {
 
   # The changelog lookup the release runs, held to a whole-line match for the reason above.
   #
-  # Scoped to the line that actually reads CHANGELOG.md, not to the file. Asking whether the string
-  # "grep -qxF" appears anywhere in release.yml passed for the wrong reason the moment the publish
-  # allowlist grew one of its own: the changelog lookup could then be weakened back to `grep -qF`
-  # and this stayed green. A check that names one thing and binds another is not a check.
-  local release
+  # It follows the decision into the script (D-0109). Scoped to the line that actually reads
+  # CHANGELOG.md rather than to the file, for the reason it was scoped that way before: asking
+  # whether "grep -qxF" appears anywhere in release.yml passed for the wrong reason the moment the
+  # publish allowlist grew one of its own, so the lookup could be weakened back and this stayed
+  # green. A check that names one thing and binds another is not a check.
+  local release check lookup
   release="$root/.github/workflows/release.yml"
+  check="$root/scripts/require-changelog-section.sh"
   if [ -f "$release" ]; then
-    local lookup
-    lookup="$(code_of "$release" | grep -F "CHANGELOG.md" | grep -F "grep " || true)"
-    if [ -z "$lookup" ]; then
+    if ! code_of "$release" | grep -qF "require-changelog-section.sh"; then
       note "release.yml no longer looks a version up in CHANGELOG.md at all"
-    elif ! printf '%s\n' "$lookup" | grep -qF -- "-qxF"; then
-      note "release.yml's changelog lookup is not a whole-line match; '## 0.2.0' would accept a '## 0.2.0-rc.1' heading"
+    elif [ ! -f "$check" ]; then
+      note "release.yml calls require-changelog-section.sh and there is no such script"
+    else
+      lookup="$(code_of "$check" | grep -F "CHANGELOG" | grep -F "grep " || true)"
+      if [ -z "$lookup" ]; then
+        note "require-changelog-section.sh no longer greps the changelog for anything"
+      elif ! printf "%s" "$lookup" | grep -qF -- "-qxF"; then
+        note "the changelog lookup is not a whole-line match; '## 0.2.0' would accept a '## 0.2.0-rc.1' heading"
+      fi
     fi
   fi
 }
@@ -809,6 +816,8 @@ mkdir -p "$FAKE/docs"
 cp docs/RELEASE.md docs/desktop.md "$FAKE/docs/"
 cp site/public/index.html "$FAKE/site/public/"
 cp .github/workflows/release.yml .github/workflows/app.yml "$FAKE/.github/workflows/"
+mkdir -p "$FAKE/scripts"
+cp scripts/require-changelog-section.sh "$FAKE/scripts/"
 for project in $(jqr '.components[].projects[], .shared_projects[]' "$DEFINITION"); do
   mkdir -p "$FAKE/$(dirname "$project")"
   cp "$project" "$FAKE/$project"
