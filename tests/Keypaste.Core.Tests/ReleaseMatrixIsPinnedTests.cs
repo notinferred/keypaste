@@ -134,30 +134,54 @@ public sealed class ReleaseMatrixIsPinnedTests
     }
 
     /// <summary>
-    /// The tag guard asks whether both gates went green on the commit, not just <c>ci</c>.
+    /// The tag guard calls the script, and the script's fixture runs where a branch reaches it.
     /// </summary>
     /// <remarks>
-    /// Only a test can hold this. The check runs on a tag against the GitHub API, so no fixture
-    /// here can drive it, and the shape it must not regress to — one workflow name — is a green
-    /// release with the desktop gate red or never run. Three of the seven targets
-    /// <c>release-targets.json</c> advertises are checked by <c>app.yml</c> alone.
+    /// The guard step is <c>if: github.ref_type == 'tag'</c>, so no dispatch and no push executes
+    /// it — the shape of defect F.4a cost two releases (D-0104). The decision therefore lives in
+    /// <c>require-green-gates.sh</c> and <c>verify-green-gates.sh</c> drives it through a fake
+    /// <c>gh</c> on every push. What only a test can hold is that both halves stay wired: an
+    /// inlined loop here would be unreachable again, and a fixture nothing runs proves nothing.
     /// </remarks>
     [Fact]
-    public void TheTagGuard_RequiresBothGatesAndNotOnlyCi()
+    public void TheTagGuard_CallsTheScriptAndTheScriptIsFixtureDriven()
     {
         var guard = Code(JobBlock(RepositoryFile(".github", "workflows", "release.yml"), "guard"));
 
-        Assert.Contains("for wf in ci app; do", guard, StringComparison.Ordinal);
+        Assert.Contains("scripts/require-green-gates.sh", guard, StringComparison.Ordinal);
+        Assert.Contains("scripts/verify-green-gates.sh", guard, StringComparison.Ordinal);
 
-        // The count is read as digits before it is compared. An absent or malformed answer must not
-        // arrive as an empty string and compare its way past `-ge 1` (D-0106).
-        Assert.Contains("*[!0-9]*", guard, StringComparison.Ordinal);
-        Assert.Contains("[ \"$green\" -ge 1 ]", guard, StringComparison.Ordinal);
+        // ci.yml is where a branch meets the fixture. Without this the decision is once again a
+        // thing only a tag can execute.
+        Assert.Contains(
+            "scripts/verify-green-gates.sh",
+            RepositoryFile(".github", "workflows", "ci.yml"),
+            StringComparison.Ordinal);
 
-        // It fails the tag. A warning here would leave the claim that every advertised target has a
+        // It fails the tag. A warning would leave the claim that every advertised target has a
         // matching check resting on a message nobody is obliged to read.
         Assert.DoesNotContain("continue-on-error", guard, StringComparison.Ordinal);
     }
+
+    /// <summary>
+    /// The required set is derived from the definition, and app.yml is in it today.
+    /// </summary>
+    [Fact]
+    public void TheRequiredGates_AreReadFromTheDefinitionAndIncludeTheDesktopGate()
+    {
+        var script = RepositoryFile("scripts", "require-green-gates.sh");
+
+        // Read, not written out: a component with its own gate is required without an edit.
+        Assert.Contains(".components[] | select(.workflow != $self)", script, StringComparison.Ordinal);
+
+        // And the release workflow never requires itself, which nothing could satisfy.
+        Assert.Contains("KEYPASTE_RELEASE_WORKFLOW", script, StringComparison.Ordinal);
+
+        // The negative control deletes exactly that line, so it has to stay on one line.
+        var derived = Lines(script).Where(l => l.Contains("jq -r --arg self", StringComparison.Ordinal)).ToList();
+        Assert.Single(derived);
+    }
+
 
     [Fact]
     public void TheGate_KeepsTheChecksThatMakeItRefuse()
