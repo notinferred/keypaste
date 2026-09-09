@@ -51,9 +51,16 @@ desktop packages without waiting for signing enrollment. A new CLI/MCP patch req
 core/CLI/bridge and release repairs; desktop release checks additionally require the desktop repairs.
 
 Two residuals are named rather than closed. **R2's actual reply to a listing is still unobserved**:
-the publish job runs on tags only, so no dispatch can reach it, and R.0b/R.0c own it. And the
-widened save-retry budget has three green Windows runs behind it, not a proof, because the failure
-it addresses was intermittent to begin with.
+the publish job runs on tags only, so no dispatch can reach it, and R.0b/R.0c own it. And **the
+widened save-retry budget is now known not to be enough.** It had three green Windows runs behind
+it, which was never a proof; ci run 34403613553 exhausted all eight attempts on `windows-2025` and
+died with D-0107's exact message, `a name that is reserved for use by another transaction`, on a
+commit that changed two markdown files and nothing else. The four ci runs before it were green on
+the same job. D-0107 asked for this to be watched rather than grown again, so the next move is the
+contention itself — KeePassLib's TxF temporary file goes in the one shared `%TEMP%`, and giving each
+test process its own is the option that was never explored — and not a ninth attempt. A second test
+in the same job returned `ExitNotFound` where it expected success; that one's cause is not
+established and is not claimed to be the same.
 
 **The F.3b timeout on run 34303291945 is not the concurrency guarantee failing, and the difference
 was worth establishing rather than filing.** `ConcurrentRequestsTests.AfterTheFirstRequestResolves_AFreshRequestIsAskedNormally`
