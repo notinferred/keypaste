@@ -57,10 +57,19 @@ it, which was never a proof; ci run 34403613553 exhausted all eight attempts on 
 died with D-0107's exact message, `a name that is reserved for use by another transaction`, on a
 commit that changed two markdown files and nothing else. The four ci runs before it were green on
 the same job. D-0107 asked for this to be watched rather than grown again, so the next move is the
-contention itself — KeePassLib's TxF temporary file goes in the one shared `%TEMP%`, and giving each
-test process its own is the option that was never explored — and not a ninth attempt. A second test
-in the same job returned `ExitNotFound` where it expected success; that one's cause is not
-established and is not claimed to be the same.
+contention itself and not a ninth attempt. **Per-process `TEMP` isolation was the first answer
+reached for and it does not work:** the two tests that failed together are in different classes and
+so different xUnit collections, running in parallel inside one process, and `Path.GetTempPath()` is
+process-global — both saves would land in the same isolated directory. F.6 owns the work and carries
+what is already ruled out.
+
+**A third observation is recorded on its own, because nothing ties it to the second.** In that same
+ci run 34403613553 and the same `windows-2025` job, `EnvVerbTests.Ls_OnAProjectWithNoVariablesLeft_SucceedsWithNoOutput`
+returned `ExitNotFound` where it expected `ExitSuccess` — the `env ls` after a `set` and a `rm`
+found no project at all. It has been seen once, it has no established cause, and sharing a job with
+a transaction failure is not evidence that it shares one: attributing it to D-0107 would retire it
+without anyone looking. It gets a task when a second occurrence or a reproduction gives it a
+verifier that can fail.
 
 **The F.3b timeout on run 34303291945 is not the concurrency guarantee failing, and the difference
 was worth establishing rather than filing.** `ConcurrentRequestsTests.AfterTheFirstRequestResolves_AFreshRequestIsAskedNormally`
@@ -186,6 +195,11 @@ passed and five platform-specific skips. Each task needs a regression that demon
 before the fix and verifies the corrected behavior. Keep the shared core and mature KDBX library;
 these tasks repair existing behavior and do not require a product rewrite. Record reproductions
 in repository fixtures/tests, so completion does not depend on a maintainer's temporary files.
+
+- [ ] **F.6 — Stop concurrent saves contending for one transacted directory.** Needs: 0.2.
+  **Build:** Establish first whether the contention is between processes, between threads of one process, or both, and say which the observed failures were — the answer decides the repair and three of the four candidates are already constrained by what is known. KeePassLib's [TxfPrepare](../third_party/KeePassLib/Serialization/FileTransactionEx.cs) puts every transaction's temporary file directly in `UrlUtil.GetTempPath()`, so every saver on the machine enlists the same directory; the random filename does not help, because what a transaction refuses operations on is the directory. **Per-process `TMP`/`TEMP` isolation is not the fix and is recorded here so it is not reached for again:** `Path.GetTempPath()` is process-global, the two tests that failed together are in different classes and therefore different xUnit collections running in parallel inside one process, so both saves would land in the same isolated directory — and setting that variable under parallelism is already documented as unsafe at [EnvPullTests](../tests/Keypaste.Cli.Tests/EnvPullTests.cs). `UseFileTransactions = false` stays rejected for D-0107's reason: it writes straight over the live vault and trades a concurrency failure for data loss on an interrupted save. That leaves a per-transaction temporary directory, which is a patch to vendored KeePassLib and needs its own recorded reason, and serialising saves behind a lock keyed on the vault path, which needs a cross-process story and has failure modes of its own. Pick one on the evidence and record why the others were not.
+  **Verify (V-F.6):** A reproduction saves one vault from several savers at once and is **red on Windows with `SaveAttempts` set to 1**, so the retry cannot absorb what the fix is supposed to remove; green after, with the budget still at 1. It covers whichever arrangement the Build established, and both if both were observed. [ConcurrentVaultSaveTests](../tests/Keypaste.Core.Tests/ConcurrentVaultSaveTests.cs) says in its own remarks that it is a guard rather than a reproduction and does not fail on a developer machine; replacing that sentence with a test that does is most of this row. A green CI run cannot pass it — the failure is intermittent, which is the whole difficulty — and neither can a repair that only isolates the test harness while two keypaste processes still contend.
+  **Status:** Opened 2026-09-09 from ci run 34403613553, which exhausted all eight attempts on `windows-2025` and died with D-0107's exact message on a commit that changed two markdown files. D-0107 asked for the budget to be watched rather than grown again; this is that watch coming back positive, and a ninth attempt is explicitly not the answer.
 
 - [ ] **F.2b2 — Observe minimize-lock on macOS and Linux.** Needs: F.2b1.
   **Build:** Run F.2b1's behavior on the remaining two advertised desktop targets and record what each actually did, including any window manager that does not report a minimize. Change [MinimizeLock](../src/Keypaste.App/MinimizeLock.cs)'s supported-surface answer if an observation contradicts it, rather than leaving the checkbox offered where it does nothing.
