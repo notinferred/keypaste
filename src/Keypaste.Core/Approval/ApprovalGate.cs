@@ -142,12 +142,9 @@ public sealed class ApprovalGate : IDisposable
 
         var settled = await SettleAsync(asking, cancellationToken).ConfigureAwait(false);
 
-        // The two rules that make a yes worthless, applied here rather than per branch so no future
-        // branch can miss one. A yes that arrives after the window closed is a no, because the
-        // human's window is the human's window whatever the channel did with the token it was
-        // handed. And a yes for a request the caller has abandoned is a no, because nobody is
-        // waiting for it: releasing would put a secret on a wire no one reads and seed a grant that
-        // the agent's own retry then spends without a human ever seeing the second request.
+        // Both rules here rather than per branch, so no future branch can miss one. A yes after the
+        // window closed is a no; a yes for an abandoned request is a no, because it would seed a
+        // grant the agent's own retry then spends without a human seeing the second request.
         if (cancellationToken.IsCancellationRequested)
         {
             return ApprovalAnswer.Cancelled;

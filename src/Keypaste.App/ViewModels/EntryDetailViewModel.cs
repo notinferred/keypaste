@@ -339,13 +339,10 @@ internal sealed class EntryDetailViewModel : ObservableObject, IDisposable
                 return;
             }
 
-            // The password is carried across untouched rather than re-typed into the record: this
-            // pane does not edit it, and reading it here only to write it back would put it in a
-            // local for no reason. `keypaste get` and the generator are how a password changes.
-            //
-            // Title and GroupPath come across too, which is why the read has to be the identity
-            // one: `UpdateEntry` locates by them, so an `existing` from the wrong entry writes the
-            // draft into that entry.
+            // The password is carried across untouched: reading it here only to write it back would put
+            // it in a local for no reason, and `keypaste get` is how a password changes.
+            // Title and GroupPath come across too, so the read has to be the identity one — `UpdateEntry`
+            // locates by them, and an `existing` from the wrong entry writes the draft into that entry.
             var updated = existing with
             {
                 Username = DraftUsername,

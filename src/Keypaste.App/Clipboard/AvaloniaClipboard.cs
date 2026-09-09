@@ -59,11 +59,10 @@ internal sealed class AvaloniaClipboard(TopLevel topLevel) : IAppClipboard
             return false;
         }
 
-        // Disposed as soon as the platform has taken the data. Holding it for the countdown would
-        // mean holding the secret in an item for the whole window, which is exactly what
-        // ClipboardCountdown refuses to do — it keeps a hash. If a platform ever needed delayed
-        // rendering, a paste would come back empty, and that is item 3 on docs/desktop.md's manual
-        // checklist because CI has no clipboard to check it with.
+        // Disposed as soon as the platform has taken the data: holding it for the countdown would
+        // keep the secret in an item for the whole window, which is what ClipboardCountdown refuses
+        // to do. A platform needing delayed rendering would paste empty — item 3 on desktop.md's
+        // manual checklist, because CI has no clipboard.
         using var transfer = new DataTransfer();
         var item = DataTransferItem.CreateText(secret);
 

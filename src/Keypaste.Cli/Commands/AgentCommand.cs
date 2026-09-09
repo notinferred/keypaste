@@ -101,11 +101,8 @@ internal static class AgentCommand
         }
 
         // Loaded before the vault is opened, so what the policy file says cannot depend on anything
-        // the vault did, and a file this command will not honour has already been read by the time
-        // anybody types a master password. It is *reported* later, with the rest of the banner in
-        // Announce, because that runs inside VaultSession.Open. Nothing here is fatal: every failure
-        // means no rules, which means every request is shown to a person — the state this command
-        // shipped in.
+        // the vault did; reported later in Announce, which runs inside VaultSession.Open. Nothing
+        // here is fatal: every failure means no rules, so every request is shown to a person.
         var policy = PolicyLoader.Load(
             line.Value(PolicyOption)
             ?? KeypasteHome.PolicyPath(context.Environment.Get(KeypasteHome.EnvironmentVariable)));

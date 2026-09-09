@@ -268,9 +268,8 @@ public static class ApproverProtocol
 
         var refusal = WriteCredential(Bounded(reply, reply.Entry));
 
-        // Belt and braces, as on the listing path: the entry is capped by EntryNameSanitizer long
-        // before it gets here, and this is what stops an error in that reasoning costing a
-        // connection and its grants rather than one release (docs/PRODUCT.md law 3.7).
+        // Belt and braces: the entry is capped by EntryNameSanitizer long before it gets here, and
+        // this stops an error in that reasoning costing a connection and its grants (law 3.7).
         return refusal.Length <= MessageFramer.MaximumPayloadBytes
             ? refusal
             : WriteCredential(Bounded(reply, entry: null));

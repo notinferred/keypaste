@@ -101,12 +101,10 @@ internal sealed class ApproverConnection(string pipeName) : IAsyncDisposable
 
         try
         {
-            // Wait(0), not WaitAsync: taking the slot must either succeed now or refuse now. The
-            // pipe carries one exchange at a time and the protocol has nothing to correlate two
-            // replies by, so waiting here queued a request behind a prompt nobody had answered yet
-            // and then delivered it as a second prompt once they had. ApprovalGate refuses exactly
-            // this, one layer in, and until F.3b this queue sat in front of that check and made it
-            // unreachable for two calls on one connection (THREATS.md T-11).
+            // Wait(0), not WaitAsync: taking the slot must succeed now or refuse now. The pipe carries
+            // one exchange at a time and nothing correlates two replies, so waiting here queues a request
+            // behind an unanswered prompt and delivers it as a second prompt. ApprovalGate refuses this
+            // one layer in, and a queue in front of that check makes it unreachable (THREATS.md T-11).
             taken = _oneAtATime.Wait(0, CancellationToken.None);
         }
         catch (ObjectDisposedException)
@@ -138,12 +136,10 @@ internal sealed class ApproverConnection(string pipeName) : IAsyncDisposable
                 return (reply, ApproverOutcome.Answered);
             }
 
-            // A caller that gave up is not an approver that died, and the difference decides
-            // whether to send the request again. The reply to the exchange it abandoned may still
-            // be in flight and a frame it stopped mid-write may be on the wire, so this connection
-            // is finished either way - but re-sending would put a request nobody is waiting for in
-            // front of a person, on a fresh connection whose id scopes a different grant and a
-            // different cooldown.
+            // A caller that gave up is not an approver that died, and the difference decides whether to
+            // send the request again. The connection is finished either way, but re-sending would put a
+            // request nobody is waiting for in front of a person, on a fresh connection whose id scopes a
+            // different grant and cooldown.
             if (cancellationToken.IsCancellationRequested)
             {
                 await DropAsync().ConfigureAwait(false);

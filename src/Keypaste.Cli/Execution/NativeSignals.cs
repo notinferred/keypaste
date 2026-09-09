@@ -71,11 +71,9 @@ internal static class NativeSignals
         _ => null,
     };
 
-    // DllImport rather than LibraryImport, which SYSLIB1054 would otherwise prefer: the source
-    // generator emits an unsafe stub, and turning <AllowUnsafeBlocks> on for the whole CLI to
-    // obtain one two-integer call is a much wider change than the call itself. The signature is
-    // fully blittable, so there is no marshalling to generate and nothing here that NativeAOT
-    // cannot compile ahead of time.
+    // DllImport rather than LibraryImport, which SYSLIB1054 prefers: its generator emits an unsafe
+    // stub, and turning <AllowUnsafeBlocks> on for the whole CLI to obtain one two-integer call is a
+    // wider change than the call. The signature is blittable, so NativeAOT needs no marshalling.
 #pragma warning disable SYSLIB1054
     [DllImport("libc", EntryPoint = "kill", SetLastError = true)]
     private static extern int Kill(int pid, int signal);

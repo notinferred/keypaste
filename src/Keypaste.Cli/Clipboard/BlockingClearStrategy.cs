@@ -45,10 +45,9 @@ internal sealed class BlockingClearStrategy : IClipboardClearStrategy
 
         using var interrupted = new ManualResetEventSlim(false);
 
-        // Both routes are registered because neither covers everything: CancelKeyPress catches
-        // Ctrl+C and Ctrl+Break, and the POSIX registrations add kill, container stop, systemd,
-        // the terminal window closing, and an SSH session dropping. Handlers do nothing but set
-        // the event — the clear runs once, on this thread, because spawning a subprocess from a
+        // Both routes, because neither covers everything: CancelKeyPress catches Ctrl+C and
+        // Ctrl+Break, the POSIX registrations add kill, container stop, systemd, the terminal
+        // closing and SSH dropping. Handlers only set the event — spawning a subprocess from a
         // signal handler races a teardown keypaste does not control.
         void OnCancel(object? sender, ConsoleCancelEventArgs e)
         {

@@ -122,11 +122,9 @@ public sealed class ApproverHandler : IApproverHandler
 
         if (!_source.TryResolve(request.Entry, out var name, out var failure))
         {
-            // A name that resolves to nothing and a name that resolves outside the exposure get the
-            // same answer, on purpose. Telling them apart would let an agent enumerate which
-            // entries exist in parts of the vault it was never allowed to see — the exposure rule
-            // undone by a difference in error messages (THREATS.md T-4). The audit line below still
-            // records which it was, because that reader is the human.
+            // A name that resolves to nothing and one outside the exposure get the same answer:
+            // telling them apart would let an agent enumerate entries in parts of the vault it was
+            // never allowed to see (THREATS.md T-4). The audit line below still records which.
             return failure == CredentialFailure.VaultLocked
                 ? Refused(AuditMethod.VaultLocked, "no vault is unlocked")
                 : Refused(AuditMethod.OutOfScope, Explain(failure));
