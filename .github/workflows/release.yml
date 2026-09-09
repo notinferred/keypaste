@@ -164,31 +164,54 @@ jobs:
       # in point: nothing in this file installs it, and it is only preinstalled because the runner
       # image happens to ship it. Same runner label as publish, so what passes here predicts there.
       #
-      # Secrets are checked only on a tag, because a dispatch has no business needing them, and are
-      # tested for emptiness rather than printed. publish re-checks them; that duplication is
-      # deliberate and free.
-      - name: Check the publish tooling and credentials exist
+      # THREE SET VARIABLES ARE NOT A WORKING CREDENTIAL, so the presence check is no longer the
+      # whole of what this step asks. `--check` runs the real listing the publish job runs: its
+      # positive control must see objects at an already-published prefix before it will believe an
+      # answer, so a credential that authenticates against the wrong bucket, or does not
+      # authenticate at all, is refused HERE rather than after four NativeAOT builds. It writes
+      # nothing; the upload lives past that branch in the same script. This closes the DECISIONS
+      # idea naming that cost, and answers what a restored secret otherwise cannot: whether the
+      # value is the one this project publishes with, or a stale copy of it.
+      #
+      # It runs on a dispatch too whenever the secrets exist, which is the point. A dispatch's
+      # version carries the -dryrun suffix, so the destination it clears says nothing about the
+      # real prefix - but the credential half is answered without spending a tag. A repository
+      # with no secrets keeps the behaviour it had, because a dispatch has no business needing
+      # them; only a tag still requires them to be there.
+      - name: Check the publish credentials reach the bucket this release goes to
         shell: bash
         env:
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          VERSION: ${{ steps.v.outputs.version }}
         run: |
           set -euo pipefail
           command -v aws >/dev/null 2>&1 \
             || { echo "::error::no aws CLI on this runner, and nothing installs it"; exit 1; }
           aws --version
 
-          if [ "${{ github.ref_type }}" = "tag" ]; then
-            missing=0
-            for v in R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY; do
-              [ -n "${!v}" ] || { echo "::error::secret $v is not set"; missing=1; }
-            done
-            [ "$missing" -eq 0 ] || exit 1
-            echo "all three R2 secrets are present"
-          else
-            echo "dispatch: skipping the secret check, this run publishes nothing"
+          present=1
+          for v in R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY; do
+            [ -n "${!v}" ] || present=0
+          done
+
+          if [ "$present" -eq 0 ]; then
+            if [ "${{ github.ref_type }}" = "tag" ]; then
+              for v in R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY; do
+                [ -n "${!v}" ] || echo "::error::secret $v is not set"
+              done
+              exit 1
+            fi
+            echo "dispatch: this repository has no R2 secrets, and this run publishes nothing"
+            exit 0
           fi
+          echo "all three R2 secrets are present; asking R2 whether they work"
+
+          AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID" \
+          AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY" \
+          AWS_DEFAULT_REGION=auto \
+            scripts/publish-release.sh --check "$VERSION"
 
       # F.4a. The destination decision now lives in scripts/publish-release.sh, so this job can run
       # the same code the upload runs - against a controlled fake `aws`, with no credential and no
