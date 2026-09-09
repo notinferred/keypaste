@@ -78,6 +78,8 @@ jobs:
     name: format + analyzers + tests
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    outputs:
+      targets: ${{ steps.targets.outputs.targets }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -133,22 +135,39 @@ jobs:
           dotnet test tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj
           --no-build -c Release
 
+      # R.0a. The package matrix is derived from release-targets.json, the same file release.yml
+      # builds the CLI from, so the two workflows cannot hold different answers about what a desktop
+      # target is. An empty matrix would make GitHub skip the package job and report this workflow
+      # green, so the count must be digits and at least one before anything is emitted (D-0106).
+      #
+      # The desktop set is deliberately three where the CLI's is four: Keypaste.App declares
+      # linux-arm64 and nothing packages it, which the definition records as declared-not-packaged
+      # with 3.9d owning the gap. verify-release-matrix.sh refuses that RID being dropped silently.
+      - name: Resolve the desktop targets this workflow packages
+        id: targets
+        shell: bash
+        run: |
+          set -euo pipefail
+          n="$(jq -r '.components.app.targets | length' release-targets.json)"
+          case "$n" in
+            ''|*[!0-9]*) echo "::error::release-targets.json did not answer with a target count"; exit 1 ;;
+          esac
+          [ "$n" -ge 1 ] || { echo "::error::release-targets.json packages no app targets"; exit 1; }
+          targets="$(jq -c '[.components.app.targets[] | {os: .runner, rid, archive}]' release-targets.json)"
+          echo "targets=$targets" >> "$GITHUB_OUTPUT"
+          echo "$n targets: $targets"
+
   package:
     name: publish + selftest (${{ matrix.os }})
     needs: gate
     strategy:
       fail-fast: false
+      # os, rid and archive come from release-targets.json (R.0a). Note ubuntu-24.04 here against
+      # release.yml's ubuntu-22.04: the desktop archives carry a glibc 2.39 floor and the CLI's is
+      # 2.35. That difference was nowhere until the definition recorded it on both targets, and
+      # 4.7b is where it has to be verified rather than merely written down.
       matrix:
-        include:
-          - os: ubuntu-24.04
-            rid: linux-x64
-            archive: tar.gz
-          - os: windows-2025
-            rid: win-x64
-            archive: zip
-          - os: macos-15
-            rid: osx-arm64
-            archive: tar.gz
+        include: ${{ fromJSON(needs.gate.outputs.targets) }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
