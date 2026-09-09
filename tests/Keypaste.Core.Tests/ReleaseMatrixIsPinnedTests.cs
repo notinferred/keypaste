@@ -133,6 +133,32 @@ public sealed class ReleaseMatrixIsPinnedTests
             StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// The tag guard asks whether both gates went green on the commit, not just <c>ci</c>.
+    /// </summary>
+    /// <remarks>
+    /// Only a test can hold this. The check runs on a tag against the GitHub API, so no fixture
+    /// here can drive it, and the shape it must not regress to — one workflow name — is a green
+    /// release with the desktop gate red or never run. Three of the seven targets
+    /// <c>release-targets.json</c> advertises are checked by <c>app.yml</c> alone.
+    /// </remarks>
+    [Fact]
+    public void TheTagGuard_RequiresBothGatesAndNotOnlyCi()
+    {
+        var guard = Code(JobBlock(RepositoryFile(".github", "workflows", "release.yml"), "guard"));
+
+        Assert.Contains("for wf in ci app; do", guard, StringComparison.Ordinal);
+
+        // The count is read as digits before it is compared. An absent or malformed answer must not
+        // arrive as an empty string and compare its way past `-ge 1` (D-0106).
+        Assert.Contains("*[!0-9]*", guard, StringComparison.Ordinal);
+        Assert.Contains("[ \"$green\" -ge 1 ]", guard, StringComparison.Ordinal);
+
+        // It fails the tag. A warning here would leave the claim that every advertised target has a
+        // matching check resting on a message nobody is obliged to read.
+        Assert.DoesNotContain("continue-on-error", guard, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void TheGate_KeepsTheChecksThatMakeItRefuse()
     {
