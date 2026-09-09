@@ -36,6 +36,12 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: '1'
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
   NUGET_XMLDOC_MODE: skip
+  # Named here rather than hidden in a secret, on purpose. It is not a credential, and where a
+  # release goes is something a reader of this file should be able to see. The name says "public"
+  # because the bucket is served without authentication at dl.keypaste.com; the allowlist in the
+  # publish job is what keeps that from being a liability. At workflow level so that guard and
+  # publish cannot come to hold two different answers about one destination.
+  R2_BUCKET: keypaste-public-dl
 
 jobs:
   guard:
@@ -150,6 +156,16 @@ jobs:
           else
             echo "dispatch: skipping the secret check, this run publishes nothing"
           fi
+
+      # F.4a. The destination decision now lives in scripts/publish-release.sh, so this job can run
+      # the same code the upload runs - against a controlled fake `aws`, with no credential and no
+      # bucket, which is the only kind of run a dispatch can make. Same argument as the step above:
+      # an assumption only a real tag can reach is tested for the first time far too late.
+      # --with-real-aws adds the phase that asks this runner's actual AWS CLI how it fails, so the
+      # fake cannot quietly become fiction.
+      - name: Verify the release destination check fails closed
+        shell: bash
+        run: scripts/verify-release-destination.sh --with-real-aws
 
   build:
     name: build ${{ matrix.rid }}
@@ -525,6 +541,15 @@ jobs:
       # Versioned prefixes only, never a mutable "latest": the documented command names an exact
       # version and an exact hash, and both must keep meaning what they meant when they were
       # written. A tag nobody has been told about is this pipeline's equivalent of a draft.
+      #
+      # A published version is immutable, and for two releases that was only a comment: the check
+      # in front of this upload asked `aws s3 ls` and treated an empty answer as an empty
+      # destination, so a denied listing, an unreachable endpoint or a throttle all read as
+      # "nothing is there" and fell through to a recursive overwrite of bytes readers had already
+      # been handed a checksum for. That decision is now scripts/publish-release.sh, which refuses
+      # everything it cannot positively verify, and which a fixture can drive with no credential
+      # (F.4a). The check and the upload are in one file on purpose: "only a verified-empty
+      # destination reaches upload" is not a claim any test can make about a step body.
       - name: Upload to R2
         shell: bash
         env:
@@ -532,37 +557,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: auto
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
-          # Named here rather than hidden in a secret, on purpose. It is not a credential, and
-          # where a release goes is something a reader of this file should be able to see. The
-          # name says "public" because the bucket is served without authentication at
-          # dl.keypaste.com; the allowlist above is what keeps that from being a liability.
-          R2_BUCKET: keypaste-public-dl
-        run: |
-          set -euo pipefail
-          for v in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY R2_ACCOUNT_ID; do
-            [ -n "${!v}" ] || { echo "::error::secret $v is not set"; exit 1; }
-          done
-          endpoint="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
-
-          # A published version is immutable, and until now that was only a comment. `aws s3 cp`
-          # overwrites without asking, so re-running a tag would replace bytes that readers have
-          # already been handed a checksum for - turning a documented `sha256sum -c` line into one
-          # that fails for an honest download, which is indistinguishable from an attack. Refuse
-          # instead. Re-releasing means a new version number, which is what semantic versioning is
-          # for (docs/PRODUCT.md law 4.7). `|| true` because the CLI's exit code for an absent prefix is
-          # not something to depend on; the emptiness of the listing is the signal.
-          prefix="s3://${R2_BUCKET}/v${VERSION}/"
-          existing="$(aws s3 ls "$prefix" --endpoint-url "$endpoint" 2>/dev/null || true)"
-          if [ -n "$existing" ]; then
-            echo "::error::v${VERSION}/ already exists on the bucket and a release is immutable"
-            echo "$existing"
-            exit 1
-          fi
-
-          aws s3 cp dist/ "s3://${R2_BUCKET}/v${VERSION}/" \
-            --endpoint-url "$endpoint" --recursive --no-progress
-          echo "published to v${VERSION}/:"
-          aws s3 ls "s3://${R2_BUCKET}/v${VERSION}/" --endpoint-url "$endpoint"
+        run: scripts/publish-release.sh --publish "$VERSION" dist
 
       - name: Say where it went
         run: |

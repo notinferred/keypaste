@@ -9,7 +9,7 @@
 
 ## Releases are immutable
 
-The release procedure and platform/channel support matrix live in [docs/RELEASE.md](docs/RELEASE.md). Published version paths must be immutable. The current `release.yml` guard suppresses listing errors; F.4a in STEPS must fix that path before any new publication. If publication leaves a partial version, use a new version rather than replacing its objects. Verify what can be verified before tagging.
+The release procedure and platform/channel support matrix live in [docs/RELEASE.md](docs/RELEASE.md). Published version paths must be immutable. `release.yml` publishes through [publish-release.sh](scripts/publish-release.sh), which refuses any destination it cannot positively verify as empty and is held to that by [verify-release-destination.sh](scripts/verify-release-destination.sh) (F.4a). If publication leaves a partial version, use a new version rather than replacing its objects — the guard will refuse the old one, which is the intended behaviour. Verify what can be verified before tagging.
 
 For `workflow_dispatch`, the workflow file must exist on the **default branch** before it can be dispatched. A dispatch can then select a branch or tag with `--ref`; it does not always run the default branch. See [GitHub's manual workflow procedure](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
 

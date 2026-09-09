@@ -515,13 +515,22 @@ path are pinned to commit SHAs rather than mutable tags (D-0041). Every release 
 corresponding source. These checks cover CLI/MCP publishing; desktop CI packages are not public
 releases. [docs/RELEASE.md](docs/RELEASE.md) records the remaining distribution requirements.
 
+**And this project's own pipeline was one of the ways those bytes could be replaced (F.4a).** The
+guard in front of the upload asked `aws s3 ls` and read an empty answer as an empty destination, so
+a credential that could write but not list — or an endpoint that was briefly unreachable — meant a
+re-run of a tag overwrote a published version, and the checksum a reader had already been handed
+would then fail for an honest download. It now uploads only through `scripts/publish-release.sh`,
+which refuses anything it cannot positively verify as empty, including a listing that answers
+"nothing there" to every question. That closes a way to lose published bytes by accident; it does
+nothing about a runner or an R2 credential in someone else's hands, which is the residual below.
+
 **What it does not hold.** The binaries are unsigned and un-notarized (O-0010), so nothing ties these bytes to this project rather than to whoever served them. The checksum lives on the same origin as the archive, so it proves integrity and not authenticity — the same distinction D-0008 drew about KeePassXC's own `.DIGEST`. The build is not reproducible: NativeAOT link output is not byte-identical across runs, so you cannot rebuild it and compare (O-0012). And the runner fleet is a third party with the ability to substitute bytes; using one fleet for all four platforms reduces that to a single party, which is a smaller surface and not a zero one. Since D-0042 that same fleet also runs the tests, so a fleet-specific quirk can no longer show up as two providers disagreeing — one fewer party to trust, one fewer way to catch it, and the trade was not chosen so much as forced.
 
 **What follows from it.** T-9 tells you to read a lock file and check for yourself. That advice is addressed to somebody building from source, and it does not transfer to somebody running a download. These are two different trust models wearing one product name, and the honest statement is that **building from source is strictly stronger** and is why the build instructions stay on both pages permanently rather than being replaced by the install one-liner.
 
 **Residual.** A compromised runner or R2 credential produces a binary that passes every gate in this repository, because the gates run on the compromised machine. Nothing here detects that. A signature would narrow it to a compromised signing key; provenance attestation would narrow it to a compromised identity token. Neither exists yet, and pretending the checksum does that job would be worse than saying this.
 
-**Proved by.** `.github/workflows/release.yml` — specifically the `rm -rf artifacts/bin` before the gates, the no-`.dll`-and-no-`runtimeconfig.json` assertion, the version-matches-the-tag check, and the checksum re-verification in the `publish` job. Each of those is a step that fails the release rather than a sentence in a document.
+**Proved by.** `.github/workflows/release.yml` — specifically the `rm -rf artifacts/bin` before the gates, the no-`.dll`-and-no-`runtimeconfig.json` assertion, the version-matches-the-tag check, and the checksum re-verification in the `publish` job. Each of those is a step that fails the release rather than a sentence in a document. The destination guard is `scripts/publish-release.sh`, and `scripts/verify-release-destination.sh` is what holds it to refusing — including the two cases nobody would think to try by hand: a listing that fails without a word, and one that calls every prefix empty.
 
 ---
 
