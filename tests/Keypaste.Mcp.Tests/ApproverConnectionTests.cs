@@ -17,7 +17,7 @@ public sealed class ApproverConnectionTests
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
-    private static readonly TimeSpan Promptly = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan _promptly = TimeSpan.FromSeconds(10);
 
     private static CredentialRequest Request(string entry = "env/dev/STRIPE_KEY") => new()
     {
@@ -62,11 +62,11 @@ public sealed class ApproverConnectionTests
 
         var call = connection.RequestAsync(Request(), giveUp.Token).AsTask();
 
-        await approver.Entered.Task.WaitAsync(Promptly, Token);
+        await approver.Entered.Task.WaitAsync(_promptly, Token);
 
         await giveUp.CancelAsync();
 
-        var (reply, _) = await call.WaitAsync(Promptly, Token);
+        var (reply, _) = await call.WaitAsync(_promptly, Token);
 
         Assert.Null(reply);
 

@@ -32,11 +32,11 @@ namespace Keypaste.Mcp.Tests;
 /// </remarks>
 public sealed class LargeVaultListingTests : IAsyncLifetime
 {
-    private const string Master = "correct horse battery staple";
-    private const string Sentinel = "SENTINEL-LARGE-VAULT-9a3e21";
+    private const string _master = "correct horse battery staple";
+    private const string _sentinel = "SENTINEL-LARGE-VAULT-9a3e21";
 
     /// <summary>Comfortably past what one frame holds, and an ordinary size for a real vault.</summary>
-    private const int Entries = 2000;
+    private const int _entries = 2000;
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
@@ -55,16 +55,16 @@ public sealed class LargeVaultListingTests : IAsyncLifetime
     public ValueTask InitializeAsync()
     {
         _directory = Directory.CreateTempSubdirectory("keypaste-large-").FullName;
-        _vault = Vault.Create(Path.Combine(_directory, "vault.kdbx"), Master);
+        _vault = Vault.Create(Path.Combine(_directory, "vault.kdbx"), _master);
 
         _vault.AddEntry(new VaultEntry
         {
             GroupPath = "env/dev",
             Title = "STRIPE_KEY",
-            Password = Sentinel,
+            Password = _sentinel,
         });
 
-        for (var i = 0; i < Entries; i++)
+        for (var i = 0; i < _entries; i++)
         {
             _vault.AddEntry(new VaultEntry
             {
@@ -164,9 +164,9 @@ public sealed class LargeVaultListingTests : IAsyncLifetime
         Assert.Contains(ToolText.ListingIncomplete, text, StringComparison.Ordinal);
 
         // A listing is names. Nothing about running out of room turns it into a credential path.
-        Assert.DoesNotContain(Sentinel, text, StringComparison.Ordinal);
-        Assert.DoesNotContain(Sentinel, harness.Transcript, StringComparison.Ordinal);
-        Assert.DoesNotContain(Sentinel, string.Join("\n", harness.AuditLines()), StringComparison.Ordinal);
+        Assert.DoesNotContain(_sentinel, text, StringComparison.Ordinal);
+        Assert.DoesNotContain(_sentinel, harness.Transcript, StringComparison.Ordinal);
+        Assert.DoesNotContain(_sentinel, string.Join("\n", harness.AuditLines()), StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -188,12 +188,12 @@ public sealed class LargeVaultListingTests : IAsyncLifetime
         _human.Answer = ApprovalAnswer.Approved;
 
         var first = await client.CallToolAsync(ToolText.CredentialToolName, Ask(), cancellationToken: Token);
-        Assert.Contains(Sentinel, TextOf(first), StringComparison.Ordinal);
+        Assert.Contains(_sentinel, TextOf(first), StringComparison.Ordinal);
 
         await client.CallToolAsync(ToolText.ListToolName, cancellationToken: Token);
 
         var again = await client.CallToolAsync(ToolText.CredentialToolName, Ask(), cancellationToken: Token);
-        Assert.Contains(Sentinel, TextOf(again), StringComparison.Ordinal);
+        Assert.Contains(_sentinel, TextOf(again), StringComparison.Ordinal);
 
         Assert.Equal(["prompt", "exposure", "grant-cache"], MethodsOf(harness));
         Assert.Equal(1, _human.Asked);
