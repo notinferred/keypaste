@@ -61,6 +61,12 @@ set -euo pipefail
 
 readonly DEFINITION="${KEYPASTE_RELEASE_DEFINITION:-release-targets.json}"
 readonly PROPS="Directory.Build.props"
+# docs/RELEASE.md owns what a floor_evidence value MEANS; this file owns what each one requires.
+# Split that way on purpose: the definition carried the values and nothing carried their meaning,
+# so "cited" could have been read as observation by anyone who never opened the script. The two
+# lists are checked against each other in both directions below, so neither can grow alone.
+readonly RELEASE_DOC="docs/RELEASE.md"
+readonly FLOOR_RULES="container-check runner-image unverified cited none"
 
 die() { echo "::error::$*" >&2; exit 1; }
 
@@ -116,6 +122,18 @@ holds() {
 
 flatten() { tr "\n" " "; }
 
+# The permitted floor_evidence values, read out of docs/RELEASE.md rather than restated here, so
+# the table a reader is sent to is the table the gate obeys. The header cell says `floor_evidence`,
+# which carries an underscore and therefore cannot be mistaken for one of its own values.
+floor_vocab_from_doc() {
+  local doc="${1:-$RELEASE_DOC}"
+  [ -f "$doc" ] || return 0
+  awk '/^## Floor evidence/ { inside = 1; next } inside && /^## / { inside = 0 } inside' "$doc" \
+    | noc | sed -n 's/^| `\([a-z][a-z-]*\)` |.*/\1/p'
+}
+FLOOR_VOCAB="$(floor_vocab_from_doc | flatten)"
+
+
 # ---------------------------------------------------------------------------
 # 1. The definition, judged on its own. Fixtures drive exactly this function.
 # ---------------------------------------------------------------------------
@@ -159,12 +177,12 @@ validate_definition() {
     # Indexed rather than selected by rid: two targets sharing one rid is a case this has to name,
     # and `select(.rid == ...)` would answer about both of them at once and report the collision as
     # a nonsense field value instead.
-    local seen="" rid i runner archive floor evidence caveat install absent advertised origin
+    local seen="" rid i runner archive floor evidence caveat citation install absent advertised origin
     origin="$(jqr ".components.\"$c\".origin // empty" "$def")"
 
     # Unit separator rather than @tsv: a tab is IFS *whitespace*, so bash collapses runs of them and
     # an absent os_floor beside an absent caveat silently shifts every later field one place left.
-    while IFS=$'\037' read -r i rid runner archive floor evidence caveat install absent advertised; do
+    while IFS=$'\037' read -r i rid runner archive floor evidence caveat citation install absent advertised; do
       [ -n "$i" ] || continue
       if [ -z "$rid" ]; then
         note "$c: target $i has no rid"
@@ -183,17 +201,28 @@ validate_definition() {
       fi
 
       # An OS floor is a claim to a stranger about their machine. It carries how it was established
-      # or it is not made at all.
+      # or it is not made at all. WHICH values exist is docs/RELEASE.md's answer, read at run time;
+      # WHAT each one must carry is this block's. Neither half is worth much alone: the definition
+      # held the values and nothing held their meaning, so `cited` - which is a citation and
+      # explicitly not an observation - could be read as proof by anyone who never opened this file.
+      if [ -n "$FLOOR_VOCAB" ] && ! holds "$FLOOR_VOCAB" "$evidence"; then
+        note "$c/$rid: floor_evidence '$evidence' is not defined in $RELEASE_DOC"
+      fi
       case "$evidence" in
-        container-check | runner-image | unverified)
+        container-check | runner-image | unverified | cited)
           [ -n "$floor" ] || note "$c/$rid: floor_evidence $evidence but no os_floor" ;;
         none)
           [ -z "$floor" ] || note "$c/$rid: os_floor '$floor' with floor_evidence none" ;;
-        *)
-          note "$c/$rid: floor_evidence '$evidence' is not container-check, runner-image, unverified or none" ;;
       esac
-      if [ "$evidence" = "unverified" ] && [ -z "$caveat" ]; then
-        note "$c/$rid: floor_evidence unverified with no floor_caveat to publish"
+
+      # A floor no run backs carries the sentence that says so, and a cited one carries what it
+      # cites. Both are published verbatim, which is what makes deleting either from a page visible.
+      case "$evidence" in
+        unverified | cited)
+          [ -n "$caveat" ] || note "$c/$rid: floor_evidence $evidence with no floor_caveat to publish" ;;
+      esac
+      if [ "$evidence" = "cited" ] && [ -z "$citation" ]; then
+        note "$c/$rid: floor_evidence cited with no floor_citation to point at"
       fi
 
       if [ -z "$install" ] && [ -z "$absent" ]; then
@@ -208,6 +237,7 @@ $(jqr ".components.\"$c\".targets // [] | to_entries[] | [
      (.key | tostring),
      (.value.rid // \"\"), (.value.runner // \"\"), (.value.archive // \"\"),
      (.value.os_floor // \"\"), (.value.floor_evidence // \"\"), (.value.floor_caveat // \"\"),
+     (.value.floor_citation // \"\"),
      (.value.install_check // \"\"), (.value.install_check_absent // \"\"),
      (.value.advertised | tostring)
    ] | join(\"\u001f\")" "$def" 2>/dev/null || true)
@@ -421,13 +451,58 @@ $(grep -ohE "$FLOOR_PATTERNS" "$root/$page" 2>/dev/null | sort -u)
 EOF
   done
 
-  # A floor established as unverified publishes its caveat. Deleting the sentence is how an
-  # untested claim becomes an unqualified one.
+  # docs/RELEASE.md owns the floor_evidence vocabulary, so the two lists are held against each
+  # other in BOTH directions. A value the table defines and this gate has no rule for is a rule
+  # nobody wrote; a rule here the table does not define is a meaning nobody published. Either way
+  # the vocabulary has one owner and half its content lives somewhere else, which is the state this
+  # check exists to make impossible.
+  local doc_vocab v
+  doc_vocab="$(floor_vocab_from_doc "$root/$RELEASE_DOC" | flatten)"
+  if [ -z "$doc_vocab" ]; then
+    note "$RELEASE_DOC defines no floor_evidence values, so nothing owns what they mean"
+  else
+    for v in $FLOOR_RULES; do
+      holds "$doc_vocab" "$v" \
+        || note "this gate has a rule for floor_evidence '$v' that $RELEASE_DOC does not define"
+    done
+    for v in $doc_vocab; do
+      holds "$FLOOR_RULES" "$v" \
+        || note "$RELEASE_DOC defines floor_evidence '$v' and this gate has no rule for it"
+    done
+    for v in $(jqr '[.components[].targets[].floor_evidence] | unique[]' "$def"); do
+      holds "$doc_vocab" "$v" \
+        || note "the definition uses floor_evidence '$v', which $RELEASE_DOC does not define"
+    done
+  fi
+
+  # Every page that advertises a target STATES that target's floor, and where no run backs that
+  # floor states that too. Required presence, not a conditional: the one-directional check above
+  # only catches a page inventing a floor and would be perfectly happy with a page that had quietly
+  # stopped mentioning one. Deleting the sentence and deleting the paragraph it lives in have to
+  # fail the same way, or the check is satisfied by silence.
+  #
+  # Scoped to the pages a target is advertised ON rather than to all of them, because they do not
+  # advertise the same set: site/public/index.html sends Windows readers to the README, and neither
+  # page has any business carrying a desktop floor while nothing desktop can be downloaded.
   for c in $(jqr '.components | keys[]' "$def"); do
-    for rid in $(json_array "$def" ".components.\"$c\".targets | map(select(.floor_evidence == \"unverified\") | .rid)"); do
-      claim="$(jqr ".components.\"$c\".targets[] | select(.rid == \"$rid\") | .floor_caveat" "$def")"
-      grep -qF "$claim" "$root/README.md" 2>/dev/null \
-        || note "README.md no longer carries the $rid caveat: $claim"
+    for rid in $(json_array "$def" ".components.\"$c\".targets | map(select(.advertised == true) | .rid)"); do
+      local target floor evidence caveat pages
+      target=".components.\"$c\".targets[] | select(.rid == \"$rid\")"
+      floor="$(jqr "$target | .os_floor // empty" "$def")"
+      [ -n "$floor" ] || continue
+      evidence="$(jqr "$target | .floor_evidence // empty" "$def")"
+      caveat="$(jqr "$target | .floor_caveat // empty" "$def")"
+      pages="$(json_array "$def" "[$target] | map(.advertised_on // []) | add")"
+      for page in $pages; do
+        [ -f "$root/$page" ] || continue
+        grep -qF "$floor" "$root/$page" \
+          || note "$page advertises $rid and no longer states its floor: $floor"
+        case "$evidence" in
+          unverified | cited)
+            grep -qF "$caveat" "$root/$page" \
+              || note "$page states the $rid floor without the caveat that qualifies it: $caveat" ;;
+        esac
+      done
     done
   done
 
@@ -703,6 +778,12 @@ expect_refusal "floor-without-evidence" "with floor_evidence none" \
   "$(mutate floor-without-evidence '.components.cli.targets[0].floor_evidence = "none"')"
 expect_refusal "unverified-without-caveat" "no floor_caveat to publish" \
   "$(mutate unverified-without-caveat '.components.cli.targets[1] |= del(.floor_caveat)')"
+expect_refusal "cited-without-citation" "no floor_citation to point at" \
+  "$(mutate cited-without-citation '.components.cli.targets |= map(if .floor_evidence == "cited" then del(.floor_citation) else . end)')"
+expect_refusal "cited-without-caveat" "no floor_caveat to publish" \
+  "$(mutate cited-without-caveat '.components.cli.targets |= map(if .floor_evidence == "cited" then del(.floor_caveat) else . end)')"
+expect_refusal "floor-evidence-undefined" "is not defined in docs/RELEASE.md" \
+  "$(mutate floor-evidence-undefined '.components.cli.targets[0].floor_evidence = "observed"')"
 expect_refusal "no-install-check-and-no-reason" "no written reason it has none" \
   "$(mutate no-install-check-and-no-reason '.components.cli.targets[1] |= (del(.install_check_absent) | .install_check = null)')"
 expect_refusal "declared-not-packaged-unexplained" "no reason recorded" \
@@ -746,6 +827,25 @@ printf '\nmacOS 14 or later is required.\n' >> "$FAKE/README.md"
 expect_repo_refusal "doc-claims-a-floor-nothing-holds" "no target in the definition holds that floor" \
   "$FAKE/release-targets.json" "$FAKE"
 cp README.md "$FAKE/README.md"
+
+# A page that stops mentioning a floor and a page that never had one look identical to a check that
+# only reads what is written. These two are why the presence rule is required rather than conditional.
+sed -i '/^\*\*macOS 13 or later\.\*\*/d' "$FAKE/README.md"
+expect_repo_refusal "doc-drops-a-floor" "no longer states its floor" \
+  "$FAKE/release-targets.json" "$FAKE"
+cp README.md "$FAKE/README.md"
+
+sed -i 's/no run backs this floor/it has been checked/g' "$FAKE/README.md"
+expect_repo_refusal "doc-drops-the-caveat" "without the caveat that qualifies it" \
+  "$FAKE/release-targets.json" "$FAKE"
+cp README.md "$FAKE/README.md"
+
+# The vocabulary lives in docs/RELEASE.md and the values live in the definition. Deleting a row
+# from the table is how one of them silently stops meaning anything.
+sed -i '/^| `cited` |/d' "$FAKE/docs/RELEASE.md"
+expect_repo_refusal "release-doc-drops-a-floor-value" "which docs/RELEASE.md does not define" \
+  "$FAKE/release-targets.json" "$FAKE"
+cp docs/RELEASE.md "$FAKE/docs/RELEASE.md"
 
 sed -i 's/unsigned/perfectly ordinary/g' "$FAKE/README.md"
 expect_repo_refusal "signing-disclosure-deleted" "no longer says the cli binaries are unsigned" \
@@ -807,7 +907,7 @@ fi
 # ---------------------------------------------------------------------------
 # 8. The verdict.
 # ---------------------------------------------------------------------------
-[ "$cases" -ge 18 ] || die "only $cases fixture cases ran; cases have gone missing rather than passing"
+[ "$cases" -ge 24 ] || die "only $cases fixture cases ran; cases have gone missing rather than passing"
 [ "$refusals" -eq "$cases" ] || die "$refusals of $cases fixtures refused"
 
 echo
