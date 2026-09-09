@@ -55,9 +55,15 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
+      # fetch-depth: 0 because verify-release-matrix.sh reads prior revisions of
+      # release-targets.json to hold `published` append-only - two fields one commit apart cannot
+      # hold each other honest, and git history can. checkout defaults to depth 1, where that
+      # history is simply absent; the gate dies rather than passing on it, which is the direction
+      # law 3.7 asks for and also why this line is load-bearing rather than an optimisation.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
@@ -87,6 +93,16 @@ jobs:
       - name: Verify the release destination check fails closed
         shell: bash
         run: scripts/verify-release-destination.sh --with-real-aws
+
+      # R.0a. One definition of what keypaste ships - component, version, OS floor, package format,
+      # signing policy - held against the workflows, the csprojs and the download pages. The
+      # fixtures drive the same validator this run uses, so a check that stops biting is a red gate
+      # rather than a quiet one. --with-public-origin is deliberately absent: it fetches published
+      # assets, and an unreachable origin is weather rather than evidence about this repository.
+      # install.yml runs that half weekly.
+      - name: Verify one release definition answers for every target
+        shell: bash
+        run: scripts/verify-release-matrix.sh
 
   test:
     name: test (${{ matrix.os }})

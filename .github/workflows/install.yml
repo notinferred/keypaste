@@ -47,9 +47,21 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
+      # fetch-depth: 0 for the same reason ci.yml's gate job has it: the release-matrix gate reads
+      # prior revisions of release-targets.json, and on a depth-1 checkout that history is absent.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+          fetch-depth: 0
+
+      # R.0a. The only job that asks dl.keypaste.com whether the releases release-targets.json
+      # records are still there. It runs here rather than in ci.yml or the release guard because an
+      # origin that cannot be reached is not evidence about the definition, and this workflow is
+      # already weekly-cron plus dispatch and already network-bound. It tells an unreachable origin
+      # from a missing asset with a positive control, and only the second is a failure.
+      - name: Verify the published releases are still on the origin
+        shell: bash
+        run: scripts/verify-release-matrix.sh --with-public-origin
 
       # No setup-dotnet, and that absence is the point. A published binary is self-contained; if any
       # step here needed a .NET SDK the claim on the page would be wrong. KEYPASTE_EXPECT_VERSION is
