@@ -31,7 +31,7 @@ An OS floor is a claim to a stranger about their machine, so [`release-targets.j
 
 [`release-targets.json`](../release-targets.json) owns this matrix. The table below restates it for a reader; [`verify-release-matrix.sh`](../scripts/verify-release-matrix.sh) fails if the two disagree, and the workflows build from the file rather than from a list written out beside it (R.0a).
 
-The public release is CLI/MCP **`v0.1.0`**, served from `https://dl.keypaste.com/v0.1.0/`. All four archive URLs returned HTTP 200 on this date; that availability check is not a new installation verification. `main` contains the [Unreleased](../CHANGELOG.md#unreleased) changes, including `setup`, while `Directory.Build.props` still declares `0.1.0`.
+The public release is CLI/MCP **`v0.1.0`**, served from `https://dl.keypaste.com/v0.1.0/`. All four archive URLs returned HTTP 200 on this date; that availability check is not a new installation verification. `main` contains the [0.2.0-rc.1](../CHANGELOG.md#020-rc1) changes, including `setup`, and `Directory.Build.props` declares `0.2.0`; neither is in the download above.
 
 | OS / CPU | RID | Public CLI/MCP | OS floor | How the floor was established | Desktop package in CI | Public desktop installer |
 | --- | --- | --- | --- | --- | --- | --- |

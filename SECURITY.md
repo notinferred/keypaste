@@ -38,7 +38,7 @@ Also in scope: the signup endpoint on keypaste.com — `site/src/worker.js` and 
 ## Supported versions
 
 The behavior described below is the current source on `main`. The public CLI/MCP release is
-`v0.1.0`; changes listed under [Unreleased](CHANGELOG.md#unreleased), including the broader
+`v0.1.0`; changes listed under [0.2.0-rc.1](CHANGELOG.md#020-rc1), including the broader
 exception-path audit coverage and resolved entry names in audit records, are not in that download.
 The desktop app is available from source and has no public release. See the
 [release contract](docs/RELEASE.md) for platform and publication status.

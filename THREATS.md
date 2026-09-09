@@ -1,7 +1,7 @@
 # Threat model — the agent bridge
 
 **Status: current source on `main`, reviewed 2026-09-07.** This includes changes listed under
-[Unreleased](CHANGELOG.md#unreleased), such as exception-path audit coverage, display hardening and
+[0.2.0-rc.1](CHANGELOG.md#020-rc1), such as exception-path audit coverage, display hardening and
 resolved entry names in audit records. Those changes are not in the public CLI/MCP `v0.1.0`
 download. Desktop behavior describes the source-built app, which has no public release. See
 [docs/RELEASE.md](docs/RELEASE.md) for distribution status. Every threat here carries a **Proved by**
