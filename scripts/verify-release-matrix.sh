@@ -308,6 +308,36 @@ validate_workflows() {
   done
 }
 
+# install.yml keeps a literal matrix rather than reading the definition, because deriving three
+# rows would cost a whole extra job on a weekly workflow. Held rather than driven, then: an
+# advertised target that records an install check has a row there, on the runner the definition
+# names - so a target cannot be advertised on the download page and quietly go untested.
+validate_install_jobs() {
+  local def="$1" root="$2" c rid check runner
+  # Assigned separately: bash expands every word of a `local` before assigning any of them, so
+  # "$root" in the same statement is unbound under set -u.
+  local workflow="$root/.github/workflows/install.yml"
+  [ -f "$workflow" ] || { note "no install workflow at .github/workflows/install.yml"; return 1; }
+
+  for c in $(jqr '.components | keys[]' "$def"); do
+    while IFS=$'\037' read -r rid check runner; do
+      [ -n "$rid" ] || continue
+      [ -n "$check" ] || continue
+      grep -qE "target:[[:space:]]*$check\$" "$workflow" \
+        || note "install.yml has no '$check' row, and $c/$rid is advertised with that install check"
+      [ -n "$runner" ] \
+        || { note "$c/$rid: an install check with no install_runner recorded"; continue; }
+      grep -qE "os:[[:space:]]*$runner\$" "$workflow" \
+        || note "install.yml does not install $c/$rid on $runner, which the definition names"
+    done <<INSTALLS
+$(jqr ".components.\"$c\".targets // [] | .[]
+     | select(.advertised == true)
+     | [ (.rid // \"\"), (.install_check // \"\"), (.install_runner // \"\") ]
+     | join(\"\u001f\")" "$def" 2>/dev/null || true)
+INSTALLS
+  done
+}
+
 validate_projects() {
   local def="$1" root="$2" c project declared actual union=""
   for c in $(jqr '.components | keys[]' "$def"); do
@@ -564,6 +594,7 @@ validate_definition "$DEFINITION" || true
 echo "== workflows, projects, documents"
 validate_workflows "$DEFINITION" "$ROOT" || true
 validate_projects "$DEFINITION" "$ROOT" || true
+validate_install_jobs "$DEFINITION" "$ROOT" || true
 validate_documents "$DEFINITION" "$ROOT" || true
 validate_source_version "$DEFINITION" "$ROOT" || true
 validate_prerelease_path "$DEFINITION" "$ROOT" || true
@@ -630,6 +661,7 @@ expect_repo_refusal() {
   PROBLEMS=()
   validate_workflows "$file" "$root" || true
   validate_projects "$file" "$root" || true
+  validate_install_jobs "$file" "$root" || true
   validate_documents "$file" "$root" || true
   report "$name" "$want"
 }
@@ -677,7 +709,9 @@ echo "== fixtures: a definition the repository contradicts"
 FAKE="$WORK/root"
 mkdir -p "$FAKE/.github/workflows" "$FAKE/site/public"
 cp "$DEFINITION" "$FAKE/release-targets.json"
-cp README.md CHANGELOG.md "$PROPS" "$FAKE/"
+cp README.md CHANGELOG.md SECURITY.md "$PROPS" "$FAKE/"
+mkdir -p "$FAKE/docs"
+cp docs/RELEASE.md docs/desktop.md "$FAKE/docs/"
 cp site/public/index.html "$FAKE/site/public/"
 cp .github/workflows/release.yml .github/workflows/app.yml "$FAKE/.github/workflows/"
 for project in $(jqr '.components[].projects[], .shared_projects[]' "$DEFINITION"); do
@@ -685,8 +719,8 @@ for project in $(jqr '.components[].projects[], .shared_projects[]' "$DEFINITION
   cp "$project" "$FAKE/$project"
 done
 
-expect_repo_refusal "target-with-no-package-job" "and the definition advertises" \
-  "$(mutate target-with-no-package-job '.components.cli.targets += [{"rid":"linux-musl-x64","runner":"ubuntu-22.04","archive":"tar.gz","cpu":"x64","advertised":false,"os_floor":null,"floor_evidence":"none","install_check":null,"install_check_absent":"fixture"}] | .components.cli.runtime_identifiers += ["linux-musl-x64"] | .source_only -= ["linux-musl-x64"]')" \
+expect_repo_refusal "target-nothing-else-declares" "and the definition says" \
+  "$(mutate target-nothing-else-declares '.components.cli.targets += [{"rid":"linux-musl-x64","runner":"ubuntu-22.04","archive":"tar.gz","cpu":"x64","advertised":false,"os_floor":null,"floor_evidence":"none","install_check":null,"install_check_absent":"fixture"}] | .components.cli.runtime_identifiers += ["linux-musl-x64"] | .source_only -= ["linux-musl-x64"]')" \
   "$FAKE"
 
 expect_repo_refusal "csproj-and-definition-disagree" "and the definition says" \

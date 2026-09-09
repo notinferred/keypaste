@@ -38,7 +38,7 @@ public sealed class ReleaseMatrixIsPinnedTests
         // download pages and the definition already disagree about what is being published.
         Assert.Contains(
             "scripts/verify-release-matrix.sh",
-            Code(Lines(JobBlock(RepositoryFile(".github", "workflows", "release.yml"), "guard"))),
+            Code(JobBlock(RepositoryFile(".github", "workflows", "release.yml"), "guard")),
             StringComparison.Ordinal);
     }
 
@@ -46,7 +46,7 @@ public sealed class ReleaseMatrixIsPinnedTests
     public void TheGitHistoryCheck_IsGivenAHistoryToRead()
     {
         var ci = RepositoryFile(".github", "workflows", "ci.yml");
-        var gate = Code(Lines(JobBlock(ci, "gate")));
+        var gate = Code(JobBlock(ci, "gate"));
 
         Assert.Contains("scripts/verify-release-matrix.sh", gate, StringComparison.Ordinal);
         Assert.True(
@@ -112,7 +112,7 @@ public sealed class ReleaseMatrixIsPinnedTests
                      "doc-claims-a-floor-nothing-holds",  // a page promising an OS nobody checked
                      "signing-disclosure-deleted",        // "unsigned" removed while it is true
                      "csproj-and-definition-disagree",
-                     "target-with-no-package-job",
+                     "target-nothing-else-declares",
                  })
         {
             Assert.Contains(fixture, gate, StringComparison.Ordinal);

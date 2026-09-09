@@ -48,7 +48,8 @@
           "advertised_on": [
             "README.md",
             "site/public/index.html"
-          ]
+          ],
+          "install_runner": "ubuntu-24.04"
         },
         {
           "rid": "linux-arm64",
@@ -74,7 +75,8 @@
           "advertised_on": [
             "README.md",
             "site/public/index.html"
-          ]
+          ],
+          "install_runner": "macos-15"
         },
         {
           "rid": "win-x64",
@@ -87,7 +89,8 @@
           "install_check": "windows",
           "advertised_on": [
             "README.md"
-          ]
+          ],
+          "install_runner": "windows-2025"
         }
       ]
     },
