@@ -2,27 +2,19 @@ using Keypaste.Core.Audit;
 
 namespace Keypaste.Mcp.Tools;
 
-/// <summary>
-/// Every word this server says to a model or a human, in one file.
-/// </summary>
+/// <summary>Every word this server says to a model or a human, in one file.</summary>
 /// <remarks>
-/// Gathered here because on a credential bridge the wording <em>is</em> a security surface: the tool
-/// descriptions are what tell a model that entry names are data rather than instructions, and the
-/// refusals are what stop a capable agent retrying a call that will never succeed. Reviewing them as
-/// a unit is the point, and it lets a test assert against the same constants the server uses rather
-/// than a copy that can drift.
+/// On a credential bridge the wording <em>is</em> a security surface, so reviewing it as a unit is the
+/// point — and a test can then assert against the same constants the server uses rather than a copy.
 /// </remarks>
 internal static class ToolText
 {
-    /// <summary>The tool that lists names.</summary>
     internal const string ListToolName = "list_entry_names";
 
-    /// <summary>The tool that asks for a credential.</summary>
     internal const string CredentialToolName = "request_credential";
 
-    /// <summary>
-    /// Stated once at protocol level, so the warning survives a model that skims tool descriptions.
-    /// </summary>
+    /// <summary>Stated once at protocol level, so the warning survives a model that skims tool
+    /// descriptions.</summary>
     internal const string ServerInstructions = """
         keypaste is the user's password vault. It never hands over a credential unless the user
         approved that specific request, or wrote a standing rule in advance that covers it.
@@ -58,9 +50,9 @@ internal static class ToolText
 
     /// <summary>Why a call was refused when no approver is running.</summary>
     /// <remarks>
-    /// It names the command, because this is the one refusal a person can fix in five seconds and
-    /// the agent is the only party in a position to tell them. Saying "do not retry" here would be
-    /// wrong: retrying is exactly right, once somebody has started it.
+    /// It names the command, because this is the one refusal a person can fix in five seconds and the
+    /// agent is the only party who can tell them. No "do not retry": retrying is right once somebody
+    /// has started one.
     /// </remarks>
     internal const string NoApprover = """
         keypaste: DENIED. No keypaste agent is running, so there is nobody to approve this. keypaste
@@ -72,10 +64,6 @@ internal static class ToolText
         """;
 
     /// <summary>Why a listing was refused when no approver is running.</summary>
-    /// <remarks>
-    /// Separate from <see cref="NoApprover"/> because the two are asking for different things and a
-    /// listing has no credential in it. Retrying is right here too, once somebody has started one.
-    /// </remarks>
     internal const string NoApproverForListing = """
         keypaste: no keypaste agent is running, so there is no unlocked vault to read names from.
         No entry names were read.
@@ -92,9 +80,8 @@ internal static class ToolText
 
     /// <summary>Why a request was refused when a person considered it and said no.</summary>
     /// <remarks>
-    /// "Do not retry" earns its place here specifically. Without it a capable agent loops on a
-    /// refusal, which burns the user's tokens and — worse — turns a considered no into a stream of
-    /// popups until somebody clicks the wrong one (THREATS.md T-11).
+    /// "Do not retry" earns its place here: without it a capable agent loops, turning a considered no
+    /// into a stream of popups until somebody clicks the wrong one (THREATS.md T-11).
     /// </remarks>
     internal const string DeniedByHuman = """
         keypaste: DENIED. A person read this request and said no.
@@ -106,8 +93,8 @@ internal static class ToolText
 
     /// <summary>Why a request was refused when nobody answered in time.</summary>
     /// <remarks>
-    /// Deliberately without "do not retry". Nobody decided anything — they were away from the
-    /// keyboard — so one later attempt is a reasonable thing for an agent to do.
+    /// Deliberately without "do not retry": nobody decided anything, so one later attempt is
+    /// reasonable.
     /// </remarks>
     internal const string TimedOut = """
         keypaste: DENIED. The request was shown to a person and nobody answered before it expired, so
@@ -119,25 +106,13 @@ internal static class ToolText
 
     /// <summary>Why a call was refused because this connection was already carrying one.</summary>
     /// <remarks>
-    /// <para>
-    /// <b>BUSY rather than DENIED, and that word is the point.</b> Every other refusal here is a
-    /// decision — a person's no, a cooldown, an entry outside the exposure. This one is keypaste
-    /// saying "not now", and an agent that reads it as a refusal learns the wrong thing about what
-    /// the user wants.
-    /// </para>
-    /// <para>
-    /// It does not say which call holds the connection. A listing and a credential request share
-    /// one pipe, so either can be the one in the way, and naming it would tell an agent which of
-    /// its own calls is still running — or worse, imply a person is looking at something when
-    /// nobody is.
-    /// </para>
-    /// <para>
-    /// No "do not retry", by the same rule as <see cref="TimedOut"/>: nobody decided anything
-    /// (D-0027). But it says the wait may be human-length, because an agent told only "try again"
-    /// will try again immediately, and a tight retry loop against a held prompt is the storm this
-    /// refusal exists to prevent. No number: the approver's window is configurable between five and
-    /// fifty-five seconds and the bridge is not told which.
-    /// </para>
+    /// BUSY, not DENIED: every other refusal here is a decision, and an agent reading this as one
+    /// learns the wrong thing about what the user wants.
+    /// It does not say which call holds the connection — a listing and a request share one pipe, and
+    /// naming it would tell an agent which of its own calls is running, or imply a person is looking.
+    /// No "do not retry" (D-0027), but it says the wait may be human-length or an agent told only "try
+    /// again" retries immediately into a held prompt. No number: the approver's window is configurable
+    /// between five and fifty-five seconds and the bridge is not told which.
     /// </remarks>
     internal const string Busy = """
         keypaste: BUSY. keypaste handles one request at a time on this connection and is already
@@ -166,23 +141,13 @@ internal static class ToolText
 
     /// <summary>Why nothing came back for a request that was authorized.</summary>
     /// <remarks>
-    /// <para>
-    /// <b>It says the value is too large, and that is deliberate.</b> The agent had just been
-    /// authorized to receive the whole of that value, so telling it the value is large discloses
-    /// strictly less than the release it was granted. The reticence THREATS.md T-4 asks for governs
-    /// what an agent learns about entries it may <em>not</em> have.
-    /// </para>
-    /// <para>
-    /// <b>It never says a person approved it.</b> A standing rule reaches this same sentence, and
-    /// nobody is asked on that path (T-16). Which authority it was belongs in the audit line's
-    /// reason, where the reader is the user; the agent only needs to know the answer was yes and the
-    /// value still did not arrive.
-    /// </para>
-    /// <para>
-    /// "Do not retry" earns its place the way <see cref="DeniedByHuman"/>'s does, and for a second
-    /// reason: inside the grant's lifetime a retry is answered without troubling anybody, and after
-    /// it a retry puts the same question in front of a person for the same result.
-    /// </para>
+    /// It says the value is too large, deliberately: the agent was just authorized to receive the
+    /// whole of it, so saying so discloses less than the release it was granted. T-4's reticence
+    /// governs entries an agent may <em>not</em> have.
+    /// It never says a person approved it, because a standing rule reaches this same sentence and
+    /// nobody is asked on that path (T-16).
+    /// "Do not retry": inside the grant's lifetime a retry is answered without troubling anybody, and
+    /// after it a retry puts the same question in front of a person for the same result.
     /// </remarks>
     internal const string Undeliverable = """
         keypaste: DENIED. This request was authorized, and then keypaste could not return the value:
@@ -202,9 +167,7 @@ internal static class ToolText
         exposure is set in the MCP client's configuration file, by the user. Do not retry.
         """;
 
-    /// <summary>
-    /// Why a call was refused when the log could not be written. The strictest rule in the bridge.
-    /// </summary>
+    /// <summary>Why a call was refused when the log could not be written.</summary>
     internal const string AuditUnavailable = """
         keypaste: DENIED. The audit log could not be written, so this call was refused. keypaste does
         not grant access it cannot record.
@@ -216,20 +179,11 @@ internal static class ToolText
 
     /// <summary>Said when a listing left names out, which it must never do silently.</summary>
     /// <remarks>
-    /// <para>
-    /// <b>No number, and no way to ask for the rest.</b> Any count of what was left out would be
-    /// measured before the exposure filter runs and would be wrong by the time it was read; and
-    /// telling an agent how many names a vault holds describes the shape of somebody's life, which
-    /// is the thing a bounded listing exists to withhold (docs/PRODUCT.md law 3.5, THREATS.md T-4).
-    /// </para>
-    /// <para>
-    /// It closes the door on paging explicitly. <c>list_entry_names</c> takes no arguments — that is
-    /// what stops an agent widening its own view — so an agent told only "some are missing" would
-    /// otherwise spend its next turn looking for the parameter that would fetch them.
-    /// </para>
-    /// <para>
-    /// No "try again": a retry returns the same answer, because nothing about the vault has changed.
-    /// </para>
+    /// No number: a count would be measured before the exposure filter runs and be wrong by the time
+    /// it was read, and how many names a vault holds describes the shape of somebody's life (T-4).
+    /// It closes the door on paging explicitly, because an agent told only "some are missing" would
+    /// spend its next turn looking for the parameter that would fetch them, and there is none.
+    /// No "try again": a retry returns the same answer.
     /// </remarks>
     internal const string ListingIncomplete = """
         keypaste: this is not the whole list. More entry names are inside this server's exposure than
@@ -240,15 +194,10 @@ internal static class ToolText
         to narrow the exposure in the MCP client's configuration.
         """;
 
-    /// <summary>
-    /// What is said around a released credential. The value itself follows on its own line.
-    /// </summary>
+    /// <summary>What is said around a released credential. The value follows on its own line.</summary>
     /// <remarks>
-    /// The value is in a model's context the moment it is returned, and no wording changes that.
-    /// What the wording can do is narrow what happens next: say plainly that this is a live
-    /// credential, that it expires, and that writing it into a file or a message is the thing
-    /// keypaste exists to stop (docs/PRODUCT.md law 3.4 is about keypaste's own writes; this is the part
-    /// only the model can honour).
+    /// The value is in a model's context the moment it is returned and no wording changes that. What
+    /// the wording can narrow is what happens next, which is the part only the model can honour.
     /// </remarks>
     internal static string Released(string field, int ttlSeconds) =>
         $"""
@@ -261,21 +210,12 @@ internal static class ToolText
         """;
 
     /// <summary>What is said around a credential released by a standing rule, with nobody asked.</summary>
-    /// <param name="field">The field released.</param>
-    /// <param name="ttlSeconds">How long the release lasts.</param>
-    /// <returns>The text to return, with the value on its own line after it.</returns>
     /// <remarks>
-    /// <para>
-    /// Separate from <see cref="Released"/> because that one says "a person released", and on this
-    /// path nobody did. Telling a model that a human just approved something no human saw is the
-    /// kind of small untruth that a credentials tool cannot afford: it is exactly the claim keypaste
-    /// asks to be trusted on.
-    /// </para>
-    /// <para>
-    /// It names neither the rule nor the pattern it matched. An agent that learns which parts of the
-    /// vault are pre-authorized has been handed a map of where to aim, and it does not need one to
-    /// use what it was given.
-    /// </para>
+    /// Separate from <see cref="Released"/> because that one says "a person released" and on this path
+    /// nobody did — telling a model a human approved something no human saw is exactly the claim
+    /// keypaste asks to be trusted on.
+    /// It names neither the rule nor the pattern it matched: an agent that learns which parts of the
+    /// vault are pre-authorized has been handed a map of where to aim.
     /// </remarks>
     internal static string ReleasedByPolicy(string field, int ttlSeconds) =>
         $"""
@@ -289,15 +229,11 @@ internal static class ToolText
 
         """;
 
-    /// <summary>
-    /// Why a request a standing rule covers was refused anyway: the rule has an hourly allowance and
-    /// it is spent.
-    /// </summary>
+    /// <summary>Why a request a standing rule covers was refused anyway: its hourly allowance is
+    /// spent.</summary>
     /// <remarks>
-    /// One of the few refusals where trying later is honest advice, alongside
-    /// <see cref="Busy"/> and <see cref="TimedOut"/> — and the only one where the wait is long
-    /// enough to be worth naming. It does not say what the allowance is: that is the user's number,
-    /// not the agent's.
+    /// The one refusal where the wait is long enough to be worth naming. It does not say what the
+    /// allowance is: that is the user's number, not the agent's.
     /// </remarks>
     internal const string PolicyLimit = """
         keypaste: DENIED. A standing rule covers this request, but it has an hourly limit and that
@@ -306,12 +242,10 @@ internal static class ToolText
         """;
 
     /// <summary>The refusal an agent reads for each way of saying no.</summary>
-    /// <param name="method">Why the answer was no.</param>
-    /// <returns>The text to return, which always explains whether retrying could ever help.</returns>
     /// <remarks>
-    /// Keyed on the audit method rather than written at each call site, so the sentence an agent
-    /// reads and the word written to the log cannot drift apart — and so a new way of saying no
-    /// cannot ship with the wrong advice attached.
+    /// Keyed on the audit method rather than written at each call site, so the sentence an agent reads
+    /// and the word written to the log cannot drift apart, and a new way of saying no cannot ship with
+    /// the wrong advice attached.
     /// </remarks>
     internal static string Refusal(AuditMethod method) => method switch
     {
@@ -330,9 +264,8 @@ internal static class ToolText
 
     /// <summary>The refusal for a tool call that arrived before the handshake finished.</summary>
     /// <remarks>
-    /// Says what to do about it, because the likely reader is a client author whose ordering is
-    /// wrong rather than an attacker. Names no vault contents: at this point keypaste has not
-    /// looked at any.
+    /// Says what to do about it, because the likely reader is a client author whose ordering is wrong
+    /// rather than an attacker.
     /// </remarks>
     internal const string NotInitialized = """
         keypaste: DENIED. This tool was called before the initialize handshake completed, so
@@ -347,13 +280,11 @@ internal static class ToolText
         by default. This call was recorded in the audit log as denied.
         """;
 
-    /// <summary>
-    /// The refusal for a malformed call. Names the field and the rule, and quotes nothing.
-    /// </summary>
+    /// <summary>The refusal for a malformed call. Names the field and the rule, and quotes
+    /// nothing.</summary>
     /// <remarks>
-    /// Never echoes the offending value. An error that reflects attacker-controlled text back into
-    /// the transcript is itself an injection channel, and a "helpful" diagnostic is the natural
-    /// place for that to happen.
+    /// Never echoes the offending value: an error reflecting attacker-controlled text back into the
+    /// transcript is itself an injection channel, and a "helpful" diagnostic is where that happens.
     /// </remarks>
     internal static string Invalid(string field, string rule) =>
         $"keypaste: DENIED. The \"{field}\" argument {rule}. This call was recorded in the audit log.";
