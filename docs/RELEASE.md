@@ -60,14 +60,18 @@ Source routes are not promises of tested downloadable support. Minimum OS versio
 
 | Gated on a tag | What it decides | Reachable another way? |
 |---|---|---|
-| Guard: the green-gates check | every required gate is green on the commit | **Yes, now.** The decision is [`require-green-gates.sh`](../scripts/require-green-gates.sh) and [`verify-green-gates.sh`](../scripts/verify-green-gates.sh) drives it through a fake `gh` in `ci.yml` and in the guard |
-| Guard: the changelog lookup | `grep -qxF "## <version>"`, whole-line since R.0a | No |
-| Guard: tag versus `VersionPrefix` | a tag that names a version the source does not | No — on a dispatch `publish=false` short-circuits the comparison |
-| Guard: the three R2 secrets | that they are set | No |
-| `app.yml`: the prerelease suffix | `-p:VersionSuffix` reaching the desktop binary, its version check and its archive name | No — a dispatch logs `prerelease suffix: <none>` |
-| Publish job, six steps | transported checksums, the source tarball, `SHA256SUMS` and its diff, the publication allowlist, the upload, the summary | No |
+| Guard: the green-gates check | every required gate is green on the commit | **Yes** — [`require-green-gates.sh`](../scripts/require-green-gates.sh), driven by [`verify-green-gates.sh`](../scripts/verify-green-gates.sh) through a fake `gh` |
+| Guard: the changelog lookup | a whole-line `## <version>` heading exists | **Yes** — [`require-changelog-section.sh`](../scripts/require-changelog-section.sh) |
+| Guard: tag versus the source's version | a tag names the version the source declares | **Yes** — [`require-tag-matches-source.sh`](../scripts/require-tag-matches-source.sh) |
+| Publish: the allowlist, the asset count and the checksums | what may become world-readable | **Yes** — [`require-release-assets.sh`](../scripts/require-release-assets.sh) |
+| Guard: the three R2 secrets | that they are set | **No, and it cannot be.** The question is whether real secrets exist in a real environment; a fixture asserting that a set variable is set proves nothing |
+| `app.yml`: the prerelease suffix | `-p:VersionSuffix` reaching the desktop binary, its version check and its archive name | **No, and it cannot be.** A dispatch has no suffix to carry, so what is untested is not a decision but the absence of an input |
+| Publish: the upload itself | where bytes land | Partly — [`publish-release.sh`](../scripts/publish-release.sh) refuses a destination it cannot verify empty, driven by [`verify-release-destination.sh`](../scripts/verify-release-destination.sh) against a fake `aws`. That R2 answers a listing in that shape needs a tag |
+| Publish: the source tarball and the `SHA256SUMS` diff | that the archive and the aggregate agree | Not yet extracted; both are cheap and neither has a wrong answer on record |
 
-Three of those are R.0a's own changes — the changelog lookup, the derived asset count and the derived allowlist — and a dispatch exercises none of them. The rule this suggests, stated rather than left to be rediscovered: **a decision that only a tag can reach belongs in a script a fixture can drive**, not in a step body.
+[`verify-release-preflight.sh`](../scripts/verify-release-preflight.sh) drives the three middle rows over twenty cases, with two negative controls that reproduce answers this repository has actually given: an unanchored changelog match taking an rc heading for the release, and an asset count without its published floor taking a release that dropped a target.
+
+Two rows are genuinely tag-only and are marked so rather than left as a to-do: a secret check and a missing build input are not decisions, and wrapping them in a script would buy a green fixture and no evidence. Everything else was extractable, which is the answer to the question worth asking about the rest — **a decision that only a tag can reach belongs in a script a fixture can drive**, and the two exceptions are the shape of thing that is not a decision at all.
 
 ## Requirements still to implement
 
