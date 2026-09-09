@@ -55,6 +55,7 @@ jobs:
       version: ${{ steps.v.outputs.version }}
       suffix: ${{ steps.v.outputs.suffix }}
       publish: ${{ steps.v.outputs.publish }}
+      targets: ${{ steps.targets.outputs.targets }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -98,9 +99,9 @@ jobs:
           echo "publish=$publish" >> "$GITHUB_OUTPUT"
           echo "building $tag (suffix='$suffix', publish=$publish)"
 
-      # A tag can point anywhere. These two say it points at something main has seen and CI has
-      # already gone green on, without re-running the whole matrix here.
-      - name: Check the commit is on main and CI is green on it
+      # A tag can point anywhere. These say it points at something main has seen and both gates
+      # have already gone green on, without re-running either matrix here.
+      - name: Check the commit is on main and both gates are green on it
         if: github.ref_type == 'tag'
         shell: bash
         env:
@@ -109,10 +110,59 @@ jobs:
           git merge-base --is-ancestor "$GITHUB_SHA" origin/main \
             || { echo "::error::$GITHUB_SHA is not an ancestor of main"; exit 1; }
 
-          green=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$GITHUB_SHA&status=success" \
-                    --jq '[.workflow_runs[] | select(.name=="ci")] | length')
-          [ "${green:-0}" -ge 1 ] \
-            || { echo "::error::no successful ci run for $GITHUB_SHA - a tag must not ship an untested commit"; exit 1; }
+          runs=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$GITHUB_SHA&status=success")
+
+          # Both workflows, not just ci. release-targets.json advertises seven targets and app.yml is
+          # the only check three of them have; a guard that reads ci alone lets a tag ship while the
+          # desktop gate is red or never ran, which makes "every advertised target has a matching
+          # check" false rather than incomplete (R.0a).
+          #
+          # app.yml's push filter can legitimately leave a commit with no app run - a push touching
+          # only src/Keypaste.Mcp or scripts does not match its paths. That fails the tag on purpose.
+          # A tag is not the place to discover the desktop gate has not been run: dispatch app.yml at
+          # the commit, let it go green, then tag. Nothing here waits for the run this tag started,
+          # because a workflow that vouches for itself vouches for nothing.
+          for wf in ci app; do
+            green=$(printf '%s' "$runs" | jq --arg wf "$wf" '[.workflow_runs[] | select(.name==$wf)] | length')
+            case "$green" in
+              ''|*[!0-9]*) echo "::error::could not count $wf runs for $GITHUB_SHA"; exit 1 ;;
+            esac
+            [ "$green" -ge 1 ] || {
+              echo "::error::no successful $wf run for $GITHUB_SHA - a tag must not ship a commit its gates have not passed"
+              echo "::error::if $wf was skipped by its paths filter, dispatch it at this commit and re-tag once it is green"
+              exit 1
+            }
+            echo "$wf: $green successful run(s) for $GITHUB_SHA"
+          done
+
+      # R.0a. A tag must not start publishing while the definition and the download pages already
+      # disagree about what is being published. The public-origin half is deliberately not run here:
+      # an unreachable dl.keypaste.com would block a release for weather rather than for a fault.
+      - name: Verify one release definition answers for every target
+        shell: bash
+        run: scripts/verify-release-matrix.sh
+
+      # R.0a. The build matrix is derived from release-targets.json rather than written out beside
+      # it, so the file that documents what keypaste ships is also the thing that decides it.
+      #
+      # A matrix that expands to nothing is the failure worth naming here: fromJSON of an empty
+      # array makes GitHub *skip* the build job, skip publish through needs:, and report the whole
+      # workflow green - a release that built nothing and said so nowhere. So the count is required
+      # to be digits and at least one before anything is emitted. That is D-0106's rule - a refusal
+      # must rest on what came back, not on how a tool chose to exit - applied to a second reader.
+      - name: Resolve the targets this release builds
+        id: targets
+        shell: bash
+        run: |
+          set -euo pipefail
+          n="$(jq -r '.components.cli.targets | length' release-targets.json)"
+          case "$n" in
+            ''|*[!0-9]*) echo "::error::release-targets.json did not answer with a target count"; exit 1 ;;
+          esac
+          [ "$n" -ge 1 ] || { echo "::error::release-targets.json advertises no cli targets"; exit 1; }
+          targets="$(jq -c '[.components.cli.targets[] | {rid, os: .runner, archive}]' release-targets.json)"
+          echo "targets=$targets" >> "$GITHUB_OUTPUT"
+          echo "$n targets: $targets"
 
       # docs/PRODUCT.md law 4.7 pairs small releases with real changelogs. Making the release depend on the
       # entry existing is what turns that from an intention into a rule.
@@ -120,7 +170,7 @@ jobs:
         if: github.ref_type == 'tag'
         shell: bash
         run: |
-          grep -qF "## ${{ steps.v.outputs.version }}" CHANGELOG.md \
+          grep -qxF -- "## ${{ steps.v.outputs.version }}" CHANGELOG.md \
             || { echo "::error::CHANGELOG.md has no '## ${{ steps.v.outputs.version }}' section"; exit 1; }
 
       # Everything the publish job needs, checked here instead of there.
@@ -172,28 +222,17 @@ jobs:
     needs: guard
     strategy:
       fail-fast: false
+      # rid, os and archive come from release-targets.json (R.0a). Cross-OS NativeAOT is not
+      # supported, so every RID is built on its own operating system and, because O-0006 requires
+      # the binary to be *run* rather than merely compiled, on its own architecture. Nothing here is
+      # cross-compiled or emulated.
+      #
+      # The runner choice IS the compatibility floor for Linux - NativeAOT links against the build
+      # machine's glibc - which is why the definition records `runner` and `os_floor` on the same
+      # target and verify-release-matrix.sh refuses a floor with no recorded evidence. ubuntu-22.04
+      # gives glibc 2.35, covering Debian 12; 24.04 would silently raise it to 2.39.
       matrix:
-        include:
-          # Cross-OS NativeAOT is not supported, so every RID is built on its own operating system
-          # and, because O-0006 requires the binary to be *run* and not merely compiled, on its own
-          # architecture. Nothing here is cross-compiled or emulated.
-          #
-          # ubuntu-22.04 for both Linux RIDs on purpose: NativeAOT links against the build
-          # machine's glibc, so the image choice *is* the compatibility floor. 22.04 gives glibc
-          # 2.35, which covers Debian 12 and Ubuntu 22.04; 24.04 would silently raise it to 2.39
-          # and break every one of those machines.
-          - rid: linux-x64
-            os: ubuntu-22.04
-            archive: tar.gz
-          - rid: linux-arm64
-            os: ubuntu-22.04-arm
-            archive: tar.gz
-          - rid: osx-arm64
-            os: macos-15
-            archive: tar.gz
-          - rid: win-x64
-            os: windows-2025
-            archive: zip
+        include: ${{ fromJSON(needs.guard.outputs.targets) }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     env:
@@ -472,7 +511,20 @@ jobs:
             sha256sum -c "$f" || { echo "::error::checksum mismatch for $f after transport"; exit 1; }
             n=$((n+1))
           done
-          [ "$n" -eq 4 ] || { echo "::error::expected 4 assets, found $n"; exit 1; }
+          # Two numbers from two places, because one would not catch the edit that matters. The
+          # equality is against what release-targets.json advertises today; the floor is the largest
+          # set any release has ALREADY published, which is a fact about history an edit to the
+          # advertised list cannot reach. Drop a target from the definition and the first still
+          # agrees with the matrix - the second does not.
+          defn="$GITHUB_WORKSPACE/release-targets.json"
+          want="$(jq -r '.components.cli.targets | length' "$defn")"
+          floor="$(jq -r '[.published[] | select(.component == "cli") | .rids | length] | max' "$defn")"
+          case "$want" in ''|*[!0-9]*) echo "::error::release-targets.json gave no target count"; exit 1 ;; esac
+          case "$floor" in ''|*[!0-9]*) echo "::error::release-targets.json gave no published floor"; exit 1 ;; esac
+          [ "$n" -eq "$want" ] \
+            || { echo "::error::built $n assets, release-targets.json advertises $want"; exit 1; }
+          [ "$n" -ge "$floor" ] \
+            || { echo "::error::built $n assets; $floor were already published and a release cannot shrink"; exit 1; }
 
       # AGPL-3.0 section 6: conveying object code obliges the corresponding source to every
       # recipient. Publishing it beside the binaries, from the same place, is option (d).
@@ -518,25 +570,51 @@ jobs:
           # --recursive` uploads them, so without this a .env in dist/ walks past the allowlist
           # and onto a public bucket - the exact file this check exists to stop. Observed: the
           # first version of this step passed a planted .env.production.
+          # The expected names come from release-targets.json's archive_pattern rather than from a
+          # list written out here, so adding a target cannot leave this step quietly refusing it.
+          defn="$GITHUB_WORKSPACE/release-targets.json"
+          archives="$(jq -r --arg v "$VERSION" '
+            .components.cli as $c
+            | $c.targets[]
+            | . as $t
+            | $c.archive_pattern
+            | split("{version}") | join($v)
+            | split("{rid}")     | join($t.rid)
+            | split("{ext}")     | join($t.archive)
+          ' "$defn")"
+          [ -n "$archives" ] || { echo "::error::release-targets.json named no archives"; exit 1; }
+          expected="$(printf '%s\n%s\n%s\n' \
+            "$archives" "keypaste-${VERSION}-source.tar.gz" "SHA256SUMS")"
+
           shopt -s dotglob nullglob
           cd dist
           bad=0
+
+          # Nothing unexpected leaves for the bucket.
           for f in *; do
             case "$f" in
-              keypaste-${VERSION}-linux-x64.tar.gz|keypaste-${VERSION}-linux-arm64.tar.gz|\
-              keypaste-${VERSION}-osx-arm64.tar.gz|keypaste-${VERSION}-win-x64.zip|\
-              keypaste-${VERSION}-source.tar.gz|SHA256SUMS) ;;
               *.sha256)
                 base="${f%.sha256}"
                 [ -f "$base" ] || { echo "::error::$f has no asset beside it"; bad=1; }
                 ;;
               *)
-                echo "::error::$f is not a release asset and must not be published"; bad=1 ;;
+                printf '%s\n' "$expected" | grep -qxF -- "$f" \
+                  || { echo "::error::$f is not a release asset and must not be published"; bad=1; }
+                ;;
             esac
             [ -f "$f" ] || { echo "::error::$f is not a regular file"; bad=1; }
           done
+
+          # And nothing expected is missing. An allowlist on its own is perfectly happy with an
+          # empty directory, which is exactly what a matrix that expanded to nothing would hand it.
+          while IFS= read -r want; do
+            [ -n "$want" ] || continue
+            [ -f "$want" ] || { echo "::error::$want is advertised and was not built"; bad=1; }
+            [ -f "$want.sha256" ] || { echo "::error::$want has no checksum beside it"; bad=1; }
+          done < <(printf '%s\n' "$expected")
+
           [ "$bad" -eq 0 ] || { echo "::error::refusing to upload to a public bucket"; exit 1; }
-          echo "every file in dist/ is a release asset:"; ls -1
+          echo "every advertised asset is present and nothing else is:"; ls -1
 
       # Versioned prefixes only, never a mutable "latest": the documented command names an exact
       # version and an exact hash, and both must keep meaning what they meant when they were
