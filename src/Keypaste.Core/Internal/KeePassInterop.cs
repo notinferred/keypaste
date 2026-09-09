@@ -217,20 +217,33 @@ internal sealed class KeePassInterop : IDisposable
     }
 
     /// <summary>How many times a save is attempted before the failure is reported.</summary>
-    internal const int SaveAttempts = 4;
+    /// <remarks>
+    /// Eight attempts at a rising delay is about 2.2 seconds of contention absorbed. Four at 60ms
+    /// bought 360ms, which run 34303291945 exhausted twice on a Windows runner.
+    /// </remarks>
+    internal const int SaveAttempts = 8;
 
     /// <summary>Base delay between save attempts. Multiplied by the attempt number.</summary>
-    internal const int SaveRetryDelayMilliseconds = 60;
+    internal const int SaveRetryDelayMilliseconds = 80;
 
     /// <summary>Writes the vault to its backing file.</summary>
     /// <remarks>
     /// <para>
     /// Retried on a transient file error. Saving goes through a file transaction — write a
-    /// temporary file, then replace the original — and on Windows that replace competes with
-    /// every other process that watches the filesystem: Defender and the search indexer open a
-    /// newly written file to scan it, which makes the replace fail for a few milliseconds at a
-    /// time. It is not rare enough to ignore; it showed up as intermittent "Could not save"
-    /// failures across unrelated tests on CI before this existed.
+    /// temporary file, then replace the original — and on Windows that competes with every other
+    /// process that watches the filesystem: Defender and the search indexer open a newly written
+    /// file to scan it, which makes the replace fail for a few milliseconds at a time.
+    /// </para>
+    /// <para>
+    /// <b>Concurrent saves contend with each other too, and harder.</b> KeePassLib's Windows path
+    /// is Transactional NTFS, and its temporary file goes in the one shared <c>%TEMP%</c>: a
+    /// directory enlisted in one transaction refuses operations from outside it, so a second save
+    /// fails with "The function attempted to use a name that is reserved for use by another
+    /// transaction" — raised where the temporary file is opened, which is upstream of the fallback
+    /// TxF has for the move. keypaste is several processes by design, so this is an ordinary
+    /// arrangement. Observed on Windows CI in run 34303291945, in two unrelated tests across two
+    /// attempts; not reproducible on a developer machine at 32 overlapping savers, which is why
+    /// the budget is set from what the runner needed rather than from a local measurement.
     /// </para>
     /// <para>
     /// Retrying is safe precisely because the write is transactional. A failed commit leaves the
