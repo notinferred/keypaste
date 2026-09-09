@@ -147,6 +147,10 @@ case "$verb" in
       throttled)         fail 'An error occurred (SlowDown) when calling the ListObjectsV2 operation: Please reduce your request rate' ;;
       unavailable)       fail 'Could not connect to the endpoint URL: "https://fixture.r2.cloudflarestorage.com/"' ;;
       empty-stdout)      exit 0 ;;
+      # The probe answers honestly and only the destination does not, which is the one shape the
+      # positive control cannot catch for the publisher: it has already been satisfied by then.
+      target-empty)      if [ "$prefix" = "${KEYPASTE_R2_PROBE_PREFIX:-}" ]; then listing_of "$prefix"; else exit 0; fi ;;
+      target-truncated)  if [ "$prefix" = "${KEYPASTE_R2_PROBE_PREFIX:-}" ]; then listing_of "$prefix"; else printf '%s' '{"Contents":['; fi ;;
       truncated-json)    printf '%s' '{"Contents":[' ;;
       root-array)        echo '[]' ;;
       root-null)         echo 'null' ;;
@@ -288,6 +292,16 @@ for scenario in wrong-prefix wrong-bucket; do
   run_case "$scenario" "$scenario" "$PUBLISHER" --publish 1 0 'is not a listing this can act on'
 done
 
+echo '--- D2. the probe answers and the destination alone does not'
+# Phase D asks every listing the same bad question, so the positive control refuses first and the
+# destination is never judged. That is how a jq exiting 0 for empty input stayed invisible until
+# release run 34302850825 on ubuntu-22.04, where an empty answer about the destination alone
+# reached `aws s3 cp` over a published version. Reproduced by hand, then made a case.
+for scenario in target-empty target-truncated; do
+  seed_state
+  run_case "$scenario" "$scenario" "$PUBLISHER" --publish 1 0 'is not a listing this can act on'
+done
+
 echo '--- E. the impostor: everything looks empty, including what is not'
 # The scenario the pre-fix code could not tell from success, and the only one a checker reading
 # exit codes alone still cannot: every listing succeeds and every listing says nothing is there.
@@ -403,16 +417,17 @@ fi
 
 # ---- 3. two guards, in opposite directions.
 
-[ "$cases_run" -ge 21 ] || die "only $cases_run cases ran; the scenario table has lost rows"
+[ "$cases_run" -ge 23 ] || die "only $cases_run cases ran; the scenario table has lost rows"
 [ "$writes_seen" -eq 1 ] \
   || die "$writes_seen write call(s) across the fixed publisher's cases, expected exactly 1"
 
 cat <<EOF
 ok: $cases_run cases. One verified-empty destination reached an upload and put $DIST_FILES files
     there; every other answer - occupied, denied, denied without a word, throttled, unreachable,
-    nine malformed shapes, an all-empty impostor and six unusable version strings - made zero write
-    calls and left the $SEEDED published objects byte-identical. The pre-fix one-liner, same fake
-    and same harness, uploaded over a published version on two of them.
+    eleven malformed shapes, two of which answered only the destination badly and left the
+    positive control satisfied, an all-empty impostor and six unusable version strings - made zero
+    write calls and left the $SEEDED published objects byte-identical. The pre-fix one-liner, same
+    fake and same harness, uploaded over a published version on two of them.
 not proved here: that R2 answers a listing in the shape this fake returns, which needs a real
     dispatch or tag; that an interrupted upload leaves a recoverable version, which is R.0b; and
     the window between the check and the first byte, which the workflow's serialised concurrency
