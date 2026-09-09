@@ -165,19 +165,29 @@ Approve? [y/N]
 
   <p class="caption">Five lines, and the third one is the reason the other four are worth typing: it checks the archive against a hash published beside it and stops if they disagree. Each binary is a single native file, so nothing needs .NET on your machine. macOS on Apple Silicon:</p>
 
+<!-- install:macos -->
 <pre>curl -fLO https://dl.keypaste.com/v0.1.0/keypaste-0.1.0-osx-arm64.tar.gz
 curl -fLO https://dl.keypaste.com/v0.1.0/keypaste-0.1.0-osx-arm64.tar.gz.sha256
 shasum -a 256 -c keypaste-0.1.0-osx-arm64.tar.gz.sha256
 tar -xzf keypaste-0.1.0-osx-arm64.tar.gz
 mkdir -p ~/.local/bin &amp;&amp; mv keypaste keypaste-mcp ~/.local/bin/</pre>
+<!-- /install:macos -->
+
+  <p class="caption"><b>macOS 13 or later</b> — that floor is what .NET 10 supports rather than a version
+     this project has measured, so no run backs this floor.</p>
 
   <p class="caption">Linux x64 — substitute <code>linux-arm64</code> for arm64:</p>
 
+<!-- install:linux -->
 <pre>curl -fLO https://dl.keypaste.com/v0.1.0/keypaste-0.1.0-linux-x64.tar.gz
 curl -fLO https://dl.keypaste.com/v0.1.0/keypaste-0.1.0-linux-x64.tar.gz.sha256
 sha256sum -c keypaste-0.1.0-linux-x64.tar.gz.sha256
 tar -xzf keypaste-0.1.0-linux-x64.tar.gz
 mkdir -p ~/.local/bin &amp;&amp; mv keypaste keypaste-mcp ~/.local/bin/</pre>
+<!-- /install:linux -->
+
+  <p class="caption"><b>glibc 2.35 or later</b> — Debian 12, Ubuntu 22.04 and newer. The release workflow runs
+     the x64 binary on a clean Debian 12 and requires Alpine to refuse it; the equivalent container check is not implemented for arm64.</p>
 
   <p class="caption">Windows, Intel Macs, Alpine and building from source are in the <a href="https://github.com/notinferred/keypaste#install">README</a>. There is deliberately no <code>curl | sh</code>: it asks you to run code you have not read, from an origin that is not the repository. And the checksum proves the bytes arrived intact, not who made them — it is served from the same origin as the archive, so anyone who can replace one can replace both. The binaries are unsigned. Building from source is strictly stronger and is documented permanently.</p>
 
