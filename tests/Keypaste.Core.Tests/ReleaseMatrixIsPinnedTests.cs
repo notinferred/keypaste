@@ -164,6 +164,33 @@ public sealed class ReleaseMatrixIsPinnedTests
     }
 
     /// <summary>
+    /// The guard asks R2 whether the credentials work, rather than whether three variables are set.
+    /// </summary>
+    /// <remarks>
+    /// D-0111's sibling and the DECISIONS idea it closes: presence is not authentication, and a
+    /// stale credential restored into a replaced repository looks identical to a working one until
+    /// the publish job runs — four NativeAOT builds after the tag was spent. <c>--check</c> writes
+    /// nothing and refuses unless its positive control sees objects at an already-published prefix,
+    /// so it separates "reaches keypaste's bucket" from "reaches a bucket". Deleting the call puts
+    /// that question back behind the tag.
+    /// </remarks>
+    [Fact]
+    public void TheGuard_AsksR2WhetherTheCredentialsWorkBeforeAnythingIsBuilt()
+    {
+        var guard = Code(JobBlock(RepositoryFile(".github", "workflows", "release.yml"), "guard"));
+
+        Assert.Contains("scripts/publish-release.sh --check", guard, StringComparison.Ordinal);
+
+        // The credentials have to reach the step, or the check answers about an empty environment.
+        Assert.Contains("R2_ACCESS_KEY_ID", guard, StringComparison.Ordinal);
+        Assert.Contains("R2_SECRET_ACCESS_KEY", guard, StringComparison.Ordinal);
+        Assert.Contains("R2_ACCOUNT_ID", guard, StringComparison.Ordinal);
+
+        Assert.DoesNotContain("continue-on-error", guard, StringComparison.Ordinal);
+    }
+
+
+    /// <summary>
     /// The three decisions a tag used to be the first thing to execute call their scripts, and the
     /// fixture that drives those scripts runs where a push reaches it.
     /// </summary>
