@@ -4,9 +4,11 @@
 
 Versions are the ones published at `https://dl.keypaste.com/v<version>/`. Every release carries a `SHA256SUMS` file and a per-asset `.sha256`, plus the corresponding source for that tag. The published CLI/MCP binaries are unsigned and un-notarized (O-0010); there is no public desktop release. The [release contract](docs/RELEASE.md) records the platform matrix and the requirements for an installed, publicly available release.
 
-## Unreleased
+## 0.2.0-rc.1
 
-These changes are available in source on `main`, **not in the `v0.1.0` downloads**. The source version still reports `0.1.0`; its version string alone does not identify the published bytes.
+**A candidate, not a download.** Everything below has been on `main` since `0.1.0` and none of it is in the `v0.1.0` archives. This tag exists to run the release pipeline over the parts only a tag reaches — the desktop build's prerelease version, the matrices both workflows derive from the release definition, and the publish job — rather than to be installed. The README and keypaste.com keep naming `0.1.0`. This one exists in the open at its own URL and nothing links it.
+
+**An agent that says hello and asks in the same breath is no longer told it never said hello.** An MCP client may send its handshake and its first request together without waiting in between, and several do. On macOS the request could overtake the handshake it followed, and keypaste answered it "called before the initialize handshake completed" — a refusal written for a client that had introduced itself to nobody, handed to one that had. keypaste now waits a moment for an identity already on its way. What it still will not do is answer for a client it cannot name: one that sent nothing waits out the same moment and is still refused.
 
 **The download pages now say which machines the binaries are for.** Every advertised target
 carries an OS floor — glibc 2.35 on Linux, macOS 13 or later, Windows 10 1809 or later — and, where

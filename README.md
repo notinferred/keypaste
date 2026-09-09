@@ -27,7 +27,7 @@ Approve? [y/N]
 - **Standard KDBX, not a new format.** Everything keypaste writes opens in KeePassXC and KeePass — proved in both directions against a real `keepassxc-cli` on Linux, macOS and Windows on every push to `main` and every pull request. If keypaste disappears tomorrow, your data doesn't.
 - **Open source, AGPL.** Auditable by anyone, forever. A tool that handles secrets shouldn't ask to be trusted on faith.
 
-**Pre-1.0.** The download below is **CLI/MCP `v0.1.0`**. Current `main` also includes `keypaste setup` and the fixes under [Unreleased](CHANGELOG.md#unreleased); those changes require a source build. The desktop app browses and edits the same vaults but has no public release ([desktop guide](docs/desktop.md)), and credential approvals still happen in the terminal. The [release contract and platform matrix](docs/RELEASE.md) distinguish source, packaged artifacts and public installs. [STEPS](docs/STEPS.md) is the delivery plan; [PRODUCT](docs/PRODUCT.md) defines the product commitments.
+**Pre-1.0.** The download below is **CLI/MCP `v0.1.0`**. Current `main` also includes `keypaste setup` and the fixes under [0.2.0-rc.1](CHANGELOG.md#020-rc1); those changes require a source build. The desktop app browses and edits the same vaults but has no public release ([desktop guide](docs/desktop.md)), and credential approvals still happen in the terminal. The [release contract and platform matrix](docs/RELEASE.md) distinguish source, packaged artifacts and public installs. [STEPS](docs/STEPS.md) is the delivery plan; [PRODUCT](docs/PRODUCT.md) defines the product commitments.
 
 ## Install
 
