@@ -44,6 +44,7 @@ on:
       - 'Directory.Build.props'
       - 'Directory.Packages.props'
       - 'keypaste.app.slnx'
+      - 'release-targets.json'
       - '.github/workflows/app.yml'
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
@@ -164,11 +165,35 @@ jobs:
       - name: Restore (locked)
         run: dotnet restore keypaste.app.slnx --locked-mode
 
+      # A prerelease tag names a version the props file does not carry: Directory.Build.props holds
+      # 0.2.0 and the tag is v0.2.0-rc.1. release.yml has always derived that suffix and passed it
+      # (:232-235); this workflow did not, so every prerelease built a binary reporting the bare
+      # version and then failed its own tag check below - which meant no desktop release candidate
+      # could be built at all, and 4.7a needs one. Same derivation as release.yml's guard, kept
+      # here rather than shared because these two workflows do not run together.
+      - name: Resolve the prerelease suffix this build must carry
+        id: suffix
+        shell: bash
+        run: |
+          set -euo pipefail
+          suffix=""
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            tag="${GITHUB_REF_NAME#v}"
+            case "$tag" in *-*) suffix="${tag#*-}" ;; esac
+          fi
+          echo "suffix=$suffix" >> "$GITHUB_OUTPUT"
+          echo "prerelease suffix: ${suffix:-<none>}"
+
       - name: Publish
-        run: >-
-          dotnet publish src/Keypaste.App/Keypaste.App.csproj
-          -c Release -r ${{ matrix.rid }} --self-contained
-          --no-restore -o artifacts/app/${{ matrix.rid }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          args="-c Release -r ${{ matrix.rid }} --self-contained"
+          args="$args --no-restore -o artifacts/app/${{ matrix.rid }}"
+          if [ -n "${{ steps.suffix.outputs.suffix }}" ]; then
+            args="$args -p:VersionSuffix=${{ steps.suffix.outputs.suffix }}"
+          fi
+          dotnet publish src/Keypaste.App/Keypaste.App.csproj $args
 
       # Avalonia draws with Skia rather than hosting a browser engine, so what has to be present is
       # the Skia and HarfBuzz natives for this RID. A publish that quietly produced none of them

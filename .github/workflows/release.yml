@@ -127,7 +127,7 @@ jobs:
         if: github.ref_type == 'tag'
         shell: bash
         run: |
-          grep -qF "## ${{ steps.v.outputs.version }}" CHANGELOG.md \
+          grep -qxF -- "## ${{ steps.v.outputs.version }}" CHANGELOG.md \
             || { echo "::error::CHANGELOG.md has no '## ${{ steps.v.outputs.version }}' section"; exit 1; }
 
       # Everything the publish job needs, checked here instead of there.
