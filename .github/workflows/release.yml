@@ -87,11 +87,12 @@ jobs:
           suffix=""
           case "$tag" in *-*) suffix="${tag#*-}";; esac
 
-          prefix="$(dotnet msbuild src/Keypaste.Cli/Keypaste.Cli.csproj -getProperty:VersionPrefix -nologo | tr -d '[:space:]')"
-          if [ "$publish" = "true" ] && [ "$base" != "$prefix" ]; then
-            echo "::error::tag $GITHUB_REF_NAME says $base but Directory.Build.props says $prefix"
-            echo "::error::the tag names the version, it does not set it - fix VersionPrefix or the tag"
-            exit 1
+          # D-0041: the tag names the version, it does not set it. The comparison is
+          # scripts/require-tag-matches-source.sh because on a dispatch publish=false used to
+          # short-circuit it, which made it a refusal nothing had ever run (D-0109). A fixture runs
+          # it now; the suffix is deliberately not compared, since adding one is what a candidate is.
+          if [ "$publish" = "true" ]; then
+            scripts/require-tag-matches-source.sh "$GITHUB_REF_NAME"
           fi
 
           echo "version=$tag"   >> "$GITHUB_OUTPUT"
@@ -147,12 +148,13 @@ jobs:
 
       # docs/PRODUCT.md law 4.7 pairs small releases with real changelogs. Making the release depend on the
       # entry existing is what turns that from an intention into a rule.
+      # docs/PRODUCT.md law 4.7 pairs small releases with real changelogs; D-0041 made that a gate
+      # and D-0109 moved it where a fixture can reach it. The match is whole-line: an unanchored one
+      # took a `## 0.2.0-rc.1` heading for `## 0.2.0`.
       - name: Check CHANGELOG.md has a section for this version
         if: github.ref_type == 'tag'
         shell: bash
-        run: |
-          grep -qxF -- "## ${{ steps.v.outputs.version }}" CHANGELOG.md \
-            || { echo "::error::CHANGELOG.md has no '## ${{ steps.v.outputs.version }}' section"; exit 1; }
+        run: scripts/require-changelog-section.sh "${{ steps.v.outputs.version }}"
 
       # Everything the publish job needs, checked here instead of there.
       #
@@ -194,6 +196,10 @@ jobs:
       # an assumption only a real tag can reach is tested for the first time far too late.
       # --with-real-aws adds the phase that asks this runner's actual AWS CLI how it fails, so the
       # fake cannot quietly become fiction.
+      - name: Verify the release preflight refuses a release that is not whole
+        shell: bash
+        run: scripts/verify-release-preflight.sh
+
       - name: Verify the green-gate check refuses a commit whose gates are not green
         shell: bash
         run: scripts/verify-green-gates.sh
@@ -484,6 +490,11 @@ jobs:
       # The checksums were computed on four different machines and travelled through artifact
       # storage to get here. Re-checking them on this one is the control against a corrupted
       # upload, which is otherwise completely invisible.
+      # The checksums were computed on four different machines and travelled through artifact
+      # storage to get here. Re-checking them on this one is the control against a corrupted
+      # upload, which is otherwise completely invisible. How MANY assets there should be is not
+      # asked here: require-release-assets.sh owns that, against the definition and against what
+      # has already been published, and one owner per question is the point of R.0a.
       - name: Re-verify every checksum on this machine
         shell: bash
         run: |
@@ -491,28 +502,10 @@ jobs:
           cd dist
           ls -l
           shopt -s nullglob
-          n=0
           for f in *.sha256; do
             sha256sum -c "$f" || { echo "::error::checksum mismatch for $f after transport"; exit 1; }
-            n=$((n+1))
           done
-          # Two numbers from two places, because one would not catch the edit that matters. The
-          # equality is against what release-targets.json advertises today; the floor is the largest
-          # set any release has ALREADY published, which is a fact about history an edit to the
-          # advertised list cannot reach. Drop a target from the definition and the first still
-          # agrees with the matrix - the second does not.
-          defn="$GITHUB_WORKSPACE/release-targets.json"
-          want="$(jq -r '.components.cli.targets | length' "$defn")"
-          floor="$(jq -r '[.published[] | select(.component == "cli") | .rids | length] | max' "$defn")"
-          case "$want" in ''|*[!0-9]*) echo "::error::release-targets.json gave no target count"; exit 1 ;; esac
-          case "$floor" in ''|*[!0-9]*) echo "::error::release-targets.json gave no published floor"; exit 1 ;; esac
-          [ "$n" -eq "$want" ] \
-            || { echo "::error::built $n assets, release-targets.json advertises $want"; exit 1; }
-          [ "$n" -ge "$floor" ] \
-            || { echo "::error::built $n assets; $floor were already published and a release cannot shrink"; exit 1; }
 
-      # AGPL-3.0 section 6: conveying object code obliges the corresponding source to every
-      # recipient. Publishing it beside the binaries, from the same place, is option (d).
       - name: Build the corresponding-source tarball
         shell: bash
         run: |
@@ -547,72 +540,20 @@ jobs:
       # release. A stray vault fixture, a build log, a core dump or an .env picked up by a future
       # edit to the packaging step would otherwise be pushed to a public origin silently.
       # ---------------------------------------------------------------------
-      - name: Refuse to publish anything that is not a release asset
-        shell: bash
-        run: |
-          set -euo pipefail
-          # dotglob is load-bearing, not tidiness. Bash's * skips dotfiles but `aws s3 cp
-          # --recursive` uploads them, so without this a .env in dist/ walks past the allowlist
-          # and onto a public bucket - the exact file this check exists to stop. Observed: the
-          # first version of this step passed a planted .env.production.
-          # The expected names come from release-targets.json's archive_pattern rather than from a
-          # list written out here, so adding a target cannot leave this step quietly refusing it.
-          defn="$GITHUB_WORKSPACE/release-targets.json"
-          archives="$(jq -r --arg v "$VERSION" '
-            .components.cli as $c
-            | $c.targets[]
-            | . as $t
-            | $c.archive_pattern
-            | split("{version}") | join($v)
-            | split("{rid}")     | join($t.rid)
-            | split("{ext}")     | join($t.archive)
-          ' "$defn")"
-          [ -n "$archives" ] || { echo "::error::release-targets.json named no archives"; exit 1; }
-          expected="$(printf '%s\n%s\n%s\n' \
-            "$archives" "keypaste-${VERSION}-source.tar.gz" "SHA256SUMS")"
-
-          shopt -s dotglob nullglob
-          cd dist
-          bad=0
-
-          # Nothing unexpected leaves for the bucket.
-          for f in *; do
-            case "$f" in
-              *.sha256)
-                base="${f%.sha256}"
-                [ -f "$base" ] || { echo "::error::$f has no asset beside it"; bad=1; }
-                ;;
-              *)
-                printf '%s\n' "$expected" | grep -qxF -- "$f" \
-                  || { echo "::error::$f is not a release asset and must not be published"; bad=1; }
-                ;;
-            esac
-            [ -f "$f" ] || { echo "::error::$f is not a regular file"; bad=1; }
-          done
-
-          # And nothing expected is missing. An allowlist on its own is perfectly happy with an
-          # empty directory, which is exactly what a matrix that expanded to nothing would hand it.
-          while IFS= read -r want; do
-            [ -n "$want" ] || continue
-            [ -f "$want" ] || { echo "::error::$want is advertised and was not built"; bad=1; }
-            [ -f "$want.sha256" ] || { echo "::error::$want has no checksum beside it"; bad=1; }
-          done < <(printf '%s\n' "$expected")
-
-          [ "$bad" -eq 0 ] || { echo "::error::refusing to upload to a public bucket"; exit 1; }
-          echo "every advertised asset is present and nothing else is:"; ls -1
-
-      # Versioned prefixes only, never a mutable "latest": the documented command names an exact
-      # version and an exact hash, and both must keep meaning what they meant when they were
-      # written. A tag nobody has been told about is this pipeline's equivalent of a draft.
+      # R.0a/D-0109. EVERYTHING BELOW THIS LINE BECOMES WORLD-READABLE: the bucket is served
+      # publicly at dl.keypaste.com with no authentication, so an object put there is published the
+      # moment it lands and cannot be unpublished from anyone who already fetched it. The upload is
+      # recursive over dist/, so the safety of the next step rests entirely on nothing unexpected
+      # being in that directory.
       #
-      # A published version is immutable, and for two releases that was only a comment: the check
-      # in front of this upload asked `aws s3 ls` and treated an empty answer as an empty
-      # destination, so a denied listing, an unreachable endpoint or a throttle all read as
-      # "nothing is there" and fell through to a recursive overwrite of bytes readers had already
-      # been handed a checksum for. That decision is now scripts/publish-release.sh, which refuses
-      # everything it cannot positively verify, and which a fixture can drive with no credential
-      # (F.4a). The check and the upload are in one file on purpose: "only a verified-empty
-      # destination reaches upload" is not a claim any test can make about a step body.
+      # That decision is scripts/require-release-assets.sh, and scripts/verify-release-preflight.sh
+      # drives it on every push: a stray dotfile, a missing target, a corrupt archive, a checksum
+      # with no asset and an asset with no checksum each refuse there before they can happen here.
+      # It was three step bodies only a tag ever ran.
+      - name: Refuse to publish anything that is not a whole release
+        shell: bash
+        run: scripts/require-release-assets.sh "$VERSION" dist
+
       - name: Upload to R2
         shell: bash
         env:

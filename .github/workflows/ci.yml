@@ -102,6 +102,10 @@ jobs:
       # install.yml runs that half weekly.
       # The tag guard's decision, driven by a fake gh. It runs here because release.yml's guard
       # only reaches it on a tag, which is the shape of defect F.4a cost two releases.
+      - name: Verify the release preflight refuses a release that is not whole
+        shell: bash
+        run: scripts/verify-release-preflight.sh
+
       - name: Verify the green-gate check refuses a commit whose gates are not green
         shell: bash
         run: scripts/verify-green-gates.sh

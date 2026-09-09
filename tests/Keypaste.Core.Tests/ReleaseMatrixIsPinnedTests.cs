@@ -164,6 +164,36 @@ public sealed class ReleaseMatrixIsPinnedTests
     }
 
     /// <summary>
+    /// The three decisions a tag used to be the first thing to execute call their scripts, and the
+    /// fixture that drives those scripts runs where a push reaches it.
+    /// </summary>
+    /// <remarks>
+    /// D-0109. Each of these was a step body behind a tag gate, so its refusing direction had never
+    /// run. Inlining any of them again would put it back out of reach, and a fixture nothing runs
+    /// would prove nothing — so both halves are asserted, the same way the green-gate pair is.
+    /// </remarks>
+    [Fact]
+    public void TheTagOnlyDecisions_AreScriptsAndTheirFixtureRunsOnEveryPush()
+    {
+        var release = RepositoryFile(".github", "workflows", "release.yml");
+
+        Assert.Contains("scripts/require-changelog-section.sh", release, StringComparison.Ordinal);
+        Assert.Contains("scripts/require-tag-matches-source.sh", release, StringComparison.Ordinal);
+        Assert.Contains("scripts/require-release-assets.sh", release, StringComparison.Ordinal);
+
+        Assert.Contains(
+            "scripts/verify-release-preflight.sh",
+            RepositoryFile(".github", "workflows", "ci.yml"),
+            StringComparison.Ordinal);
+
+        // The publication allowlist is the one that decides what becomes world-readable, so it is
+        // named here rather than left to the blanket check above.
+        var publish = Code(JobBlock(release, "publish"));
+        Assert.Contains("scripts/require-release-assets.sh", publish, StringComparison.Ordinal);
+        Assert.DoesNotContain("continue-on-error", publish, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// The required set is derived from the definition, and app.yml is in it today.
     /// </summary>
     [Fact]
