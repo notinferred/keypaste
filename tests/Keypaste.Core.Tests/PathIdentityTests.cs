@@ -155,9 +155,14 @@ public sealed class PathIdentityTests : IDisposable
     [Fact]
     public void APathWhoseAncestorsDoNotExist_IsItsOwnLexicalForm()
     {
-        var nowhere = Path.Combine(_directory, "no", "such", "place", ".env");
+        var missing = Path.Combine("no", "such", "place", ".env");
 
-        Assert.Equal(nowhere, PathIdentity.Canonical(nowhere));
+        // Against the resolved fixture directory, not the spelling it was handed: macOS puts a
+        // temporary directory under /var, which is a link to /private/var, so the deepest existing
+        // ancestor legitimately resolves and only the part below it is the lexical claim here.
+        Assert.Equal(
+            Path.Combine(PathIdentity.Canonical(_directory), missing),
+            PathIdentity.Canonical(Path.Combine(_directory, missing)));
     }
 
     [Fact]
