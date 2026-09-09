@@ -84,6 +84,55 @@ public sealed class ReleaseMatrixIsPinnedTests
         }
     }
 
+    /// <summary>
+    /// The job that emits a matrix refuses to emit an empty one.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is the fail-open the whole derived-matrix design rests on, and nothing else catches it.
+    /// <c>fromJSON</c> of an empty array expands to zero legs; GitHub then <em>skips</em> the build
+    /// job, skips <c>publish</c> through <c>needs:</c>, and reports the workflow <b>green</b> — a
+    /// release that built nothing and said so nowhere.
+    /// </para>
+    /// <para>
+    /// <c>verify-release-matrix.sh</c> cannot hold this. It judges the definition, and a definition
+    /// with no targets is exactly what it refuses; but the workflow step that reads a <em>valid</em>
+    /// definition and emits its matrix is a step body, and no fixture can drive one. Deleting those
+    /// four lines from <c>release.yml</c> leaves the gate at exit 0 and every other test passing,
+    /// which is measured rather than assumed — see the R.0a evidence in docs/STEPS.md.
+    /// </para>
+    /// <para>
+    /// Asserted on the error text rather than on the shell, because the shape of the check may
+    /// reasonably change and its refusal may not. D-0106's rule is the thing being protected: the
+    /// count must be digits, not a truthy exit status.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void EveryJobThatEmitsAMatrix_RefusesToEmitAnEmptyOne()
+    {
+        foreach (var workflow in new[] { "release.yml", "app.yml" })
+        {
+            var text = RepositoryFile(".github", "workflows", workflow);
+
+            Assert.True(
+                text.Contains("fromJSON", StringComparison.Ordinal),
+                $"{workflow} no longer derives its matrix; this test guards the derivation.");
+
+            Assert.True(
+                text.Contains("did not answer with a target count", StringComparison.Ordinal),
+                $"{workflow} emits a matrix without requiring the count to be digits. An empty "
+                + "matrix makes GitHub skip the job, skip what needs: it, and report the workflow "
+                + "green. Restore the `case \"$n\" in ''|*[!0-9]*)` guard in its targets step.");
+        }
+
+        // release.yml alone also refuses a definition that parses but advertises nothing, because
+        // it is the workflow that publishes.
+        Assert.Contains(
+            "advertises no cli targets",
+            RepositoryFile(".github", "workflows", "release.yml"),
+            StringComparison.Ordinal);
+    }
+
     [Fact]
     public void TheGate_KeepsTheChecksThatMakeItRefuse()
     {
