@@ -229,6 +229,14 @@ public sealed class ReleaseMatrixIsPinnedTests
         // A history it cannot read must never read as a clean one.
         Assert.Contains("fetch-depth: 0", gate, StringComparison.Ordinal);
 
+        // A reader that exits early cannot decide whether a workflow contains a string: `grep -q`
+        // returns at its first match, the upstream still writing takes SIGPIPE, and pipefail makes
+        // a present string absent. Guard run 34400224237 refused this repository over a changelog
+        // lookup release.yml has never stopped making. Restoring the pipe is the edit this catches.
+        Assert.Contains("code_has", gate, StringComparison.Ordinal);
+        Assert.DoesNotContain("code_of \"$release\" | grep -q", gate, StringComparison.Ordinal);
+        Assert.DoesNotContain("code_of \"$root/$workflow\" | grep -q", gate, StringComparison.Ordinal);
+
         // The cases that each earn their keep, named individually: every one of them is the whole
         // reason a different rule in the definition exists.
         foreach (var fixture in new[]
@@ -242,6 +250,7 @@ public sealed class ReleaseMatrixIsPinnedTests
                      "signing-disclosure-deleted",        // "unsigned" removed while it is true
                      "csproj-and-definition-disagree",
                      "target-nothing-else-declares",
+                     "race.yml",                          // the early-exit reader, put back
                  })
         {
             Assert.Contains(fixture, gate, StringComparison.Ordinal);

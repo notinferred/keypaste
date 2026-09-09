@@ -113,6 +113,19 @@ json_array() { jqr "$2 // empty | .[]" "$1" 2>/dev/null || true; }
 # asserted present.
 code_of() { grep -vE '^[[:space:]]*#' "$1" | noc; }
 
+# Asks whether a workflow's code contains a string, WITHOUT a pipe to a reader that exits early.
+# `grep -q` returns at its first match, and under `set -o pipefail` an upstream still writing into
+# that closed pipe makes the pipeline 141 - so a string that IS present reads as absent, and which
+# answer you get depends on who lost the race. Guard run 34400224237 reported that release.yml
+# "no longer looks a version up in CHANGELOG.md at all" while ci run 34391428689 read the same
+# commit correctly. `case` is what holds() already uses and starts no process to race with.
+code_has() {
+  local body
+  body="$(code_of "$1")"
+  case "$body" in *"$2"*) return 0 ;; esac
+  return 1
+}
+
 # Space-delimited membership, so "$rid" never matches a longer neighbour.
 holds() {
   local haystack=" $1 " needle="$2"
@@ -561,8 +574,8 @@ validate_prerelease_path() {
   for c in $(jqr '.components | keys[]' "$def"); do
     workflow="$(jqr ".components.\"$c\".workflow" "$def")"
     [ -f "$root/$workflow" ] || continue
-    code_of "$root/$workflow" | grep -qF -- "-p:VersionSuffix=" \
-      || note "$workflow never passes -p:VersionSuffix=, so a prerelease tag cannot build its own version"
+    code_has "$root/$workflow" "-p:VersionSuffix=" ||
+      note "$workflow never passes -p:VersionSuffix=, so a prerelease tag cannot build its own version"
   done
 
   # The changelog lookup the release runs, held to a whole-line match for the reason above.
@@ -576,7 +589,7 @@ validate_prerelease_path() {
   release="$root/.github/workflows/release.yml"
   check="$root/scripts/require-changelog-section.sh"
   if [ -f "$release" ]; then
-    if ! code_of "$release" | grep -qF "require-changelog-section.sh"; then
+    if ! code_has "$release" "require-changelog-section.sh"; then
       note "release.yml no longer looks a version up in CHANGELOG.md at all"
     elif [ ! -f "$check" ]; then
       note "release.yml calls require-changelog-section.sh and there is no such script"
@@ -584,7 +597,7 @@ validate_prerelease_path() {
       lookup="$(code_of "$check" | grep -F "CHANGELOG" | grep -F "grep " || true)"
       if [ -z "$lookup" ]; then
         note "require-changelog-section.sh no longer greps the changelog for anything"
-      elif ! printf "%s" "$lookup" | grep -qF -- "-qxF"; then
+      elif case "$lookup" in *"-qxF"*) false ;; *) true ;; esac; then
         note "the changelog lookup is not a whole-line match; '## 0.2.0' would accept a '## 0.2.0-rc.1' heading"
       fi
     fi
@@ -912,6 +925,33 @@ else
   echo "::error::the condition the gate exists to catch (D-0043)."
   exit 1
 fi
+
+# ---------------------------------------------------------------------------
+# 7b. NEGATIVE CONTROL. The reader that exits early, put back.
+#
+#    Not a taste question and not a hypothetical: guard run 34400224237 refused this repository
+#    for a changelog lookup release.yml has never stopped making, while ci run 34391428689 read
+#    the same commit correctly an hour earlier. `grep -q` returns at its first match and the
+#    upstream, still writing, takes SIGPIPE; `pipefail` then makes the pipeline 141 and a present
+#    string reads as absent. Which answer a run gets depends on who lost the race, so the fixture
+#    forces the losing side: the needle is on line 1 and the remainder is far past any pipe buffer.
+#    If the old shape FINDS it here, this control is not reproducing the condition and proves
+#    nothing (D-0043).
+# ---------------------------------------------------------------------------
+RACE="$WORK/race.yml"
+{
+  echo "        run: scripts/require-changelog-section.sh"
+  awk 'BEGIN { for (i = 0; i < 20000; i++) print "  key" i ": value" }'
+} > "$RACE"
+
+if code_of "$RACE" | grep -qF "require-changelog-section.sh"; then
+  die "the early-exit reader found a string 20000 lines above its own exit; this control is not
+reproducing the race it exists for, so nothing here shows why code_has does not use a pipe"
+fi
+echo "  the early-exit reader reports a present string as absent, which is the run 34400224237 saw"
+
+code_has "$RACE" "require-changelog-section.sh"   || die "code_has missed a string that is in the file; the repair does not work"
+echo "  code_has reads the text first and finds it, so the answer no longer depends on a race"
 
 # ---------------------------------------------------------------------------
 # 8. The verdict.
