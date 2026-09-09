@@ -61,7 +61,11 @@
           "floor_evidence": "unverified",
           "floor_caveat": "the equivalent container check is not implemented for arm64",
           "install_check": null,
-          "install_check_absent": "verify-install.sh takes linux|macos|windows and has no arm64 runner; README.md tells the reader to substitute the filename. 3.9d and R.0c own closing this."
+          "install_check_absent": "verify-install.sh takes linux|macos|windows and has no arm64 runner; README.md tells the reader to substitute the filename. 3.9d and R.0c own closing this.",
+          "advertised_on": [
+            "README.md",
+            "site/public/index.html"
+          ]
         },
         {
           "rid": "osx-arm64",
@@ -69,14 +73,16 @@
           "archive": "tar.gz",
           "cpu": "arm64",
           "advertised": true,
-          "os_floor": null,
-          "floor_evidence": "none",
+          "os_floor": "macOS 13 or later",
+          "floor_evidence": "cited",
           "install_check": "macos",
           "advertised_on": [
             "README.md",
             "site/public/index.html"
           ],
-          "install_runner": "macos-15"
+          "install_runner": "macos-15",
+          "floor_citation": "https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md",
+          "floor_caveat": "no run backs this floor"
         },
         {
           "rid": "win-x64",
@@ -84,13 +90,15 @@
           "archive": "zip",
           "cpu": "x64",
           "advertised": true,
-          "os_floor": null,
-          "floor_evidence": "none",
+          "os_floor": "Windows 10 1809 or later",
+          "floor_evidence": "cited",
           "install_check": "windows",
           "advertised_on": [
             "README.md"
           ],
-          "install_runner": "windows-2025"
+          "install_runner": "windows-2025",
+          "floor_citation": "https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md",
+          "floor_caveat": "no run backs this floor"
         }
       ]
     },

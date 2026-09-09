@@ -8,6 +8,15 @@ Versions are the ones published at `https://dl.keypaste.com/v<version>/`. Every 
 
 These changes are available in source on `main`, **not in the `v0.1.0` downloads**. The source version still reports `0.1.0`; its version string alone does not identify the published bytes.
 
+**The download pages now say which machines the binaries are for.** Every advertised target
+carries an OS floor — glibc 2.35 on Linux, macOS 13 or later, Windows 10 1809 or later — and, where
+nothing has actually been run on that floor, says so in the same breath. Only the Linux x64 claim is
+backed by a run: the release workflow starts that binary on a clean Debian 12 and requires Alpine to
+refuse it. The macOS and Windows numbers are .NET 10's supported-OS floors rather than versions this
+project has measured, and the pages say that rather than implying otherwise. Nothing about the
+binaries changed; what changed is that a reader on an older machine can now find out before
+downloading instead of after.
+
 **A password you approved and never received is now said out loud, and it no longer costs you the
 rest of your approvals.** Some entries carry a long note — a certificate, a private key somebody
 pasted in, a page of instructions. If an agent asked for one of those and you said yes, keypaste

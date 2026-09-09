@@ -45,7 +45,7 @@ mkdir -p ~/.local/bin && mv keypaste keypaste-mcp ~/.local/bin/
 ```
 <!-- /install:macos -->
 
-Intel Macs have no published binary; build from source below. Native Intel runners are [available from GitHub](https://docs.github.com/en/actions/reference/runners/github-hosted-runners), but this project's release matrix does not yet build and test that target.
+**macOS 13 or later.** That floor is [what .NET 10 supports](https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md), not a version this project has measured: no run backs this floor, because no keypaste release has been installed on an older Mac and checked. Intel Macs have no published binary; build from source below. Native Intel runners are [available from GitHub](https://docs.github.com/en/actions/reference/runners/github-hosted-runners), but this project's release matrix does not yet build and test that target.
 
 ### Linux — x64 and arm64
 
@@ -73,6 +73,8 @@ if ((Get-FileHash $a -Algorithm SHA256).Hash -ne $want) { throw "checksum mismat
 Expand-Archive $a -DestinationPath .
 ```
 <!-- /install:windows -->
+
+**Windows 10 1809 or later.** That floor is [what .NET 10 supports](https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md), not a version this project has measured: no run backs this floor, because no keypaste release has been installed on an older Windows and checked.
 
 The Windows block stops after extracting rather than moving the binaries anywhere, because Windows has no per-user `bin` directory that is already on `PATH` the way `~/.local/bin` is on Unix. Put `keypaste.exe` wherever you keep such things and add that directory to `PATH` yourself. On macOS and Linux, `~/.local/bin` may also not be on your `PATH` — check with `command -v keypaste`.
 
