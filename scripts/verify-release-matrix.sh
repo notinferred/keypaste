@@ -103,6 +103,10 @@ count_of() {
 
 json_array() { jqr "$2 // empty | .[]" "$1" 2>/dev/null || true; }
 
+# A comment naming a flag is prose about it, not a use of it, and these headers quote the very flags
+# asserted present.
+code_of() { grep -vE '^[[:space:]]*#' "$1" | noc; }
+
 # Space-delimited membership, so "$rid" never matches a longer neighbour.
 holds() {
   local haystack=" $1 " needle="$2"
@@ -482,16 +486,26 @@ validate_prerelease_path() {
   for c in $(jqr '.components | keys[]' "$def"); do
     workflow="$(jqr ".components.\"$c\".workflow" "$def")"
     [ -f "$root/$workflow" ] || continue
-    grep -qF -- "-p:VersionSuffix=" "$root/$workflow" \
+    code_of "$root/$workflow" | grep -qF -- "-p:VersionSuffix=" \
       || note "$workflow never passes -p:VersionSuffix=, so a prerelease tag cannot build its own version"
   done
 
   # The changelog lookup the release runs, held to a whole-line match for the reason above.
+  #
+  # Scoped to the line that actually reads CHANGELOG.md, not to the file. Asking whether the string
+  # "grep -qxF" appears anywhere in release.yml passed for the wrong reason the moment the publish
+  # allowlist grew one of its own: the changelog lookup could then be weakened back to `grep -qF`
+  # and this stayed green. A check that names one thing and binds another is not a check.
   local release
   release="$root/.github/workflows/release.yml"
   if [ -f "$release" ]; then
-    grep -qF -- "grep -qxF" "$release" \
-      || note "release.yml's changelog lookup is not a whole-line match; '## 0.2.0' would accept a '## 0.2.0-rc.1' heading"
+    local lookup
+    lookup="$(code_of "$release" | grep -F "CHANGELOG.md" | grep -F "grep " || true)"
+    if [ -z "$lookup" ]; then
+      note "release.yml no longer looks a version up in CHANGELOG.md at all"
+    elif ! printf '%s\n' "$lookup" | grep -qF -- "-qxF"; then
+      note "release.yml's changelog lookup is not a whole-line match; '## 0.2.0' would accept a '## 0.2.0-rc.1' heading"
+    fi
   fi
 }
 
