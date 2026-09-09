@@ -44,9 +44,20 @@ core/CLI/bridge and release repairs; desktop release checks additionally require
 
 Two residuals are named rather than closed. **R2's actual reply to a listing is still unobserved**:
 the publish job runs on tags only, so no dispatch can reach it, and R.0b/R.0c own it. And the
-widened save-retry budget has one green Windows run behind it, not a proof — the failure was
-intermittent, and `ConcurrentRequestsTests.AfterTheFirstRequestResolves_AFreshRequestIsAskedNormally`
-timed out once on the same runner and has not been explained.
+widened save-retry budget has three green Windows runs behind it, not a proof, because the failure
+it addresses was intermittent to begin with.
+
+**The F.3b timeout on run 34303291945 is not the concurrency guarantee failing, and the difference
+was worth establishing rather than filing.** `ConcurrentRequestsTests.AfterTheFirstRequestResolves_AFreshRequestIsAskedNormally`
+timed out inside the *first* `HoldingAsync`, so `PromptlyAsync` — the assertion that catches a
+second request queued behind a prompt — never ran; the first request never reached the approver
+within its ten seconds. "Nothing was listening" is designed out: `ApproverListener` binds the pipe
+in its constructor precisely so a bridge started in the same breath cannot lose that race, and a
+failed connect refuses in 500ms rather than hanging. What remains is scheduling latency on a
+saturated runner, which is a hypothesis and is labelled one: **it has not been measured, and the
+same commit's save retry blocks a thread-pool thread with `Thread.Sleep` for up to 2.2 seconds
+(D-0107), so the two could interact.** Seen once in five Windows runs and not since, including
+twice after that budget grew. Re-open it on a second occurrence rather than widening a timeout.
 The first new user workflow is **4.8 — create a vault in the app**, followed by **4.9 — enter and
 edit an existing password or API value**. Dependencies below determine what can actually start.
 
