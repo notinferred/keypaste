@@ -167,8 +167,7 @@ public sealed record AuditArgs
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(reason);
 
-        // Prose, so the slashes survive here too. The comment below makes this exact argument
-        // for the entry; the reason is the same field one line up and was flattening the same way.
+        // Prose, so the slashes survive: a reason impersonates nothing.
         var excerpt = EntryNameSanitizer.SanitizeProse(reason, ReasonExcerptLength).Text;
 
         // Segment-wise, so the separators survive. An audit line whose whole job is to say *which

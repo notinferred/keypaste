@@ -146,12 +146,11 @@ public sealed class ApproverListener : IDisposable
         }
         catch (Exception)
         {
-            // A peer that went away, a frame over the limit, a pipe torn down under us - and
-            // anything the handler throws that this list used to miss. The filter was narrower than
-            // the set of things reachable from a peer's bytes, and ServeAsync is fire-and-forget, so
-            // whatever escaped surfaced at shutdown instead of here. One connection's problem, and
-            // never the approver's: this is the outermost boundary between a peer and the process
-            // holding the unlocked vault (law 3.7).
+            // A peer that went away, a frame over the limit, a pipe torn down under us, and anything
+            // else the handler throws: a narrower filter misses something reachable from a peer's
+            // bytes, and ServeAsync is fire-and-forget, so it surfaces at shutdown instead of here.
+            // One connection's problem and never the approver's — this is the outermost boundary
+            // between a peer and the process holding the unlocked vault (law 3.7).
         }
         finally
         {

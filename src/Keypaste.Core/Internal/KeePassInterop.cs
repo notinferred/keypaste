@@ -119,13 +119,9 @@ internal sealed class KeePassInterop : IDisposable
 
         PwEntry pwEntry = found.Entry;
 
-        // The existing PwEntry is mutated rather than removed and re-added. Re-adding would mint a
-        // new UUID and discard the entry's timestamps, attachments, and any custom string fields
-        // added in KeePassXC — data keypaste does not model and therefore must not destroy
-        // (docs/PRODUCT.md law 4.6).
-        //
-        // CreateBackup snapshots the pre-change state and trims the history list itself, so a
-        // separate MaintainBackups call would be dead code (third_party/KeePassLib/PwEntry.cs:584).
+        // Mutated rather than removed and re-added: re-adding mints a new UUID and discards
+        // timestamps, attachments and custom string fields keypaste does not model (law 4.6).
+        // CreateBackup trims the history list itself, so a separate MaintainBackups call is dead.
         pwEntry.CreateBackup(_database);
 
         SetField(pwEntry, PwDefs.TitleField, entry.Title);

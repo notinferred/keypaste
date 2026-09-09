@@ -91,11 +91,9 @@ internal sealed class ApproverEntryNameSource(ApproverConnection approver, Serve
             .ListAsync(new NamesRequest(options.Exposure.Globs), cancellationToken)
             .ConfigureAwait(false);
 
-        // Sharing the pipe with the credential path means sharing its one-at-a-time rule. A
-        // listing is not what anybody is looking at, but it cannot be sent while a request is on
-        // the wire, and refusing is the answer that does not queue.
-        // The refusals below say they are complete because they are: each returns before anything is
-        // rendered, so nothing was left out of anything. Saying otherwise would attach "some names
+        // Sharing the pipe with the credential path means sharing its one-at-a-time rule, and
+        // refusing is the answer that does not queue. The refusals below say they are complete
+        // because each returns before anything is rendered: saying otherwise would attach "some names
         // are missing" to an answer that never claimed to have any.
         if (outcome == ApproverOutcome.Busy)
         {

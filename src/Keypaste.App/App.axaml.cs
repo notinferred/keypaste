@@ -210,8 +210,6 @@ internal sealed partial class App : Application, IDisposable
 
     private void OnLocked(object? sender, VaultLockReason reason)
     {
-        // Every view that could have held vault-derived data leaves the tree rather than being
-        // hidden, so "locked" has exactly one meaning.
         Dispatcher.UIThread.Post(() =>
             ShowUnlock(Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable)));
     }

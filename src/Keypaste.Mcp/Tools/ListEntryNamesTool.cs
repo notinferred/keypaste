@@ -103,12 +103,9 @@ internal sealed class ListEntryNamesTool(
                 ToolResults.Refuse(listing.Reason));
         }
 
-        // The exposure is applied a second time on purpose: two things enforcing one rule, where a
-        // name either matches a glob or does not and the two cannot disagree (THREATS.md T-4).
-        // What is deliberately not here is a second *cap*. That was two things authoring one claim,
-        // and this side's was wrong in both directions — it called a vault of exactly a thousand
-        // in-scope entries truncated, and called a listing the approver had already cut short
-        // complete, because filtering some out moved the count off the boundary it compared to.
+        // The exposure is applied twice on purpose: two things enforcing one rule that cannot
+        // disagree (THREATS.md T-4). A second *cap* is deliberately absent — that was two things
+        // authoring one claim, and this side's was wrong in both directions.
         var exposed = new List<EntryName>();
         foreach (var name in listing.Names)
         {

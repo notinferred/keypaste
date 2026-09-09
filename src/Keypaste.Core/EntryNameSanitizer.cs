@@ -148,12 +148,10 @@ public static class EntryNameSanitizer
                 continue;
             }
 
-            // Replaced with a space, never deleted. Deleting is the obvious choice and it is
-            // wrong: "ig\0nore" would delete to "ignore", so splitting a word with control
-            // characters would make the sanitizer reassemble it. A space does not.
-            //
-            // Consecutive replacements collapse to one space, but two spaces the name really
-            // had are left alone, so an ordinary title is returned byte for byte.
+            // Replaced with a space, never deleted: deleting is the obvious choice and it is wrong,
+            // because "ig\0nore" would delete to "ignore" and the sanitizer would reassemble a word
+            // somebody split with control characters. Consecutive replacements collapse to one space
+            // but two real spaces are left alone, so an ordinary title returns byte for byte.
             if (!lastWasSpace)
             {
                 builder.Append(' ');

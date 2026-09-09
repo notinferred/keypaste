@@ -48,11 +48,9 @@ internal sealed class RequestCredentialTool(
         InputSchema = ToolSchemas.CredentialInput,
         Annotations = new ToolAnnotations
         {
-            // ReadOnlyHint is false, and that is deliberate rather than sloppy. Literally the tool
-            // only reads. But clients treat readOnlyHint as "safe to run without asking the user",
-            // and answering yes to that question about a credential release would invite exactly
-            // the auto-approval law 3.2 exists to prevent. Idempotent is false for the same reason:
-            // each call is a separate approval event, and must not look replayable.
+            // ReadOnlyHint is false although the tool only reads: clients treat it as "safe to run
+            // without asking the user", which is the auto-approval law 3.2 exists to prevent. Idempotent
+            // is false for the same reason — each call is a separate approval event.
             ReadOnlyHint = false,
             DestructiveHint = false,
             IdempotentHint = false,
@@ -113,12 +111,9 @@ internal sealed class RequestCredentialTool(
             }
         }
 
-        // The agent is told to prefer a handle, so for the ordinary request `entry` above is an
-        // opaque k1_… and an audit line that repeats it cannot answer the one question the log
-        // exists for. The approver resolved it against the unlocked vault and sent the name back in
-        // CredentialReply.Entry; until now nothing read it. Measured with real Claude Code, which
-        // sent a handle and produced a line reading `k1_6f91aa064e192942` where docs/demo.md
-        // promises `env/demo/STRIPE_KEY`.
+        // The agent is told to prefer a handle, so `entry` above is an opaque k1_… and an audit line
+        // repeating it cannot answer the question the log exists for. The approver resolved it
+        // against the unlocked vault and sent the name back in CredentialReply.Entry.
         if (verdict.ResolvedEntry is { Length: > 0 } resolved)
         {
             args = args with
@@ -217,12 +212,10 @@ internal sealed class RequestCredentialTool(
             },
             cancellationToken).ConfigureAwait(false);
 
-        // Checked after the exchange as well as before it, and this is the important one. A person
-        // can say yes in the moment between the client giving up and the reply arriving, and
-        // without this the bridge would record a grant — and return a credential — for a request
-        // nobody was waiting for. It is the same rule ApprovalGate applies to a late yes from a
-        // channel, one layer further out, and it is also why "no answer" is read as cancelled
-        // rather than as an approver failure: keypaste did not go wrong, the client left.
+        // Checked after the exchange as well as before, and this is the important one: a person can
+        // say yes between the client giving up and the reply arriving, and without this the bridge
+        // records a grant and returns a credential for a request nobody was waiting for. It is also
+        // why "no answer" is read as cancelled rather than as an approver failure.
         if (cancellationToken.IsCancellationRequested)
         {
             return new Verdict(AuditDecision.Denied, AuditMethod.Cancelled, "the client withdrew the request");
