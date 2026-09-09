@@ -54,6 +54,21 @@ Source routes are not promises of tested downloadable support. Minimum OS versio
 - [`verify-release-matrix.sh`](../scripts/verify-release-matrix.sh) holds `release-targets.json`, the workflows, the csprojs and the download pages to one answer, against nineteen fixture cases and a negative control. It runs in `ci.yml` and in `release.yml`'s guard. **It reads `site/public/index.html` at the checked-out ref, not what keypaste.com serves** — the site is deployed by hand with `wrangler deploy` and no workflow publishes it, so the live page can differ from a passing run. Verifying the public origin is requirement 4's job, and `install.yml` does the part of it that needs no credential.
 - [`install.yml`](../.github/workflows/install.yml) runs the README install blocks weekly or manually for Linux x64, macOS ARM64 and Windows x64. It checks the installed CLI version and presence of MCP. It does not cover Linux ARM64, the subsequent setup/use instructions, desktop installation or automatic post-publication verification. A retained successful run is required to claim its result for a specific release.
 
+## What only a tag reaches
+
+`release.yml` builds and verifies on `workflow_dispatch` and publishes nothing, which makes a dispatch a real rehearsal for most of it. These parts are not rehearsed, because they are gated on `github.ref_type == 'tag'` or on the publish job it sets. **This is the list to check first when something in a release surprises you, and the list to add to when a new decision goes behind a tag gate.** F.4a fell open for two releases for exactly this reason (D-0104), and R.0a's own tag guard was the second instance.
+
+| Gated on a tag | What it decides | Reachable another way? |
+|---|---|---|
+| Guard: the green-gates check | every required gate is green on the commit | **Yes, now.** The decision is [`require-green-gates.sh`](../scripts/require-green-gates.sh) and [`verify-green-gates.sh`](../scripts/verify-green-gates.sh) drives it through a fake `gh` in `ci.yml` and in the guard |
+| Guard: the changelog lookup | `grep -qxF "## <version>"`, whole-line since R.0a | No |
+| Guard: tag versus `VersionPrefix` | a tag that names a version the source does not | No — on a dispatch `publish=false` short-circuits the comparison |
+| Guard: the three R2 secrets | that they are set | No |
+| `app.yml`: the prerelease suffix | `-p:VersionSuffix` reaching the desktop binary, its version check and its archive name | No — a dispatch logs `prerelease suffix: <none>` |
+| Publish job, six steps | transported checksums, the source tarball, `SHA256SUMS` and its diff, the publication allowlist, the upload, the summary | No |
+
+Three of those are R.0a's own changes — the changelog lookup, the derived asset count and the derived allowlist — and a dispatch exercises none of them. The rule this suggests, stated rather than left to be rediscovered: **a decision that only a tag can reach belongs in a script a fixture can drive**, not in a step body.
+
 ## Requirements still to implement
 
 These are release requirements, **not capabilities of the current pipeline**. Track their implementation and evidence in STEPS.
