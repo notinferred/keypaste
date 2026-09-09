@@ -80,7 +80,7 @@ internal sealed class RequestCredentialTool(
         // Checked before anything is decided, but after the arguments have been read, so the line
         // still records what was asked for. A refusal that does not say what was wanted is a worse
         // audit record than the request deserves (law 3.3).
-        if (!McpAudit.HandshakeComplete(request))
+        if (!await McpAudit.HandshakeCompleteAsync(request, cancellationToken).ConfigureAwait(false))
         {
             verdict = new Verdict(
                 AuditDecision.Denied,
