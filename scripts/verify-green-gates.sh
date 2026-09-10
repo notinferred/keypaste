@@ -27,6 +27,15 @@
 # missing. If the weakened one refuses too, this gate proves nothing about the fix (D-0043).
 set -euo pipefail
 
+# The expected number is counted here rather than written down: a floor somebody raises by hand
+# falls behind as cases are added, and a case that stops being driven then passes as a smaller suite.
+readonly SELF="${BASH_SOURCE[0]}"
+declared_cases() {
+  local n
+  n="$(grep -cE '^[[:space:]]*run_case ' "$SELF" || true)"
+  case "$n" in "" | 0 | *[!0-9]*) echo "" ;; *) echo "$n" ;; esac
+}
+
 readonly SUBJECT="${KEYPASTE_REQUIRE_GATES:-scripts/require-green-gates.sh}"
 readonly SHA='0123456789abcdef0123456789abcdef01234567'
 readonly REPO='notinferred/keypaste-fixture'
@@ -116,7 +125,9 @@ grep -q 'jq -r --arg self' "$WEAK" \
 run_case "weakened-accepts-app-absent" ok "$APP_ABSENT" "$WEAK" 0 "every required gate is green"
 echo "  the weakened copy accepts a commit with no app run, so requiring app is what refuses it"
 
-[ "$cases_run" -ge 8 ] || die "only $cases_run cases ran; the scenario table has lost rows"
+DECLARED="$(declared_cases)"
+[ -n "$DECLARED" ] || die "no case lines found in $SELF; the count this gate checks itself against is derived from them"
+[ "$cases_run" -eq "$DECLARED" ] || die "$cases_run cases ran, but $DECLARED are written in $SELF; a case is defined and not driven"
 [ "$accepted" -eq 2 ] \
   || die "$accepted cases were accepted, expected exactly 2 (both-green, and the weakened control)"
 

@@ -21,6 +21,15 @@
 # If either weakened copy refuses, this gate fails.
 set -euo pipefail
 
+# The expected number is counted here rather than written down: a floor somebody raises by hand
+# falls behind as cases are added, and a case that stops being driven then passes as a smaller suite.
+readonly SELF="${BASH_SOURCE[0]}"
+declared_cases() {
+  local n
+  n="$(grep -cE '^[[:space:]]*run_case ' "$SELF" || true)"
+  case "$n" in "" | 0 | *[!0-9]*) echo "" ;; *) echo "$n" ;; esac
+}
+
 readonly CHANGELOG_CHECK="${KEYPASTE_CHANGELOG_CHECK:-scripts/require-changelog-section.sh}"
 readonly VERSION_CHECK="${KEYPASTE_VERSION_CHECK:-scripts/require-tag-matches-source.sh}"
 readonly ASSETS_CHECK="${KEYPASTE_ASSETS_CHECK:-scripts/require-release-assets.sh}"
@@ -133,7 +142,9 @@ sed '/a release cannot shrink/d' "$ASSETS_CHECK" > "$WEAK_ASSETS"
 grep -q 'a release cannot shrink' "$WEAK_ASSETS" && die "the weakened asset check still holds the floor"
 run_case "weakened-takes-a-dropped-target" 0 "advertised assets, their checksums" -- env KEYPASTE_RELEASE_DEFINITION="$DROPPED" bash "$WEAK_ASSETS" "$V" "$D"
 
-[ "$cases" -ge 18 ] || die "only $cases cases ran; the scenario table has lost rows"
+DECLARED="$(declared_cases)"
+[ -n "$DECLARED" ] || die "no case lines found in $SELF; the count this gate checks itself against is derived from them"
+[ "$cases" -eq "$DECLARED" ] || die "$cases cases ran, but $DECLARED are written in $SELF; a case is defined and not driven"
 [ "$accepted" -eq 7 ] || die "$accepted cases were accepted, expected exactly 7"
 
 echo "ok: $cases cases across three decisions a tag used to be the first thing to run."

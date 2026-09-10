@@ -59,6 +59,15 @@
 # fixture that cannot reproduce the condition proves nothing about the check (D-0043).
 set -euo pipefail
 
+# The expected number is counted here rather than written down: a floor somebody raises by hand
+# falls behind as cases are added, and a case that stops being driven then passes as a smaller suite.
+readonly SELF="${BASH_SOURCE[0]}"
+declared_cases() {
+  local n
+  n="$(grep -cE '^[[:space:]]*expect_(refusal|repo_refusal) ' "$SELF" || true)"
+  case "$n" in "" | 0 | *[!0-9]*) echo "" ;; *) echo "$n" ;; esac
+}
+
 readonly DEFINITION="${KEYPASTE_RELEASE_DEFINITION:-release-targets.json}"
 readonly PROPS="Directory.Build.props"
 # docs/RELEASE.md owns what a floor_evidence value MEANS; this file owns what each one requires.
@@ -956,7 +965,9 @@ echo "  code_has reads the text first and finds it, so the answer no longer depe
 # ---------------------------------------------------------------------------
 # 8. The verdict.
 # ---------------------------------------------------------------------------
-[ "$cases" -ge 24 ] || die "only $cases fixture cases ran; cases have gone missing rather than passing"
+DECLARED="$(declared_cases)"
+[ -n "$DECLARED" ] || die "no fixture lines found in $SELF; the count this gate checks itself against is derived from them"
+[ "$cases" -eq "$DECLARED" ] || die "$cases fixture cases ran, but $DECLARED are written in $SELF; a case is defined and not driven"
 [ "$refusals" -eq "$cases" ] || die "$refusals of $cases fixtures refused"
 
 echo
