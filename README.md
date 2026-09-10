@@ -29,6 +29,26 @@ Approve? [y/N]
 
 **Pre-1.0.** The download below is **CLI/MCP `v0.1.0`**. Current `main` also includes `keypaste setup` and the fixes under [0.2.0-rc.1](CHANGELOG.md#020-rc1); those changes require a source build. The desktop app browses and edits the same vaults but has no public release ([desktop guide](docs/desktop.md)), and credential approvals still happen in the terminal. The [release contract and platform matrix](docs/RELEASE.md) distinguish source, packaged artifacts and public installs. [STEPS](docs/STEPS.md) is the delivery plan; [PRODUCT](docs/PRODUCT.md) defines the product commitments.
 
+### Known defects in `v0.1.0`
+
+**The download below is `v0.1.0`, and these are the things it gets wrong.** Every one of them is
+fixed on `main` and none of them is in that archive, so this is what you get if you run the install
+commands. Each line says how to avoid it until the next release. The list is here, rather than only
+in the [changelog](CHANGELOG.md#020-rc1), because [PRODUCT](docs/PRODUCT.md) §3.10 says a serious
+bug that ships is disclosed fast and fully.
+
+- **env export can delete your vault.** `keypaste env export billing vault.kdbx --dotenv --force --yes` writes one project's variables over that file in plaintext and takes every other entry, every other project and all entry history with it, unrecoverably. `--force` is what reaches this, not what guards against it. *Avoid it by* never naming a KeePass vault as the destination, and preferring `keypaste run`, which writes no file at all. (F.1b)
+- **env rm and env set can act on the wrong entry.** A title containing `/` produces the same joined path as a real group, and the two rules that took that path apart disagreed, so `keypaste env rm dev nested/TOKEN` could list one entry, delete another and report success. *Avoid it by* keeping `/` out of entry titles, and editing an existing one in KeePassXC rather than through keypaste. (F.1a)
+- **get can return the wrong password.** The same collision on the reading side: the first matching entry won, silently, onto your clipboard or your screen. *Avoid it by* confirming in KeePassXC which entry holds the value whenever any title contains `/`. (F.1e)
+- **env pull can delete an edit it never imported.** It deleted whatever was at the path when it finished rather than the file it read, so a change saved while it was asking for your master password was lost with no copy anywhere. *Avoid it by* not editing the `.env` while the command is prompting, and answering `n` to the delete offer so you can remove the file yourself. (F.1c)
+- **moving the clock back can revive an expired approval.** Grant lifetime was measured on the wall clock alone, so winding it back made a lapsed approval work again and left the password in memory with nothing left to clear it. *Avoid it by* restarting `keypaste agent` after any clock correction and after the machine sleeps. (F.3a)
+- **an approved credential too large to send costs you every other grant.** A released value bigger than one frame - a certificate, a pasted key, a page of notes - tore down the connection, discarded every other approval on it, and recorded the whole thing as though nobody had approved anything. *Avoid it by* keeping releasable entries' notes short; if it happens, everything on that connection has to be approved again. (F.3d)
+- **listing a large vault costs you every other grant.** The same failure on the entry-name listing: around a thousand ordinary entries, or far fewer long ones, could not be sent and the connection went with them. *Avoid it by* asking for a credential by name rather than listing, and expecting to re-approve if it happens. (F.3c)
+- **an agent can queue approval prompts.** The bridge held a second request behind the first instead of refusing it, so ten requests meant ten prompts in a row. *Avoid it by* denying any prompt you did not expect. (F.3b)
+- **entry names can render unescaped.** Bidirectional and invisible code points in an entry name reached `keypaste ls`, `keypaste env ls` and the approval prompt as written. *Avoid it by* treating the entry name and the agent's stated reason in a prompt as untrusted text. (D-0084)
+
+The desktop app has no public release, so its own repairs are not listed here.
+
 ## Install
 
 **Five lines on macOS and Linux, six on Windows, and the checksum line is the reason the others are worth typing.** It checks the archive against a hash published beside it and stops if they disagree. Each binary is a single native file with no runtime to install — nothing needs .NET on your machine. The only thing written outside the directory you run this in is the last line, which puts the two binaries somewhere your shell can find them.
@@ -223,7 +243,7 @@ keypaste env export billing .env --dotenv        # writes a file, after confirmi
 keypaste env export billing --dotenv --stdout    # prints it instead, for piping
 ```
 
-The format has to be named — `--dotenv` is not assumed — and writing a file prints a red warning naming the destination and asks before it goes ahead. It will not overwrite an existing file without `--force`, it points out a `.git` ancestor, and on Linux and macOS the file is created readable only by you. Windows has no equivalent and keypaste says so rather than implying a permission it did not set. Prefer `keypaste run`, which needs no file at all.
+The format has to be named — `--dotenv` is not assumed — and writing a file prints a red warning naming the destination and asks before it goes ahead. It will not overwrite an existing file without `--force`, it points out a `.git` ancestor, and on Linux and macOS the file is created readable only by you. Windows has no equivalent and keypaste says so rather than implying a permission it did not set. It also refuses a destination that is the vault it is reading from, or any other KeePass vault, and `--force` does not lift that — **`v0.1.0` has none of that refusal, where `--force` destroys the vault instead; see [known defects](#known-defects-in-v010)**. Prefer `keypaste run`, which needs no file at all.
 
 Values are written in single quotes wherever possible, because that form means the same thing to `motdotla/dotenv`, `python-dotenv`, `godotenv`, Docker Compose v2 and `sh` alike. The handful that cannot be — a value containing an apostrophe or a carriage return — are escaped and named on stderr, because that is the form those readers disagree about.
 
