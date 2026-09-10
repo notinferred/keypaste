@@ -38,36 +38,25 @@ Also in scope: the signup endpoint on keypaste.com — `site/src/worker.js` and 
 ## Supported versions
 
 The behavior described below is the current source on `main`. The public CLI/MCP release is
-`v0.1.0`, and it carries defects that are fixed on `main` and have never shipped; several of them
-destroy data. They are named under **Known defects in `v0.1.0`** below, each with a way to avoid
-it. The wider set of changes is listed under [0.2.0-rc.1](CHANGELOG.md#020-rc1) and none of it is
-in that download.
+`v0.2.0`.
+
+**If you installed `v0.1.0`, replace it.** In that release: env export can delete your vault;
+env rm and env set can act on the wrong entry; get can return the wrong password; env pull can
+delete an edit it never imported; and moving the clock back can revive an expired approval.
+All of those are fixed in `v0.2.0`
+([what changed](CHANGELOG.md#020)). The `v0.1.0` archives are still served and still carry every
+one of those defects: a published version is never rewritten here, so upgrading is the only fix.
 The desktop app is available from source and has no public release. See the
 [release contract](docs/RELEASE.md) for platform and publication status.
 
 | Version | Supported | Notes |
 |---|---|---|
 | `main` | Yes | Always the first thing a fix lands on |
-| `0.1.x` | Yes | The current release line |
+| `0.2.x` | Yes | The current release line |
+| `0.1.x` | No | Superseded, and carries the data-loss defects above |
 | Anything older | No | There is nothing older yet |
 
 Pre-1.0, this is a short table on purpose. There is no long-term support line and there will not be one before 1.0; a fix goes onto `main` and into the next tag, and older tags are not patched.
-
-### Known defects in `v0.1.0`
-
-Fixed on `main`, absent from the published archive, each with the way to avoid it until the next
-release. Several of these destroy data, which is why they are named here rather than left to the
-changelog.
-
-- **env export can delete your vault.** `keypaste env export billing vault.kdbx --dotenv --force --yes` writes one project's variables over that file in plaintext and takes every other entry, every other project and all entry history with it, unrecoverably. `--force` is what reaches this, not what guards against it. *Avoid it by* never naming a KeePass vault as the destination, and preferring `keypaste run`, which writes no file at all. (F.1b)
-- **env rm and env set can act on the wrong entry.** A title containing `/` produces the same joined path as a real group, and the two rules that took that path apart disagreed, so `keypaste env rm dev nested/TOKEN` could list one entry, delete another and report success. *Avoid it by* keeping `/` out of entry titles, and editing an existing one in KeePassXC rather than through keypaste. (F.1a)
-- **get can return the wrong password.** The same collision on the reading side: the first matching entry won, silently, onto your clipboard or your screen. *Avoid it by* confirming in KeePassXC which entry holds the value whenever any title contains `/`. (F.1e)
-- **env pull can delete an edit it never imported.** It deleted whatever was at the path when it finished rather than the file it read, so a change saved while it was asking for your master password was lost with no copy anywhere. *Avoid it by* not editing the `.env` while the command is prompting, and answering `n` to the delete offer so you can remove the file yourself. (F.1c)
-- **moving the clock back can revive an expired approval.** Grant lifetime was measured on the wall clock alone, so winding it back made a lapsed approval work again and left the password in memory with nothing left to clear it. *Avoid it by* restarting `keypaste agent` after any clock correction and after the machine sleeps. (F.3a)
-- **an approved credential too large to send costs you every other grant.** A released value bigger than one frame - a certificate, a pasted key, a page of notes - tore down the connection, discarded every other approval on it, and recorded the whole thing as though nobody had approved anything. *Avoid it by* keeping releasable entries' notes short; if it happens, everything on that connection has to be approved again. (F.3d)
-- **listing a large vault costs you every other grant.** The same failure on the entry-name listing: around a thousand ordinary entries, or far fewer long ones, could not be sent and the connection went with them. *Avoid it by* asking for a credential by name rather than listing, and expecting to re-approve if it happens. (F.3c)
-- **an agent can queue approval prompts.** The bridge held a second request behind the first instead of refusing it, so ten requests meant ten prompts in a row. *Avoid it by* denying any prompt you did not expect. (F.3b)
-- **entry names can render unescaped.** Bidirectional and invisible code points in an entry name reached `keypaste ls`, `keypaste env ls` and the approval prompt as written. *Avoid it by* treating the entry name and the agent's stated reason in a prompt as untrusted text. (D-0084)
 
 ## Verifying a release
 

@@ -82,10 +82,50 @@ run_check() {
 $(jqr '[.published[] | select(.advertised == true)] | last | (.known_defects // []) | .[].phrase' "$DEFINITION")
 EOF
 
+  # The other half, and the half a flip silently drops. When the advertised version moves, the
+  # defects of the release people ALREADY INSTALLED do not stop existing - and those people are the
+  # only ones the disclosure was ever for. They have no self-update and no version check to tell
+  # them, so the served page is the only thing that reaches them. A check that only asked about the
+  # current download would go green the moment the warning they need disappeared.
+  local superseded notice_missing=0 found phrase_count
+  while IFS= read -r superseded; do
+    [ -n "$superseded" ] || continue
+    [ "$superseded" = "$version" ] && continue
+
+    phrase_count="$(jqr --arg v "$superseded" '[.published[] | select(.version == $v)] | last | (.known_defects // []) | length' "$DEFINITION")"
+    case "$phrase_count" in '' | *[!0-9]*) phrase_count=0 ;; esac
+    [ "$phrase_count" -gt 0 ] || continue
+
+    if ! grep -qF -- "$superseded" "$body"; then
+      echo "::error::  $url does not name $superseded, which people are still running and which is still broken"
+      notice_missing=$((notice_missing + 1))
+      continue
+    fi
+
+    found=0
+    while IFS= read -r phrase; do
+      [ -n "$phrase" ] || continue
+      if grep -qF -- "$phrase" "$body"; then found=1; break; fi
+    done <<PHRASES
+$(jqr --arg v "$superseded" '[.published[] | select(.version == $v)] | last | (.known_defects // []) | .[].phrase' "$DEFINITION")
+PHRASES
+
+    if [ "$found" -eq 1 ]; then
+      echo "  ok   the upgrade notice for $superseded, and what it does"
+    else
+      echo "::error::  $url names $superseded and none of what it does, which is a version number and not a warning"
+      notice_missing=$((notice_missing + 1))
+    fi
+  done <<EOF
+$(jqr '[.published[] | select((.known_defects // []) | length > 0) | .version] | .[]' "$DEFINITION")
+EOF
+
   [ "$missing" -eq 0 ] || die \
     "$url is serving a page that does not disclose $missing of the defects $version is known to carry - deploy site/public/index.html with 'npx wrangler deploy'"
+  [ "$notice_missing" -eq 0 ] || die \
+    "$url is serving a page that drops the upgrade notice for $notice_missing superseded release(s) - the people running them have no other way to find out"
 
-  echo "ok: $url discloses every defect recorded against the advertised $version"
+  echo "ok: $url discloses every defect recorded against the advertised $version, and keeps the upgrade notice for every superseded release that carried any"
 }
 
 # ---------------------------------------------------------------------------
@@ -130,23 +170,59 @@ SHIM
   [ "$with_cr" -gt "$without_cr" ] \
     || die "the CRLF fake produced no carriage return, so these fixtures prove nothing"
 
-  local origin
-  origin="$("$real_jq" -r '[.published[] | select(.advertised == true)] | last | .origin' "$DEFINITION" | tr -d "$CR")"
+  # The fixtures bring their own definition. Driving them off the repository's means they only test
+  # whatever it happens to advertise today: an advertised release with no known defects makes the
+  # phrase cases vacuous, and a repository with nothing superseded makes the notice cases vacuous -
+  # both passing by having nothing to check, exactly when the next release needs them working.
+  local fixdef origin
+  fixdef="$work/definition.json"
+  origin="https://fixture.invalid/v2.0.0/"
+  cat > "$fixdef" <<'FIXDEF'
+{
+  "schema": 1,
+  "components": { "cli": { "origin": "https://fixture.invalid/v{version}/" } },
+  "published": [
+    {
+      "version": "1.0.0", "component": "cli", "advertised": false,
+      "origin": "https://fixture.invalid/v1.0.0/",
+      "known_defects": [
+        { "id": "X.1", "phrase": "the old one can delete your vault" },
+        { "id": "X.2", "phrase": "the old one can pick the wrong entry" }
+      ]
+    },
+    {
+      "version": "2.0.0", "component": "cli", "advertised": true,
+      "origin": "https://fixture.invalid/v2.0.0/",
+      "known_defects": [
+        { "id": "Y.1", "phrase": "the new one hums audibly" },
+        { "id": "Y.2", "phrase": "the new one is warm to the touch" }
+      ]
+    }
+  ]
+}
+FIXDEF
 
-  build_body() { # $1 = how many phrases to drop from the end; $2 = include the origin
-    local drop="$1" with_origin="$2" out="$work/body.html"
+  # $1 advertised phrases to drop from the end; $2 include the origin; $3 notice: full|bare|none
+  build_body() {
+    local drop="$1" with_origin="$2" notice="$3" out="$work/body.html"
     : > "$out"
     [ "$with_origin" = "yes" ] && echo "<a href=\"$origin\">download</a>" >> "$out"
     "$real_jq" -r '[.published[] | select(.advertised == true)] | last | (.known_defects // []) | .[].phrase' \
-      "$DEFINITION" | tr -d "$CR" | { [ "$drop" -gt 0 ] && head -n "-$drop" || cat; } \
+      "$fixdef" | tr -d "$CR" | { [ "$drop" -gt 0 ] && head -n "-$drop" || cat; } \
       | sed 's|^|<li>|; s|$|</li>|' >> "$out"
+    case "$notice" in
+      full) echo "<p>If you installed 1.0.0, replace it: the old one can delete your vault</p>" >> "$out" ;;
+      bare) echo "<p>1.0.0 is superseded.</p>" >> "$out" ;;
+      none) ;;
+    esac
     echo "$out"
   }
 
   expect() { # $1 name, $2 expected exit (0 ok / 1 refusal), $3 body, $4 want-in-output
     local name="$1" want_exit="$2" body="$3" want="$4" out rc=0
     cases=$((cases + 1))
-    out="$(KEYPASTE_SITE_BODY="$body" PATH="$work/fakebin:$PATH" bash "$SELF" "https://fixture.invalid/" 2>&1)" || rc=$?
+    out="$(KEYPASTE_SITE_BODY="$body" KEYPASTE_RELEASE_DEFINITION="$fixdef" \
+           PATH="$work/fakebin:$PATH" bash "$SELF" "https://fixture.invalid/" 2>&1)" || rc=$?
     if [ "$rc" -ne "$want_exit" ]; then
       echo "::error::fixture '$name' exited $rc, wanted $want_exit"
       echo "$out" | sed 's/^/::error::    /'
@@ -164,18 +240,28 @@ SHIM
 
   echo "== fixtures: the definition is read through a jq that writes CRLF"
 
-  # The regression itself. Every phrase is on the page; only the reader can fail this.
-  body="$(build_body 0 yes)"
-  expect "crlf-phrases-still-match" 0 "$body" "discloses every defect"
+  # The regression this file exists for. Every phrase and the notice are on the page; only the
+  # reader can fail this, and it fails it the moment the \r strip comes out of jqr().
+  body="$(build_body 0 yes full)"
+  expect "crlf-phrases-still-match" 0 "$body" "keeps the upgrade notice"
 
-  # And the check still refuses for the right reason when a phrase really is absent, so the fixture
+  # ... and the check still refuses for the right reason when a phrase really is absent, so the case
   # above cannot be satisfied by a reader that matches nothing at all.
-  body="$(build_body 1 yes)"
+  body="$(build_body 1 yes full)"
   expect "crlf-and-one-phrase-missing" 1 "$body" "does not disclose 1 of the defects"
 
   # The positive control, under the same CRLF reader: the origin is read through jq too.
-  body="$(build_body 0 no)"
+  body="$(build_body 0 no full)"
   expect "crlf-and-not-the-install-page" 1 "$body" "nothing was checked"
+
+  # The superseded release's warning, which is the half a flip drops. The people running 1.0.0 have
+  # no self-update and no version check; this page is the only thing that reaches them.
+  body="$(build_body 0 yes none)"
+  expect "upgrade-notice-missing-entirely" 1 "$body" "still running and which is still broken"
+
+  # A version number with nothing said about it is a changelog entry, not a warning.
+  body="$(build_body 0 yes bare)"
+  expect "upgrade-notice-without-the-defect" 1 "$body" "a version number and not a warning"
 
   echo
   if [ "$failures" -gt 0 ]; then
