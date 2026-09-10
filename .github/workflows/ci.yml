@@ -122,6 +122,13 @@ jobs:
         shell: bash
         run: scripts/verify-site-disclosure.sh --selftest
 
+      # R.0b. The publish half of this only happens on a tag; the decision it makes is driven here
+      # against a fake origin on every push, which is D-0109's rule applied to the last thing between
+      # a release and being advertised.
+      - name: Verify a published release is refused unless the public bytes say it is whole
+        shell: bash
+        run: scripts/verify-release-completion.sh
+
   test:
     name: test (${{ matrix.os }})
     needs: gate

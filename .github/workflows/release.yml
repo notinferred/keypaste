@@ -586,6 +586,28 @@ jobs:
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
         run: scripts/publish-release.sh --publish "$VERSION" dist
 
+      # R.0b. The bytes are up; whether a STRANGER can get them is a different question, and the
+      # only one that decides whether this version may ever be advertised. Written before the ask so
+      # a failure still leaves evidence of what was expected, and retained either way.
+      - name: Record what was published and verify it at the public origin
+        shell: bash
+        env:
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          scripts/release-completion.sh record \
+            "$VERSION" "${GITHUB_REF_NAME}" "$GITHUB_SHA" dist > "release-${VERSION}.json"
+          cat "release-${VERSION}.json"
+          scripts/release-completion.sh verify "$VERSION" "release-${VERSION}.json"
+
+      - name: Keep the completion record whatever the answer was
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: completion-record
+          path: release-*.json
+          if-no-files-found: warn
+
       - name: Say where it went
         run: |
           echo "### keypaste ${VERSION} published" >> "$GITHUB_STEP_SUMMARY"
