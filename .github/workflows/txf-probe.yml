@@ -1,0 +1,51 @@
+name: txf-probe
+
+# A measurement for docs/STEPS.md F.6, and only that.
+#
+# F.6's failures are on windows-2025. Every mechanism they could have had is excluded on the
+# maintainer's Windows 10 Pro 19045 machine, so the operating system is the remaining difference and
+# this is what asks the runner directly. windows-2022 runs beside it so the answer separates the OS
+# from the runner.
+#
+# Dispatch only, and deliberately outside the release path: no tag, push or pull request reaches it,
+# require-green-gates.sh does not read it, and nothing here can make a release greener. A run of it
+# is not V-F.6's reproduction and closes nothing - that verifier asks for a test that is red at one
+# save attempt and green after a repair, which no probe can supply.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
+  NUGET_XMLDOC_MODE: skip
+
+jobs:
+  probe:
+    name: txf (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2025, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      # 8dot3 name creation is a per-volume setting, and a reserved name reserves its alias too, so
+      # a run that does not record this cannot be compared against one on another machine.
+      - name: Record the volume's 8.3 setting
+        run: fsutil 8dot3name query C:
+
+      - name: Probe
+        run: dotnet run scripts/txf-probe.cs
