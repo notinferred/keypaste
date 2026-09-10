@@ -76,6 +76,16 @@ awk -v o="$open" -v c="$close" '
 
 grep -q '[^[:space:]]' "$BLOCK" || die "the $BLOCK_OS install block in $DOC is empty"
 
+# Substitution that works on both seds, because `sed -i` does not: GNU takes the backup suffix
+# attached to the flag, BSD requires it as a separate argument, so `sed -i "s/a/b/" file` on macOS
+# reads the script itself as the suffix and dies with "invalid command code". That failed the
+# macos-15 leg of install run 34544270892 before it reached the binary at all.
+subst_in_block() {
+  local expr="$1" tmp
+  tmp="$(mktemp)"
+  sed "$expr" "$BLOCK" > "$tmp" && mv "$tmp" "$BLOCK"
+}
+
 EXPECT="${KEYPASTE_EXPECT_VERSION:-}"
 if [ -z "$EXPECT" ]; then
   EXPECT="$(dotnet msbuild src/Keypaste.Cli/Keypaste.Cli.csproj -getProperty:VersionPrefix -nologo 2>/dev/null | tr -d '[:space:]')"
@@ -98,14 +108,14 @@ if [ -n "$RETARGET" ]; then
     | head -1 | sed -E 's/^keypaste-(.*)-(linux|osx|win)-[a-z0-9]+\.(tar\.gz|zip)$/\1/')"
   [ -n "$README_VERSION" ] || die "could not read a version out of the $BLOCK_OS block to retarget it"
   if [ "$README_VERSION" != "$RETARGET" ]; then
-    sed -i "s/$README_VERSION/$RETARGET/g" "$BLOCK"
+    subst_in_block "s/$README_VERSION/$RETARGET/g"
     echo "!!! CANDIDATE RUN: $DOC's block, with $README_VERSION rewritten to $RETARGET."
     echo "!!! This tests the documented install SHAPE against an unadvertised release's assets."
     echo "!!! It is not evidence that $DOC is correct - verify-release-matrix.sh owns that."
   fi
 fi
 if [ -n "$SUBSTITUTE_RID" ]; then
-  sed -i "s/linux-x64/$SUBSTITUTE_RID/g" "$BLOCK"
+  subst_in_block "s/linux-x64/$SUBSTITUTE_RID/g"
   echo "!!! ARM64 RUN: linux-x64 rewritten to $SUBSTITUTE_RID, the substitution $DOC instructs an"
   echo "!!! arm64 reader to make. The block is otherwise untouched."
 fi
