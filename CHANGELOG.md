@@ -4,9 +4,11 @@
 
 Versions are the ones published at `https://dl.keypaste.com/v<version>/`. Every release carries a `SHA256SUMS` file and a per-asset `.sha256`, plus the corresponding source for that tag. The published CLI/MCP binaries are unsigned and un-notarized (O-0010); there is no public desktop release. The [release contract](docs/RELEASE.md) records the platform matrix and the requirements for an installed, publicly available release.
 
-## 0.2.0-rc.1
+## 0.2.0
 
-**A candidate, not a download.** Everything below has been on `main` since `0.1.0` and none of it is in the `v0.1.0` archives. This tag exists to run the release pipeline over the parts only a tag reaches — the desktop build's prerelease version, the matrices both workflows derive from the release definition, and the publish job — rather than to be installed. The README and keypaste.com keep naming `0.1.0`. This one exists in the open at its own URL and nothing links it.
+**If you are running `v0.1.0`, upgrade.** Several of the repairs below are data loss, and none of them is in the `v0.1.0` archives: `env export` could delete the vault it was reading from and write plaintext over it, `env rm` and `env set` could act on a different entry than the one named, `get` could hand back the wrong entry's password, and `env pull` could delete an edit it never imported. `v0.1.0` stays where it is and stays broken — published versions are immutable here — so the fix is this version.
+
+**Built from the commit `v0.2.0-rc.1` proved.** The candidate published unadvertised at its own URL first; its bytes were then fetched anonymously from the public origin and checked against a recorded hash for every asset, and every advertised target was installed on a clean machine and made to create a vault and inject a value into a child process. `0.2.0` is that same source.
 
 **An agent that says hello and asks in the same breath is no longer told it never said hello.** An MCP client may send its handshake and its first request together without waiting in between, and several do. On macOS the request could overtake the handshake it followed, and keypaste answered it "called before the initialize handshake completed" — a refusal written for a client that had introduced itself to nobody, handed to one that had. keypaste now waits a moment for an identity already on its way. What it still will not do is answer for a client it cannot name: one that sent nothing waits out the same moment and is still refused.
 
@@ -196,6 +198,10 @@ Names out of a vault are now drawn through the sanitizer everywhere a person rea
 The approval prompt now says when the entry or the reason it shows was scrubbed. It stays silent for an ordinary name, so the dialog is unchanged for everyone whose entries are ordinary.
 
 The agent bridge now records an access that ends in an exception. Previously only cancellation was caught, so an I/O or cryptographic failure out of the vault escaped before the audit line was written — nothing was released, but nothing was recorded either. Relatedly, a connection that fails to accept no longer ends the approver holding your unlocked vault.
+
+## 0.2.0-rc.1
+
+**A candidate, not a download**, and the same source as `0.2.0` above. It was published unadvertised at its own URL to run the release pipeline over the parts only a tag reaches — the desktop build's prerelease version, the matrices both workflows derive from the release definition, and the publish job. Nothing linked it, and its changes are the ones listed under `0.2.0`.
 
 ## 0.1.0
 
