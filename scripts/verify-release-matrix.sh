@@ -445,16 +445,37 @@ validate_documents() {
       [ -n "$check" ] || continue
       name="$(archive_name "$def" "$c" "$rid" "$version")"
 
-      local carried
+      local carried block reason sentinel
       carried="$(json_array "$def" "[$target] | map(.advertised_on // []) | add")"
       [ -n "$carried" ] || note "$c/$rid: advertised with an install check and no page recorded as carrying it"
 
+      # A target may be installed from ANOTHER target's block. linux-arm64 is: README prints one
+      # Linux block naming linux-x64 and tells an arm64 reader to substitute the filename, so
+      # demanding an arm64 archive name on the page would be demanding a second block, and demanding
+      # an arm64 sentinel would be demanding one that must not exist. What is required instead is
+      # the borrowed block's sentinel and the rid itself, so the substitution is findable - plus a
+      # recorded reason, because "this target has no block of its own" is a claim that should be
+      # written down rather than inferred from a missing field.
+      block="$(jqr "$target | .install_block // \"\"" "$def")"
+      reason="$(jqr "$target | .install_block_reason // \"\"" "$def")"
+      sentinel="$check"
+      if [ -n "$block" ]; then
+        sentinel="$block"
+        [ -n "$reason" ] \
+          || note "$c/$rid installs from $block's block and records no reason it has none of its own"
+      fi
+
       for page in $carried; do
         [ -f "$root/$page" ] || { note "no page at $page, which is recorded as carrying $rid"; continue; }
-        grep -qF "$name" "$root/$page" \
-          || note "$page does not name $name, the advertised $rid asset"
-        grep -qF "<!-- install:$check -->" "$root/$page" \
-          || note "$page has no <!-- install:$check --> sentinel, so nothing can check that block"
+        if [ -n "$block" ]; then
+          grep -qF "$rid" "$root/$page" \
+            || note "$page does not name $rid, so a reader cannot find the substitution it needs"
+        else
+          grep -qF "$name" "$root/$page" \
+            || note "$page does not name $name, the advertised $rid asset"
+        fi
+        grep -qF "<!-- install:$sentinel -->" "$root/$page" \
+          || note "$page has no <!-- install:$sentinel --> sentinel, so nothing can check that block"
         grep -qF "$origin" "$root/$page" \
           || note "$page does not name the advertised origin $origin"
       done
@@ -926,6 +947,17 @@ cp docs/RELEASE.md "$FAKE/docs/RELEASE.md"
 
 sed -i 's/unsigned/perfectly ordinary/g' "$FAKE/README.md"
 expect_repo_refusal "signing-disclosure-deleted" "no longer says the cli binaries are unsigned" \
+  "$FAKE/release-targets.json" "$FAKE"
+cp README.md "$FAKE/README.md"
+
+# A target that borrows another's block has to say so, and the page has to name it - otherwise an
+# arm64 reader is told to substitute something the page never spells out.
+expect_repo_refusal "borrowed-block-with-no-reason" "records no reason it has none of its own" \
+  "$(mutate borrowed-block-with-no-reason '(.components.cli.targets[] | select(.rid == "linux-arm64") | .install_block_reason) |= ""')" \
+  "$FAKE"
+
+sed -i 's/For arm64, substitute `linux-arm64`/For arm64, substitute the other one/' "$FAKE/README.md"
+expect_repo_refusal "borrowed-block-and-the-rid-is-not-named" "cannot find the substitution it needs" \
   "$FAKE/release-targets.json" "$FAKE"
 cp README.md "$FAKE/README.md"
 

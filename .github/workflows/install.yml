@@ -19,6 +19,11 @@ name: install
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'A version in release-targets.json published[]. Blank means the advertised one. Naming an unadvertised candidate is how a release is exercised before any page points at it.'
+        required: false
+        type: string
   schedule:
     # Mondays, 07:00 UTC. No relation to release timing on purpose - a check that only ever runs
     # right after a publish tests the day everything was known to be fine.
@@ -46,6 +51,13 @@ jobs:
         include:
           - os: ubuntu-24.04
             target: linux
+          # linux-arm64 has no block of its own: README publishes one Linux block and tells an arm64
+          # reader to substitute the filename, so that substitution is what verify-install.sh makes
+          # and what is tested. Unlike the x64 row this installs on the SAME image it was built on,
+          # so it shows the binary working, not the binary working above its floor - the arm64
+          # container floor check is still absent, which is what floor_evidence 'unverified' says.
+          - os: ubuntu-22.04-arm
+            target: linux-arm64
           - os: macos-15
             target: macos
           - os: windows-2025
@@ -77,17 +89,35 @@ jobs:
       # wrong version would have been checked against the wrong version and passed. The definition
       # records what was actually published, and verify-release-matrix.sh separately holds the
       # README to it - so the two claims are made by two different things.
-      - name: Read the version that was actually published
+      - name: Read the version to install
         id: v
         shell: bash
+        env:
+          REQUESTED: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          v="$(jq -r '[.published[] | select(.advertised == true)] | last | .version' release-targets.json)"
-          case "$v" in
+          adv="$(jq -r '[.published[] | select(.advertised == true)] | last | .version' release-targets.json | tr -d '\r')"
+          case "$adv" in
             ''|null) echo "::error::release-targets.json advertises no published release"; exit 1 ;;
           esac
+
+          if [ -z "${REQUESTED:-}" ]; then
+            v="$adv"
+            echo "the advertised release is $v"
+          else
+            # Only a version this repository has recorded as published. A free-text box pointed at
+            # an arbitrary prefix would turn a green run into evidence about somebody else's bytes.
+            n="$(jq -r --arg v "$REQUESTED" '[.published[] | select(.version == $v)] | length' release-targets.json | tr -d '\r')"
+            case "$n" in ''|*[!0-9]*) echo "::error::could not count published entries for $REQUESTED"; exit 1 ;; esac
+            [ "$n" -ge 1 ] || { echo "::error::$REQUESTED is not in release-targets.json published[]; nothing was installed"; exit 1; }
+            v="$REQUESTED"
+            if [ "$v" = "$adv" ]; then
+              echo "installing $v, which is also the advertised release"
+            else
+              echo "::notice::installing $v, an UNADVERTISED release. README names $adv and still should."
+            fi
+          fi
           echo "version=$v" >> "$GITHUB_OUTPUT"
-          echo "the advertised release is $v"
 
       # --negative is not passed on Windows: the script refuses that combination outright rather
       # than skipping it quietly, because the decoy substitution shims curl and the Windows block
@@ -99,8 +129,10 @@ jobs:
           KEYPASTE_EXPECT_VERSION: ${{ steps.v.outputs.version }}
         run: |
           set -euo pipefail
+          # --version is always passed and is a no-op when README already names it; the script
+          # substitutes only when the two differ, and says so loudly when it does.
           if [ "${{ matrix.target }}" = "windows" ]; then
-            scripts/verify-install.sh windows
+            scripts/verify-install.sh windows --version "$KEYPASTE_EXPECT_VERSION"
           else
-            scripts/verify-install.sh ${{ matrix.target }} --negative
+            scripts/verify-install.sh ${{ matrix.target }} --negative --version "$KEYPASTE_EXPECT_VERSION"
           fi
