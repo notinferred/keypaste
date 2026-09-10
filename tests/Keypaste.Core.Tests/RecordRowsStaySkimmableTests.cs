@@ -32,8 +32,8 @@ namespace Keypaste.Core.Tests;
 /// </remarks>
 public sealed class RecordRowsStaySkimmableTests
 {
-    private const int LedgerRowLimit = 650;
-    private const int CompletedCellLimit = 350;
+    private const int _ledgerRowLimit = 650;
+    private const int _completedCellLimit = 350;
 
     [Fact]
     public void LedgerRows_StayOneDecisionLong()
@@ -42,7 +42,7 @@ public sealed class RecordRowsStaySkimmableTests
         foreach (var row in LedgerRows())
         {
             var length = row.Length;
-            if (length > LedgerRowLimit)
+            if (length > _ledgerRowLimit)
             {
                 over.Add($"{Id(row)} is {length} characters");
             }
@@ -52,7 +52,7 @@ public sealed class RecordRowsStaySkimmableTests
             over.Count == 0,
             "DECISIONS.md ledger rows are one line, for architecture, security or money (D-0083): "
             + string.Join("; ", over)
-            + $". The limit is {LedgerRowLimit}. Say the decision and the constraint it leaves "
+            + $". The limit is {_ledgerRowLimit}. Say the decision and the constraint it leaves "
             + "behind; the account of how it was found belongs in git and in the comment beside "
             + "the code it changed.");
     }
@@ -64,7 +64,7 @@ public sealed class RecordRowsStaySkimmableTests
         foreach (var row in CompletedStepRows())
         {
             var length = row.Length;
-            if (length > CompletedCellLimit)
+            if (length > _completedCellLimit)
             {
                 over.Add($"{Id(row)} is {length} characters");
             }
@@ -75,7 +75,7 @@ public sealed class RecordRowsStaySkimmableTests
             "A completed docs/STEPS.md row carries one line of evidence — the run IDs or commits "
             + "that observed it, and its D-row: "
             + string.Join("; ", over)
-            + $". The limit is {CompletedCellLimit}. Move the story of how the defect was found to "
+            + $". The limit is {_completedCellLimit}. Move the story of how the defect was found to "
             + "its D-row or drop it; open rows are not held to this.");
     }
 
@@ -88,9 +88,9 @@ public sealed class RecordRowsStaySkimmableTests
         // rule nobody reads.
         Assert.NotEmpty(LedgerRows());
         Assert.NotEmpty(CompletedStepRows());
-        Assert.True(LedgerRows().Max(r => r.Length) > LedgerRowLimit / 2, "no ledger row is near its limit");
+        Assert.True(LedgerRows().Max(r => r.Length) > _ledgerRowLimit / 2, "no ledger row is near its limit");
         Assert.True(
-            CompletedStepRows().Max(r => r.Length) > CompletedCellLimit / 2,
+            CompletedStepRows().Max(r => r.Length) > _completedCellLimit / 2,
             "no completed STEPS row is near its limit");
     }
 
