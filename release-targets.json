@@ -65,12 +65,14 @@
           "os_floor": "glibc 2.35",
           "floor_evidence": "unverified",
           "floor_caveat": "the equivalent container check is not implemented for arm64",
-          "install_check": null,
-          "install_check_absent": "verify-install.sh takes linux|macos|windows and has no arm64 runner; README.md tells the reader to substitute the filename. 3.9d and R.0c own closing this.",
+          "install_check": "linux-arm64",
           "advertised_on": [
             "README.md",
             "site/public/index.html"
-          ]
+          ],
+          "install_runner": "ubuntu-22.04-arm",
+          "install_block": "linux",
+          "install_block_reason": "README publishes one Linux block naming linux-x64 and tells an arm64 reader to substitute the filename. A second block would be a second thing to keep correct, so the page is checked for that instruction and for this rid rather than for an arm64 archive name it deliberately does not print."
         },
         {
           "rid": "osx-arm64",
@@ -248,6 +250,20 @@
           "phrase": "entry names can render unescaped"
         }
       ]
+    },
+    {
+      "version": "0.2.0-rc.1",
+      "tag": "v0.2.0-rc.1",
+      "component": "cli",
+      "date": "2026-09-10",
+      "origin": "https://dl.keypaste.com/v0.2.0-rc.1/",
+      "rids": [
+        "linux-x64",
+        "linux-arm64",
+        "osx-arm64",
+        "win-x64"
+      ],
+      "advertised": false
     }
   ]
 }

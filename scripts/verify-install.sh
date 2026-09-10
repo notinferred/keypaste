@@ -28,10 +28,27 @@ readonly DOC="${KEYPASTE_INSTALL_DOC:-README.md}"
 die() { echo "::error::$*" >&2; exit 1; }
 
 OS="${1:-}"
-NEGATIVE="${2:-}"
+shift || true
+NEGATIVE=""
+RETARGET=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --negative) NEGATIVE="--negative"; shift ;;
+    --version)  RETARGET="${2:-}"; [ -n "$RETARGET" ] || die "--version needs a value"; shift 2 ;;
+    *) die "unknown argument: $1" ;;
+  esac
+done
+
+# linux-arm64 is not a fourth block. README publishes ONE Linux block, naming linux-x64, and tells
+# an arm64 reader to substitute the filename - so the arm64 instruction IS that block plus that
+# substitution, and testing anything else would be testing a page nobody reads. BLOCK_OS is which
+# block to extract; OS stays what is being checked.
+BLOCK_OS="$OS"
+SUBSTITUTE_RID=""
 case "$OS" in
   linux|macos|windows) ;;
-  *) die "usage: verify-install.sh <linux|macos|windows> [--negative]" ;;
+  linux-arm64) BLOCK_OS="linux"; SUBSTITUTE_RID="linux-arm64" ;;
+  *) die "usage: verify-install.sh <linux|linux-arm64|macos|windows> [--negative] [--version <v>]" ;;
 esac
 [ -f "$DOC" ] || die "no such document: $DOC"
 
@@ -39,10 +56,10 @@ esac
 # Extract the block. Sentinels rather than "the first fence after the heading", because a heading
 # can be renamed and a fence can be inserted above, and both would silently change what is tested.
 # ---------------------------------------------------------------------------
-open="<!-- install:$OS -->"
-close="<!-- /install:$OS -->"
+open="<!-- install:$BLOCK_OS -->"
+close="<!-- /install:$BLOCK_OS -->"
 
-grep -qF "$open"  "$DOC" || die "$DOC has no '$open' marker - the install block for $OS is not gated"
+grep -qF "$open"  "$DOC" || die "$DOC has no '$open' marker - the install block for $BLOCK_OS is not gated"
 grep -qF "$close" "$DOC" || die "$DOC has no '$close' marker"
 [ "$(grep -cF "$open" "$DOC")" -eq 1 ] || die "$DOC has more than one '$open' marker"
 
@@ -57,9 +74,43 @@ awk -v o="$open" -v c="$close" '
   inblock { print }
 ' "$DOC" > "$BLOCK"
 
-grep -q '[^[:space:]]' "$BLOCK" || die "the $OS install block in $DOC is empty"
+grep -q '[^[:space:]]' "$BLOCK" || die "the $BLOCK_OS install block in $DOC is empty"
 
-echo "--- the $OS block, exactly as $DOC prints it ---"
+EXPECT="${KEYPASTE_EXPECT_VERSION:-}"
+if [ -z "$EXPECT" ]; then
+  EXPECT="$(dotnet msbuild src/Keypaste.Cli/Keypaste.Cli.csproj -getProperty:VersionPrefix -nologo 2>/dev/null | tr -d '[:space:]')"
+fi
+[ -n "$EXPECT" ] || die "could not determine the expected version; set KEYPASTE_EXPECT_VERSION"
+
+# Both substitutions below change the text a stranger reads, which is this script's whole subject,
+# so each is announced rather than applied quietly.
+#
+#   --version   retargets an UNADVERTISED candidate. README correctly names the advertised release;
+#               a candidate has no page of its own by design, so the only way to exercise its assets
+#               through the documented shape is to rewrite the version in the block. That is a
+#               narrower claim than a verbatim run and the output says so.
+#   arm64       exactly the substitution README instructs, and nothing else.
+if [ -n "$RETARGET" ] && [ "$RETARGET" != "$EXPECT" ]; then
+  die "--version $RETARGET disagrees with KEYPASTE_EXPECT_VERSION $EXPECT; the binary would be checked against the wrong number"
+fi
+if [ -n "$RETARGET" ]; then
+  README_VERSION="$(grep -oE 'keypaste-[0-9][0-9A-Za-z.-]*-(linux|osx|win)-[a-z0-9]+\.(tar\.gz|zip)' "$BLOCK" \
+    | head -1 | sed -E 's/^keypaste-(.*)-(linux|osx|win)-[a-z0-9]+\.(tar\.gz|zip)$/\1/')"
+  [ -n "$README_VERSION" ] || die "could not read a version out of the $BLOCK_OS block to retarget it"
+  if [ "$README_VERSION" != "$RETARGET" ]; then
+    sed -i "s/$README_VERSION/$RETARGET/g" "$BLOCK"
+    echo "!!! CANDIDATE RUN: $DOC's block, with $README_VERSION rewritten to $RETARGET."
+    echo "!!! This tests the documented install SHAPE against an unadvertised release's assets."
+    echo "!!! It is not evidence that $DOC is correct - verify-release-matrix.sh owns that."
+  fi
+fi
+if [ -n "$SUBSTITUTE_RID" ]; then
+  sed -i "s/linux-x64/$SUBSTITUTE_RID/g" "$BLOCK"
+  echo "!!! ARM64 RUN: linux-x64 rewritten to $SUBSTITUTE_RID, the substitution $DOC instructs an"
+  echo "!!! arm64 reader to make. The block is otherwise untouched."
+fi
+
+echo "--- the $BLOCK_OS block as it will be run ---"
 cat "$BLOCK"
 echo "---"
 
@@ -68,12 +119,6 @@ echo "---"
 # somehow not scheduled.
 grep -qiE 'sha256|Get-FileHash' "$BLOCK" \
   || die "the $OS install block has no checksum step, which is not an install instruction this project publishes"
-
-EXPECT="${KEYPASTE_EXPECT_VERSION:-}"
-if [ -z "$EXPECT" ]; then
-  EXPECT="$(dotnet msbuild src/Keypaste.Cli/Keypaste.Cli.csproj -getProperty:VersionPrefix -nologo 2>/dev/null | tr -d '[:space:]')"
-fi
-[ -n "$EXPECT" ] || die "could not determine the expected version; set KEYPASTE_EXPECT_VERSION"
 
 # ---------------------------------------------------------------------------
 # Run it somewhere that has never seen keypaste. A scratch HOME matters as much as a scratch
@@ -138,7 +183,57 @@ mcp="$(dirname "$found")/keypaste-mcp"
 [ -x "$mcp" ] || [ -x "$mcp.exe" ] || mcp="$(command -v keypaste-mcp 2>/dev/null || true)"
 [ -n "$mcp" ] || die "keypaste installed but keypaste-mcp did not; an MCP client needs both"
 
-echo "the $OS install block works: keypaste $printed and keypaste-mcp, from a clean machine."
+# ---------------------------------------------------------------------------
+# It installed. Now make it do the two things the page says it is for, because "the binary starts"
+# is not the claim on the front of this project - RELEASE requirement 4 asks for the component's
+# advertised workflows, and a release that prints a version and cannot open a vault is not one.
+#
+# Everything here happens under the scratch HOME the block ran with, so a vault, a config and an
+# audit log are all created where a stranger's would be and nowhere else.
+# ---------------------------------------------------------------------------
+exercise() {
+  local bin="$1" home="$2" work pw='correct horse battery staple' out
+  work="$(mktemp -d "$SCRATCH/use.XXXXXX")"
+
+  export HOME="$home"
+  export KEYPASTE_HOME="$work/kp"
+  export KEYPASTE_VAULT="$work/vault.kdbx"
+
+  # 1. A vault, made from nothing. This is the first thing a new user does and it exercises the
+  #    KDBX writer, Argon2 and the file path handling in one step.
+  printf '%s\n%s\n' "$pw" "$pw" | "$bin" init "$KEYPASTE_VAULT" >/dev/null 2>&1 \
+    || die "$OS: the installed keypaste could not create a vault"
+  [ -s "$KEYPASTE_VAULT" ] || die "$OS: init reported success and left no vault file"
+  echo "  vault created: $(wc -c < "$KEYPASTE_VAULT") bytes"
+
+  # 2. A value in, and out again through env injection - the workflow the README leads with. The
+  #    child prints the variable it was given, so this fails if injection silently does nothing,
+  #    which a check that only looked at keypaste's own exit code would not catch.
+  printf '%s\n' "$pw" | "$bin" env set proj TOKEN=injected-ok >/dev/null 2>&1 \
+    || die "$OS: could not set an environment variable in the new vault"
+
+  # pwsh rather than cmd: MSYS rewrites a leading /flag into a Windows path, so `cmd /c` arrives at
+  # the child as `cmd C:/...`, which starts an interactive shell that prints a banner and no value.
+  if [ "$OS" = "windows" ]; then
+    out="$(printf '%s\n' "$pw" | "$bin" run proj -- pwsh -NoProfile -NonInteractive -Command '[Console]::Out.Write($env:TOKEN)' 2>/dev/null | tr -d '\r')"
+  else
+    out="$(printf '%s\n' "$pw" | "$bin" run proj -- sh -c 'printf %s "$TOKEN"' 2>/dev/null)"
+  fi
+  case "$out" in
+    *injected-ok*) echo "  run injection: the child saw the value" ;;
+    *) die "$OS: 'keypaste run' did not put the value in the child's environment (child printed '$out')" ;;
+  esac
+
+  # 3. Nothing was written outside the scratch home. The page's promise is that injection touches
+  #    no file; this is the cheap version of scripts/verify-run-injection.sh, run against the
+  #    PUBLISHED binary rather than a build.
+  [ ! -e "$work/.env" ] || die "$OS: run left a .env behind"
+}
+
+exercise "$found" "$SCRATCH/home"
+
+echo "the $OS install block works: keypaste $printed and keypaste-mcp, from a clean machine,"
+echo "and the installed binary creates a vault and injects into a child process."
 
 [ "$NEGATIVE" = "--negative" ] || exit 0
 
