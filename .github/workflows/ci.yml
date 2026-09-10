@@ -114,6 +114,14 @@ jobs:
         shell: bash
         run: scripts/verify-release-matrix.sh
 
+      # The live half of this script asks keypaste.com and is deliberately not here: nothing in CI
+      # deploys the site, so it would be red for a reason CI cannot fix. --selftest is offline, and
+      # forces CRLF out of a fake jq whatever the platform - so the Linux runner catches a reader
+      # bug that can only happen on Windows, which is the only place it would otherwise be found.
+      - name: Verify the disclosure reader survives a jq that writes CRLF
+        shell: bash
+        run: scripts/verify-site-disclosure.sh --selftest
+
   test:
     name: test (${{ matrix.os }})
     needs: gate
