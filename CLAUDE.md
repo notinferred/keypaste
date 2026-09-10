@@ -1,5 +1,12 @@
 # Working rules for this repository
 
+## Rules
+
+- **Only the next five steps in `docs/STEPS.md` are detailed.** Later steps stay one line — ID, name,
+  Needs and what it is for — and are rough on purpose; their wording is not a contract. When a step is
+  finished it shrinks to one line under Completed steps and the next unchecked step is expanded in its
+  place.
+
 ## CI
 
 `ci.yml` runs in full on qualifying pushes to `main`, every pull request, and on dispatch. Its push-level `paths-ignore` skips specified documents; once triggered, its jobs are not filtered by changed paths, and a run on `main` is never cancelled. **`app.yml` is not its mirror.** On pushes to `main` it runs on a `paths:` allowlist — `src/Keypaste.App/**`, `src/Keypaste.Cli/**`, `src/Keypaste.Core/**`, `third_party/**`, the two `Directory.*.props`, `keypaste.app.slnx`, `release-targets.json` (which its package matrix is derived from), its own file, and the App/Cli/Consistency test projects — so a push touching only `src/Keypaste.Mcp/`, `scripts/` or `keypaste.slnx` does not trigger it. Pull requests and dispatch are unfiltered; matching version tags package the app. Feature-branch pushes alone trigger neither workflow. Runners are GitHub-hosted and free, because the repository is public (D-0086).

@@ -16,22 +16,24 @@ namespace Keypaste.Core.Tests;
 /// </para>
 /// <para>
 /// <b>The limits come from the trimmed result rather than from taste.</b> After that pass the
-/// longest ledger row was 613 (D-0090, five ratified constraints in one sentence) and the longest
-/// completed evidence cell 868 (F.4b, which carries three dispatch IDs and a hand observation).
-/// The limits sit just above each, so a row that states its decision and its evidence fits and a
-/// row that also tells the story does not.
+/// longest ledger row was 613 (D-0090, five ratified constraints in one sentence). The STEPS trim
+/// that followed moved completed work out of a four-column table with a status cell into
+/// <c>| Step | Name | Evidence |</c>, and the longest row became 322 (F.4a, which carries its case
+/// count and two D-rows). The limits sit just above each, so a row that states its decision and its
+/// evidence fits and a row that also tells the story does not.
 /// </para>
 /// <para>
 /// <b>Two things are deliberately out of scope.</b> DECISIONS' archive below the frozen line is
-/// not maintained and not rewritten (D-0083), and an open STEPS task is where the thinking is
+/// not maintained and not rewritten (D-0083), and a detailed STEPS step is where the thinking is
 /// supposed to happen — F.6 and F.7 argue about what a probe would settle, which is the row doing
-/// its job. Only rows claiming something is finished are held here.
+/// its job. Only rows claiming something is finished are held here; the one-line placeholders for
+/// later steps are bullets, so nothing reaches them either.
 /// </para>
 /// </remarks>
 public sealed class RecordRowsStaySkimmableTests
 {
     private const int LedgerRowLimit = 650;
-    private const int CompletedCellLimit = 900;
+    private const int CompletedCellLimit = 350;
 
     [Fact]
     public void LedgerRows_StayOneDecisionLong()
@@ -113,31 +115,34 @@ public sealed class RecordRowsStaySkimmableTests
     }
 
     /// <summary>
-    /// Table rows whose status cell claims the work is finished. An unchecked task is a bullet
-    /// rather than a table row, so nothing open is reached by this.
+    /// The rows of the Completed steps table. Every step in it is finished by virtue of being
+    /// there, so there is no status cell to read — an unfinished step is a bullet elsewhere in the
+    /// file, and the ID-continuity table below is a different section this never enters.
     /// </summary>
     private static List<string> CompletedStepRows()
     {
         var rows = new List<string>();
+        var inside = false;
         foreach (var line in File.ReadLines(Path.Combine(RepoRoot(), "docs", "STEPS.md")))
         {
-            if (!line.StartsWith("| ", StringComparison.Ordinal))
+            if (line.StartsWith("## ", StringComparison.Ordinal))
+            {
+                inside = line.Trim() == "## Completed steps";
+                continue;
+            }
+
+            if (!inside || !line.StartsWith("| ", StringComparison.Ordinal))
             {
                 continue;
             }
 
-            var cells = line.Split('|');
-            if (cells.Length < 4)
+            if (line.StartsWith("| Step |", StringComparison.Ordinal)
+                || line.StartsWith("|---", StringComparison.Ordinal))
             {
                 continue;
             }
 
-            var status = cells[2].Trim();
-            if (status.StartsWith("Complete", StringComparison.Ordinal)
-                || status.StartsWith("Published", StringComparison.Ordinal))
-            {
-                rows.Add(line);
-            }
+            rows.Add(line);
         }
 
         return rows;
