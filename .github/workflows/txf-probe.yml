@@ -45,7 +45,7 @@ jobs:
       # 8dot3 name creation is a per-volume setting, and a reserved name reserves its alias too, so
       # a run that does not record this cannot be compared against one on another machine.
       - name: Record the volume's 8.3 setting
-        run: fsutil 8dot3name query C:
+        run: 'fsutil 8dot3name query C:'
 
       - name: Probe
         run: dotnet run scripts/txf-probe.cs
