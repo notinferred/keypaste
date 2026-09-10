@@ -231,15 +231,15 @@ internal sealed class KeePassInterop : IDisposable
     /// file to scan it, which makes the replace fail for a few milliseconds at a time.
     /// </para>
     /// <para>
-    /// <b>Concurrent saves contend with each other too, and harder.</b> KeePassLib's Windows path
-    /// is Transactional NTFS, and its temporary file goes in the one shared <c>%TEMP%</c>: a
-    /// directory enlisted in one transaction refuses operations from outside it, so a second save
-    /// fails with "The function attempted to use a name that is reserved for use by another
-    /// transaction" — raised where the temporary file is opened, which is upstream of the fallback
-    /// TxF has for the move. keypaste is several processes by design, so this is an ordinary
-    /// arrangement. Observed on Windows CI in run 34303291945, in two unrelated tests across two
-    /// attempts; not reproducible on a developer machine at 32 overlapping savers, which is why
-    /// the budget is set from what the runner needed rather than from a local measurement.
+    /// <b>Concurrent saves contend with each other too, and harder — for a reason nobody has
+    /// established.</b> KeePassLib's Windows path is Transactional NTFS with its temporary file in
+    /// the one shared <c>%TEMP%</c>, and a save there fails "The function attempted to use a name
+    /// that is reserved for use by another transaction", raised where the temporary file is opened
+    /// and so upstream of the fallback TxF has for the move. Observed on Windows CI in runs
+    /// 34303291945 and 34403613553; not reproducible here at 32 overlapping savers, which is why
+    /// the budget is set from what the runner needed. <b>Do not write down a mechanism this
+    /// retry rests on:</b> the previous one — a directory enlisted in a transaction refusing
+    /// operations from outside it — was refuted, and F.6 owns the diagnosis (D-0114).
     /// </para>
     /// <para>
     /// Retrying is safe precisely because the write is transactional. A failed commit leaves the

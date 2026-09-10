@@ -37,6 +37,9 @@
 # closing lines say how many of its cases were reached rather than implying a number.
 set -euo pipefail
 
+readonly SELF="${BASH_SOURCE[0]}"
+SCENARIOS_SEEN=()
+
 readonly PUBLISHER="${KEYPASTE_PUBLISHER:-scripts/publish-release.sh}"
 readonly BUCKET='keypaste-fixture-dl'
 readonly PROBE='v0.1.0/'
@@ -251,6 +254,7 @@ run_case() {
   fi
 
   cases_run=$((cases_run + 1))
+  SCENARIOS_SEEN+=("$scenario")
   writes_seen=$((writes_seen + writes))
   printf '  ok  %-22s exit %s, %s write call(s)\n' "$name" "$rc" "$writes"
 }
@@ -277,17 +281,20 @@ seed_state; occupy_target
 run_case 'occupied/check' honest "$PUBLISHER" --check 1 0 'immutable'
 
 echo '--- C. the check itself could not be made'
-for scenario in denied denied-quiet throttled unavailable; do
+readonly UNVERIFIABLE=(denied denied-quiet throttled unavailable)
+for scenario in "${UNVERIFIABLE[@]}"; do
   seed_state
   run_case "$scenario" "$scenario" "$PUBLISHER" --publish 1 0 'refusing without a verified answer'
 done
 
 echo '--- D. an answer that is not a listing'
-for scenario in empty-stdout truncated-json root-array root-null root-string truncated-no-keys keyless-entry; do
+readonly NOT_A_LISTING=(empty-stdout truncated-json root-array root-null root-string truncated-no-keys keyless-entry)
+for scenario in "${NOT_A_LISTING[@]}"; do
   seed_state
   run_case "$scenario" "$scenario" "$PUBLISHER" --publish 1 0 'is not a listing this can act on'
 done
-for scenario in wrong-prefix wrong-bucket; do
+readonly WRONG_SUBJECT=(wrong-prefix wrong-bucket)
+for scenario in "${WRONG_SUBJECT[@]}"; do
   seed_state
   run_case "$scenario" "$scenario" "$PUBLISHER" --publish 1 0 'is not a listing this can act on'
 done
@@ -297,7 +304,8 @@ echo '--- D2. the probe answers and the destination alone does not'
 # destination is never judged. That is how a jq exiting 0 for empty input stayed invisible until
 # release run 34302850825 on ubuntu-22.04, where an empty answer about the destination alone
 # reached `aws s3 cp` over a published version. Reproduced by hand, then made a case.
-for scenario in target-empty target-truncated; do
+readonly PROBE_ONLY=(target-empty target-truncated)
+for scenario in "${PROBE_ONLY[@]}"; do
   seed_state
   run_case "$scenario" "$scenario" "$PUBLISHER" --publish 1 0 'is not a listing this can act on'
 done
@@ -310,7 +318,8 @@ run_case 'always-empty' always-empty "$PUBLISHER" --publish 1 0 'the positive co
 
 echo '--- F. the version string itself'
 seed_state
-for bad in '' 'v0.1.1' '0.1' '../0.1.1' '0.1.1/../..'; do
+readonly BAD_VERSIONS=('' 'v0.1.1' '0.1' '../0.1.1' '0.1.1/../..')
+for bad in "${BAD_VERSIONS[@]}"; do
   : > "$CALLS"
   rc=0
   (
@@ -323,7 +332,7 @@ for bad in '' 'v0.1.1' '0.1' '../0.1.1' '0.1.1/../..'; do
   [ "$(writes_in_log)" = 0 ] || die "version '$bad' reached a write"
   cases_run=$((cases_run + 1))
 done
-echo "  ok  five version strings that name no release were refused before any call"
+echo "  ok  ${#BAD_VERSIONS[@]} version strings that name no release were refused before any call"
 
 : > "$CALLS"
 rc=0
@@ -417,7 +426,22 @@ fi
 
 # ---- 3. two guards, in opposite directions.
 
-[ "$cases_run" -ge 23 ] || die "only $cases_run cases ran; the scenario table has lost rows"
+# The expected number is summed from the lists that drive the loops rather than written down: a
+# floor somebody raises by hand falls behind as cases are added, and a case that stops being driven
+# then passes as a smaller suite. A count cannot catch a name deleted from a list, which lowers both
+# sides at once, so every answer the fake knows how to give must also be demanded by some case.
+DECLARED=$(( $(grep -cE '^run_case ' "$SELF")
+             + ${#UNVERIFIABLE[@]} + ${#NOT_A_LISTING[@]} + ${#WRONG_SUBJECT[@]} + ${#PROBE_ONLY[@]}
+             + ${#BAD_VERSIONS[@]}
+             + 1 ))   # the no-mode case, which is written inline rather than through run_case
+[ "$cases_run" -eq "$DECLARED" ]   || die "$cases_run cases ran, but $DECLARED are written in $SELF; a case is defined and not driven"
+
+for scenario in $(sed -n '/case "$SCENARIO" in/,/no such scenario/p' "$SELF"                    | grep -oE '^ +[a-z0-9-]+\)' | tr -d ' )'); do
+  case " ${SCENARIOS_SEEN[*]} " in
+    *" $scenario "*) ;;
+    *) die "the fake answers '$scenario' and no case asks for it; a scenario left undriven is not a scenario that passed" ;;
+  esac
+done
 [ "$writes_seen" -eq 1 ] \
   || die "$writes_seen write call(s) across the fixed publisher's cases, expected exactly 1"
 
