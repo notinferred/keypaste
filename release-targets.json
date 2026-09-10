@@ -35,6 +35,11 @@
           "docs/RELEASE.md"
         ]
       },
+      "defects_disclosed_in": [
+        "README.md",
+        "site/public/index.html",
+        "SECURITY.md"
+      ],
       "targets": [
         {
           "rid": "linux-x64",
@@ -204,7 +209,45 @@
         "osx-arm64",
         "win-x64"
       ],
-      "advertised": true
+      "advertised": true,
+      "known_defects": [
+        {
+          "id": "F.1b",
+          "phrase": "env export can delete your vault"
+        },
+        {
+          "id": "F.1a",
+          "phrase": "env rm and env set can act on the wrong entry"
+        },
+        {
+          "id": "F.1e",
+          "phrase": "get can return the wrong password"
+        },
+        {
+          "id": "F.1c",
+          "phrase": "env pull can delete an edit it never imported"
+        },
+        {
+          "id": "F.3a",
+          "phrase": "moving the clock back can revive an expired approval"
+        },
+        {
+          "id": "F.3d",
+          "phrase": "an approved credential too large to send costs you every other grant"
+        },
+        {
+          "id": "F.3c",
+          "phrase": "listing a large vault costs you every other grant"
+        },
+        {
+          "id": "F.3b",
+          "phrase": "an agent can queue approval prompts"
+        },
+        {
+          "id": "D-0084",
+          "phrase": "entry names can render unescaped"
+        }
+      ]
     }
   ]
 }

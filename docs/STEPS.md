@@ -115,10 +115,26 @@ fixtures rather than a maintainer's temporary files.
 
 ### Release foundations
 
+- [ ] **R.0d — Say what the advertised download does wrong.** Needs: 3.4.
+  **Build:** Record every defect the advertised release is known to carry in
+  [release-targets.json](../release-targets.json), against the version that carries it, and name each
+  one with the way to avoid it on every page recorded as disclosing them. The list has one home, so
+  three copies of it cannot drift apart.
+  **Verify (V-R.0d):** [verify-release-matrix.sh](../scripts/verify-release-matrix.sh) refuses a page
+  that stops naming a defect the advertised release carries, and refuses a page still naming one that
+  belongs to a release no longer advertised, so the block cannot outlive the version it describes.
+  [verify-site-disclosure.sh](../scripts/verify-site-disclosure.sh) asks keypaste.com itself, behind a
+  positive control that the page it read is the one advertising the download.
+  **Note:** PRODUCT §3.10 and SECURITY.md's "no quiet patches" already required this; `v0.1.0` ships
+  `env export` deleting a vault and nothing at the download point said so. The CLI has no self-update
+  and no version check, so these pages are the only channel that reaches an installed user. **It
+  closes when keypaste.com serves the block** — the site is deployed by hand and no workflow
+  publishes it (RELEASE, what `verify-release-matrix.sh` cannot see).
+
 - [ ] **R.0a — Pin release identity and the supported platform contract.** Needs: 3.4.
   **Build:** Keep one checked release definition for component, version, source commit, supported OS floor/CPU, package format and signing policy, and drive workflow matrices and download documentation from it. It covers the four CLI/MCP targets and three desktop targets in RELEASE, distinguishes supported downloads from source-only routes, and retains an explicit unsigned policy for CLI patches until signing is available.
   **Verify (V-R.0a):** Every advertised target has a matching package/check job; a missing target, conflicting version or unsupported OS claim fails validation. A release candidate keeps its full prerelease version across CLI, MCP, desktop, archives and changelog lookup.
-  **Note:** Built and green on ad5a71d — [release-targets.json](../release-targets.json) drives both workflows, [verify-release-matrix.sh](../scripts/verify-release-matrix.sh) refuses 25 fixture cases and [verify-green-gates.sh](../scripts/verify-green-gates.sh) eight; **it closes on a prerelease tag and the three R2 secrets, because `app.yml` sets `VersionSuffix` only on a tag** ([what only a tag reaches](RELEASE.md#what-only-a-tag-reaches)); D-0108 to D-0112.
+  **Note:** Built and green on ad5a71d — [release-targets.json](../release-targets.json) drives both workflows, [verify-release-matrix.sh](../scripts/verify-release-matrix.sh) refuses 27 fixture cases and [verify-green-gates.sh](../scripts/verify-green-gates.sh) eight; **it closes on a prerelease tag and the three R2 secrets, because `app.yml` sets `VersionSuffix` only on a tag** ([what only a tag reaches](RELEASE.md#what-only-a-tag-reaches)); D-0108 to D-0112.
 
 - [ ] **R.0b — Publish complete, immutable component releases.** Needs: R.0a, F.4a.
   **Build:** Implement a per-component manifest containing tag, commit, file hashes, URLs and signature/provenance references; upload immutable assets, verify them anonymously at the public origin, and write completion evidence only after all required checks pass. Maintain the last verified advertised version separately; a partial upload uses a new version for recovery and cannot promote or overwrite the failed version.

@@ -552,6 +552,52 @@ EOF
     done
   done
 
+  # What the advertised download is known to get wrong is disclosed where it is downloaded from, for
+  # as long as it is the advertised download. The list has ONE home - the definition, against the
+  # version that carries it - because a list written out on three pages instead is three lists, and
+  # the copies drift. Both directions are checked: a page that stops naming a defect the advertised
+  # release has, and a page still naming one belonging to a release that is no longer advertised.
+  # The second is what a hand-written warning cannot do - it goes stale the moment the version moves
+  # and nothing says so, which is the whole reason this is a gate and not a paragraph.
+  local defect_component defect_pages defect
+  defect_component="$(jqr '[.published[] | select(.advertised == true)] | last | .component' "$def")"
+  if [ -n "$defect_component" ] && [ "$defect_component" != "null" ]; then
+    defect_pages="$(json_array "$def" ".components.\"$defect_component\".defects_disclosed_in")"
+
+    if [ -z "$defect_pages" ] \
+       && [ -n "$(jqr '[.published[] | select(.advertised == true)] | last | (.known_defects // []) | length' "$def")" ] \
+       && [ "$(jqr '[.published[] | select(.advertised == true)] | last | (.known_defects // []) | length' "$def")" -gt 0 ]; then
+      note "$version is recorded as carrying known defects and no page is recorded as disclosing them"
+    fi
+
+    while IFS= read -r defect; do
+      [ -n "$defect" ] || continue
+      for page in $defect_pages; do
+        [ -f "$root/$page" ] || { note "no page at $page to disclose what $version is known to get wrong"; continue; }
+        grep -qF -- "$defect" "$root/$page" \
+          || note "$page does not say that $defect, which the advertised $version is known to do"
+      done
+    done <<EOF
+$(jqr '[.published[] | select(.advertised == true)] | last | (.known_defects // []) | .[].phrase' "$def")
+EOF
+
+    while IFS= read -r defect; do
+      [ -n "$defect" ] || continue
+      for page in $defect_pages; do
+        [ -f "$root/$page" ] || continue
+        if grep -qF -- "$defect" "$root/$page"; then
+          note "$page still says that $defect, which belongs to a release that is no longer advertised"
+        fi
+      done
+    done <<EOF
+$(jqr '. as $d
+       | ([$d.published[] | select(.advertised == true)] | last | .version) as $adv
+       | ([$d.published[] | select(.version == $adv) | (.known_defects // [])[].phrase]) as $keep
+       | ([$d.published[] | select(.version != $adv) | (.known_defects // [])[].phrase] - $keep)
+       | .[]' "$def")
+EOF
+  fi
+
   # The advertised version has its own changelog section, matched as a whole line. `## 0.2.0` being
   # a substring of `## 0.2.0-rc.1` is exactly the confusion this contract exists to prevent.
   if [ -f "$root/CHANGELOG.md" ]; then
@@ -882,6 +928,21 @@ sed -i 's/unsigned/perfectly ordinary/g' "$FAKE/README.md"
 expect_repo_refusal "signing-disclosure-deleted" "no longer says the cli binaries are unsigned" \
   "$FAKE/release-targets.json" "$FAKE"
 cp README.md "$FAKE/README.md"
+
+# A page that drops one defect from the list still looks complete to a reader, which is why the
+# check reads the list from the definition rather than counting what it finds.
+sed -i 's/env export can delete your vault/env export is careful/' "$FAKE/README.md"
+expect_repo_refusal "defect-not-disclosed" "does not say that env export can delete your vault" \
+  "$FAKE/release-targets.json" "$FAKE"
+cp README.md "$FAKE/README.md"
+
+# And the stale direction: the advertised version moves on and the pages keep warning about the
+# release nobody is being sent to any more. Nothing about the pages changes here - only which
+# release the definition advertises - so this is the case a warning written by hand cannot fail.
+expect_repo_refusal "defect-of-an-unadvertised-release-still-published" \
+  "belongs to a release that is no longer advertised" \
+  "$(mutate defect-of-an-unadvertised-release-still-published '.published += [{"version":"0.2.0","tag":"v0.2.0","component":"cli","date":"2026-01-01","origin":"https://dl.keypaste.com/v0.2.0/","rids":["linux-x64","linux-arm64","osx-arm64","win-x64"],"advertised":true}]')" \
+  "$FAKE"
 
 # ---------------------------------------------------------------------------
 # 7. NEGATIVE CONTROL. The check that stops an empty matrix reporting success, removed.
