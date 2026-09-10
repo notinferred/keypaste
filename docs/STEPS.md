@@ -17,8 +17,9 @@ credential service exists. Three repairs are open — F.7 and F.6 on the Windows
 D-0114 withdrew the account of the contention rather than fixing it, and F.2b2, BLOCKED on hardware
 rather than on work. **F.7 is next**, and release work resumes at R.0a, which is built and green on
 ad5a71d and now closes on a prerelease tag alone: dispatch 34424929687 put the three R2 secrets
-against the real bucket on 2026-09-10 and they work. R.0d has disclosed what the advertised `v0.1.0`
-gets wrong and closes on its own live check; 3.8 no longer stands in front of R.0c (D-0115).
+against the real bucket on 2026-09-10 and they work. R.0d is closed — keypaste.com now names every defect the advertised `v0.1.0`
+carries, and 3.8 no longer stands in front of R.0c (D-0115). **R.0b is built and closes on a
+real publication**, so the whole release chain is waiting on one prerelease tag.
 
 ## Build order
 
@@ -84,6 +85,7 @@ deletion or restoring history, and the F rows are defects found after those orig
 | F.4a | A release destination is refused unless a listing positively verifies it is empty | [verify-release-destination.sh](../scripts/verify-release-destination.sh), 26 cases; [tripwire tests](../tests/Keypaste.Core.Tests/ReleaseDestinationIsCheckedTests.cs); R2's own listing reply is still unobserved; D-0104, D-0106 |
 | F.4b | Every binary keypaste ships reports keypaste as its publisher | [verify-publisher-metadata.sh](../scripts/verify-publisher-metadata.sh), [attribute tests](../tests/Keypaste.Core.Tests/PublisherMetadata.cs); D-0097, D-0105 |
 | F.5 | A pipelined `tools/call` is waited for rather than refused, and an unnameable client is still refused — **weak evidence; a third occurrence reopens it** | [grace tests](../tests/Keypaste.Mcp.Tests/HandshakeGraceTests.cs); D-0113 |
+| R.0d | What the advertised `v0.1.0` gets wrong is named where it is downloaded | [matrix gate](../scripts/verify-release-matrix.sh) holds three pages to `known_defects` both ways; [site check](../scripts/verify-site-disclosure.sh) green on the served page, deploy 71e1d187, 2026-09-10; D-0117 |
 | 10.1 | Initial hostile review and remediation | D-0084 in [DECISIONS](../DECISIONS.md) |
 | K.1 | Pinned SDK installed | [global.json](../global.json), D-0076 |
 
@@ -116,22 +118,6 @@ fixtures rather than a maintainer's temporary files.
 - [ ] **F.2b2 — Observe minimize-lock on macOS and Linux.** Needs: F.2b1. — **BLOCKED** on a macOS machine and a Linux desktop session (2026-09-08); run F.2b1's behavior on both remaining targets during 4.7a/4.7b, following the [desktop checklist](desktop.md#observing-minimize-lock-on-macos-and-linux), and correct [MinimizeLock](../src/Keypaste.App/MinimizeLock.cs) if an observation contradicts it.
 
 ### Release foundations
-
-- [ ] **R.0d — Say what the advertised download does wrong.** Needs: 3.4.
-  **Build:** Record every defect the advertised release is known to carry in
-  [release-targets.json](../release-targets.json), against the version that carries it, and name each
-  one with the way to avoid it on every page recorded as disclosing them. The list has one home, so
-  three copies of it cannot drift apart.
-  **Verify (V-R.0d):** [verify-release-matrix.sh](../scripts/verify-release-matrix.sh) refuses a page
-  that stops naming a defect the advertised release carries, and refuses a page still naming one that
-  belongs to a release no longer advertised, so the block cannot outlive the version it describes.
-  [verify-site-disclosure.sh](../scripts/verify-site-disclosure.sh) asks keypaste.com itself, behind a
-  positive control that the page it read is the one advertising the download.
-  **Note:** PRODUCT §3.10 and SECURITY.md's "no quiet patches" already required this; `v0.1.0` ships
-  `env export` deleting a vault and nothing at the download point said so. The CLI has no self-update
-  and no version check, so these pages are the only channel that reaches an installed user. **It
-  closes when keypaste.com serves the block** — the site is deployed by hand and no workflow
-  publishes it (RELEASE, what `verify-release-matrix.sh` cannot see). D-0117.
 
 - [ ] **R.0a — Pin release identity and the supported platform contract.** Needs: 3.4.
   **Build:** Keep one checked release definition for component, version, source commit, supported OS floor/CPU, package format and signing policy, and drive workflow matrices and download documentation from it. It covers the four CLI/MCP targets and three desktop targets in RELEASE, distinguishes supported downloads from source-only routes, and retains an explicit unsigned policy for CLI patches until signing is available.
