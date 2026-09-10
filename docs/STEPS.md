@@ -16,7 +16,9 @@ with partial entry/env screens, and no hosted service, web vault, mobile client 
 credential service exists. Three repairs are open — F.7 and F.6 on the Windows save path, where
 D-0114 withdrew the account of the contention rather than fixing it, and F.2b2, BLOCKED on hardware
 rather than on work. **F.7 is next**, and release work resumes at R.0a, which is built and green on
-ad5a71d but closes only on a prerelease tag and the three R2 secrets this repository does not hold.
+ad5a71d and now closes on a prerelease tag alone: dispatch 34424929687 put the three R2 secrets
+against the real bucket on 2026-09-10 and they work. R.0d has disclosed what the advertised `v0.1.0`
+gets wrong and closes on its own live check; 3.8 no longer stands in front of R.0c (D-0115).
 
 ## Build order
 
@@ -129,23 +131,26 @@ fixtures rather than a maintainer's temporary files.
   `env export` deleting a vault and nothing at the download point said so. The CLI has no self-update
   and no version check, so these pages are the only channel that reaches an installed user. **It
   closes when keypaste.com serves the block** — the site is deployed by hand and no workflow
-  publishes it (RELEASE, what `verify-release-matrix.sh` cannot see).
+  publishes it (RELEASE, what `verify-release-matrix.sh` cannot see). D-0117.
 
 - [ ] **R.0a — Pin release identity and the supported platform contract.** Needs: 3.4.
   **Build:** Keep one checked release definition for component, version, source commit, supported OS floor/CPU, package format and signing policy, and drive workflow matrices and download documentation from it. It covers the four CLI/MCP targets and three desktop targets in RELEASE, distinguishes supported downloads from source-only routes, and retains an explicit unsigned policy for CLI patches until signing is available.
   **Verify (V-R.0a):** Every advertised target has a matching package/check job; a missing target, conflicting version or unsupported OS claim fails validation. A release candidate keeps its full prerelease version across CLI, MCP, desktop, archives and changelog lookup.
-  **Note:** Built and green on ad5a71d — [release-targets.json](../release-targets.json) drives both workflows, [verify-release-matrix.sh](../scripts/verify-release-matrix.sh) refuses 27 fixture cases and [verify-green-gates.sh](../scripts/verify-green-gates.sh) eight; **it closes on a prerelease tag and the three R2 secrets, because `app.yml` sets `VersionSuffix` only on a tag** ([what only a tag reaches](RELEASE.md#what-only-a-tag-reaches)); D-0108 to D-0112.
+  **Note:** Built and green on ad5a71d — [release-targets.json](../release-targets.json) drives both workflows, [verify-release-matrix.sh](../scripts/verify-release-matrix.sh) refuses 27 fixture cases and [verify-green-gates.sh](../scripts/verify-green-gates.sh) eight; D-0108 to D-0112. The three R2 secrets are held and work: dispatch 34424929687 (2026-09-10) ran `publish-release.sh --check`, its positive control saw 11 objects at `v0.1.0/` and it verified `v0.2.0-dryrun/` empty. **What remains is a prerelease tag, because `app.yml` sets `VersionSuffix` only on a tag** ([what only a tag reaches](RELEASE.md#what-only-a-tag-reaches)).
 
 - [ ] **R.0b — Publish complete, immutable component releases.** Needs: R.0a, F.4a.
-  **Build:** Implement a per-component manifest containing tag, commit, file hashes, URLs and signature/provenance references; upload immutable assets, verify them anonymously at the public origin, and write completion evidence only after all required checks pass. Maintain the last verified advertised version separately; a partial upload uses a new version for recovery and cannot promote or overwrite the failed version.
+  **Build:** Implement a per-component completion record containing tag, commit, file hashes and URLs; upload immutable assets, verify them anonymously at the public origin, and write the record only after all required checks pass. Maintain the last verified advertised version separately; a partial upload uses a new version for recovery and cannot promote or overwrite the failed version. Signature and provenance references are 3.8's and are not required here (D-0116).
   **Verify (V-R.0b):** Interrupt an upload, corrupt one public asset and omit one target in separate fixtures: none creates a complete release or changes the advertised version. A successful run's recorded public bytes match the manifest; a repeated publication cannot replace them.
-  **Note:** Owns the first observation of R2's actual reply to a listing, which only a tag produces.
+  **Note:** Owns the first observation of R2's actual reply to a listing, which only a tag produces. The three refusal fixtures need no tag and no credential — drive the publisher against a fake `aws` on PATH and count write calls, the way [verify-release-destination.sh](../scripts/verify-release-destination.sh) does (D-0109's rule: a decision only a tag can reach belongs in a script a fixture can drive).
 
 - [ ] **3.8 — Authenticate release origin and retain provenance.** Needs: R.0b.
   **Build:** Generate build attestations for every distributable, source archive and release manifest; bind verification to this repository and its release workflow. Publish a copyable verification procedure and retain the evidence with the release; make no reproducible-build claim from attestation alone.
   **Verify (V-3.8):** The documented procedure accepts an anonymously downloaded genuine release and rejects a changed byte, wrong repository identity or unrelated workflow. Every advertised asset is covered after temporary CI artifacts expire.
 
-- [ ] **R.0c — Publish and installation-verify the next CLI/MCP patch.** Needs: R.0b, 3.8, F.1a, F.1b, F.1c, F.1e, F.3a, F.3b, F.3c, F.4b. — Tag, publish and install the next CLI/MCP version on all four native targets from a clean machine.
+- [ ] **R.0c — Publish and installation-verify the next CLI/MCP patch.** Needs: R.0b, F.1a, F.1b, F.1c, F.1e, F.3a, F.3b, F.3c, F.3d, F.4b.
+  **Build:** Tag `v0.2.0-rc.1` and then `v0.2.0`, publish each through [release.yml](../.github/workflows/release.yml), and install the result on all four native targets from a clean machine. The candidate is published and unadvertised — [its changelog section](../CHANGELOG.md#020-rc1) already says so, and nothing is added to `published` for it. Only after `v0.2.0` verifies anonymously does the advertised version move, in one commit that carries the `published` entry, both download pages and R.0d's defect list together.
+  **Verify (V-R.0c):** Every advertised asset is fetched from `https://dl.keypaste.com/v0.2.0/` with no repository credential, its hash checked, installed without an SDK, and exercised: `--version`, `keypaste run` injection and one approval on each target. A `cited` floor a run has now stood on is recorded as observed rather than cited.
+  **Note:** Carries the repairs a `v0.1.0` user is currently exposed to — F.1b alone destroys a vault. F.3d joins the Needs because it is one of them and was written after this row's list. 3.8 left it (D-0115) and still gates 4.7c, so provenance arrives before any public desktop download and before R.1.
 
 ### Desktop packages and platform signing
 

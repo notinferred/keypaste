@@ -94,9 +94,10 @@ requirements to implementation; all remain open until their own evidence passes.
 
 | Delivery | Owning tasks |
 |---|---|
-| Existing data-preservation, approval and transport repairs before the CLI/MCP patch | F.1a–c, F.3a–c; required by R.0c |
+| Existing data-preservation, approval and transport repairs before the CLI/MCP patch | F.1a–c, F.3a–d; required by R.0c |
 | Existing desktop preference, lock, clipboard and automation checks | F.2a–d; required by 4.7b |
 | Release destination error handling and first-party publisher metadata | F.4a/b; required by the relevant release paths |
+| Disclosing what the advertised download is known to get wrong | R.0d |
 | Executable version/platform definition, complete publication, provenance | R.0a, R.0b, 3.8 |
 | Public CLI/MCP patch and native installation | R.0c |
 | Desktop candidate packaging, installation and data-preserving upgrades | 4.7a, 4.7b, 4.7d |
