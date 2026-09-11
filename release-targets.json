@@ -40,6 +40,10 @@
         "site/public/index.html",
         "SECURITY.md"
       ],
+      "upgrade_notice_on": [
+        "SECURITY.md",
+        "site/public/index.html"
+      ],
       "targets": [
         {
           "rid": "linux-x64",
@@ -211,7 +215,7 @@
         "osx-arm64",
         "win-x64"
       ],
-      "advertised": true,
+      "advertised": false,
       "known_defects": [
         {
           "id": "F.1b",
@@ -277,7 +281,7 @@
         "osx-arm64",
         "win-x64"
       ],
-      "advertised": false
+      "advertised": true
     }
   ]
 }

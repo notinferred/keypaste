@@ -574,27 +574,42 @@ EOF
   done
 
   # What the advertised download is known to get wrong is disclosed where it is downloaded from, for
-  # as long as it is the advertised download. The list has ONE home - the definition, against the
-  # version that carries it - because a list written out on three pages instead is three lists, and
-  # the copies drift. Both directions are checked: a page that stops naming a defect the advertised
-  # release has, and a page still naming one belonging to a release that is no longer advertised.
-  # The second is what a hand-written warning cannot do - it goes stale the moment the version moves
-  # and nothing says so, which is the whole reason this is a gate and not a paragraph.
-  local defect_component defect_pages defect
+  # as long as it IS the advertised download. The list has ONE home - the definition, against the
+  # version that carries it - because a list written out on three pages instead is three lists and
+  # the copies drift.
+  #
+  # The staleness rule is about the DOWNLOAD'S defect block and nothing else, which is why it reads a
+  # marker rather than looking for phrases. Once a release is superseded its defects still need
+  # saying - somebody installed it and is still running it - so the pages carry an upgrade notice
+  # that names those very defects on purpose. A rule that refused any mention of an old defect would
+  # refuse exactly the sentence a person most needs to read. The marker separates the two: inside
+  # `<!-- defects:VERSION -->` is a claim about the current download, and a marker naming anything
+  # but the advertised version is the block outliving what it describes.
+  local defect_component defect_pages defect marker
   defect_component="$(jqr '[.published[] | select(.advertised == true)] | last | .component' "$def")"
   if [ -n "$defect_component" ] && [ "$defect_component" != "null" ]; then
     defect_pages="$(json_array "$def" ".components.\"$defect_component\".defects_disclosed_in")"
+    local defect_count
+    defect_count="$(jqr '[.published[] | select(.advertised == true)] | last | (.known_defects // []) | length' "$def")"
+    case "$defect_count" in '' | *[!0-9]*) defect_count=0 ;; esac
 
-    if [ -z "$defect_pages" ] \
-       && [ -n "$(jqr '[.published[] | select(.advertised == true)] | last | (.known_defects // []) | length' "$def")" ] \
-       && [ "$(jqr '[.published[] | select(.advertised == true)] | last | (.known_defects // []) | length' "$def")" -gt 0 ]; then
+    if [ -z "$defect_pages" ] && [ "$defect_count" -gt 0 ]; then
       note "$version is recorded as carrying known defects and no page is recorded as disclosing them"
     fi
+
+    # 1. The advertised release's defects are named, inside a block marked with its version.
+    for page in $defect_pages; do
+      [ -f "$root/$page" ] || { note "no page at $page to disclose what $version is known to get wrong"; continue; }
+      if [ "$defect_count" -gt 0 ]; then
+        grep -qF -- "<!-- defects:$version -->" "$root/$page" \
+          || note "$page has no <!-- defects:$version --> block, so nothing marks what the advertised download gets wrong"
+      fi
+    done
 
     while IFS= read -r defect; do
       [ -n "$defect" ] || continue
       for page in $defect_pages; do
-        [ -f "$root/$page" ] || { note "no page at $page to disclose what $version is known to get wrong"; continue; }
+        [ -f "$root/$page" ] || continue
         grep -qF -- "$defect" "$root/$page" \
           || note "$page does not say that $defect, which the advertised $version is known to do"
       done
@@ -602,20 +617,44 @@ EOF
 $(jqr '[.published[] | select(.advertised == true)] | last | (.known_defects // []) | .[].phrase' "$def")
 EOF
 
-    while IFS= read -r defect; do
-      [ -n "$defect" ] || continue
-      for page in $defect_pages; do
-        [ -f "$root/$page" ] || continue
-        if grep -qF -- "$defect" "$root/$page"; then
-          note "$page still says that $defect, which belongs to a release that is no longer advertised"
-        fi
+    # 2. No page carries a defect block for a version that is not the advertised one. This is the
+    #    rule that fires when the advertised version moves and the block does not move with it.
+    for page in $defect_pages; do
+      [ -f "$root/$page" ] || continue
+      while IFS= read -r marker; do
+        [ -n "$marker" ] || continue
+        [ "$marker" = "$version" ] && continue
+        note "$page marks a defect block for $marker, which is not the advertised $version"
+      done <<EOF
+$(grep -oE '<!-- defects:[^ ]+ -->' "$root/$page" 2>/dev/null | sed -E 's/^<!-- defects:(.*) -->$/\1/' || true)
+EOF
+    done
+
+    # 3. A superseded release that carried defects keeps an upgrade notice on the pages recorded for
+    #    it - naming the version and at least one of the things it does - because the people still
+    #    running it are the only ones the disclosure was ever for, and they are the ones a flip
+    #    silently drops.
+    local notice_pages superseded phrase found
+    notice_pages="$(json_array "$def" ".components.\"$defect_component\".upgrade_notice_on")"
+    while IFS= read -r superseded; do
+      [ -n "$superseded" ] || continue
+      [ "$superseded" = "$version" ] && continue
+      for page in $notice_pages; do
+        [ -f "$root/$page" ] || { note "no page at $page to carry the $superseded upgrade notice"; continue; }
+        grep -qF -- "$superseded" "$root/$page" \
+          || { note "$page no longer names $superseded, which people are still running and which is still broken"; continue; }
+        found=0
+        while IFS= read -r phrase; do
+          [ -n "$phrase" ] || continue
+          grep -qF -- "$phrase" "$root/$page" && { found=1; break; }
+        done <<PHRASES
+$(jqr --arg v "$superseded" '[.published[] | select(.version == $v)] | last | (.known_defects // []) | .[].phrase' "$def")
+PHRASES
+        [ "$found" -eq 1 ] \
+          || note "$page names $superseded and none of what it does, which is a version number and not a warning"
       done
     done <<EOF
-$(jqr '. as $d
-       | ([$d.published[] | select(.advertised == true)] | last | .version) as $adv
-       | ([$d.published[] | select(.version == $adv) | (.known_defects // [])[].phrase]) as $keep
-       | ([$d.published[] | select(.version != $adv) | (.known_defects // [])[].phrase] - $keep)
-       | .[]' "$def")
+$(jqr '[.published[] | select((.known_defects // []) | length > 0) | .version] | .[]' "$def")
 EOF
   fi
 
@@ -974,18 +1013,39 @@ cp README.md "$FAKE/README.md"
 
 # A page that drops one defect from the list still looks complete to a reader, which is why the
 # check reads the list from the definition rather than counting what it finds.
-sed_inplace 's/env export can delete your vault/env export is careful/' "$FAKE/README.md"
-expect_repo_refusal "defect-not-disclosed" "does not say that env export can delete your vault" \
+#
+# The defect comes from the fixture rather than from whatever the repository happens to advertise
+# today: an advertised release with no known defects is the normal case, and a fixture that can only
+# fire while one has them stops testing the rule the moment a clean version ships - silently, and
+# exactly when the next release would want it working.
+expect_repo_refusal "defect-not-disclosed" "does not say that" \
+  "$(mutate defect-not-disclosed '(.published[] | select(.advertised == true) | .known_defects) = [{"id":"F.X","phrase":"this sentence is on no page"}]')" \
+  "$FAKE"
+
+# And the stale direction: the advertised version moves on and the download's defect block does not
+# move with it. Nothing about the pages changes here - only which release the definition advertises -
+# so this is the case a warning written by hand cannot fail. It is the MARKER that is wrong, not the
+# presence of an old defect's words, which an upgrade notice is supposed to keep saying.
+printf '\n<!-- defects:0.0.1 -->\n' >> "$FAKE/README.md"
+expect_repo_refusal "defect-block-marks-a-version-that-is-not-advertised" \
+  "which is not the advertised" \
   "$FAKE/release-targets.json" "$FAKE"
 cp README.md "$FAKE/README.md"
 
-# And the stale direction: the advertised version moves on and the pages keep warning about the
-# release nobody is being sent to any more. Nothing about the pages changes here - only which
-# release the definition advertises - so this is the case a warning written by hand cannot fail.
-expect_repo_refusal "defect-of-an-unadvertised-release-still-published" \
-  "belongs to a release that is no longer advertised" \
-  "$(mutate defect-of-an-unadvertised-release-still-published '.published += [{"version":"0.2.0","tag":"v0.2.0","component":"cli","date":"2026-01-01","origin":"https://dl.keypaste.com/v0.2.0/","rids":["linux-x64","linux-arm64","osx-arm64","win-x64"],"advertised":true}]')" \
+# An upgrade notice that keeps the version number and drops what the version does is a changelog
+# entry, not a warning, so it is refused as one. The defect is supplied by the fixture for the same
+# reason as above, and because breaking ONE phrase on the page would prove nothing - the rule asks
+# for at least one, so the other four would still satisfy it.
+expect_repo_refusal "upgrade-notice-without-the-defect" "a version number and not a warning" \
+  "$(mutate upgrade-notice-without-the-defect '(.published[] | select(.version == "0.1.0") | .known_defects) = [{"id":"F.X","phrase":"this warning was never written down"}]')" \
   "$FAKE"
+
+# And the notice disappearing altogether. People who installed the broken version are the only ones
+# the disclosure was ever for, and they are exactly who a flip drops silently.
+sed_inplace 's/0\.1\.0/0.1.9/g' "$FAKE/SECURITY.md"
+expect_repo_refusal "upgrade-notice-deleted" "which people are still running and which is still broken" \
+  "$FAKE/release-targets.json" "$FAKE"
+cp SECURITY.md "$FAKE/SECURITY.md"
 
 # ---------------------------------------------------------------------------
 # 7. NEGATIVE CONTROL. The check that stops an empty matrix reporting success, removed.
