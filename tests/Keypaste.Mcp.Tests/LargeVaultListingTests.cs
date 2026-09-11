@@ -154,13 +154,12 @@ public sealed class LargeVaultListingTests : IAsyncLifetime
         var (harness, client) = await StartAsync();
         await using var _ = harness;
 
-        var result = await client.CallToolAsync(ToolText.ListToolName, cancellationToken: Token);
-        var text = TextOf(result);
-        var structured = result.StructuredContent!.Value;
+        var call = await ListingCall.ReadAsync(client, harness, Token);
+        var text = call.Text;
 
-        Assert.False(result.IsError);
-        Assert.True(structured.GetProperty("truncated").GetBoolean());
-        Assert.True(structured.GetProperty("count").GetInt32() > 0);
+        Assert.False(call.Result.IsError, call.Report());
+        Assert.True(call.Structured.GetProperty("truncated").GetBoolean());
+        Assert.True(call.Structured.GetProperty("count").GetInt32() > 0);
         Assert.Contains(ToolText.ListingIncomplete, text, StringComparison.Ordinal);
 
         // A listing is names. Nothing about running out of room turns it into a credential path.

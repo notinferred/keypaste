@@ -14,9 +14,12 @@
 The local vault, CLI/env workflow and approval bridge are implemented and **published as `v0.2.0`**,
 installed and exercised on all four native targets from clean runners; the desktop is a source build
 with partial entry/env screens, and no hosted service, web vault, mobile client or organization
-credential service exists. Two repairs are open — F.8 on one unexplained listing
-result, and F.2b2, BLOCKED on hardware rather than on work. F.6 is closed: D-0122 measured why
-build 10.0.26100 refuses a save its own temporary name, and D-0123 repaired it. **F.8 is next.**
+credential service exists. Two repairs are open — F.9 on four bounded waits that overran together,
+and F.2b2, BLOCKED on hardware rather than on work. F.6 is closed: D-0122 measured why build
+10.0.26100 refuses a save its own temporary name, and D-0123 repaired it. F.8 is closed: its
+diagnostic named the refusal on the first reproduction, and what it named — a 500 ms connect that
+took 5834 ms against a listener that was up — is F.9 rather than more of F.8. **F.9 is next**, and
+its Build line measures before anything is repaired.
 
 Release foundations are closed through R.0c: `0.1.0` is superseded and says so where it is
 downloaded, and the pages, the definition and keypaste.com name `0.2.0`. What stands between here and
@@ -89,6 +92,7 @@ deletion or restoring history, and the F rows are defects found after those orig
 | F.5 | A pipelined `tools/call` is waited for rather than refused, and an unnameable client is still refused — **weak evidence; a third occurrence reopens it** | [grace tests](../tests/Keypaste.Mcp.Tests/HandshakeGraceTests.cs); D-0113 |
 | F.6 | A save no longer contends for a temporary name any other KeePass-family program wants | [V-F.6](../tests/Keypaste.Core.Tests/ConcurrentVaultSaveTests.cs) red 5 of 5 on `windows-2025` without the fix and green 5 of 5 with it, budget 1 both ways; runs 34640639830 and 34644315829 bound the two sets; D-0122, D-0123 |
 | F.7 | A save refused the vault's own name is retried, and reverts nobody | [transacted-name tests](../tests/Keypaste.Core.Tests/VaultSaveUnderATransactedNameTests.cs); 6800 observed by [txf-probe](../scripts/txf-probe.cs) on Windows 10 Pro 19045 and by the regression on windows-2025, ci run 34602290950; D-0119, D-0120 |
+| F.8 | A refused listing says which refusal it was, and how long it took | [ListingCall](../tests/Keypaste.Mcp.Tests/ListingCall.cs) red 2 of 2, green 8 of 8; 12 of 80 on `windows-2025`, probe run 34653284139: `no-approver` at 5834 ms against 500 ms, listener up throughout. Dispatched against a removed commit, tests unchanged. D-0124 |
 | R.0a | One checked release definition drives both workflows and the download pages | [release-targets.json](../release-targets.json); [verify-release-matrix.sh](../scripts/verify-release-matrix.sh) refuses 31 cases; the prerelease suffix reached all three desktop targets on tag run 34542636558; D-0108 to D-0112 |
 | R.0b | A release is complete only when the public bytes say so | [release-completion.sh](../scripts/release-completion.sh) recorded 0.2.0 and verified all 11 assets anonymously at the origin, run 34549357893; six fixtures in [verify-release-completion.sh](../scripts/verify-release-completion.sh); D-0116 |
 | R.0c | 0.2.0 published and installed on all four native targets from clean runners | release run 34549357893; install runs 34549933842 and 34551580519, the second running README verbatim, each target creating a vault and injecting into a child. macOS and Windows floors stay `cited`: the runners sit above them, not on them |
@@ -112,25 +116,34 @@ The bounded 2026-09-07 review found these while the local Windows suites reporte
 platform-specific skips. Each needs a regression that fails before the fix, recorded in repository
 fixtures rather than a maintainer's temporary files.
 
-- [ ] **F.8 — A large listing came back with no content, once, on Windows.** Needs: 2.1.
-  **Build:** `ListingSizeTests.AVaultTooBigForOneReply_StillListsTheNamesThatFit` failed on
-  `windows-2025` in [ci run 34544573944](https://github.com/notinferred/keypaste/actions/runs/34544573944)
-  with `the listing had no structured content` after 13 seconds — an error result where a bounded
-  listing was due. That is the **F.3c** path: a real MCP client, a real `ApproverListener` and a real
-  named pipe, with nothing faked but the human. **It is not F.6.** F.6 is `ERROR_TRANSACTIONAL_CONFLICT`
-  on the Windows save path, a different subsystem with a different symptom, and joining them would
-  put two findings under one ID the way D-0114 had to undo. Establish what the result actually
-  carried before repairing anything: the assertion reads `StructuredContent` and throws, so the error
-  text the tool returned was never printed, and that text is the whole of what is known to be missing.
-  **Verify (V-F.8):** A reproduction fails on the recorded shape rather than on a timeout, and the
-  test reports what came back instead of only that something did not. A green run does not close this;
-  the failure is intermittent, which is the difficulty.
-  **Note:** One sighting. `4bb5e7b` changed only `scripts/verify-install.sh`, and `src/`, `tests/` and
-  `third_party/` are byte-identical across ci runs 34544267271, 34544573944 and 34545054533 — the
-  first and third passed, so the source under test was the same in all three and this is intermittent
-  rather than a regression. **In no step's Needs, so it holds no release.** If it is ever seen outside
-  CI it stops being an observation and becomes a `0.2.0` known defect, recorded in
-  [release-targets.json](../release-targets.json) against that version the way `0.1.0`'s are.
+- [ ] **F.9 — Four bounded waits overran together under load.** Needs: 2.1.
+  **Build:** [listing-probe run 34653284139](https://github.com/notinferred/keypaste/actions/runs/34653284139)
+  ran the CI test command eighty times on `windows-2025` and failed twelve, in four shapes across
+  three subsystems, every one of them a bounded wait overrunning by five to eleven times: the
+  listing connect at **5834 ms against `ApproverConnection.ConnectTimeout`'s 500 ms** with the
+  listener bound throughout (F.8); `LargeCredentialTests.AnUndeliverableRelease_AsksAPersonOnce`
+  twice, recording `no-approver` where `undeliverable` was due, which is the same unreachable
+  approver on the credential path; `VaultSaveTests.ASaveThatCannotSucceed_GivesUpQuickly` eight of
+  eighty at **6797 ms against the roughly 2.2-second retry budget D-0107 owns**; and
+  `ConcurrentRequestsTests.AfterTheFirstRequestResolves_AFreshRequestIsAskedNormally` timing out at
+  12.5 s against its ten-second `_promptly`. **Thread-pool starvation is inferred, not measured** —
+  it is the one thing common to all four and it is what the probe's load creates, but nothing here
+  observed the pool. **Measure it before repairing anything**, the way D-0122 measured F.6 rather
+  than reasoning about it: instrument the pool, or reproduce the overrun against a known starvation,
+  and say which budgets are enforced by a thread-pool timer.
+  **Widening `ConnectTimeout` is now measurably the wrong repair, not merely rejected on principle**
+  (D-0124, D-0125). A budget that overran eleven-fold was never enforced at 500 ms, so raising the
+  number raises a ceiling nothing reached. D-0035's 500 ms is a measurement on an idle machine and
+  stands as one.
+  **The user-visible half is the listing refusal, and it is not a test artifact.** An agent asking
+  for entry names on a loaded machine is told to ask a person to run `keypaste agent` — about a
+  process already running. Decide in this row whether that is a `0.2.0` known defect in
+  [release-targets.json](../release-targets.json): F.8's rule was that CI alone is an observation,
+  and a probe is CI.
+  **Verify (V-F.9):** A named mechanism, measured on a named platform with counts both ways, and a
+  regression that is red against it and green after. A repair that only moves a number is refused by
+  this line. Four subsystems overrunning together is one finding; if the measurement splits them,
+  split the row rather than repairing on the common story.
 
 - [ ] **F.2b2 — Observe minimize-lock on macOS and Linux.** Needs: F.2b1. — **BLOCKED** on a macOS machine and a Linux desktop session (2026-09-08); run F.2b1's behavior on both remaining targets during 4.7a/4.7b, following the [desktop checklist](desktop.md#observing-minimize-lock-on-macos-and-linux), and correct [MinimizeLock](../src/Keypaste.App/MinimizeLock.cs) if an observation contradicts it.
 
