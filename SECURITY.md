@@ -46,6 +46,16 @@ delete an edit it never imported; and moving the clock back can revive an expire
 All of those are fixed in `v0.2.0`
 ([what changed](CHANGELOG.md#020)). The `v0.1.0` archives are still served and still carry every
 one of those defects: a published version is never rewritten here, so upgrading is the only fix.
+<!-- defects:0.2.0 -->
+**`v0.2.0` carries one known defect of its own.** In that release,
+saving while another program saves the same vault can undo its change.
+keypaste waits a moment and retries when it cannot write immediately, and if what it was waiting
+for was another program finishing its own save, it then writes its own copy over the top. What the
+other save added is not in the entry's history and is not recoverable. It needs two saves of one
+vault within about two seconds, which is what a password manager and an agent sharing a vault do.
+`v0.1.0` has it too. Fixed on `main`, and in no published version yet.
+<!-- /defects:0.2.0 -->
+
 The desktop app is available from source and has no public release. See the
 [release contract](docs/RELEASE.md) for platform and publication status.
 

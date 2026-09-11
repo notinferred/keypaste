@@ -252,6 +252,10 @@
         {
           "id": "D-0084",
           "phrase": "entry names can render unescaped"
+        },
+        {
+          "id": "D-0119",
+          "phrase": "saving while another program saves the same vault can undo its change"
         }
       ]
     },
@@ -281,7 +285,13 @@
         "osx-arm64",
         "win-x64"
       ],
-      "advertised": true
+      "advertised": true,
+      "known_defects": [
+        {
+          "id": "D-0119",
+          "phrase": "saving while another program saves the same vault can undo its change"
+        }
+      ]
     }
   ]
 }
