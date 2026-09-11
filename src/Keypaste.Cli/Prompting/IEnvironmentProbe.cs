@@ -37,6 +37,20 @@ internal sealed class SystemEnvironmentProbe : IEnvironmentProbe
             }
         }
 
+        // A child is the user's own program, so it gets the user's temporary directory - not the
+        // private one keypaste redirected its own saves into and deletes when it exits.
+        foreach (var (name, value) in Keypaste.Core.ProcessTemporaryDirectory.OriginalTemporaryVariables)
+        {
+            if (value is null)
+            {
+                values.Remove(name);
+            }
+            else
+            {
+                values[name] = value;
+            }
+        }
+
         return values;
     }
 }

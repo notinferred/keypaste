@@ -92,6 +92,22 @@ npx wrangler deploy
 The last two lines are not optional. They are the only things that ask the origin rather than the
 checkout, and the workflow runs them for the same reason.
 
+### Deployed by hand on 2026-09-11
+
+`site.yml` could not deploy: the `keypaste.com` environment held no `CLOUDFLARE_API_TOKEN`, so both
+its runs failed at the deploy step with the page already wrong about a data-loss defect. Two versions
+went out from a checkout instead, each verified against the live origin afterwards:
+
+| Version id | Tree it carried |
+|---|---|
+| `463e2856-b29b-43ee-b603-110940ab7fc7` | `cf2df87` — disclosed the `0.2.0` concurrent-save defect |
+| `55a31129-c245-40a5-bc27-c16330f4a2e0` | the F.6 commit — added the `10.0.26100` save-failure defect |
+
+The second was deployed from the tree of a commit then called `9de4a16`. **That SHA no longer
+exists**: F.6's work was squashed into one commit afterwards, and `site/public/index.html` is
+byte-identical across the two, so the squashed commit carries the deployed bytes. An old clone
+fetched before the rewrite still has `9de4a16`.
+
 ## Running it locally
 
 ```sh

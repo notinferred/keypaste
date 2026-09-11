@@ -28,6 +28,15 @@ already waited for a scanner.
 one behind every time, and nothing ever cleaned it up. keypaste now removes it — and only it, and
 only when it is certain no other program still has the file open.
 
+**On Windows 11 24H2 and Windows Server 2025, a save could fail when another keypaste or KeePass
+program was saving at the same time.** Those Windows builds refuse to create a file whose short 8.3
+name another program's transaction has reserved, and every KeePass-family program names its
+temporary file the same way — so a completely unrelated vault, or KeePass itself, was enough to
+collide. keypaste retried for about two seconds and then reported that it could not save. Nothing
+was written and nothing was lost, but the save had to be repeated. keypaste now writes that
+temporary file into a directory of its own, which nothing else on the machine names. Older Windows
+builds were never affected.
+
 ## 0.2.0
 
 **If you are running `v0.1.0`, upgrade.** Several of the repairs below are data loss, and none of them is in the `v0.1.0` archives: `env export` could delete the vault it was reading from and write plaintext over it, `env rm` and `env set` could act on a different entry than the one named, `get` could hand back the wrong entry's password, and `env pull` could delete an edit it never imported. `v0.1.0` stays where it is and stays broken — published versions are immutable here — so the fix is this version.

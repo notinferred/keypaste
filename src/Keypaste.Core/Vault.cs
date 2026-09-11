@@ -264,7 +264,18 @@ public sealed class Vault : IDisposable
     /// derivation and the move is its last act, so a commit landing mid-attempt lets that attempt
     /// win and the test flakes.
     /// </remarks>
-    internal void SaveWaiting(Action<int> waitBetweenAttempts)
+    /// <param name="waitBetweenAttempts">
+    /// Called instead of sleeping, so a test can act at the one deterministic instant.
+    /// </param>
+    /// <param name="attempts">
+    /// The retry budget. Defaults to the shipped one; V-F.6 pins it to 1, so a green run proves the
+    /// fix removed the contention rather than that the budget outlasted it. Reachable only through
+    /// <c>InternalsVisibleTo</c> — it is not a knob a consumer or a command line can turn, because
+    /// a smaller budget is strictly worse in production and a larger one hides what V-F.6 catches.
+    /// </param>
+    internal void SaveWaiting(
+        Action<int>? waitBetweenAttempts,
+        int attempts = KeePassInterop.SaveAttempts)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -273,7 +284,7 @@ public sealed class Vault : IDisposable
             throw new VaultChangedOnDiskException();
         }
 
-        _interop.Save(HasFileChangedSinceOpen, waitBetweenAttempts);
+        _interop.Save(HasFileChangedSinceOpen, waitBetweenAttempts, attempts);
         _stamp = SourceSnapshot.Digest(Path);
     }
 
