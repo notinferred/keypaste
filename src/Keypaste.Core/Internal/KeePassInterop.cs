@@ -304,7 +304,7 @@ internal sealed class KeePassInterop : IDisposable
         // concurrent saves would name their temporaries in it together and collide exactly as two
         // processes used to (D-0122). TMP cannot be made per-thread, so the saves are made
         // one-at-a-time instead.
-        SaveGate.Wait();
+        _saveGate.Wait();
 
         // Set by whichever attempt is refused, and acted on once on the way out — including the way
         // out of a save that then succeeded. The fallback move strands its file on the attempt that
@@ -353,7 +353,7 @@ internal sealed class KeePassInterop : IDisposable
         }
         finally
         {
-            SaveGate.Release();
+            _saveGate.Release();
 
             if (strandedATemporary)
             {
@@ -363,7 +363,7 @@ internal sealed class KeePassInterop : IDisposable
     }
 
     /// <summary>Serialises saves in this process. See the comment where it is taken.</summary>
-    private static readonly SemaphoreSlim SaveGate = new(1, 1);
+    private static readonly SemaphoreSlim _saveGate = new(1, 1);
 
     /// <summary>ERROR_TRANSACTIONAL_CONFLICT.</summary>
     /// <remarks>

@@ -23,13 +23,13 @@ namespace Keypaste.Core;
 /// </remarks>
 public static class ProcessTemporaryDirectory
 {
-    private const string Prefix = "keypaste-tmp-";
-    private const string OwnerFile = "owner.lock";
+    private const string _prefix = "keypaste-tmp-";
+    private const string _ownerFile = "owner.lock";
 
     /// <summary>A directory with no owner file this recent is still being set up, not abandoned.</summary>
-    private static readonly TimeSpan YoungEnoughToStillBeStartingUp = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan _youngEnoughToStillBeStartingUp = TimeSpan.FromSeconds(30);
 
-    private static readonly Lock Gate = new();
+    private static readonly Lock _gate = new();
     private static volatile string? _directory;
     private static volatile Dictionary<string, string?>? _originals;
     private static FileStream? _owner;
@@ -54,7 +54,7 @@ public static class ProcessTemporaryDirectory
             return;
         }
 
-        lock (Gate)
+        lock (_gate)
         {
             if (_directory is not null)
             {
@@ -65,13 +65,13 @@ public static class ProcessTemporaryDirectory
             SweepAbandoned(parent);
 
             var directory = Directory.CreateDirectory(
-                Path.Combine(parent, Prefix + Guid.NewGuid().ToString("N"))).FullName;
+                Path.Combine(parent, _prefix + Guid.NewGuid().ToString("N"))).FullName;
 
             // Held open for the life of the process, and deleted the moment the handle closes -
             // including a kill, where no exit path runs. Another keypaste starting up asks for this
             // file and learns from the answer alone whether anyone still owns the directory.
             _owner = new FileStream(
-                Path.Combine(directory, OwnerFile),
+                Path.Combine(directory, _ownerFile),
                 FileMode.CreateNew,
                 FileAccess.Write,
                 FileShare.None,
@@ -105,7 +105,7 @@ public static class ProcessTemporaryDirectory
 
         try
         {
-            candidates = Directory.GetDirectories(parent, Prefix + "*");
+            candidates = Directory.GetDirectories(parent, _prefix + "*");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -116,12 +116,12 @@ public static class ProcessTemporaryDirectory
         {
             try
             {
-                if (File.Exists(Path.Combine(candidate, OwnerFile)))
+                if (File.Exists(Path.Combine(candidate, _ownerFile)))
                 {
                     continue;
                 }
 
-                if (DateTime.UtcNow - Directory.GetCreationTimeUtc(candidate) < YoungEnoughToStillBeStartingUp)
+                if (DateTime.UtcNow - Directory.GetCreationTimeUtc(candidate) < _youngEnoughToStillBeStartingUp)
                 {
                     continue;
                 }
