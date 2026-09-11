@@ -13,9 +13,9 @@
 
 The local vault, CLI/env workflow and approval bridge are implemented; the desktop is a source build
 with partial entry/env screens, and no hosted service, web vault, mobile client or organization
-credential service exists. Three repairs are open — F.7 and F.6 on the Windows save path, where
-D-0114 withdrew the account of the contention rather than fixing it, and F.2b2, BLOCKED on hardware
-rather than on work. **F.7 is next**, and release work resumes at R.0a, which is built and green on
+credential service exists. Four repairs are open — F.7 and F.6 on the Windows save path, where
+D-0114 withdrew the account of the contention rather than fixing it, F.8 on one unexplained listing
+result, and F.2b2, BLOCKED on hardware rather than on work. **F.7 is next**, and release work resumes at R.0a, which is built and green on
 ad5a71d and now closes on a prerelease tag alone: dispatch 34424929687 put the three R2 secrets
 against the real bucket on 2026-09-10 and they work. R.0d is closed — keypaste.com now names every defect the advertised `v0.1.0`
 carries, and 3.8 no longer stands in front of R.0c (D-0115). **R.0b is built and closes on a
@@ -114,6 +114,26 @@ fixtures rather than a maintainer's temporary files.
   **Build:** The mechanism this row was opened with — a directory enlisted in one transaction refusing operations from outside it — is **refuted on Windows 10 Pro 19045**. `ERROR_TRANSACTIONAL_CONFLICT` attaches to a **name**, and the three ways two savers could reach one name — duplicate identifiers, 8.3 aliasing and the shared `%TEMP%` directory — are each excluded by [probe](../scripts/txf-probe.cs); D-0114 owns what was tested and how. So a per-transaction temporary directory, a lock keyed on the vault path and `UseFileTransactions = false` are all repairs for a cause that is not established, and none is taken. **The next action is a measurement, not a repair:** run the probe on `windows-2025`, the platform both failures came from, since every mechanism reachable from this machine is excluded and the operating system is the remaining difference.
   **Verify (V-F.6):** A reproduction saves one vault from several savers at once and is **red on Windows with `SaveAttempts` set to 1**, so the retry cannot absorb what the fix removes; green after, with the budget still at 1. [ConcurrentVaultSaveTests](../tests/Keypaste.Core.Tests/ConcurrentVaultSaveTests.cs) never enters the transacted path at all — [FileTransactionEx](../third_party/KeePassLib/Serialization/FileTransactionEx.cs) forces `bTransacted` false when the base file does not exist — so replacing it with a test that does fail is most of this row. A green CI run cannot pass it; the failure is intermittent, which is the whole difficulty. The probe workflow is a measurement, not this verifier.
   **Note:** Opened from ci run 34403613553, which exhausted all eight attempts on `windows-2025` on a two-markdown-file commit; both failures read from `EnvExportTests`, `IOException` 6800 on a `%TEMP%\KeePass_TxF_*.tmp` path. In no step's Needs, so it blocks nothing.
+
+- [ ] **F.8 — A large listing came back with no content, once, on Windows.** Needs: 2.1.
+  **Build:** `ListingSizeTests.AVaultTooBigForOneReply_StillListsTheNamesThatFit` failed on
+  `windows-2025` in [ci run 34544573944](https://github.com/notinferred/keypaste/actions/runs/34544573944)
+  with `the listing had no structured content` after 13 seconds — an error result where a bounded
+  listing was due. That is the **F.3c** path: a real MCP client, a real `ApproverListener` and a real
+  named pipe, with nothing faked but the human. **It is not F.6.** F.6 is `ERROR_TRANSACTIONAL_CONFLICT`
+  on the Windows save path, a different subsystem with a different symptom, and joining them would
+  put two findings under one ID the way D-0114 had to undo. Establish what the result actually
+  carried before repairing anything: the assertion reads `StructuredContent` and throws, so the error
+  text the tool returned was never printed, and that text is the whole of what is known to be missing.
+  **Verify (V-F.8):** A reproduction fails on the recorded shape rather than on a timeout, and the
+  test reports what came back instead of only that something did not. A green run does not close this;
+  the failure is intermittent, which is the difficulty.
+  **Note:** One sighting. `4bb5e7b` changed only `scripts/verify-install.sh`, and `src/`, `tests/` and
+  `third_party/` are byte-identical across ci runs 34544267271, 34544573944 and 34545054533 — the
+  first and third passed, so the source under test was the same in all three and this is intermittent
+  rather than a regression. **In no step's Needs, so it holds no release.** If it is ever seen outside
+  CI it stops being an observation and becomes a `0.2.0` known defect, recorded in
+  [release-targets.json](../release-targets.json) against that version the way `0.1.0`'s are.
 
 - [ ] **F.2b2 — Observe minimize-lock on macOS and Linux.** Needs: F.2b1. — **BLOCKED** on a macOS machine and a Linux desktop session (2026-09-08); run F.2b1's behavior on both remaining targets during 4.7a/4.7b, following the [desktop checklist](desktop.md#observing-minimize-lock-on-macos-and-linux), and correct [MinimizeLock](../src/Keypaste.App/MinimizeLock.cs) if an observation contradicts it.
 
