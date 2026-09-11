@@ -920,6 +920,17 @@ expect_repo_refusal "csproj-and-definition-disagree" "and the definition says" \
   "$(mutate csproj-and-definition-disagree '.components.app.runtime_identifiers -= ["linux-arm64"] | .components.app.declared_not_packaged = {}')" \
   "$FAKE"
 
+# `sed -i` is not portable and these fixtures had never met a sed that says so. GNU takes the backup
+# suffix attached to the flag; BSD requires it as a separate argument, so `sed -i EXPR file` on macOS
+# reads EXPR as the suffix and dies with "invalid command code". ci.yml runs this on Linux only, and
+# the one macOS caller is install.yml, whose weekly cron last fired before any of these fixtures
+# existed - so the gate was simply broken on macOS from R.0a until install run 34544574182 said so.
+sed_inplace() {
+  local expr="$1" file="$2" tmp
+  tmp="$(mktemp)"
+  sed "$expr" "$file" > "$tmp" && mv "$tmp" "$file"
+}
+
 cp README.md "$FAKE/README.md"
 printf '\nmacOS 14 or later is required.\n' >> "$FAKE/README.md"
 expect_repo_refusal "doc-claims-a-floor-nothing-holds" "no target in the definition holds that floor" \
@@ -928,24 +939,24 @@ cp README.md "$FAKE/README.md"
 
 # A page that stops mentioning a floor and a page that never had one look identical to a check that
 # only reads what is written. These two are why the presence rule is required rather than conditional.
-sed -i '/^\*\*macOS 13 or later\.\*\*/d' "$FAKE/README.md"
+sed_inplace '/^\*\*macOS 13 or later\.\*\*/d' "$FAKE/README.md"
 expect_repo_refusal "doc-drops-a-floor" "no longer states its floor" \
   "$FAKE/release-targets.json" "$FAKE"
 cp README.md "$FAKE/README.md"
 
-sed -i 's/no run backs this floor/it has been checked/g' "$FAKE/README.md"
+sed_inplace 's/no run backs this floor/it has been checked/g' "$FAKE/README.md"
 expect_repo_refusal "doc-drops-the-caveat" "without the caveat that qualifies it" \
   "$FAKE/release-targets.json" "$FAKE"
 cp README.md "$FAKE/README.md"
 
 # The vocabulary lives in docs/RELEASE.md and the values live in the definition. Deleting a row
 # from the table is how one of them silently stops meaning anything.
-sed -i '/^| `cited` |/d' "$FAKE/docs/RELEASE.md"
+sed_inplace '/^| `cited` |/d' "$FAKE/docs/RELEASE.md"
 expect_repo_refusal "release-doc-drops-a-floor-value" "which docs/RELEASE.md does not define" \
   "$FAKE/release-targets.json" "$FAKE"
 cp docs/RELEASE.md "$FAKE/docs/RELEASE.md"
 
-sed -i 's/unsigned/perfectly ordinary/g' "$FAKE/README.md"
+sed_inplace 's/unsigned/perfectly ordinary/g' "$FAKE/README.md"
 expect_repo_refusal "signing-disclosure-deleted" "no longer says the cli binaries are unsigned" \
   "$FAKE/release-targets.json" "$FAKE"
 cp README.md "$FAKE/README.md"
@@ -956,14 +967,14 @@ expect_repo_refusal "borrowed-block-with-no-reason" "records no reason it has no
   "$(mutate borrowed-block-with-no-reason '(.components.cli.targets[] | select(.rid == "linux-arm64") | .install_block_reason) |= ""')" \
   "$FAKE"
 
-sed -i 's/For arm64, substitute `linux-arm64`/For arm64, substitute the other one/' "$FAKE/README.md"
+sed_inplace 's/For arm64, substitute `linux-arm64`/For arm64, substitute the other one/' "$FAKE/README.md"
 expect_repo_refusal "borrowed-block-and-the-rid-is-not-named" "cannot find the substitution it needs" \
   "$FAKE/release-targets.json" "$FAKE"
 cp README.md "$FAKE/README.md"
 
 # A page that drops one defect from the list still looks complete to a reader, which is why the
 # check reads the list from the definition rather than counting what it finds.
-sed -i 's/env export can delete your vault/env export is careful/' "$FAKE/README.md"
+sed_inplace 's/env export can delete your vault/env export is careful/' "$FAKE/README.md"
 expect_repo_refusal "defect-not-disclosed" "does not say that env export can delete your vault" \
   "$FAKE/release-targets.json" "$FAKE"
 cp README.md "$FAKE/README.md"
