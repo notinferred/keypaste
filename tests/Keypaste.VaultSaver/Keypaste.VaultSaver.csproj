@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Keypaste.VaultSaver</RootNamespace>
+
+    <!-- Not a test project: it holds no tests. It lives under tests/ because nothing shipped
+         references it, and it exists only so V-F.6 can save from a process whose TMP was set
+         before the process started. -->
+    <IsTestProject>false</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Keypaste.Core/Keypaste.Core.csproj" />
+  </ItemGroup>
+
+</Project>
