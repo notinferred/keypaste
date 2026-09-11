@@ -47,13 +47,20 @@ All of those are fixed in `v0.2.0`
 ([what changed](CHANGELOG.md#020)). The `v0.1.0` archives are still served and still carry every
 one of those defects: a published version is never rewritten here, so upgrading is the only fix.
 <!-- defects:0.2.0 -->
-**`v0.2.0` carries one known defect of its own.** In that release,
+**`v0.2.0` carries two known defects of its own.** In that release,
 saving while another program saves the same vault can undo its change.
 keypaste waits a moment and retries when it cannot write immediately, and if what it was waiting
 for was another program finishing its own save, it then writes its own copy over the top. What the
 other save added is not in the entry's history and is not recoverable. It needs two saves of one
 vault within about two seconds, which is what a password manager and an agent sharing a vault do.
-`v0.1.0` has it too. Fixed on `main`, and in no published version yet.
+Separately, on Windows 11 24H2 and Windows Server 2025, a save can fail when another keypaste or KeePass program is saving at the same time.
+Those Windows builds refuse a temporary name while another transaction holds one sharing its short
+8.3 alias, and every KeePass-family program builds that name the same way — so an unrelated vault,
+or KeePass itself, is enough. keypaste retries for about two seconds and then reports that it could
+not save. Nothing is written and nothing is lost; the save has to be repeated. Older Windows builds
+accept the name and are unaffected.
+`v0.1.0` has both. The first is fixed on `main` and in no published version yet; the second is not
+fixed anywhere.
 <!-- /defects:0.2.0 -->
 
 The desktop app is available from source and has no public release. See the
