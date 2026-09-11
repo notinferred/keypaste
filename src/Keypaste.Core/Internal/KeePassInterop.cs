@@ -287,9 +287,24 @@ internal sealed class KeePassInterop : IDisposable
     /// <exception cref="VaultChangedOnDiskException">
     /// Something else wrote to the vault while this save was waiting to retry. Nothing was written.
     /// </exception>
-    internal void Save(Func<bool>? hasChangedOnDisk, Action<int>? waitBetweenAttempts)
+    /// <param name="attempts">
+    /// How many times to try. Defaults to the shipped budget; V-F.6 pins it to 1 so the retry
+    /// cannot absorb the contention the fix is supposed to remove.
+    /// </param>
+    internal void Save(
+        Func<bool>? hasChangedOnDisk,
+        Action<int>? waitBetweenAttempts,
+        int attempts = SaveAttempts)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+
+        ProcessTemporaryDirectory.EnsureRedirected();
+
+        // One save at a time in this process. The private directory is the whole process's, so two
+        // concurrent saves would name their temporaries in it together and collide exactly as two
+        // processes used to (D-0122). TMP cannot be made per-thread, so the saves are made
+        // one-at-a-time instead.
+        _saveGate.Wait();
 
         // Set by whichever attempt is refused, and acted on once on the way out — including the way
         // out of a save that then succeeded. The fallback move strands its file on the attempt that
@@ -305,7 +320,7 @@ internal sealed class KeePassInterop : IDisposable
                     _database.Save(null);
                     return;
                 }
-                catch (Exception ex) when (attempt < SaveAttempts && IsTransient(ex))
+                catch (Exception ex) when (attempt < attempts && IsTransient(ex))
                 {
                     strandedATemporary |= StrandsATemporary(ex);
                 }
@@ -338,12 +353,17 @@ internal sealed class KeePassInterop : IDisposable
         }
         finally
         {
+            _saveGate.Release();
+
             if (strandedATemporary)
             {
                 SweepStrandedTemporary();
             }
         }
     }
+
+    /// <summary>Serialises saves in this process. See the comment where it is taken.</summary>
+    private static readonly SemaphoreSlim _saveGate = new(1, 1);
 
     /// <summary>ERROR_TRANSACTIONAL_CONFLICT.</summary>
     /// <remarks>

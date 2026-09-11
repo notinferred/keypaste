@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Keypaste.TxfContender</RootNamespace>
+
+    <!-- Not a test project: it holds no tests and must not be collected as one. It lives under
+         tests/ because nothing shipped references it. -->
+    <IsTestProject>false</IsTestProject>
+
+    <!-- It models KeePass 2, which is not keypaste: it references no keypaste assembly, so nothing
+         here can redirect its temporary directory the way a save does. That is the point of it. -->
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+</Project>

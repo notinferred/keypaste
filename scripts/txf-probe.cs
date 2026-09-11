@@ -48,7 +48,11 @@ Console.WriteLine($"volume     {volume} supports transactions");
 
 Reservation();
 Window();
-Race(savers: 8, rounds: 200);
+Race(savers: 8, rounds: 200, ownDirectoryPerSaver: false);
+// The same load with the one thing a repair would change. If the reservation is directory-scoped
+// this comes back clean, and a per-save temporary directory is the repair; if it refuses too, the
+// collision outlives the directory and that repair is dead.
+Race(savers: 8, rounds: 200, ownDirectoryPerSaver: true);
 
 return 0;
 
@@ -69,6 +73,12 @@ void Reservation()
         Probe.Report("a new subdirectory of the enlisted directory", () => Directory.CreateDirectory(Path.Combine(temp, "KeePass_TxF_" + Probe.Id())));
         Probe.Report("a fresh file in the destination directory", () => Probe.Touch(Path.Combine(Path.GetDirectoryName(vault)!, "probe-" + Probe.Id() + ".tmp")));
         Probe.Report("a fresh file in the temp root itself", () => Probe.Touch(Path.Combine(root, "probe-" + Probe.Id() + ".tmp")));
+        // The two lines above take a probe- name, which shares no 8.3 stem with the held one, so they
+        // cannot see the collision at all - run 34619717595 had both SUCCEEDED while the same
+        // directory's KeePass_TxF_ name was refused. These two ask the question that decides the
+        // repair: is the reservation directory-scoped, so that a per-save directory escapes it?
+        Probe.Report("a KeePass_TxF_ name in the destination directory", () => Probe.Touch(Probe.Name(Path.GetDirectoryName(vault)!)));
+        Probe.Report("a KeePass_TxF_ name in the temp root itself", () => Probe.Touch(Probe.Name(root)));
         Probe.Report("a non-transacted move onto the destination name", () =>
         {
             var scratch = Probe.Touch(Path.Combine(Path.GetDirectoryName(vault)!, "scratch-" + Probe.Id() + ".tmp"));
@@ -145,10 +155,12 @@ void Inspect(string temp, string source, string alias)
 
 // The arrangement CI failed in: concurrent savers through one shared temporary directory, running
 // the create, move and commit KeePassLib performs.
-void Race(int savers, int rounds)
+void Race(int savers, int rounds, bool ownDirectoryPerSaver)
 {
+    var arrangement = ownDirectoryPerSaver ? "one temporary directory each" : "one shared temporary directory";
+
     Console.WriteLine();
-    Console.WriteLine($"=== race: {savers} savers x {rounds} rounds through one shared temporary directory");
+    Console.WriteLine($"=== race: {savers} savers x {rounds} rounds through {arrangement}");
 
     var shared = Directory.CreateDirectory(Path.Combine(root, "keypaste-txf-race-" + Probe.Id())).FullName;
     var reasons = new ConcurrentBag<string>();
@@ -164,11 +176,15 @@ void Race(int savers, int rounds)
         File.WriteAllText(vault, "seed");
         var payload = new byte[64 * 1024];
 
+        var temporaries = ownDirectoryPerSaver
+            ? Directory.CreateDirectory(Path.Combine(shared, $"temp-{saver}")).FullName
+            : shared;
+
         ready.SignalAndWait();
 
         for (var round = 0; round < rounds; round++)
         {
-            var temp = Probe.Name(shared);
+            var temp = Probe.Name(temporaries);
 
             try
             {
