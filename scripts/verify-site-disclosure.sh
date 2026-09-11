@@ -1,16 +1,26 @@
 #!/usr/bin/env bash
 # Asks keypaste.com whether the disclosure is actually on it.
 #
-# site/public/index.html is deployed by hand with `npx wrangler deploy` and no workflow publishes it,
-# so verify-release-matrix.sh - which reads the file at the checked-out ref, and says so - can be
-# green while the live page is months older. Every other gate in this repository is blind to that
-# gap, and what sits on the far side of it is the list of ways the advertised download can destroy
-# somebody's vault. So this one asks the origin instead of the working tree.
+# verify-release-matrix.sh reads site/public/index.html at the checked-out ref, and says so, so it
+# goes green the moment a commit lands and says nothing about what the origin serves. What sits on
+# the far side of that gap is the list of ways the advertised download can destroy somebody's vault.
+# So this one asks the origin instead of the working tree.
 #
-# Run it after `npx wrangler deploy`. The live-fetch mode is deliberately NOT wired into ci.yml or
-# release.yml: nothing in CI deploys the site, so a check that stays red until a person runs wrangler
-# would be red for a reason CI cannot fix. `--selftest` is the half that does run in ci.yml - it
-# needs no network and holds the reader below to what it has to do.
+# site.yml closes the gap on a push - it deploys site/ and runs this immediately after - but the gap
+# reopens on any deploy that did not come from there: a rollback, a dashboard edit, a run that
+# stopped after wrangler. It was open once already, and that is why site.yml exists: f69c393
+# disclosed the 0.2.0 concurrent-save revert and the served page went a day without it while every
+# gate in the repository was green (D-0121).
+#
+# It runs in site.yml and nowhere else. Still NOT in ci.yml or release.yml: neither deploys, so this
+# would be red there for a reason neither can fix, and a Cloudflare outage must not redden main or
+# block a tag. `--selftest` is the half that does run in ci.yml - it needs no network and holds the
+# reader below to what it has to do.
+#
+# ONE verdict per run, emitted once. site.yml waits for the deploy to propagate BEFORE calling this,
+# by comparing the served body against site/public/index.html, because an ::error:: here becomes an
+# annotation on the run and on the commit - and a retry loop around it would leave a permanent
+# record of failures that were never true.
 #
 # Usage:
 #   scripts/verify-site-disclosure.sh [url]     (default: https://keypaste.com/)
@@ -121,7 +131,7 @@ $(jqr '[.published[] | select((.known_defects // []) | length > 0) | .version] |
 EOF
 
   [ "$missing" -eq 0 ] || die \
-    "$url is serving a page that does not disclose $missing of the defects $version is known to carry - deploy site/public/index.html with 'npx wrangler deploy'"
+    "$url is serving a page that does not disclose $missing of the defects $version is known to carry - push a repaired site/public/index.html, or dispatch site.yml to deploy this ref"
   [ "$notice_missing" -eq 0 ] || die \
     "$url is serving a page that drops the upgrade notice for $notice_missing superseded release(s) - the people running them have no other way to find out"
 

@@ -1,6 +1,6 @@
 # keypaste.com
 
-Two static pages and one form endpoint, deployed to Cloudflare Workers by hand. `public/` is the site; `src/worker.js` handles `/subscribe` and returns 404 for other unmatched paths.
+Two static pages and one form endpoint, deployed to Cloudflare Workers by [site.yml](../.github/workflows/site.yml) on every qualifying push to `main`. `public/` is the site; `src/worker.js` handles `/subscribe` and returns 404 for other unmatched paths.
 
 This is the waitlist site, not the planned hosted vault service. **Last recorded live verification: 2026-07-28**, in D-0037 of [DECISIONS.md](../DECISIONS.md). The documentation review on 2026-09-07 checked source and provider documentation, not the live account, database permissions or deployed behavior. Repeat the checks below before relying on that historical deployment evidence.
 
@@ -74,10 +74,23 @@ Recorded follow-up: migrate the SQL role to a managed role with no inherited rol
 
 ## Deploying
 
+A push to `main` touching `public/`, `src/`, `wrangler.jsonc` or either `package` file deploys it.
+[site.yml](../.github/workflows/site.yml) checks the page it is about to deploy, runs `npm ci` and
+`wrangler deploy` from here, prints the version id, then asks keypaste.com whether the disclosure is
+on it and whether the signup endpoint still refuses what it should. Dispatch that workflow to
+redeploy without a commit. `README.md` is the one file here that deploys nothing.
+
+By hand, when you need to deploy a ref the workflow will not:
+
 ```sh
 npm ci
 npx wrangler deploy
+../scripts/verify-site-disclosure.sh
+../scripts/verify-site-endpoint.sh
 ```
+
+The last two lines are not optional. They are the only things that ask the origin rather than the
+checkout, and the workflow runs them for the same reason.
 
 ## Running it locally
 
@@ -87,19 +100,36 @@ CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE="postgresql://..." npx 
 
 The environment-variable form, rather than `localConnectionString` in `wrangler.jsonc`, because the second one puts a real password in a tracked file. Point it at a scratch database if you have one.
 
-Run these checks against a scratch database before deployment and repeat the appropriate smoke checks after deployment with a dedicated test address. These endpoint and permission checks are not in CI:
+Run these checks against a scratch database before deployment. Afterwards, the split is what each
+check costs to repeat: anything that stores a row is still yours to run, and everything else now
+runs on every deploy.
+
+**Automated, on every deploy** — [verify-site-endpoint.sh](../scripts/verify-site-endpoint.sh). Each
+of these is refused or redirected before the Worker opens a database connection, which is the whole
+reason they are safe to repeat:
+
+- Submitting with the `website` field filled redirects to `/thanks/` and adds nothing.
+- Submitting nonsense gets a `400` page that says what was wrong.
+- Submitting something that is not a form, or that comes from another origin, or that is too large,
+  each gets a `400` naming its own reason.
+- `GET /subscribe` redirects home; an unknown path is a `404`; `/thanks/` is served.
+- The served page carries no script, so the promise the footer makes about JavaScript still holds.
+
+**Still by hand, with a dedicated test address** — these write a real row, and the role cannot read
+one back, so no script can check them without a credential this repository must never hold:
 
 - Submitting a valid address redirects to `/thanks/` and the row appears.
 - Submitting the same address again still redirects cleanly and adds nothing.
-- Submitting with the `website` field filled redirects to `/thanks/` and adds nothing.
-- Submitting nonsense gets a `400` page that says what was wrong.
-- The page still works with JavaScript disabled in the browser. If it does not, the promise the footer makes is no longer true.
-- View source and the network panel: no executable scripts, analytics requests or third-party assets. Ordinary outbound links are allowed.
-- The configured role can insert but cannot select, update or delete subscriber records; the connection retains its expected CA and SSL mode.
+- The configured role can insert but cannot select, update or delete subscriber records; the
+  connection retains its expected CA and SSL mode.
+- The page still works with JavaScript actually disabled in a browser. The automated check proves no
+  script is served, which is the mechanism; this is the promise.
+- The network panel shows no analytics requests or third-party assets. Ordinary outbound links are
+  allowed.
 
 ## What is not here
 
-No Worker build, deployment or signup integration job. The .NET workflow does run `scripts/verify-demo.sh`, which checks the transcript in `site/public/index.html`; that does not verify the Worker or live database. Deployment remains manual.
+No Worker build job, and no check that reaches the database. [site.yml](../.github/workflows/site.yml) deploys and then asks the live page and the live endpoint the questions a script can ask without storing anything; the .NET workflow separately runs `scripts/verify-demo.sh`, which checks the transcript in `site/public/index.html`. Neither validates the database role, its grants or its CA, and neither stores a row - those are the by-hand checks above (H-0011).
 
 No email sender or confirmation flow. The current handler stores signup requests. Double opt-in and list verification are planned in step 5.6 of [STEPS](../docs/STEPS.md); do not treat existing rows as confirmed subscribers or claim confirmation mail is already sent.
 
