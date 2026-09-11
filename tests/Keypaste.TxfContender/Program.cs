@@ -40,7 +40,18 @@ internal static class Program
             return 3;
         }
 
-        return Hold(directory, ready, release);
+        try
+        {
+            return Hold(directory, ready, release);
+        }
+        catch (Exception ex)
+        {
+            // Said out loud rather than thrown, because the only reader is a test that sees an exit
+            // code. A crash here once read as the save failing (ci run 34624443263) when it was the
+            // contenders refusing each other.
+            Console.Error.WriteLine($"contender failed: {ex.GetType().Name}: {ex.Message}");
+            return 6;
+        }
     }
 
     private static int Hold(string directory, string ready, string release)

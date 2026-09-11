@@ -49,7 +49,10 @@ public static class ProcessTemporaryDirectory
     /// <summary>Points this process's temporary path at a directory nothing else writes into.</summary>
     internal static void EnsureRedirected()
     {
-        if (_directory is not null)
+        // Windows only, because the defect is. Transactional NTFS exists nowhere else, KeePassLib
+        // never reaches TxfPrepare off Windows, and Unix reads TMPDIR rather than TMP anyway - so
+        // setting these there would move nothing and repair nothing.
+        if (!OperatingSystem.IsWindows() || _directory is not null)
         {
             return;
         }

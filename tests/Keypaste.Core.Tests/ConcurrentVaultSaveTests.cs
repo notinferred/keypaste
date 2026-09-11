@@ -32,7 +32,14 @@ namespace Keypaste.Core.Tests;
 /// </remarks>
 public sealed class ConcurrentVaultSaveTests : IDisposable
 {
-    private const int _contenders = 4;
+    /// <summary>One, and it cannot be more.</summary>
+    /// <remarks>
+    /// A holder reserves <c>KEEPAS~1.TMP</c> for the whole directory, so a second contender's own
+    /// create is refused exactly as the save's would be — ci run 34624443263 crashed four of them
+    /// proving it. One holder is also all the save needs to meet, so this is the defect setting the
+    /// test's shape rather than a limitation worked around.
+    /// </remarks>
+    private const int _contenders = 1;
 
     private const string _notWindows =
         "Transactional NTFS is a Windows file system feature; there is no name to contend for.";

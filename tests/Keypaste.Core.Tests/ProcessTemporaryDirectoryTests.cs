@@ -12,9 +12,19 @@ namespace Keypaste.Core.Tests;
 /// </remarks>
 public sealed class ProcessTemporaryDirectoryTests
 {
+    private const string _notWindows =
+        "The redirect is Windows-only, because Transactional NTFS is. Nothing off Windows reaches " +
+        "TxfPrepare, so there is no directory to separate.";
+
     [Fact]
     public void ASave_PutsTheProcessesTemporaryPathSomewhereOfItsOwn()
     {
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Skip(_notWindows);
+            return;
+        }
+
         using var vault = NewSavedVault(out _);
         vault.Save();
 
@@ -35,6 +45,12 @@ public sealed class ProcessTemporaryDirectoryTests
     [Fact]
     public void TheDirectoryIsNotSwappedPerSave_SoOtherThreadsNeverSeeItMove()
     {
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Skip(_notWindows);
+            return;
+        }
+
         using var vault = NewSavedVault(out _);
 
         vault.Save();
@@ -49,6 +65,12 @@ public sealed class ProcessTemporaryDirectoryTests
     [Fact]
     public void WhatAChildMustBeGivenBack_IsTheTemporaryPathKeypasteStartedWith()
     {
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Skip(_notWindows);
+            return;
+        }
+
         using var vault = NewSavedVault(out _);
         vault.Save();
 
