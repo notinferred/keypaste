@@ -291,6 +291,14 @@ internal sealed class KeePassInterop : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
+        ProcessTemporaryDirectory.EnsureRedirected();
+
+        // One save at a time in this process. The private directory is the whole process's, so two
+        // concurrent saves would name their temporaries in it together and collide exactly as two
+        // processes used to (D-0122). TMP cannot be made per-thread, so the saves are made
+        // one-at-a-time instead.
+        SaveGate.Wait();
+
         // Set by whichever attempt is refused, and acted on once on the way out — including the way
         // out of a save that then succeeded. The fallback move strands its file on the attempt that
         // is refused, and no later attempt, successful or not, ever goes back for it.
@@ -338,12 +346,17 @@ internal sealed class KeePassInterop : IDisposable
         }
         finally
         {
+            SaveGate.Release();
+
             if (strandedATemporary)
             {
                 SweepStrandedTemporary();
             }
         }
     }
+
+    /// <summary>Serialises saves in this process. See the comment where it is taken.</summary>
+    private static readonly SemaphoreSlim SaveGate = new(1, 1);
 
     /// <summary>ERROR_TRANSACTIONAL_CONFLICT.</summary>
     /// <remarks>
