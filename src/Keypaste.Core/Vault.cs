@@ -174,7 +174,12 @@ public sealed class Vault : IDisposable
     /// a file that could not be read at all — see <see cref="SourceSnapshot.Digest"/>, and D-0017 for
     /// the transient-failure absorption that depends on it.
     /// On Windows a file another process holds open for writing cannot be read, so a save racing a
-    /// concurrent writer narrowly is not detected; the replace then fails and is retried, so it is loud.
+    /// concurrent writer narrowly is not detected here. <b>The retry is not what saves that case —
+    /// it used to be what lost it.</b> The replace fails, and a retry that merely outlasted the
+    /// other writer would then revert it; what makes the race survivable is that
+    /// <see cref="Internal.KeePassInterop.Save"/> asks this question again across every wait
+    /// (D-0119), leaving only a writer whose hold outlasts a wait and commits inside the attempt
+    /// that follows.
     /// </remarks>
     public bool HasFileChangedSinceOpen()
     {
@@ -217,7 +222,7 @@ public sealed class Vault : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        Write();
+        Overwrite();
     }
 
     /// <summary>
@@ -249,9 +254,43 @@ public sealed class Vault : IDisposable
         return found;
     }
 
+    /// <summary>
+    /// Saves, resolving a conflict from inside the retry wait rather than on a timer.
+    /// </summary>
+    /// <remarks>
+    /// Exists so the regression for docs/STEPS.md F.7 can hold the vault's name, and then release
+    /// or commit at the one instant that makes the outcome deterministic: after an attempt has been
+    /// refused and before the vault is re-read. A timer cannot do it — an attempt is nearly all key
+    /// derivation and the move is its last act, so a commit landing mid-attempt lets that attempt
+    /// win and the test flakes.
+    /// </remarks>
+    internal void SaveWaiting(Action<int> waitBetweenAttempts)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (HasFileChangedSinceOpen())
+        {
+            throw new VaultChangedOnDiskException();
+        }
+
+        _interop.Save(HasFileChangedSinceOpen, waitBetweenAttempts);
+        _stamp = SourceSnapshot.Digest(Path);
+    }
+
     private void Write()
     {
-        _interop.Save();
+        // The check is handed to the retry loop, not just made before it. The name a save contends
+        // for is most often held by another process saving this same vault, so a retry that waits
+        // that out and then writes reverts it — see KeePassInterop.Save and D-0119.
+        _interop.Save(HasFileChangedSinceOpen, null);
+        _stamp = SourceSnapshot.Digest(Path);
+    }
+
+    private void Overwrite()
+    {
+        // No check, at any point: this caller has already put the choice to a person and been told
+        // to go ahead, so a change arriving mid-retry is one they have already accepted.
+        _interop.Save(null, null);
         _stamp = SourceSnapshot.Digest(Path);
     }
 

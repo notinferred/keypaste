@@ -4,6 +4,30 @@
 
 Versions are the ones published at `https://dl.keypaste.com/v<version>/`. Every release carries a `SHA256SUMS` file and a per-asset `.sha256`, plus the corresponding source for that tag. The published CLI/MCP binaries are unsigned and un-notarized (O-0010); there is no public desktop release. The [release contract](docs/RELEASE.md) records the platform matrix and the requirements for an installed, publicly available release.
 
+## Unreleased
+
+**A save that had to wait its turn no longer throws away the save it was waiting for.** When
+keypaste cannot write the vault immediately — a virus scanner has it open, or another keypaste
+process is saving the same file — it waits a moment and tries again, for about two seconds. If what
+it was waiting for was another program finishing its own save, keypaste would then write its own
+copy over the top. Whatever that other save added was gone: not in the entry's history, not in
+KeePassXC's History tab, not anywhere, because as far as this copy of the vault was concerned it had
+never existed. keypaste now re-reads the file between attempts and refuses to write at all if
+something else got there first — the same refusal you already get when a vault changed on disk
+while you had it open. Nothing is written, and you are told to reload. This has been possible since
+`0.1.0`; it needed two programs to save the same vault within about two seconds of each other,
+which is exactly what a password manager and an agent sharing one vault do.
+
+**On Windows, a save that collided with the vault's own name failed instantly instead of waiting.**
+Windows can briefly refuse to let a file be renamed onto a name another program has reserved.
+keypaste treated that as a permanent failure and gave up on the first try, reporting that the vault
+could not be saved when trying again a moment later would have worked. It now waits, the same way it
+already waited for a scanner.
+
+**And it no longer leaves a `vault.kdbx.tmp` file next to your vault.** The failed save above left
+one behind every time, and nothing ever cleaned it up. keypaste now removes it — and only it, and
+only when it is certain no other program still has the file open.
+
 ## 0.2.0
 
 **If you are running `v0.1.0`, upgrade.** Several of the repairs below are data loss, and none of them is in the `v0.1.0` archives: `env export` could delete the vault it was reading from and write plaintext over it, `env rm` and `env set` could act on a different entry than the one named, `get` could hand back the wrong entry's password, and `env pull` could delete an edit it never imported. `v0.1.0` stays where it is and stays broken — published versions are immutable here — so the fix is this version.
