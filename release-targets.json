@@ -264,6 +264,20 @@
         "win-x64"
       ],
       "advertised": false
+    },
+    {
+      "version": "0.2.0",
+      "tag": "v0.2.0",
+      "component": "cli",
+      "date": "2026-09-10",
+      "origin": "https://dl.keypaste.com/v0.2.0/",
+      "rids": [
+        "linux-x64",
+        "linux-arm64",
+        "osx-arm64",
+        "win-x64"
+      ],
+      "advertised": false
     }
   ]
 }
