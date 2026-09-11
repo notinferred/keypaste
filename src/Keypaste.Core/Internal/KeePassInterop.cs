@@ -298,8 +298,6 @@ internal sealed class KeePassInterop : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        ProcessTemporaryDirectory.EnsureRedirected();
-
         // One save at a time in this process. The private directory is the whole process's, so two
         // concurrent saves would name their temporaries in it together and collide exactly as two
         // processes used to (D-0122). TMP cannot be made per-thread, so the saves are made

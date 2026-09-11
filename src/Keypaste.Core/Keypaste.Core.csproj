@@ -35,6 +35,9 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Keypaste.Core.Tests" />
+    <!-- V-F.6 saves from its own process, so the retry budget it pins has to be reachable
+         from there too. A tests/ helper; nothing shipped references it. -->
+    <InternalsVisibleTo Include="Keypaste.VaultSaver" />
   </ItemGroup>
 
 </Project>
