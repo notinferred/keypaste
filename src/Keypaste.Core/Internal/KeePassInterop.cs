@@ -287,7 +287,14 @@ internal sealed class KeePassInterop : IDisposable
     /// <exception cref="VaultChangedOnDiskException">
     /// Something else wrote to the vault while this save was waiting to retry. Nothing was written.
     /// </exception>
-    internal void Save(Func<bool>? hasChangedOnDisk, Action<int>? waitBetweenAttempts)
+    /// <param name="attempts">
+    /// How many times to try. Defaults to the shipped budget; V-F.6 pins it to 1 so the retry
+    /// cannot absorb the contention the fix is supposed to remove.
+    /// </param>
+    internal void Save(
+        Func<bool>? hasChangedOnDisk,
+        Action<int>? waitBetweenAttempts,
+        int attempts = SaveAttempts)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -313,7 +320,7 @@ internal sealed class KeePassInterop : IDisposable
                     _database.Save(null);
                     return;
                 }
-                catch (Exception ex) when (attempt < SaveAttempts && IsTransient(ex))
+                catch (Exception ex) when (attempt < attempts && IsTransient(ex))
                 {
                     strandedATemporary |= StrandsATemporary(ex);
                 }
