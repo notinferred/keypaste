@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using KeePassLib;
 using KeePassLib.Cryptography.KeyDerivation;
 using KeePassLib.Keys;
@@ -222,7 +223,26 @@ internal sealed class KeePassInterop : IDisposable
     /// <summary>Base delay between save attempts. Multiplied by the attempt number.</summary>
     internal const int SaveRetryDelayMilliseconds = 80;
 
+    /// <summary>
+    /// What KeePassLib appends to the vault's own path for the temporary file it moves into place.
+    /// </summary>
+    /// <remarks>
+    /// Restated because <c>FileTransactionEx.StrTempSuffix</c> is internal to the vendored
+    /// assembly. <c>TheVendoredTemporarySuffixIsStillTheOneWeSweep</c> reads that constant by
+    /// reflection and fails if the two ever disagree — on every platform, not only the one where
+    /// the Windows regression for this can run.
+    /// </remarks>
+    internal const string StrandedTemporarySuffix = ".tmp";
+
     /// <summary>Writes the vault to its backing file.</summary>
+    /// <param name="hasChangedOnDisk">
+    /// Asked across every retry wait, and the save is abandoned if it answers true. Null for a
+    /// caller that has already been told to overwrite whatever is there.
+    /// </param>
+    /// <param name="waitBetweenAttempts">
+    /// Stands in for the wait, so a test can resolve a real conflict at the one moment that makes
+    /// the outcome deterministic. Null outside a test.
+    /// </param>
     /// <remarks>
     /// <para>
     /// Retried on a transient file error. Saving goes through a file transaction — write a
@@ -234,56 +254,190 @@ internal sealed class KeePassInterop : IDisposable
     /// <b>Concurrent saves contend with each other too, and harder — for a reason nobody has
     /// established.</b> KeePassLib's Windows path is Transactional NTFS with its temporary file in
     /// the one shared <c>%TEMP%</c>, and a save there fails "The function attempted to use a name
-    /// that is reserved for use by another transaction", raised where the temporary file is opened
-    /// and so upstream of the fallback TxF has for the move. Observed on Windows CI in runs
-    /// 34303291945 and 34403613553; not reproducible here at 32 overlapping savers, which is why
-    /// the budget is set from what the runner needed. <b>Do not write down a mechanism this
+    /// that is reserved for use by another transaction". That refusal lands in two places: where
+    /// the temporary file is opened, upstream of the fallback TxF has for the move, and on the
+    /// fallback move itself, where the name refused is the vault's own. Observed on Windows CI in
+    /// runs 34303291945 and 34403613553; not reproducible here at 32 overlapping savers, which is
+    /// why the budget is set from what the runner needed. <b>Do not write down a mechanism this
     /// retry rests on:</b> the previous one — a directory enlisted in a transaction refusing
     /// operations from outside it — was refuted, and F.6 owns the diagnosis (D-0114).
     /// </para>
     /// <para>
-    /// Retrying is safe precisely because the write is transactional. A failed commit leaves the
-    /// original file untouched, so a second attempt starts from the same place as the first, and
-    /// a save that never succeeds reports exactly what it reported before — the retry can turn a
-    /// spurious failure into success, and cannot turn a real one into corruption.
+    /// <b>Waiting is why the vault is re-read between attempts.</b> The thing most likely to be
+    /// holding the vault's name is another process saving this same vault, so a retry that simply
+    /// outlasts it writes a stale copy over the save it was waiting for — and that revert leaves no
+    /// history item, because the entry it discarded never existed in this process's tree. That is
+    /// the loss <see cref="VaultChangedOnDiskException"/> exists to refuse, and until D-0119 the
+    /// only check for it ran once, before the first attempt.
+    /// </para>
+    /// <para>
+    /// <b>What the re-read closes is the wait, and not the attempt.</b> An attempt is nearly all
+    /// key derivation and encryption, and the move that can be refused is its last act, so a writer
+    /// that commits between the re-read and that move is still reverted. The residual is therefore
+    /// a writer whose hold outlasts one of these waits and commits during the attempt that follows
+    /// it — accepted because a KeePassLib saver commits immediately after its own move, so its hold
+    /// is brief (D-0119). A detector, not a lock.
+    /// </para>
+    /// <para>
+    /// Retrying is otherwise safe precisely because the write is transactional. A failed commit
+    /// leaves the original file untouched, so a second attempt starts from the same place as the
+    /// first, and a save that never succeeds reports exactly what it reported before.
     /// </para>
     /// </remarks>
-    internal void Save()
+    /// <exception cref="VaultChangedOnDiskException">
+    /// Something else wrote to the vault while this save was waiting to retry. Nothing was written.
+    /// </exception>
+    internal void Save(Func<bool>? hasChangedOnDisk, Action<int>? waitBetweenAttempts)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        for (int attempt = 1; ; attempt++)
+        // Set by whichever attempt is refused, and acted on once on the way out — including the way
+        // out of a save that then succeeded. The fallback move strands its file on the attempt that
+        // is refused, and no later attempt, successful or not, ever goes back for it.
+        var strandedATemporary = false;
+
+        try
         {
-            try
+            for (int attempt = 1; ; attempt++)
             {
-                _database.Save(null);
-                return;
+                try
+                {
+                    _database.Save(null);
+                    return;
+                }
+                catch (Exception ex) when (attempt < SaveAttempts && IsTransient(ex))
+                {
+                    strandedATemporary |= StrandsATemporary(ex);
+                }
+                catch (Exception ex) when (ex is not VaultException)
+                {
+                    strandedATemporary |= StrandsATemporary(ex);
+
+                    // The cause is named, not merely kept as an inner exception nobody prints. A
+                    // save can fail for reasons the user can act on — the disk is full, the file is
+                    // open in KeePassXC, permissions changed — and "Could not save 'vault.kdbx'."
+                    // on its own tells them none of them.
+                    throw new VaultException(
+                        $"Could not save '{_database.IOConnectionInfo.Path}': {ex.Message}", ex);
+                }
+
+                if (waitBetweenAttempts is null)
+                {
+                    Thread.Sleep(SaveRetryDelayMilliseconds * attempt);
+                }
+                else
+                {
+                    waitBetweenAttempts(attempt);
+                }
+
+                if (hasChangedOnDisk?.Invoke() == true)
+                {
+                    throw new VaultChangedOnDiskException();
+                }
             }
-            catch (Exception ex) when (attempt < SaveAttempts && IsTransient(ex))
+        }
+        finally
+        {
+            if (strandedATemporary)
             {
-                Thread.Sleep(SaveRetryDelayMilliseconds * attempt);
-            }
-            catch (Exception ex) when (ex is not VaultException)
-            {
-                // The cause is named, not merely kept as an inner exception nobody prints. A save
-                // can fail for reasons the user can act on — the disk is full, the file is open in
-                // KeePassXC, permissions changed — and "Could not save 'vault.kdbx'." on its own
-                // tells them none of them.
-                throw new VaultException(
-                    $"Could not save '{_database.IOConnectionInfo.Path}': {ex.Message}", ex);
+                SweepStrandedTemporary();
             }
         }
     }
+
+    /// <summary>ERROR_TRANSACTIONAL_CONFLICT.</summary>
+    /// <remarks>
+    /// Observed on Windows 10 Pro 19045 by <c>scripts/txf-probe.cs</c>, on its "a non-transacted
+    /// move onto the destination name" line — which is the second hop of the fallback in
+    /// <c>FileTransactionEx.TxfMove</c> exactly.
+    /// </remarks>
+    private const int _errorTransactionalConflict = 6800;
 
     /// <summary>
     /// Whether a failure is the kind that another attempt might get past.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Deliberately narrow. Anything else — a bad path, a full disk, a permission that is simply
     /// wrong — fails on the first attempt, because retrying it would only delay the message.
+    /// </para>
+    /// <para>
+    /// <b>A native failure is admitted by its code, never by <see cref="Win32Exception"/> as a
+    /// type.</b> The vendored fallback raises that one type for whatever the move failed with, so
+    /// admitting the type would admit a full disk and a bad path from the very same <c>throw</c>,
+    /// and both would then take the whole retry budget to say so.
+    /// </para>
     /// </remarks>
-    private static bool IsTransient(Exception ex) =>
-        ex is IOException or UnauthorizedAccessException;
+    private static bool IsTransient(Exception ex) => ex switch
+    {
+        IOException or UnauthorizedAccessException => true,
+        Win32Exception win32 => IsATransientMoveCode(win32.NativeErrorCode),
+        _ => false,
+    };
+
+    /// <summary>Whether a native move failure is one another attempt might get past.</summary>
+    /// <remarks>
+    /// Each code here is a recorded observation, named with the platform whose probe produced it.
+    /// <b>A code seen only in a CI failure gets its own observation rather than joining this
+    /// list</b>: the retry budget grew once on a number nobody had reproduced, and D-0107 is still
+    /// carrying it.
+    /// </remarks>
+    private static bool IsATransientMoveCode(int code) => code switch
+    {
+        // Windows 10 Pro 19045, scripts/txf-probe.cs. docs/STEPS.md F.7.
+        _errorTransactionalConflict => true,
+        _ => false,
+    };
+
+    /// <summary>
+    /// Whether this failure is the one raised only after the fallback move has already put the
+    /// vault's next bytes beside the vault.
+    /// </summary>
+    /// <remarks>
+    /// The fallback moves its temporary file onto the vault's drive first and onto the vault
+    /// second, so a refusal of the second hop leaves the first hop's file behind. A refusal of the
+    /// first hop leaves nothing, and reports a different code.
+    /// </remarks>
+    private static bool StrandsATemporary(Exception ex) =>
+        ex is Win32Exception win32 && IsATransientMoveCode(win32.NativeErrorCode);
+
+    /// <summary>Removes the file the fallback move stranded beside the vault.</summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Opened rather than deleted by name, and only ever this one name.</b> Another writer can
+    /// be on KeePassLib's non-transacted path — KeePass 2 with file transactions turned off is one
+    /// — where this same name is the live write target, held open across the whole encryption and
+    /// renamed onto the vault only after the vault itself has been deleted. Deleting it there
+    /// destroys a vault. Asking for <see cref="FileShare.None"/> makes that writer's own handle
+    /// refuse us, and a refusal is where this stops: a file somebody still has open is never
+    /// touched.
+    /// </para>
+    /// <para>
+    /// The window this does not close is that writer's close-then-rename, where the file is shut
+    /// and the vault already deleted. D-0120 records it as accepted rather than solved.
+    /// </para>
+    /// <para>
+    /// Best effort throughout. The caller is on its way to reporting why the save failed, and
+    /// failing to tidy up must never replace that message.
+    /// </para>
+    /// </remarks>
+    private void SweepStrandedTemporary()
+    {
+        try
+        {
+            using FileStream doomed = new(
+                _database.IOConnectionInfo.Path + StrandedTemporarySuffix,
+                FileMode.Open,
+                FileAccess.ReadWrite,
+                FileShare.None,
+                bufferSize: 1,
+                FileOptions.DeleteOnClose);
+        }
+        catch (Exception ex) when (
+            ex is IOException or UnauthorizedAccessException or NotSupportedException or ArgumentException)
+        {
+        }
+    }
 
     /// <inheritdoc/>
     public void Dispose()

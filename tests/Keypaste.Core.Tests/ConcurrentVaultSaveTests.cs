@@ -34,6 +34,9 @@ namespace Keypaste.Core.Tests;
 /// <b>V-F.6 owns replacing it</b> with a reproduction that enters the transacted path and is red
 /// on Windows with the budget at 1. Until that exists, the concurrent-save failure is observed
 /// only on CI, in runs 34303291945 and 34403613553, and no test here would catch its return.
+/// <see cref="VaultSaveUnderATransactedNameTests"/> does enter the transacted path, but on the
+/// move rather than on the temporary file, and from one thread — it is F.7's refusal, not this
+/// contention, and it would not catch this one's return either.
 /// </para>
 /// </remarks>
 public sealed class ConcurrentVaultSaveTests : IDisposable
