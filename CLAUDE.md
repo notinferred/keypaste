@@ -13,7 +13,25 @@
 
 **`site.yml` is the third, and it deploys rather than gates.** On pushes to `main` it runs on a `paths:` allowlist — everything under `site/` that wrangler uploads, plus `release-targets.json` and the two site gates, which decide what the run concludes — and on dispatch. It has no pull-request trigger, because a fork’s pull request cannot read the deploy credential and a proposed change must not reach production. It checks the page it is about to deploy, runs `npm ci` and `wrangler deploy` from `site/`, prints the version id to the run log, then asks keypaste.com through [verify-site-disclosure.sh](scripts/verify-site-disclosure.sh) and [verify-site-endpoint.sh](scripts/verify-site-endpoint.sh). Its `CLOUDFLARE_API_TOKEN` is an **environment** secret whose deployment-branch rule names `main` alone, so no other ref can read it — it is the only credential here that can change a page the public reads. It is deliberately **not** a release gate: `require-green-gates.sh` requires `ci` plus every component’s workflow, the site is not a component, and making it one would let a Cloudflare outage block a CLI tag.
 
-- **Commit as you go. Push once per finished, verified unit of work.**
+- **One commit per step, written when the step is done.** Not mid-step, not per file, not as you go. A step is done when its Build line is built, its verifier has run, and STEPS, DECISIONS and CHANGELOG say what is now true. Then commit once, push once.
+- **Never push to find out whether a gate passes.** If a gate runs on this machine it runs here first. A commit whose subject repairs the commit before it is the evidence this was skipped — `d69fe91`, `138f43e`, `7779603` and `14dd809` are four of them, and ten of the eighteen red `ci.yml` runs on `main` between 2026-09-05 and 2026-09-11 were for something a local command catches in under twelve seconds, at 6.2 minutes a run. A deliberate red-first run in CI is the one exception, and only when the defect is platform-specific; say so in the commit subject.
+- **`DECISIONS.md` and `docs/STEPS.md` are under test. After editing either, run the gate before pushing.** Ledger rows are capped at 650 characters and STEPS completed-evidence cells at 350, and CI catching either costs a full round trip and an extra commit:
+  ```
+  dotnet test tests/Keypaste.Core.Tests/Keypaste.Core.Tests.csproj -c Release \
+    -- --filter-class 'Keypaste.Core.Tests.RecordRowsStaySkimmableTests'
+  ```
+- **Run the full suite last, after the documents are written, not before.** A suite run that precedes the DECISIONS edit does not cover it. The pre-push sequence, in order and measured on Windows 10 Pro 19045:
+
+  | When | Command | Cost |
+  |---|---|---|
+  | Always | `dotnet build keypaste.slnx -c Release -warnaserror` | 2 s |
+  | Always | `dotnet format keypaste.slnx --no-restore --verify-no-changes --exclude third_party/` | 10 s |
+  | After editing DECISIONS.md or docs/STEPS.md | the records gate above | 1 s |
+  | If one of the five gated pages changed | `bash scripts/verify-demo.sh` | 20 s |
+  | If `release-targets.json` or a download page changed | `bash scripts/verify-release-matrix.sh` | 87 s |
+  | Last, always | `dotnet test keypaste.slnx --no-build -c Release` | 28 s |
+
+- **A probe runs the byte-identical command `ci.yml` runs, and this is tested rather than assumed.** F.8 reproduced in `LargeVaultListingTests`, not in the `ListingSizeTests` class the probe was written for, so narrowing the command to the suspect class would have caught nothing. `dotnet test` runs the assemblies concurrently and that contention is usually the condition under test. A probe earns its runner time when the defect does not reproduce on this machine **and** the probe yields a count rather than a yes or no: [txf-probe.yml](.github/workflows/txf-probe.yml) gave D-0122 its 1387 of 1600, and [listing-probe.yml](.github/workflows/listing-probe.yml) gave F.8 and F.9 their 12 of 80 on one dispatch.
 - **Some docs-only pushes to `main` skip all three workflows.** `ci.yml` skips a push only when every changed path is in its `paths-ignore`; `app.yml` skips documentation because it is outside its allowlist. Five pages deliberately trigger `ci.yml` and must never enter its ignore list: `README.md`, `launch.md`, `docs/demo.md`, `docs/keepass-and-agents.md`, `site/public/index.html`. `scripts/verify-demo.sh` holds them to what the built binaries print. New documentation paths also trigger CI unless explicitly ignored. Never add a `docs/**` entry. Documentation pull requests still run both of those. `site.yml` skips everything except its own allowlist, and `site/README.md` is outside all three.
 
 ## Releases are immutable

@@ -1,0 +1,102 @@
+name: listing-probe
+
+# A measurement for docs/STEPS.md F.8, and only that.
+#
+# ListingSizeTests.AVaultTooBigForOneReply_StillListsTheNamesThatFit failed once on windows-2025 in
+# ci run 34544573944 and has not been seen since. One sighting establishes nothing about the
+# mechanism, and the instrument that would have named it - ListingCall in tests/Keypaste.Mcp.Tests -
+# did not exist when it happened. This buys attempts at a second one.
+#
+# It runs the whole solution rather than one assembly or one class, because `dotnet test` runs the
+# three assemblies concurrently and that contention is the only mechanism the code supports: the
+# tightest budget on the listing path is ApproverConnection.ConnectTimeout at five hundred
+# milliseconds. Narrowing the command would remove the condition and make a green run meaningless.
+#
+# windows-2025 only. txf-probe.yml carries a second leg because it is separating an OS API's
+# behaviour from a runner's; here the candidates are timing and ordering, so a second OS buys
+# nothing.
+#
+# Dispatch only, and deliberately outside the release path: no tag, push or pull request reaches it,
+# it is not a component in release-targets.json so require-green-gates.sh cannot read it, and
+# nothing here can make a release greener. A green run closes nothing - V-F.8 says so outright. A
+# red run is worth exactly one sighting, and its value is the sentence ListingCall prints, not the
+# failure.
+
+on:
+  workflow_dispatch:
+    inputs:
+      iterations:
+        description: 'Suite runs per shard'
+        default: '20'
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
+  NUGET_XMLDOC_MODE: skip
+
+jobs:
+  probe:
+    name: listing (shard ${{ matrix.shard }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # Four shards to keep one dispatch inside half an hour of wall clock. They are independent
+        # runners, not a partition of the tests: every shard runs the same command.
+        shard: [1, 2, 3, 4]
+    runs-on: windows-2025
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      - name: Restore (locked)
+        run: dotnet restore keypaste.slnx --locked-mode
+
+      - name: Build
+        run: dotnet build keypaste.slnx --no-restore -c Release
+
+      # The command is ci.yml's Test step verbatim. If the two ever diverge this probe stops
+      # measuring what CI runs, which is the only thing it is for.
+      - name: Probe
+        shell: bash
+        env:
+          ITERATIONS: ${{ inputs.iterations }}
+          SHARD: ${{ matrix.shard }}
+        run: |
+          set -uo pipefail
+          mkdir -p probe-logs
+          failed=0
+
+          for i in $(seq 1 "${ITERATIONS}"); do
+            log="probe-logs/shard-${SHARD}-run-${i}.log"
+
+            if dotnet test keypaste.slnx --no-build -c Release > "${log}" 2>&1; then
+              rm -f "${log}"
+            else
+              failed=$((failed + 1))
+              echo "::group::shard ${SHARD} iteration ${i} failed"
+              tail -n 80 "${log}"
+              echo "::endgroup::"
+            fi
+          done
+
+          echo "shard ${SHARD}: ${failed} of ${ITERATIONS} runs failed" | tee -a "${GITHUB_STEP_SUMMARY}"
+          test "${failed}" -eq 0
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: listing-probe-${{ matrix.shard }}
+          path: probe-logs/
+          if-no-files-found: ignore
