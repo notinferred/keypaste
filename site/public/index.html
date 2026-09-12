@@ -193,6 +193,14 @@ Approve? [y/N]
      two seconds and then reports that it could not save. Nothing is written and nothing is lost; the
      save has to be repeated. Older Windows builds accept the name and never see this. v0.1.0 has it
      too. Fixed on main. The v0.2.0 you can download still has it.</p>
+
+  <p class="caption"><b>The third one refuses a listing and blames the wrong thing.</b> Also in v0.2.0,
+     an agent asking for entry names on a loaded machine can be told to start keypaste agent for a process that is already running.
+     The bridge waits half a second for the approver, and on a busy machine that half second can pass
+     before the connection is made &mdash; so keypaste answers with the refusal it wrote for the case
+     where nobody is running an approver at all, and the agent tells you to start one you already
+     started. Nothing is released, nothing is written and no name is disclosed. It is being measured
+     before it is repaired, because the half second is not the part that is wrong.</p>
 <!-- /defects:0.2.0 -->
 
   <h2>Install</h2>

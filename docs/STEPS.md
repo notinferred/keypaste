@@ -18,8 +18,10 @@ credential service exists. Two repairs are open — F.9 on four bounded waits th
 and F.2b2, BLOCKED on hardware rather than on work. F.6 is closed: D-0122 measured why build
 10.0.26100 refuses a save its own temporary name, and D-0123 repaired it. F.8 is closed: its
 diagnostic named the refusal on the first reproduction, and what it named — a 500 ms connect that
-took 5834 ms against a listener that was up — is F.9 rather than more of F.8. **F.9 is next**, and
-its Build line measures before anything is repaired.
+took 5834 ms against a listener that was up — is F.9 rather than more of F.8. **F.9 is open and
+measuring.** Its instrument and its three-arm probe are built and its user-visible half is disclosed
+against `0.2.0`; the mechanism is not named, nothing is repaired, and the counts that would decide it
+wait on a `windows-2025` dispatch.
 
 Release foundations are closed through R.0c: `0.1.0` is superseded and says so where it is
 downloaded, and the pages, the definition and keypaste.com name `0.2.0`. What stands between here and
@@ -134,16 +136,32 @@ fixtures rather than a maintainer's temporary files.
   **Widening `ConnectTimeout` is now measurably the wrong repair, not merely rejected on principle**
   (D-0124, D-0125). A budget that overran eleven-fold was never enforced at 500 ms, so raising the
   number raises a ceiling nothing reached. D-0035's 500 ms is a measurement on an idle machine and
-  stands as one.
-  **The user-visible half is the listing refusal, and it is not a test artifact.** An agent asking
-  for entry names on a loaded machine is told to ask a person to run `keypaste agent` — about a
-  process already running. Decide in this row whether that is a `0.2.0` known defect in
-  [release-targets.json](../release-targets.json): F.8's rule was that CI alone is an observation,
-  and a probe is CI.
+  stands as one. Raising the pool's floor in product code is refused for the same reason and is the
+  probe's instrument instead.
+  **The user-visible half is disclosed and the mechanism is not named.** `0.2.0` carries it as
+  `F.9` in [release-targets.json](../release-targets.json) in symptom words — an agent asking for
+  entry names on a loaded machine can be told to start `keypaste agent` for a process already
+  running — because F.8's rule is that CI alone is an observation and a probe is CI.
+  **Built so far, no production file opened:** [PoolSnapshot](../tests/Keypaste.Core.Tests/PoolSnapshot.cs)
+  samples from a thread the pool cannot delay, *during* each wait rather than at the assertion a
+  drained pool would answer, and separates timer lateness from queue latency; a cross-process
+  timeline merges what two concurrently-running test assemblies did, marked from a module
+  initializer so an empty artifact means the variable never arrived rather than that no site was
+  reached. [pool-probe.yml](../.github/workflows/pool-probe.yml) runs three arms over one knob, the
+  pool floor, and [ProbesRunTheCommandCiRunsTests](../tests/Keypaste.Core.Tests/ProbesRunTheCommandCiRunsTests.cs)
+  holds every probe to `ci.yml`'s command, which CLAUDE.md said was tested and was not.
+  **The measurement is pending a `windows-2025` dispatch, which `workflow_dispatch` cannot make
+  until `pool-probe.yml` is on the default branch** — so this row spans two pushes and stays open
+  across both. Local runs on Windows 10 Pro 19045 reproduced one F.9-shaped failure in ten at a
+  floor of one worker thread, with a 50 ms delay arriving 941 ms late while a queued item started
+  in 8 ms, and none in ten either as found or relieved. Twenty-four cores, a tenth of the runs, and
+  not the platform the four overruns were seen on: that establishes the instrument reads, and
+  nothing about the mechanism.
   **Verify (V-F.9):** A named mechanism, measured on a named platform with counts both ways, and a
   regression that is red against it and green after. A repair that only moves a number is refused by
-  this line. Four subsystems overrunning together is one finding; if the measurement splits them,
-  split the row rather than repairing on the common story.
+  this line. The decisive reading is the relieved arm at zero; low-but-not-zero is a large reduction
+  and not a mechanism. Four subsystems overrunning together is one finding; if the measurement
+  splits them, split the row rather than repairing on the common story.
 
 - [ ] **F.2b2 — Observe minimize-lock on macOS and Linux.** Needs: F.2b1. — **BLOCKED** on a macOS machine and a Linux desktop session (2026-09-08); run F.2b1's behavior on both remaining targets during 4.7a/4.7b, following the [desktop checklist](desktop.md#observing-minimize-lock-on-macos-and-linux), and correct [MinimizeLock](../src/Keypaste.App/MinimizeLock.cs) if an observation contradicts it.
 

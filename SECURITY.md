@@ -59,7 +59,13 @@ Those Windows builds refuse a temporary name while another transaction holds one
 or KeePass itself, is enough. keypaste retries for about two seconds and then reports that it could
 not save. Nothing is written and nothing is lost; the save has to be repeated. Older Windows builds
 accept the name and are unaffected.
-`v0.1.0` has both. Both are fixed on `main` and in no published version yet.
+Separately again, an agent asking for entry names on a loaded machine can be told to start keypaste agent for a process that is already running.
+The bridge gives the approver half a second to answer a connection, and under load that budget can
+pass while an approver is running and its listener is bound; the refusal keypaste returns is then the
+one written for no approver at all. No credential is released, nothing is written and no entry name
+is disclosed — what is wrong is the advice. `v0.1.0` has the first two. Those two are fixed on
+`main` and in no published version yet; the third is being measured before it is repaired, because
+the overrun is five to eleven times the budget and widening the budget would not have prevented it.
 <!-- /defects:0.2.0 -->
 
 The desktop app is available from source and has no public release. See the

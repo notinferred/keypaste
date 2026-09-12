@@ -109,10 +109,20 @@ public sealed class ListingSizeTests
         await using var _ = approver;
         await using var __ = harness;
 
-        var text = (await ListingCall.ReadAsync(client, harness, Token)).Text;
+        var call = await ListingCall.ReadAsync(client, harness, Token);
+        var text = call.Text;
         var header = text.Split('\n')[0];
 
-        Assert.Contains("not all of them", header, StringComparison.Ordinal);
+        // F.9: this is the assertion that reproduces. Under an injected pool floor of one worker
+        // thread it fails here with the no-approver refusal against a listener that stayed bound,
+        // and the sub-string failure alone says nothing about why. Reported on the failing path so
+        // the pool reading arrives with it rather than being thrown away by the assertion that
+        // tripped over it - the same mistake ListingCall itself was built to stop (D-0124).
+        if (!header.Contains("not all of them", StringComparison.Ordinal))
+        {
+            Assert.Fail($"the header did not say the listing was cut off.{Environment.NewLine}{call.Report()}");
+        }
+
         Assert.DoesNotContain("cut off at", text, StringComparison.Ordinal);
     }
 

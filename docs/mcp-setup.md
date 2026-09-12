@@ -253,7 +253,7 @@ You should get two JSON lines back, the second listing `list_entry_names` and `r
 
 **The server shows as failed to start.** Check the path is absolute and the file is executable (`chmod +x`). Then check `~/.keypaste` is writable — an unwritable audit log stops the server on purpose.
 
-**Every call is refused with "no keypaste agent is running".** Start one: `keypaste agent --vault <path>`. It has to be running, and pointed at the same vault, for anything to be granted. If it is running and you still see this, the two are looking at different pipe names — pass the same `--approver <name>` to both, or set `KEYPASTE_APPROVER` for both.
+**Every call is refused with "no keypaste agent is running".** Start one: `keypaste agent --vault <path>`. It has to be running, and pointed at the same vault, for anything to be granted. If it is running and you still see this, the two are looking at different pipe names — pass the same `--approver <name>` to both, or set `KEYPASTE_APPROVER` for both. If the names match and the agent is running, the machine may simply have been busy: the bridge waits half a second for the approver to accept a connection, and under load that can pass before the connection is made, producing this same refusal (F.9). Retrying is right in that case.
 
 **A call says the vault is locked.** The approver reported that no vault was available. Check its terminal and restart it with the intended vault if needed. The current CLI approver opens its pipe after successful unlock; a failed unlock and exit normally produce `no-approver` instead.
 

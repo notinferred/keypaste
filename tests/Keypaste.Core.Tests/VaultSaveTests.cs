@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Globalization;
 using Keypaste.Core.Internal;
 using Xunit;
 
@@ -149,11 +151,88 @@ public sealed class VaultSaveTests : IDisposable
 
         Directory.Delete(home, recursive: true);
 
+        using var watch = PoolSnapshot.Watch("a doomed save's whole retry budget");
+        PoolTimeline.Mark("save-enter", "doomed");
+
         var started = Environment.TickCount64;
         Assert.Throws<VaultException>(vault.Save);
         var elapsed = Environment.TickCount64 - started;
 
-        Assert.True(elapsed < 5_000, $"a doomed save took {elapsed}ms; retrying must stay bounded");
+        PoolTimeline.Mark("save-exit", elapsed.ToString(CultureInfo.InvariantCulture));
+
+        // Reported only once the comparison has already failed: Assert.True evaluates its message
+        // eagerly, and this one reads the pool.
+        if (elapsed >= 5_000)
+        {
+            Assert.Fail($"a doomed save took {elapsed}ms; retrying must stay bounded.{Environment.NewLine}{watch.Report()}");
+        }
+    }
+
+    /// <summary>
+    /// Where a doomed save's time actually goes: waiting between attempts, or inside them.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>F.9's measurement, and it is two readings rather than one on purpose.</b>
+    /// <see cref="ASaveThatCannotSucceed_GivesUpQuickly"/> overran at 6797 ms against a budget of
+    /// about 2.2 seconds, and a single elapsed cannot say whether the retry was scheduled late or
+    /// the work inside each attempt got slower. Those have different repairs, and one of them is not
+    /// a repair at all: key derivation is CPU-parallel, so an arm that moved the processor count
+    /// would slow the work and look like a scheduling defect.
+    /// </para>
+    /// <para>
+    /// The wait callback is the existing seam <see cref="Vault.SaveWaiting"/> offers, invoked with
+    /// the production delay inside it, so the attempt count and the budget are exactly what ships.
+    /// Timestamps around the callback bracket each attempt, which is what separates the sleeping
+    /// from the working without opening a production file to measure it.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void ADoomedSave_SpendsItsBudgetWhereThisSays()
+    {
+        var (vault, home) = NewVaultInItsOwnDirectory("budget");
+        using var _ = vault;
+
+        Directory.Delete(home, recursive: true);
+
+        var work = new List<long>();
+        var slept = new List<long>();
+        var attempts = 0;
+
+        using var watch = PoolSnapshot.Watch("a doomed save, attempt by attempt");
+        PoolTimeline.Mark("save-enter", "budget");
+
+        var lastResumed = Stopwatch.GetTimestamp();
+
+        Assert.Throws<VaultException>(() => vault.SaveWaiting(attempt =>
+        {
+            attempts = attempt;
+            work.Add((long)Stopwatch.GetElapsedTime(lastResumed).TotalMilliseconds);
+
+            var sleeping = Stopwatch.GetTimestamp();
+            Thread.Sleep(KeePassInterop.SaveRetryDelayMilliseconds * attempt);
+            slept.Add((long)Stopwatch.GetElapsedTime(sleeping).TotalMilliseconds);
+
+            lastResumed = Stopwatch.GetTimestamp();
+        }));
+
+        PoolTimeline.Mark(
+            "save-exit",
+            string.Create(CultureInfo.InvariantCulture, $"attempts {attempts}; work {work.Sum()}; slept {slept.Sum()}"));
+
+        // The budget is the sleeps. Their sum is arithmetic on two shipped constants and cannot
+        // drift with the machine; the work is what the machine decides, and it is the reading this
+        // test exists to produce.
+        var budget = Enumerable.Range(1, attempts).Sum(attempt => KeePassInterop.SaveRetryDelayMilliseconds * attempt);
+
+        Assert.Equal(KeePassInterop.SaveAttempts - 1, attempts);
+
+        if (slept.Sum() > budget * 3)
+        {
+            Assert.Fail(
+                $"the sleeps alone took {slept.Sum()}ms against {budget}ms asked for, over {attempts} attempts; " +
+                $"the work between them took {work.Sum()}ms.{Environment.NewLine}{watch.Report()}");
+        }
     }
 
     /// <summary>

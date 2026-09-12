@@ -1,0 +1,172 @@
+name: pool-probe
+
+# A measurement for docs/STEPS.md F.9, and only that.
+#
+# Twelve of eighty suite runs failed on windows-2025 in listing-probe run 34653284139, in four shapes
+# across three subsystems, every one a bounded wait overrunning five- to elevenfold. Thread-pool
+# starvation is the one thing common to all four and D-0125 records it as inferred from the probe's
+# load and never observed. This is what observes it.
+#
+# THREE ARMS, ONE KNOB. Two arms would measure only degree: both would have the suspected cause
+# present and differ in how much of it. D-0122's evidence was 1387 of 1600 against 0, and the 0 came
+# from the arm with the suspected cause REMOVED. So the relieved arm is the reading that decides
+# this, and the decisive result is 0 of 80. Low-but-not-zero is a large reduction and not a named
+# mechanism.
+#
+# The knob is the pool's FLOOR and nothing else:
+#
+#   starved   ForceMinWorkerThreads=1     a floor below the runner's
+#   as-found  (unset)                     min = ProcessorCount = 4 on this runner
+#   relieved  ForceMinWorkerThreads=100   hex, so 256: a floor above any demand the suite creates
+#
+# Max worker threads is deliberately NOT moved. The runner's condition is a low floor with injection
+# still possible - the pool starves for the moment it takes to add a thread, then recovers - and
+# capping the maximum forbids injection entirely, which is a different condition. Measured: capping
+# max at 4 on a 24-core machine ran 582 tests in seven minutes with no failures, and capping it at 2
+# wedged the `dotnet test` driver before a single test host started. The environment reaches every
+# dotnet process in the tree, the driver included, which is why only the floor is safe to move.
+#
+# DOTNET_PROCESSOR_COUNT is not used. It moves GC mode and every degree of parallelism the runtime
+# derives, including Argon2's, which is CPU-parallel - so a save's overrun under it could be slower
+# work rather than a later deadline, and that is the one distinction this probe exists to draw.
+#
+# The command is ci.yml's Test step verbatim. The arms differ only in environment, so byte-identity
+# holds. If the two ever diverge this probe stops measuring what CI runs, which is the only thing it
+# is for.
+#
+# Dispatch only, and deliberately outside the release path: no tag, push or pull request reaches it,
+# it is not a component in release-targets.json so require-green-gates.sh cannot read it, and nothing
+# here can make a release greener. A green run closes nothing - V-F.9 asks for a regression that
+# induces the starvation itself and is red before a repair and green after, which no probe supplies.
+
+on:
+  workflow_dispatch:
+    inputs:
+      iterations:
+        description: 'Suite runs per shard'
+        default: '20'
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
+  NUGET_XMLDOC_MODE: skip
+
+jobs:
+  probe:
+    name: pool (${{ matrix.arm }}, shard ${{ matrix.shard }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # Four shards per arm to keep one dispatch inside half an hour of wall clock, and because
+        # eighty runs per arm is what makes the three counts comparable with listing-probe's.
+        arm: [starved, as-found, relieved]
+        shard: [1, 2, 3, 4]
+    runs-on: windows-2025
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      - name: Restore (locked)
+        run: dotnet restore keypaste.slnx --locked-mode
+
+      - name: Build
+        run: dotnet build keypaste.slnx --no-restore -c Release
+
+      # The floor this arm asks for. ForceMinWorkerThreads is read as hex, which is why the relieved
+      # arm says 100 and means 256. PoolSnapshot reads GetMinThreads back into every failure report,
+      # so a run that did not get the floor it asked for is visible rather than filed under the wrong
+      # arm.
+      - name: Choose the arm's pool floor
+        shell: bash
+        env:
+          ARM: ${{ matrix.arm }}
+        run: |
+          set -euo pipefail
+
+          case "${ARM}" in
+            starved)  echo 'DOTNET_ThreadPool_ForceMinWorkerThreads=1' >> "${GITHUB_ENV}" ;;
+            relieved) echo 'DOTNET_ThreadPool_ForceMinWorkerThreads=100' >> "${GITHUB_ENV}" ;;
+            as-found) : ;;
+            *) echo "unknown arm ${ARM}"; exit 1 ;;
+          esac
+
+      # Before twenty iterations are spent. The timeline is the only instrument that can test the
+      # producer hypothesis - it is how a save in one test assembly is lined up against a listing
+      # overrunning in another, and those are concurrent PROCESSES - and it is behind an environment
+      # variable. A variable the test host does not inherit produces a full set of failure counts and
+      # an empty artifact: the counts look like a measurement and answer nothing, and the dispatch has
+      # to be repeated. So one run first, and the arm stops here if it wrote nothing.
+      - name: Prove the timeline reaches the test host
+        shell: bash
+        env:
+          KEYPASTE_F9_TIMELINE: ${{ github.workspace }}/probe-timeline/preflight
+        run: |
+          set -uo pipefail
+          dotnet test keypaste.slnx --no-build -c Release > preflight.log 2>&1 || true
+
+          written="$(find probe-timeline/preflight -name 'f9-timeline-*.jsonl' -size +0c 2>/dev/null | wc -l)"
+
+          if [ "${written}" -eq 0 ]; then
+            echo "::error::KEYPASTE_F9_TIMELINE did not reach the test host: no non-empty f9-timeline-*.jsonl was written."
+            echo "Every participating assembly marks the timeline from a module initializer, so a process that"
+            echo "started at all leaves a file. An empty directory means the variable did not arrive, and the"
+            echo "counts this arm would go on to produce could not be correlated with anything."
+            exit 1
+          fi
+
+          echo "timeline preflight: ${written} file(s) written"
+          grep -ohE '"asm":"[^"]+"' probe-timeline/preflight/*.jsonl | sort -u
+
+      - name: Probe
+        shell: bash
+        env:
+          ITERATIONS: ${{ inputs.iterations }}
+          SHARD: ${{ matrix.shard }}
+          ARM: ${{ matrix.arm }}
+        run: |
+          set -uo pipefail
+          mkdir -p probe-logs
+          failed=0
+
+          for i in $(seq 1 "${ITERATIONS}"); do
+            log="probe-logs/${ARM}-shard-${SHARD}-run-${i}.log"
+            export KEYPASTE_F9_TIMELINE="${GITHUB_WORKSPACE}/probe-timeline/${ARM}-${SHARD}-${i}"
+
+            if dotnet test keypaste.slnx --no-build -c Release > "${log}" 2>&1; then
+              rm -f "${log}"
+              rm -rf "${KEYPASTE_F9_TIMELINE}"
+            else
+              failed=$((failed + 1))
+              echo "::group::${ARM} shard ${SHARD} iteration ${i} failed"
+              tail -n 80 "${log}"
+              echo "::endgroup::"
+            fi
+          done
+
+          echo "${ARM} shard ${SHARD}: ${failed} of ${ITERATIONS} runs failed" | tee -a "${GITHUB_STEP_SUMMARY}"
+
+          # The job is green whatever the count. Unlike listing-probe, a failure here is the reading
+          # rather than the problem: the starved arm is EXPECTED to fail and an arm that goes red on
+          # its own failures would make the dispatch harder to read, not easier. The counts are in
+          # the summary and the evidence is in the artifact.
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: pool-probe-${{ matrix.arm }}-${{ matrix.shard }}
+          path: |
+            probe-logs/
+            probe-timeline/
+          if-no-files-found: ignore

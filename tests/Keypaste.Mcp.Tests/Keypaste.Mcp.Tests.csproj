@@ -24,4 +24,14 @@
     <Compile Include="../Keypaste.Core.Tests/PublisherMetadata.cs" Link="PublisherMetadata.cs" />
   </ItemGroup>
 
+  <!--
+    F.9's instrument, compiled into both assemblies that hold one of the four overrunning waits.
+    It is one file rather than two because the two halves have to agree on the timeline format:
+    the producer correlation is read by merging what these two processes wrote, and a second copy
+    that drifted by one field would make that merge silently wrong rather than red.
+  -->
+  <ItemGroup>
+    <Compile Include="../Keypaste.Core.Tests/PoolSnapshot.cs" Link="PoolSnapshot.cs" />
+  </ItemGroup>
+
 </Project>

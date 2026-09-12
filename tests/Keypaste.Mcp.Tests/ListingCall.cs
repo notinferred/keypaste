@@ -1,6 +1,8 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using Keypaste.Core.Tests;
 using Keypaste.Mcp.Tools;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
@@ -45,12 +47,14 @@ internal sealed class ListingCall
     private readonly CallToolResult _result;
     private readonly McpHarness _harness;
     private readonly TimeSpan _elapsed;
+    private readonly PoolWatch _watch;
 
-    private ListingCall(CallToolResult result, McpHarness harness, TimeSpan elapsed)
+    private ListingCall(CallToolResult result, McpHarness harness, TimeSpan elapsed, PoolWatch watch)
     {
         _result = result;
         _harness = harness;
         _elapsed = elapsed;
+        _watch = watch;
     }
 
     /// <summary>Calls the listing tool, and keeps enough to say what it answered.</summary>
@@ -68,10 +72,19 @@ internal sealed class ListingCall
         // Timed apart from the test. F.8's thirteen seconds are attributable to no wait on this path
         // - the handshake grace is one second and the connect budget five hundred milliseconds - so
         // whether they were spent inside the call or around it is the next sighting's first question.
+        // F.9 watches the pool for the length of the call rather than at the assertion, because a
+        // reading taken after the overrun is a reading of a pool that has already drained. The
+        // sampler starts only when a probe asked for one, so an ordinary run carries no extra timer.
+        using var watch = PoolSnapshot.Watch("the listing call");
+        PoolTimeline.Mark("listing-enter");
+
         var started = Stopwatch.GetTimestamp();
         var result = await client.CallToolAsync(ToolText.ListToolName, cancellationToken: cancellationToken);
+        var elapsed = Stopwatch.GetElapsedTime(started);
 
-        return new ListingCall(result, harness, Stopwatch.GetElapsedTime(started));
+        PoolTimeline.Mark("listing-exit", ((int)elapsed.TotalMilliseconds).ToString(CultureInfo.InvariantCulture));
+
+        return new ListingCall(result, harness, elapsed, watch);
     }
 
     /// <summary>The result itself, for assertions about the protocol shape.</summary>
@@ -113,7 +126,8 @@ internal sealed class ListingCall
             .AppendLine($"content: {_result.Content.Count} block(s) [{string.Join(", ", _result.Content.Select(block => block.Type))}]")
             .AppendLine($"text ({text.Length} chars): {(text.Length <= _quoted ? text : text[.._quoted] + "…")}")
             .AppendLine($"audit ({lines.Length} line(s)): {string.Join(", ", lines.Select(MethodOf))}")
-            .Append($"transcript: {Encoding.UTF8.GetByteCount(_harness.Transcript)} bytes");
+            .AppendLine($"transcript: {Encoding.UTF8.GetByteCount(_harness.Transcript)} bytes")
+            .Append(_watch.Report());
 
         return report.ToString();
     }
