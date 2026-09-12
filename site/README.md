@@ -105,6 +105,17 @@ These are the only two things that ask keypaste.com rather than the checkout. Th
 in no workflow — a job here that asked the live origin would go red for a Cloudflare outage it cannot
 fix — so running them is yours after any deploy, Cloudflare's included.
 
+### First deploy from the Git connection, 2026-09-12
+
+Build `1716bdb6` from `309aac3` deployed version `1fcc038c`, root directory `site`, `npm run deploy`,
+24 seconds. The origin then passed both scripts and served `public/index.html` byte-for-byte.
+
+**The connection was silently dead for a week before that, and the dashboard did not say so.** Its
+repository was named by id, and this repository was deleted and recreated on 2026-09-05 — so the
+connection went on pointing at id `1312113438` while GitHub had moved to `1358644975`, and no push
+built anything between 2026-09-05 and 2026-09-12. If a page change ever stops reaching the origin,
+compare the connection's `repo_id` against `gh api repos/notinferred/keypaste --jq .id` first.
+
 ### Deployed by hand on 2026-09-11
 
 `site.yml` could not deploy: the `keypaste.com` environment held no `CLOUDFLARE_API_TOKEN`, so all
