@@ -104,8 +104,10 @@ fix — so running them is yours after any deploy, Cloudflare's included.
 
 `site.yml` could not deploy: the `keypaste.com` environment held no `CLOUDFLARE_API_TOKEN`, so all
 four of its runs failed at the deploy step, twice with the page already wrong about a data-loss
-defect. That is why it is gone. Two versions went out from a checkout instead, each verified against
-the live origin afterwards:
+defect. That is why it is gone, and why the environment went with it on 2026-09-12 — it held a stale
+`CLOUDFLARE_ACCOUNT_ID` and nothing else, and a dangling environment holding a credential fragment is
+how the next reader concludes CI deploys this. Two versions went out from a checkout instead, each
+verified against the live origin afterwards:
 
 | Version id | Tree it carried |
 |---|---|
