@@ -24,9 +24,11 @@ against `0.2.0`; the mechanism is not named, nothing is repaired, and the counts
 wait on a `windows-2025` dispatch.
 
 Release foundations are closed through R.0c: `0.1.0` is superseded and says so where it is
-downloaded, and the pages, the definition and keypaste.com name `0.2.0`. What stands between here and
-R.1 is desktop packaging and signing, browser publication, and 3.8's attestations — which no longer
-gate a CLI patch (D-0115) and still gate 4.7c.
+downloaded, and the pages, the definition and keypaste.com name `0.2.0`. **R.0e is open**: the deploy
+D-0121 recorded never ran once, so keypaste.com moves to Cloudflare's Git integration and is missing
+F.9's disclosure until it does. What stands between here and R.1 is desktop packaging and signing,
+browser publication, and 3.8's attestations — which no longer gate a CLI patch (D-0115) and still
+gate 4.7c.
 
 ## Build order
 
@@ -98,7 +100,7 @@ deletion or restoring history, and the F rows are defects found after those orig
 | R.0a | One checked release definition drives both workflows and the download pages | [release-targets.json](../release-targets.json); [verify-release-matrix.sh](../scripts/verify-release-matrix.sh) refuses 31 cases; the prerelease suffix reached all three desktop targets on tag run 34542636558; D-0108 to D-0112 |
 | R.0b | A release is complete only when the public bytes say so | [release-completion.sh](../scripts/release-completion.sh) recorded 0.2.0 and verified all 11 assets anonymously at the origin, run 34549357893; six fixtures in [verify-release-completion.sh](../scripts/verify-release-completion.sh); D-0116 |
 | R.0c | 0.2.0 published and installed on all four native targets from clean runners | release run 34549357893; install runs 34549933842 and 34551580519, the second running README verbatim, each target creating a vault and injecting into a child. macOS and Windows floors stay `cited`: the runners sit above them, not on them |
-| R.0d | What the advertised `v0.1.0` gets wrong is named where it is downloaded | [matrix gate](../scripts/verify-release-matrix.sh) holds three pages to `known_defects` both ways; [site check](../scripts/verify-site-disclosure.sh) runs in [site.yml](../.github/workflows/site.yml) on every deploy; D-0117, D-0121 |
+| R.0d | What the advertised `v0.1.0` gets wrong is named where it is downloaded | [matrix gate](../scripts/verify-release-matrix.sh) holds three pages to `known_defects` both ways, at the checked-out ref; the [site check](../scripts/verify-site-disclosure.sh) asks the origin by hand, never from a workflow; D-0117, D-0127 |
 | 10.1 | Initial hostile review and remediation | D-0084 in [DECISIONS](../DECISIONS.md) |
 | K.1 | Pinned SDK installed | [global.json](../global.json), D-0076 |
 
@@ -166,6 +168,38 @@ fixtures rather than a maintainer's temporary files.
 - [ ] **F.2b2 — Observe minimize-lock on macOS and Linux.** Needs: F.2b1. — **BLOCKED** on a macOS machine and a Linux desktop session (2026-09-08); run F.2b1's behavior on both remaining targets during 4.7a/4.7b, following the [desktop checklist](desktop.md#observing-minimize-lock-on-macos-and-linux), and correct [MinimizeLock](../src/Keypaste.App/MinimizeLock.cs) if an observation contradicts it.
 
 ### Release foundations
+
+- [ ] **R.0e — keypaste.com deploys from a path that has actually run.** Needs: R.0d.
+  **Build:** D-0121 recorded that keypaste.com deploys from a workflow on every qualifying push to
+  `main`, and **it never deployed once**: the `keypaste.com` environment was never given a
+  `CLOUDFLARE_API_TOKEN`, so all four runs — `34614262186`, `34622212108`, `34649634369`,
+  `34668820874` — failed at the deploy step and the three live checks after it were skipped every
+  time. Every version on the Worker is a hand `wrangler deploy`. R.0d cited that check as its
+  evidence, so the page and the repository have only ever converged when somebody remembered, and
+  today they do not: keypaste.com carries both `0.2.0` defects and the `0.1.0` upgrade notice and
+  **not F.9's**.
+  **The deploy moves to Cloudflare's Git integration and the workflow is deleted**, so the one
+  credential that can rewrite a page the public reads is held by Cloudflare rather than by GitHub.
+  The setting that was wrong is the root directory: `assets.directory` in
+  [wrangler.jsonc](../site/wrangler.jsonc) is `./public` and resolves against it, so a project
+  rooted at the repository root resolves `/` to nothing. Root directory `site`, **no build command**
+  — `site/package.json` has no build script and nothing compiles — deploy command `npm run deploy`,
+  production branch `main`, non-production branch builds off. There is no output-directory field;
+  that is a Pages setting, and this is a Worker with assets and a Hyperdrive binding.
+  **The origin check is demoted rather than dropped.**
+  [verify-site-disclosure.sh](../scripts/verify-site-disclosure.sh) becomes a by-hand check, its
+  `--selftest` staying in `ci.yml` where it needs no network, and
+  [verify-site-endpoint.sh](../scripts/verify-site-endpoint.sh) goes back to the by-hand H-0011 list
+  in [site/README.md](../site/README.md) that it never actually left. Neither belongs in a workflow:
+  both would redden a branch for a Cloudflare outage no job here can fix.
+  **Connecting the repository is a dashboard action outside this repository**, so this row spans two
+  pushes and stays open across both, the way F.9's does.
+  **Verify (V-R.0e):** `bash scripts/verify-site-disclosure.sh` against keypaste.com returns every
+  phrase [release-targets.json](../release-targets.json) records for the advertised version,
+  F.9's included, and exits zero — the command that fails on F.9 today. No workflow deploys the site
+  and none asks the live origin, which
+  [LiveOriginChecksStayOutOfWorkflowsTests](../tests/Keypaste.Core.Tests/LiveOriginChecksStayOutOfWorkflowsTests.cs)
+  holds. A green Cloudflare build is not this row: the evidence is what the origin serves.
 
 - [ ] **3.8 — Authenticate release origin and retain provenance.** Needs: R.0b.
   **Build:** Generate build attestations for every distributable, source archive and release manifest; bind verification to this repository and its release workflow. Publish a copyable verification procedure and retain the evidence with the release; make no reproducible-build claim from attestation alone.

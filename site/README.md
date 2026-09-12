@@ -1,6 +1,6 @@
 # keypaste.com
 
-Two static pages and one form endpoint, deployed to Cloudflare Workers by [site.yml](../.github/workflows/site.yml) on every qualifying push to `main`. `public/` is the site; `src/worker.js` handles `/subscribe` and returns 404 for other unmatched paths.
+Two static pages and one form endpoint, deployed to Cloudflare Workers by Cloudflare's Git integration on a push to `main`. `public/` is the site; `src/worker.js` handles `/subscribe` and returns 404 for other unmatched paths.
 
 This is the waitlist site, not the planned hosted vault service. **Last recorded live verification: 2026-07-28**, in D-0037 of [DECISIONS.md](../DECISIONS.md). The documentation review on 2026-09-07 checked source and provider documentation, not the live account, database permissions or deployed behavior. Repeat the checks below before relying on that historical deployment evidence.
 
@@ -74,29 +74,38 @@ Recorded follow-up: migrate the SQL role to a managed role with no inherited rol
 
 ## Deploying
 
-A push to `main` touching `public/`, `src/`, `wrangler.jsonc` or either `package` file deploys it.
-[site.yml](../.github/workflows/site.yml) checks the page it is about to deploy, runs `npm ci` and
-`wrangler deploy` from here, prints the version id, then asks keypaste.com whether the disclosure is
-on it and whether the signup endpoint still refuses what it should. Dispatch that workflow to
-redeploy without a commit. `README.md` is the one file here that deploys nothing.
+**Cloudflare's Git integration deploys this, and no workflow in this repository does** (D-0127).
+Any push to `main` builds; the settings under Workers → `keypaste-site` → Settings → Build are root
+directory `site`, **no build command** — there is no build script and nothing compiles — deploy
+command `npm run deploy`, production branch `main`, non-production branch builds off, watch paths
+unset. There is no output-directory field to set: `wrangler.jsonc`'s `assets.directory` is `./public`
+and resolves against the root directory, which is why a project rooted at the repository root served
+nothing. The Worker's dashboard name must stay `keypaste-site` to match `wrangler.jsonc`.
 
-By hand, when you need to deploy a ref the workflow will not:
+By hand, to deploy a ref Cloudflare will not:
 
 ```sh
 npm ci
 npx wrangler deploy
+```
+
+**Then ask the origin, every time, because nothing else will:**
+
+```sh
 ../scripts/verify-site-disclosure.sh
 ../scripts/verify-site-endpoint.sh
 ```
 
-The last two lines are not optional. They are the only things that ask the origin rather than the
-checkout, and the workflow runs them for the same reason.
+These are the only two things that ask keypaste.com rather than the checkout. They are deliberately
+in no workflow — a job here that asked the live origin would go red for a Cloudflare outage it cannot
+fix — so running them is yours after any deploy, Cloudflare's included.
 
 ### Deployed by hand on 2026-09-11
 
-`site.yml` could not deploy: the `keypaste.com` environment held no `CLOUDFLARE_API_TOKEN`, so both
-its runs failed at the deploy step with the page already wrong about a data-loss defect. Two versions
-went out from a checkout instead, each verified against the live origin afterwards:
+`site.yml` could not deploy: the `keypaste.com` environment held no `CLOUDFLARE_API_TOKEN`, so all
+four of its runs failed at the deploy step, twice with the page already wrong about a data-loss
+defect. That is why it is gone. Two versions went out from a checkout instead, each verified against
+the live origin afterwards:
 
 | Version id | Tree it carried |
 |---|---|
@@ -117,10 +126,10 @@ CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE="postgresql://..." npx 
 The environment-variable form, rather than `localConnectionString` in `wrangler.jsonc`, because the second one puts a real password in a tracked file. Point it at a scratch database if you have one.
 
 Run these checks against a scratch database before deployment. Afterwards, the split is what each
-check costs to repeat: anything that stores a row is still yours to run, and everything else now
-runs on every deploy.
+check costs to repeat: anything that stores a row needs a scratch database and your judgement, and
+everything else is one script.
 
-**Automated, on every deploy** — [verify-site-endpoint.sh](../scripts/verify-site-endpoint.sh). Each
+**Scripted, and yours to run after a deploy** — [verify-site-endpoint.sh](../scripts/verify-site-endpoint.sh). Each
 of these is refused or redirected before the Worker opens a database connection, which is the whole
 reason they are safe to repeat:
 
@@ -145,7 +154,7 @@ one back, so no script can check them without a credential this repository must 
 
 ## What is not here
 
-No Worker build job, and no check that reaches the database. [site.yml](../.github/workflows/site.yml) deploys and then asks the live page and the live endpoint the questions a script can ask without storing anything; the .NET workflow separately runs `scripts/verify-demo.sh`, which checks the transcript in `site/public/index.html`. Neither validates the database role, its grants or its CA, and neither stores a row - those are the by-hand checks above (H-0011).
+No Worker build job, and no check that reaches the database. Cloudflare deploys, and the two scripts that ask the live page and the live endpoint are run by hand; the .NET workflow separately runs `scripts/verify-demo.sh`, which checks the transcript in `site/public/index.html` at the checked-out ref. None of them validates the database role, its grants or its CA, and none stores a row - those are the by-hand checks above (H-0011).
 
 No email sender or confirmation flow. The current handler stores signup requests. Double opt-in and list verification are planned in step 5.6 of [STEPS](../docs/STEPS.md); do not treat existing rows as confirmed subscribers or claim confirmation mail is already sent.
 

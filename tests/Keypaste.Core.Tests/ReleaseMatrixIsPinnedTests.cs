@@ -75,7 +75,7 @@ public sealed class ReleaseMatrixIsPinnedTests
             RepositoryFile(".github", "workflows", "install.yml"),
             StringComparison.Ordinal);
 
-        foreach (var workflow in new[] { "ci.yml", "release.yml", "app.yml", "site.yml" })
+        foreach (var workflow in new[] { "ci.yml", "release.yml", "app.yml" })
         {
             Assert.DoesNotContain(
                 "--with-public-origin",
