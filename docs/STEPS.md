@@ -161,6 +161,17 @@ fixtures rather than a maintainer's temporary files.
   [ApproverConnection](../src/Keypaste.Mcp/ApproverConnection.cs) against a listener in the unstarved
   parent. It asserts the classification — a live approver is not reported `Unreachable` — and not a
   duration, so no widened timeout can buy it green.
+  **Also: put the timeline reader in the tree, in `bash` and `jq`.** Run 34701431621's timelines were
+  read with a throwaway Python script, and the tree has no Python — 27 shell scripts and one C# file —
+  so it stayed outside and the reading it produced survives only as prose in this row. That is the
+  wrong place for it, because the same read is needed at least twice more: this row's repair has to be
+  verified against a timeline read the same way the defect was measured, and F.10's first task changes
+  that instrument, so its output has to be comparable across the change. It merges every
+  `f9-timeline-*.jsonl` in one iteration directory on the machine-wide `ticks`, taking `freq` from each
+  line rather than assuming one, pairs `*-enter`/`*-exit` per process, and reports each interval with
+  the intervals other processes had open across it. It must report how many of one family were open at
+  once in the same process, because pairing is first-in-first-out and an exit does not name the enter
+  it closes — above one, the durations are a guess and the raw lines are the answer.
   **Verify (V-F.9):** the named mechanism above, with the counts both ways already recorded, plus that
   regression red before the repair and green after. A repair that only moves a number is refused by
   this line.
