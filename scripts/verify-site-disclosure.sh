@@ -6,21 +6,24 @@
 # the far side of that gap is the list of ways the advertised download can destroy somebody's vault.
 # So this one asks the origin instead of the working tree.
 #
-# site.yml closes the gap on a push - it deploys site/ and runs this immediately after - but the gap
-# reopens on any deploy that did not come from there: a rollback, a dashboard edit, a run that
-# stopped after wrangler. It was open once already, and that is why site.yml exists: f69c393
-# disclosed the 0.2.0 concurrent-save revert and the served page went a day without it while every
-# gate in the repository was green (D-0121).
+# NOTHING RUNS THIS AGAINST THE ORIGIN BUT A PERSON. keypaste.com deploys from Cloudflare's Git
+# integration (D-0127), so no workflow here publishes the page or is positioned to check what was
+# published - and a workflow that asked the origin would go red for a Cloudflare outage no job in
+# this repository can fix, on main or across a release. Run it by hand after a deploy, and whenever
+# you want to know what the public is actually being told.
 #
-# It runs in site.yml and nowhere else. Still NOT in ci.yml or release.yml: neither deploys, so this
-# would be red there for a reason neither can fix, and a Cloudflare outage must not redden main or
-# block a tag. `--selftest` is the half that does run in ci.yml - it needs no network and holds the
-# reader below to what it has to do.
+# `--selftest` is the half that does run in ci.yml: it needs no network and holds the reader below
+# to what it has to do. LiveOriginChecksStayOutOfWorkflowsTests holds that split both ways.
 #
-# ONE verdict per run, emitted once. site.yml waits for the deploy to propagate BEFORE calling this,
-# by comparing the served body against site/public/index.html, because an ::error:: here becomes an
-# annotation on the run and on the commit - and a retry loop around it would leave a permanent
-# record of failures that were never true.
+# The gap this covers is real and stays open between runs. f69c393 disclosed the 0.2.0
+# concurrent-save revert and keypaste.com served a page without it for a day while every gate in
+# the repository was green, because verify-release-matrix.sh judges the checked-out ref and says so.
+# D-0121 answered that with a deploy workflow which never deployed - the credential was never added,
+# all four of its runs failed at the deploy step - and D-0127 answers it with a deploy path that
+# runs, plus this check by hand.
+#
+# ONE verdict per run, emitted once. Give a deploy time to propagate before asking: an ::error::
+# here is the verdict, and a retry loop around it would turn propagation into a recorded failure.
 #
 # Usage:
 #   scripts/verify-site-disclosure.sh [url]     (default: https://keypaste.com/)
@@ -131,7 +134,7 @@ $(jqr '[.published[] | select((.known_defects // []) | length > 0) | .version] |
 EOF
 
   [ "$missing" -eq 0 ] || die \
-    "$url is serving a page that does not disclose $missing of the defects $version is known to carry - push a repaired site/public/index.html, or dispatch site.yml to deploy this ref"
+    "$url is serving a page that does not disclose $missing of the defects $version is known to carry - push a repaired site/public/index.html, or deploy this ref by hand with npx wrangler deploy from site/"
   [ "$notice_missing" -eq 0 ] || die \
     "$url is serving a page that drops the upgrade notice for $notice_missing superseded release(s) - the people running them have no other way to find out"
 

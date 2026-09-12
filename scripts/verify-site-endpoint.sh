@@ -2,16 +2,17 @@
 #
 # verify-site-endpoint.sh
 #
-# The half of site/README.md's pre-deploy checklist (H-0011) that writes nothing, run against the
-# live site after site.yml deploys it.
+# The half of site/README.md's pre-deploy checklist (H-0011) that writes nothing, run by hand
+# against the live site. No workflow runs it: keypaste.com deploys from Cloudflare's Git integration
+# (D-0127), and a job here asking the live origin would go red for a Cloudflare outage it cannot fix.
 #
 # EVERY request here is one the Worker refuses or redirects BEFORE it reaches the database. That is
 # the whole admission rule for this file, and it is checked against src/worker.js rather than
 # assumed: `subscribe()` opens no connection until after the origin check, the content-type check,
 # the size checks and the honeypot have all had their say, and `normalize()` returns null for a bad
 # address before `postgres(...)` is called at all. A check that submits a real address belongs in
-# the by-hand list in site/README.md and must never be added here - this script runs on every
-# deploy, and a gate that quietly accumulates rows in a production table is worse than no gate.
+# the separate by-hand list in site/README.md and must never be added here - this one is meant to be
+# safe to repeat, and a check that quietly accumulates rows in a production table is not.
 #
 # What it deliberately does NOT cover, and what stays by hand:
 #   - a valid address is stored          writes a row, and the role cannot SELECT it back
