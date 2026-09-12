@@ -20,8 +20,10 @@ temporary name, and D-0123 repaired it. F.8 is closed: its diagnostic named the 
 reproduction, and what it named — a 500 ms connect that took 5834 ms against a listener that was up —
 is F.9 rather than more of F.8. **F.9 is measured and named, and unrepaired.** Its three arms over the
 pool's worker floor failed 16, 8 and 0 of 80 suite runs on `windows-2025`, so the mechanism is
-thread-pool worker supply and D-0125's inference is now a reading (D-0128); what remains is a
-regression that induces the shortage itself, and the repair. The measurement also split the row: the
+thread-pool worker supply and D-0125's inference is now a reading (D-0128). It is three defects
+sharing that cause — a live approver reported absent, a BUSY refusal lost to queueing, and right
+answers delivered late — and what remains is a repair and regression for each, then one confirming
+dispatch. The measurement also split the row: the
 save moved 4, 4 and 2 of 80 across the same 256-fold change and left as **F.10**, where the budget is
 already met and the whole variance sits in the one attempt that takes the process-wide save gate.
 
@@ -133,17 +135,28 @@ fixtures rather than a maintainer's temporary files.
   and D-0125's inference is now a measurement. The as-found arm's 8 of 80 is consistent with
   [listing-probe](https://github.com/notinferred/keypaste/actions/runs/34653284139)'s 12 of 80; the two
   readings agree on rate, and neither pins it.
-  **It is wider than the four shapes F.9 was opened on.** Eleven distinct tests overran across the
-  bridge — the listing connect, `AnUndeliverableRelease_AsksAPersonOnce`,
-  `AfterTheFirstRequestResolves_AFreshRequestIsAskedNormally`, and also
-  `AnApproverThatStopped_IsReportedAsUnreachable`, `ACancelledExchange_DoesNotSendTheRequestAgain`,
-  `AnIdentityThatNeverArrives_StillRefuses`, `OnAPolicyGrant_TheRequestedFieldComesBack_AndOnlyThat`,
-  two more `ConcurrentRequestsTests` and both listing-size tests. That is not four defects sharing a
-  cause; it is one cause reaching every bounded wait on the path, because each of them is enforced by
-  a thread-pool timer or a continuation — `CancellationTokenSource.CancelAfter` at
-  [ApproverClient](../src/Keypaste.Core/Ipc/ApproverClient.cs), `Task.WaitAsync`, and
-  `Task.Delay` raced by `Task.WhenAny`. A floor below demand delays the deadline and the work item
-  together, so a budget of 500 ms was never enforced at 500 ms.
+  **It is wider than the four shapes F.9 was opened on, and it is three defects, not one.** Ten
+  distinct tests overran across the bridge, every one of them waiting on a thread-pool timer or
+  continuation — `CancellationTokenSource.CancelAfter` at
+  [ApproverClient](../src/Keypaste.Core/Ipc/ApproverClient.cs), `Task.WaitAsync`, `Task.Delay` raced by
+  `Task.WhenAny` — so a floor below demand delays the deadline and the work item together, and a
+  budget of 500 ms was never enforced at 500 ms. What each failure *said* divides them into three
+  classes with three different repairs:
+  1. **A live approver reported as absent** — the disclosed symptom, 16 failures:
+     `OnAPolicyGrant_TheRequestedFieldComesBack_AndOnlyThat` ("No keypaste agent is running"),
+     `AnUndeliverableRelease_AsksAPersonOnce`, both listing-size tests, and
+     `AnApproverThatStopped_IsReportedAsUnreachable`, whose *first* request to a live approver came back
+     null.
+  2. **A BUSY refusal lost to queueing** — F.3b's guarantee (D-0101), 2 failures:
+     `TheBusyRefusalIsRecordedInTheAuditLog` ("queued behind the prompt") and
+     `AListingWhileARequestIsOpen_IsBusyAndIsRecorded`.
+  3. **The right answer, late** — 9 failures: `AnIdentityThatNeverArrives_StillRefuses` (a one-second
+     handshake grace that took 5.3–6.2 s and still refused),
+     `AfterTheFirstRequestResolves_AFreshRequestIsAskedNormally` and
+     `ACancelledExchange_DoesNotSendTheRequestAgain`.
+  The shortage was measured in a test host running many tests at once. A real `keypaste-mcp` answers
+  one call at a time (F.3b), so how often a user meets it is unmeasured; answering correctly under any
+  load is still the requirement.
   **The save is not this defect and left with F.10.** It moved 4, 4 and 2 of 80 across the same
   256-fold change in the floor, and no run ever failed on both a bridge shape and a save shape.
   V-F.9's instruction to split on a measurement that splits is what this row follows.
@@ -155,14 +168,19 @@ fixtures rather than a maintainer's temporary files.
   [release-targets.json](../release-targets.json), in symptom words. Nothing is repaired, so the
   phrase does not change: it leaves only by being omitted from the `known_defects` of the version that
   carries the fix.
-  **Build (what remains):** a regression that induces the shortage itself rather than waiting for a
-  loaded runner to supply it, red before the repair and green after, and the repair. The floor cannot
-  be set from inside a test host without starving the assemblies running beside it, so the regression
-  belongs in a child process on the [Keypaste.VaultSaver](../tests/Keypaste.VaultSaver) pattern, which
-  proves it induced the shortage before it measures anything and drives the real
+  **Build (what remains):** all three classes are repaired in this row, in order, each with a
+  regression that induces the shortage itself rather than waiting for a loaded runner to supply it, red
+  before its repair and green after. The floor cannot be set from inside a test host without starving
+  the assemblies running beside it, so the regressions run in a child process on the
+  [Keypaste.VaultSaver](../tests/Keypaste.VaultSaver) pattern, which proves it induced the shortage
+  before it measures anything. Class 1's drives the real
   [ApproverConnection](../src/Keypaste.Mcp/ApproverConnection.cs) against a listener in the unstarved
-  parent. It asserts the classification — a live approver is not reported `Unreachable` — and not a
-  duration, so no widened timeout can buy it green.
+  parent and asserts the classification — a live approver is not reported `Unreachable` — and not a
+  duration, so no widened timeout can buy it green. Class 2's asserts that a concurrent request is
+  refused `BUSY` where it arrives. Class 3's defect *is* lateness, so its regression holds each wait to
+  the budget the product ships — never a widened one. Before class 1's repair, confirm in the runtime
+  source whether `NamedPipeClientStream.ConnectAsync` queues the connect itself to the pool, not only
+  its deadline, because that decides whether moving the deadline off the pool is enough.
   **Also: put the timeline reader in the tree, in `bash` and `jq`.** Run 34701431621's timelines were
   read with a throwaway Python script, and the tree has no Python — 27 shell scripts and one C# file —
   so it stayed outside and the reading it produced survives only as prose in this row. That is the
@@ -174,9 +192,12 @@ fixtures rather than a maintainer's temporary files.
   the intervals other processes had open across it. It must report how many of one family were open at
   once in the same process, because pairing is first-in-first-out and an exit does not name the enter
   it closes — above one, the durations are a guess and the raw lines are the answer.
-  **Verify (V-F.9):** the named mechanism above, with the counts both ways already recorded, plus that
-  regression red before the repair and green after. A repair that only moves a number is refused by
-  this line.
+  **Verify (V-F.9):** each class's regression red before its repair and green after — necessary, and
+  not sufficient. Then **one** confirming pool-probe dispatch, after all three repairs, read with the
+  timeline reader, in which all ten tests reach **0 of 80 in both the starved and as-found arms**.
+  The regressions show a repair holds when a shortage is induced; the dispatch shows it holds under
+  the load that exposed the defect, and it is part of this line rather than an extra. A repair that
+  only moves a number is refused by this line.
 
 - [ ] **F.10 — A doomed save's own first attempt, not the pool, spends its budget.** Needs: 2.1.
   **Split from F.9 on its measurement, which refuted the common story.**
