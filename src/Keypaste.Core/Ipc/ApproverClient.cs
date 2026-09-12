@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO.Pipes;
 
 namespace Keypaste.Core.Ipc;
@@ -33,6 +34,8 @@ public sealed class ApproverClient : IAsyncDisposable
     private readonly NamedPipeClientStream _pipe;
     private readonly MessageFramer _framer;
     private readonly SemaphoreSlim _oneAtATime = new(1, 1);
+    private static readonly TimeSpan _cancellationSlice = TimeSpan.FromMilliseconds(50);
+
     private bool _disposed;
 
     private ApproverClient(NamedPipeClientStream pipe)
@@ -47,6 +50,23 @@ public sealed class ApproverClient : IAsyncDisposable
     /// <param name="cancellationToken">Cancels the attempt.</param>
     /// <returns>A connected client, or null when nothing is listening.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="pipeName"/> is null.</exception>
+    /// <remarks>
+    /// <para>
+    /// <b>The connect runs on a thread of its own, and must not be moved back onto the pool.</b> A null
+    /// here becomes a refusal telling a person to start <c>keypaste agent</c>, so it may only mean that
+    /// nothing answered. <c>NamedPipeClientStream.ConnectAsync</c> queues its whole connect loop as a pool
+    /// work item and a <c>CancelAfter</c> budget is a pool timer; with no worker free, the expired timer
+    /// is taken before the queued connect, which then never tries the pipe at all (F.9, runtime
+    /// v10.0.10). That turned a running approver into a missing one, and a longer budget would not have
+    /// helped, because nothing was measuring it. The synchronous <c>Connect</c> times itself and needs
+    /// no worker, so <paramref name="timeout"/> is enforced where it is spent.
+    /// </para>
+    /// <para>
+    /// The budget runs from this call, and at least one attempt is always made, so a connect thread that
+    /// starts late still asks the pipe once before giving up. It waits in slices so a caller that gives
+    /// up is heard within one of them.
+    /// </para>
+    /// </remarks>
     public static async ValueTask<ApproverClient?> TryConnectAsync(
         string pipeName,
         TimeSpan timeout,
@@ -60,12 +80,15 @@ public sealed class ApproverClient : IAsyncDisposable
             PipeDirection.InOut,
             PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
 
+        var asked = Stopwatch.GetTimestamp();
+
         try
         {
-            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            deadline.CancelAfter(timeout);
-
-            await pipe.ConnectAsync(deadline.Token).ConfigureAwait(false);
+            await Task.Factory.StartNew(
+                () => ConnectWithin(pipe, asked, timeout, cancellationToken),
+                CancellationToken.None,
+                TaskCreationOptions.LongRunning | TaskCreationOptions.DenyChildAttach,
+                TaskScheduler.Default).ConfigureAwait(false);
 
             return new ApproverClient(pipe);
         }
@@ -73,6 +96,30 @@ public sealed class ApproverClient : IAsyncDisposable
         {
             await pipe.DisposeAsync().ConfigureAwait(false);
             return null;
+        }
+    }
+
+    private static void ConnectWithin(
+        NamedPipeClientStream pipe,
+        long asked,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var remaining = timeout - Stopwatch.GetElapsedTime(asked);
+
+            try
+            {
+                pipe.Connect((int)Math.Clamp(remaining.TotalMilliseconds, 0, _cancellationSlice.TotalMilliseconds));
+                return;
+            }
+            catch (TimeoutException) when (Stopwatch.GetElapsedTime(asked) < timeout)
+            {
+                // Still inside the budget: another slice.
+            }
         }
     }
 

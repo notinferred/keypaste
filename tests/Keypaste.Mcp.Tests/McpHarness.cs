@@ -2,6 +2,7 @@ using System.IO.Pipes;
 using System.Text;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Tests;
 using Keypaste.Mcp.Tools;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
@@ -281,7 +282,10 @@ internal sealed class FakeEntryNameSource : IEntryNameSource, IDisposable
 
         if (Hold)
         {
+            // F.9: a blocking wait on a pool thread, marked for the same reason as a key derivation.
+            PoolTimeline.Mark("held-enter", "pool thread " + Thread.CurrentThread.IsThreadPoolThread);
             Held!.Wait(cancellationToken);
+            PoolTimeline.Mark("held-exit");
         }
 
         if (Throw)

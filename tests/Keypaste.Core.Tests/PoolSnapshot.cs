@@ -230,6 +230,78 @@ internal sealed class PoolWatch : IDisposable
 }
 
 /// <summary>
+/// Writes a <c>stall</c> interval onto the timeline whenever this process's pool leaves a queued item
+/// waiting long enough to break a budget.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>Why this exists: <see cref="PoolWatch"/> goes silent exactly when the pool stops.</b> Its
+/// samples need the pool themselves, so both class-2 failures in pool-probe run 34701431621 reported
+/// "0 pool sample(s)" over 15–17 seconds, and a report of zero lateness from zero samples reads as a
+/// pool that was fine. This runs for the life of the process and never waits on the pool: it queues one
+/// item at a time and, from its own thread, reads the counters while that item is still waiting.
+/// </para>
+/// <para>
+/// A stall is written when a queued item has waited <see cref="_stall"/>, and closed when it runs, with
+/// the thread count and the pending and completed counts at both ends. A pool that stalled with threads
+/// climbing is short of workers it is still adding; one whose completed count did not move is running
+/// nothing at all. Only a process that asked for a timeline runs this.
+/// </para>
+/// </remarks>
+internal static class PoolLiveness
+{
+    private static readonly TimeSpan _stall = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan _cadence = TimeSpan.FromMilliseconds(25);
+
+    private static long _ranAt;
+
+    internal static void Start() =>
+        new Thread(Watch) { IsBackground = true, Name = "f9-pool-liveness" }.Start();
+
+    private static void Watch()
+    {
+        while (true)
+        {
+            var queued = Stopwatch.GetTimestamp();
+            Volatile.Write(ref _ranAt, 0);
+            ThreadPool.UnsafeQueueUserWorkItem(static _ => Volatile.Write(ref _ranAt, Stopwatch.GetTimestamp()), null);
+
+            PoolCounters? atStall = null;
+
+            while (Volatile.Read(ref _ranAt) == 0)
+            {
+                if (atStall is null && Stopwatch.GetElapsedTime(queued) >= _stall)
+                {
+                    atStall = PoolCounters.Read();
+                    PoolTimeline.Mark("stall-enter", Counts(atStall.Value));
+                }
+
+                Thread.Sleep(_cadence);
+            }
+
+            if (atStall is { } before)
+            {
+                var after = PoolCounters.Read();
+                var waited = (long)Stopwatch.GetElapsedTime(queued, Volatile.Read(ref _ranAt)).TotalMilliseconds;
+
+                PoolTimeline.Mark(
+                    "stall-exit",
+                    string.Create(
+                        CultureInfo.InvariantCulture,
+                        $"waited {waited}; threads {before.ThreadCount}->{after.ThreadCount}; pending {before.PendingWorkItems}->{after.PendingWorkItems}; completed +{after.CompletedWorkItems - before.CompletedWorkItems}"));
+            }
+
+            Thread.Sleep(_cadence);
+        }
+    }
+
+    private static string Counts(PoolCounters counters) =>
+        string.Create(
+            CultureInfo.InvariantCulture,
+            $"threads {counters.ThreadCount}; free {counters.AvailableWorker}; pending {counters.PendingWorkItems}; completed {counters.CompletedWorkItems}");
+}
+
+/// <summary>
 /// One append-only file per process, so an overrun in one test assembly can be lined up against what
 /// another was doing at the same moment.
 /// </summary>
@@ -289,6 +361,7 @@ internal static class PoolTimeline
         if (_path is not null)
         {
             Mark("opened");
+            PoolLiveness.Start();
         }
     }
 
