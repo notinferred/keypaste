@@ -216,9 +216,16 @@ public sealed class VaultSaveTests : IDisposable
             lastResumed = Stopwatch.GetTimestamp();
         }));
 
+        // Attempt by attempt rather than summed, because only the first work interval contains
+        // acquiring the process-wide save gate. `work 4100/9/8/...` is a save that queued behind
+        // another save in this process and `work 40/38/41/...` is one whose every attempt got
+        // slower; those are different findings with different repairs and a sum cannot tell them
+        // apart. Slash-separated: the detail is written into a JSON string field.
         PoolTimeline.Mark(
             "save-exit",
-            string.Create(CultureInfo.InvariantCulture, $"attempts {attempts}; work {work.Sum()}; slept {slept.Sum()}"));
+            string.Create(
+                CultureInfo.InvariantCulture,
+                $"attempts {attempts}; work {EachOf(work)}; slept {EachOf(slept)}"));
 
         // The budget is the sleeps. Their sum is arithmetic on two shipped constants and cannot
         // drift with the machine; the work is what the machine decides, and it is the reading this
@@ -246,6 +253,12 @@ public sealed class VaultSaveTests : IDisposable
         Assert.True(KeePassInterop.SaveAttempts >= 3, "one retry is not enough to ride out a scanner");
         Assert.True(KeePassInterop.SaveRetryDelayMilliseconds >= 25, "an immediate retry hits the same lock");
     }
+
+    /// <summary>
+    /// The measurements of one save, in the order they were taken, for the timeline's detail field.
+    /// </summary>
+    private static string EachOf(List<long> milliseconds) =>
+        string.Join('/', milliseconds.Select(m => m.ToString(CultureInfo.InvariantCulture)));
 
     /// <summary>A save that works still works, and the file is readable afterwards.</summary>
     [Fact]
