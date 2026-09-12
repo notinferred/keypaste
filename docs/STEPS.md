@@ -14,14 +14,16 @@
 The local vault, CLI/env workflow and approval bridge are implemented and **published as `v0.2.0`**,
 installed and exercised on all four native targets from clean runners; the desktop is a source build
 with partial entry/env screens, and no hosted service, web vault, mobile client or organization
-credential service exists. Two repairs are open — F.9 on four bounded waits that overran together,
-and F.2b2, BLOCKED on hardware rather than on work. F.6 is closed: D-0122 measured why build
-10.0.26100 refuses a save its own temporary name, and D-0123 repaired it. F.8 is closed: its
-diagnostic named the refusal on the first reproduction, and what it named — a 500 ms connect that
-took 5834 ms against a listener that was up — is F.9 rather than more of F.8. **F.9 is open and
-measuring.** Its instrument and its three-arm probe are built and its user-visible half is disclosed
-against `0.2.0`; the mechanism is not named, nothing is repaired, and the counts that would decide it
-wait on a `windows-2025` dispatch.
+credential service exists. Three repairs are open — F.9 and F.10, and F.2b2, BLOCKED on hardware
+rather than on work. F.6 is closed: D-0122 measured why build 10.0.26100 refuses a save its own
+temporary name, and D-0123 repaired it. F.8 is closed: its diagnostic named the refusal on the first
+reproduction, and what it named — a 500 ms connect that took 5834 ms against a listener that was up —
+is F.9 rather than more of F.8. **F.9 is measured and named, and unrepaired.** Its three arms over the
+pool's worker floor failed 16, 8 and 0 of 80 suite runs on `windows-2025`, so the mechanism is
+thread-pool worker supply and D-0125's inference is now a reading (D-0128); what remains is a
+regression that induces the shortage itself, and the repair. The measurement also split the row: the
+save moved 4, 4 and 2 of 80 across the same 256-fold change and left as **F.10**, where the budget is
+already met and the whole variance sits in the one attempt that takes the process-wide save gate.
 
 Release foundations are closed through R.0c: `0.1.0` is superseded and says so where it is
 downloaded, and the pages, the definition and keypaste.com name `0.2.0` — which R.0e made true of
@@ -121,50 +123,76 @@ The bounded 2026-09-07 review found these while the local Windows suites reporte
 platform-specific skips. Each needs a regression that fails before the fix, recorded in repository
 fixtures rather than a maintainer's temporary files.
 
-- [ ] **F.9 — Four bounded waits overran together under load.** Needs: 2.1.
-  **Build:** [listing-probe run 34653284139](https://github.com/notinferred/keypaste/actions/runs/34653284139)
-  ran the CI test command eighty times on `windows-2025` and failed twelve, in four shapes across
-  three subsystems, every one of them a bounded wait overrunning by five to eleven times: the
-  listing connect at **5834 ms against `ApproverConnection.ConnectTimeout`'s 500 ms** with the
-  listener bound throughout (F.8); `LargeCredentialTests.AnUndeliverableRelease_AsksAPersonOnce`
-  twice, recording `no-approver` where `undeliverable` was due, which is the same unreachable
-  approver on the credential path; `VaultSaveTests.ASaveThatCannotSucceed_GivesUpQuickly` eight of
-  eighty at **6797 ms against the roughly 2.2-second retry budget D-0107 owns**; and
-  `ConcurrentRequestsTests.AfterTheFirstRequestResolves_AFreshRequestIsAskedNormally` timing out at
-  12.5 s against its ten-second `_promptly`. **Thread-pool starvation is inferred, not measured** —
-  it is the one thing common to all four and it is what the probe's load creates, but nothing here
-  observed the pool. **Measure it before repairing anything**, the way D-0122 measured F.6 rather
-  than reasoning about it: instrument the pool, or reproduce the overrun against a known starvation,
-  and say which budgets are enforced by a thread-pool timer.
-  **Widening `ConnectTimeout` is now measurably the wrong repair, not merely rejected on principle**
-  (D-0124, D-0125). A budget that overran eleven-fold was never enforced at 500 ms, so raising the
-  number raises a ceiling nothing reached. D-0035's 500 ms is a measurement on an idle machine and
-  stands as one. Raising the pool's floor in product code is refused for the same reason and is the
-  probe's instrument instead.
-  **The user-visible half is disclosed and the mechanism is not named.** `0.2.0` carries it as
-  `F.9` in [release-targets.json](../release-targets.json) in symptom words — an agent asking for
-  entry names on a loaded machine can be told to start `keypaste agent` for a process already
-  running — because F.8's rule is that CI alone is an observation and a probe is CI.
-  **Built so far, no production file opened:** [PoolSnapshot](../tests/Keypaste.Core.Tests/PoolSnapshot.cs)
-  samples from a thread the pool cannot delay, *during* each wait rather than at the assertion a
-  drained pool would answer, and separates timer lateness from queue latency; a cross-process
-  timeline merges what two concurrently-running test assemblies did, marked from a module
-  initializer so an empty artifact means the variable never arrived rather than that no site was
-  reached. [pool-probe.yml](../.github/workflows/pool-probe.yml) runs three arms over one knob, the
-  pool floor, and [ProbesRunTheCommandCiRunsTests](../tests/Keypaste.Core.Tests/ProbesRunTheCommandCiRunsTests.cs)
-  holds every probe to `ci.yml`'s command, which CLAUDE.md said was tested and was not.
-  **The measurement is pending a `windows-2025` dispatch, which `workflow_dispatch` cannot make
-  until `pool-probe.yml` is on the default branch** — so this row spans two pushes and stays open
-  across both. Local runs on Windows 10 Pro 19045 reproduced one F.9-shaped failure in ten at a
-  floor of one worker thread, with a 50 ms delay arriving 941 ms late while a queued item started
-  in 8 ms, and none in ten either as found or relieved. Twenty-four cores, a tenth of the runs, and
-  not the platform the four overruns were seen on: that establishes the instrument reads, and
-  nothing about the mechanism.
-  **Verify (V-F.9):** A named mechanism, measured on a named platform with counts both ways, and a
-  regression that is red against it and green after. A repair that only moves a number is refused by
-  this line. The decisive reading is the relieved arm at zero; low-but-not-zero is a large reduction
-  and not a mechanism. Four subsystems overrunning together is one finding; if the measurement
-  splits them, split the row rather than repairing on the common story.
+- [ ] **F.9 — Every bounded wait on the MCP bridge overran when the pool ran short of workers.** Needs: 2.1.
+  **Mechanism named, repair open.** [pool-probe run 34701431621](https://github.com/notinferred/keypaste/actions/runs/34701431621)
+  ran `ci.yml`'s test command eighty times per arm on `windows-2025` over one knob, the pool's worker
+  floor, and the MCP bridge failed **16 of 80 at a floor of 1, 8 of 80 at the runner's default of 4,
+  and 0 of 80 at a floor of 256**. Every arm read its floor back out of the process it measured —
+  `min 1/1`, `min 4/1`, `min 256/1`, `cpus 4` — so no count is filed under an arm it did not measure.
+  Zero at a floor above demand, monotonic below it: the mechanism is **thread-pool worker supply**,
+  and D-0125's inference is now a measurement.
+  **It is wider than the four shapes F.9 was opened on.** Eleven distinct tests overran across the
+  bridge — the listing connect, `AnUndeliverableRelease_AsksAPersonOnce`,
+  `AfterTheFirstRequestResolves_AFreshRequestIsAskedNormally`, and also
+  `AnApproverThatStopped_IsReportedAsUnreachable`, `ACancelledExchange_DoesNotSendTheRequestAgain`,
+  `AnIdentityThatNeverArrives_StillRefuses`, `OnAPolicyGrant_TheRequestedFieldComesBack_AndOnlyThat`,
+  two more `ConcurrentRequestsTests` and both listing-size tests. That is not four defects sharing a
+  cause; it is one cause reaching every bounded wait on the path, because each of them is enforced by
+  a thread-pool timer or a continuation — `CancellationTokenSource.CancelAfter` at
+  [ApproverClient](../src/Keypaste.Core/Ipc/ApproverClient.cs), `Task.WaitAsync`, and
+  `Task.Delay` raced by `Task.WhenAny`. A floor below demand delays the deadline and the work item
+  together, so a budget of 500 ms was never enforced at 500 ms.
+  **The save is not this defect and left with F.10.** It moved 4, 4 and 2 of 80 across the same
+  256-fold change in the floor, and no run ever failed on both a bridge shape and a save shape.
+  V-F.9's instruction to split on a measurement that splits is what this row follows.
+  **Widening a budget stays refused, and now on two readings** (D-0125, D-0128): a budget that
+  overran elevenfold was never enforced at its number, so raising the number raises a ceiling nothing
+  reached. Raising the pool's floor in product code is refused for the same reason and remains the
+  probe's instrument.
+  **The user-visible half stays disclosed against `0.2.0`** as `F.9` in
+  [release-targets.json](../release-targets.json), in symptom words. Nothing is repaired, so the
+  phrase does not change: it leaves only by being omitted from the `known_defects` of the version that
+  carries the fix.
+  **Build (what remains):** a regression that induces the shortage itself rather than waiting for a
+  loaded runner to supply it, red before the repair and green after, and the repair. The floor cannot
+  be set from inside a test host without starving the assemblies running beside it, so the regression
+  belongs in a child process on the [Keypaste.VaultSaver](../tests/Keypaste.VaultSaver) pattern, which
+  proves it induced the shortage before it measures anything and drives the real
+  [ApproverConnection](../src/Keypaste.Mcp/ApproverConnection.cs) against a listener in the unstarved
+  parent. It asserts the classification — a live approver is not reported `Unreachable` — and not a
+  duration, so no widened timeout can buy it green.
+  **Verify (V-F.9):** the named mechanism above, with the counts both ways already recorded, plus that
+  regression red before the repair and green after. A repair that only moves a number is refused by
+  this line.
+
+- [ ] **F.10 — A doomed save's own first attempt, not the pool, spends its budget.** Needs: 2.1.
+  **Split from F.9 on its measurement, which refuted the common story.**
+  [pool-probe run 34701431621](https://github.com/notinferred/keypaste/actions/runs/34701431621)
+  moved the pool's worker floor 256-fold and `VaultSaveTests.ASaveThatCannotSucceed_GivesUpQuickly`
+  failed **4, 4 and 2 of 80** — while every MCP shape went to zero. Thread-pool worker supply is
+  therefore **measured not to be this defect**, and D-0107's account of the retry wait as a
+  pool-thread-holding ceiling does not explain it either.
+  **What the instrument does say.** The retry budget is accurate: the sleeps totalled 2259–2482 ms
+  against the 2240 ms that eight attempts at a rising 80 ms ask for, a median 3 % over and a worst
+  11 %, so nothing is arriving late. The retries themselves cost nothing — every work interval after
+  the first measured 0 ms. **All of the variance is in the first attempt**, which is the only one that
+  also contains taking `KeePassInterop`'s process-wide `_saveGate`. Against the green control runs the
+  first attempt stays under 1249 ms and the whole save under 3437 ms; in the failures it is
+  3622–6275 ms and 6453–8782 ms, with nothing at all between 3797 ms and 6453 ms. A bimodal gap is
+  what waiting for exactly one other save looks like, and is not what a machine getting gradually
+  slower looks like.
+  **Build:** separate the gate wait from the first attempt's own cost, because `work[0]` currently
+  contains both and no reading can divide them. The other savers in `Keypaste.Core.Tests` are
+  unmarked, so the timeline cannot show a save queued behind one of theirs — `ADoomedSave` and
+  `ASaveThatCannotSucceed` share a class and xunit never runs them at once, so their own marks can
+  never overlap. Mark the assembly's other saves, or time the acquisition, then name the mechanism and
+  repair it. Argon2 is a candidate for the attempt's own cost and is not excluded: KeePassLib's
+  `Argon2Kdf` queues a work item per lane per slice and blocks the caller on each, so a derivation —
+  one per save — is both a pool producer and a blocking wait.
+  **Verify (V-F.10):** a named mechanism with counts both ways on a named platform, and a regression
+  red before the repair and green after. Widening `SaveAttempts` or `SaveRetryDelayMilliseconds` is
+  refused: the measurement above shows the budget is already met, so a larger one would only move the
+  threshold past a symptom. A repair that only moves a number is refused by this line.
 
 - [ ] **F.2b2 — Observe minimize-lock on macOS and Linux.** Needs: F.2b1. — **BLOCKED** on a macOS machine and a Linux desktop session (2026-09-08); run F.2b1's behavior on both remaining targets during 4.7a/4.7b, following the [desktop checklist](desktop.md#observing-minimize-lock-on-macos-and-linux), and correct [MinimizeLock](../src/Keypaste.App/MinimizeLock.cs) if an observation contradicts it.
 
