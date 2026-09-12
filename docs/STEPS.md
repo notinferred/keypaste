@@ -20,10 +20,10 @@ temporary name, and D-0123 repaired it. F.8 is closed: its diagnostic named the 
 reproduction, and what it named — a 500 ms connect that took 5834 ms against a listener that was up —
 is F.9 rather than more of F.8. **F.9 is measured and named, and unrepaired.** Its three arms over the
 pool's worker floor failed 16, 8 and 0 of 80 suite runs on `windows-2025`, so the mechanism is
-thread-pool worker supply and D-0125's inference is now a reading (D-0128). It is three defects
-sharing that cause — a live approver reported absent, a BUSY refusal lost to queueing, and right
-answers delivered late — and what remains is a repair and regression for each, then one confirming
-dispatch. The measurement also split the row: the
+thread-pool worker supply and D-0125's inference is now a reading (D-0128). It is two defects
+sharing that cause: a live approver reported absent, whose repair and regression are built, and the
+bridge's test host stalling its own pool while test-side waits run, whose producer is being measured.
+One confirming dispatch closes both. The measurement also split the row: the
 save moved 4, 4 and 2 of 80 across the same 256-fold change and left as **F.10**, where the budget is
 already met and the whole variance sits in the one attempt that takes the process-wide save gate.
 
@@ -135,25 +135,36 @@ fixtures rather than a maintainer's temporary files.
   and D-0125's inference is now a measurement. The as-found arm's 8 of 80 is consistent with
   [listing-probe](https://github.com/notinferred/keypaste/actions/runs/34653284139)'s 12 of 80; the two
   readings agree on rate, and neither pins it.
-  **It is wider than the four shapes F.9 was opened on, and it is three defects, not one.** Ten
+  **It is wider than the four shapes F.9 was opened on, and it is two defects, not one.** Ten
   distinct tests overran across the bridge, every one of them waiting on a thread-pool timer or
   continuation — `CancellationTokenSource.CancelAfter` at
   [ApproverClient](../src/Keypaste.Core/Ipc/ApproverClient.cs), `Task.WaitAsync`, `Task.Delay` raced by
   `Task.WhenAny` — so a floor below demand delays the deadline and the work item together, and a
-  budget of 500 ms was never enforced at 500 ms. What each failure *said* divides them into three
-  classes with three different repairs:
+  budget of 500 ms was never enforced at 500 ms. What each failure said, checked against the pool
+  reading attached to it, divides them into two classes:
   1. **A live approver reported as absent** — the disclosed symptom, 16 failures:
      `OnAPolicyGrant_TheRequestedFieldComesBack_AndOnlyThat` ("No keypaste agent is running"),
      `AnUndeliverableRelease_AsksAPersonOnce`, both listing-size tests, and
      `AnApproverThatStopped_IsReportedAsUnreachable`, whose *first* request to a live approver came back
-     null.
-  2. **A BUSY refusal lost to queueing** — F.3b's guarantee (D-0101), 2 failures:
-     `TheBusyRefusalIsRecordedInTheAuditLog` ("queued behind the prompt") and
-     `AListingWhileARequestIsOpen_IsBusyAndIsRecorded`.
-  3. **The right answer, late** — 9 failures: `AnIdentityThatNeverArrives_StillRefuses` (a one-second
-     handshake grace that took 5.3–6.2 s and still refused),
+     null. `NamedPipeClientStream.ConnectAsync` queues its whole connect loop to the pool and checks its
+     token before the first try (runtime v10.0.10), so once the `CancelAfter` budget ran first the pipe
+     was never tried at all. [PoolShortageTests](../tests/Keypaste.Mcp.Tests/PoolShortageTests.cs) is
+     red 3 of 3 with `outcome Unreachable` from a pool pinned to two workers with none free, and green
+     5 of 5 once the connect is the synchronous, self-timing one on a thread of its own, at the same
+     500 ms.
+  2. **The test host's pool stalls while test-side waits run** — 11 failures, none of them a wrong
+     answer: `TheBusyRefusalIsRecordedInTheAuditLog`, `AListingWhileARequestIsOpen_IsBusyAndIsRecorded`,
+     `AnIdentityThatNeverArrives_StillRefuses` (a 120 ms grace that took 5.3–6.2 s and still refused),
      `AfterTheFirstRequestResolves_AFreshRequestIsAskedNormally` and
-     `ACancelledExchange_DoesNotSendTheRequestAgain`.
+     `ACancelledExchange_DoesNotSendTheRequestAgain`. The first two were recorded as their own class, a
+     BUSY refusal lost to queueing; "queued behind the prompt" was the test's own failure message, and
+     the reading attached to both contradicts it — **0 pool samples in 15–17 s**, and the test's own
+     ten-second delay firing 6.6 s late, against a refusal that is a non-blocking `Wait(0)` taken as
+     soon as the call is dispatched. Nothing queued behind a prompt; the host's pool ran nothing. The
+     producer is not named. The blocking waits in that process are test code — a key derivation in
+     three fixtures' `Vault.Create`, which blocks a pool thread on lanes queued to the same pool, and
+     two harness waits — and a real `keypaste-mcp` is vault-free. Twenty local runs pinned to four
+     cores reproduced none of it, which at the runner's rate is chance.
   The shortage was measured in a test host running many tests at once. A real `keypaste-mcp` answers
   one call at a time (F.3b), so how often a user meets it is unmeasured; answering correctly under any
   load is still the requirement.
@@ -168,32 +179,25 @@ fixtures rather than a maintainer's temporary files.
   [release-targets.json](../release-targets.json), in symptom words. Nothing is repaired, so the
   phrase does not change: it leaves only by being omitted from the `known_defects` of the version that
   carries the fix.
-  **Build (what remains):** all three classes are repaired in this row, in order, each with a
-  regression that induces the shortage itself rather than waiting for a loaded runner to supply it, red
-  before its repair and green after. The floor cannot be set from inside a test host without starving
-  the assemblies running beside it, so the regressions run in a child process on the
-  [Keypaste.VaultSaver](../tests/Keypaste.VaultSaver) pattern, which proves it induced the shortage
-  before it measures anything. Class 1's drives the real
-  [ApproverConnection](../src/Keypaste.Mcp/ApproverConnection.cs) against a listener in the unstarved
-  parent and asserts the classification — a live approver is not reported `Unreachable` — and not a
-  duration, so no widened timeout can buy it green. Class 2's asserts that a concurrent request is
-  refused `BUSY` where it arrives. Class 3's defect *is* lateness, so its regression holds each wait to
-  the budget the product ships — never a widened one. Before class 1's repair, confirm in the runtime
-  source whether `NamedPipeClientStream.ConnectAsync` queues the connect itself to the pool, not only
-  its deadline, because that decides whether moving the deadline off the pool is enough.
-  **Also: put the timeline reader in the tree, in `bash` and `jq`.** Run 34701431621's timelines were
-  read with a throwaway Python script, and the tree has no Python — 27 shell scripts and one C# file —
-  so it stayed outside and the reading it produced survives only as prose in this row. That is the
-  wrong place for it, because the same read is needed at least twice more: this row's repair has to be
-  verified against a timeline read the same way the defect was measured, and F.10's first task changes
-  that instrument, so its output has to be comparable across the change. It merges every
-  `f9-timeline-*.jsonl` in one iteration directory on the machine-wide `ticks`, taking `freq` from each
-  line rather than assuming one, pairs `*-enter`/`*-exit` per process, and reports each interval with
-  the intervals other processes had open across it. It must report how many of one family were open at
-  once in the same process, because pairing is first-in-first-out and an exit does not name the enter
-  it closes — above one, the durations are a guess and the raw lines are the answer.
+  **Build (what remains):** class 2's producer, named from a pool-probe dispatch of this row's
+  branch and read with the timeline reader. That dispatch carries class 1's repair, marks around the
+  fixtures' key derivations and the harness's blocking waits, and a liveness probe in
+  [PoolSnapshot](../tests/Keypaste.Core.Tests/PoolSnapshot.cs) that writes a `stall` interval from a
+  thread the pool cannot delay — `PoolWatch`'s own samples need the pool, which is why it read nothing
+  while the pool was stopped. Then the repair the reading names, with a regression red before it and
+  green after, induced in a pinned child process on the
+  [Keypaste.PoolStarver](../tests/Keypaste.PoolStarver) pattern. If the reading names no producer, this
+  row stops there rather than repairing on the inventory above.
+  **The timeline reader is in the tree:** [f9-timeline.sh](../scripts/f9-timeline.sh), `bash` and `jq`,
+  reproducing the Python reading of run 34701431621 byte for byte across all 58 iteration directories,
+  with a `--selftest` that runs in `ci.yml` through a `jq` that writes CRLF. It left the scratchpad
+  because the same read is needed at least twice more — this row's repair is verified against a
+  timeline read the way the defect was measured, and F.10's first task changes that instrument. Any
+  `<family>-enter`/`-exit` pair is an interval. It reports how many of one family were open at once in
+  the same process, because pairing is first-in-first-out and an exit does not name the enter it
+  closes, and what else was open in that process, because a pool is one per process.
   **Verify (V-F.9):** each class's regression red before its repair and green after — necessary, and
-  not sufficient. Then **one** confirming pool-probe dispatch, after all three repairs, read with the
+  not sufficient. Then **one** confirming pool-probe dispatch, after both classes' repairs, read with the
   timeline reader, in which all ten tests reach **0 of 80 in both the starved and as-found arms**.
   The regressions show a repair holds when a shortage is induced; the dispatch shows it holds under
   the load that exposed the defect, and it is part of this line rather than an extra. A repair that

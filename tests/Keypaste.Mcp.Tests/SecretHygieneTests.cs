@@ -3,6 +3,7 @@ using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Policy;
+using Keypaste.Core.Tests;
 using Keypaste.Mcp.Tools;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
@@ -112,7 +113,11 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     public ValueTask InitializeAsync()
     {
         _directory = Directory.CreateTempSubdirectory("keypaste-hygiene-").FullName;
+        // F.9: a key derivation blocks this thread on work queued to the same pool, so it is marked
+        // where a stall in this process can be lined up against it.
+        PoolTimeline.Mark("derive-enter", "SecretHygieneTests; pool thread " + Thread.CurrentThread.IsThreadPoolThread);
         _vault = Vault.Create(Path.Combine(_directory, "vault.kdbx"), Master);
+        PoolTimeline.Mark("derive-exit");
 
         _vault.AddEntry(new VaultEntry
         {
