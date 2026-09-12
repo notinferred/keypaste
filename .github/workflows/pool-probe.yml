@@ -139,6 +139,7 @@ jobs:
           set -uo pipefail
           mkdir -p probe-logs
           failed=0
+          control=''
 
           for i in $(seq 1 "${ITERATIONS}"); do
             log="probe-logs/${ARM}-shard-${SHARD}-run-${i}.log"
@@ -146,7 +147,18 @@ jobs:
 
             if dotnet test keypaste.slnx --no-build -c Release > "${log}" 2>&1; then
               rm -f "${log}"
-              rm -rf "${KEYPASTE_F9_TIMELINE}"
+
+              # The first passing run of this shard is kept as the control, and the rest are deleted.
+              # Producer-versus-victim is a COMPARISON: a save in one assembly overlapping a listing
+              # in another is the normal state of a suite whose assemblies run concurrently, so
+              # without a green timeline from this same arm every overlap in a failing one reads as a
+              # cause. One control per shard is enough to see what ordinary overlap looks like.
+              if [ -z "${control}" ]; then
+                control="${GITHUB_WORKSPACE}/probe-timeline/control-${ARM}-${SHARD}"
+                mv "${KEYPASTE_F9_TIMELINE}" "${control}"
+              else
+                rm -rf "${KEYPASTE_F9_TIMELINE}"
+              fi
             else
               failed=$((failed + 1))
               echo "::group::${ARM} shard ${SHARD} iteration ${i} failed"
@@ -156,6 +168,31 @@ jobs:
           done
 
           echo "${ARM} shard ${SHARD}: ${failed} of ${ITERATIONS} runs failed" | tee -a "${GITHUB_STEP_SUMMARY}"
+
+          # Which tests failed, not merely how many runs did. F.9 is four shapes across three
+          # subsystems and V-F.9 asks whether the measurement splits them, so a count of runs is the
+          # one number that cannot answer the question it was dispatched for: 12 of 80 is the same
+          # figure whether it is one shape twelve times or four shapes three times each. The shapes
+          # decide whether this stays one row.
+          shapes="probe-logs/shapes-${ARM}-${SHARD}.txt"
+          : > "${shapes}"
+
+          if [ "${failed}" -gt 0 ]; then
+            grep -ohE 'failed[[:space:]]+Keypaste[A-Za-z0-9_.]+' probe-logs/*.log 2>/dev/null |
+              sed -E 's/.*failed[[:space:]]+//' | sort | uniq -c | sort -rn > "${shapes}"
+
+            if [ -s "${shapes}" ]; then
+              echo "${ARM} shard ${SHARD} shapes:" | tee -a "${GITHUB_STEP_SUMMARY}"
+              sed 's/^/    /' "${shapes}" | tee -a "${GITHUB_STEP_SUMMARY}"
+            else
+              # A tally that finds nothing must say so rather than read as "no shapes". D-0111 is the
+              # standing lesson: a pattern that quietly stops matching turns a present string into an
+              # absent one, and here it would turn a split row into an unsplit one. The logs are in
+              # the artifact either way, so this is recoverable by hand - but only if it is noticed.
+              echo "::warning::${failed} run(s) failed and no failing test name matched; the tally pattern is stale. Reading the shapes needs the artifact."
+              echo "${ARM} shard ${SHARD}: ${failed} failed, shapes NOT parsed - see artifact" | tee -a "${GITHUB_STEP_SUMMARY}"
+            fi
+          fi
 
           # The job is green whatever the count. Unlike listing-probe, a failure here is the reading
           # rather than the problem: the starved arm is EXPECTED to fail and an arm that goes red on
