@@ -130,7 +130,9 @@ fixtures rather than a maintainer's temporary files.
   and 0 of 80 at a floor of 256**. Every arm read its floor back out of the process it measured —
   `min 1/1`, `min 4/1`, `min 256/1`, `cpus 4` — so no count is filed under an arm it did not measure.
   Zero at a floor above demand, monotonic below it: the mechanism is **thread-pool worker supply**,
-  and D-0125's inference is now a measurement.
+  and D-0125's inference is now a measurement. The as-found arm's 8 of 80 is consistent with
+  [listing-probe](https://github.com/notinferred/keypaste/actions/runs/34653284139)'s 12 of 80; the two
+  readings agree on rate, and neither pins it.
   **It is wider than the four shapes F.9 was opened on.** Eleven distinct tests overran across the
   bridge — the listing connect, `AnUndeliverableRelease_AsksAPersonOnce`,
   `AfterTheFirstRequestResolves_AFreshRequestIsAskedNormally`, and also
