@@ -106,6 +106,8 @@ terminal, and then try again.
 
 This is the ordinary state of things — your MCP client starts `keypaste-mcp` when it launches, probably long before you start an approver. Nothing breaks; you just get refusals until you start one.
 
+**This same refusal can also mean the machine was busy.** The bridge gives the approver half a second to accept a connection, and on a loaded machine that can pass while an approver is running and listening — so an agent is told to start something you already started. Nothing is released and no name is disclosed; the advice is what is wrong. F.9 in [STEPS](STEPS.md) is measuring why the budget overran before anything is changed.
+
 ## What is written down
 
 `keypaste-mcp` — not the approver — appends one line to `~/.keypaste/audit.jsonl` for **every** call, granted or denied, including the ones that were malformed and the ones nobody waited for. It records which entry, which field, who asked, what they said their reason was, and what was decided.

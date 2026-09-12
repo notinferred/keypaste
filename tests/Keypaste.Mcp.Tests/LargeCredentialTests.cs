@@ -4,6 +4,7 @@ using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Policy;
+using Keypaste.Core.Tests;
 using Keypaste.Mcp.Tools;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
@@ -261,14 +262,29 @@ public sealed class LargeCredentialTests : IAsyncLifetime
 
         _human.Answer = ApprovalAnswer.Approved;
 
+        // F.9 watches the pool across both calls. This test records `no-approver` where
+        // `undeliverable` was due when it fails, and `undeliverable` has no budget of its own - it
+        // is a size decision inside the approver, reached only if the exchange completed at all. So
+        // the flip is the five-hundred-millisecond connect expiring, and what the pool was doing
+        // while it expired is the reading that says why.
+        using var watch = PoolSnapshot.Watch("two requests for a field that cannot be delivered");
+        PoolTimeline.Mark("credential-enter");
+
         await client.CallToolAsync(ToolText.CredentialToolName, AskForTheNote(), cancellationToken: Token);
         await client.CallToolAsync(ToolText.CredentialToolName, AskForTheNote(), cancellationToken: Token);
+
+        PoolTimeline.Mark("credential-exit");
 
         Assert.Equal(1, _human.Asked);
 
         var lines = LinesOf(harness);
+        var methods = lines.Select(line => line.Method).ToArray();
 
-        Assert.Equal(["undeliverable", "undeliverable"], lines.Select(line => line.Method));
+        if (!methods.SequenceEqual(["undeliverable", "undeliverable"]))
+        {
+            Assert.Fail(
+                $"the audit recorded [{string.Join(", ", methods)}] rather than two undeliverables.{Environment.NewLine}{watch.Report()}");
+        }
         Assert.Contains("had already approved", lines[1].Reason, StringComparison.Ordinal);
     }
 

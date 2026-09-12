@@ -298,6 +298,10 @@
         {
           "id": "D-0122",
           "phrase": "on Windows 11 24H2 and Windows Server 2025, a save can fail when another keypaste or KeePass program is saving at the same time"
+        },
+        {
+          "id": "F.9",
+          "phrase": "an agent asking for entry names on a loaded machine can be told to start keypaste agent for a process that is already running"
         }
       ]
     }

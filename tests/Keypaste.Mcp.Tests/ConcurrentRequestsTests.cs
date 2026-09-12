@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Keypaste.Core;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Tests;
 using Keypaste.Mcp.Tools;
 using ModelContextProtocol.Protocol;
 using Xunit;
@@ -57,8 +58,23 @@ public sealed class ConcurrentRequestsTests
         };
 
     /// <summary>Waits until a call has genuinely reached the approver and parked there.</summary>
-    private static async Task HoldingAsync(FakeApprover approver) =>
-        await approver.Entered.Task.WaitAsync(_promptly, Token);
+    /// <remarks>
+    /// F.9: this is one of the four waits that overran, and it throws rather than asserting, so the
+    /// pool reading has to be attached where the timeout surfaces or it is lost with the exception.
+    /// </remarks>
+    private static async Task HoldingAsync(FakeApprover approver)
+    {
+        using var watch = PoolSnapshot.Watch("waiting for the first request to reach the approver");
+
+        try
+        {
+            await approver.Entered.Task.WaitAsync(_promptly, Token);
+        }
+        catch (TimeoutException)
+        {
+            Assert.Fail($"the first request never reached the approver.{Environment.NewLine}{watch.Report()}");
+        }
+    }
 
     /// <summary>
     /// Awaits a call that must not be waiting on a person, and says so when it is.
@@ -70,9 +86,17 @@ public sealed class ConcurrentRequestsTests
     /// </remarks>
     private static async Task<CallToolResult> PromptlyAsync(Task<CallToolResult> call, string queued)
     {
+        using var watch = PoolSnapshot.Watch("a call that must not be waiting on a person");
+
         var winner = await Task.WhenAny(call, Task.Delay(_promptly, Token));
 
-        Assert.True(winner == call, queued);
+        // Reported only once the race has already been lost. Assert.True evaluates its message
+        // eagerly, and this test's subject is a ten-second promptness budget: an instrument that
+        // read the pool on every green call would be load applied to the thing it measures.
+        if (winner != call)
+        {
+            Assert.Fail($"{queued}.{Environment.NewLine}{watch.Report()}");
+        }
 
         return await call;
     }
