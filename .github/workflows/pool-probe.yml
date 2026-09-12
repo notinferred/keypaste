@@ -178,8 +178,19 @@ jobs:
           : > "${shapes}"
 
           if [ "${failed}" -gt 0 ]; then
-            grep -ohE 'failed[[:space:]]+Keypaste[A-Za-z0-9_.]+' probe-logs/*.log 2>/dev/null |
-              sed -E 's/.*failed[[:space:]]+//' | sort | uniq -c | sort -rn > "${shapes}"
+            # Colour is stripped before anything is matched. `dotnet test` colours its output on a
+            # runner even with stdout redirected to a file, so a failing test arrives as
+            # `ESC[31mfailed ESC[m Keypaste...` and a pattern that expects whitespace between the two
+            # words matches every local log and nothing here. That is what run 34701431621 did: the
+            # tally produced no shapes at all in twelve jobs.
+            #
+            # `|| true` because GitHub runs `shell: bash` with -e, which `set -uo pipefail` above does
+            # not undo. Without it, grep finding nothing ends the whole step - so the very branch
+            # written to report a stale pattern was unreachable, and the step went red after the
+            # counts had already been printed.
+            sed -E 's/\x1b\[[0-9;]*[A-Za-z]//g' probe-logs/*.log 2>/dev/null \
+              | grep -oE '^failed +[A-Za-z0-9_.]+' | sed -E 's/^failed +//' \
+              | sort | uniq -c | sort -rn > "${shapes}" || true
 
             if [ -s "${shapes}" ]; then
               echo "${ARM} shard ${SHARD} shapes:" | tee -a "${GITHUB_STEP_SUMMARY}"
