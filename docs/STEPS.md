@@ -186,6 +186,11 @@ fixtures rather than a maintainer's temporary files.
   — `site/package.json` has no build script and nothing compiles — deploy command `npm run deploy`,
   production branch `main`, non-production branch builds off. There is no output-directory field;
   that is a Pages setting, and this is a Worker with assets and a Hyperdrive binding.
+  **The build watch path is load-bearing and is not a performance setting.** The file carrying the
+  disclosures is `site/public/index.html`, two levels below the root directory, so a pattern matching
+  one level would leave every disclosure edit undeployed while every gate stayed green — which is the
+  defect this row exists to close, rebuilt out of a different part. The first recorded reading of the
+  connection was `path_includes: ["site/*", "site/"]`.
   **The origin check is demoted rather than dropped.**
   [verify-site-disclosure.sh](../scripts/verify-site-disclosure.sh) becomes a by-hand check, its
   `--selftest` staying in `ci.yml` where it needs no network, and

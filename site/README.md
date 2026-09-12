@@ -77,10 +77,15 @@ Recorded follow-up: migrate the SQL role to a managed role with no inherited rol
 **Cloudflare's Git integration deploys this, and no workflow in this repository does** (D-0127).
 Any push to `main` builds; the settings under Workers → `keypaste-site` → Settings → Build are root
 directory `site`, **no build command** — there is no build script and nothing compiles — deploy
-command `npm run deploy`, production branch `main`, non-production branch builds off, watch paths
-unset. There is no output-directory field to set: `wrangler.jsonc`'s `assets.directory` is `./public`
-and resolves against the root directory, which is why a project rooted at the repository root served
-nothing. The Worker's dashboard name must stay `keypaste-site` to match `wrangler.jsonc`.
+command `npm run deploy`, production branch `main`, non-production branch builds off. There is no
+output-directory field to set: `wrangler.jsonc`'s `assets.directory` is `./public` and resolves
+against the root directory, which is why a project rooted at the repository root served nothing. The
+Worker's dashboard name must stay `keypaste-site` to match `wrangler.jsonc`.
+
+**The build watch path decides whether a page change deploys at all**, so it is not a performance
+setting here. The file that carries the disclosures is `site/public/index.html`, two levels down, and
+a pattern matching only one level would leave every disclosure edit silently undeployed — the exact
+defect this arrangement exists to close. Keep it broad enough to cover `site/public/`.
 
 By hand, to deploy a ref Cloudflare will not:
 
