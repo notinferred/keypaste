@@ -1,6 +1,6 @@
 # Adopted product and delivery direction
 
-Adopted 2026-09-07 through PRODUCT v1.2 and D-0090: a complete password manager with reliable public releases, managed hosting for nontechnical users, environments and organization credentials. [PRODUCT](PRODUCT.md) owns this direction; [STEPS](STEPS.md) owns delivery and status. This page explains their relationship.
+Adopted 2026-09-07 through PRODUCT v1.2 and D-0090, with build dependencies separated from ship gates by v1.3 (D-0132): a complete password manager with reliable public releases, managed hosting for nontechnical users, environments and organization credentials. [PRODUCT](PRODUCT.md) owns this direction; [STEPS](STEPS.md) owns delivery and status. This page explains their relationship.
 
 ## Product direction
 
@@ -8,7 +8,7 @@ Daily use covers creating or importing a vault, saving and filling a login, upda
 
 Local use remains offline-capable and account-free. Managed onboarding lets a nontechnical user create an account and vault without choosing KDBX paths or operating a terminal. Storage can be managed for the user while ordinary KDBX export preserves ownership. Free contains the complete local password manager and self-hosted relay; paid plans sell managed hosting and organization capabilities. Pricing plans are separate from delivery milestones.
 
-Full KeePassXC coverage is accepted work, with a dated behavior inventory in [FEATURES.md](FEATURES.md). Daily-use coverage comes first; advanced features remain explicit Expansion work after the local product gate. The inventory must distinguish implementation, tested compatibility, platform coverage and first public availability before any completeness claim.
+Full KeePassXC coverage is accepted work, with a dated behavior inventory in [FEATURES.md](FEATURES.md). Daily-use coverage comes first; advanced features remain explicit Expansion work that ships after the local product gate. The inventory must distinguish implementation, tested compatibility, platform coverage and first public availability before any completeness claim.
 
 ## Delivery structure
 
@@ -19,10 +19,10 @@ Following the sibling `notinferred` project's structure, STEPS starts with Curre
 | [Working proposition](STEPS.md#working-proposition) | A daily-use desktop password manager and browser extension, publicly distributed on the supported platforms, with integrated env and agent workflows and recovery from ordinary mistakes. |
 | [Pilot ready](STEPS.md#pilot-ready) | Invited nontechnical users can create an account, enroll devices and use encrypted sync; operators can restore the service and users can recover through documented supported paths. |
 | [Paid release](STEPS.md#paid-release) | Consumer hosting has passed the pilot, phone workflow and independent security-review gates; commercial, support and exit behavior are tested before charging. |
-| [Expansion](STEPS.md#expansion) | Complete advanced KeePassXC coverage after the Working proposition gate. Organization credential work follows the Pilot ready gate and a selected pilot scope. A full web vault follows client/core feasibility work. |
-| [Scale](STEPS.md#scale) | Increase operational capacity and reliability when recorded load, reliability or workload evidence activates the task. |
+| [Expansion](STEPS.md#expansion) | Complete advanced KeePassXC coverage, shipping after the Working proposition gate. Organization credentials ship after the Pilot ready gate, and their pilot needs a selected scope. A full web vault builds on client/core feasibility work. |
+| [Scale](STEPS.md#scale) | Increase operational capacity and reliability, verified against declared budgets. |
 
-STEPS owns the exact prerequisites and pickup rule; [CLAUDE.md](../CLAUDE.md#records) explains their use. Existing IDs and completed evidence remain traceable. Later preparation cannot bypass release gates, and unfinished behavior stays open.
+STEPS owns the exact build dependencies, ship gates and pickup rule; [CLAUDE.md](../CLAUDE.md#records) explains their use. Existing IDs and completed evidence remain traceable. Gates decide what ships, never what may be built, and unfinished behavior stays open.
 
 ## What the broader build includes
 

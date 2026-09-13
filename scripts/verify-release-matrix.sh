@@ -42,7 +42,7 @@
 #     evidence - docs/RELEASE.md requirements 4 and 7, owned by R.0b/R.0c.
 #   - AUTHENTICITY. --with-public-origin proves a published asset is still fetchable, not that it is
 #     the bytes this project produced. That is O-0010 and 3.8.
-#   - ORDERING. docs/STEPS.md 3.9a-d own adding targets and each needs R.1. A definition edit that
+#   - ORDERING. docs/STEPS.md 3.9a-d own adding targets and each ships after R.1. A definition edit that
 #     adds one early contradicts the plan, and review catches that, not a script.
 #
 # Usage:

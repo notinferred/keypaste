@@ -1,6 +1,6 @@
 # Product rules
 
-Product rules change only through dated re-ratification under explicit founder direction, recorded with a reason in DECISIONS and matching owner-document updates. The security laws in §3 remain fixed. Last ratified: 2026-09-07 (v1.2, D-0090); earlier versions remain in git. Editorial changes preserve these rules.
+Product rules change only through dated re-ratification under explicit founder direction, recorded with a reason in DECISIONS and matching owner-document updates. The security laws in §3 remain fixed. Last ratified: 2026-09-13 (v1.3, D-0132); earlier versions remain in git. Editorial changes preserve these rules.
 
 ## 1. Product
 
@@ -15,8 +15,8 @@ The product is freemium. Free is the whole local password manager and the self-h
 1. Working proposition: a publicly released daily-use desktop password manager and browser extension, with environment and agent workflows integrated.
 2. Pilot ready: managed encrypted sync and account/device operations that invited nontechnical users can complete and operators can restore.
 3. Paid release: a validated consumer hosting experience, a supported phone workflow, reviewed trust boundaries and complete commercial/support operations.
-4. Expansion: complete the remaining accepted KeePassXC baseline after the Working proposition gate; begin organization credential management after the Pilot ready gate and selection of a pilot scope. These tracks can progress alongside the later release work when their dependencies hold.
-5. Scale: operational capacity and reliability work activated by measured demands.
+4. Expansion: complete the remaining accepted KeePassXC baseline and build organization credential management. These tracks progress alongside the release work as their build dependencies hold; their publication follows the Working proposition and Pilot ready gates, and an organization pilot also needs a selected pilot scope.
+5. Scale: operational capacity and reliability work, verified against declared budgets.
 
 ## 2. Scope boundaries
 
@@ -65,7 +65,7 @@ Organization-owned credentials, access policy, provisioning integrations, audit 
 Apply these in order:
 
 1. Reject work that risks user trust.
-2. Prefer required workflows and gates in the current STEPS milestone; later work follows its recorded dependencies and activation conditions.
+2. Prefer required workflows and gates in the current STEPS milestone; later work follows its recorded build dependencies, and gates decide only what may ship.
 3. Split work that one person cannot build and verify within two weeks into bounded children, preserving the parent's acceptance requirements.
 4. Prefer demonstrable, tested outcomes with recovery from ordinary mistakes.
 5. Prefer established approaches and focused, shippable work over novelty, perfection or breadth.

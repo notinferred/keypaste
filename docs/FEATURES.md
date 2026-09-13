@@ -12,7 +12,7 @@ The keypaste column describes the source and documentation inspected on the revi
 
 "Not established" means this review found no implemented user workflow. Delivery rows identify accepted work; completion requires their evidence in STEPS.
 
-[PRODUCT v1.2](PRODUCT.md) owns accepted scope. [STEPS](STEPS.md#build-order) owns status, dependencies and milestone gates: Working proposition (R.1), Pilot ready (R.2), Paid release (R.3), Expansion with the full baseline (P.9) and organization pilot (R.4), and demand-activated Scale. Mappings below refer to that plan and every named child's acceptance criteria.
+[PRODUCT](PRODUCT.md) owns accepted scope. [STEPS](STEPS.md#build-order) owns status, dependencies and milestone gates: Working proposition (R.1), Pilot ready (R.2), Paid release (R.3), Expansion with the full baseline (P.9) and organization pilot (R.4), and Scale. Mappings below refer to that plan and every named child's acceptance criteria.
 
 ## Desktop and vault coverage
 
@@ -33,7 +33,7 @@ The upstream families come from the official [feature overview](https://keepassx
 | TOTP | No implemented user workflow. | 9.2a–b cover supported algorithm/digit/period combinations, CLI/GUI/MCP use; 8.3e covers browser filling. Working proposition. |
 | Keyfiles | Current frontend unlock does not expose them. | V.1a–b cover core/CLI/GUI create/open/change-credentials, independently of merge. Working proposition. |
 | Hardware-key protection | No implemented challenge-response workflow established. | P.1 covers explicitly supported hardware-key devices and interoperable vault operations. Expansion. |
-| Quick unlock | Idle/manual locking exists; OS-assisted quick unlock not established. | 4.10a adds Windows and 4.10b macOS quick unlock after R.1; optional alongside Pilot ready. P.0/P.9 include claimed baseline coverage. |
+| Quick unlock | Idle/manual locking exists; OS-assisted quick unlock not established. | 4.10a adds Windows and 4.10b macOS quick unlock; optional alongside Pilot ready. P.0/P.9 include claimed baseline coverage. |
 | Import/export | Env import/export works; password-manager importers remain unimplemented. | 9.1a provides the pipeline; 9.1b/c/d1/d2/e cover Bitwarden JSON, LastPass CSV, 1Password 1PUX/CSV and KeePassXC CSV/KDBX onboarding; 9.1f provides GUI guidance. V.4b covers encrypted whole-vault export. Working proposition. |
 | Multiple vaults and auto-open | Recent-vault selection exists; simultaneous vaults/auto-open not established. | P.2 covers simultaneous vault identities, linked opening, scopes and lock behavior. Expansion. |
 | Format variants/settings | KDBX4/AES-256/Argon2d writing and bidirectional fixtures exist. Broad cipher/KDF/keyfile/metadata coverage is not proved. | 9.4 publishes the Working proposition compatibility result; P.7a covers remaining cipher/KDF controls and P.7b remaining legacy format/import behavior. P.0/P.9 define and verify the complete baseline. |
@@ -79,7 +79,7 @@ PRODUCT v1.2 accepts these additions to desktop KeePassXC coverage. Hosted and o
 | Approve team or service-account use | Existing local single-user approvals do not establish a team broker. | 7.2 adds attributed scoped approval with current membership/policy checks; 7.4 adds review controls. Expansion, verified through R.4. |
 | Administer a workforce | No organization SSO, provisioning or access-review implementation. | 7.3a–b implement OIDC and provisioning/deprovisioning; 7.4 adds access reviews/dashboard; 6.1–2 add external delegation coverage only where provider evidence supports it. R.4 verifies an organization pilot. |
 | Trust hosted operation | Security policy and local checks exist; no operated/reviewed hosted service. | H.9–H.10 and 5.7 cover operations, privacy/support and usable procedures before R.2; 10.2 independently reviews new hosted/client boundaries before R.3; R.4 requires review of team boundaries. |
-| Meet later enterprise operating needs | No managed fleet deployment, downstream rotation integration or enterprise assurance evidence. | S.1–S.5 cover measured capacity, fleet deployment, one provider credential lifecycle, support capacity and requested assurance. Demand-activated Scale; credentials already disclosed require provider-side rotation, not merely membership revocation. |
+| Meet later enterprise operating needs | No managed fleet deployment, downstream rotation integration or enterprise assurance evidence. | S.1–S.5 cover measured capacity, fleet deployment, one provider credential lifecycle, support capacity and requested assurance in Scale; credentials already disclosed require provider-side rotation, not merely membership revocation. |
 
 Organization roles and per-collection permissions are distinct controls in established password managers. They are useful models for the Teams design. [Bitwarden organizations](https://bitwarden.com/help/about-organizations/), [collection permissions](https://bitwarden.com/help/collection-permissions/). Recovery also needs an explicit authority model: an organization-controlled recovery key changes who can recover access, even when the provider cannot decrypt the vault. [Bitwarden recovery design](https://bitwarden.com/help/account-recovery/).
 
