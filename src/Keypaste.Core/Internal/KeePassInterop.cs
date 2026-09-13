@@ -27,6 +27,9 @@ internal sealed class KeePassInterop : IDisposable
     private readonly PwDatabase _database;
     private bool _disposed;
 
+    // KdfPool fills its static list without synchronization; the runtime runs this once and holds concurrent first callers until it returns (F.11).
+    static KeePassInterop() => _ = KdfPool.Engines.Count();
+
     private KeePassInterop(PwDatabase database)
     {
         _database = database;
