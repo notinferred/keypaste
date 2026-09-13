@@ -12,6 +12,8 @@ Windows saves now retry transient rename collisions. A failed save's stranded `v
 
 On Windows 11 24H2 and Windows Server 2025, temporary files now use a private process directory. Shared 8.3 temporary-name aliases previously allowed unrelated Keypaste or KeePass saves to exhaust the retry budget. Older Windows builds were unaffected.
 
+Fixed a race in the KeePassLib KDF registry that could throw or corrupt the engine list when several vaults were created concurrently on first use. KeePassInterop now forces registry initialization from its type initializer. Not reachable from the CLI, agent or desktop, which each open their first vault on a single thread.
+
 ## 0.2.0
 
 Upgrade from `v0.1.0` to receive the data-preservation and approval repairs below. Old archives remain available and immutable.
