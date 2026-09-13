@@ -1,5 +1,6 @@
 using Keypaste.Core.Ipc;
 using Keypaste.Mcp;
+using Keypaste.Mcp.Tests;
 
 namespace Keypaste.PoolStarver;
 
@@ -46,6 +47,7 @@ internal static class Program
         return args[0] switch
         {
             "connect-behind-its-deadline" => ConnectBehindItsDeadline(args[1]),
+            "an-open-harness" => AnOpenHarness(),
             _ => Refuse($"no scenario named {args[0]}"),
         };
     }
@@ -131,6 +133,50 @@ internal static class Program
         releaseCaller.Set();
 
         Console.WriteLine(finished ? $"outcome {call.Task.Result.Outcome}" : "outcome unfinished");
+
+        return 0;
+    }
+
+    /// <summary>
+    /// The two reads an open MCP harness keeps outstanding — the server waiting for a request and the
+    /// client waiting for a reply — and whether anything else in the process can still get a worker.
+    /// </summary>
+    /// <remarks>
+    /// Every harness keeps both reads outstanding for as long as it is open, and nothing is written
+    /// while a test is between calls. A channel that cannot read asynchronously serves a read by
+    /// parking a pool worker in a blocking read until data arrives (<c>PipeStream.AsyncOverSyncRead</c>),
+    /// which is what pool-probe dumps showed six to eight workers doing while everything else in the
+    /// test host queued. With two workers, one open harness holds both, and the canary queued after it
+    /// never runs.
+    /// </remarks>
+    private static int AnOpenHarness()
+    {
+        using var channels = HarnessChannels.Open();
+
+        var serverWaiting = channels.ServerReads.ReadAsync(new byte[1]).AsTask();
+        var clientWaiting = channels.ClientReads.ReadAsync(new byte[1]).AsTask();
+
+        // Long enough for a read that needs a worker to have taken one.
+        Thread.Sleep(TimeSpan.FromSeconds(1));
+
+        if (serverWaiting.IsCompleted || clientWaiting.IsCompleted)
+        {
+            return Refuse("a read completed with nothing written, so no harness was waiting");
+        }
+
+        Console.WriteLine("both reads outstanding");
+
+        using var ran = new ManualResetEventSlim();
+        ThreadPool.UnsafeQueueUserWorkItem(_ => ran.Set(), null);
+
+        Console.WriteLine(ran.Wait(TimeSpan.FromSeconds(5)) ? "canary ran" : "canary never ran");
+
+        // Answer both reads so the process can end, whichever way the canary went.
+        channels.ClientWrites.Write([1]);
+        channels.ClientWrites.Flush();
+        channels.ServerWrites.Write([1]);
+        channels.ServerWrites.Flush();
+        Task.WaitAll([serverWaiting, clientWaiting], _finish);
 
         return 0;
     }

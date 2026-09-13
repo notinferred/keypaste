@@ -1,4 +1,3 @@
-using System.IO.Pipes;
 using System.Text;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
@@ -117,16 +116,8 @@ internal sealed class McpHarness : IAsyncDisposable
             throw new InvalidOperationException($"the harness could not open the audit log: {auditError}");
         }
 
-        // Two one-way pipes: one carrying the client's requests, one carrying the server's replies.
-        var toServer = new AnonymousPipeServerStream(PipeDirection.Out, HandleInheritability.None);
-        var toServerRead = new AnonymousPipeClientStream(PipeDirection.In, toServer.ClientSafePipeHandle);
-        var toClient = new AnonymousPipeServerStream(PipeDirection.Out, HandleInheritability.None);
-        var toClientRead = new AnonymousPipeClientStream(PipeDirection.In, toClient.ClientSafePipeHandle);
-
-        _owned.Add(toServer);
-        _owned.Add(toServerRead);
-        _owned.Add(toClient);
-        _owned.Add(toClientRead);
+        var channels = HarnessChannels.Open();
+        _owned.Add(channels);
 
         var serverOptions = new McpServerOptions
         {
@@ -144,15 +135,15 @@ internal sealed class McpHarness : IAsyncDisposable
                 : new ListEntryNamesTool(new ApproverEntryNameSource(_approver, options), options, _audit));
         serverOptions.ToolCollection.Add(new RequestCredentialTool(options, _approver, _audit));
 
-        _transcript = new TeeStream(toClient);
+        _transcript = new TeeStream(channels.ServerWrites);
         _owned.Add(_transcript);
 
-        _transport = new StreamServerTransport(toServerRead, _transcript, "keypaste");
+        _transport = new StreamServerTransport(channels.ServerReads, _transcript, "keypaste");
         _server = McpServer.Create(_transport, serverOptions, loggerFactory: null, serviceProvider: null);
         _serving = _server.RunAsync();
 
         _client = await McpClient.CreateAsync(
-            new StreamClientTransport(toServer, toClientRead),
+            new StreamClientTransport(channels.ClientWrites, channels.ClientReads),
             new McpClientOptions
             {
                 ClientInfo = new Implementation { Name = ClientName, Version = ClientVersion },

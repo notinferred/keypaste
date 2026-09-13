@@ -50,6 +50,27 @@ public sealed class PoolShortageTests
             $"a running approver was not answered from a pool with no worker to spare:{Environment.NewLine}{output}");
     }
 
+    /// <summary>
+    /// Class 2: an open MCP harness must not hold the workers every other test in its process needs.
+    /// </summary>
+    /// <remarks>
+    /// No budget is asserted, so none can be widened to buy it green: the canary only has to run at all
+    /// while a harness sits open between calls, which is where forty harnesses across six test classes
+    /// spend most of a suite.
+    /// </remarks>
+    [Fact]
+    public async Task AnOpenHarness_LeavesTheProcessAWorker()
+    {
+        var (code, output) = await StarveAsync("an-open-harness", pipeName: "unused");
+
+        Assert.True(code == 0, $"the scenario was not arranged (exit {code}):{Environment.NewLine}{output}");
+        Assert.Contains("workers 2..2", output, StringComparison.Ordinal);
+        Assert.Contains("both reads outstanding", output, StringComparison.Ordinal);
+        Assert.True(
+            output.Contains("canary ran", StringComparison.Ordinal),
+            $"an open harness left no worker for anything else in its process:{Environment.NewLine}{output}");
+    }
+
     private static async Task<(int Code, string Output)> StarveAsync(string scenario, string pipeName)
     {
         var info = new ProcessStartInfo
