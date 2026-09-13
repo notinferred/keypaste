@@ -1,33 +1,16 @@
-# STEPS — build plan
+# Build plan
 
-> Owns current status, build order and acceptance criteria. [PRODUCT](PRODUCT.md) owns the product;
-> [FEATURES](FEATURES.md) owns the dated capability baseline; [RELEASE](RELEASE.md) owns distribution
-> requirements. [DECISIONS](../DECISIONS.md) D-0090 records this realignment.
+This plan owns current status, build order and acceptance criteria. [PRODUCT](PRODUCT.md) owns scope, [FEATURES](FEATURES.md) the dated capability baseline, and [RELEASE](RELEASE.md) distribution requirements. [DECISIONS](../DECISIONS.md) D-0090 records the adopted structure.
 
-> **Only the next five steps are detailed.** Every step after them is one line — ID, name, Needs and
-> what it is for. Those later steps are rough and will change as the product does; their wording is not
-> a contract. When a step is finished it shrinks to one line in **Completed steps**, and the next
-> unchecked step is expanded in its place. Detail is written when a step is about to be built.
+Only the next five steps are detailed. Later steps have one line with ID, name, Needs and purpose; their wording remains provisional until activated. On completion, reduce a step to one line under Completed steps and expand the next unchecked step.
 
 ## Current status
 
-The local vault, CLI/env workflow and approval bridge are implemented and **published as `v0.2.0`**,
-installed and exercised on all four native targets from clean runners; the desktop is a source build
-with partial entry/env screens, and no hosted service, web vault, mobile client or organization
-credential service exists. Two repairs are open — F.10, and F.2b2, BLOCKED on hardware rather than
-on work. F.6, F.8 and F.9 are closed. F.9 was thread-pool worker supply (D-0128) as two defects: the
-bridge's connect let its own deadline run before it tried the pipe, so a running approver was reported
-absent, and the bridge's test host parked its workers in blocking reads on its own anonymous pipes.
-Both are repaired in `main` and neither is in the `0.2.0` download, which still discloses the first
-(D-0129). F.10 is the save that measurement split off: its budget is already met and the whole
-variance sits in the one attempt that takes the process-wide save gate.
+The local vault, CLI/env workflow and approval bridge are published as `v0.2.0`, installed and exercised on all four native targets from clean runners. The desktop has partial entry/env screens in source; hosted service, web vault, mobile client and organization credential service remain unimplemented. Concurrent KDF startup failures (F.11a/F.11b) and save overruns (F.10a/F.10b) remain open. F.2b2 is BLOCKED on hardware.
 
-Release foundations are closed through R.0c: `0.1.0` is superseded and says so where it is
-downloaded, and the pages, the definition and keypaste.com name `0.2.0` — which R.0e made true of
-the live page rather than only of the repository, after finding that the deploy D-0121 recorded had
-never run once. What stands between here and R.1 is desktop packaging and signing,
-browser publication, and 3.8's attestations — which no longer gate a CLI patch (D-0115) and still
-gate 4.7c.
+F.6, F.8 and F.9 are closed. F.9 had two worker-pool defects: the bridge's connect deadline could expire before it tried the pipe, reporting a running approver absent, and the test host blocked workers reading its anonymous pipes (D-0128). Both are repaired in `main`; `0.2.0` contains neither repair and still discloses the first defect (D-0129). F.10 remains separate because its retry sleeps matched the requested total closely, while the first recorded interval combined save-gate waiting and attempt work. Their separate costs and the overrun mechanism remain unproved.
+
+Release foundations are closed through R.0c. Download pages mark `0.1.0` superseded, and the pages, release definition and keypaste.com advertise `0.2.0`. R.0e corrected live deployment after finding D-0121's workflow had never deployed. R.1 still requires daily desktop creation and editing, recovery, migration, native approvals and browser workflows, with packaging, signing, publication and observed user acceptance. Step 3.8's attestations gate desktop publication through 4.7c; CLI patches can proceed independently (D-0115).
 
 ## Build order
 
@@ -39,21 +22,17 @@ gate 4.7c.
 | Expansion | Advanced KeePassXC coverage starts after R.1; web access and organization credentials follow their listed prerequisites |
 | Scale | Capacity, fleet and operational improvements activated by observed requirements |
 
-**Pick the first unchecked step whose Needs are complete, skipping BLOCKED ones.** Passing a numbered
-gate advances its milestone even if explicitly optional rows remain open. A later step may be prepared
-once its prerequisites exist; preparation never satisfies a publication, security-review or
-user-validation gate. Keep IDs stable, and split a large step into lettered children rather than
-widening it.
+Pick the first unchecked step whose Needs are complete, skipping BLOCKED ones. Passing a numbered gate advances its milestone even if explicitly optional rows remain open. A later step may be prepared once its prerequisites exist; publication, security-review and user-validation gates still require their evidence. Keep IDs stable and split large steps into lettered children.
+
+An unknown mechanism gets a diagnosis child before its repair. During an external wait, follow [CLAUDE.md](../CLAUDE.md#records) for bounded independent work within the same milestone; the waiting row remains open. Aggregate rows follow their first ready child and close only when every child passes.
 
 ```text
-Build the next ready step in docs/STEPS.md. Follow CLAUDE.md, implement its Build line,
-run its verifier and relevant checks, then record the actual result and evidence.
+Build the next ready step in docs/STEPS.md. Follow CLAUDE.md, implement its Build line, run its verifier and relevant checks, then record the actual result and evidence.
 ```
 
 ## Completed steps
 
-Each row keeps its original bounded scope: 4.2 does not include entering an existing secret, undoing a
-deletion or restoring history, and the F rows are defects found after those original checks.
+Each row keeps its original bounded scope: 4.2 does not include entering an existing secret, undoing a deletion or restoring history, and the F rows are defects found after those original checks.
 
 | Step | Name | Evidence |
 |---|---|---|
@@ -75,7 +54,7 @@ deletion or restoring history, and the F rows are defects found after those orig
 | 3.0 | Public repository | D-0089 in [DECISIONS](../DECISIONS.md) |
 | 3.1 | Demo GIF | [asset](demo/keypaste-demo.gif), D-0088 |
 | 3.2b | CLI launch essay, distinct from the future post 3.2 | [essay](keepass-and-agents.md) |
-| 3.4 | CLI/MCP pipeline and public archives — **Published** | [release inventory](RELEASE.md) |
+| 3.4 | CLI/MCP pipeline and public archives — Published | [release inventory](RELEASE.md) |
 | 4.1 | Desktop unlock and idle lock, source only | [session tests](../tests/Keypaste.App.Tests/Session/AppVaultSessionTests.cs) |
 | 4.2 | Search, generated entries, env screens and lost-write protection, source only | [entry tests](../tests/Keypaste.App.Tests/ViewModels/EntriesViewModelTests.cs) |
 | F.1a | One entry identity for selection and mutation; an ambiguous one is refused | [identity tests](../tests/Keypaste.Core.Tests/EntryIdentityTests.cs), [write-back gate](../scripts/verify-keepassxc-writeback.sh); D-0091 |
@@ -92,7 +71,7 @@ deletion or restoring history, and the F rows are defects found after those orig
 | F.3d | An oversized release is refused on a connection that stays open, and recorded as approved-and-undeliverable | [large-credential tests](../tests/Keypaste.Mcp.Tests/LargeCredentialTests.cs); D-0103 |
 | F.4a | A release destination is refused unless a listing positively verifies it is empty | [verify-release-destination.sh](../scripts/verify-release-destination.sh), 26 cases; [tripwire tests](../tests/Keypaste.Core.Tests/ReleaseDestinationIsCheckedTests.cs); R2's own listing reply is still unobserved; D-0104, D-0106 |
 | F.4b | Every binary keypaste ships reports keypaste as its publisher | [verify-publisher-metadata.sh](../scripts/verify-publisher-metadata.sh), [attribute tests](../tests/Keypaste.Core.Tests/PublisherMetadata.cs); D-0097, D-0105 |
-| F.5 | A pipelined `tools/call` is waited for rather than refused, and an unnameable client is still refused — **weak evidence; a third occurrence reopens it** | [grace tests](../tests/Keypaste.Mcp.Tests/HandshakeGraceTests.cs); D-0113 |
+| F.5 | A pipelined `tools/call` is waited for rather than refused, and an unnameable client is still refused — weak evidence; a third occurrence reopens it | [grace tests](../tests/Keypaste.Mcp.Tests/HandshakeGraceTests.cs); D-0113 |
 | F.6 | A save no longer contends for a temporary name any other KeePass-family program wants | [V-F.6](../tests/Keypaste.Core.Tests/ConcurrentVaultSaveTests.cs) red 5 of 5 on `windows-2025` without the fix and green 5 of 5 with it, budget 1 both ways; runs 34640639830 and 34644315829 bound the two sets; D-0122, D-0123 |
 | F.7 | A save refused the vault's own name is retried, and reverts nobody | [transacted-name tests](../tests/Keypaste.Core.Tests/VaultSaveUnderATransactedNameTests.cs); 6800 observed by [txf-probe](../scripts/txf-probe.cs) on Windows 10 Pro 19045 and by the regression on windows-2025, ci run 34602290950; D-0119, D-0120 |
 | F.8 | A refused listing says which refusal it was, and how long it took | [ListingCall](../tests/Keypaste.Mcp.Tests/ListingCall.cs) red 2 of 2, green 8 of 8; 12 of 80 on `windows-2025`, probe run 34653284139: `no-approver` at 5834 ms against 500 ms, listener up throughout. Dispatched against a removed commit, tests unchanged. D-0124 |
@@ -105,50 +84,33 @@ deletion or restoring history, and the F rows are defects found after those orig
 | 10.1 | Initial hostile review and remediation | D-0084 in [DECISIONS](../DECISIONS.md) |
 | K.1 | Pinned SDK installed | [global.json](../global.json), D-0076 |
 
-The [current release matrix](RELEASE.md#current-distribution--2026-09-07) owns public availability: a
-completed source step does not mean the behavior is in the current download.
+The [current release matrix](RELEASE.md#current-distribution--2026-09-07) owns public availability: a completed source step does not mean the behavior is in the current download.
 
 ## Working proposition
 
-A person can install the product, create or import a vault, save and use existing credentials, recover
-mistakes, inject a project's env and approve or deny agent access. Build through the shared core;
-desktop, CLI and browser steps name their surfaces. No account is required. R.1 closes the milestone
-only after the published product passes its complete user journey.
+A person can install the product, create or import a vault, save and use existing credentials, recover mistakes, inject a project's env and approve or deny agent access. Build through the shared core; desktop, CLI and browser steps name their surfaces. No account is required. R.1 closes the milestone only after the published product passes its complete user journey.
 
 ### Repair existing behavior — first ready work
 
-The bounded 2026-09-07 review found these while the local Windows suites reported 1,169 passed and five
-platform-specific skips. Each needs a regression that fails before the fix, recorded in repository
-fixtures rather than a maintainer's temporary files.
+The bounded 2026-09-07 review found these while the local Windows suites reported 1,169 passed and five platform-specific skips. Each needs a regression that fails before the fix, recorded in repository fixtures rather than a maintainer's temporary files.
 
-- [ ] **F.10 — A doomed save's own first attempt, not the pool, spends its budget.** Needs: 2.1.
-  **Split from F.9 on its measurement, which refuted the common story.**
-  [pool-probe run 34701431621](https://github.com/notinferred/keypaste/actions/runs/34701431621)
-  moved the pool's worker floor 256-fold and `VaultSaveTests.ASaveThatCannotSucceed_GivesUpQuickly`
-  failed **4, 4 and 2 of 80** — while every MCP shape went to zero. Thread-pool worker supply is
-  therefore **measured not to be this defect**, and D-0107's account of the retry wait as a
-  pool-thread-holding ceiling does not explain it either.
-  **What the instrument does say.** The retry budget is accurate: the sleeps totalled 2259–2482 ms
-  against the 2240 ms that eight attempts at a rising 80 ms ask for, a median 3 % over and a worst
-  11 %, so nothing is arriving late. The retries themselves cost nothing — every work interval after
-  the first measured 0 ms. **All of the variance is in the first attempt**, which is the only one that
-  also contains taking `KeePassInterop`'s process-wide `_saveGate`. Against the green control runs the
-  first attempt stays under 1249 ms and the whole save under 3437 ms; in the failures it is
-  3622–6275 ms and 6453–8782 ms, with nothing at all between 3797 ms and 6453 ms. A bimodal gap is
-  what waiting for exactly one other save looks like, and is not what a machine getting gradually
-  slower looks like.
-  **Build:** separate the gate wait from the first attempt's own cost, because `work[0]` currently
-  contains both and no reading can divide them. The other savers in `Keypaste.Core.Tests` are
-  unmarked, so the timeline cannot show a save queued behind one of theirs — `ADoomedSave` and
-  `ASaveThatCannotSucceed` share a class and xunit never runs them at once, so their own marks can
-  never overlap. Mark the assembly's other saves, or time the acquisition, then name the mechanism and
-  repair it. Argon2 is a candidate for the attempt's own cost and is not excluded: KeePassLib's
-  `Argon2Kdf` queues a work item per lane per slice and blocks the caller on each, so a derivation —
-  one per save — is both a pool producer and a blocking wait.
-  **Verify (V-F.10):** a named mechanism with counts both ways on a named platform, and a regression
-  red before the repair and green after. Widening `SaveAttempts` or `SaveRetryDelayMilliseconds` is
-  refused: the measurement above shows the budget is already met, so a larger one would only move the
-  threshold past a symptom. A repair that only moves a number is refused by this line.
+- [ ] **F.11 — Repair concurrent KDF startup failures.** Needs: F.11a, F.11b. — Aggregate: preserve the first-use failure, repair the confirmed mechanism and retain the regression and compatibility evidence.
+- [ ] **F.11a — Isolate the KDF registry's concurrent first use.** Needs: 0.2.
+  **Measured:** F.9's local investigation recorded `KdfPool.GetDefaultParameters` null references in two of thirty fresh suite runs, one failing 98 tests. On 2026-09-12, setup verification at `083fa45` plus the working-tree delivery changes failed 130 CLI tests in 661 ms: the first saves reported null references and later reads found invalid headers. Its log is retained locally at `artifacts/verification/local-all-final.log`; that message alone does not establish the throw site. Five subsequent fresh full-suite runs with exception tracing passed and recorded no null-reference stack (`artifacts/verification/exception-sample-{1..5}.log`); those passes do not repair the race.
+  **Build:** use the opt-in CLI exception trace in [diagnostics.md](diagnostics.md) and a fresh-process reproducer to separate concurrent registry initialization from later save work. Retain the failing stack and the smallest controlled interleaving; a warmed process does not test first use.
+  **Verify (V-F.11a):** retained evidence identifies the throwing operation and the shared state that caused it, with a failing regression and a passing control. If no failure is captured, keep this row open and record the next distinguishing experiment before selecting F.11b's repair.
+- [ ] **F.11b — Repair the confirmed KDF startup mechanism.** Needs: F.11a.
+  **Build:** make initialization complete before concurrent callers can observe its result, at the boundary established by F.11a. Preserve algorithms, KDF parameters and KDBX compatibility; record any vendor modification in its provenance guide. Do not serialize the suite to conceal the race.
+  **Verify (V-F.11b):** the first-use regression fails before the change and passes afterward; the full concurrent backend suite and both directions of KeePassXC compatibility pass. Counts and startup conditions remain explicit, and a passing retry alone cannot close this repair.
+
+- [ ] **F.10 — Repair the doomed-save overrun.** Needs: F.10a, F.10b. — Aggregate: establish the mechanism, repair it and retain the failing-before/passing-after evidence; diagnosis alone does not close this defect.
+- [ ] **F.10a — Separate save-gate waiting from the first attempt.** Needs: 2.1.
+  **Measured:** [pool-probe run 34701431621](https://github.com/notinferred/keypaste/actions/runs/34701431621) varied the worker floor 256-fold; `ASaveThatCannotSucceed_GivesUpQuickly` failed 4, 4 and 2 of 80. Raising the floor left failures and possible pool involvement in the first attempt unresolved. Recorded retry sleeps totalled 2259–2482 ms against 2240 ms requested. The first interval was 3622–6275 ms in failures and included gate acquisition and the save itself; later attempt work measured 0 ms at the instrument's resolution. Gate contention and Argon2 work remain unconfirmed hypotheses.
+  **Build:** instrument gate acquisition and first-attempt work separately, with operation identity for overlapping saves. State the timing contract: total caller wait includes gate wait, attempt work and retry sleeps; the requested retry-delay total describes the sleep schedule, not an elapsed-time bound. Keep those measures distinct. Preflight the writer and reader, then run a distinguishing experiment under the CI suite load and retain its source, command, platform, counts and interpretation per [diagnostics.md](diagnostics.md).
+  **Verify (V-F.10a):** the instrument proves it can distinguish a held gate from slow attempt work; retained observations identify the mechanism or explicitly leave this row open with the next discriminating experiment. Set F.10b's concrete repair from that result before implementing it.
+- [ ] **F.10b — Repair the measured save-overrun mechanism.** Needs: F.10a.
+  **Build:** implement the repair selected by F.10a while preserving atomic writes, lost-write protection and bounded failure. Use a regression that induces the named mechanism. Increasing `SaveAttempts`, `SaveRetryDelayMilliseconds` or the test timeout alone is not a repair; neither is omitting gate wait or first-attempt work from a claim about total caller wait.
+  **Verify (V-F.10b):** the regression fails before the repair and passes afterward on the named platform; retain counts and separate gate, work, retry and total timings under comparable load. Existing save-safety checks pass. These results, together with F.10a, close aggregate V-F.10.
 
 - [ ] **F.2b2 — Observe minimize-lock on macOS and Linux.** Needs: F.2b1. — **BLOCKED** on a macOS machine and a Linux desktop session (2026-09-08); run F.2b1's behavior on both remaining targets during 4.7a/4.7b, following the [desktop checklist](desktop.md#observing-minimize-lock-on-macos-and-linux), and correct [MinimizeLock](../src/Keypaste.App/MinimizeLock.cs) if an observation contradicts it.
 
@@ -160,15 +122,14 @@ fixtures rather than a maintainer's temporary files.
 
 ### Desktop packages and platform signing
 
-- [ ] **4.7a — Prepare desktop installers and prerelease candidates.** Needs: R.0a, F.4b.
-  **Build:** Turn the three app archives [release-targets.json](../release-targets.json) already names into an installed shape per target — a Windows installer, a macOS bundle and DMG, a Linux AppImage — driven by [app.yml](../.github/workflows/app.yml) from that same definition, so the matrix is not restated anywhere. Every candidate is labelled internal and carries the prerelease suffix R.0a proved reaches all three desktop targets; publisher metadata comes from F.4b's rule, so each installer reports keypaste. **Signing is not part of this row** and must fail closed rather than silently produce an unsigned installer that looks finished: 3.5b and 3.6b own the identities, and this row's output is explicitly not installable-without-warning.
-  **Verify (V-4.7a):** Each target's installer is produced by a workflow run from the checked definition, and [verify-release-matrix.sh](../scripts/verify-release-matrix.sh) refuses a candidate naming a target the definition does not. The unsigned candidates are marked internal everywhere they appear. A produced artifact is **Packaged** and nothing more — installing it on a real machine is 4.7b and publishing it is 4.7c, and neither may be inferred from a green run here.
-- [ ] **3.5a — Enable the macOS signing identity (H-0015).** Needs: R.0a.
-  **Build:** Enrol in the Apple Developer Program as keypaste, obtain a Developer ID Application certificate and a notarization credential, and put both where [app.yml](../.github/workflows/app.yml) can reach them as secrets scoped to this repository. The identity is the project's, not a person's: the name on it is what a user sees in the install prompt, and CLAUDE.md's commit-identity rule applies to it for the same reason. **This row enrols and nothing else** — 3.5b signs, and an identity that exists but has signed nothing is not 3.5b done.
-  **Verify (V-3.5a):** `security find-identity -v -p codesigning` on a runner names the certificate, and a throwaway binary signs, notarizes and staples with it. Record the team identifier and the certificate's expiry beside the evidence, because both expire and neither failure is obvious until a release is blocked. **External account required**: no local preparation completes this row.
-- [ ] **3.6a — Enable the Windows signing identity (H-0017).** Needs: R.0a.
-  **Build:** Obtain an Authenticode code-signing identity as keypaste — an organization-validated certificate or a managed signing service — and make it usable from [app.yml](../.github/workflows/app.yml) as secrets scoped to this repository, without a private key file checked in or written to a runner's disk beyond the job. The publisher name on it is what SmartScreen and the install prompt show, so it is the project's, not a person's, for the reason CLAUDE.md's commit-identity rule gives. **This row enrols and nothing else** — 3.6b signs.
-  **Verify (V-3.6a):** On a `windows-2025` runner a throwaway executable is signed and timestamped with the identity, `signtool verify /pa /v` accepts it and names keypaste as publisher, and a changed byte is refused. Record the issuer, the timestamp authority and the certificate's expiry beside the evidence. **External account required**: no local preparation completes this row.
+Each packaging child uses [release-targets.json](../release-targets.json) through [app.yml](../.github/workflows/app.yml), preserves the prerelease suffix and keypaste publisher, and labels unsigned candidates internal everywhere. A request for a signed package must fail closed when its identity is missing; 3.5b and 3.6b own signing. An artifact establishes Packaged only; real installation remains 4.7b and public distribution remains 4.7c.
+
+- [ ] **4.7a — Prepare desktop installers and prerelease candidates.** Needs: 4.7a1, 4.7a2, 4.7a3. — Aggregate: all three platform candidates and the shared release-matrix checks pass before downstream work may treat packaging as complete.
+- [ ] **4.7a1 — Package an internal Windows installer.** Needs: R.0a, F.4b. — Package the declared Windows payload under the shared candidate rules; retain the workflow artifact and release-matrix rejection of undeclared targets. Signing and installation remain separate gates.
+- [ ] **4.7a2 — Package an internal macOS bundle and DMG.** Needs: R.0a, F.4b. — Package the declared macOS payload under the shared candidate rules; retain the workflow artifacts and release-matrix rejection of undeclared targets. Notarization and installation remain separate gates.
+- [ ] **4.7a3 — Package an internal Linux AppImage.** Needs: R.0a, F.4b. — Build the declared Linux payload under the shared candidate rules; retain the workflow artifact and release-matrix rejection of undeclared targets.
+- [ ] **3.5a — Enable the macOS signing identity (H-0015).** Needs: R.0a. — External Apple Developer enrollment as keypaste; repository-scoped Developer ID Application and notarization credentials; a runner identifies the certificate and signs, notarizes and staples a throwaway binary, retaining team ID and expiry. Enrollment alone does not complete 3.5b.
+- [ ] **3.6a — Enable the Windows signing identity (H-0017).** Needs: R.0a. — External organization-validated certificate or managed signing identity as keypaste, repository-scoped with no key retained beyond a job; on `windows-2025`, timestamp a throwaway binary, verify publisher with `signtool verify /pa /v` and reject a changed byte; retain issuer, timestamp authority and expiry. Enrollment alone does not complete 3.6b.
 - [ ] **3.5b — Sign and notarize macOS release payloads.** Needs: 3.5a, 4.7a. — Sign, notarize and staple, and fail closed when the identity is absent.
 - [ ] **3.6b — Sign Windows executables and installers.** Needs: 3.6a, 4.7a. — Authenticode-sign and timestamp the payloads and installer, and record the real install prompts.
 - [ ] **4.7b — Exercise native desktop installation candidates.** Needs: 4.7a, 4.6, 4.8, 4.9, 4.4b, 4.3b, E.1, F.1a, F.1b, F.1c, F.1e, F.2a, F.2b1, F.2b2, F.2c, F.2d, F.3a, F.3b, F.3c. — Install each candidate and complete first render, vault creation, editing, env run and approval on every supported target.
@@ -192,7 +153,7 @@ fixtures rather than a maintainer's temporary files.
 ### Create and safely edit a vault
 
 - [ ] **4.8 — Create a vault from the desktop.** Needs: 0.2, 4.1. — First-run Create/Open choice so a fresh install makes a working vault without a terminal.
-- [ ] **4.9 — Enter and edit an existing secret.** Needs: 4.8, 4.2. — Type or paste a real login or API value into the app and have it survive save, reopen and the CLI.
+- [ ] **4.9 — Enter and edit an existing secret.** Needs: 4.8, 4.2. — Type or paste a real login or API value into the app and have it survive save, reopen and the CLI. Fix the [URL/notes display defect](ui-review.md#window-and-text-behavior); a regression must preserve ordinary punctuation and line breaks while rejecting deceptive controls.
 - [ ] **V.1a — Support keyfiles in core and CLI unlock.** Needs: 0.2. — Supported KDBX keyfile forms for create, open and change-credentials.
 - [ ] **V.1b — Expose vault credentials in the app.** Needs: V.1a, 4.8. — Choose a keyfile and change the master password from the desktop, with the loss consequences stated.
 - [ ] **V.2a — Read and restore entry history in core.** Needs: 0.2. — Bounded history metadata and restoration that records the value it replaced.
@@ -257,9 +218,7 @@ fixtures rather than a maintainer's temporary files.
 
 ## Pilot ready
 
-The first managed pilot uses the published desktop app and extension. It must hide routine file
-management, preserve offline use and provide real device, recovery and service operations. Preparation
-can start earlier, but no external pilot begins before R.1 and the controls below pass.
+The first managed pilot uses the published desktop app and extension. It must hide routine file management, preserve offline use and provide real device, recovery and service operations. Preparation can start earlier, but no external pilot begins before R.1 and the controls below pass.
 
 ### Account, device and relay foundations
 
@@ -297,9 +256,7 @@ can start earlier, but no external pilot begins before R.1 and the controls belo
 
 ## Paid release
 
-Sell hosted convenience only after the pilot works. Local functions, security, signatures and
-self-hosted operation stay available without a subscription. The consumer offer includes a supported
-phone workflow; a desktop beta does not establish that claim.
+Sell hosted convenience only after the pilot works. Local functions, security, signatures and self-hosted operation stay available without a subscription. The consumer offer includes a supported phone workflow; a desktop beta does not establish that claim.
 
 - [ ] **5.5a — Complete payment owner enrollment (H-0018).** Needs: R.2. — Activate Stripe and supply scoped credentials; external account required.
 - [ ] **5.5b — Implement hosted subscription entitlement.** Needs: 5.5a. — Checkout, verified idempotent webhooks and relay-side entitlement, with local functionality independent of payment state.
@@ -322,13 +279,11 @@ phone workflow; a desktop beta does not establish that claim.
 
 ## Expansion
 
-Advanced parity is accepted after R.1; the other tracks activate at their stated prerequisites.
-Completing the consumer gate does not claim these features are available.
+Advanced parity is accepted after R.1; the other tracks activate at their stated prerequisites. Completing the consumer gate does not claim these features are available.
 
 ### Complete the KeePassXC behavior baseline
 
-Accepted scope, activating after R.1 and able to run alongside hosted work. P.0 prepares the behavior
-contract in Working proposition; P.9 forbids a parity claim while any promised behavior is unverified.
+Accepted scope, activating after R.1 and able to run alongside hosted work. P.0 prepares the behavior contract in Working proposition; P.9 forbids a parity claim while any promised behavior is unverified.
 
 - [ ] **P.1 — Support hardware-key challenge response.** Needs: P.0, V.1b. — Unlock with a supported hardware key, kept separate from online account MFA.
 - [ ] **P.2 — Support multiple vaults and auto-open.** Needs: P.0, V.1b, 4.8. — Several vaults open at once with separate locks and approval scopes.
@@ -388,8 +343,7 @@ Activate after R.2 and the selection of an authorized pilot organization and sco
 
 ## Scale
 
-Activate a step here by recording the observed requirement. None of these postpones a control already
-required for a pilot, consumer release or organization pilot.
+Activate a step here by recording the observed requirement. None of these postpones a control already required for a pilot, consumer release or organization pilot.
 
 - [ ] **S.1 — Expand service capacity from measurements.** Needs: R.3, H.9. — Fix one demonstrated bottleneck when measured load exceeds the declared budget.
 - [ ] **S.2 — Support managed desktop fleet deployment.** Needs: R.4, 4.7d. — Package one named OS and management system when a pilot organization needs MDM.
@@ -399,14 +353,9 @@ required for a pilot, consumer release or organization pilot.
 
 ## Completion and ID continuity
 
-A finished step has its artifact, a passing verifier and an evidence link naming the tested version.
-Record source, package, public and installation evidence separately: tests of compiled code do not
-establish public installation or live service operation, and a documentation edit completes nothing.
-A gate's transitive Needs must all pass, and further findings in its acceptance journey keep it open.
-The five transcript pages named in [CLAUDE.md](../CLAUDE.md) must pass `verify-demo.sh` when affected.
+A finished step has its artifact, a passing verifier and an evidence link naming the tested version. Record source, package, public and installation evidence separately: tests of compiled code do not establish public installation or live service operation, and a documentation edit completes nothing. A gate's transitive Needs must all pass, and further findings in its acceptance journey keep it open. The five transcript pages named in [CLAUDE.md](../CLAUDE.md) must pass `verify-demo.sh` when affected.
 
-Keep every ID traceable. These formerly large rows now select their first ready child when requested by
-their old ID:
+Keep every ID traceable. These formerly large rows now select their first ready child when requested by their old ID:
 
 | Previous ID | Current children / scope |
 |---|---|
@@ -418,6 +367,7 @@ their old ID:
 | 3.10 | 3.10a/b |
 | 4.3 | 4.3a/b |
 | 4.7 | 4.7a–d |
+| 4.7a | Aggregate of Windows 4.7a1, macOS 4.7a2 and Linux 4.7a3; downstream Needs still require all three |
 | 5.2 | 5.2a–c |
 | 5.3 | 5.3a–d |
 | 5.4 | 5.4a/b |
@@ -431,9 +381,7 @@ their old ID:
 | 9.3 | 9.3a/b |
 | 10.2 | Independent review before paid release; its earlier Scale placement no longer defers it |
 | F.2b | F.2b1/F.2b2; the wiring closed with F.2b1, the remaining per-OS observation is F.2b2 |
+| F.10 | Aggregate of diagnosis F.10a and repair F.10b; remains open until both verifiers pass |
+| F.11 | Aggregate of startup diagnosis F.11a and repair F.11b; promoted from the recorded KDF failure idea |
 
-An ID that still names an explicit row selects that row: historical 3.2b is the completed essay, not a
-child of the future announcement. H-0015/H-0017 are signing enrollment, H-0018 payment, H-0019 hosting,
-H-0011 the site's pre-deploy procedure, and H-0006/H-0007 public communication. Prior decisions
-H-0002/H-0004/H-0008/H-0009/H-0012/H-0013/H-0014 remain answered in DECISIONS; H-0010 was never issued.
-The preceding roadmap is retained in git; D-0090 supersedes its MVP/Launch/Scale pricing-tier ordering.
+An aggregate ID selects its first ready child while retaining the parent's completion gate. Other IDs that still name explicit rows select those rows: historical 3.2b is the completed essay, not a child of the future announcement. H-0015/H-0017 are signing enrollment, H-0018 payment, H-0019 hosting, H-0011 the site's pre-deploy procedure, and H-0006/H-0007 public communication. Prior decisions H-0002/H-0004/H-0008/H-0009/H-0012/H-0013/H-0014 remain answered in DECISIONS; H-0010 was never issued. The preceding roadmap is retained in git; D-0090 supersedes its MVP/Launch/Scale pricing-tier ordering.

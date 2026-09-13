@@ -1,28 +1,30 @@
 # The desktop app
 
-A window over the same vault the CLI reads. It opens a `.kdbx`, holds it while you are using it, and locks it when you are not.
+The desktop app opens the same `.kdbx` vaults as the CLI and locks its session when idle.
 
-## What it is not, yet
+<a id="what-it-is-not-yet"></a>
 
-**Approvals still happen in the terminal.** When an AI agent asks `keypaste-mcp` for a credential, the request goes to a `keypaste agent` you started in your own terminal. The Agent Activity screen currently reports whether that agent is running. The design is settled: the agent owns the approver pipe and the app will connect as a UI client (D-0054 in [DECISIONS.md](../DECISIONS.md#d-0054--the-agent-owns-the-approver-pipe-the-app-is-a-client-of-it)). The client channel and approval controls remain step 4.3 in [STEPS](STEPS.md).
+## Current limits
 
-**The desktop app is not published.** Build it from source, below. `app.yml` can package desktop archives on version tags, but keeps them as workflow artifacts; `release.yml` publishes the CLI/MCP downloads. See [RELEASE](RELEASE.md) for the distribution matrix and remaining desktop publication requirements.
+Approvals still happen in the terminal. When an AI agent asks `keypaste-mcp` for a credential, the request goes to a `keypaste agent` you started in your own terminal. The Agent Activity screen currently reports whether that agent is running. The design is settled: the agent owns the approver pipe and the app will connect as a UI client (D-0054 in [DECISIONS.md](../DECISIONS.md#d-0054--the-agent-owns-the-approver-pipe-the-app-is-a-client-of-it)). The client channel and approval controls remain step 4.3 in [STEPS](STEPS.md).
 
-**Entering an existing password or variable value still requires the CLI.** Adding one in the app generates its value. `keypaste add` and `keypaste env set` prompt for an existing value; secure desktop input is scheduled in step 4.9 of [STEPS](STEPS.md).
+The desktop app is not published. Build it from source, below. `app.yml` can package desktop archives on version tags, but keeps them as workflow artifacts; `release.yml` publishes the CLI/MCP downloads. See [RELEASE](RELEASE.md) for the distribution matrix and remaining desktop publication requirements.
+
+Entering an existing password or variable value still requires the CLI. Adding one in the app generates its value. `keypaste add` and `keypaste env set` prompt for an existing value; secure desktop input is scheduled in step 4.9 of [STEPS](STEPS.md).
 
 ## What the screens show
 
-**Entries** lists titles and groups. The group tree filters the list, and the search box matches titles and group paths case-insensitively; it does not search secret values. Selecting an entry shows its username, URL and notes. **An entry's password is never shown on this screen**: there is a Copy button, and `keypaste get --show` for the times you have to read one. You can edit the username, URL and notes inline, add an entry with a generated password, and delete one behind a confirmation, because there is no undo.
+Entries lists titles and groups. The group tree filters the list; search matches titles and group paths case-insensitively, excluding secret values. Selecting an entry shows its username, URL and notes, which can be edited inline. Passwords have a Copy button but are never displayed here; use `keypaste get --show` to read one. New entries receive generated passwords. Deletion requires confirmation and has no undo.
 
-**Env Sets** shows each project as a card with the `keypaste run <project> -- ` line that injects it, and a button to copy that line. Opening a card shows the project's variables as a masked table. **Hold a value to reveal it** — one at a time, for as long as you hold it, and gone the moment you let go, switch screens or lock. There is a Copy button on every row.
+Env Sets shows project cards with a copyable `keypaste run <project> -- ` command. Opening a card displays masked variables with Copy buttons. Hold a value to reveal it; only one can be visible, and releasing, switching screens or locking hides it.
 
-**Copying clears itself.** A copied secret leaves the clipboard after twenty seconds, with a countdown in the header and a Clear now button. It is cleared early if you lock, and before the app exits if you quit. It is left alone if you have copied something else since. Copying is a round trip through the windowing system, so if you lock or quit in the middle of one, the secret is taken back as soon as that round trip finishes — quitting waits for it, locking does not make you wait. Nothing clears it if the app is killed. A copied `keypaste run` line is not a secret and is never cleared, including when it lands after a lock.
+Copied secrets clear after twenty seconds, with a countdown and Clear now button. Locking or quitting clears them sooner unless another value has replaced the clipboard. If a copy is still in progress, cleanup waits for it to finish; quitting waits, while locking proceeds immediately. Killing the app prevents cleanup. Copied run commands remain on the clipboard because they contain no secret.
 
 ## Editing your vault
 
 Everything the app writes goes through the same core as the CLI. A fresh `keypaste ls`, `keypaste get`, `keypaste env ls` or `keypaste run` invocation reads the saved change from the same file. An already unlocked process, including a terminal approver, retains its in-memory copy until reopened. Both front ends use the serialization code exercised by the KeePassXC compatibility gate.
 
-**If something else changes the file while the app has it open, the app refuses to save and says so.** The app holds your vault in memory for as long as it is unlocked, so writing it back would revert whatever a terminal or KeePassXC wrote in the meantime — silently, and with no history entry to recover from, because the change was never in the app's copy. Nothing is written. Lock and unlock to pick up the other change, then make yours again.
+If the vault file changes while open, the app refuses to save its stale copy. Lock and unlock to load the external change, then reapply your edit. No data is written during the refusal.
 
 ## Building and running it
 
@@ -42,36 +44,29 @@ These are the native GUI prerequisites for the current packaging targets. Buildi
 
 | Platform | Native prerequisites |
 |---|---|
-| **Windows** | No separate browser engine or .NET runtime for a self-contained archive |
-| **macOS** | No separate browser engine or .NET runtime for a self-contained archive |
-| **Linux** | `libx11-6 libice6 libsm6 libfontconfig1`, and an X11 or XWayland session |
+| Windows | No separate browser engine or .NET runtime for a self-contained archive |
+| macOS | No separate browser engine or .NET runtime for a self-contained archive |
+| Linux | `libx11-6 libice6 libsm6 libfontconfig1`, and an X11 or XWayland session |
 
 Avalonia draws with Skia; the app does not embed WebKit or Chromium. The supported OS versions and Linux distribution baseline still need whole-package native verification in step 4.7b. A renderer's glibc baseline alone does not establish the app's support range.
 
 ## Opening a vault
 
-Three ways in, and all three end at the same place:
-
-- **Drag a `.kdbx` file onto the window.**
-- **Browse** (`Ctrl/Cmd+O`) for one.
-- **Pick one you have opened before** from the recent list.
+Open a vault by dragging a `.kdbx` onto the window, choosing Browse (`Ctrl/Cmd+O`), or selecting a recent vault.
 
 Whichever you use, the file's header is read before you are asked for a password, so a file that was never a vault is refused immediately rather than after you have typed. Vault creation currently uses `keypaste init`; the desktop app has no creation screen yet. [PRODUCT](PRODUCT.md#4-engineering-laws) §4.2 requires shared core logic, with neither front end waiting for the other.
 
 ## Locking
 
-**The vault locks after five minutes of no keyboard and no mouse.** Change it in Settings, between one minute and eight hours; the choice is read back at every launch, so it is the timeout in force rather than the one on the screen. There is deliberately no "never" — a setting that turned the feature off would be the one everybody chose the first time the countdown interrupted them, and an unattended machine is the threat idle locking exists for.
+The default idle timeout is five minutes without keyboard or mouse input. Settings accepts one minute to eight hours and persists the choice across launches. Idle locking cannot be disabled.
 
 Thirty seconds before it locks, a quiet line appears in the header. Any key or click cancels it.
 
-**Locking now is always one keystroke:** `Ctrl/Cmd+L`, or the button at the bottom of the sidebar. That is the honest counterweight to a five-minute default.
+`Ctrl/Cmd+L` or the sidebar Lock button locks immediately.
 
-**Minimizing can lock too, if you ask it to.** The checkbox in Settings is off by default, because minimizing is not a security event for most people; for the few whose minimize means "I am leaving", it is one tick and it takes effect at once and at every launch afterwards. It is the ordinary lock, not a special one: the shell leaves the window, a copied password comes off the clipboard, and restoring shows the unlock screen. It is only a minimize — switching to another window is not one, and on macOS hiding the app with `Cmd+H` is not one either.
+Settings can enable lock-on-minimize; it is off by default and persists across launches. Minimizing then closes the unlocked view, clears copied secrets and restores to the unlock screen. Switching windows and macOS `Cmd+H` do not count as minimizing.
 
-Two behaviours worth knowing:
-
-- **Switching to another window does not lock**, and does not pause the countdown either. Alt-tabbing to a terminal is normal; leaving for ten minutes is not.
-- **A machine that slept through the timeout wakes locked.** The countdown reads both the wall clock and the monotonic clock and takes whichever says longer, and it is re-checked when the window is activated — because a timer scheduled on a monotonic clock that slept too would simply never fire.
+Switching windows leaves the vault unlocked and its idle countdown running. A machine that sleeps past the timeout wakes locked. The app takes the greater elapsed time from wall and monotonic clocks and rechecks on activation, covering platforms where a monotonic clock pauses during sleep.
 
 Locking disposes the desktop vault session and clears its visible entry state. You type your password again to reopen it. This does not lock a separate terminal approver or erase immutable strings and external copies; see [SECURITY](../SECURITY.md) for memory and clipboard limits.
 
@@ -93,110 +88,82 @@ On macOS the modifier is Cmd; everywhere else, Ctrl.
 
 ## Files it keeps, and how to delete them
 
-Both live in `~/.keypaste`, beside the audit log and the policy file, and neither travels with your vault — they describe **this machine**. `KEYPASTE_HOME` moves them.
+The app keeps machine-specific settings in `~/.keypaste`, alongside the audit log and policy. They do not travel with the vault. `KEYPASTE_HOME` changes the directory.
 
 | | |
 |---|---|
-| `recent.toml` | The vaults you have opened here. Paths only — no entry names, no secrets |
+| `recent.toml` | The vaults you have opened here. Paths only; no entry names or secrets |
 | `app.toml` | Idle timeout, theme, lock-on-minimize |
 
-`recent.toml` records a vault **only after it opens successfully**, so a file you were sent and could not open leaves no trace. It holds at most ten, most recent first. Remove one from the list in the app, clear the whole list in Settings, or delete the file. On Linux and macOS it is written owner-only; on Windows it inherits your profile's permissions, which is the same protection `audit.jsonl` already relies on.
+`recent.toml` records a vault only after it opens successfully, so a file you were sent and could not open leaves no trace. It holds at most ten, most recent first. Remove one from the list in the app, clear the whole list in Settings, or delete the file. On Linux and macOS it is written owner-only; on Windows it inherits your profile's permissions, which is the same protection `audit.jsonl` already relies on.
 
-Both files fail closed: if either is unreadable, the app uses its defaults and **does not overwrite what it could not read**, so a file you are part-way through editing by hand survives.
+Unreadable settings files cause the app to use defaults without overwriting the files.
 
-Paths in `recent.toml` are written with forward slashes, including on Windows. That is not cosmetic — the reader keypaste uses refuses a backslash inside a value, deliberately, so that a pattern in `policy.toml` cannot be written one way and mean another. The app writes `C:/Users/…` rather than weakening that rule for every file.
+The app writes forward slashes in `recent.toml`, including `C:/Users/…` on Windows. Its shared parser rejects backslashes so authorization patterns cannot render differently from their meaning.
 
 ## The Log screen
 
-It shows the same table `keypaste log` prints, from the same `~/.keypaste/audit.jsonl`, rendered by the same code — not a second implementation that could drift (DECISIONS.md D-0032). It needs no unlocked vault, because the audit log is a record of this machine rather than of your vault. "Verify chain" shows what the hash chain says about the file.
+The Log screen reads `~/.keypaste/audit.jsonl` through the same renderer as `keypaste log` (DECISIONS.md D-0032). It needs no unlocked vault. Verify chain checks the audit hash chain.
 
 A missing log is normal before the MCP bridge has initialized one. Requests and bridge events populate it; opening the desktop Log screen does not require a prior credential release.
 
-## What you should know about the master password
+<a id="what-you-should-know-about-the-master-password"></a>
 
-The field you type it into is not a text box, and that is deliberate: Avalonia's `TextBox` exposes its contents through the accessibility layer with no exception for password fields, and keeps an undo history of `string`s that cannot be wiped. The control here holds no password at all — it reports one character at a time to a buffer that is wiped on every path out, and its accessibility peer exposes nothing.
+## Master-password input
 
-What reaches the accessibility layer is the placeholder and the row of dots — the number of characters you have typed, never which ones — and that is a test rather than a claim.
+The password control sends characters directly to a buffer wiped on every exit path. It avoids Avalonia `TextBox`, which exposes contents to accessibility and retains immutable strings in undo history. Its accessibility peer exposes no password content.
 
-**One honest limit, and one gap.** Each keystroke arrives as a short-lived string the runtime will not let us wipe, and an input method can deliver several at once. That is narrower than a field holding your password for as long as the window is open, and it is not nothing. The gap: `Ctrl/Cmd+V` does nothing in this field, because nothing in the app reads clipboard text. `SECURITY.md` carries the full account.
+Tests check that accessibility exposes only the placeholder and character-count dots.
+
+Keystrokes still arrive as short-lived immutable strings, and an input method can send several characters at once. `Ctrl/Cmd+V` is unsupported because the app does not read clipboard text. `SECURITY.md` describes these memory and input limits.
 
 ## Checking a build by hand
 
 CI builds and packages on three operating systems; the current desktop logic tests do not verify rendered pixels. Rendering coverage remains step 4.6, and native installation checks remain step 4.7b. Use a disposable vault with harmless test values for this manual checklist before any release that includes the app:
 
 1. Launch with no `recent.toml`: the empty state names `keypaste init` and does not look broken.
-2. Open a vault by drag, and again by the picker. A non-`.kdbx` file is refused **before** the password field.
+2. Open a vault by drag, and again by the picker. A non-`.kdbx` file is refused before the password field.
 3. Wrong password: a calm message, still locked, and nothing added to `recent.toml`.
 4. Right password: the shell appears, and the vault is now in `recent.toml`.
-5. **Keyboard only** — launch, type, Enter, reach all five destinations, lock with `Ctrl/Cmd+L`, without touching the mouse.
-6. Set the timeout to one minute and wait: the countdown appears, typing cancels it, leaving it alone returns you to the unlock screen. Quit, relaunch and wait again without opening Settings — still one minute.
+5. Complete launch, unlock, all five destinations and `Ctrl/Cmd+L` using only the keyboard.
+6. Set a one-minute timeout. Check that the countdown appears, typing cancels it, and inactivity locks. Quit and relaunch without opening Settings; the timeout must remain one minute.
 7. Suspend the machine for longer than the timeout. It wakes locked.
 8. The theme follows the OS, and both light and dark read as calm. Choose Dark, quit and relaunch: the first frame is dark, with no flash of the light one on the way.
-9. Put a number the list does not offer into `app.toml` by hand — `idle_timeout_seconds = 137` — and relaunch. Settings names it, the countdown arrives at 137 seconds, and the file is unchanged afterwards.
-10. **Minimize-lock, with the idle timeout set long enough that it cannot be what locked you.** Tick
-    "Lock when the window is minimized", minimize from the taskbar and restore: the unlock screen.
-    Untick it, minimize and restore: still unlocked, and the countdown still arrives on time. Quit,
-    relaunch without opening Settings and minimize again: it locks. Copy a password first and paste
-    after a minimize-lock — nothing. `docs/STEPS.md` F.2b2 records what each operating system did;
-    macOS and Linux are still unobserved, and the section below is how to observe them.
+9. Set `idle_timeout_seconds = 137` in `app.toml` and relaunch. Settings must display it, locking must occur at 137 seconds, and the file must remain unchanged.
+10. Set a long idle timeout to isolate minimize locking. Enable "Lock when the window is minimized", minimize and restore: expect the unlock screen. Disable it, minimize and restore: expect an unlocked vault and a running idle countdown. Enable it again, quit and relaunch without opening Settings; minimizing must lock. A password copied before locking must no longer paste. `docs/STEPS.md` F.2b2 owns platform results; macOS and Linux remain unobserved.
 11. The Log screen matches `keypaste log` for the same `~/.keypaste/audit.jsonl`.
 12. Agent Activity says the right thing both with and without a `keypaste agent` running.
 13. Entries lists titles and groups. Filter by a group and search for part of a title or group path; case changes still match. Selecting an entry shows a username, a URL and notes, and a row of dots where the password is.
-14. Copy a password. The countdown appears and the bar drains. Paste into an editor — it is there.
-    Wait it out and paste again — it is gone.
+14. Copy a password and check the countdown and progress bar. It must paste before the timeout and be absent afterward.
 15. Copy, then `Ctrl/Cmd+L`. Paste: nothing.
 16. Copy, then quit the app. Paste: nothing.
-17. **Windows only, on a machine where Clipboard History is enabled and not disabled by policy**:
-    copy a known harmless string and confirm Win+V shows it — that is the control. Then copy a
-    password from the app and open Win+V: the value is not in it. `keypaste get` sets the same
-    formats since D-0056; whether that holds on a real machine is step 1.5a's Verify line in
-    `docs/STEPS.md`, not this list.
-18. Hold a masked value in Env Sets. The characters appear; release and they go. Hold a second row
-    while the first is showing — only one is ever revealed.
-19. Copy a project's run command, paste it in a terminal, finish the line: it runs with the
-    project's variables.
+17. On Windows with Clipboard History enabled and permitted by policy, copy a harmless control string and confirm Win+V contains it. Then copy an app password and check that Win+V excludes it. `keypaste get` has set the same formats since D-0056; native CLI verification belongs to step 1.5a in `docs/STEPS.md`.
+18. Hold an Env Sets value to reveal it, then release to hide it. Holding another row must reveal only that row.
+19. Copy a project's run command, paste it in a terminal, finish the line: it runs with the project's variables.
 20. Add, edit and delete an entry, then check `keypaste ls` and `keypaste get` in a terminal.
-21. With the app open on a vault, run `keypaste env set` against the same file in a terminal. Come
-    back and make any edit: the app refuses, says why, and the terminal's write is still there.
+21. With the app open on a vault, run `keypaste env set` against the same file in a terminal. Come back and make any edit: the app refuses, says why, and the terminal's write is still there.
 22. Generate a password in the app, then read it back with `keypaste get --show`.
 23. Open the vault the app wrote in KeePassXC.
 
 ## Observing minimize-lock on macOS and Linux
 
-Item 10 above has been run on Windows. The same three cases have to be run on the other two
-advertised targets, because a headless suite can drive a window's state and cannot tell you what a
-window manager reports. `docs/STEPS.md` F.2b2 is the task and owns the result; this is the recipe,
-written down so nobody has to work it out twice.
+Item 10 has been observed on Windows. macOS and Linux require native checks because headless tests cannot establish what their window managers report. `docs/STEPS.md` F.2b2 owns the results.
 
-**Get a build onto the machine.** Either download the seven-day `app-<rid>` artifact from an
-`app.yml` run, or publish one:
+Download the seven-day `app-<rid>` artifact from `app.yml`, or publish locally:
 
 ```
 dotnet restore keypaste.app.slnx --locked-mode
 dotnet publish src/Keypaste.App -c Release -r osx-arm64 --self-contained --no-restore -o artifacts/app/osx-arm64
 ```
 
-`linux-x64` for the other. Never pass `-r` to `restore`: it narrows the project's RID set to one and
-a locked restore then fails (D-0040). Linux also needs `libx11-6 libice6 libsm6 libfontconfig1` and
-an X11 or XWayland session.
+`linux-x64` for the other. Never pass `-r` to `restore`: it narrows the project's RID set to one and a locked restore then fails (D-0040). Linux also needs `libx11-6 libice6 libsm6 libfontconfig1` and an X11 or XWayland session.
 
-**Run these three, with the idle timeout set long enough that it cannot be what locked you.** Use a
-disposable vault.
+Use a disposable vault and set an idle timeout long enough to exclude it as the cause of locking.
 
-1. **Enabled.** Tick "Lock when the window is minimized". Minimize the way somebody actually would
-   on that desktop — the yellow button on macOS, the titlebar button or the window menu on Linux —
-   and restore. Expected: the unlock screen, and a password copied beforehand no longer pastes.
-2. **Disabled.** Untick it, minimize and restore. Expected: still unlocked, and the idle countdown
-   still arrives on time.
-3. **After a restart.** Tick it, quit, relaunch without opening Settings, minimize. Expected: it
-   locks, and `app.toml` is unchanged afterwards.
+1. Enable "Lock when the window is minimized". Use the macOS yellow button or the Linux titlebar/window-menu minimize action, then restore. Expect the unlock screen and a cleared copied password.
+2. Disabled. Untick it, minimize and restore. Expected: still unlocked, and the idle countdown still arrives on time.
+3. After a restart. Tick it, quit, relaunch without opening Settings, minimize. Expected: it locks, and `app.toml` is unchanged afterwards.
 
-**Also confirm what it is not.** Switching to another window is not a minimize. On macOS, `Cmd+H`
-is not a minimize either — `Cmd+M` is. Neither should lock.
+Switching windows must leave the app unlocked. On macOS, `Cmd+H` hides the app and must also leave it unlocked; `Cmd+M` minimizes it.
 
-**Record, in the F.2b2 row, the shape the F.2b1 row already uses:** the operating system's name,
-version and build; the session type (macOS, X11, or Wayland with XWayland, and the desktop
-environment); the app build or tag; and what each of the three cases actually did. If a window
-manager reports no minimize at all, that is the result — say so, and change
-`MinimizeLock.IsSupported` so the checkbox is omitted there rather than offered where it does
-nothing. An untested target keeps its unobserved status.
+Record the OS name, version and build; session type and desktop environment; app build or tag; and each result in F.2b2, following F.2b1. If a window manager reports no minimize event, record that result and update `MinimizeLock.IsSupported` to omit the unsupported checkbox. Untested targets remain unobserved.

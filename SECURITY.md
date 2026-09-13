@@ -1,207 +1,106 @@
-# Security Policy
-
-keypaste handles secrets. Trust is the only asset the project has, so security reports are treated as the highest-priority work in the repository.
+# Security policy
 
 ## Reporting a vulnerability
 
-**Email `security@keypaste.com`.** Please do not open a public issue, discussion, or pull request for a security problem.
+Email `security@keypaste.com` with the affected version or commit, a description, reproduction steps or proof of concept, and the expected impact. Reports in any language and anonymous reports are welcome. Do not use public issues, discussions or pull requests for vulnerabilities.
 
-Include whatever you have: affected version or commit, a description of the issue, reproduction steps or a proof of concept, and the impact you believe it has. Reports in any language are fine.
+| Response | Target |
+|---|---|
+| Acknowledgement | Within 72 hours |
+| Initial assessment | Within 7 days |
+| Fix or mitigation plan | Communicated when available, with a timeline |
+| Coordinated disclosure | Up to 90 days, shortened by agreement or active exploitation |
 
-If you would rather report anonymously, that is fine too — no identifying information is required, and no report will be ignored for lack of it.
+Security reports receive the highest priority. Credit in advisories and the changelog is optional; there is no bug bounty. Breaches and serious shipped bugs receive prompt, full disclosure covering the incident, exposure and changes, as required by PRODUCT §3.10. All security-relevant fixes are disclosed.
 
-## What to expect
-
-| | |
-| --- | --- |
-| Acknowledgement | within 72 hours |
-| Initial assessment | within 7 days |
-| Fix or mitigation plan | communicated as soon as it exists, with an honest timeline |
-| Coordinated disclosure | up to 90 days, shortened by agreement or if the issue is being exploited |
-
-You will be credited by name or handle in the advisory and changelog if you want to be, and left out if you do not.
-
-There is no bug bounty. keypaste is pre-1.0 and unfunded; this is stated plainly rather than implied by silence.
-
-## Disclosure commitment
-
-Per docs/PRODUCT.md §3.10: if keypaste is breached, or a serious bug ships, it will be disclosed fast and fully — what happened, what was exposed, what changed. No quiet patches for security-relevant bugs.
-
-## Scope
-
-In scope: anything in this repository — the core library, the CLI, the MCP bridge, the desktop app, the build and release pipeline, and the dependency chain on the secret path.
-
-The agent bridge has its own threat model in [THREATS.md](THREATS.md): prompt injection through entry names, confused-deputy attacks by a client that cannot be authenticated, audit log tampering, and what the locked-vault posture of the current version does and does not buy. It is explicit about which of those are mitigated today and which are still open, and it does not repeat what is here.
-
-Also in scope: the signup endpoint on keypaste.com — `site/src/worker.js` and everything it touches. It accepts other people's email addresses and stores them, so an injection, an authz mistake, or a way to read the list back is exactly the report we want. The static content of that site is out of scope, as is any deployment of keypaste that a third party operates. Vulnerabilities in upstream dependencies should be reported upstream first; tell us too, so the pinned version can be moved.
+Reports cover this repository, its build and release pipeline, and dependencies on the secret path. The signup endpoint at `site/src/worker.js` is also in scope because it stores email addresses. Static site content and third-party deployments are outside this reporting scope. Report upstream dependency vulnerabilities upstream and here; vendored patches must be merged manually.
 
 ## Supported versions
 
-The behavior described below is the current source on `main`. The public CLI/MCP release is
-`v0.2.0`.
+This page describes current source behavior unless a release is named. The public CLI/MCP release is `v0.2.0`; the desktop is available from source and has no public release. [RELEASE.md](docs/RELEASE.md) records distribution status.
 
-**If you installed `v0.1.0`, replace it.** In that release: env export can delete your vault;
-env rm and env set can act on the wrong entry; get can return the wrong password; env pull can
-delete an edit it never imported; and moving the clock back can revive an expired approval.
-All of those are fixed in `v0.2.0`
-([what changed](CHANGELOG.md#020)). The `v0.1.0` archives are still served and still carry every
-one of those defects: a published version is never rewritten here, so upgrading is the only fix.
+Replace `v0.1.0`: env export can delete your vault; env rm and env set can act on the wrong entry; get can return the wrong password; env pull can delete an edit it never imported; moving the clock back can revive an expired approval. These defects are fixed in `v0.2.0` ([changelog](CHANGELOG.md#020)). Published archives are immutable, so the old downloads remain affected.
+
 <!-- defects:0.2.0 -->
-**`v0.2.0` carries two known defects of its own.** In that release,
-saving while another program saves the same vault can undo its change.
-keypaste waits a moment and retries when it cannot write immediately, and if what it was waiting
-for was another program finishing its own save, it then writes its own copy over the top. What the
-other save added is not in the entry's history and is not recoverable. It needs two saves of one
-vault within about two seconds, which is what a password manager and an agent sharing a vault do.
-Separately, on Windows 11 24H2 and Windows Server 2025, a save can fail when another keypaste or KeePass program is saving at the same time.
-Those Windows builds refuse a temporary name while another transaction holds one sharing its short
-8.3 alias, and every KeePass-family program builds that name the same way — so an unrelated vault,
-or KeePass itself, is enough. keypaste retries for about two seconds and then reports that it could
-not save. Nothing is written and nothing is lost; the save has to be repeated. Older Windows builds
-accept the name and are unaffected.
-Separately again, an agent asking for entry names on a loaded machine can be told to start keypaste agent for a process that is already running.
-The bridge gives the approver half a second to answer a connection, and under load that budget can
-pass while an approver is running and its listener is bound; the refusal keypaste returns is then the
-one written for no approver at all. No credential is released, nothing is written and no entry name
-is disclosed — what is wrong is the advice. `v0.1.0` has the first two. Those two are fixed on
-`main` and in no published version yet; the third is being measured before it is repaired, because
-the overrun is five to eleven times the budget and widening the budget would not have prevented it.
+`v0.2.0` has three disclosed defects. In that release, saving while another program saves the same vault can undo its change. A retry can overwrite the other program's save with Keypaste's older copy; the lost change has no history entry. The condition requires overlapping saves within about two seconds.
+
+In the same release, on Windows 11 24H2 and Windows Server 2025, a save can fail when another keypaste or KeePass program is saving at the same time. A transaction can reserve a temporary name's 8.3 alias even for an unrelated vault. After about two seconds of retries, Keypaste reports failure without committing the save. Older Windows builds accept the name.
+
+Also, an agent asking for entry names on a loaded machine can be told to start keypaste agent for a process that is already running. The connection budget can expire before the bridge tries the pipe. The request releases no credential or entry names and writes nothing. `v0.1.0` has the first two defects. Repairs for all three are in `main` and remain unreleased; see the Unreleased changelog and STEPS F.6/F.9.
 <!-- /defects:0.2.0 -->
 
-The desktop app is available from source and has no public release. See the
-[release contract](docs/RELEASE.md) for platform and publication status.
-
-| Version | Supported | Notes |
+| Version | Supported | Status |
 |---|---|---|
-| `main` | Yes | Always the first thing a fix lands on |
-| `0.2.x` | Yes | The current release line |
-| `0.1.x` | No | Superseded, and carries the data-loss defects above |
-| Anything older | No | There is nothing older yet |
+| `main` | Yes | Fixes land here first |
+| `0.2.x` | Yes | Current release line |
+| `0.1.x` | No | Superseded; affected by the defects above |
 
-Pre-1.0, this is a short table on purpose. There is no long-term support line and there will not be one before 1.0; a fix goes onto `main` and into the next tag, and older tags are not patched.
+There is no long-term support line before 1.0. Fixes enter `main` and the next release; older tags remain unchanged.
 
 ## Verifying a release
 
-CLI/MCP binaries are published to `https://dl.keypaste.com/v<version>/`, with a `SHA256SUMS` file, a per-asset `.sha256`, and the corresponding source for that tag (AGPL-3.0 section 6). They are produced by `.github/workflows/release.yml`, which checks the NativeAOT build and runs the behavioral gates applicable to each platform, including both directions of the KeePassXC compatibility check against the exact binary it uploads. The unit suites run in `ci.yml` on the same commit, against an ordinary build. Desktop CI artifacts are not public releases; their remaining distribution work is recorded in [docs/RELEASE.md](docs/RELEASE.md).
+CLI/MCP downloads at `https://dl.keypaste.com/v<version>/` include `SHA256SUMS`, per-asset `.sha256` files and corresponding source. `release.yml` tests the NativeAOT binaries it uploads, including KeePassXC compatibility in both directions. `ci.yml` runs the unit suites against an ordinary build of the same commit. Desktop artifacts have the separate publication requirements in [RELEASE.md](docs/RELEASE.md).
 
-Two things to know before you rely on that:
+The binaries are unsigned and un-notarized. Gatekeeper and SmartScreen behavior depends on the download path, machine and reputation. README documents the macOS quarantine limitation and manual workaround; its install blocks preserve quarantine. Signing and notarization remain O-0010. A Windows signature identifies a publisher but does not guarantee reputation-based prompts disappear.
 
-**The binaries are unsigned and un-notarized.** macOS Gatekeeper and Windows SmartScreen may warn or block them; the observed result depends on the download path, machine and reputation. The README describes the macOS quarantine limitation and a manual workaround; its install blocks do not remove quarantine. Signing and notarization remain O-0010 in [DECISIONS.md](DECISIONS.md), with publication requirements in [docs/RELEASE.md](docs/RELEASE.md). A future valid Windows signature will identify the publisher but cannot guarantee the absence of reputation prompts.
+Checksums detect corrupted or truncated downloads. Because the archive and checksum share an origin, an attacker who replaces both defeats that check. Independent provenance verification is still pending. README documents building from source with dependencies pinned by content hash in `packages.lock.json`.
 
-**The checksum proves integrity, not authenticity.** It is served from the same origin as the archive, so anyone able to replace one can replace the other. It protects against a corrupted or truncated download and against nothing else. Verifying provenance needs a signature, which does not exist yet. If you want the strongest available assurance today, build from source — the instructions are in the README and the dependency closure is pinned by content hash in `packages.lock.json`.
+## Security boundaries
 
-The release pipeline is in scope for reports, as the section above says.
-
-## Design commitments worth knowing before you test
-
-These are constitutional (docs/PRODUCT.md §3) and a violation of any of them is a valid report:
-
-- The vault master key never leaves the local process.
-- Agents never receive the vault — only one credential, one scope, one TTL, after explicit human approval or a policy the human wrote. Default is deny.
-- Every agent access is logged locally, immutably, in human-readable form.
-- No secret ever touches disk unencrypted by keypaste's doing.
-- No telemetry on secret content or entry names, ever.
-- All cryptography comes from mature audited libraries implementing the KDBX4 spec. No custom cryptography is written here.
-- Every error path in the agent bridge results in denial, not exposure.
+[PRODUCT §3](docs/PRODUCT.md) owns the security laws. The master key stays in the local process. Agent releases require human approval or a user-written policy, are limited to an authorized field and lifetime, and require a local audit record. Errors deny release. Keypaste uses library cryptography and collects no telemetry on secret content or entry names. Explicit plaintext export has the limits described below. [THREATS.md](THREATS.md) records the threat model, mitigations and residual risks.
 
 ### The desktop app's master password field
 
-The GUI is weaker here than the CLI is, in a way worth stating plainly rather than leaving to be discovered.
+`ConsoleSecretPrompt` reads characters into a clearable buffer without forming a password string. Desktop input arrives from Avalonia as immutable strings that cannot be wiped, including multi-character input-method events. The OS keyboard layer, input methods and keyloggers remain outside this boundary.
 
-`ConsoleSecretPrompt` never forms a `string` at all: it reads the terminal a character at a time into a buffer that is overwritten when it is done. The desktop app cannot match that exactly, because its characters arrive from the toolkit as `string`s the runtime will not let anyone wipe.
-
-What the app does do:
-
-- **The password is not typed into a `TextBox`.** Avalonia's `TextBoxAutomationPeer` returns the control's text through the accessibility layer with no exception for password fields, and `Avalonia.FreeDesktop.AtSpi` — a session-bus service — is in the app's dependency closure. A `TextBox` master password would be readable by another process on the same machine. `TextBox` also keeps an undo stack whose entries each hold a `string`, which is a retained history of partial passwords.
-- **The control holds no password.** `MaskedInput` reports one character at a time and stores nothing; what it draws is derived from a count. Its accessibility peer implements no value pattern, and what does reach the accessibility bus is the placeholder and the row of dots — a function of how many characters you have typed and not of which ones. That is a test rather than a description: two passwords of the same length sharing no character produce an identical accessibility surface.
-- **The buffer lives in a view model that is disposed on every path out** — a successful unlock, a wrong password, and locking — and disposal overwrites it. The wrong-password path is the one that happens most and it is covered by a test.
-- **The password reaches Argon2 as a span**, never as a string, so no copy of the whole password is made on the way in.
-
-What remains, measured rather than assumed:
-
-- **Each keystroke arrives as a one-character `string`** that cannot be wiped and lives until the garbage collector reclaims it.
-- **Several characters can arrive in one `string`** — an input method or a compose sequence delivers them together, and that string cannot be wiped either. **`Ctrl/Cmd+V` in the master-password field does nothing today.** The field is not a `TextBox` and no code path in the app reads clipboard text, so there is no paste to support or to refuse; an earlier version of this page said pasting was supported, which was not true of this field. Restoring it is an open item in `DECISIONS.md`, and if it returns it will arrive as one unwipeable `string` the way it does everywhere else.
-- Anything below the toolkit — the OS keyboard layer, the input method, a keylogger — is outside this boundary and always was.
+The desktop uses `MaskedInput` instead of `TextBox`, whose automation peer and undo history can expose or retain text. The control stores a character count and reports characters to the view model. Its accessibility surface exposes the placeholder and mask length without a value pattern; different passwords of the same length produce the same surface. The view model clears its buffer after successful unlock, wrong-password failure and locking. Argon2 receives a span without an additional complete password string. Clipboard paste is currently unsupported in this field.
 
 ### Values the desktop app shows, and values it copies
 
-The app puts vault contents on screen. Which contents, and when, is a decision rather than an accident, and it is held by a test rather than by this paragraph.
+Entry lists show titles and groups. Selecting an entry shows its username, URL and notes. The Entries screen never displays its password; Copy reads it from the vault when requested. `keypaste get --show` provides explicit display. An environment value can be revealed individually while held. Its control avoids publishing the value through a `TextBlock` automation name, but screenshots, recordings, remote desktops and nearby observers can capture the visible value.
 
-- **An entry list shows titles and groups.** Not usernames, not URLs — that is what `keypaste ls` prints, and a list is read over shoulders and photographed for marketing.
-- **Selecting an entry shows its username, URL and notes.** One entry, chosen by you.
-- **An entry's password is never shown on the Entries screen, in any state.** The Copy button reads it out of the open vault at the moment you press it and hands it to the clipboard; it does not become anything the window can draw. To read one, use `keypaste get --show`.
-- **An environment value can be revealed by holding it**, one at a time, for as long as you hold it. Comparing a stored value against a `.env` file is a real task, and a product that could only copy would push people into pasting secrets into a text editor to read them. The control that draws it is not a `TextBlock` — a `TextBlock` publishes its text to the accessibility layer as the element's name, which is the same read path as a `TextBox`'s value with a different label on it. What it cannot defend against is your screen: a screenshot, a recording, a shared call, a remote-desktop session, or somebody behind you.
+Copied secrets are cleared after twenty seconds if the clipboard still contains the copied value. Locking, quitting and Clear now also clear them. A pending clipboard write is cleared when it completes; quitting waits for that handoff. Forced termination, crashes, power loss and logout can leave a copied value behind.
 
-**Copying, and clearing.** A copied secret is taken back off the clipboard after twenty seconds, and only if the clipboard still holds it — something you copied since is left alone. It is also cleared when the vault locks — the idle timeout, `Ctrl/Cmd+L`, and minimizing the window if you asked for that in Settings — and before the app exits when you quit it. If the windowing system has not finished handing over the copy at that instant, it is taken back the moment it does rather than before, which is the closest a program can get to "immediately"; quitting waits for that hand-over, because nothing would be left to. None of that survives the app being killed: `kill -9`, End Task, an out-of-memory kill, a power cut and a logout all leave the value where it is, because nothing is left running to take it away.
-
-**On Windows, both front ends keep the value out of Clipboard History.** Clipboard History (Win+V) and Cloud Clipboard keep a copy that clearing does not remove, so a copied password could otherwise outlive its twenty seconds and, through cloud sync, the machine. Both the app and `keypaste get` now mark what they copy with the formats that ask Windows to skip it — the app through the window it owns (D-0046), the CLI through a direct Win32 write that replaced `clip.exe`, which had no way to say it (D-0056). **These formats are a request to well-behaved consumers, not an enforcement boundary**, and Windows does not restrict who may read the clipboard. First-party Clipboard History and Cloud Clipboard honour them. A third-party clipboard manager decides for itself and most do not, and RDP and Citrix redirection hand the value to another machine whose history neither front end can reach.
+Both Windows front ends request exclusion from Clipboard History and Cloud Clipboard. First-party consumers honor those formats; third-party managers can ignore them, and RDP or Citrix can copy the value to another machine. Windows does not restrict which local process may read the clipboard. Keypaste sets no equivalent history-exclusion marking on macOS or Linux (O-0019). On X11 and Wayland, `xclip` or `wl-copy` can continue serving the value after Keypaste exits.
 
 ### Editing your vault from the app
 
-A vault the app writes is a vault the CLI wrote: the same code, in the same library, producing the same format. The KeePassXC compatibility gate that covers one covers the other, and a test asserts the app has no other route to a vault file so that stays true.
+The app and CLI write through the same core library and KeePassXC compatibility boundary. If the file changes while the app holds an unlocked copy, the app refuses to save. Lock and unlock to load the other change before making yours again. This protects changes absent from the app's in-memory history.
 
-**If something else changes the file while the app has it open, the app refuses to save.** It holds your vault in memory for as long as it is unlocked, and writing it back would revert anything a terminal or KeePassXC wrote in the meantime — with no history entry, because the change was never in the app's copy. You are told, and nothing is written. Lock and unlock to pick up the other change, then make yours again.
+## Memory and authorization limits
 
-## What keypaste does NOT protect against
+Clearable master-password buffers and zeroed derived bytes reduce retention without guaranteeing in-memory secrecy. Garbage collection can leave relocated copies; immutable strings, swap, hibernation and dumps can retain values. A debugger or process running as the same user can inspect memory. Keypaste does not use `SecureString`, which does not encrypt memory on Linux or macOS.
 
-Stated plainly, because a security tool that overclaims is worse than one that is modest.
+Human-approved fields are cached in a clearable buffer for the grant lifetime, up to `--max-ttl` (five minutes by default). Expiry, disconnect and disposal clear owned buffers, and lookup checks expiry before returning a value. Wall and monotonic clocks jointly prevent a clock rollback or suspension from extending the grant. The original vault value was an immutable string, and the released value crosses a local pipe as plaintext into the MCP client. Keypaste cannot erase the client's copies, revoke the credential at its issuer or invalidate sessions created with it. Policy releases are evaluated on each request and do not populate this cache.
 
-**In-memory secrecy is not claimed.** keypaste keeps master passwords in a clearable `char[]` rather than a `string`, and zeroes the derived bytes after use. That narrows the window and reduces the number of copies; it is not a boundary. The garbage collector may relocate a buffer and leave an unreachable copy behind, values can reach swap, hibernation files or a core dump, a debugger or any process running as the same user can read them, and some values necessarily become immutable strings anyway. `SecureString` is deliberately not used: it does not encrypt on Linux or macOS, so it would read as a guarantee it cannot provide.
+Entry resolution currently materializes standard fields, including passwords, through `Vault.ReadEntries` before approval. Authorization restricts the field released in the response; denial does not establish that the approver never read a secret into memory. `keypaste agent` keeps its vault unlocked until it stops and has no idle auto-lock.
 
-**This applies to approved credentials too, and for longer.** When you approve an agent's request, `keypaste agent` caches that field's value in a clearable buffer for the grant lifetime — up to `--max-ttl`, five minutes by default — so a repeat request does not have to ask you again. An expiry timer clears the owned buffer, and cache lookup checks expiry before returning a value; disconnect and disposal also clear the cache. That lifetime is measured on two clocks and ends on whichever has run further, so neither moving your computer's clock backwards nor suspending the machine extends it. But the value reached that buffer as an ordinary immutable string out of the vault, and that copy cannot be cleared. It also crosses a local pipe in plaintext and arrives in the MCP client's process, where keypaste has no say in what happens to it at all. A shorter `--max-ttl` reduces the cache window.
+A policy rule releases matching credentials without a prompt. The approver prints each release and the audit names the rule; the agent's reason is recorded without human review. Rules match the vault's current contents, so anyone able to write into a covered group can change what a rule authorizes. `keypaste policy ls` explains rule meaning but does not list currently covered entries.
 
-**TTL limits reuse of keypaste's approval, not the lifetime of a disclosed password.** Expiry stops
-the cached grant serving another request and clears its owned buffer. It does not erase copies in
-the bridge or client, revoke the credential at its issuer, or invalidate a session created with it.
-A policy release is evaluated on each request and does not populate the human-approval cache.
+Client labels are unauthenticated. A local program can start a bridge with another program's label and match its rules. Keep the policy file out of synced directories: redirecting `KEYPASTE_HOME` into one permits another machine to change local grants. Linux and macOS reject policy files writable by other users; Windows has no equivalent check. Policy is read at agent startup, so changes require a restart.
 
-**Authorization controls release, not whether plaintext has existed inside the approver.** Resolving
-an entry currently calls `Vault.ReadEntries`, which materializes the standard fields, including
-passwords, as strings before an approval decision. Only the selected authorized field is released
-over the credential response. Denial does not imply that no secret was read into the approver's
-memory; [THREATS.md](THREATS.md) T-8 and T-18 state that boundary.
+## Plaintext and file limits
 
-**And `keypaste agent` keeps the vault unlocked for as long as it runs.** There is no idle auto-lock in this version; stopping it is the lock. That is stated here rather than left to be discovered.
+Inline values in `keypaste env set project KEY=value` can enter shell history and remain visible in process arguments. The command warns on stderr. Use `keypaste env set project KEY` with a prompt or pipe to avoid that argument exposure; warning suppression remains O-0009.
 
-**With a policy rule in force, no human sees the request at all.** A rule you wrote in `~/.keypaste/policy.toml` releases the credential it covers without a prompt. The agent's stated reason is recorded and read by nobody, so none of the display protections that exist for the approval prompt apply — there is no display. What exists instead is one line on the approver's terminal per release, one line in the audit log naming which rule did it, and whatever limits you put in the rule. If you want a human in the loop, do not write the rule.
+Updating an existing variable preserves its previous value in encrypted KDBX history, subject to KeePass's ten-item history limit. KeePassXC can display it; Keypaste currently cannot. Removing the entry removes its history from the active vault, and re-adding starts a new history. Credential rotation still requires revocation at the issuer.
 
-**A policy rule is a standing grant over a part of your vault as it is now, not as it was when you wrote it.** Whoever can write into that part chooses what the rule covers: a synced vault, a colleague on a shared file, a `.env` you imported from somewhere else. Moving an entry into a group a rule names is enough. `keypaste policy ls` shows what each rule *means*; it cannot yet show what each rule currently *covers*.
+`keypaste run` passes values in the child's environment. Process inspection, descendants, crash reporters and application logs can expose them. Keypaste itself writes no environment file; `verify-run-injection.sh` checks that temporary directories remain empty. On Windows, closing the console can terminate Keypaste while leaving the child running. Keypaste forwards supported termination signals and waits for the child without escalating to a hard kill, so a child that ignores termination can keep it waiting.
 
-**A policy rule names a client label any process on your machine could claim.** `--client-label` is chosen by whoever spawns `keypaste-mcp`, not by whoever connects to it. That stops the *agent* choosing which rules apply to it, and it does not stop another local program starting a bridge with the same argv. Client-scoped policy narrows convenience, not authority — and under the previous version that program would still have needed you to press `y`.
+`keypaste env pull` deletes only the imported source when its path and content still match. Changed, replaced, linked or removed sources are retained or reported. Removal first moves the file beside itself and verifies it under that name to protect an editor's intervening save. Hard links, bind mounts, `subst`, mapped-drive versus UNC aliases and Windows 8.3 names remain unresolved identities; content checks provide additional protection.
 
-**The policy file is authorization, not configuration — keep it out of synced folders.** `~/.keypaste` is deliberately not beside your vault; pointing `KEYPASTE_HOME` at Dropbox or iCloud means another machine writes this machine's grants. On Linux and macOS keypaste **ignores** a policy file writable by anyone but you, and says so rather than repairing it; **on Windows there is no equivalent** and it says that instead. The file is read once, at startup, so editing it while the agent runs changes nothing until you restart it.
+Deletion removes a directory entry without overwriting storage. SSD remapping, copy-on-write filesystems, snapshots, backups, editor files and Git history can retain plaintext. Keypaste warns about a `.git` ancestor and offers no secure-erasure claim. Rotate credentials that were committed or shared.
 
-**The clipboard is not fully recoverable.** `keypaste get` clears the clipboard after twenty seconds, and only if it still holds what keypaste put there. But no clearing survives `kill -9`, a crash, or a power cut; and on X11 and Wayland the clipboard is owner-served, so the secret also lives in the `wl-copy`/`xclip` process that keeps serving it after keypaste exits. On Windows the copy is marked so Clipboard History and Cloud Clipboard skip it (D-0056), which closes the first-party retention and nothing else: a third-party clipboard manager decides for itself and most ignore the marking, and RDP or Citrix redirection hands the value to a machine keypaste cannot reach. macOS and Linux have no equivalent marking that keypaste sets — that gap is open as O-0019.
+`keypaste env export --dotenv` explicitly writes plaintext after the user selects a format, destination and confirmation. It warns before writing, refuses existing destinations unless `--force` is supplied, and identifies a `.git` ancestor. Linux and macOS create owner-readable files; Windows inherits directory permissions. Export refuses the source vault and any other KeePass vault, including with `--force`. Symbolic links, junctions and ancestor-directory links are resolved; the alias limits described above remain. Exported files inherit the storage and deletion risks of other plaintext files.
 
-**A value passed on the command line is not private.** `keypaste env set project KEY=value` takes the value from the arguments, where it is readable by any process on the machine — through `/proc/<pid>/cmdline` on Linux, through WMI or Sysmon on Windows — for as long as the command runs, and where your shell will also write it to its history file. This form exists because scripts need it, and keypaste prints a one-line warning to stderr when you use it. When it matters, use `keypaste env set project KEY` instead and let keypaste read the value from a prompt or a pipe, which is how every other secret enters the vault. Whether that warning should be silenceable is tracked as an open decision (O-0009 in `DECISIONS.md`).
+## Audit limits
 
-**Overwriting a value does not erase the old one.** `keypaste env set` on a variable that already exists keeps the previous value as a KDBX history item, which is what KeePassXC's own editor does and where KeePassXC will show it. It stays in the file, encrypted, until KeePass's ten-item history limit evicts it. If you are rotating a credential *because it leaked*, that is probably not what you want: `keypaste env rm` removes the entry and its history together, and re-adding it afterwards starts clean. keypaste itself has no command that reads history, so it is visible in KeePassXC and nowhere in keypaste (D-0014).
+Keypaste appends agent-access records without rotating, trimming or rewriting the log. Hash chaining detects edits, removals, insertions and foreign records unless an attacker recomputes the chain. The chain has no secret, and deleting its tail leaves no following record to expose the deletion. `keypaste log verify --expect <hash>` checks an independently retained anchor; Keypaste does not store that anchor beside the log. The log grows without bound. Linux and macOS create owner-readable logs; Windows inherits directory permissions.
 
-**An injected variable is visible to anything that can read the child.** `keypaste run` puts your values in the child process's environment, which is the only place a program can read them from — and which is readable through `/proc/<pid>/environ` on Linux, through `ps eww` and the debugging APIs on macOS, and through process inspection tools on Windows. Every grandchild inherits them, and a crash reporter or a framework that dumps its environment on error will print them. This is the cost of the feature, not a defect in it: it is strictly better than a `.env` file, which has all of the same exposure *plus* a copy on disk, in your editor's swap file, and in your backups — but it is not a boundary. keypaste's promise here is narrower and testable: **nothing is written to a file at any point**, which `scripts/verify-run-injection.sh` proves on every push by running with every temporary directory redirected at an empty folder and asserting it stays empty.
+Audit arguments are sanitized and bounded. `args.entry` prefers the approver's resolved path and is capped at 128 characters. The requested TTL is recorded separately from the effective grant or remaining cache lifetime. The reason retains a 200-character excerpt, original length and SHA-256. Released field values are not deliberately logged, but agent-written arguments can contain sensitive text. Treat the local log as sensitive data. `v0.1.0` records the sanitized request argument, which can be an opaque handle.
 
-**On Windows, closing the console window can orphan the child.** `keypaste run` suppresses its own termination on Ctrl+C, Ctrl+Break and SIGTERM so that it stays alive to pass the signal on and report the child's exit status. Closing the console window is different: Windows raises `CTRL_CLOSE_EVENT` and then terminates the process a few seconds later whether or not it was handled, which can leave the child running with no parent. keypaste also never escalates to a hard kill — a child that ignores SIGTERM will make keypaste wait, which is deliberate: keypaste does not get to decide when your database is allowed to die.
-
-**Deleting a `.env` does not destroy it.** `keypaste env pull` offers to delete the file it just imported, and only that file: what it read is recorded by path and by content, so a `.env` you edited while it was asking for your master password — or asking whether to import, or whether to delete — is kept and named rather than removed, and so is one replaced by a different file or by a link to somewhere else. The removal is not a check followed by a delete: the file is renamed beside itself first, so the bytes are confirmed and destroyed under a name nothing else can reach and a save landing between your answer and the deletion cannot be lost. **A hard link, a bind mount, a `subst` drive, a UNC path against a mapped drive letter and a Windows 8.3 short name are still names keypaste cannot resolve**, the same limits `env export` has, and the content check is what stands behind them. What deletion never was, and still is not: deleting removes the directory entry; it does not overwrite the blocks the file used, and keypaste does not try to. On an SSD the flash translation layer has already remapped them, on a copy-on-write filesystem (APFS, btrfs, ZFS, ReFS) an overwrite would land elsewhere anyway, and snapshots, Time Machine, VSS shadow copies and any backup tool keep their own copy. GNU `shred`'s own manual says the same about the filesystems it runs on, which is why keypaste does not offer a "shred" and does not use the word. Nor does deletion touch your editor's `.env~` or swap file, your backups, your CI logs, or **git history — usually the largest exposure of the three**: if the file was ever committed, the values are in the repository and in every clone, and `keypaste env pull` says so when it finds a `.git` ancestor. Treat a secret that was committed or shared as leaked and rotate it. Deletion is tidying, not erasure.
-
-**Exporting puts your secrets back on disk, and that is the whole point of it.** `keypaste env export --dotenv` is the one command that writes plaintext. docs/PRODUCT.md §3.4 forbids a secret touching disk unencrypted *by keypaste's doing*; here you name the format, name the destination, and answer a confirmation, which is the same line `keypaste get --show` sits on. keypaste narrows what it can: the file is created only if nothing is already there (`--force` to replace), on Linux and macOS it is created readable only by its owner, a `.git` ancestor is pointed out, and the warning is printed in red before the question rather than after the fact. **On Windows there is no equivalent** — the file inherits its directory's permissions and keypaste says so instead of implying a restriction it did not apply. It also refuses to write over the vault it is reading from, or over any other KeePass vault, and `--force` does not lift that; the vault is found through symbolic links and junctions, including one in a directory above the file, but **a hard link, a bind mount, a `subst` drive, a UNC path against a mapped drive letter and a Windows 8.3 short name are names keypaste cannot resolve** — reaching those means asking the operating system for a file's identity, which is a P/Invoke on a path that has none. The refusal to overwrite a vault is what stands behind them, and it is why it applies to every vault and not only yours. Everything under *"Deleting a `.env` does not destroy it"* above then applies to the file you just made, in advance: your editor's swap file, your backups, snapshots, and git. `keypaste run` exists so that you rarely need this; when you do use it, delete the file when you are done and treat the values as having been exposed if it ever left the machine.
-
-**The audit log is tamper-evident, not tamper-proof.** Every agent access is recorded locally, and keypaste opens that file only in append mode: no code path in it seeks, truncates, rewrites or deletes. Each record also carries the hash of the record before it, so `keypaste log verify` can tell you whether the file is the file keypaste wrote. That catches careless tampering — a line edited, removed, inserted, or written by something else. It does not catch two things, and the command says so every time it passes rather than only when it fails: **the chain holds no secret**, so anyone who can write the file can recompute it, and **records deleted from the end leave no trace**, because nothing follows them. For the second there is `keypaste log verify --expect <hash>`, which checks that a hash you wrote down earlier is still in the file; keypaste keeps no copy of it, because an anchor stored beside the thing it anchors is worth nothing. On Linux and macOS the log is created readable only by its owner; **on Windows there is no equivalent** and it inherits its directory's permissions, the same gap `env export` has. keypaste never rotates or trims the log — deleting lines is the opposite of what it is for — so it grows without bound. See [THREATS.md](THREATS.md) T-5.
-
-**Audit arguments are a bounded record, not a raw request transcript.** On current `main`,
-`args.entry` prefers the approver's sanitized resolved path when supplied; otherwise it retains the
-sanitized request argument. It is capped at 128 characters. `args.ttl_seconds` records the requested
-TTL, not the effective grant duration after limits or the remaining cache lifetime. The reason is a
-sanitized 200-character excerpt with its original length and SHA-256. The released field's value is
-not deliberately added to the record, but agent-written arguments can themselves contain sensitive
-text. The log remains local sensitive data. The resolved-path behavior is unreleased; `v0.1.0`
-records the sanitized entry argument, which may be an opaque handle.
-
-Policy pre-approval, implemented in roadmap step 2.3, makes the audit essential: a silent release has no human witness. If keypaste cannot append the required record, it refuses the credential response.
-
-**Local attackers are out of scope.** Anything running as your user can read your memory, watch your keystrokes, and read your clipboard. keypaste protects the vault file at rest and limits what an AI agent can reach; it cannot defend a compromised account against itself.
+If the required audit record cannot be appended, Keypaste refuses the credential response, including a policy-authorized release. Processes running as the user can still inspect memory, keystrokes and clipboard contents; Keypaste cannot defend a compromised local account.
 
 ## Maintainer note
 
-`security@keypaste.com` is the reporting channel, and mail to it has been tested from an outside address. GitHub's private vulnerability reporting is not switched on; if it ever is, it becomes a second channel and this paragraph says so.
-
-keypaste vendors KeePassLib for its KDBX4 implementation (`third_party/KeePassLib/UPSTREAM.md`). Vulnerabilities in that code are in scope here, and are also worth reporting upstream to KeePass — we hand-merge upstream patches rather than receiving them through a package manager, so a report to us does not reach Dominik Reichl automatically, or the reverse.
+The reporting mailbox has been tested from an external address. GitHub private vulnerability reporting is currently disabled. KeePassLib provenance and local changes are recorded in [UPSTREAM.md](third_party/KeePassLib/UPSTREAM.md). Reports to this project and upstream do not automatically reach one another.

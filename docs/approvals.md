@@ -1,8 +1,8 @@
 # Approving an agent's request
 
-When an AI agent asks keypaste for a credential, a person decides — unless an existing approval still covers the request or that person wrote a matching policy rule. This page is about who that person is, what they see, and what happens when nobody is there. [Pre-approving with a policy file](policy.md) is the path that requires no per-request human approval at any point.
+A person approves credential requests unless a live approval or a matching policy rule covers them. This guide explains the terminal prompt and its limits; [policy rules](policy.md) allow matching requests without a prompt.
 
-## The short version
+<a id="the-short-version"></a>
 
 ```
   your terminal                     your MCP client
@@ -14,9 +14,9 @@ When an AI agent asks keypaste for a credential, a person decides — unless an 
                                           • returns one field
 ```
 
-Two processes, on purpose. **`keypaste-mcp` never holds your vault and never decides anything** — including whether a policy rule covers a request, which is decided in `keypaste agent` where the vault is. It is started by your MCP client, which means it is started by software. `keypaste agent` is started by you.
+`keypaste-mcp` is started by the MCP client and forwards requests without holding the vault. You start `keypaste agent`, which holds the vault and decides whether to prompt, reuse an approval or apply a policy rule.
 
-That split exists for one reason above all the others: **nothing an agent does can make keypaste ask for your master password.** You type it in a terminal you opened, in answer to a command you typed. Any program on your machine can pop up a window that looks like keypaste asking for your master password — so keypaste never gives you a reason to expect one.
+An agent cannot trigger a master-password prompt. You enter the password only in a terminal you opened, after running `keypaste agent`. This avoids teaching you to trust password windows that another program could imitate.
 
 ## Starting the approver
 
@@ -43,7 +43,7 @@ The third line reports what the policy file says before anything can use it; wit
 | `--max-ttl <seconds>` | The longest grant it will ever issue, however long an agent asks for. Default 300. |
 | `--approver <name>` | Which pipe to listen on. Or set `KEYPASTE_APPROVER`. You need this only if you run two. |
 
-`keypaste-mcp` finds it automatically — both sides derive the same per-user default name — so [the MCP client config](mcp-setup.md) usually needs no change.
+Both processes derive the same per-user pipe name, so [MCP configuration](mcp-setup.md) usually needs no change.
 
 ## What you see
 
@@ -64,21 +64,19 @@ keypaste: an agent is asking for a credential.
 Approve? [y/N]
 ```
 
-Four things, and each is there for a reason.
+`client` is the connecting program's unauthenticated name. Any process that can start `keypaste-mcp` can claim it; keypaste displays it but does not authorize from it.
 
-**client** — what the connecting program calls itself. **This is not proof of anything.** Nothing authenticates it; any process that can start `keypaste-mcp` can call itself `claude-code`. keypaste shows it because it is usually true and always worth knowing, and never makes a decision from it.
+`entry` and `field` identify the requested value in your vault. A `/` inside an entry title is displayed as a space so a title such as `../../prod/ROOT_TOKEN` cannot impersonate a different group path.
 
-**entry** and **field** — where the value would come from, and which one. These come from your vault, so they are the trustworthy half of the screen. A `/` inside an entry's *title* is shown as a space, so an entry cunningly named `../../prod/ROOT_TOKEN` cannot render as though it lived somewhere it does not.
+`for` is the grant lifetime after the approver applies `--max-ttl`.
 
-**for** — how long the grant will last. This is the number that will *actually* apply after `--max-ttl`, not the number the agent asked for.
-
-**the reason** — free text the agent wrote, whose entire purpose is to persuade you. keypaste sanitizes it (no control characters, no line breaks, no invisible or right-to-left trickery) and cuts it at 400 characters, so it cannot draw a fake dialog inside the real one or push the question off your screen. It cannot change the default answer or the deadline, because the thing that renders it has nowhere to put either.
+The reason is text written by the agent. keypaste removes control characters, line breaks, invisible characters and right-to-left controls, then truncates it to 400 characters. It cannot alter the dialog, default answer or deadline.
 
 Anything that is not `y` or `yes` is a no, including pressing Enter. Answering nothing for 45 seconds is a no.
 
 ## Repeat requests
 
-If the agent asks for **the same field of the same entry** again, and the grant has not expired, you are not asked twice:
+If the agent asks for the same field of the same entry again, and the grant has not expired, you are not asked twice:
 
 ```
 keypaste: reused an approval for env/dev/STRIPE_KEY (238s left)
@@ -86,13 +84,13 @@ keypaste: reused an approval for env/dev/STRIPE_KEY (238s left)
 
 The grant belongs to that one connection. If the client restarts, the grant is gone. A different field of the same entry is a different question and you are asked again.
 
-**Worth knowing:** on a reuse, keypaste does *not* show you what the agent said its reason was that time. It is recorded in the audit log — so you can see afterwards whether it changed — but nobody reads it in the moment. If that bothers you for a particular vault, `--max-ttl 60` is the control, and `--max-ttl 1` effectively turns reuse off. THREATS.md T-12 has the full argument.
+Reused approvals do not show the new reason in the terminal. The audit log records it for later review. Set `--max-ttl 60` to shorten reuse or `--max-ttl 1` to effectively disable it; THREATS.md T-12 explains the limit.
 
 ## When you say no
 
-The agent is told plainly, and told not to ask again. Asking again for the same thing inside a minute is refused without bothering you at all. If a request times out because you were away from the keyboard, the agent is *not* told to give up — nobody decided anything.
+An explicit refusal tells the agent not to retry. The same request is refused for one minute without prompting again. A timeout allows retry because nobody made a decision.
 
-Only one request is ever in front of you at a time. A second one arriving while you are reading the first is refused immediately rather than queued behind it, so a misbehaving agent cannot build a stack of prompts you have to clear. The agent is told `BUSY` rather than `DENIED`, because you did not refuse anything — and it is not told which of its calls is in the way, only that the wait may be as long as you take. Listing entry names shares the same connection, so it is refused the same way while you are deciding.
+Only one request is displayed at a time. Additional requests on that connection, including entry listings, receive `BUSY` immediately. They are not queued, and the response does not identify the call already in progress.
 
 ## When no agent is running
 
@@ -104,26 +102,26 @@ Ask the person you are working with to run `keypaste agent --vault <their vault>
 terminal, and then try again.
 ```
 
-This is the ordinary state of things — your MCP client starts `keypaste-mcp` when it launches, probably long before you start an approver. Nothing breaks; you just get refusals until you start one.
+The MCP client may start its bridge before you start an approver. Calls are refused until an approver is available.
 
-**This same refusal can also mean the machine was busy.** The bridge gives the approver half a second to accept a connection, and on a loaded machine that can pass while an approver is running and listening — so an agent is told to start something you already started. Nothing is released and no name is disclosed; the advice is what is wrong. This is F.9, repaired after `0.2.0`: the bridge could let its half-second run out before it had tried the pipe at all. On `0.2.0` itself, retrying is right.
+On `0.2.0`, this refusal can also occur under load while the approver is running: the bridge's half-second connection deadline can expire before it tries the pipe. No credential or entry name is released. Retrying is appropriate. This is F.9, repaired after `0.2.0`.
 
 ## What is written down
 
-`keypaste-mcp` — not the approver — appends one line to `~/.keypaste/audit.jsonl` for **every** call, granted or denied, including the ones that were malformed and the ones nobody waited for. It records which entry, which field, who asked, what they said their reason was, and what was decided.
+`keypaste-mcp` appends one line to `~/.keypaste/audit.jsonl` for every call, including granted, denied, malformed and abandoned requests. It records the entry, field, client, stated reason and decision.
 
-**It does not add the returned field value to the log.** Names and reason excerpts are logged metadata, so do not put secret values in them. See [docs/mcp-setup.md](mcp-setup.md) for the format.
+It does not add the returned field value to the log. Names and reason excerpts are logged metadata, so do not put secret values in them. See [docs/mcp-setup.md](mcp-setup.md) for the format.
 
-## The honest limits
+<a id="the-honest-limits"></a>
 
-- **The vault stays unlocked while the agent runs.** There is no idle auto-lock in `keypaste agent`; closing the terminal is the lock. The desktop app does lock on idle, but it is a different process holding a different copy of the vault — it is not the approver, and locking it does not lock this one. An agent left running overnight is still unlocked in the morning.
-- **TTL bounds reuse of keypaste's cached approval, not the lifetime of the credential.** Expiry clears the cache's buffer; ordinary string copies and values already returned to a client can remain in memory, transcripts or session files. Expiry and stopping the approver cannot revoke those copies; invalidate a credential at its provider when that is needed. [SECURITY.md](../SECURITY.md) describes the memory limits.
-- **There is no native dialog yet.** The approval prompt is your terminal. If your MCP client runs somewhere you are not looking, you will not see the request until you look.
-- **keypaste cannot tell whether the agent's reason is true.** It can only make sure the sentence is inert, that it is labelled as the agent's words, and that the entry name beside it came from your vault instead.
-- **A policy rule skips this page entirely.** If you wrote one, requests it covers are released with no prompt and nobody reads the reason at all. The agent prints a line per release and the audit log records which rule did it; that is the whole of the signal. [policy.md](policy.md) is honest about what that costs.
+## Limits
+
+The vault stays unlocked while `keypaste agent` runs; it has no idle auto-lock. Closing the terminal locks it. The desktop app holds a separate session, so locking the desktop does not lock the approver. Approval prompts appear only in the approver terminal; there is no native dialog.
+
+TTL limits cached approval reuse. Expiry clears the cache buffer but cannot erase strings or copies retained by clients, transcripts or session files. Stopping the approver cannot revoke these copies; rotate the credential at its provider when needed. [SECURITY.md](../SECURITY.md) describes the memory limits.
 
 ## Verifying it yourself
 
-`scripts/verify-approval-e2e.sh` runs the whole thing in CI on Linux, macOS and Windows: a real vault, a real `keypaste agent`, a real `keypaste-mcp` in a separate process, one approval and one refusal — asserting the approved request returns the secret, the refused one does not, and neither puts it in the audit log.
+`scripts/verify-approval-e2e.sh` runs real CLI and MCP processes against a test vault in CI on Linux, macOS and Windows. It checks that approval returns the secret, refusal does not, and neither writes it to the audit log.
 
-`scripts/verify-demo.sh` checks the corresponding dialog in [**Claude asks for a key, you approve, the deploy runs**](demo.md) and four other public pages against the built binaries. It does not read this page, so edits to the examples above need review against that verified demo.
+`scripts/verify-demo.sh` checks the corresponding dialog in [Claude asks for a key, you approve, the deploy runs](demo.md) and four other public pages against the built binaries. It does not read this page, so edits to the examples above need review against that verified demo.

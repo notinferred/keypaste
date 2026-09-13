@@ -4,31 +4,6 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>
-/// Every script a workflow runs directly is committed executable (docs/STEPS.md F.4a/F.4b).
-/// </summary>
-/// <remarks>
-/// <para>
-/// A tripwire for a defect that has now happened twice in one day. <c>verify-publisher-metadata.sh</c>
-/// was committed <c>100644</c> while two workflows invoked it directly, so its first run on a runner
-/// would have been <c>Permission denied</c> rather than a check; the commit that repaired it added
-/// <c>publish-release.sh</c> and <c>verify-release-destination.sh</c> with the same mode. <b>A gate
-/// that cannot execute is a gate that has never run</b>, and one of those three is the only thing
-/// that writes to a public bucket.
-/// </para>
-/// <para>
-/// It reads the <em>index</em> mode, not the working tree's. This repository is developed on Windows
-/// with <c>core.filemode=false</c>, where the working-tree bit is not tracked and
-/// <c>File.GetUnixFileMode</c> would answer about NTFS — so a test that asked the filesystem would
-/// pass vacuously on the one machine where the defect is created. The index is what reaches a runner.
-/// </para>
-/// <para>
-/// Discovery is by pattern over every workflow rather than a list of known scripts, because a list
-/// is a thing somebody adds a script without. An interpreter in front of the path — <c>bash
-/// scripts/…</c> — needs no bit and is not asserted on; the same script invoked directly somewhere
-/// else still is.
-/// </para>
-/// </remarks>
 public sealed class WorkflowScriptsAreExecutableTests
 {
     [Fact]
@@ -36,8 +11,6 @@ public sealed class WorkflowScriptsAreExecutableTests
     {
         var invocations = DirectScriptInvocations();
 
-        // A pattern that quietly stopped matching would leave this file green and asserting
-        // nothing, which is the failure mode the gates it protects state out loud.
         Assert.NotEmpty(invocations);
 
         var modes = IndexModes();
@@ -62,10 +35,44 @@ public sealed class WorkflowScriptsAreExecutableTests
             + "\n\nFix with: git update-index --chmod=+x <path>");
     }
 
-    /// <summary>
-    /// Each <c>scripts/*.sh</c> a workflow invokes with no interpreter in front of it, mapped to
-    /// the first place it is invoked that way.
-    /// </summary>
+    [Fact]
+    public void DiscoveryReadsRunCommandsAndIgnoresMetadataAndInterpretedScripts()
+    {
+        var workflow = """
+            on:
+              push:
+                paths:
+                  - 'scripts/path-filter.sh'
+            env:
+              EXAMPLE: scripts/environment.sh
+            jobs:
+              gate:
+                steps:
+                  - name: scripts/step-name.sh
+                    run: scripts/inline.sh
+                  - run: 'scripts/quoted-inline.sh --check'
+                  - run: |
+                      # scripts/comment.sh
+                      scripts/block.sh --check
+                      bash scripts/bash-block.sh
+                      sh scripts/sh-block.sh
+                      source scripts/source-block.sh
+                    env:
+                      EXAMPLE: scripts/after-block.sh
+                  - run: >-
+                      scripts/folded.sh
+                      --check
+                  - run: bash scripts/bash-inline.sh
+                  - run: sh scripts/sh-inline.sh
+                  - run: source scripts/source-inline.sh
+            """;
+
+        var found = DirectScriptInvocations(workflow.Split('\n')).Select(invocation => invocation.Script);
+        Assert.Equal(
+            ["scripts/inline.sh", "scripts/quoted-inline.sh", "scripts/block.sh", "scripts/folded.sh"],
+            found);
+    }
+
     private static Dictionary<string, string> DirectScriptInvocations()
     {
         var workflows = Directory.GetFiles(
@@ -76,41 +83,74 @@ public sealed class WorkflowScriptsAreExecutableTests
         Dictionary<string, string> found = new(StringComparer.Ordinal);
         foreach (var file in workflows)
         {
-            var lines = File.ReadAllLines(file);
-            for (var i = 0; i < lines.Length; i++)
+            foreach (var (script, line) in DirectScriptInvocations(File.ReadAllLines(file)))
             {
-                // A comment naming a script is prose about it, not a call to it.
-                if (lines[i].TrimStart().StartsWith('#'))
-                {
-                    continue;
-                }
-
-                foreach (Match match in Regex.Matches(lines[i], @"scripts/[A-Za-z0-9._-]+\.sh"))
-                {
-                    var before = lines[i][..match.Index].TrimEnd();
-                    if (before.EndsWith("bash", StringComparison.Ordinal)
-                        || before.EndsWith("sh", StringComparison.Ordinal)
-                        || before.EndsWith("source", StringComparison.Ordinal))
-                    {
-                        continue;
-                    }
-
-                    found.TryAdd(match.Value, $"{Path.GetFileName(file)}:{i + 1}");
-                }
+                found.TryAdd(script, $"{Path.GetFileName(file)}:{line}");
             }
         }
 
         return found;
     }
 
-    /// <summary>The mode git records for every tracked file under <c>scripts/</c>.</summary>
-    /// <remarks>
-    /// Asked of git rather than of the filesystem, and a git that cannot answer fails this test
-    /// rather than skipping it: an unanswerable question here is indistinguishable from a
-    /// non-executable script, and the whole point is that one of those two is never noticed.
-    /// </remarks>
+    private static IEnumerable<(string Script, int Line)> DirectScriptInvocations(string[] lines)
+    {
+        foreach (var (command, line) in RunCommands(lines))
+        {
+            foreach (Match match in Regex.Matches(command, @"scripts/[A-Za-z0-9._-]+\.sh"))
+            {
+                var before = command[..match.Index].TrimEnd();
+                if (before.EndsWith("bash", StringComparison.Ordinal)
+                    || before.EndsWith("sh", StringComparison.Ordinal)
+                    || before.EndsWith("source", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                yield return (match.Value, line);
+            }
+        }
+    }
+
+    private static IEnumerable<(string Command, int Line)> RunCommands(string[] lines)
+    {
+        int? blockIndent = null;
+        for (var i = 0; i < lines.Length; i++)
+        {
+            var line = lines[i].TrimEnd('\r');
+            var trimmed = line.TrimStart();
+            if (trimmed.Length == 0 || trimmed.StartsWith('#'))
+            {
+                continue;
+            }
+
+            if (blockIndent is int indent && line.Length - trimmed.Length > indent)
+            {
+                yield return (trimmed, i + 1);
+                continue;
+            }
+
+            blockIndent = null;
+            var run = Regex.Match(line, @"^\s*(?:-\s+)?run:\s*(.*)$");
+            if (!run.Success)
+            {
+                continue;
+            }
+
+            var value = run.Groups[1].Value.Trim();
+            if (Regex.IsMatch(value, @"^[|>][+-]?(?:\s+#.*)?$"))
+            {
+                blockIndent = line.IndexOf("run:", StringComparison.Ordinal);
+            }
+            else
+            {
+                yield return (value.Trim('\'', '"'), i + 1);
+            }
+        }
+    }
+
     private static Dictionary<string, string> IndexModes()
     {
+        // Windows with core.filemode=false cannot report the executable bits a runner will receive.
         ProcessStartInfo start = new("git", "ls-files -s -- scripts")
         {
             WorkingDirectory = RepoRoot(),
@@ -144,7 +184,7 @@ public sealed class WorkflowScriptsAreExecutableTests
         Dictionary<string, string> modes = new(StringComparer.Ordinal);
         foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
         {
-            // "<mode> <object> <stage>\t<path>"
+            // git ls-files emits "<mode> <object> <stage>\t<path>".
             var tab = line.IndexOf('\t', StringComparison.Ordinal);
             Assert.True(tab > 0, $"unexpected git ls-files output: {line}");
             modes[line[(tab + 1)..].TrimEnd('\r')] = line[..line.IndexOf(' ', StringComparison.Ordinal)];
@@ -154,14 +194,6 @@ public sealed class WorkflowScriptsAreExecutableTests
         return modes;
     }
 
-    /// <summary>
-    /// Walks up from the test binary's location to the directory holding the solution.
-    /// </summary>
-    /// <remarks>
-    /// Deliberately a second copy of <see cref="CompatGateIsPermanentTests"/>'s helper rather than
-    /// a shared one, for the reason recorded there: a duplicated tool is not a duplicated claim,
-    /// and lifting it out would make this change touch a gate it has no business touching.
-    /// </remarks>
     private static string RepoRoot()
     {
         var directory = AppContext.BaseDirectory;

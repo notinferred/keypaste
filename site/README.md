@@ -1,181 +1,118 @@
 # keypaste.com
 
-Two static pages and one form endpoint, deployed to Cloudflare Workers by Cloudflare's Git integration on a push to `main`. `public/` is the site; `src/worker.js` handles `/subscribe` and returns 404 for other unmatched paths.
+The waitlist site has two static pages and one form endpoint. Cloudflare's Git integration deploys `site/` on pushes to `main`. `public/` contains the pages; `src/worker.js` handles `/subscribe` and returns 404 for unmatched routes. The pages use a plain form and load no scripts or cookies.
 
-This is the waitlist site, not the planned hosted vault service. **Last recorded live verification: 2026-07-28**, in D-0037 of [DECISIONS.md](../DECISIONS.md). The documentation review on 2026-09-07 checked source and provider documentation, not the live account, database permissions or deployed behavior. Repeat the checks below before relying on that historical deployment evidence.
+Database permissions were last verified on 2026-07-28 (D-0037). Page deployment and endpoint checks were repeated on 2026-09-12 (D-0127). Those checks do not establish current database grants. The hosted vault service remains planned work.
 
-The page loads no third-party scripts, sets no cookies, and runs no JavaScript of its own. The signup form is a plain `<form method="post">` that redirects to a static `/thanks/` page, which is why all of that is true at once.
+## Database connection
 
-## Where the database password is
+The database password lives in an account-level Hyperdrive configuration. `wrangler.jsonc` contains its ID; no database password or Wrangler secret belongs in the repository or Worker.
 
-**Not here, and not in the Worker.** It lives in an account-level Cloudflare Hyperdrive config. `wrangler.jsonc` carries only that config's `id`, which is a handle and is useless without access to the Cloudflare account. There is no `wrangler secret` in this setup and there should not be one.
+The recorded connection uses `keypaste_signup_writer` with `INSERT` on `public.signup` and no `SELECT`. This restricts access to stored subscribers, but a compromised handler can still read newly submitted addresses. `schema.sql` owns intended grants; verify effective permissions after role or connection changes.
 
-The recorded connection role is `keypaste_signup_writer`, with `INSERT` on `public.signup` and no `SELECT`. The July probe confirmed reads were refused with 42501. This limits access to stored subscribers; it cannot protect a newly submitted address from a compromised handler processing that submission. `schema.sql` defines the intended grants; check effective permissions after each role or connection change.
+The existing SQL-created role requires SQL administration and a branch-routing suffix in the connection username. New setups should use a managed role with verified grants. See [PlanetScale role management](https://planetscale.com/docs/postgres/connecting/roles).
 
-The recorded role was created with SQL. PlanetScale-managed roles have dashboard and CLI lifecycle controls; SQL-created roles require SQL administration and a routing suffix on the connection username. For a new setup, use the managed-role path below and verify its grants. See [PlanetScale role management](https://planetscale.com/docs/postgres/connecting/roles).
+## Setup
 
-## Setting it up, once
+Run examples from `site/` after `npm ci`. Replace placeholders with provider-returned values and supply credentials through your local secret workflow.
 
-Run these shell examples from `site/` after installing dependencies with `npm ci`. The role must exist before the grants name it. `schema.sql` creates the table and grants access; it contains no role-creation statement. Use the provider's returned database host, username and branch identifier, replacing every placeholder. Supply credentials through your approved local secret workflow and keep them out of tracked files.
+Create a managed role without inherited roles. Use its returned SQL username in `schema.sql` and verify its memberships.
 
 ```sh
-# 1. Create a managed role with NO inherited roles. Use the returned SQL username in schema.sql,
-#    not its display name. Confirm effective memberships before connecting the Worker.
 pscale role create <database> <branch> keypaste-signup --inherited-roles ''
+```
 
-# 2. Create the table and grant that role INSERT on it, and nothing else. Substitute the generated
-#    name for <ROLE> in schema.sql first - applying the file untouched fails on a role that does
-#    not exist. Uses an admin credential that is not stored anywhere in this repository.
+Apply the table and grants using an admin connection. `schema.sql` does not create the role and must have `<ROLE>` replaced first.
+
+```sh
 psql "postgresql://ADMIN@aws-us-east-2-1.pg.psdb.cloud:5432/postgres?sslmode=verify-full" \
      -f schema.sql
+```
 
-# 3. Upload the CA certificate required for this connection's explicit verify-full policy.
-#    Obtain the correct current CA from the provider; do not assume the historical CA still applies.
+The file revokes `CONNECT` on the `postgres` database from `PUBLIC`. Check existing roles with `\du` before applying it, because services relying on that grant also lose access. Provide explicit grants where required.
+
+Obtain the provider's applicable CA certificate and upload it for the connection's `verify-full` policy.
+
+```sh
 npx wrangler cert upload certificate-authority --ca-cert ca.pem --name planetscale-pg-ca
+```
 
-# 4. Point Hyperdrive at that role and NOT at an admin user. Append the BRANCH ID to the username:
-#    PlanetScale's proxy routes on it, and omitting it fails to authenticate for reasons that look
-#    nothing like the cause. Inside the database current_user is still the bare pscale_<id>.
+Connect Hyperdrive to the restricted role. PlanetScale requires the `.<branch-id>` routing suffix; inside the database, `current_user` remains the bare role name.
+
+```sh
 npx wrangler hyperdrive create keypaste-signup \
   --connection-string="postgresql://pscale_<id>.<branch-id>:PASSWORD@aws-us-east-2-1.pg.psdb.cloud:5432/postgres" \
   --ca-certificate-id <CA_CERT_ID> \
   --sslmode verify-full
+```
 
-# 5. Put the returned id into wrangler.jsonc's HYPERDRIVE binding; it currently records the old config.
+Put the returned ID into the `HYPERDRIVE` binding in `wrangler.jsonc`, then inspect the configuration.
 
-# 6. Confirm the config has the sslmode you asked for rather than one it fell back to.
+```sh
 npx wrangler hyperdrive get <HYPERDRIVE_ID>
 ```
 
-For a fresh setup, enable public intake only after the restricted connection passes verification. For an existing deployment, verify the current role before changing anything and pause intake if it has excessive privileges. Creating a restricted replacement does not remove the privileges of the connection still serving requests.
+Verify the CA reference, `verify-full` mode and a successful restricted-role query before enabling intake. For an existing deployment, inspect the active connection first and pause intake if its privileges are excessive. A replacement configuration does not change the connection still serving requests. See [Hyperdrive TLS configuration](https://developers.cloudflare.com/hyperdrive/configuration/tls-ssl-certificates-for-hyperdrive/) and [Wrangler commands](https://developers.cloudflare.com/hyperdrive/reference/wrangler-commands/).
 
-**Step 6 verifies the connection policy.** This deployment requires explicit `verify-full` with its configured CA and a successful query. Current Cloudflare documentation says Hyperdrive's default `require` mode also validates certificates through WebPKI; the older claim that it only encrypts was too broad. The selected `verify-full` mode adds explicit CA and hostname checks. See [Hyperdrive TLS configuration](https://developers.cloudflare.com/hyperdrive/configuration/tls-ssl-certificates-for-hyperdrive/) and [Wrangler Hyperdrive commands](https://developers.cloudflare.com/hyperdrive/reference/wrangler-commands/).
+## Recorded database verification
 
-### How the config was wrong, and how it was found
+On 2026-07-28, configuration `9ef85ab258e846fbb2c0d3457b744282` used `keypaste_signup_writer.jb6eu3wgh2u3`, with `NOINHERIT`, no memberships, no superuser or `bypassrls`, and only the required insert access. Select, count, returning, update, delete and other-table reads failed with 42501. Valid submissions returned 303 to `/thanks/` and inserted a row; duplicates and honeypots inserted nothing. Invalid input, origin and content type returned 400.
 
-Hyperdrive config `9ef85ab258e846fbb2c0d3457b744282` was created through the Cloudflare dashboard's PlanetScale integration rather than by the steps above, and it started out wrong in two ways. Both were recorded as fixed on 2026-07-28; this section preserves that troubleshooting history.
+The original integration role inherited `postgres` and `pscale_superuser`. It was replaced before the signup table existed; prior submissions returned 503. Integration-created roles require the same permission review as manually configured roles.
 
-**TLS: verified against the database on 2026-07-28.** That deployment served a Let's Encrypt chain, so ISRG Root X1 was uploaded (`wrangler cert upload certificate-authority`, id `f8411755-7948-4b31-aa11-2a79710ce1d4`) and the config set to `--sslmode verify-full`. The configured CA and SSL mode were checked explicitly. A query through the binding then succeeded, which is the part worth trusting: the mode is real and it did not break the connection. An earlier version of this note guessed that the update had detached the config from the PlanetScale integration; `wrangler hyperdrive get` says otherwise — `integration_name: planetScale` and the organisation and database names are all still on it.
+The July TLS check used ISRG Root X1, certificate ID `f8411755-7948-4b31-aa11-2a79710ce1d4`, with `verify-full` and a successful query. The configuration retained its PlanetScale integration metadata. Treat these as historical settings and obtain the applicable CA for a new connection.
 
-## Last recorded live checks — 2026-07-28
+A credential update was observed to clear the `mtls` configuration. After updates, inspect and restore the CA and SSL mode, then repeat restricted-role queries. PostgreSQL 18 required select access for `ON CONFLICT (email) DO NOTHING`; the shipped insert uses bare `ON CONFLICT DO NOTHING`.
 
-**The recorded Hyperdrive connection used `keypaste_signup_writer.jb6eu3wgh2u3`** — the role `keypaste_signup_writer` (a plain SQL role created with `CREATE ROLE`, which is why it kept the name typed; the managed path above would have issued a `pscale_<id>` one) with `INSERT` on `public.signup` and nothing else: no superuser, no `bypassrls`, `NOINHERIT`, zero role memberships. As that role, `select`, `count(*)`, `returning`, `update`, `delete` and reading any other table are refused with 42501. **`public.signup` exists**; `schema.sql` was applied on 2026-07-28. A live submission returns 303 to `/thanks/` and the row lands; a duplicate is a no-op; the honeypot stores nothing; nonsense, a wrong `Origin` and a non-form body each get 400. `CONNECT` on the database is no longer held by PUBLIC. Verified end to end on 2026-07-28, and `D-0037` is the record.
-
-The role the PlanetScale integration first handed the config inherited `postgres` and through it `pscale_superuser` — logical replication plus write access everywhere, reachable from a public HTTP endpoint. It was swapped before the table was created, so no subscriber row was ever reachable by it; every submission before that point returned the handler's 503 saying the address was not stored. **Never let a Hyperdrive config keep whatever role an integration wizard hands it.**
-
-Two things bit during the fix and are worth knowing before touching this again. **The July credential update was observed to wipe the `mtls` block**, dropping the CA and `verify-full`. After any update, verify both the CA reference and SSL mode with `wrangler hyperdrive get`, reapply missing settings, and run a restricted-role query before resuming intake. And **naming the conflict target in `ON CONFLICT (email) DO NOTHING` requires SELECT** on PostgreSQL 18; the bare form is what ships, and `schema.sql` says so.
-
-Two things about PlanetScale usernames, both easy to get wrong: a `pscale_<id>` name is an ordinary managed role and not an API credential — the problem with the first one was its inherited roles, not its name; and the `.<branch-id>` suffix is routing, not part of the credential, so `current_user` inside the database is the bare role and a `--origin-user` that omits the suffix fails to authenticate for reasons that look nothing like the cause.
-
-Recorded follow-up: migrate the SQL role to a managed role with no inherited roles and the grants in `schema.sql`. Check the current role and subscriber state before scheduling the change. Verify the replacement, update the connection with its CA and SSL mode, repeat the permission and submission checks, then retire the old credential. Until migrated, rotation requires SQL administration plus a Hyperdrive credential update.
-
-
-**One thing in `schema.sql` to look at before running it.** Its last line is `REVOKE CONNECT ON DATABASE postgres FROM PUBLIC`, which is correct in intent — PlanetScale grants CONNECT to PUBLIC on a new database, meaning every current and future role. But this is the `postgres` maintenance database on a cluster PlanetScale manages, so anything of theirs that connects through PUBLIC rather than an explicit grant loses access at that moment. Run `\du` and check which roles exist and what they inherit before revoking, and be ready to grant CONNECT back explicitly. It is the one line in the file that can affect something other than this application.
+The recorded follow-up is migration to a managed role without inherited roles. Check the active role and subscriber state, verify replacement grants, update Hyperdrive including TLS settings, repeat permission and submission checks, then retire the old credential. Until then, rotation requires SQL administration and a Hyperdrive update.
 
 ## Deploying
 
-**Cloudflare's Git integration deploys this, and no workflow in this repository does** (D-0127).
-Any push to `main` builds; the settings under Workers → `keypaste-site` → Settings → Build are root
-directory `site`, **no build command** — there is no build script and nothing compiles — deploy
-command `npm run deploy`, production branch `main`, non-production branch builds off. There is no
-output-directory field to set: `wrangler.jsonc`'s `assets.directory` is `./public` and resolves
-against the root directory, which is why a project rooted at the repository root served nothing. The
-Worker's dashboard name must stay `keypaste-site` to match `wrangler.jsonc`.
+Cloudflare's Git integration owns deployment (D-0127). Configure Worker `keypaste-site` with root directory `site`, no build command, deploy command `npm run deploy`, production branch `main` and non-production builds disabled. `assets.directory` is `./public` relative to that root. The build watch path must include nested files under `site/public/`.
 
-**The build watch path decides whether a page change deploys at all**, so it is not a performance
-setting here. The file that carries the disclosures is `site/public/index.html`, two levels down, and
-a pattern matching only one level would leave every disclosure edit silently undeployed — the exact
-defect this arrangement exists to close. Keep it broad enough to cover `site/public/`.
-
-By hand, to deploy a ref Cloudflare will not:
+For a manual deployment:
 
 ```sh
 npm ci
 npx wrangler deploy
 ```
 
-**Then ask the origin, every time, because nothing else will:**
+After every deployment, run the live checks:
 
 ```sh
 ../scripts/verify-site-disclosure.sh
 ../scripts/verify-site-endpoint.sh
 ```
 
-These are the only two things that ask keypaste.com rather than the checkout. They are deliberately
-in no workflow — a job here that asked the live origin would go red for a Cloudflare outage it cannot
-fix — so running them is yours after any deploy, Cloudflare's included.
+These checks are manual. GitHub workflows inspect checked-out site content without querying the live origin.
 
-### First deploy from the Git connection, 2026-09-12
+## Deployment evidence
 
-Build `1716bdb6` from `309aac3` deployed version `1fcc038c`, root directory `site`, `npm run deploy`,
-24 seconds. The origin then passed both scripts and served `public/index.html` byte-for-byte.
+On 2026-09-12, build `1716bdb6` from `309aac3` deployed version `1fcc038c` in 24 seconds. Both live checks passed and the origin matched `public/index.html`. The Git connection had retained deleted repository ID `1312113438` after the repository was recreated as `1358644975` on 2026-09-05, so intervening pushes had not deployed. If pushes stop reaching the origin, compare the connection's `repo_id` with `gh api repos/notinferred/keypaste --jq .id`.
 
-**The connection was silently dead for a week before that, and the dashboard did not say so.** Its
-repository was named by id, and this repository was deleted and recreated on 2026-09-05 — so the
-connection went on pointing at id `1312113438` while GitHub had moved to `1358644975`, and no push
-built anything between 2026-09-05 and 2026-09-12. If a page change ever stops reaching the origin,
-compare the connection's `repo_id` against `gh api repos/notinferred/keypaste --jq .id` first.
+The removed `site.yml` workflow had no `CLOUDFLARE_API_TOKEN` and failed to deploy in all four runs. Its environment was removed on 2026-09-12. Two manual deployments on 2026-09-11 were checked against the live origin:
 
-### Deployed by hand on 2026-09-11
-
-`site.yml` could not deploy: the `keypaste.com` environment held no `CLOUDFLARE_API_TOKEN`, so all
-four of its runs failed at the deploy step, twice with the page already wrong about a data-loss
-defect. That is why it is gone, and why the environment went with it on 2026-09-12 — it held a stale
-`CLOUDFLARE_ACCOUNT_ID` and nothing else, and a dangling environment holding a credential fragment is
-how the next reader concludes CI deploys this. Two versions went out from a checkout instead, each
-verified against the live origin afterwards:
-
-| Version id | Tree it carried |
+| Version | Content |
 |---|---|
-| `463e2856-b29b-43ee-b603-110940ab7fc7` | `cf2df87` — disclosed the `0.2.0` concurrent-save defect |
-| `55a31129-c245-40a5-bc27-c16330f4a2e0` | the F.6 commit — added the `10.0.26100` save-failure defect |
+| `463e2856-b29b-43ee-b603-110940ab7fc7` | `cf2df87`; concurrent-save defect disclosure |
+| `55a31129-c245-40a5-bc27-c16330f4a2e0` | F.6 tree; Windows `10.0.26100` save-failure disclosure |
 
-The second was deployed from the tree of a commit then called `9de4a16`. **That SHA no longer
-exists**: F.6's work was squashed into one commit afterwards, and `site/public/index.html` is
-byte-identical across the two, so the squashed commit carries the deployed bytes. An old clone
-fetched before the rewrite still has `9de4a16`.
+The second deployment used then-commit `9de4a16`, later replaced by the F.6 squash. Its site bytes match the squashed commit; an older clone may retain the original SHA.
 
-## Running it locally
+## Local checks
+
+Use an environment variable for a local connection string, keeping credentials out of tracked configuration. Prefer a scratch database.
 
 ```sh
 CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE="postgresql://..." npx wrangler dev
 ```
 
-The environment-variable form, rather than `localConnectionString` in `wrangler.jsonc`, because the second one puts a real password in a tracked file. Point it at a scratch database if you have one.
+[verify-site-endpoint.sh](../scripts/verify-site-endpoint.sh) checks honeypot redirection, invalid-form refusals, origin and size limits, route behavior and the absence of scripts. These cases complete before opening the database connection and can run after deployment.
 
-Run these checks against a scratch database before deployment. Afterwards, the split is what each
-check costs to repeat: anything that stores a row needs a scratch database and your judgement, and
-everything else is one script.
+Use a dedicated test address for checks that write rows. Verify valid submissions and duplicate suppression, restricted insert-only grants, CA and SSL settings, browser operation with JavaScript disabled, and absence of analytics or third-party assets. Reading the inserted row requires a separate authorized database role; the Worker role cannot verify it.
 
-**Scripted, and yours to run after a deploy** — [verify-site-endpoint.sh](../scripts/verify-site-endpoint.sh). Each
-of these is refused or redirected before the Worker opens a database connection, which is the whole
-reason they are safe to repeat:
+## Unimplemented features
 
-- Submitting with the `website` field filled redirects to `/thanks/` and adds nothing.
-- Submitting nonsense gets a `400` page that says what was wrong.
-- Submitting something that is not a form, or that comes from another origin, or that is too large,
-  each gets a `400` naming its own reason.
-- `GET /subscribe` redirects home; an unknown path is a `404`; `/thanks/` is served.
-- The served page carries no script, so the promise the footer makes about JavaScript still holds.
+The handler stores signup requests without sending confirmation mail. Double opt-in and list verification belong to STEPS 5.6; existing rows are unconfirmed.
 
-**Still by hand, with a dedicated test address** — these write a real row, and the role cannot read
-one back, so no script can check them without a credential this repository must never hold:
-
-- Submitting a valid address redirects to `/thanks/` and the row appears.
-- Submitting the same address again still redirects cleanly and adds nothing.
-- The configured role can insert but cannot select, update or delete subscriber records; the
-  connection retains its expected CA and SSL mode.
-- The page still works with JavaScript actually disabled in a browser. The automated check proves no
-  script is served, which is the mechanism; this is the promise.
-- The network panel shows no analytics requests or third-party assets. Ordinary outbound links are
-  allowed.
-
-## What is not here
-
-No Worker build job, and no check that reaches the database. Cloudflare deploys, and the two scripts that ask the live page and the live endpoint are run by hand; the .NET workflow separately runs `scripts/verify-demo.sh`, which checks the transcript in `site/public/index.html` at the checked-out ref. None of them validates the database role, its grants or its CA, and none stores a row - those are the by-hand checks above (H-0011).
-
-No email sender or confirmation flow. The current handler stores signup requests. Double opt-in and list verification are planned in step 5.6 of [STEPS](../docs/STEPS.md); do not treat existing rows as confirmed subscribers or claim confirmation mail is already sent.
-
-No rate limiting in code. That belongs in a Cloudflare rule on `POST /subscribe`; check whether the account's plan actually offers one before treating it as the defence, because the honeypot and the body, content-type and origin guards are what is genuinely shipped.
-
-No Turnstile and no managed challenge. Both inject a script, and the page says it does not load one. See `DECISIONS.md` D-0036 for the rest of what was deliberately left out.
+Code has no rate limiter. Verify an applicable Cloudflare rule before relying on one; the current handler has honeypot, body, content-type and origin checks. Turnstile and managed challenges are absent because they introduce scripts. The site has no automated database-verification job.

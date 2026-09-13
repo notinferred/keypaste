@@ -1,76 +1,31 @@
 # Contributing to keypaste
 
-keypaste is a secrets tool. Trust is the only asset it has, so the rules below are shorter and stricter than most projects', and the ones that can be mechanized are.
+## Changes and review
 
-## Sign off every commit
+Read [PRODUCT](docs/PRODUCT.md) for scope and security laws, [STEPS](docs/STEPS.md) for the active build plan, and [CLAUDE.md](CLAUDE.md) for writing rules and document ownership. Product scope changes require dated founder re-ratification; proposals do not override the current requirements.
 
-One `Signed-off-by` line per commit, and nothing else is asked of you — no CLA, no signing flow, no bot, no account (**D-0055**).
+Keep changes focused and include their documentation. Shared feature logic belongs in `Keypaste.Core`; the CLI and desktop use it. Document features available in only one front end. Secret-path changes require tests, including encryption, injection, the agent bridge and secret display. New secret-path dependencies require written justification, pinned versions and lock files regenerated with `dotnet restore --force-evaluate`.
+
+Use KDBX4 through the vendored library. Do not implement cryptography. Only `src/Keypaste.Core/Internal/KeePassInterop.cs` may reference KeePassLib types outside `third_party/KeePassLib`; application code uses the core boundary. Every KDBX file keypaste writes must open in real KeePassXC. CI permanently checks compatibility in both directions.
+
+Write self-documenting code with clear names and structure. Default to no comments; use one line only for a non-obvious constraint or decision the code cannot express. Do not repeat code, tests or documents. Write concise, connected prose without hard wrapping, redundant recaps or excessive formatting.
+
+`scripts/verify-demo.sh` checks README, launch, demo, KeePass/agent essay and site transcripts against the built binaries. These pages trigger backend CI on pushes to `main`; documentation pull requests run both workflows. Consult [RELEASE](docs/RELEASE.md) before changing published installation claims.
+
+## Verification and commits
+
+Run `./scripts/verify.ps1` in PowerShell or `bash scripts/verify.sh` in Bash after final edits. The shared command includes backend, desktop and consistency tests. [CLAUDE.md](CLAUDE.md#local-verification-and-delivery) owns profiles, prerequisites and checkpoint rules; `--list` prints commands without executing them.
+
+Sign off every commit, including maintainer and agent commits:
 
 ```sh
 git commit -s -m "your subject line"
 ```
 
-That line is the [Developer Certificate of Origin 1.1](https://developercertificate.org/): you are certifying that you wrote the change, or that you have the right to submit it under the project's licence. `.github/workflows/dco.yml` checks it on every pull request, and it checks only the commits your pull request adds.
+The `Signed-off-by` trailer certifies the [Developer Certificate of Origin 1.1](https://developercertificate.org/): you wrote the change or have the right to submit it under the project's licence. `dco.yml` checks commits added by each pull request. There is no CLA. Use a subject of at most 72 characters and the required trailer, with no other body unless requested. Follow CLAUDE.md's project identity rule and merge locally.
 
-A CLA would buy the freedom to relicense later. AGPL-3.0 is chosen and staying (**D-0041**), so that freedom has nothing to buy here, and the price is a real deterrent to the drive-by fix this project wants.
+## Security and licence
 
-**This binds the maintainer too.** Every commit in this repository needs `-s`, including the ones an agent writes.
+Report vulnerabilities privately to `security@keypaste.com`; [SECURITY.md](SECURITY.md) describes scope and response times. Anonymous reports are welcome. Do not use public issues, discussions or pull requests for security reports.
 
-## Before you open a pull request
-
-**Read [`docs/PRODUCT.md`](docs/PRODUCT.md).** §3's security laws are immutable. Other sections change only by a dated founder re-ratification recorded in `DECISIONS.md`; a proposal does not override the current text. [CLAUDE.md](CLAUDE.md#records) defines document ownership, and [docs/STEPS.md](docs/STEPS.md) owns the active build plan.
-
-**A change on the secret path needs a test** — encryption, injection, the agent bridge, or anything a secret is drawn on (law 4.5). "It obviously works" is what the tests are for.
-
-**A new dependency on the secret path needs written justification in the pull request** (law 3.9). Dependencies here are minimized and pinned, and every package change also needs `packages.lock.json` regenerated with a `--force-evaluate` restore or a locked-mode CI restore cannot hold (**D-0004**).
-
-**Never write cryptography** (law 3.6). KDBX4 via the vendored library, and nothing invented. Outside `third_party/KeePassLib`, only `src/Keypaste.Core/Internal/KeePassInterop.cs` may reference KeePassLib types directly (**D-0007**); other application code goes through the core's interop boundary.
-
-**Any KDBX file keypaste writes must open in real KeePassXC** (law 4.6). This is gated in CI in both directions and the gate is permanent.
-
-## What a good change looks like
-
-- **Commit messages are a subject line, 72 characters or fewer**, no body. `Signed-off-by` is the one trailer that belongs below it.
-- **Small and focused.** One change, one reason.
-- **Documentation ships with the feature**, not after (law 4.8).
-- **Core-first.** Shared feature logic lives in `Keypaste.Core`; the CLI and desktop app use it and neither waits for the other. Document when a feature is available in only one front end (laws 4.2–4.3).
-
-Five pages — `README.md`, `launch.md`, `docs/demo.md`, `docs/keepass-and-agents.md` and `site/public/index.html` — are held by `scripts/verify-demo.sh` to what the built binaries print. Editing one triggers the full CLI CI workflow on a push to `main`; documentation pull requests also run both CLI and app workflows. This verifies source behavior, not whether the latest published release includes it; check [docs/RELEASE.md](docs/RELEASE.md) before changing installation claims.
-
-## Two things to say before you write a comment
-
-`src` reached 36% comment lines by answering "would somebody editing this get it wrong?" and nothing
-else. Both steps below produce a sentence you either can or cannot say; neither is a matter of taste.
-
-**Say who owns the claim before you write it.** If another file carries it, link and stop — the owner
-is a document's charter, not whether its text can still be amended, so a claim [DECISIONS](DECISIONS.md)
-records in its frozen archive is still owned. A comment repeating what the line below it does restates
-the code: a `<summary>`, `<param>`, `<returns>` or `<exception>` that only echoes the signature is the
-common case, while one carrying a contract the signature does not — "more than one entry answers to that
-name" — is not. A second telling in the same file restates the file. A comment naming the test that
-enforces it restates the test, though a comment may state a claim a test also asserts when it names a
-wrong turn still available to the next editor: the test names the symptom after the edit, and the
-comment has to name the edit before it. None of the rest get written.
-
-**Say each mistake in one sentence before you write the comment.** The comment is those sentences. If
-you cannot say one, it does not get written; if the comment is longer than the sentences, it is longer
-than the mistake. Length is whatever the mistakes take — three mistakes are three sentences, not three
-paragraphs.
-
-## Before you commit
-
-```sh
-dotnet build keypaste.slnx -c Release -warnaserror && dotnet test keypaste.slnx
-```
-
-## Merging
-
-Maintainer note, recorded here because it is easy to get wrong: **merges happen locally, never with the GitHub merge button**, which stamps its own identity on the merge commit.
-
-## Security problems do not go here
-
-**Do not open an issue, a discussion, or a pull request for a security problem.** Email `security@keypaste.com` — [`SECURITY.md`](SECURITY.md) has the details, including what is in scope and what to expect. Reporting anonymously is fine.
-
-## Licence
-
-By contributing you agree your work is licensed under [AGPL-3.0](LICENSE), the licence the project ships under and keeps (**D-0041**). Every release publishes its corresponding source.
+Contributions are licensed under [AGPL-3.0](LICENSE). Every release publishes its corresponding source.

@@ -6,37 +6,6 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>
-/// V-F.6: a save survives another program holding a <c>KeePass_TxF_</c> name in the temporary
-/// directory it was given, at one attempt.
-/// </summary>
-/// <remarks>
-/// <para>
-/// <b>The contender is another process, and deliberately not keypaste.</b> D-0122 measured the
-/// cause as any holder of such a name — every KeePass-family program spells its transacted
-/// temporary the same way, so KeePass 2 saving its own database is exactly the model. A contender
-/// built from keypaste would carry D-0123's fix too and contend with nobody.
-/// </para>
-/// <para>
-/// <b>The saver is another process as well, and that is not a convenience.</b> The product
-/// redirects once, on its first save, and then relies on <c>TMP</c> staying where it put it. Setting
-/// <c>TMP</c> from inside this process after that had happened would not mislead the test so much as
-/// undo the fix — <c>TxfPrepare</c> reads it at save time. Launching a process with <c>TMP</c>
-/// already set is the only way the ambient value reaches the product's one-time redirect in the
-/// right order, through the path a shipped binary takes and with no test-only setup.
-/// </para>
-/// <para>
-/// <b>The contended directory is fresh and nothing else writes into it.</b> A machine-wide
-/// <c>%TEMP%</c> cannot do this job: ci run 34628470851 watched the contention evaporate mid-test,
-/// because once enough real <c>KeePass_TxF_</c> files occupy <c>KEEPAS~1</c> through <c>KEEPAS~4</c>
-/// the file system starts handing out hash-based aliases that collide with nothing. An empty
-/// directory leaves <c>KEEPAS~1.TMP</c> free, so the reservation bites every run.
-/// </para>
-/// <para>
-/// <b>The budget is one.</b> The contender holds throughout, so eight attempts would fail too — but
-/// then a green run could not tell a repair from a budget that outlasted a transient.
-/// </para>
-/// </remarks>
 [Collection(nameof(SavesThatSpawnProcesses))]
 public sealed class ConcurrentVaultSaveTests : IDisposable
 {
@@ -60,8 +29,7 @@ public sealed class ConcurrentVaultSaveTests : IDisposable
             return;
         }
 
-        // Empty, and named by nothing else on the machine. This is what the saver is handed as its
-        // ambient temporary directory.
+        // A fresh directory keeps hash-based 8.3 aliases from bypassing the intended collision.
         var contended = Directory.CreateDirectory(Path.Combine(_directory, "contended")).FullName;
         var vault = SeededVault();
 
@@ -93,12 +61,6 @@ public sealed class ConcurrentVaultSaveTests : IDisposable
         Assert.Contains(reopened.ReadEntries(), entry => entry.Title == "written under contention");
     }
 
-    /// <summary>Every name in a directory beside the 8.3 alias the file system gave it.</summary>
-    /// <remarks>
-    /// The alias is the mechanism, so a failure states it rather than leaving it inferred from an
-    /// error code. If <c>KEEPAS~1.TMP</c> is not among these, the collision this test is built on is
-    /// not the one that happened.
-    /// </remarks>
     [SupportedOSPlatform("windows")]
     private static string AliasesIn(string directory, string holding)
     {
@@ -128,7 +90,6 @@ public sealed class ConcurrentVaultSaveTests : IDisposable
         return report.ToString();
     }
 
-    /// <summary>Whether this build refuses the create the contender holds the alias for.</summary>
     [SupportedOSPlatform("windows")]
     private static bool ACreateIsRefusedIn(string directory)
     {
@@ -151,12 +112,10 @@ public sealed class ConcurrentVaultSaveTests : IDisposable
             }
             catch (IOException)
             {
-                // It was never created.
             }
         }
     }
 
-    /// <summary>Saves the vault from a process whose temporary directory is the contended one.</summary>
     private static (int Code, string Output) Save(string vault, string contended, int attempts)
     {
         var info = new ProcessStartInfo
@@ -170,8 +129,7 @@ public sealed class ConcurrentVaultSaveTests : IDisposable
         info.ArgumentList.Add(vault);
         info.ArgumentList.Add(attempts.ToString());
 
-        // Set before the process exists, so the product's one-time redirect is the first thing to
-        // read it. This is the whole arrangement; see the class remarks.
+        // The product reads TMP during its one-time redirect, before the child can run test setup.
         info.Environment["TMP"] = contended;
         info.Environment["TEMP"] = contended;
         info.Environment["KEYPASTE_SAVER_PASSWORD"] = VaultRoundTripTests.MasterPassword;
@@ -260,8 +218,7 @@ public sealed class ConcurrentVaultSaveTests : IDisposable
         using var vault = Vault.Create(path, VaultRoundTripTests.MasterPassword);
         vault.AddEntry(new VaultEntry { Title = "seeded", Password = "seed" });
 
-        // Saved once so the file exists. FileTransactionEx writes in place when the base file is
-        // absent, so this save is not transacted and names no temporary anywhere.
+        // FileTransactionEx uses a transacted save only after the destination file exists.
         vault.Save();
 
         return path;
@@ -275,7 +232,7 @@ public sealed class ConcurrentVaultSaveTests : IDisposable
         }
         catch (IOException)
         {
-            // A helper's scratch may still be going; the OS cleans the temp tree.
+            // A helper may still hold a temporary file during cleanup.
         }
     }
 
@@ -284,7 +241,6 @@ public sealed class ConcurrentVaultSaveTests : IDisposable
 
     private sealed class Contender(Process process, string release, string holding) : IDisposable
     {
-        /// <summary>The name it reserved, and with it the 8.3 alias everything else wants.</summary>
         internal string Holding => holding;
 
         internal bool StillHolding => !process.HasExited;
@@ -302,7 +258,6 @@ public sealed class ConcurrentVaultSaveTests : IDisposable
             }
             catch (InvalidOperationException)
             {
-                // Already gone.
             }
 
             process.Dispose();
@@ -310,12 +265,6 @@ public sealed class ConcurrentVaultSaveTests : IDisposable
     }
 }
 
-/// <summary>Saves driven from helper processes, run on their own.</summary>
-/// <remarks>
-/// Not load-bearing: V-F.6 mutates no process-wide state, and its contended directory is created
-/// fresh and touched only by its own two helpers, so nothing another test does can reach it. This
-/// keeps two spawned processes and their timing off a two-core runner's busiest moment, and no more
-/// than that.
-/// </remarks>
+// Avoid adding helper-process scheduling load while other timed tests are running.
 [CollectionDefinition(nameof(SavesThatSpawnProcesses), DisableParallelization = true)]
 public sealed class SavesThatSpawnProcesses;

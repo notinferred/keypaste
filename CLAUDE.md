@@ -1,91 +1,70 @@
-# Working rules for this repository
+# Working rules
 
-## Rules
+## Writing
 
-- **Only the next five steps in `docs/STEPS.md` are detailed.** Later steps stay one line — ID, name,
-  Needs and what it is for — and are rough on purpose; their wording is not a contract. When a step is
-  finished it shrinks to one line under Completed steps and the next unchecked step is expanded in its
-  place.
+Write clean, minimal, self-documenting code. Prefer clear names and structure. Default to no comments; add a single line only to explain a non-obvious constraint or decision the code cannot express. Never restate the code or duplicate a document's explanation.
+
+Write concise, connected prose without hard wrapping. Use headings, lists, tables and emphasis only when they help navigation or comparison. Preserve code blocks, transcripts and structured records. Remove repetition, filler, rhetorical contrasts, formulaic introductions and conclusions, and unnecessary qualifications. State what the evidence establishes and keep unresolved questions explicit. Do not invent facts or expand the task's scope.
 
 ## CI
 
-`ci.yml` runs in full on qualifying pushes to `main`, every pull request, and on dispatch. Its push-level `paths-ignore` skips specified documents; once triggered, its jobs are not filtered by changed paths, and a run on `main` is never cancelled. **`app.yml` is not its mirror.** On pushes to `main` it runs on a `paths:` allowlist — `src/Keypaste.App/**`, `src/Keypaste.Cli/**`, `src/Keypaste.Core/**`, `third_party/**`, the two `Directory.*.props`, `keypaste.app.slnx`, `release-targets.json` (which its package matrix is derived from), its own file, and the App/Cli/Consistency test projects — so a push touching only `src/Keypaste.Mcp/`, `scripts/` or `keypaste.slnx` does not trigger it. Pull requests and dispatch are unfiltered; matching version tags package the app. Feature-branch pushes alone trigger neither workflow. Runners are GitHub-hosted and free, because the repository is public (D-0086).
+`ci.yml` runs on qualifying pushes to `main`, every pull request and dispatch. Its push-level `paths-ignore` skips specified documents; triggered jobs run without path filtering, and runs on `main` are never cancelled. `app.yml` has a push allowlist for desktop, CLI, core and shared build/test inputs. Its pull requests and dispatches are unfiltered; matching version tags package the app. Feature-branch pushes require a pull request or explicit dispatch for remote evidence. The workflow files own the exact triggers.
 
-**There is no third workflow, because keypaste.com does not deploy from here.** It deploys from Cloudflare's Git integration on a push to `main`, root directory `site`, no build command, deploy command `npm run deploy` (D-0127) — so the one credential that can change a page the public reads is Cloudflare's and is not in GitHub at all. A `site.yml` used to claim otherwise and never deployed once: its environment was never given a `CLOUDFLARE_API_TOKEN` and all four of its runs failed at the deploy step. **Nothing in `.github/workflows` asks the live origin.** [verify-site-disclosure.sh](scripts/verify-site-disclosure.sh) and [verify-site-endpoint.sh](scripts/verify-site-endpoint.sh) are by-hand checks — run the first after any site deploy — because a job here that asked keypaste.com would go red for a Cloudflare outage it cannot fix, on `main` or across a release. The one half that does run in `ci.yml` is `verify-site-disclosure.sh --selftest`, which needs no network, and `LiveOriginChecksStayOutOfWorkflowsTests` holds that split both ways.
+Probes run the identical backend test command used by CI. Narrowing the suite changes concurrent load and can remove the condition being measured. Run a hosted probe when local reproduction is insufficient, and retain counts and diagnostic evidence.
 
-- **One commit per step, written when the step is done.** Not mid-step, not per file, not as you go. A step is done when its Build line is built, its verifier has run, and STEPS, DECISIONS and CHANGELOG say what is now true. Then commit once, push once.
-- **Never push to find out whether a gate passes.** If a gate runs on this machine it runs here first. A commit whose subject repairs the commit before it is the evidence this was skipped — `d69fe91`, `138f43e`, `7779603` and `14dd809` are four of them, and ten of the eighteen red `ci.yml` runs on `main` between 2026-09-05 and 2026-09-11 were for something a local command catches in under twelve seconds, at 6.2 minutes a run. A deliberate red-first run in CI is the one exception, and only when the defect is platform-specific; say so in the commit subject.
-- **`DECISIONS.md` and `docs/STEPS.md` are under test. After editing either, run the gate before pushing.** Ledger rows are capped at 650 characters and STEPS completed-evidence cells at 350, and CI catching either costs a full round trip and an extra commit:
-  ```
-  dotnet test tests/Keypaste.Core.Tests/Keypaste.Core.Tests.csproj -c Release \
-    -- --filter-class 'Keypaste.Core.Tests.RecordRowsStaySkimmableTests'
-  ```
-- **Run the full suite last, after the documents are written, not before.** A suite run that precedes the DECISIONS edit does not cover it. The pre-push sequence, in order and measured on Windows 10 Pro 19045:
+`README.md`, `launch.md`, `docs/demo.md`, `docs/keepass-and-agents.md` and `site/public/index.html` must trigger `ci.yml`: `scripts/verify-demo.sh` checks their claims against the built binaries. Never add `docs/**` to `paths-ignore`. New documentation paths trigger backend CI unless explicitly ignored; documentation pull requests run both workflows.
 
-  | When | Command | Cost |
-  |---|---|---|
-  | Always | `dotnet build keypaste.slnx -c Release -warnaserror` | 2 s |
-  | Always | `dotnet format keypaste.slnx --no-restore --verify-no-changes --exclude third_party/` | 10 s |
-  | After editing DECISIONS.md or docs/STEPS.md | the records gate above | 1 s |
-  | If one of the five gated pages changed | `bash scripts/verify-demo.sh` | 20 s |
-  | If `release-targets.json` or a download page changed | `bash scripts/verify-release-matrix.sh` | 87 s |
-  | Last, always | `dotnet test keypaste.slnx --no-build -c Release` | 28 s |
+keypaste.com deploys through Cloudflare's Git integration on pushes to `main`, watching `site/`, with root directory `site`, no build command and deploy command `npm run deploy` (D-0127). GitHub workflows do not query the live origin. Run [verify-site-disclosure.sh](scripts/verify-site-disclosure.sh) after a site deploy; [verify-site-endpoint.sh](scripts/verify-site-endpoint.sh) is also manual. Only the offline disclosure self-test runs in CI. `site/README.md` changes trigger a site deployment while skipping both GitHub workflows.
 
-- **A probe runs the byte-identical command `ci.yml` runs, and this is tested rather than assumed.** F.8 reproduced in `LargeVaultListingTests`, not in the `ListingSizeTests` class the probe was written for, so narrowing the command to the suspect class would have caught nothing. `dotnet test` runs the assemblies concurrently and that contention is usually the condition under test. A probe earns its runner time when the defect does not reproduce on this machine **and** the probe yields a count rather than a yes or no: [txf-probe.yml](.github/workflows/txf-probe.yml) gave D-0122 its 1387 of 1600, and [listing-probe.yml](.github/workflows/listing-probe.yml) gave F.8 and F.9 their 12 of 80 on one dispatch.
-- **Some docs-only pushes to `main` skip both workflows.** `ci.yml` skips a push only when every changed path is in its `paths-ignore`; `app.yml` skips documentation because it is outside its allowlist. Five pages deliberately trigger `ci.yml` and must never enter its ignore list: `README.md`, `launch.md`, `docs/demo.md`, `docs/keepass-and-agents.md`, `site/public/index.html`. `scripts/verify-demo.sh` holds them to what the built binaries print. New documentation paths also trigger CI unless explicitly ignored. Never add a `docs/**` entry. Documentation pull requests still run both of those. `site/README.md` is outside both, and Cloudflare's build watch path is `site/`, so a push touching it redeploys keypaste.com with identical bytes while no workflow runs at all.
+## Local verification and delivery
 
-## Releases are immutable
+Run `./scripts/verify.ps1` in PowerShell or `bash scripts/verify.sh` in Bash after the final code and document edits. The PowerShell launcher selects Git Bash on Windows. The default `all` profile validates workflows, prepares both solutions and the separate consistency project, checks offline scripts and real CLI/MCP process interactions, and runs all three test targets in Release.
 
-The release procedure and platform/channel support matrix live in [docs/RELEASE.md](docs/RELEASE.md). Published version paths must be immutable. `release.yml` publishes through [publish-release.sh](scripts/publish-release.sh), which refuses any destination it cannot positively verify as empty and is held to that by [verify-release-destination.sh](scripts/verify-release-destination.sh) (F.4a). If publication leaves a partial version, use a new version rather than replacing its objects — the guard will refuse the old one, which is the intended behaviour. Verify what can be verified before tagging.
+The command requires the pinned SDK, Git, jq, GNU timeout and running Docker. Linux and Git Bash supply GNU timeout; macOS can use `gtimeout` from coreutils. Process integration checks have an eight-minute deadline and a ten-second termination grace. Only `all` and `workflows` need Docker; `compat` also needs installed KeePassXC. Use `--list` to inspect commands, or select `backend`, `desktop`, `records`, `scripts`, `integration`, `workflows` or `compat` during development. `desktop` includes consistency tests. The script owns the command list; other operating systems, NativeAOT, packaging and public installation retain their separate gates.
 
-For `workflow_dispatch`, the workflow file must exist on the **default branch** before it can be dispatched. A dispatch can then select a branch or tag with `--ref`; it does not always run the default branch. See [GitHub's manual workflow procedure](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
+Run locally executable checks before pushing. Use `records` after editing DECISIONS or STEPS, then `all` after final edits. Feature branches may hold reviewable checkpoints for pull requests or platform experiments, including a named failing regression. Record why remote execution is needed and retain its source SHA. Integrate a completed step as one coherent commit after its Build, verifier and records are complete.
+
+Separate discovery from repair when the mechanism is unknown. A discovery row delivers a reproducible experiment and measured conclusion; its repair row depends on that result. Before a long probe, run a short preflight and state which outcomes distinguish the hypotheses. Keep instruments, readers and regressions in the tree. Retain the source SHA, platform, command, counts and limitations using [diagnostics.md](docs/diagnostics.md). An inconclusive run identifies the next experiment and leaves the diagnosis open.
+
+Put reproducible defects in STEPS with a verifier and priority, including defects found during another task. The ideas table may link to the task. Preserve the failing observation until a regression and repair explain it; a passing retry does not close an intermittent defect.
+
+## Releases
+
+[RELEASE.md](docs/RELEASE.md) owns release procedures and the platform/channel matrix. Published version paths are immutable. [publish-release.sh](scripts/publish-release.sh) requires a positively verified empty destination. A partial publication requires a new version; never replace its objects. Complete available verification before tagging.
+
+A manually dispatched workflow must exist on the default branch. Use `--ref` to select the branch or tag to run. See [GitHub's manual workflow procedure](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
 
 ## Git
 
-- **Merge locally. Never the GitHub merge button** — it stamps its own identity on the merge commit.
-- Commit messages are a subject line only, no body unless asked.
-- **Every commit is authored as the project: `keypaste <contact@keypaste.com>`.** This is a
-  pseudonymous project and no individual's name or personal address belongs in its history, its
-  pages, or its metadata. Set globally, enforced locally by `.git/hooks/pre-commit`, and required to
-  match the `Signed-off-by` trailer by `dco.yml`. If a commit is ever authored otherwise, fix it
-  before it is pushed — after a push it is public and only deleting the repository takes it back,
-  which is what D-0087 cost once already.
+Author every commit as `keypaste <contact@keypaste.com>`, including agent-written commits. Use the project identity in first-party pages and metadata while retaining required upstream attribution. Use a subject of at most 72 characters and a matching `Signed-off-by` trailer; include no other body unless requested. Correct an unintended identity before pushing. Merge locally because the GitHub merge button supplies its own identity.
 
 ## Records
 
-Each fact has one authoritative owner; other documents link to it. Explicit user direction authorizes amendments within its scope; do not leave an accepted change only in a proposal or ask the user to repeat that authorization. Amend PRODUCT by its dated re-ratification rule, preserve §3, record the reason in DECISIONS, and update STEPS in the same change. A pending proposal does not amend scope, and a documentation change does not make a feature built.
+Each fact has one authoritative owner; other documents link to it. Explicit user direction authorizes amendments within its scope. Product scope changes require dated re-ratification, a decision record and an updated plan; preserve the security laws in PRODUCT §3. Editorial changes preserve requirements and evidence.
 
 | Document | Owns |
 |---|---|
 | [README](README.md) | Introduction, published installation instructions and navigation |
-| [PRODUCT](docs/PRODUCT.md) | Ratified product scope and laws. §3 does not change; the rest changes only by a dated re-ratification. If a decision conflicts with it, the decision is wrong. |
-| [STEPS](docs/STEPS.md) | Current delivery status, ordered tasks, dependencies and acceptance evidence |
-| [RELEASE](docs/RELEASE.md) | Release procedure, distribution support matrix and publication/install verification requirements |
-| [FEATURES](docs/FEATURES.md) | Dated feature baseline and comparison inventory, with implementation evidence and gaps |
-| [ALIGNMENT](docs/ALIGNMENT.md) | Concise explanation of the adopted direction and its owner-document mapping; no independent status or task queue |
-| [DECISIONS](DECISIONS.md) | Lasting decisions and reasons, and pending ideas. One line per decision, only when architecture, security or money changes; ideas are one line each. The archive below the line is frozen. |
+| [PRODUCT](docs/PRODUCT.md) | Ratified scope and laws; conflicting decisions do not override it |
+| [STEPS](docs/STEPS.md) | Delivery status, ordered tasks, dependencies and acceptance evidence |
+| [RELEASE](docs/RELEASE.md) | Distribution matrix, publication and installation verification |
+| [FEATURES](docs/FEATURES.md) | Dated capability baseline, implementation evidence and gaps |
+| [ALIGNMENT](docs/ALIGNMENT.md) | Adopted direction and links to its owning documents |
+| [DECISIONS](DECISIONS.md) | Architecture, security and money decisions, pending ideas, and links to historical decisions; one line per current record |
 | [CHANGELOG](CHANGELOG.md) | Significant user-visible changes, separating Unreleased work from published versions |
-| [SECURITY](SECURITY.md) and [THREATS](THREATS.md) | Reporting and security guarantees; threat model and known limits, respectively |
-| This file | Contribution workflow and document ownership; topic guides hold their local usage instructions |
+| [SECURITY](SECURITY.md) and [THREATS](THREATS.md) | Reporting, security guarantees, threat model and known limits |
+| This file | Contribution workflow and document ownership |
 
-`docs/STEPS.md` is the single executable build plan. It starts with **Current status** and **Build order**, then groups tasks under **Working proposition**, **Pilot ready**, **Paid release**, **Expansion** and **Scale**. Commercial plans belong in PRODUCT and do not set task priority. Each checkbox is one bounded task with a stable ID, explicit **Needs**, a **Build** prompt and a falsifiable **Verify** prompt. Split oversized work into lettered children; completing one child does not complete its siblings or parent gate. Record concise evidence beside completed work rather than copying implementation history into the plan.
+STEPS is the executable build plan. Keep only the next five tasks detailed; later rows carry an ID, name, Needs and purpose. Each detailed task has a bounded Build and a falsifiable Verify prompt that traces to PRODUCT. Split oversized work into children while preserving IDs and dependencies. Completing a child leaves its siblings and parent gate open. Completed work moves to a concise evidence row, and the next task gains detail.
 
-**Pick the first unchecked task with completed Needs in the earliest unfinished active milestone, skipping BLOCKED tasks.** Passing its numbered gate advances the milestone even if explicitly optional rows remain open; those rows retain their status and later dependencies. Build and verify the selected task, update its checkbox and evidence, then stop unless the user requested several tasks. A named later task may be prepared when its prerequisites exist; preparation cannot bypass milestone or publication gates. Advanced KeePassXC coverage is accepted Expansion scope after the Working proposition gate; team work follows the Pilot ready gate and a selected pilot scope. Scale activates only on its recorded evidence trigger. Follow STEPS for the exact task dependencies and activation evidence.
+Pick the first unchecked task with completed Needs in the earliest unfinished milestone, skipping BLOCKED tasks. Follow an unchecked prerequisite to its first ready task even if it belongs to a closed milestone. Build, verify and record the selected task, then stop unless the user requested continued work. A milestone's numbered gate may advance it while optional rows remain open; those rows keep their dependencies. Follow STEPS for milestone activation, including the Working proposition prerequisite for advanced KeePassXC coverage, Pilot ready prerequisites for team work, and evidence required to activate Scale.
 
-A task exists only when its verifier can fail against repository artifacts or retained operational evidence and it traces to PRODUCT. Preserve meaningful IDs and references when moving work. Explicitly distinguish existing code, remaining behavior and external acceptance: source implementation, a local demo or a successful pipeline cannot close an unfinished user journey or public release gate. Keep future prompts brief until activated. A documentation or local implementation task does not authorize publishing, sending messages or changing customer data.
+During an external wait, record the pending result and its next decision. If the user authorized continuing delivery, work on one independent ready task in the same milestone, keeping its changes isolated. Resume the waiting task when evidence arrives. Preparation cannot bypass a prerequisite or publication gate.
 
-Use the four states defined in [RELEASE.md](docs/RELEASE.md#status-vocabulary): **Implemented**, **Packaged**, **Published** and **Installation-verified**. Record the version, platform and evidence; one state does not establish the next. A workflow artifact is not a public release, and a feature in `main` is not necessarily in the latest download.
+Use RELEASE's four states: Implemented, Packaged, Published and Installation-verified. Record version, platform and evidence. Source code, a local demo or a green pipeline cannot establish an unfinished user journey or public release. Documentation and local implementation do not authorize publication, messages or customer-data changes.
 
-If a gate needs an unchecked prerequisite in another section, follow that prerequisite to its first ready task before attempting the gate, including optional work left in a closed milestone. External action evidence cannot be inferred from elapsed time or local preparation.
+Rewrite outdated text instead of appending another account. Keep current claims with their owners and history in Git. Published claims require supporting evidence (D-0036).
 
-**Rewrite, don't append.** When something changes, say what is true now and delete the old text. Git holds history. A claim on a published page may only say what a gate holds (D-0036).
+## Optional symbol index
 
-## graphify — optional, local, and not something this repository ships
-
-`graphify-out/` is a symbol index somebody may have generated on their own machine. It is gitignored, no gate reads it, and a fresh clone has none — so everything here is conditional on `graphify-out/graph.json` actually existing, and nothing below is a reason to hold up work when it does not.
-
-- **It indexes `src/`, so use it for questions about `src/`.** `graphify query "<question>"` for a scoped subgraph, `graphify path "<A>" "<B>"` for a relationship, `graphify explain "<concept>"` for one concept. `graphify-out/GRAPH_REPORT.md` is for broad architecture review only.
-- **It is the wrong index for the documents**, which is most of what changes here. Asked for the project's status it returns xUnit method names; `docs/STEPS.md` answers that in one page. Read the governance files directly.
-- `graphify update .` after changing code, if you are using it at all. AST-only, no API cost.
-
-The hook that enforces this lives in `.claude/settings.local.json` and is gitignored with it, because its command is an absolute path to one machine's binary.
+Use graphify only when `graphify-out/graph.json` exists. It indexes `src/`; read documents directly for scope and status. `graphify query`, `graphify path` and `graphify explain` inspect symbols and relationships. If using the index, run `graphify update .` after source changes. The index and its machine-specific hook are gitignored and are not build prerequisites.

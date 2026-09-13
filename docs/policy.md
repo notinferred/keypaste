@@ -1,37 +1,35 @@
 # Pre-approving with a policy file
 
-Normally keypaste asks you before creating an approval, then reuses it for matching requests while it remains live. A policy file is how you say yes in advance to a narrow, repeating case — so `keypaste agent` releases that one credential without an initial prompt.
+A policy file authorizes matching credential requests without a prompt. The file exists only if you write it. Any error disables all rules, and requests follow the ordinary prompt and cached-approval path.
 
-**This is the path that requires no per-request human approval at any point.** It is built to fail towards asking you. There is no policy file unless you write one, and anything wrong with it disables all of its rules. Requests then follow the ordinary prompt and cached-approval path.
-
-## The short version
+<a id="the-short-version"></a>
 
 ```sh
 $EDITOR ~/.keypaste/policy.toml
-keypaste policy ls          # check it means what you meant
+keypaste policy ls
 keypaste agent --vault ~/vaults/personal.kdbx
 ```
 
 ```toml
 [[allow]]
-client          = "claude-code"     # the --client-label you gave the bridge
-entries         = ["env/dev/**"]    # which entries
-fields          = ["password"]      # which field of them
-max_ttl_seconds = 300               # the longest grant to issue
-max_per_hour    = 20                # optional; omitted means no limit
+client          = "claude-code"
+entries         = ["env/dev/**"]
+fields          = ["password"]
+max_ttl_seconds = 300
+max_per_hour    = 20
 ```
 
-keypaste reads this file and never writes it. There is no `keypaste policy add`, on purpose: a command that edits your authorization file is a command an agent could talk somebody into running.
+`keypaste agent` reads the file but never writes it. There is no command to edit authorization rules that an agent could persuade someone to run.
 
-## Read this part before you write a rule
+<a id="read-this-part-before-you-write-a-rule"></a>
 
-**`entries = ["env/dev*"]` almost certainly does not mean what you think.**
+## Pattern matching
 
-A pattern is split into a *group path* and a *title*. Unless the last segment is exactly `**`, the last segment is the **title**. So `env/dev*` means *group exactly `env`, title starting `dev`*. It matches nothing at all under `env/dev/`, and it does match an entry sitting directly in `env` called `devops_ROOT_TOKEN` — which you probably were not thinking about.
+Patterns split into a group path and title. The last segment is the title unless it is exactly `**`. Thus `env/dev*` matches `env/devops_ROOT_TOKEN` but nothing under `env/dev/`.
 
-For a subtree, write `env/dev/**`.
+Use `env/dev/**` for that subtree. Policy uses the same matching language as `--expose`.
 
-This is not a quirk keypaste can fix without inventing a second, subtly different matching language from the one `--expose` already uses, which is worse. What it does instead is never echo your line back at you. `keypaste policy ls` prints the two halves your pattern actually parsed to:
+`keypaste policy ls` shows the parsed group and title separately:
 
 ```
 1. The client labelled "claude-code"
@@ -42,25 +40,29 @@ This is not a quirk keypaste can fix without inventing a second, subtly differen
    No limit on how often.
 ```
 
-Read that block, not the line you typed. If the two halves are not what you meant, the rule is not what you meant.
+Check both parsed parts before enabling the rule.
 
-## The keys
+<a id="the-keys"></a>
+
+## Rule keys
 
 | Key | Required | What it is |
 | --- | --- | --- |
-| `client` | yes | The `--client-label` the bridge was started with. `"*"` means any *labelled* client. |
+| `client` | yes | The `--client-label` the bridge was started with. `"*"` means any labelled client. |
 | `entries` | yes | Patterns, in the same syntax as `--expose`. Up to 16, each up to 128 characters. |
 | `fields` | yes | Any of `password`, `username`, `url`, `notes`. |
 | `max_ttl_seconds` | yes | 1 to 3600. The agent gets the smaller of this and `--max-ttl`. |
 | `max_per_hour` | no | 1 to 1000 releases an hour through this rule. Omitted means no limit. |
 
-**Nothing defaults.** A missing `fields` does not mean every field; a missing `entries` does not mean everything; a missing `client` does not mean anyone. Each of those would be a way for a typo in a key name to silently widen a rule, so every one of them is a refusal instead.
+Every required key must be present. Missing `fields`, `entries` or `client` disables the file, preventing a misspelled key from widening access.
 
-Rules are tried in order and the first one that matches decides. A rule that matches but has spent its hourly allowance refuses the request — it does not fall through to the next rule, and it does not escalate to a prompt.
+The first matching rule decides. If its hourly allowance is exhausted, the request is refused without trying another rule or prompting.
 
-### `client` is the label *you* wrote, not the name the agent claims
+<a id="client-is-the-label-you-wrote-not-the-name-the-agent-claims"></a>
 
-The name an MCP client asserts about itself is unauthenticated: any process that can start `keypaste-mcp` can call itself `claude-code`. keypaste has never made an authorization decision from it and does not start now.
+### Client labels
+
+The MCP client's self-reported name is unauthenticated and never used for authorization.
 
 What a rule matches is `--client-label`, which you write into your MCP client's configuration:
 
@@ -68,20 +70,19 @@ What a rule matches is `--client-label`, which you write into your MCP client's 
 { "command": "keypaste-mcp", "args": ["--client-label", "claude-code", "--expose", "env/**"] }
 ```
 
-Be clear about what this buys, because it is less than it looks. It means the *agent* cannot choose which rules apply to it. It does not mean another program on your machine could not start a bridge with the same argv — it could, and then your rules would apply to it too. **Client-scoped policy narrows convenience, not authority.** THREATS.md T-14 is the full argument.
+The configured label prevents the agent from selecting a policy identity. Another local program can still start a bridge with the same arguments and receive the same policy access. THREATS.md T-14 describes this boundary.
 
-A bridge started with no `--client-label` matches **no rule at all**, including one written `"*"`.
+A bridge started with no `--client-label` matches no rule at all, including one written `"*"`.
 
 ## What a rule cannot do
 
-- **It cannot widen `--expose`.** The bridge's exposure is checked first, against the resolved entry, and a rule is only ever consulted for something already inside it. A rule saying `entries = ["**"]` under a bridge started `--expose "env/**"` reaches exactly `env/**`.
-- **It cannot raise `--max-ttl`.** Both ceilings apply and the rule may only lower. A rule asking for an hour under `keypaste agent --max-ttl 60` grants sixty seconds.
-- **It cannot overturn a refusal you just gave.** A "no" you typed is more specific and more recent than a rule you wrote last month.
-- **It cannot make an entry listable.** `list_entry_names` is governed by `--expose` alone; the listing path is never handed the policy at all.
+A rule applies only within `--expose`, which is checked against the resolved entry first. `entries = ["**"]` on a bridge configured with `--expose "env/**"` still reaches only `env/**`. A rule can lower `--max-ttl` but cannot raise it. An hour-long rule under `keypaste agent --max-ttl 60` grants sixty seconds. A recent explicit refusal takes precedence over a policy rule. `list_entry_names` uses `--expose` alone; policy does not affect listing.
 
-## Anything wrong means everything asks you
+<a id="anything-wrong-means-everything-asks-you"></a>
 
-There are six states the file can be in. Only **Usable** supplies rules. The other five supply none and follow the ordinary approval path; the requester is not given the policy-loading error. Your terminal distinguishes them so you can tell an absent policy from one that failed to load. A usable rule's releases identify it in the audit and response, so policy use is not hidden from the requester.
+## Load errors
+
+Only the Usable state supplies rules. Other states follow the ordinary approval path without giving the requester the loading error. The terminal reports the state; policy releases name the rule in the audit and response.
 
 | State | What `keypaste agent` says |
 | --- | --- |
@@ -92,39 +93,39 @@ There are six states the file can be in. Only **Usable** supplies rules. The oth
 | Unreadable | `policy: … is NOT in force - it could not be read: …` |
 | Writable by others | `policy: … is NOT in force - it is writable by users other than its owner` |
 
-A file that is *partly* wrong is not partly in force. Two good rules and one bad line means **zero** rules — there is no way to know whether the difference between what the file says and what you meant is narrower or wider, so the only safe reading of it is that it says nothing.
+Any invalid line disables the whole file because a partial interpretation could widen access.
 
-None of these stops the agent starting. A typo in a policy file must not be a way to lock you out of your own vault.
+A policy-loading error does not stop the approver from starting.
 
 ## The file format
 
-A deliberately small subset of TOML: `#` comments, `[[allow]]` section headers, and `key = value` where the value is a double-quoted string, a whole number, or an array of double-quoted strings.
+The parser accepts a subset of TOML: `#` comments, `[[allow]]` sections, and `key = value` with double-quoted strings, whole numbers or arrays of double-quoted strings.
 
-Anything else is a parse error naming the construct — dotted keys, inline tables, single-quoted or multi-line strings, floats, booleans, dates, hex, a singular `[table]` header, a trailing comma. So is a `[[deny]]` section: a rule shape from a later keypaste invalidates the file rather than being skipped while the `[[allow]]` rules stay in force.
+Unsupported syntax produces a parse error, including dotted keys, inline tables, single-quoted or multiline strings, floats, booleans, dates, hex, singular `[table]` headers and trailing commas. An unknown `[[deny]]` section also invalidates the file; unsupported rules cannot be silently skipped.
 
-A pattern or a label containing anything that would not survive being printed as written — a bidi override, a zero-width space, a Unicode tag character — is also refused, so a rule cannot render as `env/dev/**` while meaning `env/**`.
+Patterns and labels cannot contain characters that hide their meaning when printed, such as bidi overrides, zero-width spaces or Unicode tags.
 
 ## Permissions
 
 Your policy file decides what an agent may take without asking, so anything that can write it can grant that access.
 
-On Linux and macOS, keypaste **refuses** a policy file — or a `~/.keypaste` directory — that is writable by anyone but its owner, and says so. It does not repair it. Repairing would be a race, and it would erase the evidence that something was wrong with an authorization document. Run `chmod 600 ~/.keypaste/policy.toml` and `chmod 700 ~/.keypaste` and restart.
+On Linux and macOS, keypaste refuses a policy file or `~/.keypaste` directory writable by anyone except its owner. It leaves permissions unchanged to avoid a repair race and preserve evidence. Run `chmod 600 ~/.keypaste/policy.toml` and `chmod 700 ~/.keypaste`, then restart.
 
-**On Windows there is no equivalent check**, the same gap the audit log and `env export` have. This is stated rather than papered over: a half-check that passes on a world-writable directory is worse than none, because it implies one happened.
+Windows has no equivalent permission check, as with the audit log and `env export`.
 
-**Keep this file out of synced folders.** `~/.keypaste` is deliberately not beside your vault. If you point `KEYPASTE_HOME` at Dropbox or iCloud, another machine writes this machine's authorizations.
+Keep the policy file out of synced folders. Pointing `KEYPASTE_HOME` at Dropbox or iCloud lets another machine change this machine's authorizations.
 
-## It is read once, at startup
+<a id="it-is-read-once-at-startup"></a>
 
-`keypaste agent` reads the file when it starts and holds those rules for the whole session. Editing it changes nothing until you restart the agent — which means re-typing your master password, and which means a policy only ever comes into force with you present.
+## Reloading policy
 
-`keypaste policy ls` reads the file *now*. If the agent has been running since before you edited it, the two can disagree — so both print a short hash of the exact bytes they read:
+`keypaste agent` reads the file once at startup. Changes take effect after restarting and entering the master password again.
+
+`keypaste policy ls` reads the current file, which can differ from a running approver's copy. Both commands print a short hash of the bytes they read:
 
 ```
 2 rules, from /home/you/.keypaste/policy.toml [sha256:e75ea9d3]
 ```
-
-Same hash, same rules.
 
 ## What is written down
 
@@ -134,7 +135,7 @@ Every release through a rule appends a line to `~/.keypaste/audit.jsonl` with `"
 {"decision":"granted","method":"policy","reason":"pre-authorized by policy rule allow#1 (env/dev/**, password)"}
 ```
 
-It is never `"method":"prompt"`. That word means a person was shown that specific request, and on this path nobody was. A request refused for spending its allowance is `"method":"policy-limit"`.
+`method: prompt` is reserved for requests a person was shown. An exhausted rule records `method: policy-limit`.
 
 The agent also prints one line to its own terminal per release:
 
@@ -142,20 +143,18 @@ The agent also prints one line to its own terminal per release:
 keypaste: released env/dev/STRIPE_KEY to allow#1 for 300s without asking
 ```
 
-That line and the audit log are the only signals that a silent release happened. There is no prompt to notice.
+<a id="the-honest-limits"></a>
 
-## The honest limits
+## Limits
 
-- **A rule is a standing grant over a part of your vault as it is now, not as it was when you wrote it.** Anything that can write into that part — a synced vault, a colleague on a shared file, a hostile `.env` you imported — chooses what the rule covers. Move `personal/bank` into `env/dev` and a rule for `env/dev/**` covers it.
-- **With a rule in force, no human sees the request.** The agent's stated reason is recorded and read by nobody. The controls that exist are narrow `entries`, a small `max_per_hour`, and a short `--max-ttl`.
-- **TTL does not revoke a released credential.** Policy releases do not populate the prompt's grant cache: each request is checked against the rule and its allowance. The lifetime returned to the client cannot erase its copies or enforce expiry at the credential's provider.
-- **A rule names a client label any process on your machine could claim.** See above.
-- **There is no way to see which entries a rule matches today.** `keypaste policy ls` shows what each rule *means*, not what it currently *covers*. That is the mitigation this feature most wants, and it needs an unlocked vault — which would put a master password prompt in front of the command you reach for when something already looks wrong. It waits for the GUI, where a vault is open because you opened it. What you have meanwhile is after the fact: every release names the rule that made it, so `keypaste log` tells you what a rule has actually covered.
+A rule covers the vault's current contents. Anyone able to edit or synchronize that subtree can change what it covers. Moving `personal/bank` into `env/dev` makes it match `env/dev/**`. Policy releases show no prompt, and nobody reviews the stated reason at release time. Narrow `entries`, a low `max_per_hour` and a short `--max-ttl` limit access. Each policy request is checked against the rule and its allowance; policy releases do not populate the prompt approval cache. The returned lifetime cannot erase client copies or expire credentials at their provider.
+
+`keypaste policy ls` shows pattern semantics but cannot preview matching entries. That requires an unlocked vault and is deferred to the GUI. The audit log names each applied rule so `keypaste log` can show its past releases.
 
 THREATS.md T-13 through T-17 are the full versions of these.
 
-If you have not seen the prompt a rule replaces, [**Claude asks for a key, you approve, the deploy runs**](demo.md) is that flow end to end, with nobody's rules in the way.
+[Claude asks for a key, you approve, the deploy runs](demo.md) shows the prompt a policy rule replaces.
 
 ## Verifying it yourself
 
-`scripts/verify-policy-e2e.sh` runs a real `keypaste agent` and a real `keypaste-mcp` as separate processes and asserts that a covered request returns the credential with no prompt drawn, that the same agent still prompts for anything outside the rule, that a rule cannot reach past `--expose` or raise `--max-ttl`, that an unlabelled bridge matches nothing, that a malformed file grants nothing, and that the credential never reaches the audit log. It runs on Linux, macOS and Windows in CI.
+`scripts/verify-policy-e2e.sh` tests real approver and MCP processes on Linux, macOS and Windows. It checks silent policy release, ordinary prompting outside the rule, exposure and TTL ceilings, refusal of unlabelled bridges and malformed policies, and exclusion of credentials from the audit log.
