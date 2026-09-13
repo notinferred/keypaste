@@ -14,18 +14,13 @@
 The local vault, CLI/env workflow and approval bridge are implemented and **published as `v0.2.0`**,
 installed and exercised on all four native targets from clean runners; the desktop is a source build
 with partial entry/env screens, and no hosted service, web vault, mobile client or organization
-credential service exists. Three repairs are open — F.9 and F.10, and F.2b2, BLOCKED on hardware
-rather than on work. F.6 is closed: D-0122 measured why build 10.0.26100 refuses a save its own
-temporary name, and D-0123 repaired it. F.8 is closed: its diagnostic named the refusal on the first
-reproduction, and what it named — a 500 ms connect that took 5834 ms against a listener that was up —
-is F.9 rather than more of F.8. **F.9 is measured and named, and unrepaired.** Its three arms over the
-pool's worker floor failed 16, 8 and 0 of 80 suite runs on `windows-2025`, so the mechanism is
-thread-pool worker supply and D-0125's inference is now a reading (D-0128). It is two defects
-sharing that cause: a live approver reported absent, and the bridge's test host parking its own
-workers in blocking reads on its anonymous pipes while test-side waits run. Both are repaired with
-regressions; one confirming dispatch closes them. The measurement also split the row: the
-save moved 4, 4 and 2 of 80 across the same 256-fold change and left as **F.10**, where the budget is
-already met and the whole variance sits in the one attempt that takes the process-wide save gate.
+credential service exists. Two repairs are open — F.10, and F.2b2, BLOCKED on hardware rather than
+on work. F.6, F.8 and F.9 are closed. F.9 was thread-pool worker supply (D-0128) as two defects: the
+bridge's connect let its own deadline run before it tried the pipe, so a running approver was reported
+absent, and the bridge's test host parked its workers in blocking reads on its own anonymous pipes.
+Both are repaired in `main` and neither is in the `0.2.0` download, which still discloses the first
+(D-0129). F.10 is the save that measurement split off: its budget is already met and the whole
+variance sits in the one attempt that takes the process-wide save gate.
 
 Release foundations are closed through R.0c: `0.1.0` is superseded and says so where it is
 downloaded, and the pages, the definition and keypaste.com name `0.2.0` — which R.0e made true of
@@ -101,6 +96,7 @@ deletion or restoring history, and the F rows are defects found after those orig
 | F.6 | A save no longer contends for a temporary name any other KeePass-family program wants | [V-F.6](../tests/Keypaste.Core.Tests/ConcurrentVaultSaveTests.cs) red 5 of 5 on `windows-2025` without the fix and green 5 of 5 with it, budget 1 both ways; runs 34640639830 and 34644315829 bound the two sets; D-0122, D-0123 |
 | F.7 | A save refused the vault's own name is retried, and reverts nobody | [transacted-name tests](../tests/Keypaste.Core.Tests/VaultSaveUnderATransactedNameTests.cs); 6800 observed by [txf-probe](../scripts/txf-probe.cs) on Windows 10 Pro 19045 and by the regression on windows-2025, ci run 34602290950; D-0119, D-0120 |
 | F.8 | A refused listing says which refusal it was, and how long it took | [ListingCall](../tests/Keypaste.Mcp.Tests/ListingCall.cs) red 2 of 2, green 8 of 8; 12 of 80 on `windows-2025`, probe run 34653284139: `no-approver` at 5834 ms against 500 ms, listener up throughout. Dispatched against a removed commit, tests unchanged. D-0124 |
+| F.9 | A running approver is never reported absent for want of a free worker | [PoolShortageTests](../tests/Keypaste.Mcp.Tests/PoolShortageTests.cs) red then green for the connect and the harness pipes; run 34728679951: 0 of 80 bridge failures starved and as-found; D-0128, D-0129 |
 | R.0a | One checked release definition drives both workflows and the download pages | [release-targets.json](../release-targets.json); [verify-release-matrix.sh](../scripts/verify-release-matrix.sh) refuses 31 cases; the prerelease suffix reached all three desktop targets on tag run 34542636558; D-0108 to D-0112 |
 | R.0b | A release is complete only when the public bytes say so | [release-completion.sh](../scripts/release-completion.sh) recorded 0.2.0 and verified all 11 assets anonymously at the origin, run 34549357893; six fixtures in [verify-release-completion.sh](../scripts/verify-release-completion.sh); D-0116 |
 | R.0c | 0.2.0 published and installed on all four native targets from clean runners | release run 34549357893; install runs 34549933842 and 34551580519, the second running README verbatim, each target creating a vault and injecting into a child. macOS and Windows floors stay `cited`: the runners sit above them, not on them |
@@ -124,88 +120,6 @@ only after the published product passes its complete user journey.
 The bounded 2026-09-07 review found these while the local Windows suites reported 1,169 passed and five
 platform-specific skips. Each needs a regression that fails before the fix, recorded in repository
 fixtures rather than a maintainer's temporary files.
-
-- [ ] **F.9 — Every bounded wait on the MCP bridge overran when the pool ran short of workers.** Needs: 2.1.
-  **Mechanism named, repair open.** [pool-probe run 34701431621](https://github.com/notinferred/keypaste/actions/runs/34701431621)
-  ran `ci.yml`'s test command eighty times per arm on `windows-2025` over one knob, the pool's worker
-  floor, and the MCP bridge failed **16 of 80 at a floor of 1, 8 of 80 at the runner's default of 4,
-  and 0 of 80 at a floor of 256**. Every arm read its floor back out of the process it measured —
-  `min 1/1`, `min 4/1`, `min 256/1`, `cpus 4` — so no count is filed under an arm it did not measure.
-  Zero at a floor above demand, monotonic below it: the mechanism is **thread-pool worker supply**,
-  and D-0125's inference is now a measurement. The as-found arm's 8 of 80 is consistent with
-  [listing-probe](https://github.com/notinferred/keypaste/actions/runs/34653284139)'s 12 of 80; the two
-  readings agree on rate, and neither pins it.
-  **It is wider than the four shapes F.9 was opened on, and it is two defects, not one.** Ten
-  distinct tests overran across the bridge, every one of them waiting on a thread-pool timer or
-  continuation — `CancellationTokenSource.CancelAfter` at
-  [ApproverClient](../src/Keypaste.Core/Ipc/ApproverClient.cs), `Task.WaitAsync`, `Task.Delay` raced by
-  `Task.WhenAny` — so a floor below demand delays the deadline and the work item together, and a
-  budget of 500 ms was never enforced at 500 ms. What each failure said, checked against the pool
-  reading attached to it, divides them into two classes:
-  1. **A live approver reported as absent** — the disclosed symptom, 16 failures:
-     `OnAPolicyGrant_TheRequestedFieldComesBack_AndOnlyThat` ("No keypaste agent is running"),
-     `AnUndeliverableRelease_AsksAPersonOnce`, both listing-size tests, and
-     `AnApproverThatStopped_IsReportedAsUnreachable`, whose *first* request to a live approver came back
-     null. `NamedPipeClientStream.ConnectAsync` queues its whole connect loop to the pool and checks its
-     token before the first try (runtime v10.0.10), so once the `CancelAfter` budget ran first the pipe
-     was never tried at all. [PoolShortageTests](../tests/Keypaste.Mcp.Tests/PoolShortageTests.cs) is
-     red 3 of 3 with `outcome Unreachable` from a pool pinned to two workers with none free, and green
-     5 of 5 once the connect is the synchronous, self-timing one on a thread of its own, at the same
-     500 ms.
-  2. **The test host's pool stalls while test-side waits run** — none of them a wrong answer:
-     `TheBusyRefusalIsRecordedInTheAuditLog`, `AListingWhileARequestIsOpen_IsBusyAndIsRecorded`,
-     `AnIdentityThatNeverArrives_StillRefuses` (a 120 ms grace that took 5.3–6.2 s and still refused),
-     `AfterTheFirstRequestResolves_AFreshRequestIsAskedNormally`,
-     `ACancelledExchange_DoesNotSendTheRequestAgain`, and
-     `TheSlotSurvivesRefusal_SoARefusedBridgeIsNotAWedgedOne`, first seen failing in run 34726902396.
-     The first two were recorded as their own class, a BUSY refusal lost to queueing; "queued behind
-     the prompt" was the test's own failure message, and the reading attached to both contradicts it —
-     **0 pool samples in 15–17 s**, and the test's own ten-second delay firing 6.6 s late, against a
-     refusal that is a non-blocking `Wait(0)` taken as soon as the call is dispatched.
-     **The producer is the harness's own channels.** Run 34713153644's liveness probe found 32 stalls
-     of two seconds or more in the bridge's test host, none in the relieved arm, 18 of them beside
-     nothing the timeline marked, with six to eight workers busy whether four threads existed or
-     eighteen. Run 34726902396 dumped that process three seconds into each such stall: in 33 dumps,
-     **202 of 205 busy pool workers were blocked in `ReadFile` under a `System.IO.Pipes`
-     async-over-sync read**. The product's pipes are all opened `Asynchronous`; the only pipes in that
-     process that cannot read asynchronously are [McpHarness](../tests/Keypaste.Mcp.Tests/McpHarness.cs)'s
-     anonymous client/server channels, whose two outstanding reads each parked a worker for as long as
-     a harness stayed open — and forty harnesses across six test classes run in parallel. A real
-     `keypaste-mcp` has one stdio transport. The regression opens exactly the harness's channels in a
-     process pinned to two workers and queues a canary: red 3 of 3 (`canary never ran`), green 5 of 5
-     once [HarnessChannels](../tests/Keypaste.Mcp.Tests/HarnessChannels.cs) are in-memory `Pipe`
-     streams, whose pending read holds no thread.
-  The shortage was measured in a test host running many tests at once. A real `keypaste-mcp` answers
-  one call at a time (F.3b), so how often a user meets it is unmeasured; answering correctly under any
-  load is still the requirement.
-  **The save is not this defect and left with F.10.** It moved 4, 4 and 2 of 80 across the same
-  256-fold change in the floor, and no run ever failed on both a bridge shape and a save shape.
-  V-F.9's instruction to split on a measurement that splits is what this row follows.
-  **Widening a budget stays refused, and now on two readings** (D-0125, D-0128): a budget that
-  overran elevenfold was never enforced at its number, so raising the number raises a ceiling nothing
-  reached. Raising the pool's floor in product code is refused for the same reason and remains the
-  probe's instrument.
-  **The user-visible half stays disclosed against `0.2.0`** as `F.9` in
-  [release-targets.json](../release-targets.json), in symptom words. Nothing is repaired, so the
-  phrase does not change: it leaves only by being omitted from the `known_defects` of the version that
-  carries the fix.
-  **Build (what remains):** the confirming dispatch. Both repairs and both regressions are built. The
-  fixture key-derivation marks this row once proposed were measured and removed: `Vault.Create` took a
-  median of 0 ms and at most 188 ms across 950 fixture setups, so it was never a producer.
-  **The timeline reader is in the tree:** [f9-timeline.sh](../scripts/f9-timeline.sh), `bash` and `jq`,
-  reproducing the Python reading of run 34701431621 byte for byte across all 58 iteration directories,
-  with a `--selftest` that runs in `ci.yml` through a `jq` that writes CRLF. It left the scratchpad
-  because the same read is needed at least twice more — this row's repair is verified against a
-  timeline read the way the defect was measured, and F.10's first task changes that instrument. Any
-  `<family>-enter`/`-exit` pair is an interval. It reports how many of one family were open at once in
-  the same process, because pairing is first-in-first-out and an exit does not name the enter it
-  closes, and what else was open in that process, because a pool is one per process.
-  **Verify (V-F.9):** each class's regression red before its repair and green after — necessary, and
-  not sufficient. Then **one** confirming pool-probe dispatch, after both classes' repairs, read with the
-  timeline reader, in which all eleven bridge tests reach **0 of 80 in both the starved and as-found arms**.
-  The regressions show a repair holds when a shortage is induced; the dispatch shows it holds under
-  the load that exposed the defect, and it is part of this line rather than an extra. A repair that
-  only moves a number is refused by this line.
 
 - [ ] **F.10 — A doomed save's own first attempt, not the pool, spends its budget.** Needs: 2.1.
   **Split from F.9 on its measurement, which refuted the common story.**
@@ -252,7 +166,9 @@ fixtures rather than a maintainer's temporary files.
 - [ ] **3.5a — Enable the macOS signing identity (H-0015).** Needs: R.0a.
   **Build:** Enrol in the Apple Developer Program as keypaste, obtain a Developer ID Application certificate and a notarization credential, and put both where [app.yml](../.github/workflows/app.yml) can reach them as secrets scoped to this repository. The identity is the project's, not a person's: the name on it is what a user sees in the install prompt, and CLAUDE.md's commit-identity rule applies to it for the same reason. **This row enrols and nothing else** — 3.5b signs, and an identity that exists but has signed nothing is not 3.5b done.
   **Verify (V-3.5a):** `security find-identity -v -p codesigning` on a runner names the certificate, and a throwaway binary signs, notarizes and staples with it. Record the team identifier and the certificate's expiry beside the evidence, because both expire and neither failure is obvious until a release is blocked. **External account required**: no local preparation completes this row.
-- [ ] **3.6a — Enable the Windows signing identity (H-0017).** Needs: R.0a. — Publisher enrollment and a CI identity that can actually sign; external account required.
+- [ ] **3.6a — Enable the Windows signing identity (H-0017).** Needs: R.0a.
+  **Build:** Obtain an Authenticode code-signing identity as keypaste — an organization-validated certificate or a managed signing service — and make it usable from [app.yml](../.github/workflows/app.yml) as secrets scoped to this repository, without a private key file checked in or written to a runner's disk beyond the job. The publisher name on it is what SmartScreen and the install prompt show, so it is the project's, not a person's, for the reason CLAUDE.md's commit-identity rule gives. **This row enrols and nothing else** — 3.6b signs.
+  **Verify (V-3.6a):** On a `windows-2025` runner a throwaway executable is signed and timestamped with the identity, `signtool verify /pa /v` accepts it and names keypaste as publisher, and a changed byte is refused. Record the issuer, the timestamp authority and the certificate's expiry beside the evidence. **External account required**: no local preparation completes this row.
 - [ ] **3.5b — Sign and notarize macOS release payloads.** Needs: 3.5a, 4.7a. — Sign, notarize and staple, and fail closed when the identity is absent.
 - [ ] **3.6b — Sign Windows executables and installers.** Needs: 3.6a, 4.7a. — Authenticode-sign and timestamp the payloads and installer, and record the real install prompts.
 - [ ] **4.7b — Exercise native desktop installation candidates.** Needs: 4.7a, 4.6, 4.8, 4.9, 4.4b, 4.3b, E.1, F.1a, F.1b, F.1c, F.1e, F.2a, F.2b1, F.2b2, F.2c, F.2d, F.3a, F.3b, F.3c. — Install each candidate and complete first render, vault creation, editing, env run and approval on every supported target.

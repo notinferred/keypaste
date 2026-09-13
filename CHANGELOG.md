@@ -6,6 +6,12 @@ Versions are the ones published at `https://dl.keypaste.com/v<version>/`. Every 
 
 ## Unreleased
 
+**An agent asking for a password or for entry names is no longer told to start `keypaste agent`
+when one is already running.** On a busy machine, keypaste's bridge could give up on reaching the
+agent before it had tried even once, and then report that no agent was running. Nothing was released
+and nothing was lost, but the advice was wrong and the request had to be repeated. The bridge now
+always asks the agent before concluding it is not there, and it still waits no longer than it did.
+
 **A save that had to wait its turn no longer throws away the save it was waiting for.** When
 keypaste cannot write the vault immediately — a virus scanner has it open, or another keypaste
 process is saving the same file — it waits a moment and tries again, for about two seconds. If what

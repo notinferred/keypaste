@@ -106,7 +106,7 @@ terminal, and then try again.
 
 This is the ordinary state of things — your MCP client starts `keypaste-mcp` when it launches, probably long before you start an approver. Nothing breaks; you just get refusals until you start one.
 
-**This same refusal can also mean the machine was busy.** The bridge gives the approver half a second to accept a connection, and on a loaded machine that can pass while an approver is running and listening — so an agent is told to start something you already started. Nothing is released and no name is disclosed; the advice is what is wrong. F.9 in [STEPS](STEPS.md) has measured why: when the machine is short of thread-pool workers the half-second is not enforced at half a second, and the refusal you see was decided late rather than correctly. Nothing is repaired yet, so retrying is right.
+**This same refusal can also mean the machine was busy.** The bridge gives the approver half a second to accept a connection, and on a loaded machine that can pass while an approver is running and listening — so an agent is told to start something you already started. Nothing is released and no name is disclosed; the advice is what is wrong. This is F.9, repaired after `0.2.0`: the bridge could let its half-second run out before it had tried the pipe at all. On `0.2.0` itself, retrying is right.
 
 ## What is written down
 
