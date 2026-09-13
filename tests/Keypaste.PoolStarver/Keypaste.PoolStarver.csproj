@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Keypaste.PoolStarver</RootNamespace>
+
+    <!-- Not a test project: it holds no tests. It is a process of its own because a thread pool is
+         one per process, and F.9's regressions need a pool they can run short of workers without
+         running every test assembly beside them short too. -->
+    <IsTestProject>false</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Keypaste.Mcp/Keypaste.Mcp.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The harness's own channels, not a copy: the class-2 scenario opens what McpHarness opens. -->
+    <Compile Include="../Keypaste.Mcp.Tests/HarnessChannels.cs" Link="HarnessChannels.cs" />
+  </ItemGroup>
+
+</Project>

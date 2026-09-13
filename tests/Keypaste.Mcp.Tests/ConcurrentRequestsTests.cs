@@ -65,13 +65,16 @@ public sealed class ConcurrentRequestsTests
     private static async Task HoldingAsync(FakeApprover approver)
     {
         using var watch = PoolSnapshot.Watch("waiting for the first request to reach the approver");
+        PoolTimeline.Mark("holding-enter");
 
         try
         {
             await approver.Entered.Task.WaitAsync(_promptly, Token);
+            PoolTimeline.Mark("holding-exit");
         }
         catch (TimeoutException)
         {
+            PoolTimeline.Mark("holding-exit", "timed out");
             Assert.Fail($"the first request never reached the approver.{Environment.NewLine}{watch.Report()}");
         }
     }
@@ -88,7 +91,9 @@ public sealed class ConcurrentRequestsTests
     {
         using var watch = PoolSnapshot.Watch("a call that must not be waiting on a person");
 
+        PoolTimeline.Mark("promptly-enter");
         var winner = await Task.WhenAny(call, Task.Delay(_promptly, Token));
+        PoolTimeline.Mark("promptly-exit", winner == call ? string.Empty : "timed out");
 
         // Reported only once the race has already been lost. Assert.True evaluates its message
         // eagerly, and this test's subject is a ten-second promptness budget: an instrument that

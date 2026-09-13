@@ -135,9 +135,16 @@ jobs:
           ITERATIONS: ${{ inputs.iterations }}
           SHARD: ${{ matrix.shard }}
           ARM: ${{ matrix.arm }}
+          # A stall of three seconds writes a triage dump of the test process that stalled, so the
+          # busy workers can be named rather than counted (PoolLiveness in PoolSnapshot.cs).
+          KEYPASTE_F9_DUMP: '1'
         run: |
           set -uo pipefail
           mkdir -p probe-logs
+
+          # The dumps are uploaded from a public repository. Triage dumps carry stacks and no heap,
+          # and nothing the runner could hand a test process is left in its environment regardless.
+          unset ACTIONS_RUNTIME_TOKEN ACTIONS_ID_TOKEN_REQUEST_TOKEN ACTIONS_ID_TOKEN_REQUEST_URL ACTIONS_CACHE_URL ACTIONS_RESULTS_URL GITHUB_TOKEN
           failed=0
           control=''
 
