@@ -2,17 +2,15 @@
 
 keypaste ships an MCP server, `keypaste-mcp`, that lets an AI agent see the names of things in your vault and ask you for one credential at a time.
 
-**Read this first: `keypaste-mcp` on its own grants nothing.** It holds no vault and makes no decision. Everything it can do beyond refusing depends on a second process you start yourself:
+`keypaste-mcp` forwards requests without holding a vault or making authorization decisions. Start its approver yourself:
 
 ```sh
 keypaste agent --vault ~/vaults/personal.kdbx
 ```
 
-That is where your master password is typed, and where you are asked about each request. Set this up without it and every call is refused with a message telling you — or telling Claude to tell you — to start one. See [**Approving an agent's request**](approvals.md) for what you actually see and decide.
+Enter the master password and review requests in that terminal. Without the approver, calls are refused with startup instructions. [Approvals](approvals.md) explains the prompt.
 
-The split is deliberate: your MCP client starts `keypaste-mcp`, so `keypaste-mcp` is started by software. `keypaste agent` is started by a person, which is what makes it the only thing that ever asks for a master password.
-
----
+The MCP client starts the bridge, while you start the approver. This keeps software-triggered requests from opening a master-password prompt.
 
 ## Before you start
 
@@ -26,13 +24,13 @@ It lands at `artifacts/bin/Keypaste.Mcp/release/keypaste-mcp` (`keypaste-mcp.exe
 
 ## The short way
 
-**`setup` requires a current source build.** It was added after the published CLI/MCP `v0.1.0` release. If you installed that release, use the manual client configuration below; building `main` does not replace an older `keypaste` already on your `PATH`.
+`setup` is available in CLI/MCP `v0.2.0` and current source builds. `v0.1.0` requires manual configuration. Building the source does not replace an older binary already on `PATH`.
 
 ```sh
 keypaste setup --vault ~/vaults/personal.kdbx
 ```
 
-That finds the AI clients installed on this machine and points each one at that vault. Clients that ship a command of their own — Claude Code, Codex — are configured with it. Clients that do not — Cursor, Claude Desktop — have their block printed for you to paste, because writing a format keypaste has not verified against a real install, and then telling you it worked, would waste more of your time than asking.
+The command detects installed clients and configures Claude Code and Codex through their own commands. It prints configuration for Cursor and Claude Desktop to paste manually; those file formats have not been verified against real installs.
 
 ```
 keypaste-mcp   /home/you/.local/bin/keypaste-mcp
@@ -45,15 +43,15 @@ exposure       env/** (the default; nothing else in the vault can even be named)
   ...
 ```
 
-`--dry-run` prints the exact commands and changes nothing. `--remove` takes keypaste back out, leaving every other server in place. Running it again is the same as running it once, which is how you repoint it after moving a vault.
+`--dry-run` prints commands without changing configuration. `--remove` removes keypaste while preserving other servers. Repeating setup is idempotent and can update a moved vault path.
 
-**It grants nothing.** `setup` writes a path into a configuration file. What that path may release is still bounded by the exposure default below, still needs `keypaste agent` running, and still needs you to say yes.
+`setup` configures paths and exposure. Credential release still requires a running approver and authorization.
 
-The rest of this page is the same thing by hand — worth reading once, because it is what `setup` is doing on your behalf, and it is the only route for a client keypaste does not know about.
+The following sections show manual configuration, including clients `setup` does not recognize.
 
 ## Claude Desktop
 
-Open the config file — Claude menu → Settings → Developer → Edit Config, or by hand:
+Open Claude menu → Settings → Developer → Edit Config, or edit the file directly:
 
 | | |
 | --- | --- |
@@ -77,11 +75,11 @@ Open the config file — Claude menu → Settings → Developer → Edit Config,
 
 On Windows the backslashes must be escaped: `"C:\\Users\\you\\keypaste-mcp.exe"`.
 
-**Paths must be absolute.** The client's working directory is not yours, and a relative path will resolve somewhere you did not intend.
+Paths must be absolute. The client's working directory is not yours, and a relative path will resolve somewhere you did not intend.
 
-**There is no place here to put a master password, and there never will be.** That is the point of the design, not an omission — see the FAQ.
+Keep the master password out of client configuration; enter it only in the approver terminal.
 
-Restart Claude Desktop. The server appears under the tools icon; if it does not, see *Troubleshooting*.
+Restart Claude Desktop. The server appears under the tools icon; if it does not, see Troubleshooting.
 
 ## Claude Code
 
@@ -111,9 +109,9 @@ Use `--scope local` instead if you would rather keep it to your own machine.
 
 ## What the agent may see
 
-By default, only the `env/` subtree — the project variables `keypaste run` uses. Nothing else in your vault is nameable, let alone readable.
+Exposure defaults to the `env/` subtree used by `keypaste run`. Other entries cannot be named or read through the bridge.
 
-Widen it only if you mean to:
+To expose another group, add explicit patterns:
 
 ```json
 "args": [
@@ -123,17 +121,17 @@ Widen it only if you mean to:
 ]
 ```
 
-> **This file is your approval for what the server may name.** Every glob you add is a set of entry names an agent may read. Entry names are not passwords, but a complete inventory of your vault is what turns a vague request into a targeted one. Most people should leave the default alone.
+Each exposure glob authorizes disclosure of matching entry names. Review additions carefully: names can reveal a vault inventory and help target later requests.
 
-Patterns match the group path and the entry title as two separate things, so `*` stays inside one path segment and `**` spans any number of them. A title containing a slash is matched as a *title*, so it can never impersonate a deeper group.
+Patterns match the group path and the entry title as two separate things, so `*` stays inside one path segment and `**` spans any number of them. A title containing a slash is matched as a title, so it can never impersonate a deeper group.
 
 ## The two tools
 
-**`list_entry_names`** returns group paths and entry names only — never a user name, password, URL or note. It takes no arguments at all, deliberately: there is no parameter an agent could use to widen what it sees.
+`list_entry_names` takes no arguments and returns only exposed group paths and entry names. It cannot return usernames, passwords, URLs or notes, or widen exposure.
 
-**`request_credential`** takes `entry`, `field`, `reason` and `ttl_seconds`. It decides nothing itself: it forwards the request to `keypaste agent`, where a person answers it or a rule they wrote in advance covers it, and returns one field value with a lifetime capped by that approver's `--max-ttl`. With no approver running it is refused with a message naming the command that fixes it — which is deliberately *not* a "do not retry", because starting one takes five seconds. [**Watch it happen**](demo.md) is the sixty-second version.
+`request_credential` takes `entry`, `field`, `reason` and `ttl_seconds`. It forwards the request to `keypaste agent` for approval or a matching policy rule and returns one field with a lifetime capped by `--max-ttl`. Without an approver it refuses and names the startup command. [The demo](demo.md) shows this flow.
 
-Entry names come out of your vault, which means they are written by anyone who can edit it. keypaste strips control characters, invisible Unicode, and the punctuation that carries structure in what a model reads, then wraps the whole listing in a marked block that says it is data rather than instructions. That is a real mitigation and it is not a complete one — see [THREATS.md](../THREATS.md) T-1, which is honest about what a sanitizer cannot do.
+Anyone who can edit the vault can influence its entry names. keypaste removes control characters, invisible Unicode and structural punctuation, then labels the listing as data. Sanitization cannot eliminate prompt injection; [THREATS.md](../THREATS.md) T-1 describes the residual risk.
 
 ## The audit log
 
@@ -156,31 +154,27 @@ jq -c . < ~/.keypaste/audit.jsonl
  "prev":"0000...0000","hash":"0c806dbd...14b3c7"}
 ```
 
-`decision` is `granted` or `denied`. `method` says how it was reached, and the distinction is the useful part when you are reading this back later:
+`decision` is `granted` or `denied`; `method` records how the decision was reached:
 
 | `method` | What happened |
 |---|---|
 | `prompt` | A person was shown this exact request and answered it. With `denied`, they said no. |
-| `grant-cache` | Served from a grant a person had already given, inside its lifetime. **They did not see this request's reason** — compare it with the earlier `prompt` line for the same entry. |
-| `policy` | Released by a standing rule you wrote in `~/.keypaste/policy.toml`. **Nobody was asked at all**, and no `prompt` line exists to compare against — the `reason` field names which rule did it. See [policy.md](policy.md). |
+| `grant-cache` | A live approval was reused without showing the new reason. Compare with its original `prompt` record. |
+| `policy` | A standing rule released the field without prompting. The reason identifies the rule; see [policy.md](policy.md). |
 | `policy-limit` | A rule covered the request but had spent its `max_per_hour` allowance. |
-| `undeliverable` | The request was authorized — by a person or by a rule — and the value was too large to return in one reply, so nothing was released. The `reason` names which of the two it was. Nothing partial is ever sent. |
+| `undeliverable` | A person or policy authorized the request, but the value exceeded the reply limit. Nothing was released; the reason identifies the authorization source. |
 | `exposure` | A listing, allowed because everything named was inside your `--expose` globs. |
 | `no-approver` | Nobody was running `keypaste agent`. |
-| `out-of-scope` | The entry was outside your globs, or does not exist — deliberately the same answer, so an agent cannot use the difference to find out what exists. |
+| `out-of-scope` | The entry was outside exposure or absent. A shared response prevents existence checks outside exposure. |
 | `timed-out` / `busy` / `cooldown` | Nobody answered in time; the connection was already carrying another call, so this one was refused rather than queued behind it; or the same request was refused a moment ago. |
 | `cancelled` | The client stopped waiting before anybody answered. Nobody decided anything. |
 | `vault-locked` / `invalid-request` / `failed` | No vault open; the arguments were wrong; something went wrong. |
 | `not-initialized` | The client called a tool before finishing the MCP handshake. Denied, with the fix named; nothing was decided. |
 | `not-implemented` | Written by the early implementation of roadmap step 2.1, before approval existed; this is a step ID, not a released version. Nothing writes it now, and it is listed because the log is append-only: old records keep the word they were written with. |
 
-Four things worth knowing:
+The returned value is excluded from the log. `field` records the requested field. Current source logs the sanitized resolved entry path when available, including for opaque handles, otherwise the sanitized request argument. Published `v0.1.0` records the request argument. Keep secret values out of entry names and reason excerpts.
 
-- **The returned credential value is not added to the log.** `field` records which field was requested. Current source records the sanitized entry path returned by the approver when available, including when the agent requested an opaque handle; otherwise it retains the sanitized request argument. Published `v0.1.0` records the request argument. Entry names and reason excerpts are metadata in the log, so do not put secret values in either.
-
-- **If the log cannot be written, the call is refused.** Not logged-and-continued: refused. The log is a precondition, because otherwise breaking it would be the way to get access that leaves no trace. If the server will not start, check that `~/.keypaste` is writable.
-- **It grows without bound.** keypaste never rotates or trims it, because deleting lines is the opposite of what it is for.
-- **On Linux and macOS it is created readable only by its owner**, and keypaste tightens an existing one that is not, saying so on stderr when it does. **On Windows there is no equivalent** — it inherits its directory's permissions, the same gap `keypaste env export` has.
+Calls are refused if the audit record cannot be written. An unwritable `~/.keypaste` can also prevent startup. The log grows without automatic rotation or trimming. On Linux and macOS, keypaste creates owner-readable logs and tightens existing permissions with a stderr notice. Windows logs inherit their directory permissions without an equivalent check.
 
 ## Reading it
 
@@ -201,11 +195,11 @@ keypaste log --client claude-code --since 2h
 (!) served from an earlier approval, under a reason that person never saw.
 ```
 
-`--since` takes a span (`30m`, `2h`, `7d`) or a moment (`2026-07-20`, or a full timestamp), and `--client` matches any part of the label or the name. **A filtered view always says so**, with the count it is showing out of the count in the file, so a narrow view can never be mistaken for the whole log.
+`--since` accepts a span (`30m`, `2h`, `7d`) or timestamp (`2026-07-20` or a full timestamp). `--client` matches part of a label or name. Filtered views show both the selected and total record counts.
 
 ## Knowing it has not been edited
 
-Every record carries `prev` — the hash of the record before it — and `hash`, over its own bytes. So a record cannot be changed without breaking the link declared by the record after it.
+Each record contains its predecessor's hash in `prev` and its own hash in `hash`. Changing a record breaks the next record's declared link.
 
 ```sh
 keypaste log verify
@@ -216,17 +210,17 @@ keypaste log verify
 Latest: seq 3, hash 651f0392457b29f80f3168584758418c71734077577a9c100e83225e1783dde8
 ```
 
-It exits `5` if the chain is broken, and names the line and what happened to it — edited, removed, inserted, or written by something that is not keypaste. `keypaste log` runs the same check and puts a warning in front of the table rather than quietly showing you a file that has been altered.
+`keypaste log verify` exits 5 for a broken chain and identifies the line and problem. `keypaste log` performs the same check and warns before displaying affected records.
 
-**Two things it cannot do, and it says both on every pass.** The chain holds no secret, so anyone who can write the file can recompute the whole of it; and records deleted from the *end* leave a chain that is internally perfect, because nothing follows them to notice. For the second, write down the hash it prints and pass it back later:
+The chain has no secret key, so a file writer can recompute it. Deleting final records also leaves an internally valid chain. Both limits are printed on every successful verification. To detect loss of a previously observed record, retain its hash and supply it later:
 
 ```sh
 keypaste log verify --expect 651f0392457b29f80f3168584758418c71734077577a9c100e83225e1783dde8
 ```
 
-That fails unless a record whose own bytes still hash to it is in the file — not merely that those characters appear somewhere in it, which an entry name could be made to say. keypaste keeps no copy of the anchor, on purpose: one stored next to the thing it anchors is worth nothing. [THREATS.md](../THREATS.md) T-5 states all of this as residuals rather than leaving it to be discovered.
+`--expect` requires a record whose bytes still hash to the supplied value. keypaste does not store the anchor beside the log because a writer could replace both. [THREATS.md](../THREATS.md) T-5 covers these limits.
 
-Records written before this feature existed carry `"v":1` and no chain. They are reported as predating it and are never called tampered — and `keypaste log` marks them, and anything else the chain cannot vouch for, with a `?` in the left-hand column:
+Older `v:1` records lack a chain and are reported as predating it. `keypaste log` marks these and other unverifiable rows with `?`:
 
 ```
   time (UTC)           client       entry                decision  method
@@ -235,7 +229,7 @@ Records written before this feature existed carry `"v":1` and no chain. They are
 ?  the hash chain does not vouch for this row. Run 'keypaste log verify'.
 ```
 
-A line something else appended does not stop keypaste writing: it links past it to the last record that is part of the chain, and `keypaste log verify` reports the line. The one thing that does stop it is a record from a *newer* keypaste, because appending beneath that would fork the chain — upgrade, or move the file aside to start a new log. The old file stays readable and stays verifiable.
+Unrecognized appended lines are reported by verification; new keypaste records link to the last valid chain record. Records from a newer keypaste version stop appending to avoid a fork. Upgrade or move the file aside to start a new log; the old file remains readable and verifiable.
 
 ## Checking it works without a client
 
@@ -251,28 +245,28 @@ You should get two JSON lines back, the second listing `list_entry_names` and `r
 
 ## Troubleshooting
 
-**The server shows as failed to start.** Check the path is absolute and the file is executable (`chmod +x`). Then check `~/.keypaste` is writable — an unwritable audit log stops the server on purpose.
+If startup fails, check the executable path is absolute, the file is executable (`chmod +x`) and `~/.keypaste` is writable.
 
-**Every call is refused with "no keypaste agent is running".** Start one: `keypaste agent --vault <path>`. It has to be running, and pointed at the same vault, for anything to be granted. If it is running and you still see this, the two are looking at different pipe names — pass the same `--approver <name>` to both, or set `KEYPASTE_APPROVER` for both. If the names match and the agent is running, the machine may simply have been busy: the bridge waits half a second for the approver to accept a connection, and under load that can pass before the connection is made, producing this same refusal (F.9). Retrying is right in that case.
+If calls report "no keypaste agent is running", start `keypaste agent --vault <path>` for the intended vault. If it is already running, check that both processes use the same `--approver <name>` or `KEYPASTE_APPROVER`. In `v0.2.0`, a half-second connection deadline can also produce this refusal under load; retry in that case. F.9 repairs that race in source after `v0.2.0`.
 
-**A call says the vault is locked.** The approver reported that no vault was available. Check its terminal and restart it with the intended vault if needed. The current CLI approver opens its pipe after successful unlock; a failed unlock and exit normally produce `no-approver` instead.
+A call says the vault is locked. The approver reported that no vault was available. Check its terminal and restart it with the intended vault if needed. The current CLI approver opens its pipe after successful unlock; a failed unlock and exit normally produce `no-approver` instead.
 
-**Nothing in the audit log.** Confirm that the client actually called a tool, then check whether `KEYPASTE_HOME` or `--audit-log` changed the destination. A startup or write failure is another possibility; inspect the client's MCP server log for keypaste's stderr.
+Nothing in the audit log. Confirm that the client actually called a tool, then check whether `KEYPASTE_HOME` or `--audit-log` changed the destination. A startup or write failure is another possibility; inspect the client's MCP server log for keypaste's stderr.
 
-**The client reports a protocol error.** Something is writing to stdout, which on a stdio MCP server is the protocol stream. keypaste is careful never to do this and CI asserts it, so suspect a shell profile or a wrapper script that prints a banner.
+For protocol errors, inspect wrappers and shell profiles for text written to stdout. A stdio MCP server reserves stdout for protocol messages; CI checks that keypaste follows this rule.
 
 ## FAQ
 
-**Can the agent see my passwords?** Each successful request returns one field of one entry under a human approval, its still-live cached grant, or a matching policy rule. Repeated approved requests can accumulate credentials. TTL bounds cached approval reuse; it cannot erase values already returned to the client or expire them at their provider. `keypaste-mcp` holds no vault, but it does receive and forward the released value.
+Can the agent see my passwords? Each successful request returns one field of one entry under a human approval, its still-live cached grant, or a matching policy rule. Repeated approved requests can accumulate credentials. TTL bounds cached approval reuse; it cannot erase values already returned to the client or expire them at their provider. `keypaste-mcp` holds no vault, but it does receive and forward the released value.
 
-**Can it see my entry names?** Only the ones inside `--expose`, which defaults to `env/**`, and only while an agent is running with the vault unlocked.
+Can it see my entry names? Only the ones inside `--expose`, which defaults to `env/**`, and only while an agent is running with the vault unlocked.
 
-**Why does `keypaste-mcp` not just ask me for the master password?** Because your MCP client starts it, which means software starts it — and a password prompt that software can cause to appear is a prompt any program on your machine can imitate. There is also nowhere to put one: an MCP server's stdin and stdout *are* the protocol stream, and Claude Desktop starts it with no terminal. Putting the password in the client's config would place the secret that protects every other secret into a plaintext JSON file; asking the *client* to collect it would route it through the untrusted party. So the prompt lives in a process you start. [DECISIONS.md D-0023](../DECISIONS.md).
+The master-password prompt belongs in the process you start. An MCP client can trigger bridge startup, its stdin and stdout carry the protocol, and desktop clients provide no terminal. A configuration password would be plaintext, while client-mediated input would expose it to the requester. [DECISIONS.md D-0023](../DECISIONS.md) records this design.
 
-**Do I have to approve every single call?** No. A repeat request for the same field of the same entry, from the same connection, inside the lifetime you approved, is served without asking again. Change that with `--max-ttl` on the agent. A [policy rule](policy.md) can authorize matching releases without an initial prompt.
+Do I have to approve every single call? No. A repeat request for the same field of the same entry, from the same connection, inside the lifetime you approved, is served without asking again. Change that with `--max-ttl` on the agent. A [policy rule](policy.md) can authorize matching releases without an initial prompt.
 
-**Does anything leave my machine?** The keypaste bridge uses local stdio and local IPC; it does not send vault data to a hosted service. Your MCP client receives the tool result and may send it to a remote model and retain it in transcripts or session files. The local bridge does not make the rest of that client workflow local. See [the demo's limits](demo.md#the-honest-limits).
+Does anything leave my machine? The keypaste bridge uses local stdio and local IPC; it does not send vault data to a hosted service. Your MCP client receives the tool result and may send it to a remote model and retain it in transcripts or session files. The local bridge does not make the rest of that client workflow local. See [the demo's limits](demo.md#the-honest-limits).
 
-**Can a malicious MCP client pretend to be Claude?** Yes, and keypaste never makes a decision based on the name a client gives itself — it is recorded, not trusted. `--client-label` is the name *you* gave the server in your own config, which is why it is the one worth putting in the log, and why it is the only name a policy rule will match. That stops the *agent* choosing which rules apply to it; it does not stop another program on your machine starting a bridge with the same argv. [THREATS.md](../THREATS.md) T-3 and T-14 are explicit about what this does and does not buy.
+A client can claim another client's name, but authorization does not use that name. Policy matches the configured `--client-label`; the agent cannot change that label, although another local program can launch a bridge with the same arguments. [THREATS.md](../THREATS.md) T-3 and T-14 describe the boundary.
 
-**Should I point this at my personal vault?** The default exposure is `env/**`; only entries inside it are available through this bridge. Review that subtree, any policy rules and the client's retention behavior before using real credentials. An approval permits cached reuse on the same connection until expiry, and returned values are outside keypaste's control. Keep unrelated or high-impact credentials in a separate vault when they need a different access boundary.
+Should I point this at my personal vault? The default exposure is `env/**`; only entries inside it are available through this bridge. Review that subtree, any policy rules and the client's retention behavior before using real credentials. An approval permits cached reuse on the same connection until expiry, and returned values are outside keypaste's control. Keep unrelated or high-impact credentials in a separate vault when they need a different access boundary.

@@ -1,34 +1,6 @@
 name: app
 
-# The desktop app's gate. It exists as a separate workflow, against a separate solution, for one
-# reason: ci.yml restores and builds keypaste.slnx in eight jobs, and putting Keypaste.App in that
-# solution would make every backend push restore roughly twenty Avalonia packages for a GUI those
-# jobs do not test. CLAUDE.md asks what a workflow costs on every push, not only what it proves.
-#
-# What it costs, stated rather than left to be discovered:
-#   a main push outside paths   nothing
-#   a main push matching paths  all of it: gate, consistency tests, three-OS package job
-#   any pull request            all of it
-#   a v* tag                    all of it, and the three archives are kept as workflow artifacts
-#
-# A tag is the app's release gate (D-0081), and today it stops short of a release on purpose. Each
-# published binary must answer --version with the tag's version and pass --selftest, which creates
-# a vault through Keypaste.Core, saves it, reopens it and reads an entry back; only then is it
-# archived and hashed, the same way release.yml does the CLI. Nothing is uploaded to R2: the free
-# binary is the signed one (D-0070), so the publish step arrives with the notarization (3.5) and
-# the Windows signature (3.6), and until then a tag proves the artifacts and keeps them for seven days.
-#
-# Keypaste.Core is in the paths filter deliberately. It is the one backend change that can break
-# the app, and without it the GUI stops compiling against the core it wraps and nobody learns until
-# the next GUI-touching commit.
-#
-# The consistency tests restore separately, for a measured reason. That project is the only
-# one referencing both front ends, and Keypaste.Cli sets PublishAot over four RuntimeIdentifiers —
-# both restore-time inputs (D-0040) — so a restore that can see it pulls four RID-specific ILCompiler
-# packs whether or not anything is published. Measured 2026-07-28: it takes a restore from 2091 MB
-# to 2580 MB. Keeping it outside both solutions avoids that cost for ordinary solution restores;
-# every qualifying run of this workflow still restores and runs it in separate steps. See
-# tests/Keypaste.Consistency.Tests/README.md.
+# Separate solutions keep desktop dependencies out of backend restores.
 
 on:
   push:
@@ -43,15 +15,18 @@ on:
       - 'third_party/**'
       - 'Directory.Build.props'
       - 'Directory.Packages.props'
+      - 'global.json'
+      - '.editorconfig'
+      - 'tests/Directory.Build.props'
+      - 'tests/Keypaste.Core.Tests/PublisherMetadata.cs'
+      - 'scripts/verify.sh'
+      - 'scripts/verify-local-checks.sh'
       - 'keypaste.app.slnx'
       - 'release-targets.json'
       - '.github/workflows/app.yml'
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
       - 'v[0-9]+.[0-9]+.[0-9]+-*'
-  # No paths filter here, matching ci.yml and for its stated reason: a proposed change gets the full
-  # verdict regardless of what it touches, because that is the one place a reviewer is deciding on
-  # evidence. Contradicting that one file over would be worse than the minute it saves.
   pull_request:
   workflow_dispatch:
 
@@ -60,7 +35,6 @@ permissions:
 
 concurrency:
   group: app-${{ github.workflow }}-${{ github.ref }}
-  # A superseded pull-request run is cancelled; a run on main or a tag never is.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
@@ -68,9 +42,7 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: '1'
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
   NUGET_XMLDOC_MODE: skip
-  # MSBuild worker nodes outlive the build that started them and hold handles on artifacts/, which
-  # turns the next build into "Access to the path is denied" — a failure that reads like a
-  # permissions problem and is not one. Reuse buys nothing on a runner that builds once.
+  # Reused MSBuild nodes retain artifact handles and can block later Windows builds.
   MSBUILDDISABLENODEREUSE: '1'
 
 jobs:
@@ -91,58 +63,11 @@ jobs:
           cache: true
           cache-dependency-path: '**/packages.lock.json'
 
-      - name: Restore (locked)
-        run: dotnet restore keypaste.app.slnx --locked-mode
+      - name: Restore, format, build and test desktop and consistency
+        shell: bash
+        run: bash scripts/verify.sh desktop
 
-      # dotnet format does not read XAML, so .axaml style is not gated here. Said out loud rather
-      # than implied by a green check.
-      - name: Verify formatting
-        run: dotnet format keypaste.app.slnx --no-restore --verify-no-changes --exclude third_party/
-
-      - name: Build
-        run: dotnet build keypaste.app.slnx --no-restore -c Release -warnaserror
-
-      # The headless tests need no display and no X server — that is the point of Avalonia.Headless,
-      # and it is why there is no xvfb here. They cover the vault session, the idle policy, the
-      # settings and recent-vault stores, focus landing on the password field, and that the Log view
-      # renders AuditText verbatim rather than a second implementation of it (D-0032).
-      - name: Test
-        run: dotnet test keypaste.app.slnx --no-build -c Release
-
-      # The only project that references both front ends, so a test can make an edit through the
-      # app's view models and then ask the shipped CLI what it sees. It is in neither solution and
-      # therefore restores separately — which is the whole point, because that restore is the
-      # expensive one and a Keypaste.Core push must not pay for it.
-      #
-      # Formatted here too. Nothing else would: dotnet format takes a solution or a project, and
-      # this project is in no solution, so leaving this step out is how it quietly drifts out of the
-      # style every other file in the repository is held to.
-      - name: Restore the consistency tests (locked)
-        run: dotnet restore tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj --locked-mode
-
-      - name: Verify the consistency tests' formatting
-        run: >-
-          dotnet format tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj
-          --no-restore --verify-no-changes
-
-      - name: Build the consistency tests
-        run: >-
-          dotnet build tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj
-          --no-restore -c Release -warnaserror
-
-      - name: Run the consistency tests
-        run: >-
-          dotnet test tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj
-          --no-build -c Release
-
-      # R.0a. The package matrix is derived from release-targets.json, the same file release.yml
-      # builds the CLI from, so the two workflows cannot hold different answers about what a desktop
-      # target is. An empty matrix would make GitHub skip the package job and report this workflow
-      # green, so the count must be digits and at least one before anything is emitted (D-0106).
-      #
-      # The desktop set is deliberately three where the CLI's is four: Keypaste.App declares
-      # linux-arm64 and nothing packages it, which the definition records as declared-not-packaged
-      # with 3.9d owning the gap. verify-release-matrix.sh refuses that RID being dropped silently.
+      # GitHub reports an empty package matrix as a successful skipped job.
       - name: Resolve the desktop targets this workflow packages
         id: targets
         shell: bash
@@ -162,10 +87,6 @@ jobs:
     needs: gate
     strategy:
       fail-fast: false
-      # os, rid and archive come from release-targets.json (R.0a). Note ubuntu-24.04 here against
-      # release.yml's ubuntu-22.04: the desktop archives carry a glibc 2.39 floor and the CLI's is
-      # 2.35. That difference was nowhere until the definition recorded it on both targets, and
-      # 4.7b is where it has to be verified rather than merely written down.
       matrix:
         include: ${{ fromJSON(needs.gate.outputs.targets) }}
     runs-on: ${{ matrix.os }}
@@ -184,12 +105,6 @@ jobs:
       - name: Restore (locked)
         run: dotnet restore keypaste.app.slnx --locked-mode
 
-      # A prerelease tag names a version the props file does not carry: Directory.Build.props holds
-      # 0.2.0 and the tag is v0.2.0-rc.1. release.yml has always derived that suffix and passed it
-      # (:232-235); this workflow did not, so every prerelease built a binary reporting the bare
-      # version and then failed its own tag check below - which meant no desktop release candidate
-      # could be built at all, and 4.7a needs one. Same derivation as release.yml's guard, kept
-      # here rather than shared because these two workflows do not run together.
       - name: Resolve the prerelease suffix this build must carry
         id: suffix
         shell: bash
@@ -207,16 +122,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          args="-c Release -r ${{ matrix.rid }} --self-contained"
-          args="$args --no-restore -o artifacts/app/${{ matrix.rid }}"
+          args=(-c Release -r '${{ matrix.rid }}' --self-contained
+            --no-restore -o 'artifacts/app/${{ matrix.rid }}')
           if [ -n "${{ steps.suffix.outputs.suffix }}" ]; then
-            args="$args -p:VersionSuffix=${{ steps.suffix.outputs.suffix }}"
+            args+=('-p:VersionSuffix=${{ steps.suffix.outputs.suffix }}')
           fi
-          dotnet publish src/Keypaste.App/Keypaste.App.csproj $args
+          dotnet publish src/Keypaste.App/Keypaste.App.csproj "${args[@]}"
 
-      # Avalonia draws with Skia rather than hosting a browser engine, so what has to be present is
-      # the Skia and HarfBuzz natives for this RID. A publish that quietly produced none of them
-      # would still start here and fail on the first window on a user's machine.
       - name: Verify the native assets for this RID are there
         shell: bash
         run: |
@@ -226,13 +138,7 @@ jobs:
           echo "native asset files: $found"
           [ "$found" -ge 2 ] || { echo "::error::Skia/HarfBuzz natives missing from $out"; exit 1; }
 
-      # A runner has no display, so what this can honestly assert about the published binary is
-      # that it starts, that its own code runs on this operating system, and that the KDBX path it
-      # wraps works there: --selftest creates a vault through Keypaste.Core in a scratch directory,
-      # saves it, reopens it and reads an entry back. It does not prove the Skia and HarfBuzz natives
-      # link - those load lazily on first render, and the step above asserts only that the files are
-      # present. It constructs no window and cannot. Everything visual is on the manual checklist in
-      # docs/desktop.md, which is where a claim CI cannot hold belongs.
+      # The headless selftest cannot exercise native libraries that load on first render.
       - name: Start the published binary and run its selftest
         shell: bash
         run: |
@@ -243,9 +149,6 @@ jobs:
           [ -x "$bin" ] || { echo "::error::no binary at $bin"; exit 1; }
           "$bin" --selftest
 
-      # The version lives in Directory.Build.props and a tag only names it, exactly as release.yml
-      # holds the CLI. The binary is asked rather than the property file, because the binary is what
-      # ships: a stale build or a wrong -p:Version would pass a property check and fail this one.
       - name: Check the version the binary reports
         id: v
         shell: bash
@@ -266,9 +169,6 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      # The same shape as release.yml's step for the CLI, for the same reasons: name what ships
-      # instead of globbing the publish directory, keep macOS AppleDouble members out of the tarball,
-      # and write a checksum file in the one format sha256sum -c and shasum -c both accept.
       - name: Package and hash
         shell: bash
         env:
@@ -283,8 +183,9 @@ jobs:
           cp LICENSE THIRD_PARTY_NOTICES.md "$stage"/
           name="keypaste-app-${VERSION}-${{ matrix.rid }}"
           if [ "${{ matrix.archive }}" = "zip" ]; then
-            (cd "$stage" && /c/Windows/System32/tar.exe -a -c -f "../dist/$name.zip" *)
+            (cd "$stage" && /c/Windows/System32/tar.exe -a -c -f "../dist/$name.zip" ./*)
           else
+            # Exclude macOS AppleDouble metadata from release archives.
             COPYFILE_DISABLE=1 tar -czf "$out/$name.tar.gz" -C "$stage" .
           fi
           arch="$name.${{ matrix.archive }}"
@@ -294,6 +195,7 @@ jobs:
             hash="$(cd "$out" && shasum -a 256 "$arch" | cut -d' ' -f1)"
           fi
           [ "${#hash}" -eq 64 ] || { echo "::error::bad checksum '$hash' for $arch"; exit 1; }
+          # Both checksum tools accept two spaces, while their default output formats differ.
           printf '%s  %s\n' "$hash" "$arch" > "$out/$arch.sha256"
           if command -v sha256sum >/dev/null 2>&1; then
             (cd "$out" && sha256sum -c "$arch.sha256")
@@ -302,10 +204,6 @@ jobs:
           fi
           ls -l "$out"
 
-      # The bytes that were just staged, on the machine that built them. The assembly-attribute
-      # tests in each front end's suite cover the managed side on every operating system; this is
-      # the packaged side, including the NativeAOT binaries that have no managed assembly left to
-      # reflect over. F.4b in docs/STEPS.md is why it exists.
       - name: Verify the packaged binaries publish as the project
         shell: bash
         run: scripts/verify-publisher-metadata.sh artifacts/stage

@@ -3,25 +3,7 @@ using System.Runtime.InteropServices;
 
 namespace Keypaste.TxfContender;
 
-/// <summary>
-/// Holds one transacted <c>KeePass_TxF_*.tmp</c> name open until it is told to let go.
-/// </summary>
-/// <remarks>
-/// <para>
-/// V-F.6's contender. It stands in for KeePass 2 — a program that is not keypaste, saving its own
-/// database into the same <c>%TEMP%</c>. D-0122 measured that as the cause: any holder of such a
-/// name reserves <c>KEEPAS~1.TMP</c> for the directory, and on build 10.0.26100 every other
-/// <c>KeePass_TxF_*</c> create there is refused rather than given the next alias.
-/// </para>
-/// <para>
-/// <b>It references no keypaste assembly</b>, so nothing redirects its temporary directory. A
-/// contender that got the fix too would contend with nobody.
-/// </para>
-/// <para>
-/// It holds until signalled rather than for a duration, so the test's save meets the refusal
-/// every run instead of usually.
-/// </para>
-/// </remarks>
+// This helper must omit Keypaste.Core so its temporary-directory redirect cannot remove contention.
 internal static class Program
 {
     private static int Main(string[] args)
@@ -46,9 +28,6 @@ internal static class Program
         }
         catch (Exception ex)
         {
-            // Said out loud rather than thrown, because the only reader is a test that sees an exit
-            // code. A crash here once read as the save failing (ci run 34624443263) when it was the
-            // contenders refusing each other.
             Console.Error.WriteLine($"contender failed: {ex.GetType().Name}: {ex.Message}");
             return 6;
         }
@@ -56,7 +35,7 @@ internal static class Program
 
     private static int Hold(string directory, string ready, string release)
     {
-        // Exactly what FileTransactionEx.TxfPrepare builds, because the collision is on this stem.
+        // The collision depends on FileTransactionEx.TxfPrepare's filename stem.
         var name = Path.Combine(directory, "KeePass_TxF_" + Guid.NewGuid().ToString("N") + ".tmp");
         var destination = Path.Combine(
             Directory.CreateDirectory(Path.Combine(directory, "held-" + Guid.NewGuid().ToString("N"))).FullName,
@@ -81,8 +60,10 @@ internal static class Program
                 return 5;
             }
 
-            // Uncommitted, so the name and its 8.3 alias stay reserved for as long as this lives.
-            File.WriteAllText(ready, name);
+            // Publish a closed file so the reader cannot observe readiness before the contents are readable.
+            var pendingReady = ready + ".pending";
+            File.WriteAllText(pendingReady, name);
+            File.Move(pendingReady, ready);
 
             while (!File.Exists(release))
             {

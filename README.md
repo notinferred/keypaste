@@ -19,21 +19,25 @@ keypaste: an agent is asking for a credential.
 Approve? [y/N]
 ```
 
-**Stop pasting secrets into chats.** keypaste is a local-first, KDBX-compatible vault that stores your passwords and env variables, injects them into your projects, and lets AI agents like Claude request exactly one credential — with your approval, scoped access, and a full audit trail — without ever seeing your vault.
+keypaste stores passwords and environment variables in a local KDBX vault, injects variables into child processes, and lets AI agents request one credential at a time through scoped approvals and a local audit log.
 
-[**Claude asks for a key, you approve, the deploy runs**](docs/demo.md) is the whole thing end to end, in about sixty seconds.
+[The demo](docs/demo.md) shows a credential request, approval and deploy in about sixty seconds.
 
-- **Local-first, offline.** Your vault is a file on your disk. No account, no cloud service holding your secrets, no network required. Sync it yourself with whatever you already use.
-- **Standard KDBX, not a new format.** Everything keypaste writes opens in KeePassXC and KeePass — proved in both directions against a real `keepassxc-cli` on Linux, macOS and Windows on every push to `main` and every pull request. If keypaste disappears tomorrow, your data doesn't.
-- **Open source, AGPL.** Auditable by anyone, forever. A tool that handles secrets shouldn't ask to be trusted on faith.
+The vault is a file on your disk and works without an account or network. You can sync it with your existing file-sync service. Vaults open in KeePassXC and KeePass. CI checks read/write compatibility against a real `keepassxc-cli` on Linux, macOS and Windows on qualifying pushes to `main` and every pull request. The code is open source under AGPL-3.0.
 
-**Pre-1.0.** The download below is **CLI/MCP `v0.2.0`**. **If you installed `v0.1.0`, replace it** — it could delete your vault through `env export`, act on the wrong entry through `env rm`, and hand back the wrong password through `get`; [what changed](CHANGELOG.md#020) lists all of it. `v0.1.0` is still served and still broken, because a published version is never rewritten here. <!-- defects:0.2.0 -->**`v0.2.0` has two known defects of its own:** saving while another program saves the same vault can undo its change, with nothing kept in the entry's history — it needs both saves inside about two seconds, which is what a password manager and an agent sharing one vault do, and it is fixed on `main` but not in any published version yet. And on Windows 11 24H2 and Windows Server 2025, a save can fail when another keypaste or KeePass program is saving at the same time — those builds refuse a temporary name every KeePass-family program spells the same way, so an unrelated vault is enough; keypaste retries for about two seconds and then reports that it could not save, writing nothing and losing nothing. And an agent asking for entry names on a loaded machine can be told to start keypaste agent for a process that is already running — under load the half-second the bridge waits for the approver can pass before the connection is made, and the refusal keypaste then returns is the one written for no approver at all. Nothing is released and nothing is lost; the agent is told to fix something that is not broken. The first two are fixed on `main` and in no published version yet; the third is being measured before it is repaired.<!-- /defects:0.2.0 --> The desktop app browses and edits the same vaults but has no public release ([desktop guide](docs/desktop.md)), and credential approvals still happen in the terminal. The [release contract and platform matrix](docs/RELEASE.md) distinguish source, packaged artifacts and public installs. [STEPS](docs/STEPS.md) is the delivery plan; [PRODUCT](docs/PRODUCT.md) defines the product commitments.
+The published download is pre-1.0 CLI/MCP `v0.2.0`. Replace `v0.1.0`: it could delete a vault through `env export`, modify the wrong entry through `env rm`, and return the wrong password through `get`. [CHANGELOG](CHANGELOG.md#020) lists the fixes. Published versions are immutable, so `v0.1.0` remains available with those defects.
+
+<!-- defects:0.2.0 -->`v0.2.0` has known defects: saving while another program saves the same vault can undo its change without retaining it in entry history when the saves occur within about two seconds; on Windows 11 24H2 and Windows Server 2025, a save can fail when another keypaste or KeePass program is saving at the same time, including a different vault, because those builds refuse the shared temporary name; and an agent asking for entry names on a loaded machine can be told to start keypaste agent for a process that is already running. The Windows save failure retries for about two seconds, then reports failure without writing or losing data. The listing failure releases nothing; its advice is incorrect. All three defects are repaired on `main` and remain in the published version.<!-- /defects:0.2.0 -->
+
+The [desktop app](docs/desktop.md) browses and edits these vaults but has no public release. Credential approvals still use the terminal. [RELEASE](docs/RELEASE.md) defines distribution status, [STEPS](docs/STEPS.md) owns delivery tasks, and [PRODUCT](docs/PRODUCT.md) defines product commitments.
 
 ## Install
 
-**Five lines on macOS and Linux, six on Windows, and the checksum line is the reason the others are worth typing.** It checks the archive against a hash published beside it and stops if they disagree. Each binary is a single native file with no runtime to install — nothing needs .NET on your machine. The only thing written outside the directory you run this in is the last line, which puts the two binaries somewhere your shell can find them.
+Download the archive and its checksum, verify the hash, then extract it. Each binary is a native executable with no .NET runtime dependency. The Unix instructions move both binaries into `~/.local/bin`.
 
-### macOS — Apple Silicon
+<a id="macos--apple-silicon"></a>
+
+### macOS: Apple Silicon
 
 <!-- install:macos -->
 ```sh
@@ -45,9 +49,11 @@ mkdir -p ~/.local/bin && mv keypaste keypaste-mcp ~/.local/bin/
 ```
 <!-- /install:macos -->
 
-**macOS 13 or later.** That floor is [what .NET 10 supports](https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md), not a version this project has measured: no run backs this floor, because no keypaste release has been installed on an older Mac and checked. Intel Macs have no published binary; build from source below. Native Intel runners are [available from GitHub](https://docs.github.com/en/actions/reference/runners/github-hosted-runners), but this project's release matrix does not yet build and test that target.
+**macOS 13 or later.** This floor follows [.NET 10 support](https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md); no run backs this floor. Intel Macs have no published binary and require a source build. [GitHub offers native Intel runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners), but this release matrix does not yet build or test that target.
 
-### Linux — x64 and arm64
+<a id="linux--x64-and-arm64"></a>
+
+### Linux: x64 and arm64
 
 <!-- install:linux -->
 ```sh
@@ -59,9 +65,11 @@ mkdir -p ~/.local/bin && mv keypaste keypaste-mcp ~/.local/bin/
 ```
 <!-- /install:linux -->
 
-For arm64, substitute `linux-arm64` in all three filenames. Both are built against glibc 2.35. The release workflow checks the **x64** binary on a clean Debian 12 container and checks that it fails on Alpine; the equivalent container check is not implemented for arm64. Alpine and other musl distributions have no published binary; build from source there.
+For arm64, substitute `linux-arm64` in all three filenames. Both are built against glibc 2.35. The release workflow checks the x64 binary on a clean Debian 12 container and checks that it fails on Alpine; the equivalent container check is not implemented for arm64. Alpine and other musl distributions have no published binary; build from source there.
 
-### Windows — x64
+<a id="windows--x64"></a>
+
+### Windows: x64
 
 <!-- install:windows -->
 ```powershell
@@ -74,23 +82,25 @@ Expand-Archive $a -DestinationPath .
 ```
 <!-- /install:windows -->
 
-**Windows 10 1809 or later.** That floor is [what .NET 10 supports](https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md), not a version this project has measured: no run backs this floor, because no keypaste release has been installed on an older Windows and checked.
+Windows 10 1809 or later. This floor follows [.NET 10 support](https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md); no run backs this floor.
 
-The Windows block stops after extracting rather than moving the binaries anywhere, because Windows has no per-user `bin` directory that is already on `PATH` the way `~/.local/bin` is on Unix. Put `keypaste.exe` wherever you keep such things and add that directory to `PATH` yourself. On macOS and Linux, `~/.local/bin` may also not be on your `PATH` — check with `command -v keypaste`.
+On Windows, put the extracted binaries in a directory you add to `PATH`. On macOS and Linux, check that `~/.local/bin` is on `PATH` with `command -v keypaste`.
 
-Note the absolute path of `keypaste-mcp` either way, because that is what an MCP client needs; it is not something you run yourself.
+Keep the absolute path of `keypaste-mcp` for your MCP client configuration.
 
-### What the checksum does and does not prove
+<a id="what-the-checksum-does-and-does-not-prove"></a>
 
-**The checksum detects a corrupted or incomplete download. It does not authenticate the publisher.** The checksum is served from the same origin as the archive, so anyone able to replace one can replace both. The published binaries are **unsigned and un-notarized**. [`THREATS.md`](THREATS.md) T-21 describes the download trust boundary, and [`SECURITY.md`](SECURITY.md#verifying-a-release) has the verification steps in one place.
+### Download verification
 
-There is deliberately no `curl | sh`. It asks you to execute code you have not read, from an origin that is not this repository, in a form where the server can serve one thing to `curl` and another to a browser. A tool that handles secrets should not open by asking for that.
+The checksum detects a corrupted or incomplete download. It does not authenticate the publisher. The checksum is served from the same origin as the archive, so anyone able to replace one can replace both. The published binaries are unsigned and un-notarized. [`THREATS.md`](THREATS.md) T-21 describes the download trust boundary, and [`SECURITY.md`](SECURITY.md#verifying-a-release) has the verification steps in one place.
 
-macOS quarantine: a browser download sets `com.apple.quarantine` and a `tar` extraction does not, so these commands should not hit it. On the release runner, setting the attribute deliberately and running the binary anyway **worked** — but that is one machine's observation, not a guarantee. If your Mac blocks it, `xattr -d com.apple.quarantine ~/.local/bin/keypaste` is the fix, and being told to strip a security attribute is a real cost of shipping unsigned binaries rather than a quirk.
+The installation instructions keep downloaded commands visible for review before execution.
+
+Browser downloads set `com.apple.quarantine`; these command-line download and extraction steps should avoid it. The release runner executed the binary with quarantine deliberately set, but that observation does not establish behavior on every Mac. If macOS blocks the unsigned binary, `xattr -d com.apple.quarantine ~/.local/bin/keypaste` removes the attribute.
 
 ### Or build it from source
 
-**This is strictly stronger than downloading, and it stays here permanently for that reason.** The argument the rest of this page makes — four dependencies, nothing opening a socket, a decision order you can read — is an argument about source you can check. A prebuilt binary is a claim that it was compiled faithfully, and you did not watch it happen. Building needs the .NET SDK pinned in [`global.json`](global.json).
+Building from source lets you inspect the code you compile without relying on a prebuilt binary matching it. Install the SDK pinned in [`global.json`](global.json):
 
 ```sh
 git clone https://github.com/notinferred/keypaste
@@ -103,68 +113,68 @@ dotnet build keypaste.slnx -c Release
 ## Sixty seconds to a project with no `.env` in it
 
 ```sh
-keypaste init ~/vault.kdbx              # prompts for a master password, twice
-export KEYPASTE_VAULT=~/vault.kdbx      # or pass --vault to every command
+keypaste init ~/vault.kdbx
+export KEYPASTE_VAULT=~/vault.kdbx
 
-keypaste env pull dev                   # imports ./.env, then offers to delete it
-keypaste run dev -- npm start           # injected into the child process, nothing written to disk
+keypaste env pull dev
+keypaste run dev -- npm start
 ```
 
-[**Replace your `.env` in 5 minutes**](docs/replace-dotenv.md) is the guide — importing, CI, syncing, the way back out, and honest answers about lost master passwords.
+[Replace your `.env` in 5 minutes](docs/replace-dotenv.md) covers import, CI use, sync, export and lost master passwords.
 
 ## Connecting it to Claude
 
-Two processes, and the split is the whole design. `keypaste-mcp` is the MCP server your client starts, so software starts it; it holds no vault and decides nothing. `keypaste agent` is the one **you** start in your own terminal; it holds the vault and asks you the question at the top of this page.
+`keypaste-mcp` is started by your MCP client and forwards requests without holding a vault. You start `keypaste agent` in your terminal to unlock the vault and approve requests:
 
 ```sh
 keypaste agent --vault ~/vault.kdbx
 ```
 
-If you installed **`v0.1.0`** and have not replaced it yet, configure the client using the manual [Claude Code](docs/mcp-setup.md#claude-code) or [Claude Desktop](docs/mcp-setup.md#claude-desktop) instructions, with the absolute path of the downloaded `keypaste-mcp`.
+If you installed `v0.1.0` and have not replaced it yet, configure the client using the manual [Claude Code](docs/mcp-setup.md#claude-code) or [Claude Desktop](docs/mcp-setup.md#claude-desktop) instructions, with the absolute path of the downloaded `keypaste-mcp`.
 
-If you **built current `main` from source**, you can configure clients with the unreleased setup command:
+With `v0.2.0` or a current source build, configure clients with:
 
 ```sh
 keypaste setup --vault ~/vault.kdbx
 ```
 
-That finds the clients installed on this machine and configures each through its own `mcp add`. A client that has no such command gets its block printed for you to paste. `--dry-run` shows the exact commands and changes nothing; `--remove` takes keypaste back out. **`v0.1.0` does not contain `setup`; `v0.2.0` does.**
+`setup` configures detected clients through their `mcp add` command, or prints a configuration block for clients without one. `--dry-run` prints commands without changing configuration; `--remove` removes keypaste. `v0.1.0` lacks `setup`; `v0.2.0` includes it.
 
-**Nothing keypaste writes into a client's configuration holds a master password, and nothing ever will.** [**Connecting keypaste to Claude**](docs/mcp-setup.md) is the full guide, including what `--expose` governs and how to read the audit log back.
+Client configuration contains no master password. [Connecting keypaste to Claude](docs/mcp-setup.md) explains setup, exposure and audit reading.
 
 ## How it compares
 
-Only the wedge — where the secrets live, how they reach a process, and what happens when an agent asks for one. Everything below was checked against each vendor's own documentation in July 2026.
+This comparison covers storage, process injection and agent access, checked against vendor documentation in July 2026.
 
 | | keypaste | KeePassXC | 1Password | Infisical |
 | --- | --- | --- | --- | --- |
 | Where secrets live | a KDBX file you own | a KDBX file you own | 1Password's service | Postgres, theirs or yours |
-| Usable with no account | yes | yes | no — a membership is required | no — a server, Postgres and Redis |
+| Usable with no account | yes | yes | no; membership required | no; server, Postgres and Redis required |
 | Injecting into a child process | `keypaste run dev -- npm start` | no | `op run -- npm start` | `infisical run -- npm start` |
 | An agent can ask for a credential | yes, over MCP | no official integration | yes, over MCP (beta) | yes, over MCP |
 | A person answers each request | yes, and no is the default | — | yes | not documented |
-| What the agent receives | one field value; TTL limits approval reuse, not retained copies | — | no secret — 1Password injects it instead | not documented |
+| What the agent receives | one field value; TTL limits approval reuse, not retained copies | — | injected into the child process | not documented |
 | Per-access log | local JSONL, hash-chained | no | yes, on Business | yes, on the paid tiers |
 | Licence | AGPL-3.0 | GPL-2.0-or-later | source not published | MIT core, paid features |
 
-**keypaste is not the only thing in this space, and pretending otherwise would be the fastest way to lose the argument.** Keeper's MCP server prompts a human before it returns unmasked secret data. Bitwarden published an Agent Access SDK in March 2026 with the same request-and-approve shape, though it is alpha and its logging is not there yet. 1Password's Environments MCP server asks for approval too, and then deliberately never hands the credential over at all — a genuinely different answer to the same problem, not a worse one. `kprun` already injects KeePass entries into a child process and writes a local JSONL log, without an approval step.
+Other integrations include Keeper's MCP server, which asks before returning unmasked values; Bitwarden's March 2026 Agent Access SDK, then alpha without logging; and 1Password's Environments MCP server, which approves requests and injects credentials without returning them to the model. `kprun` injects KeePass values into child processes and logs locally without an approval step.
 
-What is keypaste's is the combination: the vault is an ordinary KDBX file you own, there is no account and no server anywhere in the picture, a person answers each request unless they wrote a rule saying otherwise, and the log never leaves your disk. Each of the others gives up at least one of those.
+keypaste combines an account-free local KDBX vault, explicit approval or user-written rules, and a local audit log.
 
 ## Using it
 
 ```sh
-keypaste init ~/vault.kdbx           # prompts for a master password, twice
-export KEYPASTE_VAULT=~/vault.kdbx   # or pass --vault to every command
+keypaste init ~/vault.kdbx
+export KEYPASTE_VAULT=~/vault.kdbx
 
 keypaste add github --username me --url https://github.com
-keypaste ls                          # tree of groups and entries, names only
-keypaste get github                  # copies to the clipboard, clears after 20s
-keypaste get github --show           # prints to stdout instead
+keypaste ls
+keypaste get github
+keypaste get github --show
 keypaste rm github --yes
 ```
 
-Passwords are never echoed at a prompt, and `get` never writes a secret to stdout unless you ask for `--show`. Data goes to stdout, everything else to stderr, so `keypaste get x --show` is safe to pipe.
+`ls` prints a names-only group tree. `get` copies the password to the clipboard and clears it after twenty seconds; `--show` writes it to stdout instead. Password prompts never echo input. Command data goes to stdout and diagnostics to stderr, so `keypaste get x --show` can be piped. Set `KEYPASTE_VAULT` or pass `--vault` to each command.
 
 | exit code | meaning |
 | --- | --- |
@@ -179,82 +189,84 @@ When stdin is not a terminal each prompt consumes exactly one line, in a fixed o
 
 ## Environment variables
 
-A project's environment variables live in the group `env/<project>`, one ordinary entry per variable — title is the name, password is the value. There is nothing keypaste-specific in the file, so KeePassXC can read, edit, add and delete them with no knowledge of keypaste at all. CI proves that in both directions on all three operating systems; see [`DECISIONS.md`](DECISIONS.md) D-0014 for why this shape was chosen over custom string fields.
+Each variable is an ordinary entry under `env/<project>`, with its name as the title and value as the password. KeePassXC can edit these entries directly. CI checks interoperability on all three operating systems; [`DECISIONS.md`](DECISIONS.md) D-0014 explains the convention.
 
 ```sh
-keypaste env pull billing                      # imports ./.env, then offers to delete it
+keypaste env pull billing
 keypaste env pull billing config/.env.prod --yes --delete-source
-keypaste env set billing DATABASE_URL          # prompts for the value, hidden
-keypaste env set billing STRIPE_KEY=sk_test_x  # or inline, for scripts — see the caveat below
-keypaste env ls                                # projects
-keypaste env ls billing                        # variable names, never values
-keypaste get env/billing/DATABASE_URL --show   # read one value
+keypaste env set billing DATABASE_URL
+keypaste env set billing STRIPE_KEY=sk_test_x
+keypaste env ls
+keypaste env ls billing
+keypaste get env/billing/DATABASE_URL --show
 keypaste env rm billing STRIPE_KEY --yes
-keypaste env export billing --dotenv --stdout  # the way back out — see below
+keypaste env export billing --dotenv --stdout
 ```
 
-`env pull` reads the whole file before it writes anything: if any line is malformed it reports every problem and imports nothing, so you never end up with half a `.env` in the vault and no `.env` on disk. It shows a plan first — how many variables are new, updated and unchanged, by name — and leaves unchanged ones alone.
+`env ls` lists projects; adding a project name lists variable names without values. `env pull` validates the entire file before importing. Malformed input leaves the vault unchanged. Its plan lists new, updated and unchanged variables by name; unchanged values are not rewritten.
 
-It handles `export` prefixes, comments, all three quoting styles, and values that span lines. Two rules differ from `dotenv`, both deliberately: a `#` only starts a comment when a space precedes it (so `PASSWORD=hunter2#42` keeps its `#`), and a key repeated in one file is an error rather than a coin flip. Values are stored **exactly as written** — `${VAR}` and `$VAR` are not expanded, because expanding them would bake one machine's environment into a vault you sync to others. Inside double quotes `\n`, `\r`, `\t`, `\\` and `\"` expand, so write `'C:\temp'` in single quotes if you mean a Windows path.
+The parser accepts `export` prefixes, comments, three quoting styles and multiline values. A `#` starts a comment only after a space, so `PASSWORD=hunter2#42` retains its suffix. Duplicate keys are errors. `${VAR}` and `$VAR` remain literal to avoid binding the vault to one machine's environment. Double quotes expand `\n`, `\r`, `\t`, `\\` and `\"`; use single quotes for a literal Windows path such as `C:\temp`.
 
-Three things worth knowing before you rely on it, all covered in [`SECURITY.md`](SECURITY.md): the `KEY=value` form leaves the value in your shell history and in the process list, so keypaste warns when you use it; setting a variable that already exists keeps the old value in the entry's KeePassXC history rather than erasing it; and deleting a `.env` is tidying, not erasure — keypaste says so rather than offering a "shred" it could not honour.
+The `KEY=value` form exposes the value to shell history and process listings, so keypaste warns on use. Updates retain old values in KeePassXC entry history. Deleting a `.env` does not erase its storage or backups; see [`SECURITY.md`](SECURITY.md).
 
 ## Running things with those variables
 
 ```sh
-keypaste run dev -- npm start          # no .env on disk, nothing written to one
+keypaste run dev -- npm start
 keypaste run prod -- ./deploy.sh
 ```
 
 The `--` is required. Without it, `keypaste run dev npm start` cannot be told apart from a project called `npm`; everything after it belongs to the command, including flags keypaste also understands.
 
-The command inherits your environment with the project's variables merged on top, and it gets keypaste's own stdin, stdout and stderr — so colours, prompts and progress bars work exactly as if keypaste were not there. **The vault is closed before the command starts**, so a server you leave running for hours is not holding a decrypted database open.
+The child inherits your environment with project variables overlaid, and receives the terminal's stdin, stdout and stderr. keypaste closes the vault before starting it.
 
-Once the command starts, its exit code is keypaste's; keypaste's own failures always print a line beginning `keypaste run:` first. A command that does not exist reports 127 and one that is not executable reports 126, as in a shell. Ctrl+C reaches the command, and keypaste waits for it rather than dying first — `docker stop` and `timeout` work the same way.
+After startup, keypaste returns the child's exit code. Missing commands return 127 and non-executable commands return 126. keypaste's own failures print a line beginning `keypaste run:`. Ctrl+C, `docker stop` and `timeout` reach the child; keypaste waits for it to exit.
 
-It refuses to run rather than inject something ambiguous: a variable whose name is not a legal environment variable, or two names differing only in case (two variables on Linux, one on Windows). Both are things KeePassXC will let you create and keypaste will not, and both name every offending key so one pass in KeePassXC fixes them.
+Invalid environment variable names and names differing only in case prevent injection. The error lists all offending keys so they can be corrected in KeePassXC.
 
 ## Getting them back out
 
-A vault you cannot leave is a vault nobody should adopt, so there is an escape hatch. It is the one command in keypaste that writes plaintext, and it behaves like it.
+`env export` writes plaintext for tools that require a file or for moving credentials elsewhere.
 
 ```sh
-keypaste env export billing .env --dotenv        # writes a file, after confirming
-keypaste env export billing --dotenv --stdout    # prints it instead, for piping
+keypaste env export billing .env --dotenv
+keypaste env export billing --dotenv --stdout
 ```
 
-The format has to be named — `--dotenv` is not assumed — and writing a file prints a red warning naming the destination and asks before it goes ahead. It will not overwrite an existing file without `--force`, it points out a `.git` ancestor, and on Linux and macOS the file is created readable only by you. Windows has no equivalent and keypaste says so rather than implying a permission it did not set. It also refuses a destination that is the vault it is reading from, or any other KeePass vault, and `--force` does not lift that — **`v0.1.0` had none of that refusal, where `--force` destroyed the vault instead**. Prefer `keypaste run`, which needs no file at all.
+Export requires `--dotenv`. File output warns with the destination path and asks for confirmation; overwriting also requires `--force`. keypaste reports a `.git` ancestor and creates owner-readable files on Linux and macOS. Windows has no equivalent permission control and reports that limit. Export refuses to overwrite its source vault or any other KeePass vault, even with `--force`; in `v0.1.0`, `--force` could destroy the vault. Prefer `keypaste run` when a file is unnecessary.
 
-Values are written in single quotes wherever possible, because that form means the same thing to `motdotla/dotenv`, `python-dotenv`, `godotenv`, Docker Compose v2 and `sh` alike. The handful that cannot be — a value containing an apostrophe or a carriage return — are escaped and named on stderr, because that is the form those readers disagree about.
+Export uses single quotes where possible for consistent reading by `motdotla/dotenv`, `python-dotenv`, `godotenv`, Docker Compose v2 and `sh`. Values containing apostrophes or carriage returns need escapes; keypaste names those keys on stderr because readers differ in escape handling.
 
-## What an agent can and cannot do
+<a id="what-an-agent-can-and-cannot-do"></a>
+
+## Agent access
 
 Two tools appear in the client: `list_entry_names`, which returns group paths and entry names and never a value, and `request_credential`, which asks you to release one field of one entry.
 
-Nothing is released without you saying yes to that specific request, unless you wrote a rule in advance that covers it. **Your master password is typed at `keypaste agent` and nowhere else.** Any program on your machine can pop up a window that looks like keypaste asking for it, so keypaste never gives you a reason to expect one: no agent, and nothing an agent does, can cause a password prompt to appear. That is why the approver is a separate process you start, rather than something the MCP server does.
+A credential request requires your approval or a matching rule you wrote. Enter your master password only in `keypaste agent`, which you start yourself. Agents cannot trigger a password prompt, avoiding prompts another local program could imitate.
 
-Say no and the agent is told not to ask again. Say nothing for 45 seconds and that is a no. Ask for the same field again within the lifetime you approved and you are not asked twice. Every call — granted, denied, or malformed — appends a line to `~/.keypaste/audit.jsonl`, and the value is never in it.
+An explicit refusal tells the agent not to retry. Silence for 45 seconds denies the request. Matching requests can reuse a live approval. Every call, including denied and malformed calls, is appended to `~/.keypaste/audit.jsonl` without the returned value.
 
 The TTL expires keypaste's cached approval. It does not erase the client's copies or revoke the password at its issuer. The bridge does not add the released value to its audit record, but agent-written arguments can themselves contain sensitive text; treat the local log as sensitive data. [SECURITY.md](SECURITY.md) states these boundaries in full.
 
-What an agent may even *name* is default-deny: out of the box that is the `env/` subtree and nothing else, and widening it takes an explicit `--expose` glob in the client's config, which is a file you wrote.
+Exposure defaults to the `env/` subtree. Only explicit `--expose` globs in your client configuration can widen it.
 
 ### Saying yes in advance
 
-If you are approving the same thing every day, you can write it down once in `~/.keypaste/policy.toml` and stop being asked about that one case:
+For repeated requests, write a narrow rule in `~/.keypaste/policy.toml`:
 
 ```toml
 [[allow]]
-client          = "claude-code"     # the --client-label you gave the bridge
+client          = "claude-code"
 entries         = ["env/dev/**"]
 fields          = ["password"]
 max_ttl_seconds = 300
-max_per_hour    = 20                # optional
+max_per_hour    = 20
 ```
 
-`keypaste policy ls` shows what your rules mean in plain English — and shows what each pattern actually *parsed to*, because the obvious way to write one is usually not what it does. There is no policy file unless you write one, keypaste never writes it, and **anything at all wrong with it means the whole file is ignored and every request comes back to you**.
+`keypaste policy ls` displays the parsed group and title patterns. keypaste never creates or edits the policy file. Any error disables all rules and restores the ordinary approval path.
 
-This is the one path in keypaste that hands an agent a credential with nobody watching. A rule cannot reach past `--expose`, cannot raise `--max-ttl`, cannot overturn a "no" you just gave, and cannot make an entry listable — but within its pattern, no human sees the request. [**Pre-approving with a policy file**](docs/policy.md) is the guide, including what that costs.
+Policy releases require no human review. Rules remain bounded by `--expose`, `--max-ttl` and recent explicit refusals, and cannot make entries listable. [The policy guide](docs/policy.md) explains the matching rules and limits.
 
 ### Seeing what happened
 
@@ -271,49 +283,54 @@ Every call an agent makes is one line in `~/.keypaste/audit.jsonl`, allowed or r
 
 `--denied`, `--client <text>` and `--since 2h` narrow it, and a narrowed view always says so.
 
-Each record carries the hash of the record before it, so `keypaste log verify` tells you whether the file is the one keypaste wrote — and tells you, every time it passes, the two things it cannot see: a rewrite that recomputed the chain, and records deleted from the end.
+Each audit record includes its predecessor's hash. `keypaste log verify` checks the chain and reports its limits on every pass: a complete recomputed chain and records removed from the end can escape detection.
 
-[**Approving an agent's request**](docs/approvals.md) is the guide to what you are actually deciding. [**THREATS.md**](THREATS.md) is the threat model — prompt injection through entry names and through the agent's stated reason, clients that cannot be authenticated, prompt fatigue, what a reused grant costs, and what tampering with the log does and does not achieve.
+[Approvals](docs/approvals.md) explains the prompt. [THREATS.md](THREATS.md) covers prompt injection, unauthenticated clients, approval fatigue, cached grants and audit tampering.
 
-[**Your KeePass vault can't talk to AI**](docs/keepass-and-agents.md) is the argument behind all of this — why vaults were built with no network surface, what changed when agents arrived, and why the answer here is the one the KDBX ecosystem already reached for when browsers wanted credentials.
+[KeePass and agents](docs/keepass-and-agents.md) explains the local approval design and its relation to browser integration.
 
 ## Packages
 
 | Roadmap name | Project | Ships as |
 | --- | --- | --- |
-| `keypaste-core` | `src/Keypaste.Core` | library — all vault logic lives here |
+| `keypaste-core` | `src/Keypaste.Core` | shared vault library |
 | `keypaste-cli` | `src/Keypaste.Cli` | `keypaste` |
-| `keypaste-mcp` | `src/Keypaste.Mcp` | `keypaste-mcp` — MCP server, stdio, holds no vault and decides nothing |
-| `keypaste-app` | `src/Keypaste.App` | desktop app — source builds and CI packages; no public release |
+| `keypaste-mcp` | `src/Keypaste.Mcp` | `keypaste-mcp`, a stdio forwarding bridge |
+| `keypaste-app` | `src/Keypaste.App` | desktop app; source builds and CI packages, no public release |
 
 ## Vault format
 
 KDBX4 with Argon2d key derivation (2 iterations, 64 MiB, parallelism 2) and AES-256. keypaste never invents a format and writes no cryptography of its own (docs/PRODUCT.md §2, §3.6): the format layer is [KeePassLib](third_party/KeePassLib/UPSTREAM.md), vendored from KeePass 2.61 and reached through a single file, `src/Keypaste.Core/Internal/KeePassInterop.cs`.
 
-Any vault keypaste writes must open in KeePassXC, and anything KeePassXC writes back must be readable by keypaste. That is not a hope — `scripts/verify-keepassxc-compat.sh` and `scripts/verify-keepassxc-writeback.sh` prove both directions on every push to `main` and every pull request, against a real `keepassxc-cli`, on all three operating systems, and the gate is permanent (docs/PRODUCT.md §4.6, [`DECISIONS.md`](DECISIONS.md) D-0008 and D-0014).
+`scripts/verify-keepassxc-compat.sh` and `scripts/verify-keepassxc-writeback.sh` check interoperability against a real `keepassxc-cli` on Linux, macOS and Windows on qualifying pushes to `main` and every pull request. This is a permanent gate under docs/PRODUCT.md §4.6 and [`DECISIONS.md`](DECISIONS.md) D-0008 and D-0014.
 
 Directories and namespaces use .NET's PascalCase convention; the kebab-case names above are the roadmap's and survive where they are user-visible, in the shipped binary names.
 
-CLI, MCP server, and the source-built desktop app are thin clients over `Keypaste.Core` — vault and authorization logic belong in the shared core (docs/PRODUCT.md §4.3).
+The CLI, MCP server and desktop app share vault and authorization logic in `Keypaste.Core` (docs/PRODUCT.md §4.3).
 
 ## Build and test
 
-Requires the .NET SDK pinned in [`global.json`](global.json).
+Local verification needs the .NET SDK pinned in [`global.json`](global.json), Git, jq and running Docker for workflow validation with the pinned actionlint image. Process checks use GNU timeout (included with Git Bash/Linux; `gtimeout` from coreutils on macOS) to bound a stuck child. From PowerShell, run:
 
-```sh
-dotnet restore keypaste.slnx --locked-mode
-dotnet build   keypaste.slnx
-dotnet test    keypaste.slnx
-dotnet run --project src/Keypaste.Cli
+```powershell
+./scripts/verify.ps1
 ```
 
-Warnings are errors, code style is enforced at build time, and every dependency is pinned by `packages.lock.json`. Adding a package is therefore a two-step: declare it in `Directory.Packages.props` and the project, then `dotnet restore --force-evaluate` and commit the regenerated lock files. **The same applies to the `RuntimeIdentifiers` list**, which is a restore-time input too: changing it changes the restore graph, and a lock file that has not been regenerated fails `--locked-mode` with NU1004.
+From Git Bash, macOS or Linux, run:
 
-**Never pass `-r` to a restore.** It narrows the project's runtime identifier set to the single RID you named, which can never match a lock file recording four, so locked mode fails — and the failure reads like a stale lock file rather than like the flag being wrong. The projects declare all four RIDs and `PublishAot=true` is committed, so a plain `dotnet restore --locked-mode` is already correct for every target. Only `dotnet publish` takes `-r`.
+```sh
+bash scripts/verify.sh
+```
+
+The command validates workflows, restores locked dependencies, checks formatting and builds both solutions plus the separate CLI/desktop consistency project, exercises offline script fixtures and real CLI/MCP process interactions, then runs their Release tests. The PowerShell wrapper selects Git Bash. `--list` prints the commands without executing them. For a shorter development loop, select `backend`, `desktop`, `records`, `scripts`, `integration` or `workflows`; only the default `all` and `workflows` need Docker. [CLAUDE.md](CLAUDE.md#local-verification-and-delivery) owns the final verification procedure. Other operating systems, NativeAOT and release installation retain their separate gates. To run the CLI after building, use `dotnet run --project src/Keypaste.Cli -c Release`.
+
+Builds treat warnings as errors and enforce code style. Declare dependencies in `Directory.Packages.props` and the project, then run `dotnet restore --force-evaluate` and commit updated lock files. Changes to `RuntimeIdentifiers` also require regenerated locks; otherwise `--locked-mode` fails with NU1004.
+
+Do not pass `-r` to restore. It narrows the runtime identifier set and conflicts with lock files recording all four targets. The projects already declare their RIDs and `PublishAot=true`; restore with `dotnet restore --locked-mode` and select a RID only when publishing.
 
 ### Building a native binary yourself
 
-Cross-OS NativeAOT is not supported, so each platform's binary is built on that platform. What the compiler needs, per O-0005, is `clang` and `zlib1g-dev` on Linux, the Xcode command line tools on macOS, and the MSVC C++ build tools on Windows — and on Windows, `vswhere.exe` has to be findable, which is the part that fails confusingly when the toolchain is installed but the build claims it is not.
+NativeAOT binaries must be built on their target operating system. Per O-0005, Linux needs `clang` and `zlib1g-dev`, macOS needs Xcode command line tools, and Windows needs MSVC C++ build tools with `vswhere.exe` discoverable.
 
 ```sh
 dotnet restore keypaste.slnx --locked-mode
@@ -321,33 +338,32 @@ dotnet publish src/Keypaste.Cli -c Release -r linux-x64 --no-restore -o out
 dotnet publish src/Keypaste.Mcp -c Release -r linux-x64 --no-restore -o out
 ```
 
-**Restore first, then publish with `--no-restore`, and the order is not stylistic.** `dotnet publish` restores implicitly, and an implicit restore inherits the `-r` — which narrows the RID set to one and rewrites `packages.lock.json` to match, leaving you with two modified lock files you did not ask for and a `--locked-mode` failure the next time CI sees them. Observed, not theorised. This is the same order `release.yml` uses, for the same reason.
+`dotnet publish` otherwise restores implicitly with its selected RID, rewriting the locks for one target and breaking the next locked restore. Use `--no-restore` after a full restore, as `release.yml` does.
 
-The result is a single native file per project with no runtime to install; `PublishAot=true` is already committed, so it does not need passing. Substitute `osx-arm64` or `win-x64` for the RID you are on. `third_party/` disarms the trim analyzers because vendored source is not ours to annotate, so `scripts/verify-aot-trim.sh` re-arms the check the other way: it reads the publish logs and diffs their trim diagnostics against a committed baseline, failing on anything new and on anything against `src/` at all. Capture the output to run it after a change under `third_party/`:
+Publishing produces one native file per project; `PublishAot=true` is already configured. Use `osx-arm64` or `win-x64` for those platforms. `scripts/verify-aot-trim.sh` compares publish diagnostics with the accepted vendored-code baseline and rejects new warnings or any warning from `src/`. Capture output after changes under `third_party/`:
 
 ```sh
 dotnet publish src/Keypaste.Cli -c Release -r linux-x64 --no-restore -o out > cli.log 2>&1
 scripts/verify-aot-trim.sh cli.log
 ```
 
-Eleven diagnostics are expected, all from vendored code, each one cleared individually in [`DECISIONS.md`](DECISIONS.md) D-0040. ILC only re-analyses when its inputs changed, so a repeat publish emits none and the script says so rather than reading that as a pass.
+Eleven vendored-code diagnostics are accepted in [`DECISIONS.md`](DECISIONS.md) D-0040. ILC analyzes only changed inputs; if a repeat publish emits none, the script reports that no new analysis occurred.
 
-`third_party/` is vendored source and is held to different rules — it is re-merged from upstream, not formatted or linted to our taste. `third_party/Directory.Build.props` quarantines it, and `dotnet format` is run with `--exclude third_party/`.
+`third_party/Directory.Build.props` isolates vendored source from project style checks, and `dotnet format` excludes `third_party/` to preserve upstream mergeability.
 
 To run the KeePassXC compatibility gate locally you need `keepassxc-cli` on `PATH` (or `KPXC_CLI` pointing at it):
 
 ```sh
-export KP_COMPAT_PASSWORD=ci-master-pw
-scripts/make-compat-fixture.sh ./artifacts/compat/gen.kdbx
-scripts/verify-keepassxc-compat.sh ./artifacts/compat/gen.kdbx
-scripts/verify-keepassxc-writeback.sh ./artifacts/compat/writeback.kdbx
+bash scripts/verify.sh compat
 ```
+
+In PowerShell, use `./scripts/verify.ps1 compat`.
 
 The fixture is built by the shipped `keypaste` binary, so the gate covers the CLI as well as the vault writer. The write-back script builds its own vault and drives both tools in turn: keypaste modifies an entry, then KeePassXC edits and adds env variables that keypaste has to read back.
 
 ## Security
 
-Please report vulnerabilities privately — see [`SECURITY.md`](SECURITY.md).
+Report vulnerabilities privately using [`SECURITY.md`](SECURITY.md).
 
 ## License
 

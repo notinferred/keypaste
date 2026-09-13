@@ -1,10 +1,10 @@
 # Claude asks for a key, you approve, the deploy runs
 
-Two terminals. A deploy that refuses because it has no API key, an agent that goes looking for one, a question on your screen, one keystroke, and a deploy that works — then the log line proving it happened. About sixty seconds.
+This demo uses two terminals to show a failed deploy, a credential request, approval and a successful retry, followed by its audit record. The recorded flow takes about sixty seconds.
 
-The two processes are not interchangeable, and the split is the whole design. **`keypaste agent`** holds your vault and asks you; **`keypaste-mcp`** holds no vault and decides nothing. Your MCP client starts the second one, which means software starts it. You start the first. [**Approving an agent's request**](approvals.md) is the guide to what you are agreeing to.
+`keypaste agent` holds the vault and asks for approval. Your MCP client starts `keypaste-mcp`, which forwards requests without holding a vault. You start the approver yourself. [Approvals](approvals.md) explains what you authorize.
 
-**Everything Claude does on this page is Claude's choice, not a script.** keypaste's half is deterministic and every block below was pasted out of a real terminal. Claude's half is a model deciding what to do, and it will word things differently every time you run it. Where that shows, this page says so.
+The terminal output below was captured from real keypaste processes. Claude's actions and wording can vary between runs.
 
 ## Before you start
 
@@ -14,7 +14,7 @@ dotnet build keypaste.slnx -c Release
 
 The two binaries land at `artifacts/bin/Keypaste.Cli/release/keypaste` and `artifacts/bin/Keypaste.Mcp/release/keypaste-mcp` (`.exe` on Windows). Make these build directories available on `PATH`, or replace the commands below with their full paths; an older installed `keypaste` will otherwise still run. You also need Claude Code, and two terminals you can see at once. This page verifies the source build; [RELEASE](RELEASE.md) owns published availability.
 
-**Use a throwaway vault for this.** The current tool returns a released credential twice — once as text and once as structured data, so that a client reading either half works. Claude can render and retain the result in its transcript and session file. This is a consequence of returning a raw credential; a different tool that executes a bounded action would require a different implementation. The vault built below holds a value that is worth nothing.
+Use a disposable vault. The tool returns credentials as text and structured data, which Claude can display and retain in transcripts or session files. This demo uses a fake value.
 
 ## Building the demo vault
 
@@ -39,7 +39,7 @@ Nothing is echoed at either prompt. When it asks for the value, paste this:
 sk_test_EXAMPLE_ONLY_not_a_real_key_0000
 ```
 
-**That value is deliberate nonsense.** It is shaped like a Stripe test key so the masked line at the end of the demo looks like the real thing, and it is worth nothing to anybody who sees it.
+This is a fake value shaped like a Stripe test key so the masked output is recognizable.
 
 ## Wiring it into Claude Code
 
@@ -63,13 +63,15 @@ The equivalent by hand, in `.mcp.json`:
 }
 ```
 
-`--scope local` keeps this to your machine. There is no `--expose` here, so the default applies and `env/**` is the only part of the vault an agent can even name. There is nowhere to put a master password, and there never will be — see [**Connecting keypaste to Claude**](mcp-setup.md).
+`--scope local` applies only to this machine. Without explicit `--expose`, only `env/**` is available. The master password is entered in the approver, never in client configuration; see [Connecting keypaste to Claude](mcp-setup.md).
 
 Work in a small scratch project rather than a real one. Copy `scripts/demo/deploy.sh` from this repository into it; that is the deploy Claude will run.
 
 ## The sixty seconds
 
-### 0:00 — start the approver
+<a id="000--start-the-approver"></a>
+
+### Start the approver
 
 Left terminal:
 
@@ -85,11 +87,13 @@ keypaste: listening on keypaste-agent-9f3a1c02b7d54e60, 45 seconds to answer, gr
 keypaste: nothing is released without you saying yes. Press Ctrl+C to stop.
 ```
 
-There is a short pause after you press Enter: that is Argon2 deriving your key, and it is the only thing in keypaste that is deliberately slow. The tail of the pipe name is derived from your home directory, so yours will differ; everything else is exact.
+Unlocking pauses for Argon2 key derivation. The pipe suffix is derived from the home directory and will differ on your machine.
 
 Leave it running. Ctrl+C locks the vault again.
 
-### 0:08 — ask for the deploy
+<a id="008--ask-for-the-deploy"></a>
+
+### Request the deploy
 
 Right terminal, in your scratch project:
 
@@ -104,9 +108,11 @@ Deploy the billing service to staging with ./deploy.sh. It needs a Stripe key �
 my keypaste vault rather than asking me to paste one.
 ```
 
-Both halves of that sentence earn their place. Naming the script removes the guesswork about what "deploy" means. The second clause heads off the ordinary failure, which is not that the agent does something dangerous — it is that it politely asks *you* to paste a secret into a chat window.
+The prompt names the deploy script and directs Claude to the MCP tool for its credential.
 
-### 0:15 — the deploy refuses
+<a id="015--the-deploy-refuses"></a>
+
+### Observe the refusal
 
 Claude runs `./deploy.sh` and gets nothing:
 
@@ -116,9 +122,11 @@ deploy: the billing service will not deploy without it.
 deploy: nothing was deployed.
 ```
 
-Exit 1, and no mention of keypaste anywhere in it. That refusal is the whole reason the agent goes looking, and it has to be the agent's idea.
+The deploy exits 1 without naming keypaste. Claude must choose how to obtain the credential.
 
-### 0:22 — the question
+<a id="022--the-question"></a>
+
+### Review the request
 
 Claude calls `request_credential`, and your left terminal stops being idle:
 
@@ -139,13 +147,15 @@ keypaste: an agent is asking for a credential.
 Approve? [y/N]
 ```
 
-**This is the captured request; Claude may choose different arguments in your run.** Claude writes the reason. `client` is the sanitized name the MCP client supplied during its handshake; it is unauthenticated and can differ from the `--client-label` you configured for audit and policy matching. `entry` identifies the resolved vault entry, `field` is the requested allowed field, and `for` is the actual grant lifetime after the approver's ceiling — this request asked for 900 seconds and received 300.
+Your run may use different arguments. Claude writes the reason. `client` is the sanitized, unauthenticated MCP handshake name; it can differ from the configured audit and policy label. `entry` is the resolved vault entry, `field` is the requested allowed field, and `for` is the capped lifetime. This request asked for 900 seconds and received 300.
 
 Claude may call `list_entry_names` first to find the entry, or go straight to the credential. Either is fine, and both appear in the log.
 
 You have 45 seconds. Anything that is not `y` or `yes` is a no, including pressing Enter, and so is saying nothing.
 
-### 0:30 — say yes
+<a id="030--say-yes"></a>
+
+### Approve
 
 Type `y`:
 
@@ -164,7 +174,7 @@ deploy: deployed billing-service to staging
 deploy: this is a demo. Nothing was built and nothing left this machine.
 ```
 
-**Look at the second line.** The one program in this story with a legitimate reason to hold the credential still does not print it. keypaste cannot make an agent behave that way — but a deploy script you control can, and this is what it costs: eight characters and a length.
+The deploy script prints only a masked prefix, suffix and length. keypaste cannot require the agent to mask its own output.
 
 ## If you say no
 
@@ -185,7 +195,7 @@ repeatedly is treated as pressure rather than as a question. Ask them directly w
 you to do instead. This call was recorded in the audit log as denied.
 ```
 
-Asking again for the same thing inside a minute is refused without reaching you at all. A request that *timed out* is told something different and deliberately softer — nobody decided anything, you may simply have been away from the keyboard — so the agent is not told to give up.
+The same request is refused for a minute after an explicit denial without prompting again. Timeouts receive a different response because nobody made a decision, and the agent is allowed to retry.
 
 ## What the log says
 
@@ -201,9 +211,9 @@ keypaste log --since 5m
   2026-07-27 09:57:42  claude-code  env/demo/STRIPE_KEY  granted   prompt
 ```
 
-Two calls, because Claude listed the names before it asked for one. `exposure` means a listing allowed by your `--expose` globs; `prompt` means a person was shown that exact request and answered it. **The returned field value is not added to the log.** Names and reason excerpts are recorded, so keep secrets out of that metadata.
+This run logged a listing (`exposure`) followed by an approved credential request (`prompt`). The returned field value is excluded from the log; names and reason excerpts remain logged metadata and should not contain secrets.
 
-A filtered view always says it is filtered, with the count it is showing out of the count in the file, so a narrow view can never be mistaken for the whole log.
+Filtered views report the selected and total record counts.
 
 ```sh
 keypaste log verify
@@ -214,7 +224,7 @@ keypaste log verify
 Latest: seq 2, hash d1845344153201c850ac949d108d24d4243931aa38c82f909558910aac78e8ae
 ```
 
-It then prints, on every pass rather than only on a failure, the two things it cannot see: a rewrite that recomputed the chain, and records deleted from the end. `--expect <hash>` closes the second — [**Connecting keypaste to Claude**](mcp-setup.md) has the detail.
+Every verification reports the limits of the chain: complete recomputation and deletion of final records can escape detection. `--expect <hash>` detects loss of a previously observed record; [Connecting keypaste to Claude](mcp-setup.md) explains its use.
 
 Repeat the credential request on the same MCP connection while its approval remains live and the second release reads `grant-cache (!)` instead of `prompt`. Restarting the client creates a new connection and requires a new approval. That mark means the credential was served from the approval you already gave, under a reason nobody read. [THREATS.md](../THREATS.md) T-12 explains the limit.
 
@@ -223,22 +233,19 @@ Repeat the credential request on the same MCP connection while its approval rema
 | What you see | What it is |
 |---|---|
 | `DENIED. No keypaste agent is running` | The left terminal is not running, or the two are on different pipes. Same vault, and pass the same `--approver` to both if you set one. |
-| Claude asks *you* to paste the key | It did not reach for the tool. Say `use the keypaste MCP server to read env/demo/STRIPE_KEY`. |
+| Claude asks you to paste the key | It did not reach for the tool. Say `use the keypaste MCP server to read env/demo/STRIPE_KEY`. |
 | `DENIED. That entry is outside what this server was configured to expose` | The entry is not under `env/`. The default exposure is `env/**` and approval cannot widen it. |
 | The dialog never appears | Your MCP client is running somewhere you are not looking. There is no native dialog yet; the approval prompt is that terminal. |
-| The server shows as failed to start | Check the path is absolute and executable, then check `~/.keypaste` is writable — an unwritable audit log stops the bridge on purpose. |
+| The server shows as failed to start | Check the absolute executable path and permissions, then whether `~/.keypaste` is writable for auditing. |
 
-## The honest limits
+<a id="the-honest-limits"></a>
 
-- **The credential is in Claude's context, twice.** `request_credential` returns it as text and as structured data so a client reading either half works, so your MCP client renders it and stores it in its session file. That is why this page uses a fake value.
-- **The agent may put it on a command line.** To run the deploy it sets the variable for a child process; how it does so and what it retains are outside keypaste's control. TTL limits cached approval reuse; it cannot erase returned values from the client's context or session files, or revoke the credential at its provider.
-- **The reason is always a claim.** keypaste can strip the control characters, cap the length, label whose words they are, and put the entry name beside it from a source the agent does not control. It cannot tell you whether the sentence is true.
-- **Nothing here proves Claude will behave this way.** It is a model, not a script. It may pick a different entry, ask a clarifying question first, or read the deploy script before running it.
-- **The vault stays unlocked while the approver runs.** There is no idle auto-lock in this version; Ctrl+C is the lock.
-- **A policy rule would skip the dialog entirely.** There is no policy file unless you wrote one, and [**Pre-approving with a policy file**](policy.md) is honest about what writing one costs.
+## Limits
+
+The tool returns the credential as both text and structured data. Claude can retain either in context and session files, which is why this demo uses a fake value. Claude may place the value on a command line when starting a child process. keypaste does not control that use or retention. TTL limits cached approval reuse; it cannot erase returned copies or revoke credentials at their provider. keypaste sanitizes, truncates and labels the reason beside the resolved entry name. It cannot verify whether the claim is true. Claude may choose another entry, ask for clarification or inspect the script first. This recording does not establish behavior in future runs. The approver keeps its vault unlocked until stopped with Ctrl+C; it has no idle auto-lock. A matching [policy rule](policy.md) bypasses the dialog. This demo assumes no policy file.
 
 ## Verifying it yourself
 
-`scripts/verify-demo.sh` runs this page in CI on Linux, macOS and Windows. It builds a vault, starts a real `keypaste agent`, drives a real `keypaste-mcp` from a separate process, and diffs the approval dialog the agent actually draws against the block on this page — character for character — so a transcript here cannot drift from what the binaries print. It runs `scripts/demo/deploy.sh` down both paths and asserts the key never appears in what it prints or in the audit log, and it checks the refused path returns nothing.
+`scripts/verify-demo.sh` runs real CLI and MCP processes on Linux, macOS and Windows. It compares the approval dialog byte for byte, exercises both deploy paths, checks that refusal returns no credential, and checks that the credential stays out of deploy output and the audit log.
 
-**It does not run Claude, and it never will.** What a model chooses to do is not a thing a gate can hold, and a check this project asks strangers to trust should not depend on a paid, networked, non-reproducible service. The stand-in sends exactly the calls this page says Claude sends; whether Claude sends them is the part you are watching for when you run the demo yourself. [DECISIONS.md](../DECISIONS.md) D-0034 is the full argument, including the two lines the harness cannot see and does not pretend to.
+The harness sends fixed MCP calls; it does not run Claude. Observing the model remains part of the manual demo. [DECISIONS.md](../DECISIONS.md) D-0034 explains the reproducibility requirement and the two prompt lines the harness cannot observe.

@@ -8,18 +8,16 @@ Putting it in `keypaste.slnx` would bring Avalonia into ordinary backend restore
 
 A measurement on 2026-07-28 found desktop restore size increased from 2091 MB to 2580 MB when the CLI joined the solution. That historical measurement explains the separation; it is not a current benchmark.
 
-`.github/workflows/app.yml` restores, formats, builds and runs this project in separate gate steps on every qualifying workflow run, including pushes that touch `Keypaste.Core`. After the gate, the workflow packages on three operating systems. Its push path filters, pull-request runs and tag triggers are documented in [CLAUDE.md](../../CLAUDE.md); the YAML is the executable authority.
+`.github/workflows/app.yml` uses the shared `desktop` verification profile to restore, format, build and run this project and the desktop solution on every qualifying workflow run, including pushes that touch `Keypaste.Core`. After the gate, the workflow packages on three operating systems. Its YAML owns the exact triggers.
 
-To run the consistency gate locally with the repository's selected SDK:
+From the repository root, run the same desktop and consistency checks locally:
 
 ```sh
-dotnet restore tests/Keypaste.Consistency.Tests --locked-mode
-dotnet format tests/Keypaste.Consistency.Tests --no-restore --verify-no-changes --severity warn
-dotnet build tests/Keypaste.Consistency.Tests -c Release --no-restore
-dotnet test tests/Keypaste.Consistency.Tests -c Release --no-build
+bash scripts/verify.sh desktop
 ```
+
+In PowerShell, use `./scripts/verify.ps1 desktop`. The default `all` profile includes this project too; [CLAUDE.md](../../CLAUDE.md#local-verification-and-delivery) owns local verification requirements.
 
 ## What must stay true
 
-- A test that does not need both `CliApp.Run` and a view model belongs in `Keypaste.App.Tests` or `Keypaste.Cli.Tests`, so it runs with that front end's own checks.
-- Every test asserts that the CLI succeeded and printed something before asserting what it printed. A CLI that always exits with an error must not make a cross-frontend test pass.
+Tests belong here only when they need both `CliApp.Run` and a desktop view model. Other cases belong in `Keypaste.App.Tests` or `Keypaste.Cli.Tests`. Assert CLI success and nonempty output before checking its contents, so an error cannot satisfy a cross-frontend check.

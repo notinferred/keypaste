@@ -1,74 +1,62 @@
-# Vendored KeePassLib — provenance
+# Vendored KeePassLib provenance
 
-| | |
+| Field | Value |
 |---|---|
-| **Upstream repository** | <https://github.com/TimothyByrd/KeePassNetStandard> |
-| **Tag** | `v2.61` |
-| **Commit** | `87c2770496ecef9e41ab86f198c9426e2f0039e3` |
-| **Vendored on** | 2026-07-25 |
-| **Original work** | KeePass 2.61 by Dominik Reichl, <https://keepass.info/> |
-| **Port author** | Timothy Byrd |
-| **Licence** | GPL-2.0-**or-later** (see `LICENSE`) |
+| Upstream repository | <https://github.com/TimothyByrd/KeePassNetStandard> |
+| Tag | `v2.61` |
+| Commit | `87c2770496ecef9e41ab86f198c9426e2f0039e3` |
+| Vendored on | 2026-07-25 |
+| Original work | KeePass 2.61 by Dominik Reichl, <https://keepass.info/> |
+| Port author | Timothy Byrd |
+| Licence | GPL-2.0-or-later; see `LICENSE` |
 
-`KeePassNetStandard` is a source port of upstream KeePass's `KeePassLib/` to .NET Standard. Only the `KeePassLib/` directory is vendored; `KeePassLib.csproj` and `KeePassLib.pfx` were not copied (we supply our own project file and do not sign the assembly).
-
-The vendoring review selected this source port instead of a published package; see [DECISIONS.md](../../DECISIONS.md) D-0007 for that historical selection. The selected tag did not publish a NuGet package. This is provenance for the pinned version, not a current survey of .NET KDBX libraries.
+`KeePassNetStandard` ports KeePassLib to .NET Standard. Only `KeePassLib/` is vendored. Keypaste supplies its own project file and excludes the upstream signing key. The selected tag did not publish a NuGet package; [DECISIONS.md](../../DECISIONS.md) D-0007 records the selection.
 
 ## Licence
 
-KeePass 2.x is distributed under the GNU GPL **version 2 or later** — verified at
-<https://keepass.info/help/v2/license.html> and in the header of every source file here
-("either version 2 of the License, or (at your option) any later version"). The "or later" grant is what makes this combinable with keypaste's AGPL-3.0: the GPLv3 option is taken, and AGPL-3.0 §13 permits the combination. keypaste is distributed as a whole under AGPL-3.0-only.
-
-> Note for anyone re-reading `DECISIONS.md` history: the original O-0001 asserted that KeePassLib is "GPL-2.0-only" and therefore incompatible. That premise was factually wrong.
+KeePass 2.x permits GNU GPL version 2 or later, as stated in its [licence](https://keepass.info/help/v2/license.html) and source headers. Keypaste takes the GPLv3 option, which AGPL-3.0 §13 permits combining into an AGPL-3.0-only distribution. The historical O-0001 claim that KeePassLib was GPL-2.0-only was incorrect.
 
 ## Local modifications
 
-Source files are otherwise **verbatim**. Every change below is guarded by a grep-able `KEYPASTE_*` symbol defined in `KeePassLib.csproj`, so `git diff` against upstream shows exactly this list and nothing else. Code is never deleted from disk — files keypaste does not build are removed from the *compilation* in `KeePassLib.csproj`, which keeps re-merges clean.
+Each source modification uses a `KEYPASTE_*` guard defined in `KeePassLib.csproj`. Other source remains verbatim. Unused files are excluded from compilation and retained on disk for upstream comparisons.
 
-### `KEYPASTE_NO_DPAPI` — drop the ASP.NET Core DataProtection substitution
+### `KEYPASTE_NO_DPAPI`
 
-Upstream KeePass uses Windows DPAPI (`ProtectedMemory`) to protect secrets **in memory**, and falls back to an in-tree, fully managed **ChaCha20** implementation where DPAPI is unavailable — which is the path real KeePass takes on Linux and macOS.
-
-The port replaced that with `Microsoft.AspNetCore.DataProtection`, pulling in three ASP.NET packages and constructing an *ephemeral* provider that also creates a key directory under `%APPDATA%/KeePass2`. For keypaste that is three unwanted dependencies on the secret path (docs/PRODUCT.md §3.9) and a filesystem side effect we did not ask for.
-
-Defining `KEYPASTE_NO_DPAPI` makes `ProtectedBinary.ProtectedMemorySupported` report `false`, which selects **upstream's own ChaCha20 path** — identical behaviour on all three platforms, zero dependencies, and no code of ours anywhere near a cipher (docs/PRODUCT.md §3.6).
+The port replaces upstream DPAPI protection with ASP.NET Core DataProtection, adding three packages and a key directory under `%APPDATA%/KeePass2`. This guard selects upstream's managed ChaCha20 fallback for in-memory protection on all platforms, without those dependencies or filesystem writes.
 
 | File | Change |
 |---|---|
-| `Security/ProtectedBinary.cs` | `ProtectedMemorySupported` returns `false`; the `ProtectedMemory` branches of `Encrypt()`/`Decrypt()` are compiled out |
-| `Cryptography/CryptoUtil.cs` | `IsProtectedDataSupported` returns `false`; `ProtectData`/`UnprotectData` are **removed, not stubbed** — a stub returning plaintext would be a fail-open error path (docs/PRODUCT.md §3.7) |
-| `Utility/StrUtil.cs` | `EncryptString`/`DecryptString` compiled out (they had no callers) |
-| `Keys/CompositeKey.cs` | the `is KcpUserAccount` count in `ValidateUserKeys` compiled out, following the exclusion below |
+| `Security/ProtectedBinary.cs` | `ProtectedMemorySupported` returns `false`; the DPAPI branches of `Encrypt()` and `Decrypt()` are excluded |
+| `Cryptography/CryptoUtil.cs` | `IsProtectedDataSupported` returns `false`; `ProtectData` and `UnprotectData` are excluded to prevent plaintext-returning stubs |
+| `Utility/StrUtil.cs` | Unused `EncryptString` and `DecryptString` methods are excluded |
+| `Keys/CompositeKey.cs` | The `KcpUserAccount` count in `ValidateUserKeys` is excluded |
 
-### `KEYPASTE_NO_GFX` — drop `System.Drawing.Common`
+### `KEYPASTE_NO_GFX`
 
-`System.Drawing.Common` is Windows-only since .NET 7 and throws `PlatformNotSupportedException` elsewhere, so it cannot be part of a cross-platform vault library (docs/PRODUCT.md §4.4).
-
-Only the *presentation* surface is affected — decoding a stored PNG into a `Bitmap`. `PwCustomIcon.ImageDataPng`, the byte array that actually lives in the KDBX file, is untouched, so **custom icons still round-trip through save/load correctly**. This vendored library does not render images; the desktop app's rendering is separate.
+This guard excludes `System.Drawing.Common` image decoding, which is Windows-only on the target runtime. Stored PNG bytes in `PwCustomIcon.ImageDataPng` remain unchanged and round-trip through save/load. Desktop rendering is separate.
 
 | File | Change |
 |---|---|
-| `PwCustomIcon.cs` | `Image` property, `GetImage()`, `GetImage(w,h)`, `IsImageValid`, `GetKey`, and the image cache compiled out |
-| `PwDatabase.cs` | the `GetCustomIcon` overloads compiled out |
+| `PwCustomIcon.cs` | `Image`, `GetImage()`, `GetImage(w,h)`, `IsImageValid`, `GetKey` and the image cache are excluded |
+| `PwDatabase.cs` | `GetCustomIcon` overloads are excluded |
 
-### Files excluded from compilation (`KeePassLib.csproj`)
+### Files excluded from compilation
 
 | Path | Reason |
 |---|---|
-| `Translation/**` | UI translation subsystem; not a library concern (upstream port excludes it too) |
-| `Native/ClipboardU.cs` | desktop clipboard; needs WinForms (upstream port excludes it too) |
-| `Properties/AssemblyInfo.cs` | assembly attributes are SDK-generated (upstream port excludes it too) |
-| `Utility/GfxUtil.cs` | image load/scale; needs `System.Drawing.Common`; called only from `PwCustomIcon` |
-| `Keys/KcpUserAccount.cs` | machine-bound key derived from the Windows account, the opposite of a portable vault file (docs/PRODUCT.md §2); also the last consumer of `CryptoUtil.ProtectData` |
+| `Translation/**` | UI translation; also excluded by the upstream port |
+| `Native/ClipboardU.cs` | WinForms clipboard; also excluded upstream |
+| `Properties/AssemblyInfo.cs` | Assembly attributes are SDK-generated; also excluded upstream |
+| `Utility/GfxUtil.cs` | System.Drawing image decoding, used only by `PwCustomIcon` |
+| `Keys/KcpUserAccount.cs` | Machine-bound Windows account key; incompatible with the portable-vault scope and the last consumer of `CryptoUtil.ProtectData` |
 
-**Result: zero `PackageReference` entries.** `packages.lock.json` resolves to `"net10.0": {}`. That is load-bearing, not incidental — see `DECISIONS.md` D-0004.
+The project has zero `PackageReference` entries and an empty `net10.0` dependency set in `packages.lock.json` (D-0004).
 
 ## Re-merging an upstream security patch
 
-1. `git clone https://github.com/TimothyByrd/KeePassNetStandard` and check out the new tag. If the port has not tracked upstream yet, diff against `dlech/KeePass2.x` `KeePassLib/` directly and apply by hand.
-2. `diff -r` that tree against `third_party/KeePassLib/`, ignoring `KeePassLib.csproj`, `UPSTREAM.md`, `LICENSE`, and `packages.lock.json`. Every hunk that is not one of the `KEYPASTE_*` guards above is an upstream change to review.
-3. Copy the updated files, re-apply the guards (`grep -rn KEYPASTE_ third_party/KeePassLib` finds every site), and update the commit/tag/date in the table at the top of this file.
-4. Re-run the verification chain in `DECISIONS.md` D-0007 — in particular the KeePassXC compatibility gate, which is what actually proves the merge did not break the format.
+1. Clone `https://github.com/TimothyByrd/KeePassNetStandard` and check out the selected tag. If the port lacks an upstream patch, compare against `dlech/KeePass2.x`'s `KeePassLib/` and apply it manually.
+2. Compare that tree with this directory, excluding `KeePassLib.csproj`, `UPSTREAM.md`, `LICENSE` and `packages.lock.json`. Review every difference outside the documented guards.
+3. Copy the updated source, reapply the guards and update the provenance table. `rg KEYPASTE_ third_party/KeePassLib` finds modification sites.
+4. Run D-0007's verification chain, including real KeePassXC compatibility.
 
-**Watch for**: any new `PackageReference` the port adds. At the time of vendoring, upstream `HEAD` (one commit past `v2.61`) had already added `System.Security.Cryptography.ProtectedData` and NuGet packaging metadata. `v2.61` was chosen over `HEAD` for that reason.
+Review new package references. The upstream commit after `v2.61` added `System.Security.Cryptography.ProtectedData` and NuGet packaging metadata, which informed the original tag selection.

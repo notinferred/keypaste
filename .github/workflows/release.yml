@@ -1,17 +1,5 @@
 name: release
 
-# A tag builds four native binaries, runs every gate this repository has against the exact bytes
-# that will be uploaded, and only then publishes them. Nothing here trusts the build: the binary
-# that gets shipped is the binary that was tested, and the checksum written next to it was computed
-# on the machine that produced it and re-checked on the machine that uploads it.
-#
-# Distribution is Cloudflare R2 behind dl.keypaste.com. R2 was chosen while this repository was
-# private, so downloads would work without a GitHub token (D-0041). The repository is now public;
-# the existing versioned download URLs remain on R2 rather than GitHub Releases.
-#
-# workflow_dispatch builds and verifies but publishes nothing. Use it to exercise a change to this
-# file without spending a tag.
-
 on:
   push:
     tags:
@@ -19,16 +7,12 @@ on:
       - 'v[0-9]+.[0-9]+.[0-9]+-*'
   workflow_dispatch:
 
-# The release path produces bytes strangers download, so a mutated action tag here would
-# substitute an artifact and no gate would notice. O-0004 deferred SHA-pinning for ci.yml; this
-# file does not get the same latitude. Each pin carries the tag it was resolved from.
 permissions:
   contents: read
 
 concurrency:
   group: release-${{ github.ref }}
-  # The deliberate inverse of ci.yml. A cancelled test run costs nothing; a cancelled upload
-  # leaves half a release on a public origin.
+  # Cancelling an upload can leave an immutable version incomplete.
   cancel-in-progress: false
 
 env:
@@ -36,11 +20,6 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: '1'
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
   NUGET_XMLDOC_MODE: skip
-  # Named here rather than hidden in a secret, on purpose. It is not a credential, and where a
-  # release goes is something a reader of this file should be able to see. The name says "public"
-  # because the bucket is served without authentication at dl.keypaste.com; the allowlist in the
-  # publish job is what keeps that from being a liability. At workflow level so that guard and
-  # publish cannot come to hold two different answers about one destination.
   R2_BUCKET: keypaste-public-dl
 
 jobs:
@@ -62,16 +41,11 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      # No NuGet cache here on purpose. This job never restores - it only reads a property and
-      # checks some facts - so the cache-save step at the end of the job would look for
-      # ~/.nuget/packages, not find it, and fail the job after every real check had passed.
+      # This job never restores packages, so enabling NuGet caching would fail on an absent cache.
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: global.json
 
-      # The version lives in Directory.Build.props and the tag only names it. Nothing is passed
-      # with -p:Version=, so a local `dotnet publish` at this commit produces the same inputs the
-      # release did. A tag that disagrees with the source is a mistake, not an override.
       - name: Resolve and check the version
         id: v
         shell: bash
@@ -83,25 +57,20 @@ jobs:
             tag="$(dotnet msbuild src/Keypaste.Cli/Keypaste.Cli.csproj -getProperty:VersionPrefix -nologo | tr -d '[:space:]')-dryrun"
             publish=false
           fi
-          base="${tag%%-*}"
           suffix=""
           case "$tag" in *-*) suffix="${tag#*-}";; esac
 
-          # D-0041: the tag names the version, it does not set it. The comparison is
-          # scripts/require-tag-matches-source.sh because on a dispatch publish=false used to
-          # short-circuit it, which made it a refusal nothing had ever run (D-0109). A fixture runs
-          # it now; the suffix is deliberately not compared, since adding one is what a candidate is.
           if [ "$publish" = "true" ]; then
             scripts/require-tag-matches-source.sh "$GITHUB_REF_NAME"
           fi
 
-          echo "version=$tag"   >> "$GITHUB_OUTPUT"
-          echo "suffix=$suffix" >> "$GITHUB_OUTPUT"
-          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          {
+            echo "version=$tag"
+            echo "suffix=$suffix"
+            echo "publish=$publish"
+          } >> "$GITHUB_OUTPUT"
           echo "building $tag (suffix='$suffix', publish=$publish)"
 
-      # A tag can point anywhere. These say it points at something main has seen and both gates
-      # have already gone green on, without re-running either matrix here.
       - name: Check the commit is on main and both gates are green on it
         if: github.ref_type == 'tag'
         shell: bash
@@ -111,27 +80,13 @@ jobs:
           git merge-base --is-ancestor "$GITHUB_SHA" origin/main \
             || { echo "::error::$GITHUB_SHA is not an ancestor of main"; exit 1; }
 
-          # One line, because the decision is scripts/require-green-gates.sh and this step only
-          # calls it. That is F.4a's lesson applied to the second thing only a tag could reach:
-          # a step body is unreachable by dispatch, a script is drivable by a fixture, and
-          # scripts/verify-green-gates.sh drives this one through a fake gh on every push.
           scripts/require-green-gates.sh "$GITHUB_SHA"
 
-      # R.0a. A tag must not start publishing while the definition and the download pages already
-      # disagree about what is being published. The public-origin half is deliberately not run here:
-      # an unreachable dl.keypaste.com would block a release for weather rather than for a fault.
       - name: Verify one release definition answers for every target
         shell: bash
         run: scripts/verify-release-matrix.sh
 
-      # R.0a. The build matrix is derived from release-targets.json rather than written out beside
-      # it, so the file that documents what keypaste ships is also the thing that decides it.
-      #
-      # A matrix that expands to nothing is the failure worth naming here: fromJSON of an empty
-      # array makes GitHub *skip* the build job, skip publish through needs:, and report the whole
-      # workflow green - a release that built nothing and said so nowhere. So the count is required
-      # to be digits and at least one before anything is emitted. That is D-0106's rule - a refusal
-      # must rest on what came back, not on how a tool chose to exit - applied to a second reader.
+      # GitHub reports an empty build matrix as a successful skipped job.
       - name: Resolve the targets this release builds
         id: targets
         shell: bash
@@ -146,38 +101,12 @@ jobs:
           echo "targets=$targets" >> "$GITHUB_OUTPUT"
           echo "$n targets: $targets"
 
-      # docs/PRODUCT.md law 4.7 pairs small releases with real changelogs. Making the release depend on the
-      # entry existing is what turns that from an intention into a rule.
-      # docs/PRODUCT.md law 4.7 pairs small releases with real changelogs; D-0041 made that a gate
-      # and D-0109 moved it where a fixture can reach it. The match is whole-line: an unanchored one
-      # took a `## 0.2.0-rc.1` heading for `## 0.2.0`.
       - name: Check CHANGELOG.md has a section for this version
         if: github.ref_type == 'tag'
         shell: bash
         run: scripts/require-changelog-section.sh "${{ steps.v.outputs.version }}"
 
-      # Everything the publish job needs, checked here instead of there.
-      #
-      # This job runs on a workflow_dispatch and the publish job does not, so an assumption checked
-      # in publish is an assumption no dry run can ever reach - it gets tested for the first time by
-      # a real tag, after four platform builds have already been paid for. The AWS CLI is the case
-      # in point: nothing in this file installs it, and it is only preinstalled because the runner
-      # image happens to ship it. Same runner label as publish, so what passes here predicts there.
-      #
-      # THREE SET VARIABLES ARE NOT A WORKING CREDENTIAL, so the presence check is no longer the
-      # whole of what this step asks. `--check` runs the real listing the publish job runs: its
-      # positive control must see objects at an already-published prefix before it will believe an
-      # answer, so a credential that authenticates against the wrong bucket, or does not
-      # authenticate at all, is refused HERE rather than after four NativeAOT builds. It writes
-      # nothing; the upload lives past that branch in the same script. This closes the DECISIONS
-      # idea naming that cost, and answers what a restored secret otherwise cannot: whether the
-      # value is the one this project publishes with, or a stale copy of it.
-      #
-      # It runs on a dispatch too whenever the secrets exist, which is the point. A dispatch's
-      # version carries the -dryrun suffix, so the destination it clears says nothing about the
-      # real prefix - but the credential half is answered without spending a tag. A repository
-      # with no secrets keeps the behaviour it had, because a dispatch has no business needing
-      # them; only a tag still requires them to be there.
+      # Check the publisher's credentials on dispatch before paying for the platform builds.
       - name: Check the publish credentials reach the bucket this release goes to
         shell: bash
         env:
@@ -213,12 +142,6 @@ jobs:
           AWS_DEFAULT_REGION=auto \
             scripts/publish-release.sh --check "$VERSION"
 
-      # F.4a. The destination decision now lives in scripts/publish-release.sh, so this job can run
-      # the same code the upload runs - against a controlled fake `aws`, with no credential and no
-      # bucket, which is the only kind of run a dispatch can make. Same argument as the step above:
-      # an assumption only a real tag can reach is tested for the first time far too late.
-      # --with-real-aws adds the phase that asks this runner's actual AWS CLI how it fails, so the
-      # fake cannot quietly become fiction.
       - name: Verify the release preflight refuses a release that is not whole
         shell: bash
         run: scripts/verify-release-preflight.sh
@@ -236,17 +159,9 @@ jobs:
     needs: guard
     strategy:
       fail-fast: false
-      # rid, os and archive come from release-targets.json (R.0a). Cross-OS NativeAOT is not
-      # supported, so every RID is built on its own operating system and, because O-0006 requires
-      # the binary to be *run* rather than merely compiled, on its own architecture. Nothing here is
-      # cross-compiled or emulated.
-      #
-      # The runner choice IS the compatibility floor for Linux - NativeAOT links against the build
-      # machine's glibc - which is why the definition records `runner` and `os_floor` on the same
-      # target and verify-release-matrix.sh refuses a floor with no recorded evidence. ubuntu-22.04
-      # gives glibc 2.35, covering Debian 12; 24.04 would silently raise it to 2.39.
       matrix:
         include: ${{ fromJSON(needs.guard.outputs.targets) }}
+    # NativeAOT inherits the runner's glibc floor recorded in release-targets.json.
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     env:
@@ -264,7 +179,6 @@ jobs:
           cache: true
           cache-dependency-path: '**/packages.lock.json'
 
-      # O-0005 said Stage 3's AOT publish would need these. It does.
       - name: Install the native toolchain (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang zlib1g-dev
@@ -273,34 +187,28 @@ jobs:
         if: runner.os == 'macOS'
         run: xcode-select -p
 
-      # NEVER add -r to a restore. It narrows the project's runtime identifier set to one, which
-      # can never match a lock file recording four, and locked mode fails NU1004. The csproj files
-      # declare all four precisely so one whole-solution restore covers every publish (D-0040).
+      # Adding -r here narrows the RID set and invalidates the multi-RID lock file (D-0040).
       - name: Restore (locked)
         run: dotnet restore keypaste.slnx --locked-mode
 
       - name: Publish both binaries with NativeAOT
         shell: bash
         run: |
-          args="-c Release -r ${{ matrix.rid }} --no-restore -o artifacts/release/${{ matrix.rid }}"
+          args=(-c Release -r "${{ matrix.rid }}" --no-restore -o "artifacts/release/${{ matrix.rid }}")
           if [ -n "${{ needs.guard.outputs.suffix }}" ]; then
-            args="$args -p:VersionSuffix=${{ needs.guard.outputs.suffix }}"
+            args+=("-p:VersionSuffix=${{ needs.guard.outputs.suffix }}")
           fi
-          dotnet publish src/Keypaste.Cli/Keypaste.Cli.csproj $args 2>&1 | tee /tmp/publish-cli.log
-          dotnet publish src/Keypaste.Mcp/Keypaste.Mcp.csproj $args 2>&1 | tee /tmp/publish-mcp.log
+          dotnet publish src/Keypaste.Cli/Keypaste.Cli.csproj "${args[@]}" 2>&1 | tee /tmp/publish-cli.log
+          dotnet publish src/Keypaste.Mcp/Keypaste.Mcp.csproj "${args[@]}" 2>&1 | tee /tmp/publish-mcp.log
 
       - name: Verify the AOT trim diagnostics still match the baseline
         shell: bash
         run: scripts/verify-aot-trim.sh /tmp/publish-cli.log /tmp/publish-mcp.log
 
-      # The rm is the most load-bearing line in this job. artifacts/bin is exactly where every
-      # verify script looks when KEYPASTE_BIN is unset, so without it a typo in either variable
-      # would quietly test the ordinary JIT build and report a green release. The two assertions
-      # after it are the cheap discriminator: an AOT binary has no managed dll and no
-      # runtimeconfig.json beside it.
       - name: Delete the JIT build and prove what is left is native
         shell: bash
         run: |
+          # Verification scripts otherwise fall back to the JIT build when an override is missing.
           rm -rf artifacts/bin
           for n in keypaste keypaste-mcp; do
             p="artifacts/release/${{ matrix.rid }}/$n"
@@ -344,13 +252,7 @@ jobs:
         timeout-minutes: 8
         run: scripts/verify-demo.sh
 
-      # ---------------------------------------------------------------------
-      # docs/PRODUCT.md law 4.6, applied to the artifact strangers actually run. The vault writer goes
-      # through vendored KeePassLib's XML, Argon2 and AES - the code most likely to be broken by
-      # trimming. An AOT binary that has not written a KDBX real KeePassXC can open is untested.
-      # Do not add an `if:` that can skip this. If a runner cannot install keepassxc-cli, drop the
-      # RID from the matrix instead (D-0008).
-      # ---------------------------------------------------------------------
+      # Every packaged RID must pass the real KeePassXC compatibility gate (PRODUCT law 4.6).
       - name: Install KeePassXC (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get install -y --no-install-recommends keepassxc
@@ -362,15 +264,12 @@ jobs:
           HOMEBREW_NO_INSTALL_CLEANUP: '1'
         run: brew install --cask keepassxc
 
-      # Windows has no package manager we would trust here, so the release zip is fetched by hand
-      # and pinned by SHA-256. The hash is a repo-side constant rather than the release's own
-      # .DIGEST, which is served from the same origin as the zip and so proves integrity but not
-      # authenticity (D-0008).
       - name: Install KeePassXC (Windows)
         if: runner.os == 'Windows'
         shell: bash
         env:
           KPXC_VERSION: 2.7.12
+          # An in-repo checksum remains independent of the download origin.
           KPXC_SHA256: 958234b0669d757b53eacf42bdd5de0fa1cc1ab7527709ddf4f7e29c06a8305f
         run: |
           url="https://github.com/keepassxreboot/keepassxc/releases/download/${KPXC_VERSION}/KeePassXC-${KPXC_VERSION}-Win64.zip"
@@ -390,10 +289,7 @@ jobs:
           scripts/verify-keepassxc-compat.sh artifacts/compat/aot.kdbx
           scripts/verify-keepassxc-writeback.sh artifacts/compat/aot-writeback.kdbx
 
-      # macOS refuses to run a downloaded unsigned binary until the quarantine attribute is
-      # removed, and a tar extraction does not set that attribute - so the gates above would pass
-      # on a binary a real user cannot start. This sets it deliberately and checks what happens,
-      # so the README's sixth line is documented from an observation rather than a guess.
+      # Archive extraction omits the quarantine attribute that browsers apply to downloads.
       - name: Check the ad-hoc signature and the quarantine behaviour (macOS)
         if: runner.os == 'macOS'
         shell: bash
@@ -407,8 +303,6 @@ jobs:
           fi
           xattr -d com.apple.quarantine "$KEYPASTE_BIN"
 
-      # Proves self-containment on a machine with no .NET on it at all, which no runner can prove
-      # about itself, and turns the README's glibc floor into a tested claim instead of a guess.
       - name: Check the glibc floor on a clean Debian 12
         if: matrix.rid == 'linux-x64'
         shell: bash
@@ -421,8 +315,6 @@ jobs:
           fi
           echo "glibc floor confirmed: Debian 12 yes, Alpine no (musl needs linux-musl-x64, O-0013)"
 
-      # Packaged on the machine that produced the bytes, and hashed there too, so the checksum
-      # covers the artifact-transport step as well as the download.
       - name: Package and hash
         shell: bash
         run: |
@@ -430,11 +322,6 @@ jobs:
           out="artifacts/dist"; mkdir -p "$out"
           stage="artifacts/stage"; rm -rf "$stage"; mkdir -p "$stage"
           src="artifacts/release/${{ matrix.rid }}"
-          # Copy the two binaries by name rather than globbing and deleting the debris afterwards.
-          # A glob collects whatever else the platform happened to emit, and the list differs per
-          # platform: macOS writes keypaste.dSYM as a *directory*, which cp refuses without -r and
-          # which has no business in a release archive. Naming what ships means a new kind of
-          # build output cannot silently end up in a download.
           for n in keypaste keypaste-mcp; do
             if   [ -f "$src/$n" ];     then cp "$src/$n"     "$stage/"
             elif [ -f "$src/$n.exe" ]; then cp "$src/$n.exe" "$stage/"
@@ -444,18 +331,11 @@ jobs:
           cp LICENSE THIRD_PARTY_NOTICES.md "$stage"/
           name="keypaste-${VERSION}-${{ matrix.rid }}"
           if [ "${{ matrix.archive }}" = "zip" ]; then
-            (cd "$stage" && /c/Windows/System32/tar.exe -a -c -f "../dist/$name.zip" *)
+            (cd "$stage" && /c/Windows/System32/tar.exe -a -c -f "../dist/$name.zip" ./*)
           else
-            # COPYFILE_DISABLE keeps macOS from smuggling ._ AppleDouble members into the tarball.
+            # Exclude macOS AppleDouble metadata from release archives.
             COPYFILE_DISABLE=1 tar -czf "$out/$name.tar.gz" -C "$stage" .
           fi
-          # Write the checksum file ourselves rather than redirecting the tool's output, because
-          # the tools disagree about the format. Git Bash's sha256sum defaults to binary mode and
-          # emits "<hash> *<name>"; coreutils on Linux emits "<hash>  <name>"; macOS has no
-          # sha256sum at all. The publish job diffs these per-asset files against an aggregate it
-          # computes on Linux, so an asterisk from the Windows runner would fail that diff on the
-          # first real tag - and publish never runs on a dispatch, so nothing else would catch it.
-          # Two spaces, no marker, everywhere. `sha256sum -c` and `shasum -c` both accept it.
           arch="$name.${{ matrix.archive }}"
           asset="$out/$arch"
           if command -v sha256sum >/dev/null 2>&1; then
@@ -464,9 +344,9 @@ jobs:
             hash="$(cd "$out" && shasum -a 256 "$arch" | cut -d' ' -f1)"
           fi
           [ "${#hash}" -eq 64 ] || { echo "::error::bad checksum '$hash' for $arch"; exit 1; }
+          # Both checksum tools accept two spaces, while their default output formats differ.
           printf '%s  %s\n' "$hash" "$arch" > "$asset.sha256"
 
-          # Prove the file we just wrote actually verifies with the tool a reader would use.
           if command -v sha256sum >/dev/null 2>&1; then
             (cd "$out" && sha256sum -c "$arch.sha256")
           else
@@ -474,10 +354,6 @@ jobs:
           fi
           ls -l "$out"; cat "$asset.sha256"
 
-      # The bytes that were just staged, on the machine that built them. The assembly-attribute
-      # tests in each front end's suite cover the managed side on every operating system; this is
-      # the packaged side, including the NativeAOT binaries that have no managed assembly left to
-      # reflect over. F.4b in docs/STEPS.md is why it exists.
       - name: Verify the packaged binaries publish as the project
         shell: bash
         run: scripts/verify-publisher-metadata.sh artifacts/stage
@@ -510,14 +386,6 @@ jobs:
           path: dist
           merge-multiple: true
 
-      # The checksums were computed on four different machines and travelled through artifact
-      # storage to get here. Re-checking them on this one is the control against a corrupted
-      # upload, which is otherwise completely invisible.
-      # The checksums were computed on four different machines and travelled through artifact
-      # storage to get here. Re-checking them on this one is the control against a corrupted
-      # upload, which is otherwise completely invisible. How MANY assets there should be is not
-      # asked here: require-release-assets.sh owns that, against the definition and against what
-      # has already been published, and one owner per question is the point of R.0a.
       - name: Re-verify every checksum on this machine
         shell: bash
         run: |
@@ -536,43 +404,18 @@ jobs:
             -o "dist/keypaste-${VERSION}-source.tar.gz" "$GITHUB_SHA"
           (cd dist && sha256sum "keypaste-${VERSION}-source.tar.gz" > "keypaste-${VERSION}-source.tar.gz.sha256")
 
-      # Both spellings from one computation, asserted to agree. SHA256SUMS is for anyone verifying
-      # everything or scripting it; the per-asset files exist so the documented command is a bare
-      # `sha256sum -c <file>.sha256` with no flags and no way to pass by accident.
       - name: Aggregate SHA256SUMS
         shell: bash
         run: |
           set -euo pipefail
           cd dist
           sha256sum keypaste-*.tar.gz keypaste-*.zip | sort -k2 > SHA256SUMS
-          cat *.sha256 | sort -k2 > /tmp/per-asset
+          cat ./*.sha256 | sort -k2 > /tmp/per-asset
           diff <(grep -v SHA256SUMS SHA256SUMS) /tmp/per-asset \
             || { echo "::error::SHA256SUMS disagrees with the per-asset checksum files"; exit 1; }
           cat SHA256SUMS
 
-      # ---------------------------------------------------------------------
-      # EVERYTHING BELOW THIS LINE BECOMES WORLD-READABLE.
-      #
-      # The destination bucket is served publicly at dl.keypaste.com with no authentication, so an
-      # object put there is published the moment it lands and cannot be unpublished from anyone
-      # who already fetched it. The upload is recursive over dist/, which means the safety of this
-      # step depends entirely on nothing unexpected being in that directory.
-      #
-      # So the allowlist below is not belt-and-braces, it is the actual control: every file is
-      # matched against the exact set a release is allowed to contain, and anything else stops the
-      # release. A stray vault fixture, a build log, a core dump or an .env picked up by a future
-      # edit to the packaging step would otherwise be pushed to a public origin silently.
-      # ---------------------------------------------------------------------
-      # R.0a/D-0109. EVERYTHING BELOW THIS LINE BECOMES WORLD-READABLE: the bucket is served
-      # publicly at dl.keypaste.com with no authentication, so an object put there is published the
-      # moment it lands and cannot be unpublished from anyone who already fetched it. The upload is
-      # recursive over dist/, so the safety of the next step rests entirely on nothing unexpected
-      # being in that directory.
-      #
-      # That decision is scripts/require-release-assets.sh, and scripts/verify-release-preflight.sh
-      # drives it on every push: a stray dotfile, a missing target, a corrupt archive, a checksum
-      # with no asset and an asset with no checksum each refuse there before they can happen here.
-      # It was three step bodies only a tag ever ran.
+      # The next step recursively uploads dist/ to a public origin, so its allowlist must pass first.
       - name: Refuse to publish anything that is not a whole release
         shell: bash
         run: scripts/require-release-assets.sh "$VERSION" dist
@@ -586,9 +429,6 @@ jobs:
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
         run: scripts/publish-release.sh --publish "$VERSION" dist
 
-      # R.0b. The bytes are up; whether a STRANGER can get them is a different question, and the
-      # only one that decides whether this version may ever be advertised. Written before the ask so
-      # a failure still leaves evidence of what was expected, and retained either way.
       - name: Record what was published and verify it at the public origin
         shell: bash
         env:
@@ -610,8 +450,10 @@ jobs:
 
       - name: Say where it went
         run: |
-          echo "### keypaste ${VERSION} published" >> "$GITHUB_STEP_SUMMARY"
-          echo '' >> "$GITHUB_STEP_SUMMARY"
-          echo "https://dl.keypaste.com/v${VERSION}/" >> "$GITHUB_STEP_SUMMARY"
-          echo '' >> "$GITHUB_STEP_SUMMARY"
-          echo 'Binaries are unsigned and un-notarized (O-0010).' >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "### keypaste ${VERSION} published"
+            echo ''
+            echo "https://dl.keypaste.com/v${VERSION}/"
+            echo ''
+            echo 'Binaries are unsigned and un-notarized (O-0010).'
+          } >> "$GITHUB_STEP_SUMMARY"

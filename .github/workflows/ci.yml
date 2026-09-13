@@ -3,9 +3,7 @@ name: ci
 on:
   push:
     branches: [main]
-    # Documents no job here reads. Five pages must never be in this list - README.md, launch.md,
-    # docs/demo.md, docs/keepass-and-agents.md, site/public/index.html - because
-    # scripts/verify-demo.sh holds them to what the binaries print. Never add a 'docs/**' entry.
+    # Keep pages checked by verify-demo.sh out of this list; docs/** would also skip them.
     paths-ignore:
       - 'docs/PRODUCT.md'
       - 'CLAUDE.md'
@@ -21,14 +19,9 @@ on:
       - 'docs/replace-dotenv.md'
       - 'docs/policy.md'
       - 'docs/approvals.md'
-      # The desktop app's page. No gate in this workflow reads it — this workflow does not build the
-      # app at all — and app.yml, which does, has no documentation gate either. It was absent here by
-      # omission rather than by decision, so a docs-only change to it was paying for eight jobs.
       - 'docs/desktop.md'
       - 'site/README.md'
       - 'site/public/thanks/**'
-  # No paths filter on pull_request on purpose: a proposed change gets the full verdict regardless
-  # of what it touches, because that is the one place a reviewer is deciding on evidence.
   pull_request:
   workflow_dispatch:
 
@@ -37,8 +30,7 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  # A superseded pull-request run is cancelled. A run on main never is: every commit on main gets
-  # its own verdict, so a tag can always point at a commit with a green run.
+  # Release tags require a completed verdict for each commit on main.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
@@ -48,22 +40,20 @@ env:
   NUGET_XMLDOC_MODE: skip
 
 jobs:
-  # Formatting and analyzers are OS-independent, so they run once on Linux and
-  # short-circuit the three-OS matrix rather than failing three times over.
   gate:
     name: format + analyzers
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      # fetch-depth: 0 because verify-release-matrix.sh reads prior revisions of
-      # release-targets.json to hold `published` append-only - two fields one commit apart cannot
-      # hold each other honest, and git history can. checkout defaults to depth 1, where that
-      # history is simply absent; the gate dies rather than passing on it, which is the direction
-      # law 3.7 asks for and also why this line is load-bearing rather than an optimisation.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+          # The release matrix verifier checks published targets against repository history.
           fetch-depth: 0
+
+      - name: Verify workflows before restoring or building
+        shell: bash
+        run: bash scripts/verify.sh workflows
 
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
@@ -71,37 +61,22 @@ jobs:
           cache: true
           cache-dependency-path: '**/packages.lock.json'
 
-      - name: Restore (locked)
-        run: dotnet restore keypaste.slnx --locked-mode
+      - name: Restore, format and build with the local verifier
+        shell: bash
+        run: bash scripts/verify.sh backend --prepare-only
 
-      # third_party/ is excluded because vendored source is re-merged from upstream, not
-      # formatted to our taste; reformatting it would turn every security bump into a
-      # conflict. The quarantine that turns the analyzers off for it is
-      # third_party/Directory.Build.props — an .editorconfig alone would not be enough,
-      # because dotnet format reads .editorconfig but is not bound by MSBuild properties.
-      - name: Verify formatting
-        run: dotnet format keypaste.slnx --no-restore --verify-no-changes --exclude third_party/
+      - name: Verify local target selection and failure propagation
+        shell: bash
+        run: bash scripts/verify-local-checks.sh
 
-      - name: Build
-        run: dotnet build keypaste.slnx --no-restore -c Release -warnaserror
+      - name: Verify diagnostic results can be read before spending a dispatch
+        shell: bash
+        run: bash scripts/probe-results.sh --selftest
 
-      # F.4a. The release destination check is a script precisely so something other than a tag can
-      # run it: this drives it against a fake `aws` through every answer a listing can give, with no
-      # credential and no bucket, and --with-real-aws additionally asks this runner's real AWS CLI
-      # how it actually fails. It runs here rather than in the three-OS matrix because the publish
-      # job is Linux-only; Git Bash portability is a developer's local run, not a claim CI makes.
       - name: Verify the release destination check fails closed
         shell: bash
         run: scripts/verify-release-destination.sh --with-real-aws
 
-      # R.0a. One definition of what keypaste ships - component, version, OS floor, package format,
-      # signing policy - held against the workflows, the csprojs and the download pages. The
-      # fixtures drive the same validator this run uses, so a check that stops biting is a red gate
-      # rather than a quiet one. --with-public-origin is deliberately absent: it fetches published
-      # assets, and an unreachable origin is weather rather than evidence about this repository.
-      # install.yml runs that half weekly.
-      # The tag guard's decision, driven by a fake gh. It runs here because release.yml's guard
-      # only reaches it on a tag, which is the shape of defect F.4a cost two releases.
       - name: Verify the release preflight refuses a release that is not whole
         shell: bash
         run: scripts/verify-release-preflight.sh
@@ -114,25 +89,15 @@ jobs:
         shell: bash
         run: scripts/verify-release-matrix.sh
 
-      # The live half of this script asks keypaste.com and is deliberately not here: nothing in CI
-      # deploys the site, so it would be red for a reason CI cannot fix. --selftest is offline, and
-      # forces CRLF out of a fake jq whatever the platform - so the Linux runner catches a reader
-      # bug that can only happen on Windows, which is the only place it would otherwise be found.
+      # Live-origin checks run separately because this workflow cannot repair the deployed site.
       - name: Verify the disclosure reader survives a jq that writes CRLF
         shell: bash
         run: scripts/verify-site-disclosure.sh --selftest
 
-      # F.9 is verified by reading a pool-probe dispatch's timelines, and F.10 changes the instrument
-      # that writes them, so this reader has to give the same answer across both. It runs nowhere else
-      # on a push; without this it could stop pairing correctly and nobody would learn it until a
-      # 35-minute dispatch had been read wrong.
       - name: Verify the F.9 timeline reader pairs, nests and overlaps what it claims
         shell: bash
         run: scripts/f9-timeline.sh --selftest
 
-      # R.0b. The publish half of this only happens on a tag; the decision it makes is driven here
-      # against a fake origin on every push, which is D-0109's rule applied to the last thing between
-      # a release and being advertised.
       - name: Verify a published release is refused unless the public bytes say it is whole
         shell: bash
         run: scripts/verify-release-completion.sh
@@ -143,9 +108,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Three operating systems on GitHub-hosted runners, which are free for a public
-        # repository. The same runners release.yml builds every shipped binary on, so a tag is
-        # tested on the machines that produce it. See D-0042 and D-0086.
         os: [ubuntu-24.04, windows-2025, macos-15]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
@@ -169,97 +131,48 @@ jobs:
       - name: Test
         run: dotnet test keypaste.slnx --no-build -c Release
 
-      # `keypaste run` hands the child keypaste's real stdin, stdout and stderr, which puts
-      # everything it does beyond CliContext and therefore beyond every in-process test. The unit
-      # tests assert the environment keypaste *builds*; these assert what a real child process
-      # actually received, and that no file was written while doing it (docs/PRODUCT.md law 3.4).
+      - name: Verify the Windows PowerShell launcher selects Git Bash
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./scripts/verify.ps1 --list
+
       - name: Verify run injects a variable and writes nothing to disk
         shell: bash
         run: scripts/verify-run-injection.sh
 
-      # Unix only: there is no kill(1) equivalent on Windows and no tty on a runner. That is a gap
-      # in the test, not a relaxation of the gate — the Windows behaviour is stated in SECURITY.md
-      # instead. Do not add an `if:` that can skip the Linux and macOS runs.
+      # The Unix signal verifier has no Windows equivalent; SECURITY.md records that coverage gap.
       - name: Verify run forwards signals and exit codes
         if: runner.os != 'Windows'
         shell: bash
         run: scripts/verify-run-signals.sh
 
-      # The in-process MCP tests drive the server through StreamServerTransport, so they never
-      # exercise StdioServerTransport or Main — and "a client spawns it with redirected stdio and
-      # no terminal" is the premise of the whole bridge. Only a real spawned process can be asked
-      # what actually reached its stdout.
       - name: Verify keypaste-mcp speaks MCP over stdio and audits every call
         shell: bash
         run: scripts/verify-mcp-stdio.sh
 
-      # Everything else runs the approver and the bridge inside one test host. This is the only
-      # place a real `keypaste agent` unlocks a real vault in one process while a real
-      # keypaste-mcp asks it over a real named pipe from another, and a person's yes or no decides
-      # what comes back. That the credential crosses a process boundary is the premise of the whole
-      # architecture (DECISIONS.md D-0023), and a premise nothing exercises is one nobody checks.
       - name: Verify a person can approve and refuse across two real processes
         shell: bash
         run: scripts/verify-approval-e2e.sh
 
-      # The step above proves a person's yes and no cross a process boundary. This proves the
-      # opposite, and it is the harder claim: that a rule the human wrote in advance releases a
-      # credential with NO prompt at all, and that the same agent still draws one for anything the
-      # rule does not cover. An absence cannot be observed in-process, and it is worth nothing
-      # unless paired with a presence — which is why every phase here counts prompts before and
-      # after (DECISIONS.md D-0028).
-      #
-      # The timeout is not decoration. This step starts three `keypaste agent` processes, each of
-      # which blocks until it is stopped; one that outlives the script holds this step's handles open
-      # and the job sits there until its own twenty-minute limit, long after every assertion passed.
-      # Eight minutes turns that into a fast, obvious failure instead of a silent one.
+      # A surviving agent process can hold the step open after its assertions finish.
       - name: Verify a policy rule grants without a prompt, and only inside its pattern
         shell: bash
         timeout-minutes: 8
         run: scripts/verify-policy-e2e.sh
 
-      # The audit log is written by keypaste-mcp and read back by keypaste — two separate programs
-      # that have to agree, byte for byte, about what a record is. That agreement is the whole of
-      # THREATS.md T-5's mitigation, and the in-process tests cannot see it because they only ever
-      # use one of the two. This step edits a real log on a real disk and asserts that the shipped
-      # `keypaste log verify` notices, and, just as importantly, that an interrupted write and a
-      # truncation are reported as what they are rather than as an attack. Without it, the chain
-      # could pass every unit test while the two binaries disagreed about a single byte.
       - name: Verify the audit chain catches tampering and forgives a crash
         shell: bash
         run: scripts/verify-log-chain.sh
 
-      # docs/demo.md is the marketing (docs/PRODUCT.md law 5.1), and the first thing a stranger does with a
-      # demo page is type it in - so one that has quietly gone stale costs more than no page at all.
-      # Nothing in-process can catch that: what drifts is a Markdown transcript, which no unit test
-      # reads, and the approval dialog it reproduces exists only on the stderr of a second process.
-      # This step drives the page's own fixture and a real agent and bridge, and diffs that dialog
-      # against the block in the document character for character.
-      #
-      # It does not run Claude and says so in its own header and in the page's "Verifying it
-      # yourself": what a model chooses to do is not a thing a gate can hold, and a check this
-      # project asks strangers to trust must not depend on a paid networked service (D-0034).
-      #
-      # The timeout is not decoration - this step starts a `keypaste agent` that blocks until it is
-      # stopped, and one that outlives the script would hold the step open until the job's own
-      # twenty-minute limit, long after every assertion passed.
       - name: Verify the demo page still matches what the binaries print
         shell: bash
         timeout-minutes: 8
         run: scripts/verify-demo.sh
 
-  # The release workflow ships NativeAOT binaries, and AOT's failure mode is a runtime
-  # NotSupportedException rather than a build error — so a compile proves nothing and a tag must
-  # never be the first time this is exercised. One RID here, natively, on every push: enough to
-  # catch an AOT-hostile dependency the day it lands rather than on release day. The other three
-  # RIDs are covered by release.yml, which runs this same suite against every published binary.
-  #
-  # ubuntu-22.04 deliberately, not 24.04: NativeAOT links against the build machine's glibc, and
-  # 22.04's 2.35 is the floor the published Linux binaries are built to. Building the check on a
-  # newer image than the release would make it a weaker test than the thing it is checking.
   aot:
     name: aot publish (linux-x64)
     needs: gate
+    # NativeAOT inherits the build machine's glibc floor, which must match release.yml.
     runs-on: ubuntu-22.04
     timeout-minutes: 25
     env:
@@ -279,9 +192,7 @@ jobs:
       - name: Install the native toolchain
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang zlib1g-dev
 
-      # Never with -r. A RID on the command line narrows the project's runtime identifier set to
-      # one, which can never match a lock file recording four, and locked mode fails NU1004. The
-      # csproj declares all four so one whole-solution restore covers every publish (D-0040).
+      # Adding -r here narrows the RID set and invalidates the multi-RID lock file (D-0040).
       - name: Restore (locked)
         run: dotnet restore keypaste.slnx --locked-mode
 
@@ -292,20 +203,14 @@ jobs:
           dotnet publish src/Keypaste.Mcp/Keypaste.Mcp.csproj -c Release -r linux-x64 \
             --no-restore -o artifacts/release/linux-x64 2>&1 | tee /tmp/publish-mcp.log
 
-      # third_party/Directory.Build.props disarms the trim analyzers for vendored source, which is
-      # what O-0006 objected to. This puts the gate back: the diagnostics are diffed against a
-      # committed baseline, so an upstream re-merge that adds AOT-hostile code is a red build.
       - name: Verify the AOT trim diagnostics still match the baseline
         shell: bash
         run: scripts/verify-aot-trim.sh /tmp/publish-cli.log /tmp/publish-mcp.log
 
-      # Everything below runs against the published native binaries, not the ordinary build. The
-      # rm is load-bearing: artifacts/bin is exactly where the scripts look when the environment
-      # variables are unset, so without it a typo in either name would silently test the JIT build
-      # and pass. The assertions after it are the cheap discriminator between the two.
       - name: Point the gates at the AOT binaries and prove they are AOT
         shell: bash
         run: |
+          # Verification scripts otherwise fall back to the JIT build when an override is missing.
           rm -rf artifacts/bin
           test -x "$KEYPASTE_BIN" || { echo "::error::no AOT cli binary"; exit 1; }
           test -x "$KEYPASTE_MCP_BIN" || { echo "::error::no AOT mcp binary"; exit 1; }
@@ -340,10 +245,6 @@ jobs:
         timeout-minutes: 8
         run: scripts/verify-demo.sh
 
-      # docs/PRODUCT.md law 4.6 applied to the artifact strangers will actually run. The vault writer goes
-      # through vendored KeePassLib's XML, Argon2 and AES, which is the code most likely to be
-      # broken by trimming — so an AOT binary that has not written a KDBX a real KeePassXC can
-      # open has not been tested at all.
       - name: Install KeePassXC
         run: sudo apt-get install -y --no-install-recommends keepassxc
 
@@ -356,27 +257,7 @@ jobs:
           scripts/verify-keepassxc-compat.sh artifacts/compat/aot.kdbx
           scripts/verify-keepassxc-writeback.sh artifacts/compat/aot-writeback.kdbx
 
-  # ===========================================================================
-  # PERMANENT COMPATIBILITY GATE — docs/PRODUCT.md law 4.6:
-  #   "Compatibility is sacred: any KDBX file keypaste writes must open
-  #    correctly in KeePassXC. This is tested in CI against real KeePassXC."
-  #
-  # docs/PRODUCT.md is the one file in this repository that cannot change, so neither
-  # can the existence of this job. It is not subject to the usual "delete it if
-  # it is annoying" latitude that applies to every other CI step.
-  #
-  # If it is failing, keypaste's vault writer is wrong. Do NOT:
-  #   - delete this job,
-  #   - add continue-on-error,
-  #   - add an `if:` to the job,
-  #   - or drop an operating system from the matrix,
-  # to make the build green. DECISIONS.md D-0008 records the reasoning and the
-  # three properties that must survive any edit here.
-  #
-  # Changing which runner IMAGE hosts an operating system is allowed and has
-  # happened once (D-0042). Removing an operating system is not. All three are
-  # still here.
-  # ===========================================================================
+  # PRODUCT law 4.6 and D-0008 require this blocking gate on all three operating systems.
   compat:
     name: keepassxc compat (${{ matrix.os }})
     needs: gate
@@ -387,12 +268,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     env:
-      # ASCII-only on purpose. keepassxc-cli forces the Windows console code page to the
-      # system ANSI page, so a non-ASCII master password is the one value that could be
-      # mangled in transit. Non-ASCII *entry* values are still asserted, by the fixture.
+      # KeePassXC's Windows console encoding can alter a non-ASCII master password.
       KP_COMPAT_PASSWORD: ci-master-pw
-      # Repo-relative on purpose. github.workspace is a backslash path on Windows, which does
-      # not survive being quoted into a bash script; steps already run from the workspace root.
       KDBX: artifacts/compat/gen.kdbx
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -405,9 +282,6 @@ jobs:
           cache: true
           cache-dependency-path: '**/packages.lock.json'
 
-      # Linux and macOS take the distro/Homebrew build. The version floats with the runner
-      # image, which is correct semantics: the claim is "opens in KeePassXC", not "opens in
-      # one build of it", and a slightly older reader is free extra coverage.
       - name: Install keepassxc-cli (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -421,22 +295,12 @@ jobs:
           HOMEBREW_NO_INSTALL_CLEANUP: '1'
         run: brew install --cask keepassxc
 
-      # Windows has no packaged CLI that lands on PATH usefully, so we fetch the official
-      # portable zip and pin it by SHA-256. The MSI would set only the *machine* PATH, which
-      # the already-running job does not observe, so it would buy nothing over an absolute
-      # path while costing an installer.
-      #
-      # The binary is invoked by absolute path rather than added to $GITHUB_PATH because the
-      # portable build resolves Qt5Core.dll / argon2.dll / botan-3.dll from its own directory.
       - name: Install keepassxc-cli (Windows)
         if: runner.os == 'Windows'
         shell: bash
         env:
           KPXC_VERSION: 2.7.12
-          # Pinned in-repo rather than trusted from the release's own .DIGEST: that file is
-          # served from the same origin as the zip, so it proves integrity but not
-          # authenticity. A constant here changes only through a reviewed diff.
-          # Matches the published DIGEST for KeePassXC-2.7.12-Win64.zip.
+          # An in-repo checksum remains independent of the download origin.
           KPXC_SHA256: 958234b0669d757b53eacf42bdd5de0fa1cc1ab7527709ddf4f7e29c06a8305f
         run: |
           set -euo pipefail
@@ -451,15 +315,12 @@ jobs:
             exit 1
           fi
 
-          # Git Bash ships no unzip, and its own /usr/bin/tar is GNU tar, which cannot read a
-          # zip and wins the PATH lookup under `shell: bash`. Windows' bundled bsdtar reads
-          # zip natively, so call it by absolute path rather than trusting resolution order.
+          # Git Bash's GNU tar cannot read ZIP files; Windows supplies bsdtar.
           bsdtar="/c/Windows/System32/tar.exe"
           [ -x "$bsdtar" ] || { echo "::error::$bsdtar not found"; exit 1; }
           "$bsdtar" -xf "$zip"
 
-          # $(pwd) rather than $GITHUB_WORKSPACE: Git Bash reports a POSIX path (/d/a/...),
-          # whereas GITHUB_WORKSPACE is a backslash path that bash would mangle when quoted.
+          # pwd supplies a Bash-compatible path on Windows.
           echo "KPXC_CLI=$(pwd)/KeePassXC-${KPXC_VERSION}-Win64/keepassxc-cli.exe" >> "$GITHUB_ENV"
 
       - name: Restore (locked)
@@ -468,25 +329,14 @@ jobs:
       - name: Build
         run: dotnet build keypaste.slnx --no-restore -c Release
 
-      # Driven through the shipped keypaste binary rather than a throwaway harness, so the gate
-      # covers argument parsing, group paths, the redirected-stdin prompt, and add's
-      # open-modify-save cycle as well as the vault writer (DECISIONS.md D-0012).
       - name: Generate the fixture vault with the keypaste binary
         shell: bash
         run: scripts/make-compat-fixture.sh "${{ env.KDBX }}"
 
-      # shell: bash on all three runners, so one assertion script serves the whole matrix.
       - name: Verify it opens in real KeePassXC
         shell: bash
         run: scripts/verify-keepassxc-compat.sh "${{ env.KDBX }}"
 
-      # The other direction, and the other moment in a file's life: keypaste modifying an entry
-      # (which writes KDBX history for the first time), and KeePassXC editing and adding env
-      # variables that keypaste must then read. This is the claim the env convention was chosen
-      # for, so it is gated, not assumed (DECISIONS.md D-0014).
-      #
-      # Builds its own vault: the fixture above is asserted against an exact `ls -R -f` tree, and
-      # mutating it here would couple the two gates.
       - name: Verify the write-back round trip through real KeePassXC
         shell: bash
         run: bash scripts/verify-keepassxc-writeback.sh artifacts/compat/writeback.kdbx

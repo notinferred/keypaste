@@ -1,51 +1,22 @@
 # Feature coverage and KeePassXC baseline
 
-**Reviewed 2026-09-07. Status: first-pass capability inventory aligned with PRODUCT v1.2 and the accepted build plan; not a parity certification.**
+Reviewed 2026-09-07 against PRODUCT v1.2 and the accepted build plan. This is a first-pass capability inventory.
 
-The comparison baseline is **KeePassXC 2.7.12**, the release currently advertised on its
-[download page](https://keepassxc.org/download/). The online
-[User Guide](https://keepassxc.org/docs/KeePassXC_UserGuide) identifies itself as 2.7.11;
-version-specific behavior must therefore be checked against the 2.7.12 release and source.
-This inventory covers feature families. It does not claim that every upstream option, integration,
-file variant or platform behavior has been inspected. **P.0** in
-[STEPS](STEPS.md#define-coverage-before-claiming-a-complete-password-manager) expands this inventory into the complete
-versioned behavior contract; **P.9** verifies that contract against public keypaste releases.
+The baseline is KeePassXC 2.7.12, advertised on its [download page](https://keepassxc.org/download/) at review time. The online [User Guide](https://keepassxc.org/docs/KeePassXC_UserGuide) identifies itself as 2.7.11, so version-specific behavior requires checking against the 2.7.12 release and source. This inventory covers feature families; individual options, integrations, file variants and platform behaviors remain for P.0 in [STEPS](STEPS.md#define-coverage-before-claiming-a-complete-password-manager). P.9 requires evidence for every behavior in that versioned contract on public keypaste releases before any complete-coverage claim.
 
-KDBX compatibility, feature implementation and published availability are separate claims.
-Keeping an attachment when editing another field does not provide an attachment manager.
-Building an app in CI does not make it installable by a customer. No broad "KeePassXC parity"
-claim is justified until individual behaviors have evidence on each supported platform.
+KDBX compatibility, feature implementation and published availability require separate evidence. Preserving attachments establishes data compatibility; an attachment manager needs its own workflow. Public installation requires checks against released packages on each supported platform.
 
 ## How to read the status
 
-The keypaste column describes the inspected source and current documentation, principally
-[desktop behavior](desktop.md), [existing steps](STEPS.md),
-[entry browsing](../src/Keypaste.App/ViewModels/EntriesViewModel.cs),
-[vault operations](../src/Keypaste.Core/Vault.cs) and
-[format handling](../src/Keypaste.Core/Internal/KeePassInterop.cs).
-**The published release remains CLI/MCP v0.1.0; the desktop is not released.** An implemented
-source feature is not automatically present in that download: for example, `keypaste setup`
-was added afterward. Release-specific availability belongs in [release documentation](RELEASE.md).
+The keypaste column describes the source and documentation inspected on the review date: [desktop behavior](desktop.md), [existing steps](STEPS.md), [entry browsing](../src/Keypaste.App/ViewModels/EntriesViewModel.cs), [vault operations](../src/Keypaste.Core/Vault.cs) and [format handling](../src/Keypaste.Core/Internal/KeePassInterop.cs). At that date, CLI/MCP v0.1.0 was public and the desktop was unreleased; `keypaste setup` had been added after that download. [RELEASE](RELEASE.md) owns current release availability.
 
-"Not established" means this review found no implemented user workflow to claim. A delivery row
-records accepted work, not evidence that it shipped. The documentation realignment added tasks;
-it did not implement their features.
+"Not established" means this review found no implemented user workflow. Delivery rows identify accepted work; completion requires their evidence in STEPS.
 
-[PRODUCT v1.2](PRODUCT.md) owns accepted scope. [STEPS](STEPS.md#build-order) owns current status,
-dependencies, build order and milestone gates: Working proposition (R.1), Pilot ready (R.2),
-Paid release (R.3), Expansion including the full baseline (P.9) and organization pilot (R.4),
-and demand-activated Scale. The mappings below point into that plan; this inventory is not a
-second work queue. Rows grouped with lettered children refer to every named child's acceptance
-criteria in STEPS.
+[PRODUCT v1.2](PRODUCT.md) owns accepted scope. [STEPS](STEPS.md#build-order) owns status, dependencies and milestone gates: Working proposition (R.1), Pilot ready (R.2), Paid release (R.3), Expansion with the full baseline (P.9) and organization pilot (R.4), and demand-activated Scale. Mappings below refer to that plan and every named child's acceptance criteria.
 
 ## Desktop and vault coverage
 
-The upstream families come from the official
-[feature overview](https://keepassxc.org/docs/KeePassXC_GettingStarted): vaults, groups, search,
-generation, reports, import/export, TOTP, fields, attachments, history, hardware keys, CLI,
-auto-open, sharing, SSH and Secret Service. The
-[User Guide](https://keepassxc.org/docs/KeePassXC_UserGuide) details backups, restoration,
-merge, quick unlock and integration behavior.
+The upstream families come from the official [feature overview](https://keepassxc.org/docs/KeePassXC_GettingStarted): vaults, groups, search, generation, reports, import/export, TOTP, fields, attachments, history, hardware keys, CLI, auto-open, sharing, SSH and Secret Service. The [User Guide](https://keepassxc.org/docs/KeePassXC_UserGuide) details backups, restoration, merge, quick unlock and integration behavior.
 
 | Family | Keypaste source status | Delivery rows / milestone |
 |---|---|---|
@@ -67,13 +38,7 @@ merge, quick unlock and integration behavior.
 | Multiple vaults and auto-open | Recent-vault selection exists; simultaneous vaults/auto-open not established. | P.2 covers simultaneous vault identities, linked opening, scopes and lock behavior. Expansion. |
 | Format variants/settings | KDBX4/AES-256/Argon2d writing and bidirectional fixtures exist. Broad cipher/KDF/keyfile/metadata coverage is not proved. | 9.4 publishes the Working proposition compatibility result; P.7a covers remaining cipher/KDF controls and P.7b remaining legacy format/import behavior. P.0/P.9 define and verify the complete baseline. |
 
-Upstream password reports include weak, reused and expired credentials; their existence does not
-prescribe keypaste's scoring algorithm.
-[KeePassXC health-check description](https://keepassxc.org/blog/2020-08-15-keepassxc-password-healthcheck/).
-Upstream quick unlock depends on Windows/macOS hardware and setup; challenge-response protection
-is different from authenticating to an online account.
-[Getting Started](https://keepassxc.org/docs/KeePassXC_GettingStarted),
-[hardware-key FAQ](https://keepassxc.org/docs/).
+Upstream password reports include weak, reused and expired credentials; their existence does not prescribe keypaste's scoring algorithm. [KeePassXC health-check description](https://keepassxc.org/blog/2020-08-15-keepassxc-password-healthcheck/). Upstream quick unlock depends on Windows/macOS hardware and setup; challenge-response protection is different from authenticating to an online account. [Getting Started](https://keepassxc.org/docs/KeePassXC_GettingStarted), [hardware-key FAQ](https://keepassxc.org/docs/).
 
 ## Integration and distribution coverage
 
@@ -92,24 +57,13 @@ is different from authenticating to an online account.
 | CLI, envs and agent access | CLI/env injection, MCP approval, policy and local audit implemented; setup is newer than v0.1.0. | 4.3a–b, 4.4 and 4.4b add native approval/activity/lifecycle; E.1 completes desktop env use. Working proposition. 6.1–2 cover separately proven external delegation views in Expansion. |
 | Product guidance | Local guides exist; future GUI, hosted and phone instructions cannot yet be followed against released products. | 3.10a delivers version-correct local guides before R.1; 5.7 and 3.10b deliver sync/operator and hosted lifecycle guides before their respective gates. |
 
-KeePassXC's tagged browser documentation includes fill, generation, adding/updating credentials and
-extra fields; a read-only filler should therefore name its supported subset rather than claim parity.
-[Browser integration at 2.7.12](https://github.com/keepassxreboot/keepassxc/blob/2.7.12/docs/topics/BrowserIntegration.adoc).
-Its passkeys require browser integration. Auto-Type is separate, with an X11 limitation on Linux.
-Its SSH feature supplies keys to an existing agent; keypaste's planned agent is a different design.
-[User Guide](https://keepassxc.org/docs/KeePassXC_UserGuide).
+KeePassXC's tagged browser documentation includes fill, generation, adding/updating credentials and extra fields; a read-only filler should therefore name its supported subset rather than claim parity. [Browser integration at 2.7.12](https://github.com/keepassxreboot/keepassxc/blob/2.7.12/docs/topics/BrowserIntegration.adoc). Its passkeys require browser integration. Auto-Type is separate, with an X11 limitation on Linux. Its SSH feature supplies keys to an existing agent; keypaste's planned agent is a different design. [User Guide](https://keepassxc.org/docs/KeePassXC_UserGuide).
 
-KeePassXC distributes platform packages and browser-store extensions. It deliberately delegates
-cloud file sync to other services and recommends separate mobile clients; there is no official
-KeePassXC mobile app. KDBX access in those apps does not establish support for keypaste's future
-account, device or relay protocol.
-[Downloads](https://keepassxc.org/download/), [FAQ](https://keepassxc.org/docs/).
+KeePassXC distributes platform packages and browser-store extensions. It deliberately delegates cloud file sync to other services and recommends separate mobile clients; there is no official KeePassXC mobile app. KDBX access in those apps does not establish support for keypaste's future account, device or relay protocol. [Downloads](https://keepassxc.org/download/), [FAQ](https://keepassxc.org/docs/).
 
 ## Hosted and organization additions
 
-These capabilities are accepted scope under PRODUCT v1.2, beyond desktop KeePassXC parity.
-The hosted service and organization workflows remain unimplemented and unreleased. Their task
-mappings describe the required delivery, without claiming an available service.
+PRODUCT v1.2 accepts these additions to desktop KeePassXC coverage. Hosted and organization workflows remain unimplemented and unreleased; their mappings identify the required delivery.
 
 | User outcome | Keypaste source status | Delivery rows / milestone |
 |---|---|---|
@@ -127,44 +81,20 @@ mappings describe the required delivery, without claiming an available service.
 | Trust hosted operation | Security policy and local checks exist; no operated/reviewed hosted service. | H.9–H.10 and 5.7 cover operations, privacy/support and usable procedures before R.2; 10.2 independently reviews new hosted/client boundaries before R.3; R.4 requires review of team boundaries. |
 | Meet later enterprise operating needs | No managed fleet deployment, downstream rotation integration or enterprise assurance evidence. | S.1–S.5 cover measured capacity, fleet deployment, one provider credential lifecycle, support capacity and requested assurance. Demand-activated Scale; credentials already disclosed require provider-side rotation, not merely membership revocation. |
 
-Organization roles and per-collection permissions are distinct controls in established password
-managers. They are useful models for the Teams design.
-[Bitwarden organizations](https://bitwarden.com/help/about-organizations/),
-[collection permissions](https://bitwarden.com/help/collection-permissions/).
-Recovery also needs an explicit authority model: an organization-controlled recovery key changes
-who can recover access, even when the provider cannot decrypt the vault.
-[Bitwarden recovery design](https://bitwarden.com/help/account-recovery/).
+Organization roles and per-collection permissions are distinct controls in established password managers. They are useful models for the Teams design. [Bitwarden organizations](https://bitwarden.com/help/about-organizations/), [collection permissions](https://bitwarden.com/help/collection-permissions/). Recovery also needs an explicit authority model: an organization-controlled recovery key changes who can recover access, even when the provider cannot decrypt the vault. [Bitwarden recovery design](https://bitwarden.com/help/account-recovery/).
 
-Vault permissions cannot erase a recipient's previous copy or make a revealed static password
-expire. Offboarding must distinguish refusing future downloads/broker requests, rotating vault keys,
-and rotating the actual downstream credential. Hidden fields are still shared credentials.
-[Bitwarden offboarding](https://bitwarden.com/help/onboarding-and-succession/),
-[permission limits](https://bitwarden.com/help/collection-permissions/).
+Vault permissions cannot erase a recipient's previous copy or make a revealed static password expire. Offboarding must distinguish refusing future downloads/broker requests, rotating vault keys, and rotating the actual downstream credential. Hidden fields are still shared credentials. [Bitwarden offboarding](https://bitwarden.com/help/onboarding-and-succession/), [permission limits](https://bitwarden.com/help/collection-permissions/).
 
-Full PAM/IAM would additionally administer privileges in other systems, including temporary role
-activation and resource access reviews. That is a separate scope from an enterprise password vault.
-Integrate with identity providers first; do not promise the broader platform by implication.
-[Microsoft PIM scope](https://learn.microsoft.com/en-us/entra/id-governance/privileged-identity-management/pim-configure).
+Full PAM/IAM would additionally administer privileges in other systems, including temporary role activation and resource access reviews. That is a separate scope from an enterprise password vault. Integrate with identity providers first; do not promise the broader platform by implication. [Microsoft PIM scope](https://learn.microsoft.com/en-us/entra/id-governance/privileged-identity-management/pim-configure).
 
 ## Evidence required to close a gap
 
-For each promoted feature, record its workflow, supported platforms, upstream baseline if applicable,
-Core/CLI/GUI/browser/mobile coverage, test evidence and first published version. Useful acceptance
-examples include:
+For each promoted feature, record its workflow, supported platforms, upstream baseline if applicable, Core/CLI/GUI/browser/mobile coverage, test evidence and first published version. Useful acceptance examples include:
 
-- A new user downloads the app, creates a vault, saves an existing login, finds it, changes it,
-  restores the prior value, then restores an accidentally deleted entry without a terminal.
-- A KeePassXC fixture containing protected fields, attachments, history and duplicate titles survives
-  an unrelated keypaste edit; unsupported operations refuse rather than discard data.
-- Two offline clients edit different entries and converge; concurrent conflicting edits remain
-  recoverable. Restore a downloaded encrypted backup on a fresh device.
-- An offboarded teammate cannot fetch the next rotated snapshot or obtain a new broker release;
-  the test explicitly acknowledges that a retained old snapshot remains decryptable with its old key.
-- Browser tests cover hostile domain matches, new-account save, password update, locked state,
-  TOTP/passkeys where claimed, and the supported OS/browser combinations.
+- A new user downloads the app, creates a vault, saves an existing login, finds it, changes it, restores the prior value, then restores an accidentally deleted entry without a terminal.
+- A KeePassXC fixture containing protected fields, attachments, history and duplicate titles survives an unrelated keypaste edit; unsupported operations refuse rather than discard data.
+- Two offline clients edit different entries and converge; concurrent conflicting edits remain recoverable. Restore a downloaded encrypted backup on a fresh device.
+- An offboarded teammate cannot fetch the next rotated snapshot or obtain a new broker release; the test explicitly acknowledges that a retained old snapshot remains decryptable with its old key.
+- Browser tests cover hostile domain matches, new-account save, password update, locked state, TOTP/passkeys where claimed, and the supported OS/browser combinations.
 
-These examples explain the evidence expected from the mapped delivery rows. They are not passing
-results or a second acceptance queue. P.0 records every baseline behavior, including gaps this
-first-pass inventory missed; P.9 cannot close until those behaviors have public-version evidence.
-R.1/R.2/R.3/R.4 separately establish the working local product, managed pilot, paid consumer release
-and organization pilot.
+These are acceptance examples for the mapped delivery rows. P.0 records every baseline behavior, including gaps this inventory missed; P.9 requires their public-version evidence. R.1/R.2/R.3/R.4 separately establish the working local product, managed pilot, paid consumer release and organization pilot.
