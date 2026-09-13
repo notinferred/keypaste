@@ -217,17 +217,17 @@ Use seven posts with the recorded GIF first. Keep links in the last two posts. D
 
 > This CLI-era release is pre-1.0 and AGPL, with terminal approvals and no public GUI release. Demo: [docs/demo.md]. Code: [repo]. Which credentials would you permit an agent to retain?
 
-## The fourteen days after
+## Answering the launch
 
-`docs/STEPS.md` step 3.3 requires responses to every issue and comment for fourteen days.
+`docs/STEPS.md` step 3.3 closes when every issue and comment received since the posts is classified and answered.
 
-On day 0, reserve six hours after Show HN for responses. Record issues during that window and defer code changes.
+Reserve six hours after Show HN for responses. Record issues during that window and defer code changes.
 
-On days 1–14, answer every issue and comment. Classify each as a bug, known gap, documentation misunderstanding or design disagreement, and correct misleading documentation.
+Answer every issue and comment. Classify each as a bug, known gap, documentation misunderstanding or design disagreement, and correct misleading documentation.
 
 Move security reports to `security@keypaste.com` immediately and avoid discussing details publicly until resolved. `docs/PRODUCT.md` §3.10 requires prompt, complete disclosure of shipped vulnerabilities.
 
-Update `CHANGELOG.md` each week; the release workflow uses it for release notes. Do not send changelog messages to the signup list, which promises one installation announcement and is not a newsletter.
+Update `CHANGELOG.md` as corrections land; the release workflow uses it for release notes. Do not send changelog messages to the signup list, which promises one installation announcement and is not a newsletter.
 
 Label good first issues only with contribution terms available in `CONTRIBUTING.md`.
 

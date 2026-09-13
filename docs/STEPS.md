@@ -273,7 +273,7 @@ Sell hosted convenience only after the pilot works. Local functions, security, s
 ### Community evidence and public communication
 
 - [ ] **3.2 — Publish the initial community introduction (H-0006).** Needs: R.1, 3.0, 3.1, 3.2b. — Refresh [launch.md](../launch.md) for the product actually released, then post once per sanctioned channel.
-- [ ] **3.3 — Complete the community feedback period (H-0007).** Needs: 3.2. — Fourteen days answering what comes back, with security reports routed privately.
+- [ ] **3.3 — Answer the community introduction's feedback (H-0007).** Needs: 3.2. — Closes when every issue and comment received on the sanctioned channels since 3.2 is classified as bug, known gap, documentation misunderstanding or design disagreement and answered, security reports have moved to `security@keypaste.com`, misleading documentation is corrected and bugs and gaps are recorded in STEPS or the Ideas table.
 - [ ] **3.10b — Ship hosted and account-lifecycle guides.** Needs: R.2, 5.5c, M.3. — Help for signup, phone access, recovery, support, cancellation, export and deletion.
 - [ ] **R.3 — Verify the paid consumer release.** Needs: R.2, H.10, 5.5c, 5.6, M.3, 10.2, 5.8, 3.3, 3.10b. — **Milestone gate:** independent nontechnical users complete onboarding through payment, cancellation and export on public distributions.
 
@@ -332,7 +332,7 @@ Activate after R.2 and the selection of an authorized pilot organization and sco
 - [ ] **7.2 — Implement attributed team approval and broker access.** Needs: 7.1c. — Approvals attributed to an identified member or service account, revoked at the next request.
 - [ ] **7.3a — Add organization OIDC sign-in.** Needs: 7.1b. — One IdP through established OIDC components; SSO authenticates the account and never unlocks the vault.
 - [ ] **7.3b — Add provisioning and deprovisioning.** Needs: 7.3a, 7.1c, 7.2. — A SCIM connector where a departure actually revokes sessions, devices and broker access.
-- [ ] **6.1 — Prove external delegation visibility and revocation.** Needs: R.2. — A two-day feasibility check of what GitHub and Google grants can really be seen and revoked.
+- [ ] **6.1 — Prove external delegation visibility and revocation.** Needs: R.2. — A feasibility check of what GitHub and Google grants can really be seen and revoked.
 - [ ] **6.2 — Add the supported delegation views.** Needs: 6.1. — Show only the proved provider integrations, with staleness labelled and offline never shown as zero.
 - [ ] **7.4 — Build team access reviews and delegation dashboard.** Needs: 7.1d, 7.2, 7.3b. — Membership, rights and broker policy in one reviewable place, with unknown access left visible.
 - [ ] **R.4 — Verify a real organization pilot.** Needs: 7.1d, 7.2, 7.3b, 7.4. — **Milestone gate:** an authorized organization onboards, shares, reviews access and offboards, independently assessed.
