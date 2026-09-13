@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
+using Microsoft.Diagnostics.NETCore.Client;
 
 namespace Keypaste.Core.Tests;
 
@@ -247,13 +248,31 @@ internal sealed class PoolWatch : IDisposable
 /// climbing is short of workers it is still adding; one whose completed count did not move is running
 /// nothing at all. Only a process that asked for a timeline runs this.
 /// </para>
+/// <para>
+/// <b>The counters say the pool withheld workers; only a dump says what the busy ones were doing.</b>
+/// Run 34713153644's long stalls held six to eight workers busy whether four threads existed or
+/// eighteen, beside nothing the timeline marks. So when <see cref="DumpVariable"/> is also set, a stall
+/// that reaches <see cref="_dumpAt"/> writes a triage dump of this process into the timeline directory,
+/// while the stall is still happening. Triage because the file is uploaded from a public repository:
+/// it carries every thread's stack and none of the heap. At most <see cref="_dumpsPerProcess"/>, so a
+/// run that stalls repeatedly does not fill the artifact with the same picture.
+/// </para>
 /// </remarks>
 internal static class PoolLiveness
 {
+    /// <summary>Set, alongside the timeline, to write a dump when the pool stalls for long enough.</summary>
+    internal const string DumpVariable = "KEYPASTE_F9_DUMP";
+
+    private const int _dumpsPerProcess = 3;
+
     private static readonly TimeSpan _stall = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan _dumpAt = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan _cadence = TimeSpan.FromMilliseconds(25);
 
+    private static readonly bool _dumpAsked = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(DumpVariable));
+
     private static long _ranAt;
+    private static int _dumps;
 
     internal static void Start() =>
         new Thread(Watch) { IsBackground = true, Name = "f9-pool-liveness" }.Start();
@@ -267,6 +286,7 @@ internal static class PoolLiveness
             ThreadPool.UnsafeQueueUserWorkItem(static _ => Volatile.Write(ref _ranAt, Stopwatch.GetTimestamp()), null);
 
             PoolCounters? atStall = null;
+            var dumped = false;
 
             while (Volatile.Read(ref _ranAt) == 0)
             {
@@ -274,6 +294,13 @@ internal static class PoolLiveness
                 {
                     atStall = PoolCounters.Read();
                     PoolTimeline.Mark("stall-enter", Counts(atStall.Value));
+                }
+
+                if (!dumped && _dumpAsked && _dumps < _dumpsPerProcess && Stopwatch.GetElapsedTime(queued) >= _dumpAt)
+                {
+                    dumped = true;
+                    _dumps++;
+                    Dump();
                 }
 
                 Thread.Sleep(_cadence);
@@ -292,6 +319,31 @@ internal static class PoolLiveness
             }
 
             Thread.Sleep(_cadence);
+        }
+    }
+
+    private static void Dump()
+    {
+        var directory = System.IO.Path.GetDirectoryName(PoolTimeline.Path);
+
+        if (directory is null)
+        {
+            return;
+        }
+
+        var file = string.Create(
+            CultureInfo.InvariantCulture,
+            $"f9-dump-{Environment.ProcessId}-{_dumps}-{Stopwatch.GetTimestamp()}.dmp");
+
+        try
+        {
+            new DiagnosticsClient(Environment.ProcessId).WriteDump(DumpType.Triage, System.IO.Path.Combine(directory, file));
+            PoolTimeline.Mark("dump", file);
+        }
+        catch (Exception ex) when (ex is ServerErrorException or IOException or UnauthorizedAccessException or TimeoutException or InvalidOperationException)
+        {
+            // The dump is evidence about a stall, not a reason to fail the run the stall happened in.
+            PoolTimeline.Mark("dump", "failed: " + ex.GetType().Name);
         }
     }
 
