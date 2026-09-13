@@ -1,7 +1,7 @@
-using System.IO.Pipes;
 using System.Text;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Tests;
 using Keypaste.Mcp.Tools;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
@@ -116,16 +116,8 @@ internal sealed class McpHarness : IAsyncDisposable
             throw new InvalidOperationException($"the harness could not open the audit log: {auditError}");
         }
 
-        // Two one-way pipes: one carrying the client's requests, one carrying the server's replies.
-        var toServer = new AnonymousPipeServerStream(PipeDirection.Out, HandleInheritability.None);
-        var toServerRead = new AnonymousPipeClientStream(PipeDirection.In, toServer.ClientSafePipeHandle);
-        var toClient = new AnonymousPipeServerStream(PipeDirection.Out, HandleInheritability.None);
-        var toClientRead = new AnonymousPipeClientStream(PipeDirection.In, toClient.ClientSafePipeHandle);
-
-        _owned.Add(toServer);
-        _owned.Add(toServerRead);
-        _owned.Add(toClient);
-        _owned.Add(toClientRead);
+        var channels = HarnessChannels.Open();
+        _owned.Add(channels);
 
         var serverOptions = new McpServerOptions
         {
@@ -143,15 +135,15 @@ internal sealed class McpHarness : IAsyncDisposable
                 : new ListEntryNamesTool(new ApproverEntryNameSource(_approver, options), options, _audit));
         serverOptions.ToolCollection.Add(new RequestCredentialTool(options, _approver, _audit));
 
-        _transcript = new TeeStream(toClient);
+        _transcript = new TeeStream(channels.ServerWrites);
         _owned.Add(_transcript);
 
-        _transport = new StreamServerTransport(toServerRead, _transcript, "keypaste");
+        _transport = new StreamServerTransport(channels.ServerReads, _transcript, "keypaste");
         _server = McpServer.Create(_transport, serverOptions, loggerFactory: null, serviceProvider: null);
         _serving = _server.RunAsync();
 
         _client = await McpClient.CreateAsync(
-            new StreamClientTransport(toServer, toClientRead),
+            new StreamClientTransport(channels.ClientWrites, channels.ClientReads),
             new McpClientOptions
             {
                 ClientInfo = new Implementation { Name = ClientName, Version = ClientVersion },
@@ -281,7 +273,10 @@ internal sealed class FakeEntryNameSource : IEntryNameSource, IDisposable
 
         if (Hold)
         {
+            // F.9: a blocking wait on a pool thread, marked for the same reason as a key derivation.
+            PoolTimeline.Mark("held-enter", "pool thread " + Thread.CurrentThread.IsThreadPoolThread);
             Held!.Wait(cancellationToken);
+            PoolTimeline.Mark("held-exit");
         }
 
         if (Throw)

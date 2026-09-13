@@ -7,6 +7,13 @@
 
   <ItemGroup Label="Testing">
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
+
+    <!-- Test projects only, for F.9's pool instrument: it writes a triage dump of its own process
+         when the pool stalls, so the probe can name what the busy workers were running. .NET 10's
+         createdump no longer accepts another process's pid, so a dump has to be asked for through the
+         runtime's diagnostics IPC, and this is the runtime team's client for it. Nothing in src/
+         references it. -->
+    <PackageVersion Include="Microsoft.Diagnostics.NETCore.Client" Version="0.2.745401" />
   </ItemGroup>
 
   <!-- The only runtime dependency in src/, and the narrowest form of it: ModelContextProtocol.Core

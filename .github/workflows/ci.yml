@@ -122,6 +122,14 @@ jobs:
         shell: bash
         run: scripts/verify-site-disclosure.sh --selftest
 
+      # F.9 is verified by reading a pool-probe dispatch's timelines, and F.10 changes the instrument
+      # that writes them, so this reader has to give the same answer across both. It runs nowhere else
+      # on a push; without this it could stop pairing correctly and nobody would learn it until a
+      # 35-minute dispatch had been read wrong.
+      - name: Verify the F.9 timeline reader pairs, nests and overlaps what it claims
+        shell: bash
+        run: scripts/f9-timeline.sh --selftest
+
       # R.0b. The publish half of this only happens on a tag; the decision it makes is driven here
       # against a fake origin on every push, which is D-0109's rule applied to the last thing between
       # a release and being advertised.

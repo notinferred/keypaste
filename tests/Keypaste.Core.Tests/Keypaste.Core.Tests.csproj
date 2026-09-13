@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="xunit.v3" />
+    <PackageReference Include="Microsoft.Diagnostics.NETCore.Client" />
   </ItemGroup>
 
   <ItemGroup>
