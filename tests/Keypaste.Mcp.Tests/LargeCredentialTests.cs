@@ -59,11 +59,7 @@ public sealed class LargeCredentialTests : IAsyncLifetime
     public ValueTask InitializeAsync()
     {
         _directory = Directory.CreateTempSubdirectory("keypaste-huge-").FullName;
-        // F.9: a key derivation blocks this thread on work queued to the same pool, so it is marked
-        // where a stall in this process can be lined up against it.
-        PoolTimeline.Mark("derive-enter", "LargeCredentialTests; pool thread " + Thread.CurrentThread.IsThreadPoolThread);
         _vault = Vault.Create(Path.Combine(_directory, "vault.kdbx"), _master);
-        PoolTimeline.Mark("derive-exit");
 
         _vault.AddEntry(new VaultEntry
         {

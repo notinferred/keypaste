@@ -2,6 +2,15 @@
   "version": 2,
   "dependencies": {
     "net10.0": {
+      "Microsoft.Diagnostics.NETCore.Client": {
+        "type": "Direct",
+        "requested": "[0.2.745401, )",
+        "resolved": "0.2.745401",
+        "contentHash": "M+XXKCFl5JZxcaopsXQgL3ItTQW3ZNlM9MR8YY9wX2/VvjVBDBfShzmiKmFq3Pl7WmA+l1jzE2OoB714gItLxA==",
+        "dependencies": {
+          "Microsoft.Extensions.Logging.Abstractions": "8.0.3"
+        }
+      },
       "xunit.v3": {
         "type": "Direct",
         "requested": "[3.2.2, )",
@@ -147,7 +156,7 @@
       "keypaste-mcp": {
         "type": "Project",
         "dependencies": {
-          "Keypaste.Core": "[0.1.0, )",
+          "Keypaste.Core": "[0.2.0, )",
           "ModelContextProtocol.Core": "[1.4.1, )"
         }
       },
