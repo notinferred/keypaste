@@ -34,11 +34,12 @@ readonly CR=$'\r'
 die() { echo "::error::$*" >&2; exit 1; }
 jqr() { command jq -r "$@" | tr -d "$CR"; }
 
+# Read from stdin: given a path containing a backslash, GNU sha256sum prefixes its digest with one.
 sha256_of() {
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum "$1" | awk '{print $1}'
+    sha256sum < "$1" | awk '{print $1}'
   else
-    shasum -a 256 "$1" | awk '{print $1}'
+    shasum -a 256 < "$1" | awk '{print $1}'
   fi
 }
 
@@ -137,7 +138,7 @@ while [ $# -gt 0 ]; do
     *) shift ;;
   esac
 done
-digest="$(sha256sum "$file" | awk '{print $1}')"
+digest="$(sha256sum < "$file" | awk '{print $1}')"
 jq -e --arg r "$repo" --arg w "$workflow" --arg f "$ref" --arg d "$digest" \
   '.repo == $r and .workflow == $w and .ref == $f and (.subjects | index($d))' "$bundle" >/dev/null || exit 1
 case "${KEYPASTE_FAKE_GH:-}" in
@@ -196,6 +197,8 @@ FAKE
   stage
   expect accept genuine-release-downloaded "all 11 assets" -- bash "$subject" "$v" "$work/get"
   expect accept genuine-staged-directory "all 11 assets" -- bash "$subject" --dir "$v" "$work/dist"
+  mkdir -p "$work/back\slash" && cp -R "$work/dist" "$work/back\slash/"
+  expect accept path-with-a-backslash "all 11 assets" -- bash "$subject" --dir "$v" "$work/back\slash/dist"
 
   stage; printf 'the bytes Of %s\n' "$(sed -n 1p <<< "$names")" > "$work/served/$(sed -n 1p <<< "$names")"
   expect refuse changed-byte "does not match the manifest" -- bash "$subject" "$v" "$work/get1"
@@ -236,8 +239,9 @@ FAKE
   expect accept weakened-believes-another-digest "all 11 assets" -- env KEYPASTE_FAKE_GH=other-digest bash "$work/weak/scripts/verify-provenance.sh" --dir "$v" "$work/dist"
 
   [ "$failures" -eq 0 ] || die "$failures of $cases provenance cases failed"
-  echo "ok: $cases cases. A changed byte, a rewritten manifest, another repository, workflow or tag, an unattested"
-  echo "    or unpublished asset, a short manifest and a verifier that proves nothing all refuse; the weakened copy does not."
+  echo "ok: $cases cases. A path with a backslash verifies. A changed byte, a rewritten manifest, another repository,"
+  echo "    workflow or tag, an unattested or unpublished asset, a short manifest and a verifier that proves nothing"
+  echo "    all refuse; the weakened copy does not."
 }
 
 case "${1:-}" in
