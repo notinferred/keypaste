@@ -107,6 +107,7 @@ The bounded 2026-09-07 review found these while the local Windows suites reporte
 - [ ] **3.8 — Authenticate release origin and retain provenance.** Needs: R.0b.
   **Build:** Generate build attestations for every distributable, source archive and release manifest; bind verification to this repository and its release workflow. Publish a copyable verification procedure and retain the evidence with the release; make no reproducible-build claim from attestation alone.
   **Verify (V-3.8):** The documented procedure accepts an anonymously downloaded genuine release and rejects a changed byte, wrong repository identity or unrelated workflow. Every advertised asset is covered after temporary CI artifacts expire.
+  **Pending (2026-09-14):** built at 2cae6d3; [verify-provenance.sh](../scripts/verify-provenance.sh) `--selftest` passes 13 cases and the no-login bundle preflight is D-0138. Tag `v0.2.1-rc.1` at c2884cf (ci and app green) stopped at the guard, release run 34875164069: R2 answered `ListObjectsV2: Unauthorized` to the secrets set 2026-09-10 that published 0.2.0. Nothing was built, attested or uploaded; `v0.2.1-rc.1/` is still absent. Next: replace the R2 token and its repository secrets, rerun that run on the same tag, then run the public acceptance.
 
 ### Desktop packages and platform signing
 
