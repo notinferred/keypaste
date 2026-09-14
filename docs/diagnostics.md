@@ -12,7 +12,7 @@ Record the failing behavior and the question the next observation must answer. D
 | CLI null-reference stacks | [ExceptionTrace.cs](../tests/Keypaste.Cli.Tests/ExceptionTrace.cs) | Optional first-chance stacks before the CLI converts an exception into a user-facing error. |
 | Timeline correlation | `bash scripts/f9-timeline.sh <iteration-directory>...` | Instrumented intervals, overlap and same-process activity. At depth above one, pairing is ambiguous. |
 | Save decomposition | [SaveClock](../src/Keypaste.Core/Internal/SaveClock.cs), `SaveTimingTests` in `Keypaste.Core.Tests` | Each save's check, redirect, gate wait, attempt work, retry waits, re-reads and stamp, and which operation held the gate; the tests prove a held gate and slow work read differently. |
-| Save readings | `bash scripts/f9-timeline.sh --saves <iteration-directory>...` | Each labelled save's first interval split by component with the dominant one named, and the operations holding the gate while it waited. |
+| Save readings | `bash scripts/f9-timeline.sh --saves <iteration-directory>...` | Each labelled save's first interval split by component with the dominant one named, and the operations holding the gate while it waited. `gate=-` is a save that never took the gate; `gatedat` is the attempt it was taken before (D-0136). |
 | Hosted comparison | [pool-probe.yml](../.github/workflows/pool-probe.yml) | The full CI test command at three pool floors on the selected Windows runner. |
 
 Run the readers' offline fixtures before using new analysis code:

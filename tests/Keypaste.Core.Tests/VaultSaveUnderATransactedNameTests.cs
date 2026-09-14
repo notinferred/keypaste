@@ -264,6 +264,39 @@ public sealed class VaultSaveUnderATransactedNameTests : IDisposable
             StringComparer.Ordinal);
     }
 
+    /// <summary>
+    /// KeePassLib still transacts only over a vault file that exists.
+    /// </summary>
+    /// <remarks>
+    /// <c>KeePassInterop.EnterGateIfTransacting</c> restates that rule to leave a save that cannot
+    /// transact out of the gate (F.10b). If upstream ever transacted over a missing file, such a
+    /// save would share the temporary directory ungated, so the rule is read from the vendored
+    /// constructor on every platform, with an existing file as the control.
+    /// </remarks>
+    [Fact]
+    public void TheVendoredSaveTransactsOnlyOverAnExistingFile()
+    {
+        var existing = System.IO.Path.Combine(_directory, "existing.kdbx");
+        File.WriteAllBytes(existing, [0]);
+
+        Assert.False(Transacts(System.IO.Path.Combine(_directory, "missing.kdbx")));
+        Assert.True(Transacts(existing));
+
+        static bool Transacts(string path)
+        {
+            var connection = Type.GetType("KeePassLib.Serialization.IOConnectionInfo, KeePassLib", throwOnError: true)!
+                .GetMethod("FromPath", BindingFlags.Public | BindingFlags.Static, [typeof(string)])!
+                .Invoke(null, [path]);
+
+            var vendored = Type.GetType("KeePassLib.Serialization.FileTransactionEx, KeePassLib", throwOnError: true)!;
+            using var transaction = (IDisposable)Activator.CreateInstance(vendored, connection, true)!;
+
+            var transacted = vendored.GetField("m_bTransacted", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.NotNull(transacted);
+            return (bool)transacted.GetValue(transaction)!;
+        }
+    }
+
     private (Vault Vault, string Path) NewSavedVault(string name)
     {
         var home = Directory.CreateDirectory(System.IO.Path.Combine(_directory, name)).FullName;
