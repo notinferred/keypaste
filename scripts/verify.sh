@@ -84,6 +84,7 @@ check_scripts() {
   run bash scripts/verify-release-matrix.sh
   run bash scripts/verify-site-disclosure.sh --selftest
   run bash scripts/verify-release-completion.sh
+  run bash scripts/verify-provenance.sh --selftest
   run bash scripts/f9-timeline.sh --selftest
   run bash scripts/probe-results.sh --selftest
 }

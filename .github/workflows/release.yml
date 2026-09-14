@@ -146,6 +146,10 @@ jobs:
         shell: bash
         run: scripts/verify-release-preflight.sh
 
+      - name: Verify the provenance check refuses a release this workflow did not attest
+        shell: bash
+        run: scripts/verify-provenance.sh --selftest
+
       - name: Verify the green-gate check refuses a commit whose gates are not green
         shell: bash
         run: scripts/verify-green-gates.sh
@@ -373,6 +377,8 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+      id-token: write
+      attestations: write
     env:
       VERSION: ${{ needs.guard.outputs.version }}
     steps:
@@ -415,6 +421,34 @@ jobs:
             || { echo "::error::SHA256SUMS disagrees with the per-asset checksum files"; exit 1; }
           cat SHA256SUMS
 
+      # The manifest is uploaded with the release, so it is written before the one upload rather than after.
+      - name: Write the release manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="$(scripts/release-completion.sh manifest-name "$VERSION")"
+          scripts/release-completion.sh record "$VERSION" "$GITHUB_REF_NAME" "$GITHUB_SHA" dist > "dist/$manifest"
+          cat "dist/$manifest"
+          (cd dist && jq -r '.assets[].name' "$manifest" | xargs sha256sum && sha256sum "$manifest") > "$RUNNER_TEMP/subjects.sha256"
+          cat "$RUNNER_TEMP/subjects.sha256"
+
+      - name: Attest every asset and the manifest
+        id: attest
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-checksums: ${{ runner.temp }}/subjects.sha256
+          show-summary: true
+
+      - name: Publish the attestation bundle with the release and check it before anything uploads
+        shell: bash
+        env:
+          BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          set -euo pipefail
+          bundle="$(scripts/release-completion.sh bundle-name "$VERSION")"
+          cp "$BUNDLE_PATH" "dist/$bundle"
+          scripts/verify-provenance.sh --dir "$VERSION" dist
+
       # The next step recursively uploads dist/ to a public origin, so its allowlist must pass first.
       - name: Refuse to publish anything that is not a whole release
         shell: bash
@@ -429,23 +463,22 @@ jobs:
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
         run: scripts/publish-release.sh --publish "$VERSION" dist
 
-      - name: Record what was published and verify it at the public origin
+      - name: Verify the public origin serves what the manifest records, and that it is attested
         shell: bash
-        env:
-          VERSION: ${{ needs.guard.outputs.version }}
         run: |
           set -euo pipefail
-          scripts/release-completion.sh record \
-            "$VERSION" "${GITHUB_REF_NAME}" "$GITHUB_SHA" dist > "release-${VERSION}.json"
-          cat "release-${VERSION}.json"
-          scripts/release-completion.sh verify "$VERSION" "release-${VERSION}.json"
+          manifest="$(scripts/release-completion.sh manifest-name "$VERSION")"
+          scripts/release-completion.sh verify "$VERSION" "dist/$manifest"
+          scripts/verify-provenance.sh "$VERSION" "$RUNNER_TEMP/public"
 
-      - name: Keep the completion record whatever the answer was
+      - name: Keep the manifest and bundle whatever the answer was
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: completion-record
-          path: release-*.json
+          path: |
+            dist/keypaste-*-manifest.json
+            dist/keypaste-*-provenance.sigstore.jsonl
           if-no-files-found: warn
 
       - name: Say where it went
@@ -455,5 +488,5 @@ jobs:
             echo ''
             echo "https://dl.keypaste.com/v${VERSION}/"
             echo ''
-            echo 'Binaries are unsigned and un-notarized (O-0010).'
+            echo 'Binaries are unsigned and un-notarized (O-0010). Every asset is attested; see SECURITY.md.'
           } >> "$GITHUB_STEP_SUMMARY"

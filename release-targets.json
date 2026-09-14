@@ -20,6 +20,11 @@
       "archive_pattern": "keypaste-{version}-{rid}.{ext}",
       "origin": "https://dl.keypaste.com/v{version}/",
       "workflow": ".github/workflows/release.yml",
+      "provenance": {
+        "repository": "notinferred/keypaste",
+        "manifest_pattern": "keypaste-{version}-manifest.json",
+        "bundle_pattern": "keypaste-{version}-provenance.sigstore.jsonl"
+      },
       "signing": {
         "policy": "none",
         "reason": "O-0010",

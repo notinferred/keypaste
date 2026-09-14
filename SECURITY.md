@@ -39,11 +39,28 @@ There is no long-term support line before 1.0. Fixes enter `main` and the next r
 
 ## Verifying a release
 
-CLI/MCP downloads at `https://dl.keypaste.com/v<version>/` include `SHA256SUMS`, per-asset `.sha256` files and corresponding source. `release.yml` tests the NativeAOT binaries it uploads, including KeePassXC compatibility in both directions. `ci.yml` runs the unit suites against an ordinary build of the same commit. Desktop artifacts have the separate publication requirements in [RELEASE.md](docs/RELEASE.md).
+CLI/MCP downloads at `https://dl.keypaste.com/v<version>/` include `SHA256SUMS`, per-asset `.sha256` files and corresponding source; releases after `v0.2.0` add a manifest, `keypaste-<version>-manifest.json`, and an attestation bundle, `keypaste-<version>-provenance.sigstore.jsonl`. `release.yml` tests the NativeAOT binaries it uploads, including KeePassXC compatibility in both directions. `ci.yml` runs the unit suites against an ordinary build of the same commit. Desktop artifacts have the separate publication requirements in [RELEASE.md](docs/RELEASE.md).
 
 The binaries are unsigned and un-notarized. Gatekeeper and SmartScreen behavior depends on the download path, machine and reputation. README documents the macOS quarantine limitation and manual workaround; its install blocks preserve quarantine. Signing and notarization remain O-0010. A Windows signature identifies a publisher but does not guarantee reputation-based prompts disappear.
 
-Checksums detect corrupted or truncated downloads. Because the archive and checksum share an origin, an attacker who replaces both defeats that check. Independent provenance verification is still pending. README documents building from source with dependencies pinned by content hash in `packages.lock.json`.
+Checksums detect corrupted or truncated downloads. Because the archive and checksum share an origin, an attacker who replaces both defeats that check.
+
+Releases after `v0.2.0` also carry a GitHub build attestation, signed through Sigstore by `release.yml` running in `notinferred/keypaste` for the release tag, covering every asset and the manifest. `v0.2.0` and earlier have none. Checking one needs [GitHub CLI](https://cli.github.com/) (established with 2.86.0) and no GitHub account:
+
+```sh
+v=<version>
+curl -fLO "https://dl.keypaste.com/v$v/keypaste-$v-linux-x64.tar.gz"
+curl -fLO "https://dl.keypaste.com/v$v/keypaste-$v-provenance.sigstore.jsonl"
+gh attestation verify "keypaste-$v-linux-x64.tar.gz" \
+  --bundle "keypaste-$v-provenance.sigstore.jsonl" \
+  --repo notinferred/keypaste \
+  --signer-workflow notinferred/keypaste/.github/workflows/release.yml \
+  --source-ref "refs/tags/v$v"
+```
+
+Substitute any other asset name. A changed byte, another repository or another workflow fails the check. The command fetches Sigstore's public trust root; to check offline, run `gh attestation trusted-root > trusted_root.jsonl` on a connected machine and add `--custom-trusted-root trusted_root.jsonl`. Without `--bundle`, `gh` fetches the attestation from GitHub and requires `gh auth login`. [verify-provenance.sh](scripts/verify-provenance.sh) `<version>` downloads a whole release and checks the manifest and every asset this way (D-0138).
+
+An attestation shows which repository, workflow, tag and commit produced the bytes. It does not show that the source is safe, that the build is reproducible (O-0012) or that the release workflow was uncompromised ([THREATS.md](THREATS.md) T-21). README documents building from source with dependencies pinned by content hash in `packages.lock.json`.
 
 ## Security boundaries
 

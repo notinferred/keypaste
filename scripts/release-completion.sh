@@ -9,19 +9,22 @@
 # recovery is a new version number, and the only way to know a recovery is needed is to ask the
 # public origin what it is serving. Nothing did.
 #
+# The record is the release manifest. release.yml writes it into the staged directory before the one
+# upload, so it is published beside the assets it names and attested with them (3.8): an outsider
+# checks the manifest's provenance first, then every asset against it (verify-provenance.sh).
+#
 # What it does NOT do:
-#   - It does not publish the record. Adding a file to the uploaded set changes what becomes
-#     world-readable, which `require-release-assets.sh`'s allowlist exists to hold; that is a
-#     deliberate change and not a side effect of adding a check. The record is retained release
-#     evidence (RELEASE.md requirement 7), and `SHA256SUMS` is what an outsider verifies against.
 #   - It does not authenticate origin. A hash fetched from the same origin as the bytes proves
-#     transport, not provenance - SECURITY.md says so plainly and 3.8 owns the rest (D-0116).
+#     transport, not provenance; the attestation bundle published beside it does that (D-0116, D-0138).
 #   - It does not move the advertised version. That is one hand-made `published` entry in
 #     release-targets.json, kept separate on purpose so a green run is not self-promoting.
 #
 # Usage:
 #   release-completion.sh record <version> <tag> <commit> <dir>   # prints the record to stdout
 #   release-completion.sh verify <version> <record.json>          # asks the public origin
+#   release-completion.sh names <version>                         # the assets a whole release holds
+#   release-completion.sh manifest-name <version>                 # the published record's file name
+#   release-completion.sh bundle-name <version>                   # the attestation bundle's file name
 #
 # Environment:
 #   KEYPASTE_RELEASE_DEFINITION  the definition to read   (default: release-targets.json)
@@ -69,6 +72,14 @@ expected_assets() {
     printf 'keypaste-%s-source.tar.gz.sha256\n' "$version"
     printf 'SHA256SUMS\n'
   } | sed '/^$/d'
+}
+
+provenance_name() {
+  local field="$1" version="$2" name
+  name="$(jqr --arg v "$version" --arg f "$field" '.components.cli.provenance[$f] // empty | split("{version}") | join($v)' "$DEFINITION")"
+  [ -n "$name" ] || die "$DEFINITION has no components.cli.provenance.$field"
+  printf '%s
+' "$name"
 }
 
 origin_for() {
@@ -182,5 +193,8 @@ cmd_verify() {
 case "${1:-}" in
   record) shift; [ $# -eq 4 ] || die "usage: release-completion.sh record <version> <tag> <commit> <dir>"; cmd_record "$@" ;;
   verify) shift; [ $# -eq 2 ] || die "usage: release-completion.sh verify <version> <record.json>";        cmd_verify "$@" ;;
-  *) die "usage: release-completion.sh record|verify ..." ;;
+  names) shift; [ $# -eq 1 ] || die "usage: release-completion.sh names <version>"; expected_assets "$1" ;;
+  manifest-name) shift; [ $# -eq 1 ] || die "usage: release-completion.sh manifest-name <version>"; provenance_name manifest_pattern "$1" ;;
+  bundle-name) shift; [ $# -eq 1 ] || die "usage: release-completion.sh bundle-name <version>"; provenance_name bundle_pattern "$1" ;;
+  *) die "usage: release-completion.sh record|verify|names|manifest-name|bundle-name ..." ;;
 esac

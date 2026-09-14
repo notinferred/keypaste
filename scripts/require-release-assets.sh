@@ -18,6 +18,9 @@
 #     expected names come from the definition's archive_pattern, not from a list written out here.
 #   - an asset with no checksum beside it, and a checksum with no asset beside it. An allowlist
 #     alone is satisfied by an empty directory and by half a release.
+#   - a release without its manifest or its attestation bundle, or without the source and SHA256SUMS
+#     they vouch for. Once published a prefix cannot be completed, so a version uploaded without
+#     its provenance could never be verified (3.8).
 #
 # Usage:
 #   require-release-assets.sh <version> <dir>
@@ -63,8 +66,15 @@ for n in want floor; do
   esac
 done
 
+provenance_name() {
+  jq -r --arg v "$VERSION" --arg f "$1" '.components.cli.provenance[$f] // empty | split("{version}") | join($v)' "$DEFINITION" | tr -d "$CR"
+}
+manifest="$(provenance_name manifest_pattern)"
+bundle="$(provenance_name bundle_pattern)"
+[ -n "$manifest" ] && [ -n "$bundle" ] || die "$DEFINITION names no manifest or attestation bundle for $VERSION"
+
 source_archive="keypaste-${VERSION}-source.tar.gz"
-expected="$(printf '%s\n%s\nSHA256SUMS\n' "$archives" "$source_archive")"
+expected="$(printf '%s\n%s\nSHA256SUMS\n%s\n%s\n' "$archives" "$source_archive" "$manifest" "$bundle")"
 
 cd "$DIR"
 
@@ -84,13 +94,17 @@ for f in *; do
   esac
   if printf '%s\n' "$expected" | grep -qxF -- "$f"; then
     case "$f" in
-      SHA256SUMS | "$source_archive") ;;
+      SHA256SUMS | "$source_archive" | "$manifest" | "$bundle") ;;
       *) built=$((built + 1)) ;;
     esac
   else
     echo "::error::$f is not a release asset and must not be published" >&2
     bad=1
   fi
+done
+
+for f in "$source_archive" SHA256SUMS "$manifest" "$bundle"; do
+  [ -f "$f" ] || { echo "::error::$f is missing, and a release published without it can never be verified" >&2; bad=1; }
 done
 
 # Every advertised archive is present, with its checksum, and that checksum verifies.
@@ -114,4 +128,4 @@ ARCHIVES
 [ "$built" -ge "$floor" ] || { echo "::error::$built built assets; $floor were already published and a release cannot shrink" >&2; bad=1; }
 
 [ "$bad" -eq 0 ] || die "refusing to publish $DIR"
-echo "  ok  $built advertised assets, their checksums, the corresponding source and SHA256SUMS"
+echo "  ok  $built advertised assets, their checksums, the corresponding source, SHA256SUMS, the manifest and its attestation bundle"
