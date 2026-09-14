@@ -273,16 +273,25 @@ public sealed class Vault : IDisposable
     /// <c>InternalsVisibleTo</c> — it is not a knob a consumer or a command line can turn, because
     /// a smaller budget is strictly worse in production and a larger one hides what V-F.6 catches.
     /// </param>
+    /// <param name="duringAttempt">
+    /// Called inside each attempt, after the gate is taken and before any work, so a test can hold
+    /// the gate the way a slow attempt does.
+    /// </param>
     internal void SaveWaiting(
         Action<int>? waitBetweenAttempts,
-        int attempts = KeePassInterop.SaveAttempts)
+        int attempts = KeePassInterop.SaveAttempts,
+        Action<int>? duringAttempt = null)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        Commit(HasFileChangedSinceOpen, waitBetweenAttempts, attempts);
+        Commit(HasFileChangedSinceOpen, waitBetweenAttempts, attempts, duringAttempt);
     }
 
-    private void Commit(Func<bool>? hasChangedOnDisk, Action<int>? waitBetweenAttempts, int attempts)
+    private void Commit(
+        Func<bool>? hasChangedOnDisk,
+        Action<int>? waitBetweenAttempts,
+        int attempts,
+        Action<int>? duringAttempt = null)
     {
         var clock = new SaveClock();
         var succeeded = false;
@@ -294,7 +303,7 @@ public sealed class Vault : IDisposable
                 throw new VaultChangedOnDiskException();
             }
 
-            _interop.Save(hasChangedOnDisk, waitBetweenAttempts, clock, attempts);
+            _interop.Save(hasChangedOnDisk, waitBetweenAttempts, clock, attempts, duringAttempt);
             _stamp = clock.Stamp(() => SourceSnapshot.Digest(Path));
             succeeded = true;
         }

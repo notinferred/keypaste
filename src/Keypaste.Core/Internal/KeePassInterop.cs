@@ -294,85 +294,106 @@ internal sealed class KeePassInterop : IDisposable
     /// </para>
     /// </remarks>
     /// <exception cref="VaultChangedOnDiskException">
-    /// Something else wrote to the vault while this save was waiting to retry. Nothing was written.
+    /// Something else wrote to the vault while this save was waiting to retry or for the gate. Nothing
+    /// was written.
     /// </exception>
     /// <param name="clock">Receives this save's timing; the caller publishes it.</param>
     /// <param name="attempts">
     /// How many times to try. Defaults to the shipped budget; V-F.6 pins it to 1 so the retry
     /// cannot absorb the contention the fix is supposed to remove.
     /// </param>
+    /// <param name="duringAttempt">Called inside each attempt before its work; null outside a test.</param>
     internal void Save(
         Func<bool>? hasChangedOnDisk,
         Action<int>? waitBetweenAttempts,
         SaveClock clock,
-        int attempts = SaveAttempts)
+        int attempts = SaveAttempts,
+        Action<int>? duringAttempt = null)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         clock.Redirect(ProcessTemporaryDirectory.EnsureRedirected);
 
-        // Set by whichever attempt is refused, and acted on once on the way out — including the way
-        // out of a save that then succeeded. The fallback move strands its file on the attempt that
-        // is refused, and no later attempt, successful or not, ever goes back for it.
+        for (int attempt = 1; !TryAttempt(hasChangedOnDisk, clock, attempt, attempts, duringAttempt); attempt++)
+        {
+            var retry = attempt;
+            clock.Wait(() =>
+            {
+                if (waitBetweenAttempts is null)
+                {
+                    Thread.Sleep(SaveRetryDelayMilliseconds * retry);
+                }
+                else
+                {
+                    waitBetweenAttempts(retry);
+                }
+            });
+        }
+    }
+
+    /// <summary>One attempt, gated if it can transact; false if it was refused and may be retried.</summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The gate is released before the sleep that follows a refusal</b>, so another save in this
+    /// process can finish while this one waits (F.12). That makes the gate wait a wait like the sleep:
+    /// another save of this vault can commit during either, so the re-read follows the gate, and a
+    /// save that used to queue behind that commit and overwrite it is refused instead (D-0119).
+    /// </para>
+    /// <para>
+    /// <b>A stranded temporary is swept before the gate is released, on every way out.</b> Another
+    /// save's fallback move replaces <c>&lt;vault&gt;.tmp</c> and holds no handle between its two
+    /// hops, so a sweep outside the gate could delete that save's next bytes mid-move.
+    /// </para>
+    /// </remarks>
+    private bool TryAttempt(
+        Func<bool>? hasChangedOnDisk, SaveClock clock, int attempt, int attempts, Action<int>? duringAttempt)
+    {
+        clock.BeginAttempt();
+        var gated = EnterGateIfTransacting(clock);
         var strandedATemporary = false;
-        var gated = false;
 
         try
         {
-            for (int attempt = 1; ; attempt++)
+            if (hasChangedOnDisk is not null && (gated || attempt > 1) && clock.Reread(hasChangedOnDisk))
             {
-                try
-                {
-                    gated = gated || EnterGateIfTransacting(clock, attempt);
-                    clock.Attempt(() => _database.Save(null));
-                    return;
-                }
-                catch (Exception ex) when (attempt < attempts && IsTransient(ex))
-                {
-                    strandedATemporary |= StrandsATemporary(ex);
-                }
-                catch (Exception ex) when (ex is not VaultException)
-                {
-                    strandedATemporary |= StrandsATemporary(ex);
-
-                    // The cause is named, not merely kept as an inner exception nobody prints. A
-                    // save can fail for reasons the user can act on — the disk is full, the file is
-                    // open in KeePassXC, permissions changed — and "Could not save 'vault.kdbx'."
-                    // on its own tells them none of them.
-                    throw new VaultException(
-                        $"Could not save '{_database.IOConnectionInfo.Path}': {ex.Message}", ex);
-                }
-
-                var retry = attempt;
-                clock.Wait(() =>
-                {
-                    if (waitBetweenAttempts is null)
-                    {
-                        Thread.Sleep(SaveRetryDelayMilliseconds * retry);
-                    }
-                    else
-                    {
-                        waitBetweenAttempts(retry);
-                    }
-                });
-
-                if (hasChangedOnDisk is not null && clock.Reread(hasChangedOnDisk))
-                {
-                    throw new VaultChangedOnDiskException();
-                }
+                throw new VaultChangedOnDiskException();
             }
+
+            clock.Attempt(() =>
+            {
+                duringAttempt?.Invoke(attempt);
+                _database.Save(null);
+            });
+            return true;
+        }
+        catch (Exception ex) when (attempt < attempts && IsTransient(ex))
+        {
+            strandedATemporary = StrandsATemporary(ex);
+            return false;
+        }
+        catch (Exception ex) when (ex is not VaultException)
+        {
+            strandedATemporary = StrandsATemporary(ex);
+
+            // The cause is named, not merely kept as an inner exception nobody prints. A save can
+            // fail for reasons the user can act on — the disk is full, the file is open in
+            // KeePassXC, permissions changed — and "Could not save 'vault.kdbx'." on its own tells
+            // them none of them.
+            throw new VaultException(
+                $"Could not save '{_database.IOConnectionInfo.Path}': {ex.Message}", ex);
         }
         finally
         {
-            if (gated)
-            {
-                Volatile.Write(ref _gateHolder, 0);
-                _saveGate.Release();
-            }
-
             if (strandedATemporary)
             {
                 SweepStrandedTemporary();
+            }
+
+            if (gated)
+            {
+                clock.ReleaseGate();
+                Volatile.Write(ref _gateHolder, 0);
+                _saveGate.Release();
             }
         }
     }
@@ -380,10 +401,10 @@ internal sealed class KeePassInterop : IDisposable
     /// <summary>Takes the save gate before an attempt that can transact, and reports whether it did.</summary>
     /// <remarks>
     /// <para>
-    /// <b>Transacted saves go one at a time in this process.</b> The private directory is the whole
-    /// process's, so two transacted saves would name their temporaries in it together and collide
+    /// <b>Transacted attempts go one at a time in this process.</b> The private directory is the whole
+    /// process's, so two transacted attempts would name their temporaries in it together and collide
     /// exactly as two processes used to (D-0122), and on every platform they would share
-    /// <c>&lt;vault&gt;.tmp</c> beside one vault. TMP cannot be made per-thread, so those saves are
+    /// <c>&lt;vault&gt;.tmp</c> beside one vault. TMP cannot be made per-thread, so those attempts are
     /// serialised instead.
     /// </para>
     /// <para>
@@ -394,20 +415,15 @@ internal sealed class KeePassInterop : IDisposable
     /// between this check and KeePassLib's own, whose attempt transacts ungated
     /// (<c>TheVendoredSaveTransactsOnlyOverAnExistingFile</c> pins the rule this restates).
     /// </para>
-    /// <para>
-    /// Once taken, the gate is held until the save ends, across its retry sleeps; F.12 owns
-    /// releasing it there.
-    /// </para>
     /// </remarks>
-    private bool EnterGateIfTransacting(SaveClock clock, int attempt)
+    private bool EnterGateIfTransacting(SaveClock clock)
     {
         if (!File.Exists(_database.IOConnectionInfo.Path))
         {
             return false;
         }
 
-        clock.HeldBy = Volatile.Read(ref _gateHolder);
-        clock.WaitForGate(attempt, _saveGate.Wait);
+        clock.WaitForGate(Volatile.Read(ref _gateHolder), _saveGate.Wait);
         Volatile.Write(ref _gateHolder, clock.Operation);
         return true;
     }
