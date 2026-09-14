@@ -16,7 +16,8 @@ internal readonly record struct SaveTiming(
     bool Succeeded,
     TimeSpan? Check,
     TimeSpan Redirect,
-    TimeSpan GateWait,
+    TimeSpan? GateWait,
+    int? GatedAttempt,
     IReadOnlyList<TimeSpan> Attempts,
     IReadOnlyList<TimeSpan> Waits,
     IReadOnlyList<TimeSpan> Rereads,
@@ -35,7 +36,8 @@ internal sealed class SaveClock
     private TimeSpan? _check;
     private TimeSpan? _stamp;
     private TimeSpan _redirect;
-    private TimeSpan _gateWait;
+    private TimeSpan? _gateWait;
+    private int? _gatedAttempt;
 
     /// <summary>Raised once per save, successful or not. Nothing subscribes outside a test.</summary>
     internal static event Action<SaveTiming>? Observed;
@@ -49,7 +51,12 @@ internal sealed class SaveClock
 
     internal void Redirect(Action redirect) => Time(redirect, elapsed => _redirect = elapsed);
 
-    internal void WaitForGate(Action wait) => Time(wait, elapsed => _gateWait = elapsed);
+    /// <summary>Times the one wait for the gate, taken before attempt <paramref name="attempt"/>.</summary>
+    internal void WaitForGate(int attempt, Action wait)
+    {
+        _gatedAttempt = attempt;
+        Time(wait, elapsed => _gateWait = elapsed);
+    }
 
     internal void Attempt(Action attempt) => Time(attempt, _attempts.Add);
 
@@ -68,6 +75,7 @@ internal sealed class SaveClock
             _check,
             _redirect,
             _gateWait,
+            _gatedAttempt,
             _attempts,
             _waits,
             _rereads,

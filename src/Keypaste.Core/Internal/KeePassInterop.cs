@@ -311,18 +311,11 @@ internal sealed class KeePassInterop : IDisposable
 
         clock.Redirect(ProcessTemporaryDirectory.EnsureRedirected);
 
-        // One save at a time in this process. The private directory is the whole process's, so two
-        // concurrent saves would name their temporaries in it together and collide exactly as two
-        // processes used to (D-0122). TMP cannot be made per-thread, so the saves are made
-        // one-at-a-time instead.
-        clock.HeldBy = Volatile.Read(ref _gateHolder);
-        clock.WaitForGate(_saveGate.Wait);
-        Volatile.Write(ref _gateHolder, clock.Operation);
-
         // Set by whichever attempt is refused, and acted on once on the way out — including the way
         // out of a save that then succeeded. The fallback move strands its file on the attempt that
         // is refused, and no later attempt, successful or not, ever goes back for it.
         var strandedATemporary = false;
+        var gated = false;
 
         try
         {
@@ -330,6 +323,7 @@ internal sealed class KeePassInterop : IDisposable
             {
                 try
                 {
+                    gated = gated || EnterGateIfTransacting(clock, attempt);
                     clock.Attempt(() => _database.Save(null));
                     return;
                 }
@@ -370,8 +364,11 @@ internal sealed class KeePassInterop : IDisposable
         }
         finally
         {
-            Volatile.Write(ref _gateHolder, 0);
-            _saveGate.Release();
+            if (gated)
+            {
+                Volatile.Write(ref _gateHolder, 0);
+                _saveGate.Release();
+            }
 
             if (strandedATemporary)
             {
@@ -380,7 +377,42 @@ internal sealed class KeePassInterop : IDisposable
         }
     }
 
-    /// <summary>Serialises saves in this process. See the comment where it is taken.</summary>
+    /// <summary>Takes the save gate before an attempt that can transact, and reports whether it did.</summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Transacted saves go one at a time in this process.</b> The private directory is the whole
+    /// process's, so two transacted saves would name their temporaries in it together and collide
+    /// exactly as two processes used to (D-0122), and on every platform they would share
+    /// <c>&lt;vault&gt;.tmp</c> beside one vault. TMP cannot be made per-thread, so those saves are
+    /// serialised instead.
+    /// </para>
+    /// <para>
+    /// <b>Only an attempt over an existing file is gated.</b> KeePassLib transacts only when the
+    /// vault file exists, so a first save or one whose directory is gone never uses either name,
+    /// and queueing it behind other saves' key derivation was F.10's overrun (D-0134). Gating an
+    /// attempt that then does not transact is harmless. The residual is a vault file created
+    /// between this check and KeePassLib's own, whose attempt transacts ungated
+    /// (<c>TheVendoredSaveTransactsOnlyOverAnExistingFile</c> pins the rule this restates).
+    /// </para>
+    /// <para>
+    /// Once taken, the gate is held until the save ends, across its retry sleeps; F.12 owns
+    /// releasing it there.
+    /// </para>
+    /// </remarks>
+    private bool EnterGateIfTransacting(SaveClock clock, int attempt)
+    {
+        if (!File.Exists(_database.IOConnectionInfo.Path))
+        {
+            return false;
+        }
+
+        clock.HeldBy = Volatile.Read(ref _gateHolder);
+        clock.WaitForGate(attempt, _saveGate.Wait);
+        Volatile.Write(ref _gateHolder, clock.Operation);
+        return true;
+    }
+
+    /// <summary>Serialises transacted saves in this process. See <see cref="EnterGateIfTransacting"/>.</summary>
     private static readonly SemaphoreSlim _saveGate = new(1, 1);
 
     /// <summary>The <see cref="SaveClock.Operation"/> holding <see cref="_saveGate"/>; 0 when free.</summary>

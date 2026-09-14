@@ -96,7 +96,9 @@ def whole: . + 0.5 | floor;
 '
 
 # A save-timing mark is written as the save returns, so each save ends at its mark and starts `total`
-# earlier; it holds the gate from after its gate wait until before its stamp.
+# earlier. A gated save waits before attempt `gatedat`, after the work, waits and rereads of the
+# attempts before it, and holds the gate from then until before its stamp; `gate=-` never gated.
+# Lines without `gatedat` predate F.10b, when every save gated before its first attempt.
 # shellcheck disable=SC2016
 readonly READ_SAVES='
 def lpad($n): tostring | if ($n - length) > 0 then (" " * ($n - length)) + . else . end;
@@ -112,8 +114,12 @@ def list: if . == "-" then [] else split("/") | map(tonumber) end;
 | [ $rows[] | select(.event == "save-timing") | (.detail | fields) as $f
     | { pid, end: .ms, op: ($f.op | tonumber), heldby: ($f.heldby | tonumber), ok: $f.ok,
         check: ($f.check | num), redirect: ($f.redirect | num), gate: ($f.gate | num),
-        work: ($f.work | list), stamp: ($f.stamp | num), total: ($f.total | num) }
-    | . + { waitStart: (.end - .total + .check + .redirect) }
+        gatedat: (if $f.gate == "-" then null else ($f.gatedat // "1" | tonumber) end),
+        work: ($f.work | list), waits: ($f.waits | list), rereads: ($f.rereads | list),
+        stamp: ($f.stamp | num), total: ($f.total | num) }
+    | . as $s
+    | ([range(0; (($s.gatedat // 1) - 1))] | map(($s.work[.] // 0) + ($s.waits[.] // 0) + ($s.rereads[.] // 0)) | add // 0) as $before
+    | . + { gated: (.gatedat != null), waitStart: (.end - .total + .check + .redirect + $before) }
     | . + { holdStart: (.waitStart + .gate), holdEnd: (.end - .stamp) } ] as $saves
 
 | [ $rows[] | select(.event == "save-op") | (.detail | fields) as $f
@@ -126,12 +132,12 @@ def list: if . == "-" then [] else split("/") | map(tonumber) end;
 
 [ $labels[] as $l
     | ([ $saves[] | select(.pid == $l.pid and .op == $l.op) ] | first) as $s
-    | { check: $s.check, redirect: $s.redirect, gate: $s.gate, work: ($s.work[0] // 0) } as $parts
+    | { check: $s.check, redirect: $s.redirect, gate: (if $s.gatedat == 1 then $s.gate else 0 end), work: ($s.work[0] // 0) } as $parts
     | $s + $parts + {
         label: $l.label,
         first: ($parts | add),
         dominant: ($parts | to_entries | max_by(.value) | if .value < 1 then "none" else .key end),
-        holders: [ $saves[] | select(.pid == $s.pid and .op != $s.op
+        holders: [ $saves[] | select($s.gated and .gated and .pid == $s.pid and .op != $s.op
             and .holdStart < $s.holdStart and .holdEnd > $s.waitStart)
           | "op \(.op) for \(([.holdEnd, $s.holdStart] | min) - ([.holdStart, $s.waitStart] | max) | whole) ms" ]
       } ] as $read
@@ -265,14 +271,15 @@ selftest() {
   printf '%s: no timeline lines\n\n' "$work/empty" > "$work/expected-empty"
 
   # Op 1 holds the gate across a 2000 ms wait; op 2 waits 1500 ms of it and op 3 works alone. Op 3's
-  # stamp keeps its hold from reaching its own mark. `unlabelled` names an op nothing timed.
+  # stamp keeps its hold from reaching its own mark. Op 4 runs inside op 1's hold without gating, so
+  # it names no holder; op 1 predates `gatedat`. `unlabelled` names an op nothing timed.
   mkdir -p "$work/saves" "$work/unlabelled"
   printf '%s\r\n' \
     '{"ticks":0,"freq":1000,"pid":111,"asm":"Keypaste.Core.Tests","event":"opened","detail":""}' \
     '{"ticks":3000,"freq":1000,"pid":111,"asm":"Keypaste.Core.Tests","event":"save-timing","detail":"op=1 heldby=0 ok=0 check=0 redirect=0 gate=0 work=0/0 waits=2000 rereads=0 stamp=- total=2000"}' \
-    '{"ticks":3100,"freq":1000,"pid":111,"asm":"Keypaste.Core.Tests","event":"save-timing","detail":"op=2 heldby=1 ok=0 check=10 redirect=0 gate=1500 work=5 waits=- rereads=- stamp=- total=1600"}' \
-    '{"ticks":3101,"freq":1000,"pid":111,"asm":"Keypaste.Core.Tests","event":"save-op","detail":"label=doomed op=2"}' \
-    '{"ticks":5000,"freq":1000,"pid":111,"asm":"Keypaste.Core.Tests","event":"save-timing","detail":"op=3 heldby=0 ok=1 check=0 redirect=0 gate=0 work=400 waits=- rereads=- stamp=20 total=430"}' \
+    '{"ticks":3100,"freq":1000,"pid":111,"asm":"Keypaste.Core.Tests","event":"save-timing","detail":"op=2 heldby=1 ok=0 check=10 redirect=0 gate=1500 gatedat=1 work=5 waits=- rereads=- stamp=- total=1600"}' \
+    '{"ticks":2500,"freq":1000,"pid":111,"asm":"Keypaste.Core.Tests","event":"save-timing","detail":"op=4 heldby=0 ok=0 check=0 redirect=0 gate=- gatedat=- work=3 waits=- rereads=- stamp=- total=5"}'     '{"ticks":2501,"freq":1000,"pid":111,"asm":"Keypaste.Core.Tests","event":"save-op","detail":"label=ungated op=4"}'     '{"ticks":3101,"freq":1000,"pid":111,"asm":"Keypaste.Core.Tests","event":"save-op","detail":"label=doomed op=2"}' \
+    '{"ticks":5000,"freq":1000,"pid":111,"asm":"Keypaste.Core.Tests","event":"save-timing","detail":"op=3 heldby=0 ok=1 check=0 redirect=0 gate=0 gatedat=1 work=400 waits=- rereads=- stamp=20 total=430"}' \
     '{"ticks":5001,"freq":1000,"pid":111,"asm":"Keypaste.Core.Tests","event":"save-op","detail":"label=budget op=3"}' \
     > "$work/saves/f9-timeline-111.jsonl"
   printf '%s\n' \
@@ -282,11 +289,12 @@ selftest() {
 
   {
     echo "$work/saves"
-    echo "  3 saves timed in 1 process(es), 2 labelled"
+    echo "  4 saves timed in 1 process(es), 3 labelled"
+    echo "    ungated  pid 111     op 4     ok 0  total      5 ms  first      3 ms = check 0 + redirect 0 + gate 0 + work 3  dominant work"
     echo "    doomed   pid 111     op 2     ok 0  total   1600 ms  first   1515 ms = check 10 + redirect 0 + gate 1500 + work 5  dominant gate"
     echo "        gate held by: op 1 for 1490 ms"
     echo "    budget   pid 111     op 3     ok 1  total    430 ms  first    400 ms = check 0 + redirect 0 + gate 0 + work 400  dominant work"
-    echo "  first intervals dominated by: gate 1, work 1"
+    echo "  first intervals dominated by: gate 1, work 2"
     echo
   } > "$work/expected-saves"
   printf '%s\n' '::error::save-op doomed names op 4 in pid 7, which has no save-timing line' \
