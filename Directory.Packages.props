@@ -54,4 +54,10 @@
     <PackageVersion Include="Avalonia.Headless" Version="12.1.0" />
   </ItemGroup>
 
+  <!-- Build-time only, in packaging/windows: harvests the staged payload into the MSI and ships
+       nothing of its own. Held at WiX v5 with the SDK by DECISIONS.md D-0139. -->
+  <ItemGroup Label="Windows installer">
+    <PackageVersion Include="WixToolset.Heat" Version="5.0.2" />
+  </ItemGroup>
+
 </Project>

@@ -177,6 +177,17 @@
           "archive": "zip",
           "cpu": "x64",
           "advertised": false,
+          "packages": [
+            {
+              "kind": "msi",
+              "pattern": "keypaste-app-{version}-{rid}-internal-unsigned.msi",
+              "internal": true,
+              "signed": false,
+              "project": "packaging/windows/Keypaste.Installer.wixproj",
+              "tool": "WixToolset.Sdk",
+              "tool_version": "5.0.2"
+            }
+          ],
           "os_floor": null,
           "floor_evidence": "none",
           "install_check": null,

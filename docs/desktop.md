@@ -8,7 +8,7 @@ The desktop app opens the same `.kdbx` vaults as the CLI and locks its session w
 
 Approvals still happen in the terminal. When an AI agent asks `keypaste-mcp` for a credential, the request goes to a `keypaste agent` you started in your own terminal. The Agent Activity screen currently reports whether that agent is running. The design is settled: the agent owns the approver pipe and the app will connect as a UI client (D-0054 in [DECISIONS.md](../DECISIONS.md#d-0054--the-agent-owns-the-approver-pipe-the-app-is-a-client-of-it)). The client channel and approval controls remain step 4.3 in [STEPS](STEPS.md).
 
-The desktop app is not published. Build it from source, below. `app.yml` can package desktop archives on version tags, but keeps them as workflow artifacts; `release.yml` publishes the CLI/MCP downloads. See [RELEASE](RELEASE.md) for the distribution matrix and remaining desktop publication requirements.
+The desktop app is not published. Build it from source, below. `app.yml` can package desktop archives, and an internal unsigned Windows MSI, on version tags, but keeps them as workflow artifacts; `release.yml` publishes the CLI/MCP downloads. See [RELEASE](RELEASE.md) for the distribution matrix and remaining desktop publication requirements.
 
 Entering an existing password or variable value still requires the CLI. Adding one in the app generates its value. `keypaste add` and `keypaste env set` prompt for an existing value; secure desktop input is scheduled in step 4.9 of [STEPS](STEPS.md).
 
@@ -40,7 +40,7 @@ If a build fails with `Access to the path 'artifacts\...' is denied`, an MSBuild
 
 ## What it needs on each platform
 
-These are the native GUI prerequisites for the current packaging targets. Building from source also requires the SDK above; CI archives include the .NET runtime but are not published installers.
+These are the native GUI prerequisites for the current packaging targets. Building from source also requires the SDK above; CI archives and the internal Windows MSI include the .NET runtime but are not published installers.
 
 | Platform | Native prerequisites |
 |---|---|

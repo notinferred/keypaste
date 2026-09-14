@@ -278,6 +278,26 @@ TARGETS
     for rid in $rids; do
       holds "$declared" "$rid" || note "$c/$rid: packaged but not in runtime_identifiers"
     done
+
+    # An installer carries its version and target in its name, and while nothing of the component is
+    # signed or published it says internal and unsigned in that name and in its record (4.7a1).
+    local policy kind pattern internal signed
+    policy="$(jqr ".components.\"$c\".signing.policy // empty" "$def")"
+    while IFS=$'\037' read -r rid kind pattern internal signed; do
+      [ -n "$rid" ] || continue
+      case "$pattern" in *"{version}"*"{rid}"*) ;; *) note "$c/$rid: $kind package '$pattern' does not carry {version} and {rid}" ;; esac
+      if [ "$policy" = "none" ]; then
+        [ "$signed" = "false" ] || note "$c/$rid: $kind package is not recorded unsigned while the $c signing policy is none"
+        case "$pattern" in *internal*unsigned*) ;; *) note "$c/$rid: $kind package '$pattern' is not named internal and unsigned while the $c signing policy is none" ;; esac
+      fi
+      if [ -z "$origin" ]; then
+        [ "$internal" = "true" ] || note "$c/$rid: $kind package is not recorded internal and $c has no origin to publish it"
+      fi
+    done <<PACKAGES
+$(jqr ".components.\"$c\".targets // [] | .[] | .rid as \$rid | .packages // [] | .[] | [
+     \$rid, (.kind // \"\"), (.pattern // \"\"), (.internal | tostring), (.signed | tostring)
+   ] | join(\"\")" "$def" 2>/dev/null || true)
+PACKAGES
   done
 
   # published: unique versions, and every rid it names is still advertised.
@@ -719,6 +739,42 @@ validate_prerelease_path() {
   fi
 }
 
+# A workflow that builds an installer builds only one the definition declares, names it from the
+# definition, and builds it with the tool the definition pins. An undeclared installer is a package
+# nothing else in this file can see (4.7a1, D-0139).
+validate_packages() {
+  local def="$1" root="$2" c workflow declared project tool tool_version sdk heat
+  for c in $(jqr '.components | keys[]' "$def"); do
+    workflow="$(jqr ".components.\"$c\".workflow" "$def")"
+    [ -f "$root/$workflow" ] || continue
+    declared="$(count_of "$def" "[.components.\"$c\".targets[]?.packages[]? | select(.kind == \"msi\")]")"
+    if code_has "$root/$workflow" ".msi"; then
+      [ "${declared:-0}" -ge 1 ] \
+        || note "$workflow builds an msi package and $c declares none in the definition"
+      code_has "$root/$workflow" '.packages[] | select(.kind == "msi")' \
+        || note "$workflow builds an msi package without reading its name from the definition"
+    fi
+
+    while IFS=$'\037' read -r project tool tool_version; do
+      [ -n "$project" ] || continue
+      [ -f "$root/$project" ] || { note "$c: no installer project at $project"; continue; }
+      sdk="$(grep -oE '<Project Sdk="[^"]*"' "$root/$project" | sed -E 's/.*Sdk="([^"]*)"/\1/' || true)"
+      [ "$sdk" = "$tool/$tool_version" ] \
+        || note "$project builds with '$sdk' and the definition pins $tool/$tool_version"
+      if [ "$tool" = "WixToolset.Sdk" ]; then
+        heat="$(grep -oE '<PackageVersion Include="WixToolset.Heat" Version="[^"]*"' "$root/Directory.Packages.props" 2>/dev/null \
+          | sed -E 's/.*Version="([^"]*)"/\1/' || true)"
+        [ "$heat" = "$tool_version" ] \
+          || note "Directory.Packages.props holds WixToolset.Heat at '$heat' and the definition pins WiX $tool_version"
+      fi
+    done <<PROJECTS
+$(jqr ".components.\"$c\".targets // [] | .[] | .packages // [] | .[] | [
+     (.project // \"\"), (.tool // \"\"), (.tool_version // \"\")
+   ] | join(\"\")" "$def" 2>/dev/null || true)
+PROJECTS
+  done
+}
+
 # ---------------------------------------------------------------------------
 # 3. published, against git history rather than against itself.
 # ---------------------------------------------------------------------------
@@ -822,6 +878,7 @@ validate_install_jobs "$DEFINITION" "$ROOT" || true
 validate_documents "$DEFINITION" "$ROOT" || true
 validate_source_version "$DEFINITION" "$ROOT" || true
 validate_prerelease_path "$DEFINITION" "$ROOT" || true
+validate_packages "$DEFINITION" "$ROOT" || true
 
 echo "== published, against git history"
 validate_history "$ROOT" "$DEFINITION" || true
@@ -887,6 +944,7 @@ expect_repo_refusal() {
   validate_projects "$file" "$root" || true
   validate_install_jobs "$file" "$root" || true
   validate_documents "$file" "$root" || true
+  validate_packages "$file" "$root" || true
   report "$name" "$want"
 }
 
@@ -931,6 +989,14 @@ expect_refusal "nothing-advertised" "no published release is marked advertised" 
   "$(mutate nothing-advertised '.published |= map(.advertised = false)')"
 expect_refusal "duplicate-published-version" "published lists 0.1.0 twice" \
   "$(mutate duplicate-published-version '.published[0].version = .published[1].version')"
+expect_refusal "installer-name-drops-the-label" "is not named internal and unsigned" \
+  "$(mutate installer-name-drops-the-label '(.components.app.targets[] | select(.rid == "win-x64") | .packages[0].pattern) = "keypaste-app-{version}-{rid}.msi"')"
+expect_refusal "installer-recorded-signed" "is not recorded unsigned" \
+  "$(mutate installer-recorded-signed '(.components.app.targets[] | select(.rid == "win-x64") | .packages[0].signed) = true')"
+expect_refusal "installer-recorded-public" "is not recorded internal" \
+  "$(mutate installer-recorded-public '(.components.app.targets[] | select(.rid == "win-x64") | .packages[0].internal) = false')"
+expect_refusal "installer-name-drops-the-version" "does not carry {version} and {rid}" \
+  "$(mutate installer-name-drops-the-version '(.components.app.targets[] | select(.rid == "win-x64") | .packages[0].pattern) = "keypaste-app-{rid}-internal-unsigned.msi"')"
 
 echo "== fixtures: a definition the repository contradicts"
 
@@ -939,14 +1005,14 @@ echo "== fixtures: a definition the repository contradicts"
 FAKE="$WORK/root"
 mkdir -p "$FAKE/.github/workflows" "$FAKE/site/public"
 cp "$DEFINITION" "$FAKE/release-targets.json"
-cp README.md CHANGELOG.md SECURITY.md "$PROPS" "$FAKE/"
+cp README.md CHANGELOG.md SECURITY.md "$PROPS" Directory.Packages.props "$FAKE/"
 mkdir -p "$FAKE/docs"
 cp docs/RELEASE.md docs/desktop.md "$FAKE/docs/"
 cp site/public/index.html "$FAKE/site/public/"
 cp .github/workflows/release.yml .github/workflows/app.yml "$FAKE/.github/workflows/"
 mkdir -p "$FAKE/scripts"
 cp scripts/require-changelog-section.sh "$FAKE/scripts/"
-for project in $(jqr '.components[].projects[], .shared_projects[]' "$DEFINITION"); do
+for project in $(jqr '.components[].projects[], .shared_projects[], (.components[].targets[].packages[]?.project)' "$DEFINITION"); do
   mkdir -p "$FAKE/$(dirname "$project")"
   cp "$project" "$FAKE/$project"
 done
@@ -957,6 +1023,14 @@ expect_repo_refusal "target-nothing-else-declares" "and the definition says" \
 
 expect_repo_refusal "csproj-and-definition-disagree" "and the definition says" \
   "$(mutate csproj-and-definition-disagree '.components.app.runtime_identifiers -= ["linux-arm64"] | .components.app.declared_not_packaged = {}')" \
+  "$FAKE"
+
+expect_repo_refusal "installer-undeclared" "builds an msi package and app declares none" \
+  "$(mutate installer-undeclared '.components.app.targets |= map(del(.packages))')" \
+  "$FAKE"
+
+expect_repo_refusal "installer-tool-unpinned" "and the definition pins WixToolset.Sdk/6.0.2" \
+  "$(mutate installer-tool-unpinned '(.components.app.targets[] | select(.rid == "win-x64") | .packages[0].tool_version) = "6.0.2"')" \
   "$FAKE"
 
 # `sed -i` is not portable and these fixtures had never met a sed that says so. GNU takes the backup
@@ -999,6 +1073,11 @@ sed_inplace 's/unsigned/perfectly ordinary/g' "$FAKE/README.md"
 expect_repo_refusal "signing-disclosure-deleted" "no longer says the cli binaries are unsigned" \
   "$FAKE/release-targets.json" "$FAKE"
 cp README.md "$FAKE/README.md"
+
+sed_inplace 's/| \.packages\[\] | select/| .installer | select/' "$FAKE/.github/workflows/app.yml"
+expect_repo_refusal "installer-name-not-read-from-the-definition" "without reading its name from the definition" \
+  "$FAKE/release-targets.json" "$FAKE"
+cp .github/workflows/app.yml "$FAKE/.github/workflows/app.yml"
 
 # A target that borrows another's block has to say so, and the page has to name it - otherwise an
 # arm64 reader is told to substitute something the page never spells out.

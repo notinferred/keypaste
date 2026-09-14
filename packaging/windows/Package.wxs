@@ -1,0 +1,45 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+    Name="keypaste $(var.FullVersion) (internal, unsigned)"
+    Manufacturer="keypaste"
+    Version="$(var.ProductVersion)"
+    UpgradeCode="6f1d9a4e-2b7c-4c55-9d7e-1a3b5c7d9e01"
+    Scope="perUser"
+    Language="1033">
+
+    <SummaryInformation
+      Description="keypaste $(var.FullVersion) internal unsigned candidate"
+      Keywords="keypaste;$(var.FullVersion);internal;unsigned"
+      Manufacturer="keypaste" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer keypaste is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Property Id="ARPCOMMENTS" Value="Internal candidate $(var.FullVersion); unsigned; not for distribution" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="ProgramsFolder" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="keypaste" />
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder" />
+
+    <Component Id="InstallFolderRemoval" Directory="INSTALLFOLDER">
+      <RemoveFolder Id="RemoveProgramsFolder" Directory="ProgramsFolder" On="uninstall" />
+      <RemoveFolder Id="RemoveInstallFolder" Directory="INSTALLFOLDER" On="uninstall" />
+      <RegistryValue Root="HKCU" Key="Software\keypaste\Installer" Name="InstallFolder" Type="string" Value="[INSTALLFOLDER]" KeyPath="yes" />
+    </Component>
+
+    <Component Id="StartMenuShortcut" Directory="ProgramMenuFolder">
+      <Shortcut Id="KeypasteShortcut" Name="keypaste" Target="[INSTALLFOLDER]keypaste-app.exe" WorkingDirectory="INSTALLFOLDER" />
+      <RegistryValue Root="HKCU" Key="Software\keypaste\Installer" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <Feature Id="Main">
+      <ComponentGroupRef Id="Payload" />
+      <ComponentRef Id="InstallFolderRemoval" />
+      <ComponentRef Id="StartMenuShortcut" />
+    </Feature>
+  </Package>
+</Wix>
