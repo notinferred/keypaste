@@ -203,12 +203,10 @@ public sealed class Vault : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (HasFileChangedSinceOpen())
-        {
-            throw new VaultChangedOnDiskException();
-        }
-
-        Write();
+        // The check is handed to the retry loop, not just made before it. The name a save contends
+        // for is most often held by another process saving this same vault, so a retry that waits
+        // that out and then writes reverts it — see KeePassInterop.Save and D-0119.
+        Commit(HasFileChangedSinceOpen, null, KeePassInterop.SaveAttempts);
     }
 
     /// <summary>Writes the vault to <see cref="Path"/>, discarding whatever else was written
@@ -222,7 +220,9 @@ public sealed class Vault : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        Overwrite();
+        // No check, at any point: this caller has already put the choice to a person and been told
+        // to go ahead, so a change arriving mid-retry is one they have already accepted.
+        Commit(null, null, KeePassInterop.SaveAttempts);
     }
 
     /// <summary>
@@ -279,30 +279,29 @@ public sealed class Vault : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (HasFileChangedSinceOpen())
+        Commit(HasFileChangedSinceOpen, waitBetweenAttempts, attempts);
+    }
+
+    private void Commit(Func<bool>? hasChangedOnDisk, Action<int>? waitBetweenAttempts, int attempts)
+    {
+        var clock = new SaveClock();
+        var succeeded = false;
+
+        try
         {
-            throw new VaultChangedOnDiskException();
+            if (hasChangedOnDisk is not null && clock.Check(hasChangedOnDisk))
+            {
+                throw new VaultChangedOnDiskException();
+            }
+
+            _interop.Save(hasChangedOnDisk, waitBetweenAttempts, clock, attempts);
+            _stamp = clock.Stamp(() => SourceSnapshot.Digest(Path));
+            succeeded = true;
         }
-
-        _interop.Save(HasFileChangedSinceOpen, waitBetweenAttempts, attempts);
-        _stamp = SourceSnapshot.Digest(Path);
-    }
-
-    private void Write()
-    {
-        // The check is handed to the retry loop, not just made before it. The name a save contends
-        // for is most often held by another process saving this same vault, so a retry that waits
-        // that out and then writes reverts it — see KeePassInterop.Save and D-0119.
-        _interop.Save(HasFileChangedSinceOpen, null);
-        _stamp = SourceSnapshot.Digest(Path);
-    }
-
-    private void Overwrite()
-    {
-        // No check, at any point: this caller has already put the choice to a person and been told
-        // to go ahead, so a change arriving mid-retry is one they have already accepted.
-        _interop.Save(null, null);
-        _stamp = SourceSnapshot.Digest(Path);
+        finally
+        {
+            clock.Publish(succeeded);
+        }
     }
 
     /// <summary>Releases the vault's key material and decrypted contents.</summary>

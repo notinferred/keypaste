@@ -140,8 +140,9 @@ public sealed class VaultSaveTests : IDisposable
     }
 
     /// <summary>
-    /// Retrying must not turn a permanent failure into a hang. Four attempts with a linear backoff
-    /// is well under a second, so a save that will never work still fails promptly.
+    /// Retrying must not turn a permanent failure into a hang. The retry sleeps are about 2.2
+    /// seconds, but the caller also waits for the checks, the gate and every attempt's work
+    /// (F.10a), so the bound is on the whole wait and the failure names each part.
     /// </summary>
     [Fact]
     public void ASaveThatCannotSucceed_GivesUpQuickly()
@@ -155,16 +156,19 @@ public sealed class VaultSaveTests : IDisposable
         PoolTimeline.Mark("save-enter", "doomed");
 
         var started = Environment.TickCount64;
-        Assert.Throws<VaultException>(vault.Save);
+        var timing = SaveTimings.Of(() => Assert.Throws<VaultException>(vault.Save));
         var elapsed = Environment.TickCount64 - started;
 
+        SaveTimings.Mark("doomed", timing);
         PoolTimeline.Mark("save-exit", elapsed.ToString(CultureInfo.InvariantCulture));
 
         // Reported only once the comparison has already failed: Assert.True evaluates its message
         // eagerly, and this one reads the pool.
         if (elapsed >= 5_000)
         {
-            Assert.Fail($"a doomed save took {elapsed}ms; retrying must stay bounded.{Environment.NewLine}{watch.Report()}");
+            Assert.Fail(
+                $"a doomed save took {elapsed}ms; retrying must stay bounded. {SaveTimings.Describe(timing)}" +
+                $"{Environment.NewLine}{watch.Report()}");
         }
     }
 
@@ -204,7 +208,7 @@ public sealed class VaultSaveTests : IDisposable
 
         var lastResumed = Stopwatch.GetTimestamp();
 
-        Assert.Throws<VaultException>(() => vault.SaveWaiting(attempt =>
+        var timing = SaveTimings.Of(() => Assert.Throws<VaultException>(() => vault.SaveWaiting(attempt =>
         {
             attempts = attempt;
             work.Add((long)Stopwatch.GetElapsedTime(lastResumed).TotalMilliseconds);
@@ -214,7 +218,9 @@ public sealed class VaultSaveTests : IDisposable
             slept.Add((long)Stopwatch.GetElapsedTime(sleeping).TotalMilliseconds);
 
             lastResumed = Stopwatch.GetTimestamp();
-        }));
+        })));
+
+        SaveTimings.Mark("budget", timing);
 
         // Attempt by attempt rather than summed, because only the first work interval contains
         // acquiring the process-wide save gate. `work 4100/9/8/...` is a save that queued behind
@@ -238,7 +244,7 @@ public sealed class VaultSaveTests : IDisposable
         {
             Assert.Fail(
                 $"the sleeps alone took {slept.Sum()}ms against {budget}ms asked for, over {attempts} attempts; " +
-                $"the work between them took {work.Sum()}ms.{Environment.NewLine}{watch.Report()}");
+                $"the work between them took {work.Sum()}ms. {SaveTimings.Describe(timing)}{Environment.NewLine}{watch.Report()}");
         }
     }
 

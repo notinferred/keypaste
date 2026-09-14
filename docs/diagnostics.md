@@ -11,6 +11,8 @@ Record the failing behavior and the question the next observation must answer. D
 | Failure counts | `bash scripts/probe-results.sh <failed-log>...` | Counts per test method from retained failed suite logs; unreadable input fails the reader. |
 | CLI null-reference stacks | [ExceptionTrace.cs](../tests/Keypaste.Cli.Tests/ExceptionTrace.cs) | Optional first-chance stacks before the CLI converts an exception into a user-facing error. |
 | Timeline correlation | `bash scripts/f9-timeline.sh <iteration-directory>...` | Instrumented intervals, overlap and same-process activity. At depth above one, pairing is ambiguous. |
+| Save decomposition | [SaveClock](../src/Keypaste.Core/Internal/SaveClock.cs), `SaveTimingTests` in `Keypaste.Core.Tests` | Each save's check, redirect, gate wait, attempt work, retry waits, re-reads and stamp, and which operation held the gate; the tests prove a held gate and slow work read differently. |
+| Save readings | `bash scripts/f9-timeline.sh --saves <iteration-directory>...` | Each labelled save's first interval split by component with the dominant one named, and the operations holding the gate while it waited. |
 | Hosted comparison | [pool-probe.yml](../.github/workflows/pool-probe.yml) | The full CI test command at three pool floors on the selected Windows runner. |
 
 Run the readers' offline fixtures before using new analysis code:
@@ -110,4 +112,8 @@ Keep downloads while investigating because GitHub artifacts expire. Commit a min
 
 Once the short sample proves the required evidence is present, use `iterations=20` if the question needs the original 80-run-per-arm comparison. Repeat the same dispatch/download recipe and compare named failure shapes at the recorded commits. Read a green probe as "the measurement completed": ordinary test failures are its result. Missing or unparseable evidence makes the job fail.
 
-F.10 in [STEPS](STEPS.md) requires separate measurements for acquiring the save gate and performing the first attempt. A broad sample cannot resolve that distinction without those intervals. Once the mechanism is known, demonstrate a failing regression before repair and a pass afterward; use hosted confirmation to resolve remaining platform uncertainty.
+## Measure with the narrowest test that produces the condition
+
+A mechanism a targeted test can reproduce is measured with that test; the full CI command is the confirming run (D-0135). F.9's starvation existed only under suite load. F.10a's gate contention did not: `SaveTimingTests` creates it in seconds, and one full-suite preflight was enough to read the decomposition.
+
+To read save decompositions from a full suite, set `KEYPASTE_F9_TIMELINE` to a directory and read it with `--saves`. Every save writes a `save-timing` line, and `ASaveThatCannotSucceed_GivesUpQuickly` and `ADoomedSave_SpendsItsBudgetWhereThisSays` mark theirs with `save-op`. On Git Bash, pass that variable as a Windows path when a native launcher such as `cmd /c start` sits between the shell and `dotnet`; `MSYS_NO_PATHCONV` otherwise leaves a POSIX path that Windows resolves under `C:\c\`. A run built from uncommitted source retains `git diff`, `git status --porcelain` and the untracked instrument files beside its timelines, because the SHA alone does not identify it.

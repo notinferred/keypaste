@@ -2,7 +2,13 @@
 # Reads the F.9 timelines a pool-probe dispatch leaves in its artifacts.
 #
 #   scripts/f9-timeline.sh <iteration-directory>...
+#   scripts/f9-timeline.sh --saves <iteration-directory>...
 #   scripts/f9-timeline.sh --selftest
+#
+# `--saves` reads the save-timing lines instead (F.10a): each save a test labelled with `save-op`, its
+# first interval split into check, redirect, gate wait and first-attempt work with the largest named,
+# the operations that held the gate while it waited, and a tally of what dominated. A label whose
+# operation has no save-timing line fails the reader rather than being left out.
 #
 # One iteration directory holds one f9-timeline-<pid>.jsonl per test process that ran, written by
 # tests/Keypaste.Core.Tests/PoolSnapshot.cs. This puts every process on one millisecond axis and
@@ -89,6 +95,79 @@ def whole: . + 0.5 | floor;
   end
 '
 
+# A save-timing mark is written as the save returns, so each save ends at its mark and starts `total`
+# earlier; it holds the gate from after its gate wait until before its stamp.
+# shellcheck disable=SC2016
+readonly READ_SAVES='
+def lpad($n): tostring | if ($n - length) > 0 then (" " * ($n - length)) + . else . end;
+def rpad($n): tostring | if ($n - length) > 0 then . + (" " * ($n - length)) else . end;
+def whole: . + 0.5 | floor;
+def fields: split(" ") | map(split("=") | {key: .[0], value: .[1]}) | from_entries;
+def num: if . == "-" then 0 else tonumber end;
+def list: if . == "-" then [] else split("/") | map(tonumber) end;
+
+(map(.ticks) | min) as $base
+| map(. + {ms: ((.ticks - $base) * 1000 / .freq)}) as $rows
+
+| [ $rows[] | select(.event == "save-timing") | (.detail | fields) as $f
+    | { pid, end: .ms, op: ($f.op | tonumber), heldby: ($f.heldby | tonumber), ok: $f.ok,
+        check: ($f.check | num), redirect: ($f.redirect | num), gate: ($f.gate | num),
+        work: ($f.work | list), stamp: ($f.stamp | num), total: ($f.total | num) }
+    | . + { waitStart: (.end - .total + .check + .redirect) }
+    | . + { holdStart: (.waitStart + .gate), holdEnd: (.end - .stamp) } ] as $saves
+
+| [ $rows[] | select(.event == "save-op") | (.detail | fields) as $f
+    | { pid, label: $f.label, op: ($f.op | tonumber), at: .ms } ] | sort_by(.at) as $labels
+
+| [ $labels[] as $l | select([ $saves[] | select(.pid == $l.pid and .op == $l.op) ] | length == 0)
+    | "MISSING save-op \($l.label) names op \($l.op) in pid \($l.pid), which has no save-timing line" ] as $missing
+
+| if ($missing | length) > 0 then $missing[] else
+
+[ $labels[] as $l
+    | ([ $saves[] | select(.pid == $l.pid and .op == $l.op) ] | first) as $s
+    | { check: $s.check, redirect: $s.redirect, gate: $s.gate, work: ($s.work[0] // 0) } as $parts
+    | $s + $parts + {
+        label: $l.label,
+        first: ($parts | add),
+        dominant: ($parts | to_entries | max_by(.value) | if .value < 1 then "none" else .key end),
+        holders: [ $saves[] | select(.pid == $s.pid and .op != $s.op
+            and .holdStart < $s.holdStart and .holdEnd > $s.waitStart)
+          | "op \(.op) for \(([.holdEnd, $s.holdStart] | min) - ([.holdStart, $s.waitStart] | max) | whole) ms" ]
+      } ] as $read
+
+| ( "  \($saves | length) saves timed in \($saves | map(.pid) | unique | length) process(es), \($read | length) labelled",
+  ($read[]
+    | "    \(.label | rpad(8)) pid \(.pid | rpad(7)) op \(.op | rpad(5)) ok \(.ok)  total \(.total | whole | lpad(6)) ms  first \(.first | whole | lpad(6)) ms = check \(.check) + redirect \(.redirect) + gate \(.gate) + work \(.work)  dominant \(.dominant)",
+      (if (.holders | length) > 0 then "        gate held by: \(.holders | join(", "))" else empty end)),
+  (if ($read | length) > 0 then
+    "  first intervals dominated by: \($read | group_by(.dominant) | map("\(.[0].dominant) \(length)") | join(", "))"
+  else empty end) )
+end
+'
+
+read_saves_directory() {
+  local dir="$1" files
+  shopt -s nullglob
+  files=("$dir"/f9-timeline-*.jsonl)
+  shopt -u nullglob
+
+  if [ "${#files[@]}" -eq 0 ] || ! cat "${files[@]}" | tr -d "$CR" | grep -F '"event":"save-timing"' >/dev/null; then
+    echo "$dir: no save-timing lines"
+    return
+  fi
+
+  local read
+  read="$(cat "${files[@]}" | jqr -s "$READ_SAVES")" || die "the save-timing lines in $dir could not be read"
+  case "$read" in
+    MISSING*) die "${read#MISSING }" ;;
+  esac
+
+  echo "$dir"
+  printf '%s
+' "$read"
+}
+
 read_directory() {
   local dir="$1" files
   shopt -s nullglob
@@ -109,10 +188,12 @@ read_directory() {
 
 read_all() {
   command -v jq >/dev/null 2>&1 || die "no jq on PATH - run this under Git Bash, not WSL"
-  local dir
+  local reader="$1" dir
+  shift
+  [ "$#" -gt 0 ] || die "no iteration directory given"
   for dir in "$@"; do
     [ -d "$dir" ] || die "not a directory: $dir"
-    read_directory "$dir"
+    "$reader" "$dir"
     echo
   done
 }
@@ -183,6 +264,35 @@ selftest() {
   } > "$work/expected-marks-only"
   printf '%s: no timeline lines\n\n' "$work/empty" > "$work/expected-empty"
 
+  # Op 1 holds the gate across a 2000 ms wait; op 2 waits 1500 ms of it and op 3 works alone. Op 3's
+  # stamp keeps its hold from reaching its own mark. `unlabelled` names an op nothing timed.
+  mkdir -p "$work/saves" "$work/unlabelled"
+  printf '%s\r\n' \
+    '{"ticks":0,"freq":1000,"pid":111,"asm":"Keypaste.Core.Tests","event":"opened","detail":""}' \
+    '{"ticks":3000,"freq":1000,"pid":111,"asm":"Keypaste.Core.Tests","event":"save-timing","detail":"op=1 heldby=0 ok=0 check=0 redirect=0 gate=0 work=0/0 waits=2000 rereads=0 stamp=- total=2000"}' \
+    '{"ticks":3100,"freq":1000,"pid":111,"asm":"Keypaste.Core.Tests","event":"save-timing","detail":"op=2 heldby=1 ok=0 check=10 redirect=0 gate=1500 work=5 waits=- rereads=- stamp=- total=1600"}' \
+    '{"ticks":3101,"freq":1000,"pid":111,"asm":"Keypaste.Core.Tests","event":"save-op","detail":"label=doomed op=2"}' \
+    '{"ticks":5000,"freq":1000,"pid":111,"asm":"Keypaste.Core.Tests","event":"save-timing","detail":"op=3 heldby=0 ok=1 check=0 redirect=0 gate=0 work=400 waits=- rereads=- stamp=20 total=430"}' \
+    '{"ticks":5001,"freq":1000,"pid":111,"asm":"Keypaste.Core.Tests","event":"save-op","detail":"label=budget op=3"}' \
+    > "$work/saves/f9-timeline-111.jsonl"
+  printf '%s\n' \
+    '{"ticks":0,"freq":1000,"pid":7,"asm":"Keypaste.Core.Tests","event":"save-timing","detail":"op=1 heldby=0 ok=1 check=0 redirect=0 gate=0 work=9 waits=- rereads=- stamp=1 total=10"}' \
+    '{"ticks":1,"freq":1000,"pid":7,"asm":"Keypaste.Core.Tests","event":"save-op","detail":"label=doomed op=4"}' \
+    > "$work/unlabelled/f9-timeline-7.jsonl"
+
+  {
+    echo "$work/saves"
+    echo "  3 saves timed in 1 process(es), 2 labelled"
+    echo "    doomed   pid 111     op 2     ok 0  total   1600 ms  first   1515 ms = check 10 + redirect 0 + gate 1500 + work 5  dominant gate"
+    echo "        gate held by: op 1 for 1490 ms"
+    echo "    budget   pid 111     op 3     ok 1  total    430 ms  first    400 ms = check 0 + redirect 0 + gate 0 + work 400  dominant work"
+    echo "  first intervals dominated by: gate 1, work 1"
+    echo
+  } > "$work/expected-saves"
+  printf '%s\n' '::error::save-op doomed names op 4 in pid 7, which has no save-timing line' \
+    > "$work/expected-unlabelled"
+  printf '%s: no save-timing lines\n\n' "$work/empty" > "$work/expected-saves-empty"
+
   mkdir -p "$work/fakebin"
   printf '%s\n' \
     '#!/usr/bin/env bash' \
@@ -199,22 +309,27 @@ selftest() {
     || die "the CRLF jq shim writes no carriage return, so the CRLF case below would prove nothing"
 
   check() {
-    local name="$1" path="$2" fixture="$3"
+    local name="$1" path="$2" fixture="$3" expected="$4"
+    shift 4
     cases=$((cases + 1))
-    PATH="$path" bash "$SELF" "$work/$fixture" > "$work/actual" 2>&1 || true
-    if cmp -s "$work/expected-$fixture" "$work/actual"; then
+    PATH="$path" bash "$SELF" "$@" "$work/$fixture" > "$work/actual" 2>&1 || true
+    if cmp -s "$work/expected-$expected" "$work/actual"; then
       echo "ok   $name"
     else
       failures=$((failures + 1))
       echo "FAIL $name"
-      diff "$work/expected-$fixture" "$work/actual" | sed 's/^/     /' || true
+      diff "$work/expected-$expected" "$work/actual" | sed 's/^/     /' || true
     fi
   }
 
-  check "pairs, nests and overlaps across two processes and two frequencies" "$PATH" both
-  check "the same, through a jq that writes CRLF" "$fake" both
-  check "a process with marks and no interval says so" "$PATH" marks-only
-  check "a directory with no timeline says so" "$PATH" empty
+  check "pairs, nests and overlaps across two processes and two frequencies" "$PATH" both both
+  check "the same, through a jq that writes CRLF" "$fake" both both
+  check "a process with marks and no interval says so" "$PATH" marks-only marks-only
+  check "a directory with no timeline says so" "$PATH" empty empty
+  check "splits first intervals, names gate holders and tallies what dominated" "$PATH" saves saves --saves
+  check "the same, through a jq that writes CRLF" "$fake" saves saves --saves
+  check "a labelled save with no timing fails the reader" "$PATH" unlabelled unlabelled --saves
+  check "a directory with no save timings says so" "$PATH" empty saves-empty --saves
 
   echo "$((cases - failures)) of $cases cases passed"
   [ "$failures" -eq 0 ] || die "the F.9 timeline reader does not read what it claims"
@@ -222,9 +337,10 @@ selftest() {
 
 case "${1:-}" in
   --selftest) selftest ;;
+  --saves) shift; read_all read_saves_directory "$@" ;;
   "" | -h | --help)
-    sed -n '4,5p' "$SELF" | sed 's/^# *//'
+    sed -n '4,6p' "$SELF" | sed 's/^# *//'
     [ -n "${1:-}" ] || exit 2
     ;;
-  *) read_all "$@" ;;
+  *) read_all read_directory "$@" ;;
 esac
