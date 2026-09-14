@@ -286,10 +286,17 @@ internal sealed class KeePassInterop : IDisposable
     /// leaves the original file untouched, so a second attempt starts from the same place as the
     /// first, and a save that never succeeds reports exactly what it reported before.
     /// </para>
+    /// <para>
+    /// <b>The retry schedule bounds the sleeps and nothing else.</b> A caller waits for the
+    /// changed-on-disk checks, the gate, every attempt's work and the sleeps; <see cref="SaveTiming"/>
+    /// keeps each separately, because <c>SaveAttempts × SaveRetryDelayMilliseconds</c> describes only
+    /// the last of them and a claim about elapsed time needs all of them (F.10a).
+    /// </para>
     /// </remarks>
     /// <exception cref="VaultChangedOnDiskException">
     /// Something else wrote to the vault while this save was waiting to retry. Nothing was written.
     /// </exception>
+    /// <param name="clock">Receives this save's timing; the caller publishes it.</param>
     /// <param name="attempts">
     /// How many times to try. Defaults to the shipped budget; V-F.6 pins it to 1 so the retry
     /// cannot absorb the contention the fix is supposed to remove.
@@ -297,17 +304,20 @@ internal sealed class KeePassInterop : IDisposable
     internal void Save(
         Func<bool>? hasChangedOnDisk,
         Action<int>? waitBetweenAttempts,
+        SaveClock clock,
         int attempts = SaveAttempts)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        ProcessTemporaryDirectory.EnsureRedirected();
+        clock.Redirect(ProcessTemporaryDirectory.EnsureRedirected);
 
         // One save at a time in this process. The private directory is the whole process's, so two
         // concurrent saves would name their temporaries in it together and collide exactly as two
         // processes used to (D-0122). TMP cannot be made per-thread, so the saves are made
         // one-at-a-time instead.
-        _saveGate.Wait();
+        clock.HeldBy = Volatile.Read(ref _gateHolder);
+        clock.WaitForGate(_saveGate.Wait);
+        Volatile.Write(ref _gateHolder, clock.Operation);
 
         // Set by whichever attempt is refused, and acted on once on the way out — including the way
         // out of a save that then succeeded. The fallback move strands its file on the attempt that
@@ -320,7 +330,7 @@ internal sealed class KeePassInterop : IDisposable
             {
                 try
                 {
-                    _database.Save(null);
+                    clock.Attempt(() => _database.Save(null));
                     return;
                 }
                 catch (Exception ex) when (attempt < attempts && IsTransient(ex))
@@ -339,16 +349,20 @@ internal sealed class KeePassInterop : IDisposable
                         $"Could not save '{_database.IOConnectionInfo.Path}': {ex.Message}", ex);
                 }
 
-                if (waitBetweenAttempts is null)
+                var retry = attempt;
+                clock.Wait(() =>
                 {
-                    Thread.Sleep(SaveRetryDelayMilliseconds * attempt);
-                }
-                else
-                {
-                    waitBetweenAttempts(attempt);
-                }
+                    if (waitBetweenAttempts is null)
+                    {
+                        Thread.Sleep(SaveRetryDelayMilliseconds * retry);
+                    }
+                    else
+                    {
+                        waitBetweenAttempts(retry);
+                    }
+                });
 
-                if (hasChangedOnDisk?.Invoke() == true)
+                if (hasChangedOnDisk is not null && clock.Reread(hasChangedOnDisk))
                 {
                     throw new VaultChangedOnDiskException();
                 }
@@ -356,6 +370,7 @@ internal sealed class KeePassInterop : IDisposable
         }
         finally
         {
+            Volatile.Write(ref _gateHolder, 0);
             _saveGate.Release();
 
             if (strandedATemporary)
@@ -367,6 +382,9 @@ internal sealed class KeePassInterop : IDisposable
 
     /// <summary>Serialises saves in this process. See the comment where it is taken.</summary>
     private static readonly SemaphoreSlim _saveGate = new(1, 1);
+
+    /// <summary>The <see cref="SaveClock.Operation"/> holding <see cref="_saveGate"/>; 0 when free.</summary>
+    private static long _gateHolder;
 
     /// <summary>ERROR_TRANSACTIONAL_CONFLICT.</summary>
     /// <remarks>
