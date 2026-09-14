@@ -7,8 +7,9 @@
 #
 # `--saves` reads the save-timing lines instead (F.10a): each save a test labelled with `save-op`, its
 # first interval split into check, redirect, gate wait and first-attempt work with the largest named,
-# the operations that held the gate while it waited, and a tally of what dominated. A label whose
-# operation has no save-timing line fails the reader rather than being left out.
+# the operations that held the gate while it waited, a tally of what dominated, and every gate hold
+# kept through a retry sleep (F.12). A label whose operation has no save-timing line fails the reader
+# rather than being left out.
 #
 # One iteration directory holds one f9-timeline-<pid>.jsonl per test process that ran, written by
 # tests/Keypaste.Core.Tests/PoolSnapshot.cs. This puts every process on one millisecond axis and
@@ -96,9 +97,12 @@ def whole: . + 0.5 | floor;
 '
 
 # A save-timing mark is written as the save returns, so each save ends at its mark and starts `total`
-# earlier. A gated save waits before attempt `gatedat`, after the work, waits and rereads of the
-# attempts before it, and holds the gate from then until before its stamp; `gate=-` never gated.
-# Lines without `gatedat` predate F.10b, when every save gated before its first attempt.
+# earlier. Since F.12 every list has one value per attempt, in the order gate wait, re-read, work,
+# then the sleep after it, and `held` is each attempt's hold from taking the gate to releasing it;
+# `-` is a step not taken. A hold spans a retry sleep when it outlasts its re-read and work by half
+# the sleep after it. Lines without `held` held one gate, taken before attempt `gatedat` and kept
+# until before the stamp, so any sleep after that attempt was spanned; lines without `gatedat`
+# predate F.10b, when every save gated before its first attempt.
 # shellcheck disable=SC2016
 readonly READ_SAVES='
 def lpad($n): tostring | if ($n - length) > 0 then (" " * ($n - length)) + . else . end;
@@ -107,20 +111,41 @@ def whole: . + 0.5 | floor;
 def fields: split(" ") | map(split("=") | {key: .[0], value: .[1]}) | from_entries;
 def num: if . == "-" then 0 else tonumber end;
 def list: if . == "-" then [] else split("/") | map(tonumber) end;
+def slots: split("/") | map(if . == "-" then null else tonumber end);
+
+def perattempt($f; $start):
+  ($f.gate | slots) as $g | ($f.held | slots) as $h | ($f.heldby | slots) as $hb
+  | ($f.rereads | slots) as $r | ($f.work | slots) as $w | ($f.waits | slots) as $ws
+  | reduce range(0; [$g, $h, $r, $w, $ws] | map(length) | max) as $i ({t: $start, a: []};
+      .t as $t | ($g[$i] // 0) as $gw
+      | .a += [{ gated: ($h[$i] != null), waitStart: $t, holdStart: ($t + $gw),
+                 holdEnd: (if $h[$i] == null then null else $t + $gw + $h[$i] end), heldby: $hb[$i],
+                 spans: ($h[$i] != null and ($ws[$i] // 0) > 0
+                   and ($h[$i] - ($r[$i] // 0) - ($w[$i] // 0)) >= (($ws[$i] // 0) / 2)) }]
+      | .t = $t + $gw + ($r[$i] // 0) + ($w[$i] // 0) + ($ws[$i] // 0))
+  | .a;
+
+def single($f; $s):
+  if $f.gate == "-" then [] else
+    ($f.gatedat // "1" | tonumber) as $at
+    | ($f.work | list) as $w | ($f.waits | list) as $ws | ($f.rereads | list) as $r
+    | ([range(0; $at - 1)] | map(($w[.] // 0) + ($ws[.] // 0) + ($r[.] // 0)) | add // 0) as $before
+    | ($s.end - $s.total + $s.check + $s.redirect + $before) as $waitStart
+    | [ range(0; $at - 1) | {gated: false} ]
+      + [ { gated: true, waitStart: $waitStart, holdStart: ($waitStart + ($f.gate | num)),
+            holdEnd: ($s.end - $s.stamp), heldby: ($f.heldby | tonumber), spans: (($ws | length) >= $at) } ]
+  end;
 
 (map(.ticks) | min) as $base
 | map(. + {ms: ((.ticks - $base) * 1000 / .freq)}) as $rows
 
 | [ $rows[] | select(.event == "save-timing") | (.detail | fields) as $f
-    | { pid, end: .ms, op: ($f.op | tonumber), heldby: ($f.heldby | tonumber), ok: $f.ok,
-        check: ($f.check | num), redirect: ($f.redirect | num), gate: ($f.gate | num),
-        gatedat: (if $f.gate == "-" then null else ($f.gatedat // "1" | tonumber) end),
-        work: ($f.work | list), waits: ($f.waits | list), rereads: ($f.rereads | list),
-        stamp: ($f.stamp | num), total: ($f.total | num) }
-    | . as $s
-    | ([range(0; (($s.gatedat // 1) - 1))] | map(($s.work[.] // 0) + ($s.waits[.] // 0) + ($s.rereads[.] // 0)) | add // 0) as $before
-    | . + { gated: (.gatedat != null), waitStart: (.end - .total + .check + .redirect + $before) }
-    | . + { holdStart: (.waitStart + .gate), holdEnd: (.end - .stamp) } ] as $saves
+    | { pid, end: .ms, op: ($f.op | tonumber), ok: $f.ok,
+        check: ($f.check | num), redirect: ($f.redirect | num), stamp: ($f.stamp | num), total: ($f.total | num),
+        gate: (($f.gate | split("/"))[0] | num), work: (($f.work | split("/"))[0] | num) }
+    | . + { attempts: (if $f.held == null then single($f; .) else perattempt($f; .end - .total + .check + .redirect) end) }
+    | . + { gate: (if (.attempts[0].gated // false) then .gate else 0 end),
+            holds: [ .attempts[] | select(.gated) ] } ] as $saves
 
 | [ $rows[] | select(.event == "save-op") | (.detail | fields) as $f
     | { pid, label: $f.label, op: ($f.op | tonumber), at: .ms } ] | sort_by(.at) as $labels
@@ -132,15 +157,20 @@ def list: if . == "-" then [] else split("/") | map(tonumber) end;
 
 [ $labels[] as $l
     | ([ $saves[] | select(.pid == $l.pid and .op == $l.op) ] | first) as $s
-    | { check: $s.check, redirect: $s.redirect, gate: (if $s.gatedat == 1 then $s.gate else 0 end), work: ($s.work[0] // 0) } as $parts
+    | { check: $s.check, redirect: $s.redirect, gate: $s.gate, work: $s.work } as $parts
+    | ($s.holds | first) as $mine
     | $s + $parts + {
         label: $l.label,
         first: ($parts | add),
         dominant: ($parts | to_entries | max_by(.value) | if .value < 1 then "none" else .key end),
-        holders: [ $saves[] | select($s.gated and .gated and .pid == $s.pid and .op != $s.op
-            and .holdStart < $s.holdStart and .holdEnd > $s.waitStart)
-          | "op \(.op) for \(([.holdEnd, $s.holdStart] | min) - ([.holdStart, $s.waitStart] | max) | whole) ms" ]
+        holders: (if $mine == null then [] else
+          [ $saves[] | select(.pid == $s.pid and .op != $s.op) | .op as $op | .holds[]
+            | select(.holdStart < $mine.holdStart and .holdEnd > $mine.waitStart)
+            | "op \($op) for \(([.holdEnd, $mine.holdStart] | min) - ([.holdStart, $mine.waitStart] | max) | whole) ms" ]
+          end)
       } ] as $read
+
+| [ $saves[] | . as $s | .holds[] | select(.spans) | "op \($s.op) in pid \($s.pid)" ] as $spanning
 
 | ( "  \($saves | length) saves timed in \($saves | map(.pid) | unique | length) process(es), \($read | length) labelled",
   ($read[]
@@ -148,7 +178,8 @@ def list: if . == "-" then [] else split("/") | map(tonumber) end;
       (if (.holders | length) > 0 then "        gate held by: \(.holders | join(", "))" else empty end)),
   (if ($read | length) > 0 then
     "  first intervals dominated by: \($read | group_by(.dominant) | map("\(.[0].dominant) \(length)") | join(", "))"
-  else empty end) )
+  else empty end),
+  "  gate holds spanning a retry sleep: \($spanning | length)\(if ($spanning | length) > 0 then " (\($spanning | unique | join(", ")))" else "" end)" )
 end
 '
 
@@ -273,7 +304,7 @@ selftest() {
   # Op 1 holds the gate across a 2000 ms wait; op 2 waits 1500 ms of it and op 3 works alone. Op 3's
   # stamp keeps its hold from reaching its own mark. Op 4 runs inside op 1's hold without gating, so
   # it names no holder; op 1 predates `gatedat`. `unlabelled` names an op nothing timed.
-  mkdir -p "$work/saves" "$work/unlabelled"
+  mkdir -p "$work/saves" "$work/unlabelled" "$work/retried"
   printf '%s\r\n' \
     '{"ticks":0,"freq":1000,"pid":111,"asm":"Keypaste.Core.Tests","event":"opened","detail":""}' \
     '{"ticks":3000,"freq":1000,"pid":111,"asm":"Keypaste.Core.Tests","event":"save-timing","detail":"op=1 heldby=0 ok=0 check=0 redirect=0 gate=0 work=0/0 waits=2000 rereads=0 stamp=- total=2000"}' \
@@ -295,8 +326,27 @@ selftest() {
     echo "        gate held by: op 1 for 1490 ms"
     echo "    budget   pid 111     op 3     ok 1  total    430 ms  first    400 ms = check 0 + redirect 0 + gate 0 + work 400  dominant work"
     echo "  first intervals dominated by: gate 1, work 2"
+    echo "  gate holds spanning a retry sleep: 1 (op 1 in pid 111)"
     echo
   } > "$work/expected-saves"
+  # F.12's shape. Op 6 kept its first hold through the 600 ms sleep after it, which is the defect;
+  # op 5 released before its sleep, and its first gate wait overlaps only op 6's second hold.
+  printf '%s\n' \
+    '{"ticks":0,"freq":1000,"pid":333,"asm":"Keypaste.Core.Tests","event":"opened","detail":""}' \
+    '{"ticks":1790,"freq":1000,"pid":333,"asm":"Keypaste.Core.Tests","event":"save-timing","detail":"op=6 ok=0 check=0 redirect=0 gate=0/0 heldby=0/0 held=700/80 rereads=0/0 work=100/80 waits=600/- stamp=- total=790"}' \
+    '{"ticks":2480,"freq":1000,"pid":333,"asm":"Keypaste.Core.Tests","event":"save-timing","detail":"op=5 ok=1 check=0 redirect=0 gate=30/2 heldby=6/0 held=100/90 rereads=0/1 work=100/88 waits=500/- stamp=5 total=730"}' \
+    '{"ticks":2481,"freq":1000,"pid":333,"asm":"Keypaste.Core.Tests","event":"save-op","detail":"label=retried op=5"}' \
+    > "$work/retried/f9-timeline-333.jsonl"
+  {
+    echo "$work/retried"
+    echo "  2 saves timed in 1 process(es), 1 labelled"
+    echo "    retried  pid 333     op 5     ok 1  total    730 ms  first    130 ms = check 0 + redirect 0 + gate 30 + work 100  dominant work"
+    echo "        gate held by: op 6 for 30 ms"
+    echo "  first intervals dominated by: work 1"
+    echo "  gate holds spanning a retry sleep: 1 (op 6 in pid 333)"
+    echo
+  } > "$work/expected-retried"
+
   printf '%s\n' '::error::save-op doomed names op 4 in pid 7, which has no save-timing line' \
     > "$work/expected-unlabelled"
   printf '%s: no save-timing lines\n\n' "$work/empty" > "$work/expected-saves-empty"
@@ -336,6 +386,7 @@ selftest() {
   check "a directory with no timeline says so" "$PATH" empty empty
   check "splits first intervals, names gate holders and tallies what dominated" "$PATH" saves saves --saves
   check "the same, through a jq that writes CRLF" "$fake" saves saves --saves
+  check "reads each attempt's hold and counts one kept through a retry sleep" "$PATH" retried retried --saves
   check "a labelled save with no timing fails the reader" "$PATH" unlabelled unlabelled --saves
   check "a directory with no save timings says so" "$PATH" empty saves-empty --saves
 

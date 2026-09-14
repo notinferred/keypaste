@@ -55,20 +55,26 @@ internal static class SaveTimings
     internal static void Mark(string label, SaveTiming timing) =>
         PoolTimeline.Mark("save-op", string.Create(CultureInfo.InvariantCulture, $"label={label} op={timing.Operation}"));
 
-    /// <summary>Space-separated <c>key=value</c>, lists slash-separated, milliseconds rounded; <c>-</c> for a step not taken.</summary>
+    /// <summary>
+    /// Space-separated <c>key=value</c>, milliseconds rounded, <c>-</c> for a step not taken. Every list
+    /// has one slash-separated value per attempt, and <c>held</c> marks the F.12 shape for the reader.
+    /// </summary>
     internal static string Describe(SaveTiming timing) =>
         string.Create(
             CultureInfo.InvariantCulture,
-            $"op={timing.Operation} heldby={timing.HeldBy} ok={(timing.Succeeded ? 1 : 0)} " +
-            $"check={Ms(timing.Check)} redirect={Ms(timing.Redirect)} gate={Ms(timing.GateWait)} gatedat={timing.GatedAttempt?.ToString(CultureInfo.InvariantCulture) ?? "-"} " +
-            $"work={Each(timing.Attempts)} waits={Each(timing.Waits)} rereads={Each(timing.Rereads)} " +
+            $"op={timing.Operation} ok={(timing.Succeeded ? 1 : 0)} " +
+            $"check={Ms(timing.Check)} redirect={Ms(timing.Redirect)} " +
+            $"gate={Each(timing, a => Ms(a.Gate))} heldby={Each(timing, a => a.Gate is null ? "-" : a.HeldBy.ToString(CultureInfo.InvariantCulture))} " +
+            $"held={Each(timing, a => Ms(a.Held))} rereads={Each(timing, a => Ms(a.Reread))} " +
+            $"work={Each(timing, a => Ms(a.Work))} waits={Each(timing, a => Ms(a.Wait))} " +
             $"stamp={Ms(timing.Stamp)} total={Ms(timing.Total)}");
 
-    internal static double Milliseconds(IEnumerable<TimeSpan> spans) => spans.Sum(span => span.TotalMilliseconds);
+    internal static TimeSpan Sum(SaveTiming timing, Func<AttemptTiming, TimeSpan?> part) =>
+        timing.Attempts.Aggregate(TimeSpan.Zero, (sum, attempt) => sum + (part(attempt) ?? TimeSpan.Zero));
 
     private static string Ms(TimeSpan? span) =>
         span is { } value ? Math.Round(value.TotalMilliseconds).ToString(CultureInfo.InvariantCulture) : "-";
 
-    private static string Each(IReadOnlyList<TimeSpan> spans) =>
-        spans.Count == 0 ? "-" : string.Join('/', spans.Select(span => Ms(span)));
+    private static string Each(SaveTiming timing, Func<AttemptTiming, string> part) =>
+        timing.Attempts.Count == 0 ? "-" : string.Join('/', timing.Attempts.Select(part));
 }
