@@ -102,6 +102,10 @@ jobs:
         shell: bash
         run: scripts/verify-release-completion.sh
 
+      - name: Verify the provenance check refuses a release this workflow did not attest
+        shell: bash
+        run: scripts/verify-provenance.sh --selftest
+
   test:
     name: test (${{ matrix.os }})
     needs: gate

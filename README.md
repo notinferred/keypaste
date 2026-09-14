@@ -92,7 +92,7 @@ Keep the absolute path of `keypaste-mcp` for your MCP client configuration.
 
 ### Download verification
 
-The checksum detects a corrupted or incomplete download. It does not authenticate the publisher. The checksum is served from the same origin as the archive, so anyone able to replace one can replace both. The published binaries are unsigned and un-notarized. [`THREATS.md`](THREATS.md) T-21 describes the download trust boundary, and [`SECURITY.md`](SECURITY.md#verifying-a-release) has the verification steps in one place.
+The checksum detects a corrupted or incomplete download. It does not authenticate the publisher. The checksum is served from the same origin as the archive, so anyone able to replace one can replace both. The published binaries are unsigned and un-notarized. Releases after `v0.2.0` also publish a build attestation that GitHub CLI can check without an account; `v0.2.0` has none. [`THREATS.md`](THREATS.md) T-21 describes the download trust boundary, and [`SECURITY.md`](SECURITY.md#verifying-a-release) has the verification steps in one place.
 
 The installation instructions keep downloaded commands visible for review before execution.
 

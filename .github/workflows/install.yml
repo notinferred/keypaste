@@ -119,6 +119,21 @@ jobs:
           fi
           echo "version=$v" >> "$GITHUB_OUTPUT"
 
+      # 3.8. Gh is deliberately not logged in: the bundle published beside the release is all it needs.
+      - name: Verify the release was built and attested by this repository's release workflow
+        if: matrix.target == 'linux'
+        shell: bash
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          set -euo pipefail
+          attested="$(jq -r --arg v "$VERSION" '[.published[] | select(.version == $v)] | last | .provenance // false' release-targets.json | tr -d '\r')"
+          if [ "$attested" != "true" ]; then
+            echo "::notice::$VERSION was published before 3.8 and has no attestation bundle; its provenance is NOT verified"
+            exit 0
+          fi
+          scripts/verify-provenance.sh "$VERSION" "$RUNNER_TEMP/provenance"
+
       # --negative is not passed on Windows: the script refuses that combination outright rather
       # than skipping it quietly, because the decoy substitution shims curl and the Windows block
       # uses Invoke-WebRequest. The Linux and macOS runs both carry it, so the assertion that the

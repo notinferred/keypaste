@@ -103,6 +103,10 @@ stage() {
     for f in keypaste-*; do sha256sum "$f" > "$f.sha256"; done
     sha256sum keypaste-* > SHA256SUMS
   )
+  printf '{"assets":[]}
+' > "$dir/keypaste-${V}-manifest.json"
+  printf '{}
+' > "$dir/keypaste-${V}-provenance.sigstore.jsonl"
 }
 
 GOOD="$WORK/good"; stage "$GOOD"
@@ -122,6 +126,16 @@ run_case "assets-no-checksum" 1 "has no checksum beside it" -- bash "$ASSETS_CHE
 
 D="$WORK/orphan"; stage "$D"; printf 'hash  ghost\n' > "$D/ghost.tar.gz.sha256"
 run_case "assets-orphan-checksum" 1 "has no asset beside it" -- bash "$ASSETS_CHECK" "$V" "$D"
+
+D="$WORK/nobundle"; stage "$D"; rm -f "$D/keypaste-${V}-provenance.sigstore.jsonl"
+run_case "assets-no-attestation-bundle" 1 "can never be verified" -- bash "$ASSETS_CHECK" "$V" "$D"
+
+D="$WORK/nomanifest"; stage "$D"; rm -f "$D/keypaste-${V}-manifest.json"
+run_case "assets-no-manifest" 1 "can never be verified" -- bash "$ASSETS_CHECK" "$V" "$D"
+
+D="$WORK/foreignbundle"; stage "$D"; printf '{}
+' > "$D/keypaste-9.9.8-provenance.sigstore.jsonl"
+run_case "assets-another-versions-bundle" 1 "is not a release asset" -- bash "$ASSETS_CHECK" "$V" "$D"
 
 D="$WORK/empty"; rm -rf "$D"; mkdir -p "$D"
 run_case "assets-empty-directory" 1 "advertised and missing" -- bash "$ASSETS_CHECK" "$V" "$D"
@@ -150,7 +164,7 @@ DECLARED="$(declared_cases)"
 echo "ok: $cases cases across three decisions a tag used to be the first thing to run."
 echo "    A version with no section of its own, a tag naming a version the source does not"
 echo "    declare, an unreadable version, a stray dotfile, a missing target, a corrupt archive,"
-echo "    a checksum with no asset and an asset with no checksum all refuse. Both weakened"
-echo "    copies accept what the repaired ones refuse."
+echo "    a checksum with no asset, an asset with no checksum and a release missing its manifest"
+echo "    or attestation bundle all refuse. Both weakened copies accept what the repaired ones refuse."
 echo "not proved here: that release.yml reaches these on a tag, which only a tag shows; and that"
 echo "    the bytes a real build stages are the bytes it published, which is R.0b."
