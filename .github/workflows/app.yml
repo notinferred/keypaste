@@ -23,6 +23,8 @@ on:
       - 'scripts/verify-local-checks.sh'
       - 'keypaste.app.slnx'
       - 'release-targets.json'
+      - 'packaging/**'
+      - 'scripts/verify-windows-installer.sh'
       - '.github/workflows/app.yml'
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
@@ -78,7 +80,7 @@ jobs:
             ''|*[!0-9]*) echo "::error::release-targets.json did not answer with a target count"; exit 1 ;;
           esac
           [ "$n" -ge 1 ] || { echo "::error::release-targets.json packages no app targets"; exit 1; }
-          targets="$(jq -c '[.components.app.targets[] | {os: .runner, rid, archive}]' release-targets.json)"
+          targets="$(jq -c '[.components.app.targets[] | {os: .runner, rid, archive, msi: ([.packages[]? | select(.kind == "msi")] | length > 0)}]' release-targets.json)"
           echo "targets=$targets" >> "$GITHUB_OUTPUT"
           echo "$n targets: $targets"
 
@@ -163,6 +165,7 @@ jobs:
           [ "${{ matrix.rid }}" = "win-x64" ] && bin="$out/keypaste-app.exe"
           reported="$("$bin" --version | tr -d '[:space:]')"
           echo "binary reports $reported"
+          echo "reported=$reported" >> "$GITHUB_OUTPUT"
           if [ "${{ github.ref_type }}" = "tag" ]; then
             want="${GITHUB_REF_NAME#v}"
             [ "$reported" = "$want" ] \
@@ -212,12 +215,52 @@ jobs:
         shell: bash
         run: scripts/verify-publisher-metadata.sh artifacts/stage
 
+      - name: Build and check the internal installer the definition declares
+        if: matrix.msi
+        shell: bash
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          REPORTED: ${{ steps.v.outputs.reported }}
+          # The SDK resolves outside packages.lock.json, so its package is held to this digest (D-0139).
+          WIX_SDK_SHA512: V6RzTWKEi35XdXySYygQ6YSuai9eaF3dPN+ADLN6+dORyqOdJ2uGOA0R/velRLtbiRHdOp+cYwHtKt2zM0396w==
+        run: |
+          set -euo pipefail
+          package='.components.app.targets[] | select(.rid == "${{ matrix.rid }}") | .packages[] | select(.kind == "msi")'
+          read_package() { jq -r "$package | .$1" release-targets.json | tr -d '\r'; }
+          project="$(read_package project)"
+          tool_version="$(read_package tool_version)"
+          name="$(read_package pattern | sed -e "s/{version}/$VERSION/g" -e "s/{rid}/${{ matrix.rid }}/g")"
+
+          dotnet restore "$project" --locked-mode
+          packages="$(dotnet nuget locals global-packages --list | sed -E 's/^global-packages: //' | tr -d '\r')"
+          nupkg="$packages/wixtoolset.sdk/$tool_version/wixtoolset.sdk.$tool_version.nupkg"
+          observed="$(openssl dgst -sha512 -binary "$nupkg" | base64 -w0)"
+          echo "WixToolset.Sdk $tool_version sha512: $observed"
+          [ "$observed" = "$WIX_SDK_SHA512" ] || { echo "::error::WixToolset.Sdk $tool_version is not the pinned package"; exit 1; }
+
+          dotnet build "$project" -c Release --no-restore -o artifacts/installer \
+            -p:PayloadDir="$(cygpath -w "$PWD/artifacts/stage")\\" \
+            -p:FullVersion="$VERSION" -p:ProductVersion="${VERSION%%-*}"
+          mv artifacts/installer/keypaste-app.msi "artifacts/dist/$name"
+          scripts/verify-windows-installer.sh "artifacts/dist/$name" "$VERSION" "$REPORTED" artifacts/stage
+
+          hash="$(sha256sum < "artifacts/dist/$name" | cut -d' ' -f1)"
+          [ "${#hash}" -eq 64 ] || { echo "::error::bad checksum '$hash' for $name"; exit 1; }
+          printf '%s  %s\n' "$hash" "$name" > "artifacts/dist/$name.sha256"
+          (cd artifacts/dist && sha256sum -c "$name.sha256")
+
       # Attested now so a desktop download published by 4.7c can be checked like the CLI's (3.8).
       - name: Attest the desktop archive
         if: github.ref_type == 'tag'
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: artifacts/dist/keypaste-app-*.${{ matrix.archive }}
+
+      - name: Attest the internal installer
+        if: github.ref_type == 'tag' && matrix.msi
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: artifacts/dist/keypaste-app-*.msi
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
