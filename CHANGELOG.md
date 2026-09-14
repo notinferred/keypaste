@@ -16,6 +16,10 @@ On Windows 11 24H2 and Windows Server 2025, temporary files now use a private pr
 
 Fixed a race in the KeePassLib KDF registry that could throw or corrupt the engine list when several vaults were created concurrently on first use. KeePassInterop now forces registry initialization from its type initializer. Not reachable from the CLI, agent or desktop, which each open their first vault on a single thread.
 
+## 0.2.1-rc.1
+
+Unadvertised candidate built from the source described under Unreleased. It is the first release published with a manifest and build attestation, and exists to verify them against public bytes before an advertised release relies on them.
+
 ## 0.2.0
 
 Upgrade from `v0.1.0` to receive the data-preservation and approval repairs below. Old archives remain available and immutable.
