@@ -309,6 +309,21 @@
           "phrase": "an agent asking for entry names on a loaded machine can be told to start keypaste agent for a process that is already running"
         }
       ]
+    },
+    {
+      "version": "0.2.1-rc.2",
+      "tag": "v0.2.1-rc.2",
+      "component": "cli",
+      "date": "2026-09-14",
+      "origin": "https://dl.keypaste.com/v0.2.1-rc.2/",
+      "rids": [
+        "linux-x64",
+        "linux-arm64",
+        "osx-arm64",
+        "win-x64"
+      ],
+      "advertised": false,
+      "provenance": true
     }
   ]
 }
