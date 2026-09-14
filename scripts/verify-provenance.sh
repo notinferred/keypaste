@@ -59,9 +59,10 @@ attested() {
   [ -z "${KEYPASTE_TRUSTED_ROOT:-}" ] || args+=(--custom-trusted-root "$KEYPASTE_TRUSTED_ROOT")
   out="$(gh "${args[@]}" 2>/dev/null)" || return 1
   digest="$(sha256_of "$file")"
-  printf '%s' "$out" | jq -e --arg d "$digest" \
+  # Compared as text: jq 1.6's -e exits 0 on empty input, which would believe a silent verifier (D-0106).
+  [ "$(printf '%s' "$out" | jq -r --arg d "$digest" \
     'type == "array" and length > 0 and any(.[]; any(.verificationResult.statement.subject[]?; .digest.sha256 == $d))' \
-    >/dev/null 2>&1
+    2>/dev/null)" = "true" ]
 }
 
 verify_dir() {
