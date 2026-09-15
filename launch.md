@@ -4,7 +4,7 @@
 
 # Launch runbook
 
-These are CLI-era drafts. The initial community introduction requires the working-product gate and founder daily use under [STEPS](docs/STEPS.md), step 3.2. Update component and version claims for the released product before posting; the historical “no released GUI” wording is not a launch requirement.
+These are CLI-era drafts. The initial community introduction requires the 0.3.0 CLI/MCP release and founder daily use under [STEPS](docs/STEPS.md), step 3.2. Update component and version claims for the released product before posting; the historical “no released GUI” wording is not a launch requirement.
 
 `docs/PRODUCT.md` §5.3 permits Hacker News, r/selfhosted, r/KeePass, the MCP community and X. Post once per channel. Do not repost, use another account or solicit votes.
 
@@ -26,7 +26,7 @@ The remaining prerequisites and ordering belong to [STEPS](docs/STEPS.md); this 
 
 Each draft uses the shared claims, links and transcripts below.
 
-PRODUCT v1.2 includes the broader password manager, managed hosting and organizations. Step 3.2 refreshes these drafts for the initial release; 3.11 follows the hosted-release gate. The historical CLI pitch covers a local KDBX vault, process environment injection, scoped agent requests and an audit log.
+PRODUCT v1.4 makes keypaste credential sharing through encrypted files, with agent access on the same vault and a paid team plan. Step 3.2 refreshes these drafts for the 0.3.0 release; 3.11 follows the paid-release gate. The historical CLI pitch covers a local KDBX vault, process environment injection, scoped agent requests and an audit log.
 
 Describe the combination of a user-owned KDBX file, account-free local use, explicit approvals with bounded reuse or user-written rules, and a local audit log. Avoid “the first”, “the only” and “nobody does this”. D-0036 records alternatives including Keeper, Bitwarden Agent Access SDK, 1Password Environments and `kprun`.
 

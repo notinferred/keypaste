@@ -102,12 +102,12 @@ STEPS owns task status and prerequisites.
 | Public CLI/MCP patch and native installation | R.0c |
 | Desktop packaging, installation and upgrades | 4.7a, 4.7b, 4.7d |
 | Signing identity and integration | 3.5a/b, 3.6a/b |
-| Public desktop installation and daily use | 4.7c, R.1 |
+| Public signed desktop and CLI downloads and the developer journey | 4.7c, R.1 |
 | Chrome and Firefox publication | 8.4a/b |
-| Self-hosted and managed relay | 5.2c, H.8 |
-| Hosted-pilot clients and observed use | 5.3d, R.2 |
+| Self-hosted and hosted drop relay | 5.2c, H.8 |
+| Observed small-team pilot and managed sync clients | R.2, 5.3d |
 | Phone distribution and upgrades | M.3 |
-| Reviewed billing-capable release | R.3 |
+| Reviewed team-plan release | R.3 |
 | Web client review and deployment | W.2c |
 | Package managers and architectures | 3.7a–c, 3.9a–d |
 

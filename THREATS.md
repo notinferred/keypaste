@@ -2,7 +2,7 @@
 
 This describes current source behavior. The public CLI/MCP release is `v0.2.0`, which includes exception-path auditing, display hardening and resolved entry names. Later repairs are listed under Unreleased in [CHANGELOG.md](CHANGELOG.md). Desktop behavior describes the source-built app, which has no public release. [docs/RELEASE.md](docs/RELEASE.md) owns distribution status.
 
-The scope is `keypaste-mcp`, the bridge between an AI agent and a vault. [SECURITY.md](SECURITY.md) covers the vault, CLI and project-wide limits. PRODUCT §3 governs both documents. Each threat names its evidence and remaining gaps. T-13's preview of entries currently matched by a rule remains deferred to the desktop Agent Activity screen, [STEPS 4.3b](docs/STEPS.md).
+The scope is `keypaste-mcp`, the bridge between an AI agent and a vault. [SECURITY.md](SECURITY.md) covers the vault, CLI and project-wide limits. PRODUCT §3 governs both documents. Each threat names its evidence and remaining gaps. T-13's preview of entries currently matched by a rule remains deferred to the desktop Agent Activity screen, [STEPS 4.3b](docs/STEPS.md). T-26 states the planned boundary for shares and relay drops, which are not implemented.
 
 ## What the bridge does
 
@@ -281,3 +281,21 @@ Release, dragging off, loss of pointer capture, the pointer leaving the window o
 The display remains readable to people, screenshots, recordings, screen-sharing and remote-desktop sessions. Rendering also creates an immutable string that cannot be wiped; its copies fall under T-18. Ending reveal cannot erase a capture.
 
 Evidence: `RevealedValueTests` covers hold/release, visual-tree removal, styled properties and `No_automation_property_carries_the_value_while_it_is_shown`. `SecretHygieneTests.Revealing_is_one_value_at_a_time_and_ends_with_the_hold` checks session behavior. Screen capture remains outside those guarantees.
+
+## T-26 — Shares and relay drops (planned)
+
+No share, receive or relay code exists. This entry states the boundary PRODUCT v1.4 plans (D-0176), so the rows that build it (STEPS 5.2a–c, 5.4a–b, 1.4b–c, E.1, H.8, 7.1c) are held to it.
+
+A share is a KDBX4 file holding only the chosen entries or env set under a generated six-word passphrase. A relay drop stores its bytes under an unguessable ID, at most 1 MB for at most 7 days, optionally deleted on first download, without accounts and rate-limited. The passphrase never reaches the relay; the sender sends it by a second channel. Sharing to a local file involves no relay.
+
+Anyone holding the link can download the drop and guess the passphrase offline. KDBX4's Argon2 key derivation and the passphrase's entropy are the only protection, as in T-20. When a drop is deleted on first download, a receiver who finds it gone learns that someone fetched it first and must treat the credentials as disclosed. Anyone holding both the link and the passphrase can read the share.
+
+Version 1 shares are unsigned. An attacker controlling only the link channel cannot produce a file the real passphrase opens, but one controlling both channels can substitute a share, and keypaste cannot tell. Sealing to a recipient's locally generated key and signing by the sender (7.1c) close that gap with keys exchanged by any means, and need no subscription.
+
+The relay operator, hosted or self-hosted, sees drop sizes, times, client addresses and IDs. KDBX4 encrypts entry names and values; the outer header's cipher and key-derivation parameters stay visible. ID length and rate limits bound enumeration; they do not prevent a flood from denying service.
+
+Receiving merges by UUID under D-0157, so a share can change an existing entry whose UUID it carries, and a crafted later modification time wins. The receive preview names every entry a merge would add, change or delete before anything is written, and each replaced value stays in entry history. Names inside a share are untrusted input (T-1) and can reach an agent once merged into an exposed group.
+
+Expiry is entry metadata that keypaste enforces: it refuses to inject an expired value and warns when receiving one. Other KeePass tools ignore it, a moved clock can defeat it, and it recalls nothing. A downloaded copy cannot be recalled; revocation means rotating the credential at its issuer.
+
+Evidence: none. Each row named above adds its own before this entry describes current behavior.
