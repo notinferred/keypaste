@@ -8,6 +8,7 @@ on:
     paths:
       - 'src/Keypaste.App/**'
       - 'tests/Keypaste.App.Tests/**'
+      - 'tests/Keypaste.MinimizeObserver/**'
       - 'tests/Keypaste.Consistency.Tests/**'
       - 'src/Keypaste.Cli/**'
       - 'tests/Keypaste.Cli.Tests/**'

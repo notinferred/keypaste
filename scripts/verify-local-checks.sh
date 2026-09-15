@@ -21,6 +21,7 @@ for target in keypaste.slnx keypaste.app.slnx tests/Keypaste.Consistency.Tests/K
 done
 grep -F 'bash scripts/verify-demo.sh' "$scratch/plan" >/dev/null || die 'all omits process/document checks'
 grep -F 'bash scripts/probe-results.sh --selftest' "$scratch/plan" >/dev/null || die 'all omits diagnostic fixtures'
+grep -F 'bash scripts/observe-minimize-lock.sh --selftest' "$scratch/plan" >/dev/null || die 'all omits the minimize-lock classifier fixtures'
 
 bash scripts/verify.sh desktop > "$scratch/output"
 [ "$(wc -l < "$VERIFY_COMMAND_LOG" | tr -d '[:space:]')" = 8 ] || die 'desktop must prepare and test both targets'

@@ -51,6 +51,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Keypaste.App.Tests" />
     <InternalsVisibleTo Include="Keypaste.Consistency.Tests" />
+    <InternalsVisibleTo Include="Keypaste.MinimizeObserver" />
   </ItemGroup>
 
 </Project>

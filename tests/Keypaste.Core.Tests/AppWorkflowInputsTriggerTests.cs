@@ -15,6 +15,7 @@ public sealed class AppWorkflowInputsTriggerTests
     [InlineData("scripts/verify-local-checks.sh", true)]
     [InlineData("src/Keypaste.App/ViewModels/MainViewModel.cs", true)]
     [InlineData("tests/Keypaste.App.Tests/ExampleTests.cs", true)]
+    [InlineData("tests/Keypaste.MinimizeObserver/Program.cs", true)]
     [InlineData("docs/STEPS.md", false)]
     [InlineData("src/Keypaste.Mcp/Program.cs", false)]
     [InlineData("src/Keypaste.App.Other/Example.cs", false)]

@@ -6,6 +6,7 @@
 
 | id | date | decision | supersedes |
 |---|---|---|---|
+| D-0199 | 2026-09-15 | F.2b2's runner checks drive a test-only observer, not a hook in the shipped app, because an unlock seam in a released binary risks user trust. It runs the real startup path and reads `App._session` and `_minimize` by reflection, refusing when either is missing, instead of composing through `App.Compose` and `App.Watch`. Its idle check is measured against the session's recorded deadline. Its workflow is dispatch-only; an unreachable check is unreached, and only a contradiction fails | — |
 | D-0198 | 2026-09-15 | Further milestone moves: 5.2a–c, H.7, H.8, 5.7 and 5.4a–b join Working proposition with R.0f, 3.2 and 3.3; H.1–H.6, 7.1a–c and 7.2 join Paid release; 5.3a–d, 4.10a–b, M.1–M.3, 5.6 and 3.10b move to Expansion with Needs unchanged apart from D-0183. K.4, K.5 and P.0 drop to one line, their detail written when a row is picked | milestone placement of those rows |
 | D-0197 | 2026-09-15 | Moved to Expansion with Needs unchanged, because no v1.4 journey exercises them: K.4, K.5, P.0, V.1a–b, V.3a–b, V.4a–b, V.5a–b, V.7, V.8a–b, V.9, 9.1a–f, 9.2a–b, 4.5, 4.3b, 4.4b, 4.6, 9.4, 3.10a, 1.5a, 8.1, 8.3a–e, 8.2b and 8.4a–b | their Working proposition placement |
 | D-0196 | 2026-09-15 | 3.2 Ships after R.0f and founder daily use of that release instead of R.1, and 3.2 and 3.3 follow R.0f in Working proposition: the introduction describes the released CLI with its repairs, not the unfinished desktop journey | 3.2's Ships after R.1 |
