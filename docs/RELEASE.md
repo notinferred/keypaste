@@ -36,7 +36,7 @@ A desktop release is complete when every supported target is published and insta
 | OS / CPU | RID | Public CLI/MCP | OS floor | Floor evidence | Desktop package in CI | Public desktop installer |
 |---|---|---|---|---|---|---|
 | Windows x64 | `win-x64` | ZIP; unsigned | Windows 10 1809 or later | `cited`; .NET 10 floor, no installation on the floor | Self-contained ZIP; internal unsigned per-user MSI | None |
-| macOS ARM64 | `osx-arm64` | tar.gz; unnotarized | macOS 13 or later | `cited`; .NET 10 floor, no installation on the floor | Self-contained tar.gz | None |
+| macOS ARM64 | `osx-arm64` | tar.gz; unnotarized | macOS 13 or later | `cited`; .NET 10 floor, no installation on the floor | Self-contained tar.gz | None; deferred to Expansion (D-0201) |
 | Linux x64 | `linux-x64` | tar.gz | glibc 2.35 | `container-check`; Debian 12 runs it, Alpine refuses it | Self-contained tar.gz; glibc 2.39 | None |
 | Linux ARM64 | `linux-arm64` | tar.gz | glibc 2.35 | `unverified`; same build inputs as x64, no container check | None; RID declared but absent from package matrix | None |
 | macOS Intel / Windows ARM64 | `osx-x64` / `win-arm64` | Source route | No claim | `none` | None | None |
@@ -79,8 +79,8 @@ Manual dispatch rehearses the build and verification without publishing. The fol
 STEPS records implementation status and acceptance evidence for these requirements.
 
 1. One version and supported matrix. R.0a implements recording and reconciliation through `release-targets.json`. Each advertised target has a runner, CPU, package format, OS floor and evidence. Advertised binaries and `source_only` routes remain separate; `published` is append-only. Workflows and publication allowlists derive from the definition, while projects and download pages are checked against it. Preserve full prerelease versions and exact changelog-heading matches. Native installation evidence belongs to R.0c and 4.7b.
-2. Installable desktop packages. Provide a signed Windows installer and payload, a signed and notarized macOS app in a stapled DMG, and a Linux AppImage or documented package tested on its runtime floor. Free downloads receive the same signing. Browser downloads retain normal OS security checks.
-3. Publisher verification. Check Windows signature, publisher and timestamp; check macOS signing, notarization and Gatekeeper assessment. Retain clean-machine prompts. A signature does not guarantee SmartScreen reputation, as [Microsoft documents](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation). Same-origin checksums alone cannot authenticate a publisher, so every CLI/MCP asset after `v0.2.0` carries a build attestation checked by the procedure in [SECURITY](../SECURITY.md#verifying-a-release); an attestation authenticates origin and is not a signature or a reproducibility claim.
+2. Installable desktop packages. Provide a signed Windows installer and payload and a Linux AppImage or documented package tested on its runtime floor. The signed and notarized macOS app in a stapled DMG is deferred to Expansion with the macOS desktop app (D-0201). Free downloads receive the same signing. Browser downloads retain normal OS security checks.
+3. Publisher verification. Check Windows signature, publisher and timestamp. macOS signing, notarization and Gatekeeper assessment are deferred to Expansion with 3.5b (D-0201); until then the macOS CLI stays unsigned and un-notarized as disclosed. Retain clean-machine prompts. A signature does not guarantee SmartScreen reputation, as [Microsoft documents](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation). Same-origin checksums alone cannot authenticate a publisher, so every CLI/MCP asset after `v0.2.0` carries a build attestation checked by the procedure in [SECURITY](../SECURITY.md#verifying-a-release); an attestation authenticates origin and is not a signature or a reproducibility claim.
 4. Anonymous public installation. Download every promised asset without repository credentials, verify hashes and applicable signatures, install without an SDK, and check its version and advertised workflows. Cover injection, approval and setup where released. Desktop checks require native rendering, vault operations and CLI/app interoperability; create fixtures through the CLI until GUI creation ships. Keep the [manual checklist](desktop.md#checking-a-build-by-hand) for behavior automation cannot observe. CLI patches do not depend on unfinished desktop features.
 5. Complete publication before promotion. R.0b implements the completion record and public-asset verification. Verify every release before changing download pages, package-manager entries or update channels, and keep the last verified release advertised until its replacement passes. A partial upload requires a new version because published paths cannot be overwritten or reused. The recovery procedure and last-known-good promotion mechanism remain open.
 6. Upgrade, uninstall and recovery. Test upgrades with existing vaults, settings and client connections. Define uninstall behavior while retaining user vaults. Test interrupted upgrades and recovery, retain previous installers, record backward readability, and document backup restoration when required. Automatic updates require a verified update path.
@@ -100,8 +100,8 @@ STEPS owns task status and prerequisites.
 | Advertised-download defect disclosure | R.0d |
 | Shared release definition, complete publication and provenance | R.0a, R.0b, 3.8 |
 | Public CLI/MCP patch and native installation | R.0c |
-| Desktop packaging, installation and upgrades | 4.7a, 4.7b, 4.7d |
-| Signing identity and integration | 3.5a/b, 3.6a/b |
+| Desktop packaging, installation and upgrades | 4.7a, 4.7b, 4.7d; macOS 4.7a2 and 4.7e in Expansion |
+| Signing identity and integration | 3.6a/b; macOS 3.5a/b in Expansion |
 | Public signed desktop and CLI downloads and the developer journey | 4.7c, R.1 |
 | Chrome and Firefox publication | 8.4a/b |
 | Self-hosted and hosted drop relay | 5.2c, H.8 |

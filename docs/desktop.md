@@ -130,7 +130,7 @@ CI builds and packages on three operating systems; the current desktop logic tes
 7. Suspend the machine for longer than the timeout. It wakes locked.
 8. The theme follows the OS, and both light and dark read as calm. Choose Dark, quit and relaunch: the first frame is dark, with no flash of the light one on the way.
 9. Set `idle_timeout_seconds = 137` in `app.toml` and relaunch. Settings must display it, locking must occur at 137 seconds, and the file must remain unchanged.
-10. Set a long idle timeout to isolate minimize locking. Enable "Lock when the window is minimized", minimize and restore: expect the unlock screen. Disable it, minimize and restore: expect an unlocked vault and a running idle countdown. Enable it again, quit and relaunch without opening Settings; minimizing must lock. A password copied before locking must no longer paste. `docs/STEPS.md` F.2b2 owns platform results; macOS and Linux remain unobserved.
+10. Set a long idle timeout to isolate minimize locking. Enable "Lock when the window is minimized", minimize and restore: expect the unlock screen. Disable it, minimize and restore: expect an unlocked vault and a running idle countdown. Enable it again, quit and relaunch without opening Settings; minimizing must lock. A password copied before locking must no longer paste. `docs/STEPS.md` F.2b2 owns the runner results for macOS and Linux; the real-desktop record is deferred to Expansion as F.2b3.
 11. The Log screen matches `keypaste log` for the same `~/.keypaste/audit.jsonl`.
 12. Agent Activity says the right thing both with and without a `keypaste agent` running.
 13. Entries lists titles and groups. Filter by a group and search for part of a title or group path; case changes still match. Selecting an entry shows a username, a URL and notes, and a row of dots where the password is.
@@ -147,7 +147,7 @@ CI builds and packages on three operating systems; the current desktop logic tes
 
 ## Observing minimize-lock on macOS and Linux
 
-Item 10 has been observed on Windows. macOS and Linux require native checks because headless tests cannot establish what their window managers report. `docs/STEPS.md` F.2b2 owns the results: it drives these checks on `macos-15` and an Xvfb Linux runner as far as those sessions allow, and a real macOS machine and Linux desktop record only what a runner cannot observe.
+Item 10 has been observed on Windows. macOS and Linux require native checks because headless tests cannot establish what their window managers report. `docs/STEPS.md` F.2b2 owns the results: `observe-desktop.yml` drives these checks on `macos-15` and on Xvfb with Openbox through [observe-minimize-lock.sh](../scripts/observe-minimize-lock.sh), and both passed. What a runner cannot observe, a person's own minimize click and, on macOS, the `Cmd+H` keystroke, is deferred to Expansion as F.2b3, recorded on a real macOS machine and Linux desktop.
 
 Download the seven-day `app-<rid>` artifact from `app.yml`, or publish locally:
 
@@ -166,4 +166,4 @@ Use a disposable vault and set an idle timeout long enough to exclude it as the 
 
 Switching windows must leave the app unlocked. On macOS, `Cmd+H` hides the app and must also leave it unlocked; `Cmd+M` minimizes it.
 
-Record the OS name, version and build; session type and desktop environment; app build or tag; and each result in F.2b2, following F.2b1. If a window manager reports no minimize event, record that result and update `MinimizeLock.IsSupported` to omit the unsupported checkbox. Untested targets remain unobserved.
+Record the OS name, version and build; session type and desktop environment; app build or tag; and each result in F.2b3, following F.2b1. If a window manager reports no minimize event, record that result and update `MinimizeLock.IsSupported` to omit the unsupported checkbox. Untested targets remain unobserved.

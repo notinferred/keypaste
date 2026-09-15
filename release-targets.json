@@ -141,7 +141,6 @@
         "policy": "none",
         "reason": "O-0010, O-0015",
         "until": [
-          "3.5b",
           "3.6b"
         ],
         "disclosed_in": [
