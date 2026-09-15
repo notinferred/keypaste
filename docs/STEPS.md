@@ -6,17 +6,17 @@ Only the next five steps are detailed. Later steps have one line with ID, name, 
 
 ## Current status
 
-The local vault, CLI/env workflow and approval bridge are published as `v0.2.0`, installed and exercised on all four native targets from clean runners. The desktop has partial entry/env screens in source; sharing, receiving, the drop relay, native approval and the team plan remain unimplemented. The F repairs on `main` await the 0.3.0 CLI/MCP release (R.0f). F.2b2's runner checks await their dispatch and its real-desktop record awaits a macOS machine and a Linux desktop session; its observer found F.13 on Windows.
+The local vault, CLI/env workflow and approval bridge are published as `v0.2.0`, installed and exercised on all four native targets from clean runners. The desktop has partial entry/env screens in source; sharing, receiving, the drop relay, native approval and the team plan remain unimplemented. The F repairs on `main` await the 0.3.0 CLI/MCP release (R.0f). F.2b2 closed on its runner checks on `ubuntu-24.04` and `macos-15`, and its observer found F.13 on Windows; the real-desktop record is deferred to Expansion as F.2b3.
 
 F.6, F.8, F.9, F.10, F.11 and F.12 are closed. F.9 had two worker-pool defects: the bridge's connect deadline could expire before it tried the pipe, reporting a running approver absent, and the test host blocked workers reading its anonymous pipes (D-0129). Both are repaired in `main`; `0.2.0` contains neither repair and still discloses the first defect (D-0126). F.11's torn KDF registry was reached only by in-process test concurrency; KeePassInterop now builds it once before any vault (D-0133). F.10a measured F.10's overrun: a doomed save spends its extra time before the first attempt queued at the in-process save gate behind other saves' key derivation and encryption, while its own attempts cost almost nothing (D-0134). F.10b gates only attempts over an existing vault file, which are the only ones that transact, so doomed and first saves no longer queue (D-0136). F.12 releases the gate before each retry sleep and re-reads after taking it again, so a save queued behind an in-process commit is refused rather than reverting it (D-0137).
 
-Release foundations are closed through 3.8. Download pages mark `0.1.0` superseded, and the pages, release definition and keypaste.com advertise `0.2.0`. R.0e corrected live deployment after finding D-0121's workflow had never deployed. The unadvertised `0.2.1-rc.2` is the first release published with a manifest and a build attestation that a logged-out `gh` verifies (D-0138); `0.2.0` has none. The unadvertised `0.2.1-rc.3` tag also built the first internal, unsigned Windows MSI (4.7a1, D-0139), kept as a workflow artifact. R.1 still requires desktop vault creation and secret entry, env mapping with expiry refusal, share and receive through a hosted drop relay that is also self-hostable, native approval and history recovery, with signing and publication of both the desktop app and the CLI.
+Release foundations are closed through 3.8. Download pages mark `0.1.0` superseded, and the pages, release definition and keypaste.com advertise `0.2.0`. R.0e corrected live deployment after finding D-0121's workflow had never deployed. The unadvertised `0.2.1-rc.2` is the first release published with a manifest and a build attestation that a logged-out `gh` verifies (D-0138); `0.2.0` has none. The unadvertised `0.2.1-rc.3` tag also built the first internal, unsigned Windows MSI (4.7a1, D-0139), kept as a workflow artifact. R.1 still requires desktop vault creation and secret entry, env mapping with expiry refusal, share and receive through a hosted drop relay that is also self-hostable, native approval and history recovery, with signing and publication of the Windows and Linux desktop apps and the CLI/MCP on all four current targets; the macOS desktop app and all macOS signing are deferred to Expansion (D-0201).
 
 ## Build order
 
 | Milestone | Completion or activation |
 |---|---|
-| Working proposition | A signed, published desktop app and CLI in which a developer keeps, injects, shares and receives env and approves agents in a native dialog, with the hosted drop relay live and self-hostable; R.1 verifies it |
+| Working proposition | Signed, published Windows and Linux desktop apps and the CLI/MCP on all four current targets, in which a developer keeps, injects, shares and receives env and approves agents in a native dialog, with the hosted drop relay live and self-hostable; R.1 verifies it |
 | Pilot ready | Invited small teams share production env through the hosted relay over an observed period, with restore by redeployment; R.2 verifies it |
 | Paid release | The team plan: hosted directory, revocation, attribution, team audit and policy, with billing, support and independent review; R.3 verifies it |
 | Expansion | Whole-vault managed sync, browser filling, importers, phone approval, the remaining KeePassXC baseline and the OIDC/SCIM tier |
@@ -96,19 +96,19 @@ The [current release matrix](RELEASE.md#current-distribution--2026-09-07) owns p
 
 ## Working proposition
 
-A developer can install the signed desktop app and CLI, create a vault, store an existing secret, keep and inject a project's env, share an env set and receive one, approve an agent request in a native dialog, recover an ordinary mistake and read the audit, with the hosted drop relay live and self-hostable. Build through the shared core; desktop, CLI and relay steps name their surfaces. No account is required. R.1 closes the milestone only after the published product passes this journey.
+A developer can install the signed Windows or Linux desktop app and the CLI/MCP, which ships for Windows, macOS and Linux, create a vault, store an existing secret, keep and inject a project's env, share an env set and receive one, approve an agent request in a native dialog, recover an ordinary mistake and read the audit, with the hosted drop relay live and self-hostable. Build through the shared core; desktop, CLI and relay steps name their surfaces. No account is required. The macOS desktop app, its packaging and all macOS signing are Expansion work (D-0201); the macOS CLI stays advertised, unsigned and un-notarized as disclosed. R.1 closes the milestone only after the published product passes this journey.
 
 ### Repair existing behavior
 
 The bounded 2026-09-07 review found these while the local Windows suites reported 1,169 passed and five platform-specific skips. Each needs a regression that fails before the fix, recorded in repository fixtures rather than a maintainer's temporary files.
 
-- [ ] **F.2b2 — Observe minimize-lock on macOS and Linux.** Needs: F.2b1. — **Input:** one record per OS from a real macOS machine and a real Linux X11/XWayland desktop, entered in this row, covering only what a runner cannot observe: the window manager's own minimize control and, on macOS, `Cmd+H` in a logged-in session. A contradiction from either source opens its own F row against [MinimizeLock](../src/Keypaste.App/MinimizeLock.cs).
+- [x] **F.2b2 — Observe minimize-lock on macOS and Linux.** Needs: F.2b1. — Closed on runner observation; the real-desktop record is deferred to Expansion as F.2b3 (D-0200).
   **Build:** `tests/Keypaste.MinimizeObserver` starts the real `App` composition on the platform backend, unlocks a disposable vault through the unlock screen and reports window states, lock reasons and the clipboard as JSON lines; nothing is added to the shipped app (D-0199). [observe-minimize-lock.sh](../scripts/observe-minimize-lock.sh) minimizes and restores it from outside the process (xdotool under Xvfb and openbox, System Events on macOS) for the three [desktop checks](desktop.md#observing-minimize-lock-on-macos-and-linux), `Cmd+H` on macOS and an unwired control, and classifies each check as pass, contradiction or unreached. The dispatch-only `observe-desktop.yml` runs it on `ubuntu-24.04` and `macos-15`.
   **Verify (V-F.2b2):** `--selftest` classifies fixture logs, including a minimize without a lock, a lock while disabled, an idle deadline moved after minimize, an idle lock late against its recorded deadline, a changed `app.toml` and a missing minimize; locally on Windows and on Linux in Docker, the wired checks pass and the unwired control shows a minimize with no lock; one dispatch records, per runner, which checks were reached and that none contradicts. Windows' disabled check is F.13's contradiction.
+  **Runner record:** observe-desktop run 35014816424 at `9b18750`, 2026-09-15, none contradicting. `ubuntu-24.04` (Ubuntu 24.04.5, image 20260907.300.1, Xvfb, Openbox 3.6.1, xdotool 3.20160805.1) passed enabled, control, disabled (idle lock 1 ms after its deadline) and restart. `macos-15` (macOS 15.7.9 24G830, image 20260907.0337.1) passed the same four, minimizing through the window's `AXMinimizeButton`, idle lock 12 ms late, and passed cmd-h, where hiding the process deactivated the window and nothing locked. Unreached: a restore under a resting pointer on macOS, whose driver cannot place one; a person's click on the minimize control; and a `Cmd+H` keystroke. F.2b3 owns those.
 - [ ] **F.13 — A window restored under a resting pointer is not activity.** Needs: none. — **Found** by F.2b2's observer on Windows 10 Pro 19045, 2026-09-15, setting off, cursor parked at the window's centre: 10 ms after `SW_RESTORE` a `PointerMoved` at that unmoved position reached `App.OnPointerMoved`, whose `Touch()` moved the idle deadline from 63,389 to 71,926 ms, and the lock came 3 ms after the moved deadline. Under Xvfb and Openbox the same restore raised no move and the lock came 10 ms after its deadline. [App](../src/Keypaste.App/App.axaml.cs) says activation is not activity; desktop.md check 2 says the countdown arrives on time. The observation is the `idle-restore-touched` fixture in [observe-minimize-lock.sh](../scripts/observe-minimize-lock.sh).
   **Build:** have the activity watch count pointer movement only when a person could have caused it, and have `Touch()` lock rather than extend once the deadline has passed. A synthesized move that beats `Reevaluate` on waking past the timeout would otherwise contradict `A_suspended_machine_wakes_locked_even_though_the_timer_never_fired`, which THREATS T-23 cites.
   **Verify (V-F.13):** two headless regressions, each red before the repair and green after: a pointer move at an unchanged position after a restore does not touch the session, and a `Touch()` arriving after the deadline has passed locks the vault instead of reviving it; ordinary pointer movement still defers the lock, and the Windows `disabled` observation turns from contradiction to pass.
-
 ### Release the repaired CLI and introduce it
 
 The F repairs on `main` reach users as a CLI/MCP release before the desktop journey is finished, and the community introduction follows that release and founder daily use (D-0176).
@@ -119,22 +119,17 @@ The F repairs on `main` reach users as a CLI/MCP release before the desktop jour
 
 ### Desktop packages and platform signing
 
-Each packaging child uses [release-targets.json](../release-targets.json) through [app.yml](../.github/workflows/app.yml), preserves the prerelease suffix and keypaste publisher, and labels unsigned candidates internal everywhere. A request for a signed package must fail closed when its identity is missing; 3.5b and 3.6b own signing. An artifact establishes Packaged only; real installation remains 4.7b and public distribution remains 4.7c.
+Each packaging child uses [release-targets.json](../release-targets.json) through [app.yml](../.github/workflows/app.yml), preserves the prerelease suffix and keypaste publisher, and labels unsigned candidates internal everywhere. A request for a signed package must fail closed when its identity is missing; 3.6b owns signing. An artifact establishes Packaged only; real installation remains 4.7b and public distribution remains 4.7c.
 
-- [ ] **4.7a — Prepare desktop installers and prerelease candidates.** Needs: 4.7a1, 4.7a2, 4.7a3. — Aggregate: all three platform candidates and the shared release-matrix checks pass before downstream work may treat packaging as complete. 4.7a1 is complete. Each sibling declares its package in the same `packages` shape that `verify-release-matrix.sh` already checks, and chooses its tool by D-0139 and D-0140's test: pinned through a hashed restore, and inspectable without running it.
-- [ ] **4.7a2 — Package an internal macOS bundle and DMG.** Needs: R.0a, F.4b.
-  **Build:** extend `app.yml`'s `osx-arm64` job to assemble `Keypaste.app` with an `Info.plist` carrying the full version and keypaste identity, and place it in a DMG made with `hdiutil`, which ships with macOS and mounts read-only without running anything, so it passes D-0140's test with no pin. Declare both in [release-targets.json](../release-targets.json), preserve the prerelease suffix and label the artifact internal and unnotarized. Signing and notarization (3.5b) and installation (4.7b) stay out of scope.
-  **Verify (V-4.7a2):** a candidate-tag run uploads a DMG whose bundle, mounted with `hdiutil attach -readonly -nobrowse`, reports the definition's version and publisher, and whose executable passes `--selftest` from inside the bundle; `verify-release-matrix.sh` refuses an undeclared or mislabelled macOS package. The publisher check reads only Info.plist strings this step writes; proof of the publisher is 3.5b's signature.
+- [ ] **4.7a — Prepare desktop installers and prerelease candidates.** Needs: 4.7a1, 4.7a3. — Aggregate: the Windows and Linux candidates and the shared release-matrix checks pass before downstream work may treat packaging as complete. 4.7a1 is complete. Each sibling declares its package in the same `packages` shape that `verify-release-matrix.sh` already checks, and chooses its tool by D-0139 and D-0140's test: pinned through a hashed restore, and inspectable without running it.
 - [ ] **4.7a3 — Package an internal Linux AppImage.** Needs: R.0a, F.4b.
   **Build:** extend `app.yml`'s `linux-x64` job to wrap the published self-contained payload in an AppImage whose desktop entry and metadata carry the full version and keypaste identity. The tool is appimagetool 1.9.1, pinned by the SHA-256 of its tagged release asset as `ci.yml` pins KeePassXC, and the AppImage is inspected with the distribution's `unsquashfs` at the squashfs offset, never by running it (D-0142). Declare the AppImage in [release-targets.json](../release-targets.json), preserve the prerelease suffix in its version and file name and label it internal and unsigned. Installation (4.7b) stays out of scope.
   **Verify (V-4.7a3):** a candidate-tag run uploads an AppImage whose embedded version, suffix and publisher match the definition, read with `unsquashfs` without executing the file, and whose unpacked payload passes `--selftest`; the job refuses an appimagetool whose hash differs from the pin; `verify-release-matrix.sh` refuses an undeclared or mislabelled Linux package. The publisher check reads only metadata this step writes.
-- [ ] **3.5a — Enable the macOS signing identity (H-0015).** Human. Needs: none. — External Apple Developer enrollment as keypaste; repository-scoped Developer ID Application and notarization credentials; a runner identifies the certificate and signs, notarizes and staples a throwaway binary, retaining team ID and expiry. Enrollment alone does not complete 3.5b.
 - [ ] **3.6a — Enable the Windows signing identity (H-0017).** Human. Needs: none. — A Microsoft Artifact Signing identity as keypaste, or an OV certificate in a cloud HSM only if Artifact Signing refuses eligibility (D-0143), repository-scoped with no key retained beyond a job; on `windows-2025`, timestamp a throwaway binary, verify publisher with `signtool verify /pa /v` and reject a changed byte; retain issuer, timestamp authority and expiry. Enrollment alone does not complete 3.6b.
-- [ ] **3.5b — Sign and notarize macOS release payloads.** Needs: 4.7a2. — **Input:** 3.5a's Developer ID Application `.p12` and its password, an App Store Connect API key (`.p8`, key ID, issuer ID) and the team ID, as repository secrets. Sign, notarize and staple the app bundle and the CLI/MCP binaries `release.yml` publishes, and fail closed when the identity is absent. Until the input exists the verifier runs on an ad-hoc `codesign -s -` identity and a fake `xcrun notarytool` and `stapler`, and nothing records the payload as signed (D-0145).
 - [ ] **3.6b — Sign Windows executables and installers.** Needs: 4.7a1. — **Input:** 3.6a's Artifact Signing endpoint, account, certificate profile and OIDC client ID, as repository variables. Authenticode-sign and timestamp the app payload, the installer and the CLI/MCP executables `release.yml` publishes through `signtool /dlib` (D-0143), fail closed when the identity is absent, and record the real install prompts. Until the input exists the verifier signs with a certificate generated in the job and trusted only on that runner, `signing.policy` stays `none`, and the dlib path stays unexercised (D-0144).
 - [ ] **4.7b — Exercise native desktop installation candidates.** Needs: 4.7a. — Install each candidate and complete first render, vault operations, env run and approval on every supported target with the screens the build contains, creating vaults through the CLI until GUI creation ships (D-0146).
 - [ ] **4.7d — Preserve user data through upgrade, uninstall and recovery.** Needs: 4.7a. — Prove an upgrade keeps vaults, history and settings, and that uninstall leaves user vaults alone. Each platform builds an unpublished synthetic pair of distinct numeric versions from one commit, because D-0139 cannot order candidates of one numeric version; the real-release upgrade is a dated observation at 4.7c (D-0147).
-- [ ] **4.7c — Publish and verify signed desktop and CLI downloads.** Needs: 4.7a. Ships after: 3.5b, 3.6b, 4.7b, 4.7d, F.2b2. — Build the desktop and CLI publication path against fake-R2 fixtures, including the Homebrew cask generated from the published DMG and its hash; then put the checked, signed desktop candidates and CLI/MCP binaries at permanent public URLs, re-run the checks against the public bytes, and record the first real-release upgrade as a dated observation (D-0148).
+- [ ] **4.7c — Publish and verify signed desktop and CLI downloads.** Needs: 4.7a. Ships after: 3.6b, 4.7b, 4.7d, F.2b2. — Build the Windows and Linux desktop and CLI publication path against fake-R2 fixtures; then put the checked, signed desktop candidates and CLI/MCP binaries at permanent public URLs, re-run the checks against the public bytes, and record the first real-release upgrade as a dated observation (D-0148).
 
 ### Create a vault and store an existing secret
 
@@ -170,7 +165,7 @@ Each packaging child uses [release-targets.json](../release-targets.json) throug
 
 ### Product acceptance
 
-- [ ] **R.1 — Verify the working share-and-approve product.** Needs: 4.7c, 4.8, 4.9, E.1, 5.4a, 5.4b, 1.4c, 4.4, V.2b, 2.4, H.8, 5.2c, 5.7. — **Milestone gate:** on public signed downloads a developer creates a vault, stores an existing secret, keeps and injects a project's env, shares an env set through the hosted drop relay and receives one, approves an agent request in the native dialog, recovers a mistake from entry history and reads the audit; the same share also passes through a self-hosted relay (D-0177).
+- [ ] **R.1 — Verify the working share-and-approve product.** Needs: 4.7c, 4.8, 4.9, E.1, 5.4a, 5.4b, 1.4c, 4.4, V.2b, 2.4, H.8, 5.2c, 5.7. — **Milestone gate:** on public downloads, with the Windows and Linux desktop apps signed and the CLI/MCP on all four current targets, a developer creates a vault, stores an existing secret, keeps and injects a project's env, shares an env set through the hosted drop relay and receives one, approves an agent request in the native dialog, recovers a mistake from entry history and reads the audit; the same share also passes through a self-hosted relay (D-0177).
 
 ## Pilot ready
 
@@ -236,7 +231,6 @@ Each step follows its own Needs; publication follows its Ships after gates. Comp
 - [ ] **V.8b — Manage attachments from the app.** Needs: V.8a, 4.9. — Attachment controls that never auto-open or execute a file.
 - [ ] **V.9 — Report local password health.** Needs: V.5a, 4.2. — Find weak, reused and expired credentials locally, with no network request.
 - [ ] **4.10a — Add Windows quick unlock.** Needs: V.1b. — Optional: resume a local session with Windows authentication, keeping the full unlock path intact. Required later by P.9.
-- [ ] **4.10b — Add macOS quick unlock.** Needs: V.1b. — Optional: the macOS equivalent under the same session policy. Required later by P.9.
 
 ### Importers and TOTP
 
@@ -255,10 +249,23 @@ Each step follows its own Needs; publication follows its Ships after gates. Comp
 - [ ] **4.5 — Define and measure the daily-use tasks.** Needs: 4.2. — `docs/ux.md` with numeric thresholds for create, find, copy, restore, inject, approve, deny and fill, measured by automated step and keystroke counts. Every threshold stores `origin: draft`; a failing test refuses a draft threshold deciding any gate or published usability claim, and the row's status reads built on drafts, review pending, never done. Review precedes the first gate or published claim that relies on a threshold (D-0156, D-0194).
 - [ ] **4.3b — Show live agent activity and effective controls.** Needs: 4.3a. — Pending requests, audit history, live counts and per-client pause; an absent agent reads unavailable, not zero.
 - [ ] **4.4b — Start and stop the approver from a user action.** Needs: 4.4. — Run one approval end to end without a terminal, with unlock input owned by the approver process.
+- [ ] **F.2b3 — Record minimize-lock on real macOS and Linux desktops.** Needs: F.2b2. — **Input:** one record per OS from a real macOS machine and a real Linux X11/XWayland desktop, entered in this row, covering only what a runner cannot observe: the window manager's own minimize control and, on macOS, `Cmd+H` in a logged-in session. A contradiction from either source opens its own F row against [MinimizeLock](../src/Keypaste.App/MinimizeLock.cs) (D-0200).
 - [ ] **4.6 — Exercise actual desktop rendering.** Needs: F.2d. — Headless Skia render tests that go red if a typed character ever appears on screen or in the automation tree.
 - [ ] **9.4 — Publish a versioned compatibility result.** Needs: V.1a, V.8a, 9.1a, 9.2a, 1.4b. Ships after: V.1b, V.7, V.8b, 9.1f, 9.2b, 1.4c. — Extend both KeePassXC gate directions over the finished workflows and record the upstream version tested.
 - [ ] **3.10a — Ship the local product guides.** Needs: 4.2. — Version-correct guides for every shipped screen, linked from the app, and a test that fails when a screen has no guide, so each later screen's row brings its own (D-0161).
 - [ ] **1.5a — Observe Windows clipboard history behavior.** Needs: 1.5b. — Optional: prove on a real machine that a keypaste secret never reaches clipboard history; a named residual, not a blocker.
+
+### macOS desktop
+
+These rows carry the macOS desktop app, its packaging and all Apple signing, moved from Working proposition (D-0201). The macOS CLI stays advertised, unsigned and un-notarized as disclosed, until 3.5b.
+
+- [ ] **4.7a2 — Package an internal macOS bundle and DMG.** Needs: R.0a, F.4b.
+  **Build:** extend `app.yml`'s `osx-arm64` job to assemble `Keypaste.app` with an `Info.plist` carrying the full version and keypaste identity, and place it in a DMG made with `hdiutil`, which ships with macOS and mounts read-only without running anything, so it passes D-0140's test with no pin. Declare both in [release-targets.json](../release-targets.json), preserve the prerelease suffix and label the artifact internal and unnotarized. Signing and notarization (3.5b) and installation (4.7b) stay out of scope.
+  **Verify (V-4.7a2):** a candidate-tag run uploads a DMG whose bundle, mounted with `hdiutil attach -readonly -nobrowse`, reports the definition's version and publisher, and whose executable passes `--selftest` from inside the bundle; `verify-release-matrix.sh` refuses an undeclared or mislabelled macOS package. The publisher check reads only Info.plist strings this step writes; proof of the publisher is 3.5b's signature.
+- [ ] **3.5a — Enable the macOS signing identity (H-0015).** Human. Needs: none. — External Apple Developer enrollment as keypaste; repository-scoped Developer ID Application and notarization credentials; a runner identifies the certificate and signs, notarizes and staples a throwaway binary, retaining team ID and expiry. Enrollment alone does not complete 3.5b.
+- [ ] **3.5b — Sign and notarize macOS release payloads.** Needs: 4.7a2. — **Input:** 3.5a's Developer ID Application `.p12` and its password, an App Store Connect API key (`.p8`, key ID, issuer ID) and the team ID, as repository secrets. Sign, notarize and staple the app bundle and the CLI/MCP binaries `release.yml` publishes, and fail closed when the identity is absent. Until the input exists the verifier runs on an ad-hoc `codesign -s -` identity and a fake `xcrun notarytool` and `stapler`, and nothing records the payload as signed (D-0145).
+- [ ] **4.7e — Install, preserve and publish the macOS desktop app.** Needs: 4.7a2. Ships after: 3.5b. — The macOS clauses of 4.7b, 4.7d and 4.7c (D-0201): install the candidate and complete its first render, vault operations, env run and approval; prove upgrade and uninstall keep user data; and build the publication path, including the Homebrew cask generated from the published DMG and its hash, then put the signed and notarized app at a permanent public URL.
+- [ ] **4.10b — Add macOS quick unlock.** Needs: V.1b. — Optional: the macOS equivalent under the same session policy. Required later by P.9.
 
 ### Browser integration and publication
 
@@ -311,7 +318,7 @@ Accepted scope that can run alongside hosted work. P.0 prepares the behavior con
 
 ### Distribution expansion
 
-- [ ] **3.7a — Publish Homebrew installation and updates.** Needs: R.0b. Ships after: R.1. — A CLI formula generated from completed release manifests; the desktop cask belongs to 4.7c (D-0149).
+- [ ] **3.7a — Publish Homebrew installation and updates.** Needs: R.0b. Ships after: R.1. — A CLI formula generated from completed release manifests; the desktop cask belongs to 4.7e (D-0149, D-0201).
 - [ ] **3.7b — Publish Scoop installation and updates.** Needs: R.0b. Ships after: R.1. — A Scoop bucket entry for the Windows payloads.
 - [ ] **3.7c — Publish winget installation and updates.** Needs: R.0b. Ships after: R.1. — winget manifests with stable publisher identity; closes O-0011 with its siblings.
 - [ ] **3.9a — Add macOS Intel downloads.** Needs: 4.7a2. Ships after: 3.5b, R.1. — Native `osx-x64` build, package, signing and install evidence.
@@ -367,14 +374,14 @@ Keep every ID traceable. These formerly large rows now select their first ready 
 | Previous ID | Current children / scope |
 |---|---|
 | 1.4 | 1.4a–c; keyfile support separated into V.1a/b |
-| 3.5 | 3.5a/b |
+| 3.5 | 3.5a/b, in Expansion with the macOS desktop app (D-0201) |
 | 3.6 | 3.6a/b |
 | 3.7 | 3.7a–c |
 | 3.9 | 3.9a–d |
 | 3.10 | 3.10a/b |
 | 4.3 | 4.3a/b |
-| 4.7 | 4.7a–d |
-| 4.7a | Aggregate of Windows 4.7a1, macOS 4.7a2 and Linux 4.7a3; downstream Needs still require all three |
+| 4.7 | 4.7a–e; 4.7e carries the macOS clauses of 4.7b–d (D-0201) |
+| 4.7a | Aggregate of Windows 4.7a1 and Linux 4.7a3; macOS 4.7a2 moved to Expansion with the macOS desktop app (D-0201) |
 | 5.2 | 5.2a–d; 5.2d carries the sync storage 5.2b held before it became drops |
 | 5.3 | 5.3a–d |
 | 5.4 | 5.4a/b |
@@ -387,7 +394,7 @@ Keep every ID traceable. These formerly large rows now select their first ready 
 | 9.2 | 9.2a/b |
 | 9.3 | 9.3a/b |
 | 10.2 | Independent review before paid release; its earlier Scale placement no longer defers it |
-| F.2b | F.2b1/F.2b2; the wiring closed with F.2b1, the remaining per-OS observation is F.2b2 |
+| F.2b | F.2b1/F.2b2/F.2b3; the wiring closed with F.2b1, the runner observation with F.2b2, and the real-desktop record is F.2b3 |
 | F.10 | Closed by diagnosis F.10a and repair F.10b; the gate held across retry sleeps is F.12 |
 
 An aggregate ID selects its first ready child while retaining the parent's completion gate. Other IDs that still name explicit rows select those rows: historical 3.2b is the completed essay, not a child of the future announcement. H-0015/H-0017 are signing enrollment, H-0018 payment, H-0019 hosting, H-0011 the site's pre-deploy procedure, and H-0006/H-0007 public communication. Prior decisions H-0002/H-0004/H-0008/H-0009/H-0012/H-0013/H-0014 remain answered in DECISIONS; H-0010 was never issued. The preceding roadmap is retained in git; D-0090 supersedes its MVP/Launch/Scale pricing-tier ordering.
