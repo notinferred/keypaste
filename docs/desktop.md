@@ -147,7 +147,7 @@ CI builds and packages on three operating systems; the current desktop logic tes
 
 ## Observing minimize-lock on macOS and Linux
 
-Item 10 has been observed on Windows. macOS and Linux require native checks because headless tests cannot establish what their window managers report. `docs/STEPS.md` F.2b2 owns the results.
+Item 10 has been observed on Windows. macOS and Linux require native checks because headless tests cannot establish what their window managers report. `docs/STEPS.md` F.2b2 owns the results: it drives these checks on `macos-15` and an Xvfb Linux runner as far as those sessions allow, and a real macOS machine and Linux desktop record only what a runner cannot observe.
 
 Download the seven-day `app-<rid>` artifact from `app.yml`, or publish locally:
 
