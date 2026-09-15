@@ -1,6 +1,6 @@
 # Threat model — the agent bridge
 
-This describes current source behavior. The public CLI/MCP release is `v0.2.0`, which includes exception-path auditing, display hardening and resolved entry names. Later repairs are listed under Unreleased in [CHANGELOG.md](CHANGELOG.md). Desktop behavior describes the source-built app, which has no public release. [docs/RELEASE.md](docs/RELEASE.md) owns distribution status.
+This describes current source behavior. The public CLI/MCP release is `v0.2.0`, which includes exception-path auditing, display hardening and resolved entry names. Later repairs are listed under `0.3.0` in [CHANGELOG.md](CHANGELOG.md), which is not yet published. Desktop behavior describes the source-built app, which has no public release. [docs/RELEASE.md](docs/RELEASE.md) owns distribution status.
 
 The scope is `keypaste-mcp`, the bridge between an AI agent and a vault. [SECURITY.md](SECURITY.md) covers the vault, CLI and project-wide limits. PRODUCT §3 governs both documents. Each threat names its evidence and remaining gaps. T-13's preview of entries currently matched by a rule remains deferred to the desktop Agent Activity screen, [STEPS 4.3b](docs/STEPS.md). T-26 states the planned boundary for shares and relay drops, which are not implemented.
 

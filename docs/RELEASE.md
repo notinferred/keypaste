@@ -31,7 +31,7 @@ A desktop release is complete when every supported target is published and insta
 
 ## Current distribution
 
-[release-targets.json](../release-targets.json) owns the matrix and publication dates. The public CLI/MCP release is `v0.2.0` at `https://dl.keypaste.com/v0.2.0/`. It includes `setup` and the changes listed under 0.2.0 in CHANGELOG. `v0.1.0` remains available as a superseded, immutable release. Later source changes belong to Unreleased.
+[release-targets.json](../release-targets.json) owns the matrix and publication dates. The public CLI/MCP release is `v0.2.0` at `https://dl.keypaste.com/v0.2.0/`. It includes `setup` and the changes listed under 0.2.0 in CHANGELOG. `v0.1.0` remains available as a superseded, immutable release. Source changes beyond it are listed under `0.3.0`, which is not yet published.
 
 | OS / CPU | RID | Public CLI/MCP | OS floor | Floor evidence | Desktop package in CI | Public desktop installer |
 |---|---|---|---|---|---|---|

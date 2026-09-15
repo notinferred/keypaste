@@ -2,29 +2,33 @@
 
 Published versions are available at `https://dl.keypaste.com/v<version>/` with checksums and corresponding source. CLI/MCP binaries are unsigned and un-notarized; the desktop has no public release. [RELEASE.md](docs/RELEASE.md) records platform support and verification requirements. The release workflow requires a section matching each tag.
 
-## Unreleased
+## 0.3.0
 
-Releases now publish a manifest and a Sigstore build attestation covering every asset. `gh attestation verify` with the published bundle confirms, without a GitHub account, that an asset was built by this repository's release workflow for its tag; SECURITY.md has the procedure. Attestation authenticates origin; the binaries remain unsigned and builds are not reproducible.
-
-The bridge now tries the approver connection before reporting that `keypaste agent` is absent. Previously, worker-pool contention could exhaust the deadline before the first attempt. The connection budget is unchanged.
+Upgrade from `v0.2.0` to receive the save and approval-bridge repairs below. Two of them preserve data that `v0.2.0` can lose or refuse to write. Old archives remain available and immutable.
 
 Saves re-read the vault between retries and refuse to overwrite a change made by another program while waiting. The earlier behavior, present since `0.1.0`, could replace that change with an older copy without retaining it in history. Reload the vault after a refusal.
 
+On Windows 11 24H2 and Windows Server 2025, temporary files now use a private process directory. Shared 8.3 temporary-name aliases previously allowed unrelated Keypaste or KeePass saves to exhaust the retry budget, after which the save reported failure without committing. Older Windows builds were unaffected.
+
+The bridge now tries the approver connection before reporting that `keypaste agent` is absent. Previously, worker-pool contention could exhaust the deadline before the first attempt, so a listing on a loaded machine could be told to start an approver that was already running. The connection budget is unchanged.
+
+Saving a vault file that does not exist yet no longer waits behind other saves, and a save sleeping between retries no longer holds the in-process lock that orders them. Only an attempt that can transact takes it. A save that queued behind another save committing in the same process is now refused as changed on disk rather than overwriting it.
+
 Windows saves now retry transient rename collisions. A failed save's stranded `vault.kdbx.tmp` is removed only when it can be opened exclusively.
 
-On Windows 11 24H2 and Windows Server 2025, temporary files now use a private process directory. Shared 8.3 temporary-name aliases previously allowed unrelated Keypaste or KeePass saves to exhaust the retry budget. Older Windows builds were unaffected.
-
-In the desktop source, restoring the window no longer postpones the idle lock when the pointer has not moved, and input arriving after the idle deadline locks the vault instead of extending it. On Windows a restore delivers a pointer move at the resting cursor, which previously counted as somebody being there.
+Releases now publish a manifest and a Sigstore build attestation covering every asset. `gh attestation verify` with the published bundle confirms, without a GitHub account, that an asset was built by this repository's release workflow for its tag; SECURITY.md has the procedure. Attestation authenticates origin; the binaries remain unsigned and builds are not reproducible.
 
 Fixed a race in the KeePassLib KDF registry that could throw or corrupt the engine list when several vaults were created concurrently on first use. KeePassInterop now forces registry initialization from its type initializer. Not reachable from the CLI, agent or desktop, which each open their first vault on a single thread.
 
+In the desktop source, which this release does not publish, restoring the window no longer postpones the idle lock when the pointer has not moved, and input arriving after the idle deadline locks the vault instead of extending it. On Windows a restore delivers a pointer move at the resting cursor, which previously counted as somebody being there.
+
 ## 0.2.1-rc.3
 
-Unadvertised candidate built from the source described under Unreleased. The CLI/MCP behavior matches `0.2.1-rc.2`. It exists to run the desktop packaging tag path, which now builds an internal, unsigned per-user Windows MSI kept as a workflow artifact and not published.
+Unadvertised candidate whose CLI/MCP behavior matches `0.3.0` and `0.2.1-rc.2`. It exists to run the desktop packaging tag path, which now builds an internal, unsigned per-user Windows MSI kept as a workflow artifact and not published.
 
 ## 0.2.1-rc.2
 
-Unadvertised candidate built from the source described under Unreleased. It is the first release published with a manifest and build attestation, and exists to verify them against public bytes before an advertised release relies on them. The `v0.2.1-rc.1` tag published nothing: its release guard stopped before any build.
+Unadvertised candidate whose CLI/MCP behavior matches `0.3.0`. It is the first release published with a manifest and build attestation, and exists to verify them against public bytes before an advertised release relies on them. The `v0.2.1-rc.1` tag published nothing: its release guard stopped before any build.
 
 ## 0.2.0
 
