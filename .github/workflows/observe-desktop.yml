@@ -1,0 +1,67 @@
+name: observe-desktop
+
+# F.2b2: what a runner's window manager reports when the desktop app is minimized (D-0199).
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
+  NUGET_XMLDOC_MODE: skip
+
+jobs:
+  observe:
+    name: minimize-lock (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      - name: Restore (locked) and build the observer
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet restore keypaste.app.slnx --locked-mode
+          dotnet build tests/Keypaste.MinimizeObserver -c Release --no-restore -warnaserror
+
+      - name: Start Xvfb and openbox
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y xvfb openbox xdotool libx11-6 libice6 libsm6 libfontconfig1
+          Xvfb :99 -screen 0 1280x800x24 > "$RUNNER_TEMP/xvfb.log" 2>&1 &
+          echo "DISPLAY=:99" >> "$GITHUB_ENV"
+          sleep 2
+          DISPLAY=:99 openbox > "$RUNNER_TEMP/openbox.log" 2>&1 &
+          sleep 2
+
+      - name: Observe
+        shell: bash
+        run: bash scripts/observe-minimize-lock.sh "$PWD/artifacts/bin/Keypaste.MinimizeObserver/release/Keypaste.MinimizeObserver" observation
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: observation-${{ matrix.os }}
+          path: observation/
+          if-no-files-found: error
+          retention-days: 30
