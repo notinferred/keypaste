@@ -1,25 +1,25 @@
 # Build plan
 
-This plan owns current status, build order and acceptance criteria. [PRODUCT](PRODUCT.md) owns scope, [FEATURES](FEATURES.md) the dated capability baseline, and [RELEASE](RELEASE.md) distribution requirements. [DECISIONS](../DECISIONS.md) D-0090 records the adopted structure.
+This plan owns current status, build order and acceptance criteria. [PRODUCT](PRODUCT.md) owns scope, [FEATURES](FEATURES.md) the dated capability baseline, and [RELEASE](RELEASE.md) distribution requirements. [DECISIONS](../DECISIONS.md) D-0090 records the adopted structure and D-0176 the current order.
 
 Only the next five steps are detailed. Later steps have one line with ID, name, Needs and purpose; their wording remains provisional until activated. On completion, reduce a step to one line under Completed steps and expand the next unchecked step.
 
 ## Current status
 
-The local vault, CLI/env workflow and approval bridge are published as `v0.2.0`, installed and exercised on all four native targets from clean runners. The desktop has partial entry/env screens in source; hosted service, web vault, mobile client and organization credential service remain unimplemented. F.2b2's runner checks are unbuilt, and its real-desktop record awaits a macOS machine and a Linux desktop session.
+The local vault, CLI/env workflow and approval bridge are published as `v0.2.0`, installed and exercised on all four native targets from clean runners. The desktop has partial entry/env screens in source; sharing, receiving, the drop relay, native approval and the team plan remain unimplemented. The F repairs on `main` await the 0.3.0 CLI/MCP release (R.0f). F.2b2's runner checks are unbuilt, and its real-desktop record awaits a macOS machine and a Linux desktop session.
 
 F.6, F.8, F.9, F.10, F.11 and F.12 are closed. F.9 had two worker-pool defects: the bridge's connect deadline could expire before it tried the pipe, reporting a running approver absent, and the test host blocked workers reading its anonymous pipes (D-0129). Both are repaired in `main`; `0.2.0` contains neither repair and still discloses the first defect (D-0126). F.11's torn KDF registry was reached only by in-process test concurrency; KeePassInterop now builds it once before any vault (D-0133). F.10a measured F.10's overrun: a doomed save spends its extra time before the first attempt queued at the in-process save gate behind other saves' key derivation and encryption, while its own attempts cost almost nothing (D-0134). F.10b gates only attempts over an existing vault file, which are the only ones that transact, so doomed and first saves no longer queue (D-0136). F.12 releases the gate before each retry sleep and re-reads after taking it again, so a save queued behind an in-process commit is refused rather than reverting it (D-0137).
 
-Release foundations are closed through 3.8. Download pages mark `0.1.0` superseded, and the pages, release definition and keypaste.com advertise `0.2.0`. R.0e corrected live deployment after finding D-0121's workflow had never deployed. The unadvertised `0.2.1-rc.2` is the first release published with a manifest and a build attestation that a logged-out `gh` verifies (D-0138); `0.2.0` has none. The unadvertised `0.2.1-rc.3` tag also built the first internal, unsigned Windows MSI (4.7a1, D-0139), kept as a workflow artifact. R.1 still requires daily desktop creation and editing, recovery, migration, native approvals and browser workflows, with packaging, signing, publication and observed user acceptance.
+Release foundations are closed through 3.8. Download pages mark `0.1.0` superseded, and the pages, release definition and keypaste.com advertise `0.2.0`. R.0e corrected live deployment after finding D-0121's workflow had never deployed. The unadvertised `0.2.1-rc.2` is the first release published with a manifest and a build attestation that a logged-out `gh` verifies (D-0138); `0.2.0` has none. The unadvertised `0.2.1-rc.3` tag also built the first internal, unsigned Windows MSI (4.7a1, D-0139), kept as a workflow artifact. R.1 still requires desktop vault creation and secret entry, env mapping with expiry refusal, share and receive through a hosted drop relay that is also self-hostable, native approval and history recovery, with signing and publication of both the desktop app and the CLI.
 
 ## Build order
 
 | Milestone | Completion or activation |
 |---|---|
-| Working proposition | A published desktop + browser password manager with usable env/agent workflows; R.1 verifies it |
-| Pilot ready | Managed encrypted sync with account/device controls, restore and observed operation; R.2 verifies private-beta entry |
-| Paid release | Nontechnical onboarding, a supported phone workflow, review, billing and support; R.3 verifies consumer release |
-| Expansion | Advanced KeePassXC coverage, web access and organization credentials |
+| Working proposition | A signed, published desktop app and CLI in which a developer keeps, injects, shares and receives env and approves agents in a native dialog, with the hosted drop relay live and self-hostable; R.1 verifies it |
+| Pilot ready | Invited small teams share production env through the hosted relay over an observed period, with restore by redeployment; R.2 verifies it |
+| Paid release | The team plan: hosted directory, revocation, attribution, team audit and policy, with billing, support and independent review; R.3 verifies it |
+| Expansion | Whole-vault managed sync, browser filling, importers, phone approval, the remaining KeePassXC baseline and the OIDC/SCIM tier |
 | Scale | Capacity, fleet and operational improvements |
 
 Needs name only what a step's own code or verifier cannot run without. A calendar date or usage window, a human act, a milestone or release gate, a freeze protecting a stored result and a tidier order are never Needs (D-0132). Gates decide what may ship, never what may be written: **Ships after** names the gates a built result must pass before publication, and a milestone gate's Needs are the evidence its verifier exercises. Rows marked **Human** are founder or external work on their own track; a code row needs one only when its verifier requires the artifact it produces, such as a signing identity. Protect a recorded result by versioning or voiding it, not by forbidding change.
@@ -96,13 +96,21 @@ The [current release matrix](RELEASE.md#current-distribution--2026-09-07) owns p
 
 ## Working proposition
 
-A person can install the product, create or import a vault, save and use existing credentials, recover mistakes, inject a project's env and approve or deny agent access. Build through the shared core; desktop, CLI and browser steps name their surfaces. No account is required. R.1 closes the milestone only after the published product passes its complete user journey.
+A developer can install the signed desktop app and CLI, create a vault, store an existing secret, keep and inject a project's env, share an env set and receive one, approve an agent request in a native dialog, recover an ordinary mistake and read the audit, with the hosted drop relay live and self-hostable. Build through the shared core; desktop, CLI and relay steps name their surfaces. No account is required. R.1 closes the milestone only after the published product passes this journey.
 
 ### Repair existing behavior
 
 The bounded 2026-09-07 review found these while the local Windows suites reported 1,169 passed and five platform-specific skips. Each needs a regression that fails before the fix, recorded in repository fixtures rather than a maintainer's temporary files.
 
 - [ ] **F.2b2 — Observe minimize-lock on macOS and Linux.** Needs: F.2b1. — **Input:** one record per OS from a real macOS machine and a real Linux X11/XWayland desktop, entered in this row, covering only what a runner cannot observe: the window manager's own minimize control and, on macOS, `Cmd+H` in a logged-in session. Drive the three [desktop checks](desktop.md#observing-minimize-lock-on-macos-and-linux) on `macos-15` and on an Xvfb Linux runner with a window manager as far as those sessions allow, recording which checks each runner reaches. A contradiction from either source opens its own F row against [MinimizeLock](../src/Keypaste.App/MinimizeLock.cs).
+
+### Release the repaired CLI and introduce it
+
+The F repairs on `main` reach users as a CLI/MCP release before the desktop journey is finished, and the community introduction follows that release and founder daily use (D-0176).
+
+- [ ] **R.0f — Publish the 0.3.0 CLI/MCP release carrying the F repairs.** Needs: F.6, F.9, F.10b, F.11, F.12. — Tag `v0.3.0` with its changelog section, publish it with its manifest and attestation, install it on all four targets through `install.yml`, and move the download pages, release definition and disclosures off `0.2.0`'s defects (D-0195).
+- [ ] **3.2 — Publish the initial community introduction (H-0006).** Human. Needs: none. Ships after: R.0f, and founder daily use of that release (PRODUCT §5.2). — Refresh [launch.md](../launch.md) for the product actually released, then post once per sanctioned channel (D-0196).
+- [ ] **3.3 — Answer the community introduction's feedback (H-0007).** Human. Needs: 3.2. — Closes when every issue and comment received on the sanctioned channels since 3.2 is classified as bug, known gap, documentation misunderstanding or design disagreement and answered, security reports have moved to `security@keypaste.com`, misleading documentation is corrected and bugs and gaps are recorded in STEPS or the Ideas table.
 
 ### Desktop packages and platform signing
 
@@ -117,56 +125,116 @@ Each packaging child uses [release-targets.json](../release-targets.json) throug
   **Verify (V-4.7a3):** a candidate-tag run uploads an AppImage whose embedded version, suffix and publisher match the definition, read with `unsquashfs` without executing the file, and whose unpacked payload passes `--selftest`; the job refuses an appimagetool whose hash differs from the pin; `verify-release-matrix.sh` refuses an undeclared or mislabelled Linux package. The publisher check reads only metadata this step writes.
 - [ ] **3.5a — Enable the macOS signing identity (H-0015).** Human. Needs: none. — External Apple Developer enrollment as keypaste; repository-scoped Developer ID Application and notarization credentials; a runner identifies the certificate and signs, notarizes and staples a throwaway binary, retaining team ID and expiry. Enrollment alone does not complete 3.5b.
 - [ ] **3.6a — Enable the Windows signing identity (H-0017).** Human. Needs: none. — A Microsoft Artifact Signing identity as keypaste, or an OV certificate in a cloud HSM only if Artifact Signing refuses eligibility (D-0143), repository-scoped with no key retained beyond a job; on `windows-2025`, timestamp a throwaway binary, verify publisher with `signtool verify /pa /v` and reject a changed byte; retain issuer, timestamp authority and expiry. Enrollment alone does not complete 3.6b.
-- [ ] **3.5b — Sign and notarize macOS release payloads.** Needs: 4.7a2. — **Input:** 3.5a's Developer ID Application `.p12` and its password, an App Store Connect API key (`.p8`, key ID, issuer ID) and the team ID, as repository secrets. Sign, notarize and staple, and fail closed when the identity is absent. Until the input exists the verifier runs on an ad-hoc `codesign -s -` identity and a fake `xcrun notarytool` and `stapler`, and nothing records the payload as signed (D-0145).
-- [ ] **3.6b — Sign Windows executables and installers.** Needs: 4.7a1. — **Input:** 3.6a's Artifact Signing endpoint, account, certificate profile and OIDC client ID, as repository variables. Authenticode-sign and timestamp the payloads and installer through `signtool /dlib` (D-0143), fail closed when the identity is absent, and record the real install prompts. Until the input exists the verifier signs with a certificate generated in the job and trusted only on that runner, `signing.policy` stays `none`, and the dlib path stays unexercised (D-0144).
+- [ ] **3.5b — Sign and notarize macOS release payloads.** Needs: 4.7a2. — **Input:** 3.5a's Developer ID Application `.p12` and its password, an App Store Connect API key (`.p8`, key ID, issuer ID) and the team ID, as repository secrets. Sign, notarize and staple the app bundle and the CLI/MCP binaries `release.yml` publishes, and fail closed when the identity is absent. Until the input exists the verifier runs on an ad-hoc `codesign -s -` identity and a fake `xcrun notarytool` and `stapler`, and nothing records the payload as signed (D-0145).
+- [ ] **3.6b — Sign Windows executables and installers.** Needs: 4.7a1. — **Input:** 3.6a's Artifact Signing endpoint, account, certificate profile and OIDC client ID, as repository variables. Authenticode-sign and timestamp the app payload, the installer and the CLI/MCP executables `release.yml` publishes through `signtool /dlib` (D-0143), fail closed when the identity is absent, and record the real install prompts. Until the input exists the verifier signs with a certificate generated in the job and trusted only on that runner, `signing.policy` stays `none`, and the dlib path stays unexercised (D-0144).
 - [ ] **4.7b — Exercise native desktop installation candidates.** Needs: 4.7a. — Install each candidate and complete first render, vault operations, env run and approval on every supported target with the screens the build contains, creating vaults through the CLI until GUI creation ships (D-0146).
 - [ ] **4.7d — Preserve user data through upgrade, uninstall and recovery.** Needs: 4.7a. — Prove an upgrade keeps vaults, history and settings, and that uninstall leaves user vaults alone. Each platform builds an unpublished synthetic pair of distinct numeric versions from one commit, because D-0139 cannot order candidates of one numeric version; the real-release upgrade is a dated observation at 4.7c (D-0147).
-- [ ] **4.7c — Publish and verify signed desktop downloads.** Needs: 4.7a. Ships after: 3.5b, 3.6b, 4.7b, 4.7d, F.2b2. — Build the desktop publication path against fake-R2 fixtures, including the Homebrew cask generated from the published DMG and its hash; then put the checked, signed candidates at permanent public URLs, re-run the checks against the public bytes, and record the first real-release upgrade as a dated observation (D-0148).
+- [ ] **4.7c — Publish and verify signed desktop and CLI downloads.** Needs: 4.7a. Ships after: 3.5b, 3.6b, 4.7b, 4.7d, F.2b2. — Build the desktop and CLI publication path against fake-R2 fixtures, including the Homebrew cask generated from the published DMG and its hash; then put the checked, signed desktop candidates and CLI/MCP binaries at permanent public URLs, re-run the checks against the public bytes, and record the first real-release upgrade as a dated observation (D-0148).
 
-### Browser publication
-
-- [ ] **8.4a — Prepare browser store identities and distributables.** Needs: R.0a, 8.1. — **Input:** a Chrome Web Store developer registration and AMO API credentials, as repository secrets. Stable extension identities (a Chrome key pair and a gecko ID) bound to the native-host allowlist, and each store's package, are built without either account; only store upload waits on the input (D-0159).
-- [ ] **8.4b — Publish and test browser store installations.** Needs: 8.4a. Ships after: 4.7c, 8.3a, 8.3b, 8.3c, 8.3d, 8.3e. — Submit, then install from the live public listing on every promised browser and platform. The submission and install checks run first on a self-distributed signed XPI and an unpacked CRX; each store's approval is recorded as a dated observation (D-0160).
-
-### Repository release protections
-
-- [ ] **K.4 — Merge to main only through a pull request whose runner-only checks passed.** Needs: 3.0.
-  **Carries a CLAUDE.md amendment:** CLAUDE.md's Git section says to merge locally and push `main` because GitHub's merge button supplies its own identity. That contradicts this row, and the step amends CLAUDE.md in the same change so the two documents agree.
-  **Build:** a repository ruleset on `main` requiring a pull request and the required checks below, with an empty bypass list, so no maintainer, admin or app can push past it. The required set is only the coverage `verify.sh` cannot produce on the development machine. Checks it already runs locally stay out, because duplicating them makes the gate slow enough to route around. (a) The runner-only classes: V-F.6 (`ConcurrentVaultSaveTests`) on `windows-2025`, which skips on build 19045, and the five owner-only file-mode tests in `PolicyLoaderTests`, `AppSettingsTests` and `EnvExportTests` on Linux and macOS, which skip on Windows. A required job fails if any of its named tests reports skipped. (b) The save shape on `windows-2025`: the backend test command run once with `KEYPASTE_F9_TIMELINE`, then `f9-timeline.sh --saves`. It fails on any gate hold spanning a retry sleep, or when no save gated twice or more (D-0137). The required check workflows run on every pull request with no path filters: a required check skipped by a filter never reports a conclusion, so its pull request stays blocked, and a records-only change to STEPS or DECISIONS could never merge. Every records commit therefore pays a `windows-2025` run, which is cheaper than a merge route that deadlocks on its most frequent commits. Adding filters later requires stub jobs carrying the same check names, decided in this row. Merges use the merge-commit method, with squash and rebase disabled in repository settings: a merge commit keeps each pushed commit verbatim, so the `keypaste <contact@keypaste.com>` author and `Signed-off-by` trailer survive, while squash composes a commit whose body and committer GitHub controls and rebase rewrites the committer and SHAs. Amend CLAUDE.md's Git and delivery wording to that route.
-  **Verify (V-K.4):** a direct push to `main` is refused for the owner account; a pull request with a required check red, or with a runner-only test skipped, cannot merge; a records-only pull request receives every required conclusion and merges; a clean pull request merges with the keypaste author and trailer on `main`'s pushed commits; `gh api` shows the ruleset's bypass list empty and squash and rebase merging disabled.
-- [ ] **K.5 — Observe fork pull-request CI.** Needs: 3.0.
-  **Input:** the number of one pull request from a fork of `notinferred/keypaste` owned by an account other than `notinferred`, and not by the `keypaste` organization, whose public fork would read as official; it applies the prepared change to one script and one checked document.
-  **Build:** prepare that change, and a reader that takes a pull request number and retains the run IDs, conclusions, approval events and token-permission blocks of every workflow it triggered. Until the input exists the reader runs on recorded run JSON. Add a workflow-reading test that refuses `pull_request_target` anywhere and any `secrets.` reference in a workflow a pull request triggers, so the observed boundary cannot be widened by an edit that no fork run exercises (D-0153).
-  **Verify (V-K.5):** the repository's `first_time_contributors` policy holds the fork's first runs until exactly one recorded maintainer approval, after which it receives ci, app and dco conclusions; the reader shows a read-only `GITHUB_TOKEN` in each run's permission block and refuses recorded runs that lack one; the test fails on fixtures that add `pull_request_target` or a secret to a pull-request-triggered job, and passes on the tree.
-
-### Define coverage before claiming a complete password manager
-
-- [ ] **P.0 — Enumerate the complete versioned parity contract.** Needs: none.
-  **Build:** record the baseline that [PRODUCT](PRODUCT.md) §1 makes a tracked objective as one versioned contract for KeePassXC 2.7.12, linked from [FEATURES](FEATURES.md). Record the 2.7.12 tag's commit SHA in the contract, and derive the guide list from the `docs/topics` tree at that SHA so anyone can recompute it; behaviors come from those guides and the release's settings, not the online guide that names 2.7.11. Each behavior gets a stable ID, a source path at the tag, a disposition (adopt, differ or decline, with a reason for the last two), platform scope, and the STEPS row plus acceptance case that will prove it. Split into children by feature family if one pass cannot finish within two weeks. Every disposition stores `origin: draft`; review replacing drafts is an R.1 release-checklist item, and a decline removes scope only through re-ratification (D-0154).
-  **Verify (V-P.0):** a repository test reads the contract. It refuses fixtures with a missing field, a missing `origin`, an untagged or unknown source path, an unknown disposition, or a STEPS ID that does not exist. It fails if a FEATURES family or a guide in the recorded tree has no behavior. While any `origin: draft` remains it fails if FEATURES, README, the site or a STEPS status claims KeePassXC coverage or parity, or if a decline has removed scope. It passes on the tree, and this row's status reads built on drafts, review pending, never done, until no draft remains.
-
-### Create and safely edit a vault
+### Create a vault and store an existing secret
 
 - [ ] **4.8 — Create a vault from the desktop.** Needs: 0.2, 4.1. — First-run Create/Open choice so a fresh install makes a working vault without a terminal.
 - [ ] **4.9 — Enter and edit an existing secret.** Needs: 4.2. — Type or paste a real login or API value into the app and have it survive save, reopen and the CLI. Fix the [URL/notes display defect](ui-review.md#window-and-text-behavior); a regression must preserve ordinary punctuation and line breaks while rejecting deceptive controls.
-- [ ] **V.1a — Support keyfiles in core and CLI unlock.** Needs: 0.2. — Supported KDBX keyfile forms for create, open and change-credentials.
-- [ ] **V.1b — Expose vault credentials in the app.** Needs: V.1a, 4.8. — Choose a keyfile and change the master password from the desktop, with the loss consequences stated.
 - [ ] **V.2a — Read and restore entry history in core.** Needs: 0.2. — Bounded history metadata and restoration that records the value it replaced.
 - [ ] **V.2b — Restore an entry from the desktop.** Needs: V.2a, 4.2. — See previous revisions and put one back, with secrets masked until revealed.
+- [ ] **V.6 — Generate passphrases.** Needs: 4.2. — Word-list passphrase generation beside the existing character generator.
+
+### Share and receive
+
+- [ ] **1.4a — Specify merge and deletion semantics.** Needs: 0.2. — Specify KeePassXC 2.7.x merge semantics as keypaste's: entries match by UUID, the newer modification wins and the other revision goes to history, `DeletedObjects` tombstones apply, and moves resolve by `LocationChanged`; fixtures come from `keepassxc-cli merge` output (D-0157).
+- [ ] **1.4b — Implement atomic entry-level merge.** Needs: 1.4a. — Merge a share file into a vault by UUID under D-0157, keeping every replaced revision in history, with a no-write preview naming each entry it adds, changes or deletes, so an older value never overwrites a newer one.
+- [ ] **1.4c — Receive a share through the CLI and desktop.** Needs: 1.4b, 4.2. — `keypaste receive <file>` and a desktop receive screen take the passphrase, show 1.4b's preview and merge on confirmation, resolving a named conflict without losing either revision. Each expired entry is warned on, with the statement that expiry cannot recall a downloaded copy and revocation means rotating the credential.
+- [ ] **5.4a — Create an encrypted share file.** Needs: V.6, 4.2. — `keypaste share` and a desktop share action write a KDBX4 file holding only the chosen entries or env set, protected by a generated six-word passphrase, to a local file without the relay (law 4.1); the file opens in KeePassXC. `--expires` sets each entry's expiry, stated with the fact that a downloaded copy cannot be recalled and revocation means rotating the credential (D-0186).
+- [ ] **5.4b — Share and receive through a relay drop.** Needs: 5.4a, 5.2b, 1.4c. — Upload a share file to a drop, optionally deleted on first download, and print its link with the instruction to send the passphrase by another channel; `keypaste receive <link>` and the desktop fetch the drop and hand it to 1.4c. Works against the hosted and a self-hosted relay; version 1 shares are unsigned (D-0187).
+- [ ] **E.1 — Finish the environment workflow.** Needs: 4.2. — Map a project to an env set and run it from the app, with no plaintext file written. `keypaste run` and the app refuse to inject an expired value, naming the entry and stating that expiry cannot recall a copy already shared and revocation means rotating the credential.
+
+### Drop relay
+
+- [ ] **5.2a — Build the drop relay executable and storage contract.** Needs: none. — `Keypaste.Relay` as one NativeAOT binary over SQLite and S3-compatible object storage, with no vault-decryption dependency (D-0064). A drop is sealed bytes the relay cannot read under an unguessable ID, at most 1 MB and kept at most 7 days, optionally deleted on first download, with no account.
+- [ ] **5.2b — Serve drops within their limits.** Needs: 5.2a. — Upload and download endpoints that refuse a drop over 1 MB, expire drops at 7 days, delete on first download when asked, rate-limit each client and log no drop contents (D-0181).
+- [ ] **5.2c — Publish and exercise the self-hosted relay.** Needs: 5.2b. — The same binary an operator can install and upgrade on a clean host without a Stripe account, with a drop uploaded and downloaded through it (D-0180).
+- [ ] **H.7 — Complete hosting owner enrollment (H-0019).** Human. Needs: none. — Obtain the relay host, bucket, relay domain and mail account; external accounts required.
+- [ ] **H.8 — Deploy the hosted drop relay.** Needs: 5.2b. — **Input:** H.7's host SSH access, bucket keys and the relay domain's DNS record. Deploy the relay build behind TLS with its free drop limits (PRODUCT §5.8), rollback and recorded deployment commands; until the input exists, those commands are verified against a local Docker host (D-0165, D-0185).
+- [ ] **5.7 — Publish usable share, receive and relay operator instructions.** Needs: 5.2c, 5.4b. — `docs/share.md` and `docs/relay.md`, keeping [THREATS](../THREATS.md) T-26 true for the shipped behavior (D-0188).
+
+### Native approvals
+
+- [ ] **8.2a — Specify the shared approval interaction.** Needs: 2.2. — The shipped terminal prompt is the specification every approval surface renders: its fields, the line saying the reason was written by the agent, D-0084's sanitising and D-0027's two refusals, with no surface-specific variant (D-0158).
+- [ ] **4.3a — Add the authenticated desktop approval channel.** Needs: 2.2, 8.2a. — Let the desktop answer a request over an authenticated local channel, with the agent still the authority.
+- [ ] **4.4 — Render native approval and denial.** Needs: 4.3a, 8.2a. — A native prompt with terminal fallback, where default, timeout and dismissal all deny.
+
+### Product acceptance
+
+- [ ] **R.1 — Verify the working share-and-approve product.** Needs: 4.7c, 4.8, 4.9, E.1, 5.4a, 5.4b, 1.4c, 4.4, V.2b, 2.4, H.8, 5.2c, 5.7. — **Milestone gate:** on public signed downloads a developer creates a vault, stores an existing secret, keeps and injects a project's env, shares an env set through the hosted drop relay and receives one, approves an agent request in the native dialog, recovers a mistake from entry history and reads the audit; the same share also passes through a self-hosted relay (D-0177).
+
+## Pilot ready
+
+The pilot uses the published desktop app and CLI. Invited small teams share production env through the hosted drop relay over an observed period, and the operator restores the service by redeploying it. Preparation can start earlier, but no external pilot begins before R.1 and the controls below pass.
+
+### Service operation and pilot gate
+
+- [ ] **H.9 — Prove restore by redeployment, outage handling and operational alerts.** Needs: H.8. — Rebuild the service from its recorded commands on a fresh host inside the declared objectives; drops in flight are lost and senders share again, and monitoring stays content-free.
+- [ ] **H.10 — Establish support, privacy and incident procedures.** Human. Needs: none. — A real support channel, published terms and a rehearsed incident notice before any external user is invited.
+- [ ] **R.2 — Verify the small-team pilot and close the beta milestone.** Needs: H.9. Ships after: R.1, H.10. — **Milestone gate:** invited small teams share production env through the hosted relay and receive it by merge over an observed period recorded with its dates, and an operator restores the service by redeployment, with no data-loss or disclosure defect left (D-0178).
+
+## Paid release
+
+Sell the team plan only after the pilot works. Local functions, security, signatures, self-hosted operation, sealing and signing shares with locally generated keys, and hosted drops within their free limits stay available without a subscription. The team plan sells the hosted directory, revocation, attribution, team audit and policy, and support.
+
+### Team plan accounts and devices
+
+- [ ] **H.1 — Settle hosted authentication and key boundaries.** Needs: none. — Write down account auth, device authorization, vault unlock, recovery and revocation as separate protocols, checked against PRODUCT §3, within D-0162: the account password is verified server-side with Argon2id and never derives the vault key, MFA is WebAuthn or TOTP, and each device holds its own keypair.
+- [ ] **H.2 — Implement account registration and authentication.** Needs: H.1, 5.2a. — Signup, login and account-password reset that never touch vault-unlock material.
+- [ ] **H.3 — Implement account MFA and session revocation.** Needs: H.2. — An MFA factor with recovery codes, plus a session list and revoke-all.
+- [ ] **H.5a — Define recoverable and unrecoverable account failures.** Needs: H.1. — Document what a lost password, MFA, device or vault secret costs under D-0163: the account recovers by email plus recovery codes, the vault secret is unrecoverable unless the user configured a recovery keyfile, and support never restores vault access.
+- [ ] **H.4 — Implement trusted-device authorization.** Needs: H.2, H.5a. — Per-device service keys, explicit first-device bootstrap and revocation that stops the next fetch.
+- [ ] **H.5b — Implement and rehearse the approved recovery flow.** Needs: H.5a, H.4. — Build only the approved recovery mechanism, and test each documented unrecoverable case.
+- [ ] **H.6 — Implement account export and deletion.** Needs: H.2. — Export an account's data and delete it on a published schedule, removing its directory membership and leaving local files intact (D-0184).
+
+### Team sharing and governance
+
+- [ ] **7.1a — Settle team ownership, sealing and sharing authority.** Needs: H.1. — Decide who owns a team directory, who can revoke and attribute, and who can recover, reviewed against §3 before any key-envelope design; keys stay generated locally and the directory only publishes them.
+- [ ] **7.1b — Implement the hosted team directory.** Needs: 7.1a, H.2. — Accounts as members: invitations, roles and service accounts, default-deny, publishing each member's locally generated public key, with opaque resource IDs in events (D-0189).
+- [ ] **7.1c — Seal and sign shares with locally generated keys.** Needs: H.4, 5.4b. — Generate a keypair locally, seal a share to a recipient's public key and sign it with the sender's key through mature libraries, with keys exchanged by any means, including a self-hosted relay, and no subscription; a signature the receiver cannot verify is refused. Free when it ships (PRODUCT §5.4, D-0190).
+- [ ] **7.2 — Revoke, attribute and govern team shares and approvals.** Needs: 7.1b, 7.1c. — Links a sender or admin can revoke before download, every team share and agent approval attributed to a member or service account and recorded in team audit, and team policy refused at the next request after removal; a downloaded copy stays readable and rotation is the revocation (D-0191).
+
+### Billing and review
+
+- [ ] **5.5a — Complete payment owner enrollment (H-0018).** Human. Needs: none. — Activate Stripe and supply scoped credentials; external account required.
+- [ ] **5.5b — Implement hosted subscription entitlement.** Needs: H.2. — **Input:** 5.5a's restricted live key and webhook signing secret, needed only for live mode. Checkout, verified idempotent webhooks and relay-side entitlement, with local functionality independent of payment state, verified against stripe-mock until the input exists (D-0167).
+- [ ] **5.5c — Implement cancellation and failed-payment behavior.** Needs: 5.5b, H.6. — Plan state, grace dates and a working export route before any hosted data is deleted.
+- [ ] **5.8 — Prepare reviewed plans and controlled checkout.** Needs: 5.5c. — Plans tied to real entitlements, with live checkout restricted until R.3. Every price stores `origin: draft`; a failing test refuses a draft price reaching Stripe live mode, the site or checkout, and the row's status reads built on drafts, review pending, never done. Owner approval of prices is an R.3 release-checklist item (D-0168).
+- [ ] **10.2 — Complete independent hosted and team-boundary review.** Human. Needs: 7.2, H.5b, 5.5c, H.8. — An external review of the drop relay, accounts, recovery, sealing and signing, revocation, bridge and billing; unresolved critical findings block paid release (D-0192).
+- [ ] **R.3 — Verify the paid team release.** Needs: H.3, H.5b, H.6, 7.2, 5.5c, 5.8, 10.2. Ships after: R.2. — **Milestone gate:** independent small teams subscribe, publish keys in the hosted directory, send sealed and signed shares, revoke a link, read attributed team audit under policy, reach support, then cancel and export, on public distributions. Its release checklist also requires owner-approved 5.8 prices, with no `origin: draft` remaining (D-0179).
+
+## Expansion
+
+Each step follows its own Needs; publication follows its Ships after gates. Completing the team-plan gate does not claim these features are available.
+
+### Repository release protections
+
+- [ ] **K.4 — Merge to main only through a pull request whose runner-only checks passed.** Needs: 3.0. — An empty-bypass ruleset requiring a pull request and only the checks `verify.sh` cannot run locally, unfiltered so records-only pull requests merge, with merge commits keeping the keypaste author and trailer; amends CLAUDE.md's merge-locally route.
+- [ ] **K.5 — Observe fork pull-request CI.** Needs: 3.0. — **Input:** one pull request number from a fork owned by an account other than `notinferred` or the `keypaste` organization. Record its runs under the `first_time_contributors` policy, and add a test refusing `pull_request_target` or a secret in any pull-request-triggered workflow (D-0153).
+
+### Local vault depth
+
+- [ ] **V.1a — Support keyfiles in core and CLI unlock.** Needs: 0.2. — Supported KDBX keyfile forms for create, open and change-credentials.
+- [ ] **V.1b — Expose vault credentials in the app.** Needs: V.1a, 4.8. — Choose a keyfile and change the master password from the desktop, with the loss consequences stated.
 - [ ] **V.3a — Implement reversible deletion.** Needs: 0.2. — Soft delete and restore through the KeePass recycle bin, with permanent delete kept separate.
 - [ ] **V.3b — Add trash and recovery controls.** Needs: V.3a, 4.2. — Recover an accidental deletion without a terminal.
 - [ ] **V.4a — Keep recoverable encrypted backups.** Needs: 0.2. — Versioned encrypted backups around each save, so an interrupted write cannot destroy the last good copy.
 - [ ] **V.4b — Restore and export a complete vault.** Needs: V.4a, 4.8. — Restore a backup or export the whole vault, with the replaced file kept until it succeeds.
-
-### Organize and migrate everyday credentials
-
 - [ ] **V.5a — Add stable organization operations.** Needs: 0.2. — Group and entry create, rename, move, clone, tag and expiry through the core, with UUIDs stable across moves.
 - [ ] **V.5b — Add organization and richer search to the app.** Needs: V.5a, 4.2. — Field, tag and expiry filters, and controls for the new core operations, cleared on lock.
-- [ ] **V.6 — Generate passphrases.** Needs: 4.2. — Word-list passphrase generation beside the existing character generator.
 - [ ] **V.7 — Manage custom fields.** Needs: 4.9. — Add, edit and remove named custom fields and keep their protected flags.
 - [ ] **V.8a — Expose bounded attachment operations.** Needs: 0.2. — Enumerate, import, remove and read attachments in memory, with size limits and no plaintext temporary files.
 - [ ] **V.8b — Manage attachments from the app.** Needs: V.8a, 4.9. — Attachment controls that never auto-open or execute a file.
 - [ ] **V.9 — Report local password health.** Needs: V.5a, 4.2. — Find weak, reused and expired credentials locally, with no network request.
+- [ ] **4.10a — Add Windows quick unlock.** Needs: V.1b. — Optional: resume a local session with Windows authentication, keeping the full unlock path intact. Required later by P.9.
+- [ ] **4.10b — Add macOS quick unlock.** Needs: V.1b. — Optional: the macOS equivalent under the same session policy. Required later by P.9.
+
+### Importers and TOTP
+
 - [ ] **9.1a — Define a loss-aware import pipeline.** Needs: V.8a. — One import contract with preview, collision decisions and atomic commit, so nothing is dropped silently.
 - [ ] **9.1b — Import Bitwarden JSON.** Needs: 9.1a. — The supported Bitwarden export forms as one adapter.
 - [ ] **9.1c — Import LastPass CSV.** Needs: 9.1a. — The LastPass CSV adapter, including quoted multiline fields and folders.
@@ -177,23 +245,17 @@ Each packaging child uses [release-targets.json](../release-targets.json) throug
 - [ ] **9.2a — Implement interoperable TOTP.** Needs: 0.2. — Read and calculate KeePassXC otp attributes, keeping the seed protected.
 - [ ] **9.2b — Use TOTP in the app and approval bridge.** Needs: 9.2a, 4.2, 2.2. — Show the code and countdown, and let an agent be approved for an otp field but never the seed.
 
-### Recover concurrent changes
+### Desktop depth and product checks
 
-- [ ] **1.4a — Specify merge and deletion semantics.** Needs: 0.2. — Specify KeePassXC 2.7.x merge semantics as keypaste's: entries match by UUID, the newer modification wins and the other revision goes to history, `DeletedObjects` tombstones apply, and moves resolve by `LocationChanged`; fixtures come from `keepassxc-cli merge` output (D-0157).
-- [ ] **1.4b — Implement atomic entry-level merge.** Needs: 1.4a. — The agreed merge with a no-write preview, so an older value can never overwrite a newer one.
-- [ ] **1.4c — Resolve merges through CLI and GUI.** Needs: 1.4b, 4.2. — Inspect and resolve a named conflict without losing either revision.
-
-### Native approvals and developer workflows
-
-- [ ] **4.5 — Define and measure the daily-use tasks.** Needs: 4.2. — `docs/ux.md` with numeric thresholds for create, find, copy, restore, inject, approve, deny and fill, measured by automated step and keystroke counts. Every threshold stores `origin: draft`; a failing test refuses a draft threshold deciding R.1 or any published usability claim, and the row's status reads built on drafts, review pending, never done. Review is an R.1 release-checklist item (D-0156).
-- [ ] **8.2a — Specify the shared approval interaction.** Needs: 2.2. — The shipped terminal prompt is the specification every approval surface renders: its fields, the line saying the reason was written by the agent, D-0084's sanitising and D-0027's two refusals, with no surface-specific variant (D-0158).
-- [ ] **4.3a — Add the authenticated desktop approval channel.** Needs: 2.2, 8.2a. — Let the desktop answer a request over an authenticated local channel, with the agent still the authority.
-- [ ] **4.4 — Render native approval and denial.** Needs: 4.3a, 8.2a. — A native prompt with terminal fallback, where default, timeout and dismissal all deny.
+- [ ] **4.5 — Define and measure the daily-use tasks.** Needs: 4.2. — `docs/ux.md` with numeric thresholds for create, find, copy, restore, inject, approve, deny and fill, measured by automated step and keystroke counts. Every threshold stores `origin: draft`; a failing test refuses a draft threshold deciding any gate or published usability claim, and the row's status reads built on drafts, review pending, never done. Review precedes the first gate or published claim that relies on a threshold (D-0156, D-0194).
 - [ ] **4.3b — Show live agent activity and effective controls.** Needs: 4.3a. — Pending requests, audit history, live counts and per-client pause; an absent agent reads unavailable, not zero.
 - [ ] **4.4b — Start and stop the approver from a user action.** Needs: 4.4. — Run one approval end to end without a terminal, with unlock input owned by the approver process.
-- [ ] **E.1 — Finish the desktop environment workflow.** Needs: 4.2. — Map a project to an env set and run it from the app, with no plaintext file written.
+- [ ] **4.6 — Exercise actual desktop rendering.** Needs: F.2d. — Headless Skia render tests that go red if a typed character ever appears on screen or in the automation tree.
+- [ ] **9.4 — Publish a versioned compatibility result.** Needs: V.1a, V.8a, 9.1a, 9.2a, 1.4b. Ships after: V.1b, V.7, V.8b, 9.1f, 9.2b, 1.4c. — Extend both KeePassXC gate directions over the finished workflows and record the upstream version tested.
+- [ ] **3.10a — Ship the local product guides.** Needs: 4.2. — Version-correct guides for every shipped screen, linked from the app, and a test that fails when a screen has no guide, so each later screen's row brings its own (D-0161).
+- [ ] **1.5a — Observe Windows clipboard history behavior.** Needs: 1.5b. — Optional: prove on a real machine that a keypaste secret never reaches clipboard history; a named residual, not a blocker.
 
-### Browser integration
+### Browser integration and publication
 
 - [ ] **8.1 — Install and pair the native messaging host.** Needs: 2.2. — A vault-free native host over the local approver, paired to specific extension identities.
 - [ ] **8.3a — Fill a login with verified origin matching.** Needs: 8.1. — Fill only on the real registrable domain, and refuse lookalikes and cross-origin frames.
@@ -202,83 +264,28 @@ Each packaging child uses [release-targets.json](../release-targets.json) throug
 - [ ] **8.3d — Generate a browser credential.** Needs: 8.3b. — The core generator in the extension, saved only after confirmation.
 - [ ] **8.3e — Fill supported TOTP and custom fields.** Needs: 8.3a, 9.2a. — Fill OTP codes and mapped extra fields without exposing a seed to the page.
 - [ ] **8.2b — Verify approval consistency across surfaces.** Needs: 4.3b, 4.4, 8.3a. — Run the same hostile approval fixtures on terminal, native prompt, activity view and browser.
+- [ ] **8.4a — Prepare browser store identities and distributables.** Needs: R.0a, 8.1. — **Input:** a Chrome Web Store developer registration and AMO API credentials, as repository secrets. Stable extension identities (a Chrome key pair and a gecko ID) bound to the native-host allowlist, and each store's package, are built without either account; only store upload waits on the input (D-0159).
+- [ ] **8.4b — Publish and test browser store installations.** Needs: 8.4a. Ships after: 4.7c, 8.3a, 8.3b, 8.3c, 8.3d, 8.3e. — Submit, then install from the live public listing on every promised browser and platform. The submission and install checks run first on a self-distributed signed XPI and an unpacked CRX; each store's approval is recorded as a dated observation (D-0160).
 
-### Product acceptance
+### Managed sync and phone
 
-- [ ] **4.6 — Exercise actual desktop rendering.** Needs: F.2d. — Headless Skia render tests that go red if a typed character ever appears on screen or in the automation tree.
-- [ ] **9.4 — Publish a versioned compatibility result.** Needs: V.1a, V.8a, 9.1a, 9.2a, 1.4b. Ships after: V.1b, V.7, V.8b, 9.1f, 9.2b, 1.4c. — Extend both KeePassXC gate directions over the finished workflows and record the upstream version tested.
-- [ ] **3.10a — Ship the local product guides.** Needs: 4.2. — Version-correct guides for every shipped screen, linked from the app, and a test that fails when a screen has no guide, so each later screen's row brings its own (D-0161).
-- [ ] **1.5a — Observe Windows clipboard history behavior.** Needs: 1.5b. — Optional: prove on a real machine that a keypaste secret never reaches clipboard history; a named residual, not a blocker.
-- [ ] **R.1 — Verify the working password manager.** Needs: R.0c, F.6, F.2b2, P.0, 4.7c, 4.7d, 8.4b, K.4, K.5, 4.8, 4.9, V.1b, V.2b, V.3b, V.4b, V.5b, V.6, V.7, V.8b, V.9, 9.1b, 9.1c, 9.1d1, 9.1d2, 9.1e, 9.1f, 9.2b, 8.3c, 8.3d, 8.3e, 1.4c, 4.4b, 4.3b, E.1, 8.2b, 4.5, 4.6, 9.4, 3.10a. — **Milestone gate:** a fresh user does the whole daily journey on public downloads without terminal help. Its release checklist also requires the P.0 dispositions and 4.5 thresholds reviewed, with no `origin: draft` remaining.
-
-## Pilot ready
-
-The first managed pilot uses the published desktop app and extension. It must hide routine file management, preserve offline use and provide real device, recovery and service operations. Preparation can start earlier, but no external pilot begins before R.1 and the controls below pass.
-
-### Account, device and relay foundations
-
-- [ ] **H.1 — Settle hosted authentication and key boundaries.** Needs: none. — Write down account auth, device authorization, vault unlock, recovery and revocation as separate protocols, checked against PRODUCT §3, within D-0162: the account password is verified server-side with Argon2id and never derives the vault key, MFA is WebAuthn or TOTP, and each device holds its own keypair.
-- [ ] **5.2a — Build the relay executable and storage contract.** Needs: none. — `Keypaste.Relay` as one NativeAOT binary over SQLite and S3-compatible object storage, with no vault-decryption dependency.
-- [ ] **H.2 — Implement account registration and authentication.** Needs: H.1, 5.2a. — Signup, login and account-password reset that never touch vault-unlock material.
-- [ ] **H.3 — Implement account MFA and session revocation.** Needs: H.2. — An MFA factor with recovery codes, plus a session list and revoke-all.
-- [ ] **H.5a — Define recoverable and unrecoverable account failures.** Needs: H.1. — Document what a lost password, MFA, device or vault secret costs under D-0163: the account recovers by email plus recovery codes, the vault secret is unrecoverable unless the user configured a recovery keyfile, and support never restores vault access.
-- [ ] **H.4 — Implement trusted-device authorization.** Needs: H.2, H.5a. — Per-device service keys, explicit first-device bootstrap and revocation that stops the next fetch.
-- [ ] **5.2b — Implement authorized blob sync and version retention.** Needs: H.4. — Bounded upload, compare-and-swap publication and retained encrypted versions, with no entry names in metadata or logs.
-- [ ] **5.2c — Publish and exercise the self-hosted relay.** Needs: 5.2b. Ships after: R.1. — The same binary an operator can install and upgrade without a Stripe account.
-
-### Managed client experience and recovery
-
-- [ ] **5.3a — Implement recoverable client synchronization.** Needs: 1.4b, 5.2b. — `keypaste sync`: pull, merge, push, and stay recoverable if killed at any write boundary.
+- [ ] **5.3a — Implement recoverable client synchronization.** Needs: 1.4b, 5.2d. — `keypaste sync`: pull, merge, push, and stay recoverable if killed at any write boundary.
 - [ ] **5.3b — Build managed desktop onboarding.** Needs: H.4, 5.3a, 4.8. — Sign up and get a synced vault without choosing a file path, with local-only use still working offline.
 - [ ] **5.3c — Expose device, sync and conflict controls.** Needs: 5.3a, H.3, H.4. — Device list, second-device enrollment, revoke, sync state and version restore in the app.
-- [ ] **H.5b — Implement and rehearse the approved recovery flow.** Needs: H.5a, H.4. — Build only the approved recovery mechanism, and test each documented unrecoverable case.
-- [ ] **H.6 — Implement account export and deletion.** Needs: 5.2b. — Export encrypted vaults and delete an account on a published schedule, leaving local files intact.
-
-### Service operation and pilot gate
-
-- [ ] **H.7 — Complete hosting owner enrollment (H-0019).** Human. Needs: none. — Obtain the relay host, bucket, `sync.keypaste.com` and mail account; external accounts required.
-- [ ] **H.8 — Deploy the managed pilot service.** Needs: 5.2b. Ships after: H.5b, H.6. — **Input:** H.7's host SSH access, bucket keys and `sync.keypaste.com` DNS record. Deploy the reviewed relay build behind TLS with backups, rollback and recorded deployment commands; until the input exists, those commands are verified against a local Docker host (D-0165).
-- [ ] **H.9 — Prove durability, outage handling and operational alerts.** Needs: H.8. — Restore from backup into a fresh deployment inside the declared objectives, with content-free monitoring.
-- [ ] **H.10 — Establish support, privacy and incident procedures.** Human. Needs: none. — A real support channel, published terms and a rehearsed incident notice before any external user is invited.
-- [ ] **5.3d — Publish the hosted-capable clients.** Needs: 5.3b, 5.3c, H.5b, H.6, H.8. Ships after: R.1. — Ship signed CLI and desktop packages containing onboarding, sync, recovery and exit, verified against the deployed relay.
-- [ ] **5.7 — Publish usable sync, recovery and operator instructions.** Needs: 5.2c, 5.3c, H.5b, H.6, H.9. — `docs/sync.md` and `docs/relay.md`, plus THREATS updated for the relay boundary.
-- [ ] **R.2 — Verify managed pilot entry and close the beta milestone.** Needs: H.3, H.4, H.5b, H.6, H.9, H.10, 5.3d, 5.7. Ships after: R.1. — **Milestone gate:** invited nontechnical users onboard, sync two devices, drill recovery and export, with no data-loss or isolation defect left.
-
-### Optional local unlock convenience on supported desktop systems
-
-- [ ] **4.10a — Add Windows quick unlock.** Needs: V.1b. — Optional: resume a local session with Windows authentication, keeping the full unlock path intact. Required later by P.9.
-- [ ] **4.10b — Add macOS quick unlock.** Needs: V.1b. — Optional: the macOS equivalent under the same session policy. Required later by P.9.
-
-## Paid release
-
-Sell hosted convenience only after the pilot works. Local functions, security, signatures and self-hosted operation stay available without a subscription. The consumer offer includes a supported phone workflow; a desktop beta does not establish that claim.
-
-- [ ] **5.5a — Complete payment owner enrollment (H-0018).** Human. Needs: none. — Activate Stripe and supply scoped credentials; external account required.
-- [ ] **5.5b — Implement hosted subscription entitlement.** Needs: H.2. — **Input:** 5.5a's restricted live key and webhook signing secret, needed only for live mode. Checkout, verified idempotent webhooks and relay-side entitlement, with local functionality independent of payment state, verified against stripe-mock until the input exists (D-0167).
-- [ ] **5.5c — Implement cancellation and failed-payment behavior.** Needs: 5.5b, H.6. — Plan state, grace dates and a working export route before any hosted data is deleted.
-- [ ] **5.6 — Implement consented list confirmation.** Needs: none. — **Input:** H.7's SMTP credentials. Double opt-in and unsubscribe for the signup list, kept separate from account and security mail, verified against a mailpit fixture until the input exists (D-0166).
+- [ ] **5.3d — Publish the hosted-capable clients.** Needs: 5.3b, 5.3c, H.5b, H.6, H.8. Ships after: R.1. — Ship signed CLI and desktop packages containing onboarding, sync, recovery and exit, verified against the deployed relay, with `docs/sync.md` (D-0183).
 - [ ] **M.1 — Select and prove the supported phone approach.** Needs: none. — Prototype Avalonia mobile over `Keypaste.Core`, with .NET MAUI as the fallback only if autofill-extension memory limits fail (D-0169), on the `macos-15` iOS simulator and an Android emulator; the run on real iOS and Android devices is recorded as a dated observation (D-0170).
 - [ ] **M.2a — Connect and lock the selected phone client.** Needs: M.1, H.4. — Enroll a real phone and open the vault locally, with revocation that works.
 - [ ] **M.2b — Add phone login use and autofill.** Needs: M.2a. — Fill and save a login on each promised phone OS.
 - [ ] **M.2c — Add phone sync, recovery and export controls.** Needs: M.2a, 5.3a, H.5b. — Converge phone and desktop after offline edits, and restore or export from the phone.
 - [ ] **M.3 — Publish and verify phone availability.** Needs: M.2b, M.2c. Ships after: R.2. — Publish through the advertised public channel and verify a new user can install and upgrade.
-- [ ] **10.2 — Complete independent hosted and client-boundary review.** Human. Needs: 5.3a, H.5b, M.2c, 5.5c. — An external review of relay, recovery, isolation, sync, bridge and mobile; unresolved critical findings block paid release.
-- [ ] **5.8 — Prepare reviewed plans and controlled checkout.** Needs: 5.5c. — Plans tied to real entitlements, with live checkout restricted until R.3. Every price stores `origin: draft`; a failing test refuses a draft price reaching Stripe live mode, the site or checkout, and the row's status reads built on drafts, review pending, never done. Owner approval of prices is an R.3 release-checklist item (D-0168).
 
-### Community evidence and public communication
+### Define coverage before claiming a complete password manager
 
-- [ ] **3.2 — Publish the initial community introduction (H-0006).** Human. Needs: none. Ships after: R.1. — Refresh [launch.md](../launch.md) for the product actually released, then post once per sanctioned channel.
-- [ ] **3.3 — Answer the community introduction's feedback (H-0007).** Human. Needs: 3.2. — Closes when every issue and comment received on the sanctioned channels since 3.2 is classified as bug, known gap, documentation misunderstanding or design disagreement and answered, security reports have moved to `security@keypaste.com`, misleading documentation is corrected and bugs and gaps are recorded in STEPS or the Ideas table.
-- [ ] **3.10b — Ship hosted and account-lifecycle guides.** Needs: 5.3c, H.5b, H.6, 5.5c, M.2c. — Help for signup, phone access, recovery, support, cancellation, export and deletion.
-- [ ] **R.3 — Verify the paid consumer release.** Needs: H.10, 5.5c, 5.6, M.3, 10.2, 5.8, 3.3, 3.10b. Ships after: R.2. — **Milestone gate:** independent nontechnical users complete onboarding through payment, cancellation and export on public distributions. Its release checklist also requires owner-approved 5.8 prices, with no `origin: draft` remaining.
-
-## Expansion
-
-Each step follows its own Needs; publication follows its Ships after gates. Completing the consumer gate does not claim these features are available.
+- [ ] **P.0 — Enumerate the complete versioned parity contract.** Needs: none. — One contract for KeePassXC 2.7.12 derived from the `docs/topics` tree at the recorded tag SHA, each behavior with a stable ID, source path, disposition stored as `origin: draft`, platform scope and proving row; a test refuses coverage or parity claims while a draft remains, and review is a P.9 release-checklist item (D-0154, D-0193).
 
 ### Complete the KeePassXC behavior baseline
 
-Accepted scope that can run alongside hosted work. P.0 prepares the behavior contract in Working proposition; P.9 forbids a parity claim while any promised behavior is unverified.
+Accepted scope that can run alongside hosted work. P.0 prepares the behavior contract; P.9 forbids a parity claim while any promised behavior is unverified.
 
 - [ ] **P.1 — Support hardware-key challenge response.** Needs: P.0, V.1b. — Unlock with a supported hardware key, kept separate from online account MFA; verified against an emulated challenge-response fixture, with the run on a real key recorded as a dated observation (D-0175).
 - [ ] **P.2 — Support multiple vaults and auto-open.** Needs: P.0, V.1b, 4.8. — Several vaults open at once with separate locks and approval scopes.
@@ -307,24 +314,18 @@ Accepted scope that can run alongside hosted work. P.0 prepares the behavior con
 - [ ] **3.9c — Add Linux musl CLI/MCP downloads.** Needs: R.0a. Ships after: R.1. — A `linux-musl-x64` toolchain and install proof on a clean musl distribution.
 - [ ] **3.9d — Add Linux ARM64 desktop downloads.** Needs: 4.7a3. Ships after: R.1. — The declared but unbuilt desktop RID, rendered and installed on a real machine.
 
-### Web vault and secure sharing
+### Web vault
 
 - [ ] **W.1 — Prove the browser vault architecture.** Needs: 0.2. — Prototype a shared-core or WASM route and record what a compromised delivery origin can reach; blocks web delivery until answered.
 - [ ] **W.2a — Implement reviewed browser onboarding and unlocking.** Needs: W.1, H.2. — Create or import and unlock in a browser, with no unencrypted vault data in storage.
 - [ ] **W.2b — Implement browser editing and sync recovery.** Needs: W.2a, 5.3a, H.6. — Edit, sync, resolve conflicts and export from the browser through the approved core.
 - [ ] **W.2c — Review and publish the web vault.** Needs: W.2b. Ships after: R.3. — Independent review of the web-origin boundary, then deploy the exact reviewed version.
-- [ ] **5.4a — Review and implement scoped share-bundle creation.** Needs: V.1a. — A real KDBX containing only the chosen entries with its own keyfile, if the transfer conforms to §3.
-- [ ] **5.4b — Publish one-download sharing and quarantine import.** Needs: 5.4a, 5.2b. Ships after: R.2. — One-download expiring bundles, imported into quarantine before anything can use them.
 
 ### Teams and enterprise credentials
 
 R.4 needs an authorized pilot organization and scope, selected on the Human track; the code rows below do not wait for it.
 
-- [ ] **7.1a — Settle organization ownership and sharing authority.** Needs: H.1. — Decide who owns, who can decrypt and who can recover, reviewed against §3 before any key-envelope design.
-- [ ] **7.1b — Implement organization membership and permissions.** Needs: 7.1a. — Invitations, roles, collections and service accounts, default-deny, with opaque resource IDs in events.
-- [ ] **7.1c — Implement reviewed shared-vault access and offboarding.** Needs: 7.1b. — Rotate access for future snapshots when a member leaves, and say plainly that retained old copies stay readable.
 - [ ] **7.1d — Build organization credential administration.** Needs: 7.1c. — Organization views, invitations, roles, ownership transfer and offboarding status in the desktop.
-- [ ] **7.2 — Implement attributed team approval and broker access.** Needs: 7.1c. — Approvals attributed to an identified member or service account, revoked at the next request.
 - [ ] **7.3a — Add organization OIDC sign-in.** Needs: 7.1b. — One IdP through established OIDC components; SSO authenticates the account and never unlocks the vault.
 - [ ] **7.3b — Add provisioning and deprovisioning.** Needs: 7.3a, 7.1c, 7.2. — A SCIM connector where a departure actually revokes sessions, devices and broker access.
 - [ ] **6.1 — Prove external delegation visibility and revocation.** Needs: none. — A feasibility check of what GitHub and Google grants can really be seen and revoked.
@@ -332,9 +333,15 @@ R.4 needs an authorized pilot organization and scope, selected on the Human trac
 - [ ] **7.4 — Build team access reviews and delegation dashboard.** Needs: 7.1d, 7.2, 7.3b. — Membership, rights and broker policy in one reviewable place, with unknown access left visible.
 - [ ] **R.4 — Verify a real organization pilot.** Needs: 7.1d, 7.2, 7.3b, 7.4. Ships after: R.2. — **Milestone gate:** an authorized organization onboards, shares, reviews access and offboards, independently assessed.
 
-### Release announcements after the product gates
+### Community evidence and public communication
 
+- [ ] **5.6 — Implement consented list confirmation.** Needs: none. — **Input:** H.7's SMTP credentials. Double opt-in and unsubscribe for the signup list, kept separate from account and security mail, verified against a mailpit fixture until the input exists (D-0166).
+- [ ] **3.10b — Ship hosted and account-lifecycle guides.** Needs: 5.3c, H.5b, H.6, 5.5c, M.2c. — Help for signup, phone access, recovery, support, cancellation, export and deletion.
 - [ ] **3.11 — Publish the app and hosted-release announcement.** Human. Needs: 3.10b. Ships after: R.3. — Version-correct announcement built on retained R.1/R.3 evidence.
+
+### Relay sync storage
+
+- [ ] **5.2d — Implement authorized blob sync and version retention.** Needs: H.4, 5.2a. — Bounded upload, compare-and-swap publication and retained encrypted versions on the relay binary, with no entry names in metadata or logs; 5.2b's former scope (D-0182).
 
 ## Scale
 
@@ -363,7 +370,7 @@ Keep every ID traceable. These formerly large rows now select their first ready 
 | 4.3 | 4.3a/b |
 | 4.7 | 4.7a–d |
 | 4.7a | Aggregate of Windows 4.7a1, macOS 4.7a2 and Linux 4.7a3; downstream Needs still require all three |
-| 5.2 | 5.2a–c |
+| 5.2 | 5.2a–d; 5.2d carries the sync storage 5.2b held before it became drops |
 | 5.3 | 5.3a–d |
 | 5.4 | 5.4a/b |
 | 5.5 | 5.5a–c |
