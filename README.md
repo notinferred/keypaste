@@ -25,9 +25,7 @@ keypaste stores passwords and environment variables in a local KDBX vault, injec
 
 The vault is a file on your disk and works without an account or network. You can sync it with your existing file-sync service. Vaults open in KeePassXC and KeePass. CI checks read/write compatibility against a real `keepassxc-cli` on Linux, macOS and Windows on qualifying pushes to `main` and every pull request. The code is open source under AGPL-3.0.
 
-The published download is pre-1.0 CLI/MCP `v0.2.0`. Replace `v0.1.0`: it could delete a vault through `env export`, modify the wrong entry through `env rm`, and return the wrong password through `get`. [CHANGELOG](CHANGELOG.md#020) lists the fixes. Published versions are immutable, so `v0.1.0` remains available with those defects.
-
-<!-- defects:0.2.0 -->`v0.2.0` has known defects: saving while another program saves the same vault can undo its change without retaining it in entry history when the saves occur within about two seconds; on Windows 11 24H2 and Windows Server 2025, a save can fail when another keypaste or KeePass program is saving at the same time, including a different vault, because those builds refuse the shared temporary name; and an agent asking for entry names on a loaded machine can be told to start keypaste agent for a process that is already running. The Windows save failure retries for about two seconds, then reports failure without writing or losing data. The listing failure releases nothing; its advice is incorrect. All three defects are repaired on `main` and remain in the published version.<!-- /defects:0.2.0 -->
+The published download is pre-1.0 CLI/MCP `v0.3.0`. Replace `v0.2.0`: a save racing another program's save could undo it without keeping the lost change in history. Replace `v0.1.0`: it could also delete a vault through `env export`, modify the wrong entry through `env rm`, and return the wrong password through `get`. [CHANGELOG](CHANGELOG.md#030) lists what `v0.3.0` repairs. Published versions are immutable, so both remain available with those defects.
 
 The [desktop app](docs/desktop.md) browses and edits these vaults but has no public release. Credential approvals still use the terminal. [RELEASE](docs/RELEASE.md) defines distribution status, [STEPS](docs/STEPS.md) owns delivery tasks, and [PRODUCT](docs/PRODUCT.md) defines product commitments.
 
@@ -41,10 +39,10 @@ Download the archive and its checksum, verify the hash, then extract it. Each bi
 
 <!-- install:macos -->
 ```sh
-curl -fLO https://dl.keypaste.com/v0.2.0/keypaste-0.2.0-osx-arm64.tar.gz
-curl -fLO https://dl.keypaste.com/v0.2.0/keypaste-0.2.0-osx-arm64.tar.gz.sha256
-shasum -a 256 -c keypaste-0.2.0-osx-arm64.tar.gz.sha256
-tar -xzf keypaste-0.2.0-osx-arm64.tar.gz
+curl -fLO https://dl.keypaste.com/v0.3.0/keypaste-0.3.0-osx-arm64.tar.gz
+curl -fLO https://dl.keypaste.com/v0.3.0/keypaste-0.3.0-osx-arm64.tar.gz.sha256
+shasum -a 256 -c keypaste-0.3.0-osx-arm64.tar.gz.sha256
+tar -xzf keypaste-0.3.0-osx-arm64.tar.gz
 mkdir -p ~/.local/bin && mv keypaste keypaste-mcp ~/.local/bin/
 ```
 <!-- /install:macos -->
@@ -57,10 +55,10 @@ mkdir -p ~/.local/bin && mv keypaste keypaste-mcp ~/.local/bin/
 
 <!-- install:linux -->
 ```sh
-curl -fLO https://dl.keypaste.com/v0.2.0/keypaste-0.2.0-linux-x64.tar.gz
-curl -fLO https://dl.keypaste.com/v0.2.0/keypaste-0.2.0-linux-x64.tar.gz.sha256
-sha256sum -c keypaste-0.2.0-linux-x64.tar.gz.sha256
-tar -xzf keypaste-0.2.0-linux-x64.tar.gz
+curl -fLO https://dl.keypaste.com/v0.3.0/keypaste-0.3.0-linux-x64.tar.gz
+curl -fLO https://dl.keypaste.com/v0.3.0/keypaste-0.3.0-linux-x64.tar.gz.sha256
+sha256sum -c keypaste-0.3.0-linux-x64.tar.gz.sha256
+tar -xzf keypaste-0.3.0-linux-x64.tar.gz
 mkdir -p ~/.local/bin && mv keypaste keypaste-mcp ~/.local/bin/
 ```
 <!-- /install:linux -->
@@ -73,9 +71,9 @@ For arm64, substitute `linux-arm64` in all three filenames. Both are built again
 
 <!-- install:windows -->
 ```powershell
-$a = "keypaste-0.2.0-win-x64.zip"
-Invoke-WebRequest -OutFile $a "https://dl.keypaste.com/v0.2.0/$a"
-Invoke-WebRequest -OutFile "$a.sha256" "https://dl.keypaste.com/v0.2.0/$a.sha256"
+$a = "keypaste-0.3.0-win-x64.zip"
+Invoke-WebRequest -OutFile $a "https://dl.keypaste.com/v0.3.0/$a"
+Invoke-WebRequest -OutFile "$a.sha256" "https://dl.keypaste.com/v0.3.0/$a.sha256"
 $want = (Get-Content "$a.sha256" -Raw).Split()[0]
 if ((Get-FileHash $a -Algorithm SHA256).Hash -ne $want) { throw "checksum mismatch" }
 Expand-Archive $a -DestinationPath .
@@ -92,7 +90,7 @@ Keep the absolute path of `keypaste-mcp` for your MCP client configuration.
 
 ### Download verification
 
-The checksum detects a corrupted or incomplete download. It does not authenticate the publisher. The checksum is served from the same origin as the archive, so anyone able to replace one can replace both. The published binaries are unsigned and un-notarized. Releases after `v0.2.0` also publish a build attestation that GitHub CLI can check without an account; `v0.2.0` has none. [`THREATS.md`](THREATS.md) T-21 describes the download trust boundary, and [`SECURITY.md`](SECURITY.md#verifying-a-release) has the verification steps in one place.
+The checksum detects a corrupted or incomplete download. It does not authenticate the publisher. The checksum is served from the same origin as the archive, so anyone able to replace one can replace both. The published binaries are unsigned and un-notarized. `v0.3.0` also publishes a build attestation that GitHub CLI can check without an account, covering every asset and the release manifest; `v0.2.0` and earlier have none. [`THREATS.md`](THREATS.md) T-21 describes the download trust boundary, and [`SECURITY.md`](SECURITY.md#verifying-a-release) has the verification steps in one place.
 
 The installation instructions keep downloaded commands visible for review before execution.
 
@@ -132,13 +130,13 @@ keypaste agent --vault ~/vault.kdbx
 
 If you installed `v0.1.0` and have not replaced it yet, configure the client using the manual [Claude Code](docs/mcp-setup.md#claude-code) or [Claude Desktop](docs/mcp-setup.md#claude-desktop) instructions, with the absolute path of the downloaded `keypaste-mcp`.
 
-With `v0.2.0` or a current source build, configure clients with:
+With `v0.2.0` or later, configure clients with:
 
 ```sh
 keypaste setup --vault ~/vault.kdbx
 ```
 
-`setup` configures detected clients through their `mcp add` command, or prints a configuration block for clients without one. `--dry-run` prints commands without changing configuration; `--remove` removes keypaste. `v0.1.0` lacks `setup`; `v0.2.0` includes it.
+`setup` configures detected clients through their `mcp add` command, or prints a configuration block for clients without one. `--dry-run` prints commands without changing configuration; `--remove` removes keypaste. `v0.1.0` lacks `setup`; every later release includes it.
 
 Client configuration contains no master password. [Connecting keypaste to Claude](docs/mcp-setup.md) explains setup, exposure and audit reading.
 

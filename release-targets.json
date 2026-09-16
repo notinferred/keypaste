@@ -304,7 +304,7 @@
         "osx-arm64",
         "win-x64"
       ],
-      "advertised": true,
+      "advertised": false,
       "known_defects": [
         {
           "id": "D-0119",
@@ -362,7 +362,7 @@
         "osx-arm64",
         "win-x64"
       ],
-      "advertised": false,
+      "advertised": true,
       "provenance": true
     }
   ]

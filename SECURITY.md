@@ -17,35 +17,32 @@ Reports cover this repository, its build and release pipeline, and dependencies 
 
 ## Supported versions
 
-This page describes current source behavior unless a release is named. The public CLI/MCP release is `v0.2.0`; the desktop is available from source and has no public release. [RELEASE.md](docs/RELEASE.md) records distribution status.
+This page describes current source behavior unless a release is named. The public CLI/MCP release is `v0.3.0`; the desktop is available from source and has no public release. [RELEASE.md](docs/RELEASE.md) records distribution status.
 
-Replace `v0.1.0`: env export can delete your vault; env rm and env set can act on the wrong entry; get can return the wrong password; env pull can delete an edit it never imported; moving the clock back can revive an expired approval. These defects are fixed in `v0.2.0` ([changelog](CHANGELOG.md#020)). Published archives are immutable, so the old downloads remain affected.
+Replace `v0.1.0`: env export can delete your vault; env rm and env set can act on the wrong entry; get can return the wrong password; env pull can delete an edit it never imported; moving the clock back can revive an expired approval. These defects were fixed in `v0.2.0` and the current download is `v0.3.0` ([changelog](CHANGELOG.md#030)). Published archives are immutable, so the old downloads remain affected.
 
-<!-- defects:0.2.0 -->
-`v0.2.0` has three disclosed defects. In that release, saving while another program saves the same vault can undo its change. A retry can overwrite the other program's save with Keypaste's older copy; the lost change has no history entry. The condition requires overlapping saves within about two seconds.
+**If you installed `v0.2.0`, replace it.** In that release, saving while another program saves the same vault can undo its change. A retry could overwrite the other program's save with Keypaste's older copy, and the lost change had no history entry; overlapping saves within about two seconds were enough. `v0.3.0` re-reads the vault between retries and refuses rather than overwriting.
 
-In the same release, on Windows 11 24H2 and Windows Server 2025, a save can fail when another keypaste or KeePass program is saving at the same time. A transaction can reserve a temporary name's 8.3 alias even for an unrelated vault. After about two seconds of retries, Keypaste reports failure without committing the save. Older Windows builds accept the name.
-
-Also, an agent asking for entry names on a loaded machine can be told to start keypaste agent for a process that is already running. The connection budget can expire before the bridge tries the pipe. The request releases no credential or entry names and writes nothing. `v0.1.0` has the first two defects. Repairs for all three are in `main` and are not yet published; see the `0.3.0` changelog section and STEPS F.6/F.9.
-<!-- /defects:0.2.0 -->
+Two further `v0.2.0` defects lost nothing. On Windows 11 24H2 and Windows Server 2025, a save can fail when another keypaste or KeePass program is saving at the same time, because those builds refuse a temporary name whose 8.3 alias another transaction holds; `v0.3.0` gives each process a temporary directory nothing else names. And an agent asking for entry names on a loaded machine can be told to start keypaste agent for a process that is already running, because the connection budget could expire before the bridge tried the pipe; `v0.3.0` tries the pipe first. `v0.1.0` has the first defect too. Published archives are immutable, so both older downloads remain affected.
 
 | Version | Supported | Status |
 |---|---|---|
 | `main` | Yes | Fixes land here first |
-| `0.2.x` | Yes | Current release line |
+| `0.3.x` | Yes | Current release line |
+| `0.2.x` | No | Superseded; affected by the defects above |
 | `0.1.x` | No | Superseded; affected by the defects above |
 
 There is no long-term support line before 1.0. Fixes enter `main` and the next release; older tags remain unchanged.
 
 ## Verifying a release
 
-CLI/MCP downloads at `https://dl.keypaste.com/v<version>/` include `SHA256SUMS`, per-asset `.sha256` files and corresponding source; releases after `v0.2.0` add a manifest, `keypaste-<version>-manifest.json`, and an attestation bundle, `keypaste-<version>-provenance.sigstore.jsonl`. `release.yml` tests the NativeAOT binaries it uploads, including KeePassXC compatibility in both directions. `ci.yml` runs the unit suites against an ordinary build of the same commit. Desktop artifacts have the separate publication requirements in [RELEASE.md](docs/RELEASE.md).
+CLI/MCP downloads at `https://dl.keypaste.com/v<version>/` include `SHA256SUMS`, per-asset `.sha256` files and corresponding source; `v0.3.0` adds a manifest, `keypaste-0.3.0-manifest.json`, and an attestation bundle, `keypaste-0.3.0-provenance.sigstore.jsonl`; `v0.2.0` and earlier have neither. `release.yml` tests the NativeAOT binaries it uploads, including KeePassXC compatibility in both directions. `ci.yml` runs the unit suites against an ordinary build of the same commit. Desktop artifacts have the separate publication requirements in [RELEASE.md](docs/RELEASE.md).
 
 The binaries are unsigned and un-notarized. Gatekeeper and SmartScreen behavior depends on the download path, machine and reputation. README documents the macOS quarantine limitation and manual workaround; its install blocks preserve quarantine. Signing and notarization remain O-0010. A Windows signature identifies a publisher but does not guarantee reputation-based prompts disappear.
 
 Checksums detect corrupted or truncated downloads. Because the archive and checksum share an origin, an attacker who replaces both defeats that check.
 
-Releases after `v0.2.0` also carry a GitHub build attestation, signed through Sigstore by `release.yml` running in `notinferred/keypaste` for the release tag, covering every asset and the manifest. `v0.2.0` and earlier have none. Checking one needs [GitHub CLI](https://cli.github.com/) (established with 2.86.0) and no GitHub account:
+`v0.3.0` also carries a GitHub build attestation, signed through Sigstore by `release.yml` running in `notinferred/keypaste` for the release tag, covering every asset and the manifest. `v0.2.0` and earlier have none. Checking one needs [GitHub CLI](https://cli.github.com/) (established with 2.86.0) and no GitHub account:
 
 ```sh
 v=<version>

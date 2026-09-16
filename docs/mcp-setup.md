@@ -24,7 +24,7 @@ It lands at `artifacts/bin/Keypaste.Mcp/release/keypaste-mcp` (`keypaste-mcp.exe
 
 ## The short way
 
-`setup` is available in CLI/MCP `v0.2.0` and current source builds. `v0.1.0` requires manual configuration. Building the source does not replace an older binary already on `PATH`.
+`setup` is available in CLI/MCP `v0.2.0` and later, including the published `v0.3.0`. `v0.1.0` requires manual configuration. Building the source does not replace an older binary already on `PATH`.
 
 ```sh
 keypaste setup --vault ~/vaults/personal.kdbx
@@ -247,7 +247,7 @@ You should get two JSON lines back, the second listing `list_entry_names` and `r
 
 If startup fails, check the executable path is absolute, the file is executable (`chmod +x`) and `~/.keypaste` is writable.
 
-If calls report "no keypaste agent is running", start `keypaste agent --vault <path>` for the intended vault. If it is already running, check that both processes use the same `--approver <name>` or `KEYPASTE_APPROVER`. In `v0.2.0`, a half-second connection deadline can also produce this refusal under load; retry in that case. F.9 repairs that race in source after `v0.2.0`.
+If calls report "no keypaste agent is running", start `keypaste agent --vault <path>` for the intended vault. If it is already running, check that both processes use the same `--approver <name>` or `KEYPASTE_APPROVER`. In `v0.2.0`, a half-second connection deadline can also produce this refusal under load; retry in that case. `v0.3.0` repairs that race (F.9).
 
 A call says the vault is locked. The approver reported that no vault was available. Check its terminal and restart it with the intended vault if needed. The current CLI approver opens its pipe after successful unlock; a failed unlock and exit normally produce `no-approver` instead.
 
