@@ -231,10 +231,15 @@ internal sealed class AppVaultSession : IDisposable
 
     /// <summary>Records that a person did something.</summary>
     /// <remarks>
-    /// Two field writes and nothing else. It is called from a tunnelling input handler on the
+    /// Two clock reads and two field writes. It is called from a tunnelling input handler on the
     /// window, so it happens on every keystroke and every click, and anything more expensive here
     /// would be paid for thousands of times an hour. The timer is coarse precisely so that this
     /// can be cheap: it re-arms when it fires, not when activity happens.
+    /// <para>
+    /// <b>A touch past the deadline locks.</b> Input can reach the window before its activation
+    /// re-check on a machine waking past the timeout; reviving the session then would undo exactly
+    /// the lock <see cref="Reevaluate"/> exists to deliver (F.13).
+    /// </para>
     /// </remarks>
     internal void Touch()
     {
@@ -245,9 +250,15 @@ internal sealed class AppVaultSession : IDisposable
                 return;
             }
 
-            _warned = false;
-            MarkActivity();
+            if (Idle() < _idleTimeout)
+            {
+                _warned = false;
+                MarkActivity();
+                return;
+            }
         }
+
+        Lock(VaultLockReason.Idle);
     }
 
     /// <summary>

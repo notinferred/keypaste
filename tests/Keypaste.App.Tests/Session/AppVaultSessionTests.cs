@@ -184,6 +184,28 @@ public sealed class AppVaultSessionTests
         Assert.False(session.IsUnlocked);
     }
 
+    /// <summary>
+    /// F.13: activity that arrives before the window's re-check must not revive a session whose
+    /// deadline has already passed.
+    /// </summary>
+    [Fact]
+    public void A_touch_after_the_deadline_locks_instead_of_reviving()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock();
+        using var session = new AppVaultSession(clock, TimeSpan.FromMinutes(5));
+
+        VaultLockReason? reason = null;
+        session.Locked += (_, r) => reason = r;
+        Unlock(session, fixture.Path_, TempVault.Password);
+
+        clock.AdvanceWallOnly(TimeSpan.FromHours(8));
+        session.Touch();
+
+        Assert.False(session.IsUnlocked);
+        Assert.Equal(VaultLockReason.Idle, reason);
+    }
+
     /// <summary>Waking inside the timeout must not lock somebody out mid-sentence.</summary>
     [Fact]
     public void A_short_sleep_does_not_lock_on_wake()

@@ -66,7 +66,7 @@ Thirty seconds before it locks, a quiet line appears in the header. Any key or c
 
 Settings can enable lock-on-minimize; it is off by default and persists across launches. Minimizing then closes the unlocked view, clears copied secrets and restores to the unlock screen. Switching windows and macOS `Cmd+H` do not count as minimizing.
 
-Switching windows leaves the vault unlocked and its idle countdown running. A machine that sleeps past the timeout wakes locked. The app takes the greater elapsed time from wall and monotonic clocks and rechecks on activation, covering platforms where a monotonic clock pauses during sleep.
+Switching windows leaves the vault unlocked and its idle countdown running, and so does restoring it: neither activation nor a pointer that has not moved counts as activity, so the countdown still arrives on time. A machine that sleeps past the timeout wakes locked. The app takes the greater elapsed time from wall and monotonic clocks and rechecks on activation, covering platforms where a monotonic clock pauses during sleep.
 
 Locking disposes the desktop vault session and clears its visible entry state. You type your password again to reopen it. This does not lock a separate terminal approver or erase immutable strings and external copies; see [SECURITY](../SECURITY.md) for memory and clipboard limits.
 

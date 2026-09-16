@@ -14,6 +14,8 @@ Windows saves now retry transient rename collisions. A failed save's stranded `v
 
 On Windows 11 24H2 and Windows Server 2025, temporary files now use a private process directory. Shared 8.3 temporary-name aliases previously allowed unrelated Keypaste or KeePass saves to exhaust the retry budget. Older Windows builds were unaffected.
 
+In the desktop source, restoring the window no longer postpones the idle lock when the pointer has not moved, and input arriving after the idle deadline locks the vault instead of extending it. On Windows a restore delivers a pointer move at the resting cursor, which previously counted as somebody being there.
+
 Fixed a race in the KeePassLib KDF registry that could throw or corrupt the engine list when several vaults were created concurrently on first use. KeePassInterop now forces registry initialization from its type initializer. Not reachable from the CLI, agent or desktop, which each open their first vault on a single thread.
 
 ## 0.2.1-rc.3

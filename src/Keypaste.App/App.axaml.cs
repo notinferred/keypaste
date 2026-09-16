@@ -27,10 +27,10 @@ internal sealed partial class App : Application, IDisposable
     private AppVaultSession? _session;
     private DesktopPreferences? _preferences;
     private MinimizeLock? _minimize;
+    private ActivityWatch? _activity;
     private MainWindow? _window;
     private UnlockViewModel? _unlock;
     private ShellViewModel? _shell;
-    private DateTimeOffset _lastTouch = DateTimeOffset.MinValue;
     private bool _shuttingDown;
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
@@ -46,7 +46,8 @@ internal sealed partial class App : Application, IDisposable
             _session.Locked += OnLocked;
 
             _window = new MainWindow();
-            Observe(_window);
+            _activity = Observe(_window, _session, TimeProvider.System, () => _shell?.ClearCountdown());
+            _window.AddHandler(InputElement.KeyDownEvent, OnShortcut, RoutingStrategies.Tunnel, handledEventsToo: true);
             _minimize = Watch(_window, _preferences, _session);
             ShowUnlock(home);
 
@@ -115,55 +116,20 @@ internal sealed partial class App : Application, IDisposable
     }
 
     /// <summary>
-    /// Watches the window for signs of a person, and asks the session to re-check on activation.
+    /// Arms idle-activity tracking against a window.
     /// </summary>
-    /// <remarks>
-    /// <para>
-    /// Tunnelling, at the top level, with <c>handledEventsToo</c>, so no control can swallow the
-    /// signal by handling its own input first.
-    /// </para>
-    /// <para>
-    /// <b>Window activation is not activity.</b> It re-checks the deadline instead.
-    /// Under focus-follows-mouse a stray pointer pass would otherwise hold the vault open forever,
-    /// and the case that matters — waking a machine that slept through the timeout — is one the
-    /// timer cannot see, because timers run on a monotonic clock that slept too.
-    /// </para>
-    /// <para>
-    /// Pointer movement is throttled: it fires at pointer-poll rate, and <c>Touch()</c> is cheap but
-    /// not free. Everything else calls straight through.
-    /// </para>
-    /// </remarks>
-    private void Observe(Window window)
-    {
-        window.AddHandler(InputElement.KeyDownEvent, OnActivity, RoutingStrategies.Tunnel, handledEventsToo: true);
-        window.AddHandler(InputElement.TextInputEvent, OnActivity, RoutingStrategies.Tunnel, handledEventsToo: true);
-        window.AddHandler(InputElement.PointerPressedEvent, OnActivity, RoutingStrategies.Tunnel, handledEventsToo: true);
-        window.AddHandler(InputElement.PointerWheelChangedEvent, OnActivity, RoutingStrategies.Tunnel, handledEventsToo: true);
-        window.AddHandler(InputElement.PointerMovedEvent, OnPointerMoved, RoutingStrategies.Tunnel, handledEventsToo: true);
-
-        window.AddHandler(InputElement.KeyDownEvent, OnShortcut, RoutingStrategies.Tunnel, handledEventsToo: true);
-
-        window.Activated += (_, _) => _session?.Reevaluate();
-    }
-
-    private void OnActivity(object? sender, RoutedEventArgs e)
-    {
-        _session?.Touch();
-        _shell?.ClearCountdown();
-    }
-
-    private void OnPointerMoved(object? sender, RoutedEventArgs e)
-    {
-        var now = DateTimeOffset.UtcNow;
-
-        if (now - _lastTouch < TimeSpan.FromSeconds(5))
-        {
-            return;
-        }
-
-        _lastTouch = now;
-        _session?.Touch();
-    }
+    /// <param name="window">The window a person uses.</param>
+    /// <param name="session">The session activity keeps open.</param>
+    /// <param name="clock">The clock the pointer throttle measures against.</param>
+    /// <param name="onActivity">What else a keystroke, click or wheel turn does.</param>
+    /// <returns>The watch, which the application owns for its lifetime.</returns>
+    /// <remarks><c>internal</c> for the reason <see cref="Watch"/> is: a test runs what launch runs.</remarks>
+    internal static ActivityWatch Observe(
+        Window window,
+        AppVaultSession session,
+        TimeProvider clock,
+        Action onActivity) =>
+        new(window, session, clock, onActivity);
 
     /// <summary>
     /// Takes a secret back off the clipboard before the process goes away.
@@ -323,6 +289,8 @@ internal sealed partial class App : Application, IDisposable
     {
         _minimize?.Dispose();
         _minimize = null;
+        _activity?.Dispose();
+        _activity = null;
         _shell?.Dispose();
         _shell = null;
         _unlock?.Dispose();
