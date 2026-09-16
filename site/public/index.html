@@ -173,45 +173,38 @@ Approve? [y/N]
      fix. <a href="https://github.com/notinferred/keypaste/blob/main/CHANGELOG.md#020">What
      changed</a>.</p>
 
-  <h2>What v0.2.0 is known to get wrong</h2>
+  <h2>If you installed v0.2.0, replace it</h2>
 
-<!-- defects:0.2.0 -->
-  <p class="caption"><b>Two defects, and one of them can lose an edit.</b> In v0.2.0,
+  <p class="caption"><b>v0.2.0 can lose an edit.</b> In that release,
      saving while another program saves the same vault can undo its change.
-     When keypaste cannot write the vault
-     immediately it waits a moment and tries again; if what it was waiting for was another program
-     finishing its own save, keypaste then writes its own copy over the top. Whatever that save
-     added is not in the entry's history and is not anywhere else either. It takes two saves of one
-     vault within about two seconds &mdash; which is exactly what a password manager and an agent sharing
-     a vault do. v0.1.0 has it too. Fixed on main, and in no published version yet.</p>
+     When keypaste could not write the vault immediately it waited and tried again; if what it was
+     waiting for was another program finishing its own save, keypaste then wrote its own copy over
+     the top, and whatever that save added was in no history and nowhere else. Two saves of one
+     vault within about two seconds was enough &mdash; which is exactly what a password manager and
+     an agent sharing a vault do. v0.3.0 re-reads the vault between retries and refuses to overwrite
+     a change made while it waited.</p>
 
-  <p class="caption"><b>The second one fails the save rather than losing anything.</b> Also in v0.2.0,
-     on Windows 11 24H2 and Windows Server 2025, a save can fail when another keypaste or KeePass program is saving at the same time.
-     Those Windows builds refuse a temporary name while another transaction holds one sharing its
-     short 8.3 alias, and every KeePass-family program spells that name the same way &mdash; so a
-     completely unrelated vault, or KeePass itself, is enough to collide. keypaste retries for about
-     two seconds and then reports that it could not save. Nothing is written and nothing is lost; the
-     save has to be repeated. Older Windows builds accept the name and never see this. v0.1.0 has it
-     too. Fixed on main. The v0.2.0 you can download still has it.</p>
-
-  <p class="caption"><b>The third one refuses a listing and blames the wrong thing.</b> Also in v0.2.0,
-     an agent asking for entry names on a loaded machine can be told to start keypaste agent for a process that is already running.
-     The bridge waits half a second for the approver, and on a busy machine that half second can pass
-     before the connection is made &mdash; so keypaste answers with the refusal it wrote for the case
-     where nobody is running an approver at all, and the agent tells you to start one you already
-     started. Nothing is released, nothing is written and no name is disclosed. It is being measured
-     before it is repaired, because the half second is not the part that is wrong.</p>
-<!-- /defects:0.2.0 -->
+  <p class="caption"><b>Two more, and neither of them loses anything.</b> Also in v0.2.0,
+     on Windows 11 24H2 and Windows Server 2025, a save can fail when another keypaste or KeePass program is saving at the same time,
+     because those builds refuse a temporary name whose short 8.3 alias another transaction holds,
+     and every KeePass-family program spells that name the same way. And
+     an agent asking for entry names on a loaded machine can be told to start keypaste agent for a process that is already running,
+     because the bridge's half-second budget could pass before it tried the connection. In v0.3.0
+     each process gets a temporary directory nothing else names, and the bridge tries the connection
+     before reporting the approver absent. The v0.2.0 and v0.1.0 archives are still served and still
+     carry these defects, because a published version is never rewritten here.
+     <a href="https://github.com/notinferred/keypaste/blob/main/CHANGELOG.md#030">What
+     changed</a>.</p>
 
   <h2>Install</h2>
 
   <p class="caption">Five lines, and the third one is the reason the other four are worth typing: it checks the archive against a hash published beside it and stops if they disagree. Each binary is a single native file, so nothing needs .NET on your machine. macOS on Apple Silicon:</p>
 
 <!-- install:macos -->
-<pre>curl -fLO https://dl.keypaste.com/v0.2.0/keypaste-0.2.0-osx-arm64.tar.gz
-curl -fLO https://dl.keypaste.com/v0.2.0/keypaste-0.2.0-osx-arm64.tar.gz.sha256
-shasum -a 256 -c keypaste-0.2.0-osx-arm64.tar.gz.sha256
-tar -xzf keypaste-0.2.0-osx-arm64.tar.gz
+<pre>curl -fLO https://dl.keypaste.com/v0.3.0/keypaste-0.3.0-osx-arm64.tar.gz
+curl -fLO https://dl.keypaste.com/v0.3.0/keypaste-0.3.0-osx-arm64.tar.gz.sha256
+shasum -a 256 -c keypaste-0.3.0-osx-arm64.tar.gz.sha256
+tar -xzf keypaste-0.3.0-osx-arm64.tar.gz
 mkdir -p ~/.local/bin &amp;&amp; mv keypaste keypaste-mcp ~/.local/bin/</pre>
 <!-- /install:macos -->
 
@@ -221,10 +214,10 @@ mkdir -p ~/.local/bin &amp;&amp; mv keypaste keypaste-mcp ~/.local/bin/</pre>
   <p class="caption">Linux x64 — substitute <code>linux-arm64</code> for arm64:</p>
 
 <!-- install:linux -->
-<pre>curl -fLO https://dl.keypaste.com/v0.2.0/keypaste-0.2.0-linux-x64.tar.gz
-curl -fLO https://dl.keypaste.com/v0.2.0/keypaste-0.2.0-linux-x64.tar.gz.sha256
-sha256sum -c keypaste-0.2.0-linux-x64.tar.gz.sha256
-tar -xzf keypaste-0.2.0-linux-x64.tar.gz
+<pre>curl -fLO https://dl.keypaste.com/v0.3.0/keypaste-0.3.0-linux-x64.tar.gz
+curl -fLO https://dl.keypaste.com/v0.3.0/keypaste-0.3.0-linux-x64.tar.gz.sha256
+sha256sum -c keypaste-0.3.0-linux-x64.tar.gz.sha256
+tar -xzf keypaste-0.3.0-linux-x64.tar.gz
 mkdir -p ~/.local/bin &amp;&amp; mv keypaste keypaste-mcp ~/.local/bin/</pre>
 <!-- /install:linux -->
 
@@ -247,11 +240,12 @@ keypaste run dev -- npm start    # injected into the child process, nothing on d
 
 <pre>keypaste agent --vault ~/vault.kdbx</pre>
 
-  <p class="caption">The downloads above are <strong>v0.2.0</strong>, which now includes
-     <code>setup</code>. Use the <a href="https://github.com/notinferred/keypaste/blob/main/docs/mcp-setup.md#claude-code">manual client instructions</a>
-     with those binaries. The command below requires a source build of current <code>main</code>:
-     it finds installed clients and configures each through its own <code>mcp add</code>;
-     a client without one gets its block printed to paste.</p>
+  <p class="caption">The downloads above are <strong>v0.3.0</strong>, which includes
+     <code>setup</code>: it finds installed clients and configures each through its own
+     <code>mcp add</code>, and a client without one gets its block printed to paste. Only
+     <code>v0.1.0</code> lacks it &mdash; on that release use the
+     <a href="https://github.com/notinferred/keypaste/blob/main/docs/mcp-setup.md#claude-code">manual client instructions</a>
+     instead.</p>
 
 <pre>keypaste setup --vault ~/vault.kdbx</pre>
 

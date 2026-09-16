@@ -104,7 +104,7 @@ terminal, and then try again.
 
 The MCP client may start its bridge before you start an approver. Calls are refused until an approver is available.
 
-On `0.2.0`, this refusal can also occur under load while the approver is running: the bridge's half-second connection deadline can expire before it tries the pipe. No credential or entry name is released. Retrying is appropriate. This is F.9, repaired after `0.2.0`.
+On `0.2.0`, this refusal can also occur under load while the approver is running: the bridge's half-second connection deadline can expire before it tries the pipe. No credential or entry name is released. Retrying is appropriate. This is F.9, repaired in `0.3.0`.
 
 ## What is written down
 
