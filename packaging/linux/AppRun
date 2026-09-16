@@ -1,0 +1,3 @@
+#!/bin/sh
+here="$(dirname "$(readlink -f "$0")")"
+exec "$here/usr/bin/keypaste-app" "$@"

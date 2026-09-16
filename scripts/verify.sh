@@ -85,6 +85,8 @@ check_scripts() {
   run bash scripts/verify-site-disclosure.sh --selftest
   run bash scripts/verify-release-completion.sh
   run bash scripts/verify-provenance.sh --selftest
+  run bash scripts/fetch-pinned-asset.sh --selftest
+  run bash scripts/verify-linux-appimage.sh --selftest
   run bash scripts/f9-timeline.sh --selftest
   run bash scripts/probe-results.sh --selftest
   run bash scripts/observe-minimize-lock.sh --selftest

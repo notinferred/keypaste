@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=keypaste
+Comment=keypaste {version} internal unsigned candidate
+Exec=keypaste-app
+Icon=com.keypaste.app
+Terminal=false
+Categories=Utility;Security;
+X-AppImage-Version={version}
