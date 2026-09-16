@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.keypaste.app</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>AGPL-3.0-only</project_license>
+  <name>keypaste</name>
+  <summary>Internal unsigned candidate of the keypaste desktop app</summary>
+  <description>
+    <p>keypaste {version} internal unsigned candidate. Not for distribution.</p>
+    <p>The keypaste desktop app opens the same KDBX vaults as the keypaste CLI, locks when idle and keeps copied secrets on the clipboard only briefly. This package exists to check desktop packaging before any public release.</p>
+  </description>
+  <developer id="com.keypaste">
+    <name>keypaste</name>
+  </developer>
+  <url type="homepage">https://keypaste.com</url>
+  <launchable type="desktop-id">com.keypaste.app.desktop</launchable>
+  <content_rating type="oars-1.1" />
+</component>

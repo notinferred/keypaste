@@ -26,6 +26,10 @@ on:
       - 'release-targets.json'
       - 'packaging/**'
       - 'scripts/verify-windows-installer.sh'
+      - 'scripts/fetch-pinned-asset.sh'
+      - 'scripts/build-linux-appimage.sh'
+      - 'scripts/verify-linux-appimage.sh'
+      - 'scripts/verify-publisher-metadata.sh'
       - '.github/workflows/app.yml'
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
@@ -81,7 +85,7 @@ jobs:
             ''|*[!0-9]*) echo "::error::release-targets.json did not answer with a target count"; exit 1 ;;
           esac
           [ "$n" -ge 1 ] || { echo "::error::release-targets.json packages no app targets"; exit 1; }
-          targets="$(jq -c '[.components.app.targets[] | {os: .runner, rid, archive, msi: ([.packages[]? | select(.kind == "msi")] | length > 0)}]' release-targets.json)"
+          targets="$(jq -c '[.components.app.targets[] | {os: .runner, rid, archive, msi: ([.packages[]? | select(.kind == "msi")] | length > 0), appimage: ([.packages[]? | select(.kind == "appimage")] | length > 0)}]' release-targets.json)"
           echo "targets=$targets" >> "$GITHUB_OUTPUT"
           echo "$n targets: $targets"
 
@@ -250,6 +254,25 @@ jobs:
           printf '%s  %s\n' "$hash" "$name" > "artifacts/dist/$name.sha256"
           (cd artifacts/dist && sha256sum -c "$name.sha256")
 
+      - name: Build and check the internal AppImage the definition declares
+        if: matrix.appimage
+        shell: bash
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          REPORTED: ${{ steps.v.outputs.reported }}
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends squashfs-tools desktop-file-utils file
+          image="$(scripts/build-linux-appimage.sh artifacts/stage "$VERSION" artifacts/dist)"
+          scripts/verify-linux-appimage.sh "$image" "$VERSION" "$REPORTED" artifacts/stage
+
+          name="$(basename "$image")"
+          hash="$(sha256sum < "$image" | cut -d' ' -f1)"
+          [ "${#hash}" -eq 64 ] || { echo "::error::bad checksum '$hash' for $name"; exit 1; }
+          printf '%s  %s\n' "$hash" "$name" > "artifacts/dist/$name.sha256"
+          (cd artifacts/dist && sha256sum -c "$name.sha256")
+
       # Attested now so a desktop download published by 4.7c can be checked like the CLI's (3.8).
       - name: Attest the desktop archive
         if: github.ref_type == 'tag'
@@ -262,6 +285,12 @@ jobs:
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: artifacts/dist/keypaste-app-*.msi
+
+      - name: Attest the internal AppImage
+        if: github.ref_type == 'tag' && matrix.appimage
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: artifacts/dist/keypaste-app-*.AppImage
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

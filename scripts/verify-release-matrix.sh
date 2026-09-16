@@ -144,6 +144,11 @@ holds() {
 
 flatten() { tr "\n" " "; }
 
+is_sha256() {
+  case "$1" in *[!0-9a-f]*) return 1 ;; esac
+  [ "${#1}" -eq 64 ]
+}
+
 # The permitted floor_evidence values, read out of docs/RELEASE.md rather than restated here, so
 # the table a reader is sent to is the table the gate obeys. The header cell says `floor_evidence`,
 # which carries an underscore and therefore cannot be mistaken for one of its own values.
@@ -281,9 +286,9 @@ TARGETS
 
     # An installer carries its version and target in its name, and while nothing of the component is
     # signed or published it says internal and unsigned in that name and in its record (4.7a1).
-    local policy kind pattern internal signed
+    local policy kind pattern internal signed tool_version tool_sha runtime_version runtime_sha
     policy="$(jqr ".components.\"$c\".signing.policy // empty" "$def")"
-    while IFS=$'\037' read -r rid kind pattern internal signed; do
+    while IFS=$'\037' read -r rid kind pattern internal signed tool_version tool_sha runtime_version runtime_sha; do
       [ -n "$rid" ] || continue
       case "$pattern" in *"{version}"*"{rid}"*) ;; *) note "$c/$rid: $kind package '$pattern' does not carry {version} and {rid}" ;; esac
       if [ "$policy" = "none" ]; then
@@ -293,9 +298,18 @@ TARGETS
       if [ -z "$origin" ]; then
         [ "$internal" = "true" ] || note "$c/$rid: $kind package is not recorded internal and $c has no origin to publish it"
       fi
+      # An AppImage is built by a downloaded tool around a downloaded runtime, so both are held by
+      # content hash rather than by a release name that can move (D-0142, D-0203).
+      if [ "$kind" = "appimage" ]; then
+        [ -n "$tool_version" ] && [ -n "$runtime_version" ] \
+          || note "$c/$rid: appimage package does not name the appimagetool and runtime releases it uses"
+        is_sha256 "$tool_sha" || note "$c/$rid: appimage package's appimagetool is not pinned by SHA-256"
+        is_sha256 "$runtime_sha" || note "$c/$rid: appimage package's runtime is not pinned by SHA-256"
+      fi
     done <<PACKAGES
 $(jqr ".components.\"$c\".targets // [] | .[] | .rid as \$rid | .packages // [] | .[] | [
-     \$rid, (.kind // \"\"), (.pattern // \"\"), (.internal | tostring), (.signed | tostring)
+     \$rid, (.kind // \"\"), (.pattern // \"\"), (.internal | tostring), (.signed | tostring),
+     (.tool_version // \"\"), (.tool_sha256 // \"\"), (.runtime_version // \"\"), (.runtime_sha256 // \"\")
    ] | join(\"\")" "$def" 2>/dev/null || true)
 PACKAGES
   done
@@ -741,19 +755,42 @@ validate_prerelease_path() {
 
 # A workflow that builds an installer builds only one the definition declares, names it from the
 # definition, and builds it with the tool the definition pins. An undeclared installer is a package
-# nothing else in this file can see (4.7a1, D-0139).
+# nothing else in this file can see (4.7a1, D-0139). A build may live in a script the workflow runs,
+# so those scripts are read with it, except this gate, whose fixtures name every package kind.
+package_code() {
+  local root="$1" workflow="$2" script
+  code_of "$root/$workflow"
+  for script in $(code_of "$root/$workflow" | grep -oE 'scripts/[A-Za-z0-9._-]+\.sh' | sort -u); do
+    [ "$(basename "$script")" != "$(basename "$SELF")" ] || continue
+    if [ -f "$root/$script" ]; then code_of "$root/$script"; fi
+  done
+}
+
 validate_packages() {
-  local def="$1" root="$2" c workflow declared project tool tool_version sdk heat
+  local def="$1" root="$2" c workflow declared project tool tool_version sdk heat code kind ext pin
   for c in $(jqr '.components | keys[]' "$def"); do
     workflow="$(jqr ".components.\"$c\".workflow" "$def")"
     [ -f "$root/$workflow" ] || continue
-    declared="$(count_of "$def" "[.components.\"$c\".targets[]?.packages[]? | select(.kind == \"msi\")]")"
-    if code_has "$root/$workflow" ".msi"; then
+    code="$(package_code "$root" "$workflow")"
+    for kind in msi appimage; do
+      case "$kind" in msi) ext=".msi" ;; appimage) ext=".AppImage" ;; esac
+      case "$code" in *"$ext"*) ;; *) continue ;; esac
+      declared="$(count_of "$def" "[.components.\"$c\".targets[]?.packages[]? | select(.kind == \"$kind\")]")"
       [ "${declared:-0}" -ge 1 ] \
-        || note "$workflow builds an msi package and $c declares none in the definition"
-      code_has "$root/$workflow" '.packages[] | select(.kind == "msi")' \
-        || note "$workflow builds an msi package without reading its name from the definition"
-    fi
+        || note "$workflow builds an $kind package and $c declares none in the definition"
+      case "$code" in
+        *".packages[] | select(.kind == \"$kind\")"*) ;;
+        *) note "$workflow builds an $kind package without reading its name from the definition" ;;
+      esac
+    done
+
+    # A pin written into the workflow or its scripts as well as the definition is two pins, and the
+    # copy nobody reads is the one that drifts.
+    for pin in $(jqr ".components.\"$c\".targets[]?.packages[]? | (.tool_sha256 // empty), (.runtime_sha256 // empty)" "$def"); do
+      case "$code" in
+        *"$pin"*) note "$workflow restates the pin $pin instead of reading it from the definition" ;;
+      esac
+    done
 
     while IFS=$'\037' read -r project tool tool_version; do
       [ -n "$project" ] || continue
@@ -997,6 +1034,16 @@ expect_refusal "installer-recorded-public" "is not recorded internal" \
   "$(mutate installer-recorded-public '(.components.app.targets[] | select(.rid == "win-x64") | .packages[0].internal) = false')"
 expect_refusal "installer-name-drops-the-version" "does not carry {version} and {rid}" \
   "$(mutate installer-name-drops-the-version '(.components.app.targets[] | select(.rid == "win-x64") | .packages[0].pattern) = "keypaste-app-{rid}-internal-unsigned.msi"')"
+expect_refusal "appimage-name-drops-the-label" "is not named internal and unsigned" \
+  "$(mutate appimage-name-drops-the-label '(.components.app.targets[] | select(.rid == "linux-x64") | .packages[0].pattern) = "keypaste-app-{version}-{rid}.AppImage"')"
+expect_refusal "appimage-recorded-signed" "is not recorded unsigned" \
+  "$(mutate appimage-recorded-signed '(.components.app.targets[] | select(.rid == "linux-x64") | .packages[0].signed) = true')"
+expect_refusal "appimage-recorded-public" "is not recorded internal" \
+  "$(mutate appimage-recorded-public '(.components.app.targets[] | select(.rid == "linux-x64") | .packages[0].internal) = false')"
+expect_refusal "appimage-tool-unpinned" "appimagetool is not pinned by SHA-256" \
+  "$(mutate appimage-tool-unpinned '(.components.app.targets[] | select(.rid == "linux-x64") | .packages[0]) |= del(.tool_sha256)')"
+expect_refusal "appimage-runtime-unpinned" "runtime is not pinned by SHA-256" \
+  "$(mutate appimage-runtime-unpinned '(.components.app.targets[] | select(.rid == "linux-x64") | .packages[0].runtime_sha256) = "continuous"')"
 
 echo "== fixtures: a definition the repository contradicts"
 
@@ -1011,8 +1058,8 @@ cp docs/RELEASE.md docs/desktop.md "$FAKE/docs/"
 cp site/public/index.html "$FAKE/site/public/"
 cp .github/workflows/release.yml .github/workflows/app.yml "$FAKE/.github/workflows/"
 mkdir -p "$FAKE/scripts"
-cp scripts/require-changelog-section.sh "$FAKE/scripts/"
-for project in $(jqr '.components[].projects[], .shared_projects[], (.components[].targets[].packages[]?.project)' "$DEFINITION"); do
+cp scripts/require-changelog-section.sh scripts/build-linux-appimage.sh "$FAKE/scripts/"
+for project in $(jqr '.components[].projects[], .shared_projects[], (.components[].targets[].packages[]?.project // empty)' "$DEFINITION"); do
   mkdir -p "$FAKE/$(dirname "$project")"
   cp "$project" "$FAKE/$project"
 done
@@ -1027,6 +1074,10 @@ expect_repo_refusal "csproj-and-definition-disagree" "and the definition says" \
 
 expect_repo_refusal "installer-undeclared" "builds an msi package and app declares none" \
   "$(mutate installer-undeclared '.components.app.targets |= map(del(.packages))')" \
+  "$FAKE"
+
+expect_repo_refusal "appimage-undeclared" "builds an appimage package and app declares none" \
+  "$(mutate appimage-undeclared '(.components.app.targets[] | select(.rid == "linux-x64")) |= del(.packages)')" \
   "$FAKE"
 
 expect_repo_refusal "installer-tool-unpinned" "and the definition pins WixToolset.Sdk/6.0.2" \
@@ -1078,6 +1129,17 @@ sed_inplace 's/| \.packages\[\] | select/| .installer | select/' "$FAKE/.github/
 expect_repo_refusal "installer-name-not-read-from-the-definition" "without reading its name from the definition" \
   "$FAKE/release-targets.json" "$FAKE"
 cp .github/workflows/app.yml "$FAKE/.github/workflows/app.yml"
+
+sed_inplace 's/| \.packages\[\] | select(\.kind == "appimage")/| .appimage | select(.kind == "appimage")/' "$FAKE/scripts/build-linux-appimage.sh"
+expect_repo_refusal "appimage-name-not-read-from-the-definition" "builds an appimage package without reading its name from the definition" \
+  "$FAKE/release-targets.json" "$FAKE"
+cp scripts/build-linux-appimage.sh "$FAKE/scripts/build-linux-appimage.sh"
+
+printf 'readonly TOOL_SHA256=%s\n' "$(jqr '.components.app.targets[] | select(.rid == "linux-x64") | .packages[0].tool_sha256' "$DEFINITION")" \
+  >> "$FAKE/scripts/build-linux-appimage.sh"
+expect_repo_refusal "appimage-pin-restated" "restates the pin" \
+  "$FAKE/release-targets.json" "$FAKE"
+cp scripts/build-linux-appimage.sh "$FAKE/scripts/build-linux-appimage.sh"
 
 # A target that borrows another's block has to say so, and the page has to name it - otherwise an
 # arm64 reader is told to substitute something the page never spells out.

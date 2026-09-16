@@ -153,6 +153,20 @@
           "runner": "ubuntu-24.04",
           "archive": "tar.gz",
           "cpu": "x64",
+          "packages": [
+            {
+              "kind": "appimage",
+              "pattern": "keypaste-app-{version}-{rid}-internal-unsigned.AppImage",
+              "internal": true,
+              "signed": false,
+              "tool": "appimagetool",
+              "tool_version": "1.9.1",
+              "tool_sha256": "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0",
+              "runtime": "type2-runtime",
+              "runtime_version": "20251108",
+              "runtime_sha256": "2fca8b443c92510f1483a883f60061ad09b46b978b2631c807cd873a47ec260d"
+            }
+          ],
           "advertised": false,
           "os_floor": "glibc 2.39",
           "floor_evidence": "runner-image",
