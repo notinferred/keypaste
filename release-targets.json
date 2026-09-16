@@ -141,7 +141,7 @@
         "policy": "none",
         "reason": "O-0010, O-0015",
         "until": [
-          "3.6b"
+          "3.6a"
         ],
         "disclosed_in": [
           "docs/RELEASE.md"
@@ -207,6 +207,16 @@
           "install_check_absent": "There is no public desktop release to install. 4.7a packages candidates and 4.7b exercises them."
         }
       ]
+    }
+  },
+  "signing": {
+    "dlib": {
+      "package": "Microsoft.ArtifactSigning.Client",
+      "version": "1.0.128",
+      "sha512": "mPBqaR9Pwvoi8Z3PhVZzPphgf775GjEsRTubB5jMkIja4KyzbjibVSoRtNIyAyR4W4VBwrUQkackwFvF31y/lQ==",
+      "project": "packaging/windows/signing/Keypaste.Signing.csproj",
+      "path": "bin/x64/Azure.CodeSigning.Dlib.dll",
+      "path_sha256": "2d4c1bbc87467b3ac25bbc49df58cc8b36a0f92b3e21aa98bbbad08a4d7c98ba"
     }
   },
   "shared_projects": [

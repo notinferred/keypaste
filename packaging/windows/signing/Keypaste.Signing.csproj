@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageDownload Include="Microsoft.ArtifactSigning.Client" Version="[1.0.128]" />
+  </ItemGroup>
+
+</Project>

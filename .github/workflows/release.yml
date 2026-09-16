@@ -319,6 +319,21 @@ jobs:
           fi
           echo "glibc floor confirmed: Debian 12 yes, Alpine no (musl needs linux-musl-x64, O-0013)"
 
+      - name: Restore the pinned signing dlib (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: scripts/sign-windows.sh --restore-dlib
+
+      - name: Sign the binaries as the definition's policy says (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          KEYPASTE_SIGNING_ENDPOINT: ${{ vars.KEYPASTE_SIGNING_ENDPOINT }}
+          KEYPASTE_SIGNING_ACCOUNT: ${{ vars.KEYPASTE_SIGNING_ACCOUNT }}
+          KEYPASTE_SIGNING_PROFILE: ${{ vars.KEYPASTE_SIGNING_PROFILE }}
+          KEYPASTE_SIGNING_CLIENT_ID: ${{ vars.KEYPASTE_SIGNING_CLIENT_ID }}
+        run: scripts/sign-windows.sh --component cli "artifacts/release/${{ matrix.rid }}"
+
       - name: Package and hash
         shell: bash
         run: |

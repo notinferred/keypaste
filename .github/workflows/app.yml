@@ -30,12 +30,20 @@ on:
       - 'scripts/build-linux-appimage.sh'
       - 'scripts/verify-linux-appimage.sh'
       - 'scripts/verify-publisher-metadata.sh'
+      - 'scripts/sign-windows.sh'
+      - 'scripts/verify-windows-signature.sh'
+      - 'scripts/rehearse-windows-signing.sh'
       - '.github/workflows/app.yml'
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
       - 'v[0-9]+.[0-9]+.[0-9]+-*'
   pull_request:
   workflow_dispatch:
+    inputs:
+      signing_rehearsal:
+        description: Sign the Windows payload and installer with a runner-trusted certificate and upload nothing (3.6b)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -181,6 +189,37 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
+      - name: Restore the pinned signing dlib
+        if: matrix.rid == 'win-x64'
+        shell: bash
+        run: scripts/sign-windows.sh --restore-dlib
+
+      - name: Create the runner-trusted rehearsal identity
+        id: rehearsal
+        if: matrix.rid == 'win-x64' && inputs.signing_rehearsal
+        shell: bash
+        run: scripts/rehearse-windows-signing.sh identity | tee -a "$GITHUB_OUTPUT"
+
+      - name: Sign the payload as the definition's policy says
+        if: matrix.rid == 'win-x64'
+        shell: bash
+        env:
+          REHEARSAL: ${{ steps.rehearsal.outputs.trusted }}
+          KEYPASTE_SIGNING_ENDPOINT: ${{ vars.KEYPASTE_SIGNING_ENDPOINT }}
+          KEYPASTE_SIGNING_ACCOUNT: ${{ vars.KEYPASTE_SIGNING_ACCOUNT }}
+          KEYPASTE_SIGNING_PROFILE: ${{ vars.KEYPASTE_SIGNING_PROFILE }}
+          KEYPASTE_SIGNING_CLIENT_ID: ${{ vars.KEYPASTE_SIGNING_CLIENT_ID }}
+        run: |
+          set -euo pipefail
+          out="artifacts/app/${{ matrix.rid }}"
+          if [ -n "$REHEARSAL" ]; then
+            scripts/sign-windows.sh --component app --rehearsal "$REHEARSAL" "$out"
+            scripts/verify-windows-signature.sh "$REHEARSAL" "$out/keypaste-app.exe" "$out/keypaste-app.dll" "$out/Keypaste.Core.dll" "$out/KeePassLib.dll"
+            "$out/keypaste-app.exe" --selftest
+          else
+            scripts/sign-windows.sh --component app "$out"
+          fi
+
       - name: Package and hash
         shell: bash
         env:
@@ -228,6 +267,12 @@ jobs:
           REPORTED: ${{ steps.v.outputs.reported }}
           # The SDK resolves outside packages.lock.json, so its package is held to this digest (D-0139).
           WIX_SDK_SHA512: V6RzTWKEi35XdXySYygQ6YSuai9eaF3dPN+ADLN6+dORyqOdJ2uGOA0R/velRLtbiRHdOp+cYwHtKt2zM0396w==
+          REHEARSAL: ${{ steps.rehearsal.outputs.trusted }}
+          UNTRUSTED: ${{ steps.rehearsal.outputs.untrusted }}
+          KEYPASTE_SIGNING_ENDPOINT: ${{ vars.KEYPASTE_SIGNING_ENDPOINT }}
+          KEYPASTE_SIGNING_ACCOUNT: ${{ vars.KEYPASTE_SIGNING_ACCOUNT }}
+          KEYPASTE_SIGNING_PROFILE: ${{ vars.KEYPASTE_SIGNING_PROFILE }}
+          KEYPASTE_SIGNING_CLIENT_ID: ${{ vars.KEYPASTE_SIGNING_CLIENT_ID }}
         run: |
           set -euo pipefail
           package='.components.app.targets[] | select(.rid == "${{ matrix.rid }}") | .packages[] | select(.kind == "msi")'
@@ -248,6 +293,12 @@ jobs:
             -p:FullVersion="$VERSION" -p:ProductVersion="${VERSION%%-*}"
           mv artifacts/installer/keypaste-app.msi "artifacts/dist/$name"
           scripts/verify-windows-installer.sh "artifacts/dist/$name" "$VERSION" "$REPORTED" artifacts/stage
+          if [ -n "$REHEARSAL" ]; then
+            scripts/sign-windows.sh --component app --rehearsal "$REHEARSAL" "artifacts/dist/$name"
+            scripts/rehearse-windows-signing.sh refusals "$REHEARSAL" "$UNTRUSTED" artifacts/app/win-x64/keypaste-app.exe "artifacts/dist/$name"
+          else
+            scripts/sign-windows.sh --component app "artifacts/dist/$name"
+          fi
 
           hash="$(sha256sum < "artifacts/dist/$name" | cut -d' ' -f1)"
           [ "${#hash}" -eq 64 ] || { echo "::error::bad checksum '$hash' for $name"; exit 1; }
@@ -275,24 +326,30 @@ jobs:
 
       # Attested now so a desktop download published by 4.7c can be checked like the CLI's (3.8).
       - name: Attest the desktop archive
-        if: github.ref_type == 'tag'
+        if: github.ref_type == 'tag' && steps.rehearsal.outputs.trusted == ''
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: artifacts/dist/keypaste-app-*.${{ matrix.archive }}
 
       - name: Attest the internal installer
-        if: github.ref_type == 'tag' && matrix.msi
+        if: github.ref_type == 'tag' && matrix.msi && steps.rehearsal.outputs.trusted == ''
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: artifacts/dist/keypaste-app-*.msi
 
       - name: Attest the internal AppImage
-        if: github.ref_type == 'tag' && matrix.appimage
+        if: github.ref_type == 'tag' && matrix.appimage && steps.rehearsal.outputs.trusted == ''
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: artifacts/dist/keypaste-app-*.AppImage
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - name: Remove the rehearsal certificates
+        if: always() && steps.rehearsal.outputs.trusted != ''
+        shell: bash
+        run: scripts/rehearse-windows-signing.sh cleanup '${{ steps.rehearsal.outputs.trusted }}' '${{ steps.rehearsal.outputs.untrusted }}'
+
+      - if: steps.rehearsal.outputs.trusted == ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: app-${{ matrix.rid }}
           path: artifacts/dist/*
