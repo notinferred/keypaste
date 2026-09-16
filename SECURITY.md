@@ -26,7 +26,7 @@ Replace `v0.1.0`: env export can delete your vault; env rm and env set can act o
 
 In the same release, on Windows 11 24H2 and Windows Server 2025, a save can fail when another keypaste or KeePass program is saving at the same time. A transaction can reserve a temporary name's 8.3 alias even for an unrelated vault. After about two seconds of retries, Keypaste reports failure without committing the save. Older Windows builds accept the name.
 
-Also, an agent asking for entry names on a loaded machine can be told to start keypaste agent for a process that is already running. The connection budget can expire before the bridge tries the pipe. The request releases no credential or entry names and writes nothing. `v0.1.0` has the first two defects. Repairs for all three are in `main` and remain unreleased; see the Unreleased changelog and STEPS F.6/F.9.
+Also, an agent asking for entry names on a loaded machine can be told to start keypaste agent for a process that is already running. The connection budget can expire before the bridge tries the pipe. The request releases no credential or entry names and writes nothing. `v0.1.0` has the first two defects. Repairs for all three are in `main` and are not yet published; see the `0.3.0` changelog section and STEPS F.6/F.9.
 <!-- /defects:0.2.0 -->
 
 | Version | Supported | Status |
