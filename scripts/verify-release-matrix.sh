@@ -288,6 +288,7 @@ TARGETS
     # signed or published it says internal and unsigned in that name and in its record (4.7a1).
     local policy kind pattern internal signed tool_version tool_sha runtime_version runtime_sha
     policy="$(jqr ".components.\"$c\".signing.policy // empty" "$def")"
+    case "$policy" in none | authenticode) ;; *) note "$c: signing policy '$policy' is neither none nor authenticode" ;; esac
     while IFS=$'\037' read -r rid kind pattern internal signed tool_version tool_sha runtime_version runtime_sha; do
       [ -n "$rid" ] || continue
       case "$pattern" in *"{version}"*"{rid}"*) ;; *) note "$c/$rid: $kind package '$pattern' does not carry {version} and {rid}" ;; esac
@@ -313,6 +314,18 @@ $(jqr ".components.\"$c\".targets // [] | .[] | .rid as \$rid | .packages // [] 
    ] | join(\"\")" "$def" 2>/dev/null || true)
 PACKAGES
   done
+
+  # The Artifact Signing dlib is restored by NuGet and held to both digests, for x64 signtool (D-0204).
+  local dlib_package dlib_version dlib_project dlib_sha512 dlib_path dlib_sha256
+  IFS=$'\037' read -r dlib_package dlib_version dlib_project dlib_sha512 dlib_path dlib_sha256 <<DLIB || true
+$(jqr '.signing.dlib // {} | [.package, .version, .project, .sha512, .path, .path_sha256] | map(. // "") | join("\u001f")' "$def" 2>/dev/null || true)
+DLIB
+  [ -n "$dlib_package" ] && [ -n "$dlib_version" ] && [ -n "$dlib_project" ] \
+    || note "signing.dlib does not name the package, version and restore project it pins"
+  case "$dlib_sha512" in *[!A-Za-z0-9+/=]*) dlib_sha512="" ;; esac
+  [ "${#dlib_sha512}" -eq 88 ] || note "signing.dlib's package is not pinned by SHA-512"
+  is_sha256 "$dlib_sha256" || note "signing.dlib's dll is not pinned by SHA-256"
+  case "$dlib_path" in bin/x64/*.dll) ;; *) note "signing.dlib path '$dlib_path' is not the x64 dlib signtool x64 loads" ;; esac
 
   # published: unique versions, and every rid it names is still advertised.
   local pubs
@@ -757,11 +770,12 @@ validate_prerelease_path() {
 # definition, and builds it with the tool the definition pins. An undeclared installer is a package
 # nothing else in this file can see (4.7a1, D-0139). A build may live in a script the workflow runs,
 # so those scripts are read with it, except this gate, whose fixtures name every package kind.
+# sign-windows.sh names installers it signs and builds none.
 package_code() {
-  local root="$1" workflow="$2" script
+  local root="$1" workflow="$2" exempt="${3-sign-windows.sh}" script
   code_of "$root/$workflow"
   for script in $(code_of "$root/$workflow" | grep -oE 'scripts/[A-Za-z0-9._-]+\.sh' | sort -u); do
-    [ "$(basename "$script")" != "$(basename "$SELF")" ] || continue
+    case " $(basename "$SELF") $exempt " in *" $(basename "$script") "*) continue ;; esac
     if [ -f "$root/$script" ]; then code_of "$root/$script"; fi
   done
 }
@@ -810,6 +824,67 @@ $(jqr ".components.\"$c\".targets // [] | .[] | .packages // [] | .[] | [
    ] | join(\"\")" "$def" 2>/dev/null || true)
 PROJECTS
   done
+}
+
+# The steps of a workflow, one per NUL-free record, split on a step's leading dash.
+workflow_steps() { code_of "$1" | awk '/^      - / { if (step != "") printf "%s\035", step; step = "" } { step = step $0 " " } END { printf "%s\035", step }'; }
+
+# A Windows build signs only through sign-windows.sh, which reads the policy from the definition;
+# a rehearsal signature lives only in app.yml's dispatch and never reaches an upload or attestation (3.6b, D-0204).
+validate_signing() {
+  local def="$1" root="$2" c workflow code step project version pin pins
+  pins="$(jqr '.signing.dlib.sha512 // empty, .signing.dlib.path_sha256 // empty' "$def")"
+  for c in $(jqr '.components | keys[]' "$def"); do
+    workflow="$(jqr ".components.\"$c\".workflow" "$def")"
+    [ -f "$root/$workflow" ] || continue
+    code="$(code_of "$root/$workflow")"
+
+    if [ -n "$(jqr ".components.\"$c\".targets[]? | select(.rid | startswith(\"win-\")) | .rid" "$def")" ]; then
+      case "$code" in
+        *"scripts/sign-windows.sh --component $c "*) ;;
+        *) note "$workflow builds a Windows target and never signs it through sign-windows.sh --component $c" ;;
+      esac
+      case "$code" in
+        *"scripts/sign-windows.sh --restore-dlib"*) ;;
+        *) note "$workflow builds a Windows target and never restores the pinned signing dlib" ;;
+      esac
+    fi
+
+    case "$code" in
+      *"--rehearsal"* | *"rehearse-windows-signing.sh"* | *"signing_rehearsal"*)
+        if [ "$workflow" != ".github/workflows/app.yml" ]; then
+          note "$workflow rehearses signing, which only app.yml's dispatch may do"
+        else
+          while IFS= read -r -d $'\035' step; do
+            case "$step" in
+              *"uses: actions/upload-artifact"* | *"uses: actions/attest-build-provenance"*)
+                case "$step" in
+                  *"steps.rehearsal.outputs.trusted == ''"*) ;;
+                  *) note "$workflow can upload or attest a rehearsal-signed file: $(printf '%s' "$step" | sed -E 's/ +/ /g' | cut -c1-80)" ;;
+                esac ;;
+            esac
+          done < <(workflow_steps "$root/$workflow")
+        fi ;;
+    esac
+
+    code="$(package_code "$root" "$workflow" "")"
+    for pin in $pins; do
+      case "$code" in
+        *"$pin"*) note "$workflow restates the signing dlib pin $pin instead of reading it from the definition" ;;
+      esac
+    done
+  done
+
+  project="$(jqr '.signing.dlib.project // empty' "$def")"
+  version="$(jqr '.signing.dlib.version // empty' "$def")"
+  if [ -n "$project" ]; then
+    if [ ! -f "$root/$project" ]; then
+      note "no signing dlib restore project at $project"
+    else
+      grep -qF "<PackageDownload Include=\"$(jqr '.signing.dlib.package' "$def")\" Version=\"[$version]\" />" "$root/$project" \
+        || note "$project does not download the signing dlib at the pinned $version"
+    fi
+  fi
 }
 
 # ---------------------------------------------------------------------------
@@ -916,6 +991,7 @@ validate_documents "$DEFINITION" "$ROOT" || true
 validate_source_version "$DEFINITION" "$ROOT" || true
 validate_prerelease_path "$DEFINITION" "$ROOT" || true
 validate_packages "$DEFINITION" "$ROOT" || true
+validate_signing "$DEFINITION" "$ROOT" || true
 
 echo "== published, against git history"
 validate_history "$ROOT" "$DEFINITION" || true
@@ -982,6 +1058,7 @@ expect_repo_refusal() {
   validate_install_jobs "$file" "$root" || true
   validate_documents "$file" "$root" || true
   validate_packages "$file" "$root" || true
+  validate_signing "$file" "$root" || true
   report "$name" "$want"
 }
 
@@ -1044,6 +1121,14 @@ expect_refusal "appimage-tool-unpinned" "appimagetool is not pinned by SHA-256" 
   "$(mutate appimage-tool-unpinned '(.components.app.targets[] | select(.rid == "linux-x64") | .packages[0]) |= del(.tool_sha256)')"
 expect_refusal "appimage-runtime-unpinned" "runtime is not pinned by SHA-256" \
   "$(mutate appimage-runtime-unpinned '(.components.app.targets[] | select(.rid == "linux-x64") | .packages[0].runtime_sha256) = "continuous"')"
+expect_refusal "signing-policy-unknown" "is neither none nor authenticode" \
+  "$(mutate signing-policy-unknown '.components.app.signing.policy = "rehearsal"')"
+expect_refusal "signing-dlib-package-unpinned" "package is not pinned by SHA-512" \
+  "$(mutate signing-dlib-package-unpinned '.signing.dlib |= del(.sha512)')"
+expect_refusal "signing-dlib-unpinned" "dll is not pinned by SHA-256" \
+  "$(mutate signing-dlib-unpinned '.signing.dlib.path_sha256 = "latest"')"
+expect_refusal "signing-dlib-not-x64" "is not the x64 dlib" \
+  "$(mutate signing-dlib-not-x64 '.signing.dlib.path = "bin/x86/Azure.CodeSigning.Dlib.dll"')"
 
 echo "== fixtures: a definition the repository contradicts"
 
@@ -1058,7 +1143,11 @@ cp docs/RELEASE.md docs/desktop.md "$FAKE/docs/"
 cp site/public/index.html "$FAKE/site/public/"
 cp .github/workflows/release.yml .github/workflows/app.yml "$FAKE/.github/workflows/"
 mkdir -p "$FAKE/scripts"
-cp scripts/require-changelog-section.sh scripts/build-linux-appimage.sh "$FAKE/scripts/"
+cp scripts/require-changelog-section.sh scripts/build-linux-appimage.sh scripts/sign-windows.sh \
+  scripts/verify-windows-signature.sh scripts/rehearse-windows-signing.sh "$FAKE/scripts/"
+DLIB_PROJECT="$(jqr '.signing.dlib.project' "$DEFINITION")"
+mkdir -p "$FAKE/$(dirname "$DLIB_PROJECT")"
+cp "$DLIB_PROJECT" "$FAKE/$DLIB_PROJECT"
 for project in $(jqr '.components[].projects[], .shared_projects[], (.components[].targets[].packages[]?.project // empty)' "$DEFINITION"); do
   mkdir -p "$FAKE/$(dirname "$project")"
   cp "$project" "$FAKE/$project"
@@ -1141,6 +1230,46 @@ expect_repo_refusal "appimage-pin-restated" "restates the pin" \
   "$FAKE/release-targets.json" "$FAKE"
 cp scripts/build-linux-appimage.sh "$FAKE/scripts/build-linux-appimage.sh"
 
+# The rehearsal's guard is the only thing between a runner-trusted signature and an uploaded artifact.
+sed_inplace "s/^      - if: steps.rehearsal.outputs.trusted == ''$/      - if: always()/" "$FAKE/.github/workflows/app.yml"
+expect_repo_refusal "rehearsal-reaches-upload" "can upload or attest a rehearsal-signed file" \
+  "$FAKE/release-targets.json" "$FAKE"
+cp .github/workflows/app.yml "$FAKE/.github/workflows/app.yml"
+
+sed_inplace "s/ \&\& steps.rehearsal.outputs.trusted == ''//" "$FAKE/.github/workflows/app.yml"
+expect_repo_refusal "rehearsal-reaches-attestation" "can upload or attest a rehearsal-signed file" \
+  "$FAKE/release-targets.json" "$FAKE"
+cp .github/workflows/app.yml "$FAKE/.github/workflows/app.yml"
+
+sed_inplace 's|run: scripts/sign-windows.sh --component cli |run: scripts/sign-windows.sh --component cli --rehearsal "$THUMB" |' "$FAKE/.github/workflows/release.yml"
+expect_repo_refusal "rehearsal-in-release-workflow" "which only app.yml's dispatch may do" \
+  "$FAKE/release-targets.json" "$FAKE"
+cp .github/workflows/release.yml "$FAKE/.github/workflows/release.yml"
+
+sed_inplace '/run: scripts\/sign-windows.sh --component cli /d' "$FAKE/.github/workflows/release.yml"
+expect_repo_refusal "windows-build-never-signs" "never signs it through sign-windows.sh --component cli" \
+  "$FAKE/release-targets.json" "$FAKE"
+cp .github/workflows/release.yml "$FAKE/.github/workflows/release.yml"
+
+sed_inplace '/run: scripts\/sign-windows.sh --restore-dlib/d' "$FAKE/.github/workflows/release.yml"
+expect_repo_refusal "windows-build-without-the-dlib" "never restores the pinned signing dlib" \
+  "$FAKE/release-targets.json" "$FAKE"
+cp .github/workflows/release.yml "$FAKE/.github/workflows/release.yml"
+
+printf '        run: signtool sign /fd SHA256 artifacts/release/win-x64/keypaste.exe\n' >> "$FAKE/.github/workflows/release.yml"
+expect_repo_refusal "workflow-signs-directly" "signs a payload while the cli signing policy is none" \
+  "$FAKE/release-targets.json" "$FAKE"
+cp .github/workflows/release.yml "$FAKE/.github/workflows/release.yml"
+
+printf 'readonly DLIB_SHA256=%s\n' "$(jqr '.signing.dlib.path_sha256' "$DEFINITION")" >> "$FAKE/scripts/sign-windows.sh"
+expect_repo_refusal "signing-dlib-pin-restated" "restates the signing dlib pin" \
+  "$FAKE/release-targets.json" "$FAKE"
+cp scripts/sign-windows.sh "$FAKE/scripts/sign-windows.sh"
+
+expect_repo_refusal "signing-dlib-project-on-another-version" "does not download the signing dlib at the pinned 1.0.115" \
+  "$(mutate signing-dlib-project-on-another-version '.signing.dlib.version = "1.0.115"')" \
+  "$FAKE"
+
 # A target that borrows another's block has to say so, and the page has to name it - otherwise an
 # arm64 reader is told to substitute something the page never spells out.
 expect_repo_refusal "borrowed-block-with-no-reason" "records no reason it has none of its own" \
@@ -1212,6 +1341,11 @@ cat > "$WORK/only-length.json" <<'ONLY'
       "signing": { "policy": "none", "disclosed_in": [] },
       "targets": null
     }
+  },
+  "signing": {
+    "dlib": { "package": "x", "version": "1.0.0", "project": "x.csproj", "path": "bin/x64/x.dll",
+      "sha512": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+      "path_sha256": "0000000000000000000000000000000000000000000000000000000000000000" }
   },
   "shared_projects": [],
   "source_only": [],

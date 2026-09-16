@@ -106,6 +106,14 @@ jobs:
         shell: bash
         run: scripts/verify-provenance.sh --selftest
 
+      - name: Verify Windows signing fails closed and signs only through the pinned dlib or a rehearsal
+        shell: bash
+        run: scripts/sign-windows.sh --selftest
+
+      - name: Verify the Windows signature check refuses an untrusted, untimestamped or changed file
+        shell: bash
+        run: scripts/verify-windows-signature.sh --selftest
+
   test:
     name: test (${{ matrix.os }})
     needs: gate

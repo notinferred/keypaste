@@ -277,6 +277,7 @@ public sealed class ReleaseMatrixIsPinnedTests
                      "signing-disclosure-deleted",        // "unsigned" removed while it is true
                      "csproj-and-definition-disagree",
                      "target-nothing-else-declares",
+                     "rehearsal-reaches-upload",          // a runner-trusted signature uploaded
                      "race.yml",                          // the early-exit reader, put back
                  })
         {
