@@ -378,6 +378,21 @@
       ],
       "advertised": true,
       "provenance": true
+    },
+    {
+      "version": "0.3.1-rc.1",
+      "tag": "v0.3.1-rc.1",
+      "component": "cli",
+      "date": "2026-09-16",
+      "origin": "https://dl.keypaste.com/v0.3.1-rc.1/",
+      "rids": [
+        "linux-x64",
+        "linux-arm64",
+        "osx-arm64",
+        "win-x64"
+      ],
+      "advertised": false,
+      "provenance": true
     }
   ]
 }
