@@ -82,9 +82,12 @@ classify() {
     case "$result" in pass | not-applicable) ;; *) [ -n "$blocked" ] || blocked="$1" ;; esac
   }
 
+  # The registration count is read here as well as after the upgrade, so a query that cannot see an
+  # installation says so at the first install rather than first at the upgrade (run 35263524309).
   if judge install-lower; then
-    if [ "$(fact_of "$dir" lower_version)" = "$LOWER" ]; then result=pass; why="$detail"
-    else result=contradiction; why="the installed app reports $(fact_of "$dir" lower_version), not $LOWER"
+    if [ "$(fact_of "$dir" lower_version)" != "$LOWER" ]; then result=contradiction; why="the installed app reports $(fact_of "$dir" lower_version), not $LOWER"
+    elif [ "$(fact_of "$dir" products_after_install)" != 1 ]; then result=contradiction; why="$(fact_of "$dir" products_after_install) keypaste installations are registered after installing $LOWER, not 1"
+    else result=pass; why="$detail"
     fi
   fi
   emit install-lower
@@ -313,12 +316,31 @@ windows_app() { printf '%s' "$(cygpath -u "$LOCALAPPDATA")/Programs/keypaste/key
 
 windows_shortcut() { printf '%s' "$(cygpath -u "$APPDATA")/Microsoft/Windows/Start Menu/Programs/keypaste.lnk"; }
 
-# The per-user installation registers itself under HKCU, which is also where the uninstall must leave nothing.
+# Windows Installer is asked, not a registry path: this install registers under
+# HKLM\...\Installer\UserData\<SID>\Products and nothing lands in HKCU's Uninstall list, so
+# enumerating that hive reported no installation at all (run 35263524309, D-0209).
 windows_registrations() {
-  powershell_out "@(Get-ItemProperty 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*' -ErrorAction SilentlyContinue | Where-Object { \$_.DisplayName -like 'keypaste*' } | ForEach-Object { \"\$(\$_.DisplayName)|\$(\$_.DisplayVersion)\" })"
+  powershell_out "\$i = New-Object -ComObject WindowsInstaller.Installer
+    foreach (\$p in @(\$i.GetType().InvokeMember('RelatedProducts', 'GetProperty', \$null, \$i, @('$(upgrade_code)')))) {
+      \"\$p|\$(\$i.ProductInfo(\$p, 'VersionString'))|\$(\$i.ProductInfo(\$p, 'ProductName'))\"
+    }"
 }
 
 windows_registration_count() { windows_registrations | grep -c . || true; }
+
+# The package's own code, so the harness and the installer cannot disagree about which product this is.
+upgrade_code() {
+  local code
+  code="$(sed -n 's/.*UpgradeCode="\([^"]*\)".*/\1/p' "$ROOT/packaging/windows/Package.wxs" | head -n 1)"
+  [ -n "$code" ] || die 'packaging/windows/Package.wxs declares no UpgradeCode'
+  printf '{%s}' "${code^^}"
+}
+
+# An MSI verbose log is UTF-16, which no grep of ours was reading: the interrupt never saw InstallFiles
+# and the refused downgrade never saw its message (run 35263524309, D-0209).
+msi_log_says() { # msi_log_says <log> <extended-regexp>
+  [ -f "$1" ] && tr -d '\0' < "$1" | grep -qiE "$2"
+}
 
 app_version() {
   local app="$1"
@@ -338,8 +360,9 @@ install_lower() {
     [ -x "$APP" ] || { echo "msiexec exited 0 and $APP does not exist"; return 1; }
     fact lower_version "$(app_version "$APP")"
     "$APP" --selftest > /dev/null || { echo 'the installed app failed --selftest'; return 1; }
+    fact products_after_install "$(windows_registration_count)"
     fact registrations_after_install "$(windows_registrations | tr '\n' ' ')"
-    echo "msiexec /i exited 0; installed $(cygpath -m "$APP") reporting $(fact_read lower_version)"
+    echo "msiexec /i exited 0; installed $(cygpath -m "$APP") reporting $(fact_read lower_version), $(fact_read products_after_install) registered"
   else
     app="$(candidate "$LOWER")" || return 1
     mkdir -p "$(dirname "$APPIMAGE")"
@@ -347,6 +370,7 @@ install_lower() {
     APP="$APPIMAGE"
     fact lower_version "$(app_version "$APP")"
     "$APP" --selftest > /dev/null || { echo 'the installed AppImage failed --selftest'; return 1; }
+    fact products_after_install "$(find "$(dirname "$APPIMAGE")" -maxdepth 1 -name 'keypaste*.AppImage' | grep -c . || true)"
     echo "placed $APPIMAGE reporting $(fact_read lower_version)"
   fi
 }
@@ -391,7 +415,7 @@ interrupt() {
     # Kill it the moment the log says the transaction has started copying files.
     fact interrupted_exit waiting
     for _ in $(seq 1 600); do
-      if grep -qi 'Action start.*InstallFiles' "$log" 2>/dev/null; then
+      if msi_log_says "$log" 'Action start.*InstallFiles'; then
         powershell_out "Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue; 'killed'" > /dev/null
         fact interrupted_exit killed-at-installfiles
         break
@@ -399,7 +423,7 @@ interrupt() {
       alive="$(powershell_out "if (Get-Process -Id $pid -ErrorAction SilentlyContinue) { 'yes' } else { 'no' }")"
       if [ "$alive" = no ]; then
         # It finished without reaching InstallFiles, or failed before it: whatever the log says.
-        fact interrupted_exit "$(grep -ciE 'Installation success|configured successfully' "$log" 2>/dev/null || true)-finished-early"
+        fact interrupted_exit finished-before-installfiles
         break
       fi
       sleep 0.1
@@ -415,8 +439,8 @@ interrupt() {
     done
 
     where='the log names no rollback'
-    grep -qi 'Action start.*InstallFiles' "$log" 2>/dev/null && where='it was killed while installing files'
-    if grep -qiE 'Action start.*Rollback|Rollback: ' "$log" 2>/dev/null; then
+    msi_log_says "$log" 'Action start.*InstallFiles' && where='it was killed while installing files'
+    if msi_log_says "$log" 'Action start.*Rollback|Rollback: '; then
       fact interrupted_rollback present
       where="$where and the installer rolled back"
     else
@@ -443,14 +467,19 @@ downgrade() {
   msi="$(candidate "$LOWER")" || return 1
   code="$(msiexec_install "$msi" "$log")"
   fact downgrade_exit "$code"
-  if grep -qF "$DOWNGRADE_MESSAGE" "$log" 2>/dev/null; then fact downgrade_message present; else fact downgrade_message absent; fi
+  if msi_log_says "$log" "$DOWNGRADE_MESSAGE"; then fact downgrade_message present; else fact downgrade_message absent; fi
   fact version_after_downgrade "$(app_version "$APP")"
 }
 
 uninstall() {
-  local code
+  local code product
   if [ "$PLATFORM" = windows ]; then
-    code="$(powershell_out "(Start-Process msiexec.exe -ArgumentList '/x', '\"$(cygpath -w "$(candidate "$HIGHER")")\"', '/qn', '/l*v', '\"$(cygpath -w "$OUT/uninstall.log")\"' -Wait -PassThru).ExitCode")"
+    # By product code, not by candidate path: a path names a package, and msiexec refuses it with
+    # 1605 when the installed product is another one (run 35263524309).
+    product="$(windows_registrations | head -n 1 | cut -d'|' -f1)"
+    [ -n "$product" ] || { echo 'no registered keypaste product to uninstall'; return 1; }
+    fact uninstalled_product "$product"
+    code="$(powershell_out "(Start-Process msiexec.exe -ArgumentList '/x', '$product', '/qn', '/l*v', '\"$(cygpath -w "$OUT/uninstall.log")\"' -Wait -PassThru).ExitCode")"
     [ "$code" = 0 ] || { echo "msiexec /x exited $code"; return 1; }
     if [ -e "$(dirname "$APP")" ]; then fact installed_app_after_uninstall "$(cygpath -m "$(dirname "$APP")")"; else fact installed_app_after_uninstall absent; fi
     if [ -f "$(windows_shortcut)" ]; then fact shortcut_after_uninstall present; else fact shortcut_after_uninstall absent; fi
@@ -541,7 +570,7 @@ selftest() {
       '{"action":"uninstall","status":"ok","detail":"msiexec /x exited 0"}' > "$dir/driver.jsonl"
     printf '%s\n' \
       '{"fact":"platform","value":"windows"}' \
-      "{\"fact\":\"lower_version\",\"value\":\"$LOWER\"}" \
+      "{\"fact\":\"lower_version\",\"value\":\"$LOWER\"}"       '{"fact":"products_after_install","value":"1"}' \
       '{"fact":"baseline","value":"complete"}' \
       "{\"fact\":\"higher_version\",\"value\":\"$HIGHER\"}" \
       '{"fact":"products_after_upgrade","value":"1"}' \
@@ -587,6 +616,8 @@ selftest() {
   refuse_action lower-not-installed install-lower 'msiexec /i exited 1603'
   passing lower-reports-another-version
   set_fact lower-reports-another-version lower_version 0.3.1
+  passing install-unregistered
+  set_fact install-unregistered products_after_install 0
   passing fixture-incomplete
   set_fact fixture-incomplete baseline 'absent policy.toml'
   passing upgrade-not-taken
@@ -638,6 +669,8 @@ selftest() {
   expect lower-not-installed uninstall unreached
   expect lower-reports-another-version install-lower contradiction
   expect lower-reports-another-version upgrade unreached
+  expect install-unregistered install-lower contradiction
+  expect install-unregistered upgrade unreached
   expect fixture-incomplete fixture contradiction
   expect upgrade-not-taken upgrade contradiction
   expect upgrade-not-taken data-after-upgrade unreached
