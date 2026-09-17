@@ -194,6 +194,20 @@ jobs:
         shell: bash
         run: scripts/sign-windows.sh --restore-dlib
 
+      - name: Resolve the signing policy
+        id: signing
+        if: matrix.rid == 'win-x64'
+        shell: bash
+        run: echo "policy=$(jq -r '.components.app.signing.policy' release-targets.json | tr -d '\r')" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Sign in to Azure for Artifact Signing
+        if: matrix.rid == 'win-x64' && !inputs.signing_rehearsal && steps.signing.outputs.policy == 'authenticode'
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.KEYPASTE_SIGNING_CLIENT_ID }}
+          tenant-id: ${{ vars.KEYPASTE_SIGNING_TENANT_ID }}
+          allow-no-subscriptions: true
+
       - name: Create the runner-trusted rehearsal identity
         id: rehearsal
         if: matrix.rid == 'win-x64' && inputs.signing_rehearsal
@@ -209,6 +223,7 @@ jobs:
           KEYPASTE_SIGNING_ACCOUNT: ${{ vars.KEYPASTE_SIGNING_ACCOUNT }}
           KEYPASTE_SIGNING_PROFILE: ${{ vars.KEYPASTE_SIGNING_PROFILE }}
           KEYPASTE_SIGNING_CLIENT_ID: ${{ vars.KEYPASTE_SIGNING_CLIENT_ID }}
+          KEYPASTE_SIGNING_TENANT_ID: ${{ vars.KEYPASTE_SIGNING_TENANT_ID }}
         run: |
           set -euo pipefail
           out="artifacts/app/${{ matrix.rid }}"
@@ -273,6 +288,7 @@ jobs:
           KEYPASTE_SIGNING_ACCOUNT: ${{ vars.KEYPASTE_SIGNING_ACCOUNT }}
           KEYPASTE_SIGNING_PROFILE: ${{ vars.KEYPASTE_SIGNING_PROFILE }}
           KEYPASTE_SIGNING_CLIENT_ID: ${{ vars.KEYPASTE_SIGNING_CLIENT_ID }}
+          KEYPASTE_SIGNING_TENANT_ID: ${{ vars.KEYPASTE_SIGNING_TENANT_ID }}
         run: |
           set -euo pipefail
           package='.components.app.targets[] | select(.rid == "${{ matrix.rid }}") | .packages[] | select(.kind == "msi")'
