@@ -128,27 +128,9 @@ kill_owner() {
   powershell_out "Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue; 'stopped'"
 }
 
-# A package that stays a package, whose files cannot be extracted: the cabinet stream is replaced with a
-# cabinet header and nothing else, so InstallFiles itself fails rather than the source going missing.
+# One owner for the surgery, shared with 4.7d's own harness (F.14).
 break_cabinet() { # break_cabinet <msi>
-  local msi="$1" broken="$OUT/$METHOD-broken.cab"
-  printf 'MSCF' > "$broken"
-  head -c 4096 /dev/zero >> "$broken"
-  powershell_out "\$ErrorActionPreference = 'Stop'
-    \$i = New-Object -ComObject WindowsInstaller.Installer
-    \$db = \$i.GetType().InvokeMember('OpenDatabase', 'InvokeMethod', \$null, \$i, @('$(cygpath -w "$msi")', 1))
-    \$media = \$db.GetType().InvokeMember('OpenView', 'InvokeMethod', \$null, \$db, @('SELECT \`Cabinet\` FROM \`Media\`'))
-    [void]\$media.GetType().InvokeMember('Execute', 'InvokeMethod', \$null, \$media, \$null)
-    \$row = \$media.GetType().InvokeMember('Fetch', 'InvokeMethod', \$null, \$media, \$null)
-    \$cab = (\$row.GetType().InvokeMember('StringData', 'GetProperty', \$null, \$row, 1)).TrimStart('#')
-    \$view = \$db.GetType().InvokeMember('OpenView', 'InvokeMethod', \$null, \$db, @(\"SELECT \`Name\`,\`Data\` FROM \`_Streams\` WHERE \`Name\` = '\$cab'\"))
-    [void]\$view.GetType().InvokeMember('Execute', 'InvokeMethod', \$null, \$view, \$null)
-    \$rec = \$view.GetType().InvokeMember('Fetch', 'InvokeMethod', \$null, \$view, \$null)
-    if (\$rec -eq \$null) { throw \"the package holds no stream named \$cab\" }
-    \$rec.GetType().InvokeMember('SetStream', 'InvokeMethod', \$null, \$rec, @(2, '$(cygpath -w "$broken")'))
-    [void]\$view.GetType().InvokeMember('Modify', 'InvokeMethod', \$null, \$view, @(2, \$rec))
-    \$db.GetType().InvokeMember('Commit', 'InvokeMethod', \$null, \$db, \$null)
-    \"replaced \$cab with a cabinet header and 4096 zero bytes\""
+  bash "$ROOT/scripts/break-msi-cabinet.sh" "$1"
 }
 
 # --- the measurement ------------------------------------------------------------------------------
@@ -202,7 +184,10 @@ run_all() {
     case "$method" in
       kill-owner) reached="$(attempt_upgrade "$OUT/$method.log" kill_owner)" ;;
       truncated-cab)
-        break_cabinet "$SOURCE" > "$OUT/$method-cabinet.log" 2>&1           || { echo "the cabinet could not be replaced: $(tail -n 3 "$OUT/$method-cabinet.log")"; continue; }
+        if ! break_cabinet "$SOURCE" > "$OUT/$method-cabinet.log" 2>&1; then
+          echo "the cabinet could not be replaced: $(tail -n 3 "$OUT/$method-cabinet.log")"
+          continue
+        fi
         reached="$(attempt_upgrade "$OUT/$method.log" true)" ;;
     esac
     read="$(reading "$method" "$reached" "$OUT/$method.log")"
