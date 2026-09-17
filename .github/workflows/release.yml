@@ -168,6 +168,10 @@ jobs:
     # NativeAOT inherits the runner's glibc floor recorded in release-targets.json.
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
+    # id-token is exchanged only by the Azure login, which runs only under an authenticode policy.
+    permissions:
+      contents: read
+      id-token: write
     env:
       VERSION: ${{ needs.guard.outputs.version }}
       KEYPASTE_BIN: artifacts/release/${{ matrix.rid }}/keypaste
@@ -324,6 +328,20 @@ jobs:
         shell: bash
         run: scripts/sign-windows.sh --restore-dlib
 
+      - name: Resolve the signing policy (Windows)
+        id: signing
+        if: runner.os == 'Windows'
+        shell: bash
+        run: echo "policy=$(jq -r '.components.cli.signing.policy' release-targets.json | tr -d '\r')" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Sign in to Azure for Artifact Signing
+        if: runner.os == 'Windows' && steps.signing.outputs.policy == 'authenticode'
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.KEYPASTE_SIGNING_CLIENT_ID }}
+          tenant-id: ${{ vars.KEYPASTE_SIGNING_TENANT_ID }}
+          allow-no-subscriptions: true
+
       - name: Sign the binaries as the definition's policy says (Windows)
         if: runner.os == 'Windows'
         shell: bash
@@ -332,6 +350,7 @@ jobs:
           KEYPASTE_SIGNING_ACCOUNT: ${{ vars.KEYPASTE_SIGNING_ACCOUNT }}
           KEYPASTE_SIGNING_PROFILE: ${{ vars.KEYPASTE_SIGNING_PROFILE }}
           KEYPASTE_SIGNING_CLIENT_ID: ${{ vars.KEYPASTE_SIGNING_CLIENT_ID }}
+          KEYPASTE_SIGNING_TENANT_ID: ${{ vars.KEYPASTE_SIGNING_TENANT_ID }}
         run: scripts/sign-windows.sh --component cli "artifacts/release/${{ matrix.rid }}"
 
       - name: Package and hash

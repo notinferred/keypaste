@@ -10,7 +10,7 @@ set -euo pipefail
 
 readonly TIMESTAMP_URL='http://timestamp.acs.microsoft.com'
 readonly FIRST_PARTY='keypaste.exe keypaste-mcp.exe keypaste-app.exe keypaste-app.dll Keypaste.Core.dll KeePassLib.dll'
-readonly IDENTITY_VARS='KEYPASTE_SIGNING_ENDPOINT KEYPASTE_SIGNING_ACCOUNT KEYPASTE_SIGNING_PROFILE KEYPASTE_SIGNING_CLIENT_ID'
+readonly IDENTITY_VARS='KEYPASTE_SIGNING_ENDPOINT KEYPASTE_SIGNING_ACCOUNT KEYPASTE_SIGNING_PROFILE KEYPASTE_SIGNING_CLIENT_ID KEYPASTE_SIGNING_TENANT_ID'
 DEFINITION="${KEYPASTE_RELEASE_DEFINITION:-release-targets.json}"
 
 die() { echo "::error::$*" >&2; exit 1; }
@@ -134,7 +134,7 @@ main() {
     jq -n --arg e "$KEYPASTE_SIGNING_ENDPOINT" --arg a "$KEYPASTE_SIGNING_ACCOUNT" \
       --arg p "$KEYPASTE_SIGNING_PROFILE" --arg c "${GITHUB_RUN_ID:-local}" \
       '{Endpoint: $e, CodeSigningAccountName: $a, CertificateProfileName: $p, CorrelationId: $c}' > "$metadata"
-    export AZURE_CLIENT_ID="$KEYPASTE_SIGNING_CLIENT_ID"
+    export AZURE_CLIENT_ID="$KEYPASTE_SIGNING_CLIENT_ID" AZURE_TENANT_ID="$KEYPASTE_SIGNING_TENANT_ID"
     args=(/dlib "$(native_path "$dlib")" /dmdf "$(native_path "$metadata")")
   fi
 
@@ -223,7 +223,7 @@ selftest() {
 
   definition authenticode "$dlib_sha"
   expect rehearsal-under-a-real-policy refuse "while the app policy is authenticode" -- --component app --rehearsal ABC "$work/payload"
-  export KEYPASTE_SIGNING_ENDPOINT=https://eus.codesigning.azure.net KEYPASTE_SIGNING_ACCOUNT=acct     KEYPASTE_SIGNING_PROFILE=prof KEYPASTE_SIGNING_CLIENT_ID=client
+  export KEYPASTE_SIGNING_ENDPOINT=https://eus.codesigning.azure.net KEYPASTE_SIGNING_ACCOUNT=acct     KEYPASTE_SIGNING_PROFILE=prof KEYPASTE_SIGNING_CLIENT_ID=client KEYPASTE_SIGNING_TENANT_ID=tenant
   local var value
   for var in $IDENTITY_VARS; do
     value="${!var}"

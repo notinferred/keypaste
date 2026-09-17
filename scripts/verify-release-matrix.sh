@@ -848,6 +848,21 @@ validate_signing() {
         *"scripts/sign-windows.sh --restore-dlib"*) ;;
         *) note "$workflow builds a Windows target and never restores the pinned signing dlib" ;;
       esac
+      case "$code" in
+        *"'.components.$c.signing.policy'"*) ;;
+        *) note "$workflow never resolves the $c signing policy from the definition" ;;
+      esac
+      local logins=0
+      while IFS= read -r -d $'\035' step; do
+        case "$step" in *"uses: azure/login@"*) ;; *) continue ;; esac
+        logins=$((logins + 1))
+        case "$step" in
+          *"steps.signing.outputs.policy == 'authenticode'"*"client-id: \${{ vars.KEYPASTE_SIGNING_CLIENT_ID }}"*"tenant-id: \${{ vars.KEYPASTE_SIGNING_TENANT_ID }}"*"allow-no-subscriptions: true"*)
+            ;;
+          *) note "$workflow signs in to Azure without the authenticode guard, the client and tenant variables and allow-no-subscriptions" ;;
+        esac
+      done < <(workflow_steps "$root/$workflow")
+      [ "$logins" -ge 1 ] || note "$workflow has an authenticode path with no Azure login guarded by the resolved policy"
     fi
 
     case "$code" in
@@ -1255,6 +1270,21 @@ sed_inplace '/run: scripts\/sign-windows.sh --restore-dlib/d' "$FAKE/.github/wor
 expect_repo_refusal "windows-build-without-the-dlib" "never restores the pinned signing dlib" \
   "$FAKE/release-targets.json" "$FAKE"
 cp .github/workflows/release.yml "$FAKE/.github/workflows/release.yml"
+
+sed_inplace 's|uses: azure/login@|uses: azure/logout@|' "$FAKE/.github/workflows/release.yml"
+expect_repo_refusal "authenticode-without-login" "has an authenticode path with no Azure login" \
+  "$FAKE/release-targets.json" "$FAKE"
+cp .github/workflows/release.yml "$FAKE/.github/workflows/release.yml"
+
+sed_inplace "s/ \&\& steps.signing.outputs.policy == 'authenticode'$//" "$FAKE/.github/workflows/release.yml"
+expect_repo_refusal "login-unguarded" "signs in to Azure without the authenticode guard" \
+  "$FAKE/release-targets.json" "$FAKE"
+cp .github/workflows/release.yml "$FAKE/.github/workflows/release.yml"
+
+sed_inplace '/tenant-id: /d' "$FAKE/.github/workflows/app.yml"
+expect_repo_refusal "login-without-tenant" "signs in to Azure without the authenticode guard" \
+  "$FAKE/release-targets.json" "$FAKE"
+cp .github/workflows/app.yml "$FAKE/.github/workflows/app.yml"
 
 printf '        run: signtool sign /fd SHA256 artifacts/release/win-x64/keypaste.exe\n' >> "$FAKE/.github/workflows/release.yml"
 expect_repo_refusal "workflow-signs-directly" "signs a payload while the cli signing policy is none" \
