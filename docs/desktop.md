@@ -48,7 +48,7 @@ These are the native GUI prerequisites for the current packaging targets. Buildi
 | macOS | No separate browser engine or .NET runtime for a self-contained archive |
 | Linux | `libx11-6 libice6 libsm6 libfontconfig1`, and an X11 or XWayland session. The AppImage also needs FUSE: `/dev/fuse` and a setuid-root `fusermount3`, which `fuse3` provides; its runtime carries libfuse 3, so `libfuse2` is not needed |
 
-Avalonia draws with Skia; the app does not embed WebKit or Chromium. The supported OS versions and Linux distribution baseline still need whole-package native verification in step 4.7b. A renderer's glibc baseline alone does not establish the app's support range.
+Avalonia draws with Skia; the app does not embed WebKit or Chromium. 4.7b installed and exercised the internal candidates on fresh `windows-2025` and `ubuntu-24.04` runners (D-0205); supported OS versions and the Linux distribution baseline beyond those runner images remain unverified. A renderer's glibc baseline alone does not establish the app's support range.
 
 ## Opening a vault
 
@@ -119,7 +119,7 @@ Keystrokes still arrive as short-lived immutable strings, and an input method ca
 
 ## Checking a build by hand
 
-CI builds and packages on three operating systems; the current desktop logic tests do not verify rendered pixels. Rendering coverage remains step 4.6, and native installation checks remain step 4.7b. Use a disposable vault with harmless test values for this manual checklist before any release that includes the app:
+CI builds and packages on three operating systems; the current desktop logic tests do not verify rendered pixels. Rendering coverage remains step 4.6. `install-desktop.yml` (4.7b) installs internal candidates on fresh runners and drives the installed app, but a browser download's SmartScreen prompt and a person's use are still observed only by hand. Use a disposable vault with harmless test values for this manual checklist before any release that includes the app:
 
 1. Launch with no `recent.toml`: the empty state names `keypaste init` and does not look broken.
 2. Open a vault by drag, and again by the picker. A non-`.kdbx` file is refused before the password field.
