@@ -22,6 +22,8 @@ done
 grep -F 'bash scripts/verify-demo.sh' "$scratch/plan" >/dev/null || die 'all omits process/document checks'
 grep -F 'bash scripts/probe-results.sh --selftest' "$scratch/plan" >/dev/null || die 'all omits diagnostic fixtures'
 grep -F 'bash scripts/observe-minimize-lock.sh --selftest' "$scratch/plan" >/dev/null || die 'all omits the minimize-lock classifier fixtures'
+grep -F 'bash scripts/verify-desktop-candidate.sh --selftest' "$scratch/plan" >/dev/null || die 'all omits the desktop candidate refusals'
+grep -F 'bash scripts/exercise-desktop-install.sh --selftest' "$scratch/plan" >/dev/null || die 'all omits the desktop installation classifier fixtures'
 
 bash scripts/verify.sh desktop > "$scratch/output"
 [ "$(wc -l < "$VERIFY_COMMAND_LOG" | tr -d '[:space:]')" = 8 ] || die 'desktop must prepare and test both targets'

@@ -46,7 +46,7 @@ These are the native GUI prerequisites for the current packaging targets. Buildi
 |---|---|
 | Windows | No separate browser engine or .NET runtime for a self-contained archive |
 | macOS | No separate browser engine or .NET runtime for a self-contained archive |
-| Linux | `libx11-6 libice6 libsm6 libfontconfig1`, and an X11 or XWayland session |
+| Linux | `libx11-6 libice6 libsm6 libfontconfig1`, and an X11 or XWayland session. The AppImage also needs FUSE: `/dev/fuse` and a setuid-root `fusermount3`, which `fuse3` provides; its runtime carries libfuse 3, so `libfuse2` is not needed |
 
 Avalonia draws with Skia; the app does not embed WebKit or Chromium. The supported OS versions and Linux distribution baseline still need whole-package native verification in step 4.7b. A renderer's glibc baseline alone does not establish the app's support range.
 
