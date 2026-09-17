@@ -116,6 +116,11 @@ jobs:
         with:
           persist-credentials: false
 
+      # Before anything that can fail, so a setup failure still has a directory to upload from.
+      - name: Make the records directory
+        shell: bash
+        run: mkdir -p upgrade-desktop
+
       - name: Read the CLI/MCP version
         id: v
         shell: bash
@@ -169,18 +174,9 @@ jobs:
       - name: Install keepassxc-cli (Windows)
         if: runner.os == 'Windows'
         shell: bash
-        env:
-          KPXC_VERSION: 2.7.12
-          # An in-repo checksum remains independent of the download origin.
-          KPXC_SHA256: 958234b0669d757b53eacf42bdd5de0fa1cc1ab7527709ddf4f7e29c06a8305f
         run: |
           set -euo pipefail
-          zip="KeePassXC-${KPXC_VERSION}-Win64.zip"
-          url="https://github.com/keepassxreboot/keepassxc/releases/download/${KPXC_VERSION}/${zip}"
-          bash scripts/fetch-pinned-asset.sh "$url" "$KPXC_SHA256" "$RUNNER_TEMP/$zip"
-          # Git Bash's GNU tar cannot read ZIP files; Windows supplies bsdtar.
-          /c/Windows/System32/tar.exe -xf "$RUNNER_TEMP/$zip" -C "$RUNNER_TEMP"
-          echo "KPXC_CLI=$RUNNER_TEMP/KeePassXC-${KPXC_VERSION}-Win64/keepassxc-cli.exe" >> "$GITHUB_ENV"
+          echo "KPXC_CLI=$(bash scripts/install-keepassxc-windows.sh "$RUNNER_TEMP")" >> "$GITHUB_ENV"
 
       - name: Install, upgrade, interrupt, refuse and uninstall
         shell: bash
@@ -197,5 +193,7 @@ jobs:
         with:
           name: upgrade-desktop-${{ matrix.rid }}
           path: upgrade-desktop/
-          if-no-files-found: error
+          # A run that fails in setup has no records to upload, and losing the run over that would
+          # take the failing log with it (run 35260785520).
+          if-no-files-found: warn
           retention-days: 30

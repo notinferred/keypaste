@@ -275,18 +275,9 @@ jobs:
       - name: Install KeePassXC (Windows)
         if: runner.os == 'Windows'
         shell: bash
-        env:
-          KPXC_VERSION: 2.7.12
-          # An in-repo checksum remains independent of the download origin.
-          KPXC_SHA256: 958234b0669d757b53eacf42bdd5de0fa1cc1ab7527709ddf4f7e29c06a8305f
         run: |
-          url="https://github.com/keepassxreboot/keepassxc/releases/download/${KPXC_VERSION}/KeePassXC-${KPXC_VERSION}-Win64.zip"
-          curl -fsSL "$url" -o kpxc.zip
-          got="$(sha256sum kpxc.zip | cut -d' ' -f1)"
-          [ "$got" = "$KPXC_SHA256" ] \
-            || { echo "::error::KeePassXC zip hash mismatch: got $got want $KPXC_SHA256"; exit 1; }
-          /c/Windows/System32/tar.exe -xf kpxc.zip
-          echo "KPXC_CLI=$(pwd)/KeePassXC-${KPXC_VERSION}-Win64/keepassxc-cli.exe" >> "$GITHUB_ENV"
+          set -euo pipefail
+          echo "KPXC_CLI=$(bash scripts/install-keepassxc-windows.sh)" >> "$GITHUB_ENV"
 
       - name: Verify a vault written by the AOT binary opens in real KeePassXC
         shell: bash

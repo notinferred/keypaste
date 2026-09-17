@@ -10,9 +10,11 @@ set -euo pipefail
 
 die() { echo "::error::$*" >&2; exit 1; }
 
+# Read on stdin, so the digest is never prefixed: GNU coreutils escapes a name holding a backslash
+# by putting one in front of the line, and a Windows destination path is full of them.
 sha256_of() {
-  if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | cut -d' ' -f1
-  else shasum -a 256 "$1" | cut -d' ' -f1
+  if command -v sha256sum >/dev/null 2>&1; then sha256sum < "$1" | cut -d' ' -f1
+  else shasum -a 256 < "$1" | cut -d' ' -f1
   fi
 }
 
@@ -53,7 +55,18 @@ selftest() {
 
   if ( fetch "$url" "${pin^^}" "$work/malformed" ) 2>/dev/null; then die "selftest: a malformed pin was accepted"; fi
 
-  echo "fetch-pinned-asset.sh: pinned bytes accepted; a changed byte and a malformed pin refused, leaving nothing"
+  # A destination whose path holds backslashes, which is every Windows destination. Reading the
+  # digest from the named file made coreutils escape it, and the pinned bytes were refused
+  # (upgrade-desktop run 35260785520).
+  printf 'pinned tool bytes\n' > "$work/tool"
+  local backslashed
+  if command -v cygpath >/dev/null 2>&1; then backslashed="$(cygpath -w "$work")\\accepted-windows"
+  else backslashed="$work/back\\slashed"
+  fi
+  ( fetch "$url" "$pin" "$backslashed" ) >/dev/null || die "selftest: a destination path holding a backslash refused the pinned bytes"
+  cmp -s "$work/tool" "$backslashed" || die "selftest: the file written to a backslashed path is not the pinned bytes"
+
+  echo "fetch-pinned-asset.sh: pinned bytes accepted, including to a backslashed path; a changed byte and a malformed pin refused, leaving nothing"
 }
 
 case "${1:-}" in
