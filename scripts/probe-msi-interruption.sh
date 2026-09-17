@@ -12,8 +12,9 @@
 #                  package stays valid and the file extraction inside InstallFiles is what fails
 #
 # Each method starts from a freshly installed lower candidate, attempts the upgrade, and records what the
-# verbose log and the installer say afterwards. A method is conclusive when the log names a rollback and the
-# lower version is registered and runnable again. Nothing is classified pass or fail: a green run means the
+# verbose log and the installer say afterwards. A method is conclusive when the transaction failed and the
+# lower version is registered and runnable again; every install writes a rollback script, so the presence of
+# rollback operations proves nothing on its own. Nothing is classified pass or fail: a green run means the
 # measurement completed, and the reading is its result (docs/diagnostics.md).
 #
 # This installs and uninstalls in the real user profile, so it refuses to start unless the caller says the
@@ -110,8 +111,9 @@ attempt_upgrade() { # attempt_upgrade <log> <at-installfiles-command...>
 
 # --- the methods ----------------------------------------------------------------------------------
 
-# The transaction's own server, named by the log: "MSI (s) (DC:3C)" is that process in hex. The first
-# reading ended a `/V` process that owned nothing, and the install finished anyway (D-0212).
+# The log's own prefix, "MSI (s) (7C:48)". It reads like a process in hex and is not one: run 35278766000
+# ended what it resolved to, pid 124, and the install finished untouched, so the log names no process this
+# can end (D-0213). The method is kept as the reading that says so.
 transaction_server() { # transaction_server <log>
   local hex
   hex="$(tr -d '\0' < "$1" | grep -oE 'MSI \(s\) \([0-9A-Fa-f]+:' | head -n 1 | sed -E 's/.*\(([0-9A-Fa-f]+):/\1/')"
@@ -151,26 +153,34 @@ break_cabinet() { # break_cabinet <msi>
 
 # --- the measurement ------------------------------------------------------------------------------
 
+# Every install writes a rollback script, so the presence of RollbackInfo ops says nothing: what the
+# question needs is whether the transaction failed after the old product was removed, and what was
+# installed when it was over.
 reading() { # reading <method> <reached> <log>
-  local method="$1" reached="$2" log="$3" rollback=absent inprogress
-  log_says "$log" 'Action start.*Rollback|Rollback: ' && rollback=present
+  local method="$1" reached="$2" log="$3" inprogress failed=no removed=no rolled=no
+  log_says "$log" 'Action ended.*InstallFinalize. Return value 3|Action ended.*InstallFiles. Return value 3' && failed=yes
+  log_says "$log" 'CleanupConfigData\(RemovingProduct=1' && removed=yes
+  log_says "$log" 'Error in rollback|RollbackCleanup,' && rolled=yes
   inprogress="$(powershell_out "if (Get-ItemProperty 'HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Installer\\InProgress' -ErrorAction SilentlyContinue) { 'present' } else { 'absent' }")"
   jq -cn \
     --arg method "$method" \
     --arg reachedInstallFiles "$reached" \
-    --arg rollback "$rollback" \
+    --arg failedInTransaction "$failed" \
+    --arg removedPrevious "$removed" \
+    --arg rollbackRan "$rolled" \
     --arg version "$(installed_version)" \
     --arg registrations "$(registrations | tr '\n' ' ')" \
     --arg inProgress "$inprogress" \
-    --arg installed "$(log_says "$log" 'installed the product' && echo yes || echo no)" \
     --arg status "$(tr -d '\0' < "$log" | grep -oiE 'success or error status: [0-9]+' | tail -n 1)" \
-    '{method: $method, reachedInstallFiles: $reachedInstallFiles, rollback: $rollback, version: $version,
-      registrations: $registrations, inProgress: $inProgress, loggedInstalled: $installed, status: $status}'
+    '{method: $method, reachedInstallFiles: $reachedInstallFiles, failedInTransaction: $failedInTransaction,
+      removedPrevious: $removedPrevious, rollbackRan: $rollbackRan, version: $version,
+      registrations: $registrations, inProgress: $inProgress, status: $status}'
 }
 
 # A method answers the question when the installer rolled back and the lower version is back.
+# A method answers the question when the transaction failed and the previous version came back.
 conclusive() { # conclusive <reading>
-  [ "$(printf '%s' "$1" | jq -r '.rollback')" = present ] \
+  [ "$(printf '%s' "$1" | jq -r '.failedInTransaction')" = yes ] \
     && [ "$(printf '%s' "$1" | jq -r '.version')" = "$LOWER" ]
 }
 
@@ -202,21 +212,28 @@ run_all() {
   done
   reset_machine
 
-  jq -s '{conclusive: [.[] | select(.rollback == "present" and .version == "'"$LOWER"'") | .method],
+  jq -s '{conclusive: [.[] | select(.failedInTransaction == "yes" and .version == "'"$LOWER"'") | .method],
           readings: .}' "$OUT/methods.jsonl" > "$OUT/probe.json"
   echo "conclusive methods: $(jq -r '.conclusive | if length == 0 then "none" else join(" ") end' "$OUT/probe.json")"
 }
 
 # --- self-test ------------------------------------------------------------------------------------
 
-# The reader's own fixtures: a UTF-16 log with a rollback, one without, and the conclusiveness rule.
+# The reader's own fixtures: a UTF-16 log of a failed transaction and of a finished install, the process the
+# log's prefix names, and the conclusiveness rule.
 selftest() {
   local work cases=0 failures=0 rolled unrolled
   work="$(mktemp -d)"
   trap 'rm -rf "$work"' RETURN
 
-  printf 'Action start 20:01:29: InstallFiles.\nAction start 20:01:30: Rollback.\n' | iconv -f UTF-8 -t UTF-16LE > "$work/rolled.log"
-  printf 'Action start 20:01:29: InstallFiles.\nWindows Installer installed the product.\n' | iconv -f UTF-8 -t UTF-16LE > "$work/plain.log"
+  printf 'Action start 20:01:29: InstallFiles.\nAction ended 20:01:30: InstallFinalize. Return value 3.\n' \
+    | iconv -f UTF-8 -t UTF-16LE > "$work/failed.log"
+  printf 'Action start 20:01:29: InstallFiles.\nWindows Installer installed the product.\n' \
+    | iconv -f UTF-8 -t UTF-16LE > "$work/plain.log"
+  printf 'MSI (s) (DC:3C) [20:34:31:316]: Resetting cached policy values\n' \
+    | iconv -f UTF-8 -t UTF-16LE > "$work/server.log"
+  printf 'MSI (c) (94:14) [20:34:31:316]: Client process\n' \
+    | iconv -f UTF-8 -t UTF-16LE > "$work/client-only.log"
 
   check() { # check <what> <expected> <actual>
     cases=$((cases + 1))
@@ -226,23 +243,21 @@ selftest() {
     fi
   }
 
-  check 'a rollback in a UTF-16 log' present "$(log_says "$work/rolled.log" 'Action start.*Rollback|Rollback: ' && echo present || echo absent)"
-  check 'no rollback in a UTF-16 log' absent "$(log_says "$work/plain.log" 'Action start.*Rollback|Rollback: ' && echo present || echo absent)"
-  check 'InstallFiles in a UTF-16 log' present "$(log_says "$work/plain.log" 'Action start.*InstallFiles' && echo present || echo absent)"
-
-  rolled="$(jq -cn --arg v "$LOWER" '{method: "kill-service", rollback: "present", version: $v}')"
-  unrolled="$(jq -cn --arg v "$HIGHER" '{method: "kill-service", rollback: "absent", version: $v}')"
-  printf 'MSI (s) (DC:3C) [20:34:31:316]: Resetting cached policy values
-' | iconv -f UTF-8 -t UTF-16LE > "$work/server.log"
-  check 'the server pid the log names' 220 "$(transaction_server "$work/server.log")"
-  printf 'MSI (c) (94:14) [20:34:31:316]: Client process
-' | iconv -f UTF-8 -t UTF-16LE > "$work/client-only.log"
+  check 'a failed transaction in a UTF-16 log' yes \
+    "$(log_says "$work/failed.log" 'Action ended.*InstallFinalize. Return value 3' && echo yes || echo no)"
+  check 'an install that finished' no \
+    "$(log_says "$work/plain.log" 'Action ended.*InstallFinalize. Return value 3' && echo yes || echo no)"
+  check 'InstallFiles in a UTF-16 log' present \
+    "$(log_says "$work/plain.log" 'Action start.*InstallFiles' && echo present || echo absent)"
+  check 'the process the log prefix names' 220 "$(transaction_server "$work/server.log")"
   check 'a log naming no server' none "$(transaction_server "$work/client-only.log" || echo none)"
 
-  check 'a rollback that restored the lower version is conclusive' yes "$(conclusive "$rolled" && echo yes || echo no)"
+  rolled="$(jq -cn --arg v "$LOWER" '{method: "truncated-cab", failedInTransaction: "yes", version: $v}')"
+  unrolled="$(jq -cn --arg v "$HIGHER" '{method: "kill-owner", failedInTransaction: "no", version: $v}')"
+  check 'a failure the previous version came back from is conclusive' yes "$(conclusive "$rolled" && echo yes || echo no)"
   check 'an install that finished is not' no "$(conclusive "$unrolled" && echo yes || echo no)"
-  check 'a rollback leaving the higher version is not' no \
-    "$(conclusive "$(printf '%s' "$rolled" | jq -c --arg v "$HIGHER" '.version = $v')" && echo yes || echo no)"
+  check 'a failure that left nothing installed is not' no \
+    "$(conclusive "$(printf '%s' "$rolled" | jq -c '.version = "absent"')" && echo yes || echo no)"
 
   [ "$failures" -eq 0 ] || die "probe-msi-interruption selftest: $failures of $cases cases failed"
   echo "probe-msi-interruption selftest: $cases cases"
