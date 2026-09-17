@@ -12,7 +12,8 @@
       Keywords="keypaste;$(var.FullVersion);internal;unsigned"
       Manufacturer="keypaste" />
 
-    <MajorUpgrade DowngradeErrorMessage="A newer keypaste is already installed." />
+    <!-- The previous version is removed only once this install commits, so a failure leaves it installed (F.14). -->
+    <MajorUpgrade Schedule="afterInstallFinalize" DowngradeErrorMessage="A newer keypaste is already installed." />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
     <Property Id="ARPCOMMENTS" Value="Internal candidate $(var.FullVersion); unsigned; not for distribution" />

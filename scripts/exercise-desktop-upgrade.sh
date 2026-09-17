@@ -14,8 +14,8 @@
 # install folder, the Start menu and HKCU through known folders, so redirecting LOCALAPPDATA sandboxes
 # nothing (D-0206).
 #
-# The interrupted install is ended while Windows Installer is copying files, and only a log that shows
-# the rollback counts: an install that failed before its transaction began proves no recovery (D-0206).
+# The interrupted install fails inside the transaction, from a copy whose cabinet cannot be extracted, and
+# only a log naming the failed action counts: an install that never failed proves no recovery (D-0213).
 #
 # Checks, in order: install-lower, fixture, upgrade, data-after-upgrade, interrupted, downgrade-refused,
 # uninstall. A check passes only on its evidence, is unreached when its action could not be done or an
@@ -118,14 +118,15 @@ classify() {
   emit data-after-upgrade
 
   if judge interrupt; then
-    # An install that never began its transaction was not interrupted: nothing rolled back, so a
-    # version that still runs says nothing about recovery (D-0206).
-    if [ "$platform" = windows ] && [ "$(fact_of "$dir" interrupted_rollback)" != present ]; then
-      result=unreached; why="the installer never rolled back: $(fact_of "$dir" interrupted_where)"
+    # An install that never failed inside its transaction was not interrupted, and a version that
+    # still runs then says nothing about recovery (D-0213).
+    if [ "$(fact_of "$dir" interrupted_failed)" != yes ]; then
+      result=unreached; why="the install did not fail inside the transaction: $(fact_of "$dir" interrupted_where)"
     elif [ "$(fact_of "$dir" interrupted_exit)" = 0 ]; then result=contradiction; why='the install that was meant to fail succeeded'
     elif [ "$(fact_of "$dir" version_after_interrupt)" != "$HIGHER" ]; then result=contradiction; why="after the interrupted install the app reports $(fact_of "$dir" version_after_interrupt), not $HIGHER"
     elif [ "$(fact_of "$dir" data_after_interrupt)" != identical ]; then result=contradiction; why="the interrupted install changed user data: $(fact_of "$dir" data_after_interrupt)"
-    else result=pass; why="exit $(fact_of "$dir" interrupted_exit); $(fact_of "$dir" interrupted_where); $HIGHER still runs"
+    elif [ "$(fact_of "$dir" products_after_interrupt)" != 1 ]; then result=contradiction; why="$(fact_of "$dir" products_after_interrupt) keypaste installations are registered after the failure, not 1"
+    else result=pass; why="exit $(fact_of "$dir" interrupted_exit); $(fact_of "$dir" interrupted_where); $HIGHER is still registered and runs"
     fi
   fi
   emit interrupted
@@ -400,36 +401,24 @@ upgrade() {
   fi
 }
 
-# The third candidate's install is ended while it is copying files, so Windows Installer has to roll
-# the previous version back. A property pointing at a volume that does not exist was the first
-# method and is not one: that fails in CostFinalize, before the transaction touches anything, and a
-# version that still runs then proves no recovery (D-0206).
+# The third candidate is installed from a copy whose cabinet cannot be extracted, so the transaction
+# fails inside the install itself. Five other ways interrupt nothing: a property on a missing volume
+# fails in CostFinalize, killing the client leaves the service to finish, an icacls deny does not stop
+# a SYSTEM write, deleting the source fails only after InstallFinalize, and the log's own process
+# prefix is no process to end (D-0210, D-0212, D-0213).
 interrupt() {
-  local msi log="$OUT/interrupt.log" where pid alive size previous
+  local msi log="$OUT/interrupt.log" source code previous size
   if [ "$PLATFORM" = windows ]; then
     msi="$(candidate "$THIRD")" || return 1
-    : > "$log"
-    pid="$(powershell_out "(Start-Process msiexec.exe -ArgumentList '/i', '\"$(cygpath -w "$msi")\"', '/qn', '/l*v', '\"$(cygpath -w "$log")\"' -PassThru).Id")"
-    fact interrupted_pid "$pid"
+    source="$OUT/interrupt-source.msi"
+    cp "$msi" "$source"
+    bash "$ROOT/scripts/break-msi-cabinet.sh" "$source" > "$OUT/interrupt-cabinet.log" 2>&1       || { echo "the cabinet could not be replaced: $(tail -n 3 "$OUT/interrupt-cabinet.log")"; return 1; }
 
-    # Kill it the moment the log says the transaction has started copying files.
-    fact interrupted_exit waiting
-    for _ in $(seq 1 600); do
-      if msi_log_says "$log" 'Action start.*InstallFiles'; then
-        powershell_out "Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue; 'killed'" > /dev/null
-        fact interrupted_exit killed-at-installfiles
-        break
-      fi
-      alive="$(powershell_out "if (Get-Process -Id $pid -ErrorAction SilentlyContinue) { 'yes' } else { 'no' }")"
-      if [ "$alive" = no ]; then
-        # It finished without reaching InstallFiles, or failed before it: whatever the log says.
-        fact interrupted_exit finished-before-installfiles
-        break
-      fi
-      sleep 0.1
-    done
+    code="$(msiexec_install "$source" "$log")"
+    fact interrupted_exit "$code"
+    rm -f "$source"
 
-    # The service does the rollback after the client is gone, so wait for the log to settle.
+    # The installer keeps writing after msiexec returns, so let the log settle before reading it.
     previous=''
     for _ in $(seq 1 120); do
       size="$(wc -c < "$log" | tr -d ' ')"
@@ -438,25 +427,26 @@ interrupt() {
       sleep 1
     done
 
-    where='the log names no rollback'
-    msi_log_says "$log" 'Action start.*InstallFiles' && where='it was killed while installing files'
-    if msi_log_says "$log" 'Action start.*Rollback|Rollback: '; then
-      fact interrupted_rollback present
-      where="$where and the installer rolled back"
+    if msi_log_says "$log" 'Action ended.*InstallFinalize. Return value 3|Action ended.*InstallFiles. Return value 3'; then
+      fact interrupted_failed yes
+      fact interrupted_where 'the transaction failed while the install was running'
     else
-      fact interrupted_rollback absent
+      fact interrupted_failed no
+      fact interrupted_where 'the log names no failed action'
     fi
-    fact interrupted_where "$where"
     fact version_after_interrupt "$(app_version "$APP")"
-    fact registrations_after_interrupt "$(windows_registrations | tr '\n' ' ')"
+    fact products_after_interrupt "$(windows_registration_count)"
+    fact registrations_after_interrupt "$(windows_registrations | tr '
+' ' ')"
   else
     # A copy that stops halfway: the temporary file is never renamed, so the running image is untouched.
     msi="$(candidate "$THIRD")" || return 1
     head -c "$(( $(stat -c %s "$msi") / 2 ))" "$msi" > "$APPIMAGE.part"
     fact interrupted_exit 1
-    fact interrupted_rollback 'not-applicable'
+    fact interrupted_failed yes
     fact interrupted_where 'the partial copy was never renamed over the installed image'
     fact version_after_interrupt "$(app_version "$APPIMAGE")"
+    fact products_after_interrupt "$(find "$(dirname "$APPIMAGE")" -maxdepth 1 -name 'keypaste*.AppImage' | grep -c . || true)"
     rm -f "$APPIMAGE.part"
   fi
   compare interrupt
@@ -578,9 +568,10 @@ selftest() {
       "{\"fact\":\"token_after_upgrade\",\"value\":\"${VALUES[2]}\"}" \
       '{"fact":"log_verify_after_upgrade","value":"pass"}' \
       "{\"fact\":\"keepassxc_after_upgrade\",\"value\":\"$HISTORY_TITLES\"}" \
-      '{"fact":"interrupted_exit","value":"killed-at-installfiles"}' \
-      '{"fact":"interrupted_rollback","value":"present"}' \
-      '{"fact":"interrupted_where","value":"it was killed while installing files and the installer rolled back"}' \
+      '{"fact":"interrupted_exit","value":"1603"}' \
+      '{"fact":"interrupted_failed","value":"yes"}' \
+      '{"fact":"products_after_interrupt","value":"1"}' \
+      '{"fact":"interrupted_where","value":"the transaction failed while the install was running"}' \
       "{\"fact\":\"version_after_interrupt\",\"value\":\"$HIGHER\"}" \
       '{"fact":"data_after_interrupt","value":"identical"}' \
       '{"fact":"downgrade_exit","value":"1603"}' \
@@ -635,8 +626,10 @@ selftest() {
   passing interrupt-succeeded
   set_fact interrupt-succeeded interrupted_exit 0
   passing interrupt-before-the-transaction
-  set_fact interrupt-before-the-transaction interrupted_rollback absent
-  set_fact interrupt-before-the-transaction interrupted_where 'the log names no rollback'
+  set_fact interrupt-before-the-transaction interrupted_failed no
+  set_fact interrupt-before-the-transaction interrupted_where 'the log names no failed action'
+  passing interrupt-deregistered
+  set_fact interrupt-deregistered products_after_interrupt 0
   passing interrupt-broke-the-app
   set_fact interrupt-broke-the-app version_after_interrupt absent
   passing interrupt-touched-the-data
@@ -683,6 +676,7 @@ selftest() {
   expect interrupt-succeeded interrupted contradiction
   expect interrupt-before-the-transaction interrupted unreached
   expect interrupt-before-the-transaction uninstall unreached
+  expect interrupt-deregistered interrupted contradiction
   expect interrupt-broke-the-app interrupted contradiction
   expect interrupt-touched-the-data interrupted contradiction
   expect downgrade-installed downgrade-refused contradiction
