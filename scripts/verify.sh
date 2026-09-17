@@ -94,6 +94,7 @@ check_scripts() {
   run bash scripts/probe-results.sh --selftest
   run bash scripts/observe-minimize-lock.sh --selftest
   run bash scripts/exercise-desktop-install.sh --selftest
+  run bash scripts/exercise-desktop-upgrade.sh --selftest
 }
 
 check_workflows() {
@@ -104,7 +105,8 @@ check_workflows() {
   run env MSYS_NO_PATHCONV=1 docker run --rm -v "$root:/repo:ro" -w /repo --entrypoint shellcheck \
     rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 \
     scripts/verify.sh scripts/verify-local-checks.sh scripts/probe-results.sh scripts/observe-minimize-lock.sh \
-    scripts/verify-desktop-candidate.sh scripts/exercise-desktop-install.sh
+    scripts/verify-desktop-candidate.sh scripts/exercise-desktop-install.sh scripts/exercise-desktop-upgrade.sh \
+    scripts/build-windows-installer.sh
 }
 
 integration_script() { run "$timeout_command" --verbose --kill-after=10s 8m bash "$1"; }

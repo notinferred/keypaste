@@ -48,6 +48,8 @@ These are the native GUI prerequisites for the current packaging targets. Buildi
 | macOS | No separate browser engine or .NET runtime for a self-contained archive |
 | Linux | `libx11-6 libice6 libsm6 libfontconfig1`, and an X11 or XWayland session. The AppImage also needs FUSE: `/dev/fuse` and a setuid-root `fusermount3`, which `fuse3` provides; its runtime carries libfuse 3, so `libfuse2` is not needed |
 
+Upgrading is a matter for the package. The Windows MSI is a per-user major upgrade: installing a higher version replaces the lower one in place, and the MSI refuses a lower version over a higher one. An AppImage has no installer, so an upgrade is a new file put in place of the old one. Neither package holds your data: the vault, `app.toml`, `recent.toml`, `policy.toml` and `audit.jsonl` are untouched by an upgrade, and uninstalling removes the install folder and the Start menu shortcut while leaving `~/.keypaste` and your vault alone. Step 4.7d in [STEPS](STEPS.md) checks all of that, including an install that fails partway, on the internal candidates; no desktop package is published yet.
+
 Avalonia draws with Skia; the app does not embed WebKit or Chromium. 4.7b installed and exercised the internal candidates on fresh `windows-2025` and `ubuntu-24.04` runners (D-0205); supported OS versions and the Linux distribution baseline beyond those runner images remain unverified. A renderer's glibc baseline alone does not establish the app's support range.
 
 ## Opening a vault

@@ -280,8 +280,6 @@ jobs:
         env:
           VERSION: ${{ steps.v.outputs.version }}
           REPORTED: ${{ steps.v.outputs.reported }}
-          # The SDK resolves outside packages.lock.json, so its package is held to this digest (D-0139).
-          WIX_SDK_SHA512: V6RzTWKEi35XdXySYygQ6YSuai9eaF3dPN+ADLN6+dORyqOdJ2uGOA0R/velRLtbiRHdOp+cYwHtKt2zM0396w==
           REHEARSAL: ${{ steps.rehearsal.outputs.trusted }}
           UNTRUSTED: ${{ steps.rehearsal.outputs.untrusted }}
           KEYPASTE_SIGNING_ENDPOINT: ${{ vars.KEYPASTE_SIGNING_ENDPOINT }}
@@ -291,24 +289,8 @@ jobs:
           KEYPASTE_SIGNING_TENANT_ID: ${{ vars.KEYPASTE_SIGNING_TENANT_ID }}
         run: |
           set -euo pipefail
-          package='.components.app.targets[] | select(.rid == "${{ matrix.rid }}") | .packages[] | select(.kind == "msi")'
-          read_package() { jq -r "$package | .$1" release-targets.json | tr -d '\r'; }
-          project="$(read_package project)"
-          tool_version="$(read_package tool_version)"
-          name="$(read_package pattern | sed -e "s/{version}/$VERSION/g" -e "s/{rid}/${{ matrix.rid }}/g")"
-
-          dotnet restore "$project" --locked-mode
-          packages="$(dotnet nuget locals global-packages --list | sed -E 's/^global-packages: //' | tr -d '\r')"
-          nupkg="$packages/wixtoolset.sdk/$tool_version/wixtoolset.sdk.$tool_version.nupkg"
-          observed="$(openssl dgst -sha512 -binary "$nupkg" | base64 -w0)"
-          echo "WixToolset.Sdk $tool_version sha512: $observed"
-          [ "$observed" = "$WIX_SDK_SHA512" ] || { echo "::error::WixToolset.Sdk $tool_version is not the pinned package"; exit 1; }
-
-          dotnet build "$project" -c Release --no-restore -o artifacts/installer \
-            -p:PayloadDir="$(cygpath -w "$PWD/artifacts/stage")\\" \
-            -p:FullVersion="$VERSION" -p:ProductVersion="${VERSION%%-*}"
-          mv artifacts/installer/keypaste-app.msi "artifacts/dist/$name"
-          scripts/verify-windows-installer.sh "artifacts/dist/$name" "$VERSION" "$REPORTED" artifacts/stage
+          msi="$(scripts/build-windows-installer.sh artifacts/stage "$VERSION" "$REPORTED" artifacts/dist)"
+          name="$(basename "$msi")"
           if [ -n "$REHEARSAL" ]; then
             scripts/sign-windows.sh --component app --rehearsal "$REHEARSAL" "artifacts/dist/$name"
             scripts/rehearse-windows-signing.sh refusals "$REHEARSAL" "$UNTRUSTED" artifacts/app/win-x64/keypaste-app.exe "artifacts/dist/$name"
