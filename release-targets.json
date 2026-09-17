@@ -198,7 +198,8 @@
               "signed": false,
               "project": "packaging/windows/Keypaste.Installer.wixproj",
               "tool": "WixToolset.Sdk",
-              "tool_version": "5.0.2"
+              "tool_version": "5.0.2",
+              "tool_sha512": "V6RzTWKEi35XdXySYygQ6YSuai9eaF3dPN+ADLN6+dORyqOdJ2uGOA0R/velRLtbiRHdOp+cYwHtKt2zM0396w=="
             }
           ],
           "os_floor": null,

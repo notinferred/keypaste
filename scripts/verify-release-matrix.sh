@@ -286,10 +286,10 @@ TARGETS
 
     # An installer carries its version and target in its name, and while nothing of the component is
     # signed or published it says internal and unsigned in that name and in its record (4.7a1).
-    local policy kind pattern internal signed tool_version tool_sha runtime_version runtime_sha
+    local policy kind pattern internal signed tool_version tool_sha runtime_version runtime_sha tool_sha512
     policy="$(jqr ".components.\"$c\".signing.policy // empty" "$def")"
     case "$policy" in none | authenticode) ;; *) note "$c: signing policy '$policy' is neither none nor authenticode" ;; esac
-    while IFS=$'\037' read -r rid kind pattern internal signed tool_version tool_sha runtime_version runtime_sha; do
+    while IFS=$'\037' read -r rid kind pattern internal signed tool_version tool_sha runtime_version runtime_sha tool_sha512; do
       [ -n "$rid" ] || continue
       case "$pattern" in *"{version}"*"{rid}"*) ;; *) note "$c/$rid: $kind package '$pattern' does not carry {version} and {rid}" ;; esac
       if [ "$policy" = "none" ]; then
@@ -307,10 +307,16 @@ TARGETS
         is_sha256 "$tool_sha" || note "$c/$rid: appimage package's appimagetool is not pinned by SHA-256"
         is_sha256 "$runtime_sha" || note "$c/$rid: appimage package's runtime is not pinned by SHA-256"
       fi
+      # WixToolset.Sdk restores outside packages.lock.json, so its package is held by content hash (D-0139, D-0206).
+      if [ "$kind" = "msi" ]; then
+        case "$tool_sha512" in *[!A-Za-z0-9+/=]*) tool_sha512="" ;; esac
+        [ "${#tool_sha512}" -eq 88 ] || note "$c/$rid: msi package's WixToolset.Sdk is not pinned by SHA-512"
+      fi
     done <<PACKAGES
 $(jqr ".components.\"$c\".targets // [] | .[] | .rid as \$rid | .packages // [] | .[] | [
      \$rid, (.kind // \"\"), (.pattern // \"\"), (.internal | tostring), (.signed | tostring),
-     (.tool_version // \"\"), (.tool_sha256 // \"\"), (.runtime_version // \"\"), (.runtime_sha256 // \"\")
+     (.tool_version // \"\"), (.tool_sha256 // \"\"), (.runtime_version // \"\"), (.runtime_sha256 // \"\"),
+     (.tool_sha512 // \"\")
    ] | join(\"\")" "$def" 2>/dev/null || true)
 PACKAGES
   done
@@ -800,7 +806,7 @@ validate_packages() {
 
     # A pin written into the workflow or its scripts as well as the definition is two pins, and the
     # copy nobody reads is the one that drifts.
-    for pin in $(jqr ".components.\"$c\".targets[]?.packages[]? | (.tool_sha256 // empty), (.runtime_sha256 // empty)" "$def"); do
+    for pin in $(jqr ".components.\"$c\".targets[]?.packages[]? | (.tool_sha256 // empty), (.runtime_sha256 // empty), (.tool_sha512 // empty)" "$def"); do
       case "$code" in
         *"$pin"*) note "$workflow restates the pin $pin instead of reading it from the definition" ;;
       esac
@@ -1158,6 +1164,8 @@ expect_refusal "appimage-tool-unpinned" "appimagetool is not pinned by SHA-256" 
   "$(mutate appimage-tool-unpinned '(.components.app.targets[] | select(.rid == "linux-x64") | .packages[0]) |= del(.tool_sha256)')"
 expect_refusal "appimage-runtime-unpinned" "runtime is not pinned by SHA-256" \
   "$(mutate appimage-runtime-unpinned '(.components.app.targets[] | select(.rid == "linux-x64") | .packages[0].runtime_sha256) = "continuous"')"
+expect_refusal "installer-sdk-unpinned" "WixToolset.Sdk is not pinned by SHA-512" \
+  "$(mutate installer-sdk-unpinned '(.components.app.targets[] | select(.rid == "win-x64") | .packages[0]) |= del(.tool_sha512)')"
 expect_refusal "signing-policy-unknown" "is neither none nor authenticode" \
   "$(mutate signing-policy-unknown '.components.app.signing.policy = "rehearsal"')"
 expect_refusal "signing-dlib-package-unpinned" "package is not pinned by SHA-512" \
@@ -1180,7 +1188,7 @@ cp docs/RELEASE.md docs/desktop.md "$FAKE/docs/"
 cp site/public/index.html "$FAKE/site/public/"
 cp .github/workflows/release.yml .github/workflows/app.yml "$FAKE/.github/workflows/"
 mkdir -p "$FAKE/scripts"
-cp scripts/require-changelog-section.sh scripts/build-linux-appimage.sh scripts/sign-windows.sh \
+cp scripts/require-changelog-section.sh scripts/build-linux-appimage.sh scripts/build-windows-installer.sh scripts/sign-windows.sh \
   scripts/verify-windows-signature.sh scripts/rehearse-windows-signing.sh "$FAKE/scripts/"
 DLIB_PROJECT="$(jqr '.signing.dlib.project' "$DEFINITION")"
 mkdir -p "$FAKE/$(dirname "$DLIB_PROJECT")"
@@ -1251,10 +1259,10 @@ expect_repo_refusal "signing-disclosure-deleted" "no longer says the cli binarie
   "$FAKE/release-targets.json" "$FAKE"
 cp README.md "$FAKE/README.md"
 
-sed_inplace 's/| \.packages\[\] | select/| .installer | select/' "$FAKE/.github/workflows/app.yml"
-expect_repo_refusal "installer-name-not-read-from-the-definition" "without reading its name from the definition" \
+sed_inplace 's/| \.packages\[\] | select(\.kind == "msi")/| .installer | select(.kind == "msi")/' "$FAKE/scripts/build-windows-installer.sh"
+expect_repo_refusal "installer-name-not-read-from-the-definition" "builds an msi package without reading its name from the definition" \
   "$FAKE/release-targets.json" "$FAKE"
-cp .github/workflows/app.yml "$FAKE/.github/workflows/app.yml"
+cp scripts/build-windows-installer.sh "$FAKE/scripts/build-windows-installer.sh"
 
 sed_inplace 's/| \.packages\[\] | select(\.kind == "appimage")/| .appimage | select(.kind == "appimage")/' "$FAKE/scripts/build-linux-appimage.sh"
 expect_repo_refusal "appimage-name-not-read-from-the-definition" "builds an appimage package without reading its name from the definition" \
@@ -1266,6 +1274,12 @@ printf 'readonly TOOL_SHA256=%s\n' "$(jqr '.components.app.targets[] | select(.r
 expect_repo_refusal "appimage-pin-restated" "restates the pin" \
   "$FAKE/release-targets.json" "$FAKE"
 cp scripts/build-linux-appimage.sh "$FAKE/scripts/build-linux-appimage.sh"
+
+printf 'readonly WIX_SDK_SHA512=%s\n' "$(jqr '.components.app.targets[] | select(.rid == "win-x64") | .packages[0].tool_sha512' "$DEFINITION")" \
+  >> "$FAKE/scripts/build-windows-installer.sh"
+expect_repo_refusal "installer-pin-restated" "restates the pin" \
+  "$FAKE/release-targets.json" "$FAKE"
+cp scripts/build-windows-installer.sh "$FAKE/scripts/build-windows-installer.sh"
 
 # The rehearsal's guard is the only thing between a runner-trusted signature and an uploaded artifact.
 sed_inplace "s/^      - if: steps.rehearsal.outputs.trusted == ''$/      - if: always()/" "$FAKE/.github/workflows/app.yml"
