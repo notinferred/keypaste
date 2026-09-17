@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# 4.7d1: measures which way of interrupting a per-user MSI upgrade makes Windows Installer roll the previous
-# version back, so 4.7d's interrupted check can be built on a mechanism that was observed rather than assumed.
+# 4.7d's diagnosis tooling: measures which way of interrupting a per-user MSI upgrade makes Windows Installer
+# roll the previous version back, so its interrupted check rests on a mechanism that was observed, not assumed.
 #
-# Two ways are already known not to interrupt anything (D-0210): a property pointing at a volume that does not
-# exist fails in CostFinalize, before the transaction, and killing the client `msiexec` leaves the service to
-# finish the install. This probe measures three more against the same candidates 4.7d installs:
+# Five ways are known not to interrupt anything: a property pointing at a volume that does not exist fails in
+# CostFinalize, killing the client `msiexec` leaves the service to finish, an icacls deny does not stop a
+# SYSTEM write, deleting the source fails only after InstallFinalize, and ending a `/V` process that owns no
+# transaction measures nothing (D-0210, D-0212). This probe measures the two that remain:
 #
-#   kill-service       the SYSTEM `msiexec /V` process is ended while InstallFiles runs
-#   deny-folder        the install folder denies writes to everyone for the length of the upgrade
-#   unreadable-source  the package the upgrade is running from is deleted, then truncated, at InstallFiles
+#   kill-owner     the server the log itself names, "MSI (s) (<pid in hex>:", is ended while InstallFiles runs
+#   truncated-cab  the package's cabinet stream is replaced through the Installer `_Streams` API, so the
+#                  package stays valid and the file extraction inside InstallFiles is what fails
 #
 # Each method starts from a freshly installed lower candidate, attempts the upgrade, and records what the
 # verbose log and the installer say afterwards. A method is conclusive when the log names a rollback and the
@@ -28,7 +29,7 @@ ROOT="$(cd "$(dirname "$SELF")/.." && pwd)"
 readonly ROOT
 readonly LOWER='0.0.1-upgrade'
 readonly HIGHER='0.0.2-upgrade'
-readonly METHODS=(kill-service deny-folder unreadable-source)
+readonly METHODS=(kill-owner truncated-cab)
 readonly CR=$'\r'
 
 die() { echo "::error::$*" >&2; exit 1; }
@@ -107,27 +108,45 @@ attempt_upgrade() { # attempt_upgrade <log> <at-installfiles-command...>
   echo "$reached"
 }
 
-# --- the three methods ----------------------------------------------------------------------------
+# --- the methods ----------------------------------------------------------------------------------
 
-# The service owns the transaction, so this is the process whose loss a power cut resembles.
-kill_service() {
-  powershell_out "@(Get-CimInstance Win32_Process -Filter \"Name = 'msiexec.exe'\" |
-      Where-Object { \$_.CommandLine -match '/V' } |
-      ForEach-Object { Stop-Process -Id \$_.ProcessId -Force -ErrorAction SilentlyContinue; \$_.ProcessId })"
+# The transaction's own server, named by the log: "MSI (s) (DC:3C)" is that process in hex. The first
+# reading ended a `/V` process that owned nothing, and the install finished anyway (D-0212).
+transaction_server() { # transaction_server <log>
+  local hex
+  hex="$(tr -d '\0' < "$1" | grep -oE 'MSI \(s\) \([0-9A-Fa-f]+:' | head -n 1 | sed -E 's/.*\(([0-9A-Fa-f]+):/\1/')"
+  [ -n "$hex" ] || return 1
+  printf '%d' "$((16#$hex))"
 }
 
-deny_folder() {
-  powershell_out "icacls '$(cygpath -w "$(cygpath -u "$LOCALAPPDATA")/Programs/keypaste")' /deny '*S-1-1-0:(W)'"
+kill_owner() {
+  local pid
+  pid="$(transaction_server "$OUT/$METHOD.log")" || { echo 'the log names no server process'; return 0; }
+  echo "ending the server the log names: $pid"
+  powershell_out "Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue; 'stopped'"
 }
 
-allow_folder() {
-  powershell_out "icacls '$(cygpath -w "$(cygpath -u "$LOCALAPPDATA")/Programs/keypaste")' /remove:d '*S-1-1-0'" > /dev/null || true
-}
-
-unreadable_source() {
-  rm -f "$SOURCE" 2>&1 || true
-  : > "$SOURCE" 2>&1 || true
-  ls -l "$SOURCE" 2>&1 || echo 'the source is gone'
+# A package that stays a package, whose files cannot be extracted: the cabinet stream is replaced with a
+# cabinet header and nothing else, so InstallFiles itself fails rather than the source going missing.
+break_cabinet() { # break_cabinet <msi>
+  local msi="$1" broken="$OUT/$METHOD-broken.cab"
+  printf 'MSCF' > "$broken"
+  head -c 4096 /dev/zero >> "$broken"
+  powershell_out "\$ErrorActionPreference = 'Stop'
+    \$i = New-Object -ComObject WindowsInstaller.Installer
+    \$db = \$i.GetType().InvokeMember('OpenDatabase', 'InvokeMethod', \$null, \$i, @('$(cygpath -w "$msi")', 1))
+    \$media = \$db.GetType().InvokeMember('OpenView', 'InvokeMethod', \$null, \$db, @('SELECT \`Cabinet\` FROM \`Media\`'))
+    [void]\$media.GetType().InvokeMember('Execute', 'InvokeMethod', \$null, \$media, \$null)
+    \$row = \$media.GetType().InvokeMember('Fetch', 'InvokeMethod', \$null, \$media, \$null)
+    \$cab = (\$row.GetType().InvokeMember('StringData', 'GetProperty', \$null, \$row, 1)).TrimStart('#')
+    \$view = \$db.GetType().InvokeMember('OpenView', 'InvokeMethod', \$null, \$db, @(\"SELECT \`Name\`,\`Data\` FROM \`_Streams\` WHERE \`Name\` = '\$cab'\"))
+    [void]\$view.GetType().InvokeMember('Execute', 'InvokeMethod', \$null, \$view, \$null)
+    \$rec = \$view.GetType().InvokeMember('Fetch', 'InvokeMethod', \$null, \$view, \$null)
+    if (\$rec -eq \$null) { throw \"the package holds no stream named \$cab\" }
+    \$rec.GetType().InvokeMember('SetStream', 'InvokeMethod', \$null, \$rec, @(2, '$(cygpath -w "$broken")'))
+    [void]\$view.GetType().InvokeMember('Modify', 'InvokeMethod', \$null, \$view, @(2, \$rec))
+    \$db.GetType().InvokeMember('Commit', 'InvokeMethod', \$null, \$db, \$null)
+    \"replaced \$cab with a cabinet header and 4096 zero bytes\""
 }
 
 # --- the measurement ------------------------------------------------------------------------------
@@ -171,12 +190,10 @@ run_all() {
     SOURCE="$OUT/$method-source.msi"
     cp "$(candidate "$HIGHER")" "$SOURCE"
     case "$method" in
-      kill-service) reached="$(attempt_upgrade "$OUT/$method.log" kill_service)" ;;
-      deny-folder)
-        deny_folder > "$OUT/$method-deny.log" 2>&1 || true
-        reached="$(attempt_upgrade "$OUT/$method.log" true)"
-        allow_folder ;;
-      unreadable-source) reached="$(attempt_upgrade "$OUT/$method.log" unreadable_source)" ;;
+      kill-owner) reached="$(attempt_upgrade "$OUT/$method.log" kill_owner)" ;;
+      truncated-cab)
+        break_cabinet "$SOURCE" > "$OUT/$method-cabinet.log" 2>&1           || { echo "the cabinet could not be replaced: $(tail -n 3 "$OUT/$method-cabinet.log")"; continue; }
+        reached="$(attempt_upgrade "$OUT/$method.log" true)" ;;
     esac
     read="$(reading "$method" "$reached" "$OUT/$method.log")"
     printf '%s\n' "$read" >> "$OUT/methods.jsonl"
@@ -184,7 +201,6 @@ run_all() {
     rm -f "$SOURCE"
   done
   reset_machine
-  allow_folder
 
   jq -s '{conclusive: [.[] | select(.rollback == "present" and .version == "'"$LOWER"'") | .method],
           readings: .}' "$OUT/methods.jsonl" > "$OUT/probe.json"
@@ -216,6 +232,13 @@ selftest() {
 
   rolled="$(jq -cn --arg v "$LOWER" '{method: "kill-service", rollback: "present", version: $v}')"
   unrolled="$(jq -cn --arg v "$HIGHER" '{method: "kill-service", rollback: "absent", version: $v}')"
+  printf 'MSI (s) (DC:3C) [20:34:31:316]: Resetting cached policy values
+' | iconv -f UTF-8 -t UTF-16LE > "$work/server.log"
+  check 'the server pid the log names' 220 "$(transaction_server "$work/server.log")"
+  printf 'MSI (c) (94:14) [20:34:31:316]: Client process
+' | iconv -f UTF-8 -t UTF-16LE > "$work/client-only.log"
+  check 'a log naming no server' none "$(transaction_server "$work/client-only.log" || echo none)"
+
   check 'a rollback that restored the lower version is conclusive' yes "$(conclusive "$rolled" && echo yes || echo no)"
   check 'an install that finished is not' no "$(conclusive "$unrolled" && echo yes || echo no)"
   check 'a rollback leaving the higher version is not' no \

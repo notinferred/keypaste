@@ -1,8 +1,8 @@
 name: interrupt-probe
 
-# 4.7d1: measures which way of interrupting a per-user MSI upgrade makes Windows Installer roll the previous
-# version back. Two ways are already known not to interrupt anything (D-0210), and 4.7d's interrupted check
-# waits on this reading. Nothing is published, attested or signed; the run is a measurement, not a gate.
+# 4.7d's diagnosis tooling: measures which way of interrupting a per-user MSI upgrade makes Windows Installer
+# roll the previous version back, so its interrupted check rests on a mechanism that was observed rather than
+# assumed (D-0210, D-0211). Nothing is published, attested or signed; the run is a measurement, not a gate.
 
 on:
   workflow_dispatch:
