@@ -310,30 +310,9 @@ jobs:
       - name: Install keepassxc-cli (Windows)
         if: runner.os == 'Windows'
         shell: bash
-        env:
-          KPXC_VERSION: 2.7.12
-          # An in-repo checksum remains independent of the download origin.
-          KPXC_SHA256: 958234b0669d757b53eacf42bdd5de0fa1cc1ab7527709ddf4f7e29c06a8305f
         run: |
           set -euo pipefail
-          zip="KeePassXC-${KPXC_VERSION}-Win64.zip"
-          url="https://github.com/keepassxreboot/keepassxc/releases/download/${KPXC_VERSION}/${zip}"
-          curl -fsSL -o "$zip" "$url"
-
-          observed=$(sha256sum "$zip" | cut -d' ' -f1)
-          echo "observed sha256: $observed"
-          if [ "$observed" != "$KPXC_SHA256" ]; then
-            echo "::error::SHA-256 mismatch for ${zip}: expected ${KPXC_SHA256}, got ${observed}"
-            exit 1
-          fi
-
-          # Git Bash's GNU tar cannot read ZIP files; Windows supplies bsdtar.
-          bsdtar="/c/Windows/System32/tar.exe"
-          [ -x "$bsdtar" ] || { echo "::error::$bsdtar not found"; exit 1; }
-          "$bsdtar" -xf "$zip"
-
-          # pwd supplies a Bash-compatible path on Windows.
-          echo "KPXC_CLI=$(pwd)/KeePassXC-${KPXC_VERSION}-Win64/keepassxc-cli.exe" >> "$GITHUB_ENV"
+          echo "KPXC_CLI=$(bash scripts/install-keepassxc-windows.sh)" >> "$GITHUB_ENV"
 
       - name: Restore (locked)
         run: dotnet restore keypaste.slnx --locked-mode
