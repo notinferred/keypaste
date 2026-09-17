@@ -852,8 +852,18 @@ validate_signing() {
         *"'.components.$c.signing.policy'"*) ;;
         *) note "$workflow never resolves the $c signing policy from the definition" ;;
       esac
-      local logins=0
+      # A refused signature must stop the job before a package exists, and an installer is signed before anything leaves the job.
+      local logins=0 index=0 payload_signed=0 packaged=0 installer_signed=0 published=0
       while IFS= read -r -d $'\035' step; do
+        index=$((index + 1))
+        case "$step" in
+          *"scripts/sign-windows.sh --component $c "*"artifacts/dist/"*) installer_signed="$index" ;;
+          *"scripts/sign-windows.sh --component $c "*) payload_signed="$index" ;;
+        esac
+        case "$step" in *"name: Package and hash"*) [ "$packaged" -gt 0 ] || packaged="$index" ;; esac
+        case "$step" in
+          *"uses: actions/upload-artifact"* | *"uses: actions/attest-build-provenance"*) [ "$published" -gt 0 ] || published="$index" ;;
+        esac
         case "$step" in *"uses: azure/login@"*) ;; *) continue ;; esac
         logins=$((logins + 1))
         case "$step" in
@@ -863,6 +873,18 @@ validate_signing() {
         esac
       done < <(workflow_steps "$root/$workflow")
       [ "$logins" -ge 1 ] || note "$workflow has an authenticode path with no Azure login guarded by the resolved policy"
+      [ "$packaged" -gt 0 ] || note "$workflow has no Package and hash step to sign the $c payload before"
+      if [ "$payload_signed" -gt 0 ] && [ "$packaged" -gt 0 ] && [ "$payload_signed" -gt "$packaged" ]; then
+        note "$workflow signs the $c payload after Package and hash, so a refused signature leaves a package behind"
+      fi
+      case "$code" in
+        *".msi"*)
+          if [ "$installer_signed" -eq 0 ]; then
+            note "$workflow builds an installer and never signs it through sign-windows.sh --component $c"
+          elif [ "$published" -gt 0 ] && [ "$installer_signed" -gt "$published" ]; then
+            note "$workflow signs the $c installer after an upload or attestation step"
+          fi ;;
+      esac
     fi
 
     case "$code" in
@@ -1270,6 +1292,30 @@ sed_inplace '/run: scripts\/sign-windows.sh --restore-dlib/d' "$FAKE/.github/wor
 expect_repo_refusal "windows-build-without-the-dlib" "never restores the pinned signing dlib" \
   "$FAKE/release-targets.json" "$FAKE"
 cp .github/workflows/release.yml "$FAKE/.github/workflows/release.yml"
+
+insert_step_before() {
+  local anchor="$1" step="$2" file="$3" tmp
+  tmp="$(mktemp)"
+  ANCHOR="$anchor" STEP="$step" awk '$0 == ENVIRON["ANCHOR"] { print ENVIRON["STEP"] } { print }' "$file" > "$tmp" && mv "$tmp" "$file"
+}
+
+insert_step_before "      - name: Sign the binaries as the definition's policy says (Windows)" \
+  "      - name: Package and hash
+        run: true
+" "$FAKE/.github/workflows/release.yml"
+expect_repo_refusal "sign-after-package" "signs the cli payload after Package and hash" \
+  "$FAKE/release-targets.json" "$FAKE"
+cp .github/workflows/release.yml "$FAKE/.github/workflows/release.yml"
+
+insert_step_before "      - name: Build and check the internal installer the definition declares" \
+  "      - if: steps.rehearsal.outputs.trusted == ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: early
+" "$FAKE/.github/workflows/app.yml"
+expect_repo_refusal "msi-sign-after-upload" "signs the app installer after an upload or attestation step" \
+  "$FAKE/release-targets.json" "$FAKE"
+cp .github/workflows/app.yml "$FAKE/.github/workflows/app.yml"
 
 sed_inplace 's|uses: azure/login@|uses: azure/logout@|' "$FAKE/.github/workflows/release.yml"
 expect_repo_refusal "authenticode-without-login" "has an authenticode path with no Azure login" \
