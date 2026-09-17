@@ -53,6 +53,7 @@ Each fact has one authoritative owner; other documents link to it. Explicit user
 | [DECISIONS](DECISIONS.md) | Architecture, security and money decisions, pending ideas, and links to historical decisions; one line per current record |
 | [CHANGELOG](CHANGELOG.md) | Significant user-visible changes, separating Unreleased work from published versions |
 | [SECURITY](SECURITY.md) and [THREATS](THREATS.md) | Reporting, security guarantees, threat model and known limits |
+| [BRAND](docs/BRAND.md) | The marks, the three colours, the type and the usage rules |
 | This file | Contribution workflow and document ownership |
 
 STEPS is the executable build plan. Keep only the next five tasks detailed; later rows carry an ID, name, Needs and purpose. Each detailed task has a bounded Build and a falsifiable Verify prompt that traces to PRODUCT. Split oversized work into children while preserving IDs and dependencies. Completing a child leaves its siblings and parent gate open. Completed work moves to a concise evidence row, and the next task gains detail.
