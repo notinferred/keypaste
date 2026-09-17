@@ -25,6 +25,7 @@ grep -F 'bash scripts/observe-minimize-lock.sh --selftest' "$scratch/plan" >/dev
 grep -F 'bash scripts/verify-desktop-candidate.sh --selftest' "$scratch/plan" >/dev/null || die 'all omits the desktop candidate refusals'
 grep -F 'bash scripts/exercise-desktop-install.sh --selftest' "$scratch/plan" >/dev/null || die 'all omits the desktop installation classifier fixtures'
 grep -F 'bash scripts/exercise-desktop-upgrade.sh --selftest' "$scratch/plan" >/dev/null || die 'all omits the desktop upgrade classifier fixtures'
+grep -F 'bash scripts/probe-msi-interruption.sh --selftest' "$scratch/plan" >/dev/null || die 'all omits the interruption probe reader fixtures'
 
 bash scripts/verify.sh desktop > "$scratch/output"
 [ "$(wc -l < "$VERIFY_COMMAND_LOG" | tr -d '[:space:]')" = 8 ] || die 'desktop must prepare and test both targets'
