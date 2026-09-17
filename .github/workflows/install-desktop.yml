@@ -1,0 +1,136 @@
+name: install-desktop
+
+# 4.7b: installs a tag's attested desktop candidates on fresh runners and exercises the installed app from
+# outside its process (D-0199). The candidates are app.yml's workflow artifacts from that tag's run, and the
+# CLI/MCP is the same tag's published release; both are verified before anything is installed.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'The candidate tag, such as v0.3.1-rc.2. Its CLI/MCP must be in release-targets.json published[].'
+        required: true
+        type: string
+      app_run_id:
+        description: "The app.yml run for that tag, whose app-win-x64 and app-linux-x64 artifacts are the candidates."
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+  attestations: read
+
+jobs:
+  install:
+    name: install-desktop (${{ matrix.rid }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2025
+            rid: win-x64
+            package: msi
+            cli: zip
+          - os: ubuntu-24.04
+            rid: linux-x64
+            package: AppImage
+            cli: tar.gz
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Read the candidate version
+        id: v
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+          RUN_ID: ${{ inputs.app_run_id }}
+        run: |
+          set -euo pipefail
+          case "$TAG" in v[0-9]*.[0-9]*.[0-9]*) ;; *) echo "::error::$TAG is not a version tag"; exit 1 ;; esac
+          case "$RUN_ID" in ''|*[!0-9]*) echo "::error::$RUN_ID is not a run ID"; exit 1 ;; esac
+          version="${TAG#v}"
+          listed="$(jq -r --arg v "$version" '[.published[] | select(.version == $v and .provenance == true)] | length' release-targets.json | tr -d '\r')"
+          [ "$listed" = 1 ] || { echo "::error::$version is not a published, attested CLI/MCP release in release-targets.json"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: app-${{ matrix.rid }}
+          path: ${{ runner.temp }}/candidate
+          run-id: ${{ inputs.app_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Download and verify the tag's CLI/MCP release anonymously
+        shell: bash
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          RID: ${{ matrix.rid }}
+          EXT: ${{ matrix.cli }}
+        run: |
+          set -euo pipefail
+          scripts/verify-provenance.sh "$VERSION" "$RUNNER_TEMP/release"
+          mkdir -p "$RUNNER_TEMP/cli"
+          archive="$RUNNER_TEMP/release/keypaste-$VERSION-$RID.$EXT"
+          if [ "$EXT" = zip ]; then
+            powershell -NoProfile -Command "Expand-Archive -LiteralPath '$(cygpath -w "$archive")' -DestinationPath '$(cygpath -w "$RUNNER_TEMP/cli")'"
+          else
+            tar -xzf "$archive" -C "$RUNNER_TEMP/cli"
+          fi
+
+      # The harness observes and drives the app; it is not something the app needs.
+      - name: Install the Linux harness (Xvfb, openbox, AT-SPI client, xdotool, ImageMagick)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb openbox xdotool imagemagick dbus-daemon dbus-x11 \
+            at-spi2-core python3-gi gir1.2-atspi-2.0 libglib2.0-bin
+
+      # docs/desktop.md's Linux prerequisites, and nothing else the app is given.
+      - name: Install the Linux app prerequisites
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y --no-install-recommends libx11-6 libice6 libsm6 libfontconfig1 fuse3
+
+      - name: Start Xvfb and openbox
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          Xvfb :99 -screen 0 1280x800x24 > "$RUNNER_TEMP/xvfb.log" 2>&1 &
+          echo "DISPLAY=:99" >> "$GITHUB_ENV"
+          sleep 2
+          DISPLAY=:99 openbox > "$RUNNER_TEMP/openbox.log" 2>&1 &
+          sleep 2
+
+      - name: Install and exercise the candidate
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.v.outputs.version }}
+          RID: ${{ matrix.rid }}
+          PACKAGE: ${{ matrix.package }}
+        run: |
+          set -euo pipefail
+          candidate="$RUNNER_TEMP/candidate/keypaste-app-$VERSION-$RID-internal-unsigned.$PACKAGE"
+          if [ "$RUNNER_OS" = Linux ]; then
+            dbus-run-session -- bash scripts/exercise-desktop-install.sh "$RID" "$candidate" "$VERSION" "$RUNNER_TEMP/cli" install-desktop
+          else
+            bash scripts/exercise-desktop-install.sh "$RID" "$candidate" "$VERSION" "$RUNNER_TEMP/cli" install-desktop
+          fi
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: install-desktop-${{ matrix.rid }}
+          path: install-desktop/
+          if-no-files-found: error
+          retention-days: 30
