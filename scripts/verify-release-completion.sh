@@ -182,6 +182,56 @@ jq '.assets |= .[1:]' "$WORK/record.json" > "$WORK/short.json"
 expect_refusal "omitted-target-in-the-record" "a record of an incomplete release" \
   run_subject verify "$VERSION" "$WORK/short.json"
 
+# ---------------------------------------------------------------------------
+echo "== fixtures: the desktop component's own record, in the same prefix"
+
+# The definition as 3.6b will leave it. Until then the app offers no package, so its record would be
+# empty and there would be nothing to serve; these cases describe the release that will happen.
+APPDEF="$WORK/publishable-app.json"
+jq '.components.app.signing.policy = "authenticode"
+    | .components.app.targets |= map(if .packages then
+        .packages |= map(.internal = false | .signed = true
+                         | .pattern = (.pattern | sub("-internal-unsigned"; ""))) else . end)' \
+   "$DEFINITION" > "$APPDEF"
+
+run_app() { PATH="$WORK/fakebin:$PATH" env KEYPASTE_RELEASE_DEFINITION="$APPDEF" bash "$SUBJECT" --component app "$@"; }
+
+app_names() { KEYPASTE_RELEASE_DEFINITION="$APPDEF" bash "$SUBJECT" --component app names "$VERSION"; }
+
+stage_app() {
+  rm -rf "$WORK/appdist"; mkdir -p "$WORK/appdist"
+  local n
+  while IFS= read -r n; do
+    [ -n "$n" ] || continue
+    printf 'the bytes of %s for %s\n' "$n" "$VERSION" > "$WORK/appdist/$n"
+  done < <(app_names)
+}
+serve_app() { rm -rf "$WORK/served"; mkdir -p "$WORK/served"; cp "$WORK/appdist"/* "$WORK/served/"; }
+
+stage_app
+run_app record "$VERSION" "v$VERSION" "deadbeef" "$WORK/appdist" > "$WORK/apprecord.json"
+serve_app
+expect_pass "whole-desktop-release-verifies" run_app verify "$VERSION" "$WORK/apprecord.json"
+
+# The record says which component it is about, so the two in one prefix cannot be confused later.
+cases=$((cases + 1))
+if [ "$(jq -r '.component' "$WORK/apprecord.json")" = app ]; then
+  echo "  ok: the desktop record names its own component"
+else
+  echo "::error::the desktop record does not name the app component"
+  failures=$((failures + 1))
+fi
+
+serve_app
+rm -f "$WORK/served/$(app_names | head -1)"
+expect_refusal "desktop-interrupted-upload" "is not being served at" \
+  run_app verify "$VERSION" "$WORK/apprecord.json"
+
+stage_app
+rm -f "$WORK/appdist/$(app_names | head -1)"
+expect_refusal "desktop-omitted-package-gets-no-record" "is not a whole release and gets no completion record" \
+  run_app record "$VERSION" "v$VERSION" "deadbeef" "$WORK/appdist"
+
 # 4. None of the above may move the advertised version.
 cases=$((cases + 1))
 after="$(definition_fingerprint)"
@@ -194,4 +244,5 @@ fi
 
 echo
 [ "$failures" -eq 0 ] || die "$failures of $cases cases failed"
-echo "$cases cases: a release is complete only if the public bytes say so, and saying so moves nothing"
+echo "$cases cases: a release is complete only if the public bytes say so, for each component it"
+echo "publishes, and saying so moves nothing"

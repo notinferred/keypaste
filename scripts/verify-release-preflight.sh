@@ -156,15 +156,123 @@ sed '/a release cannot shrink/d' "$ASSETS_CHECK" > "$WEAK_ASSETS"
 grep -q 'a release cannot shrink' "$WEAK_ASSETS" && die "the weakened asset check still holds the floor"
 run_case "weakened-takes-a-dropped-target" 0 "advertised assets, their checksums" -- env KEYPASTE_RELEASE_DEFINITION="$DROPPED" bash "$WEAK_ASSETS" "$V" "$D"
 
+echo "== a desktop package is published signed, or it is not published"
+
+# The definition as 3.6b will leave it: the policy on, both packages offered and signed, and the
+# internal-and-unsigned label gone from their names. Every desktop case below is a mutation of this
+# one, so the accepts describe the release that will actually happen rather than a shape invented here.
+SIGNED="$WORK/signed.json"
+jq '.components.app.signing.policy = "authenticode"
+    | .components.app.targets |= map(if .packages then
+        .packages |= map(.internal = false | .signed = true
+                         | .pattern = (.pattern | sub("-internal-unsigned"; ""))) else . end)' \
+   "$DEFINITION" > "$SIGNED"
+
+# Offered for publication while nothing signs them: the state release.yml must never reach.
+OFFERED_UNSIGNED="$WORK/offered-unsigned.json"
+jq '.components.app.targets |= map(if .packages then
+      .packages |= map(.internal = false
+                       | .pattern = (.pattern | sub("-internal-unsigned"; ""))) else . end)' \
+   "$DEFINITION" > "$OFFERED_UNSIGNED"
+
+# Signing is on and one package still says it is not signed.
+SIGNED_PARTLY="$WORK/signed-partly.json"
+jq '.components.app.signing.policy = "authenticode"
+    | .components.app.targets |= map(if .packages then
+        .packages |= map(.internal = false | .signed = false
+                         | .pattern = (.pattern | sub("-internal-unsigned"; ""))) else . end)' \
+   "$DEFINITION" > "$SIGNED_PARTLY"
+
+# One offered, one held back: not publishable, and not the recorded not-yet state either.
+HALF="$WORK/half.json"
+jq '.components.app.signing.policy = "authenticode"
+    | .components.app.targets |= map(if (.packages and .rid == "win-x64") then
+        .packages |= map(.internal = false | .signed = true
+                         | .pattern = (.pattern | sub("-internal-unsigned"; ""))) else . end)' \
+   "$DEFINITION" > "$HALF"
+
+packages_for() {
+  jq -r --arg v "$V" '.components.app.targets[] | . as $t | (.packages // [])[]
+    | select(.internal == false) | .pattern
+    | split("{version}") | join($v) | split("{rid}") | join($t.rid)' "$1" | tr -d "$CR"
+}
+
+# The desktop packages join the directory the CLI already staged: one prefix, one upload.
+stage_desktop() {
+  local dir="$1" def="$2" a
+  while IFS= read -r a; do
+    [ -n "$a" ] || continue
+    printf 'package %s\n' "$a" > "$dir/$a"
+    (cd "$dir" && sha256sum "$a" > "$a.sha256")
+  done < <(packages_for "$def")
+  printf '{"assets":[]}\n' > "$dir/keypaste-app-${V}-manifest.json"
+  printf '{}\n' > "$dir/keypaste-app-${V}-provenance.sigstore.jsonl"
+}
+
+BOTH="$WORK/both"; stage "$BOTH" "$SIGNED"; stage_desktop "$BOTH" "$SIGNED"
+run_case "assets-desktop-complete" 0 "advertised assets, their checksums" \
+  -- env KEYPASTE_RELEASE_DEFINITION="$SIGNED" bash "$ASSETS_CHECK" --component cli --component app "$V" "$BOTH"
+
+D="$WORK/desktop-unsigned-policy"; stage "$D" "$OFFERED_UNSIGNED"; stage_desktop "$D" "$OFFERED_UNSIGNED"
+run_case "assets-desktop-while-signing-is-none" 1 "while the app signing policy is none" \
+  -- env KEYPASTE_RELEASE_DEFINITION="$OFFERED_UNSIGNED" bash "$ASSETS_CHECK" --component cli --component app "$V" "$D"
+
+D="$WORK/desktop-recorded-unsigned"; stage "$D" "$SIGNED_PARTLY"; stage_desktop "$D" "$SIGNED_PARTLY"
+run_case "assets-desktop-recorded-unsigned" 1 "is not recorded signed" \
+  -- env KEYPASTE_RELEASE_DEFINITION="$SIGNED_PARTLY" bash "$ASSETS_CHECK" --component cli --component app "$V" "$D"
+
+D="$WORK/desktop-missing"; stage "$D" "$SIGNED"; stage_desktop "$D" "$SIGNED"
+# Derived, never written out: a package extension in this file would reach release.yml through
+# the scripts it names, and verify-release-matrix.sh would then read that workflow as one which
+# builds an installer and demand it sign one.
+gone="$(packages_for "$SIGNED" | head -1)"
+rm -f "$D/$gone" "$D/$gone.sha256"
+run_case "assets-desktop-missing" 1 "is advertised and missing" \
+  -- env KEYPASTE_RELEASE_DEFINITION="$SIGNED" bash "$ASSETS_CHECK" --component cli --component app "$V" "$D"
+
+D="$WORK/desktop-stray"; stage "$D" "$SIGNED"; stage_desktop "$D" "$SIGNED"
+# The name that package had before it was signed, which is exactly what a re-run would leave
+# behind, and which the unmodified definition still spells out.
+stale="$(jq -r --arg v "$V" '.components.app.targets[] | . as $t | (.packages // [])[] | .pattern
+  | split("{version}") | join($v) | split("{rid}") | join($t.rid)' "$DEFINITION" | tr -d "$CR" | head -1)"
+printf 'left over\n' > "$D/$stale"
+run_case "assets-desktop-stray-package" 1 "is not a release asset" \
+  -- env KEYPASTE_RELEASE_DEFINITION="$SIGNED" bash "$ASSETS_CHECK" --component cli --component app "$V" "$D"
+
+# The union is the allowlist: asked about the cli alone, the same directory is full of strays. This
+# is why one invocation names every component being published rather than one call per component.
+D="$WORK/desktop-not-asked-for"; stage "$D" "$SIGNED"; stage_desktop "$D" "$SIGNED"
+run_case "assets-desktop-not-asked-for" 1 "is not a release asset" \
+  -- env KEYPASTE_RELEASE_DEFINITION="$SIGNED" bash "$ASSETS_CHECK" "$V" "$D"
+
+run_case "publishable-cli" 0 "cli is publishable" \
+  -- bash "$ASSETS_CHECK" --component cli --publishable
+run_case "publishable-app-is-not-yet" 2 "declared and not yet publishable" \
+  -- bash "$ASSETS_CHECK" --component app --publishable
+run_case "publishable-app-when-signed" 0 "app is publishable" \
+  -- env KEYPASTE_RELEASE_DEFINITION="$SIGNED" bash "$ASSETS_CHECK" --component app --publishable
+run_case "publishable-app-half-signed" 1 "neither publishable nor in the one recorded not-yet state" \
+  -- env KEYPASTE_RELEASE_DEFINITION="$HALF" bash "$ASSETS_CHECK" --component app --publishable
+
+WEAK_SIGNED="$WORK/weak-signed.sh"
+sed '/is not recorded signed/d' "$ASSETS_CHECK" > "$WEAK_SIGNED"
+grep -q 'is not recorded signed' "$WEAK_SIGNED" && die "the weakened asset check still demands a signature"
+D="$WORK/weak-unsigned"; stage "$D" "$SIGNED_PARTLY"; stage_desktop "$D" "$SIGNED_PARTLY"
+run_case "weakened-publishes-an-unsigned-package" 0 "advertised assets, their checksums" \
+  -- env KEYPASTE_RELEASE_DEFINITION="$SIGNED_PARTLY" bash "$WEAK_SIGNED" --component cli --component app "$V" "$D"
+
 DECLARED="$(declared_cases)"
 [ -n "$DECLARED" ] || die "no case lines found in $SELF; the count this gate checks itself against is derived from them"
 [ "$cases" -eq "$DECLARED" ] || die "$cases cases ran, but $DECLARED are written in $SELF; a case is defined and not driven"
-[ "$accepted" -eq 7 ] || die "$accepted cases were accepted, expected exactly 7"
+[ "$accepted" -eq 11 ] || die "$accepted cases were accepted, expected exactly 11"
 
 echo "ok: $cases cases across three decisions a tag used to be the first thing to run."
 echo "    A version with no section of its own, a tag naming a version the source does not"
 echo "    declare, an unreadable version, a stray dotfile, a missing target, a corrupt archive,"
 echo "    a checksum with no asset, an asset with no checksum and a release missing its manifest"
-echo "    or attestation bundle all refuse. Both weakened copies accept what the repaired ones refuse."
+echo "    or attestation bundle all refuse. So does a desktop package offered for publication"
+echo "    while nothing signs it, recorded unsigned, missing, left over under its old internal"
+echo "    name, or staged for a component the call never named. All three weakened copies"
+echo "    accept what the repaired ones refuse."
 echo "not proved here: that release.yml reaches these on a tag, which only a tag shows; and that"
 echo "    the bytes a real build stages are the bytes it published, which is R.0b."

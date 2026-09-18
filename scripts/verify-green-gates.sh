@@ -69,7 +69,7 @@ runs="$KEYPASTE_FIXTURE_RUNS"
 case "$url" in
   *status=success*) runs="$(printf '%s' "$runs" | jq -c '[.[] | select(.conclusion == "success")]')" ;;
 esac
-printf '%s' "$runs" | jq -c '{workflow_runs: [.[] | {name, conclusion}]}'
+printf '%s' "$runs" | jq -c '{workflow_runs: [.[] | {name, conclusion, id, head_branch}]}'
 FAKE
 chmod +x "$SHIM/gh"
 
@@ -83,12 +83,15 @@ accepted=0
 # run_case <name> <scenario> <runs-json> <subject> <expect-rc> <expect-in-output>
 run_case() {
   local name="$1" scenario="$2" runs="$3" subject="$4" want_rc="$5" want_text="$6" rc=0
+  shift 6
+  local args=("$@")
+  [ ${#args[@]} -gt 0 ] || args=("$SHA")
   cases_run=$((cases_run + 1))
   (
     export GITHUB_REPOSITORY="$REPO"
     export KEYPASTE_FIXTURE_SCENARIO="$scenario"
     export KEYPASTE_FIXTURE_RUNS="$runs"
-    bash "$subject" "$SHA"
+    bash "$subject" "${args[@]}"
   ) >"$OUT" 2>&1 || rc=$?
   [ "$rc" -eq 0 ] && accepted=$((accepted + 1))
   [ "$rc" -eq "$want_rc" ] \
@@ -98,10 +101,13 @@ run_case() {
   printf '  %-14s %-16s exit %s\n' "$( [ "$rc" -eq 0 ] && echo accepted || echo refused )" "$name" "$rc"
 }
 
-readonly BOTH_GREEN='[{"name":"ci","conclusion":"success"},{"name":"app","conclusion":"success"}]'
-readonly APP_ABSENT='[{"name":"ci","conclusion":"success"}]'
-readonly APP_RED='[{"name":"ci","conclusion":"success"},{"name":"app","conclusion":"failure"}]'
+readonly BOTH_GREEN='[{"name":"ci","conclusion":"success","id":11,"head_branch":"v9.9.9"},{"name":"app","conclusion":"success","id":22,"head_branch":"v9.9.9"}]'
+readonly APP_ABSENT='[{"name":"ci","conclusion":"success","id":11,"head_branch":"v9.9.9"}]'
+readonly APP_RED='[{"name":"ci","conclusion":"success","id":11,"head_branch":"v9.9.9"},{"name":"app","conclusion":"failure","id":22,"head_branch":"v9.9.9"}]'
 readonly BOTH_ABSENT='[]'
+# Two green app runs at one commit, and one green app run that belongs to the branch rather than the tag.
+readonly APP_TWICE='[{"name":"ci","conclusion":"success","id":11,"head_branch":"v9.9.9"},{"name":"app","conclusion":"success","id":22,"head_branch":"v9.9.9"},{"name":"app","conclusion":"success","id":23,"head_branch":"v9.9.9"}]'
+readonly APP_ON_MAIN='[{"name":"ci","conclusion":"success","id":11,"head_branch":"v9.9.9"},{"name":"app","conclusion":"success","id":22,"head_branch":"main"}]'
 
 echo "== the four shapes a tag can arrive in"
 run_case "both-green"  ok "$BOTH_GREEN"  "$SUBJECT" 0 "every required gate is green"
@@ -113,6 +119,12 @@ echo "== a reply that cannot be counted refuses rather than counting as zero"
 run_case "api-fails"   api-fails   "$BOTH_GREEN" "$SUBJECT" 1 "could not ask"
 run_case "api-empty"   api-empty   "$BOTH_GREEN" "$SUBJECT" 1 "refusing without a verified answer"
 run_case "api-garbage" api-garbage "$BOTH_GREEN" "$SUBJECT" 1 "refusing without a verified answer"
+
+echo "== which run of a component's own workflow built this commit"
+run_case "run-id-resolved"    ok "$BOTH_GREEN"  "$SUBJECT" 0 "run_id=22" --run-id app "$SHA" refs/tags/v9.9.9
+run_case "run-id-absent"      ok "$APP_ABSENT"  "$SUBJECT" 1 "a release cannot take packages from a run that did not happen" --run-id app "$SHA" refs/tags/v9.9.9
+run_case "run-id-not-at-the-ref" ok "$APP_ON_MAIN" "$SUBJECT" 1 "a release cannot take packages from a run that did not happen" --run-id app "$SHA" refs/tags/v9.9.9
+run_case "run-id-ambiguous"   ok "$APP_TWICE"  "$SUBJECT" 1 "must not choose between them" --run-id app "$SHA" refs/tags/v9.9.9
 
 echo "== negative control"
 WEAK="$WORK/weakened.sh"
@@ -128,14 +140,16 @@ echo "  the weakened copy accepts a commit with no app run, so requiring app is 
 DECLARED="$(declared_cases)"
 [ -n "$DECLARED" ] || die "no case lines found in $SELF; the count this gate checks itself against is derived from them"
 [ "$cases_run" -eq "$DECLARED" ] || die "$cases_run cases ran, but $DECLARED are written in $SELF; a case is defined and not driven"
-[ "$accepted" -eq 2 ] \
-  || die "$accepted cases were accepted, expected exactly 2 (both-green, and the weakened control)"
+[ "$accepted" -eq 3 ] \
+  || die "$accepted cases were accepted, expected exactly 3 (both-green, the resolved run id, and the weakened control)"
 
 cat <<EOF
 ok: $cases_run cases. One shape was accepted by the real script - every required gate green - and a
     missing app run, a red one, a commit with neither, a failed call, an empty reply and an
-    unparseable one all refused. The pre-R.0a shape, same fixture and same fake, accepts the commit
-    whose desktop gate never ran.
+    unparseable one all refused. Off the same reply it resolves which app run built the commit, and
+    refuses when there is none, when the only green run belongs to the branch rather than the tag,
+    and when two green runs would have to be chosen between. The pre-R.0a shape, same fixture and
+    same fake, accepts the commit whose desktop gate never ran.
 not proved here: that the guard step is reached on a tag, which only a tag shows; and that GitHub
     returns runs in the shape this fake does, which R.0c's first real tag observes.
 EOF

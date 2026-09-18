@@ -26,6 +26,12 @@
 #
 # Usage:
 #   require-green-gates.sh <sha>
+#   require-green-gates.sh --run-id <workflow> <sha> <ref>   # prints run_id=<n> for that workflow
+#
+# --run-id answers a second question off the same reply: WHICH run of a component's own workflow
+# built the commit being released, so release.yml can take that run's packages rather than rebuild
+# them (4.7c). It refuses unless exactly one successful run matches the workflow and the ref: two
+# green runs at one commit is an ambiguity a release must not settle by picking.
 #
 # Environment:
 #   GITHUB_REPOSITORY        owner/name to ask about        (required)
@@ -37,6 +43,22 @@ readonly DEFINITION="${KEYPASTE_RELEASE_DEFINITION:-release-targets.json}"
 readonly SELF="${KEYPASTE_RELEASE_WORKFLOW:-.github/workflows/release.yml}"
 
 die() { echo "::error::$*" >&2; exit 1; }
+
+# Windows jq writes CRLF, and a CR riding on a run ID reads as "not a run ID" - the same strip
+# require-release-assets.sh applies at every call it makes.
+CR="$(printf '\r')"
+
+MODE=gates
+WANT_WORKFLOW=""
+WANT_REF=""
+if [ "${1:-}" = "--run-id" ]; then
+  MODE=run-id
+  WANT_WORKFLOW="${2:-}"
+  shift 2 || die "usage: require-green-gates.sh --run-id <workflow> <sha> <ref>"
+  [ -n "$WANT_WORKFLOW" ] || die "usage: require-green-gates.sh --run-id <workflow> <sha> <ref>"
+  WANT_REF="${2:-}"
+  [ -n "$WANT_REF" ] || die "usage: require-green-gates.sh --run-id <workflow> <sha> <ref>"
+fi
 
 SHA="${1:-}"
 [ -n "$SHA" ] || die "usage: require-green-gates.sh <sha>"
@@ -59,6 +81,21 @@ required="$(required_workflows | tr '\n' ' ')"
 runs="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$SHA&status=success" 2>/dev/null)" \
   || die "could not ask $GITHUB_REPOSITORY which runs succeeded for $SHA"
 [ -n "$runs" ] || die "the API returned nothing about $SHA; refusing without a verified answer"
+
+if [ "$MODE" = run-id ]; then
+  # Bound to the ref as well as the commit: a tag and the branch it points at are the same SHA, and
+  # only the tag run carries the full version in the names it built (app.yml's dryrun suffix).
+  ids="$(printf '%s' "$runs" | jq -r --arg wf "$WANT_WORKFLOW" --arg ref "$WANT_REF"     '[.workflow_runs[]? | select(.name == $wf and (.head_branch == $ref or .head_branch == ($ref | sub("^refs/tags/"; "")))) | .id] | .[]' 2>/dev/null | tr -d "$CR" || true)"
+  n=0
+  for id in $ids; do
+    case "$id" in '' | *[!0-9]*) die "the API named a $WANT_WORKFLOW run that is not a run ID; refusing without a verified answer" ;; esac
+    n=$((n + 1))
+  done
+  [ "$n" -ge 1 ] || die "no successful $WANT_WORKFLOW run for $SHA at $WANT_REF - a release cannot take packages from a run that did not happen"
+  [ "$n" -eq 1 ] || die "$n successful $WANT_WORKFLOW runs for $SHA at $WANT_REF; a release must not choose between them"
+  echo "run_id=$ids"
+  exit 0
+fi
 
 missing=0
 for wf in $required; do

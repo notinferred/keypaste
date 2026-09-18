@@ -41,6 +41,8 @@ readonly SELF="${BASH_SOURCE[0]}"
 SCENARIOS_SEEN=()
 
 readonly PUBLISHER="${KEYPASTE_PUBLISHER:-scripts/publish-release.sh}"
+readonly DEFINITION="${KEYPASTE_RELEASE_DEFINITION:-release-targets.json}"
+CR="$(printf '\r')"
 readonly BUCKET='keypaste-fixture-dl'
 readonly PROBE='v0.1.0/'
 readonly VERSION='0.1.1'
@@ -80,6 +82,12 @@ for rid in linux-x64 linux-arm64 osx-arm64; do
 done
 echo 'archive win-x64' > "$DIST/keypaste-${VERSION}-win-x64.zip"
 echo 'source' > "$DIST/keypaste-${VERSION}-source.tar.gz"
+# The desktop packages ride in the same directory and the same upload, because they publish to the
+# same version prefix (4.7c). Their names come from the definition rather than being written out
+# here, so a renamed package changes this fixture with it.
+jq -r --arg v "$VERSION" '.components.app.targets[] | . as $t | (.packages // [])[]
+  | .pattern | split("{version}") | join($v) | split("{rid}") | join($t.rid)
+  | sub("-internal-unsigned"; "")' "$DEFINITION" | tr -d "$CR"   | while IFS= read -r name; do [ -z "$name" ] || echo "package $name" > "$DIST/$name"; done
 for f in "$DIST"/keypaste-*; do echo "hash  $(basename "$f")" > "$f.sha256"; done
 : > "$DIST/SHA256SUMS"
 readonly DIST_FILES="$(find "$DIST" -type f | wc -l | tr -d '[:space:]')"
@@ -269,7 +277,10 @@ uploaded="$(find "$STATE/$TARGET" -type f | wc -l | tr -d '[:space:]')"
 [ "$uploaded" = "$DIST_FILES" ] || die "uploaded $uploaded of $DIST_FILES files"
 [ "$(find "$STATE/$PROBE" -type f | wc -l | tr -d '[:space:]')" = "$SEEDED" ] \
   || die 'publishing one version disturbed another'
-echo "  ok  the upload put $uploaded file(s) under $TARGET and left $PROBE alone"
+# Not just how many: exactly which. "Uploads exactly the declared CLI and desktop assets once" is a
+# claim about names, and a count alone is satisfied by a release that swapped one asset for another.
+diff <(cd "$STATE/$TARGET" && find . -type f | sed 's#^\./##' | sort)      <(cd "$DIST" && find . -type f | sed 's#^\./##' | sort) >/dev/null   || die 'the upload did not put exactly the staged assets at the destination'
+echo "  ok  the upload put $uploaded file(s) under $TARGET, exactly the staged names, and left $PROBE alone"
 
 seed_state
 run_case 'empty/check' honest "$PUBLISHER" --check 0 0 'the destination is free'
@@ -447,7 +458,8 @@ done
 
 cat <<EOF
 ok: $cases_run cases. One verified-empty destination reached an upload and put $DIST_FILES files
-    there; every other answer - occupied, denied, denied without a word, throttled, unreachable,
+    there - the CLI archives and the desktop packages that publish to the same prefix, exactly
+    those names and no others; every other answer - occupied, denied, denied without a word, throttled, unreachable,
     eleven malformed shapes, two of which answered only the destination badly and left the
     positive control satisfied, an all-empty impostor and six unusable version strings - made zero
     write calls and left the $SEEDED published objects byte-identical. The pre-fix one-liner, same

@@ -66,7 +66,9 @@ verify() {
   recorded="$(awk 'NR == 1 {print $1}' "$file.sha256" | tr -d "$CR")"
   [ "$digest" = "$recorded" ] || die "$name does not match its .sha256"
 
-  repo="$(jqr '.components.cli.provenance.repository // empty' "$(definition)")"
+  # The app's own provenance record, and the workflow that BUILT the candidate. release.yml's
+  # provenance.workflow is about what it publishes; this asks who compiled these bytes (4.7c).
+  repo="$(jqr '.components.app.provenance.repository // empty' "$(definition)")"
   workflow="$(jqr '.components.app.workflow // empty' "$(definition)")"
   [ -n "$repo" ] && [ -n "$workflow" ] || die "$(definition) names no provenance repository or app workflow"
   out="$(gh attestation verify "$file" \

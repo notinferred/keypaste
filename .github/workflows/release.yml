@@ -35,6 +35,7 @@ jobs:
       suffix: ${{ steps.v.outputs.suffix }}
       publish: ${{ steps.v.outputs.publish }}
       targets: ${{ steps.targets.outputs.targets }}
+      app_run_id: ${{ steps.gates.outputs.run_id }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -72,6 +73,7 @@ jobs:
           echo "building $tag (suffix='$suffix', publish=$publish)"
 
       - name: Check the commit is on main and both gates are green on it
+        id: gates
         if: github.ref_type == 'tag'
         shell: bash
         env:
@@ -81,6 +83,10 @@ jobs:
             || { echo "::error::$GITHUB_SHA is not an ancestor of main"; exit 1; }
 
           scripts/require-green-gates.sh "$GITHUB_SHA"
+
+          # The same reply says WHICH app run built this commit. Its packages are what the
+          # publish job takes, so a release never republishes bytes a second build made (4.7c).
+          scripts/require-green-gates.sh --run-id app "$GITHUB_SHA" "$GITHUB_REF" >> "$GITHUB_OUTPUT"
 
       - name: Verify one release definition answers for every target
         shell: bash
@@ -402,6 +408,7 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+      actions: read
       id-token: write
       attestations: write
     env:
@@ -428,6 +435,60 @@ jobs:
             sha256sum -c "$f" || { echo "::error::checksum mismatch for $f after transport"; exit 1; }
           done
 
+      # Which components this release publishes, asked of the definition rather than remembered. A
+      # component that is declared but not yet signed answers 2 and is left out, so the desktop leg
+      # turns itself on when 3.6b flips the definition rather than when somebody remembers to.
+      - name: Resolve which components this release publishes
+        id: components
+        shell: bash
+        run: |
+          set -euo pipefail
+          list=""
+          for c in $(jq -r '[.components | to_entries[] | select(.value.origin != null) | .key] | .[]' release-targets.json | tr -d '\r'); do
+            rc=0
+            scripts/require-release-assets.sh --component "$c" --publishable || rc=$?
+            case "$rc" in
+              0) list="$list $c" ;;
+              2) echo "::notice::$c is declared and not yet publishable; this release leaves it out" ;;
+              *) exit 1 ;;
+            esac
+          done
+          [ -n "$list" ] || { echo "::error::no component of this release is publishable"; exit 1; }
+          echo "list=${list# }" >> "$GITHUB_OUTPUT"
+          echo "publishing:$list"
+
+      # The desktop packages were built by app.yml on this tag, not here. They arrive from that run
+      # rather than being rebuilt, so the bytes installed on a runner in 4.7b and upgraded in 4.7d
+      # are the bytes that reach the origin.
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        if: contains(steps.components.outputs.list, 'app')
+        with:
+          pattern: app-*
+          path: ${{ runner.temp }}/app
+          merge-multiple: true
+          run-id: ${{ needs.guard.outputs.app_run_id }}
+          github-token: ${{ github.token }}
+
+      # Every candidate is held to app.yml's own attestation for THIS tag before it is staged, so a
+      # package from another run, another tag or a dispatch cannot enter the directory that uploads.
+      # The names come from the definition: a literal .msi here would make verify-release-matrix.sh
+      # demand that this workflow sign an installer it does not build.
+      - name: Take only the desktop packages the app run attested for this tag
+        if: contains(steps.components.outputs.list, 'app')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # The component column is not read here: this step is the app leg by construction.
+          while IFS=$'\t' read -r _ rid name; do
+            [ -n "$name" ] || continue
+            case "$name" in *.sha256) continue ;; esac
+            scripts/verify-desktop-candidate.sh "$RUNNER_TEMP/app/$name" "$VERSION" "$rid"
+            cp "$RUNNER_TEMP/app/$name" "$RUNNER_TEMP/app/$name.sha256" dist/
+          done < <(scripts/release-completion.sh --component app assets "$VERSION")
+          ls -l dist
+
       - name: Build the corresponding-source tarball
         shell: bash
         run: |
@@ -435,18 +496,30 @@ jobs:
             -o "dist/keypaste-${VERSION}-source.tar.gz" "$GITHUB_SHA"
           (cd dist && sha256sum "keypaste-${VERSION}-source.tar.gz" > "keypaste-${VERSION}-source.tar.gz.sha256")
 
+      # The subject list comes from the definition, not from a glob. A glob wide enough to catch the
+      # desktop packages would have to name their extensions, and a literal .msi in this workflow
+      # makes verify-release-matrix.sh demand that it sign an installer it does not build. The two
+      # sides stay independent: this hashes what the definition says a release is, and compares it
+      # with what the builders wrote beside each asset.
       - name: Aggregate SHA256SUMS
         shell: bash
+        env:
+          COMPONENTS: ${{ steps.components.outputs.list }}
         run: |
           set -euo pipefail
-          cd dist
-          sha256sum keypaste-*.tar.gz keypaste-*.zip | sort -k2 > SHA256SUMS
-          cat ./*.sha256 | sort -k2 > /tmp/per-asset
-          diff <(grep -v SHA256SUMS SHA256SUMS) /tmp/per-asset \
+          for c in $COMPONENTS; do
+            scripts/release-completion.sh --component "$c" names "$VERSION"
+          done | awk '!/\.sha256$/ && $0 != "SHA256SUMS"' | sort -u > "$RUNNER_TEMP/sums.names"
+          cat "$RUNNER_TEMP/sums.names"
+          (cd dist && xargs -a "$RUNNER_TEMP/sums.names" sha256sum | sort -k2 > SHA256SUMS)
+          (cd dist && cat ./*.sha256 | sort -k2 > "$RUNNER_TEMP/per-asset")
+          diff <(grep -v SHA256SUMS dist/SHA256SUMS) "$RUNNER_TEMP/per-asset" \
             || { echo "::error::SHA256SUMS disagrees with the per-asset checksum files"; exit 1; }
-          cat SHA256SUMS
+          cat dist/SHA256SUMS
 
-      # The manifest is uploaded with the release, so it is written before the one upload rather than after.
+      # One manifest and one bundle per component, in one prefix. Each names only its own component's
+      # assets, so verify-provenance.sh checks each against the workflow the definition says attests
+      # it, and neither sees the other's files as strays.
       - name: Write the release manifest
         shell: bash
         run: |
@@ -454,30 +527,76 @@ jobs:
           manifest="$(scripts/release-completion.sh manifest-name "$VERSION")"
           scripts/release-completion.sh record "$VERSION" "$GITHUB_REF_NAME" "$GITHUB_SHA" dist > "dist/$manifest"
           cat "dist/$manifest"
-          (cd dist && jq -r '.assets[].name' "$manifest" | xargs sha256sum && sha256sum "$manifest") > "$RUNNER_TEMP/subjects.sha256"
-          cat "$RUNNER_TEMP/subjects.sha256"
+          (cd dist && jq -r '.assets[].name' "$manifest" | xargs sha256sum && sha256sum "$manifest") > "$RUNNER_TEMP/subjects-cli.sha256"
+          cat "$RUNNER_TEMP/subjects-cli.sha256"
 
       - name: Attest every asset and the manifest
         id: attest
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-checksums: ${{ runner.temp }}/subjects.sha256
+          subject-checksums: ${{ runner.temp }}/subjects-cli.sha256
           show-summary: true
 
-      - name: Publish the attestation bundle with the release and check it before anything uploads
+      # Copied straight after its own attest step, because the next one overwrites the output.
+      - name: Publish the attestation bundle with the release
         shell: bash
         env:
           BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
         run: |
           set -euo pipefail
-          bundle="$(scripts/release-completion.sh bundle-name "$VERSION")"
-          cp "$BUNDLE_PATH" "dist/$bundle"
-          scripts/verify-provenance.sh --dir "$VERSION" dist
+          cp "$BUNDLE_PATH" "dist/$(scripts/release-completion.sh bundle-name "$VERSION")"
+
+      - name: Write the desktop manifest
+        if: contains(steps.components.outputs.list, 'app')
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="$(scripts/release-completion.sh --component app manifest-name "$VERSION")"
+          scripts/release-completion.sh --component app record "$VERSION" "$GITHUB_REF_NAME" "$GITHUB_SHA" dist > "dist/$manifest"
+          cat "dist/$manifest"
+          (cd dist && jq -r '.assets[].name' "$manifest" | xargs sha256sum && sha256sum "$manifest") > "$RUNNER_TEMP/subjects-app.sha256"
+          cat "$RUNNER_TEMP/subjects-app.sha256"
+
+      # This release attests what it PUBLISHES. app.yml's attestation, which says who compiled these
+      # bytes, was checked by verify-desktop-candidate.sh before they were staged.
+      - name: Attest every desktop package and its manifest
+        id: attest-app
+        if: contains(steps.components.outputs.list, 'app')
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-checksums: ${{ runner.temp }}/subjects-app.sha256
+          show-summary: true
+
+      - name: Publish the desktop attestation bundle with the release
+        if: contains(steps.components.outputs.list, 'app')
+        shell: bash
+        env:
+          BUNDLE_PATH: ${{ steps.attest-app.outputs.bundle-path }}
+        run: |
+          set -euo pipefail
+          cp "$BUNDLE_PATH" "dist/$(scripts/release-completion.sh --component app bundle-name "$VERSION")"
+
+      - name: Check every component's attestation before anything uploads
+        shell: bash
+        env:
+          COMPONENTS: ${{ steps.components.outputs.list }}
+        run: |
+          set -euo pipefail
+          for c in $COMPONENTS; do
+            scripts/verify-provenance.sh --component "$c" --dir "$VERSION" dist
+          done
 
       # The next step recursively uploads dist/ to a public origin, so its allowlist must pass first.
+      # One call naming every component: asked about one, the others' assets read as strays.
       - name: Refuse to publish anything that is not a whole release
         shell: bash
-        run: scripts/require-release-assets.sh "$VERSION" dist
+        env:
+          COMPONENTS: ${{ steps.components.outputs.list }}
+        run: |
+          set -euo pipefail
+          args=()
+          for c in $COMPONENTS; do args+=(--component "$c"); done
+          scripts/require-release-assets.sh "${args[@]}" "$VERSION" dist
 
       - name: Upload to R2
         shell: bash
@@ -488,13 +607,17 @@ jobs:
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
         run: scripts/publish-release.sh --publish "$VERSION" dist
 
-      - name: Verify the public origin serves what the manifest records, and that it is attested
+      - name: Verify the public origin serves what each manifest records, and that it is attested
         shell: bash
+        env:
+          COMPONENTS: ${{ steps.components.outputs.list }}
         run: |
           set -euo pipefail
-          manifest="$(scripts/release-completion.sh manifest-name "$VERSION")"
-          scripts/release-completion.sh verify "$VERSION" "dist/$manifest"
-          scripts/verify-provenance.sh "$VERSION" "$RUNNER_TEMP/public"
+          for c in $COMPONENTS; do
+            manifest="$(scripts/release-completion.sh --component "$c" manifest-name "$VERSION")"
+            scripts/release-completion.sh --component "$c" verify "$VERSION" "dist/$manifest"
+            scripts/verify-provenance.sh --component "$c" "$VERSION" "$RUNNER_TEMP/public-$c"
+          done
 
       - name: Keep the manifest and bundle whatever the answer was
         if: always()
@@ -507,11 +630,19 @@ jobs:
           if-no-files-found: warn
 
       - name: Say where it went
+        env:
+          COMPONENTS: ${{ steps.components.outputs.list }}
+          APP_RUN: ${{ needs.guard.outputs.app_run_id }}
         run: |
           {
             echo "### keypaste ${VERSION} published"
             echo ''
             echo "https://dl.keypaste.com/v${VERSION}/"
             echo ''
+            echo "components published: ${COMPONENTS}"
+            echo ''
             echo 'Binaries are unsigned and un-notarized (O-0010). Every asset is attested; see SECURITY.md.'
+            case "$COMPONENTS" in
+              *app*) echo "Desktop packages came from app.yml run ${APP_RUN}, whose attestation was checked before staging." ;;
+            esac
           } >> "$GITHUB_STEP_SUMMARY"
