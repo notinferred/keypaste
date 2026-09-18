@@ -102,7 +102,7 @@ STEPS owns task status and prerequisites.
 | Shared release definition, complete publication and provenance | R.0a, R.0b, 3.8 |
 | Public CLI/MCP patch and native installation | R.0c |
 | Desktop packaging, installation and upgrades | 4.7a, 4.7b, 4.7d; macOS 4.7a2 and 4.7e in Expansion |
-| Signing identity and integration | 3.6a/b; macOS 3.5a/b in Expansion |
+| Signing identity and integration | 3.6b, with the identity as 4.7c2's input; macOS 3.5a/b in Expansion |
 | Public signed desktop and CLI downloads and the developer journey | 4.7c1, 4.7c2, R.1 |
 | Chrome and Firefox publication | 8.4a/b |
 | Self-hosted and hosted drop relay | 5.2c, H.8 |
