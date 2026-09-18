@@ -98,9 +98,9 @@ public sealed class EnvStoreTests : IDisposable
     }
 
     /// <summary>
-    /// Pins the retention decision in D-0014. keypaste has no feature that reads history, so
-    /// nothing else in the codebase would notice if it stopped being written — while SECURITY.md
-    /// and the CLI's own output would go on claiming the old value is still there.
+    /// Pins the retention decision in D-0014: setting a variable that already exists keeps what it
+    /// replaced. SECURITY.md and the CLI's own output promise that, and this is where the promise
+    /// is checked rather than assumed.
     /// </summary>
     [Fact]
     public void Set_OnAnExistingKey_KeepsThePreviousValueAsHistory()
@@ -109,13 +109,13 @@ public sealed class EnvStoreTests : IDisposable
         var store = new EnvStore(vault);
 
         store.TrySet("billing", "TOKEN", "first", out _);
-        Assert.Equal(0, vault.CountHistoryItems(new EntryName("env/billing", "TOKEN")));
+        Assert.Equal(0, HistoryCount(vault, "env/billing", "TOKEN"));
 
         store.TrySet("billing", "TOKEN", "second", out _);
-        Assert.Equal(1, vault.CountHistoryItems(new EntryName("env/billing", "TOKEN")));
+        Assert.Equal(1, HistoryCount(vault, "env/billing", "TOKEN"));
 
         store.TrySet("billing", "TOKEN", "third", out _);
-        Assert.Equal(2, vault.CountHistoryItems(new EntryName("env/billing", "TOKEN")));
+        Assert.Equal(2, HistoryCount(vault, "env/billing", "TOKEN"));
     }
 
     /// <summary>
@@ -136,10 +136,10 @@ public sealed class EnvStoreTests : IDisposable
         var store = new EnvStore(vault);
 
         store.TrySet("billing", "TOKEN", "same", out _);
-        Assert.Equal(0, vault.CountHistoryItems(new EntryName("env/billing", "TOKEN")));
+        Assert.Equal(0, HistoryCount(vault, "env/billing", "TOKEN"));
 
         Assert.Equal(EnvSetOutcome.Updated, store.TrySet("billing", "TOKEN", "same", out _));
-        Assert.Equal(1, vault.CountHistoryItems(new EntryName("env/billing", "TOKEN")));
+        Assert.Equal(1, HistoryCount(vault, "env/billing", "TOKEN"));
     }
 
     /// <summary>Removing takes the history with it — the only way to erase a rotated value.</summary>
@@ -153,7 +153,7 @@ public sealed class EnvStoreTests : IDisposable
         store.TrySet("billing", "TOKEN", "second", out _);
 
         Assert.True(store.Remove("billing", "TOKEN"));
-        Assert.Equal(-1, vault.CountHistoryItems(new EntryName("env/billing", "TOKEN")));
+        Assert.Equal(-1, HistoryCount(vault, "env/billing", "TOKEN"));
         Assert.Empty(store.Read("billing"));
     }
 
@@ -426,5 +426,11 @@ public sealed class EnvStoreTests : IDisposable
     private string NewVaultPath()
     {
         return System.IO.Path.Combine(_directory, Guid.NewGuid().ToString("N") + ".kdbx");
+    }
+
+    /// <summary>History items on one entry, or -1 when no entry answers to that name.</summary>
+    private static int HistoryCount(Vault vault, string groupPath, string title)
+    {
+        return vault.ReadHistory(new EntryName(groupPath, title))?.Count ?? -1;
     }
 }

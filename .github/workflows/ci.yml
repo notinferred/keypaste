@@ -331,3 +331,7 @@ jobs:
       - name: Verify the write-back round trip through real KeePassXC
         shell: bash
         run: bash scripts/verify-keepassxc-writeback.sh artifacts/compat/writeback.kdbx
+
+      - name: Verify a restored revision and its history through real KeePassXC
+        shell: bash
+        run: bash scripts/verify-keepassxc-history.sh artifacts/compat/history.kdbx

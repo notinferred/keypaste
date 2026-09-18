@@ -51,8 +51,12 @@ public sealed class CompatGateIsPermanentTests
         Assert.DoesNotContain("Keypaste.CompatFixture", workflow, StringComparison.Ordinal);
 
         // The write-back direction is a separate script and therefore a separate way to lose the
-        // coverage silently. Both gates enforce the same law and get the same tripwire.
+        // coverage silently. All three gates enforce the same law and get the same tripwire.
         Assert.Contains("scripts/verify-keepassxc-writeback.sh", workflow, StringComparison.Ordinal);
+
+        // Restoring a revision rewrites an entry and adds a history item, and V.2a gave it no
+        // shipped surface, so nothing else asks KeePassXC to read the result.
+        Assert.Contains("scripts/verify-keepassxc-history.sh", workflow, StringComparison.Ordinal);
 
         // Injection is the other law with no in-process test that can reach it (docs/PRODUCT.md 3.4 and
         // 4.5): the child owns the console, so only a real child can be asked what it received.
@@ -277,6 +281,29 @@ public sealed class CompatGateIsPermanentTests
         Assert.Contains("keepassxc-cli edit", text, StringComparison.Ordinal);
         Assert.Contains("env ls", text, StringComparison.Ordinal);
         Assert.Contains("db-info", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The history gate is the only place KeePassXC is asked to read a vault keypaste restored a
+    /// revision into. V.2a added the core read and restore and no surface that can drive one, so
+    /// losing this script would leave law 4.6 unchecked on the one path that rewrites an entry's
+    /// fields and its history at once (DECISIONS.md D-0228).
+    /// </summary>
+    [Fact]
+    public void HistoryScript_ExistsAndKeepsItsNegativeControl()
+    {
+        var script = Path.Combine(RepoRoot(), "scripts", "verify-keepassxc-history.sh");
+        Assert.True(File.Exists(script), $"The history gate script is missing: {script}");
+
+        var text = File.ReadAllText(script);
+
+        Assert.Contains("NEGATIVE CONTROL", text, StringComparison.Ordinal);
+        Assert.Contains("must never be skipped or soft-passed", text, StringComparison.Ordinal);
+
+        // The two readers it needs: the restored value as current, and the XML export, which is the
+        // only thing keepassxc-cli offers that can see a history item at all.
+        Assert.Contains("show -a Password", text, StringComparison.Ordinal);
+        Assert.Contains("export -f xml", text, StringComparison.Ordinal);
     }
 
     /// <summary>

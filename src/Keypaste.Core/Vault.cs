@@ -27,9 +27,10 @@ public sealed class Vault : IDisposable
     /// <summary>Whether saves write through a temporary file. A test seam; nothing else reads it.</summary>
     internal bool UsesFileTransactions => _interop.UsesFileTransactions;
 
-    /// <summary>History items on the entry called <paramref name="name"/>, or -1 if none has that
-    /// name. A test seam; keypaste has no feature that reads history.</summary>
-    internal int CountHistoryItems(EntryName name) => _interop.CountHistoryItems(name);
+    /// <summary>The KDBX UUID of the entry called <paramref name="name"/>, as hex, or
+    /// <see langword="null"/> if none has that name. A test seam; keypaste addresses entries by
+    /// name.</summary>
+    internal string? EntryUuid(EntryName name) => _interop.EntryUuid(name);
 
     /// <summary>Creates a new, empty vault protected by <paramref name="masterPassword"/>. Nothing
     /// is written to disk until <see cref="Save"/>.</summary>
@@ -83,6 +84,55 @@ public sealed class Vault : IDisposable
         ArgumentNullException.ThrowIfNull(entry);
 
         return _interop.UpdateEntry(entry) > 0;
+    }
+
+    /// <summary>The earlier states KeePass history keeps for the one entry with this name, newest
+    /// first.</summary>
+    /// <remarks>
+    /// <para>
+    /// Ordered by each revision's modification time, and by its position in the file where a KDBX
+    /// timestamp's one-second resolution makes two of them equal.
+    /// </para>
+    /// <para>
+    /// <b>An empty list and <see langword="null"/> are different answers.</b> Empty means the entry
+    /// is there and has never been changed; null means no entry answers to that name. A caller that
+    /// collapses the two — <c>?.Count ?? 0</c> — tells somebody their history is empty when their
+    /// entry is gone.
+    /// </para>
+    /// </remarks>
+    /// <returns>The revisions, or <see langword="null"/> when the vault holds no such entry.</returns>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    public IReadOnlyList<EntryRevision>? ReadHistory(EntryName name)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+
+        return _interop.ReadHistory(name);
+    }
+
+    /// <summary>Makes the revision at <paramref name="index"/> in <see cref="ReadHistory"/>'s order
+    /// the entry's current values. Call <see cref="Save"/> to persist it.</summary>
+    /// <remarks>
+    /// The value it replaces becomes a history item rather than being lost (DECISIONS.md D-0014),
+    /// and the entry keeps its UUID, so a restore is an edit like any other: one more revision, not
+    /// a new entry. The entry's modification time becomes the moment of the restore (D-0227).
+    /// <paramref name="index"/> is only meaningful against a reading of this same vault taken since
+    /// its last change.
+    /// </remarks>
+    /// <returns>
+    /// <see langword="true"/> if an entry was restored. Restoring nothing is not an error here; the
+    /// caller decides whether it is one.
+    /// </returns>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// The entry exists and has no revision at <paramref name="index"/>. Nothing is changed.
+    /// </exception>
+    public bool RestoreRevision(EntryName name, int index)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+
+        return _interop.RestoreRevision(name, index) > 0;
     }
 
     /// <summary>Every entry in the vault, depth-first from the root group.</summary>

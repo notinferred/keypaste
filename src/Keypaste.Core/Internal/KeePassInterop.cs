@@ -200,20 +200,105 @@ internal sealed class KeePassInterop : IDisposable
     /// </summary>
     internal bool UsesFileTransactions => _database.UseFileTransactions;
 
-    /// <summary>
-    /// The number of history items an entry carries, or -1 if no entry has that name.
-    /// </summary>
-    /// <remarks>
-    /// Exists so that "overwriting a value keeps the previous one" can be asserted rather than
-    /// assumed. keypaste has no feature that reads history, so without this seam a change that
-    /// silently stopped retaining it would pass every test while the documentation kept promising
-    /// it (DECISIONS.md D-0014).
-    /// </remarks>
-    internal int CountHistoryItems(EntryName name)
+    /// <summary>Returns the history of the one entry with this name, newest first, or null when
+    /// the vault holds no entry of that name.</summary>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal IReadOnlyList<EntryRevision>? ReadHistory(EntryName name)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        return Locate(name) is { } found ? (int)found.Entry.History.UCount : -1;
+        if (Locate(name) is not { } found)
+        {
+            return null;
+        }
+
+        uint[] order = HistoryNewestFirst(found.Entry);
+        var revisions = new EntryRevision[order.Length];
+
+        for (var index = 0; index < order.Length; index++)
+        {
+            PwEntry revision = found.Entry.History.GetAt(order[index]);
+            revisions[index] = new EntryRevision(
+                index, revision.LastModificationTime, Read(revision, name.GroupPath));
+        }
+
+        return revisions;
+    }
+
+    /// <summary>Puts the revision at this position in <see cref="ReadHistory"/>'s order back as the
+    /// entry's current values.</summary>
+    /// <returns>The number of entries restored: 0 if nothing matched, otherwise 1.</returns>
+    /// <remarks>
+    /// The value being replaced becomes a history item rather than being lost (DECISIONS.md D-0014),
+    /// which is what <c>RestoreFromBackup</c> does when it is given the database's history settings.
+    /// The entry is mutated in place, so its UUID, attachments and custom fields survive exactly as
+    /// they do through <see cref="UpdateEntry"/>.
+    /// </remarks>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// The entry has no revision at that position. Nothing is changed.
+    /// </exception>
+    internal int RestoreRevision(EntryName name, int index)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (Locate(name) is not { } found)
+        {
+            return 0;
+        }
+
+        // Resolved before anything mutates: RestoreFromBackup takes the item at its raw position and
+        // only then creates the backup that can evict it, so a position read later names another
+        // revision. An index refused here has also written nothing.
+        uint[] order = HistoryNewestFirst(found.Entry);
+        ArgumentOutOfRangeException.ThrowIfNegative(index);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, order.Length);
+
+        PwEntry pwEntry = found.Entry;
+        pwEntry.RestoreFromBackup(order[index], _database);
+
+        // Restoring assigns the old revision's timestamps back, so without this the entry would be
+        // older than the value it just replaced: a merge would revert it and history eviction, which
+        // drops the oldest, would take it first (DECISIONS.md D-0227).
+        pwEntry.Touch(true);
+        return 1;
+    }
+
+    /// <summary>The entry's KDBX UUID as hex, or null if no entry has that name.</summary>
+    /// <remarks>
+    /// A test seam. keypaste addresses an entry by name (DECISIONS.md D-0091), and a public UUID
+    /// would be a second address form on the surface; V-V.2a still has to be able to say that a
+    /// restore mutated the entry rather than replacing it.
+    /// </remarks>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal string? EntryUuid(EntryName name)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        return Locate(name)?.Entry.Uuid.ToHexString();
+    }
+
+    /// <summary>The raw history positions of one entry, newest first.</summary>
+    /// <remarks>
+    /// <para>
+    /// The one ordering rule, so a read and a restore cannot reach different answers about the same
+    /// index — the shape of the defect D-0091 found in entry identity.
+    /// </para>
+    /// <para>
+    /// <b>The tiebreak is the rule, not a detail.</b> KDBX4 stores a timestamp to the second, so
+    /// several revisions written inside one second come back from a reopened file with identical
+    /// modification times; sorting is stable, so without the position they would be returned oldest
+    /// first — the exact inversion. A backup is appended at the end of the list and read back in
+    /// document order, so the later position is the later write.
+    /// </para>
+    /// </remarks>
+    private static uint[] HistoryNewestFirst(PwEntry entry)
+    {
+        return Enumerable.Range(0, (int)entry.History.UCount)
+            .OrderByDescending(position => entry.History.GetAt((uint)position).LastModificationTime)
+            .ThenByDescending(position => position)
+            .Select(position => (uint)position)
+            .ToArray();
     }
 
     /// <summary>How many times a save is attempted before the failure is reported.</summary>
