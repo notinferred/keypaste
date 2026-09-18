@@ -77,6 +77,9 @@ internal static class CliApp
             case "get":
                 return GetCommand.Execute(args, context);
 
+            case "generate":
+                return GenerateCommand.Execute(args, context);
+
             case "ls":
                 return ListCommand.Execute(args, context);
 
@@ -131,6 +134,7 @@ internal static class CliApp
         writer.WriteLine("  init <vault.kdbx>   create a new vault");
         writer.WriteLine("  add <entry>         add an entry");
         writer.WriteLine("  get <entry>         copy a password to the clipboard, or --show it");
+        writer.WriteLine("  generate --words N  print a passphrase; it is not stored");
         writer.WriteLine("  ls                  list groups and entries");
         writer.WriteLine("  rm <entry>          remove an entry");
         writer.WriteLine("  env <subcommand>    manage a project's environment variables");

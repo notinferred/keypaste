@@ -235,6 +235,9 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     /// <summary>The password being entered for the new entry, when it is not being generated.</summary>
     internal SecretField NewPassword { get; }
 
+    /// <summary>What to generate, while <see cref="GeneratePassword"/> is on.</summary>
+    internal GeneratorViewModel Generator { get; } = new();
+
     internal RelayCommand BeginAddCommand { get; }
 
     internal RelayCommand CancelAddCommand { get; }
@@ -418,8 +421,14 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         {
             if (GeneratePassword)
             {
+                if (Generator.Recipe is not { } recipe)
+                {
+                    Error = Generator.Error;
+                    return;
+                }
+
                 using var buffer = new SecretBuffer();
-                PasswordGenerator.Append(PasswordRecipe.Default, buffer);
+                PasswordGenerator.Append(recipe, buffer);
                 password = new string(buffer.Value);
             }
             else

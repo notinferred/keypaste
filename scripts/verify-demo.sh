@@ -26,8 +26,9 @@
 # EITHER page, if the `Approve? [y/N]` line is missing from either, if either stops carrying the
 # dialog at all, if an approved request does not return the credential, if a refused one does, if
 # the credential reaches the audit log, if the rendered `keypaste log` table header differs from
-# either page's, if either committed fixture is missing or not executable, or if an option the page
-# tells you to type is absent from the shipped usage text. Removing any one of those leaves a script that passes while the page it defends has
+# either page's, if either committed fixture is missing or not executable, if an option the page
+# tells you to type is absent from the shipped usage text, or if `keypaste generate` stops saying
+# that what it prints is not stored. Removing any one of those leaves a script that passes while the page it defends has
 # gone wrong. These checks must never be skipped or soft-passed.
 set -euo pipefail
 
@@ -322,6 +323,20 @@ done
 for opt in --vault --client-label --expose; do
   grep -q -- "$opt" "$WORK/mcp-help.txt" || die "keypaste-mcp no longer offers $opt, which $DOC tells you to configure"
 done
+
+# The generator options README.md's "Generating one" section tells you to type, and the verb it
+# says prints a passphrase and stores nothing. The README is in TRANSCRIPT_PAGES for the dialog;
+# this is the same principle applied to the commands it spells out beside it.
+"$CLI" add --help      >"$WORK/add-help.txt"      2>&1 || true
+"$CLI" generate --help >"$WORK/generate-help.txt" 2>&1 || true
+
+for opt in --generate --length --no-symbols --no-lookalikes --words --separator; do
+  grep -q -- "$opt" "$WORK/add-help.txt" || die "keypaste add no longer offers $opt, which README.md tells you to type"
+done
+for opt in --words --separator; do
+  grep -q -- "$opt" "$WORK/generate-help.txt" || die "keypaste generate no longer offers $opt, which README.md tells you to type"
+done
+grep -q 'not stored' "$WORK/generate-help.txt"   || die "keypaste generate no longer says its passphrase is not stored, which README.md promises"
 
 kill "$AGENT_PID" 2>/dev/null || true
 wait "$AGENT_PID" 2>/dev/null || true

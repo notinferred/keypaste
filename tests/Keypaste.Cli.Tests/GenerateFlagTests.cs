@@ -153,12 +153,154 @@ public sealed class GenerateFlagTests
     }
 
     [Fact]
+    public void Add_Words_StoresASixWordPassphrase()
+    {
+        using var harness = Seeded();
+
+        harness.Prompt.Enqueue(Master);
+        Assert.Equal(
+            CliApp.ExitSuccess,
+            harness.Run("add", "svc/api", "--generate", "--words", "6", "--vault", harness.VaultPath));
+
+        var pieces = Read(harness, "svc/api").Split(PasswordGenerator.DefaultSeparator);
+
+        Assert.Equal(6, pieces.Length);
+        Assert.All(pieces, piece => Assert.NotEmpty(piece));
+    }
+
+    [Fact]
+    public void Add_Words_SaysHowManyWordsItIs_AndNotWhatTheyAre()
+    {
+        using var harness = Seeded();
+
+        harness.Prompt.Enqueue(Master);
+        harness.Run("add", "svc/api", "--generate", "--words", "8", "--vault", harness.VaultPath);
+
+        Assert.Contains("8-word passphrase generated", harness.Err, StringComparison.Ordinal);
+        Assert.DoesNotContain(PasswordGenerator.DefaultSeparator, harness.Err);
+    }
+
+    [Fact]
+    public void Separator_IsHonoured()
+    {
+        using var harness = Seeded();
+
+        harness.Prompt.Enqueue(Master);
+        harness.Run("add", "svc/api", "--generate", "--words", "6", "--separator", "_", "--vault", harness.VaultPath);
+
+        var value = Read(harness, "svc/api");
+
+        Assert.Equal(6, value.Split('_').Length);
+        Assert.DoesNotContain(PasswordGenerator.DefaultSeparator, value);
+    }
+
+    [Fact]
+    public void EnvSet_Words_StoresAPassphraseUnderTheProject()
+    {
+        using var harness = Seeded();
+
+        harness.Prompt.Enqueue(Master);
+        Assert.Equal(
+            CliApp.ExitSuccess,
+            harness.Run("env", "set", "billing", "STRIPE_KEY", "--generate", "--words", "6", "--vault", harness.VaultPath));
+
+        Assert.Equal(
+            6,
+            Read(harness, "env/billing/STRIPE_KEY").Split(PasswordGenerator.DefaultSeparator).Length);
+        Assert.Contains("6-word passphrase generated", harness.Err, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The two kinds of recipe are not mixed silently.
+    /// </summary>
+    /// <remarks>
+    /// Honouring one of them and dropping the other is a guess about which the person meant, and
+    /// the wrong guess is a secret of a shape and strength they did not ask for.
+    /// </remarks>
+    [Theory]
+    [InlineData("--length", "32")]
+    [InlineData("--no-symbols")]
+    [InlineData("--no-lookalikes")]
+    public void WordsWithACharacterFlag_IsAUsageError(params string[] flags)
+    {
+        using var harness = Seeded();
+
+        var args = new[] { "add", "svc/api", "--generate", "--words", "6" }
+            .Concat(flags)
+            .Concat(["--vault", harness.VaultPath])
+            .ToArray();
+
+        Assert.Equal(CliApp.ExitUsageError, harness.Run(args));
+        Assert.Contains("--words", harness.Err, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SeparatorWithoutWords_IsAUsageError()
+    {
+        using var harness = Seeded();
+
+        Assert.Equal(
+            CliApp.ExitUsageError,
+            harness.Run("add", "svc/api", "--generate", "--separator", ".", "--vault", harness.VaultPath));
+        Assert.Contains("--separator", harness.Err, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("--words", "6")]
+    [InlineData("--separator", ".")]
+    public void AWordFlagWithoutGenerate_IsAUsageError(params string[] flags)
+    {
+        using var harness = Seeded();
+
+        var args = new[] { "add", "svc/api" }.Concat(flags).Concat(["--vault", harness.VaultPath]).ToArray();
+
+        Assert.Equal(CliApp.ExitUsageError, harness.Run(args));
+        Assert.Contains("--generate", harness.Err, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("5")]
+    [InlineData("33")]
+    [InlineData("six")]
+    [InlineData("-4")]
+    public void AWordCountOutsideTheBounds_IsAUsageError(string words)
+    {
+        using var harness = Seeded();
+
+        Assert.Equal(
+            CliApp.ExitUsageError,
+            harness.Run("add", "svc/api", "--generate", "--words", words, "--vault", harness.VaultPath));
+    }
+
+    /// <summary>
+    /// A hyphen cannot separate words this list spells with hyphens in them.
+    /// </summary>
+    /// <remarks>
+    /// D-0239. Accepting it would produce a value whose word count cannot be read back, which is
+    /// the number the entropy claim is made in.
+    /// </remarks>
+    [Theory]
+    [InlineData("-")]
+    [InlineData("a")]
+    [InlineData("ab")]
+    public void ASeparatorTheWordsUse_IsAUsageError(string separator)
+    {
+        using var harness = Seeded();
+
+        Assert.Equal(
+            CliApp.ExitUsageError,
+            harness.Run("add", "svc/api", "--generate", "--words", "6", "--separator", separator, "--vault", harness.VaultPath));
+    }
+
+    [Fact]
     public void Help_MentionsTheFlags()
     {
         using var harness = new CliHarness();
 
         Assert.Equal(CliApp.ExitSuccess, harness.Run("add", "--help"));
         Assert.Contains("--generate", harness.Out, StringComparison.Ordinal);
+        Assert.Contains("--words", harness.Out, StringComparison.Ordinal);
+        Assert.Contains("--separator", harness.Out, StringComparison.Ordinal);
     }
 
     private static CliHarness Seeded()

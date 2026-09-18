@@ -184,6 +184,9 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>What to generate, while <see cref="GenerateValue"/> is on.</summary>
+    internal GeneratorViewModel Generator { get; } = new();
+
     /// <summary>Replaces the value, having been given one.</summary>
     internal RelayCommand ConfirmReplaceCommand { get; }
 
@@ -382,8 +385,14 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         {
             if (GenerateValue)
             {
+                if (Generator.Recipe is not { } recipe)
+                {
+                    _report(Generator.Error ?? string.Empty);
+                    return;
+                }
+
                 using var buffer = new SecretBuffer();
-                PasswordGenerator.Append(PasswordRecipe.Default, buffer);
+                PasswordGenerator.Append(recipe, buffer);
                 value = new string(buffer.Value);
             }
             else

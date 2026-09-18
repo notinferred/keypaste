@@ -205,6 +205,27 @@ public sealed class PasswordGeneratorTests
         Assert.Equal(85, Allowed(PasswordAlphabet.Default, excludeLookalikes: false).Length);
     }
 
+    /// <summary>
+    /// The 128-bit claim is arithmetic on the alphabet, not a number typed beside it.
+    /// </summary>
+    /// <remarks>
+    /// Paired with <see cref="The_default_alphabet_is_eighty_five_characters"/>: that one holds the
+    /// alphabet to 85 characters, this one holds the figure to the alphabet, so widening the symbol
+    /// set moves the number instead of leaving a stale sentence behind (D-0036).
+    /// </remarks>
+    [Fact]
+    public void The_default_recipe_is_about_a_hundred_and_twenty_eight_bits()
+    {
+        Assert.Equal(20 * Math.Log2(85), PasswordRecipe.Default.Bits);
+        Assert.InRange(PasswordRecipe.Default.Bits, 128.0, 128.2);
+
+        // Narrowing the alphabet lowers it, so the figure is of the recipe and not of the length.
+        Assert.True(
+            (PasswordRecipe.Default with { Alphabet = PasswordAlphabet.Digits }).Bits
+                < PasswordRecipe.Default.Bits);
+        Assert.Equal(0, (PasswordRecipe.Default with { Alphabet = PasswordAlphabet.None }).Bits);
+    }
+
     [Fact]
     public void The_shell_hostile_punctuation_is_not_generated()
     {

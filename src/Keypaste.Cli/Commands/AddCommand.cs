@@ -124,7 +124,7 @@ internal static class AddCommand
             // A count, never the value. Somebody who wants it runs `keypaste get`, which already
             // has the clipboard, the --show discipline and the auto-clear.
             context.Stderr.WriteLine(recipe is { } generated
-                ? $"Added {entryPath} ({generated.Length}-character password generated)"
+                ? $"Added {entryPath} ({generated.Describe("password")} generated)"
                 : $"Added {entryPath}");
 
             // KeePassXC would make this entry, so keypaste does — and says what it costs, because
