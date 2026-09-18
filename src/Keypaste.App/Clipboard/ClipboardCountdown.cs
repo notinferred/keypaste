@@ -1,4 +1,5 @@
 using Keypaste.App.ViewModels;
+using Keypaste.Core;
 using Keypaste.Core.Clipboard;
 
 namespace Keypaste.App.Clipboard;
@@ -204,6 +205,24 @@ internal sealed class ClipboardCountdown : ObservableObject, IDisposable
     /// <summary>Everything queued so far, for a test that has to wait for a drain.</summary>
     /// <returns>A task that completes when the current queue is empty.</returns>
     internal Task SettledAsync() => _queue;
+
+    /// <summary>Reads the clipboard into a buffer. Takes no ownership and starts no countdown.</summary>
+    /// <param name="destination">The buffer to append to.</param>
+    /// <returns>What happened.</returns>
+    /// <remarks>
+    /// <para>
+    /// A pass-through, and it deliberately does not join <see cref="_queue"/>: that queue orders
+    /// the hand-off of a value keypaste <em>put</em> on the clipboard, and reading somebody else's
+    /// clipboard neither takes ownership nor has anything to clear. Queueing it would make a paste
+    /// wait behind a running countdown for no reason.
+    /// </para>
+    /// <para>
+    /// It lives here rather than on a second <see cref="IAppClipboard"/> threaded through four
+    /// constructors, because every view model that needs to paste already holds one of these.
+    /// </para>
+    /// </remarks>
+    internal Task<PasteOutcome> TryPasteIntoAsync(SecretBuffer destination) =>
+        _clipboard.TryPasteIntoAsync(destination);
 
     /// <summary>
     /// Stops counting and clears, because the vault has locked or the app is going away.

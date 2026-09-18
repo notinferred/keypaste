@@ -63,18 +63,14 @@ internal sealed class EntryDetailViewModel : ObservableObject, IDisposable
         _notes = entry.Notes;
         PasswordLength = entry.Password.Length;
 
+        NewPassword = new SecretField(clipboard);
+
         CopyPasswordCommand = new AsyncRelayCommand(CopyPasswordAsync, () => PasswordLength > 0);
         CopyUsernameCommand = new AsyncRelayCommand(CopyUsernameAsync, () => Username.Length > 0);
         EditCommand = new RelayCommand(BeginEdit, () => !IsEditing);
         CancelCommand = new RelayCommand(CancelEdit, () => IsEditing);
         SaveCommand = new RelayCommand(SaveEdit, () => IsEditing);
     }
-
-    /// <summary>The longest single-line field drawn.</summary>
-    private const int _displayLength = 512;
-
-    /// <summary>The longest notes body drawn. Notes is the largest free-text field in a vault.</summary>
-    private const int _displayNotesLength = 8192;
 
     /// <summary>Where a failure goes. Owned by the entries screen, which draws the banner.</summary>
     internal Action<string?> Report { get; }
@@ -108,18 +104,33 @@ internal sealed class EntryDetailViewModel : ObservableObject, IDisposable
 
     /// <summary>The username as the pane draws it.</summary>
     /// <remarks>
+    /// <para>
     /// <b>Separate from <see cref="Username"/> on purpose.</b> That one seeds
     /// <c>DraftUsername</c> when editing begins and is what the Copy button puts on the clipboard,
     /// so scrubbing it in place would write scrubbed text back into the vault, or paste it. Only
     /// the <c>TextBlock</c> reads this.
+    /// </para>
+    /// <para>
+    /// <b><see cref="DisplayTextSanitizer"/> and not <see cref="EntryNameSanitizer"/>.</b> These
+    /// three are read by a person and address nothing — <see cref="Name"/> addresses the entry — so
+    /// the name rule's structural set has no argument here and cost a great deal: a URL lost its
+    /// slashes, a note its brackets and line breaks, and this field the backslash in a Windows
+    /// login. What still goes is everything that can make text misrepresent itself, which
+    /// <c>HostileNameRenderingTests</c> holds and <c>FaithfulFieldRenderingTests</c> holds the other
+    /// side of. <see cref="DisplayTitle"/> and <see cref="DisplayPath"/> stay on the name rule,
+    /// because they are names.
+    /// </para>
     /// </remarks>
-    internal string DisplayUsername => EntryNameSanitizer.Sanitize(Username, _displayLength).Text;
+    internal string DisplayUsername =>
+        DisplayTextSanitizer.Sanitize(Username, DisplayTextSanitizer.MaximumLength).Text;
 
     /// <summary>The URL as the pane draws it. Separate from <see cref="Url"/> for the same reason.</summary>
-    internal string DisplayUrl => EntryNameSanitizer.Sanitize(Url, _displayLength).Text;
+    internal string DisplayUrl =>
+        DisplayTextSanitizer.Sanitize(Url, DisplayTextSanitizer.MaximumLength).Text;
 
     /// <summary>The notes as the pane draws it. Separate from <see cref="Notes"/> likewise.</summary>
-    internal string DisplayNotes => EntryNameSanitizer.Sanitize(Notes, _displayNotesLength).Text;
+    internal string DisplayNotes =>
+        DisplayTextSanitizer.Sanitize(Notes, DisplayTextSanitizer.MaximumNotesLength).Text;
 
     internal string Username
     {
@@ -170,6 +181,14 @@ internal sealed class EntryDetailViewModel : ObservableObject, IDisposable
 
     /// <summary>The dots the detail pane shows where the password would be.</summary>
     internal string PasswordMask => new('•', Math.Min(PasswordLength, 24));
+
+    /// <summary>A replacement password, while editing. Empty means "leave it alone".</summary>
+    /// <remarks>
+    /// Empty rather than a separate "change the password" switch: the field is the switch. Somebody
+    /// editing a username should not have to say they are not touching the password, and a
+    /// replacement nobody typed is exactly what an empty buffer already means.
+    /// </remarks>
+    internal SecretField NewPassword { get; }
 
     internal bool IsEditing
     {
@@ -272,6 +291,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IDisposable
         DraftUrl = string.Empty;
         DraftNotes = string.Empty;
         PasswordLength = 0;
+        NewPassword.Dispose();
 
         Raise(nameof(Title));
         Raise(nameof(GroupPath));
@@ -313,6 +333,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IDisposable
         DraftUsername = Username;
         DraftUrl = Url;
         DraftNotes = Notes;
+        NewPassword.Clear();
         IsEditing = true;
         Report(null);
     }
@@ -320,6 +341,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IDisposable
     private void CancelEdit()
     {
         IsEditing = false;
+        NewPassword.Clear();
         Report(null);
     }
 
@@ -339,8 +361,10 @@ internal sealed class EntryDetailViewModel : ObservableObject, IDisposable
                 return;
             }
 
-            // The password is carried across untouched: reading it here only to write it back would put
-            // it in a local for no reason, and `keypaste get` is how a password changes.
+            // An untouched password is carried across rather than read and written back, which
+            // would put it in a local for no reason. A replacement is applied in the same
+            // UpdateEntry as the field edits, so the whole change costs one history item rather
+            // than two (D-0014).
             // Title and GroupPath come across too, so the read has to be the identity one — `UpdateEntry`
             // locates by them, and an `existing` from the wrong entry writes the draft into that entry.
             var updated = existing with
@@ -349,6 +373,11 @@ internal sealed class EntryDetailViewModel : ObservableObject, IDisposable
                 Url = DraftUrl,
                 Notes = DraftNotes,
             };
+
+            if (NewPassword.HasValue)
+            {
+                updated = updated with { Password = NewPassword.Compose() };
+            }
 
             vault.UpdateEntry(updated);
             vault.Save();
@@ -365,6 +394,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IDisposable
         }
 
         IsEditing = false;
+        NewPassword.Clear();
         Reload();
         Report(null);
     }

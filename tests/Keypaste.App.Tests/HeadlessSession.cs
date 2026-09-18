@@ -34,4 +34,29 @@ internal static class HeadlessSession
 
     /// <summary>Runs <paramref name="body"/> on the session's UI thread.</summary>
     internal static Task On(Action body) => Instance.Dispatch(body, CancellationToken.None);
+
+    /// <summary>Runs an asynchronous <paramref name="body"/> on the session's UI thread.</summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Without this overload an <c>async</c> lambda binds to <see cref="On(Action)"/> as
+    /// <c>async void</c>.</b> The returned task then completes at the body's first <c>await</c>, so
+    /// every assertion after it runs outside the lifetime xunit observes and a failure surfaces as
+    /// an unobserved exception rather than a red test. Four tests in
+    /// <c>MaskedInputAutomationTests</c> were written that way, two of them D-0099 differentials.
+    /// </para>
+    /// <para>
+    /// <see cref="HeadlessUnitTestSession"/> offers <c>Dispatch(Action)</c>,
+    /// <c>Dispatch&lt;T&gt;(Func&lt;T&gt;)</c> and <c>Dispatch&lt;T&gt;(Func&lt;Task&lt;T&gt;&gt;)</c>
+    /// and no non-generic <c>Func&lt;Task&gt;</c>, which is why this returns a value nobody wants.
+    /// </para>
+    /// </remarks>
+    internal static Task On(Func<Task> body) =>
+        Instance.Dispatch(
+            async () =>
+            {
+                ArgumentNullException.ThrowIfNull(body);
+                await body().ConfigureAwait(true);
+                return true;
+            },
+            CancellationToken.None);
 }

@@ -12,12 +12,15 @@
   </ItemGroup>
 
   <!--
-    The CLI harness is compiled in rather than copied. It is a hundred lines of fakes that already
-    exist and already match what the verbs expect; a second copy here would drift from the first the
-    first time a seam changes, and the whole point of this project is that two things agree.
+    The CLI harness and the app's clipboard fake are compiled in rather than copied. They are fakes
+    that already exist and already match what each front end expects; a second copy here would drift
+    from the first the first time a seam changes, and the whole point of this project is that two
+    things agree. The clipboard one matters most: it defers to SecretInput for what a paste may
+    contain, so a test here cannot be asserting against a second idea of that rule.
   -->
   <ItemGroup>
     <Compile Include="../Keypaste.Cli.Tests/CliHarness.cs" Link="CliHarness.cs" />
+    <Compile Include="../Keypaste.App.Tests/Clipboard/FakeClipboard.cs" Link="FakeClipboard.cs" />
   </ItemGroup>
 
   <!--

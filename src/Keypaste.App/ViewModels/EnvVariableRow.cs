@@ -35,6 +35,7 @@ internal sealed class EnvVariableRow : ObservableObject, IRevealSource
 
         CopyValueCommand = new AsyncRelayCommand(CopyAsync);
         RemoveCommand = new RelayCommand(() => _owner.BeginRemove(this));
+        ReplaceCommand = new RelayCommand(() => _owner.BeginReplace(this));
     }
 
     /// <summary>The variable's name, as the vault holds it. Addresses the row on removal.</summary>
@@ -62,6 +63,9 @@ internal sealed class EnvVariableRow : ObservableObject, IRevealSource
 
     /// <summary>Asks to remove this variable.</summary>
     internal RelayCommand RemoveCommand { get; }
+
+    /// <summary>Opens the form that writes a new value over this one.</summary>
+    internal RelayCommand ReplaceCommand { get; }
 
     /// <inheritdoc/>
     public string? Reveal() => _owner.Reveal(this);

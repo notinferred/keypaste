@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Keypaste.App.Clipboard;
+using Keypaste.Core;
 
 namespace Keypaste.App.Tests.Clipboard;
 
@@ -78,6 +79,20 @@ internal sealed class HeldClipboard : IAppClipboard
         return ReadFails
             ? null
             : SHA256.HashData(Encoding.UTF8.GetBytes(Content ?? string.Empty));
+    }
+
+    /// <remarks>
+    /// Holdable like the hash read, and for the paste path that is the whole point: it is what lets
+    /// a test prove the keystroke's task is still outstanding while the clipboard has not answered,
+    /// rather than inferring it from a buffer that happened to fill in time.
+    /// </remarks>
+    public async Task<PasteOutcome> TryPasteIntoAsync(SecretBuffer destination)
+    {
+        await Held(_reads, HoldReads).ConfigureAwait(true);
+
+        return ReadFails
+            ? PasteOutcome.Unavailable
+            : SecretInput.Accept(Content ?? string.Empty, destination);
     }
 
     public async Task<bool> TryClearAsync()

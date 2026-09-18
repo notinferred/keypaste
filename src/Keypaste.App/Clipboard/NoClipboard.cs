@@ -1,3 +1,5 @@
+using Keypaste.Core;
+
 namespace Keypaste.App.Clipboard;
 
 /// <summary>
@@ -32,6 +34,10 @@ internal sealed class NoClipboard : IAppClipboard
 
     /// <inheritdoc/>
     public Task<byte[]?> TryReadHashAsync() => Task.FromResult<byte[]?>(null);
+
+    /// <inheritdoc/>
+    public Task<PasteOutcome> TryPasteIntoAsync(SecretBuffer destination) =>
+        Task.FromResult(PasteOutcome.Unavailable);
 
     /// <inheritdoc/>
     public Task<bool> TryClearAsync() => Task.FromResult(false);

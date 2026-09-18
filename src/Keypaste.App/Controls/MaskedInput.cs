@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Automation.Peers;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
+using Keypaste.App.ViewModels;
 
 namespace Keypaste.App.Controls;
 
@@ -53,6 +54,27 @@ internal sealed class MaskedInput : TemplatedControl
     internal static readonly StyledProperty<bool> IsEmptyProperty =
         AvaloniaProperty.Register<MaskedInput, bool>(nameof(IsEmpty), true);
 
+    /// <summary>Where the characters go, when the field is bound to one.</summary>
+    /// <remarks>
+    /// Bound rather than subscribed, so a field inside a <c>DataTemplate</c> can have one:
+    /// <c>UnlockView</c> reaches its three fields with <c>FindControl</c> and keeps the events
+    /// below, and the four secret fields 4.9 adds bind this instead. <see cref="IRevealSource"/>
+    /// established the shape.
+    /// </remarks>
+    internal static readonly StyledProperty<ISecretSink?> SinkProperty =
+        AvaloniaProperty.Register<MaskedInput, ISecretSink?>(nameof(Sink));
+
+    /// <summary>Whether this field answers the platform's paste gesture.</summary>
+    /// <remarks>
+    /// <b>Default false, and that default is the scope of the whole feature.</b> The three
+    /// master-password fields simply never set it, so they go on ignoring
+    /// <c>Ctrl</c>/<c>Cmd</c>+<c>V</c> exactly as SECURITY.md says they do. Pasting a master
+    /// password stays an open question in DECISIONS rather than something this change decided by
+    /// accident.
+    /// </remarks>
+    internal static readonly StyledProperty<bool> AllowsPasteProperty =
+        AvaloniaProperty.Register<MaskedInput, bool>(nameof(AllowsPaste));
+
     static MaskedInput() => FocusableProperty.OverrideDefaultValue<MaskedInput>(true);
 
     /// <summary>Raised once per character the user typed or pasted.</summary>
@@ -91,6 +113,27 @@ internal sealed class MaskedInput : TemplatedControl
         private set => SetValue(IsEmptyProperty, value);
     }
 
+    internal ISecretSink? Sink
+    {
+        get => GetValue(SinkProperty);
+        set => SetValue(SinkProperty, value);
+    }
+
+    internal bool AllowsPaste
+    {
+        get => GetValue(AllowsPasteProperty);
+        set => SetValue(AllowsPasteProperty, value);
+    }
+
+    /// <summary>The paste this control last started, for a test to await.</summary>
+    /// <remarks>
+    /// <see cref="OnKeyDown"/> returns <c>void</c>, so the task the sink hands back has to be kept
+    /// somewhere or it is dropped on the floor — which is precisely the defect F.16 records in the
+    /// headless test harness, where an unobserved task made assertions run after nobody was
+    /// watching. A test presses the gesture and awaits this before it asserts anything.
+    /// </remarks>
+    internal Task PasteCompleted { get; private set; } = Task.CompletedTask;
+
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
@@ -117,6 +160,7 @@ internal sealed class MaskedInput : TemplatedControl
                 if (!char.IsControl(c))
                 {
                     CharacterTyped?.Invoke(this, c);
+                    Sink?.Type(c);
                 }
             }
         }
@@ -131,13 +175,20 @@ internal sealed class MaskedInput : TemplatedControl
 
         switch (e.Key)
         {
+            case Key.V when AllowsPaste && Sink is { } sink && e.KeyModifiers == CommandModifier():
+                PasteCompleted = sink.Paste();
+                e.Handled = true;
+                break;
+
             case Key.Back:
                 BackspacePressed?.Invoke(this, EventArgs.Empty);
+                Sink?.Backspace();
                 e.Handled = true;
                 break;
 
             case Key.Escape:
                 ClearRequested?.Invoke(this, EventArgs.Empty);
+                Sink?.Clear();
                 e.Handled = true;
                 break;
 
@@ -152,6 +203,18 @@ internal sealed class MaskedInput : TemplatedControl
 
         base.OnKeyDown(e);
     }
+
+    /// <summary>
+    /// The modifier this platform uses for editing commands: Cmd on macOS, Ctrl elsewhere.
+    /// </summary>
+    /// <remarks>
+    /// Asked of the platform rather than written down. Spelling it <c>Control or Meta</c> would
+    /// accept Win+V on Windows, which is the key that opens clipboard history — the one place a
+    /// person's previous secrets are listed.
+    /// </remarks>
+    private static KeyModifiers CommandModifier() =>
+        Application.Current?.PlatformSettings?.HotkeyConfiguration.CommandModifiers
+            ?? KeyModifiers.Control;
 
     /// <summary>
     /// A peer with no value pattern, which is the entire point of this control.
