@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ctl="using:Keypaste.App.Controls"
              xmlns:vm="using:Keypaste.App.ViewModels"
              xmlns:views="using:Keypaste.App.Views"
              x:Class="Keypaste.App.Views.EntriesView"
@@ -93,10 +94,22 @@
         <StackPanel Spacing="8">
           <TextBox Text="{Binding NewEntryPath}" PlaceholderText="servers/production" />
           <CheckBox Content="Generate a password" IsChecked="{Binding GeneratePassword}" />
+          <ctl:MaskedInput x:Name="NewEntryPassword"
+                           IsVisible="{Binding !GeneratePassword}"
+                           AllowsPaste="True"
+                           Sink="{Binding NewPassword}"
+                           MaskedLength="{Binding NewPassword.MaskedLength}"
+                           Placeholder="Existing password" />
           <TextBlock FontSize="11"
                      TextWrapping="Wrap"
+                     IsVisible="{Binding !GeneratePassword}"
                      Foreground="{DynamicResource KpTextMuted}"
-                     Text="To type a password instead, run keypaste add — it prompts for one without putting it in a window." />
+                     Text="Type it or press Ctrl/Cmd+V to paste. Leave it empty for an entry with no password." />
+          <TextBlock FontSize="11"
+                     TextWrapping="Wrap"
+                     IsVisible="{Binding NewPassword.Note.Length}"
+                     Foreground="{DynamicResource KpTextMuted}"
+                     Text="{Binding NewPassword.Note}" />
           <StackPanel Orientation="Horizontal" Spacing="8">
             <Button Content="Create" Command="{Binding ConfirmAddCommand}" />
             <Button Content="Cancel" Command="{Binding CancelAddCommand}" />
@@ -193,9 +206,19 @@
                 <TextBox Text="{Binding DraftUrl}" />
                 <TextBlock Text="Notes" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
                 <TextBox Text="{Binding DraftNotes}" AcceptsReturn="True" MinHeight="80" />
+                <TextBlock Text="Password" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
+                <ctl:MaskedInput x:Name="ReplacementPassword"
+                                 AllowsPaste="True"
+                                 Sink="{Binding NewPassword}"
+                                 MaskedLength="{Binding NewPassword.MaskedLength}"
+                                 Placeholder="New password" />
                 <TextBlock FontSize="11" TextWrapping="Wrap"
                            Foreground="{DynamicResource KpTextMuted}"
-                           Text="The password is not edited here. keypaste add --generate makes a new one." />
+                           Text="Leave this empty to keep the current password. A replacement keeps the old one in this entry's history." />
+                <TextBlock FontSize="11" TextWrapping="Wrap"
+                           IsVisible="{Binding NewPassword.Note.Length}"
+                           Foreground="{DynamicResource KpTextMuted}"
+                           Text="{Binding NewPassword.Note}" />
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <Button Content="Save" Command="{Binding SaveCommand}" />
                   <Button Content="Cancel" Command="{Binding CancelCommand}" />

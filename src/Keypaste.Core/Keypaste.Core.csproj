@@ -38,6 +38,9 @@
     <!-- V-F.6 saves from its own process, so the retry budget it pins has to be reachable
          from there too. A tests/ helper; nothing shipped references it. -->
     <InternalsVisibleTo Include="Keypaste.VaultSaver" />
+    <!-- V-4.9 asserts that a replacement made in the GUI leaves the old value in KeePass history,
+         and CountHistoryItems is the only thing that can see one. -->
+    <InternalsVisibleTo Include="Keypaste.Consistency.Tests" />
   </ItemGroup>
 
 </Project>

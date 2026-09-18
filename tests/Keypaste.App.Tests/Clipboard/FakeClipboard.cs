@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Keypaste.App.Clipboard;
+using Keypaste.Core;
 
 namespace Keypaste.App.Tests.Clipboard;
 
@@ -29,6 +30,24 @@ internal sealed class FakeClipboard : IAppClipboard
 
     /// <summary>Forced failure of the read-back, for the fail-closed branch.</summary>
     internal bool ReadFails { get; set; }
+
+    /// <summary>How many times something asked this clipboard for its contents.</summary>
+    /// <remarks>
+    /// So "that field never read the clipboard" is assertable as a fact rather than inferred from
+    /// a buffer that stayed empty, which a field with a broken binding would also produce.
+    /// </remarks>
+    internal int ReadCount { get; private set; }
+
+    /// <summary>Puts text on the clipboard the way some other program would have.</summary>
+    /// <remarks>
+    /// Not <see cref="TrySetSecretAsync"/>, which records the exclusion formats keypaste sets on
+    /// its own writes. A paste test wants the clipboard as somebody else left it.
+    /// </remarks>
+    internal void Plant(string text)
+    {
+        Content = text;
+        ContentWasSetAsASecret = false;
+    }
 
     public Task<bool> TrySetSecretAsync(string secret)
     {
@@ -60,6 +79,20 @@ internal sealed class FakeClipboard : IAppClipboard
         Task.FromResult<byte[]?>(ReadFails
             ? null
             : SHA256.HashData(Encoding.UTF8.GetBytes(Content ?? string.Empty)));
+
+    /// <remarks>
+    /// It defers to <see cref="SecretInput.Accept"/> rather than appending <see cref="Content"/>
+    /// itself. A fake with its own idea of what a paste may contain would let every test about
+    /// trailing newlines and control characters pass against a rule the shipped app does not have.
+    /// </remarks>
+    public Task<PasteOutcome> TryPasteIntoAsync(SecretBuffer destination)
+    {
+        ReadCount++;
+
+        return Task.FromResult(ReadFails
+            ? PasteOutcome.Unavailable
+            : SecretInput.Accept(Content ?? string.Empty, destination));
+    }
 
     public Task<bool> TryClearAsync()
     {

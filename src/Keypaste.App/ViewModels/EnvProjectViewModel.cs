@@ -30,7 +30,9 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     private IReadOnlyList<EnvVariableRow> _variables = [];
     private EnvVariableRow? _revealed;
     private EnvVariableRow? _removing;
+    private EnvVariableRow? _replacing;
     private bool _isAdding;
+    private bool _generateValue = true;
     private string _newKey = string.Empty;
 
     internal EnvProjectViewModel(
@@ -54,6 +56,11 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         ConfirmAddCommand = new RelayCommand(ConfirmAdd, () => IsAdding);
         ConfirmRemoveCommand = new RelayCommand(ConfirmRemove, () => Removing is not null);
         CancelRemoveCommand = new RelayCommand(() => Removing = null, () => Removing is not null);
+
+        NewValue = new SecretField(clipboard);
+        ReplacementValue = new SecretField(clipboard);
+        ConfirmReplaceCommand = new RelayCommand(ConfirmReplace, () => Replacing is not null);
+        CancelReplaceCommand = new RelayCommand(CancelReplace, () => Replacing is not null);
 
         Reload();
     }
@@ -125,6 +132,72 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
 
     internal bool IsRemoving => _removing is not null;
 
+    /// <summary>The variable whose value is being replaced, or null.</summary>
+    /// <remarks>
+    /// One at a time, on the project rather than on each row, for the reason
+    /// <see cref="Removing"/> is shaped this way and <see cref="RevealedKey"/> before it: a form
+    /// per row would mean one live <see cref="SecretField"/> per variable, and a screen holding
+    /// thirty buffers in order to use one of them.
+    /// </remarks>
+    internal EnvVariableRow? Replacing
+    {
+        get => _replacing;
+        private set
+        {
+            if (Set(ref _replacing, value))
+            {
+                Raise(nameof(ReplacePrompt));
+                Raise(nameof(IsReplacing));
+                ConfirmReplaceCommand.RaiseCanExecuteChanged();
+                CancelReplaceCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    internal bool IsReplacing => _replacing is not null;
+
+    /// <summary>What the replace form is headed with.</summary>
+    internal string ReplacePrompt => _replacing is { } row
+        ? $"New value for {row.DisplayKey}. The old one stays in this entry history."
+        : string.Empty;
+
+    /// <summary>The value being entered for a new variable, when it is not being generated.</summary>
+    internal SecretField NewValue { get; }
+
+    /// <summary>The value replacing an existing variable value.</summary>
+    internal SecretField ReplacementValue { get; }
+
+    /// <summary>Whether to generate the new variable value rather than take one already in hand.</summary>
+    /// <remarks>
+    /// On by default, so adding a variable behaves exactly as it did before 4.9. Turning it off
+    /// shows <see cref="NewValue"/>, which is how somebody stores a key a provider gave them.
+    /// </remarks>
+    internal bool GenerateValue
+    {
+        get => _generateValue;
+        set
+        {
+            if (Set(ref _generateValue, value) && value)
+            {
+                NewValue.Clear();
+            }
+        }
+    }
+
+    /// <summary>Replaces the value, having been given one.</summary>
+    internal RelayCommand ConfirmReplaceCommand { get; }
+
+    internal RelayCommand CancelReplaceCommand { get; }
+
+    /// <summary>Opens the replace form for one row.</summary>
+    /// <param name="row">The variable whose value is being replaced.</param>
+    internal void BeginReplace(EnvVariableRow row)
+    {
+        ReplacementValue.Clear();
+        Replacing = row;
+        _report(null);
+    }
+
     /// <summary>What the confirmation asks.</summary>
     internal string RemovePrompt => _removing is { } row
         ? $"Remove {row.DisplayKey} from {DisplayName}? There is no undo."
@@ -169,6 +242,13 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         if (_session.Unlocked is not { } vault)
         {
             Variables = [];
+
+            // A half-entered value is as much a secret as a stored one, and the screen is about to
+            // be disposed anyway. Clearing here means the lock holds on whichever path runs.
+            NewValue.Clear();
+            ReplacementValue.Clear();
+            IsAdding = false;
+            Replacing = null;
             return;
         }
 
@@ -247,6 +327,9 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         _revealed = null;
         Variables = [];
         Removing = null;
+        Replacing = null;
+        NewValue.Dispose();
+        ReplacementValue.Dispose();
     }
 
     private async Task CopyRunCommandAsync() =>
@@ -255,6 +338,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     private void BeginAdd()
     {
         NewKey = string.Empty;
+        NewValue.Clear();
         IsAdding = true;
         _report(null);
     }
@@ -263,6 +347,14 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     {
         IsAdding = false;
         NewKey = string.Empty;
+        NewValue.Clear();
+        _report(null);
+    }
+
+    private void CancelReplace()
+    {
+        Replacing = null;
+        ReplacementValue.Clear();
         _report(null);
     }
 
@@ -284,16 +376,19 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
             return;
         }
 
-        // Generated, because typing a secret needs a field that accumulates one and this app does
-        // not have one. `keypaste env set` prompts for a value without putting it in a window.
         var value = string.Empty;
 
         try
         {
-            using (var buffer = new SecretBuffer())
+            if (GenerateValue)
             {
+                using var buffer = new SecretBuffer();
                 PasswordGenerator.Append(PasswordRecipe.Default, buffer);
                 value = new string(buffer.Value);
+            }
+            else
+            {
+                value = NewValue.Compose();
             }
 
             var store = new EnvStore(vault);
@@ -319,8 +414,73 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
 
         IsAdding = false;
         NewKey = string.Empty;
+        NewValue.Clear();
         _report(null);
         Reload();
+    }
+
+    /// <summary>
+    /// Writes a new value over an existing variable, keeping the old one in history.
+    /// </summary>
+    /// <remarks>
+    /// Straight through <see cref="EnvStore.TrySet"/>, whose update branch goes to
+    /// <c>Vault.UpdateEntry</c> and therefore to <c>CreateBackup</c> — which is what keeps the
+    /// replaced value in KeePass history (D-0014) without this screen knowing anything about it.
+    /// </remarks>
+    private void ConfirmReplace()
+    {
+        if (Replacing is not { } row)
+        {
+            return;
+        }
+
+        if (_session.Unlocked is not { } vault)
+        {
+            _report("The vault is locked.");
+            return;
+        }
+
+        var value = ReplacementValue.Compose();
+
+        try
+        {
+            var store = new EnvStore(vault);
+
+            switch (store.TrySet(Name, row.Key, value, out var rejection))
+            {
+                case EnvSetOutcome.Rejected:
+                    _report(rejection);
+                    return;
+
+                case EnvSetOutcome.Created:
+                    // TrySet created it, so it was not there to replace: something removed it
+                    // while this form was open. Say so rather than report a replacement.
+                    _report($"{row.DisplayKey} was not in {DisplayName} any more, so it was added.");
+                    break;
+
+                default:
+                    break;
+            }
+
+            vault.Save();
+        }
+        catch (VaultChangedOnDiskException)
+        {
+            _report("Something else changed this vault since you opened it. Lock and unlock to see it, then replace this again.");
+            return;
+        }
+        catch (VaultException e)
+        {
+            _report(e.Message);
+            return;
+        }
+
+        // The one length that changed, rather than Reload, which reads every value in the project
+        // back out of the vault to recompute lengths it already knows.
+        row.Resize(value.Length);
+
+        Replacing = null;
+        ReplacementValue.Clear();
     }
 
     private void ConfirmRemove()

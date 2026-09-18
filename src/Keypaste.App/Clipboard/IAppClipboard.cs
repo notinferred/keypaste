@@ -1,3 +1,5 @@
+using Keypaste.Core;
+
 namespace Keypaste.App.Clipboard;
 
 /// <summary>
@@ -5,11 +7,13 @@ namespace Keypaste.App.Clipboard;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>No member returns clipboard text</b>, which is the rule
+/// <b>No member hands a caller the clipboard's text</b>, which is the rule
 /// <c>Keypaste.Cli.Clipboard.IClipboard</c> was written to and the reason both seams look alike.
-/// Auto-clear only needs to know whether the clipboard still holds what keypaste put there, so this
-/// exposes a hash. Returning the text would pull the user's whole clipboard into a process holding
-/// an unlocked vault, for no benefit, and would give some future caller something to log.
+/// Auto-clear only needs to know whether the clipboard still holds what keypaste put there, so that
+/// one exposes a hash; paste needs the characters to reach a buffer the caller already owns, so
+/// that one takes the buffer and answers with an outcome. Returning the text would pull the user's
+/// whole clipboard into a process holding an unlocked vault, for no benefit, and would give some
+/// future caller something to log.
 /// </para>
 /// <para>
 /// <b>It is not the CLI's <c>IClipboard</c>, and that is deliberate.</b> The two front ends share
@@ -46,6 +50,17 @@ internal interface IAppClipboard
     /// <summary>Hashes what the clipboard holds now, without exposing it.</summary>
     /// <returns>The hash, or null when the clipboard could not be read.</returns>
     Task<byte[]?> TryReadHashAsync();
+
+    /// <summary>Appends what the clipboard holds to a buffer, without handing it back.</summary>
+    /// <param name="destination">The buffer to append to.</param>
+    /// <returns>What happened, decided by <see cref="Core.SecretInput"/>.</returns>
+    /// <remarks>
+    /// The buffer comes in rather than the text going out, so this interface still has no member a
+    /// caller can read a secret through. What the rule accepts is not this seam's business: every
+    /// implementation, the test doubles included, defers to <see cref="Core.SecretInput.Accept"/>
+    /// so a headless test cannot be asserting against a second copy of it.
+    /// </remarks>
+    Task<PasteOutcome> TryPasteIntoAsync(SecretBuffer destination);
 
     /// <summary>Empties the clipboard.</summary>
     /// <returns>Whether it emptied.</returns>

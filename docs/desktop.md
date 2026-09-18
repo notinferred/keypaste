@@ -10,13 +10,13 @@ Approvals still happen in the terminal. When an AI agent asks `keypaste-mcp` for
 
 The desktop app is not published. Build it from source, below. `app.yml` can package desktop archives, an internal unsigned Windows MSI and an internal unsigned Linux AppImage on version tags, but keeps them as workflow artifacts; `release.yml` publishes the CLI/MCP downloads. See [RELEASE](RELEASE.md) for the distribution matrix and remaining desktop publication requirements.
 
-Entering an existing password or variable value still requires the CLI. Adding one in the app generates its value. `keypaste add` and `keypaste env set` prompt for an existing value; secure desktop input is scheduled in step 4.9 of [STEPS](STEPS.md).
+An existing password or variable value can now be stored and replaced in the app, so `keypaste add` and `keypaste env set` are no longer the only way. A replaced value stays in the entry's KeePass history, but nothing in the app reads that history back: recovering one needs KeePassXC until step V.2b of [STEPS](STEPS.md).
 
 ## What the screens show
 
-Entries lists titles and groups. The group tree filters the list; search matches titles and group paths case-insensitively, excluding secret values. Selecting an entry shows its username, URL and notes, which can be edited inline. Passwords have a Copy button but are never displayed here; use `keypaste get --show` to read one. New entries receive generated passwords. Deletion requires confirmation and has no undo.
+Entries lists titles and groups. The group tree filters the list; search matches titles and group paths case-insensitively, excluding secret values. Selecting an entry shows its username, URL and notes, which can be edited inline. Passwords have a Copy button but are never displayed here; use `keypaste get --show` to read one. A new entry generates its password unless you untick Generate a password, which reveals a masked field to type or paste an existing one into; leaving it empty creates an entry with no password. An entry's edit form has the same field for a replacement, and leaving it empty keeps the password the entry already has. Deletion requires confirmation and has no undo.
 
-Env Sets shows project cards with a copyable `keypaste run <project> -- ` command. Opening a card displays masked variables with Copy buttons. Hold a value to reveal it; only one can be visible, and releasing, switching screens or locking hides it.
+Env Sets shows project cards with a copyable `keypaste run <project> -- ` command. Opening a card displays masked variables with Copy and Replace buttons. A new variable generates its value unless you untick Generate a value, which reveals a masked field for one you already have; Replace opens the same field for an existing variable. Hold a value to reveal it; only one can be visible, and releasing, switching screens or locking hides it.
 
 Copied secrets clear after twenty seconds, with a countdown and Clear now button. Locking or quitting clears them sooner unless another value has replaced the clipboard. If a copy is still in progress, cleanup waits for it to finish; quitting waits, while locking proceeds immediately. Killing the app prevents cleanup. Copied run commands remain on the clipboard because they contain no secret.
 
@@ -92,7 +92,8 @@ The app provides these shortcuts and focus navigation. Verify the full keyboard-
 | `Tab` / `Shift+Tab` | Move between controls |
 | `↑` `↓` | Move within the sidebar or the recent list |
 | `Enter` | Unlock |
-| `Escape` | Clear the password field |
+| `Escape` | Clear the secret field in focus |
+| `Ctrl/Cmd+V` | Paste into an entry-password or variable-value field; the master-password fields ignore it |
 
 On macOS the modifier is Cmd; everywhere else, Ctrl.
 
@@ -119,13 +120,13 @@ A missing log is normal before the MCP bridge has initialized one. Requests and 
 
 <a id="what-you-should-know-about-the-master-password"></a>
 
-## Master-password input
+## Secret input
 
-The password control sends characters directly to a buffer wiped on every exit path. It avoids Avalonia `TextBox`, which exposes contents to accessibility and retains immutable strings in undo history. Its accessibility peer exposes no password content.
+Every field that takes a secret uses one control, which sends characters directly to a buffer wiped on every exit path. It avoids Avalonia `TextBox`, which exposes contents to accessibility and retains immutable strings in undo history. Its accessibility peer exposes no content: tests check that each of the seven fields publishes only its placeholder and a row of dots, and that two secrets of the same length are indistinguishable there.
 
-Tests check that accessibility exposes only the placeholder and character-count dots.
+The entry-password and variable-value fields accept `Ctrl/Cmd+V`. The three master-password fields — unlock, and the two on the create form — do not, and nothing reads the clipboard on their behalf. A pasted value loses one trailing line break, since copying a token usually brings one. Anything else a keyboard cannot type is refused with a message rather than quietly removed, so what is stored is what was on the clipboard or nothing at all.
 
-Keystrokes still arrive as short-lived immutable strings, and an input method can send several characters at once. `Ctrl/Cmd+V` is unsupported because the app does not read clipboard text. `SECURITY.md` describes these memory and input limits.
+Keystrokes still arrive as short-lived immutable strings, and an input method can send several characters at once; a paste arrives as one. `SECURITY.md` describes these memory and input limits.
 
 ## Checking a build by hand
 
@@ -154,7 +155,11 @@ CI builds and packages on three operating systems; the current desktop logic tes
 21. Add, edit and delete an entry, then check `keypaste ls` and `keypaste get` in a terminal.
 22. With the app open on a vault, run `keypaste env set` against the same file in a terminal. Come back and make any edit: the app refuses, says why, and the terminal's write is still there.
 23. Generate a password in the app, then read it back with `keypaste get --show`.
-24. Open the vault the app wrote in KeePassXC, both one it created and one it edited.
+24. Untick Generate a password, type an existing one, and read it back with `keypaste get --show`. Repeat with `Ctrl/Cmd+V` from a value you copied elsewhere, and once with something ending in a newline copied out of a terminal: the stored value must have no trailing newline.
+25. Edit that entry and type a replacement password. `keypaste get --show` returns the new one, and KeePassXC's History tab shows the old one.
+26. Untick Generate a value on a new variable, paste a value, then `keypaste run <project> -- printenv` in a terminal: the child receives exactly what you pasted. Replace it and check the same, with the old value in KeePassXC's History tab.
+27. Press `Ctrl/Cmd+V` in the unlock field with something on the clipboard: nothing is entered.
+28. Open the vault the app wrote in KeePassXC, both one it created and one it edited.
 
 
 ## Observing minimize-lock on macOS and Linux

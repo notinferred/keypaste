@@ -75,7 +75,7 @@
     <ContentControl Grid.Row="2" Content="{Binding OpenProject}" IsVisible="{Binding HasOpenProject}">
       <ContentControl.DataTemplates>
         <DataTemplate DataType="vm:EnvProjectViewModel">
-          <Grid RowDefinitions="Auto,Auto,Auto,*">
+          <Grid RowDefinitions="Auto,Auto,Auto,Auto,*">
 
             <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,0,0,12">
               <StackPanel Grid.Column="0" Spacing="2">
@@ -100,9 +100,21 @@
                     Margin="0,0,0,12">
               <StackPanel Spacing="8">
                 <TextBox Text="{Binding NewKey}" PlaceholderText="STRIPE_KEY" />
+                <CheckBox Content="Generate a value" IsChecked="{Binding GenerateValue}" />
+                <ctl:MaskedInput x:Name="NewEnvValue"
+                                 IsVisible="{Binding !GenerateValue}"
+                                 AllowsPaste="True"
+                                 Sink="{Binding NewValue}"
+                                 MaskedLength="{Binding NewValue.MaskedLength}"
+                                 Placeholder="Existing value" />
                 <TextBlock FontSize="11" TextWrapping="Wrap"
+                           IsVisible="{Binding !GenerateValue}"
                            Foreground="{DynamicResource KpTextMuted}"
-                           Text="A generated value is stored. To set a specific one, run keypaste env set — it prompts for the value without putting it in a window." />
+                           Text="Type it or press Ctrl/Cmd+V to paste." />
+                <TextBlock FontSize="11" TextWrapping="Wrap"
+                           IsVisible="{Binding NewValue.Note.Length}"
+                           Foreground="{DynamicResource KpTextMuted}"
+                           Text="{Binding NewValue.Note}" />
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <Button Content="Add" Command="{Binding ConfirmAddCommand}" />
                   <Button Content="Cancel" Command="{Binding CancelAddCommand}" />
@@ -129,11 +141,36 @@
               </StackPanel>
             </Border>
 
-            <ScrollViewer Grid.Row="3">
+            <Border Grid.Row="3"
+                    IsVisible="{Binding IsReplacing}"
+                    Background="{DynamicResource KpSurface2}"
+                    CornerRadius="{DynamicResource KpRadiusSm}"
+                    Padding="12"
+                    Margin="0,0,0,12">
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding ReplacePrompt}" TextWrapping="Wrap"
+                           Foreground="{DynamicResource KpTextPrimary}" />
+                <ctl:MaskedInput x:Name="ReplacementEnvValue"
+                                 AllowsPaste="True"
+                                 Sink="{Binding ReplacementValue}"
+                                 MaskedLength="{Binding ReplacementValue.MaskedLength}"
+                                 Placeholder="New value" />
+                <TextBlock FontSize="11" TextWrapping="Wrap"
+                           IsVisible="{Binding ReplacementValue.Note.Length}"
+                           Foreground="{DynamicResource KpTextMuted}"
+                           Text="{Binding ReplacementValue.Note}" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Content="Replace" Command="{Binding ConfirmReplaceCommand}" />
+                  <Button Content="Cancel" Command="{Binding CancelReplaceCommand}" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <ScrollViewer Grid.Row="4">
               <ItemsControl ItemsSource="{Binding Variables}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:EnvVariableRow">
-                    <Grid ColumnDefinitions="200,*,Auto,Auto" Margin="0,0,0,8">
+                    <Grid ColumnDefinitions="200,*,Auto,Auto,Auto" Margin="0,0,0,8">
 
                       <StackPanel Grid.Column="0" Spacing="2">
                         <TextBlock Text="{Binding DisplayKey}"
@@ -161,7 +198,9 @@
                                          Foreground="{DynamicResource KpTextSecondary}" />
 
                       <Button Grid.Column="2" Content="Copy" Command="{Binding CopyValueCommand}" />
-                      <Button Grid.Column="3" Content="Remove" Margin="8,0,0,0"
+                      <Button Grid.Column="3" Content="Replace" Margin="8,0,0,0"
+                              Command="{Binding ReplaceCommand}" />
+                      <Button Grid.Column="4" Content="Remove" Margin="8,0,0,0"
                               Command="{Binding RemoveCommand}" />
 
                     </Grid>

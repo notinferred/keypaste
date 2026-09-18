@@ -47,6 +47,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
         _session = session;
         _clipboard = clipboard;
+        NewPassword = new SecretField(clipboard);
 
         BeginAddCommand = new RelayCommand(BeginAdd, () => !IsAdding);
         CancelAddCommand = new RelayCommand(CancelAdd, () => IsAdding);
@@ -210,21 +211,29 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// Whether to generate the new entry's password.
+    /// Whether to generate the new entry's password, rather than take one already in hand.
     /// </summary>
     /// <remarks>
-    /// The only way this screen creates a password, and on by default. Typing one into the GUI would
-    /// need a field that holds a secret, and the control for that is
-    /// <see cref="Controls.MaskedInput"/>, whose whole design is that it accumulates nothing —
-    /// which is right for a password being checked and wrong for one being composed. Anyone who
-    /// needs to type a specific password has <c>keypaste add</c>, which prompts for it without
-    /// putting it in a window (docs/PRODUCT.md law 4.2).
+    /// On by default, because a generated password is the better answer whenever there is a choice.
+    /// Turning it off shows <see cref="NewPassword"/>, which is how somebody stores the API key
+    /// they were handed rather than one keypaste invented (docs/PRODUCT.md §1.1).
     /// </remarks>
     internal bool GeneratePassword
     {
         get => _generatePassword;
-        set => Set(ref _generatePassword, value);
+        set
+        {
+            if (Set(ref _generatePassword, value) && value)
+            {
+                // Turning generation back on hides the field. Anything typed into it would
+                // otherwise sit in the buffer, invisible, until something else read it.
+                NewPassword.Clear();
+            }
+        }
     }
+
+    /// <summary>The password being entered for the new entry, when it is not being generated.</summary>
+    internal SecretField NewPassword { get; }
 
     internal RelayCommand BeginAddCommand { get; }
 
@@ -249,6 +258,11 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
             Groups = [];
             Rows = [];
             Selected = null;
+
+            // A half-entered password is as much a secret as a stored one, and the screen is about
+            // to be disposed anyway. Clearing here means the lock holds on whichever path runs.
+            NewPassword.Clear();
+            IsAdding = false;
             return;
         }
 
@@ -273,6 +287,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         Groups = [];
         Selected = null;
         Detail = null;
+        NewPassword.Dispose();
     }
 
     private EntryDetailViewModel? Build(EntryRow row)
@@ -318,6 +333,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     private void BeginAdd()
     {
         NewEntryPath = SelectedGroup is { IsEverything: false } group ? group.Path + "/" : string.Empty;
+        NewPassword.Clear();
         IsAdding = true;
         Error = null;
     }
@@ -326,6 +342,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     {
         IsAdding = false;
         NewEntryPath = string.Empty;
+        NewPassword.Clear();
         Error = null;
     }
 
@@ -393,6 +410,12 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
                 PasswordGenerator.Append(PasswordRecipe.Default, buffer);
                 password = new string(buffer.Value);
             }
+            else
+            {
+                // Empty is still allowed, and the field shows zero dots beside the unticked box:
+                // KDBX permits an entry with no password, and 4.2 created them that way.
+                password = NewPassword.Compose();
+            }
 
             vault.AddEntry(new VaultEntry
             {
@@ -416,6 +439,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
         IsAdding = false;
         NewEntryPath = string.Empty;
+        NewPassword.Clear();
         Error = null;
 
         Reload();

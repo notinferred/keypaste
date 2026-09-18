@@ -3,6 +3,7 @@ using System.Text;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
+using Keypaste.Core;
 
 namespace Keypaste.App.Clipboard;
 
@@ -28,11 +29,14 @@ namespace Keypaste.App.Clipboard;
 /// to another machine's history. THREATS.md T-19 says so in those words.
 /// </para>
 /// <para>
-/// <b><see cref="TryReadHashAsync"/> is the one place a clipboard string enters this process.</b>
+/// <b>This file is the only place a clipboard string enters this process.</b>
 /// Avalonia's clipboard has <c>TryGetTextAsync</c>, which is exactly the member
-/// <c>Keypaste.Cli.Clipboard.IClipboard</c> refused to declare (D-0011). The equality guard needs a
-/// read-back and there is no ownership API to use instead, so the call is made here, hashed at once,
-/// and the reference dropped. A test greps this app's sources and fails if it appears anywhere else.
+/// <c>Keypaste.Cli.Clipboard.IClipboard</c> refused to declare (D-0011). Two callers need it and
+/// neither hands it on: <see cref="TryReadHashAsync"/>, where the auto-clear equality guard has no
+/// ownership API to use instead, hashes it at once; and <see cref="TryPasteIntoAsync"/>, where the
+/// characters go straight into the caller's buffer through <see cref="SecretInput.Accept"/>. Both
+/// drop the reference in the method that made it. A test greps this app's sources and fails if
+/// <c>TryGetTextAsync</c> appears in any other file.
 /// </para>
 /// </remarks>
 internal sealed class AvaloniaClipboard(TopLevel topLevel) : IAppClipboard
@@ -123,6 +127,30 @@ internal sealed class AvaloniaClipboard(TopLevel topLevel) : IAppClipboard
         catch (Exception e) when (e is PlatformNotSupportedException or InvalidOperationException or TimeoutException)
         {
             return null;
+        }
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The string Avalonia hands back cannot be wiped, which is the limit SECURITY.md already
+    /// states for a pasted password — it arrives whole in one immutable string whichever way it
+    /// gets here. This narrows how many objects hold it, not how long the characters live.
+    /// </remarks>
+    public async Task<PasteOutcome> TryPasteIntoAsync(SecretBuffer destination)
+    {
+        if (topLevel.Clipboard is not { } clipboard)
+        {
+            return PasteOutcome.Unavailable;
+        }
+
+        try
+        {
+            var text = await clipboard.TryGetTextAsync().ConfigureAwait(true);
+            return text is null ? PasteOutcome.Empty : SecretInput.Accept(text, destination);
+        }
+        catch (Exception e) when (e is PlatformNotSupportedException or InvalidOperationException or TimeoutException)
+        {
+            return PasteOutcome.Unavailable;
         }
     }
 

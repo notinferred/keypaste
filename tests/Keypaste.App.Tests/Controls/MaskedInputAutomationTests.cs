@@ -75,7 +75,7 @@ public sealed class MaskedInputAutomationTests
         }
 
         Assert.Equal(Fixture.Length, screen.Model.MaskedLength);
-        AssertNothingExposes(screen.Password, Fixture);
+        AutomationSurface.AssertNothingExposes(screen.Password, Fixture);
     });
 
     /// <summary>
@@ -91,7 +91,7 @@ public sealed class MaskedInputAutomationTests
         screen.Window.KeyTextInput(Fixture);
 
         Assert.Equal(Fixture.Length, screen.Model.MaskedLength);
-        AssertNothingExposes(screen.Password, Fixture);
+        AutomationSurface.AssertNothingExposes(screen.Password, Fixture);
     });
 
     /// <summary>
@@ -106,7 +106,7 @@ public sealed class MaskedInputAutomationTests
         screen.Window.KeyTextInput(Rare.ToString());
 
         Assert.Equal(1, screen.Model.MaskedLength);
-        AssertNothingExposes(screen.Password, Rare.ToString());
+        AutomationSurface.AssertNothingExposes(screen.Password, Rare.ToString());
     });
 
     /// <summary>
@@ -120,14 +120,14 @@ public sealed class MaskedInputAutomationTests
             using var screen = new UnlockScreen();
 
             screen.Window.KeyTextInput(Alpha);
-            var first = Surface(screen.Password);
+            var first = AutomationSurface.Of(screen.Password);
 
             screen.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
             screen.Window.KeyReleaseQwerty(PhysicalKey.Escape, RawInputModifiers.None);
             Assert.Equal(0, screen.Model.MaskedLength);
 
             screen.Window.KeyTextInput(Beta);
-            var second = Surface(screen.Password);
+            var second = AutomationSurface.Of(screen.Password);
 
             Assert.Equal(first, second);
         });
@@ -149,14 +149,14 @@ public sealed class MaskedInputAutomationTests
             screen.NewPassword.Focus();
 
             screen.Window.KeyTextInput(Alpha);
-            var first = Surface(screen.NewPassword);
+            var first = AutomationSurface.Of(screen.NewPassword);
 
             screen.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
             screen.Window.KeyReleaseQwerty(PhysicalKey.Escape, RawInputModifiers.None);
             Assert.Equal(0, screen.Model.NewMaskedLength);
 
             screen.Window.KeyTextInput(Beta);
-            var second = Surface(screen.NewPassword);
+            var second = AutomationSurface.Of(screen.NewPassword);
 
             Assert.Equal(first, second);
         });
@@ -171,14 +171,14 @@ public sealed class MaskedInputAutomationTests
             screen.ConfirmPassword.Focus();
 
             screen.Window.KeyTextInput(Alpha);
-            var first = Surface(screen.ConfirmPassword);
+            var first = AutomationSurface.Of(screen.ConfirmPassword);
 
             screen.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
             screen.Window.KeyReleaseQwerty(PhysicalKey.Escape, RawInputModifiers.None);
             Assert.Equal(0, screen.Model.ConfirmMaskedLength);
 
             screen.Window.KeyTextInput(Beta);
-            var second = Surface(screen.ConfirmPassword);
+            var second = AutomationSurface.Of(screen.ConfirmPassword);
 
             Assert.Equal(first, second);
         });
@@ -203,8 +203,8 @@ public sealed class MaskedInputAutomationTests
         screen.ConfirmPassword.Focus();
         screen.Window.KeyTextInput(Rare.ToString() + Fixture);
 
-        AssertNothingExposes(screen.Window, Fixture);
-        AssertNothingExposes(screen.Window, Rare.ToString());
+        AutomationSurface.AssertNothingExposes(screen.Window, Fixture);
+        AutomationSurface.AssertNothingExposes(screen.Window, Rare.ToString());
     });
 
     /// <summary>
@@ -224,14 +224,14 @@ public sealed class MaskedInputAutomationTests
             screen.NewPassword.Focus();
             screen.Window.KeyTextInput(Fixture);
 
-            var created = Surface(screen.NewPassword).Select(entry => entry.Text).ToList();
+            var created = AutomationSurface.Of(screen.NewPassword).Select(entry => entry.Text).ToList();
             Assert.Contains(new string('•', Fixture.Length), created, StringComparer.Ordinal);
             Assert.Contains("New master password", created, StringComparer.Ordinal);
 
             screen.ConfirmPassword.Focus();
             screen.Window.KeyTextInput(Fixture);
 
-            var confirmed = Surface(screen.ConfirmPassword).Select(entry => entry.Text).ToList();
+            var confirmed = AutomationSurface.Of(screen.ConfirmPassword).Select(entry => entry.Text).ToList();
             Assert.Contains(new string('•', Fixture.Length), confirmed, StringComparer.Ordinal);
             Assert.Contains("Confirm master password", confirmed, StringComparer.Ordinal);
         });
@@ -247,7 +247,7 @@ public sealed class MaskedInputAutomationTests
 
         screen.Window.KeyTextInput(Fixture);
 
-        var surface = Surface(screen.Password).Select(entry => entry.Text).ToList();
+        var surface = AutomationSurface.Of(screen.Password).Select(entry => entry.Text).ToList();
 
         Assert.Contains(new string('•', Fixture.Length), surface, StringComparer.Ordinal);
         Assert.Contains("Master password", surface, StringComparer.Ordinal);
@@ -303,7 +303,7 @@ public sealed class MaskedInputAutomationTests
 
         screen.Window.KeyTextInput(Fixture);
 
-        AssertNothingExposes(screen.Window, Fixture);
+        AutomationSurface.AssertNothingExposes(screen.Window, Fixture);
     });
 
     [Theory]
@@ -321,7 +321,7 @@ public sealed class MaskedInputAutomationTests
             Attach(screen.Password, property, Fixture);
 
             var failure = Assert.ThrowsAny<XunitException>(
-                () => AssertNothingExposes(screen.Password, Fixture));
+                () => AutomationSurface.AssertNothingExposes(screen.Password, Fixture));
 
             // The peer reads the attached property, so the sweep reaches it as GetName before it
             // reaches AutomationProperties.Name. Either is the right answer; naming neither is not.
@@ -341,7 +341,7 @@ public sealed class MaskedInputAutomationTests
         var value = ControlAutomationPeer.CreatePeerForElement(box).GetProvider<IValueProvider>();
         Assert.Equal(Fixture, value?.Value);
 
-        var failure = Assert.ThrowsAny<XunitException>(() => AssertNothingExposes(box, Fixture));
+        var failure = Assert.ThrowsAny<XunitException>(() => AutomationSurface.AssertNothingExposes(box, Fixture));
 
         Assert.Contains("IValueProvider.Value", failure.Message, StringComparison.Ordinal);
     });
@@ -355,7 +355,7 @@ public sealed class MaskedInputAutomationTests
     {
         var block = new TextBlock { Text = Fixture };
 
-        var failure = Assert.ThrowsAny<XunitException>(() => AssertNothingExposes(block, Fixture));
+        var failure = Assert.ThrowsAny<XunitException>(() => AutomationSurface.AssertNothingExposes(block, Fixture));
 
         Assert.Contains("GetName", failure.Message, StringComparison.Ordinal);
     });
@@ -367,85 +367,10 @@ public sealed class MaskedInputAutomationTests
             var control = new Remembering { Kept = Fixture };
 
             var failure = Assert.ThrowsAny<XunitException>(
-                () => AssertNothingExposes(control, Fixture));
+                () => AutomationSurface.AssertNothingExposes(control, Fixture));
 
             Assert.Contains("styled property", failure.Message, StringComparison.Ordinal);
         });
-
-    private static void AssertNothingExposes(Control control, string secret)
-    {
-        foreach (var (source, text) in Surface(control))
-        {
-            if (text.Contains(secret, StringComparison.Ordinal))
-            {
-                Assert.Fail($"{source} exposes the fixture password");
-            }
-        }
-    }
-
-    /// <summary>
-    /// Everything a process on the accessibility bus, or a reader of this control's own state, can
-    /// get back — peer by peer down the tree, then every attached automation property and every
-    /// registered styled property on every element in it.
-    /// </summary>
-    private static List<(string Source, string Text)> Surface(Control control)
-    {
-        var found = new List<(string Source, string Text)>();
-
-        Walk(ControlAutomationPeer.CreatePeerForElement(control), found);
-
-        foreach (var element in Descendants(control))
-        {
-            var what = element.GetType().Name;
-
-            Add(found, $"AutomationProperties.Name on {what}", AutomationProperties.GetName(element));
-            Add(found, $"AutomationProperties.HelpText on {what}", AutomationProperties.GetHelpText(element));
-            Add(found, $"AutomationProperties.ItemStatus on {what}", AutomationProperties.GetItemStatus(element));
-            Add(found, $"AutomationProperties.ItemType on {what}", AutomationProperties.GetItemType(element));
-            Add(found, $"AutomationProperties.AutomationId on {what}", AutomationProperties.GetAutomationId(element));
-            Add(found, $"AutomationProperties.AcceleratorKey on {what}", AutomationProperties.GetAcceleratorKey(element));
-            Add(found, $"AutomationProperties.AccessKey on {what}", AutomationProperties.GetAccessKey(element));
-
-            foreach (var property in AvaloniaPropertyRegistry.Instance.GetRegistered(element))
-            {
-                Add(found, $"the {property.Name} styled property on {what}", element.GetValue(property)?.ToString());
-            }
-        }
-
-        return found;
-    }
-
-    private static IEnumerable<Control> Descendants(Control control) =>
-        new[] { control }.Concat(control.GetVisualDescendants().OfType<Control>());
-
-    private static void Walk(AutomationPeer peer, List<(string Source, string Text)> found)
-    {
-        var what = peer.GetType().Name;
-
-        Add(found, $"{what}.GetName", peer.GetName());
-        Add(found, $"{what}.GetHelpText", peer.GetHelpText());
-        Add(found, $"{what}.GetItemStatus", peer.GetItemStatus());
-        Add(found, $"{what}.GetItemType", peer.GetItemType());
-        Add(found, $"{what}.GetAutomationId", peer.GetAutomationId());
-        Add(found, $"{what}.GetClassName", peer.GetClassName());
-        Add(found, $"{what}.GetLocalizedControlType", peer.GetLocalizedControlType());
-        Add(found, $"{what}.GetAcceleratorKey", peer.GetAcceleratorKey());
-        Add(found, $"{what}.GetAccessKey", peer.GetAccessKey());
-        Add(found, "IValueProvider.Value", peer.GetProvider<IValueProvider>()?.Value);
-
-        foreach (var child in peer.GetChildren())
-        {
-            Walk(child, found);
-        }
-    }
-
-    private static void Add(List<(string Source, string Text)> found, string source, string? text)
-    {
-        if (!string.IsNullOrEmpty(text))
-        {
-            found.Add((source, text));
-        }
-    }
 
     private static void Attach(Control control, string property, string value)
     {
