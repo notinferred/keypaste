@@ -285,9 +285,10 @@ public sealed class CompatGateIsPermanentTests
 
     /// <summary>
     /// The history gate is the only place KeePassXC is asked to read a vault keypaste restored a
-    /// revision into. V.2a added the core read and restore and no surface that can drive one, so
-    /// losing this script would leave law 4.6 unchecked on the one path that rewrites an entry's
-    /// fields and its history at once (DECISIONS.md D-0228).
+    /// revision into. V.2b put a restore on the entry pane, and a bash gate cannot drive a desktop
+    /// window, so the script keeps driving the same <c>RestoreRevision</c> and <c>Save</c> through
+    /// its own binary (D-0230). Losing it would leave law 4.6 unchecked on the one path that
+    /// rewrites an entry's fields and its history at once (DECISIONS.md D-0228).
     /// </summary>
     [Fact]
     public void HistoryScript_ExistsAndKeepsItsNegativeControl()

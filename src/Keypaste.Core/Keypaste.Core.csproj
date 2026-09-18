@@ -38,6 +38,10 @@
     <!-- V-F.6 saves from its own process, so the retry budget it pins has to be reachable
          from there too. A tests/ helper; nothing shipped references it. -->
     <InternalsVisibleTo Include="Keypaste.VaultSaver" />
+    <!-- V-V.2b asks whether a restore kept the entry's UUID, and no CLI verb prints one, so the
+         claim is unassertable from either front end without EntryUuid. That one seam; a tests/
+         project, in neither solution, that nothing shipped references. -->
+    <InternalsVisibleTo Include="Keypaste.Consistency.Tests" />
   </ItemGroup>
 
 </Project>

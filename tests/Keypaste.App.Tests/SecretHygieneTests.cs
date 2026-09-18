@@ -73,6 +73,17 @@ public sealed class SecretHygieneTests
 
     internal const string SentinelUnselectedTitle = "SENTINEL-OTHER-TITLE-30bd19";
 
+    /// <summary>
+    /// The password the sentinel entry used to have, kept in its KeePass history.
+    /// </summary>
+    /// <remarks>
+    /// The entry pane can show this one, while somebody holds it, and nothing else about the entry
+    /// changes when it does (V.2b, D-0231). Having it in the fixture means every sweep in this file
+    /// now runs against an entry that has a history, so a pane that read one eagerly and kept it
+    /// fails here rather than in the one test that thought to look.
+    /// </remarks>
+    internal const string SentinelSupersededPassword = "SENTINEL-SUPERSEDED-PASSWORD-2f9a63";
+
     internal const string SentinelProject = "SENTINEL-PROJECT-3ac71d";
     internal const string SentinelEnvKey = "SENTINEL_ENV_KEY_9B2E";
     internal const string SentinelEnvValue = "SENTINEL-ENV-VALUE-7d5e08";
@@ -99,6 +110,7 @@ public sealed class SecretHygieneTests
         SentinelGroup,
         SentinelUnselectedPassword,
         SentinelUnselectedTitle,
+        SentinelSupersededPassword,
         SentinelProject,
         SentinelEnvKey,
         SentinelEnvValue,
@@ -226,6 +238,59 @@ public sealed class SecretHygieneTests
         // The mask says how long it is and nothing about what it is.
         Assert.Equal(SentinelPassword.Length, detail.PasswordLength);
         Assert.DoesNotContain(SentinelPassword, detail.PasswordMask, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The history list holds times and masks, and hands a superseded password only to a hold.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The entry half of <c>Revealing_is_one_value_at_a_time_and_ends_with_the_hold</c>. The value
+    /// legitimately reaches a screen here, so what has to hold instead is narrower: a row carries
+    /// how long the password was and when it was current, the view model records which revision is
+    /// revealed rather than what it holds, and the characters go from the open vault straight to
+    /// the control that draws them (D-0231).
+    /// </para>
+    /// <para>
+    /// The list is opened deliberately, because the pane reads no history until it is asked.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void The_history_list_holds_times_and_masks_and_no_old_value()
+    {
+        using var fixture = new SentinelVault();
+        using var session = Unlocked(fixture);
+        using var shell = new ShellViewModel(session, fixture.Home, approverFromEnvironment: null);
+
+        shell.Current = Destinations.All[0];
+        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
+        entries.Selected = entries.Rows.Single(row => row.Title == SentinelTitle);
+
+        var detail = entries.Detail!;
+        detail.History.ToggleCommand.Execute(null);
+
+        var revision = Assert.Single(detail.History.Rows);
+        Assert.Equal(SentinelSupersededPassword.Length, revision.MaskedLength);
+        Assert.NotEmpty(revision.When);
+        Assert.Empty(detail.History.RevealedWhen);
+
+        foreach (var text in Surface(detail).Concat(Surface(detail.History)).Concat(Surface(revision)))
+        {
+            Assert.DoesNotContain(SentinelSupersededPassword, text, StringComparison.Ordinal);
+        }
+
+        // The value comes back to whoever held it — that is the feature — and the view model
+        // records only which revision it was.
+        Assert.Equal(SentinelSupersededPassword, ((IRevealSource)revision).Reveal());
+        Assert.Equal(revision.When, detail.History.RevealedWhen);
+
+        foreach (var text in Surface(detail).Concat(Surface(detail.History)).Concat(Surface(revision)))
+        {
+            Assert.DoesNotContain(SentinelSupersededPassword, text, StringComparison.Ordinal);
+        }
+
+        ((IRevealSource)revision).Conceal();
+        Assert.Empty(detail.History.RevealedWhen);
     }
 
     /// <summary>
@@ -601,6 +666,18 @@ public sealed class SecretHygieneTests
             using var vault = Vault.Create(VaultFile, Master);
 
             vault.AddEntry(new VaultEntry
+            {
+                Title = SentinelTitle,
+                Username = SentinelUsername,
+                Password = SentinelSupersededPassword,
+                Url = SentinelUrl,
+                Notes = SentinelNotes,
+                GroupPath = SentinelGroup,
+            });
+
+            // Replaced rather than created with its final password, so the entry has a history for
+            // the pane to read and for every sweep here to run against.
+            vault.UpdateEntry(new VaultEntry
             {
                 Title = SentinelTitle,
                 Username = SentinelUsername,

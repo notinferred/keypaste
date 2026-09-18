@@ -272,7 +272,7 @@ Evidence: `RecentVaultsTests` checks persistence, capacity and removal. `Keypast
 
 ## T-25 — A value on screen, because somebody asked to see it
 
-Env Sets can reveal one value while its control is held, supporting comparison with a `.env` file or provider dashboard. Entry details have no reveal equivalent; `keypaste get --show` supplies explicit CLI display (D-0045).
+Env Sets can reveal one value while its control is held, supporting comparison with a `.env` file or provider dashboard. The entry pane reveals a superseded password the same way, while its control is held, because choosing which revision to restore means reading it and no CLI verb can read one (D-0231). The entry current password has no reveal; `keypaste get --show` supplies explicit CLI display (D-0045).
 
 Release, dragging off, loss of pointer capture, the pointer leaving the window or removal from the visual tree ends reveal. Lock replaces the shell content, removing the control. The view model enforces one reveal at a time without storing the characters. At press time the row reads the open vault and passes the value to the control's private field rather than a styled property.
 
@@ -280,7 +280,7 @@ Release, dragging off, loss of pointer capture, the pointer leaving the window o
 
 The display remains readable to people, screenshots, recordings, screen-sharing and remote-desktop sessions. Rendering also creates an immutable string that cannot be wiped; its copies fall under T-18. Ending reveal cannot erase a capture.
 
-Evidence: `RevealedValueTests` covers hold/release, visual-tree removal, styled properties and `No_automation_property_carries_the_value_while_it_is_shown`. `SecretHygieneTests.Revealing_is_one_value_at_a_time_and_ends_with_the_hold` checks session behavior. Screen capture remains outside those guarantees.
+Evidence: `RevealedValueTests` covers hold/release, visual-tree removal, styled properties and `No_automation_property_carries_the_value_while_it_is_shown`. `SecretHygieneTests` checks session behavior for an env value and for a superseded password. `HistoryRevealAutomationTests` compares the whole window automation surface at rest with the same window while a revision is revealed, requiring them equal, and sweeps it for the revealed characters (D-0232). Screen capture remains outside those guarantees.
 
 ## T-26 — Shares and relay drops (planned)
 

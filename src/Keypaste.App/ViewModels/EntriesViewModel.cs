@@ -312,7 +312,19 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         }
 
         Error = null;
-        return new EntryDetailViewModel(_session, _clipboard, entry, message => Error = message);
+        return new EntryDetailViewModel(_session, _clipboard, entry, message => Error = message, Reselect);
+    }
+
+    /// <summary>Reads the list again and lands on the entry a restore left behind.</summary>
+    /// <remarks>
+    /// <see cref="Reload"/> alone is not enough: it keeps the selection by path, and a restored
+    /// revision from before a rename gives the entry a different one. It is also not too much: an
+    /// <see cref="EntryRow"/> is a record, so reselecting an equal row changes nothing.
+    /// </remarks>
+    private void Reselect(EntryName name)
+    {
+        Reload();
+        Selected = Rows.FirstOrDefault(row => row.Name == name);
     }
 
     private void Filter()

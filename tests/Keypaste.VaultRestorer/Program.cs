@@ -5,11 +5,16 @@ namespace Keypaste.VaultRestorer;
 /// <summary>Restores one entry revision in one vault, once, and saves.</summary>
 /// <remarks>
 /// <para>
-/// The history gate's driver, and the reason it is a process. V.2a puts reading and restoring
-/// history in the core and adds no CLI or desktop surface, so there is no shipped binary that can
-/// perform a restore — and a gate that cannot make KeePassXC look at a restored vault is not
-/// checking the half of docs/PRODUCT.md law 4.6 that matters here. Everything the shipped writer
-/// can do in that gate, it does; this performs only the step it cannot (DECISIONS.md D-0228).
+/// The history gate's driver, and the reason it is a process. There is no shipped binary a script
+/// can tell to restore a revision — and a gate that cannot make KeePassXC look at a restored vault
+/// is not checking the half of docs/PRODUCT.md law 4.6 that matters here. Everything the shipped
+/// writer can do in that gate, it does; this performs only the step it cannot (DECISIONS.md
+/// D-0228).
+/// </para>
+/// <para>
+/// V.2b put a restore on the desktop entry pane, which a bash gate cannot drive, so this stays
+/// until a restore verb reaches the CLI (D-0230). The two calls below are the pane's own, which is
+/// what carries KeePassXC's verdict onto the button.
 /// </para>
 /// <para>
 /// It prints how many revisions it saw and which one it restored, and never a value: the gate

@@ -147,6 +147,33 @@ internal sealed class RevealedValue : Control
         InvalidateMeasure();
     }
 
+    /// <summary>
+    /// A new row to ask ends the hold on the old one.
+    /// </summary>
+    /// <remarks>
+    /// Env Sets gives every row its own control, so a source only ever changes when the control is
+    /// being built. The entry pane has one control whose source follows the selected revision, and
+    /// without this a value held while the selection moved would stay drawn against the next
+    /// revision's mask. The old row is the one told, since it is the one holding the view model's
+    /// reveal slot.
+    /// </remarks>
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+
+        base.OnPropertyChanged(change);
+
+        if (change.Property != SourceProperty)
+        {
+            return;
+        }
+
+        _shown = null;
+        (change.OldValue as IRevealSource)?.Conceal();
+        InvalidateVisual();
+        InvalidateMeasure();
+    }
+
     protected override Size MeasureOverride(Size availableSize)
     {
         var text = Layout();
