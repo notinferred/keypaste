@@ -103,6 +103,37 @@
         <StackPanel Spacing="8">
           <TextBox Text="{Binding NewEntryPath}" PlaceholderText="servers/production" />
           <CheckBox Content="Generate a password" IsChecked="{Binding GeneratePassword}" />
+          <StackPanel Spacing="4" IsVisible="{Binding GeneratePassword}">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+              <RadioButton GroupName="NewEntrySecretKind" Content="Characters" IsChecked="{Binding Generator.UseCharacters}" />
+              <RadioButton GroupName="NewEntrySecretKind" Content="Words" IsChecked="{Binding Generator.UseWords}" />
+              <NumericUpDown Width="104"
+                             IsVisible="{Binding Generator.UseWords}"
+                             Minimum="{Binding Generator.MinimumWords}"
+                             Maximum="{Binding Generator.MaximumWords}"
+                             Increment="1"
+                             FormatString="0"
+                             Value="{Binding Generator.WordCount}" />
+              <TextBox Width="44"
+                       MaxLength="1"
+                       IsVisible="{Binding Generator.UseWords}"
+                       Text="{Binding Generator.Separator}" />
+            </StackPanel>
+            <TextBlock FontSize="11"
+                       TextWrapping="Wrap"
+                       Foreground="{DynamicResource KpTextMuted}"
+                       Text="{Binding Generator.Strength}" />
+            <TextBlock FontSize="11"
+                       TextWrapping="Wrap"
+                       IsVisible="{Binding Generator.UseWords}"
+                       Foreground="{DynamicResource KpTextMuted}"
+                       Text="{Binding Generator.Provenance}" />
+            <TextBlock FontSize="11"
+                       TextWrapping="Wrap"
+                       IsVisible="{Binding Generator.Error, Converter={x:Static ObjectConverters.IsNotNull}}"
+                       Foreground="{DynamicResource KpTextSecondary}"
+                       Text="{Binding Generator.Error}" />
+          </StackPanel>
           <ctl:MaskedInput x:Name="NewEntryPassword"
                            IsVisible="{Binding !GeneratePassword}"
                            AllowsPaste="True"

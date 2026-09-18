@@ -84,6 +84,44 @@ public sealed class GuiEditIsVisibleToTheCliTests
         Assert.Equal(fixture.Unlocked.Find("svc/api")?.Password, value);
     }
 
+    /// <summary>
+    /// A passphrase generated in the app is the value <c>keypaste get --show</c> returns.
+    /// </summary>
+    /// <remarks>
+    /// V-V.6's last clause, and the same argument as the test above: the generator is the only
+    /// thing here producing a value nothing else has seen, so the two front ends cannot agree by
+    /// having been handed the same constant. The word count is read back by splitting on the
+    /// separator, and each piece is checked against the list, so five words and a stray separator
+    /// cannot pass for six.
+    /// </remarks>
+    [Fact]
+    public void A_passphrase_generated_in_the_gui_is_the_value_the_cli_returns()
+    {
+        using var fixture = new VaultFixture(("seed", "seed-password"));
+        using var screen = Entries(fixture);
+
+        screen.Model.BeginAddCommand.Execute(null);
+        screen.Model.NewEntryPath = "svc/api";
+        screen.Model.Generator.UseWords = true;
+        screen.Model.ConfirmAddCommand.Execute(null);
+
+        Assert.Null(screen.Model.Error);
+
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "svc/api", "--show"));
+
+        var value = fixture.Cli.Out.Trim();
+        Assert.NotEmpty(value);
+
+        var pieces = value.Split(PasswordGenerator.DefaultSeparator);
+        Assert.Equal(PasswordGenerator.DefaultWords, pieces.Length);
+        Assert.All(pieces, piece => Assert.True(
+            WordList.Words.Contains(piece),
+            $"'{piece}' is not a word from the vendored list"));
+
+        // And it is the value the file holds, not merely a string of the right shape.
+        Assert.Equal(fixture.Unlocked.Find("svc/api")?.Password, value);
+    }
+
     [Fact]
     public void An_entry_edited_in_the_gui_is_what_the_cli_reads_back()
     {

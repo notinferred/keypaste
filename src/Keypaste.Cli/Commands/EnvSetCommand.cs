@@ -118,7 +118,7 @@ internal static class EnvSetCommand
 
             var entryPath = EnvConvention.EntryPath(project, key);
             var generated = recipe is { } used
-                ? $" ({used.Length}-character value generated)"
+                ? $" ({used.Describe("value")} generated)"
                 : string.Empty;
 
             context.Stderr.WriteLine(outcome == EnvSetOutcome.Created

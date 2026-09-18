@@ -1,6 +1,6 @@
 # Feature coverage and KeePassXC baseline
 
-Reviewed 2026-09-07 against PRODUCT v1.2; milestone mappings updated 2026-09-15 for PRODUCT v1.4 (D-0176); entry editing restated 2026-09-18 when 4.9 closed and entry history when V.2b did. This is a first-pass capability inventory.
+Reviewed 2026-09-07 against PRODUCT v1.2; milestone mappings updated 2026-09-15 for PRODUCT v1.4 (D-0176); entry editing restated 2026-09-18 when 4.9 closed, entry history when V.2b did and generation when V.6 did. This is a first-pass capability inventory.
 
 The baseline is KeePassXC 2.7.12, advertised on its [download page](https://keepassxc.org/download/) at review time. The online [User Guide](https://keepassxc.org/docs/KeePassXC_UserGuide) identifies itself as 2.7.11, so version-specific behavior requires checking against the 2.7.12 release and source. This inventory covers feature families; individual options, integrations, file variants and platform behaviors remain for P.0 in [STEPS](STEPS.md#define-coverage-before-claiming-a-complete-password-manager). P.9 requires evidence for every behavior in that versioned contract on public keypaste releases before any complete-coverage claim.
 
@@ -23,7 +23,7 @@ The upstream families come from the official [feature overview](https://keepassx
 | Offline vault creation and opening | CLI and desktop both create and open KDBX4 through one set of core rules. | 0.2, 0.3, 4.1, 4.8 complete, source only; no desktop download yet. Working proposition. |
 | Entry editing | GUI adds generated or existing credentials, replaces an existing password or variable value, and edits username, URL and notes. | 4.2 and 4.9 complete, source only. Working proposition. |
 | Organization and search | GUI group navigation and case-insensitive title/group search exist. Rich field/tag search and rename/move/clone workflows are not established. | V.5a–b add stable organization operations and GUI search/controls. Expansion. |
-| Generator | Character password generation exists. Passphrase workflow not established. | 4.2 covers the existing generator; V.6 adds core/CLI/GUI passphrases, which share passphrases use (Working proposition); 8.3d adds browser generation (Expansion). |
+| Generator | Character passwords and word-list passphrases in the core, on `add`, `env set` and `keypaste generate`, and on both desktop forms. The word list is EFF's 7,776-word long list, vendored and pinned by digest; six words is the floor. | 4.2 and V.6 complete, source only. Working proposition; 5.4a consumes the six-word passphrase, and 8.3d adds browser generation (Expansion). |
 | Entry history | Ordinary updates retain prior values in KeePass history, and the entry pane lists them, reveals a chosen revision password while it is held and restores one. | V.2a and V.2b complete, source only. Working proposition. |
 | Recycle bin | Delete permanently removes the entry and its history, recording a deletion tombstone. | V.3a–b add reversible deletion, trash and recovery while retaining explicit permanent deletion. Expansion. |
 | Backups and merge | External-write guard refuses stale saves. Automatic backup/restore workflow not established; merge remains unimplemented. | 1.4a–c cover merge semantics, the merge engine and share receive through CLI and GUI (Working proposition); V.4a–b cover encrypted backup/restore/export (Expansion). |

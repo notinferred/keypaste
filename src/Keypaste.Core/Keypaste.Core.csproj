@@ -28,6 +28,20 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!--
+      The word list a passphrase is drawn from, vendored verbatim. Provenance and licence:
+      third_party/eff-large-wordlist/UPSTREAM.md. Its SHA-256 is pinned in WordList.Digest and
+      checked against these bytes at first use, so the file ships with the assembly rather than
+      being read from disk - a published binary has no repository to compare against (D-0235).
+
+      LogicalName is required, not decorative: the file lives outside this project directory, so
+      the name MSBuild would derive holds the `..` of the relative path.
+    -->
+    <EmbeddedResource Include="../../third_party/eff-large-wordlist/eff_large_wordlist.txt"
+                      LogicalName="Keypaste.Core.eff_large_wordlist.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Using Include="System.Buffers.Binary" />
     <Using Include="System.Security.Cryptography" />
     <Using Include="System.Text" />

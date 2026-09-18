@@ -16,6 +16,12 @@ third_party/KeePassLib/KeePassLib.csproj   text eol=lf
 third_party/KeePassLib/UPSTREAM.md         text eol=lf
 third_party/KeePassLib/packages.lock.json  text eol=lf
 
+# The vendored word list is pinned by SHA-256 in Keypaste.Core.WordList, so it has to be checked
+# out as the bytes EFF published; normalising a line ending would break the pin on Windows. The
+# licence text beside it is upstream's too. UPSTREAM.md is ours and follows the convention.
+third_party/eff-large-wordlist/**          -text
+third_party/eff-large-wordlist/UPSTREAM.md text eol=lf
+
 *.kdbx   binary
 *.png    binary
 *.gif    binary

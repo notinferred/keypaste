@@ -1,3 +1,4 @@
+using Keypaste.Core;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -154,19 +155,21 @@ public sealed class SecretHygieneTests
     /// produced passes for a <c>--generate</c> that silently did nothing.
     /// </remarks>
     [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void AGeneratedValue_IsStored_AndNeverPrintedByTheCommandThatMadeIt(bool entry)
+    [InlineData(true, false)]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    public void AGeneratedValue_IsStored_AndNeverPrintedByTheCommandThatMadeIt(bool entry, bool words)
     {
         using var harness = new CliHarness();
         Seed(harness);
 
         var target = entry ? "generated/target" : EnvPath;
+        string[] shape = words ? ["--generate", "--words", "6"] : ["--generate"];
 
         harness.Prompt.Enqueue(Master);
         var exit = entry
-            ? harness.Run("add", target, "--generate", "--vault", harness.VaultPath)
-            : harness.Run("env", "set", "hygiene", "GENERATED", "--generate", "--vault", harness.VaultPath);
+            ? harness.Run([.. new[] { "add", target }, .. shape, .. new[] { "--vault", harness.VaultPath }])
+            : harness.Run([.. new[] { "env", "set", "hygiene", "GENERATED" }, .. shape, .. new[] { "--vault", harness.VaultPath }]);
 
         Assert.Equal(CliApp.ExitSuccess, exit);
 
@@ -178,7 +181,16 @@ public sealed class SecretHygieneTests
         Assert.Equal(CliApp.ExitSuccess, harness.Run("get", target, "--show", "--vault", harness.VaultPath));
 
         var value = harness.Out.Trim();
-        Assert.Equal(20, value.Length);
+
+        // The positive half, in whichever unit was asked for.
+        if (words)
+        {
+            Assert.Equal(6, value.Split(PasswordGenerator.DefaultSeparator).Length);
+        }
+        else
+        {
+            Assert.Equal(20, value.Length);
+        }
 
         Assert.DoesNotContain(value, whileGenerating, StringComparison.Ordinal);
     }

@@ -170,9 +170,34 @@ keypaste ls
 keypaste get github
 keypaste get github --show
 keypaste rm github --yes
+
+keypaste generate --words 6
 ```
 
 `ls` prints a names-only group tree. `get` copies the password to the clipboard and clears it after twenty seconds; `--show` writes it to stdout instead. Password prompts never echo input. Command data goes to stdout and diagnostics to stderr, so `keypaste get x --show` can be piped. Set `KEYPASTE_VAULT` or pass `--vault` to each command.
+
+`get --show` and `generate` are the only commands that print a secret; `generate` is described below.
+
+### Generating one
+
+`add` and `env set` generate the secret they store when you pass `--generate`, and print how much of it there was rather than what it was:
+
+```sh
+keypaste add github --generate
+keypaste add github --generate --length 32 --no-symbols --no-lookalikes
+keypaste env set billing STRIPE_KEY --generate
+```
+
+Characters come from an 85-character alphabet: letters, digits and `!#%()*+,-./:;=?@[]^_{}~`. The punctuation that breaks in a shell, in YAML or in a URL is left out on purpose. Twenty characters is the default, about 128 bits; `--length` takes 8 to 256. `--no-symbols` leaves letters and digits, `--no-lookalikes` drops `Il1O0`, and both cost entropy to solve a problem the Copy button and `keypaste run` are there to remove.
+
+`--words N` generates a passphrase instead, drawn from the [EFF long word list](third_party/eff-large-wordlist/UPSTREAM.md) of 7,776 words vendored into keypaste and pinned by digest. Each word is worth about 12.9 bits, so the six-word minimum is about 78 bits; `--words` takes 6 to 32, and `--separator` chooses what goes between them, a full stop by default. A hyphen is refused, because four of the list's words are spelled with one and a hyphen-joined passphrase cannot be split back into the words you counted.
+
+```sh
+keypaste add github --generate --words 6
+keypaste env set billing STRIPE_KEY --generate --words 8 --separator _
+```
+
+`keypaste generate --words 6` prints a passphrase and stores nothing. It is the one command whose output is a fresh secret on stdout, because a passphrase you are about to send to somebody has to be readable and no vault holds it; what it is made of goes to stderr, so a redirect captures only the passphrase. It opens no vault and asks for nothing, so it works before you have one. Every other secret still needs `--show` before keypaste will print it.
 
 | exit code | meaning |
 | --- | --- |
