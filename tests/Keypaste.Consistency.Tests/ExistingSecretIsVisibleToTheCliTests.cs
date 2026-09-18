@@ -210,7 +210,7 @@ public sealed class ExistingSecretIsVisibleToTheCliTests
     private static int HistoryOf(VaultFixture fixture, string groupPath, string title)
     {
         using var vault = Vault.Open(fixture.VaultPath, VaultFixture.Master);
-        return vault.CountHistoryItems(new EntryName(groupPath, title));
+        return vault.ReadHistory(new EntryName(groupPath, title))?.Count ?? -1;
     }
 
     private static Screen<EntriesViewModel> Entries(VaultFixture fixture)
