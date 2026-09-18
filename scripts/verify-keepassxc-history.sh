@@ -19,9 +19,10 @@
 #
 # The seeding is done by the SHIPPED binary, exactly as the other two gates do it, so init,
 # prompting and the open-modify-save cycle are all under test here too (D-0012). Only the
-# restore itself goes through tests/Keypaste.VaultRestorer, because V.2a deliberately added no
-# CLI or desktop surface that can perform one (D-0228). When V.2b puts a restore on screen, the
-# driver is what should go, not this gate.
+# restore itself goes through tests/Keypaste.VaultRestorer, because no shipped binary a script
+# can drive performs one (D-0228). V.2b put a restore on the entry pane, and a bash gate cannot
+# drive a desktop window; what would retire the driver is a restore verb on the CLI (D-0230).
+# The call it makes is the pane's own: Vault.RestoreRevision then Vault.Save.
 #
 # This builds its OWN database. The compat fixture is asserted against an exact tree and the
 # write-back fixture against exact values; mutating either here would make the three

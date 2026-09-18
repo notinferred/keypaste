@@ -16,18 +16,25 @@ namespace Keypaste.App.ViewModels;
 /// never in a view model, never in a binding, and never in the visual tree.
 /// </para>
 /// <para>
-/// <b>Why there is no reveal here when <c>Env Sets</c> has one.</b> The two are used differently. An
-/// environment value gets compared by eye against a <c>.env</c> file or a provider's dashboard, so
-/// reading it is the task. An entry password gets pasted into a login form, so copying it is the
-/// task, and <c>keypaste get --show</c> is there for the times it genuinely has to be read. The
-/// asymmetry is a decision, not an oversight; adding a reveal here later means widening the hygiene
-/// gate's allow-set, which is where the argument belongs.
+/// <b>Why the current password has no reveal when <c>Env Sets</c> has one.</b> The two are used
+/// differently. An environment value gets compared by eye against a <c>.env</c> file or a
+/// provider's dashboard, so reading it is the task. An entry password gets pasted into a login
+/// form, so copying it is the task, and <c>keypaste get --show</c> is there for the times it
+/// genuinely has to be read. The asymmetry is a decision, not an oversight.
+/// </para>
+/// <para>
+/// <b>A password the entry no longer uses is the one exception (D-0231).</b>
+/// <see cref="History"/> reveals a superseded value while it is held, because deciding whether to
+/// restore a revision means reading it first and no CLI verb can read one at all. The reveal lives
+/// in <see cref="EntryHistoryViewModel"/> rather than here, so the paragraph above stays true of
+/// this object and the hygiene gate's allow-set widens by one type.
 /// </para>
 /// </remarks>
 internal sealed class EntryDetailViewModel : ObservableObject, IDisposable
 {
     private readonly AppVaultSession _session;
     private readonly ClipboardCountdown _clipboard;
+    private readonly Action<EntryName> _restored;
     private string _entryPath;
     private string _title;
     private string _groupPath;
@@ -44,12 +51,14 @@ internal sealed class EntryDetailViewModel : ObservableObject, IDisposable
         AppVaultSession session,
         ClipboardCountdown clipboard,
         VaultEntry entry,
-        Action<string?> report)
+        Action<string?> report,
+        Action<EntryName> restored)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(clipboard);
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(report);
+        ArgumentNullException.ThrowIfNull(restored);
 
         _session = session;
         _clipboard = clipboard;
@@ -64,6 +73,8 @@ internal sealed class EntryDetailViewModel : ObservableObject, IDisposable
         PasswordLength = entry.Password.Length;
 
         NewPassword = new SecretField(clipboard);
+        _restored = restored;
+        History = new EntryHistoryViewModel(session, this, Restored);
 
         CopyPasswordCommand = new AsyncRelayCommand(CopyPasswordAsync, () => PasswordLength > 0);
         CopyUsernameCommand = new AsyncRelayCommand(CopyUsernameAsync, () => Username.Length > 0);
@@ -190,6 +201,13 @@ internal sealed class EntryDetailViewModel : ObservableObject, IDisposable
     /// </remarks>
     internal SecretField NewPassword { get; }
 
+    /// <summary>The entry's earlier values, and the way back to one of them.</summary>
+    /// <remarks>
+    /// Always here and never null, so the section can bind whether or not it has been opened; it
+    /// reads nothing out of the vault until somebody asks for it.
+    /// </remarks>
+    internal EntryHistoryViewModel History { get; }
+
     internal bool IsEditing
     {
         get => _isEditing;
@@ -292,11 +310,29 @@ internal sealed class EntryDetailViewModel : ObservableObject, IDisposable
         DraftNotes = string.Empty;
         PasswordLength = 0;
         NewPassword.Dispose();
+        History.Dispose();
 
         Raise(nameof(Title));
         Raise(nameof(GroupPath));
         Raise(nameof(Path));
         Raise(nameof(PasswordMask));
+    }
+
+    /// <summary>Picks up what a restore left, and tells the screen which entry it left it on.</summary>
+    /// <remarks>
+    /// A restored revision can carry an older title, and then this pane addresses an entry that no
+    /// longer exists — so the pane refreshes itself only when the identity survived, and the screen
+    /// rebuilds it either way.
+    /// </remarks>
+    private void Restored(EntryName name)
+    {
+        if (name == Name)
+        {
+            Reload();
+            History.Refresh();
+        }
+
+        _restored(name);
     }
 
     private async Task CopyPasswordAsync()
@@ -396,6 +432,10 @@ internal sealed class EntryDetailViewModel : ObservableObject, IDisposable
         IsEditing = false;
         NewPassword.Clear();
         Reload();
+
+        // The edit it just made is a revision now, and a list read before it would name the wrong
+        // one at every index (D-0229).
+        History.Refresh();
         Report(null);
     }
 }

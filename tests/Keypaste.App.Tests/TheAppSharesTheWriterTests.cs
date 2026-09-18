@@ -15,7 +15,8 @@ namespace Keypaste.App.Tests;
 /// </para>
 /// <para>
 /// <b>The argument.</b> Every vault mutation the app can perform goes through
-/// <c>Vault.AddEntry</c>, <c>UpdateEntry</c>, <c>RemoveEntry</c>, <c>EnvStore.TrySet</c> or
+/// <c>Vault.AddEntry</c>, <c>UpdateEntry</c>, <c>RemoveEntry</c>, <c>RestoreRevision</c>,
+/// <c>EnvStore.TrySet</c> or
 /// <c>EnvStore.Remove</c>, and every write goes through <c>Vault.Save()</c> into the same vendored
 /// KeePassLib with the same <c>KdbxFormat</c> parameters. The CLI's path is the identical set of
 /// calls. The salt and nonces differ per save, which is a property of the format rather than of the
@@ -32,6 +33,12 @@ namespace Keypaste.App.Tests;
 /// not by one that resembles it. <c>Vault.Create(</c> and <c>Directory.CreateDirectory</c> are
 /// forbidden below to keep that literally true rather than nearly true; the app's <c>--selftest</c>
 /// was moved onto <c>VaultCreation</c> so the ban needs no exemption.
+/// </para>
+/// <para>
+/// <b>V.2b made the app a restorer, and the argument covers it for the same reason.</b> The pane's
+/// Restore button calls <c>Vault.RestoreRevision</c> and <c>Vault.Save</c> — which is exactly the
+/// pair <c>tests/Keypaste.VaultRestorer</c> calls for <c>scripts/verify-keepassxc-history.sh</c>, so
+/// the vault KeePassXC reads back in that gate is written by the path the button takes (D-0230).
 /// </para>
 /// <para>
 /// <b>"No new gate is needed" is itself a claim, and D-0036's standard is that a claim needs

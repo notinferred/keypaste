@@ -8,20 +8,28 @@
 
   <UserControl.Resources>
     <views:DepthToIndent x:Key="Indent" />
+    <views:HistoryToPaneWidth x:Key="PaneWidth" />
   </UserControl.Resources>
 
-  <Grid ColumnDefinitions="180,1,*,1,320" RowDefinitions="Auto,*">
+  <!-- The columns move when a revision is being compared: the group tree steps aside so the detail
+       pane can show a revision's fields beside the current ones. Both outer columns are Auto, so
+       what moves them is the pane's width and the tree's visibility. -->
+  <Grid ColumnDefinitions="Auto,1,*,1,Auto" RowDefinitions="Auto,*">
 
     <!-- The group tree. A flat, indented ListBox rather than a TreeView: arrow keys, Home/End and
          type-ahead work for free, and a vault three groups deep does not need expand state. -->
     <TextBlock Grid.Row="0" Grid.Column="0"
                Text="Groups"
+               Width="180"
                FontSize="11"
                Margin="0,0,0,8"
+               IsVisible="{Binding !Detail.History.IsOpen}"
                Foreground="{DynamicResource KpTextMuted}" />
 
     <ListBox Grid.Row="1" Grid.Column="0"
              Name="Groups"
+             Width="180"
+             IsVisible="{Binding !Detail.History.IsOpen}"
              ItemsSource="{Binding Groups}"
              SelectedItem="{Binding SelectedGroup}"
              Background="Transparent"
@@ -36,7 +44,8 @@
     </ListBox>
 
     <Rectangle Grid.Row="0" Grid.RowSpan="2" Grid.Column="1"
-               Width="1" Fill="{DynamicResource KpBorderSubtle}" Margin="12,0" />
+               Width="1" Fill="{DynamicResource KpBorderSubtle}" Margin="12,0"
+               IsVisible="{Binding !Detail.History.IsOpen}" />
 
     <!-- The list. Titles and groups, and nothing from inside an entry: see EntryRow. -->
     <Grid Grid.Row="0" Grid.Column="2" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,8">
@@ -144,7 +153,9 @@
 
     <!-- The detail pane. Username, URL and notes for the one entry somebody chose; the password is
          a row of dots and a copy button, and never a value this view can reach. -->
-    <ContentControl Grid.Row="0" Grid.RowSpan="2" Grid.Column="4" Content="{Binding Detail}">
+    <ContentControl Grid.Row="0" Grid.RowSpan="2" Grid.Column="4"
+                    Width="{Binding Detail.History.IsOpen, Converter={StaticResource PaneWidth}}"
+                    Content="{Binding Detail}">
       <ContentControl.DataTemplates>
         <DataTemplate DataType="vm:EntryDetailViewModel">
           <ScrollViewer>
@@ -198,6 +209,135 @@
               <Button Content="Edit" Command="{Binding EditCommand}"
                       IsVisible="{Binding !IsEditing}"
                       HorizontalAlignment="Left" />
+
+              <!-- History. Read when the toggle asks for it, never on selection: one reading
+                   materialises every superseded password (EntryHistoryViewModel). -->
+              <StackPanel Spacing="8" IsVisible="{Binding !IsEditing}">
+
+                <Button x:Name="HistoryToggle"
+                        Content="{Binding History.ToggleLabel}"
+                        Command="{Binding History.ToggleCommand}"
+                        HorizontalAlignment="Left" />
+
+                <StackPanel Spacing="8" IsVisible="{Binding History.IsOpen}">
+
+                  <TextBlock x:Name="HistoryEmpty"
+                             IsVisible="{Binding History.ShowsEmptyNote}"
+                             Text="{Binding History.EmptyNote}"
+                             TextWrapping="Wrap"
+                             FontSize="11"
+                             Foreground="{DynamicResource KpTextMuted}" />
+
+                  <ListBox x:Name="Revisions"
+                           MaxHeight="160"
+                           ItemsSource="{Binding History.Rows}"
+                           SelectedItem="{Binding History.Selected}"
+                           Background="Transparent"
+                           BorderThickness="0">
+                    <ListBox.ItemTemplate>
+                      <DataTemplate x:DataType="vm:EntryRevisionRow">
+                        <Grid ColumnDefinitions="Auto,*">
+                          <TextBlock Grid.Column="0"
+                                     Text="{Binding When}"
+                                     FontFamily="{DynamicResource KpMono}"
+                                     FontSize="12"
+                                     Foreground="{DynamicResource KpTextPrimary}" />
+                          <TextBlock Grid.Column="1"
+                                     Text="{Binding DisplayTitle}"
+                                     FontSize="12"
+                                     Margin="12,0,0,0"
+                                     TextTrimming="CharacterEllipsis"
+                                     Foreground="{DynamicResource KpTextMuted}" />
+                        </Grid>
+                      </DataTemplate>
+                    </ListBox.ItemTemplate>
+                  </ListBox>
+
+                  <!-- The chosen revision beside the entry as it is now. The revision's password is
+                       the one value on this screen that can be read, and only while it is held. -->
+                  <Grid IsVisible="{Binding History.HasSelection}"
+                        ColumnDefinitions="*,12,*"
+                        RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+
+                    <TextBlock Grid.Row="0" Grid.Column="0"
+                               Text="{Binding History.Selected.When}"
+                               FontFamily="{DynamicResource KpMono}"
+                               FontSize="12"
+                               TextTrimming="CharacterEllipsis"
+                               Foreground="{DynamicResource KpTextPrimary}" />
+                    <TextBlock Grid.Row="0" Grid.Column="2"
+                               Text="Now"
+                               FontSize="12"
+                               Foreground="{DynamicResource KpTextPrimary}" />
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
+                               Text="Password" FontSize="11" Margin="0,8,0,0"
+                               Foreground="{DynamicResource KpTextMuted}" />
+                    <ctl:RevealedValue Grid.Row="2" Grid.Column="0"
+                                       x:Name="RevisionPassword"
+                                       Source="{Binding History.Selected}"
+                                       MaskedLength="{Binding History.Selected.MaskedLength}"
+                                       AutomationProperties.Name="{Binding History.Selected.RevealLabel}"
+                                       FontFamily="{DynamicResource KpMono}"
+                                       FontSize="13"
+                                       Foreground="{DynamicResource KpTextSecondary}" />
+                    <TextBlock Grid.Row="2" Grid.Column="2"
+                               Text="{Binding PasswordMask}"
+                               FontFamily="{DynamicResource KpMono}"
+                               Foreground="{DynamicResource KpTextSecondary}" />
+
+                    <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3"
+                               Text="Username" FontSize="11" Margin="0,8,0,0"
+                               Foreground="{DynamicResource KpTextMuted}" />
+                    <TextBlock Grid.Row="4" Grid.Column="0"
+                               Text="{Binding History.Selected.DisplayUsername}"
+                               TextTrimming="CharacterEllipsis"
+                               Foreground="{DynamicResource KpTextPrimary}" />
+                    <TextBlock Grid.Row="4" Grid.Column="2"
+                               Text="{Binding DisplayUsername}"
+                               TextTrimming="CharacterEllipsis"
+                               Foreground="{DynamicResource KpTextPrimary}" />
+
+                    <TextBlock Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="3"
+                               Text="URL" FontSize="11" Margin="0,8,0,0"
+                               Foreground="{DynamicResource KpTextMuted}" />
+                    <TextBlock Grid.Row="6" Grid.Column="0"
+                               Text="{Binding History.Selected.DisplayUrl}"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource KpTextPrimary}" />
+                    <TextBlock Grid.Row="6" Grid.Column="2"
+                               Text="{Binding DisplayUrl}"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource KpTextPrimary}" />
+
+                    <TextBlock Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="3"
+                               Text="Notes" FontSize="11" Margin="0,8,0,0"
+                               Foreground="{DynamicResource KpTextMuted}" />
+                    <TextBlock Grid.Row="8" Grid.Column="0"
+                               Text="{Binding History.Selected.DisplayNotes}"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource KpTextPrimary}" />
+                    <TextBlock Grid.Row="8" Grid.Column="2"
+                               Text="{Binding DisplayNotes}"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource KpTextPrimary}" />
+
+                  </Grid>
+
+                  <StackPanel Spacing="4" IsVisible="{Binding History.HasSelection}">
+                    <Button x:Name="RestoreRevision"
+                            Content="Restore this"
+                            Command="{Binding History.RestoreCommand}"
+                            HorizontalAlignment="Left" />
+                    <TextBlock FontSize="11"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource KpTextMuted}"
+                               Text="Restoring makes these the entry's values. The ones it replaces are kept here." />
+                  </StackPanel>
+
+                </StackPanel>
+
+              </StackPanel>
 
               <StackPanel Spacing="8" IsVisible="{Binding IsEditing}">
                 <TextBlock Text="Username" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />

@@ -10,11 +10,13 @@ Approvals still happen in the terminal. When an AI agent asks `keypaste-mcp` for
 
 The desktop app is not published. Build it from source, below. `app.yml` can package desktop archives, an internal unsigned Windows MSI and an internal unsigned Linux AppImage on version tags, but keeps them as workflow artifacts; `release.yml` publishes the CLI/MCP downloads. See [RELEASE](RELEASE.md) for the distribution matrix and remaining desktop publication requirements.
 
-An existing password or variable value can now be stored and replaced in the app, so `keypaste add` and `keypaste env set` are no longer the only way. A replaced value stays in the entry's KeePass history, but nothing in the app reads that history back: recovering one needs KeePassXC until step V.2b of [STEPS](STEPS.md).
+An existing password or variable value can now be stored and replaced in the app, so `keypaste add` and `keypaste env set` are no longer the only way, and an entry's history can be read and restored on its pane, so recovering a replaced password no longer needs KeePassXC. A variable's earlier values are reached the same way, through the entry under `env/<project>` that holds it.
 
 ## What the screens show
 
 Entries lists titles and groups. The group tree filters the list; search matches titles and group paths case-insensitively, excluding secret values. Selecting an entry shows its username, URL and notes, which can be edited inline. Passwords have a Copy button but are never displayed here; use `keypaste get --show` to read one. A new entry generates its password unless you untick Generate a password, which reveals a masked field to type or paste an existing one into; leaving it empty creates an entry with no password. An entry's edit form has the same field for a replacement, and leaving it empty keeps the password the entry already has. Deletion requires confirmation and has no undo.
+
+Show history lists what the entry held before, newest first, with the time each value was current; the pane widens and the group tree steps aside while it is open. Selecting a revision shows its username, URL, notes and password beside the current ones. The revision's password is a row of dots until you hold it, as an env value is, and only one can be visible at a time; releasing, switching screens or locking hides it. The current password is still never displayed. Restore this makes the selected revision current and saves, and the value it replaces becomes the newest history item, so a restore can be undone by restoring again. An entry nobody has changed says so rather than showing an empty list, and a vault that changed under the app refuses the restore and says why. KeePass keeps a bounded number of revisions, so restoring one near the end of a long history can drop the oldest.
 
 Env Sets shows project cards with a copyable `keypaste run <project> -- ` command. Opening a card displays masked variables with Copy and Replace buttons. A new variable generates its value unless you untick Generate a value, which reveals a masked field for one you already have; Replace opens the same field for an existing variable. Hold a value to reveal it; only one can be visible, and releasing, switching screens or locking hides it.
 
@@ -156,10 +158,12 @@ CI builds and packages on three operating systems; the current desktop logic tes
 22. With the app open on a vault, run `keypaste env set` against the same file in a terminal. Come back and make any edit: the app refuses, says why, and the terminal's write is still there.
 23. Generate a password in the app, then read it back with `keypaste get --show`.
 24. Untick Generate a password, type an existing one, and read it back with `keypaste get --show`. Repeat with `Ctrl/Cmd+V` from a value you copied elsewhere, and once with something ending in a newline copied out of a terminal: the stored value must have no trailing newline.
-25. Edit that entry and type a replacement password. `keypaste get --show` returns the new one, and KeePassXC's History tab shows the old one.
+25. Edit that entry and type a replacement password. `keypaste get --show` returns the new one, and both Show history on its pane and KeePassXC's History tab show the old one.
 26. Untick Generate a value on a new variable, paste a value, then `keypaste run <project> -- printenv` in a terminal: the child receives exactly what you pasted. Replace it and check the same, with the old value in KeePassXC's History tab.
 27. Press `Ctrl/Cmd+V` in the unlock field with something on the clipboard: nothing is entered.
 28. Open the vault the app wrote in KeePassXC, both one it created and one it edited.
+29. Open Show history on that entry, hold a revision's password to reveal it and release to hide it. Switch screens while holding, and lock while holding: both must take it off the screen. Select a revision and check the layout at the smallest window the app allows — the entry list must still be usable.
+30. Restore the oldest revision. `keypaste get --show` returns it, the value it replaced is now the newest history item in both the app and KeePassXC, and the entry keeps its other fields. Restore again to go back.
 
 
 ## Observing minimize-lock on macOS and Linux
