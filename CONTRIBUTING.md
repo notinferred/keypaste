@@ -14,7 +14,7 @@ Write self-documenting code with clear names and structure. Default to no commen
 
 ## Verification and commits
 
-Run `./scripts/verify.ps1` in PowerShell or `bash scripts/verify.sh` in Bash after final edits. The shared command includes backend, desktop and consistency tests. [CLAUDE.md](CLAUDE.md#local-verification-and-delivery) owns profiles, prerequisites and checkpoint rules; `--list` prints commands without executing them.
+Run `./scripts/verify.ps1` in PowerShell or `bash scripts/verify.sh` in Bash once when a step is finished. It runs the checks the changes affect; `--all` runs backend, desktop, consistency, script and process checks together. [CLAUDE.md](CLAUDE.md#local-verification-and-delivery) owns profiles, prerequisites and checkpoint rules; `--list` prints commands without executing them.
 
 Sign off every commit, including maintainer and agent commits:
 

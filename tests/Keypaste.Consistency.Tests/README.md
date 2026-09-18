@@ -16,7 +16,7 @@ From the repository root, run the same desktop and consistency checks locally:
 bash scripts/verify.sh desktop
 ```
 
-In PowerShell, use `./scripts/verify.ps1 desktop`. The default `all` profile includes this project too; [CLAUDE.md](../../CLAUDE.md#local-verification-and-delivery) owns local verification requirements.
+In PowerShell, use `./scripts/verify.ps1 desktop`. A change under this project or `src/` selects the `desktop` profile in the default run too; [CLAUDE.md](../../CLAUDE.md#local-verification-and-delivery) owns local verification requirements.
 
 ## What must stay true
 
