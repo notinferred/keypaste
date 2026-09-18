@@ -24,54 +24,73 @@
                  FontSize="13"
                  Foreground="{DynamicResource KpTextMuted}" />
 
-      <TextBlock Text="{Binding SelectedName}"
-                 IsVisible="{Binding HasSelection}"
-                 FontSize="22"
-                 TextTrimming="CharacterEllipsis"
-                 Foreground="{DynamicResource KpTextPrimary}" />
+      <!-- Opening an existing vault. -->
+      <StackPanel Spacing="16" IsVisible="{Binding IsOpening}">
 
-      <TextBlock Text="Open a vault"
-                 IsVisible="{Binding !HasSelection}"
-                 FontSize="22"
-                 Foreground="{DynamicResource KpTextPrimary}" />
+        <TextBlock Text="{Binding SelectedName}"
+                   IsVisible="{Binding HasSelection}"
+                   FontSize="22"
+                   TextTrimming="CharacterEllipsis"
+                   Foreground="{DynamicResource KpTextPrimary}" />
 
-      <!-- First run. Points at the CLI rather than growing a second way to make a vault:
-           docs/PRODUCT.md law 4.2 says every feature exists in the CLI before it gets a GUI. -->
-      <StackPanel Spacing="6" IsVisible="{Binding HasNoRecent}">
-        <TextBlock Text="No vaults yet. Drag a .kdbx file here, or browse for one."
+        <TextBlock Text="Open a vault"
+                   IsVisible="{Binding !HasSelection}"
+                   FontSize="22"
+                   Foreground="{DynamicResource KpTextPrimary}" />
+
+        <TextBlock Text="No vaults yet. Create one, drag a .kdbx file here, or browse for one."
+                   IsVisible="{Binding HasNoRecent}"
                    TextWrapping="Wrap"
                    Foreground="{DynamicResource KpTextSecondary}" />
-        <TextBlock Text="To make a new vault, run:  keypaste init"
-                   FontFamily="{DynamicResource KpMono}"
-                   FontSize="12"
-                   Foreground="{DynamicResource KpTextMuted}" />
+
+        <ListBox ItemsSource="{Binding Recent}"
+                 IsVisible="{Binding HasRecent}"
+                 MaxHeight="150"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 SelectedItem="{Binding SelectedRecent}"
+                 x:Name="RecentList">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:RecentVaultItem">
+              <StackPanel Spacing="1" ToolTip.Tip="{Binding Path}">
+                <TextBlock Text="{Binding Name}"
+                           Foreground="{DynamicResource KpTextPrimary}" />
+                <TextBlock Text="missing"
+                           IsVisible="{Binding !Exists}"
+                           FontSize="11"
+                           Foreground="{DynamicResource KpTextMuted}" />
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+
+        <ctl:MaskedInput x:Name="Password"
+                         MaskedLength="{Binding MaskedLength}"
+                         Placeholder="Master password"
+                         IsEnabled="{Binding HasSelection}" />
       </StackPanel>
 
-      <ListBox ItemsSource="{Binding Recent}"
-               IsVisible="{Binding HasRecent}"
-               MaxHeight="150"
-               Background="Transparent"
-               BorderThickness="0"
-               SelectedItem="{Binding SelectedRecent}"
-               x:Name="RecentList">
-        <ListBox.ItemTemplate>
-          <DataTemplate x:DataType="vm:RecentVaultItem">
-            <StackPanel Spacing="1" ToolTip.Tip="{Binding Path}">
-              <TextBlock Text="{Binding Name}"
-                         Foreground="{DynamicResource KpTextPrimary}" />
-              <TextBlock Text="missing"
-                         IsVisible="{Binding !Exists}"
-                         FontSize="11"
-                         Foreground="{DynamicResource KpTextMuted}" />
-            </StackPanel>
-          </DataTemplate>
-        </ListBox.ItemTemplate>
-      </ListBox>
+      <!-- Making one. The path is already chosen by the time this shows. -->
+      <StackPanel Spacing="16" IsVisible="{Binding IsCreating}">
 
-      <ctl:MaskedInput x:Name="Password"
-                       MaskedLength="{Binding MaskedLength}"
-                       Placeholder="Master password"
-                       IsEnabled="{Binding HasSelection}" />
+        <TextBlock Text="{Binding NewVaultName}"
+                   FontSize="22"
+                   TextTrimming="CharacterEllipsis"
+                   Foreground="{DynamicResource KpTextPrimary}" />
+
+        <TextBlock Text="Choose a master password. There is no way to recover it."
+                   TextWrapping="Wrap"
+                   FontSize="13"
+                   Foreground="{DynamicResource KpTextSecondary}" />
+
+        <ctl:MaskedInput x:Name="NewPassword"
+                         MaskedLength="{Binding NewMaskedLength}"
+                         Placeholder="New master password" />
+
+        <ctl:MaskedInput x:Name="ConfirmPassword"
+                         MaskedLength="{Binding ConfirmMaskedLength}"
+                         Placeholder="Confirm master password" />
+      </StackPanel>
 
       <TextBlock Text="{Binding Message}"
                  IsVisible="{Binding HasMessage}"
@@ -79,15 +98,29 @@
                  FontSize="13"
                  Foreground="{DynamicResource KpTextSecondary}" />
 
-      <Grid ColumnDefinitions="*,Auto" >
+      <Grid ColumnDefinitions="Auto,Auto,*,Auto" IsVisible="{Binding IsOpening}">
         <Button Grid.Column="0"
-                Content="Browse…"
-                HorizontalAlignment="Left"
-                Click="OnBrowse" />
+                Content="Create…"
+                Command="{Binding StartCreateCommand}" />
         <Button Grid.Column="1"
+                Content="Browse…"
+                Margin="8,0,0,0"
+                Command="{Binding BrowseCommand}" />
+        <Button Grid.Column="3"
                 Content="Unlock"
                 IsDefault="True"
                 Command="{Binding UnlockCommand}"
+                Classes="accent" />
+      </Grid>
+
+      <Grid ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding IsCreating}">
+        <Button Grid.Column="0"
+                Content="Cancel"
+                Command="{Binding CancelCreateCommand}" />
+        <Button Grid.Column="2"
+                Content="Create vault"
+                IsDefault="True"
+                Command="{Binding CreateCommand}"
                 Classes="accent" />
       </Grid>
 

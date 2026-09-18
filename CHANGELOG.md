@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+The desktop app creates vaults. The unlock screen offers Create beside Browse, asks where the file goes and for a master password twice, and opens the new vault on an empty entry list; it no longer tells a new user to go and run `keypaste init`. The rules deciding what may be created — an occupied path refused with the file there untouched, an empty password refused, a confirmation that must match, and nothing written until all three pass — moved into the shared core, so `keypaste init` and the app apply one set rather than two. `keypaste init` behaves exactly as it did: the same prompts, the same messages and the same exit codes, now pinned by tests. This is source only: there is still no desktop download.
+
 The release workflow can publish the Windows MSI and Linux AppImage beside the CLI at the same version prefix, each component with a manifest and an attestation bundle of its own. The desktop packages are taken from the app workflow's run for the tag and are checked against that run's attestation before they are staged, rather than rebuilt. Nothing desktop is published while it is unsigned: the packages stay internal and unsigned, and the publication path refuses them until signing is enabled. There is still no public desktop download: publishing waits both on a signing identity and on the desktop being worth installing.
 
 ## 0.3.0

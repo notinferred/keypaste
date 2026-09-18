@@ -1,6 +1,5 @@
 using Avalonia.Controls;
 using Avalonia.Input;
-using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
@@ -19,7 +18,19 @@ internal sealed partial class UnlockView : UserControl
         password.CharacterTyped += (_, c) => Model?.Type(c);
         password.BackspacePressed += (_, _) => Model?.Backspace();
         password.ClearRequested += (_, _) => Model?.ClearPassword();
-        password.Submitted += (_, _) => Submit();
+        password.Submitted += (_, _) => Run(Model?.UnlockCommand);
+
+        var created = this.FindControl<MaskedInput>("NewPassword")!;
+        created.CharacterTyped += (_, c) => Model?.TypeNew(c);
+        created.BackspacePressed += (_, _) => Model?.BackspaceNew();
+        created.ClearRequested += (_, _) => Model?.ClearNew();
+        created.Submitted += (_, _) => this.FindControl<MaskedInput>("ConfirmPassword")?.Focus();
+
+        var confirm = this.FindControl<MaskedInput>("ConfirmPassword")!;
+        confirm.CharacterTyped += (_, c) => Model?.TypeConfirm(c);
+        confirm.BackspacePressed += (_, _) => Model?.BackspaceConfirm();
+        confirm.ClearRequested += (_, _) => Model?.ClearConfirm();
+        confirm.Submitted += (_, _) => Run(Model?.CreateCommand);
 
         AddHandler(DragDrop.DragOverEvent, OnDragOver);
         AddHandler(DragDrop.DropEvent, OnDrop);
@@ -33,9 +44,9 @@ internal sealed partial class UnlockView : UserControl
 
     private UnlockViewModel? Model => DataContext as UnlockViewModel;
 
-    private void Submit()
+    private static void Run(AsyncRelayCommand? command)
     {
-        if (Model?.UnlockCommand is { } command && command.CanExecute(null))
+        if (command is not null && command.CanExecute(null))
         {
             command.Execute(null);
         }
@@ -60,26 +71,5 @@ internal sealed partial class UnlockView : UserControl
         }
 
         e.Handled = true;
-    }
-
-    private async void OnBrowse(object? sender, RoutedEventArgs e)
-    {
-        if (TopLevel.GetTopLevel(this) is not { } top || Model is null)
-        {
-            return;
-        }
-
-        var picked = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-        {
-            Title = "Open a keypaste vault",
-            AllowMultiple = false,
-            FileTypeFilter = [new FilePickerFileType("KeePass vault") { Patterns = ["*.kdbx"] }],
-        }).ConfigureAwait(true);
-
-        if (picked.Count > 0 && picked[0].TryGetLocalPath() is { } path)
-        {
-            Model.Offer(path);
-            this.FindControl<MaskedInput>("Password")?.Focus();
-        }
     }
 }

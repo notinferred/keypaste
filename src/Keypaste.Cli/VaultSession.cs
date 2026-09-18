@@ -100,13 +100,21 @@ internal static class VaultSession
     }
 
     /// <summary>
-    /// Reads a master password twice and checks the two match.
+    /// Reads a master password twice.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Confirmation happens even when stdin is redirected: one code path means the compatibility
     /// gate exercises the branch a human takes, and it costs a script one extra line.
+    /// </para>
+    /// <para>
+    /// <b>It asks; it does not judge.</b> Whether the two match, and whether either is empty, are
+    /// creation rules and live in <see cref="VaultCreation"/> so the desktop applies the same ones
+    /// (docs/PRODUCT.md law 4.2). Only "nothing was typed at all" is answered here, because that is
+    /// a fact about the prompt rather than about the vault.
+    /// </para>
     /// </remarks>
-    internal static SecretBuffer? ReadNewMasterPassword(CliContext context)
+    internal static NewMasterPassword? ReadNewMasterPassword(CliContext context)
     {
         var first = context.Prompt.ReadSecret("New master password: ");
         if (first is null)
@@ -115,21 +123,41 @@ internal static class VaultSession
             return null;
         }
 
+        // Both buffers pass to NewMasterPassword, which zeroes them together; CA2000 cannot see a
+        // lifetime that leaves the method.
+#pragma warning disable CA2000
+
+        // Nothing typed, nothing to confirm. This decides no outcome — VaultCreation still refuses
+        // the empty password and supplies the words — it only keeps somebody from being asked to
+        // retype a blank line, which is what this verb did before the rules moved.
         if (first.Length == 0)
         {
-            first.Dispose();
-            context.Stderr.WriteLine("keypaste: the master password cannot be empty");
-            return null;
+            return new NewMasterPassword(first, new SecretBuffer());
         }
 
-        using var second = context.Prompt.ReadSecret("Confirm master password: ");
-        if (second is null || !first.ValueEquals(second))
-        {
-            first.Dispose();
-            context.Stderr.WriteLine("keypaste: the passwords do not match");
-            return null;
-        }
+        // A confirmation that never arrived is one that does not match, which is the conclusion
+        // VaultCreation draws from an empty buffer.
+        var second = context.Prompt.ReadSecret("Confirm master password: ") ?? new SecretBuffer();
 
-        return first;
+        return new NewMasterPassword(first, second);
+#pragma warning restore CA2000
+    }
+}
+
+/// <summary>A new master password and the confirmation typed after it.</summary>
+/// <remarks>
+/// Both buffers are owned by this object and zeroed together, so no caller can dispose one and
+/// forget the other. <see cref="VaultCreation"/> takes the two spans and decides what they mean.
+/// </remarks>
+internal sealed class NewMasterPassword(SecretBuffer password, SecretBuffer confirmation) : IDisposable
+{
+    internal SecretBuffer Password { get; } = password;
+
+    internal SecretBuffer Confirmation { get; } = confirmation;
+
+    public void Dispose()
+    {
+        Password.Dispose();
+        Confirmation.Dispose();
     }
 }

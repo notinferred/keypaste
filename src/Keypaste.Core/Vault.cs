@@ -38,8 +38,8 @@ public sealed class Vault : IDisposable
         ArgumentException.ThrowIfNullOrEmpty(path);
 
         // No stamp: there is no file yet, and a Create aimed at an occupied path is a caller
-        // saying "make a new vault here" rather than a stale copy of one. `keypaste init` is what
-        // refuses to overwrite, and it does so before reaching this.
+        // saying "make a new vault here" rather than a stale copy of one. `VaultCreation` is what
+        // refuses to overwrite, for both front ends, and it does so before reaching this.
         return new Vault(
             WithUtf8Password(masterPassword, utf8 => KeePassInterop.Create(path, utf8)),
             path,

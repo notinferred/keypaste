@@ -68,6 +68,77 @@ public sealed class VerbTests
 
         Assert.Equal(CliApp.ExitAuthFailed, exit);
         Assert.False(File.Exists(harness.VaultPath));
+        Assert.Contains("the master password cannot be empty", harness.Err, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// What each refusal says, pinned word for word.
+    /// </summary>
+    /// <remarks>
+    /// The rules moved to <c>VaultCreation</c> so the desktop applies the same ones, and each front
+    /// end maps the outcomes to its own words. Substring assertions elsewhere in this file would not
+    /// notice the <c>keypaste init:</c> and <c>keypaste:</c> prefixes swapping, and the prefix is the
+    /// part a person greps for.
+    /// </remarks>
+    [Fact]
+    public void Init_RefusalsKeepTheirExactWording()
+    {
+        using (var harness = new CliHarness())
+        {
+            harness.SeedVault(Master);
+            harness.Prompt.Enqueue(Master, Master);
+            harness.Run("init", harness.VaultPath);
+            Assert.Contains(
+                $"keypaste init: '{harness.VaultPath}' already exists",
+                harness.Err,
+                StringComparison.Ordinal);
+        }
+
+        using (var harness = new CliHarness())
+        {
+            harness.Prompt.Enqueue(string.Empty, string.Empty);
+            harness.Run("init", harness.VaultPath);
+            Assert.Contains("keypaste: the master password cannot be empty", harness.Err, StringComparison.Ordinal);
+        }
+
+        using (var harness = new CliHarness())
+        {
+            harness.Prompt.Enqueue(Master, "something else");
+            harness.Run("init", harness.VaultPath);
+            Assert.Contains("keypaste: the passwords do not match", harness.Err, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>
+    /// An empty master password is refused after one prompt, not two.
+    /// </summary>
+    /// <remarks>
+    /// Confirming a password nobody typed is a question with no useful answer. The rule that refuses
+    /// it lives in <c>VaultCreation</c>; what this pins is that the verb does not ask twice on the
+    /// way to it, which is what it did before the rules moved.
+    /// </remarks>
+    [Fact]
+    public void Init_EmptyPassword_IsNotAskedToConfirm()
+    {
+        using var harness = new CliHarness();
+        harness.Prompt.Enqueue(string.Empty, string.Empty);
+
+        harness.Run("init", harness.VaultPath);
+
+        Assert.Equal(["New master password: "], harness.Prompt.SecretPrompts);
+    }
+
+    [Fact]
+    public void Init_ANonEmptyPassword_IsAskedToConfirm()
+    {
+        using var harness = new CliHarness();
+        harness.Prompt.Enqueue(Master, Master);
+
+        harness.Run("init", harness.VaultPath);
+
+        Assert.Equal(
+            ["New master password: ", "Confirm master password: "],
+            harness.Prompt.SecretPrompts);
     }
 
     [Fact]

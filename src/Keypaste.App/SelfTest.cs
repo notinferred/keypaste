@@ -36,10 +36,26 @@ internal static class SelfTest
             scratch = Directory.CreateTempSubdirectory("keypaste-selftest-");
             var path = Path.Combine(scratch.FullName, "selftest.kdbx");
 
-            using (var vault = Vault.Create(path, _masterPassword))
+            // Through VaultCreation, like every other vault this app makes. It is the one creation
+            // path in the whole binary, which is what lets TheAppSharesTheWriterTests forbid
+            // Vault.Create here outright rather than exempt this file from the rule.
+            // The vault's ownership arrives here and leaves in the using below; CA2000 cannot see
+            // a lifetime that crosses an out parameter.
+#pragma warning disable CA2000
+            var outcome = VaultCreation.TryCreate(
+                path, _masterPassword, _masterPassword, out var created, out var failure);
+#pragma warning restore CA2000
+
+            if (outcome != VaultCreationOutcome.Created || created is null)
             {
-                vault.AddEntry(new VaultEntry { Title = _title, GroupPath = _groupPath, Password = _sentinel });
-                vault.Save();
+                stderr.WriteLine($"keypaste-app: selftest failed: the vault was not created ({outcome}) {failure}".TrimEnd());
+                return 1;
+            }
+
+            using (created)
+            {
+                created.AddEntry(new VaultEntry { Title = _title, GroupPath = _groupPath, Password = _sentinel });
+                created.Save();
             }
 
             using (var vault = Vault.Open(path, _masterPassword))

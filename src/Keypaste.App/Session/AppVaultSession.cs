@@ -199,6 +199,19 @@ internal sealed class AppVaultSession : IDisposable
             return UnlockOutcome.Failed;
         }
 
+        return Adopt(opened);
+    }
+
+    /// <summary>
+    /// Takes ownership of an open vault and starts its idle countdown.
+    /// </summary>
+    /// <remarks>
+    /// Shared by unlocking and creating so there is one place a vault becomes <c>_vault</c>, and one
+    /// place that disposes whatever it replaced. Two of these would be two chances to leak a vault
+    /// that is still holding a master key.
+    /// </remarks>
+    private UnlockOutcome Adopt(Vault opened)
+    {
         VaultLockReason? replaced = null;
 
         lock (_gate)
@@ -227,6 +240,50 @@ internal sealed class AppVaultSession : IDisposable
         }
 
         return UnlockOutcome.Opened;
+    }
+
+    /// <summary>
+    /// Creates a new vault and, if it was made, opens this session on it.
+    /// </summary>
+    /// <param name="path">Where the vault goes.</param>
+    /// <param name="password">The new master password. The caller owns the buffer behind it.</param>
+    /// <param name="confirmation">The same password, typed again.</param>
+    /// <returns>What <see cref="VaultCreation"/> decided.</returns>
+    /// <remarks>
+    /// <para>
+    /// The rules are not repeated here. Every refusal — an occupied path, an empty password, a
+    /// confirmation that does not match — is <see cref="VaultCreation"/>'s answer, which is the same
+    /// answer <c>keypaste init</c> gets (docs/PRODUCT.md law 4.2).
+    /// </para>
+    /// <para>
+    /// <b>The created vault is adopted rather than reopened.</b> <see cref="Vault.Save"/> stamps the
+    /// file it just wrote, so the vault handed back already detects an outside change and the
+    /// refuse-a-stale-save protection is live from the first moment. Reopening would derive Argon2 a
+    /// second time to arrive at the same state.
+    /// </para>
+    /// </remarks>
+    internal VaultCreationOutcome TryCreate(
+        string path,
+        ReadOnlySpan<char> password,
+        ReadOnlySpan<char> confirmation)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+
+        // Same shape and same reason as Open: the vault's ownership transfers to this session, and
+        // every route out of it — Lock, Dispose, and a later unlock replacing it — disposes it.
+        // Adopt disposes it itself if this session is already gone.
+#pragma warning disable CA2000
+        var outcome = VaultCreation.TryCreate(path, password, confirmation, out var created, out _);
+#pragma warning restore CA2000
+
+        if (outcome != VaultCreationOutcome.Created || created is null)
+        {
+            return outcome;
+        }
+
+        return Adopt(created) == UnlockOutcome.Opened
+            ? VaultCreationOutcome.Created
+            : VaultCreationOutcome.Failed;
     }
 
     /// <summary>Records that a person did something.</summary>

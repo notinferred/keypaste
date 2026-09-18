@@ -437,7 +437,7 @@ public sealed class SecretHygieneTests
     {
         using var fixture = new SentinelVault();
         using var session = new AppVaultSession(new ManualClock());
-        using var unlock = new UnlockViewModel(session, fixture.Home, () => { });
+        using var unlock = new UnlockViewModel(session, fixture.Home, new FakeVaultFilePicker(), () => { });
 
         Assert.True(unlock.Offer(fixture.VaultFile));
 
