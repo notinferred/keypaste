@@ -207,6 +207,42 @@ validate_definition() {
     local seen="" rid i runner archive floor evidence caveat citation install absent advertised origin
     origin="$(jqr ".components.\"$c\".origin // empty" "$def")"
 
+    # A component says which of its artifacts it publishes rather than this inferring it from
+    # whether a target happens to declare a package: the two numbers require-release-assets.sh holds
+    # a release to have to come from independent reads of the definition (D-0108).
+    local publishes declared_packages
+    publishes="$(jqr ".components.\"$c\".publishes // empty" "$def")"
+    case "$publishes" in
+      archives | packages) ;;
+      "") note "$c: does not say whether it publishes archives or packages" ;;
+      *) note "$c: publishes '$publishes', which is neither archives nor packages" ;;
+    esac
+    declared_packages="$(count_of "$def" "[.components.\"$c\".targets[]? | (.packages // [])[]]")"
+    if [ "$publishes" = packages ] && [ "${declared_packages:-0}" -eq 0 ]; then
+      note "$c: publishes packages and declares none"
+    fi
+
+    # Whatever reaches a public origin is verified against a manifest and an attestation bundle, so
+    # a component with an origin names both and names the workflow whose attestation covers them.
+    # That is not always the workflow that built it: release.yml attests what it publishes (4.7c).
+    if [ -n "$origin" ]; then
+      local pm pb pw
+      pm="$(jqr ".components.\"$c\".provenance.manifest_pattern // empty" "$def")"
+      pb="$(jqr ".components.\"$c\".provenance.bundle_pattern // empty" "$def")"
+      pw="$(jqr ".components.\"$c\".provenance.workflow // .components.\"$c\".workflow // empty" "$def")"
+      [ -n "$pw" ] || note "$c: has an origin and names no workflow to attest what it publishes"
+      case "$pm" in
+        "") note "$c: has an origin and no provenance manifest_pattern" ;;
+        *"{version}"*) ;;
+        *) note "$c: provenance manifest_pattern '$pm' does not carry {version}" ;;
+      esac
+      case "$pb" in
+        "") note "$c: has an origin and no provenance bundle_pattern" ;;
+        *"{version}"*) ;;
+        *) note "$c: provenance bundle_pattern '$pb' does not carry {version}" ;;
+      esac
+    fi
+
     # Unit separator rather than @tsv: a tab is IFS *whitespace*, so bash collapses runs of them and
     # an absent os_floor beside an absent caveat silently shifts every later field one place left.
     while IFS=$'\037' read -r i rid runner archive floor evidence caveat citation install absent advertised; do
@@ -294,6 +330,10 @@ TARGETS
       case "$pattern" in *"{version}"*"{rid}"*) ;; *) note "$c/$rid: $kind package '$pattern' does not carry {version} and {rid}" ;; esac
       if [ "$policy" = "none" ]; then
         [ "$signed" = "false" ] || note "$c/$rid: $kind package is not recorded unsigned while the $c signing policy is none"
+        # Offering a package for publication is internal: false, and nothing may be offered while
+        # nothing signs it. Until 4.7c the origin was what carried this, but an origin is now how a
+        # component says where it WILL publish, so the policy is what says whether it may yet.
+        [ "$internal" = "true" ] || note "$c/$rid: $kind package is not recorded internal while the $c signing policy is none"
         case "$pattern" in *internal*unsigned*) ;; *) note "$c/$rid: $kind package '$pattern' is not named internal and unsigned while the $c signing policy is none" ;; esac
       fi
       if [ -z "$origin" ]; then
@@ -333,6 +373,14 @@ DLIB
   is_sha256 "$dlib_sha256" || note "signing.dlib's dll is not pinned by SHA-256"
   case "$dlib_path" in bin/x64/*.dll) ;; *) note "signing.dlib path '$dlib_path' is not the x64 dlib signtool x64 loads" ;; esac
 
+  # Two components publishing into one prefix must not name the same manifest or bundle: the second
+  # one written would silently replace the first, and a published prefix cannot be corrected.
+  local pat dupes
+  for pat in manifest_pattern bundle_pattern; do
+    dupes="$(jqr --arg f "$pat" '[.components[] | select(.origin != null) | .provenance[$f] // empty] | group_by(.) | map(select(length > 1)) | flatten | unique | join(", ")' "$def" 2>/dev/null || true)"
+    [ -z "$dupes" ] || note "two components publish the same $pat: $dupes"
+  done
+
   # published: unique versions, and every rid it names is still advertised.
   local pubs
   pubs="$(count_of "$def" '.published')"
@@ -347,8 +395,10 @@ DLIB
     if [ -z "$v" ]; then
       note "published[$i] has no version"
     else
-      if holds "$versions" "$v"; then note "published lists $v twice"; fi
-      versions="$versions $v"
+      # Keyed on the component too: one version publishes the cli and the app as separate records
+      # into one prefix, and those are two releases of two things, not one listed twice (4.7c).
+      if holds "$versions" "$v/$pc"; then note "published lists $v twice"; fi
+      versions="$versions $v/$pc"
     fi
     if [ -n "$pc" ]; then
       local advertised_rids
@@ -380,6 +430,21 @@ archive_name() {
   ext="$(jqr ".components.\"$c\".targets[] | select(.rid == \"$rid\") | .archive" "$def")"
   jqr ".components.\"$c\".archive_pattern" "$def" \
     | sed -e "s/{version}/$version/g" -e "s/{rid}/$rid/g" -e "s/{ext}/$ext/g"
+}
+
+# What a published (component, rid) actually serves. A component publishing packages serves the
+# package's name, not archive_pattern's, so asking the origin for the archive would report a
+# published desktop release as missing (4.7c).
+published_name() {
+  local def="$1" c="$2" rid="$3" version="$4" publishes
+  publishes="$(jqr --arg c "$c" '.components[$c].publishes // empty' "$def")"
+  if [ "$publishes" = packages ]; then
+    jqr --arg c "$c" --arg rid "$rid" \
+      '[.components[$c].targets[] | select(.rid == $rid) | (.packages // [])[] | select(.internal == false) | .pattern] | first // empty' "$def" \
+      | sed -e "s/{version}/$version/g" -e "s/{rid}/$rid/g"
+    return
+  fi
+  archive_name "$def" "$c" "$rid" "$version"
 }
 
 # ---------------------------------------------------------------------------
@@ -776,9 +841,10 @@ validate_prerelease_path() {
 # definition, and builds it with the tool the definition pins. An undeclared installer is a package
 # nothing else in this file can see (4.7a1, D-0139). A build may live in a script the workflow runs,
 # so those scripts are read with it, except this gate, whose fixtures name every package kind.
-# sign-windows.sh names installers it signs and builds none.
+# sign-windows.sh names installers it signs and builds none, and verify-desktop-candidate.sh names
+# the ones it refuses and builds none either - which is what lets release.yml call it (4.7c).
 package_code() {
-  local root="$1" workflow="$2" exempt="${3-sign-windows.sh}" script
+  local root="$1" workflow="$2" exempt="${3-sign-windows.sh verify-desktop-candidate.sh}" script
   code_of "$root/$workflow"
   for script in $(code_of "$root/$workflow" | grep -oE 'scripts/[A-Za-z0-9._-]+\.sh' | sort -u); do
     case " $(basename "$SELF") $exempt " in *" $(basename "$script") "*) continue ;; esac
@@ -830,6 +896,23 @@ $(jqr ".components.\"$c\".targets // [] | .[] | .packages // [] | .[] | [
    ] | join(\"\")" "$def" 2>/dev/null || true)
 PROJECTS
   done
+  # A component whose published bytes are attested by a workflow other than the one that built them
+  # must TAKE that build's run rather than rebuild: what a runner installed in 4.7b and upgraded in
+  # 4.7d is then what reaches the origin. The mechanism is resolving that run by id (4.7c).
+  local build_wf attest_wf attest_code
+  for c in $(jqr '.components | keys[]' "$def"); do
+    [ -n "$(jqr ".components.\"$c\".origin // empty" "$def")" ] || continue
+    build_wf="$(jqr ".components.\"$c\".workflow // empty" "$def")"
+    attest_wf="$(jqr ".components.\"$c\".provenance.workflow // empty" "$def")"
+    [ -n "$attest_wf" ] && [ "$attest_wf" != "$build_wf" ] || continue
+    [ -f "$root/$attest_wf" ] || continue
+    attest_code="$(code_of "$root/$attest_wf")"
+    case "$attest_code" in
+      *"--run-id $c"*) ;;
+      *) note "$attest_wf publishes $c, which $build_wf builds, and never resolves that run; it would publish bytes nothing installed" ;;
+    esac
+  done
+
 }
 
 # The steps of a workflow, one per NUL-free record, split on a step's leading dash.
@@ -949,7 +1032,7 @@ validate_history() {
     return 0
   fi
 
-  local rev prior current v rids prior_rids
+  local rev prior current v pc pair rids prior_rids
   current="$root/$file"
   for rev in $(git -C "$root" rev-list HEAD -- "$file" | tail -n +2); do
     prior="$(mktemp)"
@@ -959,17 +1042,22 @@ validate_history() {
     fi
     jq -e . "$prior" >/dev/null 2>&1 || { rm -f "$prior"; continue; }
 
-    for v in $(jqr '.published[]?.version // empty' "$prior"); do
-      if ! jq -e --arg v "$v" '[.published[].version] | index($v)' "$current" >/dev/null 2>&1; then
-        note "${rev:0:8} published $v and it is no longer in $file; published releases are immutable"
+    # Keyed on version AND component. One version can publish two components into one prefix, and
+    # selecting on the version alone would union their rids - so dropping linux-x64 from the cli
+    # record would be masked by the app record that still names it, and `published` would quietly
+    # stop being append-only for exactly the rid the two share (4.7c).
+    for pair in $(jqr '.published[]? | "\(.version)/\(.component // "cli")"' "$prior"); do
+      v="${pair%/*}"; pc="${pair##*/}"
+      if ! jq -e --arg v "$v" --arg c "$pc" '[.published[] | select(.version == $v and (.component // "cli") == $c)] | length > 0' "$current" >/dev/null 2>&1; then
+        note "${rev:0:8} published $v ($pc) and it is no longer in $file; published releases are immutable"
         continue
       fi
-      prior_rids="$(jqr --arg v "$v" '.published[] | select(.version == $v) | .rids[]' "$prior" | flatten)"
-      rids="$(jqr --arg v "$v" '.published[] | select(.version == $v) | .rids[]' "$current" | flatten)"
+      prior_rids="$(jqr --arg v "$v" --arg c "$pc" '.published[] | select(.version == $v and (.component // "cli") == $c) | .rids[]' "$prior" | flatten)"
+      rids="$(jqr --arg v "$v" --arg c "$pc" '.published[] | select(.version == $v and (.component // "cli") == $c) | .rids[]' "$current" | flatten)"
       local prid
       for prid in $prior_rids; do
         holds "$rids" "$prid" \
-          || note "${rev:0:8} recorded $v as published for $prid and $file no longer does"
+          || note "${rev:0:8} recorded $v ($pc) as published for $prid and $file no longer does"
       done
     done
     rm -f "$prior"
@@ -1004,7 +1092,8 @@ validate_public_origin() {
     version="$(jqr ".published[$i].version" "$def")"
     c="$(jqr ".published[$i].component" "$def")"
     for rid in $(json_array "$def" ".published[$i].rids"); do
-      name="$(archive_name "$def" "$c" "$rid" "$version")"
+      name="$(published_name "$def" "$c" "$rid" "$version")"
+      [ -n "$name" ] || { note "$DEFINITION says $version published $c/$rid and names no asset for it"; continue; }
       url="${origin}${name}.sha256"
       code="$(curl -sS -o /dev/null -w "%{http_code}" --max-time 20 "$url" 2>/dev/null || echo "000")"
       case "$code" in
@@ -1166,6 +1255,26 @@ expect_refusal "appimage-runtime-unpinned" "runtime is not pinned by SHA-256" \
   "$(mutate appimage-runtime-unpinned '(.components.app.targets[] | select(.rid == "linux-x64") | .packages[0].runtime_sha256) = "continuous"')"
 expect_refusal "installer-sdk-unpinned" "WixToolset.Sdk is not pinned by SHA-512" \
   "$(mutate installer-sdk-unpinned '(.components.app.targets[] | select(.rid == "win-x64") | .packages[0]) |= del(.tool_sha512)')"
+expect_refusal "publishes-unstated" "does not say whether it publishes archives or packages" \
+  "$(mutate publishes-unstated '.components.app |= del(.publishes)')"
+expect_refusal "publishes-unknown" "which is neither archives nor packages" \
+  "$(mutate publishes-unknown '.components.app.publishes = "installers"')"
+expect_refusal "publishes-packages-and-declares-none" "publishes packages and declares none" \
+  "$(mutate publishes-packages-and-declares-none '.components.app.targets |= map(del(.packages))')"
+expect_refusal "origin-without-a-manifest" "has an origin and no provenance manifest_pattern" \
+  "$(mutate origin-without-a-manifest '.components.app.provenance |= del(.manifest_pattern)')"
+expect_refusal "origin-without-a-bundle" "has an origin and no provenance bundle_pattern" \
+  "$(mutate origin-without-a-bundle '.components.app.provenance |= del(.bundle_pattern)')"
+expect_refusal "provenance-manifest-drops-the-version" "does not carry {version}" \
+  "$(mutate provenance-manifest-drops-the-version '.components.app.provenance.manifest_pattern = "keypaste-app-manifest.json"')"
+expect_refusal "provenance-workflow-missing" "names no workflow to attest what it publishes" \
+  "$(mutate provenance-workflow-missing '.components.app |= (del(.provenance.workflow) | del(.workflow))')"
+expect_refusal "two-components-one-manifest" "publish the same manifest_pattern" \
+  "$(mutate two-components-one-manifest '.components.app.provenance.manifest_pattern = .components.cli.provenance.manifest_pattern')"
+expect_refusal "two-components-one-bundle" "publish the same bundle_pattern" \
+  "$(mutate two-components-one-bundle '.components.app.provenance.bundle_pattern = .components.cli.provenance.bundle_pattern')"
+expect_refusal "duplicate-published-component" "published lists 0.3.0 twice" \
+  "$(mutate duplicate-published-component '.published += [(.published[] | select(.version == "0.3.0"))]')"
 expect_refusal "signing-policy-unknown" "is neither none nor authenticode" \
   "$(mutate signing-policy-unknown '.components.app.signing.policy = "rehearsal"')"
 expect_refusal "signing-dlib-package-unpinned" "package is not pinned by SHA-512" \
@@ -1327,6 +1436,15 @@ insert_step_before "      - name: Build and check the internal installer the def
         with:
           name: early
 " "$FAKE/.github/workflows/app.yml"
+# A release that publishes the desktop without taking the app run's packages would publish bytes
+# nothing ever installed, and the .sha256 beside them would agree with it perfectly.
+sed '/--run-id app/d' .github/workflows/release.yml > "$FAKE/.github/workflows/release.yml"
+grep -q -- '--run-id app' "$FAKE/.github/workflows/release.yml" \
+  && die "the fixture release workflow still resolves the app run"
+expect_repo_refusal "desktop-published-without-resolving-the-app-run" "never resolves that run" \
+  "$FAKE/release-targets.json" "$FAKE"
+cp .github/workflows/release.yml "$FAKE/.github/workflows/release.yml"
+
 expect_repo_refusal "msi-sign-after-upload" "signs the app installer after an upload or attestation step" \
   "$FAKE/release-targets.json" "$FAKE"
 cp .github/workflows/app.yml "$FAKE/.github/workflows/app.yml"
@@ -1426,8 +1544,12 @@ cat > "$WORK/only-length.json" <<'ONLY'
       "runtime_identifiers": [],
       "declared_not_packaged": {},
       "archive_pattern": "x-{version}-{rid}.{ext}",
+      "publishes": "archives",
       "origin": "https://example.invalid/v{version}/",
       "workflow": ".github/workflows/release.yml",
+      "provenance": { "repository": "x/y", "workflow": ".github/workflows/release.yml",
+        "manifest_pattern": "x-{version}-manifest.json",
+        "bundle_pattern": "x-{version}-provenance.sigstore.jsonl" },
       "signing": { "policy": "none", "disclosed_in": [] },
       "targets": null
     }

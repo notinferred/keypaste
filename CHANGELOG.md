@@ -2,6 +2,10 @@
 
 Published versions are available at `https://dl.keypaste.com/v<version>/` with checksums and corresponding source. CLI/MCP binaries are unsigned and un-notarized; the desktop has no public release. [RELEASE.md](docs/RELEASE.md) records platform support and verification requirements. The release workflow requires a section matching each tag.
 
+## Unreleased
+
+The release workflow can publish the Windows MSI and Linux AppImage beside the CLI at the same version prefix, each component with a manifest and an attestation bundle of its own. The desktop packages are taken from the app workflow's run for the tag and are checked against that run's attestation before they are staged, rather than rebuilt. Nothing desktop is published while it is unsigned: the packages stay internal and unsigned, and the publication path refuses them until signing is enabled. There is still no public desktop download: publishing waits both on a signing identity and on the desktop being worth installing.
+
 ## 0.3.0
 
 Upgrade from `v0.2.0` to receive the save and approval-bridge repairs below. Two of them preserve data that `v0.2.0` can lose or refuse to write. Old archives remain available and immutable.

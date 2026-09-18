@@ -18,10 +18,12 @@
       ],
       "declared_not_packaged": {},
       "archive_pattern": "keypaste-{version}-{rid}.{ext}",
+      "publishes": "archives",
       "origin": "https://dl.keypaste.com/v{version}/",
       "workflow": ".github/workflows/release.yml",
       "provenance": {
         "repository": "notinferred/keypaste",
+        "workflow": ".github/workflows/release.yml",
         "manifest_pattern": "keypaste-{version}-manifest.json",
         "bundle_pattern": "keypaste-{version}-provenance.sigstore.jsonl"
       },
@@ -135,8 +137,15 @@
         "linux-arm64": "No desktop arm64 package job exists. 3.9d owns adding one; docs/RELEASE.md records the RID as declared but absent from the package matrix."
       },
       "archive_pattern": "keypaste-app-{version}-{rid}.{ext}",
-      "origin": null,
+      "publishes": "packages",
+      "origin": "https://dl.keypaste.com/v{version}/",
       "workflow": ".github/workflows/app.yml",
+      "provenance": {
+        "repository": "notinferred/keypaste",
+        "workflow": ".github/workflows/release.yml",
+        "manifest_pattern": "keypaste-app-{version}-manifest.json",
+        "bundle_pattern": "keypaste-app-{version}-provenance.sigstore.jsonl"
+      },
       "signing": {
         "policy": "none",
         "reason": "O-0010, O-0015",

@@ -16,12 +16,19 @@
 # may run the release workflow. A compromised workflow run attests whatever it built (THREATS T-21).
 #
 # Usage:
-#   verify-provenance.sh <version> [download-dir]   # download anonymously from the release origin
-#   verify-provenance.sh --dir <version> <dir>       # a directory already holding the release
+#   verify-provenance.sh [--component <c>] <version> [download-dir]
+#   verify-provenance.sh [--component <c>] --dir <version> <dir>
 #   verify-provenance.sh --selftest                  # fake gh and curl; no network, no credential
+#
+# A release publishes one manifest and one bundle per component into one prefix, so this is run once
+# per component and each call checks only the assets its own manifest names (4.7c). The workflow it
+# holds an attestation to is provenance.workflow: release.yml attests what it PUBLISHES, including
+# the desktop packages app.yml built, whose own build attestation verify-desktop-candidate.sh checks
+# before they are staged.
 #
 # Environment:
 #   KEYPASTE_RELEASE_DEFINITION  the definition to read   (default: release-targets.json)
+#   KEYPASTE_COMPONENT           the component to act on  (default: cli)
 #   KEYPASTE_ORIGIN_OVERRIDE     fetch from here instead of the definition's origin (fixtures)
 #   KEYPASTE_TRUSTED_ROOT        a `gh attestation trusted-root` file, for offline verification
 set -euo pipefail
@@ -45,11 +52,15 @@ sha256_of() {
 
 definition() { printf '%s' "${KEYPASTE_RELEASE_DEFINITION:-$ROOT/release-targets.json}"; }
 
+COMPONENT="${KEYPASTE_COMPONENT:-cli}"
+completion() { KEYPASTE_RELEASE_DEFINITION="$(definition)" bash "$COMPLETION" --component "$COMPONENT" "$@"; }
+
 # Prints nothing and returns 1 unless gh verified this exact file for this repository, workflow and tag.
 attested() {
   local file="$1" bundle="$2" version="$3" repo workflow out digest
-  repo="$(jqr '.components.cli.provenance.repository // empty' "$(definition)")"
-  workflow="$(jqr '.components.cli.workflow // empty' "$(definition)")"
+  repo="$(jqr --arg c "$COMPONENT" '.components[$c].provenance.repository // empty' "$(definition)")"
+  # The workflow that ATTESTS what is published, which is not always the one that built it.
+  workflow="$(jqr --arg c "$COMPONENT" '.components[$c].provenance.workflow // .components[$c].workflow // empty' "$(definition)")"
   [ -n "$repo" ] && [ -n "$workflow" ] || die "$(definition) names no provenance repository or release workflow"
   local args=(attestation verify "$file" --bundle "$bundle"
     --repo "$repo"
@@ -70,8 +81,8 @@ verify_dir() {
   local version="$1" dir="$2" manifest bundle name want_sha want_bytes checked=0
   command -v gh >/dev/null 2>&1 || die "no gh; install GitHub CLI (no login is needed)"
   command -v jq >/dev/null 2>&1 || die "no jq"
-  manifest="$(KEYPASTE_RELEASE_DEFINITION="$(definition)" bash "$COMPLETION" manifest-name "$version")"
-  bundle="$(KEYPASTE_RELEASE_DEFINITION="$(definition)" bash "$COMPLETION" bundle-name "$version")"
+  manifest="$(completion manifest-name "$version")"
+  bundle="$(completion bundle-name "$version")"
   [ -f "$dir/$bundle" ] || die "$dir has no $bundle, so nothing attests this release"
   [ -f "$dir/$manifest" ] || die "$dir has no $manifest, so there is no list of what was attested"
 
@@ -80,7 +91,7 @@ verify_dir() {
   echo "  attested  $manifest"
 
   [ "$(jqr '.version' "$dir/$manifest")" = "$version" ] || die "$manifest describes another version"
-  diff <(KEYPASTE_RELEASE_DEFINITION="$(definition)" bash "$COMPLETION" names "$version" | sort) \
+  diff <(completion names "$version" | sort) \
        <(jqr '.assets[].name' "$dir/$manifest" | sort) >/dev/null \
     || die "$manifest does not name exactly the assets a whole $version holds"
 
@@ -96,21 +107,21 @@ verify_dir() {
   done < <(jqr '.assets[] | [.name, .sha256, (.bytes|tostring)] | @tsv' "$dir/$manifest")
 
   [ "$checked" -gt 0 ] || die "the manifest named no assets, so nothing was checked"
-  echo "ok: $manifest and all $checked assets of $version were built by $(jqr '.components.cli.provenance.repository' "$(definition)")'s release workflow for v$version"
+  echo "ok: $manifest and all $checked assets of $version were built by $(jqr --arg c "$COMPONENT" '.components[$c].provenance.repository' "$(definition)")'s release workflow for v$version"
 }
 
 download() {
   local version="$1" dir="$2" origin name
   command -v curl >/dev/null 2>&1 || die "no curl"
-  origin="${KEYPASTE_ORIGIN_OVERRIDE:-$(jqr --arg v "$version" '.components.cli.origin | split("{version}") | join($v)' "$(definition)")}"
+  origin="${KEYPASTE_ORIGIN_OVERRIDE:-$(jqr --arg v "$version" --arg c "$COMPONENT" '.components[$c].origin | split("{version}") | join($v)' "$(definition)")}"
   mkdir -p "$dir"
   while IFS= read -r name; do
     [ -n "$name" ] || continue
     curl -fsSL --max-time 120 -o "$dir/$name" "$origin$name" || die "$origin$name could not be downloaded"
   done < <(
-    KEYPASTE_RELEASE_DEFINITION="$(definition)" bash "$COMPLETION" names "$version"
-    KEYPASTE_RELEASE_DEFINITION="$(definition)" bash "$COMPLETION" manifest-name "$version"
-    KEYPASTE_RELEASE_DEFINITION="$(definition)" bash "$COMPLETION" bundle-name "$version"
+    completion names "$version"
+    completion manifest-name "$version"
+    completion bundle-name "$version"
   )
   echo "  downloaded $version from $origin without credentials"
 }
@@ -238,16 +249,78 @@ FAKE
   cmp -s "$SELF" "$work/weak/scripts/verify-provenance.sh" && die "the weakened copy still checks the verified digest"
   expect accept weakened-believes-another-digest "all 11 assets" -- env KEYPASTE_FAKE_GH=other-digest bash "$work/weak/scripts/verify-provenance.sh" --dir "$v" "$work/dist"
 
+
+  # ---- the desktop component: its own manifest and bundle, in the same prefix.
+  #
+  # The release attests what it PUBLISHES, so the app's published bundle must name release.yml. A
+  # bundle naming app.yml is the build attestation, which verify-desktop-candidate.sh checks before
+  # the packages are staged - correct in its place and refused here (4.7c).
+  local appdef="$work/publishable-app.json"
+  jq '.components.app.signing.policy = "authenticode"
+      | .components.app.targets |= map(if .packages then
+          .packages |= map(.internal = false | .signed = true
+                           | .pattern = (.pattern | sub("-internal-unsigned"; ""))) else . end)' \
+     "$ROOT/release-targets.json" > "$appdef"
+
+  local appnames appmanifest appbundle
+  appnames="$(KEYPASTE_RELEASE_DEFINITION="$appdef" bash "$COMPLETION" --component app names "$v")"
+  appmanifest="$(KEYPASTE_RELEASE_DEFINITION="$appdef" bash "$COMPLETION" --component app manifest-name "$v")"
+  appbundle="$(KEYPASTE_RELEASE_DEFINITION="$appdef" bash "$COMPLETION" --component app bundle-name "$v")"
+
+  # stage_app [workflow] [ref]
+  stage_app() {
+    local workflow="${1:-notinferred/keypaste/.github/workflows/release.yml}"
+    local ref="${2:-refs/tags/v$v}" n subjects
+    rm -rf "$work/appdist"; mkdir -p "$work/appdist"
+    while IFS= read -r n; do printf 'the bytes of %s\n' "$n" > "$work/appdist/$n"; done <<< "$appnames"
+    KEYPASTE_RELEASE_DEFINITION="$appdef" bash "$COMPLETION" --component app record "$v" "v$v" deadbeef "$work/appdist" > "$work/appdist/$appmanifest"
+    subjects="$(cd "$work/appdist" && for n in $appnames "$appmanifest"; do sha256sum "$n" | awk '{print $1}'; done | jq -R . | jq -s .)"
+    jq -n --arg r notinferred/keypaste --arg w "$workflow" --arg f "$ref" --argjson s "$subjects" \
+      '{repo: $r, workflow: $w, ref: $f, subjects: $s}' > "$work/appdist/$appbundle"
+  }
+
+  stage_app
+  expect accept app-genuine-staged-directory "all 4 assets" \
+    -- env KEYPASTE_RELEASE_DEFINITION="$appdef" bash "$subject" --component app --dir "$v" "$work/appdist"
+
+  stage_app notinferred/keypaste/.github/workflows/app.yml
+  expect refuse app-attested-by-the-app-workflow "is not attested" \
+    -- env KEYPASTE_RELEASE_DEFINITION="$appdef" bash "$subject" --component app --dir "$v" "$work/appdist"
+
+  stage_app notinferred/keypaste/.github/workflows/release.yml refs/tags/v9.9.8
+  expect refuse app-another-tag "is not attested" \
+    -- env KEYPASTE_RELEASE_DEFINITION="$appdef" bash "$subject" --component app --dir "$v" "$work/appdist"
+
+  # The two manifests are not interchangeable: each names only its own component's assets, so asking
+  # the cli question of the app's directory must fail on the list rather than pass on a shared prefix.
+  stage_app; cp "$work/appdist/$appmanifest" "$work/appdist/$manifest"
+  cp "$work/appdist/$appbundle" "$work/appdist/$bundle"
+  expect refuse app-manifest-is-not-the-cli-manifest "does not name exactly" \
+    -- env KEYPASTE_RELEASE_DEFINITION="$appdef" bash "$subject" --dir "$v" "$work/appdist"
+
+  stage_app; rm -f "$work/appdist/$appbundle"
+  expect refuse app-bundle-absent "nothing attests this release" \
+    -- env KEYPASTE_RELEASE_DEFINITION="$appdef" bash "$subject" --component app --dir "$v" "$work/appdist"
+
   [ "$failures" -eq 0 ] || die "$failures of $cases provenance cases failed"
   echo "ok: $cases cases. A path with a backslash verifies. A changed byte, a rewritten manifest, another repository,"
   echo "    workflow or tag, an unattested or unpublished asset, a short manifest and a verifier that proves nothing"
-  echo "    all refuse; the weakened copy does not."
+  echo "    all refuse; the weakened copy does not. The desktop component verifies against its own manifest and"
+  echo "    bundle in the same prefix, and refuses one attested by the app workflow, at another tag, absent, or"
+  echo "    standing in for the other component's manifest."
 }
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --component) [ $# -ge 2 ] || die "--component needs a component name"; COMPONENT="$2"; shift 2 ;;
+    *) break ;;
+  esac
+done
 
 case "${1:-}" in
   --selftest) [ $# -eq 1 ] || die "usage: verify-provenance.sh --selftest"; selftest ;;
   --dir) [ $# -eq 3 ] || die "usage: verify-provenance.sh --dir <version> <dir>"; verify_dir "$2" "$3" ;;
-  '' | -*) die "usage: verify-provenance.sh <version> [download-dir] | --dir <version> <dir> | --selftest" ;;
+  '' | -*) die "usage: verify-provenance.sh [--component <c>] <version> [download-dir] | --dir <version> <dir> | --selftest" ;;
   *)
     [ $# -le 2 ] || die "usage: verify-provenance.sh <version> [download-dir]"
     dir="${2:-$(mktemp -d)}"

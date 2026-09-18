@@ -20,14 +20,20 @@
 #     release-targets.json, kept separate on purpose so a green run is not self-promoting.
 #
 # Usage:
-#   release-completion.sh record <version> <tag> <commit> <dir>   # prints the record to stdout
-#   release-completion.sh verify <version> <record.json>          # asks the public origin
-#   release-completion.sh names <version>                         # the assets a whole release holds
-#   release-completion.sh manifest-name <version>                 # the published record's file name
-#   release-completion.sh bundle-name <version>                   # the attestation bundle's file name
+#   release-completion.sh [--component <c>] record <version> <tag> <commit> <dir>
+#   release-completion.sh [--component <c>] verify <version> <record.json>
+#   release-completion.sh [--component <c>] names <version>   # the assets a whole release holds
+#   release-completion.sh [--component <c>] assets <version>  # component, rid and name, tab separated
+#   release-completion.sh [--component <c>] manifest-name <version>
+#   release-completion.sh [--component <c>] bundle-name <version>
+#
+# A component publishes either its archives or its packages, and the definition says which, so this
+# never infers it from whether a target happens to declare one. --component defaults to cli, so every
+# caller written before a second component existed still asks the question it always asked (4.7c).
 #
 # Environment:
 #   KEYPASTE_RELEASE_DEFINITION  the definition to read   (default: release-targets.json)
+#   KEYPASTE_COMPONENT           the component to act on  (default: cli)
 #   KEYPASTE_ORIGIN_OVERRIDE     fetch from here instead of the definition's origin (fixtures)
 #   KEYPASTE_VERIFY_ATTEMPTS     tries per asset before refusing  (default: 5)
 #   KEYPASTE_VERIFY_SLEEP        seconds between tries            (default: 6)
@@ -38,6 +44,15 @@ readonly CR=$'\r'
 
 die() { echo "::error::$*" >&2; exit 1; }
 jqr() { command jq -r "$@" | tr -d "$CR"; }
+
+COMPONENT="${KEYPASTE_COMPONENT:-cli}"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --component) [ $# -ge 2 ] || die "--component needs a component name"; COMPONENT="$2"; shift 2 ;;
+    *) break ;;
+  esac
+done
+readonly COMPONENT
 
 sha256_of() {
   if command -v sha256sum >/dev/null 2>&1; then
@@ -53,31 +68,63 @@ bytes_of() { wc -c < "$1" | tr -d '[:space:]'; }
 
 # The one list of what a whole release is, computed the way require-release-assets.sh computes it so
 # the two cannot drift into disagreeing about the same release.
-expected_assets() {
-  local version="$1" archives
-  archives="$(jqr --arg v "$version" '
-    .components.cli as $c
-    | $c.targets[]
-    | . as $t
-    | $c.archive_pattern
-    | split("{version}") | join($v)
-    | split("{rid}")     | join($t.rid)
-    | split("{ext}")     | join($t.archive)
-  ' "$DEFINITION")"
-  [ -n "$archives" ] || die "$DEFINITION named no archives for $version"
-  {
-    printf '%s\n' "$archives"
-    printf '%s\n' "$archives" | sed 's/$/.sha256/'
-    printf 'keypaste-%s-source.tar.gz\n'        "$version"
-    printf 'keypaste-%s-source.tar.gz.sha256\n' "$version"
-    printf 'SHA256SUMS\n'
-  } | sed '/^$/d'
+# component, rid and name, tab separated, so a caller can drive a per-rid check without writing a
+# package extension of its own, which release.yml may not do (verify-release-matrix.sh's msi rule).
+# The corresponding source and SHA256SUMS belong to the release rather than to either component and
+# ride with whichever one publishes the archives.
+expected_pairs() {
+  local version="$1" publishes rows
+  publishes="$(jqr --arg c "$COMPONENT" '.components[$c].publishes // empty' "$DEFINITION")"
+  case "$publishes" in
+    archives)
+      rows="$(jqr --arg v "$version" --arg c "$COMPONENT" '
+        .components[$c] as $comp
+        | $comp.targets[]
+        | . as $t
+        | $comp.archive_pattern
+        | split("{version}") | join($v)
+        | split("{rid}")     | join($t.rid)
+        | split("{ext}")     | join($t.archive)
+        | [$c, $t.rid, .] | @tsv
+      ' "$DEFINITION")"
+      [ -n "$rows" ] || die "$DEFINITION named no archives for $version"
+      {
+        printf '%s\n' "$rows"
+        printf '%s\n' "$rows" | sed 's/$/.sha256/'
+        printf '%s\t-\tkeypaste-%s-source.tar.gz\n'        "$COMPONENT" "$version"
+        printf '%s\t-\tkeypaste-%s-source.tar.gz.sha256\n' "$COMPONENT" "$version"
+        printf '%s\t-\tSHA256SUMS\n'                       "$COMPONENT"
+      } | sed '/^$/d' ;;
+    packages)
+      # Only a package the definition offers for publication: internal: false is the flag 3.6b flips,
+      # and until it does this component contributes nothing and the release is the CLI's alone.
+      rows="$(jqr --arg v "$version" --arg c "$COMPONENT" '
+        .components[$c].targets[]
+        | . as $t
+        | (.packages // [])[]
+        | select(.internal == false)
+        | .pattern
+        | split("{version}") | join($v)
+        | split("{rid}")     | join($t.rid)
+        | [$c, $t.rid, .] | @tsv
+      ' "$DEFINITION")"
+      # No offered package is the ordinary state until 3.6b flips internal: false, and it must print
+      # nothing at all: an empty line through `sed 's/$/.sha256/'` becomes the asset named ".sha256".
+      [ -n "$rows" ] || return 0
+      {
+        printf '%s\n' "$rows"
+        printf '%s\n' "$rows" | sed 's/$/.sha256/'
+      } | sed '/^$/d' ;;
+    *) die "$DEFINITION says $COMPONENT publishes '$publishes', which is neither archives nor packages" ;;
+  esac
 }
+
+expected_assets() { expected_pairs "$1" | cut -f3; }
 
 provenance_name() {
   local field="$1" version="$2" name
-  name="$(jqr --arg v "$version" --arg f "$field" '.components.cli.provenance[$f] // empty | split("{version}") | join($v)' "$DEFINITION")"
-  [ -n "$name" ] || die "$DEFINITION has no components.cli.provenance.$field"
+  name="$(jqr --arg v "$version" --arg f "$field" --arg c "$COMPONENT" '.components[$c].provenance[$f] // empty | split("{version}") | join($v)' "$DEFINITION")"
+  [ -n "$name" ] || die "$DEFINITION has no components.$COMPONENT.provenance.$field"
   printf '%s
 ' "$name"
 }
@@ -88,7 +135,7 @@ origin_for() {
     printf '%s' "$KEYPASTE_ORIGIN_OVERRIDE"
     return
   fi
-  jqr --arg v "$version" '.components.cli.origin | split("{version}") | join($v)' "$DEFINITION"
+  jqr --arg v "$version" --arg c "$COMPONENT" '.components[$c].origin | split("{version}") | join($v)' "$DEFINITION"
 }
 
 # ---------------------------------------------------------------------------
@@ -108,7 +155,7 @@ cmd_record() {
 
   printf '{\n'
   printf '  "schema": 1,\n'
-  printf '  "component": "cli",\n'
+  printf '  "component": "%s",\n' "$COMPONENT"
   printf '  "version": "%s",\n' "$version"
   printf '  "tag": "%s",\n'     "$tag"
   printf '  "commit": "%s",\n'  "$commit"
@@ -194,7 +241,8 @@ case "${1:-}" in
   record) shift; [ $# -eq 4 ] || die "usage: release-completion.sh record <version> <tag> <commit> <dir>"; cmd_record "$@" ;;
   verify) shift; [ $# -eq 2 ] || die "usage: release-completion.sh verify <version> <record.json>";        cmd_verify "$@" ;;
   names) shift; [ $# -eq 1 ] || die "usage: release-completion.sh names <version>"; expected_assets "$1" ;;
+  assets) shift; [ $# -eq 1 ] || die "usage: release-completion.sh assets <version>"; expected_pairs "$1" ;;
   manifest-name) shift; [ $# -eq 1 ] || die "usage: release-completion.sh manifest-name <version>"; provenance_name manifest_pattern "$1" ;;
   bundle-name) shift; [ $# -eq 1 ] || die "usage: release-completion.sh bundle-name <version>"; provenance_name bundle_pattern "$1" ;;
-  *) die "usage: release-completion.sh record|verify|names|manifest-name|bundle-name ..." ;;
+  *) die "usage: release-completion.sh [--component <c>] record|verify|names|assets|manifest-name|bundle-name ..." ;;
 esac
