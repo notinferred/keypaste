@@ -28,6 +28,12 @@ namespace Keypaste.Core.Tests;
 /// in D-0050: the day the app writes a KDBX by any other route, <c>app.yml</c> needs a KeePassXC job
 /// of its own.
 /// </para>
+/// <para>
+/// Since 4.8 the app <b>creates</b> vaults too, and the same argument carries it: creation goes
+/// through <c>VaultCreation</c>, which is what <c>keypaste init</c> calls and what
+/// <c>make-compat-fixture.sh</c> drives to build the fixture this gate opens. That tripwire forbids
+/// <c>Vault.Create(</c> in app code, so the day creation stops being shared it fails there first.
+/// </para>
 /// </remarks>
 public sealed class CompatGateIsPermanentTests
 {

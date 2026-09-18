@@ -47,9 +47,9 @@ internal static class InitCommand
             return CliApp.ExitUsageError;
         }
 
-        // Refusing to overwrite is not politeness: the existing file is an encrypted vault whose
-        // contents we cannot see, and replacing it destroys every secret in it irrecoverably.
-        if (File.Exists(path))
+        // Asked before the prompt, not only inside VaultCreation, so nobody is made to type a master
+        // password twice before being told the file was never going to be written.
+        if (VaultCreation.Inspect(path) == VaultDestination.Occupied)
         {
             context.Stderr.WriteLine($"keypaste init: '{path}' already exists");
             return CliApp.ExitUsageError;
@@ -61,26 +61,36 @@ internal static class InitCommand
             return CliApp.ExitAuthFailed;
         }
 
-        try
-        {
-            var directory = Path.GetDirectoryName(path);
-            if (!string.IsNullOrEmpty(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
+        var outcome = VaultCreation.TryCreate(
+            path,
+            master.Password.Value,
+            master.Confirmation.Value,
+            out var created,
+            out var failure);
 
-            using var vault = Vault.Create(path, master.Value);
-            vault.Save();
-        }
-        catch (VaultException ex)
+        using (created)
         {
-            context.Stderr.WriteLine($"keypaste init: {ex.Message}");
-            return CliApp.ExitInternalError;
-        }
-        catch (IOException ex)
-        {
-            context.Stderr.WriteLine($"keypaste init: {ex.Message}");
-            return CliApp.ExitInternalError;
+            switch (outcome)
+            {
+                case VaultCreationOutcome.Created:
+                    break;
+
+                case VaultCreationOutcome.PathAlreadyExists:
+                    context.Stderr.WriteLine($"keypaste init: '{path}' already exists");
+                    return CliApp.ExitUsageError;
+
+                case VaultCreationOutcome.EmptyPassword:
+                    context.Stderr.WriteLine("keypaste: the master password cannot be empty");
+                    return CliApp.ExitAuthFailed;
+
+                case VaultCreationOutcome.PasswordsDoNotMatch:
+                    context.Stderr.WriteLine("keypaste: the passwords do not match");
+                    return CliApp.ExitAuthFailed;
+
+                default:
+                    context.Stderr.WriteLine($"keypaste init: {failure}");
+                    return CliApp.ExitInternalError;
+            }
         }
 
         context.Stderr.WriteLine($"Created {path}");

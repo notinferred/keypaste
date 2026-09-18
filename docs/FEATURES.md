@@ -20,7 +20,7 @@ The upstream families come from the official [feature overview](https://keepassx
 
 | Family | Keypaste source status | Delivery rows / milestone |
 |---|---|---|
-| Offline vault creation and opening | CLI creates/opens KDBX4; desktop opens existing vaults. No GUI creation. | 0.2, 0.3, 4.1 complete; 4.8 adds GUI creation. Working proposition. |
+| Offline vault creation and opening | CLI and desktop both create and open KDBX4 through one set of core rules. | 0.2, 0.3, 4.1, 4.8 complete, source only; no desktop download yet. Working proposition. |
 | Entry editing | GUI adds generated credentials and edits username, URL and notes; cannot enter an existing password/API value. | 4.2 covers the existing subset; 4.9 adds secure existing-value input/edit. Working proposition. |
 | Organization and search | GUI group navigation and case-insensitive title/group search exist. Rich field/tag search and rename/move/clone workflows are not established. | V.5a–b add stable organization operations and GUI search/controls. Expansion. |
 | Generator | Character password generation exists. Passphrase workflow not established. | 4.2 covers the existing generator; V.6 adds core/CLI/GUI passphrases, which share passphrases use (Working proposition); 8.3d adds browser generation (Expansion). |
@@ -67,7 +67,7 @@ PRODUCT v1.4 orders these additions beside desktop KeePassXC coverage. Hosted an
 
 | User outcome | Keypaste source status | Delivery rows / milestone |
 |---|---|---|
-| Start without terminal/file expertise | Desktop opens an existing file; account/signup and managed storage onboarding are absent. | 4.8 provides desktop creation (Working proposition); H.1–H.2 settle and implement accounts for the team plan (Paid release); 9.1f import and 5.3b managed onboarding are Expansion. |
+| Start without terminal/file expertise | Desktop creates and opens a vault; account/signup and managed storage onboarding are absent. | 4.8 complete in source, so a first vault needs no terminal once the desktop ships (Working proposition); H.1–H.2 settle and implement accounts for the team plan (Paid release); 9.1f import and 5.3b managed onboarding are Expansion. |
 | Authorize and revoke devices | No hosted account MFA/session/device workflow. | H.3 adds MFA/session revocation and H.4 device authorization for team-plan accounts (Paid release); 5.3c device/sync controls and M.2a's phone client are Expansion. |
 | Sync without exposing vault plaintext | Local KDBX editing exists; no relay/client sync implementation. | 5.2a–c build and publish the drop relay and H.7–H.8 host it (Working proposition); 5.2d adds authorized blob sync, 5.3a–c recoverable client sync and controls, and 5.3d the updated clients (Expansion). |
 | Recover account or vault access | No hosted recovery workflow; account and vault recovery need separate authority. | H.5a defines what is recoverable and H.5b implements and rehearses it for team-plan accounts (Paid release); vault recovery stays local, and phone recovery follows in M.2c (Expansion). |

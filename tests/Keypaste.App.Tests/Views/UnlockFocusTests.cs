@@ -36,7 +36,7 @@ public sealed class UnlockFocusTests
         fixture.RememberSelf();
 
         using var session = new AppVaultSession(new ManualClock());
-        using var model = new UnlockViewModel(session, fixture.Home, () => { });
+        using var model = new UnlockViewModel(session, fixture.Home, new FakeVaultFilePicker(), () => { });
 
         var window = Show(model);
 
@@ -57,7 +57,7 @@ public sealed class UnlockFocusTests
         fixture.RememberSelf();
 
         using var session = new AppVaultSession(new ManualClock());
-        using var model = new UnlockViewModel(session, fixture.Home, () => { });
+        using var model = new UnlockViewModel(session, fixture.Home, new FakeVaultFilePicker(), () => { });
 
         var window = Show(model);
 
@@ -76,7 +76,7 @@ public sealed class UnlockFocusTests
     {
         using var fixture = new TempVault();
         using var session = new AppVaultSession(new ManualClock());
-        using var model = new UnlockViewModel(session, fixture.Home, () => { });
+        using var model = new UnlockViewModel(session, fixture.Home, new FakeVaultFilePicker(), () => { });
 
         var window = Show(model);
 
@@ -91,7 +91,7 @@ public sealed class UnlockFocusTests
         fixture.RememberSelf();
 
         using var session = new AppVaultSession(new ManualClock());
-        using var model = new UnlockViewModel(session, fixture.Home, () => { });
+        using var model = new UnlockViewModel(session, fixture.Home, new FakeVaultFilePicker(), () => { });
 
         var window = Show(model);
 
@@ -115,7 +115,7 @@ public sealed class UnlockFocusTests
         fixture.RememberSelf();
 
         using var session = new AppVaultSession(new ManualClock());
-        using var model = new UnlockViewModel(session, fixture.Home, () => { });
+        using var model = new UnlockViewModel(session, fixture.Home, new FakeVaultFilePicker(), () => { });
 
         var window = Show(model);
 
@@ -129,8 +129,10 @@ public sealed class UnlockFocusTests
         Assert.DoesNotContain('s', password.Display);
     });
 
+    // By name, not Single(): the screen carries the two create fields as well since 4.8, and they
+    // are in the tree whether or not the create form is showing.
     private static MaskedInput Password(Window window) =>
-        window.GetVisualDescendants().OfType<MaskedInput>().Single();
+        window.GetVisualDescendants().OfType<MaskedInput>().Single(input => input.Name == "Password");
 
     private static Window Show(UnlockViewModel model)
     {

@@ -24,6 +24,16 @@ namespace Keypaste.App.Tests;
 /// in KeePassXC.
 /// </para>
 /// <para>
+/// <b>4.8 made the app a vault creator, and the argument survived it for one reason.</b> Create does
+/// not reach <c>Vault.Create</c>: it calls <c>VaultCreation.TryCreate</c>, which is the same
+/// function, in the same assembly, that <c>keypaste init</c> calls — and
+/// <c>make-compat-fixture.sh</c> builds the gate's fixture with <c>keypaste init</c>. So the file
+/// KeePassXC opens on three operating systems every CI run is produced by the app's creation path,
+/// not by one that resembles it. <c>Vault.Create(</c> and <c>Directory.CreateDirectory</c> are
+/// forbidden below to keep that literally true rather than nearly true; the app's <c>--selftest</c>
+/// was moved onto <c>VaultCreation</c> so the ban needs no exemption.
+/// </para>
+/// <para>
 /// <b>"No new gate is needed" is itself a claim, and D-0036's standard is that a claim needs
 /// something that can hold it.</b> These two tests are that something. The day either fails, the
 /// argument above has stopped being true and <c>app.yml</c> needs a KeePassXC job.
@@ -35,9 +45,10 @@ public sealed class TheAppSharesTheWriterTests
     /// No code in the app writes a vault file itself.
     /// </summary>
     /// <remarks>
-    /// <b>The mutation that must fail this:</b> a "back up my vault" button implemented with
+    /// <b>The mutations that must fail this:</b> a "back up my vault" button implemented with
     /// <c>File.Copy</c>, or an export written by hand — either of which produces a KDBX no
-    /// compatibility gate has ever opened.
+    /// compatibility gate has ever opened; and a create that reaches <c>Vault.Create</c> directly,
+    /// which would give the app a creation path of its own and expire the argument above.
     /// </remarks>
     [Fact]
     public void No_app_code_writes_a_file_itself()
@@ -51,6 +62,8 @@ public sealed class TheAppSharesTheWriterTests
             "new FileStream",
             "File.Copy",
             "File.Move",
+            "Vault.Create(",
+            "Directory.CreateDirectory",
         ];
 
         var offenders = new List<string>();

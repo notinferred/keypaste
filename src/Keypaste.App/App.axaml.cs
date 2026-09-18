@@ -193,7 +193,7 @@ internal sealed partial class App : Application, IDisposable
         _shell = null;
 
         _unlock?.Dispose();
-        _unlock = new UnlockViewModel(_session, home, OnUnlocked);
+        _unlock = new UnlockViewModel(_session, home, new StorageProviderPicker(_window), OnUnlocked);
 
         _window.FindControl<ContentControl>("Root")!.Content =
             new UnlockView { DataContext = _unlock };

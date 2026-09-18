@@ -56,7 +56,15 @@ Avalonia draws with Skia; the app does not embed WebKit or Chromium. 4.7b instal
 
 Open a vault by dragging a `.kdbx` onto the window, choosing Browse (`Ctrl/Cmd+O`), or selecting a recent vault.
 
-Whichever you use, the file's header is read before you are asked for a password, so a file that was never a vault is refused immediately rather than after you have typed. Vault creation currently uses `keypaste init`; the desktop app has no creation screen yet. [PRODUCT](PRODUCT.md#4-engineering-laws) §4.2 requires shared core logic, with neither front end waiting for the other.
+Whichever you use, the file's header is read before you are asked for a password, so a file that was never a vault is refused immediately rather than after you have typed. [PRODUCT](PRODUCT.md#4-engineering-laws) §4.2 requires shared core logic, with neither front end waiting for the other.
+
+## Creating a vault
+
+Create makes a new vault without a terminal. It asks where the file goes through the save picker, then for a master password twice. There is no way to recover that password, and nothing else can open the vault without it.
+
+The refusals are the ones `keypaste init` makes, because both front ends ask the same code: a path something already occupies is refused and that file is left exactly as it was, an empty password is refused, and a confirmation that does not match is refused. Nothing is written until all three have passed, so a refused attempt leaves the disk as it found it, and cancelling the picker writes nothing at all. The vault is remembered in `recent.toml` only once it exists and the app has opened it.
+
+A new vault opens on an empty Entries list. Add entries there, or with `keypaste add` in a terminal against the same file.
 
 ## Locking
 
@@ -123,33 +131,35 @@ Keystrokes still arrive as short-lived immutable strings, and an input method ca
 
 CI builds and packages on three operating systems; the current desktop logic tests do not verify rendered pixels. Rendering coverage remains step 4.6. `install-desktop.yml` (4.7b) installs internal candidates on fresh runners and drives the installed app, but a browser download's SmartScreen prompt and a person's use are still observed only by hand. Use a disposable vault with harmless test values for this manual checklist before any release that includes the app:
 
-1. Launch with no `recent.toml`: the empty state names `keypaste init` and does not look broken.
+1. Launch with no `recent.toml`: the empty state offers Create, names dragging and Browse, and does not look broken.
 2. Open a vault by drag, and again by the picker. A non-`.kdbx` file is refused before the password field.
-3. Wrong password: a calm message, still locked, and nothing added to `recent.toml`.
-4. Right password: the shell appears, and the vault is now in `recent.toml`.
-5. Complete launch, unlock, all five destinations and `Ctrl/Cmd+L` using only the keyboard.
-6. Set a one-minute timeout. Check that the countdown appears, typing cancels it, and inactivity locks. Quit and relaunch without opening Settings; the timeout must remain one minute.
-7. Suspend the machine for longer than the timeout. It wakes locked.
-8. The theme follows the OS, and both light and dark read as calm. Choose Dark, quit and relaunch: the first frame is dark, with no flash of the light one on the way.
-9. Set `idle_timeout_seconds = 137` in `app.toml` and relaunch. Settings must display it, locking must occur at 137 seconds, and the file must remain unchanged.
-10. Set a long idle timeout to isolate minimize locking. Enable "Lock when the window is minimized", minimize and restore: expect the unlock screen. Disable it, minimize and restore: expect an unlocked vault and a running idle countdown. Enable it again, quit and relaunch without opening Settings; minimizing must lock. A password copied before locking must no longer paste. `docs/STEPS.md` F.2b2 owns the runner results for macOS and Linux; the real-desktop record is deferred to Expansion as F.2b3.
-11. The Log screen matches `keypaste log` for the same `~/.keypaste/audit.jsonl`.
-12. Agent Activity says the right thing both with and without a `keypaste agent` running.
-13. Entries lists titles and groups. Filter by a group and search for part of a title or group path; case changes still match. Selecting an entry shows a username, a URL and notes, and a row of dots where the password is.
-14. Copy a password and check the countdown and progress bar. It must paste before the timeout and be absent afterward.
-15. Copy, then `Ctrl/Cmd+L`. Paste: nothing.
-16. Copy, then quit the app. Paste: nothing.
-17. On Windows with Clipboard History enabled and permitted by policy, copy a harmless control string and confirm Win+V contains it. Then copy an app password and check that Win+V excludes it. `keypaste get` has set the same formats since D-0056; native CLI verification belongs to step 1.5a in `docs/STEPS.md`.
-18. Hold an Env Sets value to reveal it, then release to hide it. Holding another row must reveal only that row.
-19. Copy a project's run command, paste it in a terminal, finish the line: it runs with the project's variables.
-20. Add, edit and delete an entry, then check `keypaste ls` and `keypaste get` in a terminal.
-21. With the app open on a vault, run `keypaste env set` against the same file in a terminal. Come back and make any edit: the app refuses, says why, and the terminal's write is still there.
-22. Generate a password in the app, then read it back with `keypaste get --show`.
-23. Open the vault the app wrote in KeePassXC.
+3. Create a vault: choose a path, type a master password twice, and land on an empty Entries list. Cancel the save picker instead and check nothing was written. Aim Create at a vault that already exists: it is refused, and that vault still opens with its own password afterwards. Check this on each platform — a save picker that created or truncated the file itself would defeat the refusal, and no headless test can observe that.
+4. Wrong password: a calm message, still locked, and nothing added to `recent.toml`.
+5. Right password: the shell appears, and the vault is now in `recent.toml`.
+6. Complete launch, unlock, all five destinations and `Ctrl/Cmd+L` using only the keyboard.
+7. Set a one-minute timeout. Check that the countdown appears, typing cancels it, and inactivity locks. Quit and relaunch without opening Settings; the timeout must remain one minute.
+8. Suspend the machine for longer than the timeout. It wakes locked.
+9. The theme follows the OS, and both light and dark read as calm. Choose Dark, quit and relaunch: the first frame is dark, with no flash of the light one on the way.
+10. Set `idle_timeout_seconds = 137` in `app.toml` and relaunch. Settings must display it, locking must occur at 137 seconds, and the file must remain unchanged.
+11. Set a long idle timeout to isolate minimize locking. Enable "Lock when the window is minimized", minimize and restore: expect the unlock screen. Disable it, minimize and restore: expect an unlocked vault and a running idle countdown. Enable it again, quit and relaunch without opening Settings; minimizing must lock. A password copied before locking must no longer paste. `docs/STEPS.md` F.2b2 owns the runner results for macOS and Linux; the real-desktop record is deferred to Expansion as F.2b3.
+12. The Log screen matches `keypaste log` for the same `~/.keypaste/audit.jsonl`.
+13. Agent Activity says the right thing both with and without a `keypaste agent` running.
+14. Entries lists titles and groups. Filter by a group and search for part of a title or group path; case changes still match. Selecting an entry shows a username, a URL and notes, and a row of dots where the password is.
+15. Copy a password and check the countdown and progress bar. It must paste before the timeout and be absent afterward.
+16. Copy, then `Ctrl/Cmd+L`. Paste: nothing.
+17. Copy, then quit the app. Paste: nothing.
+18. On Windows with Clipboard History enabled and permitted by policy, copy a harmless control string and confirm Win+V contains it. Then copy an app password and check that Win+V excludes it. `keypaste get` has set the same formats since D-0056; native CLI verification belongs to step 1.5a in `docs/STEPS.md`.
+19. Hold an Env Sets value to reveal it, then release to hide it. Holding another row must reveal only that row.
+20. Copy a project's run command, paste it in a terminal, finish the line: it runs with the project's variables.
+21. Add, edit and delete an entry, then check `keypaste ls` and `keypaste get` in a terminal.
+22. With the app open on a vault, run `keypaste env set` against the same file in a terminal. Come back and make any edit: the app refuses, says why, and the terminal's write is still there.
+23. Generate a password in the app, then read it back with `keypaste get --show`.
+24. Open the vault the app wrote in KeePassXC, both one it created and one it edited.
+
 
 ## Observing minimize-lock on macOS and Linux
 
-Item 10 has been observed on Windows. macOS and Linux require native checks because headless tests cannot establish what their window managers report. `docs/STEPS.md` F.2b2 owns the results: `observe-desktop.yml` drives these checks on `macos-15` and on Xvfb with Openbox through [observe-minimize-lock.sh](../scripts/observe-minimize-lock.sh), and both passed. What a runner cannot observe, a person's own minimize click and, on macOS, the `Cmd+H` keystroke, is deferred to Expansion as F.2b3, recorded on a real macOS machine and Linux desktop.
+Item 11 has been observed on Windows. macOS and Linux require native checks because headless tests cannot establish what their window managers report. `docs/STEPS.md` F.2b2 owns the results: `observe-desktop.yml` drives these checks on `macos-15` and on Xvfb with Openbox through [observe-minimize-lock.sh](../scripts/observe-minimize-lock.sh), and both passed. What a runner cannot observe, a person's own minimize click and, on macOS, the `Cmd+H` keystroke, is deferred to Expansion as F.2b3, recorded on a real macOS machine and Linux desktop.
 
 Download the seven-day `app-<rid>` artifact from `app.yml`, or publish locally:
 

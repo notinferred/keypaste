@@ -133,6 +133,110 @@ public sealed class MaskedInputAutomationTests
         });
 
     /// <summary>
+    /// The same differential, on the field a new vault's master password is typed into (4.8).
+    /// </summary>
+    /// <remarks>
+    /// A second and third <see cref="MaskedInput"/> inherit the control and its template, not its
+    /// evidence. D-0099 is a claim about every field a master password reaches, and the create form
+    /// is where one is chosen for the first time.
+    /// </remarks>
+    [Fact]
+    public Task The_new_password_surface_depends_on_the_length_and_not_the_characters() =>
+        HeadlessSession.On(async () =>
+        {
+            using var screen = new UnlockScreen();
+            await screen.BeginCreate();
+            screen.NewPassword.Focus();
+
+            screen.Window.KeyTextInput(Alpha);
+            var first = Surface(screen.NewPassword);
+
+            screen.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+            screen.Window.KeyReleaseQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+            Assert.Equal(0, screen.Model.NewMaskedLength);
+
+            screen.Window.KeyTextInput(Beta);
+            var second = Surface(screen.NewPassword);
+
+            Assert.Equal(first, second);
+        });
+
+    /// <summary>The same differential again, on the confirmation field (4.8).</summary>
+    [Fact]
+    public Task The_confirmation_surface_depends_on_the_length_and_not_the_characters() =>
+        HeadlessSession.On(async () =>
+        {
+            using var screen = new UnlockScreen();
+            await screen.BeginCreate();
+            screen.ConfirmPassword.Focus();
+
+            screen.Window.KeyTextInput(Alpha);
+            var first = Surface(screen.ConfirmPassword);
+
+            screen.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+            screen.Window.KeyReleaseQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+            Assert.Equal(0, screen.Model.ConfirmMaskedLength);
+
+            screen.Window.KeyTextInput(Beta);
+            var second = Surface(screen.ConfirmPassword);
+
+            Assert.Equal(first, second);
+        });
+
+    /// <summary>
+    /// Nothing anywhere on the create form carries either password.
+    /// </summary>
+    /// <remarks>
+    /// Both fields hold a sentinel at once, so a leak that crossed from one field to the other — a
+    /// shared styled property, a peer that reported its sibling — is caught as well as a leak from
+    /// either on its own.
+    /// </remarks>
+    [Fact]
+    public Task Nothing_on_the_create_form_exposes_either_password() => HeadlessSession.On(async () =>
+    {
+        using var screen = new UnlockScreen();
+        await screen.BeginCreate();
+
+        screen.NewPassword.Focus();
+        screen.Window.KeyTextInput(Fixture);
+
+        screen.ConfirmPassword.Focus();
+        screen.Window.KeyTextInput(Rare.ToString() + Fixture);
+
+        AssertNothingExposes(screen.Window, Fixture);
+        AssertNothingExposes(screen.Window, Rare.ToString());
+    });
+
+    /// <summary>
+    /// The anti-vacuity guard for the two create fields.
+    /// </summary>
+    /// <remarks>
+    /// Their placeholders differ from the unlock field's, so a sweep that silently stopped reaching
+    /// them would leave the two differentials above passing on an empty surface.
+    /// </remarks>
+    [Fact]
+    public Task The_mask_reaches_the_automation_tree_for_both_create_fields() =>
+        HeadlessSession.On(async () =>
+        {
+            using var screen = new UnlockScreen();
+            await screen.BeginCreate();
+
+            screen.NewPassword.Focus();
+            screen.Window.KeyTextInput(Fixture);
+
+            var created = Surface(screen.NewPassword).Select(entry => entry.Text).ToList();
+            Assert.Contains(new string('•', Fixture.Length), created, StringComparer.Ordinal);
+            Assert.Contains("New master password", created, StringComparer.Ordinal);
+
+            screen.ConfirmPassword.Focus();
+            screen.Window.KeyTextInput(Fixture);
+
+            var confirmed = Surface(screen.ConfirmPassword).Select(entry => entry.Text).ToList();
+            Assert.Contains(new string('•', Fixture.Length), confirmed, StringComparer.Ordinal);
+            Assert.Contains("Confirm master password", confirmed, StringComparer.Ordinal);
+        });
+
+    /// <summary>
     /// The guard against every absence above being vacuous. If the sweep were reaching nothing,
     /// each of those tests would pass for the worst possible reason.
     /// </summary>
@@ -379,7 +483,8 @@ public sealed class MaskedInputAutomationTests
         {
             _fixture.RememberSelf();
             _session = new AppVaultSession(new ManualClock());
-            Model = new UnlockViewModel(_session, _fixture.Home, () => { });
+            Picker = new FakeVaultFilePicker();
+            Model = new UnlockViewModel(_session, _fixture.Home, Picker, () => { });
 
             Window = new Window { Content = new UnlockView { DataContext = Model } };
             Window.Show();
@@ -392,7 +497,27 @@ public sealed class MaskedInputAutomationTests
 
         internal UnlockViewModel Model { get; }
 
-        internal MaskedInput Password => Window.GetVisualDescendants().OfType<MaskedInput>().Single();
+        internal FakeVaultFilePicker Picker { get; }
+
+        internal MaskedInput Password => Field("Password");
+
+        /// <summary>The new-vault master password, shown when the create form is open.</summary>
+        internal MaskedInput NewPassword => Field("NewPassword");
+
+        /// <summary>Its confirmation.</summary>
+        internal MaskedInput ConfirmPassword => Field("ConfirmPassword");
+
+        /// <summary>Opens the create form, so its two fields can be typed into.</summary>
+        internal async Task BeginCreate()
+        {
+            Picker.NewPath = Path.Combine(_fixture.Home, "created.kdbx");
+            await Model.StartCreateAsync();
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        }
+
+        // By name, not Single(): there are three of these on the screen since 4.8.
+        private MaskedInput Field(string name) =>
+            Window.GetVisualDescendants().OfType<MaskedInput>().Single(input => input.Name == name);
 
         public void Dispose()
         {

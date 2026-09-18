@@ -61,8 +61,8 @@ internal sealed class AvaloniaClipboard(TopLevel topLevel) : IAppClipboard
 
         // Disposed as soon as the platform has taken the data: holding it for the countdown would
         // keep the secret in an item for the whole window, which is what ClipboardCountdown refuses
-        // to do. A platform needing delayed rendering would paste empty — item 3 on desktop.md's
-        // manual checklist, because CI has no clipboard.
+        // to do. A platform needing delayed rendering would paste empty — the copy-and-paste check
+        // on desktop.md's manual checklist, because CI has no clipboard.
         using var transfer = new DataTransfer();
         var item = DataTransferItem.CreateText(secret);
 
