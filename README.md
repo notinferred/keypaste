@@ -384,6 +384,12 @@ In PowerShell, use `./scripts/verify.ps1 compat`.
 
 The fixture is built by the shipped `keypaste` binary, so the gate covers the CLI as well as the vault writer. The write-back script builds its own vault and drives both tools in turn: keypaste modifies an entry, then KeePassXC edits and adds env variables that keypaste has to read back.
 
+## Found something wrong?
+
+Bugs, missing features and "this made no sense to me" go to the [issue tracker](https://github.com/notinferred/keypaste/issues). They are read by the person who wrote the thing. A report that says what you ran, what you expected and what happened is worth more than a polished one.
+
+Anything that looks like a security problem goes to <security@keypaste.com> instead of the tracker. [`SECURITY.md`](SECURITY.md) owns what is in scope, what happens next and how fast.
+
 ## Security
 
 Report vulnerabilities privately using [`SECURITY.md`](SECURITY.md).

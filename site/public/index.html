@@ -124,7 +124,11 @@
 </head>
 <body>
 <main>
-  <h1>keypaste <span>— the safe bridge between your credentials and the AI era</span></h1>
+  <h1>keypaste <span>&mdash; your agent asks for one password. you say yes or no.</span></h1>
+
+  <p class="pitch"><strong>Your AI agent needs a credential. Today your choices are pasting it into a chat window, or handing the agent your whole vault.</strong> keypaste is a third option: an encrypted file on your own disk that releases one credential at a time, only when you approve it, and writes down every time it happens.</p>
+
+  <p class="sub">It is also an ordinary password manager. The file opens in KeePassXC. No account, no server, nothing to sign up for.</p>
 
   <img src="/demo/keypaste-demo.gif" width="1040" height="583"
        alt="An agent asks keypaste for one credential; a person approves it; the audit log records it."
@@ -149,9 +153,7 @@ Approve? [y/N]
 
   <p class="caption">The agent approval flow in one screen. An agent asked; you were shown who, what and why; one field goes back, with a time limit on reusing that approval. Expiry does not erase the client's copies or revoke the credential. <a href="https://github.com/notinferred/keypaste/blob/main/docs/demo.md">Watch it end to end</a> — about sixty seconds.</p>
 
-  <p class="pitch"><strong>Stop pasting secrets into chats.</strong> keypaste is a local-first, KDBX-compatible vault that stores your passwords and env variables, injects them into your projects, and lets AI agents like Claude request exactly one credential — with your approval, scoped access, and a full audit trail — without ever seeing your vault.</p>
-
-  <p class="sub">For developers who are tired of choosing between <code>.env</code> files and trusting an agent with everything.</p>
+  
 
   <ul class="bullets">
     <li><b>Local-first, offline</b> <span>Your vault is a file on your disk. No account, no cloud service holding your secrets, no network required. Sync it yourself with whatever you already use.</span></li>
@@ -160,41 +162,6 @@ Approve? [y/N]
   </ul>
 
   <p class="status"><b>Pre-1.0, and it says so.</b> The vault, the environment-variable injection and the agent bridge all work today and are tested on all three operating systems. The binaries are unsigned, the desktop app is not released yet, and the approval prompt is a terminal prompt rather than a native dialog.</p>
-
-  <h2>If you installed v0.1.0, replace it</h2>
-
-  <p class="caption"><b>v0.1.0 could destroy your vault.</b> <code>env export</code> with
-     <code>--force</code> wrote a project's variables over it in plaintext, taking every other entry
-     and all history with it. In that release: env export can delete your vault; env rm and env set
-     can act on the wrong entry; get can return the wrong password; env pull can delete an edit it
-     never imported; and moving the clock back can revive an expired approval. Every one of those is
-     fixed in v0.2.0. The v0.1.0 archives are still served and still carry the
-     defects, because a published version is never rewritten here - so replacing the binary is the
-     fix. <a href="https://github.com/notinferred/keypaste/blob/main/CHANGELOG.md#020">What
-     changed</a>.</p>
-
-  <h2>If you installed v0.2.0, replace it</h2>
-
-  <p class="caption"><b>v0.2.0 can lose an edit.</b> In that release,
-     saving while another program saves the same vault can undo its change.
-     When keypaste could not write the vault immediately it waited and tried again; if what it was
-     waiting for was another program finishing its own save, keypaste then wrote its own copy over
-     the top, and whatever that save added was in no history and nowhere else. Two saves of one
-     vault within about two seconds was enough &mdash; which is exactly what a password manager and
-     an agent sharing a vault do. v0.3.0 re-reads the vault between retries and refuses to overwrite
-     a change made while it waited.</p>
-
-  <p class="caption"><b>Two more, and neither of them loses anything.</b> Also in v0.2.0,
-     on Windows 11 24H2 and Windows Server 2025, a save can fail when another keypaste or KeePass program is saving at the same time,
-     because those builds refuse a temporary name whose short 8.3 alias another transaction holds,
-     and every KeePass-family program spells that name the same way. And
-     an agent asking for entry names on a loaded machine can be told to start keypaste agent for a process that is already running,
-     because the bridge's half-second budget could pass before it tried the connection. In v0.3.0
-     each process gets a temporary directory nothing else names, and the bridge tries the connection
-     before reporting the approver absent. The v0.2.0 and v0.1.0 archives are still served and still
-     carry these defects, because a published version is never rewritten here.
-     <a href="https://github.com/notinferred/keypaste/blob/main/CHANGELOG.md#030">What
-     changed</a>.</p>
 
   <h2>Install</h2>
 
@@ -233,6 +200,28 @@ export KEYPASTE_VAULT=~/vault.kdbx
 
 keypaste env pull dev            # imports ./.env, then offers to delete it
 keypaste run dev -- npm start    # injected into the child process, nothing on disk</pre>
+
+    <h2>Running an older version?</h2>
+
+  <p class="caption">Published versions are never rewritten here, so the old archives are still served and still broken. Replacing the binary is the fix. Full detail in the <a href="https://github.com/notinferred/keypaste/blob/main/CHANGELOG.md">changelog</a>.</p>
+
+  <div class="scroll">
+  <table>
+    <thead><tr><th>If you have</th><th>What it does</th><th>Fixed in</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>0.1.0</td>
+        <td>Can destroy your vault: <b>env export can delete your vault</b>, writing a project's variables over it in plaintext and taking every other entry and its history. Also: env rm and env set can act on the wrong entry; get can return the wrong password; env pull can delete an edit it never imported; and moving the clock back can revive an expired approval.</td>
+        <td>0.2.0</td>
+      </tr>
+      <tr>
+        <td>0.2.0</td>
+        <td>Can lose an edit: <b>saving while another program saves the same vault can undo its change</b>, with the lost edit in no history and nowhere else. Two saves within about two seconds was enough &mdash; which is what a password manager and an agent sharing a vault do. Two more that lose nothing are listed in the changelog.</td>
+        <td>0.3.0</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
 
   <h2>Connecting it to Claude</h2>
 
@@ -282,9 +271,9 @@ keypaste run dev -- npm start    # injected into the child process, nothing on d
 
   <p class="caption"><strong>keypaste is not the only thing in this space, and pretending otherwise would be the fastest way to lose the argument.</strong> Keeper's MCP server prompts a human before it returns unmasked secret data. Bitwarden published an Agent Access SDK in March 2026 with the same request-and-approve shape, though it is alpha and its logging is not there yet. 1Password's Environments MCP server asks for approval too, and then deliberately never hands the credential over at all — a different answer to the same problem, not a worse one. What is keypaste's is the combination: an ordinary KDBX file you own, no account and no server anywhere, a person answering each request, and a log that never leaves your disk.</p>
 
-  <h2>Tell me about the next release</h2>
+  <h2>Tell me when the app ships</h2>
 
-  <p class="caption">CLI/MCP downloads are available above. Leave your email for one future release announcement; we will ask you to confirm your subscription before sending it. Not a newsletter.</p>
+  <p class="caption">The command-line tool is above and works today. The desktop app &mdash; same vault, no terminal &mdash; is next. Leave your email and you get one message when it lands. We ask you to confirm before anything is sent, and there is nothing else to send. Not a newsletter, and not an account.</p>
 
   <form class="signup" method="post" action="/subscribe">
     <label class="field">
@@ -298,8 +287,12 @@ keypaste run dev -- npm start    # injected into the child process, nothing on d
 
   <p style="margin-top:2rem"><a class="cta" href="https://github.com/notinferred/keypaste">Read the source on GitHub →</a></p>
 
+  <h2>Found something wrong?</h2>
+
+  <p class="caption">Bugs, missing features and "this made no sense to me" all go to the <a href="https://github.com/notinferred/keypaste/issues">issue tracker</a>, and are read by the person who wrote it. Anything that looks like a security problem goes to <a href="mailto:security@keypaste.com">security@keypaste.com</a> instead of the tracker &mdash; <a href="https://github.com/notinferred/keypaste/blob/main/SECURITY.md">SECURITY.md</a> says what happens next and how fast.</p>
+
   <footer>
-    <p>Security reports: <a href="mailto:security@keypaste.com">security@keypaste.com</a></p>
+    <p>Security reports: <a href="mailto:security@keypaste.com">security@keypaste.com</a> &middot; Everything else: <a href="https://github.com/notinferred/keypaste/issues">the issue tracker</a></p>
     <p>This page sets no cookies, loads no third-party scripts, and runs no JavaScript at all. If you enter your email it is stored on a database the maintainer runs, used only to tell you when keypaste ships, and confirmed with you before anything is sent.</p>
   </footer>
 </main>

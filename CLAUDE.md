@@ -44,6 +44,8 @@ Author every commit as `keypaste <contact@keypaste.com>`, including agent-writte
 
 Each fact has one authoritative owner; other documents link to it. Explicit user direction authorizes amendments within its scope. Product scope changes require dated re-ratification, a decision record and an updated plan; preserve the security laws in PRODUCT §3. Editorial changes preserve requirements and evidence.
 
+Records are proportional to the risk they retire (PRODUCT §6.6). A decision row is one sentence under 400 characters saying what was decided and what it supersedes — not the argument that reached it, which is in the commit and the code. Record a decision when it constrains a future change or a reader would otherwise undo it; a choice with no future cost does not need a row. Never write a document whose subject is another document: delete it instead. Tests on the secret, injection, sync and bridge paths are outside this rule and stay mandatory (PRODUCT §4.5) — what gets cut is ceremony, never coverage.
+
 | Document | Owns |
 |---|---|
 | [README](README.md) | Introduction, published installation instructions and navigation |
@@ -51,8 +53,7 @@ Each fact has one authoritative owner; other documents link to it. Explicit user
 | [STEPS](docs/STEPS.md) | Delivery status, ordered tasks, dependencies and acceptance evidence |
 | [RELEASE](docs/RELEASE.md) | Distribution matrix, publication and installation verification |
 | [FEATURES](docs/FEATURES.md) | Dated capability baseline, implementation evidence and gaps |
-| [ALIGNMENT](docs/ALIGNMENT.md) | Adopted direction and links to its owning documents |
-| [DECISIONS](DECISIONS.md) | Architecture, security and money decisions, pending ideas, and links to historical decisions; one line per current record |
+| [DECISIONS](DECISIONS.md) | Architecture, security and money decisions, and pending ideas; one line per current record. Settled and superseded rows live in [decisions-archive](docs/decisions-archive.md), which nothing is required to read |
 | [CHANGELOG](CHANGELOG.md) | Significant user-visible changes, separating Unreleased work from published versions |
 | [SECURITY](SECURITY.md) and [THREATS](THREATS.md) | Reporting, security guarantees, threat model and known limits |
 | [BRAND](docs/BRAND.md) | The marks, the three colours, the type and the usage rules |

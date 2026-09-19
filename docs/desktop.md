@@ -6,7 +6,7 @@ The desktop app opens the same `.kdbx` vaults as the CLI and locks its session w
 
 ## Current limits
 
-Approvals still happen in the terminal. When an AI agent asks `keypaste-mcp` for a credential, the request goes to a `keypaste agent` you started in your own terminal. The Agent Activity screen currently reports whether that agent is running. The design is settled: the agent owns the approver pipe and the app will connect as a UI client (D-0054 in [DECISIONS.md](../DECISIONS.md#d-0054--the-agent-owns-the-approver-pipe-the-app-is-a-client-of-it)). The client channel and approval controls remain step 4.3 in [STEPS](STEPS.md).
+Approvals still happen in the terminal. When an AI agent asks `keypaste-mcp` for a credential, the request goes to a `keypaste agent` you started in your own terminal. The Agent Activity screen currently reports whether that agent is running. The design is settled: the agent owns the approver pipe and the app will connect as a UI client (D-0054 in [DECISIONS.md](decisions-archive.md#d-0054--the-agent-owns-the-approver-pipe-the-app-is-a-client-of-it)). The client channel and approval controls remain step 4.3 in [STEPS](STEPS.md).
 
 The desktop app is not published. Build it from source, below. `app.yml` can package desktop archives, an internal unsigned Windows MSI and an internal unsigned Linux AppImage on version tags, but keeps them as workflow artifacts; `release.yml` publishes the CLI/MCP downloads. See [RELEASE](RELEASE.md) for the distribution matrix and remaining desktop publication requirements.
 

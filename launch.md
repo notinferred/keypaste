@@ -4,7 +4,9 @@
 
 # Launch runbook
 
-These are CLI-era drafts, kept for the copy rather than for a plan. The community introduction step that once carried them was withdrawn (D-0220): no announcement is scheduled, and none is required. If one is ever made it gets its own row, and the component and version claims below must be updated for the product actually released first; the historical “no released GUI” wording is not a launch requirement.
+These are CLI-era drafts. The announcement they were written for is now **L.1 in [STEPS](docs/STEPS.md)**, the last row of Working proposition: D-0220 withdrew it and D-0241 reversed that, because PRODUCT §5.3 now makes an announcement a condition of every milestone gate. A release nobody was told about does not close a milestone.
+
+Nothing below is ready to post as written. Every draft predates the desktop app, the entry history, the generator and the file share, and each still claims the CLI-era component set and version; L.1 requires them rewritten for what is actually published before anything goes out. The historical “no released GUI” wording is a fact about the drafts, not a launch requirement.
 
 `docs/PRODUCT.md` §5.3 permits Hacker News, r/selfhosted, r/KeePass, the MCP community and X. Post once per channel. Do not repost, use another account or solicit votes.
 

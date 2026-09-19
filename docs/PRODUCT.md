@@ -1,10 +1,14 @@
 # Product rules
 
-Product rules change only through dated re-ratification under explicit founder direction, recorded with a reason in DECISIONS and matching owner-document updates. The security laws in §3 remain fixed. Last ratified: 2026-09-15 (v1.4, D-0176); earlier versions remain in git. Editorial changes preserve these rules.
+Product rules change only through dated re-ratification under explicit founder direction, recorded with a reason in DECISIONS and matching owner-document updates. The security laws in §3 remain fixed. Last ratified: 2026-09-19 (v1.5, D-0241); earlier versions remain in git. Editorial changes preserve these rules.
 
 ## 1. Product
 
-keypaste is credential sharing through encrypted files, with environments and controlled agent access on the same KeePass-compatible vault for personal and work credentials.
+**keypaste is a password manager for people whose software now asks for the passwords.** Credentials live in an ordinary KeePass-compatible file the person owns. From that one file, three things follow that a password manager does not usually do: a project's environment variables are injected straight into a child process with nothing written to disk; an AI agent can ask for one credential and get it only when a human says yes, with every request logged; and a chosen set of entries can be handed to another person as an encrypted file they merge into their own vault.
+
+Who it is for, in order: a developer who keeps secrets in `.env` files and has started letting agents run commands; then their team; then an organization that has to govern the same credentials. What it replaces for the first of those is the `.env` file and the habit of pasting a key into a chat window.
+
+Everything above works with no account, no server and no network. That is the product, not a tier of it.
 
 A share is a KDBX4 file holding only the chosen entries or env set, protected by a generated six-word passphrase. It travels as a link through the relay while the passphrase goes by a second channel, and the receiver merges it into their vault by UUID under the merge semantics D-0157 records, keeping history. Sharing to a local file works without the relay (§4.1). A temporary share sets entry expiry: keypaste refuses to inject an expired value and warns when receiving one. A downloaded copy cannot be recalled, and revocation means rotating the credential; every description of expiry says so.
 
@@ -14,8 +18,8 @@ The complete KeePassXC feature baseline is a tracked product objective. Daily-us
 
 The product is freemium. Free is the whole local password manager and the self-hosted relay; paid plans sell managed hosting and organization capabilities. Sealing a share to a recipient's key and signing it are free (§5.4); the paid team plan sells the hosted directory, revocation, attribution, team audit and policy, and support. Commercial plans do not determine engineering milestones. [STEPS.md](STEPS.md) owns the build order:
 
-1. Working proposition: a signed, published desktop app and CLI in which a developer creates a vault, stores an existing secret, keeps env sets, injects a project's env, shares an env set and receives one, approves an agent request in a native dialog, recovers an ordinary mistake and reads the audit, with the hosted drop relay live and self-hostable.
-2. Pilot ready: invited small teams share production env through the hosted relay over an observed period, and operator restore is redeployment.
+1. Working proposition: a signed, published desktop app and CLI in which a developer creates a vault, stores an existing secret, keeps env sets, injects a project's env, shares an env set as a file and receives one, approves an agent request, recovers an ordinary mistake and reads the audit — announced publicly, installable from the package managers developers already use, and with a route for users to report what they find. Sharing here is file-based (§4.1); it needs no relay and no account.
+2. Pilot ready: the hosted drop relay is live and self-hostable, a share travels as a link, an agent request is approved in a native dialog, and invited small teams share production env through the relay over an observed period with operator restore by redeployment.
 3. Paid release: the team plan, with accounts as its directory, billing, support and independent review of the hosted and team boundaries.
 4. Expansion: whole-vault managed sync, browser filling, importers, phone approval, the remaining KeePassXC baseline and the OIDC/SCIM tier. These tracks progress alongside the release work as their build dependencies hold; their publication follows the Working proposition and Pilot ready gates, and an organization pilot also needs a selected pilot scope.
 5. Scale: operational capacity and reliability work, verified against declared budgets.
@@ -58,7 +62,7 @@ Organization-owned credentials, access policy, provisioning integrations, audit 
 
 1. Each delivery slice produces a short user demo for marketing and retains the milestone's required acceptance evidence.
 2. The founder uses the supported workflow daily before asking others to rely on it. New users must be able to create or migrate, use credentials and recover ordinary mistakes without developer assistance.
-3. Publish and support the local product, then validate managed hosting with invited users before charging. Paid release requires the pilot gates and independent review of the hosted and team trust boundaries; a phone workflow is not a precondition. Marketing announcements follow the release they describe.
+3. Publish and support the local product, then validate managed hosting with invited users before charging. Paid release requires the pilot gates and independent review of the hosted and team trust boundaries; a phone workflow is not a precondition. Marketing announcements follow the release they describe — and every milestone gate requires one. A release nobody was told about does not close a milestone: shipping includes being findable, installable through the channels the audience already uses, and reachable for what they report back. Unannounced published work is unfinished work, and no milestone verifier may pass without naming where it was announced and where its users report.
 4. Free and self-hosted tiers are fully secure and fully functional. Paid tiers sell hosting, sync convenience, team features and support. Encryption and signatures are never paid upgrades.
 5. STEPS is the founder's executable plan and owns active work and dependencies. Accepted product changes update PRODUCT, STEPS and the decision record together. Unaccepted ideas stay in DECISIONS.
 6. Free includes the complete local password manager: CLI, app, agent bridge, browser extension, TOTP, SSH, importers and the self-hosted relay binary. Paid plans sell managed hosting and organization capabilities such as shared ownership, administrative policy and lifecycle management. Every plan must satisfy its full workflow and release gates.
@@ -74,3 +78,4 @@ Apply these in order:
 3. Split work that one person cannot build and verify within two weeks into bounded children, preserving the parent's acceptance requirements.
 4. Prefer demonstrable, tested outcomes with recovery from ordinary mistakes.
 5. Prefer established approaches and focused, shippable work over novelty, perfection or breadth.
+6. Where a question can be settled by a user rather than by more internal evidence, ship and ask. Tests on the secret, injection, sync and bridge paths are not subject to this rule (§4.5); documentation, ledger prose and acceptance narrative are. Record-keeping is proportional to the risk it retires, and a record that exists to describe another record is deleted, not maintained.
