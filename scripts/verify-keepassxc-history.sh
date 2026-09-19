@@ -74,9 +74,20 @@ for value in v1-first v2-second v3-third v4-current; do
   printf '%s\n%s\n' "$pw" "$value" | "$kp" env set "$project" "$key" --vault "$db"
 done
 
+# The last <UUID> BEFORE the first <History>, which is the entry's own rather than a revision's.
+#
+# The seen-flag is load-bearing, and `{exit}` is what it replaces (F.16). Leaving the stream
+# early closes the pipe while the `tr` upstream is still writing, and GNU coreutils reports that
+# as `tr: write error: Broken pipe` with a non-zero status, which `set -euo pipefail` then
+# correctly propagates - killing the gate before it had checked anything. It failed on every
+# ubuntu-24.04 run and on no windows-2025 or macos-15 run, so a local pass proved nothing.
+#
+# `head` is not the alternative: it closes the pipe the same way and only moves the broken pipe
+# one process to the left. Consuming the whole stream is the fix, and the history reader below
+# already reads it that way, so the two now agree.
 uuid_before=$(kpxc export -f xml "$db" \
   | tr -d '\t' \
-  | awk '/<History>/{exit} /<UUID>/{last=$0} END{print last}')
+  | awk '/<History>/{seen=1} !seen && /<UUID>/{last=$0} END{print last}')
 [ -n "$uuid_before" ] || die "could not read the entry's UUID out of the XML export"
 
 # ---------------------------------------------------------------------------------------
@@ -119,7 +130,7 @@ for value in v1-first v2-second v3-third v4-current; do
 done
 
 step "the entry KeePassXC reads is the entry keypaste restored into"
-uuid_after=$(tr -d '\t' <<<"$xml" | awk '/<History>/{exit} /<UUID>/{last=$0} END{print last}')
+uuid_after=$(tr -d '\t' <<<"$xml" | awk '/<History>/{seen=1} !seen && /<UUID>/{last=$0} END{print last}')
 [ "$uuid_after" = "$uuid_before" ] \
   || die "the entry's UUID changed across the restore: '${uuid_before}' became '${uuid_after}'"
 
