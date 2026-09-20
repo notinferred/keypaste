@@ -32,6 +32,12 @@ internal sealed partial class UnlockView : UserControl
         confirm.ClearRequested += (_, _) => Model?.ClearConfirm();
         confirm.Submitted += (_, _) => Run(Model?.CreateCommand);
 
+        var backup = this.FindControl<MaskedInput>("BackupPassword")!;
+        backup.CharacterTyped += (_, c) => Model?.Restore?.Type(c);
+        backup.BackspacePressed += (_, _) => Model?.Restore?.Backspace();
+        backup.ClearRequested += (_, _) => Model?.Restore?.ClearPassword();
+        backup.Submitted += (_, _) => Run(Model?.Restore?.CheckCommand);
+
         AddHandler(DragDrop.DragOverEvent, OnDragOver);
         AddHandler(DragDrop.DropEvent, OnDrop);
 

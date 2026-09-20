@@ -96,8 +96,8 @@ public sealed class VaultBackupTests : IDisposable
     [Fact]
     public void ABackupTakesTheVaultsOwnExtension()
     {
-        // A byte copy must not restate the file's format: nothing here decrypted it, and V.4b's
-        // restore reads the extension back off the name.
+        // A byte copy must not restate the file's format: nothing here decrypted it, and List
+        // matches a copy to its vault by the extension it kept.
         var path = SeededVault("before", name: "personal.kdb");
 
         using (var vault = Vault.Open(path, MasterPassword))
@@ -393,14 +393,14 @@ public sealed class VaultBackupTests : IDisposable
         Assert.Equal(already, Names(path));
     }
 
-    // ------------------------------------------------------------------ the restore path
+    // ------------------------------------------------------------------ the overwriting save
 
     [Fact]
     public void SaveOverwriting_KeepsWhatItReplaces_EvenInsideTheFloor()
     {
-        // This is the restore path, and the vault it replaces is exactly the copy somebody needs
-        // when the restore turns out to have been the wrong one. Neither the per-unlock rule nor
-        // the floor may suppress it.
+        // This discards somebody else's write, and the vault it replaces is exactly the copy somebody
+        // needs when that turns out to have been the wrong choice. Neither the per-unlock rule nor
+        // the floor may suppress it. Restoring a backup is VaultRestoreTests' subject.
         var path = SeededVault("before");
 
         using var vault = Vault.Open(path, MasterPassword);

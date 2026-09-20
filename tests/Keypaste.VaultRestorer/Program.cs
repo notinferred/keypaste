@@ -19,7 +19,13 @@ namespace Keypaste.VaultRestorer;
 /// through here (D-0254).
 /// </para>
 /// <para>
-/// It prints how many revisions or recycled entries it saw and what it did, and never a value: the
+/// V.4b put restoring a whole-vault backup on the desktop unlock screen and the encrypted copy in
+/// its settings. Reading a backup needs no driver, because a backup is an ordinary vault the shipped
+/// binary opens; putting one back and exporting are acts no command line performs, so they come
+/// through here as well, over the same public calls the app makes.
+/// </para>
+/// <para>
+/// It prints how many revisions, recycled entries or backups it saw and what it did, and never a value: the
 /// gate seeded the values itself and asks KeePassXC for them, so nothing is learned by putting a
 /// secret on this process's stdout.
 /// </para>
@@ -38,6 +44,9 @@ internal static class Program
         "       trash-restore <vault-path> <id> put one back\n" +
         "       trash-purge <vault-path> <id>   remove one for good\n" +
         "       trash-empty <vault-path>        remove all of them for good\n" +
+        "       backup-ls <vault-path>          list the vault's backups, newest first\n" +
+        "       backup-restore <vault-path> <backup-file-name>\n" +
+        "       vault-export <vault-path> <destination>\n" +
         "the master password is read from KEYPASTE_RESTORER_PASSWORD";
 
     private static int Main(string[] args)
@@ -58,9 +67,13 @@ internal static class Program
 
         try
         {
-            return args[0].StartsWith("trash-", StringComparison.Ordinal)
-                ? Trash(args, password)
-                : RestoreRevision(args, password);
+            return args[0] switch
+            {
+                "backup-ls" or "backup-restore" => Backup(args, password),
+                "vault-export" => Export(args, password),
+                _ when args[0].StartsWith("trash-", StringComparison.Ordinal) => Trash(args, password),
+                _ => RestoreRevision(args, password),
+            };
         }
         catch (ArgumentOutOfRangeException ex)
         {
@@ -119,6 +132,75 @@ internal static class Program
 
         vault.Save();
         Console.WriteLine($"restored      [{index}]");
+        return 0;
+    }
+
+    private static int Backup(string[] args, string password)
+    {
+        if (args.Length != (args[0] == "backup-restore" ? 3 : 2))
+        {
+            Console.Error.WriteLine(_usage);
+            return 2;
+        }
+
+        var backups = VaultBackups.List(args[1]);
+
+        if (args[0] == "backup-ls")
+        {
+            Console.WriteLine($"backups       {backups.Count}");
+
+            foreach (var listed in backups)
+            {
+                Console.WriteLine($"  {Path.GetFileName(listed.Path)}  {listed.TakenAt:O}");
+            }
+
+            return 0;
+        }
+
+        var backup = backups.FirstOrDefault(candidate => Path.GetFileName(candidate.Path) == args[2]);
+
+        if (backup is null)
+        {
+            Console.Error.WriteLine($"restore refused: '{args[2]}' is not a name from backup-ls");
+            return 1;
+        }
+
+        var validated = VaultBackups.Inspect(args[1], backup, password);
+
+        Console.WriteLine($"taken         {validated.Backup.TakenAt:O}");
+        Console.WriteLine($"entries       {validated.Entries}");
+        Console.WriteLine($"groups        {validated.Groups}");
+        Console.WriteLine($"projects      {validated.EnvProjects}");
+        Console.WriteLine($"replaces      {(validated.Replaces is { } facts ? $"{facts.Length} bytes" : "nothing")}");
+
+        var report = VaultBackups.Restore(validated);
+
+        Console.WriteLine($"restored      {Path.GetFileName(report.Restored.Path)}");
+
+        if (report.Preserved is { } preserved)
+        {
+            Console.WriteLine($"preserved     {Path.GetFileName(preserved.Path)}");
+        }
+        else if (report.AlreadyKeptAs is { } kept)
+        {
+            Console.WriteLine($"already-kept  {Path.GetFileName(kept.Path)}");
+        }
+
+        return 0;
+    }
+
+    private static int Export(string[] args, string password)
+    {
+        if (args.Length != 3)
+        {
+            Console.Error.WriteLine(_usage);
+            return 2;
+        }
+
+        using var vault = Vault.Open(args[1], password);
+        vault.ExportTo(args[2]);
+
+        Console.WriteLine($"exported      {args[2]}");
         return 0;
     }
 

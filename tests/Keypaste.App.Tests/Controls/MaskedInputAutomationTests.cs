@@ -237,6 +237,67 @@ public sealed class MaskedInputAutomationTests
         });
 
     /// <summary>
+    /// The same differential, on the field a backup's master password is typed into (V.4b).
+    /// </summary>
+    /// <remarks>
+    /// The fourth master-password field, and the one most likely to hold a password somebody no
+    /// longer uses anywhere else. It is typed on the locked screen, so D-0099 applies to it exactly
+    /// as it does to the first.
+    /// </remarks>
+    [Fact]
+    public Task The_backup_password_surface_depends_on_the_length_and_not_the_characters() =>
+        HeadlessSession.On(() =>
+        {
+            using var screen = new UnlockScreen();
+            screen.BeginRestore();
+            screen.BackupPassword.Focus();
+
+            screen.Window.KeyTextInput(Alpha);
+            var first = AutomationSurface.Of(screen.BackupPassword);
+
+            screen.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+            screen.Window.KeyReleaseQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+            Assert.Equal(0, screen.Model.Restore!.MaskedLength);
+
+            screen.Window.KeyTextInput(Beta);
+            var second = AutomationSurface.Of(screen.BackupPassword);
+
+            Assert.Equal(first, second);
+        });
+
+    /// <summary>Nothing anywhere on the restore panel carries the backup's password, and the mask does reach it.</summary>
+    [Fact]
+    public Task Nothing_on_the_restore_panel_exposes_the_backup_password() => HeadlessSession.On(() =>
+    {
+        using var screen = new UnlockScreen();
+        screen.BeginRestore();
+        screen.BackupPassword.Focus();
+
+        screen.Window.KeyTextInput(Rare.ToString() + Fixture);
+
+        Assert.Equal(Fixture.Length + 1, screen.Model.Restore!.MaskedLength);
+        AutomationSurface.AssertNothingExposes(screen.Window, Fixture);
+        AutomationSurface.AssertNothingExposes(screen.Window, Rare.ToString());
+
+        // The anti-vacuity half: its placeholder differs from the other three, so a sweep that
+        // stopped reaching this field would leave the absences above passing on nothing.
+        var surface = AutomationSurface.Of(screen.BackupPassword).Select(entry => entry.Text).ToList();
+        Assert.Contains(new string('•', Fixture.Length + 1), surface, StringComparer.Ordinal);
+        Assert.Contains("That backup's master password", surface, StringComparer.Ordinal);
+    });
+
+    /// <summary>A master password is typed, never pasted: the restore field ignores the gesture as the unlock field does.</summary>
+    [Fact]
+    public Task The_backup_password_field_takes_no_paste() => HeadlessSession.On(() =>
+    {
+        using var screen = new UnlockScreen();
+        screen.BeginRestore();
+
+        Assert.False(screen.BackupPassword.AllowsPaste);
+        Assert.Null(screen.BackupPassword.Sink);
+    });
+
+    /// <summary>
     /// The guard against every absence above being vacuous. If the sweep were reaching nothing,
     /// each of those tests would pass for the worst possible reason.
     /// </summary>
@@ -432,6 +493,28 @@ public sealed class MaskedInputAutomationTests
         /// <summary>Its confirmation.</summary>
         internal MaskedInput ConfirmPassword => Field("ConfirmPassword");
 
+        /// <summary>The password of a backup being restored, shown when the restore panel is open.</summary>
+        internal MaskedInput BackupPassword => Field("BackupPassword");
+
+        /// <summary>Saves once so the vault has a backup, then opens the restore panel on it.</summary>
+        internal void BeginRestore()
+        {
+            using (var vault = Keypaste.Core.Vault.Open(_fixture.Path_, TempVault.Password))
+            {
+                vault.AddEntry(new Keypaste.Core.VaultEntry { Title = "saved-again", Password = "p" });
+                vault.Save();
+            }
+
+            // The selection was read before the backup existed, so choose the vault again.
+            Assert.True(Model.Offer(_fixture.Path_));
+            Model.SelectedPath = null;
+            Assert.True(Model.Offer(_fixture.Path_));
+
+            Model.StartRestoreCommand.Execute(null);
+            Assert.NotNull(Model.Restore);
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        }
+
         /// <summary>Opens the create form, so its two fields can be typed into.</summary>
         internal async Task BeginCreate()
         {
@@ -440,7 +523,7 @@ public sealed class MaskedInputAutomationTests
             Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         }
 
-        // By name, not Single(): there are three of these on the screen since 4.8.
+        // By name, not Single(): there are four of these on the screen since V.4b.
         private MaskedInput Field(string name) =>
             Window.GetVisualDescendants().OfType<MaskedInput>().Single(input => input.Name == name);
 

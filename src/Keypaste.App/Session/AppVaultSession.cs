@@ -101,6 +101,9 @@ internal sealed class AppVaultSession : IDisposable
     /// <summary>Whether a vault is open.</summary>
     internal bool IsUnlocked => Unlocked is not null;
 
+    /// <summary>The clock idleness is measured on, for anything else that must expire by it.</summary>
+    internal TimeProvider Clock => _clock;
+
     /// <summary>How long the app may sit untouched before it locks.</summary>
     /// <remarks>Setting it re-arms immediately, so a change in Settings takes effect at once.</remarks>
     internal TimeSpan IdleTimeout

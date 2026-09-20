@@ -40,6 +40,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     private readonly string? _home;
     private readonly Action _unlocked;
     private readonly IVaultFilePicker _picker;
+    private readonly Action<Action> _post;
 
     private SecretBuffer _master = new();
     private SecretBuffer _new = new();
@@ -50,13 +51,17 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     private string _message = string.Empty;
     private bool _busy;
     private bool _creating;
+    private bool _restoreOnly;
+    private int _backups;
+    private RestoreBackupViewModel? _restore;
     private bool _disposed;
 
     internal UnlockViewModel(
         AppVaultSession session,
         string? home,
         IVaultFilePicker picker,
-        Action unlocked)
+        Action unlocked,
+        Action<Action>? post = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(picker);
@@ -66,12 +71,15 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         _home = home;
         _picker = picker;
         _unlocked = unlocked;
+        _post = post ?? (action => action());
 
         UnlockCommand = new AsyncRelayCommand(UnlockAsync, () => CanUnlock);
         BrowseCommand = new AsyncRelayCommand(BrowseAsync, () => !_busy);
         StartCreateCommand = new AsyncRelayCommand(StartCreateAsync, () => !_busy);
         CreateCommand = new AsyncRelayCommand(CreateAsync, () => CanCreate);
         CancelCreateCommand = new AsyncRelayCommand(CancelCreateAsync, () => !_busy);
+        StartRestoreCommand = new RelayCommand(StartRestore, () => !_busy && HasBackups && IsOpening);
+        CloseRestoreCommand = new RelayCommand(CloseRestore, () => _restore is { Busy: false });
         Reload();
     }
 
@@ -98,6 +106,48 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     /// <summary>Abandons the create form and forgets both passwords.</summary>
     internal AsyncRelayCommand CancelCreateCommand { get; }
 
+    /// <summary>Opens the restore panel for the selected vault's backups.</summary>
+    internal RelayCommand StartRestoreCommand { get; }
+
+    /// <summary>Leaves the restore panel, forgetting whatever was typed into it.</summary>
+    internal RelayCommand CloseRestoreCommand { get; }
+
+    /// <summary>The restore panel, while it is open.</summary>
+    internal RestoreBackupViewModel? Restore
+    {
+        get => _restore;
+        private set
+        {
+            if (Set(ref _restore, value))
+            {
+                Raise(nameof(IsRestoring));
+                Raise(nameof(IsOpening));
+                Raise(nameof(OffersRestore));
+                StartRestoreCommand.RaiseCanExecuteChanged();
+                CloseRestoreCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    internal bool IsRestoring => _restore is not null;
+
+    /// <summary>Whether the selected vault has backups V.4a's saves left beside it.</summary>
+    internal bool HasBackups => _backups > 0;
+
+    /// <summary>Whether the quiet "Restore a backup" action shows under the unlock controls.</summary>
+    internal bool OffersRestore => HasBackups && IsOpening;
+
+    /// <summary>
+    /// Whether the selection is a path with no readable vault at it, chosen only because it has
+    /// backups. There is nothing to unlock, so the password field and the button stay off.
+    /// </summary>
+    internal bool IsRestoreOnly => _restoreOnly;
+
+    internal bool CanTypePassword => _selectedPath is not null && !_restoreOnly;
+
+    /// <summary>What a restore that has just landed in the vault did, for the shell to say once.</summary>
+    internal string? RestoreNotice { get; private set; }
+
     /// <summary>Whether the create fields are showing instead of the unlock ones.</summary>
     internal bool IsCreating
     {
@@ -107,12 +157,14 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
             if (Set(ref _creating, value))
             {
                 Raise(nameof(IsOpening));
+                Raise(nameof(OffersRestore));
+                StartRestoreCommand.RaiseCanExecuteChanged();
             }
         }
     }
 
     /// <summary>The other half of <see cref="IsCreating"/>, for the open controls' visibility.</summary>
-    internal bool IsOpening => !_creating;
+    internal bool IsOpening => !_creating && _restore is null;
 
     /// <summary>The file name the new vault will have, for the heading.</summary>
     internal string NewVaultName =>
@@ -133,9 +185,9 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
             if (Set(ref _selectedPath, value))
             {
                 Message = string.Empty;
+                Look();
                 Raise(nameof(SelectedName));
                 Raise(nameof(HasSelection));
-                UnlockCommand.RaiseCanExecuteChanged();
             }
         }
     }
@@ -158,7 +210,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
             {
                 SelectedPath = value.Path;
             }
-            else if (value is not null)
+            else if (value is not null && !OfferForRestore(value.Path, "That file isn't there any more"))
             {
                 Message = "That file isn't there any more.";
             }
@@ -196,7 +248,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         }
     }
 
-    private bool CanUnlock => !_busy && _selectedPath is not null && _master.Length > 0;
+    private bool CanUnlock => !_busy && CanTypePassword && _master.Length > 0;
 
     // The confirmation is not required to be non-empty here: an empty one that does not match is
     // VaultCreation's refusal to make, not a reason to grey out the button and explain nothing.
@@ -286,18 +338,128 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
 
         if (!File.Exists(path))
         {
-            Message = "That file isn't there any more.";
+            if (!OfferForRestore(path, "That file isn't there any more"))
+            {
+                Message = "That file isn't there any more.";
+            }
+
             return false;
         }
 
         if (!KdbxHeader.IsVaultFile(path))
         {
-            Message = "That isn't a KeePass vault.";
+            if (!OfferForRestore(path, "That isn't a readable KeePass vault"))
+            {
+                Message = "That isn't a KeePass vault.";
+            }
+
             return false;
         }
 
         SelectedPath = System.IO.Path.GetFullPath(path);
         return true;
+    }
+
+    /// <summary>
+    /// Selects a path that holds no readable vault, for restoring only, when backups sit beside it.
+    /// </summary>
+    /// <remarks>
+    /// A damaged or missing vault is the case backups exist for (docs/PRODUCT.md law 5.7), and
+    /// refusing to select one would leave its backups unreachable from the only screen that can
+    /// restore them. Nothing here can be unlocked, and <see cref="Offer"/> still answers false.
+    /// </remarks>
+    private bool OfferForRestore(string path, string why)
+    {
+        var full = System.IO.Path.GetFullPath(path);
+        var backups = VaultBackups.List(full).Count;
+
+        if (backups == 0)
+        {
+            return false;
+        }
+
+        SelectedPath = full;
+        Message = backups == 1
+            ? $"{why}, but a backup of it is kept beside it. Restore it to get the vault back."
+            : $"{why}, but {backups} backups of it are kept beside it. Restore one to get the vault back.";
+        return true;
+    }
+
+    /// <summary>Reads what the selection is: whether anything can be unlocked, and how many backups it has.</summary>
+    private void Look()
+    {
+        _backups = _selectedPath is { } path ? VaultBackups.List(path).Count : 0;
+        _restoreOnly = _selectedPath is { } selected && !(File.Exists(selected) && KdbxHeader.IsVaultFile(selected));
+
+        Raise(nameof(HasBackups));
+        Raise(nameof(OffersRestore));
+        Raise(nameof(IsRestoreOnly));
+        Raise(nameof(CanTypePassword));
+        UnlockCommand.RaiseCanExecuteChanged();
+        StartRestoreCommand.RaiseCanExecuteChanged();
+    }
+
+    /// <summary>Drops a restore that is waiting on a confirmation, as a minimize does to an open vault.</summary>
+    internal void CancelPendingRestore() => _restore?.CancelPending();
+
+    private void StartRestore()
+    {
+        if (_disposed || _selectedPath is not { } path)
+        {
+            return;
+        }
+
+        ResetPassword();
+        Message = string.Empty;
+        Restore = new RestoreBackupViewModel(path, _session.Clock, () => _session.IdleTimeout, _post, OnRestoredAsync);
+    }
+
+    private void CloseRestore()
+    {
+        _restore?.Dispose();
+        Restore = null;
+        Look();
+    }
+
+    /// <summary>Opens the vault a restore has just put in place, with the password that was checked.</summary>
+    private async Task OnRestoredAsync(VaultRestoreReport report, SecretBuffer password)
+    {
+        if (_disposed || _selectedPath is not { } path)
+        {
+            return;
+        }
+
+        var outcome = await Task.Run(() => _session.TryUnlock(path, password.Value)).ConfigureAwait(true);
+
+        CloseRestore();
+
+        if (outcome != UnlockOutcome.Opened)
+        {
+            Message = "The backup was restored. Unlock it with the password that backup was made under.";
+            return;
+        }
+
+        RestoreNotice = Describe(report);
+        Remember(path);
+        _unlocked();
+    }
+
+    private static string Describe(VaultRestoreReport report)
+    {
+        static string When(VaultBackup backup) =>
+            backup.TakenAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.CurrentCulture);
+
+        var kept = report switch
+        {
+            { Preserved: { } preserved } =>
+                $"The vault it replaced is kept beside it as the backup from {When(preserved)}.",
+            { AlreadyKeptAs: { } already } =>
+                $"The vault it replaced was already kept, as the backup from {When(already)}.",
+            _ => "There was no file to keep.",
+        };
+
+        return $"Restored the backup from {When(report.Restored)}. {kept} " +
+            "This vault opens with the master password that backup was made under.";
     }
 
     /// <summary>Forgets one vault and rewrites the list.</summary>
@@ -351,7 +513,9 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
                 return;
             }
 
-            Message = Explain(outcome);
+            Message = HasBackups
+                ? $"{Explain(outcome)} If the file is damaged, or its password was changed and lost, restore a backup."
+                : Explain(outcome);
             ResetPassword();
         }
         finally
@@ -586,6 +750,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         }
 
         _disposed = true;
+        _restore?.Dispose();
         _master.Dispose();
         _new.Dispose();
         _confirm.Dispose();

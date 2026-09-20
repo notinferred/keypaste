@@ -43,4 +43,19 @@ internal sealed class StorageProviderPicker(TopLevel top) : IVaultFilePicker
 
         return file?.TryGetLocalPath();
     }
+
+    public async Task<string?> PickExportDestinationAsync(string suggestedName)
+    {
+        // No overwrite prompt, for PickNewAsync's reason: an export refuses an occupied path itself.
+        var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export an encrypted copy of this vault",
+            SuggestedFileName = suggestedName,
+            DefaultExtension = "kdbx",
+            ShowOverwritePrompt = false,
+            FileTypeChoices = [_vault],
+        }).ConfigureAwait(true);
+
+        return file?.TryGetLocalPath();
+    }
 }

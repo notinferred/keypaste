@@ -593,6 +593,71 @@ public sealed class SecretHygieneTests
         Assert.DoesNotContain(Master, written, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// A checked backup shows counts and a time on the locked screen, and nothing from inside it.
+    /// </summary>
+    /// <remarks>
+    /// The restore panel is the one place a vault is decrypted while the app is locked, so it is held
+    /// to the locked screen's standard and not an open vault's: no name, no value and no master
+    /// password on any property, while the check is pending and after it is abandoned. The backup is
+    /// made by a save, so it holds every sentinel the vault does, the history revision included.
+    /// </remarks>
+    [Fact]
+    public async Task A_checked_backup_puts_nothing_from_the_vault_on_the_locked_screen()
+    {
+        using var fixture = new SentinelVault();
+
+        using (var vault = Vault.Open(fixture.VaultFile, Master))
+        {
+            vault.AddEntry(new VaultEntry { Title = "saved-again", Password = "p" });
+            vault.Save();
+        }
+
+        using var session = new AppVaultSession(new ManualClock());
+        using var unlock = new UnlockViewModel(session, fixture.Home, new FakeVaultFilePicker(), () => { });
+
+        Assert.True(unlock.Offer(fixture.VaultFile));
+        unlock.StartRestoreCommand.Execute(null);
+        var restore = Assert.IsType<RestoreBackupViewModel>(unlock.Restore);
+
+        foreach (var c in Master)
+        {
+            restore.Type(c);
+        }
+
+        await restore.CheckAsync();
+
+        Assert.True(restore.IsConfirming);
+        Assert.NotEmpty(restore.Holds);
+
+        void Sweep()
+        {
+            foreach (var model in new object[] { unlock, restore })
+            {
+                var (answered, refused) = Probe(model);
+                Assert.True(refused == 0 && answered > 0, $"{model.GetType().Name} answered {answered} and refused {refused}");
+
+                foreach (var text in Surface(model))
+                {
+                    Assert.DoesNotContain(Master, text, StringComparison.Ordinal);
+                    Assert.DoesNotContain(SentinelTitle, text, StringComparison.Ordinal);
+
+                    foreach (var sentinel in _everySentinel)
+                    {
+                        Assert.DoesNotContain(sentinel, text, StringComparison.Ordinal);
+                    }
+                }
+            }
+        }
+
+        Sweep();
+
+        restore.CancelCommand.Execute(null);
+        Assert.Equal(0, restore.MaskedLength);
+
+        Sweep();
+    }
+
     private static AppVaultSession Unlocked(SentinelVault fixture)
     {
         var session = new AppVaultSession(new ManualClock());

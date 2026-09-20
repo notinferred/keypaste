@@ -47,6 +47,32 @@
         <Button Content="Forget them all" Command="{Binding ForgetAllCommand}" HorizontalAlignment="Left" />
       </StackPanel>
 
+      <StackPanel Spacing="8">
+        <TextBlock Text="Backups and export" Foreground="{DynamicResource KpTextPrimary}" />
+        <TextBlock TextWrapping="Wrap"
+                   FontSize="12"
+                   Foreground="{DynamicResource KpTextMuted}"
+                   Text="{Binding BackupsRule}" />
+        <SelectableTextBlock FontFamily="{DynamicResource KpMono}" FontSize="11"
+                             TextWrapping="Wrap"
+                             Foreground="{DynamicResource KpTextSecondary}"
+                             Text="{Binding BackupsPath}" />
+        <TextBlock Name="BackupsSummary"
+                   TextWrapping="Wrap"
+                   FontSize="12"
+                   Foreground="{DynamicResource KpTextSecondary}"
+                   Text="{Binding BackupsSummary}" />
+        <TextBlock TextWrapping="Wrap"
+                   FontSize="12"
+                   Foreground="{DynamicResource KpTextMuted}"
+                   Text="{Binding RestoreHint}" />
+        <TextBlock TextWrapping="Wrap"
+                   FontSize="12"
+                   Foreground="{DynamicResource KpTextMuted}"
+                   Text="{Binding ElsewhereAdvice}" />
+        <Button Content="Export an encrypted copy…" Command="{Binding ExportCommand}" HorizontalAlignment="Left" />
+      </StackPanel>
+
       <TextBlock Text="{Binding Message}"
                  IsVisible="{Binding HasMessage}"
                  TextWrapping="Wrap"

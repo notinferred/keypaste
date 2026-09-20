@@ -48,7 +48,7 @@ internal sealed partial class App : Application, IDisposable
             _window = new MainWindow();
             _activity = Observe(_window, _session, TimeProvider.System, () => _shell?.ClearCountdown());
             _window.AddHandler(InputElement.KeyDownEvent, OnShortcut, RoutingStrategies.Tunnel, handledEventsToo: true);
-            _minimize = Watch(_window, _preferences, _session);
+            _minimize = Watch(_window, _preferences, _session, () => _unlock?.CancelPendingRestore());
             ShowUnlock(home);
 
             desktop.MainWindow = _window;
@@ -92,8 +92,9 @@ internal sealed partial class App : Application, IDisposable
     /// <param name="window">The window a person minimizes.</param>
     /// <param name="preferences">The preferences this process was composed from.</param>
     /// <param name="session">The session a minimize locks.</param>
+    /// <param name="whileLocked">What else a minimize drops: a restore pending on the unlock screen.</param>
     /// <returns>The watch, which the application owns for its lifetime.</returns>
-    /// <exception cref="ArgumentNullException">Any argument is null.</exception>
+    /// <exception cref="ArgumentNullException">A required argument is null.</exception>
     /// <remarks>
     /// <c>internal</c> for the same reason <see cref="Compose"/> is: the defect F.2b repairs was
     /// that composition never introduced the saved setting to any behaviour at all, so a test has
@@ -104,15 +105,22 @@ internal sealed partial class App : Application, IDisposable
     internal static MinimizeLock Watch(
         Window window,
         DesktopPreferences preferences,
-        AppVaultSession session)
+        AppVaultSession session,
+        Action? whileLocked = null)
     {
         ArgumentNullException.ThrowIfNull(preferences);
         ArgumentNullException.ThrowIfNull(session);
 
+        // The locked screen can hold a checked backup's password one click from an open vault, so the
+        // setting that closes a vault on minimize drops that too.
         return new MinimizeLock(
             window,
             () => preferences.LockWhenMinimized,
-            () => session.Lock(VaultLockReason.Minimized));
+            () =>
+            {
+                session.Lock(VaultLockReason.Minimized);
+                whileLocked?.Invoke();
+            });
     }
 
     /// <summary>
@@ -193,7 +201,9 @@ internal sealed partial class App : Application, IDisposable
         _shell = null;
 
         _unlock?.Dispose();
-        _unlock = new UnlockViewModel(_session, home, new StorageProviderPicker(_window), OnUnlocked);
+        _unlock = new UnlockViewModel(
+            _session, home, new StorageProviderPicker(_window), OnUnlocked,
+            action => Dispatcher.UIThread.Post(action));
 
         _window.FindControl<ContentControl>("Root")!.Content =
             new UnlockView { DataContext = _unlock };
@@ -215,7 +225,9 @@ internal sealed partial class App : Application, IDisposable
             new AvaloniaClipboard(_window),
             TimeProvider.System,
             action => Dispatcher.UIThread.Post(action),
-            _preferences);
+            _preferences,
+            _unlock?.RestoreNotice,
+            new StorageProviderPicker(_window));
 
         _window.FindControl<ContentControl>("Root")!.Content =
             new ShellView { DataContext = _shell };

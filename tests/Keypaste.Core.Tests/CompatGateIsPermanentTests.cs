@@ -354,9 +354,17 @@ public sealed class CompatGateIsPermanentTests
     /// every other check in the repository, which is why presence is never what this asserts.
     /// </summary>
     /// <remarks>
-    /// It needs no driver, and that is itself the claim: a backup is an ordinary KDBX file, so
-    /// <c>keepassxc-cli</c> and <c>keypaste --vault</c> both read one directly. A gate that had to
-    /// reach for a special reader would be evidence the bytes were not simply copied.
+    /// <para>
+    /// Reading a backup needs no driver, and that is itself the claim: a backup is an ordinary KDBX
+    /// file, so <c>keepassxc-cli</c> and <c>keypaste --vault</c> both read one directly. A gate that
+    /// had to reach for a special reader would be evidence the bytes were not simply copied.
+    /// </para>
+    /// <para>
+    /// Putting one back and exporting are acts the desktop performs and no command line does, so
+    /// since V.4b those two go through <c>Keypaste.VaultRestorer</c>, for D-0254's reason. What is
+    /// pinned is that the restored vault is held to the backup's bytes and not merely opened, and
+    /// each claim a regression would have to delete to pass.
+    /// </para>
     /// </remarks>
     [Fact]
     public void BackupScript_ExistsAndKeepsItsNegativeControl()
@@ -381,6 +389,17 @@ public sealed class CompatGateIsPermanentTests
         // The refusal. A save that cannot take a backup must leave the vault byte-identical, and
         // od over the whole file is what says so.
         Assert.Contains("od -An -v -tx1", text, StringComparison.Ordinal);
+
+        // The restore and the export (V.4b): the driver that performs them, the byte comparison a
+        // re-serialising restore would fail, and the four claims themselves.
+        Assert.Contains("Keypaste.VaultRestorer", text, StringComparison.Ordinal);
+        Assert.Contains("backup-restore", text, StringComparison.Ordinal);
+        Assert.Contains("vault-export", text, StringComparison.Ordinal);
+        Assert.Contains("cmp -s", text, StringComparison.Ordinal);
+        Assert.Contains("the restored vault is not the backup's bytes", text, StringComparison.Ordinal);
+        Assert.Contains("the vault a restore replaced was not kept", text, StringComparison.Ordinal);
+        Assert.Contains("a restore pruned", text, StringComparison.Ordinal);
+        Assert.Contains("the export does not open in KeePassXC", text, StringComparison.Ordinal);
 
         // The floor is defeated by renaming, never by a knob. A gate that could set an environment
         // variable to shorten it would be proving a configuration the product does not ship.

@@ -53,6 +53,54 @@ public sealed class SaveTimingTests : IDisposable
         AssertComponentsFitTheTotal(waited);
     }
 
+    /// <remarks>
+    /// A restore takes the same gate and has no save clock to name, so without a holder of its own a
+    /// save queued behind one would report that nobody held it, which is what 0 means everywhere else.
+    /// </remarks>
+    [Fact]
+    public void ASaveQueuedBehindARestore_NamesItsHolder()
+    {
+        var (restored, path) = SavedVault("restored");
+        restored.AddEntry(new VaultEntry { Title = "second", Password = "p" });
+        restored.Save();
+        restored.Dispose();
+
+        using var waiter = SavedVault("waiter").Vault;
+        var validated = VaultBackups.Inspect(path, VaultBackups.List(path)[0], VaultSaveTests.MasterPassword);
+
+        using var inside = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+
+        var restoring = new Thread(() => VaultBackups.Restore(
+            validated,
+            beforeReplacing: _ =>
+            {
+                inside.Set();
+                release.Wait();
+            },
+            waitBetweenAttempts: null))
+        { IsBackground = true };
+
+        restoring.Start();
+        Assert.True(inside.Wait(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
+
+        var releasing = new Thread(() =>
+        {
+            Thread.Sleep(_hold);
+            release.Set();
+        })
+        { IsBackground = true };
+
+        releasing.Start();
+        var waited = SaveTimings.Of(() => waiter.SaveWaiting(null, attempts: 1));
+
+        Assert.True(restoring.Join(TimeSpan.FromSeconds(30)) && releasing.Join(TimeSpan.FromSeconds(30)));
+
+        var gated = Assert.Single(waited.Attempts);
+        Assert.Equal(KeePassInterop.HeldByAFileOperation, gated.HeldBy);
+        Assert.True(gated.Gate >= _hold / 2, $"a save did not wait out a restore: {SaveTimings.Describe(waited)}");
+    }
+
     [Fact]
     public void ADoomedSave_DoesNotQueueBehindATransactedSave()
     {

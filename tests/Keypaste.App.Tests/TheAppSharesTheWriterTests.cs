@@ -41,6 +41,13 @@ namespace Keypaste.App.Tests;
 /// the vault KeePassXC reads back in that gate is written by the path the button takes (D-0230).
 /// </para>
 /// <para>
+/// V.4b is the feature this test was written ahead of: the app now restores a backup and exports
+/// the vault, and it still moves no byte. Both are <c>VaultBackups.Restore</c> and
+/// <c>Vault.ExportTo</c>, copies of bytes a gated save wrote, and
+/// <c>scripts/verify-keepassxc-backup.sh</c> opens the result of each in KeePassXC through the same
+/// calls. This stayed green without being touched, which is the argument surviving.
+/// </para>
+/// <para>
 /// <b>"No new gate is needed" is itself a claim, and D-0036's standard is that a claim needs
 /// something that can hold it.</b> These two tests are that something. The day either fails, the
 /// argument above has stopped being true and <c>app.yml</c> needs a KeePassXC job.

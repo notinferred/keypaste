@@ -23,4 +23,11 @@ internal interface IVaultFilePicker
 
     /// <summary>Asks where a new vault should go. Null when the person cancelled.</summary>
     Task<string?> PickNewAsync();
+
+    /// <summary>Asks where an encrypted copy of the open vault should go. Null when the person cancelled.</summary>
+    /// <param name="suggestedName">
+    /// The file name the dialog starts with. A convenience and nothing more: what may not be written
+    /// where is <see cref="Keypaste.Core.Vault.ExportTo"/>'s to refuse, whatever the file is called.
+    /// </param>
+    Task<string?> PickExportDestinationAsync(string suggestedName);
 }

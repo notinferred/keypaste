@@ -400,11 +400,125 @@ public sealed class Vault : IDisposable
         // No check, at any point: this caller has already put the choice to a person and been told
         // to go ahead, so a change arriving mid-retry is one they have already accepted.
         //
-        // backUp is unconditional here, and deliberately does not consult or set _backedUp. This is
-        // the path a restore takes, and the vault it replaces is precisely the copy somebody needs
-        // when the restore turns out to have been the wrong one — the one case this feature cannot
+        // backUp is unconditional here, and deliberately does not consult or set _backedUp. This
+        // discards somebody else's write, and the vault it replaces is precisely the copy somebody
+        // needs when that turns out to have been the wrong choice — the one case this feature cannot
         // afford to skip. A Save() later in the same unlock still gets its own per-unlock backup.
         Commit(null, null, KeePassInterop.SaveAttempts, backUp: true, applyFloor: false);
+    }
+
+    /// <summary>Writes an exact encrypted copy of the saved vault to a new file.</summary>
+    /// <param name="destination">A path nothing occupies, outside this vault's backup directory.</param>
+    /// <exception cref="VaultChangedOnDiskException">
+    /// The file is no longer what this vault opened or last saved, so the copy would be somebody
+    /// else's vault. Nothing was written.
+    /// </exception>
+    /// <exception cref="VaultException">The destination was refused or could not be written.</exception>
+    /// <remarks>
+    /// <para>
+    /// The file's bytes and not a fresh serialisation, for <see cref="VaultBackups"/>' reason, so the
+    /// copy opens with this vault's master password. Read once: the bytes compared with what was
+    /// opened are the bytes written, and a second read would be a second chance to disagree.
+    /// </para>
+    /// <para>
+    /// The refusals take no override. The backup directory is refused by where it is and not by what
+    /// the file is called: a name <see cref="VaultBackups.List"/> recognises there would be pruned as
+    /// a backup, and any other would sit among them looking like one.
+    /// </para>
+    /// </remarks>
+    public void ExportTo(string destination)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentException.ThrowIfNullOrEmpty(destination);
+
+        if (_stamp is not { } stamp)
+        {
+            throw new VaultException("This vault has not been saved yet, so there is no file to copy.");
+        }
+
+        destination = System.IO.Path.GetFullPath(destination);
+        RefuseAsExportDestination(destination);
+
+        byte[] bytes;
+        try
+        {
+            bytes = File.ReadAllBytes(Path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            throw new VaultException($"Could not read '{Path}' to copy it: {ex.Message}", ex);
+        }
+
+        if (!CryptographicOperations.FixedTimeEquals(SHA256.HashData(bytes), stamp))
+        {
+            throw new VaultChangedOnDiskException(
+                "The vault file changed since it was opened, so the copy would not be the vault on screen.");
+        }
+
+        WriteNew(destination, bytes);
+    }
+
+    private void RefuseAsExportDestination(string destination)
+    {
+        if (PathIdentity.SameFile(destination, Path))
+        {
+            throw new VaultException("That is the vault itself. Nothing was written; name another file.");
+        }
+
+        // The directory's own name too: a file there would stop the directory ever being created, and
+        // a save that cannot keep a backup does not happen.
+        var backups = PathIdentity.Canonical(VaultBackups.DirectoryFor(Path));
+        var target = PathIdentity.Canonical(destination);
+        if (string.Equals(target, backups, PathIdentity.Comparison)
+            || target.StartsWith(backups + System.IO.Path.DirectorySeparatorChar, PathIdentity.Comparison))
+        {
+            throw new VaultException(
+                "That is this vault's backup directory. Nothing was written; choose another folder.");
+        }
+
+        if (File.Exists(destination) || Directory.Exists(destination))
+        {
+            throw new VaultException($"'{destination}' already exists. Nothing was written; name a new file.");
+        }
+    }
+
+    private static void WriteNew(string destination, byte[] bytes)
+    {
+        var options = new FileStreamOptions
+        {
+            Mode = FileMode.CreateNew,
+            Access = FileAccess.Write,
+            Share = FileShare.None,
+        };
+
+        if (!OperatingSystem.IsWindows())
+        {
+            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        }
+
+        var created = false;
+        try
+        {
+            using var stream = new FileStream(destination, options);
+            created = true;
+            stream.Write(bytes);
+            stream.Flush(flushToDisk: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            if (created)
+            {
+                try
+                {
+                    File.Delete(destination);
+                }
+                catch (Exception cleanup) when (cleanup is IOException or UnauthorizedAccessException)
+                {
+                }
+            }
+
+            throw new VaultException($"Could not write '{destination}': {ex.Message}", ex);
+        }
     }
 
     /// <summary>
@@ -502,8 +616,8 @@ public sealed class Vault : IDisposable
     /// <summary>Keeps the bytes this save is about to replace. Called with the save gate held.</summary>
     /// <remarks>
     /// <paramref name="applyFloor"/> is false only on <see cref="SaveOverwriting"/>'s path, and
-    /// <see cref="_backedUp"/> is set only when the floor applies, so a restore can neither be
-    /// suppressed by an ordinary edit earlier in the unlock nor suppress one later in it.
+    /// <see cref="_backedUp"/> is set only when the floor applies, so an overwriting save can neither
+    /// be suppressed by an ordinary edit earlier in the unlock nor suppress one later in it.
     /// </remarks>
     private void PreserveBefore(string path, bool applyFloor)
     {

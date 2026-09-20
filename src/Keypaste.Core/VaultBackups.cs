@@ -1,9 +1,10 @@
 using System.Globalization;
 using System.Runtime.Versioning;
+using Keypaste.Core.Internal;
 
 namespace Keypaste.Core;
 
-/// <summary>One copy of a vault, taken before a save replaced it.</summary>
+/// <summary>One copy of a vault, taken before a save or a restore replaced it.</summary>
 /// <param name="Path">Where the copy is.</param>
 /// <param name="TakenAt">When it was taken, in UTC.</param>
 /// <remarks>
@@ -153,8 +154,8 @@ public static class VaultBackups
     /// <param name="now">The current time, in UTC.</param>
     /// <param name="applyFloor">
     /// Whether <see cref="Floor"/> may suppress this backup. False on the overwriting save path: see
-    /// <see cref="Vault.SaveOverwriting"/>, which is a restore replacing a live vault, and the vault
-    /// it replaces is exactly the copy somebody needs when the restore turns out to be the wrong one.
+    /// <see cref="Vault.SaveOverwriting"/>, which discards somebody else's write, and the vault it
+    /// replaces is exactly the copy somebody needs when that choice turns out to be the wrong one.
     /// </param>
     /// <param name="createdDirectory">Whether this call is what created the backup directory.</param>
     /// <exception cref="VaultBackupException">
@@ -192,6 +193,23 @@ public static class VaultBackups
             return VaultBackupOutcome.SkippedRecent;
         }
 
+        Keep(vaultPath, now, out createdDirectory);
+
+        Prune(vaultPath);
+
+        return VaultBackupOutcome.Written;
+    }
+
+    /// <summary>Copies the vault into its backup directory under a complete name, and prunes nothing.</summary>
+    /// <remarks>
+    /// The half a save and a restore share. Pruning is the save's alone: a restore that pruned could
+    /// drop the very backup it is restoring, so <see cref="Prune"/> is reachable only from
+    /// <see cref="Preserve"/>.
+    /// </remarks>
+    private static VaultBackup Keep(string vaultPath, DateTimeOffset now, out bool createdDirectory)
+    {
+        var directory = DirectoryFor(vaultPath);
+
         createdDirectory = Ensure(directory);
 
         var reserved = Path.Combine(
@@ -202,7 +220,12 @@ public static class VaultBackups
         {
             File.Copy(vaultPath, reserved, overwrite: false);
             RestrictToOwner(reserved);
-            File.Move(reserved, Name(directory, vaultPath, now));
+
+            var kept = Name(directory, vaultPath, now);
+            File.Move(reserved, kept);
+
+            var utc = now.ToUniversalTime();
+            return new VaultBackup(kept, utc.AddTicks(-(utc.Ticks % TimeSpan.TicksPerSecond)));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
         {
@@ -211,17 +234,354 @@ public static class VaultBackups
             throw new VaultBackupException(
                 $"Could not back '{vaultPath}' up to '{directory}': {ex.Message}", ex);
         }
+    }
 
-        Prune(vaultPath);
+    /// <summary>
+    /// Opens one of the vault's backups to establish that it can be restored, and changes nothing.
+    /// </summary>
+    /// <param name="vaultPath">The vault the backup belongs to, which need not exist or be readable.</param>
+    /// <param name="backup">One of the copies <see cref="List"/> names for that vault.</param>
+    /// <param name="password">The master password the backup was made under.</param>
+    /// <returns>What the backup holds, bound to the bytes that were opened.</returns>
+    /// <exception cref="VaultRestoreException">
+    /// <see cref="List"/> does not name the file, it has no KDBX header, or it changed while it was
+    /// being opened. The password was not used in the first two cases.
+    /// </exception>
+    /// <exception cref="InvalidMasterPasswordException">
+    /// The password does not open the backup, or its body is damaged. One answer on purpose: nothing
+    /// finer can be said of a file that did not decrypt.
+    /// </exception>
+    public static VaultBackupSummary Inspect(string vaultPath, VaultBackup backup, ReadOnlySpan<char> password)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(vaultPath);
+        ArgumentNullException.ThrowIfNull(backup);
 
-        return VaultBackupOutcome.Written;
+        vaultPath = Path.GetFullPath(vaultPath);
+        var listed = Listed(vaultPath, backup.Path);
+
+        var digest = SourceSnapshot.Digest(listed.Path)
+            ?? throw new VaultRestoreException($"The backup '{listed.Path}' could not be read.");
+
+        int entries, groups, projects;
+        try
+        {
+            using var vault = Vault.Open(listed.Path, password);
+            entries = vault.ReadEntries().Count;
+            groups = vault.ReadGroupPaths().Count;
+            projects = new EnvStore(vault).Projects().Count;
+        }
+        catch (VaultException ex)
+        {
+            throw new InvalidMasterPasswordException(
+                "That password does not open this backup, or the backup is damaged.", ex);
+        }
+
+        if (SourceSnapshot.Digest(listed.Path) is not { } after
+            || !CryptographicOperations.FixedTimeEquals(digest, after))
+        {
+            throw new VaultRestoreException($"The backup '{listed.Path}' changed while it was being checked.");
+        }
+
+        return new VaultBackupSummary(vaultPath, listed, entries, groups, projects, Facts(vaultPath), digest);
+    }
+
+    /// <summary>Puts a validated backup in the vault's place, byte for byte.</summary>
+    /// <param name="validated">What <see cref="Inspect"/> returned for the backup.</param>
+    /// <returns>Which copy was restored, and what became of the file it replaced.</returns>
+    /// <exception cref="VaultRestoreException">The backup is no longer the one validated, or the vault could not be replaced.</exception>
+    /// <exception cref="VaultBackupException">The vault being replaced could not be kept, so it was not replaced.</exception>
+    /// <exception cref="VaultChangedOnDiskException">The vault changed during the restore, so it was not replaced.</exception>
+    /// <remarks>
+    /// <para>
+    /// <b>Any exception means the vault was not replaced.</b> The rename is the last act and nothing
+    /// follows it that can fail.
+    /// </para>
+    /// <para>
+    /// The restored vault is the backup's bytes, so it opens with the password the backup was made
+    /// under. Nothing is re-serialised, for the reason a backup is a copy in the first place.
+    /// </para>
+    /// <para>
+    /// The file being replaced is kept as an ordinary backup, exempt from <see cref="Floor"/>, unless
+    /// a listed backup already holds exactly its bytes. <b>Nothing is pruned</b>: the next save does
+    /// that, and until then a restore can only add to what is recoverable.
+    /// </para>
+    /// <para>
+    /// Staged beside the vault rather than in the backup directory. A rename within one directory is
+    /// on one volume by construction; a backup directory that is a junction to another volume would
+    /// turn the rename into a copy over the live vault, which a kill could leave half written.
+    /// </para>
+    /// </remarks>
+    public static VaultRestoreReport Restore(VaultBackupSummary validated) => Restore(validated, null, null);
+
+    /// <param name="validated">What <see cref="Inspect"/> returned for the backup.</param>
+    /// <param name="beforeReplacing">
+    /// Called with the staged file's path after the vault has been kept and before it is replaced, so
+    /// a test can act at the one instant between the two.
+    /// </param>
+    /// <param name="waitBetweenAttempts">Called instead of sleeping between rename attempts.</param>
+    internal static VaultRestoreReport Restore(
+        VaultBackupSummary validated, Action<string>? beforeReplacing, Action<int>? waitBetweenAttempts)
+    {
+        ArgumentNullException.ThrowIfNull(validated);
+
+        return KeePassInterop.WhileNoSaveReplaces(() => Replace(validated, beforeReplacing, waitBetweenAttempts));
+    }
+
+    private static VaultRestoreReport Replace(
+        VaultBackupSummary validated, Action<string>? beforeReplacing, Action<int>? waitBetweenAttempts)
+    {
+        var vaultPath = validated.VaultPath;
+
+        SweepStaged(vaultPath);
+
+        var backup = Listed(vaultPath, validated.Backup.Path);
+        var bytes = ReadValidated(backup, validated.Digest);
+        var staged = Stage(vaultPath, bytes);
+
+        try
+        {
+            var live = ObserveReadable(vaultPath, waitBetweenAttempts);
+            VaultBackup? preserved = null;
+            VaultBackup? alreadyKeptAs = null;
+
+            if (live.Digest is { } liveDigest)
+            {
+                alreadyKeptAs = HeldBy(vaultPath, liveDigest);
+                if (alreadyKeptAs is null)
+                {
+                    Sweep(DirectoryFor(vaultPath));
+                    preserved = Keep(vaultPath, DateTimeOffset.UtcNow, out _);
+                }
+            }
+
+            beforeReplacing?.Invoke(staged);
+
+            MoveIntoPlace(staged, vaultPath, live, waitBetweenAttempts);
+
+            return new VaultRestoreReport(backup, preserved, alreadyKeptAs);
+        }
+        catch
+        {
+            Discard(staged);
+            throw;
+        }
+    }
+
+    /// <summary>The listed backup at <paramref name="backupPath"/>, which must carry a KDBX header.</summary>
+    private static VaultBackup Listed(string vaultPath, string backupPath)
+    {
+        var listed = List(vaultPath)
+            .FirstOrDefault(candidate => string.Equals(candidate.Path, backupPath, StringComparison.Ordinal))
+            ?? throw new VaultRestoreException($"'{backupPath}' is not a backup of '{vaultPath}'.");
+
+        return KdbxHeader.IsVaultFile(listed.Path)
+            ? listed
+            : throw new VaultRestoreException($"The backup '{listed.Path}' is not a KDBX file.");
+    }
+
+    /// <summary>The backup's bytes, read once, which must be the bytes <see cref="Inspect"/> opened.</summary>
+    private static byte[] ReadValidated(VaultBackup backup, byte[] digest)
+    {
+        byte[] bytes;
+        try
+        {
+            bytes = File.ReadAllBytes(backup.Path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            throw new VaultRestoreException($"The backup '{backup.Path}' could not be read: {ex.Message}", ex);
+        }
+
+        return CryptographicOperations.FixedTimeEquals(SHA256.HashData(bytes), digest)
+            ? bytes
+            : throw new VaultRestoreException(
+                $"The backup '{backup.Path}' changed since it was checked, so nothing was restored.");
+    }
+
+    /// <summary>Writes the bytes to a new owner-only file beside the vault.</summary>
+    private static string Stage(string vaultPath, byte[] bytes)
+    {
+        var staged = Path.Combine(
+            Path.GetDirectoryName(vaultPath)!,
+            $".{Path.GetFileName(vaultPath)}.keypaste-restore-{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8))}.tmp");
+
+        var options = new FileStreamOptions
+        {
+            Mode = FileMode.CreateNew,
+            Access = FileAccess.Write,
+            Share = FileShare.None,
+        };
+
+        if (!OperatingSystem.IsWindows())
+        {
+            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        }
+
+        try
+        {
+            using var stream = new FileStream(staged, options);
+            stream.Write(bytes);
+            stream.Flush(flushToDisk: true);
+            return staged;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            Discard(staged);
+
+            throw new VaultRestoreException($"Could not stage the backup beside '{vaultPath}': {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>Whether a file is at the vault's path, and what it holds; no digest when it cannot be read.</summary>
+    private static (bool Exists, byte[]? Digest) Observe(string vaultPath) =>
+        File.Exists(vaultPath) ? (true, SourceSnapshot.Digest(vaultPath)) : (false, null);
+
+    /// <summary>The vault as it is before anything is done to it, waiting out a file that cannot be read.</summary>
+    /// <remarks>
+    /// A vault another process is in the middle of saving refuses a read for a moment, and a file that
+    /// cannot be read is not a change (D-0017). One that stays unreadable cannot be kept, so it is not
+    /// replaced.
+    /// </remarks>
+    private static (bool Exists, byte[]? Digest) ObserveReadable(string vaultPath, Action<int>? waitBetweenAttempts)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            var observed = Observe(vaultPath);
+            if (!observed.Exists || observed.Digest is not null)
+            {
+                return observed;
+            }
+
+            if (attempt >= KeePassInterop.SaveAttempts)
+            {
+                throw new VaultRestoreException($"'{vaultPath}' could not be read, so it was not replaced.");
+            }
+
+            Wait(attempt, waitBetweenAttempts);
+        }
+    }
+
+    private static void Wait(int attempt, Action<int>? waitBetweenAttempts)
+    {
+        if (waitBetweenAttempts is not null)
+        {
+            waitBetweenAttempts(attempt);
+        }
+        else
+        {
+            Thread.Sleep(KeePassInterop.SaveRetryDelayMilliseconds * attempt);
+        }
+    }
+
+    /// <summary>The listed backup already holding exactly these bytes, if one does.</summary>
+    private static VaultBackup? HeldBy(string vaultPath, byte[] liveDigest)
+    {
+        foreach (var backup in List(vaultPath))
+        {
+            if (SourceSnapshot.Digest(backup.Path) is { } digest
+                && CryptographicOperations.FixedTimeEquals(digest, liveDigest))
+            {
+                return backup;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Renames the staged file onto the vault, which must still be what was observed.</summary>
+    /// <remarks>
+    /// The vault is looked at again before every attempt, the way D-0119 has a save do: a wait is where
+    /// another writer lands, and the bytes replaced must be the bytes kept. A vault that appears where
+    /// there was none is a change too.
+    /// </remarks>
+    private static void MoveIntoPlace(
+        string staged, string vaultPath, (bool Exists, byte[]? Digest) observed, Action<int>? waitBetweenAttempts)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            var now = Observe(vaultPath);
+            var unreadable = now.Exists && now.Digest is null;
+
+            if (!unreadable && (now.Exists != observed.Exists
+                || (now.Digest is { } digest && !CryptographicOperations.FixedTimeEquals(digest, observed.Digest!))))
+            {
+                throw new VaultChangedOnDiskException(
+                    "The vault file changed while the backup was being restored, so it was not replaced.");
+            }
+
+            Exception? refusal = null;
+
+            if (!unreadable)
+            {
+                try
+                {
+                    File.Move(staged, vaultPath, overwrite: true);
+                    return;
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+                {
+                    refusal = ex;
+                }
+            }
+
+            if (attempt >= KeePassInterop.SaveAttempts || (refusal is not null && !MayClear(refusal)))
+            {
+                throw new VaultRestoreException(
+                    $"Could not replace '{vaultPath}': {refusal?.Message ?? "it could not be read"}", refusal!);
+            }
+
+            Wait(attempt, waitBetweenAttempts);
+        }
+    }
+
+    /// <summary>Whether waiting could change the answer: a held name can come free, a missing one cannot.</summary>
+    private static bool MayClear(Exception ex) => ex
+        is UnauthorizedAccessException
+        or (IOException and not FileNotFoundException and not DirectoryNotFoundException and not PathTooLongException);
+
+    /// <summary>Removes staged files a killed restore left beside the vault.</summary>
+    /// <remarks>
+    /// Only from <see cref="Restore(VaultBackupSummary)"/>, with the gate held. A save sweeping these would delete one
+    /// between its close and its rename.
+    /// </remarks>
+    private static void SweepStaged(string vaultPath)
+    {
+        string[] stale;
+        try
+        {
+            stale = Directory.GetFiles(
+                Path.GetDirectoryName(vaultPath)!, $".{Path.GetFileName(vaultPath)}.keypaste-restore-*.tmp");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return;
+        }
+
+        foreach (var path in stale)
+        {
+            Discard(path);
+        }
+    }
+
+    /// <summary>What is at the vault's path now, or null when nothing readable is.</summary>
+    private static VaultFileFacts? Facts(string vaultPath)
+    {
+        try
+        {
+            var file = new FileInfo(vaultPath);
+            return file.Exists ? new VaultFileFacts(vaultPath, file.Length, file.LastWriteTimeUtc) : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
     }
 
     /// <summary>An unused name for a backup taken at <paramref name="now"/>.</summary>
     /// <remarks>
     /// The source's own extension, never a restated <c>.kdbx</c>: the bytes were copied rather than
-    /// written, so nothing here knows the format well enough to name it, and V.4b's restore reads the
-    /// extension back off the name. A second within the same second gets a counter — one backup per
+    /// written, so nothing here knows the format well enough to name it, and <see cref="List"/> matches a
+    /// copy to its vault by that extension. A second within the same second gets a counter — one backup per
     /// unlock makes that nearly unreachable, but a name collision must not be an exception.
     /// </remarks>
     private static string Name(string directory, string vaultPath, DateTimeOffset now)
@@ -408,3 +768,61 @@ public static class VaultBackups
 /// </remarks>
 public sealed record VaultBackupReport(
     string Directory, VaultBackupOutcome Outcome, bool CreatedDirectory, int Retained);
+
+/// <summary>What is at a vault's path, without opening it.</summary>
+/// <param name="Path">The file.</param>
+/// <param name="Length">Its size in bytes.</param>
+/// <param name="ModifiedAt">When it was last written, in UTC.</param>
+public sealed record VaultFileFacts(string Path, long Length, DateTimeOffset ModifiedAt);
+
+/// <summary>What <see cref="VaultBackups.Inspect"/> found in a backup, and the only thing a restore accepts.</summary>
+/// <remarks>
+/// Only <see cref="VaultBackups.Inspect"/> can make one, and the digest it carries is not public, so
+/// a restore cannot be aimed at bytes nobody opened or at another vault. A class rather than a record
+/// so the digest stays out of <c>ToString</c>, which T-24 holds <see cref="VaultBackupReport"/> to as
+/// well. The counts are of live items: the recycle bin is left out, as it is from every read (D-0248).
+/// </remarks>
+public sealed class VaultBackupSummary
+{
+    internal VaultBackupSummary(
+        string vaultPath, VaultBackup backup, int entries, int groups, int envProjects,
+        VaultFileFacts? replaces, byte[] digest)
+    {
+        VaultPath = vaultPath;
+        Backup = backup;
+        Entries = entries;
+        Groups = groups;
+        EnvProjects = envProjects;
+        Replaces = replaces;
+        Digest = digest;
+    }
+
+    /// <summary>The vault a restore would replace.</summary>
+    public string VaultPath { get; }
+
+    /// <summary>The backup that was opened.</summary>
+    public VaultBackup Backup { get; }
+
+    /// <summary>How many entries it holds.</summary>
+    public int Entries { get; }
+
+    /// <summary>How many groups it holds, the <c>env</c> group and its projects among them.</summary>
+    public int Groups { get; }
+
+    /// <summary>How many env projects it holds.</summary>
+    public int EnvProjects { get; }
+
+    /// <summary>The file a restore would replace, or null when none is there.</summary>
+    public VaultFileFacts? Replaces { get; }
+
+    internal byte[] Digest { get; }
+}
+
+/// <summary>What a restore did.</summary>
+/// <param name="Restored">The backup now in the vault's place.</param>
+/// <param name="Preserved">The copy made of the file that was replaced, when one was made.</param>
+/// <param name="AlreadyKeptAs">
+/// The backup that already held the replaced file's exact bytes, which is why no copy was made. Both
+/// are null when there was no file to replace.
+/// </param>
+public sealed record VaultRestoreReport(VaultBackup Restored, VaultBackup? Preserved, VaultBackup? AlreadyKeptAs);

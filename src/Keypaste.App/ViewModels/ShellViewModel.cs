@@ -18,6 +18,8 @@ namespace Keypaste.App.ViewModels;
 internal sealed class ShellViewModel : ObservableObject, IDisposable
 {
     private readonly AppVaultSession _session;
+    private readonly IVaultFilePicker? _picker;
+    private string? _restoreNotice;
     private Destination _current;
     private object? _content;
     private string _countdown = string.Empty;
@@ -31,11 +33,15 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         IAppClipboard? clipboard = null,
         TimeProvider? clock = null,
         Action<Action>? post = null,
-        DesktopPreferences? preferences = null)
+        DesktopPreferences? preferences = null,
+        string? restoreNotice = null,
+        IVaultFilePicker? picker = null)
     {
         ArgumentNullException.ThrowIfNull(session);
 
         _session = session;
+        _restoreNotice = restoreNotice;
+        _picker = picker;
         Home = home;
         ApproverFromEnvironment = approverFromEnvironment;
         ApplyTheme = applyTheme ?? (_ => { });
@@ -50,6 +56,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             post);
 
         LockCommand = new RelayCommand(() => _session.Lock(VaultLockReason.Manual));
+        DismissRestoreNoticeCommand = new RelayCommand(() => RestoreNotice = null);
 
         _current = Destinations.All[0];
         _session.LockingSoon += OnLockingSoon;
@@ -59,6 +66,27 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         // invisible in 4.1, when the first destination was an empty state with nothing to miss.
         Show(_current);
     }
+
+    /// <summary>What the restore that opened this vault did, until it is dismissed or the vault locks.</summary>
+    /// <remarks>
+    /// Said after the fact as well as before it, because only afterwards is it known whether the
+    /// replaced file was kept, was already kept, or was never there.
+    /// </remarks>
+    internal string? RestoreNotice
+    {
+        get => _restoreNotice;
+        private set
+        {
+            if (Set(ref _restoreNotice, value))
+            {
+                Raise(nameof(HasRestoreNotice));
+            }
+        }
+    }
+
+    internal bool HasRestoreNotice => _restoreNotice is not null;
+
+    internal RelayCommand DismissRestoreNoticeCommand { get; }
 
     /// <summary>The auto-clearing clipboard, and the toast that counts it down.</summary>
     internal ClipboardCountdown Clipboard { get; }
@@ -180,7 +208,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             // Real in 4.1, and it needs no unlocked vault: the audit log is machine state, which is
             // why `keypaste log` reads it without one.
             DestinationKind.Log => new LogViewModel(Home),
-            DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme),
+            DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker),
             DestinationKind.AgentActivity => Activity(),
             DestinationKind.Entries => new EntriesViewModel(_session, Clipboard),
             DestinationKind.EnvSets => new EnvSetsViewModel(_session, Clipboard),
@@ -208,6 +236,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
         _disposed = true;
         _session.LockingSoon -= OnLockingSoon;
+        RestoreNotice = null;
         (Content as IDisposable)?.Dispose();
         Content = null;
 

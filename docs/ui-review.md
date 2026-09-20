@@ -18,9 +18,9 @@ These are target behaviors. Today the desktop and terminal approver unlock indep
 
 ## Existing source and known gaps
 
-The app creates and opens vaults, adds generated or existing credentials, edits passwords, usernames, URLs and notes, generates passwords or passphrases, copies secrets, restores prior entry values and restores or erases a deleted entry. Env values can be added, replaced, copied and revealed while held. These source features do not establish public desktop availability.
+The app creates and opens vaults, adds generated or existing credentials, edits passwords, usernames, URLs and notes, generates passwords or passphrases, copies secrets, restores prior entry values, restores or erases a deleted entry, restores a whole-vault backup from the unlock screen and exports an encrypted copy from Settings. Env values can be added, replaced, copied and revealed while held. These source features do not establish public desktop availability.
 
-Custom-field editing, encrypted backup/restore, native approvals and launching projects from the app are not implemented. The current interface uses fixed panes; narrower layouts and long text still need review. The earlier layout measurements predate the expanded history pane and are not current rendering evidence.
+Custom-field editing, native approvals and launching projects from the app are not implemented. The restore panel and the Settings backups section have not had a rendered layout review. The current interface uses fixed panes; narrower layouts and long text still need review. The earlier layout measurements predate the expanded history pane and are not current rendering evidence.
 
 Username, URL and notes display now preserves ordinary punctuation and line breaks while sanitizing control characters that could misrepresent text. Titles and group paths retain stricter name sanitization. Display limits, clipping and shortening must remain distinguishable from the actual stored or copied value.
 

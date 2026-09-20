@@ -19,6 +19,15 @@ internal sealed class FakeVaultFilePicker : IVaultFilePicker
     /// <summary>What <see cref="PickExistingAsync"/> answers. Null is a cancelled picker.</summary>
     internal string? ExistingPath { get; set; }
 
+    /// <summary>What <see cref="PickExportDestinationAsync"/> answers. Null is a cancelled picker.</summary>
+    internal string? ExportPath { get; set; }
+
+    /// <summary>How many times the export picker was opened.</summary>
+    internal int ExportCalls { get; private set; }
+
+    /// <summary>The name the export picker was last asked to start with.</summary>
+    internal string? SuggestedExportName { get; private set; }
+
     /// <summary>How many times the save picker was opened.</summary>
     internal int NewCalls { get; private set; }
 
@@ -35,5 +44,12 @@ internal sealed class FakeVaultFilePicker : IVaultFilePicker
     {
         NewCalls++;
         return Task.FromResult(NewPath);
+    }
+
+    public Task<string?> PickExportDestinationAsync(string suggestedName)
+    {
+        ExportCalls++;
+        SuggestedExportName = suggestedName;
+        return Task.FromResult(ExportPath);
     }
 }

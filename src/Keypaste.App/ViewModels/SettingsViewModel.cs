@@ -1,5 +1,6 @@
 using System.Globalization;
 using Keypaste.App.Session;
+using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Recent;
 using Keypaste.Core.Settings;
@@ -32,18 +33,21 @@ internal sealed class SettingsViewModel : ObservableObject
     private readonly string? _home;
     private readonly DesktopPreferences _preferences;
     private readonly Action<AppTheme> _applyTheme;
+    private readonly IVaultFilePicker? _picker;
 
     private AppSettings _settings;
     private IdleChoice _idle;
     private AppTheme _theme;
     private bool _lockWhenMinimized;
     private string _message = string.Empty;
+    private bool _exporting;
 
     internal SettingsViewModel(
         AppVaultSession session,
         string? home,
         DesktopPreferences preferences,
-        Action<AppTheme> applyTheme)
+        Action<AppTheme> applyTheme,
+        IVaultFilePicker? picker = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(preferences);
@@ -53,6 +57,7 @@ internal sealed class SettingsViewModel : ObservableObject
         _home = home;
         _preferences = preferences;
         _applyTheme = applyTheme;
+        _picker = picker;
 
         // The preferences the app was composed from, not a second read of the same file: what is
         // shown here is what is in force.
@@ -64,6 +69,7 @@ internal sealed class SettingsViewModel : ObservableObject
         _idle = IdleChoices.Single(choice => choice.Seconds == _settings.IdleTimeoutSeconds);
 
         ForgetAllCommand = new RelayCommand(ForgetAll);
+        ExportCommand = new AsyncRelayCommand(ExportAsync, () => !_exporting && _picker is not null);
     }
 
     /// <summary>
@@ -167,6 +173,41 @@ internal sealed class SettingsViewModel : ObservableObject
     /// <summary>Empties the recent-vaults list.</summary>
     internal RelayCommand ForgetAllCommand { get; }
 
+    /// <summary>Writes an exact encrypted copy of the open vault where the person says.</summary>
+    internal AsyncRelayCommand ExportCommand { get; }
+
+    /// <summary>Where a save keeps the file it replaces.</summary>
+    /// <remarks>
+    /// The desktop's counterpart to the line the CLI prints when it creates the directory (D-0260): a
+    /// folder of encrypted vaults appearing beside somebody's file should not be a discovery.
+    /// </remarks>
+    internal string BackupsPath =>
+        _session.VaultPath is { } path ? VaultBackups.DirectoryFor(path) : "none";
+
+    /// <summary>How many copies are there, and how old the newest is. Read each time, never cached.</summary>
+    internal string BackupsSummary => _session.VaultPath is { } path
+        ? VaultBackups.List(path) switch
+        {
+            [] => "No copies yet. The first save after an unlock makes one.",
+            [var only] => $"1 copy, from {When(only)}.",
+            [var newest, ..] all => $"{all.Count} copies, the newest from {When(newest)}.",
+        }
+        : string.Empty;
+
+#pragma warning disable CA1822
+    internal string BackupsRule =>
+        $"A save keeps the file it replaces: the first save after each unlock, no more often than every " +
+        $"fifteen minutes, keeping the last {VaultBackups.Retained}. Each copy opens with the master " +
+        "password it was made under, and none of them recovers a forgotten one.";
+
+    internal string RestoreHint =>
+        "To put one back, lock keypaste and choose Restore a backup on the unlock screen.";
+
+    internal string ElsewhereAdvice =>
+        "Copies beside the vault do not survive losing the disk or the folder. Export an encrypted copy " +
+        "and keep it on another disk. It opens with this vault's master password.";
+#pragma warning restore CA1822
+
     /// <summary>The vault that is open.</summary>
     internal string VaultPath => _session.VaultPath ?? "none";
 
@@ -195,6 +236,56 @@ internal sealed class SettingsViewModel : ObservableObject
     }
 
     internal bool HasMessage => _message.Length > 0;
+
+    /// <summary>Asks where, then has the core write the copy.</summary>
+    /// <remarks>
+    /// <c>internal</c> for <see cref="UnlockViewModel.UnlockAsync"/>'s reason. The suggested name
+    /// only saves typing; every refusal is <see cref="Vault.ExportTo"/>'s.
+    /// </remarks>
+    internal async Task ExportAsync()
+    {
+        if (_exporting || _picker is null || _session.Unlocked is not { } vault)
+        {
+            return;
+        }
+
+        var stem = Path.GetFileNameWithoutExtension(vault.Path);
+        var today = _session.Clock.GetLocalNow().ToString("yyyyMMdd", CultureInfo.InvariantCulture);
+
+        if (await _picker.PickExportDestinationAsync($"{stem}-copy-{today}.kdbx").ConfigureAwait(true) is not { } destination)
+        {
+            return;
+        }
+
+        _exporting = true;
+        ExportCommand.RaiseCanExecuteChanged();
+
+        try
+        {
+            await Task.Run(() => vault.ExportTo(destination)).ConfigureAwait(true);
+            Message = $"An encrypted copy is at {destination}. It opens with this vault's master password.";
+        }
+        catch (VaultChangedOnDiskException)
+        {
+            Message = "The vault file changed since it was unlocked. Lock and unlock to see it, then export.";
+        }
+        catch (VaultException e)
+        {
+            Message = e.Message;
+        }
+        catch (ObjectDisposedException)
+        {
+            Message = "The vault locked before the copy was made. Nothing was written.";
+        }
+        finally
+        {
+            _exporting = false;
+            ExportCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    private static string When(VaultBackup backup) =>
+        backup.TakenAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.CurrentCulture);
 
     private void ForgetAll()
     {

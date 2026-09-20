@@ -90,7 +90,7 @@
       </DockPanel>
     </Border>
 
-    <Grid Grid.Column="1" RowDefinitions="Auto,*">
+    <Grid Grid.Column="1" RowDefinitions="Auto,Auto,*">
 
       <Border Grid.Row="0"
               BorderBrush="{DynamicResource KpBorderSubtle}"
@@ -156,7 +156,31 @@
         </Grid>
       </Border>
 
-      <ContentControl Grid.Row="1" Content="{Binding Content}" Margin="24" />
+      <!-- Said once, after a restore landed here. Quiet: the restore worked, and this is what it did. -->
+      <Border Grid.Row="1"
+              IsVisible="{Binding HasRestoreNotice}"
+              Background="{DynamicResource KpAccentQuiet}"
+              CornerRadius="{DynamicResource KpRadiusSm}"
+              Padding="12,8"
+              Margin="24,16,24,0">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Grid.Column="0"
+                     Name="RestoreNotice"
+                     Text="{Binding RestoreNotice}"
+                     TextWrapping="Wrap"
+                     FontSize="12"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource KpTextSecondary}" />
+          <Button Grid.Column="1"
+                  Content="Dismiss"
+                  Padding="8,2"
+                  FontSize="11"
+                  Margin="12,0,0,0"
+                  Command="{Binding DismissRestoreNoticeCommand}" />
+        </Grid>
+      </Border>
+
+      <ContentControl Grid.Row="2" Content="{Binding Content}" Margin="24" />
 
     </Grid>
   </Grid>

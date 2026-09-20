@@ -9,7 +9,9 @@
 # verify-keepassxc-history.sh proves a revision keypaste RESTORES is the one KeePassXC reads, and
 # verify-keepassxc-recyclebin.sh proves a DELETED entry is recoverable. This one covers what
 # docs/STEPS.md V.4a added: before replacing a vault, keypaste KEEPS the bytes it is replacing,
-# and what it keeps is a vault KeePassXC opens and reads the previous values out of.
+# and what it keeps is a vault KeePassXC opens and reads the previous values out of. V.4b added
+# the other half: a backup PUT BACK is the vault KeePassXC then reads, the vault it replaced is
+# kept, and an encrypted EXPORT opens in KeePassXC on its own.
 #
 # What this gate exists to catch, and what a directory listing cannot:
 #
@@ -23,15 +25,22 @@
 #   * Retention eating the evidence. The oldest goes and the newest stays, and the count is the
 #     one the shipped binary believes in.
 #
-# Backups are ordinary KDBX files, so this gate needs NO driver: `keepassxc-cli` opens one
+#   * A restore that re-serialises. The restored vault is compared with the backup byte for
+#     byte (`cmp -s`), because a vault that merely opens would hide a second KDBX writer.
+#
+# Backups are ordinary KDBX files, so READING one needs no driver: `keepassxc-cli` opens one
 # directly and so does `keypaste --vault`. That is the whole claim of the design — the bytes are
 # copied, never re-serialised — and a gate that needed a special reader would be evidence against
-# it.
+# it. The two ACTS are different: restoring and exporting happen in the desktop app, which a bash
+# gate cannot press a button in, so they go through tests/Keypaste.VaultRestorer over the same
+# public core calls the app makes (D-0254's argument, and D-0230's). The driver goes when a
+# shipped command line performs them.
 #
 # Usage:  scripts/verify-keepassxc-backup.sh <backup.kdbx>
 # Env:    KP_COMPAT_PASSWORD   master password for the fixture       (required)
 #         KPXC_CLI             path to keepassxc-cli                 (default: PATH lookup)
 #         KEYPASTE_BIN         path to the keypaste binary           (default: the Release build)
+#         KEYPASTE_RESTORER    path to the restore/export driver     (default: the Release build)
 #
 # The seeding AND every save are done by the SHIPPED binary (D-0012): `keypaste env set` is what
 # replaces the vault, so the backup under test is one a real command produced.
@@ -67,6 +76,16 @@ if [ -z "$kp" ]; then
   [ -x "$kp" ] || kp="${kp}.exe"
 fi
 [ -x "$kp" ] || die "keypaste binary not found at '$kp' (build it, or set KEYPASTE_BIN)"
+
+restorer=${KEYPASTE_RESTORER:-}
+if [ -z "$restorer" ]; then
+  restorer=artifacts/bin/Keypaste.VaultRestorer/release/Keypaste.VaultRestorer
+  [ -x "$restorer" ] || restorer="${restorer}.exe"
+fi
+[ -x "$restorer" ] || die "restore driver not found at '$restorer' (build keypaste.slnx, or set KEYPASTE_RESTORER)"
+
+# The password travels in the environment, never in argv — see Keypaste.VaultRestorer.
+drive() { KEYPASTE_RESTORER_PASSWORD="$pw" "$restorer" "$@" | tr -d '\r'; }
 
 # BOTH sides need \r stripped — see verify-keepassxc-writeback.sh.
 kpxc()  { printf '%s\n' "$pw" | "$cli" "$@" | tr -d '\r'; }
@@ -236,6 +255,93 @@ diff -u <(printf '%s\n' 'v-rolled') <(printf '%s\n' "$refused") \
   || die "a refused save changed the value in the vault"
 
 # ---------------------------------------------------------------------------------------
+step "a restored backup is the vault KeePassXC reads, byte for byte, and what it replaced is kept"
+before_roll="v$((generation - 1))-gen"
+
+restored_out=$(drive backup-restore "$db" "$rolled") || die "the driver could not restore $rolled"
+printf '%s\n' "$restored_out"
+
+cmp -s "$db" "$backups/$rolled" || die "the restored vault is not the backup's bytes"
+container "$db" "the restored vault"
+
+restored=$(kpxc show -a Password "$db" "$entry") || die "keepassxc-cli show failed on the restored vault"
+diff -u <(printf '%s\n' "$before_roll") <(printf '%s\n' "$restored") \
+  || die "the restored vault does not hold the value the backup held"
+
+[ "$(count)" -ge "$((retained + 1))" ] || die "the vault a restore replaced was not kept; $(count) backups remain"
+[ "$(count)" -eq "$((retained + 1))" ] || die "a restore pruned, or kept more than one copy: $(count) backups"
+
+preserved=$(sed -n 's/^preserved[[:space:]]*//p' <<<"$restored_out")
+[ -n "$preserved" ] && [ -f "$backups/$preserved" ] || die "the driver named no preserved copy: '$preserved'"
+container "$backups/$preserved" "the copy of the vault a restore replaced"
+
+replaced=$(kpxc show -a Password "$backups/$preserved" "$entry") || die "keepassxc-cli show failed on the preserved copy"
+diff -u <(printf '%s\n' 'v-rolled') <(printf '%s\n' "$replaced") \
+  || die "the copy kept by a restore does not hold the value the restore replaced"
+
+# ---------------------------------------------------------------------------------------
+step "restoring again keeps nothing new, and the next save prunes"
+again_out=$(drive backup-restore "$db" "$rolled") || die "the driver could not restore $rolled a second time"
+grep -q '^already-kept' <<<"$again_out" || die "a vault already kept byte for byte was kept again: $again_out"
+[ "$(count)" -eq "$((retained + 1))" ] || die "a second restore changed the backups: $(count)"
+
+age
+kpset "$project" v-after-restore ROTATED
+[ "$(count)" -eq "$retained" ] || die "the save after a restore left $(count) backups, expected $retained"
+rolled=$(list | head -n1)
+
+# ---------------------------------------------------------------------------------------
+step "an encrypted export opens in KeePassXC on its own, and refuses what it must"
+export_to="$(dirname "$db")/${stem}-copy-gate.kdbx"
+rm -f "$export_to"
+
+drive vault-export "$db" "$export_to" || die "the driver could not export the vault"
+cmp -s "$db" "$export_to" || die "the export is not the vault's bytes"
+container "$export_to" "the export"
+
+exported=$(kpxc show -a Password "$export_to" "$entry") || die "the export does not open in KeePassXC"
+diff -u <(printf '%s\n' 'v-after-restore') <(printf '%s\n' "$exported") \
+  || die "the export does not hold the vault's current value"
+
+set +e
+drive vault-export "$db" "$export_to" >/dev/null 2>&1
+twice_rc=$?
+drive vault-export "$db" "$backups/${stem}-copy-gate.kdbx" >/dev/null 2>&1
+inside_rc=$?
+set -e
+
+[ "$twice_rc" -ne 0 ] || die "an export over an existing file reported success"
+cmp -s "$db" "$export_to" || die "a refused export changed the file that was already there"
+[ "$inside_rc" -ne 0 ] || die "an export into the backup directory reported success"
+[ ! -e "$backups/${stem}-copy-gate.kdbx" ] || die "an export was written into the backup directory"
+rm -f "$export_to"
+
+# ---------------------------------------------------------------------------------------
+step "a wrong password and a backup that is not a vault restore nothing"
+before_refused_restore=$(bytes)
+
+set +e
+KEYPASTE_RESTORER_PASSWORD="not-$pw" "$restorer" backup-restore "$db" "$rolled" >/dev/null 2>&1
+wrong_rc=$?
+set -e
+
+[ "$wrong_rc" -ne 0 ] || die "a restore under the wrong password reported success"
+[ "$(bytes)" = "$before_refused_restore" ] || die "a restore refused for a wrong password changed the vault"
+
+planted="${stem}.20991231T235959Z.kdbx"
+printf 'not a vault' > "$backups/$planted"
+
+set +e
+drive backup-restore "$db" "$planted" >/dev/null 2>&1
+planted_rc=$?
+set -e
+
+rm -f "$backups/$planted"
+
+[ "$planted_rc" -ne 0 ] || die "a backup that is not a vault was restored"
+[ "$(bytes)" = "$before_refused_restore" ] || die "a refused restore changed the vault"
+
+# ---------------------------------------------------------------------------------------
 # NEGATIVE CONTROL.
 #
 # Everything above only means something if this gate is still capable of failing. See
@@ -252,6 +358,12 @@ if kpxc show -a Password "$backups/$rolled" 'env/compat-backup/NEVER-WRITTEN' >/
   die "an entry nothing ever wrote was read out of a backup — the reader is not reading"
 fi
 
+# The byte comparison a restore is held to must be able to say no: the vault has been saved since
+# the restore, so it is no longer any backup's bytes.
+if cmp -s "$db" "$backups/$rolled"; then
+  die "a vault saved since its restore still compares equal to a backup — cmp is not comparing"
+fi
+
 # A backup must not merely be a file of the right size: prove the container check can refuse one.
 printf 'not a vault' > "$backups/${stem}.19700101T000000Z.kdbx"
 if (container "$backups/${stem}.19700101T000000Z.kdbx" "a planted non-vault") >/dev/null 2>&1; then
@@ -259,4 +371,4 @@ if (container "$backups/${stem}.19700101T000000Z.kdbx" "a planted non-vault") >/
 fi
 rm -f "$backups/${stem}.19700101T000000Z.kdbx"
 
-printf '\nBACKUP GATE PASSED: KeePassXC opens what keypaste kept, and reads the values it replaced.\n'
+printf '\nBACKUP GATE PASSED: KeePassXC opens what keypaste kept, restored and exported, and reads the right values out of each.\n'

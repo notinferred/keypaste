@@ -67,7 +67,79 @@
         <ctl:MaskedInput x:Name="Password"
                          MaskedLength="{Binding MaskedLength}"
                          Placeholder="Master password"
-                         IsEnabled="{Binding HasSelection}" />
+                         IsEnabled="{Binding CanTypePassword}" />
+      </StackPanel>
+
+      <!-- Putting a backup in the vault's place. Locked throughout: the check shows counts and a
+           time, never a name or a value, and nothing here is reachable once the vault is open. -->
+      <StackPanel IsVisible="{Binding IsRestoring}">
+      <StackPanel Spacing="12" DataContext="{Binding Restore}" x:DataType="vm:RestoreBackupViewModel">
+
+        <TextBlock Text="Restore a backup"
+                   FontSize="22"
+                   Foreground="{DynamicResource KpTextPrimary}" />
+
+        <TextBlock Text="{Binding Note}"
+                   TextWrapping="Wrap"
+                   FontSize="13"
+                   Foreground="{DynamicResource KpTextSecondary}" />
+
+        <ListBox ItemsSource="{Binding Rows}"
+                 SelectedItem="{Binding Selected}"
+                 IsEnabled="{Binding IsChoosing}"
+                 MaxHeight="150"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 x:Name="BackupList">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:BackupRow">
+              <StackPanel Spacing="1">
+                <TextBlock Text="{Binding Taken}"
+                           Foreground="{DynamicResource KpTextPrimary}" />
+                <TextBlock Text="damaged"
+                           IsVisible="{Binding IsDamaged}"
+                           FontSize="11"
+                           Foreground="{DynamicResource KpTextMuted}" />
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+
+        <ctl:MaskedInput x:Name="BackupPassword"
+                         MaskedLength="{Binding MaskedLength}"
+                         Placeholder="That backup's master password"
+                         IsEnabled="{Binding IsChoosing}" />
+
+        <!-- Replacing a vault is the one act on this screen that is not ordinary. -->
+        <Border IsVisible="{Binding IsConfirming}"
+                BorderBrush="{DynamicResource KpDanger}"
+                BorderThickness="1"
+                CornerRadius="{DynamicResource KpRadiusSm}"
+                Padding="12">
+          <StackPanel Spacing="8">
+            <TextBlock Text="{Binding Taken}" TextWrapping="Wrap"
+                       Foreground="{DynamicResource KpTextPrimary}" />
+            <TextBlock Text="{Binding Holds}" TextWrapping="Wrap"
+                       Foreground="{DynamicResource KpTextPrimary}" />
+            <TextBlock Text="{Binding Replaces}" TextWrapping="Wrap"
+                       Foreground="{DynamicResource KpTextPrimary}" />
+            <TextBlock Text="{Binding Warning}" TextWrapping="Wrap"
+                       FontSize="13"
+                       Foreground="{DynamicResource KpTextSecondary}" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Content="Restore this backup" Command="{Binding ConfirmCommand}"
+                      Foreground="{DynamicResource KpDanger}" />
+              <Button Content="Leave the vault as it is" Command="{Binding CancelCommand}" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <TextBlock Text="{Binding Message}"
+                   IsVisible="{Binding HasMessage}"
+                   TextWrapping="Wrap"
+                   FontSize="13"
+                   Foreground="{DynamicResource KpTextSecondary}" />
+      </StackPanel>
       </StackPanel>
 
       <!-- Making one. The path is already chosen by the time this shows. -->
@@ -110,6 +182,22 @@
                 Content="Unlock"
                 IsDefault="True"
                 Command="{Binding UnlockCommand}"
+                Classes="accent" />
+      </Grid>
+
+      <Button Content="Restore a backup…"
+              IsVisible="{Binding OffersRestore}"
+              Command="{Binding StartRestoreCommand}"
+              HorizontalAlignment="Left" />
+
+      <Grid ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding IsRestoring}">
+        <Button Grid.Column="0"
+                Content="Back"
+                Command="{Binding CloseRestoreCommand}" />
+        <Button Grid.Column="2"
+                Content="Check this backup"
+                Command="{Binding Restore.CheckCommand}"
+                IsVisible="{Binding Restore.IsChoosing}"
                 Classes="accent" />
       </Grid>
 

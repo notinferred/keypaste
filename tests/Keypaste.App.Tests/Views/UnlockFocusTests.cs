@@ -61,7 +61,8 @@ public sealed class UnlockFocusTests
 
         var window = Show(model);
 
-        var list = window.GetVisualDescendants().OfType<ListBox>().Single();
+        // By name: the restore panel has a list of its own since V.4b.
+        var list = window.GetVisualDescendants().OfType<ListBox>().Single(box => box.Name == "RecentList");
 
         Assert.False(list.IsFocused);
         Assert.True(Password(window).IsFocused);

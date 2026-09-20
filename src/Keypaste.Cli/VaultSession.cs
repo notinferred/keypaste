@@ -72,7 +72,7 @@ internal static class VaultSession
     /// </para>
     /// <para>
     /// Here rather than in the five commands that save, because one wording is the point, and the
-    /// desktop is not here at all: its App project may not write files, and V.4b owns its surface.
+    /// desktop is not here at all: its Settings screen names the directory instead (V.4b).
     /// </para>
     /// </remarks>
     private static void Announce(Vault vault, CliContext context)

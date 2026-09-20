@@ -2,7 +2,10 @@ using Keypaste.Core;
 
 namespace Keypaste.VaultSaver;
 
-/// <summary>Saves one vault, once, at a given retry budget, and says what happened.</summary>
+/// <summary>
+/// Saves one vault, once, at a given retry budget, and says what happened; or restores a backup as
+/// far as the instant before the vault is replaced, and waits there to be killed.
+/// </summary>
 /// <remarks>
 /// <para>
 /// V-F.6's saver, and the reason it is a process rather than a method. The product redirects its
@@ -28,17 +31,25 @@ internal static class Program
 {
     private static int Main(string[] args)
     {
-        if (args.Length != 2 || !int.TryParse(args[1], out var attempts))
-        {
-            Console.Error.WriteLine("usage: <vault-path> <attempts>   (password in KEYPASTE_SAVER_PASSWORD)");
-            return 2;
-        }
-
         var password = Environment.GetEnvironmentVariable("KEYPASTE_SAVER_PASSWORD");
 
         if (string.IsNullOrEmpty(password))
         {
             Console.Error.WriteLine("KEYPASTE_SAVER_PASSWORD is unset");
+            return 2;
+        }
+
+        if (args is ["restore-hold", var vaultPath, var backupName])
+        {
+            return RestoreAndHold(vaultPath, backupName, password);
+        }
+
+        if (args.Length != 2 || !int.TryParse(args[1], out var attempts))
+        {
+            Console.Error.WriteLine(
+                "usage: <vault-path> <attempts>\n" +
+                "       restore-hold <vault-path> <backup-file-name>\n" +
+                "the master password is read from KEYPASTE_SAVER_PASSWORD");
             return 2;
         }
 
@@ -61,6 +72,41 @@ internal static class Program
         {
             Console.Error.WriteLine($"save refused: {ex.Message}");
             return 1;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"saver failed: {ex.GetType().Name}: {ex.Message}");
+            return 3;
+        }
+    }
+
+    /// <summary>
+    /// Restores a backup as far as the instant before the vault is replaced, says so, and waits to be
+    /// killed.
+    /// </summary>
+    /// <remarks>
+    /// Here and not in the public-API restorer because only the internal seam can stop at that
+    /// instant. Nothing but a rename lies between keeping the vault and replacing it, so a test that
+    /// polled for the kept copy, as the save's kill test does, would almost never land inside it.
+    /// </remarks>
+    private static int RestoreAndHold(string vaultPath, string backupName, string password)
+    {
+        try
+        {
+            var backup = VaultBackups.List(vaultPath).Single(candidate => Path.GetFileName(candidate.Path) == backupName);
+            var validated = VaultBackups.Inspect(vaultPath, backup, password);
+
+            VaultBackups.Restore(
+                validated,
+                beforeReplacing: _ =>
+                {
+                    Console.WriteLine("holding");
+                    Console.Out.Flush();
+                    Thread.Sleep(Timeout.Infinite);
+                },
+                waitBetweenAttempts: null);
+
+            return 0;
         }
         catch (Exception ex)
         {

@@ -825,6 +825,32 @@ internal sealed class KeePassInterop : IDisposable
     /// <summary>The <see cref="SaveClock.Operation"/> holding <see cref="_saveGate"/>; 0 when free.</summary>
     private static long _gateHolder;
 
+    /// <summary>What <see cref="_gateHolder"/> reads while a restore, which has no save clock, holds the gate.</summary>
+    internal const long HeldByAFileOperation = -1;
+
+    /// <summary>Runs <paramref name="act"/> while no save in this process can replace a vault.</summary>
+    /// <remarks>
+    /// Taken whether or not the vault exists: gating something that does not transact is harmless,
+    /// and asking first would be a check a file appearing could outrun. Held across the caller's own
+    /// retry sleeps, unlike F.12's saves, because nothing inside derives a key and releasing it would
+    /// separate keeping a vault from replacing it.
+    /// </remarks>
+    internal static T WhileNoSaveReplaces<T>(Func<T> act)
+    {
+        _saveGate.Wait();
+        Volatile.Write(ref _gateHolder, HeldByAFileOperation);
+
+        try
+        {
+            return act();
+        }
+        finally
+        {
+            Volatile.Write(ref _gateHolder, 0);
+            _saveGate.Release();
+        }
+    }
+
     /// <summary>ERROR_TRANSACTIONAL_CONFLICT.</summary>
     /// <remarks>
     /// Observed on Windows 10 Pro 19045 by <c>scripts/txf-probe.cs</c>, on its "a non-transacted

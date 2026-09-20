@@ -104,7 +104,8 @@ public sealed class InvalidMasterPasswordException : VaultException
 }
 
 /// <summary>
-/// Raised when the vault's previous bytes could not be preserved before a save replaced them.
+/// Raised when the vault's previous bytes could not be preserved before a save or a restore replaced
+/// them.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -139,6 +140,35 @@ public sealed class VaultBackupException : VaultException
     /// <param name="message">A description of the failure.</param>
     /// <param name="innerException">The underlying failure.</param>
     public VaultBackupException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}
+
+/// <summary>Raised when a backup could not be validated or put in the vault's place.</summary>
+/// <remarks>
+/// <b>The live vault was not replaced</b> when this is thrown. Replacing it is the last thing a
+/// restore does and nothing after it can fail, so any refusal leaves the file holding what it held. A
+/// copy of that file may already have been kept, which costs a backup slot and nothing else.
+/// </remarks>
+public sealed class VaultRestoreException : VaultException
+{
+    /// <summary>Creates an exception with no message.</summary>
+    public VaultRestoreException()
+    {
+    }
+
+    /// <summary>Creates an exception with the given message.</summary>
+    /// <param name="message">A description of the failure.</param>
+    public VaultRestoreException(string message)
+        : base(message)
+    {
+    }
+
+    /// <summary>Creates an exception with the given message and cause.</summary>
+    /// <param name="message">A description of the failure.</param>
+    /// <param name="innerException">The underlying failure.</param>
+    public VaultRestoreException(string message, Exception innerException)
         : base(message, innerException)
     {
     }
