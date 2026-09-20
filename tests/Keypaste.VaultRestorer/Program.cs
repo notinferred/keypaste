@@ -13,10 +13,10 @@ namespace Keypaste.VaultRestorer;
 /// </para>
 /// <para>
 /// V.2b put a revision restore on the desktop entry pane, which a bash gate cannot drive, so this
-/// stays until a restore verb reaches the CLI (D-0230). V.3a adds the same shape one level up: the
-/// shipped <c>keypaste rm</c> is what recycles an entry in the recycle-bin gate, and only the
-/// listing, the restore and the purge — which no shipped surface performs until V.3b — come
-/// through here.
+/// stays until a restore verb reaches the CLI (D-0230). V.3b put the trash on the desktop the same
+/// way: the shipped <c>keypaste rm</c> is what recycles an entry in the recycle-bin gate, and the
+/// listing, the restore and the purge — which the app performs and no command line does — come
+/// through here (D-0254).
 /// </para>
 /// <para>
 /// It prints how many revisions or recycled entries it saw and what it did, and never a value: the

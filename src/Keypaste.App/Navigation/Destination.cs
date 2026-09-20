@@ -1,6 +1,6 @@
 namespace Keypaste.App.Navigation;
 
-/// <summary>The five places the sidebar can go.</summary>
+/// <summary>The six places the sidebar can go.</summary>
 internal enum DestinationKind
 {
     /// <summary>Entries. 4.2 fills it.</summary>
@@ -17,6 +17,9 @@ internal enum DestinationKind
 
     /// <summary>Settings. Real in 4.1.</summary>
     Settings = 4,
+
+    /// <summary>The recycle bin, and the way back out of it. Real in V.3b.</summary>
+    Trash = 5,
 }
 
 /// <summary>
@@ -38,7 +41,7 @@ internal enum DestinationKind
 /// </remarks>
 internal sealed record Destination(DestinationKind Kind, string Title, int Shortcut);
 
-/// <summary>The five destinations, in sidebar order.</summary>
+/// <summary>The six destinations, in sidebar order.</summary>
 internal static class Destinations
 {
     /// <summary>Every destination the app has.</summary>
@@ -49,5 +52,6 @@ internal static class Destinations
         new(DestinationKind.AgentActivity, "Agent Activity", 3),
         new(DestinationKind.Log, "Log", 4),
         new(DestinationKind.Settings, "Settings", 5),
+        new(DestinationKind.Trash, "Trash", 6),
     ];
 }

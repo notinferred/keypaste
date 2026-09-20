@@ -30,9 +30,10 @@
 #         KEYPASTE_RESTORER    path to the recovery driver           (default: the Release build)
 #
 # The seeding AND the deletion are done by the SHIPPED binary (D-0012): `keypaste rm` is what
-# recycles. Only the listing, the restore and the purge go through tests/Keypaste.VaultRestorer,
-# because no shipped surface performs one until V.3b puts a trash view on the desktop — the same
-# argument D-0228 made for the history gate's driver.
+# recycles. Only the listing, the restore and the purge go through tests/Keypaste.VaultRestorer.
+# V.3b put all three on the desktop's Trash screen, which a bash gate cannot press, and no CLI verb
+# performs them — the same argument D-0228 made for the history gate's driver, reaffirmed in
+# D-0254.
 #
 # This builds its OWN database, for the reason verify-keepassxc-history.sh gives: the other
 # fixtures are asserted against exact trees and values, and mutating one here would make the

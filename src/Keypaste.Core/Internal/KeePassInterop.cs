@@ -186,6 +186,10 @@ internal sealed class KeePassInterop : IDisposable
     internal bool RecyclesDeletedEntries => _database.RecycleBinEnabled;
 
     /// <summary>Deletes the one entry with this name, reversibly where the vault allows it.</summary>
+    /// <param name="name">The entry to delete.</param>
+    /// <param name="recycled">
+    /// The identity of what is now in the bin, when this recycled; otherwise the default.
+    /// </param>
     /// <returns>What happened to the entry.</returns>
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
     /// <remarks>
@@ -202,9 +206,11 @@ internal sealed class KeePassInterop : IDisposable
     /// V.3a exists to repair — an ordinary mis-click taking an entry and its history with it.
     /// </para>
     /// </remarks>
-    internal DeletionOutcome RemoveEntry(EntryName name)
+    internal DeletionOutcome RemoveEntry(EntryName name, out RecycledEntryId recycled)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+
+        recycled = default;
 
         if (Locate(name) is not { } found)
         {
@@ -226,6 +232,9 @@ internal sealed class KeePassInterop : IDisposable
         // The three-argument overload stamps LocationChanged, which is when the entry was
         // deleted, and leaves LastModificationTime and History alone: a delete is not an edit.
         bin.AddEntry(found.Entry, true, true);
+
+        // The same identity ReadRecycled will list for this entry, from the same UUID.
+        recycled = RecycledEntryId.FromUuidHex(found.Entry.Uuid.ToHexString());
         return DeletionOutcome.Recycled;
     }
 

@@ -6,7 +6,7 @@
 
 Keep the lowercase keypaste wordmark, a clear vault identity and an obvious locked or unlocked state. Opening the app should lead to creating or opening a vault, then finding, adding, editing or copying a credential. Search, Add and the selected item's details must remain usable in a small window. Notes should have enough room to read and edit without forcing every item into a large editor.
 
-Recovery belongs beside the action it reverses. Entry history is implemented in source; accidental deletion still needs recovery. Preserve familiar KeePass groups and ordinary KDBX data. Custom item templates, shared ownership, organization administration and browser integration are optional ideas in [BACKLOG](BACKLOG.md).
+Recovery belongs beside the action it reverses. Entry history and deletion recovery are implemented in source: a deletion states where the entry went and offers to put it back, and Trash holds what is still recoverable. Preserve familiar KeePass groups and ordinary KDBX data. Custom item templates, shared ownership, organization administration and browser integration are optional ideas in [BACKLOG](BACKLOG.md).
 
 ## One session for credentials, agents and projects
 
@@ -18,9 +18,9 @@ These are target behaviors. Today the desktop and terminal approver unlock indep
 
 ## Existing source and known gaps
 
-The app creates and opens vaults, adds generated or existing credentials, edits passwords, usernames, URLs and notes, generates passwords or passphrases, copies secrets and restores prior entry values. Env values can be added, replaced, copied and revealed while held. These source features do not establish public desktop availability.
+The app creates and opens vaults, adds generated or existing credentials, edits passwords, usernames, URLs and notes, generates passwords or passphrases, copies secrets, restores prior entry values and restores or erases a deleted entry. Env values can be added, replaced, copied and revealed while held. These source features do not establish public desktop availability.
 
-Deletion is permanent. Custom-field editing, encrypted backup/restore, native approvals and launching projects from the app are not implemented. The current interface uses fixed panes; narrower layouts and long text still need review. The earlier layout measurements predate the expanded history pane and are not current rendering evidence.
+Custom-field editing, encrypted backup/restore, native approvals and launching projects from the app are not implemented. The current interface uses fixed panes; narrower layouts and long text still need review. The earlier layout measurements predate the expanded history pane and are not current rendering evidence.
 
 Username, URL and notes display now preserves ordinary punctuation and line breaks while sanitizing control characters that could misrepresent text. Titles and group paths retain stricter name sanitization. Display limits, clipping and shortening must remain distinguishable from the actual stored or copied value.
 

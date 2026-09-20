@@ -517,10 +517,24 @@ public sealed class SecretHygieneTests
 
         var (answeredBefore, _) = Probe(entries);
 
+        // Deleted through the screen, so the trash below holds a row somebody's action produced
+        // rather than an empty list that would sweep clean whatever the screen did.
+        entries.DeleteCommand.Execute(null);
+        entries.ConfirmDeleteCommand.Execute(null);
+
+        shell.Current = Destinations.All[5];
+        var trash = Assert.IsType<TrashViewModel>(shell.Content);
+        Assert.Contains(trash.Rows, row => row.Title == SentinelTitle);
+
         session.Lock(VaultLockReason.Manual);
         shell.Dispose();
 
-        foreach (var (model, name) in new (object, string)[] { (entries, "entries"), (detail, "detail") })
+        foreach (var (model, name) in new (object, string)[]
+        {
+            (entries, "entries"),
+            (detail, "detail"),
+            (trash, "trash"),
+        })
         {
             var (answered, refused) = Probe(model);
 

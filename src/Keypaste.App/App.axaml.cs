@@ -259,6 +259,7 @@ internal sealed partial class App : Application, IDisposable
             Key.D3 or Key.NumPad3 => 3,
             Key.D4 or Key.NumPad4 => 4,
             Key.D5 or Key.NumPad5 => 5,
+            Key.D6 or Key.NumPad6 => 6,
             _ => 0,
         };
 

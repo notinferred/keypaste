@@ -56,6 +56,11 @@
          claim is unassertable from either front end without EntryUuid. That one seam; a tests/
          project, in neither solution, that nothing shipped references. -->
     <InternalsVisibleTo Include="Keypaste.Consistency.Tests" />
+    <!-- V-V.3b asks what the Trash screen says about a vault whose owner turned the recycle bin
+         off in KeePassXC, and SetRecyclesDeletedEntries is the only way to build one without a
+         KeePassXC installation. That one seam; a tests/ project. D-0255 owns why it is a seam
+         rather than public API. -->
+    <InternalsVisibleTo Include="Keypaste.App.Tests" />
   </ItemGroup>
 
 </Project>

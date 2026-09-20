@@ -26,6 +26,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
 {
     private readonly AppVaultSession _session;
     private readonly Action<string?> _report;
+    private readonly Action<string?> _announce;
 
     private IReadOnlyList<EnvVariableRow> _variables = [];
     private EnvVariableRow? _revealed;
@@ -39,7 +40,8 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         AppVaultSession session,
         ClipboardCountdown clipboard,
         string name,
-        Action<string?> report)
+        Action<string?> report,
+        Action<string?>? announce = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(clipboard);
@@ -47,6 +49,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
 
         _session = session;
         _report = report;
+        _announce = announce ?? (_ => { });
         Clipboard = clipboard;
         Name = name;
 
@@ -204,7 +207,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     /// <summary>What the confirmation asks, and whether the variable can come back.</summary>
     /// <remarks>
     /// The vault's recycle-bin setting decides, not this screen: the same question has two honest
-    /// answers depending on the file. Recovery before V.3b's trash view means KeePassXC.
+    /// answers depending on the file. A recycled variable is recovered on the Trash screen.
     /// </remarks>
     internal string RemovePrompt
     {
@@ -520,9 +523,13 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
             return;
         }
 
+        DeletionOutcome outcome;
+
         try
         {
-            if (new EnvStore(vault).Remove(Name, row.Key) == DeletionOutcome.NothingMatched)
+            outcome = new EnvStore(vault).Remove(Name, row.Key);
+
+            if (outcome == DeletionOutcome.NothingMatched)
             {
                 _report($"{row.DisplayKey} is not in {DisplayName} any more.");
                 Removing = null;
@@ -545,6 +552,12 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
 
         Removing = null;
         _report(null);
+
+        // Reported after the act, from the outcome core returned, as the CLI reports it.
+        _announce(outcome == DeletionOutcome.Recycled
+            ? $"Moved {row.DisplayKey} to the trash. Restore it there."
+            : $"Removed {row.DisplayKey}. This vault has no recycle bin, so nothing can put it back.");
+
         Reload();
     }
 }

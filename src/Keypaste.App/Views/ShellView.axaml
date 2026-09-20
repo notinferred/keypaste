@@ -19,6 +19,10 @@
       <views:EnvSetsView />
     </DataTemplate>
 
+    <DataTemplate DataType="vm:TrashViewModel">
+      <views:TrashView />
+    </DataTemplate>
+
     <DataTemplate DataType="vm:LogViewModel">
       <views:LogView />
     </DataTemplate>

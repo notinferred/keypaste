@@ -85,7 +85,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     /// </remarks>
     internal DesktopPreferences Preferences { get; }
 
-    /// <summary>The five places the sidebar offers.</summary>
+    /// <summary>The six places the sidebar offers.</summary>
     /// <remarks>
     /// An instance property over a static list, because a binding needs one. The trailing
     /// underscore keeps it from colliding with the <see cref="Navigation.Destinations"/> class it
@@ -154,7 +154,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     internal void ClearCountdown() => Countdown = string.Empty;
 
     /// <summary>Moves to a destination by its shortcut digit.</summary>
-    /// <param name="digit">1 through 5.</param>
+    /// <param name="digit">1 through 6.</param>
     /// <returns><see langword="true"/> when a destination matched.</returns>
     internal bool GoTo(int digit)
     {
@@ -184,6 +184,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             DestinationKind.AgentActivity => Activity(),
             DestinationKind.Entries => new EntriesViewModel(_session, Clipboard),
             DestinationKind.EnvSets => new EnvSetsViewModel(_session, Clipboard),
+            DestinationKind.Trash => new TrashViewModel(_session),
             _ => null,
         };
     }

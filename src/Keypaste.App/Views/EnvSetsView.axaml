@@ -5,9 +5,21 @@
              x:Class="Keypaste.App.Views.EnvSetsView"
              x:DataType="vm:EnvSetsViewModel">
 
-  <Grid RowDefinitions="Auto,Auto,*">
+  <Grid RowDefinitions="Auto,Auto,Auto,*">
 
     <Border Grid.Row="0"
+            IsVisible="{Binding HasNotice}"
+            Background="{DynamicResource KpAccentQuiet}"
+            CornerRadius="{DynamicResource KpRadiusSm}"
+            Padding="12,8"
+            Margin="0,0,0,12">
+      <TextBlock Text="{Binding Notice}"
+                 TextWrapping="Wrap"
+                 FontSize="12"
+                 Foreground="{DynamicResource KpTextSecondary}" />
+    </Border>
+
+    <Border Grid.Row="1"
             IsVisible="{Binding HasError}"
             Background="{DynamicResource KpAccentQuiet}"
             CornerRadius="{DynamicResource KpRadiusSm}"
@@ -19,7 +31,7 @@
                  Foreground="{DynamicResource KpTextSecondary}" />
     </Border>
 
-    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
+    <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
       <Button Content="New project" Command="{Binding BeginAddCommand}" IsVisible="{Binding !IsAdding}" />
       <TextBox Text="{Binding NewProject}" PlaceholderText="billing-api" Width="220"
                IsVisible="{Binding IsAdding}" />
@@ -29,7 +41,7 @@
 
     <!-- The cards. A card knows a project's name and the command that injects it; the values behind
          it are read only when it is opened. -->
-    <ScrollViewer Grid.Row="2" IsVisible="{Binding !HasOpenProject}">
+    <ScrollViewer Grid.Row="3" IsVisible="{Binding !HasOpenProject}">
       <StackPanel Spacing="12">
 
         <TextBlock IsVisible="{Binding !HasProjects}"
@@ -72,7 +84,7 @@
 
     <!-- The open project's table. Masked, with reveal-on-hold on a control that publishes nothing
          to the accessibility bus (THREATS.md T-22). -->
-    <ContentControl Grid.Row="2" Content="{Binding OpenProject}" IsVisible="{Binding HasOpenProject}">
+    <ContentControl Grid.Row="3" Content="{Binding OpenProject}" IsVisible="{Binding HasOpenProject}">
       <ContentControl.DataTemplates>
         <DataTemplate DataType="vm:EnvProjectViewModel">
           <Grid RowDefinitions="Auto,Auto,Auto,Auto,*">

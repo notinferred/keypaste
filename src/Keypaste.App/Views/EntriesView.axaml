@@ -58,10 +58,33 @@
       <Button Grid.Column="2" Content="Delete" Margin="8,0,0,0" Command="{Binding DeleteCommand}" />
     </Grid>
 
-    <Grid Grid.Row="1" Grid.Column="2" RowDefinitions="Auto,Auto,*">
+    <Grid Grid.Row="1" Grid.Column="2" RowDefinitions="Auto,Auto,Auto,*">
+
+      <!-- What the last deletion did, and the way back for the one still on screen. Every other
+           recovery is on Trash, which is where this one goes once the screen moves on. -->
+      <Border Grid.Row="0"
+              IsVisible="{Binding HasNotice}"
+              Background="{DynamicResource KpAccentQuiet}"
+              CornerRadius="{DynamicResource KpRadiusSm}"
+              Padding="12,8"
+              Margin="0,0,0,8">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Grid.Column="0"
+                     Text="{Binding Notice}"
+                     TextWrapping="Wrap"
+                     VerticalAlignment="Center"
+                     FontSize="12"
+                     Foreground="{DynamicResource KpTextSecondary}" />
+          <Button Grid.Column="1"
+                  Content="Restore"
+                  Margin="8,0,0,0"
+                  IsVisible="{Binding CanUndoDelete}"
+                  Command="{Binding UndoDeleteCommand}" />
+        </Grid>
+      </Border>
 
       <!-- Calm, not a dialog. KpDanger is reserved for the destructive confirmation. -->
-      <Border Grid.Row="0"
+      <Border Grid.Row="1"
               IsVisible="{Binding HasError}"
               Background="{DynamicResource KpAccentQuiet}"
               CornerRadius="{DynamicResource KpRadiusSm}"
@@ -75,7 +98,7 @@
 
       <!-- The one place KpDanger appears on this screen. What the deletion costs depends on the
            vault: DeletePrompt reads its recycle-bin setting and says which case this is. -->
-      <Border Grid.Row="1"
+      <Border Grid.Row="2"
               IsVisible="{Binding IsConfirmingDelete}"
               BorderBrush="{DynamicResource KpDanger}"
               BorderThickness="1"
@@ -94,7 +117,7 @@
         </StackPanel>
       </Border>
 
-      <Border Grid.Row="1"
+      <Border Grid.Row="2"
               IsVisible="{Binding IsAdding}"
               Background="{DynamicResource KpSurface2}"
               CornerRadius="{DynamicResource KpRadiusSm}"
@@ -157,7 +180,7 @@
         </StackPanel>
       </Border>
 
-      <ListBox Grid.Row="2"
+      <ListBox Grid.Row="3"
                Name="Rows"
                ItemsSource="{Binding Rows}"
                SelectedItem="{Binding Selected}"

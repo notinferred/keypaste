@@ -237,12 +237,32 @@ public sealed class Vault : IDisposable
     /// <see cref="PurgeRecycled"/> and <see cref="EmptyRecycleBin"/> are the irreversible ones,
     /// and they are separate on purpose.
     /// </remarks>
-    public DeletionOutcome RemoveEntry(EntryName name)
+    public DeletionOutcome RemoveEntry(EntryName name) => RemoveEntry(name, out _);
+
+    /// <summary>Deletes the one entry with this name, and says what is now in the bin. Call
+    /// <see cref="Save"/> to persist it.</summary>
+    /// <param name="name">The entry to delete.</param>
+    /// <param name="recycled">
+    /// The identity <see cref="RestoreRecycled"/> takes to put this entry back, when the outcome
+    /// is <see cref="DeletionOutcome.Recycled"/>; otherwise the default.
+    /// </param>
+    /// <returns>
+    /// What happened to the entry. Deleting nothing is not an error here; the caller decides
+    /// whether it is one.
+    /// </returns>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    /// <remarks>
+    /// For a caller that offers to undo the delete it just made. The identity comes from here
+    /// rather than from a reading of the bin taken afterwards, because which row a delete produced
+    /// is the vault's answer and not something a screen should work out (docs/PRODUCT.md §4.2).
+    /// The path overload has no counterpart: nothing addressing an entry by path offers an undo.
+    /// </remarks>
+    public DeletionOutcome RemoveEntry(EntryName name, out RecycledEntryId recycled)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(name);
 
-        return _interop.RemoveEntry(name);
+        return _interop.RemoveEntry(name, out recycled);
     }
 
     /// <summary>Deletes the entry at <paramref name="entryPath"/>. Call <see cref="Save"/> to
@@ -258,7 +278,7 @@ public sealed class Vault : IDisposable
         ArgumentNullException.ThrowIfNull(entryPath);
 
         return ResolveByPath(entryPath) is { } found
-            ? _interop.RemoveEntry(EntryName.Of(found))
+            ? _interop.RemoveEntry(EntryName.Of(found), out _)
             : DeletionOutcome.NothingMatched;
     }
 

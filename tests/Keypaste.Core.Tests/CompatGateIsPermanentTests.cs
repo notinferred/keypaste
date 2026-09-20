@@ -317,8 +317,8 @@ public sealed class CompatGateIsPermanentTests
     /// into, restored out of and purged. It is also the only check that the file keypaste writes
     /// is KDBX 4.1 once something has been recycled: at 4.0 the format cannot carry
     /// <c>PreviousParentGroup</c>, so the deletion would still look right and a restore after a
-    /// reopen would have lost where the entry belonged. V.3b's trash view is what would give the
-    /// listing and the restore a shipped surface; the purge stays driver-only until then (D-0228).
+    /// reopen would have lost where the entry belonged. V.3b put the listing, the restore and the
+    /// purge on the desktop, which a bash gate cannot drive, so they stay with the driver (D-0254).
     /// </summary>
     [Fact]
     public void RecycleBinScript_ExistsAndKeepsItsNegativeControl()

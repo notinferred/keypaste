@@ -71,6 +71,42 @@ public sealed class VaultRecycleBinTests : IDisposable
         Assert.Equal(1, vault.TombstoneCount);
     }
 
+    /// <summary>
+    /// The identity comes back from the delete that produced it, so a caller offering to undo one
+    /// does not have to work out which row it just made (docs/PRODUCT.md §4.2).
+    /// </summary>
+    [Fact]
+    public void RemoveEntry_HandsBackTheIdentityTheBinNowListsForThatEntry()
+    {
+        using var vault = Seeded(out _);
+
+        Assert.Equal(DeletionOutcome.Recycled, vault.RemoveEntry(_token, out var recycled));
+
+        Assert.Equal(Assert.Single(vault.ReadRecycled()).Id, recycled);
+        Assert.Equal(RestoreOutcome.Restored, vault.RestoreRecycled(recycled));
+    }
+
+    /// <summary>
+    /// Nothing to restore, so nothing is named. A caller checking the outcome first cannot act on
+    /// an identity that stands for no row.
+    /// </summary>
+    [Fact]
+    public void RemoveEntry_NamesNoIdentity_WhenItRecycledNothing()
+    {
+        using var vault = Seeded(out _);
+
+        Assert.Equal(
+            DeletionOutcome.NothingMatched,
+            vault.RemoveEntry(new EntryName("env/billing", "ABSENT"), out var missing));
+
+        Assert.Equal(default, missing);
+
+        vault.SetRecyclesDeletedEntries(false);
+
+        Assert.Equal(DeletionOutcome.DeletedPermanently, vault.RemoveEntry(_token, out var erased));
+        Assert.Equal(default, erased);
+    }
+
     [Fact]
     public void RemoveEntry_MatchesNothing_WhenNoEntryHasThatName()
     {

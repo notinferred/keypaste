@@ -28,6 +28,7 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
     private IReadOnlyList<string> _projectNames = [];
     private EnvProjectViewModel? _open;
     private string? _error;
+    private string? _notice;
     private bool _isAdding;
     private string _newProject = string.Empty;
 
@@ -99,6 +100,25 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
     }
 
     internal bool HasError => _error is not null;
+
+    /// <summary>What the last action did, or null.</summary>
+    /// <remarks>
+    /// Separate from <see cref="Error"/> because a removal that worked is not a failure, and a
+    /// person needs to be told where the variable went. The screen draws them the same way.
+    /// </remarks>
+    internal string? Notice
+    {
+        get => _notice;
+        private set
+        {
+            if (Set(ref _notice, value))
+            {
+                Raise(nameof(HasNotice));
+            }
+        }
+    }
+
+    internal bool HasNotice => _notice is not null;
 
     internal bool IsAdding
     {
@@ -197,10 +217,16 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
     private void Open(string? project)
     {
         Error = null;
+        Notice = null;
 
         OpenProject = project is null
             ? null
-            : new EnvProjectViewModel(_session, _clipboard, project, message => Error = message);
+            : new EnvProjectViewModel(
+                _session,
+                _clipboard,
+                project,
+                message => Error = message,
+                outcome => Notice = outcome);
     }
 
     private void BeginAdd()

@@ -37,6 +37,8 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     private string? _error;
     private bool _isAdding;
     private bool _isConfirmingDelete;
+    private string? _notice;
+    private RecycledEntryId? _undo;
     private string _newEntryPath = string.Empty;
     private bool _generatePassword = true;
 
@@ -59,6 +61,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         CancelDeleteCommand = new RelayCommand(
             () => IsConfirmingDelete = false,
             () => IsConfirmingDelete);
+        UndoDeleteCommand = new RelayCommand(UndoDelete, () => _undo is not null);
 
         Reload();
     }
@@ -151,8 +154,8 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     /// <summary>What the confirmation asks, naming what goes and whether it can come back.</summary>
     /// <remarks>
     /// Read from the vault, because the answer is the vault's: KeePassXC writes the recycle-bin
-    /// setting and a person can turn it off there. Until the trash view lands (V.3b) a recovery
-    /// means opening the vault in KeePassXC, so this promises no more than it can keep.
+    /// setting and a person can turn it off there. <see cref="Notice"/> says what the delete
+    /// actually did, which is the answer that cannot go stale between the question and the act.
     /// </remarks>
     internal string DeletePrompt
     {
@@ -202,6 +205,29 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     }
 
     internal bool HasError => _error is not null;
+
+    /// <summary>What the last deletion did, or null.</summary>
+    /// <remarks>
+    /// Reported after the act, from the outcome core returned, so a vault whose recycle bin was
+    /// switched off between the confirmation and the deletion cannot make this line wrong. The CLI
+    /// says the same thing for the same reason.
+    /// </remarks>
+    internal string? Notice
+    {
+        get => _notice;
+        private set
+        {
+            if (Set(ref _notice, value))
+            {
+                Raise(nameof(HasNotice));
+            }
+        }
+    }
+
+    internal bool HasNotice => _notice is not null;
+
+    /// <summary>Whether the last deletion can still be taken back from here.</summary>
+    internal bool CanUndoDelete => _undo is not null;
 
     /// <summary>How many entries the vault holds, for the empty state.</summary>
     internal int TotalCount => _all.Count;
@@ -270,6 +296,14 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
     internal RelayCommand CancelDeleteCommand { get; }
 
+    /// <summary>Puts back the entry the last deletion recycled.</summary>
+    /// <remarks>
+    /// Recovery beside the action it reverses, for the one deletion a person is still looking at.
+    /// The Trash screen is where every other recovery happens, including this one after a
+    /// navigation or a lock.
+    /// </remarks>
+    internal RelayCommand UndoDeleteCommand { get; }
+
     /// <summary>Reads the vault again, keeping the selection if it survived.</summary>
     internal void Reload()
     {
@@ -308,6 +342,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         Groups = [];
         Selected = null;
         Detail = null;
+        Offer(null, null);
         NewPassword.Dispose();
     }
 
@@ -365,6 +400,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
     private void BeginAdd()
     {
+        Offer(null, null);
         NewEntryPath = SelectedGroup is { IsEverything: false } group ? group.Path + "/" : string.Empty;
         NewPassword.Clear();
         IsAdding = true;
@@ -487,6 +523,8 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
     private void Delete()
     {
+        Offer(null, null);
+
         if (Selected is not { } row)
         {
             return;
@@ -498,13 +536,19 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
             return;
         }
 
+        DeletionOutcome outcome;
+        RecycledEntryId recycled;
+        var name = EntryNameSanitizer.SanitizePath(row.Path).Text;
+
         try
         {
             // Reversible where the vault has a recycle bin: the entry keeps its identity, fields
-            // and history, and V.3b adds the view that puts it back. The confirmation is the view's
-            // job, and it is the one place KpDanger appears. The row is addressed by its name
-            // rather than its path: two entries can share a path.
-            if (vault.RemoveEntry(row.Name) == DeletionOutcome.NothingMatched)
+            // and history, and Trash puts it back. The confirmation is the view's job, and it is
+            // the one place KpDanger appears. The row is addressed by its name rather than its
+            // path: two entries can share a path.
+            outcome = vault.RemoveEntry(row.Name, out recycled);
+
+            if (outcome == DeletionOutcome.NothingMatched)
             {
                 Error = "That entry is not in this vault any more.";
                 IsConfirmingDelete = false;
@@ -528,5 +572,71 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         IsConfirmingDelete = false;
         Selected = null;
         Reload();
+
+        // Last, because Reload and the selection it clears both drop a pending offer.
+        Offer(
+            outcome == DeletionOutcome.Recycled ? recycled : null,
+            outcome == DeletionOutcome.Recycled
+                ? $"Moved {name} to the trash."
+                : $"Deleted {name}. This vault has no recycle bin, so nothing can put it back.");
+    }
+
+    /// <summary>Restores the entry the last deletion recycled, by the identity core returned.</summary>
+    private void UndoDelete()
+    {
+        if (_undo is not { } id)
+        {
+            return;
+        }
+
+        if (_session.Unlocked is not { } vault)
+        {
+            Error = "The vault is locked.";
+            return;
+        }
+
+        RestoreOutcome outcome;
+
+        try
+        {
+            outcome = vault.RestoreRecycled(id);
+
+            if (outcome is RestoreOutcome.Restored or RestoreOutcome.RestoredToRoot)
+            {
+                vault.Save();
+            }
+        }
+        catch (VaultChangedOnDiskException)
+        {
+            Error = "Something else changed this vault since you opened it. Lock and unlock to see it, then restore this from Trash.";
+            return;
+        }
+        catch (VaultException e)
+        {
+            Error = e.Message;
+            return;
+        }
+
+        Offer(null, null);
+
+        if (outcome is RestoreOutcome.Restored or RestoreOutcome.RestoredToRoot)
+        {
+            Reload();
+            Error = null;
+            return;
+        }
+
+        // Every refusal reads the same way from here: the entry is still in the bin, and Trash is
+        // the screen that says which refusal it was and what to do about it.
+        Error = "That entry could not be put back. Open Trash to see why.";
+    }
+
+    /// <summary>Holds, or drops, the offer to undo the last deletion.</summary>
+    private void Offer(RecycledEntryId? undo, string? notice)
+    {
+        _undo = undo;
+        Notice = notice;
+        Raise(nameof(CanUndoDelete));
+        UndoDeleteCommand.RaiseCanExecuteChanged();
     }
 }
