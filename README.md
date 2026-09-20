@@ -159,7 +159,7 @@ keypaste rm github --yes
 
 `ls` prints a names-only group tree. `get` copies the password to the clipboard and clears it after twenty seconds; `--show` writes it to stdout instead. Password prompts never echo input. Command data goes to stdout and diagnostics to stderr, so `keypaste get x --show` can be piped. Set `KEYPASTE_VAULT` or pass `--vault` to each command.
 
-`rm` permanently deletes the entry and its history; there is no recycle-bin recovery yet. `get --show` and explicit env export expose plaintext. The standalone passphrase generator described below is an Unreleased source feature.
+In `v0.3.0`, `rm` permanently deletes the entry and its history. In Unreleased source it moves the entry to the vault's recycle bin, where KeePassXC can see and restore it, unless the vault's recycle bin is switched off. `get --show` and explicit env export expose plaintext. The standalone passphrase generator described below is an Unreleased source feature.
 
 ### Generating one
 

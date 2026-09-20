@@ -30,7 +30,7 @@ public sealed class VaultRemoveTests : IDisposable
 
         using (var vault = Vault.Open(path, MasterPassword))
         {
-            Assert.True(vault.RemoveEntry("servers/production"));
+            Assert.Equal(DeletionOutcome.Recycled, vault.RemoveEntry("servers/production"));
             vault.Save();
         }
 
@@ -40,14 +40,14 @@ public sealed class VaultRemoveTests : IDisposable
     }
 
     [Fact]
-    public void RemoveEntry_ReturnsFalse_WhenNothingMatches()
+    public void RemoveEntry_MatchesNothing_WhenNothingMatches()
     {
         var path = Seed();
 
         using var vault = Vault.Open(path, MasterPassword);
 
-        Assert.False(vault.RemoveEntry("servers/does-not-exist"));
-        Assert.False(vault.RemoveEntry("no-such-group/entry"));
+        Assert.Equal(DeletionOutcome.NothingMatched, vault.RemoveEntry("servers/does-not-exist"));
+        Assert.Equal(DeletionOutcome.NothingMatched, vault.RemoveEntry("no-such-group/entry"));
     }
 
     /// <summary>

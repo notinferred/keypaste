@@ -468,8 +468,13 @@ public sealed class VerbTests
         Assert.DoesNotContain("the-user", harness.Out, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// The entry leaves the vault's own listing and lands somewhere it can be recovered from, and
+    /// the command says which of the two deletions it did. Saying "Removed" for a deletion that
+    /// can be undone, or the reverse, is the half of this a person acts on.
+    /// </summary>
     [Fact]
-    public void Rm_WithYes_RemovesTheEntryForGood()
+    public void Rm_WithYes_MovesTheEntryToTheRecycleBin_AndSaysSo()
     {
         using var harness = new CliHarness();
         harness.SeedVault(Master, ("solo", "one"), ("keep", "two"));
@@ -478,10 +483,40 @@ public sealed class VerbTests
         var exit = harness.Run("rm", "solo", "--vault", harness.VaultPath, "--yes");
 
         Assert.Equal(CliApp.ExitSuccess, exit);
+        Assert.Contains("recycle bin", harness.Err, StringComparison.Ordinal);
 
         using var vault = Vault.Open(harness.VaultPath, Master);
         Assert.Null(vault.Find("solo"));
         Assert.NotNull(vault.Find("keep"));
+
+        var recycled = Assert.Single(vault.ReadRecycled());
+        Assert.Equal("solo", recycled.Title, StringComparer.Ordinal);
+        Assert.Equal(RestoreOutcome.Restored, vault.RestoreRecycled(recycled.Id));
+        Assert.Equal("one", vault.Find("solo")?.Password, StringComparer.Ordinal);
+    }
+
+    /// <summary>
+    /// The confirmation is asked before the deletion, so it has to come from the vault rather than
+    /// from what keypaste would prefer to be true.
+    /// </summary>
+    [Fact]
+    public void Rm_AsksAConfirmationThatMatchesWhatTheVaultWillDo()
+    {
+        using var harness = new CliHarness();
+        harness.SeedVault(Master, ("solo", "one"));
+
+        harness.Prompt.Interactive = true;
+        harness.Prompt.Enqueue(Master, "y");
+        var exit = harness.Run("rm", "solo", "--vault", harness.VaultPath);
+
+        Assert.Equal(CliApp.ExitSuccess, exit);
+        Assert.Contains(
+            harness.Prompt.PromptsSeen,
+            prompt => prompt.Contains("recycle bin", StringComparison.Ordinal));
+
+        Assert.DoesNotContain(
+            harness.Prompt.PromptsSeen,
+            prompt => prompt.Contains("no undo", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -537,7 +572,8 @@ public sealed class VerbTests
 
     /// <summary>
     /// A piped run must not have its confirmation answered by whatever the next line of stdin
-    /// happens to be. Deleting a secret is irreversible, so it has to be asked for explicitly.
+    /// happens to be. In a vault with no recycle bin the deletion is irreversible, and in one with
+    /// a bin it is most of the way there, so either way it is asked for explicitly.
     /// </summary>
     [Fact]
     public void Rm_WithoutYes_AndRedirectedStdin_IsAUsageError()

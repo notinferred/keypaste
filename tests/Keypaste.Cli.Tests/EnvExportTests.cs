@@ -119,7 +119,9 @@ public sealed class EnvExportTests
         using (var vault = Vault.Open(harness.VaultPath, Master))
         {
             vault.AddEntry(new VaultEntry { Title = "PLACEHOLDER", Password = "x", GroupPath = "env/empty" });
-            Assert.True(new EnvStore(vault).Remove("empty", "PLACEHOLDER"));
+            Assert.Equal(
+                DeletionOutcome.Recycled,
+                new EnvStore(vault).Remove("empty", "PLACEHOLDER"));
             vault.Save();
         }
 

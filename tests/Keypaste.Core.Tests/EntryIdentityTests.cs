@@ -43,7 +43,9 @@ public sealed class EntryIdentityTests : IDisposable
 
         using (var vault = Collision(path))
         {
-            Assert.True(vault.RemoveEntry(new EntryName("env/dev", "nested/TOKEN")));
+            Assert.Equal(
+                DeletionOutcome.Recycled,
+                vault.RemoveEntry(new EntryName("env/dev", "nested/TOKEN")));
             vault.Save();
         }
 
@@ -60,7 +62,9 @@ public sealed class EntryIdentityTests : IDisposable
 
         using (var vault = Collision(path))
         {
-            Assert.True(vault.RemoveEntry(new EntryName("env/dev/nested", "TOKEN")));
+            Assert.Equal(
+                DeletionOutcome.Recycled,
+                vault.RemoveEntry(new EntryName("env/dev/nested", "TOKEN")));
             vault.Save();
         }
 
@@ -112,7 +116,9 @@ public sealed class EntryIdentityTests : IDisposable
     {
         using var vault = Collision(NewVaultPath());
 
-        Assert.False(vault.RemoveEntry(new EntryName("env/dev", "TOKEN")));
+        Assert.Equal(
+            DeletionOutcome.NothingMatched,
+            vault.RemoveEntry(new EntryName("env/dev", "TOKEN")));
         Assert.Equal(3, vault.ReadEntries().Count);
     }
 
@@ -177,7 +183,7 @@ public sealed class EntryIdentityTests : IDisposable
             var found = vault.Find(name);
             var removed = vault.RemoveEntry(name);
 
-            Assert.Equal(found is not null, removed);
+            Assert.Equal(found is not null, removed != DeletionOutcome.NothingMatched);
             Assert.DoesNotContain(
                 Shape(vault),
                 row => string.Equals(row.GroupPath, name.GroupPath, StringComparison.Ordinal)

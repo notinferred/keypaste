@@ -23,8 +23,16 @@ namespace Keypaste.Cli.Commands;
 /// <b>The mark and the note appear only when something was actually altered</b>, so a vault of
 /// ordinary names prints exactly what it printed before. <c>--flat</c> never takes the mark, because
 /// it is the form something else parses; it is told on stderr instead, which a parser does not read.
-/// Nothing is ever hidden — a scrubbed row is still listed, because keypaste does not get to pretend
-/// the vault holds something other than what KeePassXC shows (docs/PRODUCT.md law 4.6).
+/// A scrubbed row is still listed, because keypaste does not get to pretend the vault holds
+/// something other than what KeePassXC shows (docs/PRODUCT.md law 4.6).
+/// </para>
+/// <para>
+/// <b>The recycle bin is the one thing this listing leaves out, and it is not concealment.</b> A
+/// deleted entry is on a surface that names it as deleted — <see cref="Core.Vault.ReadRecycled"/>,
+/// which reports what can be recovered and where each entry came from — rather than mixed back in
+/// with the live ones, where it would read as a credential somebody still uses. KeePassXC shows
+/// the bin as an ordinary group, so the two disagree about that group and about nothing else; a
+/// row this listing does print is still exactly what the vault holds (V.3a).
 /// </para>
 /// </remarks>
 internal static class ListCommand

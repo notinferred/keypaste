@@ -130,9 +130,9 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     /// </summary>
     /// <remarks>
     /// A second click rather than a modal, and the one place in this screen where
-    /// <c>KpDanger</c> appears — <c>Tokens.axaml</c> reserves it for exactly this. The confirmation
-    /// exists because there is nothing to undo: core has no recycle bin, and
-    /// <see cref="Vault.RemoveEntry(EntryName)"/> leaves a tombstone rather than a copy.
+    /// <c>KpDanger</c> appears — <c>Tokens.axaml</c> reserves it for exactly this. In a vault with
+    /// a recycle bin the entry can be recovered; in one whose owner turned the bin off it cannot,
+    /// and <see cref="DeletePrompt"/> says which vault this is rather than guessing.
     /// </remarks>
     internal bool IsConfirmingDelete
     {
@@ -148,10 +148,28 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>What the confirmation asks, naming what goes.</summary>
-    internal string DeletePrompt => Selected is { } row
-        ? $"Delete {EntryNameSanitizer.SanitizePath(row.Path).Text}? There is no undo."
-        : string.Empty;
+    /// <summary>What the confirmation asks, naming what goes and whether it can come back.</summary>
+    /// <remarks>
+    /// Read from the vault, because the answer is the vault's: KeePassXC writes the recycle-bin
+    /// setting and a person can turn it off there. Until the trash view lands (V.3b) a recovery
+    /// means opening the vault in KeePassXC, so this promises no more than it can keep.
+    /// </remarks>
+    internal string DeletePrompt
+    {
+        get
+        {
+            if (Selected is not { } row)
+            {
+                return string.Empty;
+            }
+
+            var name = EntryNameSanitizer.SanitizePath(row.Path).Text;
+
+            return _session.Unlocked?.RecyclesDeletedEntries == true
+                ? $"Delete {name}? It goes to the vault's recycle bin."
+                : $"Delete {name}? There is no undo.";
+        }
+    }
 
     /// <summary>The selected entry's fields, or null when nothing is selected.</summary>
     internal EntryDetailViewModel? Detail
@@ -482,10 +500,11 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
         try
         {
-            // No recycle bin, because core has none: RemoveEntry writes a tombstone and the value
-            // is gone. The confirmation is the view's job, and it is the one place KpDanger appears.
-            // The row is addressed by its name rather than its path: two entries can share a path.
-            if (!vault.RemoveEntry(row.Name))
+            // Reversible where the vault has a recycle bin: the entry keeps its identity, fields
+            // and history, and V.3b adds the view that puts it back. The confirmation is the view's
+            // job, and it is the one place KpDanger appears. The row is addressed by its name
+            // rather than its path: two entries can share a path.
+            if (vault.RemoveEntry(row.Name) == DeletionOutcome.NothingMatched)
             {
                 Error = "That entry is not in this vault any more.";
                 IsConfirmingDelete = false;

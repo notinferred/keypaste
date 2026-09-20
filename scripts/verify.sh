@@ -251,6 +251,7 @@ profile_compat() {
   run bash scripts/verify-keepassxc-compat.sh artifacts/compat/local.kdbx
   run bash scripts/verify-keepassxc-writeback.sh artifacts/compat/local-writeback.kdbx
   run bash scripts/verify-keepassxc-history.sh artifacts/compat/local-history.kdbx
+  run bash scripts/verify-keepassxc-recyclebin.sh artifacts/compat/local-recyclebin.kdbx
 }
 
 # Backend tests read workflows, scripts and the release definition, so those paths select backend too.

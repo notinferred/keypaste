@@ -40,6 +40,16 @@ This guard excludes `System.Drawing.Common` image decoding, which is Windows-onl
 | `PwCustomIcon.cs` | `Image`, `GetImage()`, `GetImage(w,h)`, `IsImageValid`, `GetKey` and the image cache are excluded |
 | `PwDatabase.cs` | `GetCustomIcon` overloads are excluded |
 
+### `KEYPASTE_KDBX_4_1_MOVES`
+
+`PreviousParentGroup` records the group an object was moved out of, which is how a recycled entry knows where to go back to. `KdbxFile.Write.cs` writes it only at KDBX 4.1, but `GetMinKdbxVersion` raises the written version to 4.1 for group tags, a cleared `QualityCheck`, named or dated custom icons and timestamped custom data — not for `PreviousParentGroup`. A vault keypaste writes is therefore 4.0, and the field is dropped on the next save, so a restore after a reopen cannot find the original group. `ForceVersion` is `internal` to this assembly and the project grants no `InternalsVisibleTo`, so the version cannot be selected from outside.
+
+This guard adds `PreviousParentGroup` to the same version floor upstream already applies to the other 4.1-only fields. A vault stays 4.0 until something is moved or recycled; from then on it is 4.1, which KeePassXC 2.7 and KeePass 2.48 and later read. Nothing else about the format, the cipher or the key derivation changes.
+
+| File | Change |
+|---|---|
+| `Serialization/KdbxFile.cs` | `GetMinKdbxVersion()`'s group and entry handlers raise the minimum to 4.1 when the object carries a non-zero `PreviousParentGroup` |
+
 ### Files excluded from compilation
 
 | Path | Reason |

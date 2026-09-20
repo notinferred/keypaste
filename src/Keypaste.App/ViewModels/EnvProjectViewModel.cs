@@ -201,10 +201,25 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         _report(null);
     }
 
-    /// <summary>What the confirmation asks.</summary>
-    internal string RemovePrompt => _removing is { } row
-        ? $"Remove {row.DisplayKey} from {DisplayName}? There is no undo."
-        : string.Empty;
+    /// <summary>What the confirmation asks, and whether the variable can come back.</summary>
+    /// <remarks>
+    /// The vault's recycle-bin setting decides, not this screen: the same question has two honest
+    /// answers depending on the file. Recovery before V.3b's trash view means KeePassXC.
+    /// </remarks>
+    internal string RemovePrompt
+    {
+        get
+        {
+            if (_removing is not { } row)
+            {
+                return string.Empty;
+            }
+
+            return _session.Unlocked?.RecyclesDeletedEntries == true
+                ? $"Remove {row.DisplayKey} from {DisplayName}? It goes to the vault's recycle bin."
+                : $"Remove {row.DisplayKey} from {DisplayName}? There is no undo.";
+        }
+    }
 
     internal bool IsAdding
     {
@@ -507,7 +522,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
 
         try
         {
-            if (!new EnvStore(vault).Remove(Name, row.Key))
+            if (new EnvStore(vault).Remove(Name, row.Key) == DeletionOutcome.NothingMatched)
             {
                 _report($"{row.DisplayKey} is not in {DisplayName} any more.");
                 Removing = null;

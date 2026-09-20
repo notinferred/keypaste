@@ -73,8 +73,8 @@
                    Foreground="{DynamicResource KpTextSecondary}" />
       </Border>
 
-      <!-- The one place KpDanger appears on this screen, because there is no undo: core has no
-           recycle bin and RemoveEntry leaves a tombstone rather than a copy. -->
+      <!-- The one place KpDanger appears on this screen. What the deletion costs depends on the
+           vault: DeletePrompt reads its recycle-bin setting and says which case this is. -->
       <Border Grid.Row="1"
               IsVisible="{Binding IsConfirmingDelete}"
               BorderBrush="{DynamicResource KpDanger}"

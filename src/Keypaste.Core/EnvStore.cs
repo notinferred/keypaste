@@ -223,8 +223,8 @@ public sealed class EnvStore(Vault vault)
     /// <param name="project">The project name.</param>
     /// <param name="key">The variable name.</param>
     /// <returns>
-    /// <see langword="true"/> if a variable was removed, <see langword="false"/> if the project or
-    /// the variable does not exist.
+    /// What happened to the variable, including <see cref="DeletionOutcome.NothingMatched"/> when
+    /// the project or the variable does not exist.
     /// </returns>
     /// <exception cref="ArgumentNullException"><paramref name="project"/> or <paramref name="key"/> is null.</exception>
     /// <exception cref="ObjectDisposedException">The vault has been disposed.</exception>
@@ -239,7 +239,7 @@ public sealed class EnvStore(Vault vault)
     /// what keeps a KeePassXC-authored title of <c>nested/TOKEN</c> in <c>env/dev</c> distinct from
     /// a <c>TOKEN</c> in <c>env/dev/nested</c>: they share a path and are different entries.
     /// </remarks>
-    public bool Remove(string project, string key)
+    public DeletionOutcome Remove(string project, string key)
     {
         return _vault.RemoveEntry(new EntryName(EnvConvention.GroupPath(project), key));
     }

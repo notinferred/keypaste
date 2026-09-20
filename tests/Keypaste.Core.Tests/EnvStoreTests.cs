@@ -142,9 +142,12 @@ public sealed class EnvStoreTests : IDisposable
         Assert.Equal(1, HistoryCount(vault, "env/billing", "TOKEN"));
     }
 
-    /// <summary>Removing takes the history with it — the only way to erase a rotated value.</summary>
+    /// <summary>
+    /// Removing takes the history out of the project with it, and purging what it recycled is what
+    /// erases a rotated value. Two deliberate acts rather than one: removing used to be the erasure.
+    /// </summary>
     [Fact]
-    public void Remove_TakesTheHistoryWithIt()
+    public void Remove_TakesTheHistoryOutOfTheProject_AndPurgingIsWhatErasesIt()
     {
         using var vault = Vault.Create(NewVaultPath(), MasterPassword);
         var store = new EnvStore(vault);
@@ -152,9 +155,17 @@ public sealed class EnvStoreTests : IDisposable
         store.TrySet("billing", "TOKEN", "first", out _);
         store.TrySet("billing", "TOKEN", "second", out _);
 
-        Assert.True(store.Remove("billing", "TOKEN"));
+        Assert.Equal(DeletionOutcome.Recycled, store.Remove("billing", "TOKEN"));
         Assert.Equal(-1, HistoryCount(vault, "env/billing", "TOKEN"));
         Assert.Empty(store.Read("billing"));
+
+        var recycled = Assert.Single(vault.ReadRecycled());
+        Assert.Equal("TOKEN", recycled.Title, StringComparer.Ordinal);
+        Assert.Equal("env/billing", recycled.OriginalGroupPath, StringComparer.Ordinal);
+
+        Assert.True(vault.PurgeRecycled(recycled.Id));
+        Assert.Empty(vault.ReadRecycled());
+        Assert.Equal(-1, HistoryCount(vault, "env/billing", "TOKEN"));
     }
 
     /// <summary>
@@ -169,7 +180,7 @@ public sealed class EnvStoreTests : IDisposable
         vault.AddEntry(new VaultEntry { Title = "nested/TOKEN", Password = "slashed", GroupPath = "env/dev" });
         vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "nested", GroupPath = "env/dev/nested" });
 
-        Assert.True(new EnvStore(vault).Remove("dev", "nested/TOKEN"));
+        Assert.Equal(DeletionOutcome.Recycled, new EnvStore(vault).Remove("dev", "nested/TOKEN"));
 
         var survivors = vault.ReadEntries();
         var survivor = Assert.Single(survivors);
@@ -184,7 +195,7 @@ public sealed class EnvStoreTests : IDisposable
         vault.AddEntry(new VaultEntry { Title = "nested/TOKEN", Password = "slashed", GroupPath = "env/dev" });
         vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "nested", GroupPath = "env/dev/nested" });
 
-        Assert.True(new EnvStore(vault).Remove("dev/nested", "TOKEN"));
+        Assert.Equal(DeletionOutcome.Recycled, new EnvStore(vault).Remove("dev/nested", "TOKEN"));
 
         var survivor = Assert.Single(vault.ReadEntries());
         Assert.Equal("env/dev", survivor.GroupPath, StringComparer.Ordinal);
@@ -254,14 +265,15 @@ public sealed class EnvStoreTests : IDisposable
     }
 
     [Fact]
-    public void Remove_ReturnsFalse_WhenTheKeyOrProjectIsAbsent()
+    public void Remove_MatchesNothing_WhenTheKeyOrProjectIsAbsent()
     {
         using var vault = Vault.Create(NewVaultPath(), MasterPassword);
         var store = new EnvStore(vault);
         store.TrySet("billing", "TOKEN", "first", out _);
 
-        Assert.False(store.Remove("billing", "NOT_THERE"));
-        Assert.False(store.Remove("no-such-project", "TOKEN"));
+        Assert.Equal(DeletionOutcome.NothingMatched, store.Remove("billing", "NOT_THERE"));
+        Assert.Equal(DeletionOutcome.NothingMatched, store.Remove("no-such-project", "TOKEN"));
+        Assert.Empty(vault.ReadRecycled());
     }
 
     [Fact]

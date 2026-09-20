@@ -363,6 +363,13 @@ namespace KeePassLib.Serialization
 				if(pg.Tags.Count != 0)
 					uMin = Math.Max(uMin, FileVersion32_4_1);
 
+#if KEYPASTE_KDBX_4_1_MOVES
+				// Written only at 4.1 (WriteGroup), but upstream never asks for 4.1 on its
+				// account, so a 4.0 save drops where a recycled object came from.
+				if(!pg.PreviousParentGroup.IsZero)
+					uMin = Math.Max(uMin, FileVersion32_4_1);
+#endif
+
 				return true;
 			};
 
@@ -372,6 +379,11 @@ namespace KeePassLib.Serialization
 
 				if(!pe.QualityCheck)
 					uMin = Math.Max(uMin, FileVersion32_4_1);
+
+#if KEYPASTE_KDBX_4_1_MOVES
+				if(!pe.PreviousParentGroup.IsZero)
+					uMin = Math.Max(uMin, FileVersion32_4_1);
+#endif
 
 				return true;
 			};

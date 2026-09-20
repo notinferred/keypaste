@@ -58,6 +58,11 @@ public sealed class CompatGateIsPermanentTests
         // shipped surface, so nothing else asks KeePassXC to read the result.
         Assert.Contains("scripts/verify-keepassxc-history.sh", workflow, StringComparison.Ordinal);
 
+        // Deleting moves an entry into the KDBX recycle bin and raises the file to KDBX 4.1 so it
+        // can record where the entry came from. Both are claims about the format that only real
+        // KeePassXC can settle (V.3a).
+        Assert.Contains("scripts/verify-keepassxc-recyclebin.sh", workflow, StringComparison.Ordinal);
+
         // Injection is the other law with no in-process test that can reach it (docs/PRODUCT.md 3.4 and
         // 4.5): the child owns the console, so only a real child can be asked what it received.
         Assert.Contains("scripts/verify-run-injection.sh", workflow, StringComparison.Ordinal);
@@ -305,6 +310,40 @@ public sealed class CompatGateIsPermanentTests
         // only thing keepassxc-cli offers that can see a history item at all.
         Assert.Contains("show -a Password", text, StringComparison.Ordinal);
         Assert.Contains("export -f xml", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The recycle-bin gate is the only place KeePassXC is asked to read a vault keypaste deleted
+    /// into, restored out of and purged. It is also the only check that the file keypaste writes
+    /// is KDBX 4.1 once something has been recycled: at 4.0 the format cannot carry
+    /// <c>PreviousParentGroup</c>, so the deletion would still look right and a restore after a
+    /// reopen would have lost where the entry belonged. V.3b's trash view is what would give the
+    /// listing and the restore a shipped surface; the purge stays driver-only until then (D-0228).
+    /// </summary>
+    [Fact]
+    public void RecycleBinScript_ExistsAndKeepsItsNegativeControl()
+    {
+        var script = Path.Combine(RepoRoot(), "scripts", "verify-keepassxc-recyclebin.sh");
+        Assert.True(File.Exists(script), $"The recycle bin gate script is missing: {script}");
+
+        var text = File.ReadAllText(script);
+
+        Assert.Contains("NEGATIVE CONTROL", text, StringComparison.Ordinal);
+        Assert.Contains("must never be skipped or soft-passed", text, StringComparison.Ordinal);
+
+        // The deletion itself must stay the shipped binary's (D-0012); only what no shipped
+        // surface can do goes through the driver.
+        Assert.Contains("\"$kp\" rm", text, StringComparison.Ordinal);
+
+        // The three readers it needs: where KeePassXC now sees the entry, what it holds there,
+        // and the XML, which is the only thing keepassxc-cli offers that can show
+        // PreviousParentGroup and DeletedObjects at all.
+        Assert.Contains("ls -R -f", text, StringComparison.Ordinal);
+        Assert.Contains("show -a Password", text, StringComparison.Ordinal);
+        Assert.Contains("export -f xml", text, StringComparison.Ordinal);
+
+        // The minor-version byte. Nothing else in the repository would notice it going back to 0.
+        Assert.Contains("hdr:16:2", text, StringComparison.Ordinal);
     }
 
     /// <summary>

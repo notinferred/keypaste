@@ -32,6 +32,22 @@ public sealed class Vault : IDisposable
     /// name.</summary>
     internal string? EntryUuid(EntryName name) => _interop.EntryUuid(name);
 
+    /// <summary>How many deleted-object tombstones the vault carries.</summary>
+    /// <remarks>
+    /// A test seam, for the reason <see cref="EntryUuid"/> gives. V-V.3a has to be able to say
+    /// that recycling writes no tombstone and purging writes one, and no keypaste surface prints
+    /// them. The compatibility gate asks KeePassXC the same question about the saved file.
+    /// </remarks>
+    internal int TombstoneCount => _interop.TombstoneCount;
+
+    /// <summary>Turns this vault's recycle bin on or off.</summary>
+    /// <remarks>
+    /// A test seam, and the only writer of this setting in keypaste: KeePassXC owns it, and
+    /// <see cref="RecyclesDeletedEntries"/> only reads it. What a vault whose owner turned the bin
+    /// off does on a delete still has to be assertable without a KeePassXC installation.
+    /// </remarks>
+    internal void SetRecyclesDeletedEntries(bool recycles) => _interop.SetRecyclesDeletedEntries(recycles);
+
     /// <summary>Creates a new, empty vault protected by <paramref name="masterPassword"/>. Nothing
     /// is written to disk until <see cref="Save"/>.</summary>
     public static Vault Create(string path, ReadOnlySpan<char> masterPassword)
@@ -186,33 +202,111 @@ public sealed class Vault : IDisposable
         return _interop.ReadGroupPaths();
     }
 
-    /// <summary>Removes the one entry with this name. Call <see cref="Save"/> to persist it.</summary>
+    /// <summary>Whether deleting from this vault moves the entry to the recycle bin.</summary>
+    /// <remarks>
+    /// <para>
+    /// The vault's own setting, which KeePassXC writes and a person can turn off there. keypaste
+    /// honours it rather than overriding it: a vault whose owner asked for no recycle bin does not
+    /// get one because keypaste would prefer the safety.
+    /// </para>
+    /// <para>
+    /// Read this to word a confirmation truthfully before the act — "there is no undo" is right in
+    /// one vault and wrong in another. <see cref="RemoveEntry(EntryName)"/> reports what actually
+    /// happened, which is the answer that cannot go stale.
+    /// </para>
+    /// </remarks>
+    public bool RecyclesDeletedEntries
+    {
+        get
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            return _interop.RecyclesDeletedEntries;
+        }
+    }
+
+    /// <summary>Deletes the one entry with this name. Call <see cref="Save"/> to persist it.</summary>
     /// <returns>
-    /// <see langword="true"/> if an entry was removed. Removing nothing is not an error here; the
-    /// caller decides whether it is one.
+    /// What happened to the entry. Deleting nothing is not an error here; the caller decides
+    /// whether it is one.
     /// </returns>
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
-    public bool RemoveEntry(EntryName name)
+    /// <remarks>
+    /// Where the vault has a recycle bin this is reversible: the entry keeps its identity, its
+    /// fields and its history, and <see cref="RestoreRecycled"/> puts it back.
+    /// <see cref="PurgeRecycled"/> and <see cref="EmptyRecycleBin"/> are the irreversible ones,
+    /// and they are separate on purpose.
+    /// </remarks>
+    public DeletionOutcome RemoveEntry(EntryName name)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(name);
 
-        return _interop.RemoveEntry(name) > 0;
+        return _interop.RemoveEntry(name);
     }
 
-    /// <summary>Removes the entry at <paramref name="entryPath"/>. Call <see cref="Save"/> to
+    /// <summary>Deletes the entry at <paramref name="entryPath"/>. Call <see cref="Save"/> to
     /// persist it.</summary>
     /// <returns>
-    /// <see langword="true"/> if an entry was removed. Removing nothing is not an error here; the
-    /// caller decides whether it is one.
+    /// What happened to the entry. Deleting nothing is not an error here; the caller decides
+    /// whether it is one.
     /// </returns>
     /// <exception cref="VaultException">More than one entry answers to that path.</exception>
-    public bool RemoveEntry(string entryPath)
+    public DeletionOutcome RemoveEntry(string entryPath)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(entryPath);
 
-        return ResolveByPath(entryPath) is { } found && _interop.RemoveEntry(EntryName.Of(found)) > 0;
+        return ResolveByPath(entryPath) is { } found
+            ? _interop.RemoveEntry(EntryName.Of(found))
+            : DeletionOutcome.NothingMatched;
+    }
+
+    /// <summary>Everything in the recycle bin, or an empty list when there is nothing to recover.</summary>
+    /// <remarks>
+    /// The rows carry no field values — see <see cref="RecycledEntry"/>. A restored entry is read
+    /// back through <see cref="Find(EntryName)"/> like any other.
+    /// </remarks>
+    public IReadOnlyList<RecycledEntry> ReadRecycled()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        return _interop.ReadRecycled();
+    }
+
+    /// <summary>Puts a recycled entry back. Call <see cref="Save"/> to persist it.</summary>
+    /// <param name="id">The identity from <see cref="ReadRecycled"/>.</param>
+    /// <returns>What happened to the entry. Nothing is changed unless this is a restore.</returns>
+    public RestoreOutcome RestoreRecycled(RecycledEntryId id)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        return _interop.RestoreRecycled(id);
+    }
+
+    /// <summary>Removes one recycled entry and its history for good. Call <see cref="Save"/> to
+    /// persist it.</summary>
+    /// <param name="id">The identity from <see cref="ReadRecycled"/>.</param>
+    /// <returns><see langword="true"/> if an entry was removed.</returns>
+    /// <remarks>
+    /// Irreversible, and the only route to that: an entry has to be in the bin before this can
+    /// reach it, so losing a value takes two deliberate acts rather than one.
+    /// </remarks>
+    public bool PurgeRecycled(RecycledEntryId id)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        return _interop.PurgeRecycled(id);
+    }
+
+    /// <summary>Removes everything in the recycle bin for good. Call <see cref="Save"/> to persist
+    /// it.</summary>
+    /// <returns>The number of entries removed.</returns>
+    public int EmptyRecycleBin()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        return _interop.EmptyRecycleBin();
     }
 
     /// <summary>Whether something else has written to <see cref="Path"/> since this vault read

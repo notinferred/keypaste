@@ -139,12 +139,16 @@ internal sealed class KeePassInterop : IDisposable
     }
 
     /// <summary>Returns every entry in the vault, depth-first from the root group.</summary>
+    /// <remarks>
+    /// The recycle bin is not walked. See <see cref="Bin"/> for why that one exclusion is here
+    /// rather than at each of the callers that must not see a deleted entry.
+    /// </remarks>
     internal IReadOnlyList<VaultEntry> ReadEntries()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         List<VaultEntry> entries = [];
-        Collect(_database.RootGroup, string.Empty, entries);
+        Collect(_database.RootGroup, string.Empty, entries, Bin());
         return entries;
     }
 
@@ -168,29 +172,274 @@ internal sealed class KeePassInterop : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         List<string> paths = [];
-        CollectGroups(_database.RootGroup, string.Empty, paths);
+        CollectGroups(_database.RootGroup, string.Empty, paths, Bin());
         return paths;
     }
 
-    /// <summary>Removes the one entry with this name.</summary>
-    /// <returns>The number of entries removed: 0 if nothing matched, otherwise 1.</returns>
+    /// <summary>Whether a delete in this vault moves the entry to the recycle bin.</summary>
+    /// <remarks>
+    /// The vault's own setting, not keypaste's. KeePassXC writes it, a person can turn it off
+    /// there, and a vault whose owner asked for no recycle bin does not get one because keypaste
+    /// would prefer the safety. A caller that must word a confirmation before the act reads this;
+    /// <see cref="RemoveEntry"/> reports what actually happened.
+    /// </remarks>
+    internal bool RecyclesDeletedEntries => _database.RecycleBinEnabled;
+
+    /// <summary>Deletes the one entry with this name, reversibly where the vault allows it.</summary>
+    /// <returns>What happened to the entry.</returns>
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
-    internal int RemoveEntry(EntryName name)
+    /// <remarks>
+    /// <para>
+    /// A recycled entry keeps its UUID, its fields and its whole history, and records the group it
+    /// came from in <c>PreviousParentGroup</c> so <see cref="RestoreRecycled"/> can put it back.
+    /// It gets no tombstone: a tombstone says an object was deleted, and a merge that believed one
+    /// would delete the entry in the other copy of the vault. <see cref="PurgeRecycled"/> is where
+    /// the tombstone belongs, and it is what this method used to do unconditionally.
+    /// </para>
+    /// <para>
+    /// The cost of that change is stated where it matters: a deleted value is still in the file,
+    /// so erasing one is now two deliberate steps rather than one. The alternative was the defect
+    /// V.3a exists to repair — an ordinary mis-click taking an entry and its history with it.
+    /// </para>
+    /// </remarks>
+    internal DeletionOutcome RemoveEntry(EntryName name)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         if (Locate(name) is not { } found)
         {
+            return DeletionOutcome.NothingMatched;
+        }
+
+        if (!_database.RecycleBinEnabled)
+        {
+            found.Group.Entries.Remove(found.Entry);
+            _database.DeletedObjects.Add(new PwDeletedObject(found.Entry.Uuid, DateTime.UtcNow));
+            return DeletionOutcome.DeletedPermanently;
+        }
+
+        PwGroup bin = EnsureBin();
+
+        found.Group.Entries.Remove(found.Entry);
+        found.Entry.PreviousParentGroup = found.Group.Uuid;
+
+        // The three-argument overload stamps LocationChanged, which is when the entry was
+        // deleted, and leaves LastModificationTime and History alone: a delete is not an edit.
+        bin.AddEntry(found.Entry, true, true);
+        return DeletionOutcome.Recycled;
+    }
+
+    /// <summary>Returns everything in the recycle bin, or an empty list when there is none.</summary>
+    internal IReadOnlyList<RecycledEntry> ReadRecycled()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (Bin() is not { } bin)
+        {
+            return [];
+        }
+
+        List<RecycledEntry> rows = [];
+        CollectRecycled(bin, rows);
+        return rows;
+    }
+
+    /// <summary>Puts a recycled entry back where it was deleted from.</summary>
+    /// <returns>What happened to the entry.</returns>
+    internal RestoreOutcome RestoreRecycled(RecycledEntryId id)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (Bin() is not { } bin || LocateRecycled(bin, id) is not { } found)
+        {
+            return RestoreOutcome.NothingMatched;
+        }
+
+        PwGroup? original = OriginalGroupOf(found.Entry);
+        bool toRoot = original is null;
+        PwGroup destination = original ?? _database.RootGroup;
+
+        // Resolved before anything moves. A restore that recreated the one condition every
+        // resolver in keypaste refuses — two entries answering to one name — would deny both of
+        // them to MCP and take out the whole env project for `keypaste run` (D-0091).
+        var restored = new EntryName(
+            PathOf(destination) ?? string.Empty,
+            ReadField(found.Entry, PwDefs.TitleField));
+
+        if (Matches(restored).Count != 0)
+        {
+            return RestoreOutcome.DestinationOccupied;
+        }
+
+        found.Group.Entries.Remove(found.Entry);
+        found.Entry.PreviousParentGroup = PwUuid.Zero;
+        destination.AddEntry(found.Entry, true, true);
+
+        return toRoot ? RestoreOutcome.RestoredToRoot : RestoreOutcome.Restored;
+    }
+
+    /// <summary>Removes one recycled entry and its history for good.</summary>
+    /// <returns>Whether an entry was removed.</returns>
+    internal bool PurgeRecycled(RecycledEntryId id)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (Bin() is not { } bin || LocateRecycled(bin, id) is not { } found)
+        {
+            return false;
+        }
+
+        found.Group.Entries.Remove(found.Entry);
+        _database.DeletedObjects.Add(new PwDeletedObject(found.Entry.Uuid, DateTime.UtcNow));
+        return true;
+    }
+
+    /// <summary>Removes everything in the recycle bin for good.</summary>
+    /// <returns>The number of entries removed.</returns>
+    internal int EmptyRecycleBin()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (Bin() is not { } bin)
+        {
             return 0;
         }
 
-        // Removed outright rather than moved to the recycle bin: a vault the user asked to
-        // delete from should not keep a readable copy of the secret (docs/PRODUCT.md law 3.4). This
-        // takes the entry's history with it, which is the only way a value keypaste previously
-        // wrote can be erased — see DECISIONS.md D-0014.
-        found.Group.Entries.Remove(found.Entry);
-        _database.DeletedObjects.Add(new PwDeletedObject(found.Entry.Uuid, DateTime.UtcNow));
-        return 1;
+        var removed = (int)bin.GetEntriesCount(true);
+
+        // Tombstones every entry and every subgroup it removes, which is what this bin's
+        // contents have earned: they are being deleted, not moved.
+        bin.DeleteAllObjects(_database);
+        return removed;
+    }
+
+    /// <summary>The vault's recycle bin, or null when it has none.</summary>
+    /// <remarks>
+    /// <para>
+    /// <b>One exclusion, at the traversals, rather than a filter at each caller.</b> Everything
+    /// downstream — MCP listing, credential release, env injection, <c>keypaste ls</c> and the
+    /// desktop entry list — reads through <see cref="ReadEntries"/>, <see cref="ReadGroupPaths"/>
+    /// and <see cref="Locate"/>. Filtering there means a deleted credential cannot be released by
+    /// a route somebody forgot to update, which is the failure mode a per-caller filter has.
+    /// </para>
+    /// <para>
+    /// The enabled flag is not consulted here. It decides what a delete does; it does not make the
+    /// entries already in a bin live again, and a vault whose owner turned the bin off after using
+    /// it must not start serving what is in there.
+    /// </para>
+    /// </remarks>
+    private PwGroup? Bin()
+    {
+        return _database.RecycleBinUuid.IsZero
+            ? null
+            : _database.RootGroup.FindGroup(_database.RecycleBinUuid, true);
+    }
+
+    /// <summary>The vault's recycle bin, creating it when there is none.</summary>
+    /// <remarks>
+    /// Named, iconed and configured as KeePass and KeePassXC create it, so the group a person sees
+    /// there is the one they expect rather than a keypaste invention. A RecycleBinUuid naming a
+    /// group that no longer exists is replaced, which is how KeePass treats it too.
+    /// </remarks>
+    private PwGroup EnsureBin()
+    {
+        if (Bin() is { } existing)
+        {
+            return existing;
+        }
+
+        var bin = new PwGroup(true, true, "Recycle Bin", PwIcon.TrashBin)
+        {
+            EnableAutoType = false,
+            EnableSearching = false,
+        };
+
+        _database.RootGroup.AddGroup(bin, true);
+        _database.RecycleBinUuid = bin.Uuid;
+        _database.RecycleBinChanged = DateTime.UtcNow;
+        return bin;
+    }
+
+    private void CollectRecycled(PwGroup group, List<RecycledEntry> rows)
+    {
+        foreach (PwEntry entry in group.Entries)
+        {
+            rows.Add(new RecycledEntry(
+                RecycledEntryId.FromUuidHex(entry.Uuid.ToHexString()),
+                ReadField(entry, PwDefs.TitleField),
+                OriginalGroupOf(entry) is { } original ? PathOf(original) : null,
+                entry.LocationChanged));
+        }
+
+        foreach (PwGroup child in group.Groups)
+        {
+            CollectRecycled(child, rows);
+        }
+    }
+
+    private static (PwGroup Group, PwEntry Entry)? LocateRecycled(PwGroup bin, RecycledEntryId id)
+    {
+        foreach (PwEntry candidate in bin.Entries)
+        {
+            if (string.Equals(candidate.Uuid.ToHexString(), id.UuidHex, StringComparison.Ordinal))
+            {
+                return (bin, candidate);
+            }
+        }
+
+        foreach (PwGroup child in bin.Groups)
+        {
+            if (LocateRecycled(child, id) is { } found)
+            {
+                return found;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>The live group a recycled entry was deleted from, or null when there is none.</summary>
+    /// <remarks>
+    /// Null covers three cases a restore cannot tell apart and does not need to: the vault records
+    /// no previous parent, the group it names is gone, and the group it names is itself recycled.
+    /// </remarks>
+    private PwGroup? OriginalGroupOf(PwEntry entry)
+    {
+        if (entry.PreviousParentGroup.IsZero)
+        {
+            return null;
+        }
+
+        PwGroup? original = _database.RootGroup.FindGroup(entry.PreviousParentGroup, true);
+        if (original is null)
+        {
+            return null;
+        }
+
+        return Bin() is { } bin && (ReferenceEquals(original, bin) || original.IsContainedIn(bin))
+            ? null
+            : original;
+    }
+
+    /// <summary>The group's path, or null when it is not connected to the root group.</summary>
+    private string? PathOf(PwGroup group)
+    {
+        List<string> segments = [];
+
+        PwGroup? current = group;
+        while (current is not null && !ReferenceEquals(current, _database.RootGroup))
+        {
+            segments.Add(current.Name);
+            current = current.ParentGroup;
+        }
+
+        if (current is null)
+        {
+            return null;
+        }
+
+        segments.Reverse();
+        return string.Join("/", segments);
     }
 
     /// <summary>
@@ -276,6 +525,26 @@ internal sealed class KeePassInterop : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         return Locate(name)?.Entry.Uuid.ToHexString();
+    }
+
+    /// <summary>How many deleted-object tombstones the vault carries. A test seam.</summary>
+    internal int TombstoneCount
+    {
+        get
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            return (int)_database.DeletedObjects.UCount;
+        }
+    }
+
+    /// <summary>Turns the recycle bin on or off. A test seam; KeePassXC owns this setting.</summary>
+    internal void SetRecyclesDeletedEntries(bool recycles)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        _database.RecycleBinEnabled = recycles;
+        _database.RecycleBinChanged = DateTime.UtcNow;
     }
 
     /// <summary>The raw history positions of one entry, newest first.</summary>
@@ -682,7 +951,7 @@ internal sealed class KeePassInterop : IDisposable
         entry.Strings.Set(field, new ProtectedString(protect, value));
     }
 
-    private static void Collect(PwGroup group, string groupPath, List<VaultEntry> entries)
+    private static void Collect(PwGroup group, string groupPath, List<VaultEntry> entries, PwGroup? bin)
     {
         foreach (PwEntry entry in group.Entries)
         {
@@ -691,17 +960,27 @@ internal sealed class KeePassInterop : IDisposable
 
         foreach (PwGroup child in group.Groups)
         {
-            Collect(child, ChildPath(groupPath, child.Name), entries);
+            if (ReferenceEquals(child, bin))
+            {
+                continue;
+            }
+
+            Collect(child, ChildPath(groupPath, child.Name), entries, bin);
         }
     }
 
-    private static void CollectGroups(PwGroup group, string groupPath, List<string> paths)
+    private static void CollectGroups(PwGroup group, string groupPath, List<string> paths, PwGroup? bin)
     {
         foreach (PwGroup child in group.Groups)
         {
+            if (ReferenceEquals(child, bin))
+            {
+                continue;
+            }
+
             string childPath = ChildPath(groupPath, child.Name);
             paths.Add(childPath);
-            CollectGroups(child, childPath, paths);
+            CollectGroups(child, childPath, paths, bin);
         }
     }
 
@@ -743,6 +1022,10 @@ internal sealed class KeePassInterop : IDisposable
     /// entries in both while a name lookup sees only the first.
     /// </para>
     /// <para>
+    /// A recycled entry is not a candidate: the bin is skipped exactly as it is in
+    /// <see cref="Collect"/>, so a deleted entry cannot be found, read or removed by name.
+    /// </para>
+    /// <para>
     /// Two entries answering to one name are refused rather than resolved to whichever came first,
     /// because there is no answer that is not a guess (docs/PRODUCT.md law 3.7). KDBX permits that
     /// within one group and KeePassXC will make it; <see cref="EntryHandle"/> is what keeps each of
@@ -751,19 +1034,33 @@ internal sealed class KeePassInterop : IDisposable
     /// </remarks>
     private (PwGroup Group, PwEntry Entry)? Locate(EntryName name)
     {
-        (PwGroup Group, PwEntry Entry)? found = null;
-        var matches = 0;
+        List<(PwGroup Group, PwEntry Entry)> matches = Matches(name);
 
-        Search(_database.RootGroup, string.Empty);
-
-        if (matches > 1)
+        if (matches.Count > 1)
         {
             string where = name.GroupPath.Length == 0 ? "the root group" : name.GroupPath;
             throw new VaultException(
-                $"'{name.Title}' in '{where}' names {matches} entries. keypaste will not guess " +
+                $"'{name.Title}' in '{where}' names {matches.Count} entries. keypaste will not guess " +
                 "which one you meant; rename one of them in KeePassXC.");
         }
 
+        return matches.Count == 0 ? null : matches[0];
+    }
+
+    /// <summary>Every live entry answering to this name, in traversal order.</summary>
+    /// <remarks>
+    /// Split out of <see cref="Locate"/> rather than written twice, for the reason that method's
+    /// own documentation gives: two traversals that could disagree about what a name means is the
+    /// shape of the defect D-0091 found. <see cref="RestoreRecycled"/> needs the count without the
+    /// refusal, because it is asking whether putting an entry back would create the ambiguity
+    /// rather than whether one is already there.
+    /// </remarks>
+    private List<(PwGroup Group, PwEntry Entry)> Matches(EntryName name)
+    {
+        List<(PwGroup Group, PwEntry Entry)> found = [];
+        PwGroup? bin = Bin();
+
+        Search(_database.RootGroup, string.Empty);
         return found;
 
         void Search(PwGroup group, string groupPath)
@@ -774,14 +1071,18 @@ internal sealed class KeePassInterop : IDisposable
                 {
                     if (string.Equals(ReadField(candidate, PwDefs.TitleField), name.Title, StringComparison.Ordinal))
                     {
-                        matches++;
-                        found ??= (group, candidate);
+                        found.Add((group, candidate));
                     }
                 }
             }
 
             foreach (PwGroup child in group.Groups)
             {
+                if (ReferenceEquals(child, bin))
+                {
+                    continue;
+                }
+
                 Search(child, ChildPath(groupPath, child.Name));
             }
         }

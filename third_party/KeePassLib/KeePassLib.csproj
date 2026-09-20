@@ -36,10 +36,15 @@
       KEYPASTE_NO_GFX    drops the System.Drawing.Common decode-PNG-to-Bitmap convenience.
                          PwCustomIcon.ImageDataPng — the bytes that actually live in the
                          KDBX file — is untouched, so custom icons still round-trip.
+      KEYPASTE_KDBX_4_1_MOVES
+                         raises the written format to KDBX 4.1 when a group or entry carries
+                         a PreviousParentGroup. Upstream writes that field only at 4.1 but
+                         never asks for 4.1 on its account, so a recycled entry loses the
+                         place it came from on the next save.
 
-      Both are grep-able markers. Every site they guard is listed in UPSTREAM.md.
+      All three are grep-able markers. Every site they guard is listed in UPSTREAM.md.
     -->
-    <DefineConstants>TRACE;NETSTANDARD2_0;KEYPASTE_NO_DPAPI;KEYPASTE_NO_GFX</DefineConstants>
+    <DefineConstants>TRACE;NETSTANDARD2_0;KEYPASTE_NO_DPAPI;KEYPASTE_NO_GFX;KEYPASTE_KDBX_4_1_MOVES</DefineConstants>
 
     <!--
       docs/PRODUCT.md §3.9: dependencies on the secret path are minimised. This project has

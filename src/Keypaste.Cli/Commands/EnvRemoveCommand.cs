@@ -74,7 +74,9 @@ internal static class EnvRemoveCommand
 
             if (!assumeYes)
             {
-                var answer = context.Prompt.ReadLine($"Remove {entryPath}? [y/N] ");
+                var answer = context.Prompt.ReadLine(vault.RecyclesDeletedEntries
+                    ? $"Move {entryPath} to the recycle bin? [y/N] "
+                    : $"Remove {entryPath}? This vault has no recycle bin. [y/N] ");
                 if (answer is null || !answer.Trim().StartsWith('y') && !answer.Trim().StartsWith('Y'))
                 {
                     context.Stderr.WriteLine("Cancelled.");
@@ -84,7 +86,8 @@ internal static class EnvRemoveCommand
 
             // Nothing removed means nothing to save. Something wrote to the file between the
             // check above and here, and the honest answer is that this run did not do it.
-            if (!store.Remove(project, key))
+            var outcome = store.Remove(project, key);
+            if (outcome == DeletionOutcome.NothingMatched)
             {
                 context.Stderr.WriteLine(
                     $"keypaste env rm: '{entryPath}' was not removed; the vault is unchanged");
@@ -93,7 +96,9 @@ internal static class EnvRemoveCommand
 
             vault.Save();
 
-            context.Stderr.WriteLine($"Removed {entryPath}");
+            context.Stderr.WriteLine(outcome == DeletionOutcome.Recycled
+                ? $"Moved {entryPath} to the recycle bin"
+                : $"Removed {entryPath}");
             return CliApp.ExitSuccess;
         });
     }

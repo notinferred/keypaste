@@ -207,6 +207,58 @@ public sealed class SecretHygieneTests
     }
 
     /// <summary>
+    /// A trash row holds the name and where it came from, and no field value.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="RecycledEntry"/> says in prose that it carries no secret. This is what holds it:
+    /// the same walk every other surface here gets, so adding a <c>Password</c> to that record
+    /// fails a test rather than passing a review. A trash view keeps its whole list for as long as
+    /// it is open, which is exactly the shape 4.1's blanket claim was written against.
+    /// </remarks>
+    [Fact]
+    public void A_trash_row_holds_the_name_and_where_it_came_from_and_no_field_value()
+    {
+        using var fixture = new SentinelVault();
+        using var session = Unlocked(fixture);
+
+        var vault = session.Unlocked!;
+
+        Assert.Equal(
+            DeletionOutcome.Recycled,
+            vault.RemoveEntry(new EntryName(SentinelGroup, SentinelTitle)));
+
+        Assert.Equal(
+            DeletionOutcome.Recycled,
+            vault.RemoveEntry(new EntryName("env/" + SentinelProject, SentinelEnvKey)));
+
+        var rows = vault.ReadRecycled();
+
+        // First, that there is something to sweep. Without this the sweep below passes for a
+        // recovery list that lists nothing at all.
+        Assert.Equal(2, rows.Count);
+        Assert.Contains(rows, row => row.Title == SentinelTitle);
+        Assert.Contains(rows, row => row.OriginalGroupPath == SentinelGroup);
+
+        foreach (var row in rows)
+        {
+            foreach (var text in Surface(row).Concat(Surface(row.Id)))
+            {
+                foreach (var sentinel in new[]
+                {
+                    SentinelPassword,
+                    SentinelUsername,
+                    SentinelUrl,
+                    SentinelNotes,
+                    SentinelEnvValue,
+                })
+                {
+                    Assert.DoesNotContain(sentinel, text, StringComparison.Ordinal);
+                }
+            }
+        }
+    }
+
+    /// <summary>
     /// Selecting an entry widens the surface to the fields that were asked for, and no further.
     /// </summary>
     [Fact]
