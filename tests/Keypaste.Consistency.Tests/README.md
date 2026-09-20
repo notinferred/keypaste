@@ -1,6 +1,6 @@
 # Keypaste.Consistency.Tests
 
-This project references both front ends. Tests edit a vault through desktop view models, then invoke the CLI implementation through `CliApp.Run` to inspect the saved file. They verify shared behavior, not a downloaded executable, native GUI rendering or installation.
+This project references both front ends. Tests edit a vault through desktop view models, then invoke the CLI implementation through `CliApp.Run` to inspect the saved file. They verify shared core behavior. They do not establish a shared unlock session: the current app and CLI open vaults independently. Downloaded executables, native GUI rendering, installation and the planned desktop session each need their own evidence.
 
 ## Why it is in neither solution
 

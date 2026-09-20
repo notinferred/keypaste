@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>keypaste — the safe bridge between your credentials and the AI era</title>
-<meta name="description" content="A local-first, KDBX-compatible vault that stores your passwords and env variables, injects them into your projects, and lets AI agents request exactly one credential — with your approval, scoped access, and a full audit trail.">
+<title>keypaste — a local password manager for projects and AI</title>
+<meta name="description" content="A local KeePass-compatible password manager with project environments and approved AI access. CLI/MCP downloads are available; the shared desktop unlock session is planned.">
 <meta name="color-scheme" content="light dark">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔑</text></svg>">
 <style>
@@ -124,11 +124,11 @@
 </head>
 <body>
 <main>
-  <h1>keypaste <span>&mdash; your agent asks for one password. you say yes or no.</span></h1>
+  <h1>keypaste <span>&mdash; passwords, projects and agent approvals.</span></h1>
 
-  <p class="pitch"><strong>Your AI agent needs a credential. Today your choices are pasting it into a chat window, or handing the agent your whole vault.</strong> keypaste is a third option: an encrypted file on your own disk that releases one credential at a time, only when you approve it, and writes down every time it happens.</p>
+  <p class="pitch"><strong>A local password manager for your credentials, your projects and your AI tools.</strong> keypaste stores credentials in an ordinary KDBX file. Its CLI injects project environments and lets an agent request one credential under your approval or a rule you wrote, with a local audit record.</p>
 
-  <p class="sub">It is also an ordinary password manager. The file opens in KeePassXC. No account, no server, nothing to sign up for.</p>
+  <p class="sub">The planned desktop experience brings vault use, native approval prompts and project launches into one unlock session. Today the published tool is the CLI/MCP, and approvals use a separate terminal process. Local use needs no account or server.</p>
 
   <img src="/demo/keypaste-demo.gif" width="1040" height="583"
        alt="An agent asks keypaste for one credential; a person approves it; the audit log records it."
@@ -151,17 +151,17 @@ keypaste: an agent is asking for a credential.
 Approve? [y/N]
 </pre>
 
-  <p class="caption">The agent approval flow in one screen. An agent asked; you were shown who, what and why; one field goes back, with a time limit on reusing that approval. Expiry does not erase the client's copies or revoke the credential. <a href="https://github.com/notinferred/keypaste/blob/main/docs/demo.md">Watch it end to end</a> — about sixty seconds.</p>
+  <p class="caption">The agent approval flow in one screen. An agent asked; you were shown its requester label, the requested field and its stated reason; one field goes back, with a time limit on reusing that approval. Expiry does not erase the client's copies or revoke the credential. <a href="https://github.com/notinferred/keypaste/blob/main/docs/demo.md">Watch it end to end</a> — about sixty seconds.</p>
 
   
 
   <ul class="bullets">
-    <li><b>Local-first, offline</b> <span>Your vault is a file on your disk. No account, no cloud service holding your secrets, no network required. Sync it yourself with whatever you already use.</span></li>
-    <li><b>Standard KDBX, not a new format</b> <span>Everything keypaste writes opens in KeePassXC and KeePass, proved in both directions against a real keepassxc-cli on Linux, macOS and Windows on every push. If keypaste disappears tomorrow, your data doesn't.</span></li>
+    <li><b>Local-first, offline</b> <span>Your vault is a file on your disk. Local use needs no account, service or network. Existing file-sync tools can transport the encrypted file; keypaste has no merge or managed-sync workflow.</span></li>
+    <li><b>Standard KDBX, not a new format</b> <span>CI checks KDBX read/write compatibility against real keepassxc-cli on Linux, macOS and Windows on qualifying pushes to main and every pull request. Your file remains portable; this does not claim complete KeePassXC feature coverage.</span></li>
     <li><b>Open source, AGPL</b> <span>Auditable by anyone, forever. A tool that handles secrets shouldn't ask to be trusted on faith.</span></li>
   </ul>
 
-  <p class="status"><b>Pre-1.0, and it says so.</b> The vault, the environment-variable injection and the agent bridge all work today and are tested on all three operating systems. The binaries are unsigned, the desktop app is not released yet, and the approval prompt is a terminal prompt rather than a native dialog.</p>
+  <p class="status"><b>Published: CLI/MCP v0.3.0.</b> Local vaults, environment injection and terminal approval are available on four native targets. The binaries are unsigned and there is no public desktop download. The desktop source creates and edits vaults and restores entry history, but it unlocks separately from the terminal approver. Locking the app does not stop that approver; its env screen currently copies a run command.</p>
 
   <h2>Install</h2>
 
@@ -191,7 +191,7 @@ mkdir -p ~/.local/bin &amp;&amp; mv keypaste keypaste-mcp ~/.local/bin/</pre>
   <p class="caption"><b>glibc 2.35 or later</b> — Debian 12, Ubuntu 22.04 and newer. The release workflow runs
      the x64 binary on a clean Debian 12 and requires Alpine to refuse it; the equivalent container check is not implemented for arm64.</p>
 
-  <p class="caption">Windows, Intel Macs, Alpine and building from source are in the <a href="https://github.com/notinferred/keypaste#install">README</a>. There is deliberately no <code>curl | sh</code>: it asks you to run code you have not read, from an origin that is not the repository. And the checksum proves the bytes arrived intact, not who made them — it is served from the same origin as the archive, so anyone who can replace one can replace both. The binaries are unsigned. Building from source is strictly stronger and is documented permanently.</p>
+  <p class="caption">Windows, Intel Macs, Alpine and building from source are in the <a href="https://github.com/notinferred/keypaste#install">README</a>. There is deliberately no <code>curl | sh</code>: it asks you to run code you have not read, from an origin that is not the repository. And the checksum proves the bytes arrived intact, not who made them — it is served from the same origin as the archive, so anyone who can replace one can replace both. The binaries are unsigned. Source-build instructions and the v0.3.0 build-attestation procedure are in the README.</p>
 
   <p class="caption">Then a vault, and a project with no <code>.env</code> in it:</p>
 
@@ -225,7 +225,7 @@ keypaste run dev -- npm start    # injected into the child process, nothing on d
 
   <h2>Connecting it to Claude</h2>
 
-  <p class="caption">Two processes, and the split is the whole design. <code>keypaste-mcp</code> is started by your MCP client, holds no vault and decides nothing. <code>keypaste agent</code> is started by you, holds the vault, and asks you the question at the top of this page.</p>
+  <p class="caption">The current CLI workflow uses two processes. <code>keypaste-mcp</code> is started by your MCP client and forwards requests without opening the vault. <code>keypaste agent</code> is started by you, holds the vault, and asks you the question at the top of this page.</p>
 
 <pre>keypaste agent --vault ~/vault.kdbx</pre>
 
@@ -238,7 +238,7 @@ keypaste run dev -- npm start    # injected into the child process, nothing on d
 
 <pre>keypaste setup --vault ~/vault.kdbx</pre>
 
-  <p class="caption"><strong>Nothing keypaste writes into a client's configuration holds a master password, and nothing ever will.</strong> Every call an agent makes — granted or refused — is one line in a log on your disk, and the value is never in it:</p>
+  <p class="caption"><strong>Nothing keypaste writes into a client's configuration holds a master password, and nothing ever will.</strong> MCP tool calls are logged locally, granted or refused. The bridge excludes the returned field value, but request names and reasons remain and may contain sensitive text:</p>
 
 <pre>
   time (UTC)           client       entry                decision  method
@@ -247,33 +247,13 @@ keypaste run dev -- npm start    # injected into the child process, nothing on d
   2026-07-26 14:07:44  claude-code  env/demo/STRIPE_KEY  denied    out-of-scope
 </pre>
 
-  <h2>How it compares</h2>
+  <h2>The planned desktop experience</h2>
 
-  <p class="caption">Only the wedge — where the secrets live, how they reach a process, and what happens when an agent asks for one. Checked against each vendor's own documentation in July 2026.</p>
-
-  <div class="scroll">
-    <table>
-      <thead>
-        <tr><th></th><th>keypaste</th><th>KeePassXC</th><th>1Password</th><th>Infisical</th></tr>
-      </thead>
-      <tbody>
-        <tr><th>Where secrets live</th><td>a KDBX file you own</td><td>a KDBX file you own</td><td>1Password's service</td><td>Postgres, theirs or yours</td></tr>
-        <tr><th>Usable with no account</th><td>yes</td><td>yes</td><td>no — a membership is required</td><td>no — a server, Postgres and Redis</td></tr>
-        <tr><th>Injecting into a child process</th><td><code>keypaste run dev -- npm start</code></td><td>no</td><td><code>op run -- npm start</code></td><td><code>infisical run -- npm start</code></td></tr>
-        <tr><th>An agent can ask for a credential</th><td>yes, over MCP</td><td>no official integration</td><td>yes, over MCP (beta)</td><td>yes, over MCP</td></tr>
-        <tr><th>A person answers each request</th><td>yes, and no is the default</td><td>—</td><td>yes</td><td>not documented</td></tr>
-        <tr><th>What the agent receives</th><td>one field value; TTL limits approval reuse, not retained copies</td><td>—</td><td>no secret — 1Password injects it instead</td><td>not documented</td></tr>
-        <tr><th>Per-access log</th><td>local JSONL, hash-chained</td><td>no</td><td>yes, on Business</td><td>yes, on the paid tiers</td></tr>
-        <tr><th>Licence</th><td>AGPL-3.0</td><td>GPL-2.0-or-later</td><td>source not published</td><td>MIT core, paid features</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <p class="caption"><strong>keypaste is not the only thing in this space, and pretending otherwise would be the fastest way to lose the argument.</strong> Keeper's MCP server prompts a human before it returns unmasked secret data. Bitwarden published an Agent Access SDK in March 2026 with the same request-and-approve shape, though it is alpha and its logging is not there yet. 1Password's Environments MCP server asks for approval too, and then deliberately never hands the credential over at all — a different answer to the same problem, not a worse one. What is keypaste's is the combination: an ordinary KDBX file you own, no account and no server anywhere, a person answering each request, and a log that never leaves your disk.</p>
+  <p class="caption">The next release focuses on daily vault use and recovery, one unlock session, native MCP approvals and launching a project with its env set. Locking will stop new session-backed secret releases and launches. Values already delivered to an agent or child process remain outside that control. Sharing, hosted services, teams and complete KeePassXC parity are outside this release.</p>
 
   <h2>Tell me when the app ships</h2>
 
-  <p class="caption">The command-line tool is above and works today. The desktop app &mdash; same vault, no terminal &mdash; is next. Leave your email and you get one message when it lands. We ask you to confirm before anything is sent, and there is nothing else to send. Not a newsletter, and not an account.</p>
+  <p class="caption">The CLI/MCP is available above. The intended desktop app uses one unlock session for credentials, native approvals and project launches; it has no public download yet. You can register interest in one installation announcement. Confirmation mail is not implemented, so signups remain unconfirmed and no messages are sent. Any future message requires confirmation first.</p>
 
   <form class="signup" method="post" action="/subscribe">
     <label class="field">
@@ -293,7 +273,7 @@ keypaste run dev -- npm start    # injected into the child process, nothing on d
 
   <footer>
     <p>Security reports: <a href="mailto:security@keypaste.com">security@keypaste.com</a> &middot; Everything else: <a href="https://github.com/notinferred/keypaste/issues">the issue tracker</a></p>
-    <p>This page sets no cookies, loads no third-party scripts, and runs no JavaScript at all. If you enter your email it is stored on a database the maintainer runs, used only to tell you when keypaste ships, and confirmed with you before anything is sent.</p>
+    <p>This page sets no cookies, loads no third-party scripts, and runs no JavaScript at all. If you enter your email it is stored for a possible desktop installation announcement. Addresses remain unconfirmed and no mail is currently sent; confirmation is required before any future message.</p>
   </footer>
 </main>
 </body>

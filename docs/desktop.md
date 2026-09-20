@@ -6,9 +6,11 @@ The desktop app opens the same `.kdbx` vaults as the CLI and locks its session w
 
 ## Current limits
 
-Approvals still happen in the terminal. When an AI agent asks `keypaste-mcp` for a credential, the request goes to a `keypaste agent` you started in your own terminal. The Agent Activity screen currently reports whether that agent is running. The design is settled: the agent owns the approver pipe and the app will connect as a UI client (D-0054 in [DECISIONS.md](decisions-archive.md#d-0054--the-agent-owns-the-approver-pipe-the-app-is-a-client-of-it)). The client channel and approval controls remain step 4.3 in [STEPS](STEPS.md).
+Approvals currently happen in a separate terminal. An AI request goes through `keypaste-mcp` to a `keypaste agent` you started and unlocked yourself. Agent Activity only reports whether that process is running. Unlocking or locking the desktop does not control it.
 
-The desktop app is not published. Build it from source, below. `app.yml` can package desktop archives, an internal unsigned Windows MSI and an internal unsigned Linux AppImage on version tags, but keeps them as workflow artifacts; `release.yml` publishes the CLI/MCP downloads. See [RELEASE](RELEASE.md) for the distribution matrix and remaining desktop publication requirements.
+The focused target is one unlock session for desktop use, MCP requests and env launches, with approval and denial in the app. Locking will stop new releases and launches and cancel pending approvals. This is unfinished work in [STEPS](STEPS.md); the earlier terminal-owned design is no longer the required architecture.
+
+The desktop app is not published. Build it from source, below. CI produces desktop archives and internal unsigned Windows MSI and Linux AppImage candidates. A desktop publication path exists but remains gated; [RELEASE](RELEASE.md) owns the distribution matrix and outstanding signing, publication and installation evidence.
 
 An existing password or variable value can now be stored and replaced in the app, so `keypaste add` and `keypaste env set` are no longer the only way, and an entry's history can be read and restored on its pane, so recovering a replaced password no longer needs KeePassXC. Both forms that generate a secret can generate a passphrase as well as a password. A variable's earlier values are reached the same way, through the entry under `env/<project>` that holds it.
 
@@ -18,7 +20,7 @@ Entries lists titles and groups. The group tree filters the list; search matches
 
 Show history lists what the entry held before, newest first, with the time each value was current; the pane widens and the group tree steps aside while it is open. Selecting a revision shows its username, URL, notes and password beside the current ones. The revision's password is a row of dots until you hold it, as an env value is, and only one can be visible at a time; releasing, switching screens or locking hides it. The current password is still never displayed. Restore this makes the selected revision current and saves, and the value it replaces becomes the newest history item, so a restore can be undone by restoring again. An entry nobody has changed says so rather than showing an empty list, and a vault that changed under the app refuses the restore and says why. KeePass keeps a bounded number of revisions, so restoring one near the end of a long history can drop the oldest.
 
-Env Sets shows project cards with a copyable `keypaste run <project> -- ` command. Opening a card displays masked variables with Copy and Replace buttons. A new variable generates its value unless you untick Generate a value, which reveals a masked field for one you already have; Replace opens the same field for an existing variable. The Characters or Words choice is the same one the entry form offers, over the same generator. Hold a value to reveal it; only one can be visible, and releasing, switching screens or locking hides it.
+Env Sets shows project cards with a copyable `keypaste run <project> -- ` command. It does not launch an app or terminal. The copied CLI command opens the vault separately, asks for its password and closes it before starting the child; it does not reuse the desktop session. Opening a card displays masked variables with Copy and Replace buttons. A new variable generates its value unless you untick Generate a value, which reveals a masked field for one you already have; Replace opens the same field for an existing variable. The Characters or Words choice is the same one the entry form offers, over the same generator. Hold a value to reveal it; only one can be visible, and releasing, switching screens or locking hides it.
 
 Copied secrets clear after twenty seconds, with a countdown and Clear now button. Locking or quitting clears them sooner unless another value has replaced the clipboard. If a copy is still in progress, cleanup waits for it to finish; quitting waits, while locking proceeds immediately. Killing the app prevents cleanup. Copied run commands remain on the clipboard because they contain no secret.
 
@@ -27,6 +29,8 @@ Copied secrets clear after twenty seconds, with a countdown and Clear now button
 Everything the app writes goes through the same core as the CLI. A fresh `keypaste ls`, `keypaste get`, `keypaste env ls` or `keypaste run` invocation reads the saved change from the same file. An already unlocked process, including a terminal approver, retains its in-memory copy until reopened. Both front ends use the serialization code exercised by the KeePassXC compatibility gate.
 
 If the vault file changes while open, the app refuses to save its stale copy. Lock and unlock to load the external change, then reapply your edit. No data is written during the refusal.
+
+The app is a vault editor, not just a viewer. It currently has no recycle bin, concurrent-edit merge or automatic backup/restore workflow. Entry history can recover a replaced value while that entry and vault survive; it cannot recover a deleted entry or a lost file. Keep protected copies of the encrypted vault externally.
 
 ## Building and running it
 
@@ -50,15 +54,15 @@ These are the native GUI prerequisites for the current packaging targets. Buildi
 | macOS | No separate browser engine or .NET runtime for a self-contained archive |
 | Linux | `libx11-6 libice6 libsm6 libfontconfig1`, and an X11 or XWayland session. The AppImage also needs FUSE: `/dev/fuse` and a setuid-root `fusermount3`, which `fuse3` provides; its runtime carries libfuse 3, so `libfuse2` is not needed |
 
-Upgrading is a matter for the package. The Windows MSI is a per-user major upgrade: installing a higher version replaces the lower one in place, the previous version is removed only once the new install commits, so an upgrade that fails partway leaves the one you had installed and runnable, and the MSI refuses a lower version over a higher one. An AppImage has no installer, so an upgrade is a new file put in place of the old one. Neither package holds your data: the vault, `app.toml`, `recent.toml`, `policy.toml` and `audit.jsonl` are untouched by an upgrade, and uninstalling removes the install folder and the Start menu shortcut while leaving `~/.keypaste` and your vault alone. Step 4.7d in [STEPS](STEPS.md) checks all of that, including an install that fails partway, on the internal candidates; no desktop package is published yet.
+Upgrading is a matter for the package. The Windows MSI is a per-user major upgrade: installing a higher version replaces the lower one in place, the previous version is removed only once the new install commits, so an upgrade that fails partway leaves the one you had installed and runnable, and the MSI refuses a lower version over a higher one. An AppImage has no installer, so an upgrade is a new file put in place of the old one. Neither package holds your data: the vault, `app.toml`, `recent.toml`, `policy.toml` and `audit.jsonl` are untouched by an upgrade, and uninstalling removes the install folder and the Start menu shortcut while leaving `~/.keypaste` and your vault alone. Recorded internal-candidate checks include upgrade and interrupted-install recovery; they do not establish a public desktop installation. See [RELEASE](RELEASE.md) for their evidence.
 
-Avalonia draws with Skia; the app does not embed WebKit or Chromium. 4.7b installed and exercised the internal candidates on fresh `windows-2025` and `ubuntu-24.04` runners (D-0205); supported OS versions and the Linux distribution baseline beyond those runner images remain unverified. A renderer's glibc baseline alone does not establish the app's support range.
+Avalonia draws with Skia; the app does not embed WebKit or Chromium. Internal installation checks exercised the candidates on fresh `windows-2025` and `ubuntu-24.04` runners (D-0205); supported OS versions and the Linux distribution baseline beyond those runner images remain unverified. A renderer's glibc baseline alone does not establish the app's support range.
 
 ## Opening a vault
 
-Open a vault by dragging a `.kdbx` onto the window, choosing Browse (`Ctrl/Cmd+O`), or selecting a recent vault.
+Open a vault by dragging a `.kdbx` onto the window, choosing Browse, or selecting a recent vault.
 
-Whichever you use, the file's header is read before you are asked for a password, so a file that was never a vault is refused immediately rather than after you have typed. [PRODUCT](PRODUCT.md#4-engineering-laws) §4.2 requires shared core logic, with neither front end waiting for the other.
+Whichever you use, the file's header is read before you are asked for a password, so a file that was never a vault is refused immediately rather than after you have typed. [PRODUCT](PRODUCT.md) requires both front ends to use shared core rules.
 
 ## Creating a vault
 
@@ -67,6 +71,8 @@ Create makes a new vault without a terminal. It asks where the file goes through
 The refusals are the ones `keypaste init` makes, because both front ends ask the same code: a path something already occupies is refused and that file is left exactly as it was, an empty password is refused, and a confirmation that does not match is refused. Nothing is written until all three have passed, so a refused attempt leaves the disk as it found it, and cancelling the picker writes nothing at all. The vault is remembered in `recent.toml` only once it exists and the app has opened it.
 
 A new vault opens on an empty Entries list. Add entries there, or with `keypaste add` in a terminal against the same file.
+
+`Ctrl/Cmd+O` is not implemented; use Browse on the unlock screen. The missing shortcut remains a delivery gap in [STEPS](STEPS.md).
 
 ## Locking
 
@@ -90,7 +96,6 @@ The app provides these shortcuts and focus navigation. Verify the full keyboard-
 |---|---|
 | `Ctrl/Cmd+1` … `5` | Entries, Env Sets, Agent Activity, Log, Settings |
 | `Ctrl/Cmd+L` | Lock now |
-| `Ctrl/Cmd+O` | Open a vault |
 | `Tab` / `Shift+Tab` | Move between controls |
 | `↑` `↓` | Move within the sidebar or the recent list |
 | `Enter` | Unlock |
@@ -116,7 +121,7 @@ The app writes forward slashes in `recent.toml`, including `C:/Users/…` on Win
 
 ## The Log screen
 
-The Log screen reads `~/.keypaste/audit.jsonl` through the same renderer as `keypaste log` (DECISIONS.md D-0032). It needs no unlocked vault. Verify chain checks the audit hash chain.
+The Log screen reads `~/.keypaste/audit.jsonl` through the same renderer as `keypaste log` ([D-0032](decisions-archive.md)). The reader and `keypaste log` need no unlocked vault; the current desktop exposes this screen only after unlock. Verify chain checks the audit hash chain.
 
 A missing log is normal before the MCP bridge has initialized one. Requests and bridge events populate it; opening the desktop Log screen does not require a prior credential release.
 
@@ -132,7 +137,7 @@ Keystrokes still arrive as short-lived immutable strings, and an input method ca
 
 ## Checking a build by hand
 
-CI builds and packages on three operating systems; the current desktop logic tests do not verify rendered pixels. Rendering coverage remains step 4.6. `install-desktop.yml` (4.7b) installs internal candidates on fresh runners and drives the installed app, but a browser download's SmartScreen prompt and a person's use are still observed only by hand. Use a disposable vault with harmless test values for this manual checklist before any release that includes the app:
+CI builds and packages on three operating systems; current desktop logic tests do not establish rendered pixels or a complete native workflow. `install-desktop.yml` installs internal candidates on fresh runners and drives the installed app, but a browser download's SmartScreen prompt and a person's use are still observed only by hand. Use a disposable vault with harmless test values for this manual checklist before any release that includes the app:
 
 1. Launch with no `recent.toml`: the empty state offers Create, names dragging and Browse, and does not look broken.
 2. Open a vault by drag, and again by the picker. A non-`.kdbx` file is refused before the password field.
@@ -144,14 +149,14 @@ CI builds and packages on three operating systems; the current desktop logic tes
 8. Suspend the machine for longer than the timeout. It wakes locked.
 9. The theme follows the OS, and both light and dark read as calm. Choose Dark, quit and relaunch: the first frame is dark, with no flash of the light one on the way.
 10. Set `idle_timeout_seconds = 137` in `app.toml` and relaunch. Settings must display it, locking must occur at 137 seconds, and the file must remain unchanged.
-11. Set a long idle timeout to isolate minimize locking. Enable "Lock when the window is minimized", minimize and restore: expect the unlock screen. Disable it, minimize and restore: expect an unlocked vault and a running idle countdown. Enable it again, quit and relaunch without opening Settings; minimizing must lock. A password copied before locking must no longer paste. `docs/STEPS.md` F.2b2 owns the runner results for macOS and Linux; the real-desktop record is deferred to Expansion as F.2b3.
+11. Set a long idle timeout to isolate minimize locking. Enable "Lock when the window is minimized", minimize and restore: expect the unlock screen. Disable it, minimize and restore: expect an unlocked vault and a running idle countdown. Enable it again, quit and relaunch without opening Settings; minimizing must lock. A password copied before locking must no longer paste. Recorded runner results do not replace a person's check on a real macOS or Linux desktop.
 12. The Log screen matches `keypaste log` for the same `~/.keypaste/audit.jsonl`.
 13. Agent Activity says the right thing both with and without a `keypaste agent` running.
 14. Entries lists titles and groups. Filter by a group and search for part of a title or group path; case changes still match. Selecting an entry shows a username, a URL and notes, and a row of dots where the password is.
 15. Copy a password and check the countdown and progress bar. It must paste before the timeout and be absent afterward.
 16. Copy, then `Ctrl/Cmd+L`. Paste: nothing.
 17. Copy, then quit the app. Paste: nothing.
-18. On Windows with Clipboard History enabled and permitted by policy, copy a harmless control string and confirm Win+V contains it. Then copy an app password and check that Win+V excludes it. `keypaste get` has set the same formats since D-0056; native CLI verification belongs to step 1.5a in `docs/STEPS.md`.
+18. On Windows with Clipboard History enabled and permitted by policy, copy a harmless control string and confirm Win+V contains it. Then copy an app password and check that Win+V excludes it. `keypaste get` has set the same formats since D-0056; native CLI verification is still needed; unit checks alone do not establish absence from Win+V.
 19. Hold an Env Sets value to reveal it, then release to hide it. Holding another row must reveal only that row.
 20. Copy a project's run command, paste it in a terminal, finish the line: it runs with the project's variables.
 21. Add, edit and delete an entry, then check `keypaste ls` and `keypaste get` in a terminal.
@@ -169,7 +174,7 @@ CI builds and packages on three operating systems; the current desktop logic tes
 
 ## Observing minimize-lock on macOS and Linux
 
-Item 11 has been observed on Windows. macOS and Linux require native checks because headless tests cannot establish what their window managers report. `docs/STEPS.md` F.2b2 owns the results: `observe-desktop.yml` drives these checks on `macos-15` and on Xvfb with Openbox through [observe-minimize-lock.sh](../scripts/observe-minimize-lock.sh), and both passed. What a runner cannot observe, a person's own minimize click and, on macOS, the `Cmd+H` keystroke, is deferred to Expansion as F.2b3, recorded on a real macOS machine and Linux desktop.
+Item 11 has been observed on Windows. macOS and Linux require native checks because headless tests cannot establish what their window managers report. `observe-desktop.yml` drives these checks on `macos-15` and on Xvfb with Openbox through [observe-minimize-lock.sh](../scripts/observe-minimize-lock.sh), and both passed. What a runner cannot observe, a person's own minimize click and, on macOS, the `Cmd+H` keystroke, still needs to be recorded on a real macOS machine and Linux desktop.
 
 Download the seven-day `app-<rid>` artifact from `app.yml`, or publish locally:
 
@@ -188,4 +193,4 @@ Use a disposable vault and set an idle timeout long enough to exclude it as the 
 
 Switching windows must leave the app unlocked. On macOS, `Cmd+H` hides the app and must also leave it unlocked; `Cmd+M` minimizes it.
 
-Record the OS name, version and build; session type and desktop environment; app build or tag; and each result in F.2b3, following F.2b1. If a window manager reports no minimize event, record that result and update `MinimizeLock.IsSupported` to omit the unsupported checkbox. Untested targets remain unobserved.
+Record the OS name, version and build; session type and desktop environment; app build or tag; and each result with the selected platform task. F.2b3 covers the focused Windows/Linux release; macOS observation is needed if that desktop target is selected from BACKLOG. If a window manager reports no minimize event, record that result and update `MinimizeLock.IsSupported` to omit the unsupported checkbox. Untested targets remain unobserved.

@@ -2,7 +2,7 @@
 
 Owns the marks, the palette, the type and the usage rules. Every surface — desktop app, CLI, site, store listing, installer — takes its visual values from here. Where a value also has to exist as code, this page names the file that holds it and that file is generated from or checked against these values; it does not carry a second opinion.
 
-**Status:** adopted 2026-09-08 and not yet applied. The desktop app and the site still draw their earlier palettes, and no STEPS row carries this identity into them yet.
+**Status:** adopted 2026-09-08 and not yet applied. The desktop app and the site still draw their earlier palettes. Apply these assets when relevant interface work calls for them; a complete brand rollout is not a separate gate for the focused local release.
 
 ## Colour
 

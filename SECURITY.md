@@ -63,6 +63,8 @@ An attestation shows which repository, workflow, tag and commit produced the byt
 
 [PRODUCT §3](docs/PRODUCT.md) owns the security laws. The master key stays in the local process. Agent releases require human approval or a user-written policy, are limited to an authorized field and lifetime, and require a local audit record. Errors deny release. Keypaste uses library cryptography and collects no telemetry on secret content or entry names. Explicit plaintext export has the limits described below. [THREATS.md](THREATS.md) records the threat model, mitigations and residual risks.
 
+The current desktop, terminal approver and `keypaste run` do not share an unlock session. Desktop lock affects its own session only; the terminal approver remains unlocked until stopped, and `run` separately opens and closes its vault before launching a child. The shared-session behavior in [PRODUCT](docs/PRODUCT.md) is a delivery requirement, not a current guarantee. It will govern new releases and launches; it cannot recall copied values, erase client transcripts or revoke credentials at their issuers.
+
 ### Secret input in the desktop app
 
 `ConsoleSecretPrompt` reads characters into a clearable buffer without forming a password string. Desktop input arrives from Avalonia as immutable strings that cannot be wiped, including multi-character input-method events. The OS keyboard layer, input methods and keyloggers remain outside this boundary.
@@ -81,7 +83,9 @@ Both Windows front ends request exclusion from Clipboard History and Cloud Clipb
 
 ### Editing your vault from the app
 
-The app and CLI write through the same core library and KeePassXC compatibility boundary. If the file changes while the app holds an unlocked copy, the app refuses to save. Lock and unlock to load the other change before making yours again. This protects changes absent from the app's in-memory history.
+The app and CLI write through the same core library and KeePassXC compatibility boundary. If the file changes while the app holds an unlocked copy, the app refuses to save. Lock and unlock to load the other change before making yours again. This protects changes absent from the app's in-memory history. An already-open terminal approver also retains its snapshot until reopened.
+
+Current deletion permanently removes the entry and its history. There is no recycle bin, concurrent-edit merge or automatic encrypted backup/restore workflow. Entry history is inside the vault, so it does not protect against losing the file. Keep protected copies externally.
 
 ## Memory and authorization limits
 
@@ -99,9 +103,9 @@ Client labels are unauthenticated. A local program can start a bridge with anoth
 
 Inline values in `keypaste env set project KEY=value` can enter shell history and remain visible in process arguments. The command warns on stderr. Use `keypaste env set project KEY` with a prompt or pipe to avoid that argument exposure; warning suppression remains O-0009.
 
-Updating an existing variable preserves its previous value in encrypted KDBX history, subject to KeePass's ten-item history limit. KeePassXC can display it; Keypaste currently cannot. Removing the entry removes its history from the active vault, and re-adding starts a new history. Credential rotation still requires revocation at the issuer.
+Updating an existing variable preserves its previous value in encrypted KDBX history, subject to KeePass's ten-item history limit. KeePassXC can display it; the source-built Keypaste desktop can display and restore it through the corresponding entry's history pane. Removing the entry removes its history from the active vault, and re-adding starts a new history. Credential rotation still requires revocation at the issuer.
 
-`keypaste run` passes values in the child's environment. Process inspection, descendants, crash reporters and application logs can expose them. Keypaste itself writes no environment file; `verify-run-injection.sh` checks that temporary directories remain empty. On Windows, closing the console can terminate Keypaste while leaving the child running. Keypaste forwards supported termination signals and waits for the child without escalating to a hard kill, so a child that ignores termination can keep it waiting.
+`keypaste run` closes the vault before starting the child and passes values in the child's environment. Locking the desktop does not stop the child or erase its environment. Process inspection, descendants, crash reporters and application logs can expose them. Keypaste itself writes no environment file; `verify-run-injection.sh` checks that temporary directories remain empty. On Windows, closing the console can terminate Keypaste while leaving the child running. Keypaste forwards supported termination signals and waits for the child without escalating to a hard kill, so a child that ignores termination can keep it waiting.
 
 `keypaste env pull` deletes only the imported source when its path and content still match. Changed, replaced, linked or removed sources are retained or reported. Removal first moves the file beside itself and verifies it under that name to protect an editor's intervening save. Hard links, bind mounts, `subst`, mapped-drive versus UNC aliases and Windows 8.3 names remain unresolved identities; content checks provide additional protection.
 

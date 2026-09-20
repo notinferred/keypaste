@@ -2,7 +2,9 @@
 
 This describes current source behavior. The public CLI/MCP release is `v0.3.0`, which includes exception-path auditing, display hardening, resolved entry names and the save and approval-bridge repairs listed under 0.3.0 in [CHANGELOG.md](CHANGELOG.md). Desktop behavior describes the source-built app, which has no public release. [docs/RELEASE.md](docs/RELEASE.md) owns distribution status.
 
-The scope is `keypaste-mcp`, the bridge between an AI agent and a vault. [SECURITY.md](SECURITY.md) covers the vault, CLI and project-wide limits. PRODUCT §3 governs both documents. Each threat names its evidence and remaining gaps. T-13's preview of entries currently matched by a rule remains deferred to the desktop Agent Activity screen, [STEPS 4.3b](docs/STEPS.md). T-26 states the planned boundary for shares and relay drops, which are not implemented.
+The scope is `keypaste-mcp`, the bridge between an AI agent and a vault, together with its current desktop and local-data boundaries. [SECURITY.md](SECURITY.md) covers the vault, CLI and project-wide limits. PRODUCT §3 governs both documents. Each threat names its evidence and remaining gaps.
+
+The shared unlock session and native approval flow in [STEPS](docs/STEPS.md) are not implemented. Current desktop lock does not stop the terminal approver or revoke values already delivered to a child or client. Hosted services and sharing are uncommitted options in [BACKLOG](docs/BACKLOG.md); this document makes no security guarantees for them.
 
 ## What the bridge does
 
@@ -138,7 +140,7 @@ A human refusal starts a sixty-second cooldown for the same connection, entry an
 
 Optional policy `max_per_hour` limits silent releases per rule, process-wide, on a sliding hour window. Exhausting it denies the request rather than falling through to a prompt. `keypaste policy ls` states when no limit exists. Reconnecting cannot reset a rule's allowance.
 
-There is no prompt limit across different entries, hourly client-wide cap or pause-client switch. Requests for twenty different entries can produce twenty prompts; unanswered prompts wait up to forty-five seconds each. Policy quotas do not limit this prompted path. Per-client controls remain STEPS 4.3b.
+There is no prompt limit across different entries, hourly client-wide cap or pause-client switch. Requests for twenty different entries can produce twenty prompts; unanswered prompts wait up to forty-five seconds each. Policy quotas do not limit this prompted path. Additional prompt controls are not implemented.
 
 Evidence: `ConcurrentRequestsTests` holds a prompt through a real MCP connection and checks immediate audited busy refusals, listing contention, no approver delivery and continued operation after five refusals. `ApproverClientTests.TwoExchangesAtOnce_AreABrokenInvariantRatherThanAQueue` checks the lower-layer invariant. `ApprovalGateTests.ASecondRequestWhileSomebodyIsDeciding_IsRefusedNotQueued` and `TheSameRequestRightAfterARefusal_IsDeniedWithoutAskingAgain` cover the gate and cooldown; boundary refusals do not arm that cooldown. Paired `ServerToolsTests` check when “do not retry” is present or absent. `PolicyGateTests.TheAllowanceComesBackOneReleaseAtATime_AnHourAfterEachWasSpent` and `TheAllowanceBelongsToTheRule_NotToTheCaller` cover quota scope and timing.
 
@@ -162,7 +164,7 @@ The namespace's contents can also change after authorization. A synced vault, co
 
 `keypaste policy ls` renders the parsed group and title constraints separately. Rules use the same `EntryExposure` matcher as exposure: separate raw group/title values, ordinal case-sensitive comparison (D-0021). Ambiguous names deny rather than selecting an entry. Every bridge release identifies its rule in terminal output and the audit log.
 
-Nothing prevents later vault changes from widening what a standing rule covers. A current-match preview requires an unlocked vault and remains deferred to the desktop Agent Activity screen, STEPS 4.3b. `keypaste log` and `keypaste policy ls` remain usable without unlocking a vault; the former shows past rule use but cannot preview future matches.
+Nothing prevents later vault changes from widening what a standing rule covers. A current-match preview requires an unlocked vault and is not implemented. `keypaste log` and `keypaste policy ls` remain usable without unlocking a vault; the former shows past rule use but cannot preview future matches.
 
 Evidence: `PolicyRuleTests.APolicyRuleWithATrailingStar_ConstrainsTheTitleNotTheGroup` tests both matching directions; `ARuleUsesTheSameMatcherAsTheExposure` compares real matcher decisions; `ATitleFullOfSlashes_CannotSatisfyAGroupPattern` and `PolicyVerbTests.ItRendersWhatEachPatternParsedTo_NeverTheLineTheUserWrote` cover path and display constraints. No test claims to prevent a vault changing under a standing rule.
 
@@ -214,7 +216,7 @@ On Windows, both front ends set the three opt-out formats for Clipboard History 
 
 Cleanup requires a surviving process. A crash, forced termination, OOM kill, power loss or logout can leave the value. X11 and Wayland clipboard ownership can outlive keypaste in `xclip` or `wl-copy`. Third-party managers can ignore the Windows formats, and RDP, Citrix or VDI can copy values to another machine. History, pasted values and immutable memory copies cannot be erased; the desktop's own paste into a secret field reads the clipboard without taking ownership of it or clearing it, so whatever was copied stays there. keypaste sets no equivalent history marker on macOS or Linux; `org.nspasteboard.ConcealedType` is a community convention and O-0019 remains open. Copied `keypaste run <project> --` commands contain no secret and are intentionally left on the clipboard.
 
-Evidence: `ClipboardCountdownTests` and `ClipboardWritesDoNotOutliveTheAppTests` cover completed and pending writes. CLI coverage includes `VerbTests.Get_ClipboardChangedSinceTheCopy_IsLeftAlone` and `Get_WithoutShow_CopiesToTheClipboard_AndNeverToStdout`. `WindowsClipboardWriterTests` requires all formats in one open/close session because `CloseClipboard` triggers history notification. `Win32ClipboardFormatNameTests` round-trips names through `GetClipboardFormatName` and reproduces KeePassXC's trailing-space defect as a failing control. Shipped-binary absence from Win+V requires the manual verifier in STEPS 1.5a and is not established by these tests. `SecretHygieneTests` checks bridge output, whose implementation has no clipboard path.
+Evidence: `ClipboardCountdownTests` and `ClipboardWritesDoNotOutliveTheAppTests` cover completed and pending writes. CLI coverage includes `VerbTests.Get_ClipboardChangedSinceTheCopy_IsLeftAlone` and `Get_WithoutShow_CopiesToTheClipboard_AndNeverToStdout`. `WindowsClipboardWriterTests` requires all formats in one open/close session because `CloseClipboard` triggers history notification. `Win32ClipboardFormatNameTests` round-trips names through `GetClipboardFormatName` and reproduces KeePassXC's trailing-space defect as a failing control. Shipped-binary absence from Win+V requires native observation and is not established by these tests. `SecretHygieneTests` checks bridge output, whose implementation has no clipboard path.
 
 ## T-20 — A stolen vault file
 
@@ -260,7 +262,7 @@ This protects an unattended interface. Switching windows, covering the window or
 
 Locking cannot erase immutable copies or undo a memory read made while unlocked (T-18). It also does not lock the separate `keypaste agent` process, which has no idle lock and must be stopped (docs/approvals.md).
 
-Evidence: `AppVaultSessionTests.It_locks_when_the_timeout_passes`, `A_suspended_machine_wakes_locked_even_though_the_timer_never_fired` and `There_is_no_never` cover session deadlines and settings. `MinimizeLockTests` uses real window state and the launch composition to cover enabled/disabled settings, restart, live changes, restore, other states and an already-locked session. These tests do not establish memory erasure. Native minimize behavior has been observed by hand on Windows 10 and, through F.2b2's observer, on `ubuntu-24.04` under Xvfb and Openbox and on `macos-15`; the real-desktop record of a person's own minimize click and `Cmd+H` keystroke on macOS and Linux is deferred to Expansion as STEPS F.2b3. The move Windows sends at a resting cursor when a window is restored no longer postpones the idle lock, and activity arriving after the deadline locks rather than reviving the session: `ActivityWatchTests` and `AppVaultSessionTests.A_touch_after_the_deadline_locks_instead_of_reviving` cover both, and the Windows observation now passes (STEPS F.13, D-0202).
+Evidence: `AppVaultSessionTests.It_locks_when_the_timeout_passes`, `A_suspended_machine_wakes_locked_even_though_the_timer_never_fired` and `There_is_no_never` cover session deadlines and settings. `MinimizeLockTests` uses real window state and the launch composition to cover enabled/disabled settings, restart, live changes, restore, other states and an already-locked session. These tests do not establish memory erasure. Native minimize behavior has been observed by hand on Windows 10 and, through F.2b2's observer, on `ubuntu-24.04` under Xvfb and Openbox and on `macos-15`; the real-desktop record of a person's own minimize click and `Cmd+H` keystroke on macOS and Linux is still outstanding. The move Windows sends at a resting cursor when a window is restored no longer postpones the idle lock, and activity arriving after the deadline locks rather than reviving the session: `ActivityWatchTests` and `AppVaultSessionTests.A_touch_after_the_deadline_locks_instead_of_reviving` cover both, and the Windows observation now passes (STEPS F.13, D-0202).
 
 ## T-24 — `recent.toml` tells anything that can read `~/.keypaste` where your vaults are
 
@@ -281,21 +283,3 @@ Release, dragging off, loss of pointer capture, the pointer leaving the window o
 The display remains readable to people, screenshots, recordings, screen-sharing and remote-desktop sessions. Rendering also creates an immutable string that cannot be wiped; its copies fall under T-18. Ending reveal cannot erase a capture.
 
 Evidence: `RevealedValueTests` covers hold/release, visual-tree removal, styled properties and `No_automation_property_carries_the_value_while_it_is_shown`. `SecretHygieneTests` checks session behavior for an env value and for a superseded password. `HistoryRevealAutomationTests` compares the whole window automation surface at rest with the same window while a revision is revealed, requiring them equal, and sweeps it for the revealed characters (D-0232). Screen capture remains outside those guarantees.
-
-## T-26 — Shares and relay drops (planned)
-
-No share, receive or relay code exists. This entry states the boundary PRODUCT v1.4 plans (D-0176), so the rows that build it (STEPS 5.2a–c, 5.4a–b, 1.4b–c, E.1, H.8, 7.1c) are held to it.
-
-A share is a KDBX4 file holding only the chosen entries or env set under a generated six-word passphrase. A relay drop stores its bytes under an unguessable ID, at most 1 MB for at most 7 days, optionally deleted on first download, without accounts and rate-limited. The passphrase never reaches the relay; the sender sends it by a second channel. Sharing to a local file involves no relay.
-
-Anyone holding the link can download the drop and guess the passphrase offline. KDBX4's Argon2 key derivation and the passphrase's entropy are the only protection, as in T-20. When a drop is deleted on first download, a receiver who finds it gone learns that someone fetched it first and must treat the credentials as disclosed. Anyone holding both the link and the passphrase can read the share.
-
-Version 1 shares are unsigned. An attacker controlling only the link channel cannot produce a file the real passphrase opens, but one controlling both channels can substitute a share, and keypaste cannot tell. Sealing to a recipient's locally generated key and signing by the sender (7.1c) close that gap with keys exchanged by any means, and need no subscription.
-
-The relay operator, hosted or self-hosted, sees drop sizes, times, client addresses and IDs. KDBX4 encrypts entry names and values; the outer header's cipher and key-derivation parameters stay visible. ID length and rate limits bound enumeration; they do not prevent a flood from denying service.
-
-Receiving merges by UUID under D-0157, so a share can change an existing entry whose UUID it carries, and a crafted later modification time wins. The receive preview names every entry a merge would add, change or delete before anything is written, and each replaced value stays in entry history. Names inside a share are untrusted input (T-1) and can reach an agent once merged into an exposed group.
-
-Expiry is entry metadata that keypaste enforces: it refuses to inject an expired value and warns when receiving one. Other KeePass tools ignore it, a moved clock can defeat it, and it recalls nothing. A downloaded copy cannot be recalled; revocation means rotating the credential at its issuer.
-
-Evidence: none. Each row named above adds its own before this entry describes current behavior.

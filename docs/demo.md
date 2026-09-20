@@ -2,7 +2,7 @@
 
 This demo uses two terminals to show a failed deploy, a credential request, approval and a successful retry, followed by its audit record. The recorded flow takes about sixty seconds.
 
-`keypaste agent` holds the vault and asks for approval. Your MCP client starts `keypaste-mcp`, which forwards requests without holding a vault. You start the approver yourself. [Approvals](approvals.md) explains what you authorize.
+`keypaste agent` holds the vault and asks for approval. Your MCP client starts `keypaste-mcp`, which forwards requests without holding a vault. You start the approver yourself. Its unlock is independent of the desktop app, and locking that app does not stop this approver. The planned shared desktop session and native approval dialog are not part of this demo. [Approvals](approvals.md) explains what you authorize.
 
 The terminal output below was captured from real keypaste processes. Claude's actions and wording can vary between runs.
 
@@ -89,7 +89,7 @@ keypaste: nothing is released without you saying yes. Press Ctrl+C to stop.
 
 Unlocking pauses for Argon2 key derivation. The pipe suffix is derived from the home directory and will differ on your machine.
 
-Leave it running. Ctrl+C locks the vault again.
+Leave it running. Ctrl+C stops this approver and closes its vault; it does not control another process's unlocked session or erase credentials already released.
 
 <a id="008--ask-for-the-deploy"></a>
 
@@ -248,4 +248,4 @@ The tool returns the credential as both text and structured data. Claude can ret
 
 `scripts/verify-demo.sh` runs real CLI and MCP processes on Linux, macOS and Windows. It compares the approval dialog byte for byte, exercises both deploy paths, checks that refusal returns no credential, and checks that the credential stays out of deploy output and the audit log.
 
-The harness sends fixed MCP calls; it does not run Claude. Observing the model remains part of the manual demo. [DECISIONS.md](../DECISIONS.md) D-0034 explains the reproducibility requirement and the two prompt lines the harness cannot observe.
+The harness sends fixed MCP calls; it does not run Claude. Observing the model remains part of the manual demo. [D-0034](decisions-archive.md) explains the reproducibility requirement and the two prompt lines the harness cannot observe.

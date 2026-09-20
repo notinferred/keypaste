@@ -1,5 +1,11 @@
 # keypaste
 
+keypaste is being built as a local, KeePass-compatible password manager with project environments and human-approved AI access. The intended desktop workflow is one unlock session for the vault, native MCP approvals and project launches.
+
+The published CLI already stores passwords and environment variables in a local KDBX vault, injects variables into child processes, and lets AI agents request one credential at a time through scoped approvals and a local audit log. The shared desktop session is not implemented yet.
+
+## Current CLI demo
+
 ![An agent asks keypaste for one credential; a person approves it; the audit log records it.](docs/demo/keypaste-demo.gif)
 
 ```
@@ -19,15 +25,13 @@ keypaste: an agent is asking for a credential.
 Approve? [y/N]
 ```
 
-keypaste stores passwords and environment variables in a local KDBX vault, injects variables into child processes, and lets AI agents request one credential at a time through scoped approvals and a local audit log.
-
 [The demo](docs/demo.md) shows a credential request, approval and deploy in about sixty seconds.
 
-The vault is a file on your disk and works without an account or network. You can sync it with your existing file-sync service. Vaults open in KeePassXC and KeePass. CI checks read/write compatibility against a real `keepassxc-cli` on Linux, macOS and Windows on qualifying pushes to `main` and every pull request. The code is open source under AGPL-3.0.
+The vault is a file on your disk and works without an account or network. You can transport the encrypted file with your existing file-sync service; keypaste has no merge or managed-sync workflow. CI checks read/write compatibility against a real `keepassxc-cli` on Linux, macOS and Windows on qualifying pushes to `main` and every pull request. KDBX compatibility does not mean complete KeePassXC feature coverage. The code is open source under AGPL-3.0.
 
 The published download is pre-1.0 CLI/MCP `v0.3.0`. Replace `v0.2.0`: a save racing another program's save could undo it without keeping the lost change in history. Replace `v0.1.0`: it could also delete a vault through `env export`, modify the wrong entry through `env rm`, and return the wrong password through `get`. [CHANGELOG](CHANGELOG.md#030) lists what `v0.3.0` repairs. Published versions are immutable, so both remain available with those defects.
 
-The [desktop app](docs/desktop.md) browses and edits these vaults but has no public release. Credential approvals still use the terminal. [RELEASE](docs/RELEASE.md) defines distribution status, [STEPS](docs/STEPS.md) owns delivery tasks, and [PRODUCT](docs/PRODUCT.md) defines product commitments.
+The [desktop app](docs/desktop.md) creates and edits vaults and restores entry history in source, but has no public release. Credential approvals still use a separately unlocked terminal process; locking the app does not lock that process. The app's env screen copies a run command rather than launching a project. [RELEASE](docs/RELEASE.md) defines distribution status, [STEPS](docs/STEPS.md) owns the focused desktop plan, and [PRODUCT](docs/PRODUCT.md) defines product commitments. Broader ideas are in [BACKLOG](docs/BACKLOG.md).
 
 ## Install
 
@@ -140,25 +144,6 @@ keypaste setup --vault ~/vault.kdbx
 
 Client configuration contains no master password. [Connecting keypaste to Claude](docs/mcp-setup.md) explains setup, exposure and audit reading.
 
-## How it compares
-
-This comparison covers storage, process injection and agent access, checked against vendor documentation in July 2026.
-
-| | keypaste | KeePassXC | 1Password | Infisical |
-| --- | --- | --- | --- | --- |
-| Where secrets live | a KDBX file you own | a KDBX file you own | 1Password's service | Postgres, theirs or yours |
-| Usable with no account | yes | yes | no; membership required | no; server, Postgres and Redis required |
-| Injecting into a child process | `keypaste run dev -- npm start` | no | `op run -- npm start` | `infisical run -- npm start` |
-| An agent can ask for a credential | yes, over MCP | no official integration | yes, over MCP (beta) | yes, over MCP |
-| A person answers each request | yes, and no is the default | — | yes | not documented |
-| What the agent receives | one field value; TTL limits approval reuse, not retained copies | — | injected into the child process | not documented |
-| Per-access log | local JSONL, hash-chained | no | yes, on Business | yes, on the paid tiers |
-| Licence | AGPL-3.0 | GPL-2.0-or-later | source not published | MIT core, paid features |
-
-Other integrations include Keeper's MCP server, which asks before returning unmasked values; Bitwarden's March 2026 Agent Access SDK, then alpha without logging; and 1Password's Environments MCP server, which approves requests and injects credentials without returning them to the model. `kprun` injects KeePass values into child processes and logs locally without an approval step.
-
-keypaste combines an account-free local KDBX vault, explicit approval or user-written rules, and a local audit log.
-
 ## Using it
 
 ```sh
@@ -170,13 +155,11 @@ keypaste ls
 keypaste get github
 keypaste get github --show
 keypaste rm github --yes
-
-keypaste generate --words 6
 ```
 
 `ls` prints a names-only group tree. `get` copies the password to the clipboard and clears it after twenty seconds; `--show` writes it to stdout instead. Password prompts never echo input. Command data goes to stdout and diagnostics to stderr, so `keypaste get x --show` can be piped. Set `KEYPASTE_VAULT` or pass `--vault` to each command.
 
-`get --show` and `generate` are the only commands that print a secret; `generate` is described below.
+`rm` permanently deletes the entry and its history; there is no recycle-bin recovery yet. `get --show` and explicit env export expose plaintext. The standalone passphrase generator described below is an Unreleased source feature.
 
 ### Generating one
 
@@ -190,14 +173,14 @@ keypaste env set billing STRIPE_KEY --generate
 
 Characters come from an 85-character alphabet: letters, digits and `!#%()*+,-./:;=?@[]^_{}~`. The punctuation that breaks in a shell, in YAML or in a URL is left out on purpose. Twenty characters is the default, about 128 bits; `--length` takes 8 to 256. `--no-symbols` leaves letters and digits, `--no-lookalikes` drops `Il1O0`, and both cost entropy to solve a problem the Copy button and `keypaste run` are there to remove.
 
-`--words N` generates a passphrase instead, drawn from the [EFF long word list](third_party/eff-large-wordlist/UPSTREAM.md) of 7,776 words vendored into keypaste and pinned by digest. Each word is worth about 12.9 bits, so the six-word minimum is about 78 bits; `--words` takes 6 to 32, and `--separator` chooses what goes between them, a full stop by default. A hyphen is refused, because four of the list's words are spelled with one and a hyphen-joined passphrase cannot be split back into the words you counted.
+**Unreleased source feature:** `--words N` generates a passphrase instead, drawn from the [EFF long word list](third_party/eff-large-wordlist/UPSTREAM.md) of 7,776 words vendored into keypaste and pinned by digest. These options and `keypaste generate` are absent from the published `v0.3.0` download. Each word is worth about 12.9 bits, so the six-word minimum is about 78 bits; `--words` takes 6 to 32, and `--separator` chooses what goes between them, a full stop by default. A hyphen is refused, because four of the list's words are spelled with one and a hyphen-joined passphrase cannot be split back into the words you counted.
 
 ```sh
 keypaste add github --generate --words 6
 keypaste env set billing STRIPE_KEY --generate --words 8 --separator _
 ```
 
-`keypaste generate --words 6` prints a passphrase and stores nothing. It is the one command whose output is a fresh secret on stdout, because a passphrase you are about to send to somebody has to be readable and no vault holds it; what it is made of goes to stderr, so a redirect captures only the passphrase. It opens no vault and asks for nothing, so it works before you have one. Every other secret still needs `--show` before keypaste will print it.
+`keypaste generate --words 6` prints a passphrase and stores nothing. Generation details go to stderr, so a redirect captures only the passphrase. It opens no vault and asks for nothing. This does not implement encrypted sharing or receiving.
 
 | exit code | meaning |
 | --- | --- |
@@ -208,11 +191,11 @@ keypaste env set billing STRIPE_KEY --generate --words 8 --separator _
 | 4 | wrong master password |
 | 5 | the audit log is not the file keypaste wrote |
 
-When stdin is not a terminal each prompt consumes exactly one line, in a fixed order: `init` takes the password twice, `add` and `env set` take the master password then the value, and everything else takes the master password. That is what makes the CLI scriptable.
+When stdin is not a terminal each prompt consumes one line in order. `init` takes the new password twice; `add` and `env set` take the master password followed by a value unless generating one. Commands that do not open a vault, such as `log`, need no master password. Consult command help before scripting confirmation or export prompts.
 
 ## Environment variables
 
-Each variable is an ordinary entry under `env/<project>`, with its name as the title and value as the password. KeePassXC can edit these entries directly. CI checks interoperability on all three operating systems; [`DECISIONS.md`](DECISIONS.md) D-0014 explains the convention.
+Each variable is an ordinary entry under `env/<project>`, with its name as the title and value as the password. KeePassXC can edit these entries directly. CI checks interoperability on all three operating systems; [D-0014](docs/decisions-archive.md) explains the convention.
 
 ```sh
 keypaste env pull billing
@@ -241,7 +224,7 @@ keypaste run prod -- ./deploy.sh
 
 The `--` is required. Without it, `keypaste run dev npm start` cannot be told apart from a project called `npm`; everything after it belongs to the command, including flags keypaste also understands.
 
-The child inherits your environment with project variables overlaid, and receives the terminal's stdin, stdout and stderr. keypaste closes the vault before starting it.
+The child inherits your environment with project variables overlaid, and receives the terminal's stdin, stdout and stderr. Each current `run` invocation opens the vault independently and closes it before starting the child. It does not use the desktop's unlock session. The child receives a snapshot: later edits or locks do not update or erase its environment.
 
 After startup, keypaste returns the child's exit code. Missing commands return 127 and non-executable commands return 126. keypaste's own failures print a line beginning `keypaste run:`. Ctrl+C, `docker stop` and `timeout` reach the child; keypaste waits for it to exit.
 
@@ -325,7 +308,7 @@ Each audit record includes its predecessor's hash. `keypaste log verify` checks 
 
 KDBX4 with Argon2d key derivation (2 iterations, 64 MiB, parallelism 2) and AES-256. keypaste never invents a format and writes no cryptography of its own (docs/PRODUCT.md §2, §3.6): the format layer is [KeePassLib](third_party/KeePassLib/UPSTREAM.md), vendored from KeePass 2.61 and reached through a single file, `src/Keypaste.Core/Internal/KeePassInterop.cs`.
 
-`scripts/verify-keepassxc-compat.sh` and `scripts/verify-keepassxc-writeback.sh` check interoperability against a real `keepassxc-cli` on Linux, macOS and Windows on qualifying pushes to `main` and every pull request. This is a permanent gate under docs/PRODUCT.md §4.6 and [`DECISIONS.md`](DECISIONS.md) D-0008 and D-0014.
+`scripts/verify-keepassxc-compat.sh` and `scripts/verify-keepassxc-writeback.sh` check interoperability against a real `keepassxc-cli` on Linux, macOS and Windows on qualifying pushes to `main` and every pull request. This is a permanent gate under docs/PRODUCT.md §4.6 and [D-0008 and D-0014](docs/decisions-archive.md).
 
 Directories and namespaces use .NET's PascalCase convention; the kebab-case names above are the roadmap's and survive where they are user-visible, in the shipped binary names.
 
@@ -370,7 +353,7 @@ dotnet publish src/Keypaste.Cli -c Release -r linux-x64 --no-restore -o out > cl
 scripts/verify-aot-trim.sh cli.log
 ```
 
-Eleven vendored-code diagnostics are accepted in [`DECISIONS.md`](DECISIONS.md) D-0040. ILC analyzes only changed inputs; if a repeat publish emits none, the script reports that no new analysis occurred.
+Eleven vendored-code diagnostics are accepted in [D-0040](docs/decisions-archive.md). ILC analyzes only changed inputs; if a repeat publish emits none, the script reports that no new analysis occurred.
 
 `third_party/Directory.Build.props` isolates vendored source from project style checks, and `dotnet format` excludes `third_party/` to preserve upstream mergeability.
 

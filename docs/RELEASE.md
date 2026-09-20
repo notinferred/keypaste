@@ -11,7 +11,7 @@
 | Published | That distributable is available at a permanent, anonymous public URL. |
 | Installation-verified | The public download is verified, installed and exercised on the claimed OS and CPU architecture, with retained results. |
 
-A desktop release is complete when every supported target is published and installation-verified. Record the tag, source commit and artifact hashes. Expiring CI artifacts do not establish publication.
+A desktop release is complete when every target it advertises is published and installation-verified. The first desktop release focuses on Windows x64 and Linux x64; existing CLI/MCP downloads retain their four targets. Record the tag, source commit and artifact hashes. Expiring CI artifacts do not establish publication.
 
 ## Floor evidence
 
@@ -36,7 +36,7 @@ A desktop release is complete when every supported target is published and insta
 | OS / CPU | RID | Public CLI/MCP | OS floor | Floor evidence | Desktop package in CI | Public desktop installer |
 |---|---|---|---|---|---|---|
 | Windows x64 | `win-x64` | ZIP; unsigned | Windows 10 1809 or later | `cited`; .NET 10 floor, no installation on the floor | Self-contained ZIP; internal unsigned per-user MSI | None; 4.7c1 built the path, which refuses an unsigned package; 4.7c2 publishes |
-| macOS ARM64 | `osx-arm64` | tar.gz; unnotarized | macOS 13 or later | `cited`; .NET 10 floor, no installation on the floor | Self-contained tar.gz | None; deferred to Expansion (D-0201) |
+| macOS ARM64 | `osx-arm64` | tar.gz; unnotarized | macOS 13 or later | `cited`; .NET 10 floor, no installation on the floor | Self-contained tar.gz | None; desktop delivery is in [BACKLOG](BACKLOG.md) |
 | Linux x64 | `linux-x64` | tar.gz | glibc 2.35 | `container-check`; Debian 12 runs it, Alpine refuses it | Self-contained tar.gz; internal unsigned AppImage; glibc 2.39 | None; 4.7c1 built the path, which refuses an unsigned package; 4.7c2 publishes |
 | Linux ARM64 | `linux-arm64` | tar.gz | glibc 2.35 | `unverified`; same build inputs as x64, no container check | None; RID declared but absent from package matrix | None |
 | macOS Intel / Windows ARM64 | `osx-x64` / `win-arm64` | Source route | No claim | `none` | None | None |
@@ -80,8 +80,8 @@ Manual dispatch rehearses the build and verification without publishing. The fol
 STEPS records implementation status and acceptance evidence for these requirements.
 
 1. One version and supported matrix. R.0a implements recording and reconciliation through `release-targets.json`. Each advertised target has a runner, CPU, package format, OS floor and evidence. Advertised binaries and `source_only` routes remain separate; `published` is append-only. Workflows and publication allowlists derive from the definition, while projects and download pages are checked against it. Preserve full prerelease versions and exact changelog-heading matches. Native installation evidence belongs to R.0c for the CLI/MCP, 4.7b for internal desktop candidates and 4.7c2 for public desktop downloads. Each component records whether it `publishes` archives or packages, the origin it publishes to, and the workflow whose attestation covers what it publishes; `published` is append-only and keyed on version **and** component.
-2. Installable desktop packages. Provide a signed Windows installer and payload and a Linux AppImage or documented package tested on its runtime floor. The signed and notarized macOS app in a stapled DMG is deferred to Expansion with the macOS desktop app (D-0201). Free downloads receive the same signing. Browser downloads retain normal OS security checks. A package is published only where the definition records it signed and public under a policy that is not `none`; until then it is built, labelled internal and unsigned, and refused by the publication path.
-3. Publisher verification. Check Windows signature, publisher and timestamp. macOS signing, notarization and Gatekeeper assessment are deferred to Expansion with 3.5b (D-0201); until then the macOS CLI stays unsigned and un-notarized as disclosed. Retain clean-machine prompts. A signature does not guarantee SmartScreen reputation, as [Microsoft documents](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation). Same-origin checksums alone cannot authenticate a publisher, so every CLI/MCP asset from `v0.3.0` onward carries a build attestation checked by the procedure in [SECURITY](../SECURITY.md#verifying-a-release); an attestation authenticates origin and is not a signature or a reproducibility claim.
+2. Installable desktop packages. Provide a signed Windows installer and payload and a Linux AppImage or documented package tested on its runtime floor. macOS desktop packaging is deferred to [BACKLOG](BACKLOG.md). Browser downloads retain normal OS security checks. A package is published only where the definition records it signed and public under a policy that is not `none`; until then it is built, labelled internal and unsigned, and refused by the publication path.
+3. Publisher verification. Check Windows signature, publisher and timestamp. macOS signing, notarization and Gatekeeper assessment are deferred to [BACKLOG](BACKLOG.md); until then the macOS CLI stays unsigned and un-notarized as disclosed. Retain clean-machine prompts. A signature does not guarantee SmartScreen reputation, as [Microsoft documents](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation). Same-origin checksums alone cannot authenticate a publisher, so every CLI/MCP asset from `v0.3.0` onward carries a build attestation checked by the procedure in [SECURITY](../SECURITY.md#verifying-a-release); an attestation authenticates origin and is not a signature or a reproducibility claim.
 4. Anonymous public installation. Download every promised asset without repository credentials, verify hashes and applicable signatures, install without an SDK, and check its version and advertised workflows. Cover injection, approval and setup where released. Desktop checks require native rendering, vault operations and CLI/app interoperability, including creating a vault in the app and opening it with the CLI. Keep the [manual checklist](desktop.md#checking-a-build-by-hand) for behavior automation cannot observe. CLI patches do not depend on unfinished desktop features.
 5. Complete publication before promotion. R.0b implements the completion record and public-asset verification. Verify every release before changing download pages, package-manager entries or update channels, and keep the last verified release advertised until its replacement passes. A partial upload requires a new version because published paths cannot be overwritten or reused. The recovery procedure and last-known-good promotion mechanism remain open.
 6. Upgrade, uninstall and recovery. 4.7d owns this evidence for the internal candidates through `upgrade-desktop.yml`; the first real-release upgrade is a dated observation at 4.7c2, against the published MSI and AppImage at the CLI's version prefix once its gates pass. Test upgrades with existing vaults, settings and client connections. Define uninstall behavior while retaining user vaults. Test interrupted upgrades and recovery, retain previous installers, record backward readability, and document backup restoration when required. Automatic updates require a verified update path.
@@ -89,27 +89,12 @@ STEPS records implementation status and acceptance evidence for these requiremen
 
 Advertise a target or change its public install URL only after the applicable requirements pass. Packaging and signing integration may be prepared before account enrollment, but signing claims require verified identities and delivered files.
 
-## Delivery tasks
+## Delivery scope
 
-STEPS owns task status and prerequisites.
+[STEPS](STEPS.md) owns the five active tracks: daily vault use and recovery, a shared unlock session, native MCP approvals, project environments and desktop delivery. T5 retains the existing packaging, signing, installation and upgrade evidence. R.1a verifies an integrated candidate before 4.7c2 publishes it; R.1 verifies the local workflow on public downloads. L.1 supplies usable guides, download instructions and routes for reports.
 
-| Delivery | Owning tasks |
-|---|---|
-| Data preservation, approval and transport repairs before the CLI/MCP patch | F.1a–c, F.3a–d; required by R.0c |
-| Desktop preference, lock, clipboard and automation checks | F.2a–d; required by 4.7b |
-| Release destination errors and publisher metadata | F.4a/b |
-| Advertised-download defect disclosure | R.0d |
-| Shared release definition, complete publication and provenance | R.0a, R.0b, 3.8 |
-| Public CLI/MCP patch and native installation | R.0c |
-| Desktop packaging, installation and upgrades | 4.7a, 4.7b, 4.7d; macOS 4.7a2 and 4.7e in Expansion |
-| Signing identity and integration | 3.6b, with the identity as 4.7c2's input; macOS 3.5a/b in Expansion |
-| Public signed desktop and CLI downloads and the developer journey | 4.7c1, 4.7c2, R.1 |
-| Chrome and Firefox publication | 8.4a/b |
-| Self-hosted and hosted drop relay | 5.2c, H.8 |
-| Observed small-team pilot and managed sync clients | R.2, 5.3d |
-| Phone distribution and upgrades | M.3 |
-| Reviewed team-plan release | R.3 |
-| Web client review and deployment | W.2c |
-| Package managers and architectures | 3.7a–c, 3.9a–d |
+The intended desktop workflow has one session governing vault use, new credential releases and project launches. The current app and terminal approver have separate unlocked vaults, and `keypaste run` opens its own. A successful CLI demo or existing installer check does not establish the shared session or native approval workflow.
 
-Each client or service change needs updated artifacts published and exercised through its supported channel before its public-version claim can close.
+File sharing, relay hosting, accounts, teams, payment, mobile clients, complete KeePassXC parity, additional platforms and package-manager coverage are not prerequisites for the local desktop release. Optional future distribution belongs to [BACKLOG](BACKLOG.md). Public download instructions and a route for user reports belong with the release; marketing campaigns and an announcement at every milestone are not release gates.
+
+Every advertised behavior still requires evidence from the version that contains it. Scope changes preserve existing immutable downloads, defect disclosures and release safeguards.

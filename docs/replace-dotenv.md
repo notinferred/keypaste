@@ -74,7 +74,11 @@ See [SECURITY.md](../SECURITY.md) for the deletion and exposure limits.
 keypaste run dev -- npm start
 ```
 
+This command currently asks for the vault password on each invocation; an unlocked desktop does not satisfy it. Env Sets in the desktop only copies the command. Reusing one desktop unlock to launch an app or terminal is planned in [STEPS](STEPS.md), not available yet.
+
 keypaste places variables in the child environment without writing a plaintext env file. CI points temporary directories at an empty folder and checks that the injection fixture leaves it empty. The child can still write or forward values; review its logging and behavior.
+
+Once delivered, environment values are copies held by the child and possibly its descendants. Locking a vault cannot remove those copies. The focused product will require an unlocked session for new launches and stop new releases when locked; it will not promise to revoke values already supplied.
 
 The `--` separates the project from its command. Without it, `keypaste run dev npm start` could name `npm` as the project. All arguments after `--` belong to the command. The child receives keypaste's stdin, stdout and stderr, preserving terminal prompts and output. keypaste closes the vault before starting the child, so a long-running server does not keep the vault unlocked. Ctrl+C, `docker stop` and `timeout` reach the child; keypaste waits for it to exit. After startup, keypaste returns the child's exit code. Missing commands return 127 and non-executable commands return 126. keypaste's own failures print a line beginning `keypaste run:`.
 
@@ -144,7 +148,7 @@ Export uses single quotes where possible, which are literal in `motdotla/dotenv`
 
 ### What if I lose my master password?
 
-Without the master password or another usable copy of the credentials, current keypaste cannot recover the vault's contents. There is no master-password reset or support backdoor. The planned hosted service also stores encrypted data without the keys needed to decrypt it. Any future trusted-device or user-held recovery mechanism requires the reviewed design in [STEPS](STEPS.md); it is not available today. [PRODUCT](PRODUCT.md) §2 separates account recovery from vault recovery.
+Without the master password or another usable copy of the credentials, keypaste cannot recover the vault's contents. There is no master-password reset or support backdoor. Entry history can restore an earlier value in an accessible vault; it cannot recover the master password, an entry that was permanently deleted or a lost vault file.
 
 Keep a written copy of the master password in a secure physical location. Keep current `.kdbx` backups in protected locations. Their confidentiality depends on the master password's strength. Current keypaste cannot open vaults that require a key file. KeePassXC supports this extra factor, but losing either required factor without a backup can make that vault inaccessible.
 
@@ -152,13 +156,13 @@ If you cannot recover access, rotate each credential at its provider.
 
 ### How do I sync it between machines?
 
-keypaste has no built-in sync today. You can copy or synchronize the encrypted `.kdbx` with an existing file-sync service or a USB drive; keep the master password separate. [PRODUCT](PRODUCT.md) includes optional hosted encrypted sync and the same relay for self-hosting, with client-held keys. That service is planned, not available; [STEPS](STEPS.md) owns its delivery status.
+keypaste has no built-in sync. You can copy or synchronize the encrypted `.kdbx` with an existing file-sync service or a USB drive; keep the master password separate. Hosted sync and relays are optional ideas in [BACKLOG](BACKLOG.md), with no committed delivery.
 
 One caveat: keypaste does not merge concurrent vault edits today. If two machines edit offline, the sync tool may leave conflicting copies or overwrite one version. KDBX itself does not prohibit merging; the missing feature is in keypaste. Keep every conflicting copy, edit in one place at a time, and let synchronization finish before switching machines.
 
 ### Can my teammate use the same vault?
 
-Someone with the file and master password can read everything in that vault. If you choose to share one, use a dedicated work vault and transfer its password through a separate trusted channel. This gives no per-person revocation or individual accountability and has the concurrent-edit limitation above. Organization-owned credentials and offboarding are planned in [STEPS](STEPS.md), not implemented. Removing file access cannot invalidate values someone already copied; that requires changing them at their providers.
+Someone with the file and master password can read everything in that vault. If you choose to share one, use a dedicated work vault and transfer its password through a separate trusted channel. This gives no per-person revocation or individual accountability and has the concurrent-edit limitation above. Organization management and offboarding are unimplemented options in [BACKLOG](BACKLOG.md). Removing file access cannot invalidate values someone already copied; that requires changing them at their providers.
 
 ### Does it work offline?
 
@@ -166,11 +170,11 @@ The vault path contains no network code and works offline.
 
 ### What does KeePassXC see?
 
-Ordinary entries. `env/dev` is a group, each variable is an entry with the name as its title and the value as its password. You can read, edit, add and delete them in KeePassXC with no knowledge of keypaste, and CI verifies that in both directions on Linux, macOS and Windows on every push.
+Ordinary entries. `env/dev` is a group, each variable is an entry with the name as its title and the value as its password. You can read, edit, add and delete them in KeePassXC with no knowledge of keypaste, and the compatibility gate checks both directions on Linux, macOS and Windows for qualifying CI runs.
 
 ### Can I keep using `direnv`?
 
-Use `keypaste run` within the command `direnv` starts. An `.envrc` can instead call `keypaste env export dev --dotenv --stdout` to populate the interactive shell, which exposes those values to every process that shell launches.
+Use `keypaste run` within the command `direnv` starts. Explicitly exporting values into an interactive shell exposes them to every process that shell launches. Those values persist independently of the desktop's lock state; this is not automatic activation or revocation.
 
 ### Why did my value change when I imported it?
 

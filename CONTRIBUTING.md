@@ -2,7 +2,7 @@
 
 ## Changes and review
 
-Read [PRODUCT](docs/PRODUCT.md) for scope and security laws, [STEPS](docs/STEPS.md) for the active build plan, and [CLAUDE.md](CLAUDE.md) for writing rules and document ownership. Product scope changes require dated founder re-ratification; proposals do not override the current requirements.
+Read [PRODUCT](docs/PRODUCT.md) for scope and security laws, [STEPS](docs/STEPS.md) for the active build plan, and [CLAUDE.md](CLAUDE.md) for writing rules and document ownership. Product scope changes require dated founder re-ratification; proposals do not override the current requirements. The active plan covers the local vault, one unlock session, native MCP approvals, project env use and desktop delivery. [BACKLOG](docs/BACKLOG.md) preserves optional ideas; its rows are not instructions to build them.
 
 Keep changes focused and include their documentation. Shared feature logic belongs in `Keypaste.Core`; the CLI and desktop use it. Document features available in only one front end. Secret-path changes require tests, including encryption, injection, the agent bridge and secret display. New secret-path dependencies require written justification, pinned versions and lock files regenerated with `dotnet restore --force-evaluate`.
 
@@ -14,7 +14,7 @@ Write self-documenting code with clear names and structure. Default to no commen
 
 ## Verification and commits
 
-Run `./scripts/verify.ps1` in PowerShell or `bash scripts/verify.sh` in Bash once when a step is finished. It runs the checks the changes affect; `--all` runs backend, desktop, consistency, script and process checks together. [CLAUDE.md](CLAUDE.md#local-verification-and-delivery) owns profiles, prerequisites and checkpoint rules; `--list` prints commands without executing them.
+For implementation work, run `./scripts/verify.ps1` in PowerShell or `bash scripts/verify.sh` in Bash once when the task is finished. It runs the checks the changes affect; `--all` runs backend, desktop, consistency, script and process checks together. An explicit documents-only or no-build instruction limits that work: review the wording, links and source evidence without building, running tests or starting delivery tasks. [CLAUDE.md](CLAUDE.md#local-verification-and-delivery) owns profiles, prerequisites and checkpoint rules; `--list` prints commands without executing them.
 
 Sign off every commit, including maintainer and agent commits:
 

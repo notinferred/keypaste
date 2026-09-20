@@ -1,6 +1,8 @@
 # Approving an agent's request
 
-A person approves credential requests unless a live approval or a matching policy rule covers them. This guide explains the terminal prompt and its limits; [policy rules](policy.md) allow matching requests without a prompt.
+A person approves credential requests unless a live approval or a matching policy rule covers them. This guide describes the current terminal workflow; [policy rules](policy.md) allow matching requests without a prompt.
+
+The focused product will put approval and denial in the app and use one unlock session for desktop, MCP and env launches. That integration is not implemented. The current desktop and terminal approver unlock independently; [STEPS](STEPS.md) owns the remaining work.
 
 <a id="the-short-version"></a>
 
@@ -116,7 +118,7 @@ It does not add the returned field value to the log. Names and reason excerpts a
 
 ## Limits
 
-The vault stays unlocked while `keypaste agent` runs; it has no idle auto-lock. Closing the terminal locks it. The desktop app holds a separate session, so locking the desktop does not lock the approver. Approval prompts appear only in the approver terminal; there is no native dialog.
+The vault stays unlocked while `keypaste agent` runs; it has no idle auto-lock. Stop that process to lock it. The desktop app holds a separate session, so locking the desktop does not lock the approver. Approval prompts appear only in the approver terminal; there is no native dialog. An already-open approver also retains its in-memory vault snapshot: reopen it after a desktop or external edit to use the updated values.
 
 TTL limits cached approval reuse. Expiry clears the cache buffer but cannot erase strings or copies retained by clients, transcripts or session files. Stopping the approver cannot revoke these copies; rotate the credential at its provider when needed. [SECURITY.md](../SECURITY.md) describes the memory limits.
 

@@ -2,7 +2,7 @@
 
 The waitlist site has two static pages and one form endpoint. Cloudflare's Git integration deploys `site/` on pushes to `main`. `public/` contains the pages; `src/worker.js` handles `/subscribe` and returns 404 for unmatched routes. The pages use a plain form and load no scripts or cookies.
 
-Database permissions were last verified on 2026-07-28 (D-0037). Page deployment and endpoint checks were repeated on 2026-09-12 (D-0127). Those checks do not establish current database grants. The hosted vault service remains planned work.
+Database permissions were last verified on 2026-07-28 (D-0037). Page deployment and endpoint checks were repeated on 2026-09-12 (D-0127). Those checks do not establish current database grants. The focused product is local. Hosted vault services and other expansion ideas are deferred to [BACKLOG](../docs/BACKLOG.md).
 
 ## Database connection
 
@@ -113,6 +113,6 @@ Use a dedicated test address for checks that write rows. Verify valid submission
 
 ## Unimplemented features
 
-The handler stores signup requests without sending confirmation mail. Double opt-in and list verification belong to STEPS 5.6; existing rows are unconfirmed.
+The handler stores signup requests without sending confirmation mail; existing rows are unconfirmed. Double opt-in and list verification are optional work in [BACKLOG](../docs/BACKLOG.md), not prerequisites for the local desktop release. No mail may be sent to the list before the promised consent flow exists and each recipient has confirmed.
 
 Code has no rate limiter. Verify an applicable Cloudflare rule before relying on one; the current handler has honeypot, body, content-type and origin checks. Turnstile and managed challenges are absent because they introduce scripts. The site has no automated database-verification job.

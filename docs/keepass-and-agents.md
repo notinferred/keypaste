@@ -2,7 +2,7 @@
 
 # KeePass vaults and agent access
 
-> CLI launch essay. The cited reports and announcements describe their stated 2025–2026 periods; they are not an exhaustive current market inventory. Recheck comparisons before publishing a new campaign. [PRODUCT](PRODUCT.md) owns the broader password-manager direction, [FEATURES](FEATURES.md) owns the dated capability comparison, and [RELEASE](RELEASE.md) owns current downloads.
+> CLI launch essay. The cited reports and announcements describe their stated 2025–2026 periods; they are not an exhaustive current market inventory. Recheck comparisons before publishing a new campaign. [PRODUCT](PRODUCT.md) owns the focused local password-manager direction, [FEATURES](FEATURES.md) owns the current capability inventory, and [RELEASE](RELEASE.md) owns current downloads.
 
 A coding agent that needs a credential may ask you to paste it into the chat, exposing it to the client and its retained conversation.
 
@@ -87,4 +87,4 @@ keypaste removes control characters from the reason, caps its length and labels 
 
 The local vault works without an account or network and opens in KeePassXC. A permanent CI gate checks compatibility in both directions against a real `keepassxc-cli` on all three operating systems. The source is licensed under AGPL-3.0.
 
-It is also pre-1.0 and says so: unsigned binaries, no released GUI, and a terminal prompt rather than a native dialog; [RELEASE](RELEASE.md) records that dated status. [`kprun`](https://github.com/numikel/kprun) is another KDBX-oriented project to evaluate for process injection. keypaste combines a KDBX file you own, account-free local use, explicit approvals with bounded reuse or rules you wrote, and a local audit. Managed hosting is planned as an optional experience; it does not remove that local path.
+It is also pre-1.0 and says so: unsigned binaries, no released GUI, and a terminal prompt rather than a native dialog; [RELEASE](RELEASE.md) records that dated status. [`kprun`](https://github.com/numikel/kprun) is another KDBX-oriented project to evaluate for process injection. keypaste combines a KDBX file you own, account-free local use, explicit approvals with bounded reuse or rules you wrote, and a local audit. The focused plan is a local desktop password manager with one unlock session for native MCP approvals and project env launches. That session is not implemented: the current desktop and terminal approver unlock separately, and locking the desktop does not stop the approver. Hosted services and broader integrations are optional ideas in [BACKLOG](BACKLOG.md).

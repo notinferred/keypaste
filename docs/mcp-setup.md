@@ -2,7 +2,7 @@
 
 keypaste ships an MCP server, `keypaste-mcp`, that lets an AI agent see the names of things in your vault and ask you for one credential at a time.
 
-`keypaste-mcp` forwards requests without holding a vault or making authorization decisions. Start its approver yourself:
+The bridge holds no vault. It checks exposure and records access; the approver handles consent, grants and policy. Start the current terminal approver yourself:
 
 ```sh
 keypaste agent --vault ~/vaults/personal.kdbx
@@ -11,6 +11,8 @@ keypaste agent --vault ~/vaults/personal.kdbx
 Enter the master password and review requests in that terminal. Without the approver, calls are refused with startup instructions. [Approvals](approvals.md) explains the prompt.
 
 The MCP client starts the bridge, while you start the approver. This keeps software-triggered requests from opening a master-password prompt.
+
+These are the current CLI/MCP instructions. The desktop cannot approve requests or supply its unlocked session yet, and locking it does not stop a separate terminal approver. [STEPS](STEPS.md) covers the focused target: one unlock session with native approval and denial in the app.
 
 ## Before you start
 
@@ -129,7 +131,7 @@ Patterns match the group path and the entry title as two separate things, so `*`
 
 `list_entry_names` takes no arguments and returns only exposed group paths and entry names. It cannot return usernames, passwords, URLs or notes, or widen exposure.
 
-`request_credential` takes `entry`, `field`, `reason` and `ttl_seconds`. It forwards the request to `keypaste agent` for approval or a matching policy rule and returns one field with a lifetime capped by `--max-ttl`. Without an approver it refuses and names the startup command. [The demo](demo.md) shows this flow.
+`request_credential` takes `entry`, `field`, `reason` and `ttl_seconds`. It forwards the request to `keypaste agent` for approval or a matching policy rule and returns one field. `--max-ttl` caps approval reuse, not the lifetime of the returned credential. Without an approver it refuses and names the startup command. [The demo](demo.md) shows this flow.
 
 Anyone who can edit the vault can influence its entry names. keypaste removes control characters, invisible Unicode and structural punctuation, then labels the listing as data. Sanitization cannot eliminate prompt injection; [THREATS.md](../THREATS.md) T-1 describes the residual risk.
 
@@ -259,9 +261,13 @@ For protocol errors, inspect wrappers and shell profiles for text written to std
 
 Can the agent see my passwords? Each successful request returns one field of one entry under a human approval, its still-live cached grant, or a matching policy rule. Repeated approved requests can accumulate credentials. TTL bounds cached approval reuse; it cannot erase values already returned to the client or expire them at their provider. `keypaste-mcp` holds no vault, but it does receive and forward the released value.
 
-Can it see my entry names? Only the ones inside `--expose`, which defaults to `env/**`, and only while an agent is running with the vault unlocked.
+Can it see my entry names? Only the ones inside `--expose`, which defaults to `env/**`, and only while the terminal approver is running with its vault unlocked.
 
-The master-password prompt belongs in the process you start. An MCP client can trigger bridge startup, its stdin and stdout carry the protocol, and desktop clients provide no terminal. A configuration password would be plaintext, while client-mediated input would expose it to the requester. [DECISIONS.md D-0023](../DECISIONS.md) records this design.
+Can it change my vault? The current MCP surface only lists names and requests values; it cannot add, edit or delete entries. Desktop and CLI editing are separate workflows.
+
+Will it see my desktop edits immediately? No. The current terminal approver holds its own snapshot. Stop and reopen it after changing the file to read the saved values.
+
+The master-password prompt belongs in the process you start. An MCP client can trigger bridge startup, its stdin and stdout carry the protocol, and desktop clients provide no terminal. A configuration password would be plaintext, while client-mediated input would expose it to the requester. [D-0023](decisions-archive.md) records this design.
 
 Do I have to approve every single call? No. A repeat request for the same field of the same entry, from the same connection, inside the lifetime you approved, is served without asking again. Change that with `--max-ttl` on the agent. A [policy rule](policy.md) can authorize matching releases without an initial prompt.
 

@@ -18,9 +18,11 @@ keypaste.com deploys through Cloudflare's Git integration on pushes to `main`, w
 
 ## Local verification and delivery
 
-While working, run the filtered tests for the code being changed, such as `dotnet test <project> -- --filter-class <class>`. When the step's code and documents are finished, run `./scripts/verify.ps1` in PowerShell or `bash scripts/verify.sh` in Bash once. The PowerShell launcher selects Git Bash on Windows. The command maps the working tree's changes, `git diff` against HEAD plus untracked files, to profiles: `workflows` and `records` always run, a path the map does not know runs everything, and each skipped profile is logged with its reason. `--all` runs every profile; hosted CI is the full gate for each commit on `main`.
+For implementation work, run the filtered tests for the code being changed, such as `dotnet test <project> -- --filter-class <class>`. When the step's code and documents are finished, run `./scripts/verify.ps1` in PowerShell or `bash scripts/verify.sh` in Bash once. The PowerShell launcher selects Git Bash on Windows. The command maps the working tree's changes, `git diff` against HEAD plus untracked files, to profiles: `workflows` and `records` always run, a path the map does not know runs everything, and each skipped profile is logged with its reason. `--all` runs every profile; hosted CI is the full gate for each commit on `main`.
 
 After a failure the command names every failed profile, prints their held output and prints the resume command. Fix the cause and resume with `--from <profile>`; do not start again. Never run a profile by name and then run the command again, because the second run repeats the first. `scripts` and `workflows` run beside the dotnet profiles, which run in sequence because both solutions build into one `artifacts/` tree. Each profile's output is held in `artifacts/verify/`.
+
+For documentation-only work, inspect changed claims, links, ownership and scope against source and recorded evidence. Do not start a build task or run commands that build code when the user has restricted the work to documents. A documentation review does not establish new runtime or release evidence.
 
 The command requires the pinned SDK, Git, jq, GNU timeout and running Docker. Linux and Git Bash supply GNU timeout; macOS can use `gtimeout` from coreutils. Process integration checks have an eight-minute deadline and a ten-second termination grace. `compat` is never selected automatically and needs installed KeePassXC. On Windows the offline script fixtures run in the Linux container that [scripts/container](scripts/container/Dockerfile) defines, where they take a tenth of the time; a linked worktree, whose history lies outside the mount, runs them in Git Bash, as does `VERIFY_SCRIPTS_NATIVE=1`. Use `--list` to inspect the selection and commands. CI calls `backend`, `desktop` and `workflows` by name. `desktop` includes consistency tests. The script owns the command list; other operating systems, NativeAOT, packaging and public installation retain their separate gates.
 
@@ -28,7 +30,7 @@ Run the command before committing, because a clean tree selects only the profile
 
 Separate discovery from repair when the mechanism is unknown. A discovery row delivers a reproducible experiment and measured conclusion; its repair row depends on that result. Before a long probe, run a short preflight and state which outcomes distinguish the hypotheses. Keep instruments, readers and regressions in the tree. Retain the source SHA, platform, command, counts and limitations using [diagnostics.md](docs/diagnostics.md). An inconclusive run identifies the next experiment and leaves the diagnosis open.
 
-Put reproducible defects in STEPS with a verifier and priority, including defects found during another task. The ideas table may link to the task. Preserve the failing observation until a regression and repair explain it; a passing retry does not close an intermittent defect.
+Put reproducible defects in STEPS with a verifier and priority, including defects found during another task. BACKLOG may link to the task; a reproduced defect is not left as an unverified idea. Preserve the failing observation until a regression and repair explain it; a passing retry does not close an intermittent defect.
 
 ## Releases
 
@@ -50,20 +52,21 @@ Records are proportional to the risk they retire (PRODUCT §6.6). A decision row
 |---|---|
 | [README](README.md) | Introduction, published installation instructions and navigation |
 | [PRODUCT](docs/PRODUCT.md) | Ratified scope and laws; conflicting decisions do not override it |
-| [STEPS](docs/STEPS.md) | Delivery status, ordered tasks, dependencies and acceptance evidence |
+| [STEPS](docs/STEPS.md) | Committed product tracks, ordered tasks, dependencies, delivery status and acceptance evidence |
+| [BACKLOG](docs/BACKLOG.md) | Optional ideas, investigation candidates and conditions for reconsideration; no delivery commitments |
 | [RELEASE](docs/RELEASE.md) | Distribution matrix, publication and installation verification |
-| [FEATURES](docs/FEATURES.md) | Dated capability baseline, implementation evidence and gaps |
-| [DECISIONS](DECISIONS.md) | Architecture, security and money decisions, and pending ideas; one line per current record. Settled and superseded rows live in [decisions-archive](docs/decisions-archive.md), which nothing is required to read |
+| [FEATURES](docs/FEATURES.md) | Dated capabilities by surface, implementation evidence and gaps; no parity promise |
+| [DECISIONS](DECISIONS.md) | Current architecture, security and scope decisions; one line per record. Superseded records live in [decisions-archive](docs/decisions-archive.md) as history, not requirements |
 | [CHANGELOG](CHANGELOG.md) | Significant user-visible changes, separating Unreleased work from published versions |
 | [SECURITY](SECURITY.md) and [THREATS](THREATS.md) | Reporting, security guarantees, threat model and known limits |
 | [BRAND](docs/BRAND.md) | The marks, the three colours, the type and the usage rules |
 | This file | Contribution workflow and document ownership |
 
-STEPS is the executable build plan. Keep only the next five tasks detailed; later rows carry an ID, name, Needs and purpose. Each detailed task has a bounded Build and a falsifiable Verify prompt that traces to PRODUCT. Split oversized work into children while preserving IDs and dependencies. Completing a child leaves its siblings and parent gate open. Completed work moves to a concise evidence row, and the next task gains detail.
+STEPS is the committed build plan; BACKLOG is not an implementation queue. The founder selects implementation work, and a documentation-only instruction starts no task. Keep only the next five tasks detailed; later rows carry an ID, name, Needs and purpose. Each detailed task has a bounded Build and a falsifiable Verify prompt that traces to PRODUCT. Identify the producer, transport, consumer and user action; the existence of a reader, view, protocol, fixture or package does not prove that the producing operation or complete journey works. Split oversized work into children while preserving IDs and dependencies. Completing a child leaves its siblings and parent gate open. Completed work moves to a concise evidence row, and the next task gains detail.
 
 A task's Needs name only what its own code or verifier cannot run without. Time, human acts, milestone or release gates, freezes and tidier ordering are never Needs. Gates decide what may ship through Ships after, and Human rows are a separate track. Protect a recorded result by versioning or voiding it, not by a test or rule that forbids change.
 
-Pick the first unchecked code task with completed Needs in the earliest unfinished milestone, skipping Human and BLOCKED tasks. Follow an unchecked prerequisite to its first ready task even if it belongs to a closed milestone. Build, verify and record the selected task, then stop unless the user requested continued work. A milestone's numbered gate may advance it while optional rows remain open; those rows keep their dependencies.
+When the user explicitly requests the next build task, pick the first unchecked ready code task in product-track order, skipping external inputs and blocked work; a specific user selection takes precedence. Expand a later selected row before implementing it. Build, verify and record only the authorized task, then stop unless the user requested continued implementation. Neither document edits nor dependency readiness authorize starting work, and optional BACKLOG items require selection into STEPS first.
 
 During an external wait, record the pending result and its next decision. If the user authorized continuing delivery, work on the next ready code task, keeping its changes isolated. Resume the waiting task when evidence arrives. Nothing publishes before its Ships after gates pass.
 
