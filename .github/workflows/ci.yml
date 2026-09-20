@@ -339,3 +339,7 @@ jobs:
       - name: Verify reversible deletion and recovery through real KeePassXC
         shell: bash
         run: bash scripts/verify-keepassxc-recyclebin.sh artifacts/compat/recyclebin.kdbx
+
+      - name: Verify the backup a save keeps through real KeePassXC
+        shell: bash
+        run: bash scripts/verify-keepassxc-backup.sh artifacts/compat/backup.kdbx

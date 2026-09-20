@@ -168,6 +168,14 @@ public sealed class GenerateFlagTests
         Assert.All(pieces, piece => Assert.NotEmpty(piece));
     }
 
+    /// <remarks>
+    /// The words themselves are what must not be on stderr, and this asks for exactly that rather
+    /// than for the absence of the separator character. The separator is a full stop, and stderr
+    /// carries ordinary prose — V.4a's one-time note of where backups are kept names a file path —
+    /// so its absence was only ever a proxy, and one that a sentence could break without a single
+    /// word of the passphrase having leaked. Asking after the words is also the stronger question:
+    /// it still fails if the passphrase is printed joined by something else, or one word at a time.
+    /// </remarks>
     [Fact]
     public void Add_Words_SaysHowManyWordsItIs_AndNotWhatTheyAre()
     {
@@ -176,8 +184,19 @@ public sealed class GenerateFlagTests
         harness.Prompt.Enqueue(Master);
         harness.Run("add", "svc/api", "--generate", "--words", "8", "--vault", harness.VaultPath);
 
-        Assert.Contains("8-word passphrase generated", harness.Err, StringComparison.Ordinal);
-        Assert.DoesNotContain(PasswordGenerator.DefaultSeparator, harness.Err);
+        var reported = harness.Err;
+        Assert.Contains("8-word passphrase generated", reported, StringComparison.Ordinal);
+
+        var passphrase = Read(harness, "svc/api");
+        Assert.DoesNotContain(passphrase, reported, StringComparison.Ordinal);
+
+        var words = passphrase.Split(PasswordGenerator.DefaultSeparator);
+        Assert.Equal(8, words.Length);
+
+        foreach (var word in words)
+        {
+            Assert.DoesNotContain(word, reported, StringComparison.OrdinalIgnoreCase);
+        }
     }
 
     [Fact]

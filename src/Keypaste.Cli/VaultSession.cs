@@ -32,7 +32,9 @@ internal static class VaultSession
         try
         {
             using var vault = Vault.Open(path, master.Value);
-            return body(vault);
+            var exit = body(vault);
+            Announce(vault, context);
+            return exit;
         }
         catch (InvalidMasterPasswordException)
         {
@@ -54,6 +56,36 @@ internal static class VaultSession
             context.Stderr.WriteLine($"keypaste: {ex.Message}");
             return CliApp.ExitInternalError;
         }
+    }
+
+    /// <summary>Says, once, that keypaste has started keeping copies beside this vault.</summary>
+    /// <remarks>
+    /// <para>
+    /// Only on the save that creates the directory. A directory of encrypted vaults appearing next to
+    /// somebody's file without a word is the kind of discovery docs/PRODUCT.md §6.1 calls a risk to
+    /// trust; saying so on every later command would be noise on a command whose job is something
+    /// else, and the first thing anyone scripting keypaste would want silenced.
+    /// </para>
+    /// <para>
+    /// On stderr, because stdout is a command's result and a redirect should capture that alone —
+    /// the rule <c>keypaste generate</c> already follows for what a passphrase is made of.
+    /// </para>
+    /// <para>
+    /// Here rather than in the five commands that save, because one wording is the point, and the
+    /// desktop is not here at all: its App project may not write files, and V.4b owns its surface.
+    /// </para>
+    /// </remarks>
+    private static void Announce(Vault vault, CliContext context)
+    {
+        if (vault.LastBackup is not { CreatedDirectory: true } report)
+        {
+            return;
+        }
+
+        context.Stderr.WriteLine(
+            $"keypaste: keeping the last {report.Retained} copies of this vault in " +
+            $"'{report.Directory}', in case the file is lost. They open with the master password " +
+            "they were made under.");
     }
 
     /// <summary>

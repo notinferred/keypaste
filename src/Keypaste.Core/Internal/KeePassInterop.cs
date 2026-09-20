@@ -666,18 +666,26 @@ internal sealed class KeePassInterop : IDisposable
     /// cannot absorb the contention the fix is supposed to remove.
     /// </param>
     /// <param name="duringAttempt">Called inside each attempt before its work; null outside a test.</param>
+    /// <param name="beforeReplacing">
+    /// Called once, on the attempt that is about to replace an existing vault, after the re-read has
+    /// passed and while the gate is held. Preserves the bytes being replaced; a throw from it
+    /// abandons the save. Null when the caller has already taken its backup, or has none to take.
+    /// </param>
     internal void Save(
         Func<bool>? hasChangedOnDisk,
         Action<int>? waitBetweenAttempts,
         SaveClock clock,
         int attempts = SaveAttempts,
-        Action<int>? duringAttempt = null)
+        Action<int>? duringAttempt = null,
+        Action<string>? beforeReplacing = null)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         clock.Redirect(ProcessTemporaryDirectory.EnsureRedirected);
 
-        for (int attempt = 1; !TryAttempt(hasChangedOnDisk, clock, attempt, attempts, duringAttempt); attempt++)
+        for (int attempt = 1;
+            !TryAttempt(hasChangedOnDisk, clock, attempt, attempts, duringAttempt, ref beforeReplacing);
+            attempt++)
         {
             var retry = attempt;
             clock.Wait(() =>
@@ -709,7 +717,12 @@ internal sealed class KeePassInterop : IDisposable
     /// </para>
     /// </remarks>
     private bool TryAttempt(
-        Func<bool>? hasChangedOnDisk, SaveClock clock, int attempt, int attempts, Action<int>? duringAttempt)
+        Func<bool>? hasChangedOnDisk,
+        SaveClock clock,
+        int attempt,
+        int attempts,
+        Action<int>? duringAttempt,
+        ref Action<string>? beforeReplacing)
     {
         clock.BeginAttempt();
         var gated = EnterGateIfTransacting(clock);
@@ -720,6 +733,21 @@ internal sealed class KeePassInterop : IDisposable
             if (hasChangedOnDisk is not null && (gated || attempt > 1) && clock.Reread(hasChangedOnDisk))
             {
                 throw new VaultChangedOnDiskException();
+            }
+
+            if (gated && beforeReplacing is { } preserve)
+            {
+                // Here and nowhere else. The gate is held, so no other save in this process can
+                // replace the vault between the copy and the write it is a backup of; the re-read
+                // above has just established that the bytes on disk are the ones this vault was
+                // opened from, so the copy is of a file keypaste is known to have read; and `gated`
+                // is false exactly when the file does not exist, so a first creation has nothing to
+                // preserve and never reaches this.
+                //
+                // Cleared before the call rather than after, so a backup is attempted once per save
+                // however many attempts follow. A throw abandons the save with the vault untouched.
+                beforeReplacing = null;
+                preserve(_database.IOConnectionInfo.Path);
             }
 
             clock.Attempt(() =>

@@ -102,3 +102,44 @@ public sealed class InvalidMasterPasswordException : VaultException
     {
     }
 }
+
+/// <summary>
+/// Raised when the vault's previous bytes could not be preserved before a save replaced them.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>Nothing was written</b> when this is thrown: not the backup, not the vault, and nothing was
+/// pruned. A save that cannot keep the copy it is about to make unnecessary does not proceed, and
+/// there is no flag, setting or environment variable that lets it — the whole value of a backup is
+/// that it is there on the one occasion nobody planned for.
+/// </para>
+/// <para>
+/// Distinct from <see cref="VaultException"/> so the save's retry cannot absorb it. A failed copy is
+/// a full disk, a read-only folder or a wrong permission, and
+/// <c>KeePassInterop.IsTransient</c> deliberately admits <see cref="IOException"/> and
+/// <see cref="UnauthorizedAccessException"/>; arriving as those would spend the whole retry budget
+/// before saying so.
+/// </para>
+/// </remarks>
+public sealed class VaultBackupException : VaultException
+{
+    /// <summary>Creates an exception with no message.</summary>
+    public VaultBackupException()
+    {
+    }
+
+    /// <summary>Creates an exception with the given message.</summary>
+    /// <param name="message">A description of the failure.</param>
+    public VaultBackupException(string message)
+        : base(message)
+    {
+    }
+
+    /// <summary>Creates an exception with the given message and cause.</summary>
+    /// <param name="message">A description of the failure.</param>
+    /// <param name="innerException">The underlying failure.</param>
+    public VaultBackupException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}

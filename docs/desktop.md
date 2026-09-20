@@ -32,7 +32,7 @@ Everything the app writes goes through the same core as the CLI. A fresh `keypas
 
 If the vault file changes while open, the app refuses to save its stale copy. Lock and unlock to load the external change, then reapply your edit. No data is written during the refusal.
 
-The app is a vault editor, not just a viewer. Deleting an entry moves it to the vault's KDBX recycle bin, so the entry, its fields and its history survive, and Trash puts it back. A vault whose recycle bin was switched off in KeePassXC still deletes permanently, and the confirmation says so. There is no concurrent-edit merge or automatic backup/restore workflow. Entry history can recover a replaced value while that entry and vault survive; neither it nor the recycle bin can recover a lost file. Keep protected copies of the encrypted vault externally.
+The app is a vault editor, not just a viewer. Deleting an entry moves it to the vault's KDBX recycle bin, so the entry, its fields and its history survive, and Trash puts it back. A vault whose recycle bin was switched off in KeePassXC still deletes permanently, and the confirmation says so. There is no concurrent-edit merge. Entry history can recover a replaced value while that entry and vault survive; neither it nor the recycle bin can recover a lost file. Saving now keeps the file it replaces: the first save after each unlock copies the vault into `<vault>.backups` beside it, keeping the last five, and a save whose copy cannot be written does not happen. The app has no screen for them yet — V.4b adds one — so recovering from a copy today means opening it in KeePassXC or pointing `--vault` at it. Keep protected copies of the encrypted vault elsewhere as well.
 
 ## Building and running it
 

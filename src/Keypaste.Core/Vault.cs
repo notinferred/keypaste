@@ -13,6 +13,7 @@ public sealed class Vault : IDisposable
     private readonly KeePassInterop _interop;
     private byte[]? _stamp;
     private bool _disposed;
+    private bool _backedUp;
 
     private Vault(KeePassInterop interop, string path, bool stamp)
     {
@@ -26,6 +27,18 @@ public sealed class Vault : IDisposable
 
     /// <summary>Whether saves write through a temporary file. A test seam; nothing else reads it.</summary>
     internal bool UsesFileTransactions => _interop.UsesFileTransactions;
+
+    /// <summary>
+    /// What the last save that took a backup did, or null while no save on this vault has replaced
+    /// anything. A later save suppressed by the floor or by this unlock's own backup leaves it as
+    /// it was, because what it reports — where the copies are kept — has not changed.
+    /// </summary>
+    /// <remarks>
+    /// Exists so one caller can say, once, that keypaste has started keeping copies beside somebody's
+    /// vault. A directory of encrypted vaults appearing next to their file without a word is the
+    /// discovery docs/PRODUCT.md §6.1 calls a risk to trust.
+    /// </remarks>
+    public VaultBackupReport? LastBackup { get; private set; }
 
     /// <summary>The KDBX UUID of the entry called <paramref name="name"/>, as hex, or
     /// <see langword="null"/> if none has that name. A test seam; keypaste addresses entries by
@@ -370,7 +383,7 @@ public sealed class Vault : IDisposable
         // The check is handed to the retry loop, not just made before it. The name a save contends
         // for is most often held by another process saving this same vault, so a retry that waits
         // that out and then writes reverts it — see KeePassInterop.Save and D-0119.
-        Commit(HasFileChangedSinceOpen, null, KeePassInterop.SaveAttempts);
+        Commit(HasFileChangedSinceOpen, null, KeePassInterop.SaveAttempts, backUp: !_backedUp);
     }
 
     /// <summary>Writes the vault to <see cref="Path"/>, discarding whatever else was written
@@ -386,7 +399,12 @@ public sealed class Vault : IDisposable
 
         // No check, at any point: this caller has already put the choice to a person and been told
         // to go ahead, so a change arriving mid-retry is one they have already accepted.
-        Commit(null, null, KeePassInterop.SaveAttempts);
+        //
+        // backUp is unconditional here, and deliberately does not consult or set _backedUp. This is
+        // the path a restore takes, and the vault it replaces is precisely the copy somebody needs
+        // when the restore turns out to have been the wrong one — the one case this feature cannot
+        // afford to skip. A Save() later in the same unlock still gets its own per-unlock backup.
+        Commit(null, null, KeePassInterop.SaveAttempts, backUp: true, applyFloor: false);
     }
 
     /// <summary>
@@ -448,14 +466,16 @@ public sealed class Vault : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        Commit(HasFileChangedSinceOpen, waitBetweenAttempts, attempts, duringAttempt);
+        Commit(HasFileChangedSinceOpen, waitBetweenAttempts, attempts, duringAttempt, backUp: !_backedUp);
     }
 
     private void Commit(
         Func<bool>? hasChangedOnDisk,
         Action<int>? waitBetweenAttempts,
         int attempts,
-        Action<int>? duringAttempt = null)
+        Action<int>? duringAttempt = null,
+        bool backUp = false,
+        bool applyFloor = true)
     {
         var clock = new SaveClock();
         var succeeded = false;
@@ -467,7 +487,9 @@ public sealed class Vault : IDisposable
                 throw new VaultChangedOnDiskException();
             }
 
-            _interop.Save(hasChangedOnDisk, waitBetweenAttempts, clock, attempts, duringAttempt);
+            _interop.Save(
+                hasChangedOnDisk, waitBetweenAttempts, clock, attempts, duringAttempt,
+                backUp ? path => PreserveBefore(path, applyFloor) : null);
             _stamp = clock.Stamp(() => SourceSnapshot.Digest(Path));
             succeeded = true;
         }
@@ -475,6 +497,25 @@ public sealed class Vault : IDisposable
         {
             clock.Publish(succeeded);
         }
+    }
+
+    /// <summary>Keeps the bytes this save is about to replace. Called with the save gate held.</summary>
+    /// <remarks>
+    /// <paramref name="applyFloor"/> is false only on <see cref="SaveOverwriting"/>'s path, and
+    /// <see cref="_backedUp"/> is set only when the floor applies, so a restore can neither be
+    /// suppressed by an ordinary edit earlier in the unlock nor suppress one later in it.
+    /// </remarks>
+    private void PreserveBefore(string path, bool applyFloor)
+    {
+        var outcome = VaultBackups.Preserve(path, DateTimeOffset.UtcNow, applyFloor, out var createdDirectory);
+
+        if (applyFloor)
+        {
+            _backedUp = true;
+        }
+
+        LastBackup = new VaultBackupReport(
+            VaultBackups.DirectoryFor(path), outcome, createdDirectory, VaultBackups.Retained);
     }
 
     /// <summary>Releases the vault's key material and decrypted contents.</summary>

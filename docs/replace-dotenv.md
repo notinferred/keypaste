@@ -13,7 +13,7 @@ export KEYPASTE_VAULT=~/keypaste.kdbx
 
 Put that `export` in your shell profile. Otherwise every command needs `--vault ~/keypaste.kdbx`.
 
-Set up backups for the `.kdbx` now, and keep them current after changes. A backup protects against losing the file; it does not recover a forgotten master password. Anyone who obtains the encrypted file can attempt offline password guessing, so use a strong master password and protect your backups.
+Set up backups for the `.kdbx` now, somewhere other than the machine it lives on. Keypaste keeps its own copies of the file beside it, in `<vault>.backups`, which covers a bad save and not a lost disk. A backup protects against losing the file; it does not recover a forgotten master password, and a copy taken before you changed that password still opens with the old one. Anyone who obtains any of these encrypted files can attempt offline password guessing, so use a strong master password and protect the copies as carefully as the vault.
 
 <a id="minute-1--import-what-you-already-have"></a>
 

@@ -62,6 +62,7 @@ public sealed class CompatGateIsPermanentTests
         // can record where the entry came from. Both are claims about the format that only real
         // KeePassXC can settle (V.3a).
         Assert.Contains("scripts/verify-keepassxc-recyclebin.sh", workflow, StringComparison.Ordinal);
+        Assert.Contains("scripts/verify-keepassxc-backup.sh", workflow, StringComparison.Ordinal);
 
         // Injection is the other law with no in-process test that can reach it (docs/PRODUCT.md 3.4 and
         // 4.5): the child owns the console, so only a real child can be asked what it received.
@@ -344,6 +345,46 @@ public sealed class CompatGateIsPermanentTests
 
         // The minor-version byte. Nothing else in the repository would notice it going back to 0.
         Assert.Contains("hdr:16:2", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The backup gate is the only place KeePassXC is asked to open a file keypaste produced by
+    /// copying rather than by writing, and the only check that what a save preserved still holds
+    /// the values that save replaced. A backup that is the right size and unreadable would pass
+    /// every other check in the repository, which is why presence is never what this asserts.
+    /// </summary>
+    /// <remarks>
+    /// It needs no driver, and that is itself the claim: a backup is an ordinary KDBX file, so
+    /// <c>keepassxc-cli</c> and <c>keypaste --vault</c> both read one directly. A gate that had to
+    /// reach for a special reader would be evidence the bytes were not simply copied.
+    /// </remarks>
+    [Fact]
+    public void BackupScript_ExistsAndKeepsItsNegativeControl()
+    {
+        var script = Path.Combine(RepoRoot(), "scripts", "verify-keepassxc-backup.sh");
+        Assert.True(File.Exists(script), $"The backup gate script is missing: {script}");
+
+        var text = File.ReadAllText(script);
+
+        Assert.Contains("NEGATIVE CONTROL", text, StringComparison.Ordinal);
+        Assert.Contains("must never be skipped or soft-passed", text, StringComparison.Ordinal);
+
+        // Every save under test is the shipped binary's (D-0012), so the backup examined is one a
+        // real command produced rather than one the gate arranged.
+        Assert.Contains("\"$kp\" env set", text, StringComparison.Ordinal);
+
+        // The two readers that make this more than a directory listing: KeePassXC opening the
+        // backup, and the value it reads back out of it.
+        Assert.Contains("db-info", text, StringComparison.Ordinal);
+        Assert.Contains("show -a Password", text, StringComparison.Ordinal);
+
+        // The refusal. A save that cannot take a backup must leave the vault byte-identical, and
+        // od over the whole file is what says so.
+        Assert.Contains("od -An -v -tx1", text, StringComparison.Ordinal);
+
+        // The floor is defeated by renaming, never by a knob. A gate that could set an environment
+        // variable to shorten it would be proving a configuration the product does not ship.
+        Assert.DoesNotContain("KEYPASTE_BACKUP", text, StringComparison.Ordinal);
     }
 
     /// <summary>
