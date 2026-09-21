@@ -137,6 +137,80 @@ public sealed class VaultOrganizeTests : IDisposable
         Assert.DoesNotContain(vault.ReadEntries(), entry => entry.GroupPath == "env/billing");
     }
 
+    // ---------------------------------------------------------------- both halves at once
+
+    /// <summary>
+    /// The combined write, which is the one the desktop performs. Neither <c>Renamed</c> nor
+    /// <c>Moved</c> is true of it, so it says so, and the entry survives it whole.
+    /// </summary>
+    [Fact]
+    public void Relocate_ChangingBothHalves_IsOneWriteThatKeepsTheEntry()
+    {
+        var path = NewVaultPath();
+        string before;
+
+        using (var vault = Seeded(path))
+        {
+            before = vault.EntryUuid(_token)!;
+
+            Assert.Equal(
+                OrganizeOutcome.RenamedAndMoved,
+                vault.Relocate(_token, new EntryName("keys", "API_TOKEN"), out var result));
+
+            Assert.Equal(new EntryName("keys", "API_TOKEN"), result);
+            vault.Save();
+        }
+
+        using var reopened = Vault.Open(path, MasterPassword);
+        var name = new EntryName("keys", "API_TOKEN");
+
+        Assert.Equal(before, reopened.EntryUuid(name));
+        Assert.Null(reopened.Find(_token));
+        Assert.Equal("v3", reopened.Find(name)!.Password, StringComparer.Ordinal);
+
+        Assert.Equal(
+            new[] { "v2", "v1", string.Empty },
+            reopened.ReadHistory(name)!.Select(revision => revision.Fields.Password));
+
+        // The claim the recycle bin gate makes in the opposite direction: tidying costs no reader.
+        Assert.Equal(0, MinorVersion(path));
+    }
+
+    /// <summary>
+    /// Each half held constant, through the combined operation, still answers for that half alone.
+    /// The wrappers cannot produce <c>RenamedAndMoved</c>, and this is why.
+    /// </summary>
+    [Fact]
+    public void Relocate_ChangingOneHalf_SaysWhichHalfChanged()
+    {
+        using var vault = Seeded(NewVaultPath());
+
+        Assert.Equal(
+            OrganizeOutcome.Renamed,
+            vault.Relocate(_token, new EntryName("env/billing", "API_TOKEN"), out _));
+
+        Assert.Equal(
+            OrganizeOutcome.Moved,
+            vault.Relocate(new EntryName("env/billing", "API_TOKEN"), new EntryName("keys", "API_TOKEN"), out _));
+    }
+
+    /// <summary>
+    /// A target equal to the name it was given is not a write. Stated here because the combined
+    /// operation is the first one whose caller can reach this without meaning to: a confirm that
+    /// changed neither field submits the entry's own name back.
+    /// </summary>
+    [Fact]
+    public void Relocate_ChangingNeitherHalf_SaysNothingChanged()
+    {
+        using var vault = Seeded(NewVaultPath());
+
+        Assert.Equal(
+            OrganizeOutcome.DestinationUnchanged,
+            vault.Relocate(_token, new EntryName("env/billing", "TOKEN"), out var result));
+
+        Assert.Null(result);
+    }
+
     // ---------------------------------------------------------------- groups
 
     /// <summary>

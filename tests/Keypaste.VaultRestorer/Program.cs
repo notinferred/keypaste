@@ -57,6 +57,7 @@ internal static class Program
         "       group-rename <vault-path> <group-path> <new-name>\n" +
         "       entry-rename <vault-path> <group-path> <title> <new-title>\n" +
         "       entry-move   <vault-path> <group-path> <title> <destination-group-path>\n" +
+        "       entry-relocate <vault-path> <group-path> <title> <destination-group-path> <new-title>\n" +
         "the master password is read from KEYPASTE_RESTORER_PASSWORD";
 
     private static int Main(string[] args)
@@ -156,7 +157,7 @@ internal static class Program
     /// </remarks>
     private static int Entries(string[] args, string password)
     {
-        if (args.Length != 5)
+        if (args.Length != (args[0] == "entry-relocate" ? 6 : 5))
         {
             Console.Error.WriteLine(_usage);
             return 2;
@@ -178,19 +179,33 @@ internal static class Program
                 outcome = vault.MoveEntry(name, args[4], out result);
                 break;
 
+            // One write that changes both halves, which is what the desktop performs and what
+            // neither of the two above can produce. The gate needs it to ask KeePassXC whether
+            // an entry survives being moved and renamed at once.
+            case "entry-relocate":
+                outcome = vault.Relocate(name, new EntryName(args[4], args[5]), out result);
+                break;
+
             default:
                 Console.Error.WriteLine(_usage);
                 return 2;
         }
 
-        if (outcome is not (OrganizeOutcome.Renamed or OrganizeOutcome.Moved))
+        if (outcome is not (OrganizeOutcome.Renamed or OrganizeOutcome.Moved or OrganizeOutcome.RenamedAndMoved))
         {
             Console.Error.WriteLine($"refused: {outcome}");
             return 1;
         }
 
+        var did = outcome switch
+        {
+            OrganizeOutcome.Renamed => "renamed",
+            OrganizeOutcome.Moved => "moved",
+            _ => "relocated",
+        };
+
         vault.Save();
-        Console.WriteLine($"{(outcome is OrganizeOutcome.Renamed ? "renamed" : "moved")}       {result!.GroupPath}/{result.Title}");
+        Console.WriteLine($"{did}       {result!.GroupPath}/{result.Title}");
         return 0;
     }
 

@@ -37,6 +37,7 @@ Complete KeePassXC parity is withdrawn as an objective. Individual capabilities 
 | Secret rotation reminders and deliberate history removal | Reminders do not rotate a provider credential; purging a leaked value is explicit and cannot erase existing copies or backups. |
 | Applying the adopted brand | [BRAND](BRAND.md) records unapplied marks and palette; apply them when relevant interface work is selected, without a separate release gate. |
 | Command palette and additional generator recipes | Add when they improve an observed frequent task; existing CLI recipe controls are not proof of desktop controls. |
+| Deleting a group, and moving one to another parent | Core has neither, so neither front end can offer them and a group made by mistake is removed in KeePassXC. A deletion has to decide what happens to what is inside it — recycle each entry, or refuse a group that is not empty — and that is its own design with its own refusals. Select it when somebody actually reorganizes deeply enough to need it. |
 | Pasting the master password | A local input choice needing explicit clipboard handling and tests; entry-field paste support does not establish it for unlock fields. |
 | Policy editing/storage in the vault and unusual-request notices | Policy is authorization. Avoid automatic broadening, circular unlock rules or inferred trust from a client label. |
 | Git secret hooks and conflict guidance | Potential project tooling; a warning or file-sync guide does not implement merge or guarantee secret removal from history. |

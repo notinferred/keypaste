@@ -215,6 +215,44 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
         });
     }
 
+    /// <summary>
+    /// The combined write refuses the same way the two halves do, and writes nothing when it does.
+    /// </summary>
+    /// <remarks>
+    /// This is the claim the desktop rests on. Composing a rename and a move would refuse the
+    /// second after the first had already mutated the open vault, and the harness below checks
+    /// exactly that by saving the same vault afterwards: the bytes and the shape must both be what
+    /// they were. One operation cannot half-apply.
+    /// </remarks>
+    [Fact]
+    public void ARefusedRelocate_LeavesNeitherHalfBehind()
+    {
+        WritesNothing(vault =>
+        {
+            // Both halves vary, and the title is one the destination already answers to.
+            Assert.Equal(
+                OrganizeOutcome.DestinationOccupied,
+                vault.Relocate(_token, new EntryName("keys", "SPARE"), out var result));
+
+            Assert.Null(result);
+
+            // Both halves vary, and the destination is not a group.
+            Assert.Equal(
+                OrganizeOutcome.DestinationMissing,
+                vault.Relocate(_token, new EntryName("nowhere", "API_TOKEN"), out _));
+
+            // Both halves vary, and the new title is one no vault could address.
+            Assert.Equal(
+                OrganizeOutcome.NameRefused,
+                vault.Relocate(_token, new EntryName("keys", "a/b"), out _));
+
+            // Both halves vary, and the destination is a project the new title could not export to.
+            Assert.Equal(
+                OrganizeOutcome.EnvNameRefused,
+                vault.Relocate(new EntryName("keys", "SPARE"), new EntryName("env/shipping", "HAS-HYPHEN"), out _));
+        });
+    }
+
     [Fact]
     public void ASiblingGroupOfThatName_RefusesTheRenameAndTheCreate()
     {

@@ -155,6 +155,23 @@ internal sealed class KeePassInterop : IDisposable
         return entries;
     }
 
+    /// <summary>Every entry whose title, group path, username or URL contains the query.</summary>
+    /// <remarks>
+    /// The same traversal as <see cref="Collect"/>, so a result can never name a path a listing
+    /// would not report, and the recycle bin is skipped for the reason <see cref="Bin"/> gives.
+    /// Only the four fields are read: <see cref="PwDefs.PasswordField"/> and
+    /// <see cref="PwDefs.NotesField"/> are never touched here, which is what makes
+    /// <see cref="MatchedFields"/>'s claim about them structural rather than a filter.
+    /// </remarks>
+    internal IReadOnlyList<EntryMatch> Search(string query)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        List<EntryMatch> matches = [];
+        CollectMatches(_database.RootGroup, string.Empty, query, matches, Bin());
+        return matches;
+    }
+
     /// <summary>Returns the one entry with this name, or null when the vault holds none.</summary>
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
     internal VaultEntry? FindEntry(EntryName name)
@@ -246,7 +263,7 @@ internal sealed class KeePassInterop : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        return Relocate(name, new EntryName(name.GroupPath, title), OrganizeOutcome.Renamed, out renamed);
+        return Relocate(name, new EntryName(name.GroupPath, title), out renamed);
     }
 
     /// <summary>Moves the one entry with this name into another group, mutating it in place.</summary>
@@ -254,7 +271,7 @@ internal sealed class KeePassInterop : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        return Relocate(name, new EntryName(destinationGroupPath, name.Title), OrganizeOutcome.Moved, out moved);
+        return Relocate(name, new EntryName(destinationGroupPath, name.Title), out moved);
     }
 
     /// <summary>Creates one empty group inside an existing one.</summary>
@@ -350,6 +367,27 @@ internal sealed class KeePassInterop : IDisposable
     }
 
     /// <summary>
+    /// Writes a protected custom string onto an entry, which keypaste has no other way to make.
+    /// </summary>
+    /// <remarks>
+    /// A test seam, for the reason D-0255 gives about <see cref="AddGroupUnchecked"/>: a TOTP seed
+    /// or an API secret in a custom field is a shape KeePassXC writes every day, keypaste preserves
+    /// and keypaste must never search. Without a way to put one in a fixture, that last claim can
+    /// only be argued from the implementation.
+    /// </remarks>
+    internal void AddProtectedFieldUnchecked(EntryName name, string field, string value)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (Locate(name) is not { } found)
+        {
+            throw new VaultException($"'{name.Title}' is not in this vault.");
+        }
+
+        found.Entry.Strings.Set(field, new ProtectedString(true, value));
+    }
+
+    /// <summary>
     /// Adds a group without applying any of the rules, for building the shapes KeePassXC can make
     /// and keypaste refuses to.
     /// </summary>
@@ -366,7 +404,7 @@ internal sealed class KeePassInterop : IDisposable
     }
 
     /// <summary>
-    /// The one write that changes an entry's name, whichever half of it varies.
+    /// The one write that changes an entry's name, whichever half of it varies — or both at once.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -382,7 +420,7 @@ internal sealed class KeePassInterop : IDisposable
     /// attachments and the custom string fields keypaste does not model.
     /// </para>
     /// </remarks>
-    private OrganizeOutcome Relocate(EntryName source, EntryName target, OrganizeOutcome success, out EntryName? result)
+    internal OrganizeOutcome Relocate(EntryName source, EntryName target, out EntryName? result)
     {
         result = null;
 
@@ -444,7 +482,16 @@ internal sealed class KeePassInterop : IDisposable
         }
 
         result = target;
-        return success;
+
+        // Computed from what actually varied rather than declared by the caller. A combined change
+        // is neither a rename nor a move on its own, and a result that had to pick one of them
+        // would be half wrong for the operation the app performs most.
+        return (renames, moves) switch
+        {
+            (true, true) => OrganizeOutcome.RenamedAndMoved,
+            (true, false) => OrganizeOutcome.Renamed,
+            _ => OrganizeOutcome.Moved,
+        };
     }
 
     /// <summary>The one live group at this path, and the group holding it.</summary>
@@ -1468,6 +1515,77 @@ internal sealed class KeePassInterop : IDisposable
             Collect(child, ChildPath(groupPath, child.Name), entries, bin);
         }
     }
+
+    private static void CollectMatches(
+        PwGroup group,
+        string groupPath,
+        string query,
+        List<EntryMatch> matches,
+        PwGroup? bin)
+    {
+        foreach (PwEntry entry in group.Entries)
+        {
+            string title = ReadField(entry, PwDefs.TitleField);
+            MatchedFields fields = Matched(title, groupPath, entry, query);
+
+            if (query.Length == 0 || fields != MatchedFields.None)
+            {
+                matches.Add(new EntryMatch(new EntryName(groupPath, title), fields));
+            }
+        }
+
+        foreach (PwGroup child in group.Groups)
+        {
+            if (ReferenceEquals(child, bin))
+            {
+                continue;
+            }
+
+            CollectMatches(child, ChildPath(groupPath, child.Name), query, matches, bin);
+        }
+    }
+
+    /// <summary>Which of the four readable fields contain the query.</summary>
+    /// <remarks>
+    /// Every field is compared, rather than stopping at the first hit, because a caller is told
+    /// which ones matched and "the first one in this method's order" is not an answer about the
+    /// entry. The comparison is culture-insensitive: a search that changed its results with the
+    /// machine's locale would make two people disagree about the contents of one vault.
+    /// </remarks>
+    private static MatchedFields Matched(string title, string groupPath, PwEntry entry, string query)
+    {
+        if (query.Length == 0)
+        {
+            return MatchedFields.None;
+        }
+
+        MatchedFields fields = MatchedFields.None;
+
+        if (Contains(title, query))
+        {
+            fields |= MatchedFields.Title;
+        }
+
+        if (Contains(groupPath, query))
+        {
+            fields |= MatchedFields.GroupPath;
+        }
+
+        if (Contains(ReadField(entry, PwDefs.UserNameField), query))
+        {
+            fields |= MatchedFields.Username;
+        }
+
+        if (Contains(ReadField(entry, PwDefs.UrlField), query))
+        {
+            fields |= MatchedFields.Url;
+        }
+
+        return fields;
+    }
+
+    private static bool Contains(string value, string query) =>
+        value.Contains(query, StringComparison.OrdinalIgnoreCase);
 
     private static void CollectGroups(PwGroup group, string groupPath, List<string> paths, PwGroup? bin)
     {

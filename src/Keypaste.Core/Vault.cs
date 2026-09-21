@@ -172,6 +172,42 @@ public sealed class Vault : IDisposable
         return _interop.ReadEntries();
     }
 
+    /// <summary>
+    /// Every entry whose title, group path, username or URL contains <paramref name="query"/>.
+    /// </summary>
+    /// <param name="query">
+    /// What to look for, compared case-insensitively as a substring. An empty or whitespace query
+    /// matches every entry and reports <see cref="MatchedFields.None"/> for each.
+    /// </param>
+    /// <returns>Each entry found, with every field the query was in.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="query"/> is null.</exception>
+    /// <remarks>
+    /// <para>
+    /// <b>No value is returned, and the fields holding one are never read.</b> A result carries an
+    /// <see cref="EntryName"/> and a <see cref="MatchedFields"/>, both of which a listing already
+    /// discloses. The password and the notes are not compared at all: notes routinely hold recovery
+    /// codes, connection strings and second passwords, so matching them would make a query a way to
+    /// confirm a secret without ever opening the entry that holds it (docs/STEPS.md V.5b).
+    /// </para>
+    /// <para>
+    /// Here rather than in a front end because it is a rule about what may be read out of a vault,
+    /// which docs/PRODUCT.md law 4.2 puts in the core. A screen that did its own matching would have
+    /// to hold every username it compared, and the desktop's hygiene gate exists to stop exactly
+    /// that.
+    /// </para>
+    /// <para>
+    /// A recycled entry is not found: the bin is skipped by the same traversal that skips it for
+    /// <see cref="ReadEntries"/> (D-0248).
+    /// </para>
+    /// </remarks>
+    public IReadOnlyList<EntryMatch> Search(string query)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(query);
+
+        return _interop.Search(query.Trim());
+    }
+
     /// <summary>Finds the one entry with this group path and title, or <see langword="null"/>.</summary>
     /// <remarks>
     /// The unambiguous form, and the one every mutation goes through. <see cref="Find(string)"/> takes
@@ -351,6 +387,50 @@ public sealed class Vault : IDisposable
         return _interop.MoveEntry(name, destinationGroupPath, out moved);
     }
 
+    /// <summary>
+    /// Renames and moves the one entry with this name in a single write. Call <see cref="Save"/> to
+    /// persist it.
+    /// </summary>
+    /// <param name="name">The entry to change.</param>
+    /// <param name="target">
+    /// What it should be called and where it should live. Either half may equal the entry's
+    /// current one; the group must already exist, because nothing is created on the way.
+    /// </param>
+    /// <param name="result">
+    /// The name the entry now answers to, or <see langword="null"/> when nothing was written.
+    /// </param>
+    /// <returns>
+    /// <see cref="OrganizeOutcome.RenamedAndMoved"/>, <see cref="OrganizeOutcome.Renamed"/> or
+    /// <see cref="OrganizeOutcome.Moved"/> for what actually changed,
+    /// <see cref="OrganizeOutcome.DestinationUnchanged"/> when neither half did, and every reason
+    /// it did not happen otherwise.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">Either argument is null.</exception>
+    /// <exception cref="VaultException">More than one entry, or more than one group, answers.</exception>
+    /// <remarks>
+    /// <para>
+    /// <b>Prefer this to calling <see cref="RenameEntry"/> and then <see cref="MoveEntry"/>.</b>
+    /// Those two are each this one with a half held constant, and running them in sequence is not
+    /// the same thing: the first can succeed and the second be refused, leaving the open vault
+    /// holding a change the caller was told did not happen, which the next unrelated
+    /// <see cref="Save"/> then writes out. Every check here happens before the one mutation, so a
+    /// refusal leaves the vault exactly as it found it, in memory as well as on disk (D-0272).
+    /// </para>
+    /// <para>
+    /// The entry is mutated in place, so its UUID, its timestamps, its attachments, its custom
+    /// string fields and its whole history survive, and nothing records where it came from, so an
+    /// organized vault stays KDBX 4.0.
+    /// </para>
+    /// </remarks>
+    public OrganizeOutcome Relocate(EntryName name, EntryName target, out EntryName? result)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(target);
+
+        return _interop.Relocate(name, target, out result);
+    }
+
     /// <summary>Creates one empty group. Call <see cref="Save"/> to persist it.</summary>
     /// <param name="parentGroupPath">
     /// The group to create it in, slash-separated and excluding the root; an empty string is the
@@ -405,6 +485,15 @@ public sealed class Vault : IDisposable
 
         return _interop.RenameGroup(groupPath, name, out renamedPath);
     }
+
+    /// <summary>Writes a protected custom string onto an entry. A test seam; nothing else uses it.</summary>
+    /// <remarks>
+    /// Internal for the reason <see cref="AddGroupUnchecked"/> is: it exists so a fixture can hold
+    /// the custom fields KeePassXC writes, which keypaste preserves and <see cref="Search"/> must
+    /// never read.
+    /// </remarks>
+    internal void AddProtectedFieldUnchecked(EntryName name, string field, string value) =>
+        _interop.AddProtectedFieldUnchecked(name, field, value);
 
     /// <summary>Adds a group without applying any of the rules. A test seam; nothing else uses it.</summary>
     /// <remarks>

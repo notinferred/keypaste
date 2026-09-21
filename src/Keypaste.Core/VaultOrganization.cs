@@ -7,8 +7,9 @@ namespace Keypaste.Core;
 /// <para>
 /// Renaming and moving share this vocabulary because they are one write. An entry's identity is
 /// its group path and its title (DECISIONS.md D-0091); a rename varies one half and a move varies
-/// the other, and every way either can be refused is a way the other can be refused too. The two
-/// success members are what keeps a caller honest about which it asked for.
+/// the other, and every way either can be refused is a way the other can be refused too. The three
+/// success members say which halves actually changed, so a caller that varied both is not told a
+/// half-truth by a result that can only say <see cref="Renamed"/> or <see cref="Moved"/>.
 /// </para>
 /// <para>
 /// A refusal is a value rather than an exception because a person is going to read it: the front
@@ -54,6 +55,9 @@ public enum OrganizeOutcome
     /// Linux and one on Windows.
     /// </summary>
     EnvNameCollides = 9,
+
+    /// <summary>The entry is in its new group, under its new title. One write changed both.</summary>
+    RenamedAndMoved = 10,
 }
 
 /// <summary>

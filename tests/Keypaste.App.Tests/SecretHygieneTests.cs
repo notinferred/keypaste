@@ -53,6 +53,16 @@ public sealed class SecretHygieneTests
 
     internal const string SentinelPassword = "SENTINEL-PASSWORD-a17f3c";
     internal const string SentinelUsername = "SENTINEL-USERNAME-b28e4d";
+
+    /// <summary>
+    /// Part of <see cref="SentinelUsername"/>, which is what a search is given.
+    /// </summary>
+    /// <remarks>
+    /// A query is on the screen because somebody typed it, so searching the whole value would find
+    /// it in the search box and say nothing about whether the row carries it. A fragment is also
+    /// what a person actually types.
+    /// </remarks>
+    internal const string SentinelUsernameFragment = "USERNAME-b28";
     internal const string SentinelUrl = "https://SENTINEL-URL-c39f5e.example";
     internal const string SentinelNotes = "SENTINEL-NOTES-d40a6f";
     internal const string SentinelTitle = "SENTINEL-TITLE-e51b70";
@@ -200,6 +210,89 @@ public sealed class SecretHygieneTests
                 SentinelEnvValue,
                 SentinelOtherEnvValue,
             })
+            {
+                Assert.DoesNotContain(sentinel, text, StringComparison.Ordinal);
+            }
+        }
+    }
+
+    /// <summary>
+    /// A search that matched a username holds the name it found and not the username.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The test above is about an unfiltered list. This one is about the case V.5b added, where a
+    /// row is in the list <em>because of</em> a field the row does not show: the obvious way to
+    /// write that feature is to read every username into the screen and compare it there, and the
+    /// obvious way is the one this file exists to prevent.
+    /// </para>
+    /// <para>
+    /// What makes it pass is that the comparison happens in <c>Vault.Search</c> and what comes back
+    /// is an entry name and a <c>MatchedFields</c>. The row says "username", which is a constant in
+    /// this assembly, and the sweep below is what holds the difference between that and the value.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void A_search_that_matched_a_username_holds_no_username()
+    {
+        using var fixture = new SentinelVault();
+        using var session = Unlocked(fixture);
+        using var shell = new ShellViewModel(session, fixture.Home, approverFromEnvironment: null);
+
+        shell.Current = Destinations.All[0];
+        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
+
+        entries.Search = SentinelUsernameFragment;
+
+        // The positive control. Without it the sweep passes for a search that found nothing, which
+        // is the shape every negative claim in this file is written against.
+        var row = Assert.Single(entries.Rows);
+        Assert.Equal(SentinelTitle, row.Title);
+        Assert.Equal("username", row.Why);
+
+        foreach (var text in Surface(entries))
+        {
+            foreach (var sentinel in new[]
+            {
+                SentinelPassword,
+                SentinelUnselectedPassword,
+                SentinelUsername,
+                SentinelUrl,
+                SentinelNotes,
+                SentinelEnvValue,
+                SentinelOtherEnvValue,
+            })
+            {
+                Assert.DoesNotContain(sentinel, text, StringComparison.Ordinal);
+            }
+        }
+    }
+
+    /// <summary>
+    /// A query is what somebody was looking for in this vault, so a lock takes it too.
+    /// </summary>
+    [Fact]
+    public void A_lock_takes_the_query_and_the_result_with_everything_else()
+    {
+        using var fixture = new SentinelVault();
+        using var session = Unlocked(fixture);
+        using var shell = new ShellViewModel(session, fixture.Home, approverFromEnvironment: null);
+
+        shell.Current = Destinations.All[0];
+        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
+
+        entries.Search = SentinelUsernameFragment;
+        Assert.NotEmpty(entries.Rows);
+
+        session.Lock(VaultLockReason.Manual);
+        shell.Dispose();
+
+        Assert.Empty(entries.Search);
+        Assert.Empty(entries.Rows);
+
+        foreach (var text in Surface(entries))
+        {
+            foreach (var sentinel in _everySentinel)
             {
                 Assert.DoesNotContain(sentinel, text, StringComparison.Ordinal);
             }

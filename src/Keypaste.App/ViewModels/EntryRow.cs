@@ -7,6 +7,10 @@ namespace Keypaste.App.ViewModels;
 /// </summary>
 /// <param name="Title">The entry's title.</param>
 /// <param name="GroupPath">Its group, or empty at the root.</param>
+/// <param name="Fields">
+/// Which of the entry's fields the current query was found in, or
+/// <see cref="MatchedFields.None"/> when there is no query.
+/// </param>
 /// <remarks>
 /// <para>
 /// <b>No field value is materialised here, and that is the decision 4.1's hygiene gate existed to
@@ -22,8 +26,16 @@ namespace Keypaste.App.ViewModels;
 /// selected. An implementation that read every password into every row would fail
 /// <c>SecretHygieneTests</c> on the entry it never selected.
 /// </para>
+/// <para>
+/// <b><see cref="Fields"/> is the one thing here that came from a search, and it is not a value.</b>
+/// V.5b matches usernames and URLs, so a row can be in a result for a reason that is nowhere on it,
+/// and saying which field matched is how the list answers "why is this here?". The matching happens
+/// in <see cref="Core.Vault.Search"/> and what comes back is a member of a four-value enum, so the
+/// username that matched never reaches this assembly — which is what keeps the paragraph above true
+/// of a filtered list as well as an unfiltered one.
+/// </para>
 /// </remarks>
-internal sealed record EntryRow(string Title, string GroupPath)
+internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fields = MatchedFields.None)
 {
     /// <summary>The row's identity, which is what core reads and writes through.</summary>
     /// <remarks>
@@ -47,4 +59,21 @@ internal sealed record EntryRow(string Title, string GroupPath)
     /// <summary>The group, for a list that is not grouped by one. Display only, so scrubbed.</summary>
     internal string Where { get; } =
         GroupPath.Length == 0 ? "—" : EntryNameSanitizer.SanitizePath(GroupPath).Text;
+
+    /// <summary>
+    /// Which fields a person cannot see on this row the query was found in, worded for the list.
+    /// </summary>
+    /// <remarks>
+    /// Only the two that are not already on the row. A title or a group match shows its own evidence
+    /// in the two columns beside this one, and labelling those would be noise on every row of an
+    /// ordinary search. The strings are constants: nothing from the vault is interpolated here.
+    /// </remarks>
+    internal string Why =>
+        (Fields.HasFlag(MatchedFields.Username), Fields.HasFlag(MatchedFields.Url)) switch
+        {
+            (true, true) => "username, URL",
+            (true, false) => "username",
+            (false, true) => "URL",
+            _ => string.Empty,
+        };
 }

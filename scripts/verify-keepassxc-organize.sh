@@ -9,7 +9,11 @@
 # verify-keepassxc-history.sh proves a revision keypaste RESTORES is the one KeePassXC then reads,
 # verify-keepassxc-recyclebin.sh proves a DELETE is recoverable, and verify-keepassxc-backup.sh
 # proves the whole-file copies. This one covers what docs/STEPS.md V.5a added: keypaste CREATES and
-# RENAMES a group, RENAMES an entry and MOVES one between groups.
+# RENAMES a group, RENAMES an entry, MOVES one between groups, and does the last two as ONE
+# write. That combined act is what the desktop performs (V.5b): a person edits a title and a
+# group on one form and confirms once, so it is the path most vaults are organized by and the
+# one the assertions below have to cover. Composing a rename and a move would refuse the second
+# after the first had already changed the open vault.
 #
 # Two things here are keypaste's claims about the FORMAT rather than about its own reader:
 #
@@ -229,6 +233,41 @@ for value in v1-first v2-second v3-third; do
 done
 
 # ---------------------------------------------------------------------------------------
+# One write that changes both halves of the name.
+#
+# Everything above did one thing at a time. This does what the desktop does, and it is not implied
+# by the two separate acts: the entry is unlinked from one group and its title field is set inside
+# a single mutation, and the same two format claims have to survive it.
+# ---------------------------------------------------------------------------------------
+step "keypaste moves and renames the entry in one write, and KeePassXC follows both halves"
+said=$("$driver" entry-relocate "$db" archive API_TOKEN env/invoicing FINAL_TOKEN)   || die "entry-relocate failed: ${said}"
+grep -qE '^relocated +env/invoicing/FINAL_TOKEN$' <<<"$said"   || die "entry-relocate did not report that it did both. It said: ${said}"
+
+assert_kdbx_40 "a combined rename and move"
+
+tree=$(kpxc ls -R -f "$db")
+grep -qF 'env/invoicing/FINAL_TOKEN' <<<"$tree"   || die "KeePassXC does not see the relocated entry. Its tree: ${tree}"
+grep -qF 'archive/API_TOKEN' <<<"$tree" && die "KeePassXC still sees the entry where it was"
+
+relocated=$(kpxc show -a Password "$db" 'env/invoicing/FINAL_TOKEN')   || die "keepassxc-cli show failed on the relocated entry"
+diff -u <(printf '%s
+' 'v4-current') <(printf '%s
+' "$relocated")   || die "the relocated entry does not hold its value"
+
+step "the combined write mutated the entry rather than replacing it"
+uuid_relocated=$(entry_uuid)
+[ "$uuid_relocated" = "$uuid_before" ]   || die "the entry's UUID changed across a combined rename and move, so it was re-added rather than mutated."
+
+xml=$(kpxc export -f xml "$db") || die "keepassxc-cli export -f xml failed"
+grep -q '<PreviousParentGroup>' <<<"$xml"   && die "the combined write stamped PreviousParentGroup, raising the file to KDBX 4.1 (D-0247)."
+grep -q '<DeletedObjects/>' <<<"$xml"   || die "the combined write left a deleted-object tombstone. A merge would then delete the entry in the other copy of the vault."
+
+history=$(awk '/<History>/{inside=1} inside' <<<"$xml")
+for value in v1-first v2-second v3-third; do
+  grep -qF ">${value}<" <<<"$history"     || die "'${value}' is missing from the history of the relocated entry"
+done
+
+# ---------------------------------------------------------------------------------------
 # Both directions of law 4.6: a group KeePassXC made, renamed by keypaste.
 #
 # This runs AFTER every header assertion above, because KeePassXC's own writer may raise the file
@@ -325,4 +364,4 @@ said=$("$driver" entry-rename "$db" env/invoicing CONTROL CONTROL_RENAMED) \
 kpxc show -a Password "$db" 'env/invoicing/CONTROL_RENAMED' >/dev/null \
   || die "KeePassXC cannot read the control rename"
 
-printf '\nORGANIZE GATE PASSED: KeePassXC reads what keypaste created, renamed and moved, and the file is still KDBX 4.0.\n'
+printf '\nORGANIZE GATE PASSED: KeePassXC reads what keypaste created, renamed and moved — separately and in one write — and the file is still KDBX 4.0.\n'

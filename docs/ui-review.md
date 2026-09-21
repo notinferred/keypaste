@@ -40,3 +40,5 @@ Review the relevant interface changes on Windows and Linux at minimum and normal
 | Project launch and later vault changes | The env snapshot and limits of later locking are understandable |
 
 T1 covers daily vault use and recovery, T2 the shared session, T3 native MCP approval, T4 project environments and T5 installation and delivery. Backend compatibility, secret-display protections and installed-app verification remain required for the behaviors they establish.
+
+The organize forms and the search result's matched-field label were added in V.5b and have had no rendered layout review. Their logic is covered; how three mutually exclusive inline panels and a third column on every row look at the smallest window the app allows is not.

@@ -26,36 +26,53 @@
                IsVisible="{Binding !Detail.History.IsOpen}"
                Foreground="{DynamicResource KpTextMuted}" />
 
-    <ListBox Grid.Row="1" Grid.Column="0"
-             Name="Groups"
-             Width="180"
-             IsVisible="{Binding !Detail.History.IsOpen}"
-             ItemsSource="{Binding Groups}"
-             SelectedItem="{Binding SelectedGroup}"
-             Background="Transparent"
-             BorderThickness="0">
-      <ListBox.ItemTemplate>
-        <DataTemplate x:DataType="vm:GroupNode">
-          <TextBlock Text="{Binding Label}"
-                     Margin="{Binding Depth, Converter={StaticResource Indent}}"
-                     TextTrimming="CharacterEllipsis" />
-        </DataTemplate>
-      </ListBox.ItemTemplate>
-    </ListBox>
+    <Grid Grid.Row="1" Grid.Column="0"
+          Width="180"
+          RowDefinitions="*,Auto"
+          IsVisible="{Binding !Detail.History.IsOpen}">
+
+      <ListBox Grid.Row="0"
+               Name="Groups"
+               ItemsSource="{Binding Groups}"
+               SelectedItem="{Binding SelectedGroup}"
+               Background="Transparent"
+               BorderThickness="0">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:GroupNode">
+            <TextBlock Text="{Binding Label}"
+                       Margin="{Binding Depth, Converter={StaticResource Indent}}"
+                       TextTrimming="CharacterEllipsis" />
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+
+      <!-- A group is a thing on the tree, so its controls are where the tree is. New makes a child
+           of whatever is selected, or a top-level group under "All entries"; Rename is unavailable
+           there, because the root is not a group somebody named. -->
+      <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+        <Button x:Name="NewGroup" Content="New group" FontSize="11"
+                Command="{Binding BeginCreateGroupCommand}" />
+        <Button x:Name="RenameGroup" Content="Rename" FontSize="11"
+                Command="{Binding BeginRenameGroupCommand}" />
+      </StackPanel>
+
+    </Grid>
 
     <Rectangle Grid.Row="0" Grid.RowSpan="2" Grid.Column="1"
                Width="1" Fill="{DynamicResource KpBorderSubtle}" Margin="12,0"
                IsVisible="{Binding !Detail.History.IsOpen}" />
 
     <!-- The list. Titles and groups, and nothing from inside an entry: see EntryRow. -->
-    <Grid Grid.Row="0" Grid.Column="2" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,8">
+    <Grid Grid.Row="0" Grid.Column="2" ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,0,0,8">
       <TextBox Grid.Column="0"
                Name="Search"
                Text="{Binding Search}"
                PlaceholderText="Search entries"
                BorderThickness="1" />
       <Button Grid.Column="1" Content="Add" Margin="8,0,0,0" Command="{Binding BeginAddCommand}" />
-      <Button Grid.Column="2" Content="Delete" Margin="8,0,0,0" Command="{Binding DeleteCommand}" />
+      <Button Grid.Column="2" x:Name="Organize" Content="Organize" Margin="8,0,0,0"
+              Command="{Binding OrganizeCommand}" />
+      <Button Grid.Column="3" Content="Delete" Margin="8,0,0,0" Command="{Binding DeleteCommand}" />
     </Grid>
 
     <Grid Grid.Row="1" Grid.Column="2" RowDefinitions="Auto,Auto,Auto,*">
@@ -180,6 +197,92 @@
         </StackPanel>
       </Border>
 
+      <!-- Renaming and moving on one form, behind one Save. The two are a single core write
+           (Vault.Relocate), and splitting them into two submits would let a rename commit in the
+           open vault while the move beside it was refused, for the next save to write out. -->
+      <Border Grid.Row="2"
+              IsVisible="{Binding IsOrganizing}"
+              Background="{DynamicResource KpSurface2}"
+              CornerRadius="{DynamicResource KpRadiusSm}"
+              Padding="12"
+              Margin="0,0,0,8">
+        <StackPanel Spacing="8">
+          <TextBlock Text="{Binding OrganizePrompt}"
+                     FontSize="11"
+                     FontFamily="{DynamicResource KpMono}"
+                     TextTrimming="CharacterEllipsis"
+                     Foreground="{DynamicResource KpTextMuted}" />
+          <TextBlock Text="Name" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
+          <TextBox x:Name="OrganizeTitle" Text="{Binding DraftTitle}" />
+          <TextBlock Text="Group" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
+          <ComboBox x:Name="OrganizeGroup"
+                    HorizontalAlignment="Stretch"
+                    ItemsSource="{Binding MoveTargets}"
+                    SelectedItem="{Binding MoveTarget}">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:GroupNode">
+                <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+          <TextBlock FontSize="11" TextWrapping="Wrap"
+                     Foreground="{DynamicResource KpTextMuted}"
+                     Text="{Binding AccessNote}" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button x:Name="OrganizeSave" Content="Save" Command="{Binding ConfirmOrganizeCommand}" />
+            <Button Content="Cancel" Command="{Binding CancelOrganizeCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <Border Grid.Row="2"
+              IsVisible="{Binding IsCreatingGroup}"
+              Background="{DynamicResource KpSurface2}"
+              CornerRadius="{DynamicResource KpRadiusSm}"
+              Padding="12"
+              Margin="0,0,0,8">
+        <StackPanel Spacing="8">
+          <TextBlock Text="{Binding CreateGroupPrompt}"
+                     FontSize="11"
+                     TextWrapping="Wrap"
+                     Foreground="{DynamicResource KpTextMuted}" />
+          <TextBox x:Name="NewGroupName" Text="{Binding DraftGroupName}" PlaceholderText="servers" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button x:Name="CreateGroup" Content="Create" Command="{Binding ConfirmCreateGroupCommand}" />
+            <Button Content="Cancel" Command="{Binding CancelGroupCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <Border Grid.Row="2"
+              IsVisible="{Binding IsRenamingGroup}"
+              Background="{DynamicResource KpSurface2}"
+              CornerRadius="{DynamicResource KpRadiusSm}"
+              Padding="12"
+              Margin="0,0,0,8">
+        <StackPanel Spacing="8">
+          <TextBlock Text="{Binding RenameGroupPrompt}"
+                     FontSize="11"
+                     TextWrapping="Wrap"
+                     Foreground="{DynamicResource KpTextMuted}" />
+          <TextBox x:Name="RenameGroupName" Text="{Binding DraftGroupName}" />
+          <TextBlock FontSize="11" TextWrapping="Wrap"
+                     Foreground="{DynamicResource KpTextMuted}"
+                     Text="{Binding AccessNote}" />
+          <!-- The specific case of the line above: renaming a project is also how the name
+               `keypaste run` takes changes. -->
+          <TextBlock x:Name="ProjectRenameNote"
+                     FontSize="11" TextWrapping="Wrap"
+                     IsVisible="{Binding ShowsProjectRenameNote}"
+                     Foreground="{DynamicResource KpTextMuted}"
+                     Text="{Binding ProjectRenameNote}" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button x:Name="RenameGroupSave" Content="Rename" Command="{Binding ConfirmRenameGroupCommand}" />
+            <Button Content="Cancel" Command="{Binding CancelGroupCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
       <ListBox Grid.Row="3"
                Name="Rows"
                ItemsSource="{Binding Rows}"
@@ -188,9 +291,17 @@
                BorderThickness="0">
         <ListBox.ItemTemplate>
           <DataTemplate x:DataType="vm:EntryRow">
-            <Grid ColumnDefinitions="*,Auto">
+            <Grid ColumnDefinitions="*,Auto,Auto">
               <TextBlock Grid.Column="0" Text="{Binding DisplayTitle}" TextTrimming="CharacterEllipsis" />
+              <!-- Why the row is in a result whose reason is nowhere else on it. A field name from
+                   a fixed vocabulary; the value that matched is never drawn. -->
               <TextBlock Grid.Column="1"
+                         Text="{Binding Why}"
+                         FontSize="11"
+                         Margin="12,0,0,0"
+                         IsVisible="{Binding Why.Length}"
+                         Foreground="{DynamicResource KpAccent}" />
+              <TextBlock Grid.Column="2"
                          Text="{Binding Where}"
                          FontSize="11"
                          Margin="12,0,0,0"
@@ -260,9 +371,12 @@
                            Foreground="{DynamicResource KpTextPrimary}" />
               </StackPanel>
 
-              <Button Content="Edit" Command="{Binding EditCommand}"
-                      IsVisible="{Binding !IsEditing}"
-                      HorizontalAlignment="Left" />
+              <StackPanel Orientation="Horizontal" Spacing="8"
+                          IsVisible="{Binding !IsEditing}">
+                <Button Content="Edit" Command="{Binding EditCommand}" />
+                <Button x:Name="OrganizeFromPane" Content="Rename or move"
+                        Command="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).OrganizeCommand}" />
+              </StackPanel>
 
               <!-- History. Read when the toggle asks for it, never on selection: one reading
                    materialises every superseded password (EntryHistoryViewModel). -->
