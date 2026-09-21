@@ -45,6 +45,27 @@ public sealed class VerbTests
         Assert.Contains("do not match", harness.Err, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// V.5a put renaming and moving in the core and gave them no command line, the way the recycle
+    /// bin and the whole-file backups have none (D-0254, D-0264). The day one of these becomes a
+    /// verb, it needs its own row, its own prompts and its own exit codes — this is what stops one
+    /// appearing without them.
+    /// </summary>
+    [Theory]
+    [InlineData("mv")]
+    [InlineData("move")]
+    [InlineData("rename")]
+    [InlineData("mkdir")]
+    public void OrganizingHasNoCommandLine(string verb)
+    {
+        using var harness = new CliHarness();
+        harness.SeedVault(Master);
+
+        var exit = harness.Run(verb, "a", "b");
+
+        Assert.Equal(CliApp.ExitUsageError, exit);
+    }
+
     [Fact]
     public void Init_RefusesToOverwriteAnExistingVault()
     {

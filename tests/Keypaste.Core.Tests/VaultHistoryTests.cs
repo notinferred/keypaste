@@ -320,6 +320,73 @@ public sealed class VaultHistoryTests : IDisposable
     /// A saved vault whose entry has been through three updates, and the revisions as the writing
     /// session saw them, so a caller can compare those with what survives the file.
     /// </summary>
+    /// <summary>
+    /// A revision is values, never identity. History items carry the title the entry had when the
+    /// revision was taken, and <c>RestoreFromBackup</c> assigns every string back — so without a
+    /// guard, restoring an old revision would silently undo a rename nobody asked about, and could
+    /// move the entry onto a name something else already answers to (D-0091).
+    /// </summary>
+    [Fact]
+    public void RestoringARevisionTakenBeforeARename_LeavesTheEntryAtItsCurrentName()
+    {
+        var path = Seed(out _);
+        var renamed = new EntryName("servers", "prod");
+
+        using var vault = Vault.Open(path, MasterPassword);
+
+        Assert.Equal(OrganizeOutcome.Renamed, vault.RenameEntry(_production, "prod", out _));
+        Assert.True(vault.RestoreRevision(renamed, 0));
+
+        Assert.Null(vault.Find(_production));
+
+        var entry = vault.Find(renamed);
+        Assert.NotNull(entry);
+        Assert.Equal("v2", entry!.Password, StringComparer.Ordinal);
+        Assert.Equal("u2", entry.Username, StringComparer.Ordinal);
+    }
+
+    /// <summary>
+    /// The value the restore replaced is still kept, so a restore after a rename can itself be
+    /// undone — and the entry has still not moved.
+    /// </summary>
+    [Fact]
+    public void ARestoreAfterARename_KeepsWhatItReplaced_AndStillDoesNotMoveTheEntry()
+    {
+        var path = Seed(out _);
+        var renamed = new EntryName("servers", "prod");
+
+        using var vault = Vault.Open(path, MasterPassword);
+
+        Assert.Equal(OrganizeOutcome.Renamed, vault.RenameEntry(_production, "prod", out _));
+        Assert.True(vault.RestoreRevision(renamed, 0));
+
+        Assert.Equal("v3", vault.ReadHistory(renamed)![0].Fields.Password, StringComparer.Ordinal);
+
+        Assert.True(vault.RestoreRevision(renamed, 0));
+        Assert.Equal("v3", vault.Find(renamed)!.Password, StringComparer.Ordinal);
+        Assert.Equal("prod", vault.Find(renamed)!.Title, StringComparer.Ordinal);
+    }
+
+    /// <summary>
+    /// Reading is unchanged by all of this. <see cref="EntryRevision"/> says a revision carries the
+    /// title it held, which is why its path can address nothing; the guard is on the restore, which
+    /// writes, and not on the read, which does not.
+    /// </summary>
+    [Fact]
+    public void AfterARename_ARevisionStillReportsTheTitleItHeld()
+    {
+        var path = Seed(out _);
+        var renamed = new EntryName("servers", "prod");
+
+        using var vault = Vault.Open(path, MasterPassword);
+
+        Assert.Equal(OrganizeOutcome.Renamed, vault.RenameEntry(_production, "prod", out _));
+
+        var revisions = vault.ReadHistory(renamed)!;
+        Assert.All(revisions, revision => Assert.Equal("production", revision.Fields.Title, StringComparer.Ordinal));
+        Assert.All(revisions, revision => Assert.Equal("servers", revision.Fields.GroupPath, StringComparer.Ordinal));
+    }
+
     private string Seed(out IReadOnlyList<EntryRevision> beforeSaving)
     {
         var path = NewVaultPath();

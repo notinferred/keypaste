@@ -76,7 +76,7 @@ A bridge started with no `--client-label` matches no rule at all, including one 
 
 ## What a rule cannot do
 
-A rule applies only within `--expose`, which is checked against the resolved entry first. `entries = ["**"]` on a bridge configured with `--expose "env/**"` still reaches only `env/**`. A rule can lower `--max-ttl` but cannot raise it. An hour-long rule under `keypaste agent --max-ttl 60` grants sixty seconds. A recent explicit refusal takes precedence over a policy rule. `list_entry_names` uses `--expose` alone; policy does not affect listing.
+A rule applies only within `--expose`, which is checked against the resolved entry first. `entries = ["**"]` on a bridge configured with `--expose "env/**"` still reaches only `env/**`. A rule can lower `--max-ttl` but cannot raise it. An hour-long rule under `keypaste agent --max-ttl 60` grants sixty seconds. A recent explicit refusal takes precedence over a policy rule. `list_entry_names` uses `--expose` alone; policy does not affect listing. A rule matches the path an entry has now, so organizing the vault changes which rule covers what: renaming a project moves every credential in it under the rules written for the new name, and out from under the rules written for the old one. Nothing warns about that — [THREATS](../THREATS.md) T-13 records it.
 
 <a id="anything-wrong-means-everything-asks-you"></a>
 

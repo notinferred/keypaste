@@ -64,6 +64,10 @@ public sealed class CompatGateIsPermanentTests
         Assert.Contains("scripts/verify-keepassxc-recyclebin.sh", workflow, StringComparison.Ordinal);
         Assert.Contains("scripts/verify-keepassxc-backup.sh", workflow, StringComparison.Ordinal);
 
+        // Renaming and moving make the opposite claim about the same format byte: an organized
+        // vault stays KDBX 4.0, and only a deletion may raise it (V.5a).
+        Assert.Contains("scripts/verify-keepassxc-organize.sh", workflow, StringComparison.Ordinal);
+
         // Injection is the other law with no in-process test that can reach it (docs/PRODUCT.md 3.4 and
         // 4.5): the child owns the console, so only a real child can be asked what it received.
         Assert.Contains("scripts/verify-run-injection.sh", workflow, StringComparison.Ordinal);
@@ -311,6 +315,39 @@ public sealed class CompatGateIsPermanentTests
         // only thing keepassxc-cli offers that can see a history item at all.
         Assert.Contains("show -a Password", text, StringComparison.Ordinal);
         Assert.Contains("export -f xml", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The organize gate's twin assertion. The recycle-bin gate holds the minor-version byte at
+    /// <c>01</c> and this one holds it at <c>00</c>; losing either is how the reader floor changes
+    /// silently, in the direction nobody would think to look.
+    /// </summary>
+    [Fact]
+    public void OrganizeScript_ExistsAndKeepsItsNegativeControl()
+    {
+        var script = Path.Combine(RepoRoot(), "scripts", "verify-keepassxc-organize.sh");
+        Assert.True(File.Exists(script), $"The organize gate script is missing: {script}");
+
+        var text = File.ReadAllText(script);
+
+        Assert.Contains("NEGATIVE CONTROL", text, StringComparison.Ordinal);
+        Assert.Contains("must never be skipped or soft-passed", text, StringComparison.Ordinal);
+
+        // The seeding stays the shipped binary's (D-0012); only the four acts no CLI verb performs
+        // go through the driver.
+        Assert.Contains("\"$kp\" env set", text, StringComparison.Ordinal);
+        Assert.Contains("\"$kp\" add", text, StringComparison.Ordinal);
+        Assert.Contains("Keypaste.VaultRestorer", text, StringComparison.Ordinal);
+
+        // Only `ls -R -f` sees a group with no entries in it, which is the whole of what creating
+        // one does; `show` reads the moved value; the XML is the only reader that can show
+        // PreviousParentGroup is absent.
+        Assert.Contains("ls -R -f", text, StringComparison.Ordinal);
+        Assert.Contains("show -a Password", text, StringComparison.Ordinal);
+        Assert.Contains("export -f xml", text, StringComparison.Ordinal);
+
+        // The minor-version byte, asserted as 00 here and as 01 by the recycle-bin gate.
+        Assert.Contains("hdr:16:2", text, StringComparison.Ordinal);
     }
 
     /// <summary>

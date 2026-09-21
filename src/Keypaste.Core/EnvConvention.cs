@@ -66,40 +66,8 @@ public static class EnvConvention
     /// path could ever find it again. A name containing a separator would nest a group one level
     /// deeper than the project listing looks, with the same result: a silent write to nowhere.
     /// </remarks>
-    public static bool IsValidProject(string project, out string error)
-    {
-        ArgumentNullException.ThrowIfNull(project);
-
-        if (project.Length == 0)
-        {
-            error = "the project name cannot be empty";
-            return false;
-        }
-
-        foreach (char c in project)
-        {
-            if (c is '/' or '\\')
-            {
-                error = $"the project name cannot contain '{c}'";
-                return false;
-            }
-
-            if (char.IsControl(c))
-            {
-                error = "the project name cannot contain control characters";
-                return false;
-            }
-        }
-
-        if (project.Trim().Length != project.Length)
-        {
-            error = "the project name cannot begin or end with whitespace";
-            return false;
-        }
-
-        error = string.Empty;
-        return true;
-    }
+    public static bool IsValidProject(string project, out string error) =>
+        VaultNameRules.IsValidName(project, "project name", out error);
 
     /// <summary>Whether a variable name is one keypaste is willing to create.</summary>
     /// <param name="key">The variable name to check.</param>

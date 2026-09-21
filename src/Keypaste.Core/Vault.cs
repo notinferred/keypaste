@@ -295,6 +295,126 @@ public sealed class Vault : IDisposable
             : DeletionOutcome.NothingMatched;
     }
 
+    /// <summary>Renames the one entry with this name. Call <see cref="Save"/> to persist it.</summary>
+    /// <param name="name">The entry to rename.</param>
+    /// <param name="title">What to call it.</param>
+    /// <param name="renamed">
+    /// The name the entry now answers to, or <see langword="null"/> when nothing was written.
+    /// </param>
+    /// <returns>What happened, including every reason it did not.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="name"/> or <paramref name="title"/> is null.</exception>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    /// <remarks>
+    /// <para>
+    /// The entry is mutated in place, so its UUID, its timestamps, its attachments, its custom
+    /// string fields and its whole history survive. A rename takes no history revision of its own:
+    /// it overwrites no value, and KeePass evicts the oldest revision when the list fills.
+    /// </para>
+    /// <para>
+    /// A recycled entry is not here to rename. Putting one back is
+    /// <see cref="RestoreRecycled"/>; reorganizing the bin is not something keypaste does.
+    /// </para>
+    /// </remarks>
+    public OrganizeOutcome RenameEntry(EntryName name, string title, out EntryName? renamed)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(title);
+
+        return _interop.RenameEntry(name, title, out renamed);
+    }
+
+    /// <summary>Moves the one entry with this name into another group. Call <see cref="Save"/> to
+    /// persist it.</summary>
+    /// <param name="name">The entry to move.</param>
+    /// <param name="destinationGroupPath">
+    /// The group to move it into, slash-separated and excluding the root; an empty string is the
+    /// root group. The group must already exist — nothing is created on the way.
+    /// </param>
+    /// <param name="moved">
+    /// The name the entry now answers to, or <see langword="null"/> when nothing was written.
+    /// </param>
+    /// <returns>What happened, including every reason it did not.</returns>
+    /// <exception cref="ArgumentNullException">Either argument is null.</exception>
+    /// <exception cref="VaultException">More than one entry, or more than one group, answers.</exception>
+    /// <remarks>
+    /// The recycle bin is not a destination: a move is not a delete, and
+    /// <see cref="RemoveEntry(EntryName)"/> is. Nothing records where the entry came from, so an
+    /// organized vault stays KDBX 4.0 and only recycling raises it.
+    /// </remarks>
+    public OrganizeOutcome MoveEntry(EntryName name, string destinationGroupPath, out EntryName? moved)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(destinationGroupPath);
+
+        return _interop.MoveEntry(name, destinationGroupPath, out moved);
+    }
+
+    /// <summary>Creates one empty group. Call <see cref="Save"/> to persist it.</summary>
+    /// <param name="parentGroupPath">
+    /// The group to create it in, slash-separated and excluding the root; an empty string is the
+    /// root group. It must already exist — a path that does not is refused rather than built.
+    /// </param>
+    /// <param name="name">What to call the new group. One name, never a path.</param>
+    /// <param name="created">
+    /// The path the new group has, or an empty string when nothing was written.
+    /// </param>
+    /// <returns>What happened, including every reason it did not.</returns>
+    /// <exception cref="ArgumentNullException">Either argument is null.</exception>
+    /// <exception cref="VaultException">More than one group answers to the parent path.</exception>
+    /// <remarks>
+    /// A new group holds nothing, so only <see cref="ReadGroupPaths"/> can see it:
+    /// <see cref="ReadEntries"/> has nothing of it to report.
+    /// </remarks>
+    public GroupOutcome CreateGroup(string parentGroupPath, string name, out string created)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(parentGroupPath);
+        ArgumentNullException.ThrowIfNull(name);
+
+        return _interop.CreateGroup(parentGroupPath, name, out created);
+    }
+
+    /// <summary>Renames one group, carrying everything under it. Call <see cref="Save"/> to
+    /// persist it.</summary>
+    /// <param name="groupPath">The group to rename, slash-separated and excluding the root.</param>
+    /// <param name="name">What to call it. One name, never a path: this does not move the group.</param>
+    /// <param name="renamedPath">
+    /// The path the group now has, or an empty string when nothing was written.
+    /// </param>
+    /// <returns>What happened, including every reason it did not.</returns>
+    /// <exception cref="ArgumentNullException">Either argument is null.</exception>
+    /// <exception cref="VaultException">More than one group answers to that path.</exception>
+    /// <remarks>
+    /// <para>
+    /// Every entry beneath the group is re-pathed by this, so every one of them is checked against
+    /// the same rules a single rename or move is checked against, and a collision with any of them
+    /// refuses the whole rename rather than half of it.
+    /// </para>
+    /// <para>
+    /// The group is mutated in place and keeps its UUID, so a recycled entry that came from it can
+    /// still find its way home: where an entry came from is a UUID and not a path.
+    /// </para>
+    /// </remarks>
+    public GroupOutcome RenameGroup(string groupPath, string name, out string renamedPath)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(groupPath);
+        ArgumentNullException.ThrowIfNull(name);
+
+        return _interop.RenameGroup(groupPath, name, out renamedPath);
+    }
+
+    /// <summary>Adds a group without applying any of the rules. A test seam; nothing else uses it.</summary>
+    /// <remarks>
+    /// Two sibling groups of one name is a shape KDBX permits, KeePassXC makes and keypaste refuses
+    /// to create, and keypaste still has to have an answer for a vault that holds one. Internal for
+    /// the reason D-0255 gives about <see cref="SetRecyclesDeletedEntries"/>.
+    /// </remarks>
+    internal void AddGroupUnchecked(string parentGroupPath, string name) =>
+        _interop.AddGroupUnchecked(parentGroupPath, name);
+
     /// <summary>Everything in the recycle bin, or an empty list when there is nothing to recover.</summary>
     /// <remarks>
     /// The rows carry no field values — see <see cref="RecycledEntry"/>. A restored entry is read

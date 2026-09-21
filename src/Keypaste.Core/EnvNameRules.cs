@@ -53,21 +53,40 @@ public static class EnvNameRules
             return false;
         }
 
+        return TryCheckCase([.. variables.Select(variable => variable.Key)], out error);
+    }
+
+    /// <summary>
+    /// Rejects a set holding two names that differ only in case.
+    /// </summary>
+    /// <param name="keys">The variable names.</param>
+    /// <param name="error">The reason, or an empty string when there is none.</param>
+    /// <returns><see langword="true"/> when no two names collide.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="keys"/> is null.</exception>
+    /// <remarks>
+    /// Shared with the write path, which refuses a rename or a move that would create the pair
+    /// rather than leaving it for whoever next runs the project to discover. That caller words its
+    /// own refusal from <see cref="OrganizeOutcome"/>: the message here ends in advice to repair
+    /// the vault in KeePassXC, which is export's problem and not a rename's.
+    /// </remarks>
+    internal static bool TryCheckCase(IReadOnlyList<string> keys, out string error)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+
         // Ordinal-blind, deliberately, so the collision is found on every platform rather than only
         // on the one where it happens to matter. A vault that runs on Linux and refuses on Windows
         // is a failure a teammate cannot reproduce, which is worse than a rule that always holds.
         var seen = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var variable in variables)
+        foreach (var key in keys)
         {
-            if (seen.TryGetValue(variable.Key, out var other)
-                && !string.Equals(other, variable.Key, StringComparison.Ordinal))
+            if (seen.TryGetValue(key, out var other) && !string.Equals(other, key, StringComparison.Ordinal))
             {
-                error = $"contains '{other}' and '{variable.Key}', which differ only in case. " +
+                error = $"contains '{other}' and '{key}', which differ only in case. " +
                     "They are two variables on Linux and one on Windows, so rename one in KeePassXC.";
                 return false;
             }
 
-            seen[variable.Key] = variable.Key;
+            seen[key] = key;
         }
 
         error = string.Empty;

@@ -343,3 +343,7 @@ jobs:
       - name: Verify the backup a save keeps, a restore and an export through real KeePassXC
         shell: bash
         run: bash scripts/verify-keepassxc-backup.sh artifacts/compat/backup.kdbx
+
+      - name: Verify renaming and moving through real KeePassXC
+        shell: bash
+        run: bash scripts/verify-keepassxc-organize.sh artifacts/compat/organize.kdbx

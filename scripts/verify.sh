@@ -25,7 +25,7 @@ scripts      Offline release/diagnostic fixtures and shell syntax, run in parall
 backend      Locked restore, format, Release build and backend tests.
 integration  Prepare the backend and exercise real CLI/MCP processes and the demo pages.
 desktop      The desktop solution AND the separate CLI/desktop consistency project.
-compat       Prepare the backend and verify creation, write-back and history against installed KeePassXC.
+compat       Prepare the backend and verify creation, write-back, history, recovery and organization against installed KeePassXC.
              Never selected automatically; run it by name.
 
 --list prints the selection and commands without executing them. Backend/desktop accept
@@ -253,6 +253,7 @@ profile_compat() {
   run bash scripts/verify-keepassxc-history.sh artifacts/compat/local-history.kdbx
   run bash scripts/verify-keepassxc-recyclebin.sh artifacts/compat/local-recyclebin.kdbx
   run bash scripts/verify-keepassxc-backup.sh artifacts/compat/local-backup.kdbx
+  run bash scripts/verify-keepassxc-organize.sh artifacts/compat/local-organize.kdbx
 }
 
 # Backend tests read workflows, scripts and the release definition, so those paths select backend too.

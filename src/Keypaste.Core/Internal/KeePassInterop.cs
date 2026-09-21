@@ -24,6 +24,9 @@ namespace Keypaste.Core.Internal;
 /// </remarks>
 internal sealed class KeePassInterop : IDisposable
 {
+    /// <summary>What KeePass and KeePassXC call the recycle bin, and so does keypaste.</summary>
+    internal const string RecycleBinName = "Recycle Bin";
+
     private readonly PwDatabase _database;
     private bool _disposed;
 
@@ -238,6 +241,430 @@ internal sealed class KeePassInterop : IDisposable
         return DeletionOutcome.Recycled;
     }
 
+    /// <summary>Renames the one entry with this name, mutating it in place.</summary>
+    internal OrganizeOutcome RenameEntry(EntryName name, string title, out EntryName? renamed)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        return Relocate(name, new EntryName(name.GroupPath, title), OrganizeOutcome.Renamed, out renamed);
+    }
+
+    /// <summary>Moves the one entry with this name into another group, mutating it in place.</summary>
+    internal OrganizeOutcome MoveEntry(EntryName name, string destinationGroupPath, out EntryName? moved)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        return Relocate(name, new EntryName(destinationGroupPath, name.Title), OrganizeOutcome.Moved, out moved);
+    }
+
+    /// <summary>Creates one empty group inside an existing one.</summary>
+    internal GroupOutcome CreateGroup(string parentGroupPath, string name, out string created)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        created = string.Empty;
+
+        if (LocateGroup(parentGroupPath) is not { } parent)
+        {
+            return GroupOutcome.ParentMissing;
+        }
+
+        if (!VaultNameRules.IsValidGroupName(name, out _))
+        {
+            return GroupOutcome.NameRefused;
+        }
+
+        if (IsReserved(parentGroupPath, name))
+        {
+            return GroupOutcome.NameReserved;
+        }
+
+        if (HasChildNamed(parent.Group, name, except: null))
+        {
+            return GroupOutcome.DestinationOccupied;
+        }
+
+        // Constructed exactly as EnsureGroup constructs one, so a group keypaste made is the same
+        // object however it came to exist.
+        var group = new PwGroup(true, true, name, PwIcon.Folder);
+        parent.Group.AddGroup(group, true);
+
+        created = ChildPath(parentGroupPath, name);
+        return GroupOutcome.Created;
+    }
+
+    /// <summary>Renames one group in place, carrying everything under it.</summary>
+    internal GroupOutcome RenameGroup(string groupPath, string name, out string renamedPath)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        renamedPath = string.Empty;
+
+        // The root group has no name a person gave it and no parent to be renamed within.
+        if (LocateGroup(groupPath) is not { Parent: { } parent } located)
+        {
+            return GroupOutcome.NothingMatched;
+        }
+
+        if (string.Equals(located.Group.Name, name, StringComparison.Ordinal))
+        {
+            return GroupOutcome.DestinationUnchanged;
+        }
+
+        if (!VaultNameRules.IsValidGroupName(name, out _))
+        {
+            return GroupOutcome.NameRefused;
+        }
+
+        string parentPath = PathOf(parent) ?? string.Empty;
+
+        // Both directions of the same rule: a root group cannot become the env root, and the env
+        // root cannot stop being it. Either silently reclassifies a whole subtree, in one case
+        // bringing it under the default exposure and in the other switching every project off.
+        if (IsReserved(parentPath, name)
+            || (parentPath.Length == 0
+                && string.Equals(located.Group.Name, EnvConvention.RootGroup, StringComparison.Ordinal)))
+        {
+            return GroupOutcome.NameReserved;
+        }
+
+        if (HasChildNamed(parent, name, except: located.Group))
+        {
+            return GroupOutcome.DestinationOccupied;
+        }
+
+        string target = ChildPath(parentPath, name);
+
+        if (RefuseCollision(Projected(null, null, located.Group, target)) is { } collision)
+        {
+            return collision == OrganizeOutcome.DestinationOccupied
+                ? GroupOutcome.DestinationOccupied
+                : GroupOutcome.DestinationAmbiguous;
+        }
+
+        located.Group.Name = name;
+        located.Group.Touch(true);
+
+        renamedPath = target;
+        return GroupOutcome.Renamed;
+    }
+
+    /// <summary>
+    /// Adds a group without applying any of the rules, for building the shapes KeePassXC can make
+    /// and keypaste refuses to.
+    /// </summary>
+    /// <remarks>
+    /// A test seam, visible only through <c>InternalsVisibleTo</c>, for the reason D-0255 gives
+    /// about a vault with its recycle bin switched off: two sibling groups of one name is a vault
+    /// keypaste has to have an answer for and has no supported way to write.
+    /// </remarks>
+    internal void AddGroupUnchecked(string parentGroupPath, string name)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        EnsureGroup(parentGroupPath).AddGroup(new PwGroup(true, true, name, PwIcon.Folder), true);
+    }
+
+    /// <summary>
+    /// The one write that changes an entry's name, whichever half of it varies.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Every check is a read, and they all happen before the single mutation at the bottom. The
+    /// alternative — mutate, check, undo — leaves the in-memory tree wrong on any path that throws
+    /// between the two, and the next unrelated save writes that out. <see cref="EnsureGroup"/> is
+    /// the specific trap: it is the obvious way to find a destination and it creates every missing
+    /// segment, so a refused move made with it would leave an empty group tree behind.
+    /// </para>
+    /// <para>
+    /// The entry is mutated, never removed and re-added as a new <see cref="PwEntry"/>, for the
+    /// reason <see cref="UpdateEntry"/> gives: re-adding mints a new UUID and discards timestamps,
+    /// attachments and the custom string fields keypaste does not model.
+    /// </para>
+    /// </remarks>
+    private OrganizeOutcome Relocate(EntryName source, EntryName target, OrganizeOutcome success, out EntryName? result)
+    {
+        result = null;
+
+        if (Locate(source) is not { } found)
+        {
+            return OrganizeOutcome.NothingMatched;
+        }
+
+        if (LocateGroup(target.GroupPath) is not { } destination)
+        {
+            return OrganizeOutcome.DestinationMissing;
+        }
+
+        bool moves = !ReferenceEquals(found.Group, destination.Group);
+        bool renames = !string.Equals(source.Title, target.Title, StringComparison.Ordinal);
+
+        if (!moves && !renames)
+        {
+            return OrganizeOutcome.DestinationUnchanged;
+        }
+
+        if (!VaultNameRules.IsValidTitle(target.Title, out _))
+        {
+            return OrganizeOutcome.NameRefused;
+        }
+
+        if (RefuseEnvName(target, destination.Group, found.Entry) is { } refused)
+        {
+            return refused;
+        }
+
+        if (RefuseCollision(Projected(found.Entry, target, null, null)) is { } collision)
+        {
+            return collision;
+        }
+
+        // Nothing above this line writes; nothing below it reads a decision. The two halves of the
+        // move stay adjacent so an entry can never be left belonging to no group.
+        if (moves)
+        {
+            found.Group.Entries.Remove(found.Entry);
+
+            // The three-argument overload stamps LocationChanged and leaves LastModificationTime
+            // and History alone: a move is not an edit of the entry's values. PreviousParentGroup
+            // is deliberately not written — that field raises the file to KDBX 4.1 (D-0247), and
+            // tidying a folder must not cost a reader what deleting does. One another tool wrote
+            // is left alone: it is somebody else's record, and the file is already 4.1 for it.
+            destination.Group.AddEntry(found.Entry, true, true);
+        }
+
+        if (renames)
+        {
+            SetField(found.Entry, PwDefs.TitleField, target.Title);
+
+            // The title is a field, so a merge that did not see it change would revert the rename.
+            // It takes no history revision: a rename overwrites no value, and KeePass evicts the
+            // oldest revision when the list fills.
+            found.Entry.Touch(true);
+        }
+
+        result = target;
+        return success;
+    }
+
+    /// <summary>The one live group at this path, and the group holding it.</summary>
+    /// <returns>
+    /// The group and its parent, with a null parent for the root group, or null when no group has
+    /// that path. The recycle bin is not a group any of this can reach.
+    /// </returns>
+    /// <exception cref="VaultException">More than one group answers to that path.</exception>
+    /// <remarks>
+    /// The counterpart <see cref="EnsureGroup"/> is not: that one creates, and takes the first
+    /// child of a matching name. This walks the tree and joins names the way <see cref="Collect"/>
+    /// does, so it cannot disagree with the paths a listing reports — the shape of the defect
+    /// D-0091 found, at group level.
+    /// </remarks>
+    private (PwGroup? Parent, PwGroup Group)? LocateGroup(string groupPath)
+    {
+        if (groupPath.Length == 0)
+        {
+            return (null, _database.RootGroup);
+        }
+
+        List<(PwGroup? Parent, PwGroup Group)> found = [];
+        PwGroup? bin = Bin();
+
+        Search(_database.RootGroup, string.Empty);
+
+        if (found.Count > 1)
+        {
+            throw new VaultException(
+                $"'{groupPath}' names {found.Count} groups. keypaste will not guess which one you " +
+                "meant; rename one of them in KeePassXC.");
+        }
+
+        return found.Count == 0 ? null : found[0];
+
+        void Search(PwGroup group, string path)
+        {
+            foreach (PwGroup child in group.Groups)
+            {
+                if (ReferenceEquals(child, bin))
+                {
+                    continue;
+                }
+
+                string childPath = ChildPath(path, child.Name);
+
+                if (string.Equals(childPath, groupPath, StringComparison.Ordinal))
+                {
+                    found.Add((group, child));
+                }
+
+                Search(child, childPath);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Every live entry's name as it would be <em>after</em> a write, without performing it, with
+    /// the names that write produces marked.
+    /// </summary>
+    private List<(string GroupPath, string Title, bool Written)> Projected(
+        PwEntry? movedEntry,
+        EntryName? movedEntryName,
+        PwGroup? renamedGroup,
+        string? renamedGroupPath)
+    {
+        List<(string GroupPath, string Title, bool Written)> names = [];
+        PwGroup? bin = Bin();
+
+        Walk(_database.RootGroup, string.Empty, false);
+        return names;
+
+        void Walk(PwGroup group, string groupPath, bool written)
+        {
+            foreach (PwEntry entry in group.Entries)
+            {
+                names.Add(ReferenceEquals(entry, movedEntry)
+                    ? (movedEntryName!.GroupPath, movedEntryName.Title, true)
+                    : (groupPath, ReadField(entry, PwDefs.TitleField), written));
+            }
+
+            foreach (PwGroup child in group.Groups)
+            {
+                if (ReferenceEquals(child, bin))
+                {
+                    continue;
+                }
+
+                bool renamed = ReferenceEquals(child, renamedGroup);
+                Walk(child, renamed ? renamedGroupPath! : ChildPath(groupPath, child.Name), written || renamed);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Whether a projected set of names holds a collision that this write would create.
+    /// </summary>
+    /// <remarks>
+    /// Only a collision involving a written name counts. A vault can already hold the pair keypaste
+    /// refuses to create — <c>EntryIdentityTests</c>' fixtures are what KeePassXC puts in a file —
+    /// and trapping such a vault so nothing else in it could be reorganized would be worse than the
+    /// ambiguity. Reading stays permissive; only the new ambiguity is refused.
+    /// </remarks>
+    private static OrganizeOutcome? RefuseCollision(List<(string GroupPath, string Title, bool Written)> projected)
+    {
+        Dictionary<(string, string), int> byName = [];
+        Dictionary<string, int> byPath = [];
+
+        foreach (var row in projected)
+        {
+            byName[(row.GroupPath, row.Title)] = byName.GetValueOrDefault((row.GroupPath, row.Title)) + 1;
+            string joined = ChildPath(row.GroupPath, row.Title);
+            byPath[joined] = byPath.GetValueOrDefault(joined) + 1;
+        }
+
+        foreach (var row in projected)
+        {
+            if (row.Written && byName[(row.GroupPath, row.Title)] > 1)
+            {
+                return OrganizeOutcome.DestinationOccupied;
+            }
+        }
+
+        foreach (var row in projected)
+        {
+            if (row.Written && byPath[ChildPath(row.GroupPath, row.Title)] > 1)
+            {
+                return OrganizeOutcome.DestinationAmbiguous;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// What the env namespace will not accept, applied where the name is written rather than where
+    /// the set is later exported.
+    /// </summary>
+    /// <remarks>
+    /// One call site, because renaming and moving are one write. The entry being written is left
+    /// out of the case comparison: changing <c>PATH</c> to <c>Path</c> leaves the project holding
+    /// one variable, and refusing it would refuse the repair somebody opened the app to make.
+    /// </remarks>
+    private static OrganizeOutcome? RefuseEnvName(EntryName target, PwGroup destination, PwEntry moving)
+    {
+        if (!string.Equals(target.GroupPath, EnvConvention.RootGroup, StringComparison.Ordinal)
+            && !target.GroupPath.StartsWith(EnvConvention.RootGroup + "/", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        string[] segments = target.GroupPath.Split('/');
+
+        // An entry directly in env is a write to nowhere: EnvStore reads env/<project>, so no read
+        // path could ever find it again.
+        if (segments.Length == 1)
+        {
+            return OrganizeOutcome.EnvNameRefused;
+        }
+
+        foreach (string segment in segments[1..])
+        {
+            if (!EnvConvention.IsValidProject(segment, out _))
+            {
+                return OrganizeOutcome.EnvNameRefused;
+            }
+        }
+
+        if (!EnvConvention.IsValidKey(target.Title, out _))
+        {
+            return OrganizeOutcome.EnvNameRefused;
+        }
+
+        List<string> keys = [target.Title];
+        foreach (PwEntry sibling in destination.Entries)
+        {
+            if (!ReferenceEquals(sibling, moving))
+            {
+                keys.Add(ReadField(sibling, PwDefs.TitleField));
+            }
+        }
+
+        return EnvNameRules.TryCheckCase(keys, out _) ? null : OrganizeOutcome.EnvNameCollides;
+    }
+
+    /// <summary>
+    /// Whether a name means something keypaste assigns rather than something a group may be called.
+    /// </summary>
+    /// <remarks>
+    /// The bin is asked for directly rather than looked for among the siblings, because it is
+    /// excluded from every traversal: a sibling scan would happily make a second group of its name
+    /// that KeePassXC then draws as two trash cans. Creating <c>env</c> through this surface is
+    /// refused while <see cref="EnsureGroup"/> still makes it on the env write path — that group is
+    /// a consequence of storing a variable, not a folder somebody chose to make.
+    /// </remarks>
+    private bool IsReserved(string parentGroupPath, string name)
+    {
+        if (string.Equals(name, RecycleBinName, StringComparison.Ordinal)
+            || (Bin() is { } bin && string.Equals(name, bin.Name, StringComparison.Ordinal)))
+        {
+            return true;
+        }
+
+        return parentGroupPath.Length == 0
+            && string.Equals(name, EnvConvention.RootGroup, StringComparison.Ordinal);
+    }
+
+    private static bool HasChildNamed(PwGroup parent, string name, PwGroup? except)
+    {
+        foreach (PwGroup child in parent.Groups)
+        {
+            if (!ReferenceEquals(child, except) && string.Equals(child.Name, name, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /// <summary>Returns everything in the recycle bin, or an empty list when there is none.</summary>
     internal IReadOnlyList<RecycledEntry> ReadRecycled()
     {
@@ -357,7 +784,7 @@ internal sealed class KeePassInterop : IDisposable
             return existing;
         }
 
-        var bin = new PwGroup(true, true, "Recycle Bin", PwIcon.TrashBin)
+        var bin = new PwGroup(true, true, RecycleBinName, PwIcon.TrashBin)
         {
             EnableAutoType = false,
             EnableSearching = false,
@@ -513,7 +940,17 @@ internal sealed class KeePassInterop : IDisposable
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, order.Length);
 
         PwEntry pwEntry = found.Entry;
+
+        // Read before the restore, which assigns every string back — the title included. A history
+        // item carries the title the entry had when the revision was taken, so without this a
+        // restore silently undoes a rename nobody asked about, and can land the entry on a name
+        // something else already answers to. A revision is values, never identity (D-0091), which
+        // is the same claim UpdateEntry makes about its own name argument.
+        string title = ReadField(pwEntry, PwDefs.TitleField);
+
         pwEntry.RestoreFromBackup(order[index], _database);
+
+        SetField(pwEntry, PwDefs.TitleField, title);
 
         // Restoring assigns the old revision's timestamps back, so without this the entry would be
         // older than the value it just replaced: a merge would revert it and history eviction, which

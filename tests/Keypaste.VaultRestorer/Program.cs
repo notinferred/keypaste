@@ -25,6 +25,12 @@ namespace Keypaste.VaultRestorer;
 /// through here as well, over the same public calls the app makes.
 /// </para>
 /// <para>
+/// V.5a added renaming and moving. Those are core operations with no front end at all yet — V.5b is
+/// what puts them in front of a person — so every one of them comes through here, and a refusal
+/// prints the outcome's own name rather than a sentence, so the gate can assert which refusal it
+/// got. The driver goes when a shipped command-line surface performs them (D-0254).
+/// </para>
+/// <para>
 /// It prints how many revisions, recycled entries or backups it saw and what it did, and never a value: the
 /// gate seeded the values itself and asks KeePassXC for them, so nothing is learned by putting a
 /// secret on this process's stdout.
@@ -47,6 +53,10 @@ internal static class Program
         "       backup-ls <vault-path>          list the vault's backups, newest first\n" +
         "       backup-restore <vault-path> <backup-file-name>\n" +
         "       vault-export <vault-path> <destination>\n" +
+        "       group-create <vault-path> <parent-group-path> <name>\n" +
+        "       group-rename <vault-path> <group-path> <new-name>\n" +
+        "       entry-rename <vault-path> <group-path> <title> <new-title>\n" +
+        "       entry-move   <vault-path> <group-path> <title> <destination-group-path>\n" +
         "the master password is read from KEYPASTE_RESTORER_PASSWORD";
 
     private static int Main(string[] args)
@@ -72,6 +82,8 @@ internal static class Program
                 "backup-ls" or "backup-restore" => Backup(args, password),
                 "vault-export" => Export(args, password),
                 _ when args[0].StartsWith("trash-", StringComparison.Ordinal) => Trash(args, password),
+                _ when args[0].StartsWith("group-", StringComparison.Ordinal) => Groups(args, password),
+                _ when args[0].StartsWith("entry-", StringComparison.Ordinal) => Entries(args, password),
                 _ => RestoreRevision(args, password),
             };
         }
@@ -90,6 +102,96 @@ internal static class Program
             Console.Error.WriteLine($"restorer failed: {ex.GetType().Name}: {ex.Message}");
             return 3;
         }
+    }
+
+    /// <summary>Creates or renames a group, and says which refusal it got when it did not.</summary>
+    /// <remarks>
+    /// The outcome's own name is printed on a refusal rather than a sentence, so the gate can
+    /// assert <em>which</em> refusal happened. A gate that only checked that something failed would
+    /// pass with every refusal collapsed into one.
+    /// </remarks>
+    private static int Groups(string[] args, string password)
+    {
+        if (args.Length != 4)
+        {
+            Console.Error.WriteLine(_usage);
+            return 2;
+        }
+
+        using var vault = Vault.Open(args[1], password);
+
+        GroupOutcome outcome;
+        string path;
+
+        switch (args[0])
+        {
+            case "group-create":
+                outcome = vault.CreateGroup(args[2], args[3], out path);
+                break;
+
+            case "group-rename":
+                outcome = vault.RenameGroup(args[2], args[3], out path);
+                break;
+
+            default:
+                Console.Error.WriteLine(_usage);
+                return 2;
+        }
+
+        if (outcome is not (GroupOutcome.Created or GroupOutcome.Renamed))
+        {
+            Console.Error.WriteLine($"refused: {outcome}");
+            return 1;
+        }
+
+        vault.Save();
+        Console.WriteLine($"{(outcome is GroupOutcome.Created ? "created" : "renamed")}       {path}");
+        return 0;
+    }
+
+    /// <summary>Renames or moves one entry, addressed by its group path and title as two values.</summary>
+    /// <remarks>
+    /// Never by the two joined: joining is the lossy step <see cref="EntryName"/> exists to avoid,
+    /// and the gate has to be able to hand this a title that contains a separator.
+    /// </remarks>
+    private static int Entries(string[] args, string password)
+    {
+        if (args.Length != 5)
+        {
+            Console.Error.WriteLine(_usage);
+            return 2;
+        }
+
+        using var vault = Vault.Open(args[1], password);
+        var name = new EntryName(args[2], args[3]);
+
+        OrganizeOutcome outcome;
+        EntryName? result;
+
+        switch (args[0])
+        {
+            case "entry-rename":
+                outcome = vault.RenameEntry(name, args[4], out result);
+                break;
+
+            case "entry-move":
+                outcome = vault.MoveEntry(name, args[4], out result);
+                break;
+
+            default:
+                Console.Error.WriteLine(_usage);
+                return 2;
+        }
+
+        if (outcome is not (OrganizeOutcome.Renamed or OrganizeOutcome.Moved))
+        {
+            Console.Error.WriteLine($"refused: {outcome}");
+            return 1;
+        }
+
+        vault.Save();
+        Console.WriteLine($"{(outcome is OrganizeOutcome.Renamed ? "renamed" : "moved")}       {result!.GroupPath}/{result.Title}");
+        return 0;
     }
 
     private static int RestoreRevision(string[] args, string password)
