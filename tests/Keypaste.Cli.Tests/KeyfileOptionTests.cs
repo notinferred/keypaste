@@ -9,7 +9,7 @@ namespace Keypaste.Cli.Tests;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The point of the reach tests is not that eleven verbs each parse a flag. It is that adding a
+/// The point of the reach tests is not that twelve verbs each parse a flag. It is that adding a
 /// keyfile to a vault must not silently take that vault away from <c>keypaste run</c> and
 /// <c>keypaste agent</c> — the env and MCP journeys — while leaving it open in the app. A verb that
 /// quietly lost the option would fail nothing else in this suite.
@@ -52,6 +52,7 @@ public sealed class KeyfileOptionTests
             verbs.Add(["env", "export", "demo", "--dotenv", "--stdout", "--yes", _vault, _keyfile]);
             verbs.Add(["run", "demo", _vault, _keyfile, "--", "true"]);
             verbs.Add(["agent", _vault, _keyfile]);
+            verbs.Add(["access", "--password", _vault, _keyfile]);
             return verbs;
         }
     }

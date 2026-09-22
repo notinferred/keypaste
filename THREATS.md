@@ -290,7 +290,7 @@ The desktop restores a whole-vault backup from the unlock screen, so a vault tha
 
 The password stays in a buffer from the check until the restore, because the restored vault is opened with it. That is a correct master password one click from an open vault, so it is zeroed on cancel, on choosing another copy, on every outcome, after the idle timeout measured on the session's clock, and on minimize when that setting is on. The field is the fourth master-password field and is held to D-0099 like the first: no paste, and an automation surface that depends on the length and not the characters (T-22).
 
-Anyone who knows an earlier master password and can write to the vault's directory can roll the vault back to a copy made under it. They could already read that copy elsewhere, and the replaced vault is kept as a backup, so the loss is availability of the newer state until somebody restores it, not disclosure. Deleting old copies after a password change closes it. A restore is a rename beside the vault preceded by a re-read: another process that writes between the two is detected and the restore refused, which is detection and not a lock (D-0119's residual).
+Anyone who knows an earlier master password and can write to the vault's directory can roll the vault back to a copy made under it. They could already read that copy elsewhere, and the replaced vault is kept as a backup, so the loss is availability of the newer state until somebody restores it, not disclosure. Deleting old copies after a password change closes it. `keypaste access` keeps one more such copy when it changes a password or keyfile and says so, naming the directory and this remedy; ordinary saves prune past five, so the copies also leave over time. A restore is a rename beside the vault preceded by a re-read: another process that writes between the two is detected and the restore refused, which is detection and not a lock (D-0119's residual).
 
 Evidence: `VaultRestoreTests` holds every refusal to a byte-identical vault, including a kill between keeping and replacing. `RestoreBackupTests` drives the journey from a save in the app to the vault the restore opens, and the expiry. `SecretHygieneTests.A_checked_backup_puts_nothing_from_the_vault_on_the_locked_screen` sweeps both view models. `MaskedInputAutomationTests` holds the field's differential. `scripts/verify-keepassxc-backup.sh` compares the restored vault with the backup byte for byte and opens it, the kept copy and an export in KeePassXC 2.7.10.
 
@@ -304,13 +304,15 @@ This is the same exposure `--vault` and `KEYPASTE_VAULT` already have, and the s
 
 keypaste records nothing about which keyfile a vault uses: `recent.toml` is unchanged and holds vault paths alone (T-24). Each command is told again, which is a cost to the person and a deliberate one.
 
-Evidence: `Keypaste.Cli.Tests.KeyfileOptionTests` covers both sources and the flag winning over the variable. `verify-keepassxc-keyfile.sh` exercises the whole path with the shipped binary.
+`keypaste access` takes the new keyfile from `--new-keyfile` alone. `--keyfile` and `KEYPASTE_KEYFILE` name the keyfile that opens the vault now, so a variable left in a profile cannot become the key a vault is changed to.
+
+Evidence: `Keypaste.Cli.Tests.KeyfileOptionTests` covers both sources and the flag winning over the variable, and `AccessCommandTests` that the variable is never the new keyfile. `verify-keepassxc-keyfile.sh` exercises the whole path with the shipped binary.
 
 ## T-28 — A keyfile that is any file at all is one edit from losing the vault
 
 KeePass accepts four keyfile forms, and keypaste opens all four because KeePassXC wrote vaults with all four: an XML keyfile, a 32-byte file, a 64-character hex file, and — the fallback — any other file, keyed by the SHA-256 of its contents. In the fourth case the key is the file's bytes, so editing the file, re-encoding it, or letting a synchroniser rewrite it destroys access to the vault permanently. No warning precedes that, and no recovery follows it beyond restoring the file's exact former contents.
 
-keypaste says so when it opens such a vault: one line on stderr, once per open, naming the file. It never creates a keyfile of this kind — V.1a2 writes only the XML form — so a vault keypaste protected cannot acquire this weakness, but one it inherits keeps it.
+keypaste says so when it opens such a vault: one line on stderr, once per open, naming the file. It never writes a keyfile at all, and `keypaste access` refuses to attach one of this kind, so a vault keypaste protected cannot acquire this weakness; one it inherits keeps it, including across a password change.
 
 Two adjacent facts matter and are not warned about, because they are indistinguishable from a deliberate choice. A file of exactly 32 bytes is read as raw key material and a file of exactly 64 hexadecimal characters is decoded, by keypaste and by KeePassXC alike, so an ordinary document of one of those two lengths is not the fragile form and draws no line. And a keyfile is not a password: anyone who can read the file has that factor, so its protection lies in where it is kept.
 

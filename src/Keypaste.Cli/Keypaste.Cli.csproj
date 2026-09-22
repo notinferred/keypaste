@@ -40,6 +40,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <TrimmerRootDescriptor Include="KeyfileTrimRoots.xml" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="Keypaste.Cli.Tests" />
     <!--
       So a test can run a verb against a file the desktop app just wrote, and hear the answer from

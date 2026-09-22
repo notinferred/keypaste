@@ -191,7 +191,7 @@ keypaste env set billing STRIPE_KEY --generate --words 8 --separator _
 | 4 | wrong master password |
 | 5 | the audit log is not the file keypaste wrote |
 
-When stdin is not a terminal each prompt consumes one line in order. `init` takes the new password twice; `add` and `env set` take the master password followed by a value unless generating one. Commands that do not open a vault, such as `log`, need no master password. Consult command help before scripting confirmation or export prompts.
+When stdin is not a terminal each prompt consumes one line in order. `init` takes the new password twice; `add` and `env set` take the master password followed by a value unless generating one. In Unreleased source, `access --password` takes the current master password and then the new one twice; `access` refuses with 1 before changing anything it would not change safely and with 4 for a wrong current password. Commands that do not open a vault, such as `log`, need no master password. Consult command help before scripting confirmation or export prompts.
 
 ## Environment variables
 

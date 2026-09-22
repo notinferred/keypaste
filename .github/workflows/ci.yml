@@ -268,6 +268,9 @@ jobs:
           scripts/make-compat-fixture.sh artifacts/compat/aot.kdbx
           scripts/verify-keepassxc-compat.sh artifacts/compat/aot.kdbx
           scripts/verify-keepassxc-writeback.sh artifacts/compat/aot-writeback.kdbx
+          # Keyfiles reach XmlSerializer, which trimming can remove; only the AOT binary shows it.
+          scripts/verify-keepassxc-xml-attach.sh artifacts/compat/aot-xml-attach
+          scripts/verify-keepassxc-keyfile.sh artifacts/compat/aot-keyfile.kdbx
 
   # PRODUCT law 4.6 and D-0008 require this blocking gate on all three operating systems.
   compat:

@@ -86,6 +86,9 @@ internal static class CliApp
             case "rm":
                 return RemoveCommand.Execute(args, context);
 
+            case "access":
+                return AccessCommand.Execute(args, context);
+
             case "env":
                 return EnvCommand.Execute(args, context);
 
@@ -137,6 +140,7 @@ internal static class CliApp
         writer.WriteLine("  generate --words N  print a passphrase; it is not stored");
         writer.WriteLine("  ls                  list groups and entries");
         writer.WriteLine("  rm <entry>          remove an entry");
+        writer.WriteLine("  access              change the master password or keyfile");
         writer.WriteLine("  env <subcommand>    manage a project's environment variables");
         writer.WriteLine("  run <project> --    run a command with those variables injected");
         writer.WriteLine("  agent               unlock the vault and approve AI agents' requests");

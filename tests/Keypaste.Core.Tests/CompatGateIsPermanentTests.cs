@@ -68,11 +68,15 @@ public sealed class CompatGateIsPermanentTests
         // vault stays KDBX 4.0, and only a deletion may raise it (V.5a).
         Assert.Contains("scripts/verify-keepassxc-organize.sh", workflow, StringComparison.Ordinal);
 
-        // A keyfile vault is the one case where the fixture cannot come from keypaste at all: it
-        // has no verb that attaches a keyfile until V.1a2, so KeePassXC creates every vault this
-        // gate opens. It is also the only place an empty master password is not a wrong one, and
-        // the only place a save could silently stop requiring the second factor (V.1a1).
+        // A keyfile vault is the one case where the fixture must not come from keypaste: KeePassXC
+        // creates every vault this gate opens, and `keypaste access` changes some of them. It is
+        // also the only place an empty master password is not a wrong one, and the only place a
+        // save could silently stop requiring the second factor (V.1a1, V.1a2). Reading an XML
+        // keyfile goes through XmlSerializer, which trimming can remove, so the NativeAOT binary
+        // runs it too.
         Assert.Contains("scripts/verify-keepassxc-keyfile.sh", workflow, StringComparison.Ordinal);
+        Assert.Contains("scripts/verify-keepassxc-keyfile.sh artifacts/compat/aot-keyfile.kdbx", workflow, StringComparison.Ordinal);
+        Assert.Contains("scripts/verify-keepassxc-xml-attach.sh artifacts/compat/aot-xml-attach", workflow, StringComparison.Ordinal);
 
         // Injection is the other law with no in-process test that can reach it (docs/PRODUCT.md 3.4 and
         // 4.5): the child owns the console, so only a real child can be asked what it received.

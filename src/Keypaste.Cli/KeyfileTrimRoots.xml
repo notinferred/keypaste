@@ -1,0 +1,19 @@
+<!--
+  KcpKeyFile reads a KeePass XML keyfile with XmlSerializer, which finds these types' constructors
+  and properties by reflection. Trimmed, it throws "KfxFile cannot be serialized because it does not
+  have a parameterless constructor", KcpKeyFile swallows that and keys with the file's hash, and
+  every XML keyfile opens the wrong vault key (D-0294). Kept whole so the vendored parser runs.
+-->
+<linker>
+  <assembly fullname="KeePassLib">
+    <!-- Only what reading needs: keypaste never writes a keyfile (D-0287), so Save stays trimmed. -->
+    <type fullname="KeePassLib.Keys.KfxFile">
+      <method name=".ctor" />
+      <property name="Meta" />
+      <property name="Key" />
+    </type>
+    <type fullname="KeePassLib.Keys.KfxMeta" preserve="all" />
+    <type fullname="KeePassLib.Keys.KfxKey" preserve="all" />
+    <type fullname="KeePassLib.Keys.KfxData" preserve="all" />
+  </assembly>
+</linker>

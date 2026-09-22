@@ -98,6 +98,184 @@ internal sealed class KeePassInterop : IDisposable
         return new KeePassInterop(database);
     }
 
+    /// <summary>A valid KeePass 2.0 XML keyfile and the key it holds, for <see cref="ReadsXmlKeyfiles"/>.</summary>
+    private const string _probeKeyfile =
+        """<?xml version="1.0" encoding="UTF-8"?><KeyFile><Meta><Version>2.0</Version></Meta><Key><Data Hash="1E281D73">B243DCB7 D3F97ECC E1DB3620 C8B7D53B A0CE206E 92889C8C 75755038 EE5DCCDD</Data></Key></KeyFile>""";
+
+    private const string _probeKey = "B243DCB7D3F97ECCE1DB3620C8B7D53BA0CE206E92889C8C75755038EE5DCCDD";
+
+    private static readonly Lazy<bool> _readsXmlKeyfiles = new(ProbeXmlKeyfiles);
+
+    /// <summary>Whether this build's keyfile loader reads a KeePass XML keyfile's key.</summary>
+    /// <remarks>
+    /// <c>KcpKeyFile</c> keys with the SHA-256 of the file whenever its XML parse throws, which is
+    /// right for a document it cannot parse and wrong for every XML keyfile when the parser itself
+    /// cannot run, as under NativeAOT before the CLI kept the types it reads. Asked of a keyfile whose key is known, so a document
+    /// that does not parse in a working build still falls back as KeePassXC's does (D-0294).
+    /// </remarks>
+    internal static bool ReadsXmlKeyfiles => _readsXmlKeyfiles.Value;
+
+    private static bool ProbeXmlKeyfiles()
+    {
+        try
+        {
+            using MemoryStream stream = new(Encoding.UTF8.GetBytes(_probeKeyfile), writable: false);
+            var key = KfxFile.Load(stream)?.GetKey();
+            return key is not null && Convert.ToHexString(key) == _probeKey;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Whether the vault's key includes a master password.</summary>
+    internal bool KeyHasPassword => _database.MasterKey.ContainsType(typeof(KcpPassword));
+
+    /// <summary>The keyfile the vault's key includes, or <see langword="null"/>.</summary>
+    internal string? KeyfilePath => (_database.MasterKey.GetUserKey(typeof(KcpKeyFile)) as KcpKeyFile)?.Path;
+
+    /// <summary>Replaces the vault's key in memory. Nothing is written until a save is given the change.</summary>
+    /// <param name="utf8NewPassword">The new password, or <see langword="null"/> to keep the current one if there is one.</param>
+    /// <param name="keyfilePath">The keyfile the new key includes, or <see langword="null"/> for none.</param>
+    /// <param name="keepCurrentKeyfile">Whether <paramref name="keyfilePath"/> is the keyfile the vault opened with.</param>
+    /// <remarks>
+    /// A kept keyfile keeps the key material it was opened with, so a file edited since then cannot
+    /// slip a different key into the vault; the verifying key re-reads it from disk and refuses
+    /// instead. The KDF, cipher and format version are the vault's own and are not touched.
+    /// </remarks>
+    /// <exception cref="VaultException">The keyfile could not be read.</exception>
+    internal KeyChange ChangeKey(byte[]? utf8NewPassword, string? keyfilePath, bool keepCurrentKeyfile)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        var current = _database.MasterKey;
+        var password = utf8NewPassword is null
+            ? current.GetUserKey(typeof(KcpPassword))
+            : new KcpPassword(utf8NewPassword, false);
+
+        CompositeKey next = new();
+        CompositeKey verify = new();
+        if (password is not null)
+        {
+            next.AddUserKey(password);
+            verify.AddUserKey(password);
+        }
+
+        if (keyfilePath is not null)
+        {
+            next.AddUserKey(keepCurrentKeyfile ? current.GetUserKey(typeof(KcpKeyFile)) : ReadKeyfile(keyfilePath));
+            verify.AddUserKey(ReadKeyfile(keyfilePath));
+        }
+
+        var change = new KeyChange(current, _database.MasterKeyChanged, verify);
+        _database.MasterKey = next;
+        _database.MasterKeyChanged = DateTime.UtcNow;
+        return change;
+    }
+
+    /// <summary>Puts back the key a change replaced, so this vault saves as it would have before.</summary>
+    internal void Revert(KeyChange change)
+    {
+        _database.MasterKey = change.Previous;
+        _database.MasterKeyChanged = change.PreviousChangedAt;
+    }
+
+    /// <summary>Opens the file on disk with the changed key's factors, and keeps nothing.</summary>
+    /// <exception cref="VaultException">It did not open.</exception>
+    internal void ConfirmOnDisk(KeyChange change)
+    {
+        PwDatabase check = new();
+        try
+        {
+            check.Open(_database.IOConnectionInfo, Reread(change.Verify), null);
+        }
+        catch (Exception ex)
+        {
+            throw new VaultException($"'{_database.IOConnectionInfo.Path}' did not open with the new credentials.", ex);
+        }
+        finally
+        {
+            check.Close();
+        }
+    }
+
+    private static KcpKeyFile ReadKeyfile(string path)
+    {
+        try
+        {
+            return new KcpKeyFile(path, true);
+        }
+        catch (Exception ex)
+        {
+            throw new VaultException($"The keyfile '{path}' could not be read.", ex);
+        }
+    }
+
+    /// <summary>The same factors with every keyfile read again from disk.</summary>
+    private static CompositeKey Reread(CompositeKey key)
+    {
+        CompositeKey fresh = new();
+        foreach (var component in key.UserKeys)
+        {
+            fresh.AddUserKey(component is KcpKeyFile keyfile ? ReadKeyfile(keyfile.Path) : component);
+        }
+
+        return fresh;
+    }
+
+    /// <summary>Serialises, proves the bytes open with the new key, and only then replaces the vault.</summary>
+    /// <remarks>
+    /// What <c>PwDatabase.Save</c> does, with the check between the write and the commit that
+    /// method gives no hook for. Its file lock is off in keypaste and its hash fields have no reader
+    /// here; a re-keyed vault is closed rather than saved again (D-0293).
+    /// </remarks>
+    private void WriteVerified(KeyChange change)
+    {
+        MemoryStream buffer = new();
+        byte[] bytes = [];
+        try
+        {
+            // KdbxFile.Save closes the stream it is given; the buffer survives the close.
+            new KdbxFile(_database).Save(buffer, null, KeePassLib.Serialization.KdbxFormat.Default, null);
+            bytes = buffer.ToArray();
+
+            PwDatabase check = new();
+            try
+            {
+                check.MasterKey = Reread(change.Verify);
+                new KdbxFile(check).Load(new MemoryStream(bytes, writable: false), KeePassLib.Serialization.KdbxFormat.Default, null);
+            }
+            catch (Exception ex)
+            {
+                throw new VaultException("The new credentials did not open what was about to be saved. Nothing was replaced.", ex);
+            }
+            finally
+            {
+                check.Close();
+            }
+
+            using (FileTransactionEx transaction = new(_database.IOConnectionInfo, _database.UseFileTransactions))
+            {
+                using (Stream target = transaction.OpenWrite())
+                {
+                    target.Write(bytes);
+                }
+
+                transaction.CommitWrite();
+            }
+
+            change.Committed = true;
+            _database.Modified = false;
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(buffer.GetBuffer());
+            CryptographicOperations.ZeroMemory(bytes);
+            buffer.Dispose();
+        }
+    }
+
     /// <summary>Adds an entry, creating any missing groups along its group path.</summary>
     internal void AddEntry(VaultEntry entry)
     {
@@ -939,6 +1117,13 @@ internal sealed class KeePassInterop : IDisposable
     /// </summary>
     internal bool UsesFileTransactions => _database.UseFileTransactions;
 
+    /// <summary>KeePassLib's unsaved-changes flag. A test seam.</summary>
+    internal bool Modified
+    {
+        get => _database.Modified;
+        set => _database.Modified = value;
+    }
+
     /// <summary>Returns the history of the one entry with this name, newest first, or null when
     /// the vault holds no entry of that name.</summary>
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
@@ -1162,20 +1347,22 @@ internal sealed class KeePassInterop : IDisposable
     /// passed and while the gate is held. Preserves the bytes being replaced; a throw from it
     /// abandons the save. Null when the caller has already taken its backup, or has none to take.
     /// </param>
+    /// <param name="keyChange">A key change this save commits, verifying the bytes before they replace the vault; null for an ordinary save.</param>
     internal void Save(
         Func<bool>? hasChangedOnDisk,
         Action<int>? waitBetweenAttempts,
         SaveClock clock,
         int attempts = SaveAttempts,
         Action<int>? duringAttempt = null,
-        Action<string>? beforeReplacing = null)
+        Action<string>? beforeReplacing = null,
+        KeyChange? keyChange = null)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         clock.Redirect(ProcessTemporaryDirectory.EnsureRedirected);
 
         for (int attempt = 1;
-            !TryAttempt(hasChangedOnDisk, clock, attempt, attempts, duringAttempt, ref beforeReplacing);
+            !TryAttempt(hasChangedOnDisk, clock, attempt, attempts, duringAttempt, ref beforeReplacing, keyChange);
             attempt++)
         {
             var retry = attempt;
@@ -1213,7 +1400,8 @@ internal sealed class KeePassInterop : IDisposable
         int attempt,
         int attempts,
         Action<int>? duringAttempt,
-        ref Action<string>? beforeReplacing)
+        ref Action<string>? beforeReplacing,
+        KeyChange? keyChange)
     {
         clock.BeginAttempt();
         var gated = EnterGateIfTransacting(clock);
@@ -1244,7 +1432,14 @@ internal sealed class KeePassInterop : IDisposable
             clock.Attempt(() =>
             {
                 duringAttempt?.Invoke(attempt);
-                _database.Save(null);
+                if (keyChange is null)
+                {
+                    _database.Save(null);
+                }
+                else
+                {
+                    WriteVerified(keyChange);
+                }
             });
             return true;
         }
@@ -1778,5 +1973,26 @@ internal sealed class KeePassInterop : IDisposable
         }
 
         return current;
+    }
+
+    /// <summary>A key replaced in memory and not yet, or just, written.</summary>
+    internal sealed class KeyChange
+    {
+        internal KeyChange(CompositeKey previous, DateTime previousChangedAt, CompositeKey verify)
+        {
+            Previous = previous;
+            PreviousChangedAt = previousChangedAt;
+            Verify = verify;
+        }
+
+        internal CompositeKey Previous { get; }
+
+        internal DateTime PreviousChangedAt { get; }
+
+        /// <summary>The new key's factors, each keyfile named by the path it is read again from.</summary>
+        internal CompositeKey Verify { get; }
+
+        /// <summary>Whether the vault file has been replaced by bytes under the new key.</summary>
+        internal bool Committed { get; set; }
     }
 }

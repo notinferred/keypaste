@@ -11,13 +11,15 @@
 # verify-keepassxc-backup.sh proves the copy of a replaced vault is a usable vault, and
 # verify-keepassxc-organize.sh proves a RENAMED entry keeps what keypaste does not model.
 # This one covers what docs/STEPS.md V.1a1 added: a vault KeePassXC protected with a KEYFILE is one
-# keypaste opens, writes and hands back, in every form such a keyfile can take.
+# keypaste opens, writes and hands back, in every form such a keyfile can take. It also covers
+# V.1a2: `keypaste access` changes a vault's password and keyfile, and KeePassXC opens the result
+# with the new factors and refuses the old ones.
 #
 # WHO MAKES WHAT, which is the whole honesty of this gate:
 #
-#   * KeePassXC creates every vault here, with `db-create --set-key-file`. keypaste has no verb
-#     that attaches a keyfile — that is V.1a2 — so a fixture keypaste made would proved nothing
-#     about reading somebody else's.
+#   * KeePassXC creates every vault here, with `db-create`. The opening half of this gate is about
+#     reading somebody else's vault, which a fixture keypaste keyed would prove nothing about; the
+#     access half starts from KeePassXC's vaults too, so only the change is keypaste's.
 #
 #   * KeePassXC also AUTHORS the XML keyfile: pointed at a path that does not exist, db-create
 #     writes a KeePass XML keyfile there. The other three forms are bytes this script makes,
@@ -64,7 +66,10 @@
 # cannot open one of the four forms, if it cannot open a keyfile-only vault with an empty password,
 # if a value it wrote is not what KeePassXC reads back, if a save stops requiring the keyfile, if
 # any refusal changes one byte of the vault, if KeePassXC rewrites a keyfile it was handed, or if
-# the fragile-keyfile warning is missing from stderr or present on stdout.
+# the fragile-keyfile warning is missing from stderr or present on stdout. It also fails if
+# KeePassXC cannot open a vault with the password or keyfile `keypaste access` set, still opens it
+# with the ones replaced, sees a changed cipher or KDF, or if an access refusal writes the vault or
+# a backup, or if the copy an access change kept does not open with the old password.
 
 set -euo pipefail
 
@@ -286,8 +291,96 @@ if printf '%s\n' "$pw" | "$kp" ls --vault "$backup" >/dev/null 2>&1; then
   die "the copy kept beside a keyfile vault opened WITHOUT the keyfile"
 fi
 
+# ---------------------------------------------------------------------------------------
+# keypaste access (V.1a2): keypaste changes the key, KeePassXC opens the result.
+# ---------------------------------------------------------------------------------------
+new_pw="next-$pw"
+acc="$dir/$stem-access.kdbx"
+kpxc_as() { local secret=$1; shift; printf '%s\n' "$secret" | "$cli" "$@" | tr -d '\r'; }
+opens_in_kpxc() { kpxc_as "$1" db-info "${@:2}" >/dev/null 2>&1; }
+copies() { ls -1 "$1.backups" 2>/dev/null | wc -l | tr -d ' '; }
+
+step "KeePassXC creates a password-only vault for keypaste to change"
+printf '%s\n%s\n' "$pw" "$pw" | "$cli" db-create -q -p "$(native "$acc")" \
+  || die "KeePassXC could not create the access vault"
+printf '%s\n' "$pw" | "$kp" env set "$project" "TOKEN=v-access" --vault "$acc" >/dev/null 2>&1 \
+  || die "keypaste could not write the access vault"
+container_before=$(kpxc db-info "$(native "$acc")" | grep -E '^(Cipher|KDF):') \
+  || die "KeePassXC cannot report on the access vault"
+old_copy_count=$(copies "$acc")
+
+step "keypaste changes the master password; KeePassXC opens with the new one and refuses the old"
+printf '%s\n%s\n%s\n' "$pw" "$new_pw" "$new_pw" | "$kp" access --password --vault "$acc" >/dev/null 2>&1 \
+  || die "keypaste access --password failed"
+opens_in_kpxc "$new_pw" "$(native "$acc")" || die "KeePassXC cannot open the vault with the password keypaste set"
+opens_in_kpxc "$pw" "$(native "$acc")" && die "KeePassXC still opens the vault with the old password"
+got=$(kpxc_as "$new_pw" show -q -a Password "$(native "$acc")" "env/$project/TOKEN") \
+  || die "KeePassXC cannot read the entry after the password change"
+[ "$got" = "v-access" ] || die "KeePassXC reads '$got' after the password change, not 'v-access'"
+container_after=$(kpxc_as "$new_pw" db-info "$(native "$acc")" | grep -E '^(Cipher|KDF):')
+[ "$container_before" = "$container_after" ] \
+  || die "the password change altered the container. Before: ${container_before}. After: ${container_after}"
+
+step "the copy the change kept opens in KeePassXC under the OLD password only"
+[ "$(copies "$acc")" -gt "$old_copy_count" ] || die "the password change kept no copy of the vault it replaced"
+kept=$(ls -1 "$acc.backups"/* | sort | tail -n 1)
+opens_in_kpxc "$pw" "$(native "$kept")" || die "the kept copy does not open with the old password"
+opens_in_kpxc "$new_pw" "$(native "$kept")" && die "the kept copy opens with the new password"
+
+for form in xml raw32 hex64; do
+  case $form in
+    xml)   kf=$xml_kf ;;
+    raw32) kf=$raw_kf ;;
+    hex64) kf=$hex_kf ;;
+  esac
+  step "keypaste attaches the $form keyfile; KeePassXC needs it from then on"
+  before_kf=$(bytes "$kf")
+  printf '%s\n' "$new_pw" | "$kp" access --new-keyfile "$kf" --vault "$acc" ${cur_kf:+--keyfile "$cur_kf"} >/dev/null 2>&1 \
+    || die "keypaste access --new-keyfile could not attach the $form keyfile"
+  [ "$before_kf" = "$(bytes "$kf")" ] || die "keypaste rewrote the $form keyfile it attached"
+  opens_in_kpxc "$new_pw" --key-file "$(native "$kf")" "$(native "$acc")" \
+    || die "KeePassXC cannot open the vault with the $form keyfile keypaste attached"
+  opens_in_kpxc "$new_pw" "$(native "$acc")" && die "KeePassXC opens the vault without the $form keyfile"
+  if [ -n "${cur_kf:-}" ]; then
+    opens_in_kpxc "$new_pw" --key-file "$(native "$cur_kf")" "$(native "$acc")" \
+      && die "KeePassXC still opens the vault with the keyfile the $form one replaced"
+  fi
+  cur_kf=$kf
+done
+
+step "keypaste removes the keyfile; KeePassXC opens with the password alone"
+printf '%s\n' "$new_pw" | "$kp" access --remove-keyfile --vault "$acc" --keyfile "$cur_kf" >/dev/null 2>&1 \
+  || die "keypaste access --remove-keyfile failed"
+opens_in_kpxc "$new_pw" "$(native "$acc")" || die "KeePassXC cannot open the vault after its keyfile was removed"
+
+refuse_access() {
+  local what=$1 target=$2 secret=$3; shift 3
+  local was count
+  was=$(bytes "$target")
+  count=$(copies "$target")
+  if printf '%s\n%s\n%s\n' "$secret" "$new_pw" "$new_pw" | "$kp" access --vault "$target" "$@" >/dev/null 2>&1; then
+    die "$what was accepted"
+  fi
+  [ "$was" = "$(bytes "$target")" ] || die "$what changed the vault"
+  [ "$count" = "$(copies "$target")" ] || die "$what kept a backup"
+}
+
+step "access refusals write neither the vault nor a backup"
+refuse_access "attaching an arbitrary hashed file"    "$acc" "$new_pw" --new-keyfile "$any_kf"
+refuse_access "attaching the vault as its own keyfile" "$acc" "$new_pw" --new-keyfile "$acc"
+refuse_access "a wrong current password"               "$acc" "wrong-$new_pw" --password
+refuse_access "removing the only factor of a keyfile-only vault" "$only" "" --remove-keyfile --keyfile "$only_kf"
+
+step "a keyfile-only vault swaps its keyfile and stays keyfile-only"
+printf '\n' | "$kp" access --new-keyfile "$raw_kf" --vault "$only" --keyfile "$only_kf" >/dev/null 2>&1 \
+  || die "keypaste could not swap the keyfile of a keyfile-only vault"
+kpxc_only db-info --no-password --key-file "$(native "$raw_kf")" "$(native "$only")" >/dev/null \
+  || die "KeePassXC cannot open the keyfile-only vault with the keyfile keypaste attached"
+kpxc_only db-info --no-password --key-file "$(native "$only_kf")" "$(native "$only")" >/dev/null 2>&1 \
+  && die "KeePassXC still opens the keyfile-only vault with the keyfile it replaced"
+
 # The vault under test is the XML one, so the caller's path names a file that exists afterwards.
 cp -f "$vault" "$db"
 
-printf '\nKEYFILE GATE PASSED: four forms, a keyfile-only vault, five refusals and a backup, on %s\n' \
+printf '\nKEYFILE GATE PASSED: four forms, a keyfile-only vault, five refusals, a backup and access changes, on %s\n' \
   "$("$cli" --version | tr -d '\r')"

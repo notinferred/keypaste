@@ -18,11 +18,17 @@ internal static class VaultSession
     /// <param name="line">
     /// The parsed command line, for <c>--keyfile</c>. Taken whole rather than as a resolved path so
     /// that every verb reaches the keyfile the same way, for the reason the vault path is resolved
-    /// once: eleven commands each deciding what an unreadable keyfile means is eleven wordings.
+    /// once: twelve commands each deciding what an unreadable keyfile means is twelve wordings.
     /// </param>
     /// <param name="context">Where prompts and errors go.</param>
     /// <param name="body">What to do with the open vault.</param>
-    internal static int Open(string path, CommandLine line, CliContext context, Func<Vault, int> body)
+    /// <param name="namesHardwareKeys">
+    /// Whether a refusal also says a hardware key cannot be the missing factor. keypaste cannot tell a
+    /// wrong secret from a challenge-response vault, and a verb about access is where somebody with
+    /// one would look for the reason.
+    /// </param>
+    internal static int Open(
+        string path, CommandLine line, CliContext context, Func<Vault, int> body, bool namesHardwareKeys = false)
     {
         if (!File.Exists(path))
         {
@@ -54,7 +60,18 @@ internal static class VaultSession
             context.Stderr.WriteLine(keyfile is null
                 ? "keypaste: wrong master password"
                 : "keypaste: wrong master password or keyfile");
+            if (namesHardwareKeys)
+            {
+                context.Stderr.WriteLine(
+                    "keypaste: a vault that also needs a hardware key cannot be opened; keypaste does not support hardware keys yet.");
+            }
+
             return CliApp.ExitAuthFailed;
+        }
+        catch (UnreadableKeyfileException ex)
+        {
+            context.Stderr.WriteLine($"keypaste: {ex.Message}");
+            return CliApp.ExitNotFound;
         }
         catch (VaultChangedOnDiskException)
         {
@@ -117,12 +134,13 @@ internal static class VaultSession
         return true;
     }
 
-    private static string Refusal(KeyfileOutcome outcome, string path) => outcome switch
+    internal static string Refusal(KeyfileOutcome outcome, string path) => outcome switch
     {
         KeyfileOutcome.Missing => $"no keyfile at '{path}'",
         KeyfileOutcome.Unreadable => $"the keyfile '{path}' could not be read",
         KeyfileOutcome.Empty => $"the keyfile '{path}' is empty",
         KeyfileOutcome.IsAVault => $"'{path}' is a KeePass vault, not a keyfile",
+        KeyfileOutcome.XmlUnreadable => UnreadableKeyfile.Explain(path),
         _ => $"the keyfile '{path}' cannot be used",
     };
 

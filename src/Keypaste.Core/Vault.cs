@@ -14,6 +14,8 @@ public sealed class Vault : IDisposable
     private byte[]? _stamp;
     private bool _disposed;
     private bool _backedUp;
+    private bool _rekeyed;
+    private VaultBackup? _lastKept;
 
     private Vault(KeePassInterop interop, string path, bool stamp)
     {
@@ -27,6 +29,13 @@ public sealed class Vault : IDisposable
 
     /// <summary>Whether saves write through a temporary file. A test seam; nothing else reads it.</summary>
     internal bool UsesFileTransactions => _interop.UsesFileTransactions;
+
+    /// <summary>KeePassLib's unsaved-changes flag. A test seam; keypaste does not maintain it.</summary>
+    internal bool Modified
+    {
+        get => _interop.Modified;
+        set => _interop.Modified = value;
+    }
 
     /// <summary>
     /// What the last save that took a backup did, or null while no save on this vault has replaced
@@ -79,12 +88,9 @@ public sealed class Vault : IDisposable
     /// <summary>Creates a new vault protected by a password and a keyfile.</summary>
     /// <remarks>
     /// <para>
-    /// <b>Internal on purpose.</b> Attaching a keyfile is a vault access change, and V.1a1 does not
-    /// make one — it opens what somebody else protected. The public surface for this is
-    /// <c>keypaste access</c> in V.1a2, which will apply the rules that belong with it: only the
-    /// XML form may be written, and a vault may not be left without a master password. Exposing
-    /// the operation before those rules exist would let a caller create exactly the vaults keypaste
-    /// has decided not to make.
+    /// <b>Internal on purpose.</b> Attaching a keyfile is an access change, and the public way to make
+    /// one is <see cref="ChangeAccess(VaultAccessChange, ReadOnlySpan{char}, ReadOnlySpan{char})"/>,
+    /// which applies the rules that belong with it. This applies none of them.
     /// </para>
     /// <para>
     /// What it is for today is fixtures. A test that needs a keyfile-protected vault must build it
@@ -122,6 +128,11 @@ public sealed class Vault : IDisposable
     public static Vault Open(string path, ReadOnlySpan<char> masterPassword, string? keyfilePath)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
+
+        if (keyfilePath is not null && VaultKeyfile.Inspect(keyfilePath).Outcome == KeyfileOutcome.XmlUnreadable)
+        {
+            throw new UnreadableKeyfileException(keyfilePath);
+        }
 
         return new Vault(
             WithUtf8Password(masterPassword, utf8 => KeePassInterop.Open(path, utf8, keyfilePath)),
@@ -630,6 +641,7 @@ public sealed class Vault : IDisposable
     public void Save()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfRekeyed();
 
         // The check is handed to the retry loop, not just made before it. The name a save contends
         // for is most often held by another process saving this same vault, so a retry that waits
@@ -647,6 +659,7 @@ public sealed class Vault : IDisposable
     public void SaveOverwriting()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfRekeyed();
 
         // No check, at any point: this caller has already put the choice to a person and been told
         // to go ahead, so a change arriving mid-retry is one they have already accepted.
@@ -656,6 +669,178 @@ public sealed class Vault : IDisposable
         // needs when that turns out to have been the wrong choice — the one case this feature cannot
         // afford to skip. A Save() later in the same unlock still gets its own per-unlock backup.
         Commit(null, null, KeePassInterop.SaveAttempts, backUp: true, applyFloor: false);
+    }
+
+    /// <summary>Changes what unlocks this vault: its master password, its keyfile, or both.</summary>
+    /// <param name="change">What to change.</param>
+    /// <param name="newPassword">The new master password; read only when <see cref="VaultAccessChange.SetPassword"/> is set.</param>
+    /// <param name="confirmation">The same password, typed again.</param>
+    /// <returns>What happened, and on success the kept copy of the file that was replaced.</returns>
+    /// <exception cref="VaultChangedOnDiskException">Something else wrote to <see cref="Path"/>. Nothing was written.</exception>
+    /// <exception cref="VaultAccessUnconfirmedException">The file was replaced and then did not open with the new credentials.</exception>
+    /// <exception cref="VaultException">The backup, the check of the new bytes or the write failed; the vault is as it was.</exception>
+    /// <remarks>
+    /// <para>
+    /// <b>A password is never taken away.</b> A vault that has one keeps one, and a vault a keyfile
+    /// alone protects may change its keyfile but loses it only for a password. Only a keyfile that
+    /// already exists is attached, and never one keyed by its hash (D-0287, D-0288).
+    /// </para>
+    /// <para>
+    /// The save always keeps the file it replaces, like <see cref="SaveOverwriting"/>, but refuses a
+    /// changed file like <see cref="Save"/> (D-0289). Once the vault has been replaced this object is
+    /// sealed: every later write throws, and the vault is opened again with the new credentials.
+    /// </para>
+    /// </remarks>
+    public VaultAccessResult ChangeAccess(
+        VaultAccessChange change, ReadOnlySpan<char> newPassword, ReadOnlySpan<char> confirmation) =>
+        ChangeAccess(change, newPassword, confirmation, duringAttempt: null);
+
+    /// <summary>
+    /// <see cref="ChangeAccess(VaultAccessChange, ReadOnlySpan{char}, ReadOnlySpan{char})"/>, with a
+    /// hook inside each write attempt so a test can act between the backup and the write.
+    /// </summary>
+    internal VaultAccessResult ChangeAccess(
+        VaultAccessChange change,
+        ReadOnlySpan<char> newPassword,
+        ReadOnlySpan<char> confirmation,
+        Action<int>? duringAttempt)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(change);
+        ThrowIfRekeyed();
+
+        var keyfilePath = change.Keyfile == AccessKeyfileChange.Attach && !string.IsNullOrEmpty(change.KeyfilePath)
+            ? System.IO.Path.GetFullPath(change.KeyfilePath)
+            : null;
+
+        if (_stamp is null)
+        {
+            throw new VaultException("This vault has not been saved yet, so there is no file to change.");
+        }
+
+        if (RefuseAccessChange(change, keyfilePath, newPassword, confirmation) is { } refused)
+        {
+            return refused;
+        }
+
+        if (HasFileChangedSinceOpen())
+        {
+            throw new VaultChangedOnDiskException();
+        }
+
+        var keyfileAfter = change.Keyfile switch
+        {
+            AccessKeyfileChange.Attach => keyfilePath,
+            AccessKeyfileChange.Remove => null,
+            _ => _interop.KeyfilePath,
+        };
+
+        var pending = change.SetPassword
+            ? WithUtf8Password(newPassword, utf8 => _interop.ChangeKey(utf8, keyfileAfter, change.Keyfile == AccessKeyfileChange.Keep))
+            : _interop.ChangeKey(null, keyfileAfter, change.Keyfile == AccessKeyfileChange.Keep);
+
+        _lastKept = null;
+        try
+        {
+            Commit(HasFileChangedSinceOpen, null, KeePassInterop.SaveAttempts, duringAttempt,
+                backUp: true, applyFloor: false, keyChange: pending);
+        }
+        catch (VaultException ex) when (!pending.Committed && _lastKept is { } copy
+            && ex is not VaultChangedOnDiskException and not VaultBackupException)
+        {
+            throw new VaultException($"{ex.Message} The vault is unchanged; a copy of it was kept at '{copy.Path}'.", ex);
+        }
+        finally
+        {
+            if (pending.Committed)
+            {
+                _rekeyed = true;
+            }
+            else
+            {
+                _interop.Revert(pending);
+            }
+        }
+
+        var kept = _lastKept ?? throw new VaultException("The vault was changed without keeping the file it replaced.");
+
+        try
+        {
+            _interop.ConfirmOnDisk(pending);
+        }
+        catch (VaultException ex)
+        {
+            throw new VaultAccessUnconfirmedException(kept, ex);
+        }
+
+        return new VaultAccessResult(VaultAccessOutcome.Changed, kept, default);
+    }
+
+    private VaultAccessResult? RefuseAccessChange(
+        VaultAccessChange change, string? keyfilePath, ReadOnlySpan<char> newPassword, ReadOnlySpan<char> confirmation)
+    {
+        if (!change.SetPassword && change.Keyfile == AccessKeyfileChange.Keep)
+        {
+            return Refused(VaultAccessOutcome.NothingToChange);
+        }
+
+        if (change.Keyfile == AccessKeyfileChange.Remove && _interop.KeyfilePath is null)
+        {
+            return Refused(VaultAccessOutcome.NoKeyfileToRemove);
+        }
+
+        if (change.Keyfile == AccessKeyfileChange.Remove && !change.SetPassword && !_interop.KeyHasPassword)
+        {
+            return Refused(VaultAccessOutcome.WouldLeaveNoPassword);
+        }
+
+        if (change.Keyfile == AccessKeyfileChange.Attach)
+        {
+            if (keyfilePath is null)
+            {
+                return Refused(VaultAccessOutcome.KeyfileUnusable, new KeyfileInspection(KeyfileOutcome.Missing, default));
+            }
+
+            if (VaultBackups.BelongsTo(Path, keyfilePath))
+            {
+                return Refused(VaultAccessOutcome.KeyfileIsThisVault);
+            }
+
+            var inspection = VaultKeyfile.Inspect(keyfilePath);
+            if (!inspection.Accepted)
+            {
+                return Refused(VaultAccessOutcome.KeyfileUnusable, inspection);
+            }
+
+            if (inspection.IsFragile)
+            {
+                return Refused(VaultAccessOutcome.KeyfileIsFragile, inspection);
+            }
+        }
+
+        if (change.SetPassword && newPassword.IsEmpty)
+        {
+            return Refused(VaultAccessOutcome.EmptyPassword);
+        }
+
+        if (change.SetPassword && !newPassword.SequenceEqual(confirmation))
+        {
+            return Refused(VaultAccessOutcome.PasswordsDoNotMatch);
+        }
+
+        return null;
+
+        static VaultAccessResult Refused(VaultAccessOutcome outcome, KeyfileInspection keyfile = default) =>
+            new(outcome, null, keyfile);
+    }
+
+    private void ThrowIfRekeyed()
+    {
+        if (_rekeyed)
+        {
+            throw new VaultException(
+                "This vault's access was changed; open it again with the new credentials before saving.");
+        }
     }
 
     /// <summary>Writes an exact encrypted copy of the saved vault to a new file.</summary>
@@ -680,6 +865,7 @@ public sealed class Vault : IDisposable
     public void ExportTo(string destination)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfRekeyed();
         ArgumentException.ThrowIfNullOrEmpty(destination);
 
         if (_stamp is not { } stamp)
@@ -718,10 +904,7 @@ public sealed class Vault : IDisposable
 
         // The directory's own name too: a file there would stop the directory ever being created, and
         // a save that cannot keep a backup does not happen.
-        var backups = PathIdentity.Canonical(VaultBackups.DirectoryFor(Path));
-        var target = PathIdentity.Canonical(destination);
-        if (string.Equals(target, backups, PathIdentity.Comparison)
-            || target.StartsWith(backups + System.IO.Path.DirectorySeparatorChar, PathIdentity.Comparison))
+        if (VaultBackups.BelongsTo(Path, destination))
         {
             throw new VaultException(
                 "That is this vault's backup directory. Nothing was written; choose another folder.");
@@ -830,6 +1013,7 @@ public sealed class Vault : IDisposable
         Action<int>? duringAttempt = null)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfRekeyed();
 
         Commit(HasFileChangedSinceOpen, waitBetweenAttempts, attempts, duringAttempt, backUp: !_backedUp);
     }
@@ -840,7 +1024,8 @@ public sealed class Vault : IDisposable
         int attempts,
         Action<int>? duringAttempt = null,
         bool backUp = false,
-        bool applyFloor = true)
+        bool applyFloor = true,
+        KeePassInterop.KeyChange? keyChange = null)
     {
         var clock = new SaveClock();
         var succeeded = false;
@@ -854,7 +1039,8 @@ public sealed class Vault : IDisposable
 
             _interop.Save(
                 hasChangedOnDisk, waitBetweenAttempts, clock, attempts, duringAttempt,
-                backUp ? path => PreserveBefore(path, applyFloor) : null);
+                backUp ? path => PreserveBefore(path, applyFloor) : null,
+                keyChange);
             _stamp = clock.Stamp(() => SourceSnapshot.Digest(Path));
             succeeded = true;
         }
@@ -866,13 +1052,14 @@ public sealed class Vault : IDisposable
 
     /// <summary>Keeps the bytes this save is about to replace. Called with the save gate held.</summary>
     /// <remarks>
-    /// <paramref name="applyFloor"/> is false only on <see cref="SaveOverwriting"/>'s path, and
+    /// <paramref name="applyFloor"/> is false only on the overwriting and access-changing paths, and
     /// <see cref="_backedUp"/> is set only when the floor applies, so an overwriting save can neither
     /// be suppressed by an ordinary edit earlier in the unlock nor suppress one later in it.
     /// </remarks>
     private void PreserveBefore(string path, bool applyFloor)
     {
-        var outcome = VaultBackups.Preserve(path, DateTimeOffset.UtcNow, applyFloor, out var createdDirectory);
+        var outcome = VaultBackups.Preserve(
+            path, DateTimeOffset.UtcNow, applyFloor, out var createdDirectory, out _lastKept);
 
         if (applyFloor)
         {
@@ -897,9 +1084,9 @@ public sealed class Vault : IDisposable
 
     /// <summary>Encodes the password to UTF-8, runs <paramref name="use"/>, and zeroes the buffer
     /// whether or not that succeeded.</summary>
-    private static KeePassInterop WithUtf8Password(
+    private static T WithUtf8Password<T>(
         ReadOnlySpan<char> masterPassword,
-        Func<byte[], KeePassInterop> use)
+        Func<byte[], T> use)
     {
         byte[] utf8 = new byte[Encoding.UTF8.GetByteCount(masterPassword)];
         try

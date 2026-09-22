@@ -94,6 +94,23 @@ public static class VaultBackups
         return Path.Combine(directory, Path.GetFileName(vaultPath) + DirectorySuffix);
     }
 
+    /// <summary>Whether <paramref name="path"/> is the vault itself, its backup directory, or inside that directory.</summary>
+    public static bool BelongsTo(string vaultPath, string path)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(vaultPath);
+        ArgumentException.ThrowIfNullOrEmpty(path);
+
+        if (PathIdentity.SameFile(path, vaultPath))
+        {
+            return true;
+        }
+
+        var backups = PathIdentity.Canonical(DirectoryFor(vaultPath));
+        var target = PathIdentity.Canonical(path);
+        return string.Equals(target, backups, PathIdentity.Comparison)
+            || target.StartsWith(backups + Path.DirectorySeparatorChar, PathIdentity.Comparison);
+    }
+
     /// <summary>The backups of the vault at <paramref name="vaultPath"/>, newest first.</summary>
     /// <remarks>
     /// Only files this type named are listed. Anything else in the directory — a copy somebody made
@@ -158,6 +175,7 @@ public static class VaultBackups
     /// replaces is exactly the copy somebody needs when that choice turns out to be the wrong one.
     /// </param>
     /// <param name="createdDirectory">Whether this call is what created the backup directory.</param>
+    /// <param name="kept">The copy written, or <see langword="null"/> when the floor suppressed it.</param>
     /// <exception cref="VaultBackupException">
     /// The copy could not be written. <b>Nothing was pruned and nothing was replaced</b>; the caller
     /// must abandon the save.
@@ -175,9 +193,10 @@ public static class VaultBackups
     /// </para>
     /// </remarks>
     internal static VaultBackupOutcome Preserve(
-        string vaultPath, DateTimeOffset now, bool applyFloor, out bool createdDirectory)
+        string vaultPath, DateTimeOffset now, bool applyFloor, out bool createdDirectory, out VaultBackup? kept)
     {
         createdDirectory = false;
+        kept = null;
 
         var directory = DirectoryFor(vaultPath);
 
@@ -193,7 +212,7 @@ public static class VaultBackups
             return VaultBackupOutcome.SkippedRecent;
         }
 
-        Keep(vaultPath, now, out createdDirectory);
+        kept = Keep(vaultPath, now, out createdDirectory);
 
         Prune(vaultPath);
 
@@ -279,7 +298,7 @@ public static class VaultBackups
             groups = vault.ReadGroupPaths().Count;
             projects = new EnvStore(vault).Projects().Count;
         }
-        catch (VaultException ex)
+        catch (VaultException ex) when (ex is not UnreadableKeyfileException)
         {
             throw new InvalidMasterPasswordException(
                 "That password does not open this backup, or the backup is damaged.", ex);

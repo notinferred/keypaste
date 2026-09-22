@@ -54,6 +54,12 @@ public enum KeyfileOutcome
 
     /// <summary>It is a KeePass database. A vault is not its own second factor.</summary>
     IsAVault = 4,
+
+    /// <summary>
+    /// It is a KeePass XML keyfile and this build cannot read one, so using it would key with the
+    /// file's hash instead of the key it holds (D-0294).
+    /// </summary>
+    XmlUnreadable = 5,
 }
 
 /// <summary>What <see cref="VaultKeyfile.Inspect"/> made of a file.</summary>
@@ -130,9 +136,38 @@ public static class VaultKeyfile
             return new KeyfileInspection(KeyfileOutcome.Empty, default);
         }
 
-        return IsAVault(bytes)
-            ? new KeyfileInspection(KeyfileOutcome.IsAVault, default)
-            : new KeyfileInspection(KeyfileOutcome.Accepted, FormOf(bytes));
+        if (IsAVault(bytes))
+        {
+            return new KeyfileInspection(KeyfileOutcome.IsAVault, default);
+        }
+
+        var form = FormOf(bytes);
+        return form == KeyfileForm.Xml && !ReadsXmlKeyfiles
+            ? new KeyfileInspection(KeyfileOutcome.XmlUnreadable, form)
+            : new KeyfileInspection(KeyfileOutcome.Accepted, form);
+    }
+
+    private static readonly AsyncLocal<bool> _simulatedFallback = new();
+
+    /// <summary>Whether this build reads the key inside a KeePass XML keyfile.</summary>
+    /// <remarks>
+    /// False in a build whose XML keyfile loader cannot run and silently keys with the file's hash
+    /// instead, as the NativeAOT CLI did while trimming removed what that loader needs. Every XML keyfile is then refused,
+    /// on opening and attaching alike, rather than used with a key KeePassXC would not derive.
+    /// </remarks>
+    public static bool ReadsXmlKeyfiles => !_simulatedFallback.Value && Internal.KeePassInterop.ReadsXmlKeyfiles;
+
+    /// <summary>Makes <see cref="ReadsXmlKeyfiles"/> false on this async flow until disposed. A test seam.</summary>
+    /// <remarks>Only a NativeAOT build falls back for real, and no test runs as one.</remarks>
+    internal static IDisposable SimulateXmlFallback()
+    {
+        _simulatedFallback.Value = true;
+        return new Restore();
+    }
+
+    private sealed class Restore : IDisposable
+    {
+        public void Dispose() => _simulatedFallback.Value = false;
     }
 
     /// <summary>Classifies bytes already known to be a usable file.</summary>

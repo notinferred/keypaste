@@ -150,7 +150,7 @@ Export uses single quotes where possible, which are literal in `motdotla/dotenv`
 
 Without the master password or another usable copy of the credentials, keypaste cannot recover the vault's contents. There is no master-password reset or support backdoor. Entry history can restore an earlier value in an accessible vault; it cannot recover the master password, an entry that was permanently deleted or a lost vault file.
 
-Keep a written copy of the master password in a secure physical location. Keep current `.kdbx` backups in protected locations. Their confidentiality depends on the master password's strength. Current keypaste cannot open vaults that require a key file. KeePassXC supports this extra factor, but losing either required factor without a backup can make that vault inaccessible.
+Keep a written copy of the master password in a secure physical location. Keep current `.kdbx` backups in protected locations. Their confidentiality depends on the master password's strength. The published `v0.3.0` cannot open vaults that require a key file; in Unreleased source keypaste opens them and `keypaste access` attaches an existing key file. Losing either required factor without a backup can make that vault inaccessible.
 
 If you cannot recover access, rotate each credential at its provider.
 

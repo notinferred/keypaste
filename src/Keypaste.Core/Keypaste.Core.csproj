@@ -61,6 +61,10 @@
          KeePassXC installation. That one seam; a tests/ project. D-0255 owns why it is a seam
          rather than public API. -->
     <InternalsVisibleTo Include="Keypaste.App.Tests" />
+    <!-- V-V.1a2 asks what the CLI says when its XML keyfile loader falls back to hashing the file,
+         which only a NativeAOT build does and no test runs as. VaultKeyfile.SimulateXmlFallback is
+         that one seam (D-0294). -->
+    <InternalsVisibleTo Include="Keypaste.Cli.Tests" />
   </ItemGroup>
 
 </Project>

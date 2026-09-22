@@ -169,12 +169,13 @@ public sealed class GenerateFlagTests
     }
 
     /// <remarks>
-    /// The words themselves are what must not be on stderr, and this asks for exactly that rather
-    /// than for the absence of the separator character. The separator is a full stop, and stderr
-    /// carries ordinary prose — V.4a's one-time note of where backups are kept names a file path —
-    /// so its absence was only ever a proxy, and one that a sentence could break without a single
-    /// word of the passphrase having leaked. Asking after the words is also the stronger question:
-    /// it still fails if the passphrase is printed joined by something else, or one word at a time.
+    /// Stderr is compared line for line with what the verb says about a generated passphrase, rather
+    /// than searched for the passphrase's words. Searching was a false alarm waiting to happen: the word
+    /// list holds ordinary English, so a generated `keep` was found inside the backup note's
+    /// `keeping` (ci run 35682288136), and `case`, `last`, `open` and `word` occur in stderr as whole
+    /// words. An exact line still fails if the passphrase is printed joined, split or one word at a
+    /// time. V.4a's one-time backup note is the only other line a first save prints, and it is the
+    /// same whatever was generated.
     /// </remarks>
     [Fact]
     public void Add_Words_SaysHowManyWordsItIs_AndNotWhatTheyAre()
@@ -184,19 +185,12 @@ public sealed class GenerateFlagTests
         harness.Prompt.Enqueue(Master);
         harness.Run("add", "svc/api", "--generate", "--words", "8", "--vault", harness.VaultPath);
 
-        var reported = harness.Err;
-        Assert.Contains("8-word passphrase generated", reported, StringComparison.Ordinal);
+        var reported = harness.Err
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(line => !line.StartsWith("keypaste: keeping the last", StringComparison.Ordinal));
 
-        var passphrase = Read(harness, "svc/api");
-        Assert.DoesNotContain(passphrase, reported, StringComparison.Ordinal);
-
-        var words = passphrase.Split(PasswordGenerator.DefaultSeparator);
-        Assert.Equal(8, words.Length);
-
-        foreach (var word in words)
-        {
-            Assert.DoesNotContain(word, reported, StringComparison.OrdinalIgnoreCase);
-        }
+        Assert.Equal(["Added svc/api (8-word passphrase generated)"], reported);
+        Assert.Equal(8, Read(harness, "svc/api").Split(PasswordGenerator.DefaultSeparator).Length);
     }
 
     [Fact]
