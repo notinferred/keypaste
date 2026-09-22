@@ -8,6 +8,7 @@ internal static class RemoveCommand
     private static readonly OptionSpec[] _options =
     [
         new("vault", TakesValue: true),
+        new("keyfile", TakesValue: true),
         new("yes", TakesValue: false),
     ];
 
@@ -49,7 +50,7 @@ internal static class RemoveCommand
             return CliApp.ExitUsageError;
         }
 
-        return VaultSession.Open(path, context, vault =>
+        return VaultSession.Open(path, line, context, vault =>
         {
             if (vault.Find(entryPath) is null)
             {

@@ -54,6 +54,7 @@ internal static class ListCommand
     private static readonly OptionSpec[] _options =
     [
         new("vault", TakesValue: true),
+        new("keyfile", TakesValue: true),
         new("flat", TakesValue: false),
     ];
 
@@ -85,7 +86,7 @@ internal static class ListCommand
 
         var flat = line.HasFlag("flat");
 
-        return VaultSession.Open(path, context, vault =>
+        return VaultSession.Open(path, line, context, vault =>
         {
             // Groups and entries are collected separately because a group holding no entries is
             // invisible in an entry listing, and KeePassXC lists it.

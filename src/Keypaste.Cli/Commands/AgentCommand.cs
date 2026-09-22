@@ -46,6 +46,7 @@ internal static class AgentCommand
     private static readonly OptionSpec[] _options =
     [
         new("vault", TakesValue: true),
+        new("keyfile", TakesValue: true),
         new(ApproverOption, TakesValue: true),
         new(TimeoutOption, TakesValue: true),
         new(MaxTtlOption, TakesValue: true),
@@ -107,7 +108,7 @@ internal static class AgentCommand
             line.Value(PolicyOption)
             ?? KeypasteHome.PolicyPath(context.Environment.Get(KeypasteHome.EnvironmentVariable)));
 
-        return VaultSession.Open(vaultPath, context, vault => Serve(vault, vaultPath, pipeName, limits, policy, context));
+        return VaultSession.Open(vaultPath, line, context, vault => Serve(vault, vaultPath, pipeName, limits, policy, context));
     }
 
     private static int Serve(
@@ -300,7 +301,7 @@ internal static class AgentCommand
 
     internal static void WriteUsage(TextWriter writer)
     {
-        writer.WriteLine("usage: keypaste agent [--vault <path>] [--approver <name>]");
+        writer.WriteLine("usage: keypaste agent [--vault <path>] [--keyfile <path>] [--approver <name>]");
         writer.WriteLine("                      [--approval-timeout <seconds>] [--max-ttl <seconds>]");
         writer.WriteLine("                      [--policy <path>]");
         writer.WriteLine();
@@ -309,6 +310,7 @@ internal static class AgentCommand
         writer.WriteLine("Leave this running in its own terminal; Ctrl+C locks the vault again.");
         writer.WriteLine();
         writer.WriteLine($"  --vault <path>             which vault to unlock, or set {VaultLocator.EnvironmentVariable}");
+        writer.WriteLine($"  --keyfile <path>           the keyfile it needs too, or set {VaultLocator.KeyfileEnvironmentVariable}");
         writer.WriteLine($"  --approver <name>          which pipe to listen on, or set {ApproverEndpoint.EnvironmentVariable}");
         writer.WriteLine($"  --approval-timeout <secs>  how long you have to answer, {ApprovalLimits.MinimumWindowSeconds}-{ApprovalLimits.MaximumWindowSeconds}, default {ApprovalLimits.DefaultWindowSeconds}");
         writer.WriteLine($"  --max-ttl <secs>           the longest grant to issue, default {ApprovalLimits.DefaultMaximumTtlSeconds}");

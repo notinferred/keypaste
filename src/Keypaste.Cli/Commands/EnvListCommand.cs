@@ -16,6 +16,7 @@ internal static class EnvListCommand
     private static readonly OptionSpec[] _options =
     [
         new("vault", TakesValue: true),
+        new("keyfile", TakesValue: true),
     ];
 
     internal static int Execute(string[] args, CliContext context)
@@ -46,7 +47,7 @@ internal static class EnvListCommand
 
         var project = line.Operands.Count == 1 ? line.Operands[0] : null;
 
-        return VaultSession.Open(path, context, vault =>
+        return VaultSession.Open(path, line, context, vault =>
         {
             var store = new EnvStore(vault);
 

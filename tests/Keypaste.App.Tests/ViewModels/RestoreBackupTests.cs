@@ -23,7 +23,7 @@ namespace Keypaste.App.Tests.ViewModels;
 /// </para>
 /// <para>
 /// <b>What the file holds is asserted by opening it again</b>, through a separate
-/// <see cref="Vault.Open"/> or by its digest, never by what a view model says it did. Every refusal
+/// <see cref="Vault.Open(string, ReadOnlySpan{char})"/> or by its digest, never by what a view model says it did. Every refusal
 /// asserts the live file byte for byte, and asserts first that the step it refused was reached.
 /// </para>
 /// </remarks>

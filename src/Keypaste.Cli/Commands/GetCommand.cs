@@ -21,6 +21,7 @@ internal static class GetCommand
     private static readonly OptionSpec[] _options =
     [
         new("vault", TakesValue: true),
+        new("keyfile", TakesValue: true),
         new("show", TakesValue: false),
         new("timeout", TakesValue: true),
     ];
@@ -64,7 +65,7 @@ internal static class GetCommand
         var entryPath = line.Operands[0];
         var show = line.HasFlag("show");
 
-        return VaultSession.Open(path, context, vault =>
+        return VaultSession.Open(path, line, context, vault =>
         {
             var entry = vault.Find(entryPath);
             if (entry is null)

@@ -12,6 +12,7 @@ internal static class EnvRemoveCommand
     private static readonly OptionSpec[] _options =
     [
         new("vault", TakesValue: true),
+        new("keyfile", TakesValue: true),
         new("yes", TakesValue: false),
     ];
 
@@ -53,7 +54,7 @@ internal static class EnvRemoveCommand
             return CliApp.ExitUsageError;
         }
 
-        return VaultSession.Open(path, context, vault =>
+        return VaultSession.Open(path, line, context, vault =>
         {
             var store = new EnvStore(vault);
 

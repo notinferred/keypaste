@@ -144,7 +144,7 @@ internal sealed class AppVaultSession : IDisposable
     /// <returns>What happened.</returns>
     /// <remarks>
     /// <para>
-    /// <b>A span, exactly as <see cref="Vault.Open"/> takes.</b> The buffer stays the caller's, in
+    /// <b>A span, exactly as <see cref="Vault.Open(string, ReadOnlySpan{char})"/> takes.</b> The buffer stays the caller's, in
     /// a <c>using</c>, which zeroes it on every path out — including the wrong-password path, which
     /// is the one that happens most and the one people forget. Taking ownership of a
     /// <see cref="SecretBuffer"/> here instead would have been defensible, but it makes CA2000

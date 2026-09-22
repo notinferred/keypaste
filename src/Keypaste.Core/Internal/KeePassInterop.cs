@@ -40,12 +40,12 @@ internal sealed class KeePassInterop : IDisposable
 
     /// <summary>Creates a new KDBX4 vault protected by the given UTF-8 master password.</summary>
     /// <remarks>The caller owns <paramref name="utf8Password"/> and is responsible for zeroing it.</remarks>
-    internal static KeePassInterop Create(string path, byte[] utf8Password)
+    internal static KeePassInterop Create(string path, byte[] utf8Password, string? keyfilePath = null)
     {
         PwDatabase database = new();
         try
         {
-            database.New(IOConnectionInfo.FromPath(path), BuildKey(utf8Password));
+            database.New(IOConnectionInfo.FromPath(path), BuildKey(utf8Password, keyfilePath));
             ApplyKeypasteFormatSettings(database);
             ApplyWriteSafety(database);
         }
@@ -62,18 +62,25 @@ internal sealed class KeePassInterop : IDisposable
     /// <remarks>The caller owns <paramref name="utf8Password"/> and is responsible for zeroing it.</remarks>
     /// <exception cref="InvalidMasterPasswordException">The password does not open the vault.</exception>
     /// <exception cref="VaultException">The vault could not be read.</exception>
-    internal static KeePassInterop Open(string path, byte[] utf8Password)
+    internal static KeePassInterop Open(string path, byte[] utf8Password, string? keyfilePath = null)
     {
         PwDatabase database = new();
         try
         {
-            database.Open(IOConnectionInfo.FromPath(path), BuildKey(utf8Password), null);
+            database.Open(IOConnectionInfo.FromPath(path), BuildKey(utf8Password, keyfilePath), null);
         }
         catch (InvalidCompositeKeyException ex)
         {
             database.Close();
+
+            // Which factor was wrong is not knowable — the library compares one derived key — but
+            // which factors were OFFERED is, and a message naming only the password sends somebody
+            // with a good password and the wrong keyfile to retype the one thing that was right.
             throw new InvalidMasterPasswordException(
-                "The master password is incorrect, or the vault is not a readable KDBX file.", ex);
+                string.IsNullOrEmpty(keyfilePath)
+                    ? "The master password is incorrect, or the vault is not a readable KDBX file."
+                    : "The master password or the keyfile is incorrect, or the vault is not a readable KDBX file.",
+                ex);
         }
         catch (Exception ex)
         {
@@ -1445,13 +1452,41 @@ internal sealed class KeePassInterop : IDisposable
         _disposed = true;
     }
 
-    private static CompositeKey BuildKey(byte[] utf8Password)
+    /// <summary>Builds the composite key from the factors the caller supplied.</summary>
+    /// <remarks>
+    /// <para>
+    /// <b>An empty password is not the same as no password.</b> <see cref="KcpPassword"/> hashes
+    /// whatever bytes it is given, so an empty one contributes SHA-256 of nothing — a real 32-byte
+    /// component — and <c>CompositeKey.CreateRawCompositeKey32</c> concatenates the components and
+    /// hashes the result. Adding an empty password beside a keyfile therefore produces a different
+    /// key from the keyfile alone, and would refuse every keyfile-only vault KeePassXC ever wrote.
+    /// So when there is a keyfile and nothing was typed, the password is left out entirely.
+    /// </para>
+    /// <para>
+    /// Only then. An empty password with no keyfile still builds the key it always did, because
+    /// that is not a passwordless vault, it is a wrong password, and it has to keep being refused
+    /// as one.
+    /// </para>
+    /// </remarks>
+    private static CompositeKey BuildKey(byte[] utf8Password, string? keyfilePath)
     {
         CompositeKey key = new();
 
-        // bRememberPassword: false — the key material is the SHA-256 of the password; there is
-        // no reason to also retain the password itself for the lifetime of the database object.
-        key.AddUserKey(new KcpPassword(utf8Password, false));
+        if (utf8Password.Length > 0 || string.IsNullOrEmpty(keyfilePath))
+        {
+            // bRememberPassword: false — the key material is the SHA-256 of the password; there is
+            // no reason to also retain the password itself for the lifetime of the database object.
+            key.AddUserKey(new KcpPassword(utf8Password, false));
+        }
+
+        if (!string.IsNullOrEmpty(keyfilePath))
+        {
+            // bThrowIfDbFile: true — a vault offered as its own keyfile is refused by the library
+            // as well as by VaultKeyfile, so neither can be the only thing standing between a
+            // person and a vault keyed to itself.
+            key.AddUserKey(new KcpKeyFile(keyfilePath, true));
+        }
+
         return key;
     }
 

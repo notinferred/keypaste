@@ -14,11 +14,24 @@ namespace Keypaste.Cli;
 internal static class VaultSession
 {
     /// <summary>Opens the vault at <paramref name="path"/> and runs <paramref name="body"/>.</summary>
-    internal static int Open(string path, CliContext context, Func<Vault, int> body)
+    /// <param name="path">The vault, already resolved by <see cref="VaultLocator.TryResolve"/>.</param>
+    /// <param name="line">
+    /// The parsed command line, for <c>--keyfile</c>. Taken whole rather than as a resolved path so
+    /// that every verb reaches the keyfile the same way, for the reason the vault path is resolved
+    /// once: eleven commands each deciding what an unreadable keyfile means is eleven wordings.
+    /// </param>
+    /// <param name="context">Where prompts and errors go.</param>
+    /// <param name="body">What to do with the open vault.</param>
+    internal static int Open(string path, CommandLine line, CliContext context, Func<Vault, int> body)
     {
         if (!File.Exists(path))
         {
             context.Stderr.WriteLine($"keypaste: no vault at '{path}'");
+            return CliApp.ExitNotFound;
+        }
+
+        if (!TryKeyfile(line, context, out var keyfile))
+        {
             return CliApp.ExitNotFound;
         }
 
@@ -31,14 +44,16 @@ internal static class VaultSession
 
         try
         {
-            using var vault = Vault.Open(path, master.Value);
+            using var vault = Vault.Open(path, master.Value, keyfile);
             var exit = body(vault);
             Announce(vault, context);
             return exit;
         }
         catch (InvalidMasterPasswordException)
         {
-            context.Stderr.WriteLine("keypaste: wrong master password");
+            context.Stderr.WriteLine(keyfile is null
+                ? "keypaste: wrong master password"
+                : "keypaste: wrong master password or keyfile");
             return CliApp.ExitAuthFailed;
         }
         catch (VaultChangedOnDiskException)
@@ -57,6 +72,59 @@ internal static class VaultSession
             return CliApp.ExitInternalError;
         }
     }
+
+    /// <summary>
+    /// Resolves <c>--keyfile</c>, refuses a file that is not usable as one, and says when the file
+    /// that was given is the fragile kind.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Before the password prompt, because being asked for a master password and then told the
+    /// keyfile was never there wastes the one thing the person had to type. The refusal is
+    /// <see cref="VaultKeyfile"/>'s finding worded here, so a missing keyfile reads like a missing
+    /// vault rather than like a wrong password.
+    /// </para>
+    /// <para>
+    /// <b>The warning is on stderr and happens once.</b> A hashed-any-file keyfile is one edit away
+    /// from losing the vault and somebody should hear so, but <c>keypaste get</c> is piped into
+    /// other programs and <c>keypaste run</c> hands its stdout to a child. Saying it on stdout
+    /// would put a sentence about key material into somebody's script output, which is the rule
+    /// <see cref="Announce"/> already follows.
+    /// </para>
+    /// </remarks>
+    private static bool TryKeyfile(CommandLine line, CliContext context, out string? keyfile)
+    {
+        if (!VaultLocator.TryResolveKeyfile(line, context.Environment, out keyfile))
+        {
+            return true;
+        }
+
+        var inspection = VaultKeyfile.Inspect(keyfile!);
+        if (!inspection.Accepted)
+        {
+            context.Stderr.WriteLine($"keypaste: {Refusal(inspection.Outcome, keyfile!)}");
+            keyfile = null;
+            return false;
+        }
+
+        if (inspection.IsFragile)
+        {
+            context.Stderr.WriteLine(
+                $"keypaste: '{keyfile}' is not a keyfile keypaste or KeePassXC made, so the vault is "
+                + "keyed to its exact contents. Changing or replacing that file locks the vault for good.");
+        }
+
+        return true;
+    }
+
+    private static string Refusal(KeyfileOutcome outcome, string path) => outcome switch
+    {
+        KeyfileOutcome.Missing => $"no keyfile at '{path}'",
+        KeyfileOutcome.Unreadable => $"the keyfile '{path}' could not be read",
+        KeyfileOutcome.Empty => $"the keyfile '{path}' is empty",
+        KeyfileOutcome.IsAVault => $"'{path}' is a KeePass vault, not a keyfile",
+        _ => $"the keyfile '{path}' cannot be used",
+    };
 
     /// <summary>Says, once, that keypaste has started keeping copies beside this vault.</summary>
     /// <remarks>
@@ -108,11 +176,13 @@ internal static class VaultSession
     /// </remarks>
     /// <typeparam name="T">What the first phase takes out of the vault.</typeparam>
     /// <param name="path">The vault file.</param>
+    /// <param name="line">The parsed command line, for <c>--keyfile</c>.</param>
     /// <param name="context">Where prompts and errors go.</param>
     /// <param name="load">Reads the vault. Returns an exit code, and what to hand on.</param>
     /// <param name="use">Runs after the vault has been disposed.</param>
     internal static int OpenThen<T>(
         string path,
+        CommandLine line,
         CliContext context,
         Func<Vault, (int Exit, T? Loaded)> load,
         Func<T, int> use)
@@ -120,7 +190,7 @@ internal static class VaultSession
     {
         T? loaded = null;
 
-        var exit = Open(path, context, vault =>
+        var exit = Open(path, line, context, vault =>
         {
             var (code, value) = load(vault);
             loaded = value;

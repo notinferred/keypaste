@@ -65,6 +65,10 @@ An attestation shows which repository, workflow, tag and commit produced the byt
 
 The current desktop, terminal approver and `keypaste run` do not share an unlock session. Desktop lock affects its own session only; the terminal approver remains unlocked until stopped, and `run` separately opens and closes its vault before launching a child. The shared-session behavior in [PRODUCT](docs/PRODUCT.md) is a delivery requirement, not a current guarantee. It will govern new releases and launches; it cannot recall copied values, erase client transcripts or revoke credentials at their issuers.
 
+### What unlocks a vault
+
+A vault is unlocked by a master password, and in source by a master password and a keyfile, or by a keyfile alone where the vault was made that way elsewhere. keypaste opens every keyfile form KeePass accepts: an XML keyfile, a 32-byte file, a 64-character hex file, and any other file keyed by the hash of its contents. That last form is one edit away from losing the vault for good, so keypaste names it on stderr each time it opens such a vault and will never create one (T-28). The file is named per command as `--keyfile <path>` or in `KEYPASTE_KEYFILE`; nothing records which keyfile a vault uses, and both places are readable by anything running as the same user (T-27). A keyfile protects a vault whose file is copied away — a backup, a synced folder, a lost disk — and not a machine somebody is already executing on. Support cannot reconstruct a lost keyfile any more than a lost password. In the current download, `v0.3.0`, there is no keyfile support and no verb that changes a vault's password or keyfile; changing either is unimplemented everywhere.
+
 ### Secret input in the desktop app
 
 `ConsoleSecretPrompt` reads characters into a clearable buffer without forming a password string. Desktop input arrives from Avalonia as immutable strings that cannot be wiped, including multi-character input-method events. The OS keyboard layer, input methods and keyloggers remain outside this boundary.

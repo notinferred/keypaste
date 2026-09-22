@@ -76,13 +76,55 @@ public sealed class Vault : IDisposable
             stamp: false);
     }
 
-    /// <summary>Opens an existing vault.</summary>
-    public static Vault Open(string path, ReadOnlySpan<char> masterPassword)
+    /// <summary>Creates a new vault protected by a password and a keyfile.</summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Internal on purpose.</b> Attaching a keyfile is a vault access change, and V.1a1 does not
+    /// make one — it opens what somebody else protected. The public surface for this is
+    /// <c>keypaste access</c> in V.1a2, which will apply the rules that belong with it: only the
+    /// XML form may be written, and a vault may not be left without a master password. Exposing
+    /// the operation before those rules exist would let a caller create exactly the vaults keypaste
+    /// has decided not to make.
+    /// </para>
+    /// <para>
+    /// What it is for today is fixtures. A test that needs a keyfile-protected vault must build it
+    /// through the writer under test rather than beside it, for the reason
+    /// <c>make-compat-fixture.sh</c> drives the shipped binary (D-0012). The compatibility gate has
+    /// the stronger version of the same fixture: there, KeePassXC makes them.
+    /// </para>
+    /// </remarks>
+    internal static Vault CreateWith(string path, ReadOnlySpan<char> masterPassword, string? keyfilePath)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
 
         return new Vault(
-            WithUtf8Password(masterPassword, utf8 => KeePassInterop.Open(path, utf8)),
+            WithUtf8Password(masterPassword, utf8 => KeePassInterop.Create(path, utf8, keyfilePath)),
+            path,
+            stamp: false);
+    }
+
+    /// <summary>Opens an existing vault.</summary>
+    public static Vault Open(string path, ReadOnlySpan<char> masterPassword) =>
+        Open(path, masterPassword, keyfilePath: null);
+
+    /// <summary>Opens an existing vault, optionally protected by a keyfile as well.</summary>
+    /// <param name="path">The vault file.</param>
+    /// <param name="masterPassword">
+    /// The master password. Empty is a passwordless vault when <paramref name="keyfilePath"/> is
+    /// given, and a wrong password when it is not; see <c>KeePassInterop.BuildKey</c>.
+    /// </param>
+    /// <param name="keyfilePath">
+    /// The keyfile, or <see langword="null"/> for a vault that has none. Inspect it with
+    /// <see cref="VaultKeyfile.Inspect"/> first if the caller wants to say why a file is unusable;
+    /// an unreadable one reaching here is an <see cref="InvalidMasterPasswordException"/> like any
+    /// other factor that does not open the vault.
+    /// </param>
+    public static Vault Open(string path, ReadOnlySpan<char> masterPassword, string? keyfilePath)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(path);
+
+        return new Vault(
+            WithUtf8Password(masterPassword, utf8 => KeePassInterop.Open(path, utf8, keyfilePath)),
             path,
             stamp: true);
     }

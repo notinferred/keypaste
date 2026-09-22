@@ -20,6 +20,7 @@ internal static class EnvSetCommand
     private static readonly OptionSpec[] _options =
     [
         new("vault", TakesValue: true),
+        new("keyfile", TakesValue: true),
         .. GenerateOption.Specs,
     ];
 
@@ -77,7 +78,7 @@ internal static class EnvSetCommand
             return CliApp.ExitUsageError;
         }
 
-        return VaultSession.Open(path, context, vault =>
+        return VaultSession.Open(path, line, context, vault =>
         {
             string value;
             if (inlineValue is not null)

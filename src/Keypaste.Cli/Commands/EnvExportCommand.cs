@@ -27,6 +27,7 @@ internal static class EnvExportCommand
     private static readonly OptionSpec[] _options =
     [
         new("vault", TakesValue: true),
+        new("keyfile", TakesValue: true),
         new("dotenv", TakesValue: false),
         new("stdout", TakesValue: false),
         new("yes", TakesValue: false),
@@ -109,7 +110,7 @@ internal static class EnvExportCommand
             }
         }
 
-        return VaultSession.Open(vaultPath, context, vault =>
+        return VaultSession.Open(vaultPath, line, context, vault =>
             Export(vault, vaultPath, project, targetPath, force, assumeYes, context));
     }
 

@@ -147,6 +147,7 @@ internal static class CliApp
         writer.WriteLine();
         writer.WriteLine("the vault:");
         writer.WriteLine($"  --vault <path>      which vault to use, or set {VaultLocator.EnvironmentVariable}");
+        writer.WriteLine($"  --keyfile <path>    the keyfile it needs too, or set {VaultLocator.KeyfileEnvironmentVariable}");
         writer.WriteLine();
         writer.WriteLine("exit codes:");
         writer.WriteLine("  0 ok  1 usage  2 error  3 not found  4 wrong password  5 audit log tampered");

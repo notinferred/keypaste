@@ -347,3 +347,7 @@ jobs:
       - name: Verify renaming and moving through real KeePassXC
         shell: bash
         run: bash scripts/verify-keepassxc-organize.sh artifacts/compat/organize.kdbx
+
+      - name: Verify opening a keyfile-protected vault through real KeePassXC
+        shell: bash
+        run: bash scripts/verify-keepassxc-keyfile.sh artifacts/compat/keyfile.kdbx

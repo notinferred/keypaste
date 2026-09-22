@@ -109,6 +109,12 @@ A project-scoped `.mcp.json` is a file in the repository that you can commit; th
 
 Use `--scope local` instead if you would rather keep it to your own machine.
 
+## If your vault has a keyfile
+
+`keypaste agent` opens the vault, so it is the process that needs the keyfile: add `--keyfile <path>` beside its `--vault`, or set `KEYPASTE_KEYFILE`.
+
+`keypaste-mcp` never opens a vault and never asks for a password, so its entry in a client's configuration takes no keyfile and `keypaste setup` does not write one. A client block that names a keyfile would record where your second factor is kept and change nothing about what the bridge can do.
+
 ## What the agent may see
 
 Exposure defaults to the `env/` subtree used by `keypaste run`. Other entries cannot be named or read through the bridge.

@@ -22,6 +22,7 @@ internal static class EnvPullCommand
     private static readonly OptionSpec[] _options =
     [
         new("vault", TakesValue: true),
+        new("keyfile", TakesValue: true),
         new("yes", TakesValue: false),
         new("delete-source", TakesValue: false),
         new("keep", TakesValue: false),
@@ -86,7 +87,7 @@ internal static class EnvPullCommand
             context.Stderr.WriteLine(advisory);
         }
 
-        var exit = VaultSession.Open(vaultPath, context, vault =>
+        var exit = VaultSession.Open(vaultPath, line, context, vault =>
             Import(vault, project, document, assumeYes, context));
 
         if (exit != CliApp.ExitSuccess)

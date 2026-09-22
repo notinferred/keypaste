@@ -30,4 +30,18 @@ internal static class VaultLocator
             environment.Get(EnvironmentVariable),
             out path,
             out error);
+
+    /// <summary>The environment variable consulted when <c>--keyfile</c> is absent.</summary>
+    internal const string KeyfileEnvironmentVariable = VaultLocation.KeyfileEnvironmentVariable;
+
+    /// <summary>Resolves the keyfile path, when the command line or the environment names one.</summary>
+    /// <returns><see langword="false"/>, with <paramref name="path"/> null, when neither does.</returns>
+    internal static bool TryResolveKeyfile(
+        CommandLine line,
+        IEnvironmentProbe environment,
+        out string? path) =>
+        VaultLocation.TryResolveKeyfile(
+            line.Value("keyfile"),
+            environment.Get(KeyfileEnvironmentVariable),
+            out path);
 }

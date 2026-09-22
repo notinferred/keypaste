@@ -13,6 +13,7 @@ internal static class AddCommand
     private static readonly OptionSpec[] _options =
     [
         new("vault", TakesValue: true),
+        new("keyfile", TakesValue: true),
         new("username", TakesValue: true),
         new("url", TakesValue: true),
         new("notes", TakesValue: true),
@@ -74,7 +75,7 @@ internal static class AddCommand
             return CliApp.ExitUsageError;
         }
 
-        return VaultSession.Open(path, context, vault =>
+        return VaultSession.Open(path, line, context, vault =>
         {
             var name = new EntryName(groupPath, title);
             var entryPath = groupPath.Length == 0 ? title : groupPath + "/" + title;

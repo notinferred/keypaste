@@ -242,6 +242,11 @@ public static class VaultBackups
     /// <param name="vaultPath">The vault the backup belongs to, which need not exist or be readable.</param>
     /// <param name="backup">One of the copies <see cref="List"/> names for that vault.</param>
     /// <param name="password">The master password the backup was made under.</param>
+    /// <param name="keyfilePath">
+    /// The keyfile the backup was made under, or <see langword="null"/>. A copy is the vault's own
+    /// bytes, so it opens under exactly the factors the vault had when it was taken — which is also
+    /// why a later access change does not reach the copies already on disk.
+    /// </param>
     /// <returns>What the backup holds, bound to the bytes that were opened.</returns>
     /// <exception cref="VaultRestoreException">
     /// <see cref="List"/> does not name the file, it has no KDBX header, or it changed while it was
@@ -251,7 +256,11 @@ public static class VaultBackups
     /// The password does not open the backup, or its body is damaged. One answer on purpose: nothing
     /// finer can be said of a file that did not decrypt.
     /// </exception>
-    public static VaultBackupSummary Inspect(string vaultPath, VaultBackup backup, ReadOnlySpan<char> password)
+    public static VaultBackupSummary Inspect(
+        string vaultPath,
+        VaultBackup backup,
+        ReadOnlySpan<char> password,
+        string? keyfilePath = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(vaultPath);
         ArgumentNullException.ThrowIfNull(backup);
@@ -265,7 +274,7 @@ public static class VaultBackups
         int entries, groups, projects;
         try
         {
-            using var vault = Vault.Open(listed.Path, password);
+            using var vault = Vault.Open(listed.Path, password, keyfilePath);
             entries = vault.ReadEntries().Count;
             groups = vault.ReadGroupPaths().Count;
             projects = new EnvStore(vault).Projects().Count;

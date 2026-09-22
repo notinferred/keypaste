@@ -293,3 +293,25 @@ The password stays in a buffer from the check until the restore, because the res
 Anyone who knows an earlier master password and can write to the vault's directory can roll the vault back to a copy made under it. They could already read that copy elsewhere, and the replaced vault is kept as a backup, so the loss is availability of the newer state until somebody restores it, not disclosure. Deleting old copies after a password change closes it. A restore is a rename beside the vault preceded by a re-read: another process that writes between the two is detected and the restore refused, which is detection and not a lock (D-0119's residual).
 
 Evidence: `VaultRestoreTests` holds every refusal to a byte-identical vault, including a kill between keeping and replacing. `RestoreBackupTests` drives the journey from a save in the app to the vault the restore opens, and the expiry. `SecretHygieneTests.A_checked_backup_puts_nothing_from_the_vault_on_the_locked_screen` sweeps both view models. `MaskedInputAutomationTests` holds the field's differential. `scripts/verify-keepassxc-backup.sh` compares the restored vault with the backup byte for byte and opens it, the kept copy and an export in KeePassXC 2.7.10.
+
+## T-27 — Naming a keyfile tells the machine where the second factor is
+
+A vault may be protected by a master password and a keyfile, and keypaste is told which file on the command line as `--keyfile <path>` or in the `KEYPASTE_KEYFILE` environment variable. Neither carries key material, and neither is a secret in itself; what they carry is the location of the file that is.
+
+Both are readable by anything running as the same user. A command line appears in the process table for as long as the process lives and, on an interactive shell, in that shell's history afterwards. An environment variable is read by every child the shell starts and commonly outlives the session that set it, because the natural way to avoid retyping it is a line in a shell profile or an MCP client configuration. So an attacker who can already run code as the user learns where to look; they learn nothing they could not also learn by watching which file keypaste opened.
+
+This is the same exposure `--vault` and `KEYPASTE_VAULT` already have, and the same limit applies: the protection a keyfile adds is against somebody who has the vault file and not the keyfile — a stolen backup, a synced folder, a lost disk — rather than against somebody already executing on the unlocked machine. A keyfile kept on removable media is outside keypaste's reach when the media is.
+
+keypaste records nothing about which keyfile a vault uses: `recent.toml` is unchanged and holds vault paths alone (T-24). Each command is told again, which is a cost to the person and a deliberate one.
+
+Evidence: `Keypaste.Cli.Tests.KeyfileOptionTests` covers both sources and the flag winning over the variable. `verify-keepassxc-keyfile.sh` exercises the whole path with the shipped binary.
+
+## T-28 — A keyfile that is any file at all is one edit from losing the vault
+
+KeePass accepts four keyfile forms, and keypaste opens all four because KeePassXC wrote vaults with all four: an XML keyfile, a 32-byte file, a 64-character hex file, and — the fallback — any other file, keyed by the SHA-256 of its contents. In the fourth case the key is the file's bytes, so editing the file, re-encoding it, or letting a synchroniser rewrite it destroys access to the vault permanently. No warning precedes that, and no recovery follows it beyond restoring the file's exact former contents.
+
+keypaste says so when it opens such a vault: one line on stderr, once per open, naming the file. It never creates a keyfile of this kind — V.1a2 writes only the XML form — so a vault keypaste protected cannot acquire this weakness, but one it inherits keeps it.
+
+Two adjacent facts matter and are not warned about, because they are indistinguishable from a deliberate choice. A file of exactly 32 bytes is read as raw key material and a file of exactly 64 hexadecimal characters is decoded, by keypaste and by KeePassXC alike, so an ordinary document of one of those two lengths is not the fragile form and draws no line. And a keyfile is not a password: anyone who can read the file has that factor, so its protection lies in where it is kept.
+
+Evidence: `Keypaste.Core.Tests.VaultKeyfileTests` pins the four forms and both length edges. `verify-keepassxc-keyfile.sh` asserts the warning reaches stderr and never stdout, since `keypaste get` is piped and `keypaste run` hands stdout to a child.

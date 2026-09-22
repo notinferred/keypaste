@@ -33,6 +33,7 @@ internal static class RunCommand
     private static readonly OptionSpec[] _options =
     [
         new("vault", TakesValue: true),
+        new("keyfile", TakesValue: true),
     ];
 
     internal static int Execute(string[] args, CliContext context)
@@ -76,6 +77,7 @@ internal static class RunCommand
 
         return VaultSession.OpenThen(
             path,
+            line,
             context,
             vault => Load(vault, project, context),
             environment => Start(split.Command, environment, context));

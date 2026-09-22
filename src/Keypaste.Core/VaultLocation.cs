@@ -22,6 +22,14 @@ public static class VaultLocation
     /// <summary>The environment variable consulted when no path was given explicitly.</summary>
     public const string EnvironmentVariable = "KEYPASTE_VAULT";
 
+    /// <summary>The environment variable consulted when no keyfile was given explicitly.</summary>
+    /// <remarks>
+    /// It names a file, never a secret, but the file is the second factor — so THREATS records that
+    /// this variable is readable by every process running as the same user and commonly outlives
+    /// the session that set it, in a shell profile or a client configuration.
+    /// </remarks>
+    public const string KeyfileEnvironmentVariable = "KEYPASTE_KEYFILE";
+
     /// <summary>Resolves the vault path from an explicit value and the environment.</summary>
     /// <param name="fromFlag">The explicit path — <c>--vault</c> on either front end. May be null.</param>
     /// <param name="fromEnvironment">The value of <see cref="EnvironmentVariable"/>. May be null.</param>
@@ -55,5 +63,34 @@ public static class VaultLocation
 
         error = $"no vault given. Use --vault <path> or set {EnvironmentVariable}.";
         return false;
+    }
+
+    /// <summary>Resolves the keyfile path, if one was given at all.</summary>
+    /// <param name="fromFlag">The explicit path — <c>--keyfile</c>. May be null.</param>
+    /// <param name="fromEnvironment">The value of <see cref="KeyfileEnvironmentVariable"/>. May be null.</param>
+    /// <param name="path">The absolute path, or <see langword="null"/> when no keyfile was given.</param>
+    /// <returns><see langword="true"/> when a keyfile was given.</returns>
+    /// <remarks>
+    /// <para>
+    /// Unlike the vault, absent is a valid answer with a meaning of its own — most vaults have no
+    /// keyfile — so this reports whether one was named rather than failing when none was. There is
+    /// nothing to refuse here and so no error out-parameter: whether the file is usable is
+    /// <see cref="VaultKeyfile.Inspect"/>'s question, and it needs the path first.
+    /// </para>
+    /// <para>
+    /// Here beside the vault rule for the reason that rule gives: the answer has to be the same
+    /// wherever it is asked (docs/PRODUCT.md law 4.3). An empty variable counts as unset, so
+    /// <c>KEYPASTE_KEYFILE= keypaste ls</c> opens a vault that has no keyfile rather than failing
+    /// on a keyfile called "".
+    /// </para>
+    /// </remarks>
+    public static bool TryResolveKeyfile(string? fromFlag, string? fromEnvironment, out string? path)
+    {
+        string? chosen = !string.IsNullOrEmpty(fromFlag) ? fromFlag
+            : !string.IsNullOrEmpty(fromEnvironment) ? fromEnvironment
+            : null;
+
+        path = chosen is null ? null : Path.GetFullPath(chosen);
+        return path is not null;
     }
 }

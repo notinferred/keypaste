@@ -21,7 +21,7 @@ namespace Keypaste.App.Tests.ViewModels;
 /// <para>
 /// <b>What the file holds is asserted by opening it again.</b> A restore that only changed the
 /// vault in memory would satisfy every screen in this file, so each recovery is read back through
-/// a separate <see cref="Vault.Open"/> after the session has gone.
+/// a separate <see cref="Vault.Open(string, ReadOnlySpan{char})"/> after the session has gone.
 /// </para>
 /// <para>
 /// There is no automation test beside this one, the way <c>HistoryRevealAutomationTests</c> sits
