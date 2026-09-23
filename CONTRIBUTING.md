@@ -2,7 +2,7 @@
 
 ## Changes and review
 
-Read [PRODUCT](docs/PRODUCT.md) for scope and security laws, [STEPS](docs/STEPS.md) for the active build plan, and [CLAUDE.md](CLAUDE.md) for writing rules and document ownership. Product scope changes require dated founder re-ratification; proposals do not override the current requirements. The active plan covers the local vault, one unlock session, native MCP approvals, project env use and desktop delivery. [BACKLOG](docs/BACKLOG.md) preserves optional ideas; its rows are not instructions to build them.
+Read [PRODUCT](docs/PRODUCT.md) for scope and security laws, [STEPS](docs/STEPS.md) for the active build plan, the [code map](docs/ARCHITECTURE.md) for where things are, and [CLAUDE.md](CLAUDE.md) for writing rules, document ownership and what a finished step records. Product scope changes require dated founder re-ratification; proposals do not override the current requirements. The active plan covers the local vault, one unlock session, native MCP approvals, project env use and desktop delivery. [BACKLOG](docs/BACKLOG.md) preserves optional ideas; its rows are not instructions to build them.
 
 Keep changes focused and include their documentation. Shared feature logic belongs in `Keypaste.Core`; the CLI and desktop use it. Document features available in only one front end. Secret-path changes require tests, including encryption, injection, the agent bridge and secret display. New secret-path dependencies require written justification, pinned versions and lock files regenerated with `dotnet restore --force-evaluate`.
 

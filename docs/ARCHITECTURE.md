@@ -1,0 +1,53 @@
+# Code map
+
+Where the code is, so a task starts from the right files instead of a search of the whole tree. [PRODUCT](PRODUCT.md) owns intent and laws; this map changes only when a project, entry point or process boundary changes.
+
+## Projects
+
+| Project | Role | Start at |
+|---|---|---|
+| `src/Keypaste.Core` | Every vault, env, generation, policy, approval, audit and release rule. Front ends adapt it and add none of their own (PRODUCT §4.2). Only `Internal/KeePassInterop.cs` touches KeePassLib types. | the concern table below |
+| `src/Keypaste.Cli` | The `keypaste` command. One class per verb in `Commands/`; `CliApp` owns streams and exit codes, `VaultLocator` resolves `--vault` and `KEYPASTE_VAULT`, and `VaultSession` owns prompts, `--keyfile` and opening a vault. `keypaste agent` is the terminal approver. | `Program.cs`, `CliApp.cs` |
+| `src/Keypaste.Mcp` | `keypaste-mcp`, the vault-free MCP bridge over stdio. Its two tools are in `Tools/`. It is the only process that writes the audit log (`McpAudit.cs`). | `Program.cs` |
+| `src/Keypaste.App` | The Avalonia desktop. `Session/AppVaultSession.cs` owns the unlocked vault; `ViewModels/` has one view model per screen and `Views/` its XAML; `ShellViewModel` disposes every screen on lock. | `Program.cs`, `App.axaml.cs` |
+| `third_party/KeePassLib` | The vendored KDBX engine. [UPSTREAM.md](../third_party/KeePassLib/UPSTREAM.md) owns provenance and local changes. | — |
+
+`keypaste.slnx` builds Core, CLI, MCP, their tests and KeePassLib; `keypaste.app.slnx` builds Core, the desktop and its tests. Both write into `artifacts/`. `tests/Keypaste.Consistency.Tests` references both front ends and belongs to neither solution; [its README](../tests/Keypaste.Consistency.Tests/README.md) says why.
+
+## Processes today
+
+Four processes can hold vault data, each unlocking on its own; T2 in [STEPS](STEPS.md) replaces this with one session.
+
+- The desktop app unlocks its own session and locks it on idle, on `Ctrl/Cmd+L` and, when that setting is on, on minimize.
+- `keypaste agent` is started by a person in a terminal. It holds the unlocked vault, listens on a per-user named pipe (`Core/Ipc/ApproverEndpoint.cs`) and asks that person through `Cli/Approval/TerminalApprovalChannel.cs`.
+- `keypaste-mcp` is started by the MCP client, never opens a vault, forwards each request to the agent over the pipe and writes the audit record.
+- `keypaste run` opens the vault, reads an env set, closes the vault and starts the child with the values in its environment.
+
+A credential request runs: MCP client → `Mcp/Tools/RequestCredentialTool.cs` → `Mcp/ApproverConnection.cs` → `Core/Ipc/ApproverClient.cs` → pipe → `Core/Ipc/ApproverListener.cs` in the agent → `Core/Approval/ApproverHandler.cs`, which resolves the entry, re-checks exposure, consults the grant cache, a recent refusal and the policy, asks the person and only then reads one field → reply → audit line.
+
+## Where each concern lives in Core
+
+| Concern | Files |
+|---|---|
+| Open, save, entries, history, recycle bin | `Vault.cs`, `VaultEntry.cs`, `EntryName.cs`, `EntryHandle.cs`, `EntryRevision.cs`, `RecycledEntry.cs` |
+| Organize and search | `VaultOrganization.cs`, `VaultNameRules.cs`, `VaultSearch.cs` |
+| Creation, unlock factors and access changes | `VaultCreation.cs`, `VaultKeyfile.cs`, `VaultAccess.cs`, `VaultLocation.cs` |
+| Backups, restore and export | `VaultBackups.cs` |
+| KDBX boundary, save retries and timing | `Internal/KeePassInterop.cs`, `Internal/SaveClock.cs`, `KdbxFormat.cs`, `ProcessTemporaryDirectory.cs`, `PathIdentity.cs` |
+| Env sets and dotenv | `EnvStore.cs`, `EnvConvention.cs`, `EnvNameRules.cs`, `DotEnv.cs`, `DotEnvWriter.cs`, `SourceSnapshot.cs` |
+| Password and passphrase generation | `PasswordGenerator.cs`, `PassphraseRecipe.cs`, `WordList.cs` |
+| Secret input and display | `SecretBuffer.cs`, `SecretInput.cs`, `DisplayTextSanitizer.cs`, `EntryNameSanitizer.cs`, `Clipboard/` |
+| What an agent may name | `EntryExposure.cs` |
+| Approval, grants and credential release | `Approval/` |
+| Approver pipe protocol | `Ipc/` |
+| Standing rules in `policy.toml` | `Policy/` |
+| Audit log and `~/.keypaste` paths | `Audit/`, `Audit/KeypasteHome.cs` |
+| `recent.toml`, `app.toml`, MCP client configuration | `Recent/`, `Settings/`, `Clients/` |
+
+## Tests, gates and delivery
+
+- `tests/Keypaste.<Project>.Tests` mirror the projects. The helper projects `TxfContender`, `PoolStarver`, `VaultSaver`, `VaultRestorer` and `MinimizeObserver` are unshipped processes that particular probes and gates drive.
+- `scripts/verify.sh`, or `verify.ps1` in PowerShell, is the local verification entry point ([CLAUDE.md](../CLAUDE.md)). `scripts/verify-keepassxc-*.sh` are the permanent KeePassXC compatibility gates, one per vault feature; `verify-mcp-stdio.sh`, `verify-approval-e2e.sh`, `verify-policy-e2e.sh`, `verify-log-chain.sh` and `verify-run-*.sh` drive the shipped processes; `verify-demo.sh` checks published transcripts against the binaries.
+- Packaging and release: `release-targets.json` defines targets; `build-*.sh`, `sign-windows.sh`, `publish-release.sh`, `release-completion.sh` and `require-*.sh` implement [RELEASE](RELEASE.md).
+- `.github/workflows/`: `ci.yml` (backend), `app.yml` (desktop), `release.yml`, `install*.yml`, `upgrade-desktop.yml`, `observe-desktop.yml`, `dco.yml` and single-question probes (`*-probe.yml`).
+- `site/` is keypaste.com; [site/README.md](../site/README.md) owns its deployment.
