@@ -6,6 +6,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 All of this is source only: there is still no desktop download, and the published CLI is unchanged. Each entry that names a step links its record, which holds the full account.
 
+`Ctrl/Cmd+O` on the desktop's unlock screen opens the vault picker, as Browse does ([F.15](docs/steps/F.15.md)).
+
 The desktop entry pane reveals the current password while it is held, and a history revision now has Copy with the same twenty-second clear as every other secret. Masked fields are announced by their purpose to screen readers ([V.10](docs/steps/V.10.md)).
 
 The desktop opens, creates and restores vaults that need a keyfile, and remembers where each vault's keyfile is, as KeePassXC does. Settings changes the master password and adds, replaces or removes a keyfile after asking for the current password. It says that existing backups still open with the old credentials, and the app stays unlocked afterwards ([V.1b](docs/steps/V.1b.md)).

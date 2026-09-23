@@ -76,7 +76,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         _post = post ?? (action => action());
 
         UnlockCommand = new AsyncRelayCommand(UnlockAsync, () => CanUnlock);
-        BrowseCommand = new AsyncRelayCommand(BrowseAsync, () => !_busy);
+        BrowseCommand = new AsyncRelayCommand(BrowseAsync, () => !_busy && IsOpening);
         StartCreateCommand = new AsyncRelayCommand(StartCreateAsync, () => !_busy);
         CreateCommand = new AsyncRelayCommand(CreateAsync, () => CanCreate);
         CancelCreateCommand = new AsyncRelayCommand(CancelCreateAsync, () => !_busy);
@@ -103,7 +103,8 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
 
     internal AsyncRelayCommand UnlockCommand { get; }
 
-    /// <summary>Opens the picker for an existing vault.</summary>
+    /// <summary>Opens the picker for an existing vault, from Browse or <c>Ctrl/Cmd+O</c>.</summary>
+    /// <remarks>Off wherever Browse is hidden, so the chord cannot reach past a create or restore form.</remarks>
     internal AsyncRelayCommand BrowseCommand { get; }
 
     /// <summary>Opens the save picker and, if a path comes back, shows the create fields.</summary>
@@ -134,6 +135,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
                 Raise(nameof(OffersRestore));
                 StartRestoreCommand.RaiseCanExecuteChanged();
                 CloseRestoreCommand.RaiseCanExecuteChanged();
+                BrowseCommand.RaiseCanExecuteChanged();
             }
         }
     }
@@ -205,6 +207,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
                 Raise(nameof(IsOpening));
                 Raise(nameof(OffersRestore));
                 StartRestoreCommand.RaiseCanExecuteChanged();
+                BrowseCommand.RaiseCanExecuteChanged();
             }
         }
     }
@@ -291,6 +294,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
             if (Set(ref _busy, value))
             {
                 UnlockCommand.RaiseCanExecuteChanged();
+                BrowseCommand.RaiseCanExecuteChanged();
                 ChooseKeyfileCommand.RaiseCanExecuteChanged();
                 ClearKeyfileCommand.RaiseCanExecuteChanged();
             }

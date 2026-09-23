@@ -72,7 +72,7 @@ Avalonia draws with Skia; the app does not embed WebKit or Chromium. Internal in
 
 ## Opening a vault
 
-Open a vault by dragging a `.kdbx` onto the window, choosing Browse, or selecting a recent vault.
+Open a vault by dragging a `.kdbx` onto the window, choosing Browse or pressing `Ctrl/Cmd+O`, or selecting a recent vault. The shortcut opens the same picker as Browse and does nothing while the create or restore form is showing, while an unlock is running or once a vault is open.
 
 Whichever you use, the file's header is read before you are asked for a password, so a file that was never a vault is refused immediately rather than after you have typed. [PRODUCT](PRODUCT.md) requires both front ends to use shared core rules.
 
@@ -87,8 +87,6 @@ A keyfile is optional: Add a keyfile… attaches one you already have, such as a
 The refusals are the ones `keypaste init` makes, because both front ends ask the same code: a path something already occupies is refused and that file is left exactly as it was, an empty password is refused, and a confirmation that does not match is refused, as is a keyfile keypaste will not attach. Nothing is written until all of them have passed, so a refused attempt leaves the disk as it found it, and cancelling the picker writes nothing at all. The vault is remembered in `recent.toml` only once it exists and the app has opened it.
 
 A new vault opens on an empty Entries list. Add entries there, or with `keypaste add` in a terminal against the same file.
-
-`Ctrl/Cmd+O` is not implemented; use Browse on the unlock screen. The missing shortcut remains a delivery gap in [STEPS](STEPS.md).
 
 ## Locking
 
@@ -111,6 +109,7 @@ The app provides these shortcuts and focus navigation. Verify the full keyboard-
 | | |
 |---|---|
 | `Ctrl/Cmd+1` … `6` | Entries, Env Sets, Agent Activity, Log, Settings, Trash |
+| `Ctrl/Cmd+O` | Open a vault, on the unlock screen |
 | `Ctrl/Cmd+L` | Lock now |
 | `Tab` / `Shift+Tab` | Move between controls |
 | `↑` `↓` | Move within the sidebar or the recent list |

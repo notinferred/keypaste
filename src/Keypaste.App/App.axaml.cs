@@ -1,8 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Input;
-using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using Keypaste.App.Clipboard;
@@ -28,6 +26,7 @@ internal sealed partial class App : Application, IDisposable
     private DesktopPreferences? _preferences;
     private MinimizeLock? _minimize;
     private ActivityWatch? _activity;
+    private Shortcuts? _shortcuts;
     private MainWindow? _window;
     private UnlockViewModel? _unlock;
     private ShellViewModel? _shell;
@@ -47,7 +46,7 @@ internal sealed partial class App : Application, IDisposable
 
             _window = new MainWindow();
             _activity = Observe(_window, _session, TimeProvider.System, () => _shell?.ClearCountdown());
-            _window.AddHandler(InputElement.KeyDownEvent, OnShortcut, RoutingStrategies.Tunnel, handledEventsToo: true);
+            _shortcuts = Bind(_window, _session, () => _unlock, () => _shell);
             _minimize = Watch(_window, _preferences, _session, () => _unlock?.CancelPendingRestore());
             ShowUnlock(home);
 
@@ -138,6 +137,22 @@ internal sealed partial class App : Application, IDisposable
         TimeProvider clock,
         Action onActivity) =>
         new(window, session, clock, onActivity);
+
+    /// <summary>
+    /// Binds the keyboard chords to a window.
+    /// </summary>
+    /// <param name="window">The window a person types into.</param>
+    /// <param name="session">The session <c>Ctrl/Cmd+L</c> locks.</param>
+    /// <param name="unlock">The unlock screen, while it is showing.</param>
+    /// <param name="shell">The unlocked shell, while it is showing.</param>
+    /// <returns>The binding, which the application owns for its lifetime.</returns>
+    /// <remarks><c>internal</c> for the reason <see cref="Watch"/> is: a test runs what launch runs.</remarks>
+    internal static Shortcuts Bind(
+        Window window,
+        AppVaultSession session,
+        Func<UnlockViewModel?> unlock,
+        Func<ShellViewModel?> shell) =>
+        new(window, session, unlock, shell);
 
     /// <summary>
     /// Takes a secret back off the clipboard before the process goes away.
@@ -241,54 +256,6 @@ internal sealed partial class App : Application, IDisposable
     }
 
     /// <summary>
-    /// The chords, built from the platform's own command modifier rather than a hardcoded Ctrl.
-    /// </summary>
-    /// <remarks>
-    /// Handled at the window, on the tunnelling pass, so a focused list or text field cannot eat
-    /// them first. <c>Ctrl/Cmd+L</c> is the honest counterweight to a five-minute idle timeout:
-    /// a default that short is only defensible when locking now is one keystroke.
-    /// </remarks>
-    private void OnShortcut(object? sender, KeyEventArgs e)
-    {
-        if (_shell is null || _window is null)
-        {
-            return;
-        }
-
-        // Cmd on macOS, Ctrl everywhere else — which is what a platform hotkey configuration
-        // resolves to, without depending on where Avalonia keeps that configuration this version.
-        var command = OperatingSystem.IsMacOS() ? KeyModifiers.Meta : KeyModifiers.Control;
-
-        if ((e.KeyModifiers & command) != command)
-        {
-            return;
-        }
-
-        if (e.Key == Key.L)
-        {
-            _session?.Lock(VaultLockReason.Manual);
-            e.Handled = true;
-            return;
-        }
-
-        var digit = e.Key switch
-        {
-            Key.D1 or Key.NumPad1 => 1,
-            Key.D2 or Key.NumPad2 => 2,
-            Key.D3 or Key.NumPad3 => 3,
-            Key.D4 or Key.NumPad4 => 4,
-            Key.D5 or Key.NumPad5 => 5,
-            Key.D6 or Key.NumPad6 => 6,
-            _ => 0,
-        };
-
-        if (digit > 0 && _shell.GoTo(digit))
-        {
-            e.Handled = true;
-        }
-    }
-
-    /// <summary>
     /// Applies a theme choice. <c>System</c> hands the decision back to the operating system.
     /// </summary>
     internal void ApplyTheme(Core.Settings.AppTheme theme) =>
@@ -311,6 +278,8 @@ internal sealed partial class App : Application, IDisposable
         _minimize = null;
         _activity?.Dispose();
         _activity = null;
+        _shortcuts?.Dispose();
+        _shortcuts = null;
         _shell?.Dispose();
         _shell = null;
         _unlock?.Dispose();
