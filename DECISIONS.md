@@ -6,6 +6,7 @@
 
 | id | date | decision | supersedes |
 |---|---|---|---|
+| D-0303 | 2026-09-23 | The desktop test session renders with Skia, and a claim that a secret is or is not on screen is read from a captured frame by a reader shown to find what it rejects, not from `RevealedValue.Rendered` or a view model; that frame is D-0232's rendering evidence | D-0232's `Rendered` as proof the characters were drawn |
 | D-0301 | 2026-09-23 | A secret input's accessible name is its attached name or, failing that, its placeholder, never anything derived from what was typed; the mask stays in the tree as D-0099 allows | — |
 | D-0300 | 2026-09-23 | The entry pane reveals the current password while held, under the env hold rule, and every surface that holds a secret (current password, env value, history revision) copies through the one clearing countdown, although KeePassXC copies no revision | D-0231's "the current one stays copy-only" |
 | D-0297 | 2026-09-22 | A vault is created with a keyfile only through `VaultCreation`, which still requires a master password and refuses the keyfile on the grounds an access change does, through one shared rule: missing or unusable, keyed by its hash, or the vault and its copies; keypaste makes no keyfile-only vault, and `keypaste init` takes no keyfile | — |

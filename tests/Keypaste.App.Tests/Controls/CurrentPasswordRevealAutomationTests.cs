@@ -21,10 +21,10 @@ namespace Keypaste.App.Tests.Controls;
 /// nothing different while it is (V.10, D-0300).
 /// </summary>
 /// <remarks>
-/// The gesture is delivered as pointer events raised on the cell the template built, rather than
-/// as a press on the window: this session draws no frames, so a window press resolves to no
-/// control. What that keeps is the control's own press, release and capture handling, and every
-/// binding the pane gives it.
+/// The gesture is delivered as pointer events raised on the cell the template built, which keeps
+/// the control's own press, release and capture handling and every binding the pane gives it. The
+/// press the platform hit-tests through the window, and the frame it draws, are
+/// <c>DrawnRevealTests</c>.
 /// </remarks>
 public sealed class CurrentPasswordRevealAutomationTests
 {

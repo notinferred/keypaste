@@ -152,7 +152,7 @@ Keystrokes still arrive as short-lived immutable strings, and an input method ca
 
 ## Checking a build by hand
 
-CI builds and packages on three operating systems; current desktop logic tests do not establish rendered pixels or a complete native workflow. `install-desktop.yml` installs internal candidates on fresh runners and drives the installed app, but a browser download's SmartScreen prompt and a person's use are still observed only by hand. Use a disposable vault with harmless test values for this manual checklist before any release that includes the app:
+CI builds and packages on three operating systems; desktop tests read secret surfaces from frames Skia renders in a headless window ([4.6](steps/4.6.md)) but do not establish native rendering or a complete native workflow. `install-desktop.yml` installs internal candidates on fresh runners and drives the installed app, but a browser download's SmartScreen prompt and a person's use are still observed only by hand. Use a disposable vault with harmless test values for this manual checklist before any release that includes the app:
 
 1. Launch with no `recent.toml`: the empty state offers Create, names dragging and Browse, and does not look broken.
 2. Open a vault by drag, and again by the picker. A non-`.kdbx` file is refused before the password field.

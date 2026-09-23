@@ -231,12 +231,10 @@ public sealed class HistoryRevealAutomationTests
         /// Holds the cell the comparison built, and remembers which revision it belongs to.
         /// </summary>
         /// <remarks>
-        /// The hold is begun on the control rather than by a pointer press on the window: this
-        /// session draws no frames, and Avalonia resolves a press to a control through the
-        /// renderer, so a press lands on the window and reaches nothing inside it. What that costs
-        /// is the gesture, which <see cref="RevealedValueTests"/> covers on the same control; what
-        /// it keeps is everything the screen contributes — the cell the template built, the row its
-        /// <c>Source</c> binding found, and the mask its <c>MaskedLength</c> binding sized.
+        /// The hold is begun on the control rather than by a pointer press on the window; the
+        /// press the platform hit-tests, and the frame it draws, are <c>DrawnRevealTests</c>. What
+        /// this keeps is everything the screen contributes — the cell the template built, the row
+        /// its <c>Source</c> binding found, and the mask its <c>MaskedLength</c> binding sized.
         /// </remarks>
         internal void Hold()
         {

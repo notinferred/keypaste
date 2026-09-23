@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Headless;
 
 namespace Keypaste.App.Tests;
@@ -30,7 +31,14 @@ namespace Keypaste.App.Tests;
 internal static class HeadlessSession
 {
     internal static HeadlessUnitTestSession Instance { get; } =
-        HeadlessUnitTestSession.StartNew(typeof(App));
+        HeadlessUnitTestSession.StartNew(typeof(HeadlessSession));
+
+    /// <summary>The app drawn by Skia, so a test can read what a frame actually shows (4.6).</summary>
+    public static AppBuilder BuildAvaloniaApp() =>
+        AppBuilder.Configure<App>()
+            .UseSkia()
+            .WithInterFont()
+            .UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false });
 
     /// <summary>Runs <paramref name="body"/> on the session's UI thread.</summary>
     internal static Task On(Action body) => Instance.Dispatch(body, CancellationToken.None);
