@@ -130,10 +130,11 @@ public sealed class SecretHygieneTests
 
     /// <summary>The strings with no legitimate surface anywhere, in any state.</summary>
     /// <remarks>
-    /// A password, a value in a project nobody opened, and the master password. The one string here
-    /// with a legitimate moment on screen is <see cref="SentinelEnvValue"/>, which appears while
-    /// somebody holds it — so it is asserted separately rather than blanket-forbidden, and its
-    /// transience is what that test checks.
+    /// A password, a value in a project nobody opened, and the master password. No view model
+    /// carries any of them. <see cref="SentinelPassword"/> can be drawn while its cell is held, by the
+    /// control and never by a view model, which
+    /// <see cref="The_entry_pane_hands_its_current_password_only_to_a_hold"/> checks; the env value
+    /// and the superseded password have their own hold tests for the same reason.
     /// </remarks>
     private static readonly string[] _neverAnywhere =
     [
@@ -436,6 +437,45 @@ public sealed class SecretHygieneTests
 
         ((IRevealSource)revision).Conceal();
         Assert.Empty(detail.History.RevealedWhen);
+    }
+
+    /// <summary>
+    /// The entry pane hands its current password only to a hold, and keeps none of it (D-0300).
+    /// </summary>
+    /// <remarks>
+    /// The third surface that draws a value on purpose, after env values and revisions. The pane
+    /// knows the password's length for the mask; the characters go from the open vault straight to
+    /// the control that draws them, and no property of the pane has them before, during or after.
+    /// </remarks>
+    [Fact]
+    public void The_entry_pane_hands_its_current_password_only_to_a_hold()
+    {
+        using var fixture = new SentinelVault();
+        using var session = Unlocked(fixture);
+        using var shell = new ShellViewModel(session, fixture.Home, approverFromEnvironment: null);
+
+        shell.Current = Destinations.All[0];
+        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
+        entries.Selected = entries.Rows.Single(row => row.Title == SentinelTitle);
+
+        var detail = entries.Detail!;
+        Assert.Equal(SentinelPassword.Length, ((IRevealSource)detail).MaskedLength);
+
+        foreach (var text in Surface(entries).Concat(Surface(detail)))
+        {
+            Assert.DoesNotContain(SentinelPassword, text, StringComparison.Ordinal);
+        }
+
+        Assert.Equal(SentinelPassword, ((IRevealSource)detail).Reveal());
+
+        foreach (var text in Surface(entries).Concat(Surface(detail)))
+        {
+            Assert.DoesNotContain(SentinelPassword, text, StringComparison.Ordinal);
+        }
+
+        ((IRevealSource)detail).Conceal();
+        session.Lock(VaultLockReason.Manual);
+        Assert.Null(((IRevealSource)detail).Reveal());
     }
 
     /// <summary>

@@ -5,7 +5,7 @@ namespace Keypaste.App.ViewModels;
 
 /// <summary>
 /// One earlier state of an entry, as the detail pane lists it: when it was current, what it held,
-/// and a way to see its password briefly.
+/// and a way to see or copy its password.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -47,6 +47,8 @@ internal sealed class EntryRevisionRow : ObservableObject, IRevealSource
         _username = revision.Fields.Username;
         _url = revision.Fields.Url;
         _notes = revision.Fields.Notes;
+
+        CopyPasswordCommand = new AsyncRelayCommand(() => _owner.Copy(this), () => MaskedLength > 0);
     }
 
     /// <summary>This revision's position in the reading that built the list, newest first.</summary>
@@ -90,6 +92,9 @@ internal sealed class EntryRevisionRow : ObservableObject, IRevealSource
 
     /// <summary>What a screen reader is told the hold does. Names the time, never the value.</summary>
     internal string RevealLabel => $"Hold to reveal the password from {When}";
+
+    /// <summary>Copies this revision's password, with the auto-clearing countdown.</summary>
+    internal AsyncRelayCommand CopyPasswordCommand { get; }
 
     /// <inheritdoc/>
     public string? Reveal() => _owner.Reveal(this);

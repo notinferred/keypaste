@@ -6,6 +6,8 @@
 
 | id | date | decision | supersedes |
 |---|---|---|---|
+| D-0301 | 2026-09-23 | A secret input's accessible name is its attached name or, failing that, its placeholder, never anything derived from what was typed; the mask stays in the tree as D-0099 allows | — |
+| D-0300 | 2026-09-23 | The entry pane reveals the current password while held, under the env hold rule, and every surface that holds a secret (current password, env value, history revision) copies through the one clearing countdown, although KeePassXC copies no revision | D-0231's "the current one stays copy-only" |
 | D-0297 | 2026-09-22 | A vault is created with a keyfile only through `VaultCreation`, which still requires a master password and refuses the keyfile on the grounds an access change does, through one shared rule: missing or unusable, keyed by its hash, or the vault and its copies; keypaste makes no keyfile-only vault, and `keypaste init` takes no keyfile | — |
 | D-0296 | 2026-09-22 | A desktop access change asks for the current master password and checks it by opening the file from disk with it and the session's keyfile before anything is written, then keeps the app unlocked by reopening the vault under the new factors and swapping it into the session without reporting a lock, as KeePassXC stays open; a failed reopen locks with its own reason | — |
 | D-0295 | 2026-09-22 | The desktop remembers in `recent.toml` the path of the keyfile each vault last opened or was created with, and the unlock screen offers it again, as KeePassXC does; it records a location and never key material, and the CLI still records nothing and names a keyfile per command | D-0285's "`recent.toml` keeps vault paths alone" |

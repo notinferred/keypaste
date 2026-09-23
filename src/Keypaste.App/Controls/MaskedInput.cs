@@ -224,6 +224,17 @@ internal sealed class MaskedInput : TemplatedControl
     /// no <c>IValueProvider</c>, so there is no accessibility path that returns text — and since
     /// this control never holds the password, there would be nothing to return in any case.
     /// </remarks>
-    protected override AutomationPeer OnCreateAutomationPeer() =>
-        new ControlAutomationPeer(this);
+    protected override AutomationPeer OnCreateAutomationPeer() => new MaskedInputAutomationPeer(this);
+
+    /// <summary>Names the field by what it is for, never by what is in it (D-0301).</summary>
+    /// <remarks>
+    /// The base peer names a control from its attached name, a label or a tooltip, and none of the
+    /// eleven fields sets one, so each was announced with no name at all. The placeholder is a
+    /// literal in every view that uses this control.
+    /// </remarks>
+    private sealed class MaskedInputAutomationPeer(MaskedInput owner) : ControlAutomationPeer(owner)
+    {
+        protected override string? GetNameCore() =>
+            base.GetNameCore() is { Length: > 0 } named ? named : owner.Placeholder;
+    }
 }

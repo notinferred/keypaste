@@ -1,3 +1,4 @@
+using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.Core;
 
@@ -8,10 +9,9 @@ namespace Keypaste.App.ViewModels;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Its own object rather than more properties on <see cref="EntryDetailViewModel"/>.</b> That
-/// pane's claim is that the entry's password is not a property of it in any state, and a reveal
-/// belongs to exactly one kind of value here — a password the entry no longer uses. Keeping it
-/// apart bounds the widening to one type and leaves the pane's claim literally true.
+/// <b>Its own object rather than more properties on <see cref="EntryDetailViewModel"/>.</b> A
+/// revision is addressed by an index that is only good for one reading, and every hold, copy and
+/// restore re-checks it; the pane addresses one current entry and has none of that to do.
 /// </para>
 /// <para>
 /// <b>History is read when somebody asks for it, not when they select an entry.</b>
@@ -32,6 +32,7 @@ internal sealed class EntryHistoryViewModel : ObservableObject, IDisposable
         "This entry changed since its history was read. The list has been refreshed — choose again.";
 
     private readonly AppVaultSession _session;
+    private readonly ClipboardCountdown _clipboard;
     private readonly EntryDetailViewModel _owner;
     private readonly Action<EntryName> _restored;
 
@@ -44,14 +45,17 @@ internal sealed class EntryHistoryViewModel : ObservableObject, IDisposable
 
     internal EntryHistoryViewModel(
         AppVaultSession session,
+        ClipboardCountdown clipboard,
         EntryDetailViewModel owner,
         Action<EntryName> restored)
     {
         ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(clipboard);
         ArgumentNullException.ThrowIfNull(owner);
         ArgumentNullException.ThrowIfNull(restored);
 
         _session = session;
+        _clipboard = clipboard;
         _owner = owner;
         _restored = restored;
 
@@ -203,6 +207,33 @@ internal sealed class EntryHistoryViewModel : ObservableObject, IDisposable
             _revealed = null;
             Raise(nameof(RevealedWhen));
         }
+    }
+
+    /// <summary>
+    /// Copies a revision's password with the countdown every other secret copy uses (D-0300).
+    /// </summary>
+    /// <remarks>
+    /// Re-read and re-checked like a hold, so a list read before an edit elsewhere cannot put a
+    /// different revision's password on the clipboard.
+    /// </remarks>
+    internal async Task Copy(EntryRevisionRow row)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+
+        if (_session.Unlocked is null)
+        {
+            _owner.Report("That password could not be read. The vault may have locked.");
+            return;
+        }
+
+        if (Read(row) is not { Length: > 0 } password)
+        {
+            _owner.Report(_stale);
+            Load();
+            return;
+        }
+
+        await _clipboard.CopyAsync(password, $"Password from {row.When}").ConfigureAwait(true);
     }
 
     /// <summary>Nothing read out of the vault outlives this.</summary>

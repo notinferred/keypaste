@@ -4,6 +4,7 @@ using Avalonia.Automation.Peers;
 using Avalonia.Automation.Provider;
 using Avalonia.Controls;
 using Avalonia.VisualTree;
+using Keypaste.App.Controls;
 using Xunit;
 
 namespace Keypaste.App.Tests.Controls;
@@ -36,6 +37,18 @@ internal static class AutomationSurface
                 Assert.Fail($"{source} exposes the fixture password");
             }
         }
+    }
+
+    /// <summary>
+    /// The field is announced by what it is for: a non-empty name equal to its placeholder, which is
+    /// a literal in every view, so the name cannot move with what is typed (D-0301).
+    /// </summary>
+    internal static void AssertNamedByPurpose(MaskedInput field)
+    {
+        var name = ControlAutomationPeer.CreatePeerForElement(field).GetName();
+
+        Assert.False(string.IsNullOrWhiteSpace(name), $"{field.Name} has no accessible name");
+        Assert.Equal(field.Placeholder, name);
     }
 
     /// <summary>

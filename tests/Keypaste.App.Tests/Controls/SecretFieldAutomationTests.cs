@@ -201,8 +201,10 @@ public sealed class SecretFieldAutomationTests
     /// <returns>What was typed the second time, so a caller can assert the field was not empty.</returns>
     private static string Differential(Window window, MaskedInput field)
     {
+        AutomationSurface.AssertNamedByPurpose(field);
         Type(window, field, _alpha);
         var first = AutomationSurface.Of(field);
+        AutomationSurface.AssertNamedByPurpose(field);
 
         window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
         window.KeyReleaseQwerty(PhysicalKey.Escape, RawInputModifiers.None);
@@ -210,6 +212,7 @@ public sealed class SecretFieldAutomationTests
 
         window.KeyTextInput(_beta);
         var second = AutomationSurface.Of(field);
+        AutomationSurface.AssertNamedByPurpose(field);
 
         Assert.Equal(first, second);
         return _beta;

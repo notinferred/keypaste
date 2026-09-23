@@ -12,25 +12,12 @@ namespace Keypaste.App.ViewModels;
 /// <b>The password is not a property of this object, in any state.</b> Title, group, username, URL
 /// and notes are read once on selection and held, which is a deliberate widening bounded to one
 /// entry a person chose — <c>keypaste get</c>'s scope minus the password. The password is read out
-/// of the open vault at the moment Copy is pressed and handed straight to the clipboard, so it is
-/// never in a view model, never in a binding, and never in the visual tree.
-/// </para>
-/// <para>
-/// <b>Why the current password has no reveal when <c>Env Sets</c> has one.</b> The two are used
-/// differently. An environment value gets compared by eye against a <c>.env</c> file or a
-/// provider's dashboard, so reading it is the task. An entry password gets pasted into a login
-/// form, so copying it is the task, and <c>keypaste get --show</c> is there for the times it
-/// genuinely has to be read. The asymmetry is a decision, not an oversight.
-/// </para>
-/// <para>
-/// <b>A password the entry no longer uses is the one exception (D-0231).</b>
-/// <see cref="History"/> reveals a superseded value while it is held, because deciding whether to
-/// restore a revision means reading it first and no CLI verb can read one at all. The reveal lives
-/// in <see cref="EntryHistoryViewModel"/> rather than here, so the paragraph above stays true of
-/// this object and the hygiene gate's allow-set widens by one type.
+/// of the open vault at the moment Copy is pressed or its cell is held (D-0300), and handed straight
+/// to the clipboard or to the <see cref="Controls.RevealedValue"/> that draws it, so it is never in a
+/// view model and never in a binding.
 /// </para>
 /// </remarks>
-internal sealed class EntryDetailViewModel : ObservableObject, IDisposable
+internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, IDisposable
 {
     private readonly AppVaultSession _session;
     private readonly ClipboardCountdown _clipboard;
@@ -74,7 +61,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IDisposable
 
         NewPassword = new SecretField(clipboard);
         _restored = restored;
-        History = new EntryHistoryViewModel(session, this, Restored);
+        History = new EntryHistoryViewModel(session, clipboard, this, Restored);
 
         CopyPasswordCommand = new AsyncRelayCommand(CopyPasswordAsync, () => PasswordLength > 0);
         CopyUsernameCommand = new AsyncRelayCommand(CopyUsernameAsync, () => Username.Length > 0);
@@ -193,6 +180,9 @@ internal sealed class EntryDetailViewModel : ObservableObject, IDisposable
     /// <summary>The dots the detail pane shows where the password would be.</summary>
     internal string PasswordMask => new('•', Math.Min(PasswordLength, 24));
 
+    /// <inheritdoc/>
+    public int MaskedLength => PasswordLength;
+
     /// <summary>A replacement password, while editing. Empty means "leave it alone".</summary>
     /// <remarks>
     /// Empty rather than a separate "change the password" switch: the field is the switch. Somebody
@@ -276,8 +266,29 @@ internal sealed class EntryDetailViewModel : ObservableObject, IDisposable
         Notes = entry.Notes;
         PasswordLength = entry.Password.Length;
         Raise(nameof(PasswordLength));
+        Raise(nameof(MaskedLength));
         Raise(nameof(PasswordMask));
         CopyPasswordCommand.RaiseCanExecuteChanged();
+    }
+
+    /// <inheritdoc/>
+    public string? Reveal()
+    {
+        try
+        {
+            return _session.Unlocked?.Find(Name)?.Password;
+        }
+        catch (VaultException e)
+        {
+            Report(e.Message);
+            return null;
+        }
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>The pane has one current password, so there is no slot to give back.</remarks>
+    public void Conceal()
+    {
     }
 
     /// <summary>
@@ -315,6 +326,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IDisposable
         Raise(nameof(Title));
         Raise(nameof(GroupPath));
         Raise(nameof(Path));
+        Raise(nameof(MaskedLength));
         Raise(nameof(PasswordMask));
     }
 

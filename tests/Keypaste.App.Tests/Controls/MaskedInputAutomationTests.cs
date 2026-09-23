@@ -60,7 +60,7 @@ public sealed class MaskedInputAutomationTests
 
         var peer = ControlAutomationPeer.CreatePeerForElement(input);
 
-        Assert.IsType<ControlAutomationPeer>(peer);
+        Assert.IsAssignableFrom<ControlAutomationPeer>(peer);
         Assert.Null(peer.GetProvider<IValueProvider>());
     });
 
@@ -119,8 +119,10 @@ public sealed class MaskedInputAutomationTests
         {
             using var screen = new UnlockScreen();
 
+            AutomationSurface.AssertNamedByPurpose(screen.Password);
             screen.Window.KeyTextInput(Alpha);
             var first = AutomationSurface.Of(screen.Password);
+            AutomationSurface.AssertNamedByPurpose(screen.Password);
 
             screen.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
             screen.Window.KeyReleaseQwerty(PhysicalKey.Escape, RawInputModifiers.None);
@@ -128,6 +130,7 @@ public sealed class MaskedInputAutomationTests
 
             screen.Window.KeyTextInput(Beta);
             var second = AutomationSurface.Of(screen.Password);
+            AutomationSurface.AssertNamedByPurpose(screen.Password);
 
             Assert.Equal(first, second);
         });
@@ -148,8 +151,10 @@ public sealed class MaskedInputAutomationTests
             await screen.BeginCreate();
             screen.NewPassword.Focus();
 
+            AutomationSurface.AssertNamedByPurpose(screen.NewPassword);
             screen.Window.KeyTextInput(Alpha);
             var first = AutomationSurface.Of(screen.NewPassword);
+            AutomationSurface.AssertNamedByPurpose(screen.NewPassword);
 
             screen.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
             screen.Window.KeyReleaseQwerty(PhysicalKey.Escape, RawInputModifiers.None);
@@ -157,6 +162,7 @@ public sealed class MaskedInputAutomationTests
 
             screen.Window.KeyTextInput(Beta);
             var second = AutomationSurface.Of(screen.NewPassword);
+            AutomationSurface.AssertNamedByPurpose(screen.NewPassword);
 
             Assert.Equal(first, second);
         });
@@ -170,8 +176,10 @@ public sealed class MaskedInputAutomationTests
             await screen.BeginCreate();
             screen.ConfirmPassword.Focus();
 
+            AutomationSurface.AssertNamedByPurpose(screen.ConfirmPassword);
             screen.Window.KeyTextInput(Alpha);
             var first = AutomationSurface.Of(screen.ConfirmPassword);
+            AutomationSurface.AssertNamedByPurpose(screen.ConfirmPassword);
 
             screen.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
             screen.Window.KeyReleaseQwerty(PhysicalKey.Escape, RawInputModifiers.None);
@@ -179,6 +187,7 @@ public sealed class MaskedInputAutomationTests
 
             screen.Window.KeyTextInput(Beta);
             var second = AutomationSurface.Of(screen.ConfirmPassword);
+            AutomationSurface.AssertNamedByPurpose(screen.ConfirmPassword);
 
             Assert.Equal(first, second);
         });
@@ -252,8 +261,10 @@ public sealed class MaskedInputAutomationTests
             screen.BeginRestore();
             screen.BackupPassword.Focus();
 
+            AutomationSurface.AssertNamedByPurpose(screen.BackupPassword);
             screen.Window.KeyTextInput(Alpha);
             var first = AutomationSurface.Of(screen.BackupPassword);
+            AutomationSurface.AssertNamedByPurpose(screen.BackupPassword);
 
             screen.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
             screen.Window.KeyReleaseQwerty(PhysicalKey.Escape, RawInputModifiers.None);
@@ -261,6 +272,7 @@ public sealed class MaskedInputAutomationTests
 
             screen.Window.KeyTextInput(Beta);
             var second = AutomationSurface.Of(screen.BackupPassword);
+            AutomationSurface.AssertNamedByPurpose(screen.BackupPassword);
 
             Assert.Equal(first, second);
         });

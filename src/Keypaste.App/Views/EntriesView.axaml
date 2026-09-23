@@ -317,7 +317,7 @@
                Width="1" Fill="{DynamicResource KpBorderSubtle}" Margin="12,0" />
 
     <!-- The detail pane. Username, URL and notes for the one entry somebody chose; the password is
-         a row of dots and a copy button, and never a value this view can reach. -->
+         dots until its cell is held, and no binding here carries it (D-0300). -->
     <ContentControl Grid.Row="0" Grid.RowSpan="2" Grid.Column="4"
                     Width="{Binding Detail.History.IsOpen, Converter={StaticResource PaneWidth}}"
                     Content="{Binding Detail}">
@@ -339,12 +339,17 @@
               <StackPanel Spacing="4" IsVisible="{Binding !IsEditing}">
                 <TextBlock Text="Password" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
                 <Grid ColumnDefinitions="*,Auto">
-                  <TextBlock Grid.Column="0"
-                             Text="{Binding PasswordMask}"
-                             FontFamily="{DynamicResource KpMono}"
-                             VerticalAlignment="Center"
-                             Foreground="{DynamicResource KpTextSecondary}" />
-                  <Button Grid.Column="1" Content="Copy" Command="{Binding CopyPasswordCommand}" />
+                  <ctl:RevealedValue Grid.Column="0"
+                                     x:Name="CurrentPassword"
+                                     Source="{Binding}"
+                                     MaskedLength="{Binding MaskedLength}"
+                                     AutomationProperties.Name="Hold to reveal the password"
+                                     FontFamily="{DynamicResource KpMono}"
+                                     FontSize="13"
+                                     VerticalAlignment="Center"
+                                     Foreground="{DynamicResource KpTextSecondary}" />
+                  <Button Grid.Column="1" x:Name="CopyPassword" Content="Copy"
+                          Command="{Binding CopyPasswordCommand}" />
                 </Grid>
               </StackPanel>
 
@@ -421,8 +426,8 @@
                     </ListBox.ItemTemplate>
                   </ListBox>
 
-                  <!-- The chosen revision beside the entry as it is now. The revision's password is
-                       the one value on this screen that can be read, and only while it is held. -->
+                  <!-- The chosen revision beside the entry as it is now. Its password can be read
+                       only while it is held, and copied as the current one is. -->
                   <Grid IsVisible="{Binding History.HasSelection}"
                         ColumnDefinitions="*,12,*"
                         RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
@@ -441,14 +446,19 @@
                     <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
                                Text="Password" FontSize="11" Margin="0,8,0,0"
                                Foreground="{DynamicResource KpTextMuted}" />
-                    <ctl:RevealedValue Grid.Row="2" Grid.Column="0"
-                                       x:Name="RevisionPassword"
-                                       Source="{Binding History.Selected}"
-                                       MaskedLength="{Binding History.Selected.MaskedLength}"
-                                       AutomationProperties.Name="{Binding History.Selected.RevealLabel}"
-                                       FontFamily="{DynamicResource KpMono}"
-                                       FontSize="13"
-                                       Foreground="{DynamicResource KpTextSecondary}" />
+                    <Grid Grid.Row="2" Grid.Column="0" ColumnDefinitions="*,Auto">
+                      <ctl:RevealedValue Grid.Column="0"
+                                         x:Name="RevisionPassword"
+                                         Source="{Binding History.Selected}"
+                                         MaskedLength="{Binding History.Selected.MaskedLength}"
+                                         AutomationProperties.Name="{Binding History.Selected.RevealLabel}"
+                                         FontFamily="{DynamicResource KpMono}"
+                                         FontSize="13"
+                                         VerticalAlignment="Center"
+                                         Foreground="{DynamicResource KpTextSecondary}" />
+                      <Button Grid.Column="1" x:Name="CopyRevisionPassword" Content="Copy"
+                              Command="{Binding History.Selected.CopyPasswordCommand}" />
+                    </Grid>
                     <TextBlock Grid.Row="2" Grid.Column="2"
                                Text="{Binding PasswordMask}"
                                FontFamily="{DynamicResource KpMono}"

@@ -37,9 +37,11 @@ public sealed class VaultAccessAutomationTests
             var field = screen.Field(name);
 
             field.Focus();
+            AutomationSurface.AssertNamedByPurpose(field);
             screen.Window.KeyTextInput(_alpha);
             Assert.Equal(_alpha.Length, field.MaskedLength);
             var first = AutomationSurface.Of(field);
+            AutomationSurface.AssertNamedByPurpose(field);
 
             screen.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
             screen.Window.KeyReleaseQwerty(PhysicalKey.Escape, RawInputModifiers.None);
@@ -47,6 +49,7 @@ public sealed class VaultAccessAutomationTests
 
             screen.Window.KeyTextInput(_beta);
             var second = AutomationSurface.Of(field);
+            AutomationSurface.AssertNamedByPurpose(field);
 
             Assert.Equal(first, second);
         });
