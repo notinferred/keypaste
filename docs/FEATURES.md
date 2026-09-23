@@ -15,12 +15,51 @@ The current public product is CLI/MCP `v0.3.0`. The desktop works from source an
 | Find | Desktop group navigation and case-insensitive search over titles, group paths, usernames and URLs, matched in core so no value reaches the screen; a result names the fields it matched. Passwords, notes and protected custom fields are not read for matching. CLI lists a names-only tree. | The CLI has no search verb. Tag search is unimplemented. |
 | Copy and reveal | Copy clears unchanged clipboard content after twenty seconds; desktop also clears on lock and normal quit. On the desktop an entry's current password, an env value and a history password each reveal while held and copy through that same clear. Every masked input is announced by its purpose, not its content. | Reveal needs a pointer: no keyboard gesture holds a value. What each secret surface draws is checked in frames Skia renders in a headless window ([4.6](steps/4.6.md)), not on a native display, scaling or screen reader. |
 | Generate | Core, CLI and desktop generate character passwords and EFF word-list passphrases. | No browser generation or credential rotation workflow. |
-| History | Updates retain prior revisions; desktop lists, reveals and restores them. Restoring retains the replaced value, within the history limit. A recycled entry keeps its history and gets it back on a restore. | History lives in the same vault and is not a separate backup; the whole-file copies under Save safely are, and Restore and export a vault puts one back. |
+| History | Updates retain prior revisions; desktop lists, reveals and restores them. A restore makes the entry that revision whole, as KeePass and KeePassXC do: its attachments, custom fields, custom data, tags and auto-type become the revision's, and the replaced state is kept as the newest revision, within the history limit. A recycled entry keeps its history and gets it back on a restore. | History lives in the same vault and is not a separate backup; the whole-file copies under Save safely are, and Restore and export a vault puts one back. |
 | Delete | Deletion asks for confirmation and moves the entry, its fields and its history to the vault's KDBX recycle bin, which KeePassXC reads as its own. A vault whose recycle bin is switched off deletes permanently, and both front ends say which happened. The desktop's Trash screen restores one or erases one behind a second confirmation, and Delete offers an immediate Restore. | No trash verb in the CLI, so recovering from a terminal still means KeePassXC. Emptying the whole bin is KeePassXC's. |
 | Lock | Desktop manual, idle and optional minimize locking dispose its vault session and clear its visible state. Idle defaults to five minutes. | This does not lock the separate terminal approver or control a launched process. |
-| Existing data | Ordinary edits preserve attachments and custom strings; fixtures exercise real KeePassXC reads and writes. | No attachment/custom-field management UI, broad format-options contract or full KeePassXC coverage claim. |
+| Existing data | Every workflow under [KeePassXC compatibility](#keepassxc-compatibility) keeps the attachments, custom fields, custom data, tags and auto-type KeePassXC wrote, except a history restore, which returns them to the revision's. | No attachment, custom-field, tag or auto-type editor, and no claim beyond the subset below. |
 
 Implementation: [Vault](../src/Keypaste.Core/Vault.cs), [organize outcomes](../src/Keypaste.Core/VaultOrganization.cs), [name rules](../src/Keypaste.Core/VaultNameRules.cs), [format boundary](../src/Keypaste.Core/Internal/KeePassInterop.cs), [desktop session](../src/Keypaste.App/Session/AppVaultSession.cs), [entries](../src/Keypaste.App/ViewModels/EntriesViewModel.cs), [editing](../src/Keypaste.App/ViewModels/EntryDetailViewModel.cs), [history](../src/Keypaste.App/ViewModels/EntryHistoryViewModel.cs), [trash](../src/Keypaste.App/ViewModels/TrashViewModel.cs), [backups, restore](../src/Keypaste.Core/VaultBackups.cs), [restore panel](../src/Keypaste.App/ViewModels/RestoreBackupViewModel.cs), [export](../src/Keypaste.App/ViewModels/SettingsViewModel.cs). Existing coverage includes vault round-trip/save/history suites, desktop session and secret-input suites, [CLI/desktop consistency tests](../tests/Keypaste.Consistency.Tests/README.md), and KeePassXC compatibility scripts. [The desktop guide](desktop.md) records native verification limits.
+
+## KeePassXC compatibility
+
+Checked on 2026-09-23 in source ([9.4](steps/9.4.md)) by [verify-keepassxc-workflows.sh](../scripts/verify-keepassxc-workflows.sh): locally against KeePassXC 2.7.10 on Windows, and in `app.yml` run 35892763909 against Ubuntu 24.04's packaged 2.7.6 and the pinned Windows 2.7.12. None of it is in a public download.
+
+KeePassXC makes three vaults by importing one KeePass XML document: one behind a password, one behind a password and an XML keyfile, and one behind the keyfile alone. Each is KDBX 4.0 with AES-256 and AES-KDF. Each carries meta, group and entry custom data, a plain and a protected custom field, a tag, an auto-type association, a revision KeePassXC wrote and two attachments. The CLI runs its verbs on them, and the desktop's screens are driven through the commands they bind to. After every write, KeePassXC opens the vault with its current factors and reads what was written.
+
+| Workflow | CLI | Desktop | What KeePassXC reads afterwards |
+|---|---|---|---|
+| Open | `ls` | Unlock, with a password, a keyfile or both | — |
+| Edit | `env set` on a variable KeePassXC made | The entry pane changes the password, notes and URL of the entry carrying the unmodelled data | The new values. The first save's backup is byte for byte the file KeePassXC wrote |
+| History | — | Restores the revision KeePassXC wrote, then the state that restore replaced | The first restore makes the entry the revision whole, dropping what KeePassXC added after it; the second brings all of it back |
+| Organize | — | Renames the group carrying custom data, then renames the entry and moves it out of that group | Still KDBX 4.0, and the entry keeps its data |
+| Delete and recover | `rm` | Trash restores the CLI's deletion, and its own | Each deletion is in KeePassXC's own Recycle Bin until it is restored |
+| Backup and restore | Saves keep the backups | The restore panel, and export from Settings | The restored vault is KeePassXC's own bytes, and the export opens under the same factors |
+| Change access | Changes the password, attaches, replaces and removes an XML keyfile, and swaps a keyfile-only vault's keyfile | The same, and sets a password while removing a keyfile-only vault's keyfile | Opens only under the new factors, with the cipher and KDF KeePassXC chose |
+| Create | `init` | Create with a password and a keyfile | Opens both; the desktop's needs both factors |
+
+After every write in the table, KeePassXC checks four things. It still finds the custom data, custom fields, tag and auto-type on the entries themselves, not only in history. It exports both attachments byte for byte. Its cipher and KDF are unchanged. The file is still KDBX 4.
+
+These are refused, and each leaves the vault byte-identical with no backup taken:
+
+- Opening with a wrong password, or with a missing or wrong keyfile, from either front end.
+- Attaching an arbitrary file keyed by its hash, from either front end.
+- Removing the only factor of a keyfile-only vault, from either front end.
+- `add` over an existing entry.
+- A desktop move onto an occupied name.
+- A Trash restore onto a name KeePassXC has since taken.
+- Restoring a backup with a wrong password.
+- Creating over an existing vault.
+
+Not exercised:
+
+- KDBX 3.1.
+- ChaCha20 or Twofish.
+- An Argon2 vault made by KeePassXC, because `keepassxc-cli` cannot choose a KDF.
+- Custom icons and KeePassXC's browser-integration data.
+
+The desktop is driven through its screens' commands, not through rendered windows. This is a supported subset, not KeePassXC parity (D-0292).
 
 ## MCP and approvals
 

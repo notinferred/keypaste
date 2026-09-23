@@ -1155,8 +1155,9 @@ internal sealed class KeePassInterop : IDisposable
     /// <remarks>
     /// The value being replaced becomes a history item rather than being lost (DECISIONS.md D-0014),
     /// which is what <c>RestoreFromBackup</c> does when it is given the database's history settings.
-    /// The entry is mutated in place, so its UUID, attachments and custom fields survive exactly as
-    /// they do through <see cref="UpdateEntry"/>.
+    /// The entry is mutated in place, so it keeps its UUID, but <c>RestoreFromBackup</c> assigns the
+    /// revision's strings, attachments, custom data, tags and auto-type: the entry becomes the revision
+    /// whole, as it does in KeePass and KeePassXC, and what it drops is in the revision just made (9.4).
     /// </remarks>
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
     /// <exception cref="ArgumentOutOfRangeException">

@@ -10,6 +10,9 @@ on:
       - 'tests/Keypaste.App.Tests/**'
       - 'tests/Keypaste.MinimizeObserver/**'
       - 'tests/Keypaste.Consistency.Tests/**'
+      - 'tests/Keypaste.AppDriver/**'
+      - 'scripts/verify-keepassxc-workflows.sh'
+      - 'scripts/install-keepassxc-windows.sh'
       - 'src/Keypaste.Cli/**'
       - 'tests/Keypaste.Cli.Tests/**'
       - 'src/Keypaste.Core/**'
@@ -95,6 +98,56 @@ jobs:
           targets="$(jq -c '[.components.app.targets[] | {os: .runner, rid, archive, msi: ([.packages[]? | select(.kind == "msi")] | length > 0), appimage: ([.packages[]? | select(.kind == "appimage")] | length > 0)}]' release-targets.json)"
           echo "targets=$targets" >> "$GITHUB_OUTPUT"
           echo "$n targets: $targets"
+
+  # The supported workflows on vaults KeePassXC made, through the CLI and the app's screens (9.4, D-0307).
+  compat:
+    name: keepassxc workflows (${{ matrix.os }})
+    needs: gate
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      # KeePassXC's Windows console encoding can alter a non-ASCII master password.
+      KP_COMPAT_PASSWORD: ci-master-pw
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      - name: Install keepassxc-cli (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends keepassxc
+
+      - name: Install keepassxc-cli (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "KPXC_CLI=$(bash scripts/install-keepassxc-windows.sh)" >> "$GITHUB_ENV"
+
+      - name: Restore and build the CLI and the app driver
+        shell: bash
+        run: |
+          set -euo pipefail
+          for project in src/Keypaste.Cli/Keypaste.Cli.csproj tests/Keypaste.AppDriver/Keypaste.AppDriver.csproj; do
+            dotnet restore "$project" --locked-mode
+            dotnet build "$project" --no-restore -c Release
+          done
+
+      - name: Verify every workflow on KeePassXC-made vaults through the CLI and the app
+        shell: bash
+        run: bash scripts/verify-keepassxc-workflows.sh artifacts/compat/workflows
 
   package:
     name: publish + selftest (${{ matrix.os }})

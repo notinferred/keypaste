@@ -52,6 +52,7 @@
     <InternalsVisibleTo Include="Keypaste.App.Tests" />
     <InternalsVisibleTo Include="Keypaste.Consistency.Tests" />
     <InternalsVisibleTo Include="Keypaste.MinimizeObserver" />
+    <InternalsVisibleTo Include="Keypaste.AppDriver" />
   </ItemGroup>
 
 </Project>

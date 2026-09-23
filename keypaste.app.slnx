@@ -21,6 +21,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Keypaste.App.Tests/Keypaste.App.Tests.csproj" />
+    <Project Path="tests/Keypaste.AppDriver/Keypaste.AppDriver.csproj" />
     <Project Path="tests/Keypaste.MinimizeObserver/Keypaste.MinimizeObserver.csproj" />
   </Folder>
   <Folder Name="/third_party/">

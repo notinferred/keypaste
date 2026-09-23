@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Keypaste.AppDriver</RootNamespace>
+    <RuntimeIdentifiers>linux-x64;linux-arm64;osx-arm64;win-x64</RuntimeIdentifiers>
+
+    <!-- Not a test project: a process verify-keepassxc-workflows.sh runs between KeePassXC's writes and reads (9.4). -->
+    <IsTestProject>false</IsTestProject>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Keypaste.App/Keypaste.App.csproj" />
+  </ItemGroup>
+
+</Project>

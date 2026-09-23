@@ -24,7 +24,8 @@ scripts      Offline release/diagnostic fixtures and shell syntax, run in parall
 backend      Locked restore, format, Release build and backend tests.
 integration  Prepare the backend and exercise real CLI/MCP processes and the demo pages.
 desktop      The desktop solution AND the separate CLI/desktop consistency project.
-compat       Prepare the backend and verify creation, write-back, history, recovery and organization against installed KeePassXC.
+compat       Prepare the backend and the app driver, and verify creation, write-back, history, recovery, organization,
+             keyfiles and every workflow on vaults KeePassXC made, through the CLI and the app, against installed KeePassXC.
              Never selected automatically; run it by name.
 
 --list prints the selection and commands without executing them. Backend/desktop accept
@@ -248,12 +249,14 @@ profile_compat() {
   run bash scripts/verify-keepassxc-organize.sh artifacts/compat/local-organize.kdbx
   run bash scripts/verify-keepassxc-keyfile.sh artifacts/compat/local-keyfile.kdbx
   run bash scripts/verify-keepassxc-xml-attach.sh artifacts/compat/local-xml-attach
+  prepare tests/Keypaste.AppDriver/Keypaste.AppDriver.csproj
+  run bash scripts/verify-keepassxc-workflows.sh artifacts/compat/local-workflows
 }
 
 # Backend tests read workflows, scripts and the release definition, so those paths select backend too.
 profiles_for_path() {
   case "$1" in
-    src/Keypaste.App/*|tests/Keypaste.App.Tests/*|tests/Keypaste.MinimizeObserver/*) echo desktop ;;
+    src/Keypaste.App/*|tests/Keypaste.App.Tests/*|tests/Keypaste.MinimizeObserver/*|tests/Keypaste.AppDriver/*) echo desktop ;;
     tests/Keypaste.Consistency.Tests/*|keypaste.app.slnx) echo desktop ;;
     src/Keypaste.Cli/Keypaste.Cli.csproj) echo scripts backend integration desktop ;;
     src/*|third_party/*) echo backend integration desktop ;;

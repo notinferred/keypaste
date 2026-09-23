@@ -46,8 +46,8 @@ A credential request runs: MCP client â†’ `Mcp/Tools/RequestCredentialTool.cs` â
 
 ## Tests, gates and delivery
 
-- `tests/Keypaste.<Project>.Tests` mirror the projects. The helper projects `TxfContender`, `PoolStarver`, `VaultSaver`, `VaultRestorer` and `MinimizeObserver` are unshipped processes that particular probes and gates drive.
-- `scripts/verify.sh`, or `verify.ps1` in PowerShell, is the local verification entry point ([CLAUDE.md](../CLAUDE.md)). `scripts/verify-keepassxc-*.sh` are the permanent KeePassXC compatibility gates, one per vault feature; `verify-mcp-stdio.sh`, `verify-approval-e2e.sh`, `verify-policy-e2e.sh`, `verify-log-chain.sh` and `verify-run-*.sh` drive the shipped processes; `verify-demo.sh` checks published transcripts against the binaries.
+- `tests/Keypaste.<Project>.Tests` mirror the projects. The helper projects `TxfContender`, `PoolStarver`, `VaultSaver`, `VaultRestorer`, `MinimizeObserver` and `AppDriver` are unshipped processes that particular probes and gates drive; `AppDriver` performs one desktop act through the screen's view model.
+- `scripts/verify.sh`, or `verify.ps1` in PowerShell, is the local verification entry point ([CLAUDE.md](../CLAUDE.md)). `scripts/verify-keepassxc-*.sh` are the permanent KeePassXC compatibility gates, one per vault feature, and `verify-keepassxc-workflows.sh` runs every workflow through the CLI and the desktop on vaults KeePassXC made; `verify-mcp-stdio.sh`, `verify-approval-e2e.sh`, `verify-policy-e2e.sh`, `verify-log-chain.sh` and `verify-run-*.sh` drive the shipped processes; `verify-demo.sh` checks published transcripts against the binaries.
 - Packaging and release: `release-targets.json` defines targets; `build-*.sh`, `sign-windows.sh`, `publish-release.sh`, `release-completion.sh` and `require-*.sh` implement [RELEASE](RELEASE.md).
 - `.github/workflows/`: `ci.yml` (backend), `app.yml` (desktop), `release.yml`, `install*.yml`, `upgrade-desktop.yml`, `observe-desktop.yml`, `dco.yml` and single-question probes (`*-probe.yml`).
 - `site/` is keypaste.com; [site/README.md](../site/README.md) owns its deployment.
