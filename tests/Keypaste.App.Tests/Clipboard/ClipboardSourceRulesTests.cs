@@ -7,9 +7,8 @@ namespace Keypaste.App.Tests.Clipboard;
 /// Two rules about the app's clipboard code that only a look at the source can hold.
 /// </summary>
 /// <remarks>
-/// The same mechanism as <c>CompatGateIsPermanentTests</c> in <c>Keypaste.Core.Tests</c>, and for
-/// the same reason: some properties are about where code is allowed to be rather than about what it
-/// computes, and a reviewer noticing is not a gate.
+/// Some properties are about where code is allowed to be rather than about what it computes, and a
+/// reviewer noticing is not a gate.
 /// </remarks>
 public sealed class ClipboardSourceRulesTests
 {

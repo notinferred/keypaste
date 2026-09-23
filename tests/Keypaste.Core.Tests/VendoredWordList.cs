@@ -32,7 +32,6 @@ internal static class VendoredWordList
     /// Walks up from the output directory rather than using <c>CallerFilePath</c>: the root props
     /// set <c>ContinuousIntegrationBuild</c> on CI, which rewrites compile-time paths to
     /// <c>/_/…</c>, so on CI and only on CI a caller path names a directory that never existed.
-    /// Same reasoning as CompatGateIsPermanentTests.
     /// </remarks>
     internal static string RepoRoot()
     {

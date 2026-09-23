@@ -21,7 +21,6 @@ on:
       - 'tests/Directory.Build.props'
       - 'tests/Keypaste.Core.Tests/PublisherMetadata.cs'
       - 'scripts/verify.sh'
-      - 'scripts/verify-local-checks.sh'
       - 'keypaste.app.slnx'
       - 'release-targets.json'
       - 'packaging/**'

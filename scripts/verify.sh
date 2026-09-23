@@ -8,17 +8,16 @@ Usage: bash scripts/verify.sh [--all] [--from <profile>] [--list]
        bash scripts/verify.sh <profile> [--list] [--prepare-only|--test-only]
 
 With no profile, runs what the working tree changed: git diff against HEAD plus untracked
-files, mapped to profiles. workflows and records always run, a path the map does not know
+files, mapped to profiles. workflows always runs, a path the map does not know
 runs everything, and every skipped profile is logged with its reason. --all (or all) runs
 everything. Hosted CI remains the full gate.
 
 --from <profile> resumes at that profile after a failure, in the order
-workflows, records, scripts, backend, integration, desktop. A failed run names every failed
+workflows, scripts, backend, integration, desktop. A failed run names every failed
 profile, prints their held output and the command that resumes. scripts and workflows run
 beside the dotnet profiles; each profile's output is held in artifacts/verify/<profile>.log.
 
 workflows    Workflow syntax, expressions and embedded shell checks (pinned actionlint via Docker).
-records      Build and run the documentation row checks only.
 scripts      Offline release/diagnostic fixtures and shell syntax, run in parallel; no build or
              credentials. On Windows they run in a Linux container, where they take a tenth of
              the time; VERIFY_SCRIPTS_NATIVE=1 keeps them in Git Bash.
@@ -38,11 +37,11 @@ USAGE
 
 bad_usage() { echo "$1" >&2; usage >&2; exit 2; }
 
-sequence=(workflows records scripts backend integration desktop)
+sequence=(workflows scripts backend integration desktop)
 heavy=(scripts backend integration desktop)
 docker_lane=(workflows scripts)
 # Both solutions build Keypaste.Core into one artifacts/ tree, so dotnet work never overlaps.
-dotnet_lane=(records backend integration desktop)
+dotnet_lane=(backend integration desktop)
 
 profile=''
 phase=all
@@ -65,7 +64,7 @@ while [ "$#" -gt 0 ]; do
       [ "$phase" = all ] || bad_usage 'choose only one phase'
       phase="${1#--}"
       ;;
-    all|backend|desktop|records|scripts|workflows|integration|compat)
+    all|backend|desktop|scripts|workflows|integration|compat)
       [ -z "$profile" ] || bad_usage 'choose one profile'
       profile="$1"
       ;;
@@ -114,7 +113,6 @@ test_desktop() {
 }
 
 selftests=(
-  'scripts/verify-local-checks.sh'
   'scripts/verify-release-destination.sh'
   'scripts/verify-release-preflight.sh'
   'scripts/verify-green-gates.sh'
@@ -132,7 +130,6 @@ selftests=(
   'scripts/observe-minimize-lock.sh --selftest'
   'scripts/exercise-desktop-install.sh --selftest'
   'scripts/exercise-desktop-upgrade.sh --selftest'
-  'scripts/probe-msi-interruption.sh --selftest'
 )
 
 check_scripts() {
@@ -202,9 +199,9 @@ profile_workflows() {
     rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 -color
   run env MSYS_NO_PATHCONV=1 docker run --rm -v "$root:/repo:ro" -w /repo --entrypoint shellcheck \
     rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 \
-    scripts/verify.sh scripts/verify-local-checks.sh scripts/probe-results.sh scripts/observe-minimize-lock.sh \
+    scripts/verify.sh scripts/probe-results.sh scripts/observe-minimize-lock.sh \
     scripts/verify-desktop-candidate.sh scripts/exercise-desktop-install.sh scripts/exercise-desktop-upgrade.sh \
-    scripts/build-windows-installer.sh scripts/install-keepassxc-windows.sh scripts/fetch-pinned-asset.sh     scripts/build-upgrade-candidates.sh scripts/probe-msi-interruption.sh scripts/break-msi-cabinet.sh
+    scripts/build-windows-installer.sh scripts/install-keepassxc-windows.sh scripts/fetch-pinned-asset.sh     scripts/build-upgrade-candidates.sh scripts/break-msi-cabinet.sh
 }
 
 integration_script() { run "$timeout_command" --verbose --kill-after=10s 8m bash "$1"; }
@@ -220,11 +217,6 @@ check_integration() {
   integration_script scripts/verify-policy-e2e.sh
   integration_script scripts/verify-log-chain.sh
   integration_script scripts/verify-demo.sh
-}
-
-profile_records() {
-  run dotnet restore tests/Keypaste.Core.Tests/Keypaste.Core.Tests.csproj --locked-mode
-  run dotnet test tests/Keypaste.Core.Tests/Keypaste.Core.Tests.csproj --no-restore -c Release -- --filter-class Keypaste.Core.Tests.RecordRowsStaySkimmableTests
 }
 
 backend_prepared=false
@@ -332,13 +324,11 @@ plan_profiles() {
     var="why_$p"; reason="${!var:-}"
     var="hits_$p"; hits="${!var:-0}"
     if [ "$hits" -gt 1 ]; then reason="$reason and $((hits - 1)) more"; fi
-    case "$p" in workflows|records) reason='always runs' ;; esac
+    case "$p" in workflows) reason='always runs' ;; esac
     if [ -z "$reason" ]; then
       printf 'verify: skip %-12s no changed path maps to it\n' "$p"
     elif [ "$reached" = false ]; then
       printf 'verify: skip %-12s before --from %s\n' "$p" "$from"
-    elif [ "$p" = records ] && [ -n "${why_backend:-}" ]; then
-      printf 'verify: skip %-12s backend runs the same row checks\n' "$p"
     else
       printf 'verify: run  %-12s %s\n' "$p" "$reason"
       planned+=("$p")

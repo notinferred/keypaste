@@ -4,8 +4,52 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-public sealed class WorkflowScriptsAreExecutableTests
+public sealed class WorkflowRulesTests
 {
+    [Fact]
+    public void EveryActionIsPinnedToACommitAndNotToATag()
+    {
+        var workflows = Directory.GetFiles(
+            Path.Combine(RepoRoot(), ".github", "workflows"), "*.yml");
+
+        Assert.NotEmpty(workflows);
+
+        List<string> unpinned = [];
+        foreach (var file in workflows)
+        {
+            var lines = File.ReadAllLines(file);
+            for (var i = 0; i < lines.Length; i++)
+            {
+                var match = Regex.Match(lines[i], @"uses:\s*(?<ref>[^\s#]+)");
+                if (!match.Success)
+                {
+                    continue;
+                }
+
+                var reference = match.Groups["ref"].Value;
+
+                // A local composite action is this repository's own file, versioned with it.
+                if (reference.StartsWith('.'))
+                {
+                    continue;
+                }
+
+                var at = reference.LastIndexOf('@');
+                var pin = at < 0 ? string.Empty : reference[(at + 1)..];
+
+                if (!Regex.IsMatch(pin, "^[0-9a-f]{40}$"))
+                {
+                    unpinned.Add($"{Path.GetFileName(file)}:{i + 1} {reference}");
+                }
+            }
+        }
+
+        Assert.True(
+            unpinned.Count == 0,
+            "these actions are pinned to something mutable:\n  "
+            + string.Join("\n  ", unpinned));
+    }
+
     [Fact]
     public void EveryScriptAWorkflowRunsDirectlyIsCommittedExecutable()
     {

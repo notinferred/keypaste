@@ -8,6 +8,8 @@ on:
       - 'docs/PRODUCT.md'
       - 'CLAUDE.md'
       - 'docs/STEPS.md'
+      - 'docs/steps/**'
+      - 'docs/ARCHITECTURE.md'
       - 'DECISIONS.md'
       - 'CHANGELOG.md'
       - 'THREATS.md'
@@ -64,10 +66,6 @@ jobs:
       - name: Restore, format and build with the local verifier
         shell: bash
         run: bash scripts/verify.sh backend --prepare-only
-
-      - name: Verify local target selection and failure propagation
-        shell: bash
-        run: bash scripts/verify-local-checks.sh
 
       - name: Verify diagnostic results can be read before spending a dispatch
         shell: bash

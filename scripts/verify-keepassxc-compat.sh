@@ -16,8 +16,7 @@
 #         KPXC_CLI            path to keepassxc-cli            (default: PATH lookup)
 #
 # Every expected value below is duplicated from scripts/make-compat-fixture.sh, which builds the
-# fixture with the shipped binary (D-0012; the throwaway tools/Keypaste.CompatFixture generator it
-# replaced is gone, and CompatGateIsPermanentTests bans that name from ci.yml). That duplication is
+# fixture with the shipped binary (D-0012). That duplication is
 # the change detector: expectations generated from the writer under test would agree with it forever
 # and assert nothing.
 

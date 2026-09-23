@@ -13,7 +13,7 @@
 # you want to know what the public is actually being told.
 #
 # `--selftest` is the half that does run in ci.yml: it needs no network and holds the reader below
-# to what it has to do. LiveOriginChecksStayOutOfWorkflowsTests holds that split both ways.
+# to what it has to do.
 #
 # The gap this covers is real and stays open between runs. f69c393 disclosed the 0.2.0
 # concurrent-save revert and keypaste.com served a page without it for a day while every gate in
