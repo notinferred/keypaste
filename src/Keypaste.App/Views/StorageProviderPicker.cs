@@ -58,4 +58,16 @@ internal sealed class StorageProviderPicker(TopLevel top) : IVaultFilePicker
 
         return file?.TryGetLocalPath();
     }
+
+    public async Task<string?> PickKeyfileAsync()
+    {
+        // No type filter: KeePassXC's keyfiles are .keyx or .key, and older ones are any file at all.
+        var picked = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Choose a keyfile",
+            AllowMultiple = false,
+        }).ConfigureAwait(true);
+
+        return picked.Count > 0 ? picked[0].TryGetLocalPath() : null;
+    }
 }

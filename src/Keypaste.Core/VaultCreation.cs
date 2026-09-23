@@ -34,6 +34,15 @@ public enum VaultCreationOutcome
 
     /// <summary>The path was reachable and the write still failed.</summary>
     Failed = 4,
+
+    /// <summary>The keyfile is missing, unreadable, empty, a vault or one this build cannot read.</summary>
+    KeyfileUnusable = 5,
+
+    /// <summary>The keyfile would be keyed by its hash, which one edit to it destroys (D-0287).</summary>
+    KeyfileIsFragile = 6,
+
+    /// <summary>The keyfile is the new vault's own path or lies in its backup directory.</summary>
+    KeyfileIsThisVault = 7,
 }
 
 /// <summary>
@@ -57,7 +66,7 @@ public static class VaultCreation
 {
     /// <summary>Whether <paramref name="path"/> can receive a new vault. Writes nothing.</summary>
     /// <remarks>
-    /// Separate from <see cref="TryCreate"/> so each front end keeps its own order of asking. The
+    /// Separate from <see cref="TryCreate(string, ReadOnlySpan{char}, ReadOnlySpan{char}, string?, out Vault?, out string)"/> so each front end keeps its own order of asking. The
     /// CLI refuses an occupied path before it prompts for a password, and the desktop says so the
     /// moment the picker comes back, rather than after two fields have been filled in.
     /// </remarks>
@@ -102,6 +111,25 @@ public static class VaultCreation
         ReadOnlySpan<char> password,
         ReadOnlySpan<char> confirmation,
         out Vault? created,
+        out string failure) =>
+        TryCreate(path, password, confirmation, keyfilePath: null, out created, out failure);
+
+    /// <summary>
+    /// <see cref="TryCreate(string, ReadOnlySpan{char}, ReadOnlySpan{char}, out Vault?, out string)"/>,
+    /// protected by an existing keyfile as well as the password.
+    /// </summary>
+    /// <param name="path">Where the vault goes.</param>
+    /// <param name="password">The new master password, which is still required: keypaste makes no vault a keyfile alone opens.</param>
+    /// <param name="confirmation">The same password, typed again.</param>
+    /// <param name="keyfilePath">An existing keyfile, refused on the grounds an access change refuses one; null for none.</param>
+    /// <param name="created">The open vault, or <see langword="null"/> on every refusal.</param>
+    /// <param name="failure">What the filesystem or the format said, when the outcome is <see cref="VaultCreationOutcome.Failed"/>.</param>
+    public static VaultCreationOutcome TryCreate(
+        string path,
+        ReadOnlySpan<char> password,
+        ReadOnlySpan<char> confirmation,
+        string? keyfilePath,
+        out Vault? created,
         out string failure)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
@@ -124,6 +152,21 @@ public static class VaultCreation
             return VaultCreationOutcome.PasswordsDoNotMatch;
         }
 
+        if (keyfilePath is not null)
+        {
+            keyfilePath = Path.GetFullPath(keyfilePath);
+
+            if (Vault.RefuseAttaching(Path.GetFullPath(path), keyfilePath) is { } refused)
+            {
+                return refused.Outcome switch
+                {
+                    VaultAccessOutcome.KeyfileIsFragile => VaultCreationOutcome.KeyfileIsFragile,
+                    VaultAccessOutcome.KeyfileIsThisVault => VaultCreationOutcome.KeyfileIsThisVault,
+                    _ => VaultCreationOutcome.KeyfileUnusable,
+                };
+            }
+        }
+
         try
         {
             var directory = Path.GetDirectoryName(path);
@@ -133,7 +176,7 @@ public static class VaultCreation
             }
 
 #pragma warning disable CA2000
-            var vault = Vault.Create(path, password);
+            var vault = Vault.CreateWith(path, password, keyfilePath);
 #pragma warning restore CA2000
 
             try

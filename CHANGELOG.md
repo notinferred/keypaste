@@ -6,6 +6,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 All of this is source only: there is still no desktop download, and the published CLI is unchanged. Each entry that names a step links its record, which holds the full account.
 
+The desktop opens, creates and restores vaults that need a keyfile, and remembers where each vault's keyfile is, as KeePassXC does. Settings changes the master password and adds, replaces or removes a keyfile after asking for the current password. It says that existing backups still open with the old credentials, and the app stays unlocked afterwards ([V.1b](docs/steps/V.1b.md)).
+
 `keypaste access` changes a vault's master password and attaches, replaces or removes an existing KeePass XML, 32-byte or 64-character hex keyfile. It never creates a keyfile and never removes a password, opens the new bytes with the new credentials before and after replacing the file, and keeps the replaced file as a backup; that copy and every earlier one still open with the old credentials, so delete them if those were exposed. The native-compiled CLI no longer reads an XML keyfile as the hash of the whole file ([V.1a2](docs/steps/V.1a2.md)).
 
 Every command that opens a vault takes `--keyfile <path>` or `KEYPASTE_KEYFILE`, opening all four KeePass keyfile forms and a vault a keyfile alone protects. A vault keyed to an arbitrary file is named on stderr each time it opens, because editing that file loses the vault. A missing, empty or unreadable keyfile is refused before the password prompt. `keypaste setup` takes no keyfile, nothing records which keyfile a vault uses, and the desktop cannot open a keyfile vault yet ([V.1a1](docs/steps/V.1a1.md)).

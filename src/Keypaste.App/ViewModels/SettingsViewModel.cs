@@ -27,7 +27,7 @@ internal sealed record IdleChoice(int Seconds, string Label);
 /// environment variable is overriding them.
 /// </para>
 /// </remarks>
-internal sealed class SettingsViewModel : ObservableObject
+internal sealed class SettingsViewModel : ObservableObject, IDisposable
 {
     private readonly AppVaultSession _session;
     private readonly string? _home;
@@ -70,7 +70,11 @@ internal sealed class SettingsViewModel : ObservableObject
 
         ForgetAllCommand = new RelayCommand(ForgetAll);
         ExportCommand = new AsyncRelayCommand(ExportAsync, () => !_exporting && _picker is not null);
+        Access = new VaultAccessViewModel(session, home, picker);
     }
+
+    /// <summary>Changing the vault's master password and keyfile.</summary>
+    internal VaultAccessViewModel Access { get; }
 
     /// <summary>
     /// The timeouts every vault is offered. There is deliberately no "never".
@@ -283,6 +287,9 @@ internal sealed class SettingsViewModel : ObservableObject
             ExportCommand.RaiseCanExecuteChanged();
         }
     }
+
+    /// <summary>Zeroes whatever the access form holds; the shell calls this on lock and on leaving.</summary>
+    public void Dispose() => Access.Dispose();
 
     private static string When(VaultBackup backup) =>
         backup.TakenAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.CurrentCulture);

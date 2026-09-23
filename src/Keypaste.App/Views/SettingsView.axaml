@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Keypaste.App.ViewModels"
+             xmlns:ctl="using:Keypaste.App.Controls"
              x:Class="Keypaste.App.Views.SettingsView"
              x:DataType="vm:SettingsViewModel">
 
@@ -43,8 +44,88 @@
         <TextBlock TextWrapping="Wrap"
                    FontSize="12"
                    Foreground="{DynamicResource KpTextMuted}"
-                   Text="keypaste remembers the paths of vaults you have opened on this machine. It holds no entry names and no secrets." />
+                   Text="keypaste remembers the paths of vaults you have opened on this machine, and where the keyfile each one opened with is. It holds no entry names, no secrets and no key material." />
         <Button Content="Forget them all" Command="{Binding ForgetAllCommand}" HorizontalAlignment="Left" />
+      </StackPanel>
+
+      <!-- What unlocks the vault. Every password field here is a MaskedInput held to D-0099. -->
+      <StackPanel Spacing="8" DataContext="{Binding Access}" x:DataType="vm:VaultAccessViewModel">
+        <TextBlock Text="Master password and keyfile" Foreground="{DynamicResource KpTextPrimary}" />
+        <TextBlock Name="AccessFactors"
+                   TextWrapping="Wrap"
+                   FontSize="12"
+                   Foreground="{DynamicResource KpTextSecondary}"
+                   Text="{Binding Factors}" />
+
+        <ctl:MaskedInput x:Name="CurrentPassword"
+                         MaskedLength="{Binding CurrentMaskedLength}"
+                         Placeholder="Current master password"
+                         IsEnabled="{Binding IsEditing}" />
+
+        <CheckBox Content="Set a new master password"
+                  IsChecked="{Binding SetPassword}"
+                  IsEnabled="{Binding IsEditing}" />
+        <StackPanel Spacing="8" IsVisible="{Binding SetPassword}">
+          <ctl:MaskedInput x:Name="AccessNewPassword"
+                           MaskedLength="{Binding NewMaskedLength}"
+                           Placeholder="New master password"
+                           IsEnabled="{Binding IsEditing}" />
+          <ctl:MaskedInput x:Name="AccessConfirmPassword"
+                           MaskedLength="{Binding ConfirmMaskedLength}"
+                           Placeholder="Confirm new master password"
+                           IsEnabled="{Binding IsEditing}" />
+        </StackPanel>
+
+        <StackPanel Spacing="4" IsEnabled="{Binding IsEditing}">
+          <RadioButton GroupName="Keyfile" Content="Keep the keyfile as it is" IsChecked="{Binding KeepKeyfile}" />
+          <RadioButton GroupName="Keyfile" Content="{Binding AttachLabel}" IsChecked="{Binding AttachKeyfile}" />
+          <StackPanel Orientation="Horizontal" Spacing="8" Margin="28,0,0,0" IsVisible="{Binding AttachKeyfile}">
+            <Button Content="Choose keyfile…" Command="{Binding ChooseKeyfileCommand}" />
+            <TextBlock Text="{Binding NewKeyfileName}" VerticalAlignment="Center"
+                       ToolTip.Tip="{Binding NewKeyfilePath}"
+                       Foreground="{DynamicResource KpTextSecondary}" />
+          </StackPanel>
+          <RadioButton GroupName="Keyfile" Content="Stop using a keyfile"
+                       IsVisible="{Binding HasKeyfile}"
+                       IsChecked="{Binding RemoveKeyfile}" />
+        </StackPanel>
+
+        <Button Content="Change…" Command="{Binding ReviewCommand}" HorizontalAlignment="Left"
+                IsVisible="{Binding IsEditing}" />
+
+        <Border IsVisible="{Binding IsConfirming}"
+                BorderBrush="{DynamicResource KpDanger}"
+                BorderThickness="1"
+                CornerRadius="{DynamicResource KpRadiusSm}"
+                Padding="12">
+          <StackPanel Spacing="8">
+            <TextBlock Text="{Binding Summary}" TextWrapping="Wrap"
+                       Foreground="{DynamicResource KpTextPrimary}" />
+            <TextBlock Text="{Binding BackupCost}" TextWrapping="Wrap"
+                       FontSize="12"
+                       Foreground="{DynamicResource KpTextSecondary}" />
+            <TextBlock Text="{Binding KeyfileWarning}" TextWrapping="Wrap"
+                       IsVisible="{Binding HasKeyfileWarning}"
+                       FontSize="12"
+                       Foreground="{DynamicResource KpTextSecondary}" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Content="Change access" Command="{Binding ConfirmCommand}"
+                      Foreground="{DynamicResource KpDanger}" />
+              <Button Content="Leave access as it is" Command="{Binding CancelCommand}" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <TextBlock Text="Changing…"
+                   IsVisible="{Binding Busy}"
+                   FontSize="12"
+                   Foreground="{DynamicResource KpTextMuted}" />
+        <TextBlock Name="AccessMessage"
+                   Text="{Binding Message}"
+                   IsVisible="{Binding HasMessage}"
+                   TextWrapping="Wrap"
+                   FontSize="12"
+                   Foreground="{DynamicResource KpTextSecondary}" />
       </StackPanel>
 
       <StackPanel Spacing="8">

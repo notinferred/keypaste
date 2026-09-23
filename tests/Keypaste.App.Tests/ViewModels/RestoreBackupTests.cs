@@ -102,7 +102,7 @@ public sealed class RestoreBackupTests : IDisposable
         Assert.True(session.IsUnlocked);
         Assert.Equal("v0", session.Unlocked!.Find(_entry)?.Password);
         Assert.Null(unlock.Restore);
-        Assert.Contains("is kept beside it", unlock.RestoreNotice, StringComparison.Ordinal);
+        Assert.Contains("is kept beside it", unlock.Notice, StringComparison.Ordinal);
 
         session.Lock(VaultLockReason.Manual);
 
@@ -126,15 +126,15 @@ public sealed class RestoreBackupTests : IDisposable
 
         await RestoreNewest(unlock);
 
-        var shell = new ShellViewModel(session, _home, null, restoreNotice: unlock.RestoreNotice);
-        Assert.True(shell.HasRestoreNotice);
-        Assert.Equal(unlock.RestoreNotice, shell.RestoreNotice);
+        var shell = new ShellViewModel(session, _home, null, notice: unlock.Notice);
+        Assert.True(shell.HasNotice);
+        Assert.Equal(unlock.Notice, shell.Notice);
 
         session.Lock(VaultLockReason.Manual);
         shell.Dispose();
 
-        Assert.False(shell.HasRestoreNotice);
-        Assert.Null(shell.RestoreNotice);
+        Assert.False(shell.HasNotice);
+        Assert.Null(shell.Notice);
     }
 
     [Fact]
@@ -146,10 +146,10 @@ public sealed class RestoreBackupTests : IDisposable
         using var unlock = new UnlockViewModel(session, _home, new FakeVaultFilePicker(), () => { });
         await RestoreNewest(unlock);
 
-        using var shell = new ShellViewModel(session, _home, null, restoreNotice: unlock.RestoreNotice);
-        shell.DismissRestoreNoticeCommand.Execute(null);
+        using var shell = new ShellViewModel(session, _home, null, notice: unlock.Notice);
+        shell.DismissNoticeCommand.Execute(null);
 
-        Assert.False(shell.HasRestoreNotice);
+        Assert.False(shell.HasNotice);
     }
 
     // ------------------------------------------------------------------ a vault that will not open
@@ -224,7 +224,7 @@ public sealed class RestoreBackupTests : IDisposable
         await unlock.Restore!.ConfirmAsync();
 
         Assert.Equal("v0", session.Unlocked!.Find(_entry)?.Password);
-        Assert.Contains("no file to keep", unlock.RestoreNotice, StringComparison.Ordinal);
+        Assert.Contains("no file to keep", unlock.Notice, StringComparison.Ordinal);
         Assert.Single(VaultBackups.List(_vaultPath));
     }
 

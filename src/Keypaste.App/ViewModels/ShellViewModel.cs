@@ -19,7 +19,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 {
     private readonly AppVaultSession _session;
     private readonly IVaultFilePicker? _picker;
-    private string? _restoreNotice;
+    private string? _notice;
     private Destination _current;
     private object? _content;
     private string _countdown = string.Empty;
@@ -34,13 +34,13 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         TimeProvider? clock = null,
         Action<Action>? post = null,
         DesktopPreferences? preferences = null,
-        string? restoreNotice = null,
+        string? notice = null,
         IVaultFilePicker? picker = null)
     {
         ArgumentNullException.ThrowIfNull(session);
 
         _session = session;
-        _restoreNotice = restoreNotice;
+        _notice = notice;
         _picker = picker;
         Home = home;
         ApproverFromEnvironment = approverFromEnvironment;
@@ -56,7 +56,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             post);
 
         LockCommand = new RelayCommand(() => _session.Lock(VaultLockReason.Manual));
-        DismissRestoreNoticeCommand = new RelayCommand(() => RestoreNotice = null);
+        DismissNoticeCommand = new RelayCommand(() => Notice = null);
 
         _current = Destinations.All[0];
         _session.LockingSoon += OnLockingSoon;
@@ -72,21 +72,21 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     /// Said after the fact as well as before it, because only afterwards is it known whether the
     /// replaced file was kept, was already kept, or was never there.
     /// </remarks>
-    internal string? RestoreNotice
+    internal string? Notice
     {
-        get => _restoreNotice;
+        get => _notice;
         private set
         {
-            if (Set(ref _restoreNotice, value))
+            if (Set(ref _notice, value))
             {
-                Raise(nameof(HasRestoreNotice));
+                Raise(nameof(HasNotice));
             }
         }
     }
 
-    internal bool HasRestoreNotice => _restoreNotice is not null;
+    internal bool HasNotice => _notice is not null;
 
-    internal RelayCommand DismissRestoreNoticeCommand { get; }
+    internal RelayCommand DismissNoticeCommand { get; }
 
     /// <summary>The auto-clearing clipboard, and the toast that counts it down.</summary>
     internal ClipboardCountdown Clipboard { get; }
@@ -236,7 +236,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
         _disposed = true;
         _session.LockingSoon -= OnLockingSoon;
-        RestoreNotice = null;
+        Notice = null;
         (Content as IDisposable)?.Dispose();
         Content = null;
 

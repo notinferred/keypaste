@@ -30,4 +30,7 @@ internal enum UnlockOutcome
 
     /// <summary>The file is a vault and something else went wrong reading it.</summary>
     Failed = 4,
+
+    /// <summary>The keyfile is missing, unreadable, empty, a vault, or one this build cannot read.</summary>
+    KeyfileUnusable = 5,
 }

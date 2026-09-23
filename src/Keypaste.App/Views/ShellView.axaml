@@ -158,15 +158,15 @@
 
       <!-- Said once, after a restore landed here. Quiet: the restore worked, and this is what it did. -->
       <Border Grid.Row="1"
-              IsVisible="{Binding HasRestoreNotice}"
+              IsVisible="{Binding HasNotice}"
               Background="{DynamicResource KpAccentQuiet}"
               CornerRadius="{DynamicResource KpRadiusSm}"
               Padding="12,8"
               Margin="24,16,24,0">
         <Grid ColumnDefinitions="*,Auto">
           <TextBlock Grid.Column="0"
-                     Name="RestoreNotice"
-                     Text="{Binding RestoreNotice}"
+                     Name="Notice"
+                     Text="{Binding Notice}"
                      TextWrapping="Wrap"
                      FontSize="12"
                      VerticalAlignment="Center"
@@ -176,7 +176,7 @@
                   Padding="8,2"
                   FontSize="11"
                   Margin="12,0,0,0"
-                  Command="{Binding DismissRestoreNoticeCommand}" />
+                  Command="{Binding DismissNoticeCommand}" />
         </Grid>
       </Border>
 

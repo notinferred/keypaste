@@ -88,12 +88,12 @@ public sealed class Vault : IDisposable
     /// <summary>Creates a new vault protected by a password and a keyfile.</summary>
     /// <remarks>
     /// <para>
-    /// <b>Internal on purpose.</b> Attaching a keyfile is an access change, and the public way to make
-    /// one is <see cref="ChangeAccess(VaultAccessChange, ReadOnlySpan{char}, ReadOnlySpan{char})"/>,
-    /// which applies the rules that belong with it. This applies none of them.
+    /// <b>Internal on purpose.</b> This applies none of the rules about which keyfiles keypaste will
+    /// attach. The public ways to make such a vault are <see cref="VaultCreation"/>, which applies them
+    /// before calling this, and <see cref="ChangeAccess(VaultAccessChange, ReadOnlySpan{char}, ReadOnlySpan{char})"/>.
     /// </para>
     /// <para>
-    /// What it is for today is fixtures. A test that needs a keyfile-protected vault must build it
+    /// It is also for fixtures. A test that needs a keyfile-protected vault must build it
     /// through the writer under test rather than beside it, for the reason
     /// <c>make-compat-fixture.sh</c> drives the shipped binary (D-0012). The compatibility gate has
     /// the stronger version of the same fixture: there, KeePassXC makes them.
@@ -302,6 +302,26 @@ public sealed class Vault : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         return _interop.ReadGroupPaths();
+    }
+
+    /// <summary>Whether a master password is one of the factors this vault opens with.</summary>
+    public bool HasPassword
+    {
+        get
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return _interop.KeyHasPassword;
+        }
+    }
+
+    /// <summary>The keyfile this vault opens with, or <see langword="null"/> when it has none.</summary>
+    public string? KeyfilePath
+    {
+        get
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return _interop.KeyfilePath;
+        }
     }
 
     /// <summary>Whether deleting from this vault moves the entry to the recycle bin.</summary>
@@ -794,28 +814,9 @@ public sealed class Vault : IDisposable
             return Refused(VaultAccessOutcome.WouldLeaveNoPassword);
         }
 
-        if (change.Keyfile == AccessKeyfileChange.Attach)
+        if (change.Keyfile == AccessKeyfileChange.Attach && RefuseAttaching(Path, keyfilePath) is { } refusedKeyfile)
         {
-            if (keyfilePath is null)
-            {
-                return Refused(VaultAccessOutcome.KeyfileUnusable, new KeyfileInspection(KeyfileOutcome.Missing, default));
-            }
-
-            if (VaultBackups.BelongsTo(Path, keyfilePath))
-            {
-                return Refused(VaultAccessOutcome.KeyfileIsThisVault);
-            }
-
-            var inspection = VaultKeyfile.Inspect(keyfilePath);
-            if (!inspection.Accepted)
-            {
-                return Refused(VaultAccessOutcome.KeyfileUnusable, inspection);
-            }
-
-            if (inspection.IsFragile)
-            {
-                return Refused(VaultAccessOutcome.KeyfileIsFragile, inspection);
-            }
+            return refusedKeyfile;
         }
 
         if (change.SetPassword && newPassword.IsEmpty)
@@ -829,6 +830,35 @@ public sealed class Vault : IDisposable
         }
 
         return null;
+
+        static VaultAccessResult Refused(VaultAccessOutcome outcome, KeyfileInspection keyfile = default) =>
+            new(outcome, null, keyfile);
+    }
+
+    /// <summary>Why <paramref name="keyfilePath"/> may not become a factor of the vault at <paramref name="vaultPath"/>, or null when it may.</summary>
+    /// <remarks>
+    /// One rule for attaching a keyfile to an existing vault and for creating one with it: only a file
+    /// that exists, is not the vault or one of its copies, and is not keyed by its hash (D-0287).
+    /// </remarks>
+    internal static VaultAccessResult? RefuseAttaching(string vaultPath, string? keyfilePath)
+    {
+        if (keyfilePath is null)
+        {
+            return Refused(VaultAccessOutcome.KeyfileUnusable, new KeyfileInspection(KeyfileOutcome.Missing, default));
+        }
+
+        if (VaultBackups.BelongsTo(vaultPath, keyfilePath))
+        {
+            return Refused(VaultAccessOutcome.KeyfileIsThisVault);
+        }
+
+        var inspection = VaultKeyfile.Inspect(keyfilePath);
+        if (!inspection.Accepted)
+        {
+            return Refused(VaultAccessOutcome.KeyfileUnusable, inspection);
+        }
+
+        return inspection.IsFragile ? Refused(VaultAccessOutcome.KeyfileIsFragile, inspection) : null;
 
         static VaultAccessResult Refused(VaultAccessOutcome outcome, KeyfileInspection keyfile = default) =>
             new(outcome, null, keyfile);

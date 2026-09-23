@@ -217,6 +217,67 @@ public sealed class VaultCreationTests : IDisposable
         Assert.False(File.Exists(free), "Inspect created the file it was asked about");
     }
 
+    [Fact]
+    public void A_vault_created_with_a_keyfile_needs_both_factors_to_reopen()
+    {
+        var path = Path.Combine(_directory, "keyed.kdbx");
+        var keyfile = Path.Combine(_directory, "vault.key");
+        File.WriteAllBytes(keyfile, RandomNumberGenerator.GetBytes(32));
+
+        var outcome = VaultCreation.TryCreate(path, _password, _password, keyfile, out var created, out _);
+
+        using (created)
+        {
+            Assert.Equal(VaultCreationOutcome.Created, outcome);
+            Assert.Equal(keyfile, created!.KeyfilePath);
+            Assert.True(created.HasPassword);
+        }
+
+        using (var reopened = Vault.Open(path, _password, keyfile))
+        {
+            Assert.Empty(reopened.ReadEntries());
+        }
+
+        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(path, _password));
+        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(path, string.Empty, keyfile));
+    }
+
+    [Theory]
+    [InlineData("missing", VaultCreationOutcome.KeyfileUnusable)]
+    [InlineData("empty", VaultCreationOutcome.KeyfileUnusable)]
+    [InlineData("hashed", VaultCreationOutcome.KeyfileIsFragile)]
+    [InlineData("itself", VaultCreationOutcome.KeyfileIsThisVault)]
+    public void A_keyfile_keypaste_will_not_attach_is_refused_before_anything_is_written(
+        string kind, VaultCreationOutcome expected)
+    {
+        var parent = Path.Combine(_directory, "not-yet");
+        var path = Path.Combine(parent, "new.kdbx");
+        var keyfile = kind switch
+        {
+            "itself" => path,
+            _ => Path.Combine(_directory, "candidate"),
+        };
+
+        if (kind == "empty")
+        {
+            File.WriteAllBytes(keyfile, []);
+        }
+        else if (kind == "hashed")
+        {
+            File.WriteAllText(keyfile, "an ordinary document someone might edit");
+        }
+
+        var outcome = VaultCreation.TryCreate(path, _password, _password, keyfile, out var created, out _);
+
+        using (created)
+        {
+            Assert.Equal(expected, outcome);
+            Assert.Null(created);
+        }
+
+        Assert.False(Directory.Exists(parent), "a refused create still changed the disk");
+    }
+
     public void Dispose()
     {
         try

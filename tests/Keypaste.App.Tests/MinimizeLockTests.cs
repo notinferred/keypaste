@@ -184,7 +184,8 @@ public sealed class MinimizeLockTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
-        var checkbox = window.GetVisualDescendants().OfType<CheckBox>().Single();
+        var checkbox = window.GetVisualDescendants().OfType<CheckBox>()
+            .Single(box => Equals(box.Content, "Lock when the window is minimized"));
 
         Assert.Equal(MinimizeLock.IsSupported, screen.MinimizeLockSupported);
         Assert.Equal(MinimizeLock.IsSupported, checkbox.IsEffectivelyVisible);

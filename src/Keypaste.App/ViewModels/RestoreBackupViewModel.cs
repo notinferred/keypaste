@@ -47,16 +47,21 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
 
     private const string _refused = "That password doesn't open this backup, or the backup is damaged. Try another copy.";
 
+    private const string _refusedWithKeyfile =
+        "That password and keyfile don't open this backup, or the backup is damaged. Try another copy.";
+
     private readonly string _vaultPath;
     private readonly TimeProvider _clock;
     private readonly Func<TimeSpan> _idleTimeout;
     private readonly Action<Action> _post;
-    private readonly Func<VaultRestoreReport, SecretBuffer, Task> _restored;
+    private readonly Func<VaultRestoreReport, SecretBuffer, string?, Task> _restored;
+    private readonly Func<Task<string?>> _pickKeyfile;
 
     private SecretBuffer _password = new();
     private VaultBackupSummary? _validated;
     private ITimer? _expiry;
     private BackupRow? _selected;
+    private string? _keyfilePath;
     private string _message = string.Empty;
     private bool _busy;
     private bool _disposed;
@@ -66,17 +71,23 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
         TimeProvider clock,
         Func<TimeSpan> idleTimeout,
         Action<Action> post,
-        Func<VaultRestoreReport, SecretBuffer, Task> restored)
+        Func<VaultRestoreReport, SecretBuffer, string?, Task> restored,
+        string? keyfilePath,
+        Func<Task<string?>> pickKeyfile)
     {
         _vaultPath = vaultPath;
         _clock = clock;
         _idleTimeout = idleTimeout;
         _post = post;
         _restored = restored;
+        _keyfilePath = keyfilePath;
+        _pickKeyfile = pickKeyfile;
 
         CheckCommand = new AsyncRelayCommand(CheckAsync, () => CanCheck);
         ConfirmCommand = new AsyncRelayCommand(ConfirmAsync, () => IsConfirming && !_busy);
         CancelCommand = new RelayCommand(() => Forget(string.Empty), () => IsConfirming && !_busy);
+        ChooseKeyfileCommand = new AsyncRelayCommand(ChooseKeyfileAsync, () => IsChoosing && !_busy);
+        ClearKeyfileCommand = new RelayCommand(() => SetKeyfile(null), () => IsChoosing && !_busy && _keyfilePath is not null);
 
         Rows = [.. VaultBackups.List(vaultPath).Select(backup => new BackupRow(backup, !KdbxHeader.IsVaultFile(backup.Path)))];
         _selected = Rows.FirstOrDefault(row => !row.IsDamaged);
@@ -90,6 +101,22 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
 
     /// <summary>Leaves the confirmation without restoring, and forgets the password.</summary>
     internal RelayCommand CancelCommand { get; }
+
+    /// <summary>Asks for the keyfile the backup was made under.</summary>
+    internal AsyncRelayCommand ChooseKeyfileCommand { get; }
+
+    /// <summary>Checks the backup with no keyfile.</summary>
+    internal RelayCommand ClearKeyfileCommand { get; }
+
+    /// <summary>
+    /// The keyfile the backup was made under, starting as the one the unlock screen had chosen. A copy
+    /// keeps the factors the vault had when it was taken, so after an access change it is the old one.
+    /// </summary>
+    internal string? KeyfilePath => _keyfilePath;
+
+    internal string KeyfileName => _keyfilePath is null ? string.Empty : Path.GetFileName(_keyfilePath);
+
+    internal bool HasKeyfile => _keyfilePath is not null;
 
     internal BackupRow? Selected
     {
@@ -164,7 +191,8 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
     internal string Warning => OtherPrograms;
 #pragma warning restore CA1822
 
-    private bool CanCheck => !_busy && IsChoosing && _selected is { IsDamaged: false } && _password.Length > 0;
+    private bool CanCheck =>
+        !_busy && IsChoosing && _selected is { IsDamaged: false } && (_password.Length > 0 || _keyfilePath is not null);
 
     internal void Type(char c) => Edit(() => _password.Append(c));
 
@@ -195,7 +223,8 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
         try
         {
             // Argon2, as unlocking is, so off the UI thread for the same reason.
-            _validated = await Task.Run(() => VaultBackups.Inspect(_vaultPath, row.Backup, _password.Value))
+            var keyfile = _keyfilePath;
+            _validated = await Task.Run(() => VaultBackups.Inspect(_vaultPath, row.Backup, _password.Value, keyfile))
                 .ConfigureAwait(true);
 
             Arm();
@@ -203,7 +232,7 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
         }
         catch (InvalidMasterPasswordException)
         {
-            Forget(_refused);
+            Forget(_keyfilePath is null ? _refused : _refusedWithKeyfile);
         }
         catch (VaultException e)
         {
@@ -230,7 +259,7 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
         try
         {
             var report = await Task.Run(() => VaultBackups.Restore(validated)).ConfigureAwait(true);
-            await _restored(report, _password).ConfigureAwait(true);
+            await _restored(report, _password, _keyfilePath).ConfigureAwait(true);
             Forget(string.Empty);
         }
         catch (VaultChangedOnDiskException)
@@ -261,6 +290,40 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
         Rows = [];
         Raise(nameof(Rows));
         Raise(nameof(Selected));
+    }
+
+    private async Task ChooseKeyfileAsync()
+    {
+        if (_disposed || await _pickKeyfile().ConfigureAwait(true) is not { } picked)
+        {
+            return;
+        }
+
+        var full = Path.GetFullPath(picked);
+        var inspection = VaultKeyfile.Inspect(full);
+
+        if (!inspection.Accepted)
+        {
+            Message = UnlockViewModel.ExplainKeyfile(inspection.Outcome);
+            return;
+        }
+
+        SetKeyfile(full);
+    }
+
+    private void SetKeyfile(string? keyfile)
+    {
+        if (_disposed || _busy || IsConfirming)
+        {
+            return;
+        }
+
+        _keyfilePath = keyfile;
+        Message = string.Empty;
+        Raise(nameof(KeyfilePath));
+        Raise(nameof(KeyfileName));
+        Raise(nameof(HasKeyfile));
+        RaiseCommands();
     }
 
     private void Edit(Action edit)
@@ -328,6 +391,8 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
     private void RaiseCommands()
     {
         CheckCommand.RaiseCanExecuteChanged();
+        ChooseKeyfileCommand.RaiseCanExecuteChanged();
+        ClearKeyfileCommand.RaiseCanExecuteChanged();
         ConfirmCommand.RaiseCanExecuteChanged();
         CancelCommand.RaiseCanExecuteChanged();
     }

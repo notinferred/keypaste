@@ -8,7 +8,8 @@ namespace Keypaste.Core.Recent;
 /// <summary>One vault this machine has opened.</summary>
 /// <param name="Path">The absolute path, in this platform's own form.</param>
 /// <param name="OpenedAt">When it was last opened successfully.</param>
-public sealed record RecentVault(string Path, DateTimeOffset OpenedAt);
+/// <param name="KeyfilePath">The keyfile it was last opened with, or <see langword="null"/>.</param>
+public sealed record RecentVault(string Path, DateTimeOffset OpenedAt, string? KeyfilePath = null);
 
 /// <summary>
 /// The vaults the desktop app has opened on this machine, most recent first.
@@ -20,9 +21,10 @@ public sealed record RecentVault(string Path, DateTimeOffset OpenedAt);
 /// this person has actually used, not of what has been pointed at them.
 /// </para>
 /// <para>
-/// <b>It holds paths and nothing else.</b> No entry names, no counts, no fingerprints of the
-/// contents. docs/PRODUCT.md law 3.5 is about telemetry and this file never leaves the machine, but a vault
-/// path is still information about a person — <c>~/work/acme-prod.kdbx</c> says something — which is
+/// <b>It holds paths and nothing else</b>: each vault's, and the keyfile it last opened with, whose
+/// location the desktop remembers as KeePassXC does (T-27). No entry names, no counts, no
+/// fingerprints of the contents, and never key material. docs/PRODUCT.md law 3.5 is about
+/// telemetry and this file never leaves the machine, but a vault path is still information about a person — <c>~/work/acme-prod.kdbx</c> says something — which is
 /// why it is capped, written owner-only, and forgettable from the UI in one click.
 /// </para>
 /// <para>
@@ -47,7 +49,7 @@ public static class RecentVaults
     public const string SectionName = "vault";
 
     /// <summary>
-    /// The two keys a section carries.
+    /// The keys a section carries.
     /// </summary>
     /// <remarks>
     /// <c>internal</c> rather than <c>private</c> for the reason <see cref="Audit.AuditText"/>
@@ -58,6 +60,9 @@ public static class RecentVaults
 
     /// <inheritdoc cref="PathKey"/>
     internal const string OpenedAtKey = "opened_at";
+
+    /// <inheritdoc cref="PathKey"/>
+    internal const string KeyfileKey = "keyfile";
 
     private static readonly string[] _header =
     [
@@ -122,6 +127,7 @@ public static class RecentVaults
     /// <param name="existing">The list as it stands.</param>
     /// <param name="path">The vault that was opened.</param>
     /// <param name="openedAt">When.</param>
+    /// <param name="keyfilePath">The keyfile it was opened with, or <see langword="null"/> for none.</param>
     /// <returns>The new list, most recent first, at most <see cref="Capacity"/> long.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="existing"/> or <paramref name="path"/> is null.</exception>
     /// <remarks>
@@ -131,13 +137,15 @@ public static class RecentVaults
     public static IReadOnlyList<RecentVault> Remember(
         IReadOnlyList<RecentVault> existing,
         string path,
-        DateTimeOffset openedAt)
+        DateTimeOffset openedAt,
+        string? keyfilePath = null)
     {
         ArgumentNullException.ThrowIfNull(existing);
         ArgumentNullException.ThrowIfNull(path);
 
         var full = System.IO.Path.GetFullPath(path);
-        var vaults = new List<RecentVault> { new(full, openedAt) };
+        var keyfile = string.IsNullOrEmpty(keyfilePath) ? null : System.IO.Path.GetFullPath(keyfilePath);
+        var vaults = new List<RecentVault> { new(full, openedAt, keyfile) };
 
         foreach (var vault in existing)
         {
@@ -189,6 +197,12 @@ public static class RecentVaults
                 string.Create(
                     CultureInfo.InvariantCulture,
                     $"{OpenedAtKey} = \"{vault.OpenedAt.ToUniversalTime():yyyy-MM-ddTHH:mm:ssZ}\""));
+
+            if (vault.KeyfilePath is { } keyfile)
+            {
+                lines.Add($"{KeyfileKey} = \"{Portable(keyfile)}\"");
+            }
+
             lines.Add(string.Empty);
         }
 
@@ -237,13 +251,7 @@ public static class RecentVaults
             return false;
         }
 
-        string full;
-
-        try
-        {
-            full = System.IO.Path.GetFullPath(pair.Value.Text);
-        }
-        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        if (FullPath(pair.Value.Text) is not { } full)
         {
             return false;
         }
@@ -258,8 +266,30 @@ public static class RecentVaults
                 ? parsed
                 : DateTimeOffset.MinValue;
 
-        vault = new RecentVault(full, openedAt);
+        // A keyfile that cannot be read back costs the shortcut to it and never the vault's row.
+        var keyfile = table.TryGet(KeyfileKey, out var named) && named.Value.Kind == TomlValueKind.Text
+            ? FullPath(named.Value.Text)
+            : null;
+
+        vault = new RecentVault(full, openedAt, keyfile);
         return true;
+    }
+
+    private static string? FullPath(string text)
+    {
+        if (text.Length == 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            return System.IO.Path.GetFullPath(text);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return null;
+        }
     }
 
     private static List<RecentVault> Trim(IReadOnlyList<RecentVault> vaults) =>

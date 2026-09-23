@@ -134,5 +134,7 @@ public sealed class TheCliOpensAVaultTheAppCreatedTests : IDisposable
         public Task<string?> PickNewAsync() => Task.FromResult(NewPath);
 
         public Task<string?> PickExportDestinationAsync(string suggestedName) => Task.FromResult<string?>(null);
+
+        public Task<string?> PickKeyfileAsync() => Task.FromResult<string?>(null);
     }
 }

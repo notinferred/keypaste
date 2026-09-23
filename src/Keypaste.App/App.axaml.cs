@@ -185,10 +185,16 @@ internal sealed partial class App : Application, IDisposable
     private void OnLocked(object? sender, VaultLockReason reason)
     {
         Dispatcher.UIThread.Post(() =>
-            ShowUnlock(Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable)));
+            ShowUnlock(
+                Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable),
+                reason == VaultLockReason.AccessChanged ? AccessChangedMessage : null));
     }
 
-    private void ShowUnlock(string? home)
+    /// <summary>What the unlock screen says when an access change could not carry on with the vault open.</summary>
+    internal const string AccessChangedMessage =
+        "The vault's password or keyfile was changed, and it locked rather than open again. Unlock it with the new ones.";
+
+    private void ShowUnlock(string? home, string? message = null)
     {
         if (_session is null || _window is null)
         {
@@ -203,7 +209,8 @@ internal sealed partial class App : Application, IDisposable
         _unlock?.Dispose();
         _unlock = new UnlockViewModel(
             _session, home, new StorageProviderPicker(_window), OnUnlocked,
-            action => Dispatcher.UIThread.Post(action));
+            action => Dispatcher.UIThread.Post(action),
+            message);
 
         _window.FindControl<ContentControl>("Root")!.Content =
             new UnlockView { DataContext = _unlock };
@@ -226,7 +233,7 @@ internal sealed partial class App : Application, IDisposable
             TimeProvider.System,
             action => Dispatcher.UIThread.Post(action),
             _preferences,
-            _unlock?.RestoreNotice,
+            _unlock?.Notice,
             new StorageProviderPicker(_window));
 
         _window.FindControl<ContentControl>("Root")!.Content =

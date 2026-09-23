@@ -23,7 +23,7 @@ public sealed class VaultExportTests
         using var fixture = new TempVault();
         using var session = Unlocked(fixture);
         var picker = new FakeVaultFilePicker { ExportPath = Path.Combine(fixture.Home, "elsewhere.kdbx") };
-        var model = Screen(session, fixture, picker);
+        using var model = Screen(session, fixture, picker);
 
         await model.ExportAsync();
 
@@ -42,7 +42,8 @@ public sealed class VaultExportTests
         using var session = Unlocked(fixture, new ManualClock(new DateTimeOffset(2026, 9, 20, 12, 0, 0, TimeSpan.Zero)));
         var picker = new FakeVaultFilePicker();
 
-        await Screen(session, fixture, picker).ExportAsync();
+        using var screen = Screen(session, fixture, picker);
+        await screen.ExportAsync();
 
         Assert.Matches("^test-copy-202609(19|20|21)\\.kdbx$", picker.SuggestedExportName);
     }
@@ -53,7 +54,7 @@ public sealed class VaultExportTests
         using var fixture = new TempVault();
         using var session = Unlocked(fixture);
         var picker = new FakeVaultFilePicker();
-        var model = Screen(session, fixture, picker);
+        using var model = Screen(session, fixture, picker);
         var before = Directory.GetFileSystemEntries(fixture.Home);
 
         await model.ExportAsync();
@@ -71,7 +72,7 @@ public sealed class VaultExportTests
         var taken = Path.Combine(fixture.Home, "taken.kdbx");
         File.WriteAllText(taken, "somebody's file");
         var picker = new FakeVaultFilePicker { ExportPath = taken };
-        var model = Screen(session, fixture, picker);
+        using var model = Screen(session, fixture, picker);
 
         await model.ExportAsync();
 
@@ -90,7 +91,7 @@ public sealed class VaultExportTests
         using var fixture = new TempVault();
         using var session = Unlocked(fixture);
         var picker = new FakeVaultFilePicker();
-        var model = Screen(session, fixture, picker);
+        using var model = Screen(session, fixture, picker);
 
         await model.ExportAsync();
         var inside = Path.Combine(VaultBackups.DirectoryFor(fixture.Path_), picker.SuggestedExportName!);
@@ -109,7 +110,7 @@ public sealed class VaultExportTests
         using var fixture = new TempVault();
         using var session = Unlocked(fixture);
         var digest = Digest(fixture.Path_);
-        var model = Screen(session, fixture, new FakeVaultFilePicker { ExportPath = fixture.Path_ });
+        using var model = Screen(session, fixture, new FakeVaultFilePicker { ExportPath = fixture.Path_ });
 
         await model.ExportAsync();
 
@@ -123,7 +124,7 @@ public sealed class VaultExportTests
         using var fixture = new TempVault();
         using var session = Unlocked(fixture);
         var destination = Path.Combine(fixture.Home, "stale.kdbx");
-        var model = Screen(session, fixture, new FakeVaultFilePicker { ExportPath = destination });
+        using var model = Screen(session, fixture, new FakeVaultFilePicker { ExportPath = destination });
 
         using (var other = Vault.Open(fixture.Path_, TempVault.Password))
         {
@@ -142,7 +143,7 @@ public sealed class VaultExportTests
     {
         using var fixture = new TempVault();
         using var session = Unlocked(fixture);
-        var model = Screen(session, fixture, new FakeVaultFilePicker());
+        using var model = Screen(session, fixture, new FakeVaultFilePicker());
 
         Assert.Equal(VaultBackups.DirectoryFor(fixture.Path_), model.BackupsPath);
         Assert.StartsWith("No copies yet", model.BackupsSummary, StringComparison.Ordinal);
@@ -162,7 +163,7 @@ public sealed class VaultExportTests
     {
         using var fixture = new TempVault();
         using var session = Unlocked(fixture);
-        var model = Screen(session, fixture, new FakeVaultFilePicker());
+        using var model = Screen(session, fixture, new FakeVaultFilePicker());
 
         session.Lock(VaultLockReason.Manual);
 

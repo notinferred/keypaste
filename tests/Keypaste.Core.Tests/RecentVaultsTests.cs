@@ -150,6 +150,37 @@ public sealed class RecentVaultsTests : IDisposable
     }
 
     [Fact]
+    public void A_keyfile_round_trips_beside_its_vault_and_is_replaced_or_dropped_by_the_next_open()
+    {
+        var vault = Path.Combine(_directory, "keyed.kdbx");
+        var keyfile = Path.Combine(_directory, "keys", "vault.key");
+
+        var remembered = RecentVaults.Remember([], vault, DateTimeOffset.UtcNow, keyfile);
+        Assert.True(RecentVaults.Save(RecentFile, remembered));
+        Assert.DoesNotContain('\\', File.ReadAllText(RecentFile));
+
+        var only = Assert.Single(RecentVaults.Load(RecentFile));
+        Assert.Equal(Path.GetFullPath(keyfile), only.KeyfilePath);
+
+        var without = RecentVaults.Remember(RecentVaults.Load(RecentFile), vault, DateTimeOffset.UtcNow);
+        Assert.True(RecentVaults.Save(RecentFile, without));
+
+        Assert.Null(Assert.Single(RecentVaults.Load(RecentFile)).KeyfilePath);
+        Assert.DoesNotContain("keyfile", File.ReadAllText(RecentFile), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_keyfile_that_cannot_be_read_back_costs_the_keyfile_and_not_the_vault()
+    {
+        var vault = RecentVaults.Portable(Path.Combine(_directory, "v.kdbx"));
+        File.WriteAllText(RecentFile, $"[[vault]]\npath = \"{vault}\"\nkeyfile = 7\n");
+
+        var only = Assert.Single(RecentVaults.Load(RecentFile));
+        Assert.Equal(Path.GetFullPath(vault), only.Path);
+        Assert.Null(only.KeyfilePath);
+    }
+
+    [Fact]
     public void Saving_creates_the_directory_if_it_is_missing()
     {
         var nested = Path.Combine(_directory, "nested", "recent.toml");

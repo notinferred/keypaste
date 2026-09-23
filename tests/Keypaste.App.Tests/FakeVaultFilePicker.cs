@@ -52,4 +52,16 @@ internal sealed class FakeVaultFilePicker : IVaultFilePicker
         SuggestedExportName = suggestedName;
         return Task.FromResult(ExportPath);
     }
+
+    /// <summary>What <see cref="PickKeyfileAsync"/> answers. Null is a cancelled picker.</summary>
+    internal string? KeyfilePath { get; set; }
+
+    /// <summary>How many times the keyfile picker was opened.</summary>
+    internal int KeyfileCalls { get; private set; }
+
+    public Task<string?> PickKeyfileAsync()
+    {
+        KeyfileCalls++;
+        return Task.FromResult(KeyfilePath);
+    }
 }

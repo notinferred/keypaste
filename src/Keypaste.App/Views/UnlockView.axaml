@@ -68,6 +68,15 @@
                          MaskedLength="{Binding MaskedLength}"
                          Placeholder="Master password"
                          IsEnabled="{Binding CanTypePassword}" />
+
+        <StackPanel Orientation="Horizontal" Spacing="8" IsEnabled="{Binding CanTypePassword}">
+          <Button Content="Keyfile…" Command="{Binding ChooseKeyfileCommand}" />
+          <TextBlock Text="{Binding KeyfileName}" VerticalAlignment="Center"
+                     TextTrimming="CharacterEllipsis" MaxWidth="220"
+                     ToolTip.Tip="{Binding KeyfilePath}"
+                     Foreground="{DynamicResource KpTextSecondary}" />
+          <Button Content="No keyfile" Command="{Binding ClearKeyfileCommand}" IsVisible="{Binding HasKeyfile}" />
+        </StackPanel>
       </StackPanel>
 
       <!-- Putting a backup in the vault's place. Locked throughout: the check shows counts and a
@@ -109,6 +118,15 @@
                          MaskedLength="{Binding MaskedLength}"
                          Placeholder="That backup's master password"
                          IsEnabled="{Binding IsChoosing}" />
+
+        <StackPanel Orientation="Horizontal" Spacing="8" IsEnabled="{Binding IsChoosing}">
+          <Button Content="That backup's keyfile…" Command="{Binding ChooseKeyfileCommand}" />
+          <TextBlock Text="{Binding KeyfileName}" VerticalAlignment="Center"
+                     TextTrimming="CharacterEllipsis" MaxWidth="220"
+                     ToolTip.Tip="{Binding KeyfilePath}"
+                     Foreground="{DynamicResource KpTextSecondary}" />
+          <Button Content="No keyfile" Command="{Binding ClearKeyfileCommand}" IsVisible="{Binding HasKeyfile}" />
+        </StackPanel>
 
         <!-- Replacing a vault is the one act on this screen that is not ordinary. -->
         <Border IsVisible="{Binding IsConfirming}"
@@ -162,6 +180,19 @@
         <ctl:MaskedInput x:Name="ConfirmPassword"
                          MaskedLength="{Binding ConfirmMaskedLength}"
                          Placeholder="Confirm master password" />
+
+        <TextBlock Text="A keyfile is optional. keypaste uses one you already have, such as a KeePassXC keyfile, and never makes one. Losing it locks the vault."
+                   TextWrapping="Wrap"
+                   FontSize="12"
+                   Foreground="{DynamicResource KpTextMuted}" />
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button Content="Add a keyfile…" Command="{Binding ChooseKeyfileCommand}" />
+          <TextBlock Text="{Binding KeyfileName}" VerticalAlignment="Center"
+                     TextTrimming="CharacterEllipsis" MaxWidth="220"
+                     ToolTip.Tip="{Binding KeyfilePath}"
+                     Foreground="{DynamicResource KpTextSecondary}" />
+          <Button Content="No keyfile" Command="{Binding ClearKeyfileCommand}" IsVisible="{Binding HasKeyfile}" />
+        </StackPanel>
       </StackPanel>
 
       <TextBlock Text="{Binding Message}"

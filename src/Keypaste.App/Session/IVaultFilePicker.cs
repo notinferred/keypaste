@@ -30,4 +30,11 @@ internal interface IVaultFilePicker
     /// where is <see cref="Keypaste.Core.Vault.ExportTo"/>'s to refuse, whatever the file is called.
     /// </param>
     Task<string?> PickExportDestinationAsync(string suggestedName);
+
+    /// <summary>Asks which existing keyfile to use. Null when the person cancelled.</summary>
+    /// <remarks>
+    /// Read, never written: keypaste attaches a keyfile somebody already has and makes none (D-0287).
+    /// What the file turns out to be is <see cref="Keypaste.Core.VaultKeyfile.Inspect"/>'s to say.
+    /// </remarks>
+    Task<string?> PickKeyfileAsync();
 }

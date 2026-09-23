@@ -140,7 +140,11 @@ internal sealed class AppVaultSession : IDisposable
 
     /// <summary>Opens a vault.</summary>
     /// <param name="path">The <c>.kdbx</c> file.</param>
-    /// <param name="master">The master password. The caller owns the buffer behind it.</param>
+    /// <param name="master">
+    /// The master password. The caller owns the buffer behind it. Empty is a vault a keyfile alone
+    /// opens when <paramref name="keyfilePath"/> is given, and a wrong password when it is not.
+    /// </param>
+    /// <param name="keyfilePath">The keyfile the vault needs as well, or <see langword="null"/>.</param>
     /// <returns>What happened.</returns>
     /// <remarks>
     /// <para>
@@ -157,7 +161,7 @@ internal sealed class AppVaultSession : IDisposable
     /// and unlock policy be tested without an async harness.
     /// </para>
     /// </remarks>
-    internal UnlockOutcome TryUnlock(string path, ReadOnlySpan<char> master)
+    internal UnlockOutcome TryUnlock(string path, ReadOnlySpan<char> master, string? keyfilePath = null)
     {
         ArgumentNullException.ThrowIfNull(path);
 
@@ -177,10 +181,16 @@ internal sealed class AppVaultSession : IDisposable
             return UnlockOutcome.NotAKdbx;
         }
 
-        return Open(path, master);
+        // A keyfile that is not there is said before the password is spent on it (D-0284).
+        if (keyfilePath is not null && !VaultKeyfile.Inspect(keyfilePath).Accepted)
+        {
+            return UnlockOutcome.KeyfileUnusable;
+        }
+
+        return Open(path, master, keyfilePath);
     }
 
-    private UnlockOutcome Open(string path, ReadOnlySpan<char> master)
+    private UnlockOutcome Open(string path, ReadOnlySpan<char> master, string? keyfilePath)
     {
         Vault opened;
 
@@ -190,12 +200,16 @@ internal sealed class AppVaultSession : IDisposable
             // Dispose, and a second TryUnlock replacing it — disposes it. CA2000 cannot see a
             // lifetime that leaves the method. Same shape and same reason as GrantCache.Store.
 #pragma warning disable CA2000
-            opened = Vault.Open(path, master);
+            opened = Vault.Open(path, master, keyfilePath);
 #pragma warning restore CA2000
         }
         catch (InvalidMasterPasswordException)
         {
             return UnlockOutcome.WrongPassword;
+        }
+        catch (UnreadableKeyfileException)
+        {
+            return UnlockOutcome.KeyfileUnusable;
         }
         catch (VaultException)
         {
@@ -251,6 +265,7 @@ internal sealed class AppVaultSession : IDisposable
     /// <param name="path">Where the vault goes.</param>
     /// <param name="password">The new master password. The caller owns the buffer behind it.</param>
     /// <param name="confirmation">The same password, typed again.</param>
+    /// <param name="keyfilePath">An existing keyfile the vault will need as well, or <see langword="null"/>.</param>
     /// <returns>What <see cref="VaultCreation"/> decided.</returns>
     /// <remarks>
     /// <para>
@@ -268,7 +283,8 @@ internal sealed class AppVaultSession : IDisposable
     internal VaultCreationOutcome TryCreate(
         string path,
         ReadOnlySpan<char> password,
-        ReadOnlySpan<char> confirmation)
+        ReadOnlySpan<char> confirmation,
+        string? keyfilePath = null)
     {
         ArgumentNullException.ThrowIfNull(path);
 
@@ -276,7 +292,7 @@ internal sealed class AppVaultSession : IDisposable
         // every route out of it — Lock, Dispose, and a later unlock replacing it — disposes it.
         // Adopt disposes it itself if this session is already gone.
 #pragma warning disable CA2000
-        var outcome = VaultCreation.TryCreate(path, password, confirmation, out var created, out _);
+        var outcome = VaultCreation.TryCreate(path, password, confirmation, keyfilePath, out var created, out _);
 #pragma warning restore CA2000
 
         if (outcome != VaultCreationOutcome.Created || created is null)
@@ -287,6 +303,106 @@ internal sealed class AppVaultSession : IDisposable
         return Adopt(created) == UnlockOutcome.Opened
             ? VaultCreationOutcome.Created
             : VaultCreationOutcome.Failed;
+    }
+
+    /// <summary>
+    /// Changes what unlocks the open vault, and carries on with it open under the new factors.
+    /// </summary>
+    /// <param name="current">The current master password, checked against the file on disk first.</param>
+    /// <param name="change">What to change.</param>
+    /// <param name="newPassword">The new master password, read only when the change sets one.</param>
+    /// <param name="confirmation">The same password, typed again.</param>
+    /// <returns>What happened.</returns>
+    /// <exception cref="VaultException">
+    /// The vault changed on disk, or the backup, the check of the new bytes or the write failed. The
+    /// vault is as it was, unless it is a <see cref="VaultAccessUnconfirmedException"/>.
+    /// </exception>
+    /// <remarks>
+    /// <para>
+    /// <b>The current password is asked for although the vault is open</b>, so a person who walks up
+    /// to an unlocked app cannot re-key the vault out from under its owner. It is checked by opening
+    /// the file from disk with it and the session's keyfile, before anything is written.
+    /// </para>
+    /// <para>
+    /// A vault whose access changed refuses every later write until it is reopened (D-0293), so the
+    /// session opens it again under the new factors and swaps it in without reporting a lock: the
+    /// person stays where they were, as in KeePassXC. If that reopen fails the session locks instead,
+    /// with <see cref="VaultLockReason.AccessChanged"/>.
+    /// </para>
+    /// </remarks>
+    internal AccessChangeResult ChangeAccess(
+        ReadOnlySpan<char> current,
+        VaultAccessChange change,
+        ReadOnlySpan<char> newPassword,
+        ReadOnlySpan<char> confirmation)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+
+        if (Unlocked is not { } vault)
+        {
+            return new AccessChangeResult(AccessChangeOutcome.Locked);
+        }
+
+        var keyfile = vault.KeyfilePath;
+
+        try
+        {
+            using var check = Vault.Open(vault.Path, current, keyfile);
+        }
+        catch (InvalidMasterPasswordException)
+        {
+            return new AccessChangeResult(AccessChangeOutcome.WrongCurrentSecret);
+        }
+
+        var result = vault.ChangeAccess(change, newPassword, confirmation);
+
+        if (result.Outcome != VaultAccessOutcome.Changed)
+        {
+            return new AccessChangeResult(AccessChangeOutcome.Refused, result);
+        }
+
+        var keyfileAfter = change.Keyfile switch
+        {
+            AccessKeyfileChange.Attach => Path.GetFullPath(change.KeyfilePath!),
+            AccessKeyfileChange.Remove => null,
+            _ => keyfile,
+        };
+
+        Vault reopened;
+        try
+        {
+            // Owned by the session once swapped in; Swap disposes it when it is not.
+#pragma warning disable CA2000
+            reopened = Vault.Open(vault.Path, change.SetPassword ? newPassword : current, keyfileAfter);
+#pragma warning restore CA2000
+        }
+        catch (VaultException)
+        {
+            Lock(VaultLockReason.AccessChanged);
+            return new AccessChangeResult(AccessChangeOutcome.ChangedAndLocked, result);
+        }
+
+        return Swap(vault, reopened)
+            ? new AccessChangeResult(AccessChangeOutcome.Changed, result)
+            : new AccessChangeResult(AccessChangeOutcome.ChangedAndLocked, result);
+    }
+
+    /// <summary>Puts <paramref name="reopened"/> in the place of <paramref name="expected"/>, keeping the idle countdown.</summary>
+    /// <returns>False, having disposed <paramref name="reopened"/>, when the session locked or moved on meanwhile.</returns>
+    private bool Swap(Vault expected, Vault reopened)
+    {
+        lock (_gate)
+        {
+            if (_disposed || !ReferenceEquals(_vault, expected))
+            {
+                reopened.Dispose();
+                return false;
+            }
+
+            _vault.Dispose();
+            _vault = reopened;
+            return true;
+        }
     }
 
     /// <summary>Records that a person did something.</summary>

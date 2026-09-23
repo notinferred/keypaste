@@ -21,4 +21,7 @@ internal enum VaultLockReason
 
     /// <summary>The window was minimized and the user asked for that to lock.</summary>
     Minimized = 4,
+
+    /// <summary>The vault's access changed and it did not open again under the new factors.</summary>
+    AccessChanged = 5,
 }

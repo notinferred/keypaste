@@ -47,6 +47,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     private SecretBuffer _confirm = new();
     private IReadOnlyList<RecentVault> _remembered = [];
     private string? _selectedPath;
+    private string? _keyfilePath;
     private string? _newVaultPath;
     private string _message = string.Empty;
     private bool _busy;
@@ -61,7 +62,8 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         string? home,
         IVaultFilePicker picker,
         Action unlocked,
-        Action<Action>? post = null)
+        Action<Action>? post = null,
+        string? message = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(picker);
@@ -80,7 +82,14 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         CancelCreateCommand = new AsyncRelayCommand(CancelCreateAsync, () => !_busy);
         StartRestoreCommand = new RelayCommand(StartRestore, () => !_busy && HasBackups && IsOpening);
         CloseRestoreCommand = new RelayCommand(CloseRestore, () => _restore is { Busy: false });
+        ChooseKeyfileCommand = new AsyncRelayCommand(ChooseKeyfileAsync, () => !_busy);
+        ClearKeyfileCommand = new RelayCommand(() => KeyfilePath = null, () => !_busy && _keyfilePath is not null);
         Reload();
+
+        if (message is not null)
+        {
+            Message = message;
+        }
     }
 
     /// <summary>The vaults this machine has opened, most recent first.</summary>
@@ -145,8 +154,45 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
 
     internal bool CanTypePassword => _selectedPath is not null && !_restoreOnly;
 
-    /// <summary>What a restore that has just landed in the vault did, for the shell to say once.</summary>
-    internal string? RestoreNotice { get; private set; }
+    /// <summary>
+    /// What the shell says once on opening: what a restore did, or that the vault's keyfile is one
+    /// edit from lost (T-28).
+    /// </summary>
+    internal string? Notice { get; private set; }
+
+    /// <summary>Asks for a keyfile, for opening, creating or restoring alike.</summary>
+    internal AsyncRelayCommand ChooseKeyfileCommand { get; }
+
+    /// <summary>Stops using a keyfile.</summary>
+    internal RelayCommand ClearKeyfileCommand { get; }
+
+    /// <summary>
+    /// The keyfile the vault needs as well as, or instead of, a password, or <see langword="null"/>.
+    /// </summary>
+    /// <remarks>
+    /// Selecting a remembered vault fills this with the keyfile it last opened with, and a successful
+    /// open or create remembers it again. The file's location is recorded, never its contents (T-27).
+    /// </remarks>
+    internal string? KeyfilePath
+    {
+        get => _keyfilePath;
+        private set
+        {
+            if (Set(ref _keyfilePath, value))
+            {
+                Raise(nameof(KeyfileName));
+                Raise(nameof(HasKeyfile));
+                UnlockCommand.RaiseCanExecuteChanged();
+                ClearKeyfileCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    /// <summary>The keyfile's name. The full path is a tooltip, as a vault's is.</summary>
+    internal string KeyfileName =>
+        _keyfilePath is null ? string.Empty : System.IO.Path.GetFileName(_keyfilePath);
+
+    internal bool HasKeyfile => _keyfilePath is not null;
 
     /// <summary>Whether the create fields are showing instead of the unlock ones.</summary>
     internal bool IsCreating
@@ -185,6 +231,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
             if (Set(ref _selectedPath, value))
             {
                 Message = string.Empty;
+                KeyfilePath = RememberedKeyfile(value);
                 Look();
                 Raise(nameof(SelectedName));
                 Raise(nameof(HasSelection));
@@ -244,11 +291,14 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
             if (Set(ref _busy, value))
             {
                 UnlockCommand.RaiseCanExecuteChanged();
+                ChooseKeyfileCommand.RaiseCanExecuteChanged();
+                ClearKeyfileCommand.RaiseCanExecuteChanged();
             }
         }
     }
 
-    private bool CanUnlock => !_busy && CanTypePassword && _master.Length > 0;
+    // A keyfile alone is a whole answer: KeePassXC makes vaults with no password (D-0282).
+    private bool CanUnlock => !_busy && CanTypePassword && (_master.Length > 0 || _keyfilePath is not null);
 
     // The confirmation is not required to be non-empty here: an empty one that does not match is
     // VaultCreation's refusal to make, not a reason to grey out the button and explain nothing.
@@ -411,7 +461,8 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
 
         ResetPassword();
         Message = string.Empty;
-        Restore = new RestoreBackupViewModel(path, _session.Clock, () => _session.IdleTimeout, _post, OnRestoredAsync);
+        Restore = new RestoreBackupViewModel(
+            path, _session.Clock, () => _session.IdleTimeout, _post, OnRestoredAsync, _keyfilePath, _picker.PickKeyfileAsync);
     }
 
     private void CloseRestore()
@@ -422,25 +473,26 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>Opens the vault a restore has just put in place, with the password that was checked.</summary>
-    private async Task OnRestoredAsync(VaultRestoreReport report, SecretBuffer password)
+    private async Task OnRestoredAsync(VaultRestoreReport report, SecretBuffer password, string? keyfile)
     {
         if (_disposed || _selectedPath is not { } path)
         {
             return;
         }
 
-        var outcome = await Task.Run(() => _session.TryUnlock(path, password.Value)).ConfigureAwait(true);
+        var outcome = await Task.Run(() => _session.TryUnlock(path, password.Value, keyfile)).ConfigureAwait(true);
 
         CloseRestore();
+        KeyfilePath = keyfile;
 
         if (outcome != UnlockOutcome.Opened)
         {
-            Message = "The backup was restored. Unlock it with the password that backup was made under.";
+            Message = "The backup was restored. Unlock it with the password and keyfile that backup was made under.";
             return;
         }
 
-        RestoreNotice = Describe(report);
-        Remember(path);
+        Notice = Describe(report);
+        Remember(path, keyfile);
         _unlocked();
     }
 
@@ -502,20 +554,26 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         {
             // Argon2 is a good fraction of a second by design. Off the UI thread, or the window
             // stops painting and the app looks broken at the exact moment it is working hardest.
-            var outcome = await Task.Run(() => _session.TryUnlock(path, _master.Value))
+            var keyfile = _keyfilePath;
+            var outcome = await Task.Run(() => _session.TryUnlock(path, _master.Value, keyfile))
                 .ConfigureAwait(true);
 
             if (outcome == UnlockOutcome.Opened)
             {
-                Remember(path);
+                Remember(path, keyfile);
                 ResetPassword();
+                Notice = FragileNotice(keyfile);
                 _unlocked();
                 return;
             }
 
-            Message = HasBackups
-                ? $"{Explain(outcome)} If the file is damaged, or its password was changed and lost, restore a backup."
-                : Explain(outcome);
+            var explained = outcome == UnlockOutcome.KeyfileUnusable && keyfile is not null
+                ? ExplainKeyfile(VaultKeyfile.Inspect(keyfile).Outcome)
+                : Explain(outcome, keyfile is not null);
+
+            Message = HasBackups && outcome != UnlockOutcome.KeyfileUnusable
+                ? $"{explained} If the file is damaged, or its password or keyfile was changed and lost, restore a backup."
+                : explained;
             ResetPassword();
         }
         finally
@@ -575,6 +633,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
 
         _newVaultPath = full;
         Message = string.Empty;
+        KeyfilePath = null;
         Raise(nameof(NewVaultName));
         IsCreating = true;
         CreateCommand.RaiseCanExecuteChanged();
@@ -601,12 +660,13 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         {
             // Argon2 again, and off the UI thread again. Creating derives a key exactly as opening
             // does, so the window would stop painting for the same good fraction of a second.
-            var outcome = await Task.Run(() => _session.TryCreate(path, _new.Value, _confirm.Value))
+            var keyfile = _keyfilePath;
+            var outcome = await Task.Run(() => _session.TryCreate(path, _new.Value, _confirm.Value, keyfile))
                 .ConfigureAwait(true);
 
             if (outcome == VaultCreationOutcome.Created)
             {
-                Remember(path);
+                Remember(path, keyfile);
                 ResetCreation();
                 IsCreating = false;
                 _unlocked();
@@ -634,12 +694,65 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
             ResetCreation();
             _newVaultPath = null;
             Message = string.Empty;
+            KeyfilePath = RememberedKeyfile(_selectedPath);
             Raise(nameof(NewVaultName));
             IsCreating = false;
         }
 
         return Task.CompletedTask;
     }
+
+    /// <summary>
+    /// Asks for a keyfile and takes it only if it is one, saying why not at once rather than after a
+    /// password has been typed (D-0284).
+    /// </summary>
+    internal async Task ChooseKeyfileAsync()
+    {
+        if (_disposed || await _picker.PickKeyfileAsync().ConfigureAwait(true) is not { } picked)
+        {
+            return;
+        }
+
+        var full = System.IO.Path.GetFullPath(picked);
+        var inspection = VaultKeyfile.Inspect(full);
+
+        if (!inspection.Accepted)
+        {
+            Message = ExplainKeyfile(inspection.Outcome);
+            return;
+        }
+
+        KeyfilePath = full;
+        Message = inspection.IsFragile
+            ? _creating
+                ? "keypaste won't make a vault that needs this file: it is keyed by the file's exact bytes, so one edit to it loses the vault. Choose a KeePass keyfile."
+                : FragileNotice(full)!
+            : string.Empty;
+    }
+
+    /// <summary>The T-28 warning for a keyfile keyed by its hash, or null for any other.</summary>
+    private static string? FragileNotice(string? keyfile) =>
+        keyfile is not null && VaultKeyfile.Inspect(keyfile).IsFragile
+            ? $"This vault's keyfile, {System.IO.Path.GetFileName(keyfile)}, is an ordinary file keyed by its exact bytes. " +
+              "Editing it, re-saving it or letting something sync over it loses the vault for good. Change to a KeePass keyfile in Settings."
+            : null;
+
+    /// <summary>Why a file cannot be used as a keyfile, in the register of <see cref="Explain"/>.</summary>
+    internal static string ExplainKeyfile(KeyfileOutcome outcome) => outcome switch
+    {
+        KeyfileOutcome.Missing => "That keyfile isn't there any more.",
+        KeyfileOutcome.Unreadable => "That keyfile couldn't be read.",
+        KeyfileOutcome.Empty => "That file is empty, so it can't be a keyfile.",
+        KeyfileOutcome.IsAVault => "That's a KeePass vault, not a keyfile.",
+        KeyfileOutcome.XmlUnreadable =>
+            "That's a KeePass XML keyfile, and this build of keypaste can't read one: it would use the wrong key. Nothing was opened.",
+        _ => "That file can't be used as a keyfile.",
+    };
+
+    private string? RememberedKeyfile(string? vaultPath) =>
+        vaultPath is null
+            ? null
+            : _remembered.FirstOrDefault(vault => string.Equals(vault.Path, vaultPath, PathIdentity.Comparison))?.KeyfilePath;
 
     /// <summary>
     /// What went wrong making a vault, in the same register as <see cref="Explain"/>.
@@ -654,6 +767,10 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         VaultCreationOutcome.PathAlreadyExists => "There's already a file there. Choose a name that isn't taken.",
         VaultCreationOutcome.EmptyPassword => "A vault needs a master password.",
         VaultCreationOutcome.PasswordsDoNotMatch => "Those two passwords aren't the same.",
+        VaultCreationOutcome.KeyfileUnusable => "That keyfile can't be used. Choose it again, or another.",
+        VaultCreationOutcome.KeyfileIsFragile =>
+            "keypaste won't make a vault that needs this file: it is keyed by the file's exact bytes, so one edit to it loses the vault. Choose a KeePass keyfile.",
+        VaultCreationOutcome.KeyfileIsThisVault => "A vault can't be its own keyfile. Choose another file.",
         _ => "That vault couldn't be created.",
     };
 
@@ -665,17 +782,21 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     /// them is something a person does routinely, and the Ideas table in DECISIONS.md names scary warnings for normal
     /// actions as an anti-pattern.
     /// </remarks>
-    private static string Explain(UnlockOutcome outcome) => outcome switch
+    private static string Explain(UnlockOutcome outcome, bool withKeyfile = false) => outcome switch
     {
+        // Naming both factors when both were given, or a good password and the wrong file sends the
+        // person to retype the half that was right (D-0284).
+        UnlockOutcome.WrongPassword when withKeyfile => "That password and keyfile didn't open this vault.",
         UnlockOutcome.WrongPassword => "That password didn't open this vault.",
+        UnlockOutcome.KeyfileUnusable => "That keyfile can't be used.",
         UnlockOutcome.NotFound => "That file isn't there any more.",
         UnlockOutcome.NotAKdbx => "That isn't a KeePass vault.",
         _ => "That vault couldn't be opened.",
     };
 
-    private void Remember(string path)
+    private void Remember(string path, string? keyfile)
     {
-        _remembered = RecentVaults.Remember(_remembered, path, DateTimeOffset.UtcNow);
+        _remembered = RecentVaults.Remember(_remembered, path, DateTimeOffset.UtcNow, keyfile);
         RecentVaults.Save(KeypasteHome.RecentPath(_home), _remembered);
         Project();
     }
