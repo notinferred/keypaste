@@ -12,7 +12,7 @@ Enter the master password and review requests in that terminal. Without the appr
 
 The MCP client starts the bridge, while you start the approver. This keeps software-triggered requests from opening a master-password prompt.
 
-These are the current CLI/MCP instructions. The desktop cannot approve requests or supply its unlocked session yet, and locking it does not stop a separate terminal approver. [STEPS](STEPS.md) covers the focused target: one unlock session with native approval and denial in the app.
+These are the current CLI/MCP instructions. The desktop cannot approve requests yet, and locking it does not stop a terminal approver holding another vault. In source, the bridge reaches whichever keypaste process holds the vault its `--vault` names: a desktop that has it unlocked answers listings and refuses every credential request, and `keypaste agent` on a vault the desktop holds is refused naming the app. A bridge with no `--vault` is refused, and `keypaste setup` always writes one. [STEPS](STEPS.md) covers the focused target: one unlock session with native approval and denial in the app.
 
 ## Before you start
 
@@ -172,7 +172,8 @@ jq -c . < ~/.keypaste/audit.jsonl
 | `policy-limit` | A rule covered the request but had spent its `max_per_hour` allowance. |
 | `undeliverable` | A person or policy authorized the request, but the value exceeded the reply limit. Nothing was released; the reason identifies the authorization source. |
 | `exposure` | A listing, allowed because everything named was inside your `--expose` globs. |
-| `no-approver` | Nobody was running `keypaste agent`. |
+| `no-approver` | Nobody was running `keypaste agent`; in source, nothing held the vault unlocked, or it was held by a desktop that cannot approve yet. |
+| `no-session` | In source: the request did not reach the current session of the process holding this server's vault — the bridge named no vault, the process that answered holds another vault, or the vault was locked or unlocked again between attaching and asking. Nothing was considered. |
 | `out-of-scope` | The entry was outside exposure or absent. A shared response prevents existence checks outside exposure. |
 | `timed-out` / `busy` / `cooldown` | Nobody answered in time; the connection was already carrying another call, so this one was refused rather than queued behind it; or the same request was refused a moment ago. |
 | `cancelled` | The client stopped waiting before anybody answered. Nobody decided anything. |
@@ -255,7 +256,7 @@ You should get two JSON lines back, the second listing `list_entry_names` and `r
 
 If startup fails, check the executable path is absolute, the file is executable (`chmod +x`) and `~/.keypaste` is writable.
 
-If calls report "no keypaste agent is running", start `keypaste agent --vault <path>` for the intended vault. If it is already running, check that both processes use the same `--approver <name>` or `KEYPASTE_APPROVER`. In `v0.2.0`, a half-second connection deadline can also produce this refusal under load; retry in that case. `v0.3.0` repairs that race (F.9).
+If calls report "no keypaste agent is running" (in source, "no keypaste agent holds this vault unlocked"), start `keypaste agent --vault <path>` for the intended vault; in source, lock that vault in the desktop first if it is open there. If it is already running, check that both processes use the same `--approver <name>` or `KEYPASTE_APPROVER`. In `v0.2.0`, a half-second connection deadline can also produce this refusal under load; retry in that case. `v0.3.0` repairs that race (F.9).
 
 A call says the vault is locked. The approver reported that no vault was available. Check its terminal and restart it with the intended vault if needed. The current CLI approver opens its pipe after successful unlock; a failed unlock and exit normally produce `no-approver` instead.
 

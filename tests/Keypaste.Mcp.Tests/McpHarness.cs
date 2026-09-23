@@ -49,7 +49,7 @@ internal sealed class McpHarness : IAsyncDisposable
     private Task? _serving;
 
     /// <summary>The vault the server will be pointed at. Never opened: nothing opens a vault here.</summary>
-    internal string VaultPath => Path.Combine(_directory, "vault.kdbx");
+    internal string VaultPath => _vaultPath ?? Path.Combine(_directory, "vault.kdbx");
 
     internal string AuditPath => Path.Combine(_directory, "audit.jsonl");
 
@@ -78,7 +78,7 @@ internal sealed class McpHarness : IAsyncDisposable
     internal McpHarness()
     {
         Approver = new FakeApprover();
-        _approver = new ApproverConnection(Approver.PipeName);
+        _approver = new ApproverConnection(Approver.PipeName, VaultPath);
     }
 
     /// <summary>
@@ -90,14 +90,18 @@ internal sealed class McpHarness : IAsyncDisposable
     /// still built and still disposed; it is simply never started, which is also the state a bridge
     /// finds the world in most of the time.
     /// </remarks>
-    internal McpHarness(string approverPipeName)
+    /// <param name="approverPipeName">Where that approver listens.</param>
+    /// <param name="vaultPath">The vault it holds, which the bridge names when it attaches, or null for a fake.</param>
+    internal McpHarness(string approverPipeName, string? vaultPath = null)
     {
+        _vaultPath = vaultPath;
         Approver = new FakeApprover();
-        _approver = new ApproverConnection(approverPipeName);
+        _approver = new ApproverConnection(approverPipeName, VaultPath);
         _approverPipeName = approverPipeName;
     }
 
     private readonly string? _approverPipeName;
+    private readonly string? _vaultPath;
 
     /// <summary>Starts the server with the given arguments and connects a client to it.</summary>
     internal async Task<McpClient> StartAsync(params string[] argv)

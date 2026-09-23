@@ -157,7 +157,7 @@ public sealed class SecretHygieneTests
     {
         using var fixture = new SentinelVault();
         using var session = Unlocked(fixture);
-        using var shell = new ShellViewModel(session, fixture.Home, approverFromEnvironment: null);
+        using var shell = new ShellViewModel(session, fixture.Home, host: null);
 
         foreach (var destination in Destinations.All)
         {
@@ -181,7 +181,7 @@ public sealed class SecretHygieneTests
     {
         using var fixture = new SentinelVault();
         using var session = Unlocked(fixture);
-        using var shell = new ShellViewModel(session, fixture.Home, approverFromEnvironment: null);
+        using var shell = new ShellViewModel(session, fixture.Home, host: null);
 
         shell.Current = Destinations.All[0];
         var entries = Assert.IsType<EntriesViewModel>(shell.Content);
@@ -238,7 +238,7 @@ public sealed class SecretHygieneTests
     {
         using var fixture = new SentinelVault();
         using var session = Unlocked(fixture);
-        using var shell = new ShellViewModel(session, fixture.Home, approverFromEnvironment: null);
+        using var shell = new ShellViewModel(session, fixture.Home, host: null);
 
         shell.Current = Destinations.All[0];
         var entries = Assert.IsType<EntriesViewModel>(shell.Content);
@@ -277,7 +277,7 @@ public sealed class SecretHygieneTests
     {
         using var fixture = new SentinelVault();
         using var session = Unlocked(fixture);
-        using var shell = new ShellViewModel(session, fixture.Home, approverFromEnvironment: null);
+        using var shell = new ShellViewModel(session, fixture.Home, host: null);
 
         shell.Current = Destinations.All[0];
         var entries = Assert.IsType<EntriesViewModel>(shell.Content);
@@ -360,7 +360,7 @@ public sealed class SecretHygieneTests
     {
         using var fixture = new SentinelVault();
         using var session = Unlocked(fixture);
-        using var shell = new ShellViewModel(session, fixture.Home, approverFromEnvironment: null);
+        using var shell = new ShellViewModel(session, fixture.Home, host: null);
 
         shell.Current = Destinations.All[0];
         var entries = Assert.IsType<EntriesViewModel>(shell.Content);
@@ -406,7 +406,7 @@ public sealed class SecretHygieneTests
     {
         using var fixture = new SentinelVault();
         using var session = Unlocked(fixture);
-        using var shell = new ShellViewModel(session, fixture.Home, approverFromEnvironment: null);
+        using var shell = new ShellViewModel(session, fixture.Home, host: null);
 
         shell.Current = Destinations.All[0];
         var entries = Assert.IsType<EntriesViewModel>(shell.Content);
@@ -452,7 +452,7 @@ public sealed class SecretHygieneTests
     {
         using var fixture = new SentinelVault();
         using var session = Unlocked(fixture);
-        using var shell = new ShellViewModel(session, fixture.Home, approverFromEnvironment: null);
+        using var shell = new ShellViewModel(session, fixture.Home, host: null);
 
         shell.Current = Destinations.All[0];
         var entries = Assert.IsType<EntriesViewModel>(shell.Content);
@@ -486,7 +486,7 @@ public sealed class SecretHygieneTests
     {
         using var fixture = new SentinelVault();
         using var session = Unlocked(fixture);
-        using var shell = new ShellViewModel(session, fixture.Home, approverFromEnvironment: null);
+        using var shell = new ShellViewModel(session, fixture.Home, host: null);
 
         shell.Current = Destinations.All[1];
         var env = Assert.IsType<EnvSetsViewModel>(shell.Content);
@@ -511,7 +511,7 @@ public sealed class SecretHygieneTests
     {
         using var fixture = new SentinelVault();
         using var session = Unlocked(fixture);
-        using var shell = new ShellViewModel(session, fixture.Home, approverFromEnvironment: null);
+        using var shell = new ShellViewModel(session, fixture.Home, host: null);
 
         shell.Current = Destinations.All[1];
         var env = Assert.IsType<EnvSetsViewModel>(shell.Content);
@@ -554,7 +554,7 @@ public sealed class SecretHygieneTests
     {
         using var fixture = new SentinelVault();
         using var session = Unlocked(fixture);
-        using var shell = new ShellViewModel(session, fixture.Home, approverFromEnvironment: null);
+        using var shell = new ShellViewModel(session, fixture.Home, host: null);
 
         shell.Current = Destinations.All[1];
         var env = Assert.IsType<EnvSetsViewModel>(shell.Content);
@@ -595,7 +595,7 @@ public sealed class SecretHygieneTests
 
         var clipboard = new FakeClipboard();
         using var shell = new ShellViewModel(
-            session, fixture.Home, approverFromEnvironment: null, applyTheme: null,
+            session, fixture.Home, host: null, applyTheme: null,
             clipboard: clipboard, clock: new ManualClock());
 
         shell.Current = Destinations.All[0];
@@ -641,7 +641,7 @@ public sealed class SecretHygieneTests
     {
         using var fixture = new SentinelVault();
         using var session = Unlocked(fixture);
-        using var shell = new ShellViewModel(session, fixture.Home, approverFromEnvironment: null);
+        using var shell = new ShellViewModel(session, fixture.Home, host: null);
 
         shell.Current = Destinations.All[0];
         var entries = Assert.IsType<EntriesViewModel>(shell.Content);

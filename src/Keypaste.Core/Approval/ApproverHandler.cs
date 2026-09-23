@@ -34,7 +34,7 @@ namespace Keypaste.Core.Approval;
 /// able to collide with a prompt somebody is in the middle of answering.
 /// </para>
 /// </remarks>
-public sealed class ApproverHandler : IApproverHandler
+public sealed class ApproverHandler
 {
     private readonly ICredentialSource _source;
     private readonly IEntryNameLister _lister;
@@ -79,7 +79,11 @@ public sealed class ApproverHandler : IApproverHandler
         _narrate = narrate;
     }
 
-    /// <inheritdoc/>
+    /// <summary>Which entry names may be shown under the bridge's exposure.</summary>
+    /// <param name="request">The exposure the bridge is configured with.</param>
+    /// <param name="connectionId">Who is asking.</param>
+    /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
+    /// <returns>The names, or the reason there are none.</returns>
     public ValueTask<NamesReply> ListAsync(NamesRequest request, string connectionId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -101,7 +105,11 @@ public sealed class ApproverHandler : IApproverHandler
         return ValueTask.FromResult(new NamesReply(true, names, string.Empty, true));
     }
 
-    /// <inheritdoc/>
+    /// <summary>Decides one credential request, asking a human if it has to.</summary>
+    /// <param name="request">What the agent asked for.</param>
+    /// <param name="connectionId">Who is asking, and what any resulting grant is scoped to.</param>
+    /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
+    /// <returns>The decision, and the field value on the one path that has one.</returns>
     public async ValueTask<CredentialReply> RequestAsync(
         CredentialRequest request,
         string connectionId,
@@ -289,7 +297,8 @@ public sealed class ApproverHandler : IApproverHandler
         }
     }
 
-    /// <inheritdoc/>
+    /// <summary>Revokes the grants scoped to a connection that has gone.</summary>
+    /// <param name="connectionId">The connection that ended.</param>
     public void Disconnected(string connectionId)
     {
         ArgumentNullException.ThrowIfNull(connectionId);

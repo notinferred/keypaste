@@ -104,6 +104,7 @@ prepare_backend() { prepare keypaste.slnx; }
 prepare_desktop() {
   prepare keypaste.app.slnx
   prepare tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj
+  prepare src/Keypaste.Mcp/Keypaste.Mcp.csproj
 }
 test_backend() {
   run dotnet test keypaste.slnx --no-build -c Release
@@ -111,6 +112,7 @@ test_backend() {
 test_desktop() {
   run dotnet test keypaste.app.slnx --no-build -c Release
   run dotnet test tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj --no-build -c Release
+  integration_script scripts/verify-session-authority.sh
 }
 
 selftests=(
@@ -263,6 +265,7 @@ profiles_for_path() {
     tests/Directory.Build.props) echo backend desktop ;;
     tests/*) echo backend ;;
     keypaste.slnx) echo backend integration ;;
+    scripts/verify-session-authority.sh) echo scripts desktop ;;
     scripts/*) echo scripts backend integration ;;
     .github/*|release-targets.json) echo scripts backend ;;
     README.md|site/public/index.html|docs/PRODUCT.md) echo scripts integration ;;

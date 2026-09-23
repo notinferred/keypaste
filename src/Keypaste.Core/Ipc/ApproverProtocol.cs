@@ -31,18 +31,15 @@ public static class ApproverProtocol
 {
     /// <summary>The wire version, so a later change to the shape is unambiguous.</summary>
     /// <remarks>
-    /// Stage 2.3 added an optional <c>client_label</c> to a credential request and deliberately did
-    /// <b>not</b> bump this. The version guards how a frame is interpreted, and a bump would make
-    /// every mixed-version pair fail at the framing layer — no reply, no audit line beyond
-    /// <see cref="AuditMethod.NoApprover"/> — over one optional field. Both mismatched pairs degrade
-    /// the same way instead: the label is absent, so no rule matches, so every request is shown to a
-    /// person. That is the same state a malformed policy file produces, and it is the state this
-    /// whole stage is built to fall back to.
+    /// Version 2 makes every request name its vault and session (D-0310). An optional field does not
+    /// bump this, because a bump fails every mixed-version pair at the framing layer; that failure
+    /// is the point here, since a bridge that names no vault must not be answered by one.
     /// </remarks>
-    public const int Version = 1;
+    public const int Version = 2;
 
     internal const string NamesKind = "names";
     internal const string CredentialKind = "credential";
+    internal const string AttachKind = "attach";
 
     /// <summary>Stands in for a reply whose own envelope will not fit a frame.</summary>
     /// <remarks>
@@ -90,7 +87,47 @@ public static class ApproverProtocol
         {
             writer.WriteNumber("v", Version);
             writer.WriteString("kind", NamesKind);
+            writer.WriteString("vault", request.Vault);
+            writer.WriteString("session", request.Session);
             WriteStrings(writer, "exposure", request.Exposure);
+        });
+    }
+
+    /// <summary>Encodes a request to attach to a vault's session.</summary>
+    /// <param name="request">The vault to attach to.</param>
+    /// <returns>The frame's bytes, without a delimiter.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    public static byte[] Encode(AttachRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return Write(writer =>
+        {
+            writer.WriteNumber("v", Version);
+            writer.WriteString("kind", AttachKind);
+            writer.WriteString("vault", request.Vault);
+        });
+    }
+
+    /// <summary>Encodes the answer to an attach request.</summary>
+    /// <param name="reply">The session, or why there is none.</param>
+    /// <returns>The frame's bytes, without a delimiter.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
+    public static byte[] Encode(AttachReply reply)
+    {
+        ArgumentNullException.ThrowIfNull(reply);
+
+        return Write(writer =>
+        {
+            writer.WriteNumber("v", Version);
+            writer.WriteString("kind", AttachKind);
+            WriteOptional(writer, "session", reply.Session);
+            if (reply.Refusal is { } refusal)
+            {
+                writer.WriteNumber("method", (int)refusal);
+            }
+
+            writer.WriteString("reason", reply.Reason);
         });
     }
 
@@ -106,6 +143,8 @@ public static class ApproverProtocol
         {
             writer.WriteNumber("v", Version);
             writer.WriteString("kind", CredentialKind);
+            writer.WriteString("vault", request.Vault);
+            writer.WriteString("session", request.Session);
             writer.WriteString("entry", request.Entry);
             writer.WriteString("field", request.Field);
             writer.WriteString("reason", request.Reason);
@@ -154,7 +193,7 @@ public static class ApproverProtocol
         // that reasoning costing a connection and its grants rather than a listing (law 3.7).
         return frame.Length <= MessageFramer.MaximumPayloadBytes
             ? frame
-            : WriteNames(new NamesReply(reply.VaultUnlocked, [], Undersized, false), 0, false);
+            : WriteNames(new NamesReply(reply.VaultUnlocked, [], Undersized, false) { Session = reply.Session }, 0, false);
     }
 
     /// <summary>How many of a reply's names fit one frame.</summary>
@@ -211,6 +250,7 @@ public static class ApproverProtocol
             writer.WriteBoolean("unlocked", reply.VaultUnlocked);
             writer.WriteString("reason", reply.Reason);
             writer.WriteBoolean("complete", complete);
+            WriteOptional(writer, "session", reply.Session);
             writer.WriteStartArray("names");
 
             for (var i = 0; i < count; i++)
@@ -301,6 +341,7 @@ public static class ApproverProtocol
                 Method = AuditMethod.Undeliverable,
                 Reason = UndeliverableReason(reply.Method),
                 Entry = entry,
+                Session = reply.Session,
             }
             : new CredentialReply
             {
@@ -308,6 +349,7 @@ public static class ApproverProtocol
                 Method = reply.Method,
                 Reason = Oversized,
                 Entry = entry,
+                Session = reply.Session,
             };
 
     private static byte[] WriteCredential(CredentialReply reply) =>
@@ -320,6 +362,7 @@ public static class ApproverProtocol
             writer.WriteString("reason", reply.Reason);
             writer.WriteNumber("ttl_seconds", reply.TtlSeconds);
             WriteOptional(writer, "entry", reply.Entry);
+            WriteOptional(writer, "session", reply.Session);
             WriteOptional(writer, "value", reply.Value);
         });
 
@@ -344,6 +387,7 @@ public static class ApproverProtocol
             {
                 NamesKind => ApproverMessageKind.Names,
                 CredentialKind => ApproverMessageKind.Credential,
+                AttachKind => ApproverMessageKind.Attach,
                 _ => ApproverMessageKind.Unknown,
             };
         }
@@ -366,12 +410,15 @@ public static class ApproverProtocol
         {
             var root = document.RootElement;
 
-            if (!IsKind(root, NamesKind) || !TryStrings(root, "exposure", out var exposure))
+            if (!IsKind(root, NamesKind)
+                || !TryString(root, "vault", out var vault)
+                || !TryString(root, "session", out var session)
+                || !TryStrings(root, "exposure", out var exposure))
             {
                 return false;
             }
 
-            request = new NamesRequest(exposure);
+            request = new NamesRequest(exposure) { Vault = vault, Session = session };
             return true;
         }
     }
@@ -394,6 +441,8 @@ public static class ApproverProtocol
             var root = document.RootElement;
 
             if (!IsKind(root, CredentialKind)
+                || !TryString(root, "vault", out var vault)
+                || !TryString(root, "session", out var session)
                 || !TryString(root, "entry", out var entry)
                 || !TryString(root, "field", out var field)
                 || !TryString(root, "reason", out var reason)
@@ -413,6 +462,8 @@ public static class ApproverProtocol
                 ClientName = Optional(root, "client"),
                 ClientVersion = Optional(root, "client_version"),
                 ClientLabel = Optional(root, "client_label"),
+                Vault = vault,
+                Session = session,
             };
 
             return true;
@@ -463,7 +514,10 @@ public static class ApproverProtocol
                 unlocked.GetBoolean(),
                 decoded,
                 Optional(root, "reason") ?? string.Empty,
-                TrueOnly(root, "complete"));
+                TrueOnly(root, "complete"))
+            {
+                Session = Optional(root, "session"),
+            };
 
             return true;
         }
@@ -518,7 +572,77 @@ public static class ApproverProtocol
                 TtlSeconds = ttl,
                 Entry = Optional(root, "entry"),
                 Value = granted ? value : null,
+                Session = Optional(root, "session"),
             };
+
+            return true;
+        }
+    }
+
+    /// <summary>Decodes a request to attach to a vault's session.</summary>
+    /// <param name="frame">The frame's bytes.</param>
+    /// <param name="request">The decoded request.</param>
+    /// <returns><see langword="true"/> when the frame was a well-formed attach request.</returns>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out AttachRequest? request)
+    {
+        request = null;
+
+        if (!TryParse(frame, out var document))
+        {
+            return false;
+        }
+
+        using (document)
+        {
+            var root = document.RootElement;
+
+            if (!IsKind(root, AttachKind) || !TryString(root, "vault", out var vault))
+            {
+                return false;
+            }
+
+            request = new AttachRequest(vault);
+            return true;
+        }
+    }
+
+    /// <summary>Decodes the answer to an attach request.</summary>
+    /// <param name="frame">The frame's bytes.</param>
+    /// <param name="reply">The decoded reply.</param>
+    /// <returns><see langword="true"/> when the frame was a well-formed attach reply.</returns>
+    /// <remarks>
+    /// A reply carrying both a session and a refusal, or neither, is not well formed, so an
+    /// attachment is never inferred from a reply that also says no.
+    /// </remarks>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out AttachReply? reply)
+    {
+        reply = null;
+
+        if (!TryParse(frame, out var document))
+        {
+            return false;
+        }
+
+        using (document)
+        {
+            var root = document.RootElement;
+
+            if (!IsKind(root, AttachKind) || !TryString(root, "reason", out var reason))
+            {
+                return false;
+            }
+
+            var session = Optional(root, "session");
+            var refused = TryInteger(root, "method", out var method);
+
+            if (refused == session is { Length: > 0 })
+            {
+                return false;
+            }
+
+            reply = refused
+                ? AttachReply.Refused(Enum.IsDefined((AuditMethod)method) ? (AuditMethod)method : AuditMethod.Failed, reason)
+                : AttachReply.To(session!);
 
             return true;
         }

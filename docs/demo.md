@@ -83,7 +83,7 @@ keypaste agent --vault ~/keypaste-demo.kdbx
 Master password:
 keypaste: watching /home/you/keypaste-demo.kdbx
 keypaste: policy: no file at /home/you/.keypaste/policy.toml, so every request is shown to you.
-keypaste: listening on keypaste-agent-9f3a1c02b7d54e60, 45 seconds to answer, grants last at most 300 seconds
+keypaste: listening on keypaste-vault-9f3a1c02b7d54e60 for session 5d0c8e1a4b7f2c936e0a1d4b8c7f3e21, 45 seconds to answer, grants last at most 300 seconds
 keypaste: nothing is released without you saying yes. Press Ctrl+C to stop.
 ```
 
@@ -232,7 +232,7 @@ Repeat the credential request on the same MCP connection while its approval rema
 
 | What you see | What it is |
 |---|---|
-| `DENIED. No keypaste agent is running` | The left terminal is not running, or the two are on different pipes. Same vault, and pass the same `--approver` to both if you set one. |
+| `DENIED. No keypaste agent is running` (in source, `Nobody can approve this right now`) | The left terminal is not running, or the two are on different pipes. Same vault, and pass the same `--approver` to both if you set one. In source, an app with this vault unlocked keeps `keypaste agent` from starting on it; lock the vault in the app first. |
 | Claude asks you to paste the key | It did not reach for the tool. Say `use the keypaste MCP server to read env/demo/STRIPE_KEY`. |
 | `DENIED. That entry is outside what this server was configured to expose` | The entry is not under `env/`. The default exposure is `env/**` and approval cannot widen it. |
 | The dialog never appears | Your MCP client is running somewhere you are not looking. There is no native dialog yet; the approval prompt is that terminal. |

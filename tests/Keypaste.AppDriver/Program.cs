@@ -3,6 +3,7 @@ using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Ipc;
 
 namespace Keypaste.AppDriver;
 
@@ -20,6 +21,11 @@ namespace Keypaste.AppDriver;
 /// environment, as they do for the restorer. Exit 0 did it, 1 the screen refused, 2 usage, 3 the
 /// driver could not arrange the act.
 /// </para>
+/// <para>
+/// <c>hold</c> is the one act that does not exit: it unlocks as the app does, serves the vault as the
+/// app does, prints the session it holds, and then locks or unlocks again on each line read from
+/// standard input until it closes. <c>scripts/verify-session-authority.sh</c> drives it (U.1).
+/// </para>
 /// </remarks>
 internal static class Program
 {
@@ -35,6 +41,7 @@ internal static class Program
         "       backup-restore <vault> <backup-file-name>\n" +
         "       export <vault> <destination>\n" +
         "       access <vault> [--password] [--attach <keyfile> | --remove-keyfile]\n" +
+        "       hold <vault>   (then 'lock' or 'unlock' per line of standard input)\n" +
         "KEYPASTE_HOME must be set. KEYPASTE_DRIVER_PASSWORD is the password typed (empty for none),\n" +
         "KEYPASTE_DRIVER_KEYFILE the keyfile chosen, KEYPASTE_DRIVER_NEW_PASSWORD a new password or entry password.";
 
@@ -65,6 +72,7 @@ internal static class Program
                 ["backup-restore", var vault, var backup] => await driver.RestoreBackupAsync(vault, backup).ConfigureAwait(true),
                 ["export", var vault, var destination] => await driver.ExportAsync(vault, destination).ConfigureAwait(true),
                 ["access", var vault, .. var change] => await driver.ChangeAccessAsync(vault, change).ConfigureAwait(true),
+                ["hold", var vault] => await driver.HoldAsync(vault).ConfigureAwait(true),
                 _ => Usage(),
             };
         }
@@ -98,14 +106,14 @@ internal sealed class Driver(string home)
 
     internal async Task<int> OpenAsync(string vault)
     {
-        using var session = new AppVaultSession(TimeProvider.System);
+        using var session = new AppVaultSession(TimeProvider.System, home: home);
         using var unlock = Screen(session);
         return await UnlockAsync(unlock, session, vault).ConfigureAwait(true) ?? Did("opened");
     }
 
     internal async Task<int> CreateAsync(string vault)
     {
-        using var session = new AppVaultSession(TimeProvider.System);
+        using var session = new AppVaultSession(TimeProvider.System, home: home);
         using var unlock = Screen(session);
 
         _picker.NewPath = vault;
@@ -191,7 +199,7 @@ internal sealed class Driver(string home)
 
     internal async Task<int> RestoreRecycledAsync(string vault, string title)
     {
-        using var session = new AppVaultSession(TimeProvider.System);
+        using var session = new AppVaultSession(TimeProvider.System, home: home);
         using var unlock = Screen(session);
 
         if (await UnlockAsync(unlock, session, vault).ConfigureAwait(true) is { } refused)
@@ -230,7 +238,7 @@ internal sealed class Driver(string home)
 
     internal async Task<int> RestoreBackupAsync(string vault, string backup)
     {
-        using var session = new AppVaultSession(TimeProvider.System);
+        using var session = new AppVaultSession(TimeProvider.System, home: home);
         using var unlock = Screen(session);
 
         unlock.Offer(vault);
@@ -270,7 +278,7 @@ internal sealed class Driver(string home)
 
     internal async Task<int> ExportAsync(string vault, string destination)
     {
-        using var session = new AppVaultSession(TimeProvider.System);
+        using var session = new AppVaultSession(TimeProvider.System, home: home);
         using var unlock = Screen(session);
 
         if (await UnlockAsync(unlock, session, vault).ConfigureAwait(true) is { } refused)
@@ -289,7 +297,7 @@ internal sealed class Driver(string home)
 
     internal async Task<int> ChangeAccessAsync(string vault, string[] change)
     {
-        using var session = new AppVaultSession(TimeProvider.System);
+        using var session = new AppVaultSession(TimeProvider.System, home: home);
         using var unlock = Screen(session);
 
         if (await UnlockAsync(unlock, session, vault).ConfigureAwait(true) is { } refused)
@@ -351,7 +359,7 @@ internal sealed class Driver(string home)
 
     private async Task<int> WithEntriesAsync(string vault, Func<EntriesViewModel, int> act)
     {
-        using var session = new AppVaultSession(TimeProvider.System);
+        using var session = new AppVaultSession(TimeProvider.System, home: home);
         using var unlock = Screen(session);
 
         if (await UnlockAsync(unlock, session, vault).ConfigureAwait(true) is { } refused)
@@ -362,6 +370,57 @@ internal sealed class Driver(string home)
         using var countdown = new ClipboardCountdown(NoClipboard.Instance, TimeProvider.System);
         using var entries = new EntriesViewModel(session, countdown);
         return act(entries);
+    }
+
+    internal async Task<int> HoldAsync(string vault)
+    {
+        using var session = new AppVaultSession(TimeProvider.System, AppVaultSession.MaximumIdleTimeout, home);
+        using var host = new SessionHost(session, Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable));
+
+        if (await HoldOnceAsync(session, host, vault).ConfigureAwait(true) is { } refused)
+        {
+            return refused;
+        }
+
+        while (await Console.In.ReadLineAsync().ConfigureAwait(true) is { } command)
+        {
+            switch (command.Trim())
+            {
+                case "lock":
+                    session.Lock(VaultLockReason.Manual);
+                    Console.Out.WriteLine("locked");
+                    break;
+
+                case "unlock":
+                    if (await HoldOnceAsync(session, host, vault).ConfigureAwait(true) is { } again)
+                    {
+                        return again;
+                    }
+
+                    break;
+
+                default:
+                    throw new DriverException($"hold understands 'lock' and 'unlock', not '{command}'");
+            }
+        }
+
+        return 0;
+    }
+
+    private async Task<int?> HoldOnceAsync(AppVaultSession session, SessionHost host, string vault)
+    {
+        using var unlock = Screen(session);
+
+        if (await UnlockAsync(unlock, session, vault).ConfigureAwait(true) is { } refused)
+        {
+            return refused;
+        }
+
+        Console.Out.WriteLine(host.Endpoint is { } endpoint
+            ? $"holding session {session.SessionId} as process {Environment.ProcessId} on {endpoint}"
+            : $"holding session {session.SessionId} as process {Environment.ProcessId}, not served: {host.Failure}");
+
+        return null;
     }
 
     private UnlockViewModel Screen(AppVaultSession session) => new(session, home, _picker, () => { });

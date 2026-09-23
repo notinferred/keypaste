@@ -8,11 +8,9 @@ namespace Keypaste.App;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>This process is not the approver.</b> It holds an unlocked vault for its own windows and
-/// nothing else: it does not bind the approver pipe, so a running <c>keypaste agent</c> keeps
-/// answering agent requests exactly as it did before. Binding it here would mean whichever of the
-/// two started second failed to bind, and the loser would be a silent loss of the approval path.
-/// Stage 4.3 owns that hand-off (DECISIONS.md D-0044).
+/// <b>This process owns the vault it unlocks</b> and serves it to <c>keypaste-mcp</c> on that
+/// vault's endpoint while it is unlocked; a <c>keypaste agent</c> on the same vault is refused by
+/// name (D-0309).
 /// </para>
 /// </remarks>
 internal static class Program

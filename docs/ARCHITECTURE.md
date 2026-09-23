@@ -16,14 +16,14 @@ Where the code is, so a task starts from the right files instead of a search of 
 
 ## Processes today
 
-Four processes can hold vault data, each unlocking on its own; T2 in [STEPS](STEPS.md) replaces this with one session.
+Four processes can hold vault data, each unlocking on its own; T2 in [STEPS](STEPS.md) replaces this with one session. One vault has one owner: the desktop and `keypaste agent` take its claim (`Core/Ownership/VaultClaim.cs`) before reading the password, and serve it on a per-user, per-vault named pipe (`Core/Ipc/ApproverEndpoint.cs`) while unlocked (D-0309).
 
-- The desktop app unlocks its own session and locks it on idle, on `Ctrl/Cmd+L` and, when that setting is on, on minimize.
-- `keypaste agent` is started by a person in a terminal. It holds the unlocked vault, listens on a per-user named pipe (`Core/Ipc/ApproverEndpoint.cs`) and asks that person through `Cli/Approval/TerminalApprovalChannel.cs`.
-- `keypaste-mcp` is started by the MCP client, never opens a vault, forwards each request to the agent over the pipe and writes the audit record.
-- `keypaste run` opens the vault, reads an env set, closes the vault and starts the child with the values in its environment.
+- The desktop app unlocks its own session (`App/Session/AppVaultSession.cs`) and locks it on idle, on `Ctrl/Cmd+L` and, when that setting is on, on minimize. `App/Session/SessionHost.cs` serves the unlocked vault to agents: listings are answered and every credential request is refused, because the app cannot ask a person yet.
+- `keypaste agent` is started by a person in a terminal. It holds the unlocked vault, listens on the vault's pipe and asks that person through `Cli/Approval/TerminalApprovalChannel.cs`.
+- `keypaste-mcp` is started by the MCP client, never opens a vault, forwards each request to the vault's owner over the pipe and writes the audit record.
+- `keypaste run` opens the vault, reads an env set, closes the vault and starts the child with the values in its environment. It takes no claim.
 
-A credential request runs: MCP client → `Mcp/Tools/RequestCredentialTool.cs` → `Mcp/ApproverConnection.cs` → `Core/Ipc/ApproverClient.cs` → pipe → `Core/Ipc/ApproverListener.cs` in the agent → `Core/Approval/ApproverHandler.cs`, which resolves the entry, re-checks exposure, consults the grant cache, a recent refusal and the policy, asks the person and only then reads one field → reply → audit line.
+A credential request runs: MCP client → `Mcp/Tools/RequestCredentialTool.cs` → `Mcp/ApproverConnection.cs`, which attaches to the owner's session naming its vault → `Core/Ipc/ApproverClient.cs` → pipe → `Core/Ipc/ApproverListener.cs` in the owner → `Core/Ownership/SessionAuthority.cs`, which refuses a request not from its current session (D-0310) → `Core/Approval/ApproverHandler.cs`, which resolves the entry, re-checks exposure, consults the grant cache, a recent refusal and the policy, asks the person and only then reads one field → reply naming the session → audit line.
 
 ## Where each concern lives in Core
 
@@ -40,14 +40,15 @@ A credential request runs: MCP client → `Mcp/Tools/RequestCredentialTool.cs` �
 | What an agent may name | `EntryExposure.cs` |
 | Approval, grants and credential release | `Approval/` |
 | Approver pipe protocol | `Ipc/` |
+| Who holds a vault, and which session a request belongs to | `Ownership/` |
 | Standing rules in `policy.toml` | `Policy/` |
 | Audit log and `~/.keypaste` paths | `Audit/`, `Audit/KeypasteHome.cs` |
 | `recent.toml`, `app.toml`, MCP client configuration | `Recent/`, `Settings/`, `Clients/` |
 
 ## Tests, gates and delivery
 
-- `tests/Keypaste.<Project>.Tests` mirror the projects. The helper projects `TxfContender`, `PoolStarver`, `VaultSaver`, `VaultRestorer`, `MinimizeObserver` and `AppDriver` are unshipped processes that particular probes and gates drive; `AppDriver` performs one desktop act through the screen's view model.
-- `scripts/verify.sh`, or `verify.ps1` in PowerShell, is the local verification entry point ([CLAUDE.md](../CLAUDE.md)). `scripts/verify-keepassxc-*.sh` are the permanent KeePassXC compatibility gates, one per vault feature, and `verify-keepassxc-workflows.sh` runs every workflow through the CLI and the desktop on vaults KeePassXC made; `verify-mcp-stdio.sh`, `verify-approval-e2e.sh`, `verify-policy-e2e.sh`, `verify-log-chain.sh` and `verify-run-*.sh` drive the shipped processes; `verify-demo.sh` checks published transcripts against the binaries.
+- `tests/Keypaste.<Project>.Tests` mirror the projects. The helper projects `TxfContender`, `PoolStarver`, `VaultSaver`, `VaultRestorer`, `MinimizeObserver` and `AppDriver` are unshipped processes that particular probes and gates drive; `AppDriver` performs one desktop act through the screen's view model, or holds a vault unlocked and served as the app does.
+- `scripts/verify.sh`, or `verify.ps1` in PowerShell, is the local verification entry point ([CLAUDE.md](../CLAUDE.md)). `scripts/verify-keepassxc-*.sh` are the permanent KeePassXC compatibility gates, one per vault feature, and `verify-keepassxc-workflows.sh` runs every workflow through the CLI and the desktop on vaults KeePassXC made; `verify-mcp-stdio.sh`, `verify-approval-e2e.sh`, `verify-policy-e2e.sh`, `verify-log-chain.sh`, `verify-session-authority.sh` and `verify-run-*.sh` drive the shipped processes; `verify-demo.sh` checks published transcripts against the binaries.
 - Packaging and release: `release-targets.json` defines targets; `build-*.sh`, `sign-windows.sh`, `publish-release.sh`, `release-completion.sh` and `require-*.sh` implement [RELEASE](RELEASE.md).
 - `.github/workflows/`: `ci.yml` (backend), `app.yml` (desktop), `release.yml`, `install*.yml`, `upgrade-desktop.yml`, `observe-desktop.yml`, `dco.yml` and single-question probes (`*-probe.yml`).
 - `site/` is keypaste.com; [site/README.md](../site/README.md) owns its deployment.

@@ -6,6 +6,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 All of this is source only: there is still no desktop download, and the published CLI is unchanged. Each entry that names a step links its record, which holds the full account.
 
+The desktop now owns the vault it unlocks. A `keypaste-mcp` configured for that vault reaches the app, which answers `list_entry_names` and refuses every credential request until approving in the app exists, and each audit line names the unlocked session that answered. `keypaste agent` on a vault the app holds, or a second app on it, is refused naming the holder before any password is asked for. The bridge now needs `--vault`, and the bridge and the approver must both be this version ([U.1](docs/steps/U.1.md)).
+
 FEATURES now lists which vault workflows work on a vault KeePassXC made, through the CLI and the desktop, what KeePassXC still reads afterwards and what is refused without touching the file. Restoring a history revision makes the entry that revision whole, attachments and custom fields included, as KeePassXC does ([9.4](docs/steps/9.4.md)).
 
 `Ctrl/Cmd+O` on the desktop's unlock screen opens the vault picker, as Browse does ([F.15](docs/steps/F.15.md)).

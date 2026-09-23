@@ -95,6 +95,14 @@ public enum AuditMethod
     /// never written up as a human act. The only method where a denial follows an authorization.
     /// </remarks>
     Undeliverable = 16,
+
+    /// <summary>The request did not come from a connection attached to the session now holding the
+    /// vault it named, so it was not considered (D-0310).</summary>
+    /// <remarks>
+    /// Distinct from <see cref="VaultLocked"/>: the vault may be unlocked, but not in the session
+    /// this request belonged to, or not by the process it reached.
+    /// </remarks>
+    NoSession = 17,
 }
 
 /// <summary>Who asked.</summary>
@@ -227,4 +235,7 @@ public sealed record AuditRecord
     /// from a configuration file that has been edited since.
     /// </remarks>
     public IReadOnlyList<string> Exposure { get; init; } = [];
+
+    /// <summary>The unlocked session that answered, or null when the request reached none.</summary>
+    public string? Session { get; init; }
 }

@@ -571,6 +571,13 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
                 return;
             }
 
+            if (outcome == UnlockOutcome.HeldElsewhere)
+            {
+                Message = HeldElsewhere();
+                ResetPassword();
+                return;
+            }
+
             var explained = outcome == UnlockOutcome.KeyfileUnusable && keyfile is not null
                 ? ExplainKeyfile(VaultKeyfile.Inspect(keyfile).Outcome)
                 : Explain(outcome, keyfile is not null);
@@ -677,7 +684,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
                 return;
             }
 
-            Message = ExplainCreation(outcome);
+            Message = _session.HeldElsewhere is not null ? HeldElsewhere() : ExplainCreation(outcome);
 
             // The passwords go whatever the answer was. A refusal means starting the pair again,
             // which is what `keypaste init` makes a person do and is the only way the buffers are
@@ -786,6 +793,12 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     /// them is something a person does routinely, and the Ideas table in DECISIONS.md names scary warnings for normal
     /// actions as an anti-pattern.
     /// </remarks>
+    private string HeldElsewhere()
+    {
+        var reason = _session.HeldElsewhere ?? "another keypaste process holds this vault.";
+        return char.ToUpperInvariant(reason[0]) + reason[1..];
+    }
+
     private static string Explain(UnlockOutcome outcome, bool withKeyfile = false) => outcome switch
     {
         // Naming both factors when both were given, or a good password and the wrong file sends the

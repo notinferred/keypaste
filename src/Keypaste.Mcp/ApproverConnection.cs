@@ -23,11 +23,36 @@ internal enum ApproverOutcome
     /// This connection was already carrying an exchange, so this one was refused rather than queued.
     /// </summary>
     Busy = 3,
+
+    /// <summary>The process that answered would not attach this bridge to a session. The refusal
+    /// says why.</summary>
+    Refused = 4,
+
+    /// <summary>No vault was configured, so there was nothing to name when attaching.</summary>
+    NoVault = 5,
+}
+
+/// <summary>What an exchange produced.</summary>
+/// <typeparam name="T">The reply's type.</typeparam>
+/// <param name="Reply">The owner's reply, when it answered.</param>
+/// <param name="Outcome">What became of the exchange.</param>
+/// <param name="Refusal">Why the owner would not attach this bridge, when it would not.</param>
+internal readonly record struct Exchange<T>(T? Reply, ApproverOutcome Outcome, AttachReply? Refusal = null)
+    where T : class
+{
+    /// <summary>The reply and the outcome, for a caller with no use for the refusal.</summary>
+    /// <param name="reply">The owner's reply, when it answered.</param>
+    /// <param name="outcome">What became of the exchange.</param>
+    public void Deconstruct(out T? reply, out ApproverOutcome outcome)
+    {
+        reply = Reply;
+        outcome = Outcome;
+    }
 }
 
 /// <summary>
-/// The bridge's link to <c>keypaste agent</c>: connects on demand, and reconnects once when the
-/// approver has been restarted underneath it.
+/// The bridge's link to the process holding its vault: connects on demand, attaches before every
+/// request, and reconnects once when the owner has been restarted underneath it.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -42,8 +67,16 @@ internal enum ApproverOutcome
 /// there and the exchange failed" is not, and says so instead. Collapsing the two would make the
 /// common case unactionable.
 /// </para>
+/// <para>
+/// <b>Attaching precedes every request</b>, so a connection left idle across a lock learns of the
+/// new session before it sends anything. A request whose reply was lost is retried with the session
+/// it was first sent under, never a later one: the owner refuses it rather than answer it from an
+/// unlock that happened after it was asked (D-0310).
+/// </para>
 /// </remarks>
-internal sealed class ApproverConnection(string pipeName) : IAsyncDisposable
+/// <param name="pipeName">The owner's endpoint, or null when no vault was named.</param>
+/// <param name="vaultPath">The vault this bridge was configured with, or empty.</param>
+internal sealed class ApproverConnection(string? pipeName, string vaultPath) : IAsyncDisposable
 {
     /// <summary>
     /// How long to wait for the approver to answer the door.
@@ -70,33 +103,38 @@ internal sealed class ApproverConnection(string pipeName) : IAsyncDisposable
     private ApproverClient? _client;
     private bool _disposed;
 
-    /// <summary>Asks the approver to decide one credential request.</summary>
-    /// <param name="request">What the agent asked for.</param>
+    /// <summary>Asks the owner to decide one credential request.</summary>
+    /// <param name="request">What the agent asked for. Its vault and session are filled in here.</param>
     /// <param name="cancellationToken">Cancelled when the client gives up on the call.</param>
-    /// <returns>The approver's answer, and what became of the exchange.</returns>
-    internal async ValueTask<(CredentialReply? Reply, ApproverOutcome Outcome)> RequestAsync(
+    /// <returns>The owner's answer, and what became of the exchange.</returns>
+    internal ValueTask<Exchange<CredentialReply>> RequestAsync(
         CredentialRequest request,
         CancellationToken cancellationToken) =>
-        await ExchangeAsync(
-            (client, token) => client.RequestAsync(request, token),
-            cancellationToken).ConfigureAwait(false);
+        ExchangeAsync(
+            (client, session, token) => client.RequestAsync(request with { Vault = vaultPath, Session = session }, token),
+            cancellationToken);
 
-    /// <summary>Asks the approver which entry names may be shown.</summary>
-    /// <param name="request">The exposure to apply.</param>
+    /// <summary>Asks the owner which entry names may be shown.</summary>
+    /// <param name="request">The exposure to apply. Its vault and session are filled in here.</param>
     /// <param name="cancellationToken">Cancelled when the client gives up on the call.</param>
     /// <returns>The reply, and what became of the exchange.</returns>
-    internal async ValueTask<(NamesReply? Reply, ApproverOutcome Outcome)> ListAsync(
+    internal ValueTask<Exchange<NamesReply>> ListAsync(
         NamesRequest request,
         CancellationToken cancellationToken) =>
-        await ExchangeAsync(
-            (client, token) => client.ListAsync(request, token),
-            cancellationToken).ConfigureAwait(false);
+        ExchangeAsync(
+            (client, session, token) => client.ListAsync(request with { Vault = vaultPath, Session = session }, token),
+            cancellationToken);
 
-    private async ValueTask<(T? Reply, ApproverOutcome Outcome)> ExchangeAsync<T>(
-        Func<ApproverClient, CancellationToken, ValueTask<T?>> exchange,
+    private async ValueTask<Exchange<T>> ExchangeAsync<T>(
+        Func<ApproverClient, string, CancellationToken, ValueTask<T?>> exchange,
         CancellationToken cancellationToken)
         where T : class
     {
+        if (pipeName is null || vaultPath.Length == 0)
+        {
+            return new(null, ApproverOutcome.NoVault);
+        }
+
         bool taken;
 
         try
@@ -109,7 +147,7 @@ internal sealed class ApproverConnection(string pipeName) : IAsyncDisposable
         }
         catch (ObjectDisposedException)
         {
-            return (null, ApproverOutcome.Unreachable);
+            return new(null, ApproverOutcome.Unreachable);
         }
 
         // Deliberately above the try below, whose finally releases the slot. A refusal never took
@@ -117,26 +155,26 @@ internal sealed class ApproverConnection(string pipeName) : IAsyncDisposable
         // then on - the precise failure this method exists to prevent.
         if (!taken)
         {
-            return (null, ApproverOutcome.Busy);
+            return new(null, ApproverOutcome.Busy);
         }
 
         try
         {
-            var client = await ConnectedAsync(cancellationToken).ConfigureAwait(false);
+            var (client, attached, outcome) = await AttachedAsync(cancellationToken).ConfigureAwait(false);
 
-            if (client is null)
+            if (client is null || attached is not { Attached: true, Session: { } session })
             {
-                return (null, ApproverOutcome.Unreachable);
+                return new(null, outcome, attached);
             }
 
-            var reply = await exchange(client, cancellationToken).ConfigureAwait(false);
+            var reply = await exchange(client, session, cancellationToken).ConfigureAwait(false);
 
             if (reply is not null)
             {
-                return (reply, ApproverOutcome.Answered);
+                return new(reply, ApproverOutcome.Answered);
             }
 
-            // A caller that gave up is not an approver that died, and the difference decides whether to
+            // A caller that gave up is not an owner that died, and the difference decides whether to
             // send the request again. The connection is finished either way, but re-sending would put a
             // request nobody is waiting for in front of a person, on a fresh connection whose id scopes a
             // different grant and cooldown.
@@ -144,24 +182,23 @@ internal sealed class ApproverConnection(string pipeName) : IAsyncDisposable
             {
                 await DropAsync().ConfigureAwait(false);
 
-                return (null, ApproverOutcome.Failed);
+                return new(null, ApproverOutcome.Failed);
             }
 
-            // One reconnect, and one retry. The ordinary cause of a dead exchange is an approver
-            // that was stopped and started again between two tool calls, which a person would
-            // reasonably expect to just work rather than to cost them one mysterious refusal.
+            // One reconnect, and one retry under the session the request was first sent in. If the
+            // owner has locked or restarted since, it refuses rather than answering from a later unlock.
             await DropAsync().ConfigureAwait(false);
 
-            var reconnected = await ConnectedAsync(cancellationToken).ConfigureAwait(false);
+            var (reconnected, _, _) = await AttachedAsync(cancellationToken).ConfigureAwait(false);
 
             if (reconnected is null)
             {
-                return (null, ApproverOutcome.Unreachable);
+                return new(null, ApproverOutcome.Unreachable);
             }
 
-            var retried = await exchange(reconnected, cancellationToken).ConfigureAwait(false);
+            var retried = await exchange(reconnected, session, cancellationToken).ConfigureAwait(false);
 
-            return (retried, retried is not null ? ApproverOutcome.Answered : ApproverOutcome.Failed);
+            return new(retried, retried is not null ? ApproverOutcome.Answered : ApproverOutcome.Failed);
         }
         finally
         {
@@ -169,9 +206,40 @@ internal sealed class ApproverConnection(string pipeName) : IAsyncDisposable
         }
     }
 
+    /// <summary>Connects if need be and attaches, reconnecting once if an idle connection has died.</summary>
+    private async ValueTask<(ApproverClient? Client, AttachReply? Attached, ApproverOutcome Outcome)> AttachedAsync(
+        CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            var client = await ConnectedAsync(cancellationToken).ConfigureAwait(false);
+
+            if (client is null)
+            {
+                return (null, null, ApproverOutcome.Unreachable);
+            }
+
+            var attached = await client.AttachAsync(new AttachRequest(vaultPath), cancellationToken).ConfigureAwait(false);
+
+            if (attached is not null)
+            {
+                return (client, attached, attached.Attached ? ApproverOutcome.Answered : ApproverOutcome.Refused);
+            }
+
+            await DropAsync().ConfigureAwait(false);
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
+        }
+
+        return (null, null, ApproverOutcome.Failed);
+    }
+
     private async ValueTask<ApproverClient?> ConnectedAsync(CancellationToken cancellationToken)
     {
-        if (_disposed)
+        if (_disposed || pipeName is null)
         {
             return null;
         }

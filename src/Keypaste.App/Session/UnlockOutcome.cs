@@ -33,4 +33,7 @@ internal enum UnlockOutcome
 
     /// <summary>The keyfile is missing, unreadable, empty, a vault, or one this build cannot read.</summary>
     KeyfileUnusable = 5,
+
+    /// <summary>Another keypaste process holds this vault, so it was not opened.</summary>
+    HeldElsewhere = 6,
 }

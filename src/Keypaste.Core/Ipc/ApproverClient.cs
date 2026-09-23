@@ -126,6 +126,20 @@ public sealed class ApproverClient : IAsyncDisposable
     /// <summary>Whether the pipe is still up. False does not mean the approver is gone for good.</summary>
     public bool IsConnected => !_disposed && _pipe.IsConnected;
 
+    /// <summary>Attaches this connection to the session holding a vault.</summary>
+    /// <param name="request">The vault to attach to.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <returns>The reply, or null when the owner could not be reached or understood.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    public async ValueTask<AttachReply?> AttachAsync(AttachRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken).ConfigureAwait(false);
+
+        return frame is not null && ApproverProtocol.TryDecode(frame, out AttachReply? reply) ? reply : null;
+    }
+
     /// <summary>Asks for the entry names an agent may be shown.</summary>
     /// <param name="request">The exposure to apply.</param>
     /// <param name="cancellationToken">Cancels the exchange.</param>

@@ -358,6 +358,9 @@ public sealed class ApproverListenerTests
         /// <summary>What a release carries. Settable so a test can hand back a field no frame holds.</summary>
         internal string Value { get; set; } = Sentinel;
 
+        public ValueTask<AttachReply> AttachAsync(AttachRequest request, string connectionId, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(AttachReply.To("test-session"));
+
         public ValueTask<NamesReply> ListAsync(NamesRequest request, string connectionId, CancellationToken cancellationToken)
         {
             ConnectionIds.Add(connectionId);

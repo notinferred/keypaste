@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Ownership;
 
 namespace Keypaste.Mcp;
 
@@ -37,16 +38,17 @@ internal sealed record ServerOptions
           --expose <glob>       what may be named, repeatable. Defaults to env/**
           --client-label <name> what to call this client in the audit log
           --audit-log <path>    where to append the audit trail, or set KEYPASTE_HOME
-          --approver <name>     which keypaste agent to ask, or set KEYPASTE_APPROVER
+          --approver <name>     which pipe to ask instead of the vault's own, or set KEYPASTE_APPROVER
 
         Nothing is released unless a person says yes to that specific request, or a rule they wrote
-        in advance covers it. They are reached through `keypaste agent`, which they start themselves
-        in their own terminal - so no agent can cause a master password prompt to appear. With no
-        agent running, every credential request is denied. `keypaste policy ls` shows the standing
-        rules, if there are any.
+        in advance covers it. Requests go to whichever keypaste process holds the vault unlocked:
+        the desktop app or a `keypaste agent` the person started in their own terminal - so no agent
+        can cause a master password prompt to appear. With nothing holding the vault, every request
+        is denied. `keypaste policy ls` shows the standing rules, if there are any.
         """;
 
-    /// <summary>The vault to expose. Empty when none was configured, which is not fatal.</summary>
+    /// <summary>The vault to ask about. Empty when none was configured, which is not fatal: every
+    /// request is then refused, saying so.</summary>
     internal required string VaultPath { get; init; }
 
     /// <summary>What this server may name at all.</summary>
@@ -55,14 +57,14 @@ internal sealed record ServerOptions
     /// <summary>Where the audit trail is appended.</summary>
     internal required string AuditPath { get; init; }
 
-    /// <summary>Which pipe <c>keypaste agent</c> is expected on.</summary>
+    /// <summary>Which pipe the vault's owner is expected on, or null when no vault was named.</summary>
     /// <remarks>
     /// Resolved at startup so a malformed name is a startup failure, but nothing connects until a
-    /// call needs an answer: the bridge is spawned by a client long before anybody starts an
-    /// approver, and refusing to start without one would make keypaste look broken in the client's
+    /// call needs an answer: the bridge is spawned by a client long before anybody unlocks the
+    /// vault, and refusing to start without an owner would make keypaste look broken in the client's
     /// log rather than saying so in an answer an agent can act on.
     /// </remarks>
-    internal required string ApproverName { get; init; }
+    internal required string? ApproverName { get; init; }
 
     /// <summary>What to call this client in the audit log, or null.</summary>
     internal string? ClientLabel { get; init; }
@@ -171,11 +173,14 @@ internal sealed record ServerOptions
         // configured" is diagnosable, and one that exits leaves the client's log as the only clue.
         VaultLocation.TryResolve(vault, vaultFromEnvironment, out var vaultPath, out _);
 
-        string pipeName;
+        string? pipeName;
 
         try
         {
-            pipeName = ApproverEndpoint.Resolve(approver, approverFromEnvironment);
+            pipeName = ApproverEndpoint.Resolve(
+                approver,
+                approverFromEnvironment,
+                vaultPath.Length > 0 ? VaultIdentity.Of(KeypasteHome.Resolve(homeFromEnvironment), vaultPath) : null);
         }
         catch (ArgumentException ex)
         {

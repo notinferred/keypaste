@@ -83,7 +83,7 @@ internal static class Program
             return Refuse("the first worker never started");
         }
 
-        var connection = new ApproverConnection(pipeName);
+        var connection = new ApproverConnection(pipeName, Path.Combine(Path.GetTempPath(), "pool-starver.kdbx"));
 
         try
         {
@@ -189,6 +189,6 @@ internal static class Program
 
     private sealed class Call
     {
-        public Task<(NamesReply? Reply, ApproverOutcome Outcome)>? Task { get; set; }
+        public Task<Exchange<NamesReply>>? Task { get; set; }
     }
 }

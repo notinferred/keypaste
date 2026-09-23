@@ -4,6 +4,7 @@ using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Ownership;
 using Keypaste.Core.Policy;
 
 namespace Keypaste.Cli.Commands;
@@ -22,6 +23,11 @@ namespace Keypaste.Cli.Commands;
 /// <b>Deliberately not a daemon.</b> No service, no launch agent, no PID file, no starting itself
 /// on demand. It runs in the foreground, says what it is doing, and stops when you stop it — which
 /// is also the honest answer to "is anything able to act as me right now?".
+/// </para>
+/// <para>
+/// <b>It holds the vault's claim for as long as it runs</b>, taken before the password is asked
+/// for, so a vault the desktop app or another agent already holds is refused by name and never
+/// opened (D-0309).
 /// </para>
 /// <para>
 /// <b>It writes no audit lines.</b> <c>keypaste-mcp</c> is the only process that appends to the
@@ -89,11 +95,15 @@ internal static class AgentCommand
             return CliApp.ExitUsageError;
         }
 
+        var home = KeypasteHome.Resolve(context.Environment.Get(KeypasteHome.EnvironmentVariable));
         string pipeName;
 
         try
         {
-            pipeName = ApproverEndpoint.Resolve(line.Value(ApproverOption), context.Environment.Get(ApproverEndpoint.EnvironmentVariable));
+            pipeName = ApproverEndpoint.Resolve(
+                line.Value(ApproverOption),
+                context.Environment.Get(ApproverEndpoint.EnvironmentVariable),
+                VaultIdentity.Of(home, vaultPath))!;
         }
         catch (ArgumentException ex)
         {
@@ -108,17 +118,27 @@ internal static class AgentCommand
             line.Value(PolicyOption)
             ?? KeypasteHome.PolicyPath(context.Environment.Get(KeypasteHome.EnvironmentVariable)));
 
-        return VaultSession.Open(vaultPath, line, context, vault => Serve(vault, vaultPath, pipeName, limits, policy, context));
+        if (!VaultClaim.TryAcquire(home, vaultPath, OwnerKind.TerminalAgent, out var claim, out var refusal))
+        {
+            context.Stderr.WriteLine($"keypaste: {refusal}");
+            return CliApp.ExitInternalError;
+        }
+
+        using (claim)
+        {
+            return VaultSession.Open(vaultPath, line, context, vault => Serve(vault, claim, pipeName, limits, policy, context));
+        }
     }
 
     private static int Serve(
         Vault vault,
-        string vaultPath,
+        VaultClaim claim,
         string pipeName,
         ApprovalLimits limits,
         PolicyLoad policy,
         CliContext context)
     {
+        var session = VaultOwner.NewSession();
         using var grants = new GrantCache(TimeProvider.System);
         using var gate = new ApprovalGate(
             new TerminalApprovalChannel(context.Prompt, context.Stderr),
@@ -133,6 +153,8 @@ internal static class AgentCommand
             new PolicyGate(policy.Rules, TimeProvider.System),
             line => context.Stderr.WriteLine($"keypaste: {line}"));
 
+        var authority = new SessionAuthority(claim.Vault, () => session, handler);
+
         ApproverListener? listener = null;
 
         try
@@ -141,12 +163,12 @@ internal static class AgentCommand
             {
                 // Binding happens here, so a name somebody else already holds is a startup failure
                 // rather than a server that looks up and never accepts anything.
-                listener = new ApproverListener(pipeName, handler);
+                listener = new ApproverListener(pipeName, authority);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 context.Stderr.WriteLine($"keypaste: could not listen on '{pipeName}': {ex.Message}");
-                context.Stderr.WriteLine("keypaste: another keypaste agent may already be running.");
+                context.Stderr.WriteLine("keypaste: another keypaste process may be listening on that name.");
                 return CliApp.ExitInternalError;
             }
 
@@ -164,7 +186,7 @@ internal static class AgentCommand
 
             try
             {
-                Announce(vaultPath, pipeName, limits, policy, context);
+                Announce(claim.Vault.Path, pipeName, session, limits, policy, context);
 
                 // Blocking on the listener is the command. There is no synchronization context in
                 // a console app, so this is a wait rather than a deadlock waiting to happen.
@@ -202,6 +224,7 @@ internal static class AgentCommand
     internal static void Announce(
         string vaultPath,
         string pipeName,
+        string session,
         ApprovalLimits limits,
         PolicyLoad policy,
         CliContext context)
@@ -226,7 +249,7 @@ internal static class AgentCommand
         context.Stderr.WriteLine(
             string.Create(
                 CultureInfo.InvariantCulture,
-                $"keypaste: listening on {pipeName}, {limits.Window.TotalSeconds:0} seconds to answer, grants last at most {limits.MaximumTtlSeconds} seconds"));
+                $"keypaste: listening on {pipeName} for session {session}, {limits.Window.TotalSeconds:0} seconds to answer, grants last at most {limits.MaximumTtlSeconds} seconds"));
 
         // The claim changes when a rule is in force, because with one it is no longer true. Saying
         // "nothing is released without you saying yes" while a standing rule releases things

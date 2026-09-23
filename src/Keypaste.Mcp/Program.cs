@@ -76,11 +76,11 @@ internal static class Program
 
     private static async Task ServeAsync(ServerOptions options, AuditLog audit)
     {
-        // Nothing connects here. The approver is reached on the first call that needs an answer,
-        // because a client spawns this server long before anybody starts one, and a bridge that
+        // Nothing connects here. The vault's owner is reached on the first call that needs an answer,
+        // because a client spawns this server long before anybody unlocks the vault, and a bridge that
         // refused to start would look broken in the client's log rather than saying so in an
         // answer an agent can act on.
-        await using var approver = new ApproverConnection(options.ApproverName);
+        await using var approver = new ApproverConnection(options.ApproverName, options.VaultPath);
 
         var serverOptions = new McpServerOptions
         {

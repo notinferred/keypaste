@@ -28,7 +28,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     internal ShellViewModel(
         AppVaultSession session,
         string? home,
-        string? approverFromEnvironment,
+        SessionHost? host,
         Action<Core.Settings.AppTheme>? applyTheme = null,
         IAppClipboard? clipboard = null,
         TimeProvider? clock = null,
@@ -43,7 +43,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         _notice = notice;
         _picker = picker;
         Home = home;
-        ApproverFromEnvironment = approverFromEnvironment;
+        Host = host;
         ApplyTheme = applyTheme ?? (_ => { });
         Preferences = preferences ?? new DesktopPreferences(home);
 
@@ -94,8 +94,8 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     /// <summary>The value of <c>KEYPASTE_HOME</c>, or null.</summary>
     internal string? Home { get; }
 
-    /// <summary>The value of <c>KEYPASTE_APPROVER</c>, or null.</summary>
-    internal string? ApproverFromEnvironment { get; }
+    /// <summary>What serves this vault to agents, or null where nothing does.</summary>
+    internal SessionHost? Host { get; }
 
     /// <summary>How a theme choice reaches the application object.</summary>
     /// <remarks>
@@ -219,7 +219,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
     private AgentActivityViewModel Activity()
     {
-        var activity = new AgentActivityViewModel(ApproverFromEnvironment);
+        var activity = new AgentActivityViewModel(Host);
         _ = activity.RefreshAsync();
         return activity;
     }

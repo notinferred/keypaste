@@ -6,6 +6,8 @@
 
 | id | date | decision | supersedes |
 |---|---|---|---|
+| D-0310 | 2026-09-23 | Approver protocol v2: a bridge attaches by naming its vault and every request names that vault and the session the owner minted at unlock; the owner answers only its current session on that connection. Authentication stays the OS same-user check; no password, key or keyfile crosses the endpoint | v1's unnamed requests to whatever listened |
+| D-0309 | 2026-09-23 | In the desktop journey the app process owns the vault it unlocks and serves it on a per-user, per-vault endpoint; `keypaste agent` is the same authority in a terminal. One owner per vault, by an exclusive claim under keypaste's home taken before the password is read, and a second owner is refused naming the first | D-0054's agent-owned pipe with the app as its client |
 | D-0307 | 2026-09-23 | FEATURES states KeePassXC compatibility only from `verify-keepassxc-workflows.sh` on vaults KeePassXC made, a claim with no step there being removed; the gate's desktop half presses the commands the screens bind to through `Keypaste.AppDriver` and never calls core for the act under test | FEATURES' unchecked "ordinary edits preserve attachments and custom strings" |
 | D-0303 | 2026-09-23 | The desktop test session renders with Skia, and a claim that a secret is or is not on screen is read from a captured frame by a reader shown to find what it rejects, not from `RevealedValue.Rendered` or a view model; that frame is D-0232's rendering evidence | D-0232's `Rendered` as proof the characters were drawn |
 | D-0301 | 2026-09-23 | A secret input's accessible name is its attached name or, failing that, its placeholder, never anything derived from what was typed; the mask stays in the tree as D-0099 allows | — |

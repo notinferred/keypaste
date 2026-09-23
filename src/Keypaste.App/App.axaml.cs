@@ -23,6 +23,7 @@ namespace Keypaste.App;
 internal sealed partial class App : Application, IDisposable
 {
     private AppVaultSession? _session;
+    private SessionHost? _host;
     private DesktopPreferences? _preferences;
     private MinimizeLock? _minimize;
     private ActivityWatch? _activity;
@@ -43,6 +44,7 @@ internal sealed partial class App : Application, IDisposable
             _preferences = new DesktopPreferences(home);
             _session = Compose(_preferences, TimeProvider.System);
             _session.Locked += OnLocked;
+            _host = new SessionHost(_session, Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable));
 
             _window = new MainWindow();
             _activity = Observe(_window, _session, TimeProvider.System, () => _shell?.ClearCountdown());
@@ -82,7 +84,10 @@ internal sealed partial class App : Application, IDisposable
 
         ApplyTheme(preferences.Current.Theme);
 
-        return new AppVaultSession(clock, preferences.IdleTimeout);
+        return new AppVaultSession(
+            clock,
+            preferences.IdleTimeout,
+            KeypasteHome.Resolve(Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable)));
     }
 
     /// <summary>
@@ -242,7 +247,7 @@ internal sealed partial class App : Application, IDisposable
         _shell = new ShellViewModel(
             _session,
             Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable),
-            Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable),
+            _host,
             ApplyTheme,
             new AvaloniaClipboard(_window),
             TimeProvider.System,
@@ -284,6 +289,8 @@ internal sealed partial class App : Application, IDisposable
         _shell = null;
         _unlock?.Dispose();
         _unlock = null;
+        _host?.Dispose();
+        _host = null;
         _session?.Dispose();
         _session = null;
     }

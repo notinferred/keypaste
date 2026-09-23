@@ -13,6 +13,34 @@ public enum ApproverMessageKind
 
     /// <summary>One field of one entry, subject to a human saying yes.</summary>
     Credential = 2,
+
+    /// <summary>Binds a connection to the session holding a named vault.</summary>
+    Attach = 3,
+}
+
+/// <summary>Asks the owner of a vault to attach this connection to its current session.</summary>
+/// <param name="Vault">The vault the bridge was configured with, as an absolute path.</param>
+public sealed record AttachRequest(string Vault);
+
+/// <summary>The session a connection is now attached to, or why it is not attached.</summary>
+/// <param name="Session">The session's identifier, or null when the connection was not attached.</param>
+/// <param name="Refusal">Why not, for the audit line, or null when it was attached.</param>
+/// <param name="Reason">keypaste's own words for a refusal, or empty.</param>
+public sealed record AttachReply(string? Session, AuditMethod? Refusal, string Reason)
+{
+    /// <summary>Whether the connection may now make requests.</summary>
+    public bool Attached => Session is { Length: > 0 } && Refusal is null;
+
+    /// <summary>A connection attached to a session.</summary>
+    /// <param name="session">The session's identifier.</param>
+    /// <returns>The reply.</returns>
+    public static AttachReply To(string session) => new(session, null, string.Empty);
+
+    /// <summary>A connection that was not attached.</summary>
+    /// <param name="method">vault-locked or no-session.</param>
+    /// <param name="reason">keypaste's own words.</param>
+    /// <returns>The reply.</returns>
+    public static AttachReply Refused(AuditMethod method, string reason) => new(null, method, reason);
 }
 
 /// <summary>
@@ -24,7 +52,14 @@ public enum ApproverMessageKind
 /// from the bridge's own configuration, not from the call.
 /// </remarks>
 /// <param name="Exposure">The globs the bridge was configured with, applied again by the approver.</param>
-public sealed record NamesRequest(IReadOnlyList<string> Exposure);
+public sealed record NamesRequest(IReadOnlyList<string> Exposure)
+{
+    /// <summary>The vault this connection attached to.</summary>
+    public string Vault { get; init; } = string.Empty;
+
+    /// <summary>The session this connection attached to.</summary>
+    public string Session { get; init; } = string.Empty;
+}
 
 /// <summary>The names the approver is willing to have shown, or why there are none.</summary>
 /// <param name="VaultUnlocked">Whether a vault was open at all.</param>
@@ -47,7 +82,11 @@ public sealed record NamesReply(
     bool VaultUnlocked,
     IReadOnlyList<EntryName> Names,
     string Reason,
-    bool Complete);
+    bool Complete)
+{
+    /// <summary>The session that answered, or null when none did.</summary>
+    public string? Session { get; init; }
+}
 
 /// <summary>An agent's credential request, forwarded to whoever can ask a human about it.</summary>
 /// <remarks>
@@ -100,6 +139,12 @@ public sealed record CredentialRequest
     /// </para>
     /// </remarks>
     public string? ClientLabel { get; init; }
+
+    /// <summary>The vault this connection attached to.</summary>
+    public string Vault { get; init; } = string.Empty;
+
+    /// <summary>The session this connection attached to.</summary>
+    public string Session { get; init; } = string.Empty;
 }
 
 /// <summary>The approver's answer, and — on exactly one path — the field value itself.</summary>
@@ -135,6 +180,9 @@ public sealed record CredentialReply
 
     /// <summary>The released field value. Present only when <see cref="Decision"/> is granted.</summary>
     public string? Value { get; init; }
+
+    /// <summary>The session that answered, or null when none did.</summary>
+    public string? Session { get; init; }
 
     /// <summary>A description with the credential left out.</summary>
     /// <returns>The decision and method, and never the value.</returns>

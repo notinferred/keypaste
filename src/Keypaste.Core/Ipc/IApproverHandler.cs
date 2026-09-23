@@ -21,6 +21,13 @@ namespace Keypaste.Core.Ipc;
 /// </remarks>
 public interface IApproverHandler
 {
+    /// <summary>Attaches a connection to the session holding the vault it names.</summary>
+    /// <param name="request">The vault the bridge was configured with.</param>
+    /// <param name="connectionId">The connection to attach.</param>
+    /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
+    /// <returns>The session, or why the connection was not attached.</returns>
+    ValueTask<AttachReply> AttachAsync(AttachRequest request, string connectionId, CancellationToken cancellationToken);
+
     /// <summary>Which entry names may be shown to the agent on this connection.</summary>
     /// <param name="request">The exposure the bridge is configured with.</param>
     /// <param name="connectionId">Who is asking, for as long as they stay connected.</param>

@@ -31,6 +31,7 @@ internal sealed class FakeApprover : IAsyncDisposable
     private readonly Handler _handler;
     private ApproverListener? _listener;
     private Task? _running;
+    private int _attaches;
     private bool _disposed;
 
     internal FakeApprover()
@@ -47,6 +48,21 @@ internal sealed class FakeApprover : IAsyncDisposable
 
     /// <summary>What the approver decides. Denies unless a test says otherwise.</summary>
     internal CredentialReply Answer { get; set; } = Denial(AuditMethod.Prompt, "a person refused this request");
+
+    /// <summary>The session every attachment is given.</summary>
+    internal string Session { get; set; } = "fake-session";
+
+    /// <summary>Set to refuse every attachment with this reply instead.</summary>
+    internal AttachReply? AttachRefusal { get; set; }
+
+    /// <summary>
+    /// Set to end the connection without answering the next credential request, after running this
+    /// action. The bridge then reconnects and retries, which is what a test of that retry needs.
+    /// </summary>
+    internal Action? DropOnce { get; set; }
+
+    /// <summary>How many attachments reached the approver.</summary>
+    internal int Attaches => Volatile.Read(ref _attaches);
 
     /// <summary>What the approver says the vault contains.</summary>
     internal NamesReply Names { get; set; } = new(false, [], "no vault is unlocked", true);
@@ -149,8 +165,14 @@ internal sealed class FakeApprover : IAsyncDisposable
 
     private sealed class Handler(FakeApprover approver) : IApproverHandler
     {
+        public ValueTask<AttachReply> AttachAsync(AttachRequest request, string connectionId, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref approver._attaches);
+            return ValueTask.FromResult(approver.AttachRefusal ?? AttachReply.To(approver.Session));
+        }
+
         public ValueTask<NamesReply> ListAsync(NamesRequest request, string connectionId, CancellationToken cancellationToken) =>
-            ValueTask.FromResult(approver.Names);
+            ValueTask.FromResult(approver.Names with { Session = approver.Session });
 
         public async ValueTask<CredentialReply> RequestAsync(
             CredentialRequest request,
@@ -160,12 +182,19 @@ internal sealed class FakeApprover : IAsyncDisposable
             approver.Received.Add(request);
             approver.Entered.TrySetResult();
 
+            if (approver.DropOnce is { } drop)
+            {
+                approver.DropOnce = null;
+                drop();
+                throw new IOException("the fake approver dropped this connection unanswered");
+            }
+
             if (approver.Hold)
             {
                 await approver.Held.Task.ConfigureAwait(false);
             }
 
-            return approver.Answer;
+            return approver.Answer with { Session = approver.Session };
         }
 
         public void Disconnected(string connectionId)

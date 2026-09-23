@@ -1,4 +1,7 @@
+using System.Diagnostics.CodeAnalysis;
 using Keypaste.Core;
+using Keypaste.Core.Audit;
+using Keypaste.Core.Ownership;
 
 namespace Keypaste.App.Session;
 
@@ -19,6 +22,11 @@ namespace Keypaste.App.Session;
 /// null means locked. When the app becomes an approver it is
 /// <c>new VaultCredentialSource(() =&gt; session.Unlocked)</c> and nothing here changes. Building
 /// to that signature now costs nothing and is the difference between a seam and a rewrite.
+/// </para>
+/// <para>
+/// <b>It holds the vault's claim while unlocked</b>, taken before the password is spent, so a vault
+/// another keypaste process holds is refused by name and never opened, and it mints a fresh
+/// <see cref="SessionId"/> for every unlock (D-0309).
 /// </para>
 /// <para>
 /// <b>It names no Avalonia type, and must not.</b> Everything below is testable with a
@@ -51,8 +59,11 @@ internal sealed class AppVaultSession : IDisposable
 
     private readonly Lock _gate = new();
     private readonly TimeProvider _clock;
+    private readonly string _home;
 
     private Vault? _vault;
+    private VaultClaim? _claim;
+    private string? _session;
     private ITimer? _timer;
     private DateTimeOffset _activityWall;
     private long _activityStamp;
@@ -60,16 +71,53 @@ internal sealed class AppVaultSession : IDisposable
     private bool _warned;
     private bool _disposed;
 
-    internal AppVaultSession(TimeProvider clock, TimeSpan? idleTimeout = null)
+    /// <param name="clock">The clock idleness is measured on.</param>
+    /// <param name="idleTimeout">How long the app may sit untouched, or null for the default.</param>
+    /// <param name="home">keypaste's home, where the vault's claim is kept; null resolves it as the app does.</param>
+    internal AppVaultSession(TimeProvider clock, TimeSpan? idleTimeout = null, string? home = null)
     {
         ArgumentNullException.ThrowIfNull(clock);
 
         _clock = clock;
         _idleTimeout = Clamp(idleTimeout ?? DefaultIdleTimeout);
+        _home = home ?? KeypasteHome.Resolve(Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable));
     }
 
     /// <summary>Raised after the vault has been disposed, never before.</summary>
     internal event EventHandler<VaultLockReason>? Locked;
+
+    /// <summary>Raised after a vault has been opened or created, with its session in place.</summary>
+    internal event EventHandler? Opened;
+
+    /// <summary>keypaste's home, where the vault's claim is kept.</summary>
+    internal string Home => _home;
+
+    /// <summary>The open vault's identity, or <see langword="null"/> when locked.</summary>
+    internal VaultIdentity? Identity
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _claim?.Vault;
+            }
+        }
+    }
+
+    /// <summary>This unlock's session identifier, or <see langword="null"/> when locked.</summary>
+    internal string? SessionId
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _session;
+            }
+        }
+    }
+
+    /// <summary>Why the last unlock or create was refused as <see cref="UnlockOutcome.HeldElsewhere"/>.</summary>
+    internal string? HeldElsewhere { get; private set; }
 
     /// <summary>Raised once per idle period, <see cref="WarningWindow"/> before locking.</summary>
     internal event EventHandler<TimeSpan>? LockingSoon;
@@ -187,10 +235,15 @@ internal sealed class AppVaultSession : IDisposable
             return UnlockOutcome.KeyfileUnusable;
         }
 
-        return Open(path, master, keyfilePath);
+        if (!TryClaim(path, out var claim))
+        {
+            return UnlockOutcome.HeldElsewhere;
+        }
+
+        return Open(path, master, keyfilePath, claim);
     }
 
-    private UnlockOutcome Open(string path, ReadOnlySpan<char> master, string? keyfilePath)
+    private UnlockOutcome Open(string path, ReadOnlySpan<char> master, string? keyfilePath, VaultClaim claim)
     {
         Vault opened;
 
@@ -205,18 +258,56 @@ internal sealed class AppVaultSession : IDisposable
         }
         catch (InvalidMasterPasswordException)
         {
+            Release(claim);
             return UnlockOutcome.WrongPassword;
         }
         catch (UnreadableKeyfileException)
         {
+            Release(claim);
             return UnlockOutcome.KeyfileUnusable;
         }
         catch (VaultException)
         {
+            Release(claim);
             return UnlockOutcome.Failed;
         }
 
-        return Adopt(opened);
+        return Adopt(opened, claim);
+    }
+
+    /// <summary>Takes the claim on a vault, or reuses the one this session already holds on it.</summary>
+    private bool TryClaim(string path, [NotNullWhen(true)] out VaultClaim? claim)
+    {
+        lock (_gate)
+        {
+            if (_claim is { } held && held.Vault.Names(path))
+            {
+                claim = held;
+                HeldElsewhere = null;
+                return true;
+            }
+        }
+
+        // Ownership passes to Adopt, or back through Release on every refusal after this.
+#pragma warning disable CA2000
+        var taken = VaultClaim.TryAcquire(_home, path, OwnerKind.DesktopApp, out claim, out var refusal);
+#pragma warning restore CA2000
+        HeldElsewhere = refusal;
+        return taken;
+    }
+
+    /// <summary>Gives back a claim an unlock took and did not use.</summary>
+    private void Release(VaultClaim claim)
+    {
+        lock (_gate)
+        {
+            if (ReferenceEquals(claim, _claim))
+            {
+                return;
+            }
+        }
+
+        claim.Dispose();
     }
 
     /// <summary>
@@ -227,7 +318,7 @@ internal sealed class AppVaultSession : IDisposable
     /// place that disposes whatever it replaced. Two of these would be two chances to leak a vault
     /// that is still holding a master key.
     /// </remarks>
-    private UnlockOutcome Adopt(Vault opened)
+    private UnlockOutcome Adopt(Vault opened, VaultClaim claim)
     {
         VaultLockReason? replaced = null;
 
@@ -236,6 +327,12 @@ internal sealed class AppVaultSession : IDisposable
             if (_disposed)
             {
                 opened.Dispose();
+
+                if (!ReferenceEquals(claim, _claim))
+                {
+                    claim.Dispose();
+                }
+
                 return UnlockOutcome.Failed;
             }
 
@@ -245,7 +342,14 @@ internal sealed class AppVaultSession : IDisposable
                 replaced = VaultLockReason.Replaced;
             }
 
+            if (!ReferenceEquals(claim, _claim))
+            {
+                _claim?.Dispose();
+            }
+
             _vault = opened;
+            _claim = claim;
+            _session = VaultOwner.NewSession();
             _warned = false;
             MarkActivity();
             Rearm();
@@ -255,6 +359,8 @@ internal sealed class AppVaultSession : IDisposable
         {
             Locked?.Invoke(this, reason);
         }
+
+        Opened?.Invoke(this, EventArgs.Empty);
 
         return UnlockOutcome.Opened;
     }
@@ -288,6 +394,11 @@ internal sealed class AppVaultSession : IDisposable
     {
         ArgumentNullException.ThrowIfNull(path);
 
+        if (!TryClaim(path, out var claim))
+        {
+            return VaultCreationOutcome.Failed;
+        }
+
         // Same shape and same reason as Open: the vault's ownership transfers to this session, and
         // every route out of it — Lock, Dispose, and a later unlock replacing it — disposes it.
         // Adopt disposes it itself if this session is already gone.
@@ -297,10 +408,11 @@ internal sealed class AppVaultSession : IDisposable
 
         if (outcome != VaultCreationOutcome.Created || created is null)
         {
+            Release(claim);
             return outcome;
         }
 
-        return Adopt(created) == UnlockOutcome.Opened
+        return Adopt(created, claim) == UnlockOutcome.Opened
             ? VaultCreationOutcome.Created
             : VaultCreationOutcome.Failed;
     }
@@ -469,6 +581,9 @@ internal sealed class AppVaultSession : IDisposable
             _timer = null;
             _vault?.Dispose();
             _vault = null;
+            _session = null;
+            _claim?.Dispose();
+            _claim = null;
             _warned = false;
         }
 

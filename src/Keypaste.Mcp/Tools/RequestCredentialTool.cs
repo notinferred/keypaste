@@ -124,7 +124,7 @@ internal sealed class RequestCredentialTool(
             };
         }
 
-        var record = McpAudit.Line(
+        var line = McpAudit.Line(
             ToolText.CredentialToolName,
             client,
             verdict.Decision,
@@ -132,6 +132,7 @@ internal sealed class RequestCredentialTool(
             verdict.Reason,
             options.Exposure,
             args);
+        var record = line with { Session = verdict.Session };
 
         // No cancellation token reaches this, and there is none to forward: appending is synchronous
         // and takes none. That is what makes "every call is logged" true even for the calls nobody
@@ -193,7 +194,7 @@ internal sealed class RequestCredentialTool(
                 "the entry is outside this server's configured exposure");
         }
 
-        var (reply, outcome) = await approver.RequestAsync(
+        var (reply, outcome, refusal) = await approver.RequestAsync(
             new CredentialRequest
             {
                 Entry = entry,
@@ -234,15 +235,26 @@ internal sealed class RequestCredentialTool(
 
         if (reply is null)
         {
-            return outcome == ApproverOutcome.Failed
-                ? new Verdict(AuditDecision.Denied, AuditMethod.Failed, "the approver could not be asked")
-                : new Verdict(AuditDecision.Denied, AuditMethod.NoApprover, "no keypaste agent is running");
+            return outcome switch
+            {
+                ApproverOutcome.Refused when refusal?.Refusal is { } method =>
+                    new Verdict(AuditDecision.Denied, method, refusal.Reason),
+                ApproverOutcome.NoVault =>
+                    new Verdict(
+                        AuditDecision.Denied,
+                        AuditMethod.NoSession,
+                        "this server was started without a vault to ask about",
+                        Refusal: ToolText.NoVault),
+                ApproverOutcome.Failed =>
+                    new Verdict(AuditDecision.Denied, AuditMethod.Failed, "the approver could not be asked"),
+                _ => new Verdict(AuditDecision.Denied, AuditMethod.NoApprover, "no keypaste process holds the vault unlocked"),
+            };
         }
 
         if (reply.Decision != AuditDecision.Granted || reply.Value is not { Length: > 0 })
         {
             return new Verdict(
-                AuditDecision.Denied, reply.Method, reply.Reason, ResolvedEntry: reply.Entry);
+                AuditDecision.Denied, reply.Method, reply.Reason, ResolvedEntry: reply.Entry, Session: reply.Session);
         }
 
         return new Verdict(
@@ -250,7 +262,8 @@ internal sealed class RequestCredentialTool(
             reply.Method,
             reply.Reason,
             new Released(field, reply.Value, reply.TtlSeconds),
-            ResolvedEntry: reply.Entry);
+            ResolvedEntry: reply.Entry,
+            Session: reply.Session);
     }
 
     /// <summary>Whether a path-shaped argument names something this server may discuss.</summary>
@@ -316,11 +329,13 @@ internal sealed class RequestCredentialTool(
     /// audit line prefers this over the argument the agent sent, because that argument is usually
     /// an opaque handle and a log that repeats it answers nothing.
     /// </param>
+    /// <param name="Session">The unlocked session that answered, for the audit line.</param>
     private readonly record struct Verdict(
         AuditDecision Decision,
         AuditMethod Method,
         string Reason,
         Released? Released = null,
         string? Refusal = null,
-        string? ResolvedEntry = null);
+        string? ResolvedEntry = null,
+        string? Session = null);
 }

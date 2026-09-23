@@ -19,6 +19,8 @@ public sealed class ApproverConnectionTests
 
     private static readonly TimeSpan _promptly = TimeSpan.FromSeconds(10);
 
+    private static readonly string _vault = Path.Combine(Path.GetTempPath(), "keypaste-connection-tests.kdbx");
+
     private static CredentialRequest Request(string entry = "env/dev/STRIPE_KEY") => new()
     {
         Entry = entry,
@@ -56,7 +58,7 @@ public sealed class ApproverConnectionTests
         approver.Hold = true;
         approver.StartApproving();
 
-        await using var connection = new ApproverConnection(approver.PipeName);
+        await using var connection = new ApproverConnection(approver.PipeName, _vault);
 
         using var giveUp = new CancellationTokenSource();
 
@@ -89,7 +91,7 @@ public sealed class ApproverConnectionTests
         var approver = new FakeApprover();
         approver.StartApproving();
 
-        await using var connection = new ApproverConnection(approver.PipeName);
+        await using var connection = new ApproverConnection(approver.PipeName, _vault);
 
         var (first, answered) = await connection.RequestAsync(Request(), Token);
 

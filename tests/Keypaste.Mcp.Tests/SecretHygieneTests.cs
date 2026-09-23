@@ -154,7 +154,7 @@ public sealed class SecretHygieneTests : IAsyncLifetime
             PolicyGate.None);
 
         _stop = new CancellationTokenSource();
-        _listener = new ApproverListener(PipeName, handler);
+        _listener = new ApproverListener(PipeName, TestSession.Over(_vault, handler));
         _serving = _listener.RunAsync(_stop.Token);
 
         // A second approver over the same vault, with a rule in force. Two listeners rather than one
@@ -169,12 +169,14 @@ public sealed class SecretHygieneTests : IAsyncLifetime
         _ruleStop = new CancellationTokenSource();
         _ruleListener = new ApproverListener(
             RulePipeName,
-            new ApproverHandler(
-                new VaultCredentialSource(() => _vault),
-                new VaultEntryNameLister(() => _vault),
-                _ruleGate,
-                _ruleGrants,
-                new PolicyGate(rules, TimeProvider.System)));
+            TestSession.Over(
+                _vault,
+                new ApproverHandler(
+                    new VaultCredentialSource(() => _vault),
+                    new VaultEntryNameLister(() => _vault),
+                    _ruleGate,
+                    _ruleGrants,
+                    new PolicyGate(rules, TimeProvider.System))));
 
         _ruleServing = _ruleListener.RunAsync(_ruleStop.Token);
 
@@ -223,14 +225,14 @@ public sealed class SecretHygieneTests : IAsyncLifetime
 
     private async Task<(McpHarness Harness, McpClient Client)> StartAsync()
     {
-        var harness = new McpHarness(PipeName);
+        var harness = new McpHarness(PipeName, _vault!.Path);
         return (harness, await harness.StartAsync());
     }
 
     /// <summary>A bridge talking to the approver that has a standing rule in force.</summary>
     private async Task<(McpHarness Harness, McpClient Client)> StartPreapprovedAsync()
     {
-        var harness = new McpHarness(RulePipeName);
+        var harness = new McpHarness(RulePipeName, _vault!.Path);
         return (harness, await harness.StartAsync());
     }
 

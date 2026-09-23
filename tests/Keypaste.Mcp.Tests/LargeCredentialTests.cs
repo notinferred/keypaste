@@ -82,12 +82,14 @@ public sealed class LargeCredentialTests : IAsyncLifetime
         _stop = new CancellationTokenSource();
         _listener = new ApproverListener(
             PipeName,
-            new ApproverHandler(
-                new VaultCredentialSource(() => _vault),
-                new VaultEntryNameLister(() => _vault),
-                _gate,
-                _grants,
-                PolicyGate.None));
+            TestSession.Over(
+                _vault,
+                new ApproverHandler(
+                    new VaultCredentialSource(() => _vault),
+                    new VaultEntryNameLister(() => _vault),
+                    _gate,
+                    _grants,
+                    PolicyGate.None)));
 
         _serving = _listener.RunAsync(_stop.Token);
 
@@ -154,7 +156,7 @@ public sealed class LargeCredentialTests : IAsyncLifetime
 
     private async Task<(McpHarness Harness, McpClient Client)> StartAsync()
     {
-        var harness = new McpHarness(PipeName);
+        var harness = new McpHarness(PipeName, _vault!.Path);
         return (harness, await harness.StartAsync());
     }
 

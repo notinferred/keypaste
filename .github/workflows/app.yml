@@ -12,6 +12,8 @@ on:
       - 'tests/Keypaste.Consistency.Tests/**'
       - 'tests/Keypaste.AppDriver/**'
       - 'scripts/verify-keepassxc-workflows.sh'
+      - 'scripts/verify-session-authority.sh'
+      - 'src/Keypaste.Mcp/**'
       - 'scripts/install-keepassxc-windows.sh'
       - 'src/Keypaste.Cli/**'
       - 'tests/Keypaste.Cli.Tests/**'

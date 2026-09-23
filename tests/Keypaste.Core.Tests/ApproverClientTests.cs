@@ -108,6 +108,9 @@ public sealed class ApproverClientTests
 
         internal TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+        public ValueTask<AttachReply> AttachAsync(AttachRequest request, string connectionId, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(AttachReply.To("test-session"));
+
         public ValueTask<NamesReply> ListAsync(NamesRequest request, string connectionId, CancellationToken cancellationToken) =>
             ValueTask.FromResult(new NamesReply(true, [], string.Empty, true));
 

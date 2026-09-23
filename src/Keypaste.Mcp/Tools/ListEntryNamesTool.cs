@@ -124,6 +124,7 @@ internal sealed class ListEntryNamesTool(
             Method = AuditMethod.Exposure,
             Reason = $"listed {exposed.Count} entry names",
             Exposure = options.Exposure.Globs,
+            Session = listing.Session,
         };
 
         return Record(record, Render(exposed, truncated, options.Exposure.Globs));
@@ -141,6 +142,7 @@ internal sealed class ListEntryNamesTool(
     {
         VaultAvailability.Locked => AuditMethod.VaultLocked,
         VaultAvailability.Busy => AuditMethod.Busy,
+        VaultAvailability.NoSession => AuditMethod.NoSession,
         _ => AuditMethod.NoApprover,
     };
 

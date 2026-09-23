@@ -153,6 +153,7 @@ public sealed class AgentPolicyTests : IDisposable
         AgentCommand.Announce(
             harness.VaultPath,
             "keypaste-agent-test",
+            "test-session",
             ApprovalLimits.Default,
             PolicyLoader.Load(path),
             harness.NewContext());

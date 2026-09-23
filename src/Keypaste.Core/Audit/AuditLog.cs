@@ -585,6 +585,8 @@ public sealed class AuditLog : IDisposable
 
             writer.WriteEndArray();
 
+            WriteOptional(writer, "session", record.Session);
+
             // Last, so the bytes the hash covers include the link. The other order would let a
             // line's link be re-pointed without disturbing its hash.
             writer.WriteString("prev", previous);
@@ -645,6 +647,7 @@ public sealed class AuditLog : IDisposable
         AuditMethod.PolicyLimit => "policy-limit",
         AuditMethod.NotInitialized => "not-initialized",
         AuditMethod.Undeliverable => "undeliverable",
+        AuditMethod.NoSession => "no-session",
         _ => "unknown",
     };
 

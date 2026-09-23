@@ -55,27 +55,51 @@ internal static class ToolText
     /// has started one.
     /// </remarks>
     internal const string NoApprover = """
-        keypaste: DENIED. No keypaste agent is running, so there is nobody to approve this. keypaste
-        never releases a credential without a person saying yes to that specific request.
+        keypaste: DENIED. Nobody can approve this right now: no keypaste agent holds this vault
+        unlocked. keypaste never releases a credential without a person saying yes to that specific
+        request.
 
         Ask the person you are working with to run `keypaste agent --vault <their vault>` in a
-        terminal, and then try again. Until they do, every request will be refused. This call was
+        terminal, and then try again. The keypaste desktop app cannot approve requests yet, so if it
+        has this vault unlocked they need to lock it there first. Until then, every request will be
+        refused. This call was recorded in the audit log as denied.
+        """;
+
+    /// <summary>Why a listing was refused when nothing holds the vault.</summary>
+    internal const string NoApproverForListing = """
+        keypaste: nothing holds this vault unlocked, so there are no entry names to read. No entry
+        names were read.
+
+        Ask the person you are working with to unlock it in the keypaste desktop app, or to run
+        `keypaste agent --vault <their vault>` in a terminal, and then try again. This call was
         recorded in the audit log as denied.
         """;
 
-    /// <summary>Why a listing was refused when no approver is running.</summary>
-    internal const string NoApproverForListing = """
-        keypaste: no keypaste agent is running, so there is no unlocked vault to read names from.
-        No entry names were read.
-
-        Ask the person you are working with to run `keypaste agent --vault <their vault>` in a
-        terminal, and then try again. This call was recorded in the audit log as denied.
+    /// <summary>Why a call was refused when the vault's owner answered locked.</summary>
+    internal const string VaultLocked = """
+        keypaste: the vault is locked, so there was nothing to read. Nothing was read or released.
+        This call was recorded in the audit log as denied.
         """;
 
-    /// <summary>Why a listing was refused when the vault behind the approver is locked.</summary>
-    internal const string VaultLocked = """
-        keypaste: the keypaste agent is running but no vault is unlocked, so there was nothing to
-        read. No entry names were read. This call was recorded in the audit log as denied.
+    /// <summary>Why a call was refused because it did not belong to the vault's current session.</summary>
+    /// <remarks>
+    /// One retry is reasonable, because the ordinary cause is a lock or unlock between two calls.
+    /// </remarks>
+    internal const string NoSession = """
+        keypaste: DENIED. This call did not reach the current session of the keypaste process
+        holding this server's vault, so it was not considered. Nothing was read or released.
+
+        If the vault was just locked or unlocked again, try once more. Otherwise ask the person you
+        are working with to check that this server's --vault names the vault they unlocked. This
+        call was recorded in the audit log as denied.
+        """;
+
+    /// <summary>Why a call was refused when this server names no vault.</summary>
+    internal const string NoVault = """
+        keypaste: DENIED. This server was started without a vault to ask about, so nothing was read
+        or released. Ask the person you are working with to add `--vault <their vault>` to this
+        server's entry in the MCP client's configuration; `keypaste setup` writes it. This call was
+        recorded in the audit log as denied.
         """;
 
     /// <summary>Why a request was refused when a person considered it and said no.</summary>
@@ -259,6 +283,7 @@ internal static class ToolText
         AuditMethod.Cancelled => Cancelled,
         AuditMethod.PolicyLimit => PolicyLimit,
         AuditMethod.Undeliverable => Undeliverable,
+        AuditMethod.NoSession => NoSession,
         _ => ApproverFailed,
     };
 

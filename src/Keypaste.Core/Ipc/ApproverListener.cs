@@ -162,6 +162,10 @@ public sealed class ApproverListener : IDisposable
     {
         switch (ApproverProtocol.KindOf(frame))
         {
+            case ApproverMessageKind.Attach when ApproverProtocol.TryDecode(frame, out AttachRequest? attach):
+                return ApproverProtocol.Encode(
+                    await _handler.AttachAsync(attach, connectionId, cancellationToken).ConfigureAwait(false));
+
             case ApproverMessageKind.Names when ApproverProtocol.TryDecode(frame, out NamesRequest? names):
                 return ApproverProtocol.Encode(
                     await _handler.ListAsync(names, connectionId, cancellationToken).ConfigureAwait(false));

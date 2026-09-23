@@ -24,6 +24,12 @@ internal enum VaultAvailability
     /// rather than queued behind it. <see cref="ToolText.Busy"/> is what the agent is told.
     /// </summary>
     Busy = 3,
+
+    /// <summary>
+    /// No session holding this bridge's vault would take the listing: none was named, or the process
+    /// that answered holds another vault.
+    /// </summary>
+    NoSession = 4,
 }
 
 /// <summary>What the vault had to say when asked for its entry names.</summary>
@@ -40,7 +46,11 @@ internal sealed record EntryNameListing(
     VaultAvailability Availability,
     IReadOnlyList<EntryName> Names,
     string Reason,
-    bool Complete);
+    bool Complete)
+{
+    /// <summary>The unlocked session that answered, or null when none did.</summary>
+    public string? Session { get; init; }
+}
 
 /// <summary>
 /// The seam between the bridge and an unlocked vault.
@@ -66,7 +76,7 @@ internal interface IEntryNameSource
     ValueTask<EntryNameListing> ListAsync(CancellationToken cancellationToken);
 }
 
-/// <summary>Asks <c>keypaste agent</c> which names may be shown.</summary>
+/// <summary>Asks the process holding the vault which names may be shown.</summary>
 /// <remarks>
 /// <para>
 /// This is what closes THREATS.md T-7. The bridge still cannot unlock anything — its stdin and
@@ -87,7 +97,7 @@ internal sealed class ApproverEntryNameSource(ApproverConnection approver, Serve
     /// <inheritdoc/>
     public async ValueTask<EntryNameListing> ListAsync(CancellationToken cancellationToken)
     {
-        var (reply, outcome) = await approver
+        var (reply, outcome, refusal) = await approver
             .ListAsync(new NamesRequest(options.Exposure.Globs), cancellationToken)
             .ConfigureAwait(false);
 
@@ -98,6 +108,18 @@ internal sealed class ApproverEntryNameSource(ApproverConnection approver, Serve
         if (outcome == ApproverOutcome.Busy)
         {
             return new EntryNameListing(VaultAvailability.Busy, [], ToolText.Busy, true);
+        }
+
+        if (outcome == ApproverOutcome.NoVault)
+        {
+            return new EntryNameListing(VaultAvailability.NoSession, [], ToolText.NoVault, true);
+        }
+
+        if (outcome == ApproverOutcome.Refused)
+        {
+            return refusal?.Refusal == Core.Audit.AuditMethod.VaultLocked
+                ? new EntryNameListing(VaultAvailability.Locked, [], ToolText.VaultLocked, true)
+                : new EntryNameListing(VaultAvailability.NoSession, [], ToolText.NoSession, true);
         }
 
         if (reply is null)
@@ -113,6 +135,9 @@ internal sealed class ApproverEntryNameSource(ApproverConnection approver, Serve
 
         return reply.VaultUnlocked
             ? new EntryNameListing(VaultAvailability.Available, reply.Names, string.Empty, reply.Complete)
+            {
+                Session = reply.Session,
+            }
             : new EntryNameListing(VaultAvailability.Locked, [], ToolText.VaultLocked, true);
     }
 }

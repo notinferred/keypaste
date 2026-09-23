@@ -190,7 +190,7 @@ public sealed class ApproverProtocolTests
     [Fact]
     public void AReplyWithNoCompleteField_DecodesAsIncomplete()
     {
-        var older = """{"v":1,"kind":"names","unlocked":true,"reason":"","names":[]}"""u8;
+        var older = """{"v":2,"kind":"names","unlocked":true,"reason":"","names":[]}"""u8;
 
         Assert.True(ApproverProtocol.TryDecode(older, out NamesReply? decoded));
 
@@ -213,25 +213,6 @@ public sealed class ApproverProtocolTests
             Assert.True(document.RootElement.TryGetProperty("complete", out var complete));
             Assert.True(complete.ValueKind is JsonValueKind.True or JsonValueKind.False);
         }
-    }
-
-    /// <summary>
-    /// Adding it did not bump the wire version, and must not.
-    /// </summary>
-    /// <remarks>
-    /// The same argument <c>client_label</c> settled in 2.3: a bump makes every mixed-version pair
-    /// fail at the framing layer, with no reply and no audit line beyond <c>no-approver</c>, over
-    /// one optional field. Both sides degrade to "assume incomplete" instead, which is true.
-    /// </remarks>
-    [Fact]
-    public void AddingCompleteDidNotBumpTheWireVersion()
-    {
-        Assert.Equal(1, ApproverProtocol.Version);
-
-        using var document = JsonDocument.Parse(
-            ApproverProtocol.Encode(new NamesReply(true, [Ordinary(1)], string.Empty, true)));
-
-        Assert.Equal(1, document.RootElement.GetProperty("v").GetInt32());
     }
 
     /// <summary>
@@ -347,7 +328,7 @@ public sealed class ApproverProtocolTests
     public void AGrantedReplyWithNoValue_IsRefused()
     {
         var frame = Encoding.UTF8.GetBytes(
-            """{"v":1,"kind":"credential","decision":"granted","method":5,"reason":"ok","ttl_seconds":300}""");
+            """{"v":2,"kind":"credential","decision":"granted","method":5,"reason":"ok","ttl_seconds":300}""");
 
         Assert.False(ApproverProtocol.TryDecode(frame, out CredentialReply? reply));
         Assert.Null(reply);
@@ -390,13 +371,13 @@ public sealed class ApproverProtocolTests
     [InlineData("not json at all")]
     [InlineData("[]")]
     [InlineData("\"a string\"")]
-    [InlineData("""{"v":1}""")]
-    [InlineData("""{"v":1,"kind":"credential"}""")]
+    [InlineData("""{"v":2}""")]
+    [InlineData("""{"v":2,"kind":"credential"}""")]
     [InlineData("""{"v":2,"kind":"credential","entry":"a","field":"password","reason":"r","ttl_seconds":1,"exposure":[]}""")]
-    [InlineData("""{"v":1,"kind":"nonsense","entry":"a","field":"password","reason":"r","ttl_seconds":1,"exposure":[]}""")]
-    [InlineData("""{"v":1,"kind":"credential","entry":1,"field":"password","reason":"r","ttl_seconds":1,"exposure":[]}""")]
-    [InlineData("""{"v":1,"kind":"credential","entry":"a","field":"password","reason":"r","ttl_seconds":"nine","exposure":[]}""")]
-    [InlineData("""{"v":1,"kind":"credential","entry":"a","field":"password","reason":"r","ttl_seconds":1,"exposure":[7]}""")]
+    [InlineData("""{"v":2,"kind":"nonsense","entry":"a","field":"password","reason":"r","ttl_seconds":1,"exposure":[]}""")]
+    [InlineData("""{"v":2,"kind":"credential","entry":1,"field":"password","reason":"r","ttl_seconds":1,"exposure":[]}""")]
+    [InlineData("""{"v":2,"kind":"credential","entry":"a","field":"password","reason":"r","ttl_seconds":"nine","exposure":[]}""")]
+    [InlineData("""{"v":2,"kind":"credential","entry":"a","field":"password","reason":"r","ttl_seconds":1,"exposure":[7]}""")]
     public void AMalformedFrame_IsRefusedRatherThanThrowing(string json)
     {
         var frame = Encoding.UTF8.GetBytes(json);
@@ -429,7 +410,7 @@ public sealed class ApproverProtocolTests
     public void AnUnknownMethod_BecomesAFailureRatherThanLosingTheReply()
     {
         var frame = Encoding.UTF8.GetBytes(
-            """{"v":1,"kind":"credential","decision":"denied","method":9999,"reason":"who knows","ttl_seconds":0}""");
+            """{"v":2,"kind":"credential","decision":"denied","method":9999,"reason":"who knows","ttl_seconds":0}""");
 
         Assert.True(ApproverProtocol.TryDecode(frame, out CredentialReply? reply));
         Assert.Equal(AuditMethod.Failed, reply.Method);
@@ -444,7 +425,7 @@ public sealed class ApproverProtocolTests
     public void ADeniedReplyCarryingAValue_ArrivesWithoutIt()
     {
         var frame = Encoding.UTF8.GetBytes(
-            """{"v":1,"kind":"credential","decision":"denied","method":7,"reason":"nobody answered","ttl_seconds":0,"value":"sk_live_smuggled"}""");
+            """{"v":2,"kind":"credential","decision":"denied","method":7,"reason":"nobody answered","ttl_seconds":0,"value":"sk_live_smuggled"}""");
 
         Assert.True(ApproverProtocol.TryDecode(frame, out CredentialReply? reply));
         Assert.Null(reply.Value);
@@ -666,5 +647,64 @@ public sealed class ApproverProtocolTests
         Assert.Throws<ArgumentNullException>(() => ApproverProtocol.Encode((CredentialReply)null!));
         Assert.Throws<ArgumentNullException>(() => ApproverProtocol.Encode((NamesRequest)null!));
         Assert.Throws<ArgumentNullException>(() => ApproverProtocol.Encode((NamesReply)null!));
+        Assert.Throws<ArgumentNullException>(() => ApproverProtocol.Encode((AttachRequest)null!));
+        Assert.Throws<ArgumentNullException>(() => ApproverProtocol.Encode((AttachReply)null!));
+    }
+
+    [Fact]
+    public void ARequestCarriesItsVaultAndSession()
+    {
+        var sent = Request() with { Vault = "/home/me/vault.kdbx", Session = "0123abcd" };
+
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(sent), out CredentialRequest? credential));
+        Assert.True(ApproverProtocol.TryDecode(
+            ApproverProtocol.Encode(new NamesRequest(["env/**"]) { Vault = sent.Vault, Session = sent.Session }),
+            out NamesRequest? names));
+
+        Assert.Equal(sent.Vault, credential.Vault);
+        Assert.Equal(sent.Session, credential.Session);
+        Assert.Equal(sent.Vault, names.Vault);
+        Assert.Equal(sent.Session, names.Session);
+    }
+
+    /// <summary>A bridge from before version 2 names no vault or session, so it is not answered.</summary>
+    [Theory]
+    [InlineData("""{"v":1,"kind":"names","exposure":["env/**"]}""")]
+    [InlineData("""{"v":2,"kind":"names","exposure":["env/**"]}""")]
+    [InlineData("""{"v":2,"kind":"credential","entry":"a","field":"password","reason":"r","ttl_seconds":1,"exposure":[]}""")]
+    public void ARequestNamingNoVaultOrSession_IsRefused(string frame)
+    {
+        var bytes = Encoding.UTF8.GetBytes(frame);
+
+        Assert.False(ApproverProtocol.TryDecode(bytes, out NamesRequest? _));
+        Assert.False(ApproverProtocol.TryDecode(bytes, out CredentialRequest? _));
+    }
+
+    [Fact]
+    public void AnAttachmentRoundTrips()
+    {
+        Assert.True(ApproverProtocol.TryDecode(
+            ApproverProtocol.Encode(new AttachRequest("/home/me/vault.kdbx")), out AttachRequest? request));
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(AttachReply.To("0123abcd")), out AttachReply? attached));
+        Assert.True(ApproverProtocol.TryDecode(
+            ApproverProtocol.Encode(AttachReply.Refused(AuditMethod.NoSession, "another vault")), out AttachReply? refused));
+
+        Assert.Equal("/home/me/vault.kdbx", request.Vault);
+        Assert.True(attached.Attached);
+        Assert.Equal("0123abcd", attached.Session);
+        Assert.False(refused.Attached);
+        Assert.Equal(AuditMethod.NoSession, refused.Refusal);
+        Assert.Null(refused.Session);
+    }
+
+    /// <summary>A reply that both attaches and refuses, or does neither, is not taken as an attachment.</summary>
+    [Theory]
+    [InlineData("""{"v":2,"kind":"attach","session":"0123abcd","method":17,"reason":"no"}""")]
+    [InlineData("""{"v":2,"kind":"attach","reason":""}""")]
+    [InlineData("""{"v":2,"kind":"attach","session":"","reason":""}""")]
+    public void AnAmbiguousAttachReply_IsRefused(string frame)
+    {
+        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out AttachReply? reply));
+        Assert.Null(reply);
     }
 }
