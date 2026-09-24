@@ -47,9 +47,9 @@ internal sealed class RenderedShell : IDisposable
     private ShellViewModel? _shell;
     private UnlockViewModel? _unlock;
 
-    internal RenderedShell()
+    internal RenderedShell(string directoryPrefix = "keypaste-drawn-")
     {
-        _directory = Directory.CreateTempSubdirectory("keypaste-drawn-").FullName;
+        _directory = Directory.CreateTempSubdirectory(directoryPrefix).FullName;
         var path = Path.Combine(_directory, "vault.kdbx");
 
         using (var vault = Vault.Create(path, Master))

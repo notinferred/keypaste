@@ -23,9 +23,13 @@ namespace Keypaste.App.Tests.Rendering;
 /// </remarks>
 public sealed class DrawnMaskTests
 {
-    private const string _pool = "QZXJ#%&@WVKq";
+    // The first character is the whole one-character value, so no path or label may hold it (F.17).
+    private const string _pool = "¤ZXJ#%&@WVKq";
     private const string _alpha = "QZXJ#%&@WVKq";
     private const string _beta = "0123456789ab";
+
+    // The fixture directory whose Q the vault-name tooltip showed in probe run 36033202756 (F.17).
+    private const string _recordedFixture = "keypaste-drawn-v7uQny";
 
     public static TheoryData<string> UnlockFields => ["Password", "BackupPassword", "NewPassword", "ConfirmPassword"];
 
@@ -49,6 +53,16 @@ public sealed class DrawnMaskTests
     {
         using var shell = new RenderedShell();
         NeverDrawn(shell.Window, shell.OpenField(name));
+    });
+
+    [Fact]
+    public Task The_one_character_value_is_on_no_surface_before_typing() => HeadlessSession.On(() =>
+    {
+        using var shell = new RenderedShell(_recordedFixture);
+        var field = shell.OpenField("ReplacementEnvValue");
+
+        Assert.Contains(AutomationSurface.Of(shell.Window), found => found.Text.Contains(_recordedFixture, StringComparison.Ordinal));
+        NeverDrawn(shell.Window, field);
     });
 
     [Theory]
@@ -93,6 +107,7 @@ public sealed class DrawnMaskTests
 
     private static void NeverDrawn(Window window, MaskedInput field)
     {
+        NotOnScreenBeforeTyping(window);
         WindowInput.Click(window, field);
         var value = string.Empty;
 
@@ -151,6 +166,17 @@ public sealed class DrawnMaskTests
         Assert.Equal(first, second);
         AutomationSurface.AssertNothingExposes(window, _alpha);
         AutomationSurface.AssertNothingExposes(window, _beta);
+    }
+
+    /// <summary>A sweep that finds the one-character value before it is typed would read the window's own text as an exposure.</summary>
+    private static void NotOnScreenBeforeTyping(Window window)
+    {
+        var value = Secret(1);
+
+        foreach (var (source, text) in AutomationSurface.Of(window))
+        {
+            Assert.False(text.Contains(value, StringComparison.Ordinal), $"{source} holds the one-character value before anything is typed: {text}");
+        }
     }
 
     /// <summary>The template's text block that draws the mask.</summary>
