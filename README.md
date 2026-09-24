@@ -228,7 +228,7 @@ The child inherits your environment with project variables overlaid, and receive
 
 After startup, keypaste returns the child's exit code. Missing commands return 127 and non-executable commands return 126. keypaste's own failures print a line beginning `keypaste run:`. Ctrl+C, `docker stop` and `timeout` reach the child; keypaste waits for it to exit.
 
-Invalid environment variable names and names differing only in case prevent injection. The error lists all offending keys so they can be corrected in KeePassXC.
+A set is injected whole or not at all. An expired entry, an untitled one, an invalid or repeated name, or names differing only in case prevent injection, and the error lists every offending key and why, never a value, so they can be corrected in KeePassXC. An entry in the recycle bin is not part of the set.
 
 ## Getting them back out
 

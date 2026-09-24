@@ -4,6 +4,7 @@ using KeePassLib.Cryptography.KeyDerivation;
 using KeePassLib.Keys;
 using KeePassLib.Security;
 using KeePassLib.Serialization;
+using KeePassLib.Utility;
 
 namespace Keypaste.Core.Internal;
 
@@ -570,6 +571,20 @@ internal sealed class KeePassInterop : IDisposable
         }
 
         found.Entry.Strings.Set(field, new ProtectedString(true, value));
+    }
+
+    /// <summary>Sets an entry's expiry, which only KeePassXC writes, for a fixture to hold one.</summary>
+    internal void SetExpiryUnchecked(EntryName name, DateTimeOffset? expires)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (Locate(name) is not { } found)
+        {
+            throw new VaultException($"'{name.Title}' is not in this vault.");
+        }
+
+        found.Entry.Expires = expires is not null;
+        found.Entry.ExpiryTime = expires?.UtcDateTime ?? found.Entry.ExpiryTime;
     }
 
     /// <summary>
@@ -1848,6 +1863,9 @@ internal sealed class KeePassInterop : IDisposable
             Url = ReadField(entry, PwDefs.UrlField),
             Notes = ReadField(entry, PwDefs.NotesField),
             GroupPath = groupPath,
+            Expires = entry.Expires
+                ? new DateTimeOffset(TimeUtil.ToUtc(entry.ExpiryTime, true))
+                : null,
         };
     }
 

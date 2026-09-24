@@ -87,7 +87,12 @@ internal sealed class AppVaultSession : IDisposable
         _clock = clock;
         _idleTimeout = Clamp(idleTimeout ?? DefaultIdleTimeout);
         _home = home ?? KeypasteHome.Resolve(Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable));
+        Environments = new SessionEnvResolver(() => Lifetime, UnlockedFor, clock);
     }
+
+    /// <summary>Resolves env sets from this session's vault, released only while the unlock that asked is live.</summary>
+    /// <remarks>Answered through <see cref="Lifetime"/>, so resolving is not activity and a passed idle deadline refuses.</remarks>
+    internal SessionEnvResolver Environments { get; }
 
     /// <summary>Raised after the vault has been disposed, never before.</summary>
     internal event EventHandler<VaultLockReason>? Locked;

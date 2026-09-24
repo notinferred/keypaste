@@ -36,6 +36,13 @@ public sealed record VaultEntry
     /// </summary>
     public string GroupPath { get; init; } = string.Empty;
 
+    /// <summary>When the entry expires, as its file records it, or null when it never does.</summary>
+    /// <remarks>
+    /// Read only. KeePassXC sets expiry; <see cref="Vault.AddEntry"/> and <see cref="Vault.UpdateEntry"/>
+    /// leave the file's value as it was.
+    /// </remarks>
+    public DateTimeOffset? Expires { get; init; }
+
     /// <summary>
     /// The entry's full path, as accepted by <see cref="Vault.Find(string)"/> and by
     /// <c>keepassxc-cli show</c>.

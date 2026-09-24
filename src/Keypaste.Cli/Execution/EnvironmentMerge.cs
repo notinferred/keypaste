@@ -25,24 +25,15 @@ internal static class EnvironmentMerge
     internal static StringComparer Comparer =>
         OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
 
-    /// <summary>
-    /// Merges <paramref name="variables"/> over <paramref name="parent"/>, refusing anything that
-    /// could not be injected the same way on every platform.
-    /// </summary>
-    /// <returns><see langword="false"/> with <paramref name="error"/> set, having built nothing.</returns>
-    internal static bool TryBuild(
+    /// <summary>Merges <paramref name="variables"/> over <paramref name="parent"/>.</summary>
+    /// <remarks>
+    /// The set has already been resolved whole by <see cref="EnvResolution"/>, which refuses names
+    /// that could not be injected the same way on every platform.
+    /// </remarks>
+    internal static IReadOnlyDictionary<string, string> Build(
         IReadOnlyDictionary<string, string> parent,
-        IReadOnlyList<EnvVariable> variables,
-        out IReadOnlyDictionary<string, string> merged,
-        out string error)
+        IReadOnlyList<EnvVariable> variables)
     {
-        merged = null!;
-
-        if (!EnvNameRules.TryCheck(variables, out error))
-        {
-            return false;
-        }
-
         var result = new Dictionary<string, string>(parent, Comparer);
 
         foreach (var variable in variables)
@@ -52,8 +43,7 @@ internal static class EnvironmentMerge
             result[variable.Key] = variable.Value;
         }
 
-        merged = result;
-        return true;
+        return result;
     }
 
     /// <summary>Whether the project sets <c>PATH</c>, which is worth saying out loud.</summary>

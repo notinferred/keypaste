@@ -6,6 +6,7 @@
 
 | id | date | decision | supersedes |
 |---|---|---|---|
+| D-0337 | 2026-09-24 | An env set leaves the vault only through `EnvResolution`, whole or not at all: an untitled, unexportable, duplicate or case-colliding name or an expiry at or before now refuses it, naming each entry without its value; a recycled entry is outside the set (D-0248); a session release reads again after confirmation and commits under its lifetime | `run` checking names only and skipping untitled entries |
 | D-0334 | 2026-09-23 | The desktop packages carry the NativeAOT `keypaste-mcp` beside `keypaste-app`, and both package verifiers require it; in an AppImage, whose mount path changes each launch, a client is registered as the image file with `mcp`, which `AppRun` dispatches to the bridge (founder amendment of 2.6a) | Desktop payloads holding the app alone |
 | D-0333 | 2026-09-23 | Connecting an MCP client, from `keypaste setup` or the app, runs only the `McpSetupPlan` core composed and showed, and the app's connection check starts that registration's own command line and asks through it, never keeping a released value | `setup` composing and running client commands in the CLI alone |
 | D-0331 | 2026-09-23 | Agent Activity's history is the audit records naming the app's current session, rendered by `AuditText` with the filter and counts stated; a missing or unreadable log is shown there as unavailable, while the Log screen and `keypaste log` keep treating an absent log as normal | — |

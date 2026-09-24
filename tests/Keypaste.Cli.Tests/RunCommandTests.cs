@@ -261,6 +261,28 @@ public sealed class RunCommandTests
         Assert.Empty(harness.ProcessLauncher.Started);
     }
 
+    [Fact]
+    public void AnExpiredEntry_StopsTheRun_NamingItAndWhy_WithoutAnyValue()
+    {
+        using var harness = Seeded(("GOOD", "good-value-7c1e"), ("OLD", "old-value-7c1e"));
+
+        using (var vault = Core.Vault.Open(harness.VaultPath, Master))
+        {
+            vault.SetExpiryUnchecked(new Core.EntryName("env/dev", "OLD"), new DateTimeOffset(2020, 1, 2, 3, 4, 5, TimeSpan.Zero));
+            vault.AddEntry(new Core.VaultEntry { Title = "BAD-NAME", Password = "bad-value-7c1e", GroupPath = "env/dev" });
+            vault.Save();
+        }
+
+        harness.Prompt.Enqueue(Master);
+        var exit = harness.Run("run", "dev", "--vault", harness.VaultPath, "--", "node");
+
+        Assert.Equal(CliApp.ExitInternalError, exit);
+        Assert.Contains("OLD expired 2020-01-02 03:04:05Z", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("BAD-NAME is not a valid environment variable name", harness.Err, StringComparison.Ordinal);
+        Assert.DoesNotContain("value-7c1e", harness.Err + harness.Out, StringComparison.Ordinal);
+        Assert.Empty(harness.ProcessLauncher.Started);
+    }
+
     // ---- exit codes --------------------------------------------------------------------
 
     [Theory]

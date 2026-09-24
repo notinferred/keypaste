@@ -1,8 +1,8 @@
 namespace Keypaste.Core;
 
 /// <summary>
-/// The names a set of variables must have before it can leave the vault — into a child process,
-/// or into a file.
+/// The names a set of variables must have before it can be written into a file. A child process
+/// gets its set through <see cref="EnvResolution"/>, which applies the same rules and expiry.
 /// </summary>
 /// <remarks>
 /// <para>

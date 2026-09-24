@@ -341,6 +341,10 @@ jobs:
         shell: bash
         run: bash scripts/verify-keepassxc-recyclebin.sh artifacts/compat/recyclebin.kdbx
 
+      - name: Verify run refuses an expired or misnamed entry KeePassXC made
+        shell: bash
+        run: bash scripts/verify-keepassxc-run.sh artifacts/compat/run
+
       - name: Verify the backup a save keeps, a restore and an export through real KeePassXC
         shell: bash
         run: bash scripts/verify-keepassxc-backup.sh artifacts/compat/backup.kdbx

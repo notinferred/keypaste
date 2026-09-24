@@ -112,27 +112,44 @@ internal static class RunCommand
         return new RunArguments(args, [], HasSeparator: false);
     }
 
-    /// <summary>Reads the project's variables and merges them over the current environment.</summary>
+    /// <summary>Resolves the project's variables and merges them over the current environment.</summary>
+    /// <remarks>A set with any entry that cannot be released starts nothing, and each such entry is named.</remarks>
     private static (int Exit, IReadOnlyDictionary<string, string>? Loaded) Load(
         Vault vault,
         string project,
         CliContext context)
     {
-        var store = new EnvStore(vault);
+        var resolved = EnvResolution.Resolve(vault, project, TimeProvider.System);
 
-        if (!store.ProjectExists(project))
+        switch (resolved.Outcome)
         {
-            context.Stderr.WriteLine($"keypaste run: no env set for '{project}'");
-            return (CliApp.ExitNotFound, null);
+            case EnvOutcome.Resolved:
+                break;
+
+            case EnvOutcome.NoProject:
+                context.Stderr.WriteLine($"keypaste run: {resolved.Refusal}");
+                return (CliApp.ExitNotFound, null);
+
+            case EnvOutcome.Unusable:
+                context.Stderr.WriteLine(
+                    $"keypaste run: '{EnvConvention.GroupPath(project)}' cannot be used, so nothing was started:");
+
+                foreach (var problem in resolved.Problems)
+                {
+                    var line = $"{EnvResolved.Display(problem.Key)} {problem.Reason}";
+                    context.Stderr.WriteLine($"  {EntryNameSanitizer.Sanitize(line, 512).Text}");
+                }
+
+                context.Stderr.WriteLine("Fix or remove them in KeePassXC or the app, then run again.");
+                return (CliApp.ExitInternalError, null);
+
+            default:
+                context.Stderr.WriteLine($"keypaste run: {resolved.Refusal}");
+                return (CliApp.ExitInternalError, null);
         }
 
-        var variables = store.Read(project);
-
-        if (!EnvironmentMerge.TryBuild(context.Environment.All(), variables, out var merged, out var error))
-        {
-            context.Stderr.WriteLine($"keypaste run: '{EnvConvention.GroupPath(project)}' {error}");
-            return (CliApp.ExitInternalError, null);
-        }
+        var variables = resolved.Variables;
+        var merged = EnvironmentMerge.Build(context.Environment.All(), variables);
 
         if (EnvironmentMerge.OverridesPath(variables))
         {

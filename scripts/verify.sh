@@ -253,6 +253,7 @@ profile_compat() {
   run bash scripts/verify-keepassxc-writeback.sh artifacts/compat/local-writeback.kdbx
   run bash scripts/verify-keepassxc-history.sh artifacts/compat/local-history.kdbx
   run bash scripts/verify-keepassxc-recyclebin.sh artifacts/compat/local-recyclebin.kdbx
+  run bash scripts/verify-keepassxc-run.sh artifacts/compat/local-run
   run bash scripts/verify-keepassxc-backup.sh artifacts/compat/local-backup.kdbx
   run bash scripts/verify-keepassxc-organize.sh artifacts/compat/local-organize.kdbx
   run bash scripts/verify-keepassxc-keyfile.sh artifacts/compat/local-keyfile.kdbx

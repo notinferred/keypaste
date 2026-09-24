@@ -34,13 +34,13 @@ A credential request runs: MCP client â†’ `Mcp/Tools/RequestCredentialTool.cs` â
 | Creation, unlock factors and access changes | `VaultCreation.cs`, `VaultKeyfile.cs`, `VaultAccess.cs`, `VaultLocation.cs` |
 | Backups, restore and export | `VaultBackups.cs` |
 | KDBX boundary, save retries and timing | `Internal/KeePassInterop.cs`, `Internal/SaveClock.cs`, `KdbxFormat.cs`, `ProcessTemporaryDirectory.cs`, `PathIdentity.cs` |
-| Env sets and dotenv | `EnvStore.cs`, `EnvConvention.cs`, `EnvNameRules.cs`, `DotEnv.cs`, `DotEnvWriter.cs`, `SourceSnapshot.cs` |
+| Env sets and dotenv | `EnvStore.cs`, `EnvConvention.cs`, `EnvNameRules.cs`, `EnvResolution.cs` (what may leave for a child), `DotEnv.cs`, `DotEnvWriter.cs`, `SourceSnapshot.cs` |
 | Password and passphrase generation | `PasswordGenerator.cs`, `PassphraseRecipe.cs`, `WordList.cs` |
 | Secret input and display | `SecretBuffer.cs`, `SecretInput.cs`, `DisplayTextSanitizer.cs`, `EntryNameSanitizer.cs`, `Clipboard/` |
 | What an agent may name | `EntryExposure.cs` |
 | Approval, grants and credential release | `Approval/` |
 | Approver pipe protocol | `Ipc/` |
-| Who holds a vault, and which session a request belongs to | `Ownership/` |
+| Who holds a vault, which session a request belongs to, and env sets released under that session (`SessionEnvResolver.cs`) | `Ownership/` |
 | Standing rules in `policy.toml` | `Policy/` |
 | Audit log and `~/.keypaste` paths | `Audit/`, `Audit/KeypasteHome.cs` |
 | `recent.toml` and `app.toml` | `Recent/`, `Settings/` |

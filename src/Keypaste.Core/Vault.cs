@@ -250,9 +250,16 @@ public sealed class Vault : IDisposable
     /// gives. A file that cannot be read is <see cref="SavedRead.Unreadable"/>, not current.
     /// </para>
     /// </remarks>
-    public SavedRead ReadSaved(out IReadOnlyList<VaultEntry>? entries)
+    public SavedRead ReadSaved(out IReadOnlyList<VaultEntry>? entries) => ReadSaved(out entries, out _);
+
+    /// <summary><see cref="ReadSaved(out IReadOnlyList{VaultEntry}?)"/>, with every group path read from the same state.</summary>
+    /// <param name="entries">The entries when the answer is <see cref="SavedRead.Current"/>, otherwise null.</param>
+    /// <param name="groupPaths">The group paths, as <see cref="ReadGroupPaths"/> reports them, under the same condition.</param>
+    /// <returns>Whether the vault matches its file, and if not, why.</returns>
+    public SavedRead ReadSaved(out IReadOnlyList<VaultEntry>? entries, out IReadOnlyList<string>? groupPaths)
     {
         entries = null;
+        groupPaths = null;
 
         lock (_state)
         {
@@ -274,6 +281,7 @@ public sealed class Vault : IDisposable
             }
 
             entries = _interop.ReadEntries();
+            groupPaths = _interop.ReadGroupPaths();
             return SavedRead.Current;
         }
     }
@@ -657,6 +665,10 @@ public sealed class Vault : IDisposable
     /// </remarks>
     internal void AddProtectedFieldUnchecked(EntryName name, string field, string value) =>
         Change(() => _interop.AddProtectedFieldUnchecked(name, field, value), VaultEdit.Of(name));
+
+    /// <summary>Sets an entry's expiry. A test seam; KeePassXC is what writes expiry.</summary>
+    internal void SetExpiryUnchecked(EntryName name, DateTimeOffset? expires) =>
+        Change(() => _interop.SetExpiryUnchecked(name, expires), VaultEdit.Of(name));
 
     /// <summary>Adds a group without applying any of the rules. A test seam; nothing else uses it.</summary>
     /// <remarks>
@@ -1237,7 +1249,7 @@ public sealed class Vault : IDisposable
     /// <returns>The outcome.</returns>
     /// <remarks>
     /// Until the next successful save the vault then holds something its file does not, and
-    /// <see cref="ReadSaved"/> refuses it. <see cref="Edited"/> is raised outside the lock.
+    /// <see cref="ReadSaved(out IReadOnlyList{VaultEntry}?)"/> refuses it. <see cref="Edited"/> is raised outside the lock.
     /// </remarks>
     private T Change<T>(Func<T> apply, Func<T, VaultEdit?> touched)
     {

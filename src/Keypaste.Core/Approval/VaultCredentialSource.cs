@@ -13,7 +13,7 @@ namespace Keypaste.Core.Approval;
 /// <see cref="CredentialFailure.VaultLocked"/> rather than into a disposed-object exception.
 /// </para>
 /// <para>
-/// Every read is of the vault as its file holds it (<see cref="Vault.ReadSaved"/>), so an edit not yet
+/// Every read is of the vault as its file holds it (<see cref="Vault.ReadSaved(out IReadOnlyList{VaultEntry}?)"/>), so an edit not yet
 /// saved and a file somebody else has written are refused rather than answered from memory (D-0317).
 /// </para>
 /// <para>
