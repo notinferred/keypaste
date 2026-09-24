@@ -8,8 +8,8 @@
 # premise nothing exercises is a premise nobody is checking.
 #
 # NEGATIVE CONTROL: this script fails if an approved request does not return the secret, if a
-# refused one does, if the secret ever reaches the audit log, or if a request is answered with no
-# agent running. Removing any one of those checks leaves a script that passes while the flow is
+# refused one does, if the secret ever reaches the audit log, if a request is answered with no
+# agent running, or if an answer's audit line does not name the session the agent unlocked. Removing any one of those checks leaves a script that passes while the flow is
 # broken. These checks must never be skipped or soft-passed.
 set -euo pipefail
 
@@ -90,6 +90,8 @@ for _ in $(seq 1 100); do
   sleep 0.2
 done
 grep -q 'listening on' "$AGENT_ERR" || die "keypaste agent never started listening"
+SESSION="$(grep 'listening on' "$AGENT_ERR" | head -1 | sed -E 's/.* for session ([^,]+),.*/\1/')"
+[ -n "$SESSION" ] || die "keypaste agent named no session on its listening line"
 
 ask() {
   local id="$1" out="$2" err="$3"
@@ -134,6 +136,16 @@ grep -q '"decision":"granted"' "$AUDIT" || die "the approval was not recorded as
 grep -q '"method":"prompt"'    "$AUDIT" || die "the approval was not recorded as coming from a person"
 grep -q '"decision":"denied"'  "$AUDIT" || die "the refusal was not recorded as denied"
 grep -q '"label":"ci-probe"'   "$AUDIT" || die "the operator-supplied client label was not recorded"
+
+# The request with no agent reached no session; both later answers came from the agent's own gate,
+# under the session it unlocked (4.3a).
+jq -e -s --arg s "$SESSION" \
+  'length == 3
+   and .[0].decision == "denied" and .[0].method == "no-approver" and (.[0] | has("session") | not)
+   and (.[1:] | all(.method == "prompt" and .session == $s))
+   and .[1].decision == "granted" and .[2].decision == "denied"' \
+  <"$AUDIT" >/dev/null \
+  || die "the audit lines do not show a sessionless denial, then the prompts of keypaste agent's session $SESSION"
 
 # The one thing the log must never contain, on the one path where a credential existed to leak.
 grep -q "$SECRET" "$AUDIT" && die "the audit log contains the released credential"

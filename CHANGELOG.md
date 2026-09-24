@@ -6,6 +6,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 All of this is source only: there is still no desktop download, and the published CLI is unchanged. Each entry that names a step links its record, which holds the full account.
 
+The desktop and `keypaste agent` now apply every limit on an agent's request themselves: entry and reason length, the field, a lifetime of 1 to 3600 seconds and the exposure. A process that talks to them without `keypaste-mcp` is refused the same way, and an out-of-range lifetime is refused rather than shortened. Agents using the bridge see no difference ([4.3a](docs/steps/4.3a.md)).
+
 Agent Activity now says what agents meet as the app's session reports it, naming this app's process and session while it serves the vault. When `keypaste agent` already holds the vault, the unlock screen names it as the owner and leaves it running. A desktop app that crashed leaves nothing answering agents; relaunched, it starts locked and serves again once unlocked ([4.4b](docs/steps/4.4b.md)).
 
 Agents now get the vault as it is saved. A password changed in the desktop is the next value an agent receives, and editing, moving, renaming or deleting an entry, or changing the vault's access, makes the next request for it ask again instead of reusing an earlier approval. When another program saves the vault file, the desktop and `keypaste agent` refuse every agent request as `vault-changed` until you lock and unlock, or restart the agent, and they never write over that save ([U.3](docs/steps/U.3.md)).

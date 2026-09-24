@@ -691,13 +691,16 @@ public static class ApproverProtocol
         }
     }
 
+    // A property named twice would leave the reader to pick one, and the sender may have meant the other (D-0325).
+    private static readonly JsonDocumentOptions _strict = new() { AllowDuplicateProperties = false };
+
     private static bool TryParse(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out JsonDocument? document)
     {
         document = null;
 
         try
         {
-            var parsed = JsonDocument.Parse(frame.ToArray());
+            var parsed = JsonDocument.Parse(frame.ToArray(), _strict);
 
             if (parsed.RootElement.ValueKind != JsonValueKind.Object)
             {

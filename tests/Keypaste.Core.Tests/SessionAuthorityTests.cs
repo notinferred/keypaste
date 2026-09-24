@@ -1,4 +1,6 @@
+using System.IO.Pipes;
 using System.Security.Cryptography;
+using System.Text;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
@@ -393,6 +395,110 @@ public sealed class SessionAuthorityTests : IDisposable
         Assert.Equal(0, policed.Channel.Asked);
     }
 
+    public static TheoryData<string, string, string, string, int> OutsideTheLimits => new()
+    {
+        { "entry", string.Empty, "password", "deploy", 60 },
+        { "entry", new string('a', CredentialRequestRules.MaximumEntryLength + 1), "password", "deploy", 60 },
+        { "field", "env/dev/STRIPE_KEY", "password,username", "deploy", 60 },
+        { "field", "env/dev/STRIPE_KEY", "totp", "deploy", 60 },
+        { "reason", "env/dev/STRIPE_KEY", "password", string.Empty, 60 },
+        { "reason", "env/dev/STRIPE_KEY", "password", new string('r', CredentialRequestRules.MaximumReasonLength + 1), 60 },
+        { "ttl_seconds", "env/dev/STRIPE_KEY", "password", "deploy", 0 },
+        { "ttl_seconds", "env/dev/STRIPE_KEY", "password", "deploy", -5 },
+        { "ttl_seconds", "env/dev/STRIPE_KEY", "password", "deploy", ApprovalLimits.MaximumRequestableTtlSeconds + 1 },
+        { "ttl_seconds", "env/dev/STRIPE_KEY", "password", "deploy", int.MaxValue },
+    };
+
+    /// <summary>
+    /// A request sent to the owner without the bridge meets the limits the bridge would have applied,
+    /// with a person ready to say yes, so a missing check would release (D-0324).
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(OutsideTheLimits))]
+    public async Task ARequestOutsideTheToolsLimits_IsRefusedAsInvalidByTheOwner_Unasked(
+        string argument, string entry, string field, string reason, int ttl)
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        await using var owner = Owner.Start(this);
+        await using var client = await ConnectAsync(owner.PipeName);
+        await client.AttachAsync(new AttachRequest(VaultPath), Token);
+
+        var reply = await client.RequestAsync(
+            Request("session-one") with { Entry = entry, Field = field, Reason = reason, TtlSeconds = ttl }, Token);
+
+        Assert.NotNull(reply);
+        Assert.Equal(AuditDecision.Denied, reply.Decision);
+        Assert.Equal(AuditMethod.InvalidRequest, reply.Method);
+        Assert.StartsWith($"the request's {argument} ", reply.Reason, StringComparison.Ordinal);
+        Assert.Null(reply.Value);
+        Assert.Equal("session-one", reply.Session);
+        Assert.Equal(0, _fixture.Channel.Asked);
+        Assert.Equal(0, _fixture.Source.Reads);
+    }
+
+    [Fact]
+    public async Task TheLongestRequestableTtl_IsStillGranted_AtTheOwnersCeiling()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        await using var owner = Owner.Start(this);
+        await using var client = await ConnectAsync(owner.PipeName);
+        await client.AttachAsync(new AttachRequest(VaultPath), Token);
+
+        var reply = await client.RequestAsync(
+            Request("session-one") with { TtlSeconds = ApprovalLimits.MaximumRequestableTtlSeconds }, Token);
+
+        Assert.NotNull(reply);
+        Assert.Equal(AuditDecision.Granted, reply.Decision);
+        Assert.Equal(ApprovalLimits.DefaultMaximumTtlSeconds, reply.TtlSeconds);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AnUnexposedEntry_IsRefusedByTheOwner_ByPathAndByHandle_Unasked(bool byHandle)
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        await using var owner = Owner.Start(this);
+        await using var client = await ConnectAsync(owner.PipeName);
+        await client.AttachAsync(new AttachRequest(VaultPath), Token);
+
+        var entry = byHandle ? EntryHandle.For(new EntryName("personal", "bank")) : "personal/bank";
+        var reply = await client.RequestAsync(Request("session-one") with { Entry = entry }, Token);
+
+        Assert.NotNull(reply);
+        Assert.Equal(AuditMethod.OutOfScope, reply.Method);
+        Assert.Null(reply.Value);
+        Assert.Equal(0, _fixture.Channel.Asked);
+        Assert.Equal(0, _fixture.Source.Reads);
+    }
+
+    /// <summary>
+    /// A frame that names a second field, or leaves one out, is not a request: the owner hangs up
+    /// without answering, and nobody is asked (D-0325).
+    /// </summary>
+    [Theory]
+    [InlineData("field named twice")]
+    [InlineData("field as a list")]
+    [InlineData("no ttl_seconds")]
+    public async Task AMalformedRequest_EndsTheConnectionUnanswered_AndAsksNobody(string shape)
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        await using var owner = Owner.Start(this);
+
+        var wellFormed = Encoding.UTF8.GetString(ApproverProtocol.Encode(Request("session-one")));
+        var frame = shape switch
+        {
+            "field named twice" => "{\"field\":\"username\"," + wellFormed[1..],
+            "field as a list" => wellFormed.Replace("\"field\":\"password\"", "\"field\":[\"password\",\"username\"]", StringComparison.Ordinal),
+            _ => wellFormed.Replace(",\"ttl_seconds\":60", string.Empty, StringComparison.Ordinal),
+        };
+
+        Assert.NotEqual(wellFormed, frame);
+        Assert.True(await HangsUpOnAsync(owner.PipeName, frame));
+        Assert.Equal(0, _fixture.Channel.Asked);
+        Assert.Equal(0, _fixture.Source.Reads);
+    }
+
     public void Dispose()
     {
         _lifetime?.Dispose();
@@ -433,6 +539,30 @@ public sealed class SessionAuthorityTests : IDisposable
             fixture.Grants,
             fixture.Policy,
             fixture.Narration.Add);
+    }
+
+    /// <summary>Attaches over a raw pipe, sends one frame as written, and says whether the owner hung up unanswered.</summary>
+    private async Task<bool> HangsUpOnAsync(string pipeName, string frame)
+    {
+        await using var pipe = new NamedPipeClientStream(
+            ".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+        await pipe.ConnectAsync(Token);
+        using var framer = new MessageFramer(pipe, ownsStream: false);
+
+        await framer.WriteAsync(ApproverProtocol.Encode(new AttachRequest(VaultPath)), Token);
+        Assert.True(ApproverProtocol.TryDecode(await framer.ReadAsync(Token) ?? [], out AttachReply? attached));
+        Assert.True(attached.Attached);
+
+        await framer.WriteAsync(Encoding.UTF8.GetBytes(frame), Token);
+
+        try
+        {
+            return await framer.ReadAsync(Token) is null;
+        }
+        catch (IOException)
+        {
+            return true;
+        }
     }
 
     private static async Task<ApproverClient> ConnectAsync(string pipeName)

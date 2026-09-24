@@ -163,24 +163,9 @@ internal sealed class RequestCredentialTool(
         int ttl,
         CancellationToken cancellationToken)
     {
-        if (entry.Length is 0 or > ToolSchemas.MaximumEntryLength)
+        if (CredentialRequestRules.Check(entry, field, reason, ttl) is { } problem)
         {
-            return Invalid("entry", $"must be 1 to {ToolSchemas.MaximumEntryLength} characters");
-        }
-
-        if (Recognised(field) is null)
-        {
-            return Invalid("field", $"must be one of: {string.Join(", ", ToolSchemas.AllowedFields)}");
-        }
-
-        if (reason.Length is 0 or > ToolSchemas.MaximumReasonLength)
-        {
-            return Invalid("reason", $"must be 1 to {ToolSchemas.MaximumReasonLength} characters");
-        }
-
-        if (ttl is < 1 or > ToolSchemas.MaximumTtlSeconds)
-        {
-            return Invalid("ttl_seconds", $"must be between 1 and {ToolSchemas.MaximumTtlSeconds}");
+            return Invalid(problem.Argument, problem.Rule);
         }
 
         // A path can be checked here without opening anything. A handle cannot — resolving one needs

@@ -715,6 +715,23 @@ public sealed class ServerToolsTests
         Assert.Equal(CredentialFields.All, advertised);
     }
 
+    /// <summary>
+    /// The bounds an agent is told about are the ones the vault's owner refuses outside of (D-0324).
+    /// </summary>
+    [Fact]
+    public void TheSchemaAndTheCoreAgreeAboutLimits()
+    {
+        using var schema = JsonDocument.Parse(ToolSchemas.CredentialInputJson);
+        var properties = schema.RootElement.GetProperty("properties");
+
+        Assert.Equal(1, properties.GetProperty("entry").GetProperty("minLength").GetInt32());
+        Assert.Equal(CredentialRequestRules.MaximumEntryLength, properties.GetProperty("entry").GetProperty("maxLength").GetInt32());
+        Assert.Equal(1, properties.GetProperty("reason").GetProperty("minLength").GetInt32());
+        Assert.Equal(CredentialRequestRules.MaximumReasonLength, properties.GetProperty("reason").GetProperty("maxLength").GetInt32());
+        Assert.Equal(1, properties.GetProperty("ttl_seconds").GetProperty("minimum").GetInt32());
+        Assert.Equal(ApprovalLimits.MaximumRequestableTtlSeconds, properties.GetProperty("ttl_seconds").GetProperty("maximum").GetInt32());
+    }
+
     [Fact]
     public async Task EveryCall_WritesOneAuditLine_NamingTheClientAndTheExposure()
     {

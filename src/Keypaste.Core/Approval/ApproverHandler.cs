@@ -121,9 +121,9 @@ public sealed class ApproverHandler
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(connectionId);
 
-        if (!CredentialFields.IsReleasable(request.Field))
+        if (CredentialRequestRules.Check(request.Entry, request.Field, request.Reason, request.TtlSeconds) is { } problem)
         {
-            return Refused(AuditMethod.InvalidRequest, "the field asked for is not one keypaste releases");
+            return Refused(AuditMethod.InvalidRequest, $"the request's {problem.Argument} {problem.Rule}");
         }
 
         if (!EntryExposure.TryCreate(request.Exposure, out var exposure, out var globError))

@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Keypaste.Core.Approval;
 
 namespace Keypaste.Mcp.Tools;
 
@@ -27,19 +26,6 @@ namespace Keypaste.Mcp.Tools;
 /// </remarks>
 internal static class ToolSchemas
 {
-    /// <summary>The longest <c>entry</c> argument accepted.</summary>
-    internal const int MaximumEntryLength = 512;
-
-    /// <summary>The longest <c>reason</c> accepted.</summary>
-    internal const int MaximumReasonLength = 2000;
-
-    /// <summary>The longest lifetime an agent may ask for, in seconds.</summary>
-    /// <remarks>
-    /// The same number the policy file's <c>max_ttl_seconds</c> is bounded by, taken from the core
-    /// rather than repeated here, so the schema and the rule reader cannot come to disagree.
-    /// </remarks>
-    internal const int MaximumTtlSeconds = ApprovalLimits.MaximumRequestableTtlSeconds;
-
     /// <summary>
     /// <c>list_entry_names</c> takes nothing at all.
     /// </summary>
@@ -90,16 +76,6 @@ internal static class ToolSchemas
 
     /// <summary>The parsed schema for <c>request_credential</c>.</summary>
     internal static readonly JsonElement CredentialInput = Parse(CredentialInputJson);
-
-    /// <summary>The field names <c>request_credential</c> will accept.</summary>
-    /// <remarks>
-    /// Taken from the core rather than written again here, because four things have to agree about
-    /// this list — the schema an agent reads, the server's own re-validation, the approval prompt a
-    /// person reads, and the approver's release path — and docs/PRODUCT.md law 4.3 does not allow that
-    /// written down four times. <c>TheSchemaAndTheCoreAgreeAboutFields</c> is what keeps the JSON
-    /// literal above in step with it.
-    /// </remarks>
-    internal static IReadOnlyList<string> AllowedFields => CredentialFields.All;
 
     /// <summary>
     /// Detaches the element from its document, so the parsed schema outlives the parse without

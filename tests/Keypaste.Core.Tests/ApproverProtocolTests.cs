@@ -393,6 +393,7 @@ public sealed class ApproverProtocolTests
     [InlineData("""{"v":2,"kind":"credential","entry":1,"field":"password","reason":"r","ttl_seconds":1,"exposure":[]}""")]
     [InlineData("""{"v":2,"kind":"credential","entry":"a","field":"password","reason":"r","ttl_seconds":"nine","exposure":[]}""")]
     [InlineData("""{"v":2,"kind":"credential","entry":"a","field":"password","reason":"r","ttl_seconds":1,"exposure":[7]}""")]
+    [InlineData("""{"v":2,"kind":"credential","vault":"v","session":"s","entry":"a","field":"password","field":"notes","reason":"r","ttl_seconds":1,"exposure":[]}""")]
     public void AMalformedFrame_IsRefusedRatherThanThrowing(string json)
     {
         var frame = Encoding.UTF8.GetBytes(json);
@@ -444,6 +445,20 @@ public sealed class ApproverProtocolTests
 
         Assert.True(ApproverProtocol.TryDecode(frame, out CredentialReply? reply));
         Assert.Null(reply.Value);
+    }
+
+    /// <summary>
+    /// A reply naming its value twice is not read at all, rather than read as whichever came last
+    /// (D-0325).
+    /// </summary>
+    [Fact]
+    public void AReplyNamingItsValueTwice_IsRefused()
+    {
+        var frame = Encoding.UTF8.GetBytes(
+            """{"v":2,"kind":"credential","decision":"granted","method":5,"reason":"ok","ttl_seconds":60,"value":"first","value":"second"}""");
+
+        Assert.False(ApproverProtocol.TryDecode(frame, out CredentialReply? reply));
+        Assert.Null(reply);
     }
 
     [Fact]
