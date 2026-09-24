@@ -19,6 +19,8 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 {
     private readonly AppVaultSession _session;
     private readonly IVaultFilePicker? _picker;
+    private readonly TimeProvider _clock;
+    private readonly Action<Action>? _post;
     private string? _notice;
     private Destination _current;
     private object? _content;
@@ -46,13 +48,15 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         Authority = authority;
         ApplyTheme = applyTheme ?? (_ => { });
         Preferences = preferences ?? new DesktopPreferences(home);
+        _clock = clock ?? TimeProvider.System;
+        _post = post;
 
         // Owned here rather than by each screen, so a copy made on Entries is still counting down
         // after a move to Env Sets — and is cleared by the lock, because this is disposed with
         // everything else the shell built.
         Clipboard = new ClipboardCountdown(
             clipboard ?? NoClipboard.Instance,
-            clock ?? TimeProvider.System,
+            _clock,
             post);
 
         LockCommand = new RelayCommand(() => _session.Lock(VaultLockReason.Manual));
@@ -217,12 +221,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         };
     }
 
-    private AgentActivityViewModel Activity()
-    {
-        var activity = new AgentActivityViewModel(Authority);
-        _ = activity.RefreshAsync();
-        return activity;
-    }
+    private AgentActivityViewModel Activity() => new(Authority, Home, _clock, _post);
 
     private void OnLockingSoon(object? sender, TimeSpan remaining) =>
         Countdown = $"Locking in {Math.Max(1, (int)remaining.TotalSeconds)} seconds.";

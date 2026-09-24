@@ -64,6 +64,6 @@ public sealed class SessionLifetimeTests
     private static void Grant(GrantCache grants)
     {
         using var released = new ReleasedField("password", "sk_live_x");
-        grants.Store(_key, released, TimeSpan.FromMinutes(1));
+        grants.Store(_key, released, TimeSpan.FromMinutes(1), ApprovalPrompt.For("claude-code", new EntryName("env/ci", "DEPLOY_KEY"), "password", "deploy", 60));
     }
 }

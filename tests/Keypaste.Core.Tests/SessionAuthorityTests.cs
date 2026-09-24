@@ -204,6 +204,70 @@ public sealed class SessionAuthorityTests : IDisposable
     }
 
     [Fact]
+    public async Task TheAuthorityLists_TheRequestWaitingAndThenItsGrant_AndNothingOnceTheLifetimeEnds()
+    {
+        _fixture.Channel.Hold = true;
+        await using var owner = Owner.Start(this);
+        await using var client = await ConnectAsync(owner.PipeName);
+
+        await client.AttachAsync(new AttachRequest(VaultPath), Token);
+        var pending = client.RequestAsync(Request("session-one") with { ClientLabel = "ci-probe" }, Token);
+        await _fixture.Channel.Waiting.WaitAsync(_connectTimeout, Token);
+
+        var waiting = Assert.Single(owner.Authority.Activity.Waiting);
+        Assert.Equal("env/dev/STRIPE_KEY", waiting.Prompt.Entry, StringComparer.Ordinal);
+        Assert.Equal("ci-probe", waiting.Prompt.Label, StringComparer.Ordinal);
+        Assert.Empty(owner.Authority.Activity.Grants);
+
+        _fixture.Clock.Advance(TimeSpan.FromSeconds(ApprovalLimits.DefaultWindowSeconds));
+        await pending.AsTask().WaitAsync(_connectTimeout, Token);
+
+        _fixture.Channel.Hold = false;
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        await client.RequestAsync(Request("session-one"), Token);
+
+        var activity = owner.Authority.Activity;
+        Assert.Empty(activity.Waiting);
+        Assert.Equal("env/dev/STRIPE_KEY", Assert.Single(activity.Grants).Approved.Entry, StringComparer.Ordinal);
+
+        _lifetime!.End();
+
+        Assert.Same(ApproverActivity.None, owner.Authority.Activity);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ARevokeThroughTheAuthority_MakesTheSameRequestAskAgain(bool all)
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        await using var owner = Owner.Start(this);
+        await using var client = await ConnectAsync(owner.PipeName);
+
+        await client.AttachAsync(new AttachRequest(VaultPath), Token);
+        await client.RequestAsync(Request("session-one"), Token);
+        var reused = await client.RequestAsync(Request("session-one"), Token);
+        Assert.Equal(AuditMethod.GrantCache, reused!.Method);
+
+        if (all)
+        {
+            owner.Authority.RevokeAll();
+        }
+        else
+        {
+            owner.Authority.Revoke(Assert.Single(owner.Authority.Activity.Grants).Key);
+        }
+
+        Assert.Empty(owner.Authority.Activity.Grants);
+
+        var again = await client.RequestAsync(Request("session-one"), Token);
+
+        Assert.Equal(AuditMethod.Prompt, again!.Method);
+        Assert.Equal(AuditDecision.Granted, again.Decision);
+        Assert.Equal(2, _fixture.Channel.Asked);
+    }
+
+    [Fact]
     public async Task ARequestWaitingForAPerson_IsWithdrawnAndDeniedAsLockedWhenTheLifetimeEnds()
     {
         _fixture.Channel.Hold = true;
@@ -580,14 +644,17 @@ public sealed class SessionAuthorityTests : IDisposable
         private readonly ApproverListener _listener;
         private readonly Task _running;
 
-        private Owner(string pipeName, ApproverListener listener)
+        private Owner(string pipeName, ApproverListener listener, SessionAuthority authority)
         {
             PipeName = pipeName;
+            Authority = authority;
             _listener = listener;
             _running = listener.RunAsync(_stop.Token);
         }
 
         internal string PipeName { get; }
+
+        internal SessionAuthority Authority { get; }
 
         internal static Owner Start(SessionAuthorityTests test, ApproverHandler? handler = null)
         {
@@ -597,7 +664,7 @@ public sealed class SessionAuthorityTests : IDisposable
                 () => test._lifetime,
                 handler ?? test._fixture.Handler);
 
-            return new Owner(name, new ApproverListener(name, authority));
+            return new Owner(name, new ApproverListener(name, authority), authority);
         }
 
         public async ValueTask DisposeAsync()

@@ -17,6 +17,7 @@ on:
       - 'scripts/verify-current-state.sh'
       - 'scripts/verify-session-lifecycle.sh'
       - 'scripts/verify-desktop-approval.sh'
+      - 'scripts/verify-agent-activity.sh'
       - 'src/Keypaste.Mcp/**'
       - 'scripts/install-keepassxc-windows.sh'
       - 'src/Keypaste.Cli/**'

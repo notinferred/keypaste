@@ -6,6 +6,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 All of this is source only: there is still no desktop download, and the published CLI is unchanged. Each entry that names a step links its record, which holds the full account.
 
+Agent Activity now lists the request waiting in the desktop's prompt and the grants in force, with the client, label, entry, field and time left, and Revoke or Revoke all makes the next request ask again. Below them is this session's audit history, which says when the log is missing or unreadable instead of looking empty ([4.3b](docs/steps/4.3b.md)).
+
 The desktop now asks about an agent's credential request in its own prompt window, showing the client, its label, the entry, the field, the lifetime and the agent's reason, and releases only when you press Approve, which works a second after the window appears. Deny, closing it, the timeout, locking and the client giving up each refuse. At the app and at `keypaste agent`, a request whose client cancels or whose `keypaste-mcp` goes away is now withdrawn at once. The app does not read `policy.toml` ([4.4](docs/steps/4.4.md)).
 
 The desktop and `keypaste agent` now apply every limit on an agent's request themselves: entry and reason length, the field, a lifetime of 1 to 3600 seconds and the exposure. A process that talks to them without `keypaste-mcp` is refused the same way, and an out-of-range lifetime is refused rather than shortened. Agents using the bridge see no difference ([4.3a](docs/steps/4.3a.md)).

@@ -14,10 +14,13 @@ public sealed class GrantCacheTests
     private static GrantKey Key(string connection = "conn-1", string handle = "k1_0123456789abcdef", string field = "password") =>
         new(connection, handle, field);
 
+    private static ApprovalPrompt Approved(string field = "password") =>
+        ApprovalPrompt.For("claude-code", new EntryName("env/ci", "DEPLOY_KEY"), field, "deploy", 300, "ci-probe");
+
     private static void Store(GrantCache cache, GrantKey key, string value = "sk_live_x", TimeSpan? ttl = null)
     {
         using var released = new ReleasedField(key.Field, value);
-        cache.Store(key, released, ttl ?? _ttl);
+        cache.Store(key, released, ttl ?? _ttl, Approved(key.Field));
     }
 
     /// <summary>
@@ -247,13 +250,84 @@ public sealed class GrantCacheTests
     }
 
     [Fact]
+    public void InForce_ListsWhatWasApprovedAndItsRemainingLifetime_NeverAValue()
+    {
+        var clock = new ManualClock();
+        using var cache = new GrantCache(clock);
+        Store(cache, Key(field: "password"), ttl: TimeSpan.FromSeconds(60));
+        Store(cache, Key(field: "username"), ttl: TimeSpan.FromSeconds(30));
+
+        clock.Advance(TimeSpan.FromSeconds(10));
+
+        var listed = cache.InForce();
+
+        Assert.Collection(
+            listed,
+            first =>
+            {
+                Assert.Equal(Key(field: "username"), first.Key);
+                Assert.Equal(TimeSpan.FromSeconds(20), first.Remaining);
+                Assert.Equal("claude-code", first.Approved.Client, StringComparer.Ordinal);
+                Assert.Equal("ci-probe", first.Approved.Label, StringComparer.Ordinal);
+                Assert.Equal("env/ci/DEPLOY_KEY", first.Approved.Entry, StringComparer.Ordinal);
+                Assert.Equal("username", first.Approved.Field, StringComparer.Ordinal);
+            },
+            second =>
+            {
+                Assert.Equal(Key(field: "password"), second.Key);
+                Assert.Equal(TimeSpan.FromSeconds(50), second.Remaining);
+            });
+
+        Assert.All(listed, grant => Assert.DoesNotContain("sk_live_x", grant.ToString(), StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void InForce_LeavesOutAGrantPastItsLifetime_AndADisposedCacheListsNothing()
+    {
+        var clock = new ManualClock();
+        var cache = new GrantCache(clock);
+        Store(cache, Key(field: "password"), ttl: TimeSpan.FromSeconds(60));
+        Store(cache, Key(field: "username"), ttl: TimeSpan.FromSeconds(30));
+
+        clock.AdvanceWallOnly(TimeSpan.FromSeconds(31));
+
+        Assert.Equal(Key(field: "password"), Assert.Single(cache.InForce()).Key);
+
+        cache.Dispose();
+
+        Assert.Empty(cache.InForce());
+    }
+
+    [Fact]
+    public void RevokingOneGrant_ZeroesItAndNoOther()
+    {
+        using var cache = new GrantCache(new ManualClock());
+        Store(cache, Key(field: "password"));
+        Store(cache, Key(field: "username"));
+        Store(cache, Key(connection: "conn-2"));
+
+        Assert.True(cache.TryUse(Key(field: "password"), out var copy, out _));
+        copy!.Dispose();
+
+        cache.Revoke(Key(field: "password"));
+        cache.Revoke(Key(handle: "k1_ffffffffffffffff"));
+
+        AssertNoGrant(cache, Key(field: "password"));
+        Assert.Equal(2, cache.Count);
+        Assert.DoesNotContain(cache.InForce(), grant => grant.Key == Key(field: "password"));
+    }
+
+    [Fact]
     public void TheCacheRejectsNulls()
     {
         Assert.Throws<ArgumentNullException>(() => new GrantCache(null!));
 
         using var cache = new GrantCache(new ManualClock());
 
-        Assert.Throws<ArgumentNullException>(() => cache.Store(Key(), null!, _ttl));
+        Assert.Throws<ArgumentNullException>(() => cache.Store(Key(), null!, _ttl, Approved()));
+
+        using var released = new ReleasedField("password", "sk_live_x");
+        Assert.Throws<ArgumentNullException>(() => cache.Store(Key(), released, _ttl, null!));
         Assert.Throws<ArgumentNullException>(() => cache.Revoke(null!));
         Assert.Throws<ArgumentNullException>(() => cache.RevokeEntries(null!));
     }

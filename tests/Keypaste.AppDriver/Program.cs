@@ -1,3 +1,4 @@
+using System.Globalization;
 using Keypaste.App;
 using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
@@ -498,6 +499,14 @@ internal sealed class Driver(string home)
                     OnEntries(session, entries => Relocate(entries, entry, group, title));
                     break;
 
+                case ["activity"]:
+                    Activity(authority);
+                    break;
+
+                case ["revoke", var which]:
+                    Revoke(authority, which);
+                    break;
+
                 case [("approve" or "deny" or "close") and var answer]:
                     await (screen ?? throw new DriverException("hold answers a prompt only with the app's own"))
                         .AnswerAsync(answer).ConfigureAwait(true);
@@ -514,6 +523,65 @@ internal sealed class Driver(string home)
         Report(authority);
         return 0;
     }
+
+    /// <summary>Prints what Agent Activity shows, read by its own view model from the authority and the audit file.</summary>
+    private void Activity(AppAuthority authority)
+    {
+        using var model = OpenActivity(authority);
+
+        if (model.IsUnavailable)
+        {
+            Console.Out.WriteLine($"unavailable {model.Unavailable}");
+        }
+
+        foreach (var row in model.Waiting)
+        {
+            Console.Out.WriteLine($"waiting n={row.Number} {Describe(row)}");
+        }
+
+        foreach (var row in model.Grants)
+        {
+            Console.Out.WriteLine($"grant n={row.Number} {Describe(row)}");
+        }
+
+        if (model.HasHistoryMessage)
+        {
+            Console.Out.WriteLine($"history-message {model.HistoryMessage}");
+        }
+
+        foreach (var line in model.History.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries))
+        {
+            Console.Out.WriteLine($"history {line}");
+        }
+
+        Console.Out.WriteLine("activity end");
+    }
+
+    /// <summary>Presses Revoke on one listed grant, or Revoke all.</summary>
+    private void Revoke(AppAuthority authority, string which)
+    {
+        using var model = OpenActivity(authority);
+
+        if (which == "all")
+        {
+            model.RevokeAllCommand.Execute(null);
+        }
+        else
+        {
+            var row = model.Grants.SingleOrDefault(grant => grant.Number.ToString(CultureInfo.InvariantCulture) == which)
+                ?? throw new DriverException($"Agent Activity lists no grant {which}");
+            model.RevokeCommand.Execute(row);
+        }
+
+        Console.Out.WriteLine($"revoked {which}, {model.Grants.Count} left");
+    }
+
+    // Its ticks are posted nowhere: each command reads once, and a timer thread must not rewrite
+    // the lists while they are printed.
+    private AgentActivityViewModel OpenActivity(AppAuthority authority) => new(authority, home, TimeProvider.System, _ => { });
+
+    private static string Describe(ActivityRow row) =>
+        $"client={row.Client} label={row.Label} entry={row.Entry} field={row.Field} left={row.Left}";
 
     /// <summary>A person in front of the prompt who approves whatever is asked.</summary>
     internal sealed class ApprovingPrompt : IApprovalChannel

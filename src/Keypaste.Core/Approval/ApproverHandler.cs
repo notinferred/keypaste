@@ -238,7 +238,7 @@ public sealed class ApproverHandler
             // rather than to the request, so every retry would end the same way — and re-prompting
             // for each one is THREATS.md T-11 with a lever attached. From the cache, the second ask
             // is refused without troubling anybody, and the copy is zeroed at its ordinary TTL.
-            _grants.Store(key, released, TimeSpan.FromSeconds(ttl));
+            _grants.Store(key, released, TimeSpan.FromSeconds(ttl), prompt);
 
             return Deliver(
                 new CredentialReply
@@ -313,6 +313,19 @@ public sealed class ApproverHandler
                 $"released {display} to {rule.Id} for {ttl}s without asking");
         }
     }
+
+    /// <summary>What a person is being asked about now and the grants they have given that are in force.</summary>
+    /// <returns>The waiting request, if any, and every live grant, none carrying a value.</returns>
+    public ApproverActivity Activity() =>
+        new(_gate.Waiting is { } waiting ? [waiting] : [], _grants.InForce());
+
+    /// <summary>Ends one grant, so the next request it would have answered is asked again.</summary>
+    /// <param name="key">The grant, as <see cref="Activity"/> listed it.</param>
+    /// <remarks>No cooldown starts: a revoked grant is a decision withdrawn, not a request refused.</remarks>
+    public void Revoke(GrantKey key) => _grants.Revoke(key);
+
+    /// <summary>Ends every grant, so each request they would have answered is asked again.</summary>
+    public void RevokeAll() => _grants.RevokeEntries(VaultEdit.Everything);
 
     /// <summary>Revokes the grants scoped to a connection that has gone.</summary>
     /// <param name="connectionId">The connection that ended.</param>

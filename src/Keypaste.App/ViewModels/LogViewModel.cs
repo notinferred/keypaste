@@ -131,54 +131,21 @@ internal sealed class LogViewModel : ObservableObject
         VerifyCommand.RaiseCanExecuteChanged();
     }
 
-    /// <summary>
-    /// Reads and renders, in the order <c>LogCommand</c> does it.
-    /// </summary>
-    /// <remarks>
-    /// The reader and the verifier are two passes over the same file on purpose: the verifier works
-    /// on bytes and the reader on JSON, so a parser difference can drop a row from a table but can
-    /// never change a verdict.
-    /// </remarks>
+    /// <summary>Reads and renders, in the order <c>LogCommand</c> does it.</summary>
     private void Load()
     {
-        if (!File.Exists(_path))
+        var history = AuditHistory.Read(_path);
+
+        _lines = history.Lines;
+        _verdict = history.Verdict;
+        _message = history.Kind switch
         {
-            _message = NothingYet;
-            return;
-        }
-
-        if (!AuditReader.TryRead(_path, out var entries, out var unreadable, out var error))
-        {
-            _message = $"That log couldn't be read: {error}";
-            return;
-        }
-
-        var report = AuditChainVerifier.Verify(_path);
-
-        // A table drawn from a file nothing checked must not be handed over as though something had.
-        if (report.Verdict == AuditChainVerdict.Unreadable)
-        {
-            _message = "That log couldn't be checked, so nothing from it is shown here.";
-            return;
-        }
-
-        var unverified = report.Unverified;
-
-        // No filters in this version, so the heading says the whole file's count and shows no
-        // "of N" — which is the reading AuditText gives an unfiltered table.
-        _lines =
-        [
-            AuditText.Heading(_path, entries.Count, entries.Count, []),
-            .. AuditText.Table(entries, unverified),
-            .. AuditText.Notes(entries, unreadable, unverified),
-        ];
-
-        _verdict = AuditText.Verdict(report);
-
-        if (report.Verdict == AuditChainVerdict.Broken)
-        {
-            _message = "This log has been edited since keypaste wrote it. Verify chain says where.";
-        }
+            AuditReadKind.Missing => NothingYet,
+            AuditReadKind.Unreadable => $"That log couldn't be read: {history.Error}",
+            AuditReadKind.Unchecked => "That log couldn't be checked, so nothing from it is shown here.",
+            AuditReadKind.Broken => "This log has been edited since keypaste wrote it. Verify chain says where.",
+            _ => string.Empty,
+        };
     }
 
     /// <summary>

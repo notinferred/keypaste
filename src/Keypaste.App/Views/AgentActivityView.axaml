@@ -1,0 +1,120 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Keypaste.App.ViewModels"
+             x:Class="Keypaste.App.Views.AgentActivityView"
+             x:DataType="vm:AgentActivityViewModel"
+             Background="{DynamicResource KpSurface0}">
+
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Spacing="16" Margin="{DynamicResource KpCardPadding}">
+
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Grid.Column="0"
+                   Text="Agent Activity"
+                   FontSize="22"
+                   VerticalAlignment="Center"
+                   Foreground="{DynamicResource KpTextPrimary}" />
+        <Button Grid.Column="1"
+                Content="Refresh"
+                VerticalAlignment="Center"
+                Command="{Binding RefreshCommand}" />
+      </Grid>
+
+      <TextBlock Text="{Binding Status}"
+                 TextWrapping="Wrap"
+                 MaxWidth="640"
+                 HorizontalAlignment="Left"
+                 Foreground="{DynamicResource KpTextPrimary}" />
+
+      <TextBlock Text="{Binding Unavailable}"
+                 IsVisible="{Binding IsUnavailable}"
+                 TextWrapping="Wrap"
+                 FontSize="13"
+                 Foreground="{DynamicResource KpTextSecondary}" />
+
+      <StackPanel Spacing="8" IsVisible="{Binding IsAvailable}">
+        <TextBlock Text="Waiting for you" FontSize="16" Foreground="{DynamicResource KpTextPrimary}" />
+        <TextBlock Text="Nothing is waiting for an answer."
+                   IsVisible="{Binding NothingWaiting}"
+                   FontSize="13"
+                   Foreground="{DynamicResource KpTextMuted}" />
+        <ItemsControl ItemsSource="{Binding Waiting}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ActivityRow">
+              <Border Theme="{StaticResource KpCard}" Margin="0,0,0,8">
+                <StackPanel Spacing="4">
+                  <TextBlock Text="{Binding What}" FontSize="14" Foreground="{DynamicResource KpTextPrimary}" />
+                  <TextBlock Text="{Binding Who}" FontSize="12" Foreground="{DynamicResource KpTextSecondary}" />
+                  <TextBlock Text="{Binding Left}" FontSize="12" Foreground="{DynamicResource KpTextMuted}" />
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+
+      <StackPanel Spacing="8" IsVisible="{Binding IsAvailable}">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Grid.Column="0" Text="Grants in force" FontSize="16"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource KpTextPrimary}" />
+          <Button Grid.Column="1" Content="Revoke all" Command="{Binding RevokeAllCommand}" />
+        </Grid>
+        <TextBlock Text="No grant is in force, so the next credential request is asked about."
+                   IsVisible="{Binding NoGrants}"
+                   FontSize="13"
+                   Foreground="{DynamicResource KpTextMuted}" />
+        <ItemsControl ItemsSource="{Binding Grants}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ActivityRow">
+              <Border Theme="{StaticResource KpCard}" Margin="0,0,0,8">
+                <Grid ColumnDefinitions="*,Auto">
+                  <StackPanel Grid.Column="0" Spacing="4">
+                    <TextBlock Text="{Binding What}" FontSize="14" Foreground="{DynamicResource KpTextPrimary}" />
+                    <TextBlock Text="{Binding Who}" FontSize="12" Foreground="{DynamicResource KpTextSecondary}" />
+                    <TextBlock Text="{Binding Left}" FontSize="12" Foreground="{DynamicResource KpTextMuted}" />
+                  </StackPanel>
+                  <Button Grid.Column="1"
+                          Content="Revoke"
+                          VerticalAlignment="Center"
+                          Command="{Binding $parent[ItemsControl].((vm:AgentActivityViewModel)DataContext).RevokeCommand}"
+                          CommandParameter="{Binding}" />
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+
+      <!-- This session's audit records as `keypaste log` renders them (D-0331); the Log screen has
+           the whole file. -->
+      <StackPanel Spacing="8">
+        <TextBlock Text="This session's history" FontSize="16" Foreground="{DynamicResource KpTextPrimary}" />
+        <TextBlock Text="{Binding AuditPath}"
+                   FontFamily="{DynamicResource KpMono}"
+                   FontSize="11"
+                   TextTrimming="CharacterEllipsis"
+                   Foreground="{DynamicResource KpTextMuted}" />
+        <TextBlock Text="{Binding HistoryMessage}"
+                   IsVisible="{Binding HasHistoryMessage}"
+                   TextWrapping="Wrap"
+                   FontSize="13"
+                   Foreground="{DynamicResource KpTextSecondary}" />
+        <Border IsVisible="{Binding HasHistory}"
+                Background="{DynamicResource KpSurface1}"
+                BorderBrush="{DynamicResource KpBorderSubtle}"
+                BorderThickness="1"
+                CornerRadius="{DynamicResource KpRadiusMd}">
+          <ScrollViewer HorizontalScrollBarVisibility="Auto" MaxHeight="360" Padding="16">
+            <SelectableTextBlock Text="{Binding History}"
+                                 FontFamily="{DynamicResource KpMono}"
+                                 FontSize="12"
+                                 Foreground="{DynamicResource KpTextPrimary}" />
+          </ScrollViewer>
+        </Border>
+      </StackPanel>
+
+    </StackPanel>
+  </ScrollViewer>
+
+</UserControl>

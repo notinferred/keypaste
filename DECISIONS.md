@@ -6,6 +6,8 @@
 
 | id | date | decision | supersedes |
 |---|---|---|---|
+| D-0331 | 2026-09-23 | Agent Activity's history is the audit records naming the app's current session, rendered by `AuditText` with the filter and counts stated; a missing or unreadable log is shown there as unavailable, while the Log screen and `keypaste log` keep treating an absent log as normal | — |
+| D-0330 | 2026-09-23 | Agent Activity reads the waiting request and the grants in force from the session authority (`SessionAuthority.Activity`), never from the prompt window's events, and Revoke ends grants there without starting a cooldown, so the next matching request is asked again | — |
 | D-0327 | 2026-09-23 | While a request is decided, the approver listener reads the connection ahead: a peer that hangs up or sends mid-exchange has its request withdrawn and its connection ended, and a stopping listener still delivers the denials of what it withdrew | Requests that stayed in front of a person after their bridge had gone |
 | D-0326 | 2026-09-23 | The app asks about each credential request in its own fixed-layout prompt window with no default button, focus on Deny, and Approve armed only after one second on screen; it consults no policy file, so every release from the app follows a press of Approve | D-0311 and D-0316's app channel with nowhere to ask |
 | D-0324 | 2026-09-23 | A vault's owner refuses as `invalid-request` any credential request outside the tool's entry, field, reason or TTL limits, checked by the one core rule (`CredentialRequestRules`) the bridge also words its refusals from. A TTL outside 1 to 3600 seconds is refused rather than clamped | The owner re-checking only the field and clamping any TTL |

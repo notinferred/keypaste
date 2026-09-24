@@ -83,6 +83,38 @@ internal sealed class SessionHost : IDisposable
         }
     }
 
+    /// <summary>What the authority answering agents has waiting for a person and has granted.</summary>
+    /// <remarks>Nothing once the accept loop has ended or the lifetime it answers for has.</remarks>
+    internal ApproverActivity Activity
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _hosted?.Activity ?? ApproverActivity.None;
+            }
+        }
+    }
+
+    /// <summary>Ends one grant in the authority, so the next matching request is asked again.</summary>
+    /// <param name="key">The grant, as <see cref="Activity"/> listed it.</param>
+    internal void Revoke(GrantKey key)
+    {
+        lock (_gate)
+        {
+            _hosted?.Revoke(key);
+        }
+    }
+
+    /// <summary>Ends every grant in the authority.</summary>
+    internal void RevokeAll()
+    {
+        lock (_gate)
+        {
+            _hosted?.RevokeAll();
+        }
+    }
+
     private void OnOpened(object? sender, EventArgs e) => Start();
 
     private void OnLocked(object? sender, VaultLockReason reason) => Stop();
@@ -186,6 +218,12 @@ internal sealed class SessionHost : IDisposable
 
         /// <summary>The session the authority answers under while the listener still accepts, or null.</summary>
         internal string? Serving => _run.IsCompleted ? null : _authority.Serving;
+
+        internal ApproverActivity Activity => _run.IsCompleted ? ApproverActivity.None : _authority.Activity;
+
+        internal void Revoke(GrantKey key) => _authority.Revoke(key);
+
+        internal void RevokeAll() => _authority.RevokeAll();
 
         internal static Hosted? TryStart(
             string pipe,

@@ -65,6 +65,17 @@ internal sealed class AppAuthority : IDisposable
         }
     }
 
+    /// <summary>What the authority answering agents has waiting for a person and has granted, never a value.</summary>
+    /// <remarks>Nothing while it answers no session: a lock ends the lifetime that held both (D-0313).</remarks>
+    internal ApproverActivity Activity => _host.Activity;
+
+    /// <summary>Ends one grant, so the next request it would have answered is asked again.</summary>
+    /// <param name="key">The grant, as <see cref="Activity"/> listed it.</param>
+    internal void Revoke(GrantKey key) => _host.Revoke(key);
+
+    /// <summary>Ends every grant this session has given.</summary>
+    internal void RevokeAll() => _host.RevokeAll();
+
     /// <summary>Quits: the session locks before its endpoint stops, so what an agent has waiting is answered as locked rather than dropped with the endpoint (D-0313).</summary>
     public void Dispose()
     {

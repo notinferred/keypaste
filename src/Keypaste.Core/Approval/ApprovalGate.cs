@@ -2,6 +2,11 @@ using System.Collections.Concurrent;
 
 namespace Keypaste.Core.Approval;
 
+/// <summary>The request in front of a person, as a list shows it.</summary>
+/// <param name="Prompt">What the person is being shown.</param>
+/// <param name="Remaining">How long is left before the gate answers for them.</param>
+public sealed record WaitingRequest(ApprovalPrompt Prompt, TimeSpan Remaining);
+
 /// <summary>
 /// Puts one request in front of a human, enforces the deadline, and denies everything else.
 /// </summary>
@@ -33,6 +38,7 @@ public sealed class ApprovalGate : IDisposable
     private readonly TimeProvider _clock;
     private readonly SemaphoreSlim _oneAtATime = new(1, 1);
     private readonly ConcurrentDictionary<string, Deadline> _cooldowns = new(StringComparer.Ordinal);
+    private volatile Asking? _asking;
     private bool _disposed;
 
     /// <summary>Builds a gate over one channel.</summary>
@@ -53,6 +59,10 @@ public sealed class ApprovalGate : IDisposable
 
     /// <summary>The window, TTL ceiling and cooldown in force.</summary>
     public ApprovalLimits Limits { get; }
+
+    /// <summary>The request a person is being asked about now, or null when nobody is being asked.</summary>
+    public WaitingRequest? Waiting =>
+        _asking is { } asking ? new WaitingRequest(asking.Prompt, asking.Window.Remaining(_clock)) : null;
 
     /// <summary>Asks a human, and answers for them when they cannot be asked.</summary>
     /// <param name="cooldownKey">
@@ -91,6 +101,8 @@ public sealed class ApprovalGate : IDisposable
 
         try
         {
+            _asking = new Asking(prompt, Deadline.Starting(_clock, Limits.Window));
+
             var answer = await AskOnceAsync(prompt, cancellationToken).ConfigureAwait(false);
 
             if (answer == ApprovalAnswer.Denied)
@@ -102,6 +114,7 @@ public sealed class ApprovalGate : IDisposable
         }
         finally
         {
+            _asking = null;
             _oneAtATime.Release();
         }
     }
@@ -229,4 +242,6 @@ public sealed class ApprovalGate : IDisposable
         _disposed = true;
         _oneAtATime.Dispose();
     }
+
+    private sealed record Asking(ApprovalPrompt Prompt, Deadline Window);
 }

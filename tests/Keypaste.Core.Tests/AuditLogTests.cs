@@ -59,6 +59,24 @@ public sealed class AuditLogTests : IDisposable
         return reader.ReadToEnd().Split('\n', StringSplitOptions.RemoveEmptyEntries);
     }
 
+    [Fact]
+    public void TheSessionARecordNames_IsReadBackSanitized_AndBlankWhenItNamesNone()
+    {
+        using (var log = Open())
+        {
+            Assert.True(log.TryAppend(Denial() with { Session = "session-one" }, out var error), error);
+            Assert.True(log.TryAppend(Denial(), out error), error);
+            Assert.True(log.TryAppend(Denial() with { Session = "abc‮def" }, out error), error);
+        }
+
+        Assert.True(AuditReader.TryRead(LogPath, out var entries, out var unreadable, out var failure), failure);
+
+        Assert.Equal(0, unreadable);
+        Assert.Equal("session-one", entries[0].Session, StringComparer.Ordinal);
+        Assert.Equal(string.Empty, entries[1].Session, StringComparer.Ordinal);
+        Assert.DoesNotContain('‮', entries[2].Session);
+    }
+
     /// <summary>
     /// Every <see cref="AuditMethod"/> is written as itself, and none of them lands on the
     /// fallback.

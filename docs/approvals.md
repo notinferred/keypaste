@@ -102,7 +102,9 @@ In source, when the desktop app has a vault unlocked, a credential request for t
 
 Approve releases that one field. It works a second after the prompt appears, so a click meant for another window cannot approve. Deny, Escape and closing the window refuse, and focus starts on Deny, so Enter refuses too. Nobody answering for 45 seconds refuses. Locking the app, quitting it and the client giving up each refuse the request and take the prompt down. The one-prompt-at-a-time rule, the one-minute refusal cooldown and connection-scoped grants apply as they do at `keypaste agent`. The app's grants last at most 300 seconds.
 
-The app does not read `policy.toml`: every release from the app needs a press of Approve. Agent Activity does not yet list waiting requests, grants or the audit history.
+The app does not read `policy.toml`: every release from the app needs a press of Approve.
+
+Agent Activity lists the request in front of you and the grants in force, each with the client, its label, the entry, the field and the seconds left, and counts them down. Revoke ends one grant and Revoke all ends every one, so the next request for them opens the prompt again; a revoke is not recorded in the audit log. Below the lists is this session's history: the audit records naming the app's current session, as `keypaste log` prints them. It says when the log is missing or cannot be read rather than showing an empty history, and the Log screen shows the whole file.
 
 ## When no agent is running
 

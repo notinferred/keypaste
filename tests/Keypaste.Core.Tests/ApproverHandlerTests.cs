@@ -275,6 +275,72 @@ public sealed class ApproverHandlerTests
 
     /// <summary>The person is shown which configured connection is asking, as the bridge was labelled.</summary>
     [Fact]
+    public async Task AnApprovedGrant_IsListedWithWhatThePersonApproved_AndNoValue()
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Channel.Answer = ApprovalAnswer.Approved;
+
+        await fixture.Handler.RequestAsync(Request() with { ClientLabel = "deploy-bot" }, "conn-1", Token);
+
+        var activity = fixture.Handler.Activity();
+        var grant = Assert.Single(activity.Grants);
+
+        Assert.Empty(activity.Waiting);
+        Assert.Equal(new GrantKey("conn-1", EntryHandle.For(new EntryName("env/dev", "STRIPE_KEY")), "password"), grant.Key);
+        Assert.Equal(fixture.Channel.LastPrompt, grant.Approved);
+        Assert.Equal("deploy-bot", grant.Approved.Label, StringComparer.Ordinal);
+        Assert.Equal(TimeSpan.FromSeconds(ApprovalLimits.Default.EffectiveTtlSeconds(900)), grant.Remaining);
+        Assert.DoesNotContain(Sentinel, grant.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TheRequestInFrontOfAPerson_IsListedAsWaiting()
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Channel.Hold = true;
+
+        var asking = fixture.Handler.RequestAsync(Request(), "conn-1", Token).AsTask();
+        await fixture.Channel.Waiting.WaitAsync(Token);
+
+        var waiting = Assert.Single(fixture.Handler.Activity().Waiting);
+        Assert.Equal("env/dev/STRIPE_KEY", waiting.Prompt.Entry, StringComparer.Ordinal);
+
+        fixture.Clock.Advance(TimeSpan.FromSeconds(ApprovalLimits.DefaultWindowSeconds));
+        await asking;
+
+        Assert.Empty(fixture.Handler.Activity().Waiting);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AfterARevoke_TheSameRequestIsAskedAgain_RatherThanRefused(bool all)
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Channel.Answer = ApprovalAnswer.Approved;
+
+        await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
+        var grant = Assert.Single(fixture.Handler.Activity().Grants);
+
+        if (all)
+        {
+            fixture.Handler.RevokeAll();
+        }
+        else
+        {
+            fixture.Handler.Revoke(grant.Key);
+        }
+
+        Assert.Empty(fixture.Handler.Activity().Grants);
+
+        var again = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
+
+        Assert.Equal(AuditMethod.Prompt, again.Method);
+        Assert.Equal(AuditDecision.Granted, again.Decision);
+        Assert.Equal(2, fixture.Channel.Asked);
+    }
+
+    [Fact]
     public async Task ThePromptCarriesTheBridgesLabel()
     {
         using var fixture = new ApproverFixture();

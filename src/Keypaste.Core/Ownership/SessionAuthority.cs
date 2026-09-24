@@ -55,6 +55,28 @@ public sealed class SessionAuthority : IApproverHandler
     /// <remarks>Read the way every request reads it, so a status built on it says what an agent would meet.</remarks>
     public string? Serving => Live()?.Id;
 
+    /// <summary>What the current session has waiting for a person and has granted, or nothing while no session is live.</summary>
+    public ApproverActivity Activity => Live() is null ? ApproverActivity.None : _inner.Activity();
+
+    /// <summary>Ends one grant of the current session, so the next request it would have answered is asked again.</summary>
+    /// <param name="key">The grant, as <see cref="Activity"/> listed it.</param>
+    public void Revoke(GrantKey key)
+    {
+        if (Live() is not null)
+        {
+            _inner.Revoke(key);
+        }
+    }
+
+    /// <summary>Ends every grant of the current session.</summary>
+    public void RevokeAll()
+    {
+        if (Live() is not null)
+        {
+            _inner.RevokeAll();
+        }
+    }
+
     /// <inheritdoc/>
     public ValueTask<AttachReply> AttachAsync(AttachRequest request, string connectionId, CancellationToken cancellationToken)
     {

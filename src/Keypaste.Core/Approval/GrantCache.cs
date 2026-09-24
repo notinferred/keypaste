@@ -23,6 +23,12 @@ namespace Keypaste.Core.Approval;
 /// <param name="Field">Which field, so an approval for one is not an approval for another.</param>
 public readonly record struct GrantKey(string ConnectionId, string Handle, string Field);
 
+/// <summary>A grant a person gave that is still in force, as a list shows it: never its value.</summary>
+/// <param name="Key">Which connection, entry and field, so this one grant can be revoked.</param>
+/// <param name="Approved">What the person approved, already sanitized for display.</param>
+/// <param name="Remaining">How much of its lifetime is left.</param>
+public sealed record GrantInForce(GrantKey Key, ApprovalPrompt Approved, TimeSpan Remaining);
+
 /// <summary>
 /// Holds released field values until their TTL expires, so a repeat request inside the window does
 /// not put the same question in front of a human again.
@@ -119,18 +125,34 @@ public sealed class GrantCache : IDisposable
         }
     }
 
+    /// <summary>Lists the grants in force, soonest to expire first.</summary>
+    /// <returns>Each live grant's key, what was approved and its remaining lifetime; nothing once disposed.</returns>
+    public IReadOnlyList<GrantInForce> InForce()
+    {
+        lock (_gate)
+        {
+            return _grants
+                .Where(pair => !pair.Value.Expires.HasExpired(_clock))
+                .Select(pair => new GrantInForce(pair.Key, pair.Value.Approved, pair.Value.Expires.Remaining(_clock)))
+                .OrderBy(grant => grant.Remaining)
+                .ToList();
+        }
+    }
+
     /// <summary>Records a grant a human just gave.</summary>
     /// <param name="key">Which connection, entry and field.</param>
     /// <param name="value">The released field. The cache takes a copy; the caller keeps ownership of its own.</param>
     /// <param name="ttl">How long the grant lives.</param>
-    /// <exception cref="ArgumentNullException"><paramref name="value"/> is null.</exception>
+    /// <param name="approved">What the person was shown and approved, kept so the grant can be listed.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="value"/> or <paramref name="approved"/> is null.</exception>
     /// <remarks>
     /// A cache that has been disposed keeps nothing: its lifetime has ended, and a request decided
     /// across that lock is refused by the owner rather than stored for later (D-0313).
     /// </remarks>
-    public void Store(GrantKey key, ReleasedField value, TimeSpan ttl)
+    public void Store(GrantKey key, ReleasedField value, TimeSpan ttl, ApprovalPrompt approved)
     {
         ArgumentNullException.ThrowIfNull(value);
+        ArgumentNullException.ThrowIfNull(approved);
 
         lock (_gate)
         {
@@ -144,7 +166,7 @@ public sealed class GrantCache : IDisposable
             // The copy's ownership transfers to the dictionary, and every route out of it — Forget,
             // Revoke, Expire, Dispose — zeroes it. CA2000 cannot see a lifetime that leaves the method.
 #pragma warning disable CA2000
-            var grant = new Grant(new ReleasedField(value.Field, value.Value), Deadline.Starting(_clock, ttl));
+            var grant = new Grant(new ReleasedField(value.Field, value.Value), Deadline.Starting(_clock, ttl), approved);
 #pragma warning restore CA2000
 
             if (_grants.TryGetValue(key, out var replaced))
@@ -176,6 +198,19 @@ public sealed class GrantCache : IDisposable
             foreach (var key in _grants.Keys.Where(k => string.Equals(k.ConnectionId, connectionId, StringComparison.Ordinal)).ToList())
             {
                 Forget(key, _grants[key]);
+            }
+        }
+    }
+
+    /// <summary>Zeroes one grant, so the next request it would have answered is decided again.</summary>
+    /// <param name="key">The grant, as <see cref="InForce"/> listed it.</param>
+    public void Revoke(GrantKey key)
+    {
+        lock (_gate)
+        {
+            if (_grants.TryGetValue(key, out var grant))
+            {
+                Forget(key, grant);
             }
         }
     }
@@ -254,11 +289,13 @@ public sealed class GrantCache : IDisposable
         }
     }
 
-    private sealed class Grant(ReleasedField value, Deadline expires) : IDisposable
+    private sealed class Grant(ReleasedField value, Deadline expires, ApprovalPrompt approved) : IDisposable
     {
         internal ReleasedField Value { get; } = value;
 
         internal Deadline Expires { get; } = expires;
+
+        internal ApprovalPrompt Approved { get; } = approved;
 
         internal ITimer? Expiry { get; set; }
 

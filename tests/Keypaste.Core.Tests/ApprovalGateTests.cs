@@ -277,6 +277,68 @@ public sealed class ApprovalGateTests
         Assert.Throws<ArgumentNullException>(() => new ApprovalGate(new ScriptedChannel(ApprovalAnswer.Denied), clock, null!));
     }
 
+    [Fact]
+    public async Task TheRequestBeingAsked_IsWaiting_WithItsWindowCountingDown_UntilItIsAnswered()
+    {
+        var channel = new ScriptedChannel(ApprovalAnswer.Approved) { Park = true };
+        var (gate, clock) = Build(channel);
+        using var owned = gate;
+
+        Assert.Null(owned.Waiting);
+
+        var asking = owned.AskAsync("k", Prompt(), TestContext.Current.CancellationToken).AsTask();
+        await channel.Entered.WaitAsync(TestContext.Current.CancellationToken);
+
+        var waiting = Assert.IsType<WaitingRequest>(owned.Waiting);
+        Assert.Equal(Prompt(), waiting.Prompt);
+        Assert.Equal(TimeSpan.FromSeconds(ApprovalLimits.DefaultWindowSeconds), waiting.Remaining);
+
+        clock.Advance(TimeSpan.FromSeconds(10));
+        Assert.Equal(TimeSpan.FromSeconds(ApprovalLimits.DefaultWindowSeconds - 10), owned.Waiting!.Remaining);
+
+        channel.Release();
+
+        Assert.Equal(ApprovalAnswer.Approved, await asking);
+        Assert.Null(owned.Waiting);
+    }
+
+    [Fact]
+    public async Task ARequestTheWindowClosedOn_IsNoLongerWaiting()
+    {
+        var channel = new ScriptedChannel(ApprovalAnswer.Approved) { Park = true };
+        var (gate, clock) = Build(channel);
+        using var owned = gate;
+
+        var asking = owned.AskAsync("k", Prompt(), TestContext.Current.CancellationToken).AsTask();
+        await channel.Entered.WaitAsync(TestContext.Current.CancellationToken);
+
+        clock.Advance(TimeSpan.FromSeconds(ApprovalLimits.DefaultWindowSeconds));
+
+        Assert.Equal(ApprovalAnswer.TimedOut, await asking);
+        Assert.Null(owned.Waiting);
+    }
+
+    [Fact]
+    public async Task AWithdrawnRequest_IsNoLongerWaiting_AndOneRefusedAsBusyWasNeverListed()
+    {
+        var channel = new ScriptedChannel(ApprovalAnswer.Approved) { Park = true };
+        var (gate, _) = Build(channel);
+        using var owned = gate;
+        using var withdraw = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+
+        var asking = owned.AskAsync("k", Prompt(), withdraw.Token).AsTask();
+        await channel.Entered.WaitAsync(TestContext.Current.CancellationToken);
+
+        var other = ApprovalPrompt.For("other", new EntryName("env/dev", "OTHER"), "password", "x", 300);
+        Assert.Equal(ApprovalAnswer.Busy, await owned.AskAsync("k2", other, TestContext.Current.CancellationToken));
+        Assert.Equal(Prompt(), owned.Waiting!.Prompt);
+
+        await withdraw.CancelAsync();
+
+        Assert.Equal(ApprovalAnswer.Cancelled, await asking);
+        Assert.Null(owned.Waiting);
+    }
+
     /// <summary>A channel that answers what it was told to, when it is told to.</summary>
     /// <remarks>
     /// Both completion sources are built with
