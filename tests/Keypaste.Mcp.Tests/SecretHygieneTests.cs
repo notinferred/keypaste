@@ -143,6 +143,9 @@ public sealed class SecretHygieneTests : IAsyncLifetime
             Password = SentinelOutsideTheRule,
         });
 
+        // What an agent is answered from is the vault as saved (D-0317).
+        _vault.Save();
+
         _grants = new GrantCache(TimeProvider.System);
         _gate = new ApprovalGate(_human, TimeProvider.System, ApprovalLimits.Default);
 

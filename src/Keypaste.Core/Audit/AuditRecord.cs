@@ -103,6 +103,14 @@ public enum AuditMethod
     /// this request belonged to, or not by the process it reached.
     /// </remarks>
     NoSession = 17,
+
+    /// <summary>The vault's owner holds a copy that no longer matches its file, so it answered
+    /// nothing from it (D-0317).</summary>
+    /// <remarks>
+    /// Somebody else wrote the file, which lasts until a person reloads it, or a change made in the
+    /// owner has not been saved yet. The reason says which.
+    /// </remarks>
+    VaultChanged = 18,
 }
 
 /// <summary>Who asked.</summary>

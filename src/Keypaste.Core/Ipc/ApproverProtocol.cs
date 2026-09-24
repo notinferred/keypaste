@@ -193,7 +193,7 @@ public static class ApproverProtocol
         // that reasoning costing a connection and its grants rather than a listing (law 3.7).
         return frame.Length <= MessageFramer.MaximumPayloadBytes
             ? frame
-            : WriteNames(new NamesReply(reply.VaultUnlocked, [], Undersized, false) { Session = reply.Session }, 0, false);
+            : WriteNames(new NamesReply(reply.VaultUnlocked, [], Undersized, false) { Session = reply.Session, Refusal = reply.Refusal }, 0, false);
     }
 
     /// <summary>How many of a reply's names fit one frame.</summary>
@@ -251,6 +251,12 @@ public static class ApproverProtocol
             writer.WriteString("reason", reply.Reason);
             writer.WriteBoolean("complete", complete);
             WriteOptional(writer, "session", reply.Session);
+
+            if (reply.Refusal is { } refusal)
+            {
+                writer.WriteNumber("method", (int)refusal);
+            }
+
             writer.WriteStartArray("names");
 
             for (var i = 0; i < count; i++)
@@ -517,6 +523,9 @@ public static class ApproverProtocol
                 TrueOnly(root, "complete"))
             {
                 Session = Optional(root, "session"),
+                Refusal = TryInteger(root, "method", out var method)
+                    ? Enum.IsDefined((AuditMethod)method) ? (AuditMethod)method : AuditMethod.Failed
+                    : null,
             };
 
             return true;

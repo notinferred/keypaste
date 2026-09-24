@@ -174,6 +174,7 @@ jq -c . < ~/.keypaste/audit.jsonl
 | `exposure` | A listing, allowed because everything named was inside your `--expose` globs. |
 | `no-approver` | Nobody was running `keypaste agent`; in source, nothing held the vault unlocked, or it was held by a desktop that cannot approve yet. |
 | `no-session` | In source: the request did not reach the current session of the process holding this server's vault — the bridge named no vault, the process that answered holds another vault, or the vault was locked or unlocked again between attaching and asking. Nothing was considered. |
+| `vault-changed` | In source: the process holding the vault had a copy that no longer matched its file. Another program saved the file, which lasts until the person reloads the vault, or a change made in keypaste was still being saved. Nothing was read. |
 | `out-of-scope` | The entry was outside exposure or absent. A shared response prevents existence checks outside exposure. |
 | `timed-out` / `busy` / `cooldown` | Nobody answered in time; the connection was already carrying another call, so this one was refused rather than queued behind it; or the same request was refused a moment ago. |
 | `cancelled` | The client stopped waiting before anybody answered. Nobody decided anything. |
@@ -272,7 +273,7 @@ Can it see my entry names? Only the ones inside `--expose`, which defaults to `e
 
 Can it change my vault? The current MCP surface only lists names and requests values; it cannot add, edit or delete entries. Desktop and CLI editing are separate workflows.
 
-Will it see my desktop edits immediately? No. The current terminal approver holds its own snapshot. Stop and reopen it after changing the file to read the saved values.
+Will it see my desktop edits immediately? No. The current terminal approver holds its own snapshot. Stop and reopen it after changing the file to read the saved values. In source, the desktop serves its own saved edits at once, and an approver or desktop whose file another program changed refuses as `vault-changed` until it is reopened.
 
 The master-password prompt belongs in the process you start. An MCP client can trigger bridge startup, its stdin and stdout carry the protocol, and desktop clients provide no terminal. A configuration password would be plaintext, while client-mediated input would expose it to the requester. [D-0023](decisions-archive.md) records this design.
 

@@ -6,6 +6,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 All of this is source only: there is still no desktop download, and the published CLI is unchanged. Each entry that names a step links its record, which holds the full account.
 
+Agents now get the vault as it is saved. A password changed in the desktop is the next value an agent receives, and editing, moving, renaming or deleting an entry, or changing the vault's access, makes the next request for it ask again instead of reusing an earlier approval. When another program saves the vault file, the desktop and `keypaste agent` refuse every agent request as `vault-changed` until you lock and unlock, or restart the agent, and they never write over that save ([U.3](docs/steps/U.3.md)).
+
 Locking is now one step for agents. Every desktop lock, and quitting, denies a request still waiting at the app as `vault-locked` in the audit log and clears the grants agents were given; so does stopping `keypaste agent` with Ctrl+C, SIGTERM or by closing its terminal. An agent's requests never keep the app unlocked, and one that arrives after the machine slept past the timeout locks the app and is refused. Values already delivered are not recalled ([U.2](docs/steps/U.2.md)).
 
 The desktop now owns the vault it unlocks. A `keypaste-mcp` configured for that vault reaches the app, which answers `list_entry_names` and refuses every credential request until approving in the app exists, and each audit line names the unlocked session that answered. `keypaste agent` on a vault the app holds, or a second app on it, is refused naming the holder before any password is asked for. The bridge now needs `--vault`, and the bridge and the approver must both be this version ([U.1](docs/steps/U.1.md)).

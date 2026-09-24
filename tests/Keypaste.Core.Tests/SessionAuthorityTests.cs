@@ -307,11 +307,132 @@ public sealed class SessionAuthorityTests : IDisposable
         Assert.Empty(listing.Names);
     }
 
+    [Fact]
+    public async Task AfterAnotherProgramSavesTheVault_RequestsAndListingsAreRefusedAsChanged_AndNothingIsAsked()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        using var vault = SavedVault("v1");
+        await using var owner = Owner.Start(this, Over(vault));
+        await using var client = await ConnectAsync(owner.PipeName);
+        await client.AttachAsync(new AttachRequest(VaultPath), Token);
+
+        var before = await client.RequestAsync(Request("session-one"), Token);
+        Assert.NotNull(before);
+        Assert.Equal("v1", before.Value);
+        Assert.Equal(1, _fixture.Grants.Count);
+
+        var external = SaveElsewhere("external");
+
+        var reply = await client.RequestAsync(Request("session-one"), Token);
+        var listing = await client.ListAsync(Listing("session-one"), Token);
+
+        Assert.NotNull(reply);
+        Assert.Equal(AuditDecision.Denied, reply.Decision);
+        Assert.Equal(AuditMethod.VaultChanged, reply.Method);
+        Assert.Contains("another program changed the vault file", reply.Reason, StringComparison.Ordinal);
+        Assert.Null(reply.Value);
+        Assert.NotNull(listing);
+        Assert.Empty(listing.Names);
+        Assert.Equal(AuditMethod.VaultChanged, listing.Refusal);
+        Assert.Equal(1, _fixture.Channel.Asked);
+        Assert.Equal(0, _fixture.Grants.Count);
+        Assert.Equal(external, File.ReadAllBytes(VaultPath));
+        Assert.Contains(_fixture.Narration, line => line.Contains("restart keypaste agent", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// The grant is zeroed when the change is seen, not merely stepped over while the file differs:
+    /// with the old bytes put back, the same request is asked again rather than served from it.
+    /// </summary>
+    [Fact]
+    public async Task AGrantGivenBeforeAnExternalChange_IsGoneEvenIfTheFileIsPutBack()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        using var vault = SavedVault("v1");
+        await using var owner = Owner.Start(this, Over(vault));
+        await using var client = await ConnectAsync(owner.PipeName);
+        await client.AttachAsync(new AttachRequest(VaultPath), Token);
+
+        await client.RequestAsync(Request("session-one"), Token);
+        var original = File.ReadAllBytes(VaultPath);
+
+        SaveElsewhere("external");
+        var refused = await client.RequestAsync(Request("session-one"), Token);
+        Assert.NotNull(refused);
+        Assert.Equal(AuditMethod.VaultChanged, refused.Method);
+
+        File.WriteAllBytes(VaultPath, original);
+        var again = await client.RequestAsync(Request("session-one"), Token);
+
+        Assert.NotNull(again);
+        Assert.Equal(AuditMethod.Prompt, again.Method);
+        Assert.Equal("v1", again.Value);
+        Assert.Equal(2, _fixture.Channel.Asked);
+    }
+
+    [Fact]
+    public async Task APolicyRelease_IsRefusedAfterAnExternalChange()
+    {
+        using var vault = SavedVault("v1");
+        using var policed = new ApproverFixture(ApproverHandlerPolicyTests.Policy());
+        await using var owner = Owner.Start(this, Over(vault, policed));
+        await using var client = await ConnectAsync(owner.PipeName);
+        await client.AttachAsync(new AttachRequest(VaultPath), Token);
+        var request = Request("session-one") with { ClientLabel = "billing-bot" };
+
+        var before = await client.RequestAsync(request, Token);
+        Assert.NotNull(before);
+        Assert.Equal(AuditMethod.Policy, before.Method);
+
+        SaveElsewhere("external");
+        var after = await client.RequestAsync(request, Token);
+
+        Assert.NotNull(after);
+        Assert.Equal(AuditMethod.VaultChanged, after.Method);
+        Assert.Null(after.Value);
+        Assert.Equal(0, policed.Channel.Asked);
+    }
+
     public void Dispose()
     {
         _lifetime?.Dispose();
         _fixture.Dispose();
         Directory.Delete(_directory, recursive: true);
+    }
+
+    /// <summary>The test's vault, saved, holding the one entry requests name.</summary>
+    private Vault SavedVault(string password)
+    {
+        var vault = Vault.Create(VaultPath, VaultCredentialSourceTests.MasterPassword);
+        vault.AddEntry(new VaultEntry { GroupPath = "env/dev", Title = "STRIPE_KEY", Password = password });
+        vault.Save();
+        return vault;
+    }
+
+    /// <summary>Another program saving the test's vault; returns the bytes it wrote.</summary>
+    private byte[] SaveElsewhere(string password)
+    {
+        using (var writer = Vault.Open(VaultPath, VaultCredentialSourceTests.MasterPassword))
+        {
+            writer.UpdateEntry(new VaultEntry { GroupPath = "env/dev", Title = "STRIPE_KEY", Password = password });
+            writer.Save();
+        }
+
+        return File.ReadAllBytes(VaultPath);
+    }
+
+    /// <summary>The fixture's gate, grants and policy in front of a real vault.</summary>
+    private ApproverHandler Over(Vault vault, ApproverFixture? fixture = null)
+    {
+        fixture ??= _fixture;
+
+        return new ApproverHandler(
+            new VaultCredentialSource(() => vault),
+            new VaultEntryNameLister(() => vault),
+            fixture.Gate,
+            fixture.Grants,
+            fixture.Policy,
+            fixture.Narration.Add);
     }
 
     private static async Task<ApproverClient> ConnectAsync(string pipeName)

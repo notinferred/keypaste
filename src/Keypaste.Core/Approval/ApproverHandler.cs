@@ -99,7 +99,10 @@ public sealed class ApproverHandler
 
         if (!_lister.TryList(exposure, out var names, out var failure))
         {
-            return ValueTask.FromResult(new NamesReply(false, [], Explain(failure), true));
+            return ValueTask.FromResult(
+                IsStale(failure)
+                    ? new NamesReply(false, [], Stale(failure, "a listing"), true) { Refusal = AuditMethod.VaultChanged }
+                    : new NamesReply(false, [], Explain(failure), true));
         }
 
         return ValueTask.FromResult(new NamesReply(true, names, string.Empty, true));
@@ -133,9 +136,12 @@ public sealed class ApproverHandler
             // A name that resolves to nothing and one outside the exposure get the same answer:
             // telling them apart would let an agent enumerate entries in parts of the vault it was
             // never allowed to see (THREATS.md T-4). The audit line below still records which.
-            return failure == CredentialFailure.VaultLocked
-                ? Refused(AuditMethod.VaultLocked, "no vault is unlocked")
-                : Refused(AuditMethod.OutOfScope, Explain(failure));
+            return failure switch
+            {
+                CredentialFailure.VaultLocked => Refused(AuditMethod.VaultLocked, "no vault is unlocked"),
+                _ when IsStale(failure) => Refused(AuditMethod.VaultChanged, Stale(failure, "a request")),
+                _ => Refused(AuditMethod.OutOfScope, Explain(failure)),
+            };
         }
 
         if (!exposure.Allows(name))
@@ -223,7 +229,7 @@ public sealed class ApproverHandler
         // Last of all. Nothing has decrypted a field until a person said yes to this exact request.
         if (!_source.TryRead(name, request.Field, out var released, out var readFailure))
         {
-            return Refused(AuditMethod.Failed, Explain(readFailure), display);
+            return Unread(readFailure, display);
         }
 
         using (released)
@@ -286,7 +292,7 @@ public sealed class ApproverHandler
 
         if (!_source.TryRead(name, request.Field, out var released, out var readFailure))
         {
-            return Refused(AuditMethod.Failed, Explain(readFailure), display);
+            return Unread(readFailure, display);
         }
 
         using (released)
@@ -350,6 +356,37 @@ public sealed class ApproverHandler
         return granted;
     }
 
+    /// <summary>Refuses a release whose field could not be read, naming a stale vault as that.</summary>
+    private CredentialReply Unread(CredentialFailure failure, string display) =>
+        IsStale(failure)
+            ? Refused(AuditMethod.VaultChanged, Stale(failure, display), display)
+            : Refused(AuditMethod.Failed, Explain(failure), display);
+
+    private static bool IsStale(CredentialFailure failure) =>
+        failure is CredentialFailure.ChangedOnDisk or CredentialFailure.Unsaved;
+
+    /// <summary>Says why a vault that no longer matches its file answered nothing.</summary>
+    /// <param name="failure">Which way it no longer matches.</param>
+    /// <param name="what">What was refused, for the operator's terminal.</param>
+    /// <returns>The refusal's reason.</returns>
+    /// <remarks>
+    /// A file somebody else wrote zeroes every grant: each holds a value from the copy that is now
+    /// stale, and that copy is not served again until a person reloads the vault (D-0317).
+    /// </remarks>
+    private string Stale(CredentialFailure failure, string what)
+    {
+        if (failure == CredentialFailure.ChangedOnDisk)
+        {
+            _grants.RevokeEntries(VaultEdit.Everything);
+        }
+
+        _narrate?.Invoke(failure == CredentialFailure.ChangedOnDisk
+            ? $"refused {what}: another program changed the vault file, so nothing is served from the copy unlocked here; restart keypaste agent to serve what the file holds now"
+            : $"refused {what}: {Explain(failure)}");
+
+        return Explain(failure);
+    }
+
     /// <summary>Refuses, before anything is read, a request withdrawn while it was being decided.</summary>
     /// <remarks>
     /// A lock withdraws requests through this token (D-0313), so after one nothing more is decrypted
@@ -406,6 +443,9 @@ public sealed class ApproverHandler
         CredentialFailure.Ambiguous => "more than one entry answers to that name",
         CredentialFailure.NoSuchField => "the field asked for is not one keypaste releases",
         CredentialFailure.Empty => "the entry has nothing in that field",
+        CredentialFailure.ChangedOnDisk =>
+            "another program changed the vault file since keypaste read it; nothing is released until a person reloads the vault",
+        CredentialFailure.Unsaved => "the vault has a change that is not saved yet",
         _ => "the vault could not be read",
     };
 }

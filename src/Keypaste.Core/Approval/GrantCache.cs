@@ -180,6 +180,28 @@ public sealed class GrantCache : IDisposable
         }
     }
 
+    /// <summary>Zeroes every connection's grants for the entries a change to the vault touched.</summary>
+    /// <param name="edit">The change; <see cref="VaultEdit.Everything"/> zeroes every grant.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="edit"/> is null.</exception>
+    /// <remarks>
+    /// A grant holds the value a person approved, so once the entry under that name has changed, the
+    /// grant would answer with something the vault no longer holds (D-0318).
+    /// </remarks>
+    public void RevokeEntries(VaultEdit edit)
+    {
+        ArgumentNullException.ThrowIfNull(edit);
+
+        var handles = edit.Entries.Select(EntryHandle.For).ToHashSet(StringComparer.Ordinal);
+
+        lock (_gate)
+        {
+            foreach (var key in _grants.Keys.Where(k => edit.IsEverything || handles.Contains(k.Handle)).ToList())
+            {
+                Forget(key, _grants[key]);
+            }
+        }
+    }
+
     /// <summary>Zeroes the grant a timer was armed for, if it is still the one under that key.</summary>
     /// <remarks>
     /// <para>

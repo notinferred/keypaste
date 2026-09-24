@@ -182,6 +182,41 @@ public sealed class GrantCacheTests
         survivor.Dispose();
     }
 
+    /// <summary>
+    /// A change to an entry withdraws every connection's grant for it, whichever field, and leaves
+    /// the grants for entries it did not touch (D-0318).
+    /// </summary>
+    [Fact]
+    public void AnEditWithdrawsTheGrantsForTheEntriesItTouched_AndNoOthers()
+    {
+        var edited = new EntryName("env/dev", "EDITED");
+        var untouched = new EntryName("env/dev", "UNTOUCHED");
+        using var cache = new GrantCache(new ManualClock());
+        Store(cache, Key(connection: "one", handle: EntryHandle.For(edited)));
+        Store(cache, Key(connection: "two", handle: EntryHandle.For(edited), field: "username"), "alice");
+        Store(cache, Key(connection: "one", handle: EntryHandle.For(untouched)));
+
+        cache.RevokeEntries(VaultEdit.Of(edited));
+
+        AssertNoGrant(cache, Key(connection: "one", handle: EntryHandle.For(edited)));
+        AssertNoGrant(cache, Key(connection: "two", handle: EntryHandle.For(edited), field: "username"));
+        Assert.True(cache.TryUse(Key(connection: "one", handle: EntryHandle.For(untouched)), out var survivor, out _));
+        survivor.Dispose();
+    }
+
+    [Fact]
+    public void AChangeToEverythingWithdrawsEveryGrant()
+    {
+        using var cache = new GrantCache(new ManualClock());
+        Store(cache, Key(connection: "one"));
+        Store(cache, Key(connection: "two", handle: "k1_fedcba9876543210"));
+
+        cache.RevokeEntries(VaultEdit.Everything);
+
+        Assert.Equal(0, cache.Count);
+        AssertNoGrant(cache, Key(connection: "one"));
+    }
+
     [Fact]
     public void ReApprovingReplacesTheGrantRatherThanKeepingBoth()
     {
@@ -220,6 +255,7 @@ public sealed class GrantCacheTests
 
         Assert.Throws<ArgumentNullException>(() => cache.Store(Key(), null!, _ttl));
         Assert.Throws<ArgumentNullException>(() => cache.Revoke(null!));
+        Assert.Throws<ArgumentNullException>(() => cache.RevokeEntries(null!));
     }
 
     /// <summary>

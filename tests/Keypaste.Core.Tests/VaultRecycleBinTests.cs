@@ -267,6 +267,7 @@ public sealed class VaultRecycleBinTests : IDisposable
     public void ARecycledEntry_IsNotListedToAnAgent_EvenUnderTheWidestExposure()
     {
         using var vault = Seeded(out _);
+        vault.Save();
         var lister = new VaultEntryNameLister(() => vault);
 
         Assert.True(EntryExposure.TryCreate(["**"], out var exposure, out _));
@@ -274,6 +275,7 @@ public sealed class VaultRecycleBinTests : IDisposable
         Assert.Contains(before!, name => name == _token);
 
         Assert.Equal(DeletionOutcome.Recycled, vault.RemoveEntry(_token));
+        vault.Save();
 
         Assert.True(lister.TryList(exposure!, out var after, out _));
         Assert.Empty(after!);
@@ -284,11 +286,13 @@ public sealed class VaultRecycleBinTests : IDisposable
     public void ARecycledEntry_CannotBeResolvedOrReadForARelease()
     {
         using var vault = Seeded(out _);
+        vault.Save();
         var source = new VaultCredentialSource(() => vault);
 
         Assert.True(source.TryResolve("env/billing/TOKEN", out _, out _));
 
         Assert.Equal(DeletionOutcome.Recycled, vault.RemoveEntry(_token));
+        vault.Save();
 
         Assert.False(source.TryResolve("env/billing/TOKEN", out _, out var resolveFailure));
         Assert.Equal(CredentialFailure.NotFound, resolveFailure);
@@ -305,12 +309,14 @@ public sealed class VaultRecycleBinTests : IDisposable
     public void ARecycledEntry_CannotBeResolvedByTheHandleItHad()
     {
         using var vault = Seeded(out _);
+        vault.Save();
         var handle = EntryHandle.For(_token);
         var source = new VaultCredentialSource(() => vault);
 
         Assert.True(source.TryResolve(handle, out _, out _));
 
         Assert.Equal(DeletionOutcome.Recycled, vault.RemoveEntry(_token));
+        vault.Save();
 
         Assert.False(source.TryResolve(handle, out _, out var failure));
         Assert.Equal(CredentialFailure.NotFound, failure);

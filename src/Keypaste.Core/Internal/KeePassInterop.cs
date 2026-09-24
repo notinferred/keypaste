@@ -913,10 +913,14 @@ internal sealed class KeePassInterop : IDisposable
     }
 
     /// <summary>Puts a recycled entry back where it was deleted from.</summary>
+    /// <param name="id">The recycled entry.</param>
+    /// <param name="restored">The name the entry answers to again, or null when nothing moved.</param>
     /// <returns>What happened to the entry.</returns>
-    internal RestoreOutcome RestoreRecycled(RecycledEntryId id)
+    internal RestoreOutcome RestoreRecycled(RecycledEntryId id, out EntryName? restored)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+
+        restored = null;
 
         if (Bin() is not { } bin || LocateRecycled(bin, id) is not { } found)
         {
@@ -930,11 +934,11 @@ internal sealed class KeePassInterop : IDisposable
         // Resolved before anything moves. A restore that recreated the one condition every
         // resolver in keypaste refuses — two entries answering to one name — would deny both of
         // them to MCP and take out the whole env project for `keypaste run` (D-0091).
-        var restored = new EntryName(
+        var target = new EntryName(
             PathOf(destination) ?? string.Empty,
             ReadField(found.Entry, PwDefs.TitleField));
 
-        if (Matches(restored).Count != 0)
+        if (Matches(target).Count != 0)
         {
             return RestoreOutcome.DestinationOccupied;
         }
@@ -942,6 +946,7 @@ internal sealed class KeePassInterop : IDisposable
         found.Group.Entries.Remove(found.Entry);
         found.Entry.PreviousParentGroup = PwUuid.Zero;
         destination.AddEntry(found.Entry, true, true);
+        restored = target;
 
         return toRoot ? RestoreOutcome.RestoredToRoot : RestoreOutcome.Restored;
     }

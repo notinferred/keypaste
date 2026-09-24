@@ -32,9 +32,9 @@ Copied secrets clear after twenty seconds, with a countdown and Clear now button
 
 ## Editing your vault
 
-Everything the app writes goes through the same core as the CLI. A fresh `keypaste ls`, `keypaste get`, `keypaste env ls` or `keypaste run` invocation reads the saved change from the same file. An already unlocked process, including a terminal approver, retains its in-memory copy until reopened. Both front ends use the serialization code exercised by the KeePassXC compatibility gate.
+Everything the app writes goes through the same core as the CLI. A fresh `keypaste ls`, `keypaste get`, `keypaste env ls` or `keypaste run` invocation reads the saved change from the same file. In source, agents are answered from the vault as saved: a change saved in the app is the next value an agent is given, and a grant for what it touched is asked about again. Both front ends use the serialization code exercised by the KeePassXC compatibility gate.
 
-If the vault file changes while open, the app refuses to save its stale copy. Lock and unlock to load the external change, then reapply your edit. No data is written during the refusal.
+If the vault file changes while open, the app refuses to save its stale copy. Lock and unlock to load the external change, then reapply your edit. No data is written during the refusal. In source, the app also refuses every agent request as `vault-changed` from the moment it sees the change until you lock and unlock.
 
 The app is a vault editor, not just a viewer. Deleting an entry moves it to the vault's KDBX recycle bin, so the entry, its fields and its history survive, and Trash puts it back. A vault whose recycle bin was switched off in KeePassXC still deletes permanently, and the confirmation says so. There is no concurrent-edit merge. Entry history can recover a replaced value while that entry and vault survive; neither it nor the recycle bin can recover a lost file. Saving keeps the file it replaces: the first save after each unlock copies the vault into `<vault>.backups` beside it, no more often than every fifteen minutes, keeping the last five, and a save whose copy cannot be written does not happen. An edit made within fifteen minutes of the newest copy therefore has no copy of its own, and restoring returns the vault as that newest copy found it.
 

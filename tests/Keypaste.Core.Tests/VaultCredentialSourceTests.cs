@@ -54,6 +54,9 @@ public sealed class VaultCredentialSourceTests : IDisposable
         // An entry whose title is shaped exactly like a handle, which is why resolution has to
         // fall back to a path match rather than stopping when no handle matches.
         _vault.AddEntry(new VaultEntry { GroupPath = "env/dev", Title = "k1_0123456789abcdef", Password = "titled-like-a-handle" });
+
+        // What an agent is answered from is the vault as saved (D-0317).
+        _vault.Save();
     }
 
     public void Dispose()
@@ -252,6 +255,7 @@ public sealed class VaultCredentialSourceTests : IDisposable
     public void AnEntryWithOnlyOnePopulatedField_StillReleasesThatOne()
     {
         _vault.AddEntry(new VaultEntry { GroupPath = "env/dev", Title = "ONLY_URL", Url = "https://only.example" });
+        _vault.Save();
 
         Assert.Equal("https://only.example", Read("env/dev/ONLY_URL", "url"), StringComparer.Ordinal);
         Assert.False(Source().TryRead(new EntryName("env/dev", "ONLY_URL"), "password", out _, out var failure));

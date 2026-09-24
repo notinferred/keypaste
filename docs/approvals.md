@@ -123,7 +123,7 @@ It does not add the returned field value to the log. Names and reason excerpts a
 
 ## Limits
 
-The vault stays unlocked while `keypaste agent` runs; it has no idle auto-lock. Stop that process to lock it. The desktop app holds a separate session, so locking the desktop does not lock the approver; in source the two cannot hold the same vault at once. Approval prompts appear only in the approver terminal; there is no native dialog. An already-open approver also retains its in-memory vault snapshot: reopen it after a desktop or external edit to use the updated values.
+The vault stays unlocked while `keypaste agent` runs; it has no idle auto-lock. Stop that process to lock it. The desktop app holds a separate session, so locking the desktop does not lock the approver; in source the two cannot hold the same vault at once. Approval prompts appear only in the approver terminal; there is no native dialog. An already-open approver also retains its in-memory vault snapshot: reopen it after a desktop or external edit to use the updated values. In source, once another program changes the file it refuses every request as `vault-changed` instead, until you restart it.
 
 TTL limits cached approval reuse. Expiry clears the cache buffer but cannot erase strings or copies retained by clients, transcripts or session files. Stopping the approver cannot revoke these copies; rotate the credential at its provider when needed. [SECURITY.md](../SECURITY.md) describes the memory limits.
 

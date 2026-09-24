@@ -108,6 +108,21 @@ public sealed class ApproverProtocolTests
         Assert.True(decoded.VaultUnlocked);
         Assert.Equal(reply.Names, decoded.Names);
         Assert.Equal(reply.Reason, decoded.Reason, StringComparer.Ordinal);
+        Assert.Null(decoded.Refusal);
+    }
+
+    [Fact]
+    public void ARefusedListingKeepsItsMethod_AndAnUnknownOneReadsAsFailed()
+    {
+        var reply = new NamesReply(false, [], "stale", true) { Refusal = AuditMethod.VaultChanged };
+
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(reply), out NamesReply? decoded));
+        Assert.Equal(AuditMethod.VaultChanged, decoded.Refusal);
+
+        var unknown = """{"v":2,"kind":"names","unlocked":false,"reason":"","complete":true,"method":999,"names":[]}"""u8;
+
+        Assert.True(ApproverProtocol.TryDecode(unknown, out NamesReply? future));
+        Assert.Equal(AuditMethod.Failed, future.Refusal);
     }
 
     [Fact]

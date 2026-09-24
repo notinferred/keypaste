@@ -11,7 +11,9 @@ namespace Keypaste.Core;
 public sealed class Vault : IDisposable
 {
     private readonly KeePassInterop _interop;
+    private readonly Lock _state = new();
     private byte[]? _stamp;
+    private bool _pending;
     private bool _disposed;
     private bool _backedUp;
     private bool _rekeyed;
@@ -49,6 +51,13 @@ public sealed class Vault : IDisposable
     /// </remarks>
     public VaultBackupReport? LastBackup { get; private set; }
 
+    /// <summary>Raised after a change to this open vault, naming the entries it touched.</summary>
+    /// <remarks>
+    /// Raised on the thread that made the change, before the method making it returns and so before
+    /// any save of it, so whatever was released from those entries is withdrawn first (D-0318).
+    /// </remarks>
+    public event EventHandler<VaultEdit>? Edited;
+
     /// <summary>The KDBX UUID of the entry called <paramref name="name"/>, as hex, or
     /// <see langword="null"/> if none has that name. A test seam; keypaste addresses entries by
     /// name.</summary>
@@ -68,7 +77,8 @@ public sealed class Vault : IDisposable
     /// <see cref="RecyclesDeletedEntries"/> only reads it. What a vault whose owner turned the bin
     /// off does on a delete still has to be assertable without a KeePassXC installation.
     /// </remarks>
-    internal void SetRecyclesDeletedEntries(bool recycles) => _interop.SetRecyclesDeletedEntries(recycles);
+    internal void SetRecyclesDeletedEntries(bool recycles) =>
+        Change(() => _interop.SetRecyclesDeletedEntries(recycles));
 
     /// <summary>Creates a new, empty vault protected by <paramref name="masterPassword"/>. Nothing
     /// is written to disk until <see cref="Save"/>.</summary>
@@ -147,7 +157,7 @@ public sealed class Vault : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(entry);
 
-        _interop.AddEntry(entry);
+        Change(() => _interop.AddEntry(entry), VaultEdit.Of(EntryName.Of(entry)));
     }
 
     /// <summary>Overwrites the fields of the entry at <paramref name="entry"/>'s
@@ -165,7 +175,7 @@ public sealed class Vault : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(entry);
 
-        return _interop.UpdateEntry(entry) > 0;
+        return Change(() => _interop.UpdateEntry(entry) > 0, updated => updated ? VaultEdit.Of(EntryName.Of(entry)) : null);
     }
 
     /// <summary>The earlier states KeePass history keeps for the one entry with this name, newest
@@ -214,7 +224,7 @@ public sealed class Vault : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(name);
 
-        return _interop.RestoreRevision(name, index) > 0;
+        return Change(() => _interop.RestoreRevision(name, index) > 0, restored => restored ? VaultEdit.Of(name) : null);
     }
 
     /// <summary>Every entry in the vault, depth-first from the root group.</summary>
@@ -223,6 +233,49 @@ public sealed class Vault : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         return _interop.ReadEntries();
+    }
+
+    /// <summary>Every entry, but only while this vault holds exactly what its file holds.</summary>
+    /// <param name="entries">The entries when the answer is <see cref="SavedRead.Current"/>, otherwise null.</param>
+    /// <returns>Whether the vault matches its file, and if not, why.</returns>
+    /// <remarks>
+    /// <para>
+    /// What another process is served from (D-0317). A change made here and not yet saved, a write in
+    /// progress, and a file somebody else has written since this vault last read or wrote it are each
+    /// refused rather than answered from memory. The check and the read happen under the lock every
+    /// change takes, so neither can see a change half made.
+    /// </para>
+    /// <para>
+    /// The comparison is with the file's whole digest, for the reason <see cref="SourceSnapshot.Digest"/>
+    /// gives. A file that cannot be read is <see cref="SavedRead.Unreadable"/>, not current.
+    /// </para>
+    /// </remarks>
+    public SavedRead ReadSaved(out IReadOnlyList<VaultEntry>? entries)
+    {
+        entries = null;
+
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            if (_pending || _stamp is not { } stamp)
+            {
+                return SavedRead.Unsaved;
+            }
+
+            if (SourceSnapshot.Digest(Path) is not { } current)
+            {
+                return SavedRead.Unreadable;
+            }
+
+            if (!CryptographicOperations.FixedTimeEquals(stamp, current))
+            {
+                return SavedRead.ChangedOnDisk;
+            }
+
+            entries = _interop.ReadEntries();
+            return SavedRead.Current;
+        }
     }
 
     /// <summary>
@@ -384,7 +437,12 @@ public sealed class Vault : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(name);
 
-        return _interop.RemoveEntry(name, out recycled);
+        var id = default(RecycledEntryId);
+        var outcome = Change(
+            () => _interop.RemoveEntry(name, out id),
+            removed => removed == DeletionOutcome.NothingMatched ? null : VaultEdit.Of(name));
+        recycled = id;
+        return outcome;
     }
 
     /// <summary>Deletes the entry at <paramref name="entryPath"/>. Call <see cref="Save"/> to
@@ -400,7 +458,7 @@ public sealed class Vault : IDisposable
         ArgumentNullException.ThrowIfNull(entryPath);
 
         return ResolveByPath(entryPath) is { } found
-            ? _interop.RemoveEntry(EntryName.Of(found), out _)
+            ? RemoveEntry(EntryName.Of(found), out _)
             : DeletionOutcome.NothingMatched;
     }
 
@@ -430,7 +488,12 @@ public sealed class Vault : IDisposable
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(title);
 
-        return _interop.RenameEntry(name, title, out renamed);
+        EntryName? result = null;
+        var outcome = Change(
+            () => _interop.RenameEntry(name, title, out result),
+            _ => result is null ? null : VaultEdit.Of(name, result));
+        renamed = result;
+        return outcome;
     }
 
     /// <summary>Moves the one entry with this name into another group. Call <see cref="Save"/> to
@@ -457,7 +520,12 @@ public sealed class Vault : IDisposable
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(destinationGroupPath);
 
-        return _interop.MoveEntry(name, destinationGroupPath, out moved);
+        EntryName? result = null;
+        var outcome = Change(
+            () => _interop.MoveEntry(name, destinationGroupPath, out result),
+            _ => result is null ? null : VaultEdit.Of(name, result));
+        moved = result;
+        return outcome;
     }
 
     /// <summary>
@@ -501,7 +569,12 @@ public sealed class Vault : IDisposable
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(target);
 
-        return _interop.Relocate(name, target, out result);
+        EntryName? relocated = null;
+        var outcome = Change(
+            () => _interop.Relocate(name, target, out relocated),
+            _ => relocated is null ? null : VaultEdit.Of(name, relocated));
+        result = relocated;
+        return outcome;
     }
 
     /// <summary>Creates one empty group. Call <see cref="Save"/> to persist it.</summary>
@@ -526,7 +599,12 @@ public sealed class Vault : IDisposable
         ArgumentNullException.ThrowIfNull(parentGroupPath);
         ArgumentNullException.ThrowIfNull(name);
 
-        return _interop.CreateGroup(parentGroupPath, name, out created);
+        var path = string.Empty;
+        var outcome = Change(
+            () => _interop.CreateGroup(parentGroupPath, name, out path),
+            made => made == GroupOutcome.Created ? VaultEdit.Of() : null);
+        created = path;
+        return outcome;
     }
 
     /// <summary>Renames one group, carrying everything under it. Call <see cref="Save"/> to
@@ -556,7 +634,19 @@ public sealed class Vault : IDisposable
         ArgumentNullException.ThrowIfNull(groupPath);
         ArgumentNullException.ThrowIfNull(name);
 
-        return _interop.RenameGroup(groupPath, name, out renamedPath);
+        var path = string.Empty;
+        IReadOnlyList<EntryName> beneath = [];
+        var outcome = Change(
+            () =>
+            {
+                beneath = [.. _interop.ReadEntries().Select(EntryName.Of).Where(entry => IsBeneath(entry.GroupPath, groupPath))];
+                return _interop.RenameGroup(groupPath, name, out path);
+            },
+            renamed => renamed == GroupOutcome.Renamed
+                ? VaultEdit.Of([.. beneath, .. beneath.Select(entry => new EntryName(path + entry.GroupPath[groupPath.Length..], entry.Title))])
+                : null);
+        renamedPath = path;
+        return outcome;
     }
 
     /// <summary>Writes a protected custom string onto an entry. A test seam; nothing else uses it.</summary>
@@ -566,7 +656,7 @@ public sealed class Vault : IDisposable
     /// never read.
     /// </remarks>
     internal void AddProtectedFieldUnchecked(EntryName name, string field, string value) =>
-        _interop.AddProtectedFieldUnchecked(name, field, value);
+        Change(() => _interop.AddProtectedFieldUnchecked(name, field, value), VaultEdit.Of(name));
 
     /// <summary>Adds a group without applying any of the rules. A test seam; nothing else uses it.</summary>
     /// <remarks>
@@ -575,7 +665,7 @@ public sealed class Vault : IDisposable
     /// the reason D-0255 gives about <see cref="SetRecyclesDeletedEntries"/>.
     /// </remarks>
     internal void AddGroupUnchecked(string parentGroupPath, string name) =>
-        _interop.AddGroupUnchecked(parentGroupPath, name);
+        Change(() => _interop.AddGroupUnchecked(parentGroupPath, name));
 
     /// <summary>Everything in the recycle bin, or an empty list when there is nothing to recover.</summary>
     /// <remarks>
@@ -596,7 +686,10 @@ public sealed class Vault : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        return _interop.RestoreRecycled(id);
+        EntryName? restored = null;
+        return Change(
+            () => _interop.RestoreRecycled(id, out restored),
+            _ => restored is null ? null : VaultEdit.Of(restored));
     }
 
     /// <summary>Removes one recycled entry and its history for good. Call <see cref="Save"/> to
@@ -611,7 +704,7 @@ public sealed class Vault : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        return _interop.PurgeRecycled(id);
+        return Change(() => _interop.PurgeRecycled(id), purged => purged ? VaultEdit.Of() : null);
     }
 
     /// <summary>Removes everything in the recycle bin for good. Call <see cref="Save"/> to persist
@@ -621,7 +714,7 @@ public sealed class Vault : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        return _interop.EmptyRecycleBin();
+        return Change(() => _interop.EmptyRecycleBin(), removed => removed > 0 ? VaultEdit.Of() : null);
     }
 
     /// <summary>Whether something else has written to <see cref="Path"/> since this vault read
@@ -755,6 +848,17 @@ public sealed class Vault : IDisposable
             _ => _interop.KeyfilePath,
         };
 
+        // Nothing released under the old factors is reused under the new ones (D-0318), and nothing
+        // is read from this vault while its file is being replaced.
+        bool wasPending;
+        lock (_state)
+        {
+            wasPending = _pending;
+            _pending = true;
+        }
+
+        Edited?.Invoke(this, VaultEdit.Everything);
+
         var pending = change.SetPassword
             ? WithUtf8Password(newPassword, utf8 => _interop.ChangeKey(utf8, keyfileAfter, change.Keyfile == AccessKeyfileChange.Keep))
             : _interop.ChangeKey(null, keyfileAfter, change.Keyfile == AccessKeyfileChange.Keep);
@@ -779,6 +883,11 @@ public sealed class Vault : IDisposable
             else
             {
                 _interop.Revert(pending);
+
+                lock (_state)
+                {
+                    _pending = wasPending;
+                }
             }
         }
 
@@ -1071,7 +1180,14 @@ public sealed class Vault : IDisposable
                 hasChangedOnDisk, waitBetweenAttempts, clock, attempts, duringAttempt,
                 backUp ? path => PreserveBefore(path, applyFloor) : null,
                 keyChange);
-            _stamp = clock.Stamp(() => SourceSnapshot.Digest(Path));
+            var stamp = clock.Stamp(() => SourceSnapshot.Digest(Path));
+
+            lock (_state)
+            {
+                _stamp = stamp;
+                _pending = false;
+            }
+
             succeeded = true;
         }
         finally
@@ -1103,14 +1219,66 @@ public sealed class Vault : IDisposable
     /// <summary>Releases the vault's key material and decrypted contents.</summary>
     public void Dispose()
     {
-        if (_disposed)
+        lock (_state)
         {
-            return;
+            if (_disposed)
+            {
+                return;
+            }
+
+            _interop.Dispose();
+            _disposed = true;
+        }
+    }
+
+    /// <summary>Makes a change under the state lock and reports the entries it touched.</summary>
+    /// <param name="apply">The change.</param>
+    /// <param name="touched">What the outcome touched, or null when it changed nothing.</param>
+    /// <returns>The outcome.</returns>
+    /// <remarks>
+    /// Until the next successful save the vault then holds something its file does not, and
+    /// <see cref="ReadSaved"/> refuses it. <see cref="Edited"/> is raised outside the lock.
+    /// </remarks>
+    private T Change<T>(Func<T> apply, Func<T, VaultEdit?> touched)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        T outcome;
+        VaultEdit? edit;
+
+        lock (_state)
+        {
+            outcome = apply();
+            edit = touched(outcome);
+
+            if (edit is not null)
+            {
+                _pending = true;
+            }
         }
 
-        _interop.Dispose();
-        _disposed = true;
+        if (edit is { Entries.Count: > 0 })
+        {
+            Edited?.Invoke(this, edit);
+        }
+
+        return outcome;
     }
+
+    /// <summary><see cref="Change{T}(Func{T}, Func{T, VaultEdit?})"/> for a change that always changes something.</summary>
+    private void Change(Action apply, VaultEdit? touched = null) =>
+        Change(
+            () =>
+            {
+                apply();
+                return true;
+            },
+            _ => touched ?? VaultEdit.Of());
+
+    /// <summary>Whether a group path is <paramref name="groupPath"/> or lies inside it.</summary>
+    private static bool IsBeneath(string candidate, string groupPath) =>
+        string.Equals(candidate, groupPath, StringComparison.Ordinal)
+        || candidate.StartsWith(groupPath + "/", StringComparison.Ordinal);
 
     /// <summary>Encodes the password to UTF-8, runs <paramref name="use"/>, and zeroes the buffer
     /// whether or not that succeeded.</summary>

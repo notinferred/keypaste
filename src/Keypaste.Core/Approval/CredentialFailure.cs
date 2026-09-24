@@ -38,4 +38,13 @@ public enum CredentialFailure
 
     /// <summary>The vault could not be read at all.</summary>
     Failed = 6,
+
+    /// <summary>
+    /// Something else wrote the vault's file since the open vault last read or wrote it, so the open
+    /// vault is a stale copy until a person reloads it (D-0317).
+    /// </summary>
+    ChangedOnDisk = 7,
+
+    /// <summary>The open vault holds a change no save has written yet, or is being written.</summary>
+    Unsaved = 8,
 }

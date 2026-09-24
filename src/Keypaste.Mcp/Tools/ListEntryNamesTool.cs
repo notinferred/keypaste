@@ -143,6 +143,7 @@ internal sealed class ListEntryNamesTool(
         VaultAvailability.Locked => AuditMethod.VaultLocked,
         VaultAvailability.Busy => AuditMethod.Busy,
         VaultAvailability.NoSession => AuditMethod.NoSession,
+        VaultAvailability.Changed => AuditMethod.VaultChanged,
         _ => AuditMethod.NoApprover,
     };
 

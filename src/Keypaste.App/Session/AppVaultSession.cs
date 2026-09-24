@@ -95,6 +95,15 @@ internal sealed class AppVaultSession : IDisposable
     /// <summary>Raised after a vault has been opened or created, with its session in place.</summary>
     internal event EventHandler? Opened;
 
+    /// <summary>
+    /// Raised when the open vault changes, naming what the change touched, before the change is saved.
+    /// </summary>
+    /// <remarks>
+    /// Forwarded from whichever vault is open, so what agents were given from an entry is withdrawn
+    /// when it changes, and everything when the vault's access does (D-0318).
+    /// </remarks>
+    internal event EventHandler<VaultEdit>? Edited;
+
     /// <summary>keypaste's home, where the vault's claim is kept.</summary>
     internal string Home => _home;
 
@@ -406,6 +415,12 @@ internal sealed class AppVaultSession : IDisposable
                 _claim?.Dispose();
             }
 
+            if (previous is not null)
+            {
+                previous.Edited -= OnVaultEdited;
+            }
+
+            opened.Edited += OnVaultEdited;
             _vault = opened;
             _claim = claim;
             _lifetime = new SessionLifetime();
@@ -572,11 +587,15 @@ internal sealed class AppVaultSession : IDisposable
                 return false;
             }
 
+            _vault.Edited -= OnVaultEdited;
             _vault.Dispose();
+            reopened.Edited += OnVaultEdited;
             _vault = reopened;
             return true;
         }
     }
+
+    private void OnVaultEdited(object? sender, VaultEdit edit) => Edited?.Invoke(this, edit);
 
     /// <summary>Records that a person did something.</summary>
     /// <remarks>
@@ -643,6 +662,11 @@ internal sealed class AppVaultSession : IDisposable
             _lifetime = null;
             vault = _vault;
             _vault = null;
+
+            if (vault is not null)
+            {
+                vault.Edited -= OnVaultEdited;
+            }
 
             _timer?.Dispose();
             _timer = null;

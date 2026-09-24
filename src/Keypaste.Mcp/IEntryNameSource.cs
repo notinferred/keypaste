@@ -30,6 +30,12 @@ internal enum VaultAvailability
     /// that answered holds another vault.
     /// </summary>
     NoSession = 4,
+
+    /// <summary>
+    /// The owner's copy of the vault no longer matches its file, so it named nothing.
+    /// <see cref="ToolText.VaultChanged"/> is what the agent is told.
+    /// </summary>
+    Changed = 5,
 }
 
 /// <summary>What the vault had to say when asked for its entry names.</summary>
@@ -131,6 +137,14 @@ internal sealed class ApproverEntryNameSource(ApproverConnection approver, Serve
                     ? ToolText.ApproverFailed
                     : ToolText.NoApproverForListing,
                 true);
+        }
+
+        if (reply.Refusal == Core.Audit.AuditMethod.VaultChanged)
+        {
+            return new EntryNameListing(VaultAvailability.Changed, [], ToolText.VaultChanged, true)
+            {
+                Session = reply.Session,
+            };
         }
 
         return reply.VaultUnlocked

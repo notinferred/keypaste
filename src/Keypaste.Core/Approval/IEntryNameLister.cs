@@ -83,8 +83,15 @@ public sealed class VaultEntryNameLister(Func<Vault?> unlockedVault) : IEntryNam
         try
         {
             var matched = new List<EntryName>();
+            var state = vault.ReadSaved(out var entries);
 
-            foreach (var entry in vault.ReadEntries())
+            if (entries is null)
+            {
+                failure = VaultCredentialSource.Failure(state);
+                return false;
+            }
+
+            foreach (var entry in entries)
             {
                 var name = EntryName.Of(entry);
 

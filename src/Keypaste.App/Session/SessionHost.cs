@@ -1,3 +1,4 @@
+using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
@@ -139,13 +140,20 @@ internal sealed class SessionHost : IDisposable
     {
         private readonly ApproverListener _listener;
         private readonly ApprovalGate _approvals;
+        private readonly AppVaultSession _session;
+        private readonly GrantCache _grants;
         private readonly CancellationTokenSource _stop = new();
         private readonly Task _run;
 
-        private Hosted(ApproverListener listener, ApprovalGate approvals)
+        private Hosted(ApproverListener listener, ApprovalGate approvals, AppVaultSession session, GrantCache grants)
         {
             _listener = listener;
             _approvals = approvals;
+            _session = session;
+            _grants = grants;
+
+            // An edit in the app withdraws the grants naming what it touched before it is saved (D-0318).
+            _session.Edited += OnEdited;
             _run = listener.RunAsync(_stop.Token);
         }
 
@@ -174,7 +182,7 @@ internal sealed class SessionHost : IDisposable
             {
                 var listener = new ApproverListener(pipe, new SessionAuthority(vault, () => session.Lifetime, handler));
                 failure = null;
-                return new Hosted(listener, approvals);
+                return new Hosted(listener, approvals, session, grants);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
@@ -184,8 +192,11 @@ internal sealed class SessionHost : IDisposable
             }
         }
 
+        private void OnEdited(object? sender, VaultEdit edit) => _grants.RevokeEntries(edit);
+
         public void Dispose()
         {
+            _session.Edited -= OnEdited;
             _stop.Cancel();
 
             try

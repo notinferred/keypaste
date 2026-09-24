@@ -29,7 +29,11 @@ namespace Keypaste.AppDriver;
 /// <c>scripts/verify-session-authority.sh</c> drives it (U.1). With <c>--held-prompt</c> a request
 /// that needs a person is put in front of one who never answers, printing <c>asking</c> and then
 /// <c>withdrawn</c>, so <c>scripts/verify-lock-boundary.sh</c> can lock the app with a real request
-/// waiting at its session (U.2). The app itself still has nowhere to ask until STEPS 4.4.
+/// waiting at its session (U.2). With <c>--approving-prompt</c> a person approves every request,
+/// printing <c>asking</c> and <c>approved</c>, and the lines <c>edit</c>, <c>delete</c> and
+/// <c>relocate</c> act on the held vault through the entries screen, so
+/// <c>scripts/verify-current-state.sh</c> can change it between two real requests (U.3). The app
+/// itself still has nowhere to ask until STEPS 4.4.
 /// </para>
 /// </remarks>
 internal static class Program
@@ -46,7 +50,9 @@ internal static class Program
         "       backup-restore <vault> <backup-file-name>\n" +
         "       export <vault> <destination>\n" +
         "       access <vault> [--password] [--attach <keyfile> | --remove-keyfile]\n" +
-        "       hold <vault> [--held-prompt]   (then 'lock' or 'unlock' per line of standard input)\n" +
+        "       hold <vault> [--held-prompt | --approving-prompt]\n" +
+        "            (then per line of standard input: lock, unlock, edit <entry-path>, delete <entry-path>,\n" +
+        "             relocate <entry-path> <destination-group-path> <new-title>)\n" +
         "KEYPASTE_HOME must be set. KEYPASTE_DRIVER_PASSWORD is the password typed (empty for none),\n" +
         "KEYPASTE_DRIVER_KEYFILE the keyfile chosen, KEYPASTE_DRIVER_NEW_PASSWORD a new password or entry password.";
 
@@ -77,8 +83,9 @@ internal static class Program
                 ["backup-restore", var vault, var backup] => await driver.RestoreBackupAsync(vault, backup).ConfigureAwait(true),
                 ["export", var vault, var destination] => await driver.ExportAsync(vault, destination).ConfigureAwait(true),
                 ["access", var vault, .. var change] => await driver.ChangeAccessAsync(vault, change).ConfigureAwait(true),
-                ["hold", var vault] => await driver.HoldAsync(vault, heldPrompt: false).ConfigureAwait(true),
-                ["hold", var vault, "--held-prompt"] => await driver.HoldAsync(vault, heldPrompt: true).ConfigureAwait(true),
+                ["hold", var vault] => await driver.HoldAsync(vault, null).ConfigureAwait(true),
+                ["hold", var vault, "--held-prompt"] => await driver.HoldAsync(vault, () => new Driver.HeldPrompt()).ConfigureAwait(true),
+                ["hold", var vault, "--approving-prompt"] => await driver.HoldAsync(vault, () => new Driver.ApprovingPrompt()).ConfigureAwait(true),
                 _ => Usage(),
             };
         }
@@ -181,27 +188,47 @@ internal sealed class Driver(string home)
         });
 
     internal Task<int> RelocateAsync(string vault, string entry, string group, string title) =>
-        WithEntriesAsync(vault, entries =>
-        {
-            Select(entries, entry);
-
-            Press(entries.OrganizeCommand, "Organize");
-            entries.DraftTitle = title;
-            entries.MoveTarget = entries.MoveTargets.SingleOrDefault(node => node.Path == group)
-                ?? throw new DriverException($"no group '{group}' to move to");
-            Press(entries.ConfirmOrganizeCommand, "Move");
-            return entries.IsOrganizing || entries.Error is not null ? Refused(entries.Error) : Did(entries.Notice);
-        });
+        WithEntriesAsync(vault, entries => Relocate(entries, entry, group, title));
 
     internal Task<int> DeleteAsync(string vault, string entry) =>
-        WithEntriesAsync(vault, entries =>
-        {
-            Select(entries, entry);
+        WithEntriesAsync(vault, entries => Delete(entries, entry));
 
-            Press(entries.DeleteCommand, "Delete");
-            Press(entries.ConfirmDeleteCommand, "Move to trash");
-            return entries.Error is not null ? Refused(entries.Error) : Did(entries.Notice);
-        });
+    private static int Relocate(EntriesViewModel entries, string entry, string group, string title)
+    {
+        Select(entries, entry);
+
+        Press(entries.OrganizeCommand, "Organize");
+        entries.DraftTitle = title;
+        entries.MoveTarget = entries.MoveTargets.SingleOrDefault(node => node.Path == group)
+            ?? throw new DriverException($"no group '{group}' to move to");
+        Press(entries.ConfirmOrganizeCommand, "Move");
+        return entries.IsOrganizing || entries.Error is not null ? Refused(entries.Error) : Did(entries.Notice);
+    }
+
+    private static int Delete(EntriesViewModel entries, string entry)
+    {
+        Select(entries, entry);
+
+        Press(entries.DeleteCommand, "Delete");
+        Press(entries.ConfirmDeleteCommand, "Move to trash");
+        return entries.Error is not null ? Refused(entries.Error) : Did(entries.Notice);
+    }
+
+    /// <summary>Sets an entry's password to the new one, as the detail pane's edit is used.</summary>
+    private int SetPassword(EntriesViewModel entries, string entry)
+    {
+        var detail = Select(entries, entry);
+
+        Press(detail.EditCommand, "Edit");
+
+        foreach (var c in _newPassword)
+        {
+            detail.NewPassword.Type(c);
+        }
+
+        Press(detail.SaveCommand, "Save");
+        return detail.IsEditing || entries.Error is not null ? Refused(entries.Error) : Did($"saved {entry}");
+    }
 
     internal async Task<int> RestoreRecycledAsync(string vault, string title)
     {
@@ -373,18 +400,23 @@ internal sealed class Driver(string home)
             return refused;
         }
 
+        return OnEntries(session, act);
+    }
+
+    private static int OnEntries(AppVaultSession session, Func<EntriesViewModel, int> act)
+    {
         using var countdown = new ClipboardCountdown(NoClipboard.Instance, TimeProvider.System);
         using var entries = new EntriesViewModel(session, countdown);
         return act(entries);
     }
 
-    internal async Task<int> HoldAsync(string vault, bool heldPrompt)
+    internal async Task<int> HoldAsync(string vault, Func<IApprovalChannel>? prompt)
     {
         using var session = new AppVaultSession(TimeProvider.System, AppVaultSession.MaximumIdleTimeout, home);
         using var host = new SessionHost(
             session,
             Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable),
-            heldPrompt ? () => new HeldPrompt() : null);
+            prompt);
 
         if (await HoldOnceAsync(session, host, vault).ConfigureAwait(true) is { } refused)
         {
@@ -393,14 +425,14 @@ internal sealed class Driver(string home)
 
         while (await Console.In.ReadLineAsync().ConfigureAwait(true) is { } command)
         {
-            switch (command.Trim())
+            switch (command.Split(' ', StringSplitOptions.RemoveEmptyEntries))
             {
-                case "lock":
+                case ["lock"]:
                     session.Lock(VaultLockReason.Manual);
                     Console.Out.WriteLine("locked");
                     break;
 
-                case "unlock":
+                case ["unlock"]:
                     if (await HoldOnceAsync(session, host, vault).ConfigureAwait(true) is { } again)
                     {
                         return again;
@@ -408,8 +440,20 @@ internal sealed class Driver(string home)
 
                     break;
 
+                case ["edit", var entry]:
+                    OnEntries(session, entries => SetPassword(entries, entry));
+                    break;
+
+                case ["delete", var entry]:
+                    OnEntries(session, entries => Delete(entries, entry));
+                    break;
+
+                case ["relocate", var entry, var group, var title]:
+                    OnEntries(session, entries => Relocate(entries, entry, group, title));
+                    break;
+
                 default:
-                    throw new DriverException($"hold understands 'lock' and 'unlock', not '{command}'");
+                    throw new DriverException($"hold does not understand '{command}'");
             }
         }
 
@@ -419,8 +463,19 @@ internal sealed class Driver(string home)
         return 0;
     }
 
+    /// <summary>A person in front of the prompt who approves whatever is asked.</summary>
+    internal sealed class ApprovingPrompt : IApprovalChannel
+    {
+        public ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken)
+        {
+            Console.Out.WriteLine($"asking {prompt.Entry}");
+            Console.Out.WriteLine("approved");
+            return ValueTask.FromResult(ApprovalAnswer.Approved);
+        }
+    }
+
     /// <summary>A person in front of the prompt who never answers.</summary>
-    private sealed class HeldPrompt : IApprovalChannel
+    internal sealed class HeldPrompt : IApprovalChannel
     {
         public async ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken)
         {

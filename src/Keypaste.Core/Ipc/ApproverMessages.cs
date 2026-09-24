@@ -86,6 +86,12 @@ public sealed record NamesReply(
 {
     /// <summary>The session that answered, or null when none did.</summary>
     public string? Session { get; init; }
+
+    /// <summary>
+    /// Why an unlocked vault named nothing, when the reason has a word of its own; null reads as the
+    /// vault being locked, as before this existed.
+    /// </summary>
+    public AuditMethod? Refusal { get; init; }
 }
 
 /// <summary>An agent's credential request, forwarded to whoever can ask a human about it.</summary>

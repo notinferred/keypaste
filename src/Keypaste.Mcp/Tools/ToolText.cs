@@ -94,6 +94,17 @@ internal static class ToolText
         call was recorded in the audit log as denied.
         """;
 
+    /// <summary>Why a call was refused because the owner's copy of the vault no longer matches its file.</summary>
+    internal const string VaultChanged = """
+        keypaste: DENIED. The keypaste process holding this vault has a copy that no longer matches
+        the vault file: another program changed the file, or a change made in keypaste was still being
+        saved. Nothing was read or released.
+
+        If a change was being saved, try once more. Otherwise ask the person you are working with to
+        reload the vault, by locking and unlocking it in the keypaste desktop app or restarting
+        `keypaste agent`, and then try again. This call was recorded in the audit log as denied.
+        """;
+
     /// <summary>Why a call was refused when this server names no vault.</summary>
     internal const string NoVault = """
         keypaste: DENIED. This server was started without a vault to ask about, so nothing was read
@@ -284,6 +295,7 @@ internal static class ToolText
         AuditMethod.PolicyLimit => PolicyLimit,
         AuditMethod.Undeliverable => Undeliverable,
         AuditMethod.NoSession => NoSession,
+        AuditMethod.VaultChanged => VaultChanged,
         _ => ApproverFailed,
     };
 

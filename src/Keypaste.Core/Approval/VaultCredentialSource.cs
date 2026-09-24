@@ -13,6 +13,10 @@ namespace Keypaste.Core.Approval;
 /// <see cref="CredentialFailure.VaultLocked"/> rather than into a disposed-object exception.
 /// </para>
 /// <para>
+/// Every read is of the vault as its file holds it (<see cref="Vault.ReadSaved"/>), so an edit not yet
+/// saved and a file somebody else has written are refused rather than answered from memory (D-0317).
+/// </para>
+/// <para>
 /// Every failure path returns <see langword="false"/>. Nothing here throws for a request it cannot
 /// satisfy, and nothing here guesses (docs/PRODUCT.md law 3.7).
 /// </para>
@@ -132,6 +136,15 @@ public sealed class VaultCredentialSource(Func<Vault?> unlockedVault) : ICredent
         return true;
     }
 
+    /// <summary>Why a vault that does not match its file answered nothing.</summary>
+    internal static CredentialFailure Failure(SavedRead state) => state switch
+    {
+        SavedRead.Current => CredentialFailure.None,
+        SavedRead.ChangedOnDisk => CredentialFailure.ChangedOnDisk,
+        SavedRead.Unsaved => CredentialFailure.Unsaved,
+        _ => CredentialFailure.Failed,
+    };
+
     private static string Select(VaultEntry entry, string field) => field switch
     {
         "password" => entry.Password,
@@ -185,9 +198,11 @@ public sealed class VaultCredentialSource(Func<Vault?> unlockedVault) : ICredent
             return false;
         }
 
+        SavedRead state;
+
         try
         {
-            entries = vault.ReadEntries();
+            state = vault.ReadSaved(out entries);
         }
         catch (Exception)
         {
@@ -198,7 +213,7 @@ public sealed class VaultCredentialSource(Func<Vault?> unlockedVault) : ICredent
             return false;
         }
 
-        failure = CredentialFailure.None;
-        return true;
+        failure = Failure(state);
+        return entries is not null;
     }
 }
