@@ -4,7 +4,7 @@ This describes current source behavior. The public CLI/MCP release is `v0.3.0`, 
 
 The scope is `keypaste-mcp`, the bridge between an AI agent and a vault, together with its current desktop and local-data boundaries. [SECURITY.md](SECURITY.md) covers the vault, CLI and project-wide limits. PRODUCT §3 governs both documents. Each threat names its evidence and remaining gaps.
 
-One owner per vault is implemented: the desktop app and `keypaste agent` can no longer both hold one vault (T-29). The common lock boundary, serving current saved state and native approval in [STEPS](docs/STEPS.md) are not implemented. Locking the desktop ends its own session and endpoint and does not revoke values already delivered to a child or client. Hosted services and sharing are uncommitted options in [BACKLOG](docs/BACKLOG.md); this document makes no security guarantees for them.
+One owner per vault and the common lock boundary are implemented in source. The desktop app and `keypaste agent` can no longer both hold one vault (T-29). Every lock of the owning session withdraws the requests waiting at it, zeroes its grants and refuses a release that had not committed (D-0313). Serving current saved state and native approval in [STEPS](docs/STEPS.md) are not implemented. Locking does not revoke values already delivered to a child or client. Hosted services and sharing are uncommitted options in [BACKLOG](docs/BACKLOG.md); this document makes no security guarantees for them.
 
 ## What the bridge does
 
@@ -100,7 +100,7 @@ Evidence: `AuditLogTests.AnUnopenableLog_FailsWithAReason`, `ALogFromANewerKeypa
 
 The master password is entered in the person's terminal after they start `keypaste agent` (D-0023). The bridge cannot prompt through its JSON-RPC stdin/stdout stream, put the password in plaintext client configuration, or ask the untrusted MCP client to collect it. An agent request cannot cause a master-password prompt to appear.
 
-The approver holds the unlocked vault and serves the production listing, exposure and credential paths. Its vault remains unlocked for the process lifetime: the terminal approver has no idle auto-lock. Desktop idle locking, implemented in step 4.1, affects only the separate desktop session.
+The approver holds the unlocked vault and serves the production listing, exposure and credential paths. Its vault remains unlocked for the process lifetime: the terminal approver has no idle auto-lock. Stopping it with Ctrl+C, SIGTERM or by closing its terminal takes the same lock transition as the desktop's locks, so a request waiting at its prompt is withdrawn and denied and its grants are zeroed (D-0313). Desktop idle locking, implemented in step 4.1, affects only the desktop's own session.
 
 Evidence: `SecretHygieneTests` uses a real vault, approver and bridge with a simulated human decision. `scripts/verify-approval-e2e.sh` exercises the separate processes.
 
@@ -256,7 +256,7 @@ Evidence: `MaskedInputAutomationTests` types into the real unlock and create scr
 
 ## T-23 — What auto-lock is for, and what it is not
 
-The desktop defaults to locking after five minutes without input. Optional minimize-lock uses the same lock path as timeout and `Ctrl/Cmd+L`: dispose the vault, empty the screen and clear the copied secret. The deadline checks both wall and monotonic clocks and is re-evaluated on window activation, so suspension through the timeout wakes locked.
+The desktop defaults to locking after five minutes without input. Optional minimize-lock uses the same lock path as timeout and `Ctrl/Cmd+L`: dispose the vault, empty the screen and clear the copied secret. The deadline checks both wall and monotonic clocks and is re-evaluated on window activation and on every agent request, so suspension through the timeout wakes locked and a request arriving first is refused. Each of these locks, and quitting, ends the unlocked session in one transition before the vault is disposed: a request waiting at the session is answered as a `vault-locked` denial, grants are zeroed, and a release racing the lock is refused unless it committed first. An agent's request never counts as activity (D-0313).
 
 This protects an unattended interface. Switching windows, covering the window or macOS `Cmd+H` does not minimize it and does not trigger minimize-lock. The checkbox is omitted where the platform cannot report that state. Minimize-lock is off by default; before F.2b, its saved preference did not affect behavior (D-0096). Users can raise the idle timeout, including to eight hours, but cannot select “never.”
 

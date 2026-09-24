@@ -82,6 +82,9 @@ internal sealed class FakeSource : ICredentialSource, IEntryNameLister
 
     internal int Reads { get; private set; }
 
+    /// <summary>Runs inside a read or a listing, so a test can lock the owner in the middle of one.</summary>
+    internal Action? During { get; set; }
+
     /// <summary>What a read returns. Settable so a test can hand over a field no frame can carry.</summary>
     internal string Value { get; set; } = ApproverFixture.Sentinel;
 
@@ -125,6 +128,7 @@ internal sealed class FakeSource : ICredentialSource, IEntryNameLister
         }
 
         Reads++;
+        During?.Invoke();
         value = new ReleasedField(field, Value);
         failure = CredentialFailure.None;
         return true;
@@ -140,6 +144,7 @@ internal sealed class FakeSource : ICredentialSource, IEntryNameLister
             return false;
         }
 
+        During?.Invoke();
         names = [.. _entries.Where(exposure.Allows)];
         failure = CredentialFailure.None;
         return true;
@@ -148,16 +153,44 @@ internal sealed class FakeSource : ICredentialSource, IEntryNameLister
 
 internal sealed class FakeChannel : IApprovalChannel
 {
+    private readonly TaskCompletionSource _waiting = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
     internal ApprovalAnswer Answer { get; set; } = ApprovalAnswer.Denied;
+
+    /// <summary>When set, nobody answers: the prompt stays up until it is withdrawn.</summary>
+    internal bool Hold { get; set; }
 
     internal int Asked { get; private set; }
 
     internal ApprovalPrompt? LastPrompt { get; private set; }
 
-    public ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken)
+    /// <summary>Completes once a held prompt is up.</summary>
+    internal Task Waiting => _waiting.Task;
+
+    /// <summary>Whether a held prompt was withdrawn.</summary>
+    internal bool Withdrawn { get; private set; }
+
+    public async ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken)
     {
         Asked++;
         LastPrompt = prompt;
-        return ValueTask.FromResult(Answer);
+
+        if (!Hold)
+        {
+            return Answer;
+        }
+
+        _waiting.TrySetResult();
+
+        try
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            Withdrawn = true;
+        }
+
+        return ApprovalAnswer.Denied;
     }
 }

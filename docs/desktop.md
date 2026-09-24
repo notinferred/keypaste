@@ -8,7 +8,7 @@ The desktop app opens the same `.kdbx` vaults as the CLI and locks its session w
 
 Approvals currently happen in a separate terminal. An AI request goes through `keypaste-mcp` to a `keypaste agent` you started and unlocked yourself. Agent Activity only reports whether that process is running. Unlocking or locking the desktop does not control it.
 
-The focused target is one unlock session for desktop use, MCP requests and env launches, with approval and denial in the app. Locking will stop new releases and launches and cancel pending approvals. This is unfinished work in [STEPS](STEPS.md); the earlier terminal-owned design is no longer the required architecture.
+The focused target is one unlock session for desktop use, MCP requests and env launches, with approval and denial in the app. In source, locking already ends that session for agents in one step: a request still waiting at the app is denied as locked and grants are cleared. Approval in the app, launches and serving the latest saved values are unfinished work in [STEPS](STEPS.md); the earlier terminal-owned design is no longer the required architecture.
 
 The desktop app is not published. Build it from source, below. CI produces desktop archives and internal unsigned Windows MSI and Linux AppImage candidates. A desktop publication path exists but remains gated; [RELEASE](RELEASE.md) owns the distribution matrix and outstanding signing, publication and installation evidence.
 
@@ -100,7 +100,7 @@ Settings can enable lock-on-minimize; it is off by default and persists across l
 
 Switching windows leaves the vault unlocked and its idle countdown running, and so does restoring it: neither activation nor a pointer that has not moved counts as activity, so the countdown still arrives on time. A machine that sleeps past the timeout wakes locked. The app takes the greater elapsed time from wall and monotonic clocks and rechecks on activation, covering platforms where a monotonic clock pauses during sleep.
 
-Locking disposes the desktop vault session and clears its visible entry state. You type your password again to reopen it. This does not lock a separate terminal approver or erase immutable strings and external copies; see [SECURITY](../SECURITY.md) for memory and clipboard limits.
+Locking disposes the desktop vault session and clears its visible entry state. You type your password again to reopen it. In source, every lock and quitting also deny an agent's request still waiting at the app and clear the grants agents were given, and a request that arrives after the machine slept past the timeout locks the app and is refused. An agent's requests never count as activity. Values already delivered to a client are not recalled. This does not lock a separate terminal approver or erase immutable strings and external copies; see [SECURITY](../SECURITY.md) for memory and clipboard limits.
 
 ## Keyboard
 

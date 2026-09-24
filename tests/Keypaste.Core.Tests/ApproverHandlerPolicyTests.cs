@@ -410,7 +410,7 @@ public sealed class ApproverHandlerPolicyTests
         Assert.Null(reply.Value);
     }
 
-    private static PolicyDocument Policy(
+    internal static PolicyDocument Policy(
         string client = "\"billing-bot\"",
         string entries = "[\"env/dev/**\"]",
         string field = "\"password\"",

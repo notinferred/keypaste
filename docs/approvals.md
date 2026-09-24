@@ -36,7 +36,7 @@ keypaste: listening on keypaste-vault-9f3a1c02b7d54e60 for session 5d0c8e1a4b7f2
 keypaste: nothing is released without you saying yes. Press Ctrl+C to stop.
 ```
 
-The third line reports what the policy file says before anything can use it; with no such file, as above, every request comes to you. Leave it running in its own terminal. Ctrl+C locks the vault again and zeroes every live grant.
+The third line reports what the policy file says before anything can use it; with no such file, as above, every request comes to you. Leave it running in its own terminal. Ctrl+C locks the vault again and zeroes every live grant. In source, so do SIGTERM and closing the terminal, and a request waiting at the prompt is withdrawn and denied as `vault-locked`.
 
 | Option | What it does |
 |---|---|

@@ -10,9 +10,7 @@ namespace Keypaste.Core.Approval;
 /// The vault arrives through a delegate rather than as a constructor argument because the approver
 /// auto-locks on idle: the session disposes its <see cref="Vault"/> and returns
 /// <see langword="null"/> here until the human unlocks again, which turns an expired session into
-/// <see cref="CredentialFailure.VaultLocked"/> rather than into a disposed-object exception. It
-/// also means live grants outlive the session, since the grant cache holds values rather than a
-/// capability to re-read one.
+/// <see cref="CredentialFailure.VaultLocked"/> rather than into a disposed-object exception.
 /// </para>
 /// <para>
 /// Every failure path returns <see langword="false"/>. Nothing here throws for a request it cannot

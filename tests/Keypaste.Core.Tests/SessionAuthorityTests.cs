@@ -9,7 +9,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// A vault's owner over a real pipe: only a connection attached to the session now holding the vault
-/// it names is answered (D-0310).
+/// it names is answered (D-0310), and nothing is released across the lock that ends it (D-0313).
 /// </summary>
 public sealed class SessionAuthorityTests : IDisposable
 {
@@ -17,7 +17,7 @@ public sealed class SessionAuthorityTests : IDisposable
 
     private readonly string _directory = Directory.CreateTempSubdirectory("keypaste-authority-tests-").FullName;
     private readonly ApproverFixture _fixture = new();
-    private string? _session = "session-one";
+    private SessionLifetime? _lifetime = new("session-one");
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
@@ -133,7 +133,7 @@ public sealed class SessionAuthorityTests : IDisposable
         await using var client = await ConnectAsync(owner.PipeName);
 
         await client.AttachAsync(new AttachRequest(VaultPath), Token);
-        _session = "session-two";
+        _lifetime = new SessionLifetime("session-two");
 
         var reply = await client.RequestAsync(Request("session-one"), Token);
         var listing = await client.ListAsync(Listing("session-one"), Token);
@@ -155,7 +155,7 @@ public sealed class SessionAuthorityTests : IDisposable
         await using var client = await ConnectAsync(owner.PipeName);
 
         await client.AttachAsync(new AttachRequest(VaultPath), Token);
-        _session = "session-two";
+        _lifetime = new SessionLifetime("session-two");
 
         var reply = await client.RequestAsync(Request("session-two"), Token);
 
@@ -172,7 +172,7 @@ public sealed class SessionAuthorityTests : IDisposable
         await using var client = await ConnectAsync(owner.PipeName);
 
         await client.AttachAsync(new AttachRequest(VaultPath), Token);
-        _session = null;
+        _lifetime = null;
 
         var reply = await client.RequestAsync(Request("session-one"), Token);
         var attached = await client.AttachAsync(new AttachRequest(VaultPath), Token);
@@ -201,8 +201,115 @@ public sealed class SessionAuthorityTests : IDisposable
         Assert.True(listing.VaultUnlocked);
     }
 
+    [Fact]
+    public async Task ARequestWaitingForAPerson_IsWithdrawnAndDeniedAsLockedWhenTheLifetimeEnds()
+    {
+        _fixture.Channel.Hold = true;
+        await using var owner = Owner.Start(this);
+        await using var client = await ConnectAsync(owner.PipeName);
+
+        await client.AttachAsync(new AttachRequest(VaultPath), Token);
+        var pending = client.RequestAsync(Request("session-one"), Token);
+        await _fixture.Channel.Waiting.WaitAsync(_connectTimeout, Token);
+
+        _lifetime!.End();
+        var reply = await pending.AsTask().WaitAsync(_connectTimeout, Token);
+
+        Assert.NotNull(reply);
+        Assert.Equal(AuditDecision.Denied, reply.Decision);
+        Assert.Equal(AuditMethod.VaultLocked, reply.Method);
+        Assert.Equal("the vault was locked before anybody answered", reply.Reason);
+        Assert.Equal("session-one", reply.Session);
+        Assert.Null(reply.Value);
+        Assert.True(_fixture.Channel.Withdrawn);
+        Assert.Equal(0, _fixture.Source.Reads);
+    }
+
+    [Fact]
+    public async Task AnApprovalRacingTheLock_ReleasesNothingAndKeepsNoGrant()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        var lifetime = _lifetime!;
+        lifetime.Own(_fixture.Grants);
+        _fixture.Source.During = lifetime.End;
+        await using var owner = Owner.Start(this);
+        await using var client = await ConnectAsync(owner.PipeName);
+
+        await client.AttachAsync(new AttachRequest(VaultPath), Token);
+        var reply = await client.RequestAsync(Request("session-one"), Token);
+
+        Assert.NotNull(reply);
+        Assert.Equal(AuditDecision.Denied, reply.Decision);
+        Assert.Equal(AuditMethod.VaultLocked, reply.Method);
+        Assert.Equal("the vault was locked before this was released", reply.Reason);
+        Assert.Null(reply.Value);
+        Assert.Equal(0, _fixture.Grants.Count);
+    }
+
+    [Fact]
+    public async Task APolicyReleaseRacingTheLock_IsRefused()
+    {
+        using var policed = new ApproverFixture(ApproverHandlerPolicyTests.Policy());
+        policed.Source.During = _lifetime!.End;
+        await using var owner = Owner.Start(this, policed.Handler);
+        await using var client = await ConnectAsync(owner.PipeName);
+
+        await client.AttachAsync(new AttachRequest(VaultPath), Token);
+        var reply = await client.RequestAsync(Request("session-one") with { ClientLabel = "billing-bot" }, Token);
+
+        Assert.NotNull(reply);
+        Assert.Equal(AuditMethod.VaultLocked, reply.Method);
+        Assert.Null(reply.Value);
+        Assert.Equal(1, policed.Source.Reads);
+        Assert.Equal(0, policed.Channel.Asked);
+    }
+
+    [Fact]
+    public async Task AGrantGivenBeforeALock_ReleasesNothingAfterTheNextUnlock()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        _lifetime!.Own(_fixture.Grants);
+        await using var owner = Owner.Start(this);
+        await using var client = await ConnectAsync(owner.PipeName);
+
+        await client.AttachAsync(new AttachRequest(VaultPath), Token);
+        var granted = await client.RequestAsync(Request("session-one"), Token);
+        Assert.NotNull(granted);
+        Assert.Equal(AuditMethod.Prompt, granted.Method);
+        Assert.Equal(1, _fixture.Grants.Count);
+
+        _lifetime.End();
+        Assert.Equal(0, _fixture.Grants.Count);
+
+        _lifetime = new SessionLifetime("session-two");
+        _fixture.Channel.Answer = ApprovalAnswer.Denied;
+        await client.AttachAsync(new AttachRequest(VaultPath), Token);
+        var again = await client.RequestAsync(Request("session-two"), Token);
+
+        Assert.NotNull(again);
+        Assert.Equal(AuditDecision.Denied, again.Decision);
+        Assert.Equal(AuditMethod.Prompt, again.Method);
+        Assert.Equal(2, _fixture.Channel.Asked);
+    }
+
+    [Fact]
+    public async Task AListingRacingTheLock_IsRefused()
+    {
+        _fixture.Source.During = _lifetime!.End;
+        await using var owner = Owner.Start(this);
+        await using var client = await ConnectAsync(owner.PipeName);
+
+        await client.AttachAsync(new AttachRequest(VaultPath), Token);
+        var listing = await client.ListAsync(Listing("session-one"), Token);
+
+        Assert.NotNull(listing);
+        Assert.False(listing.VaultUnlocked);
+        Assert.Empty(listing.Names);
+    }
+
     public void Dispose()
     {
+        _lifetime?.Dispose();
         _fixture.Dispose();
         Directory.Delete(_directory, recursive: true);
     }
@@ -231,13 +338,13 @@ public sealed class SessionAuthorityTests : IDisposable
 
         internal string PipeName { get; }
 
-        internal static Owner Start(SessionAuthorityTests test)
+        internal static Owner Start(SessionAuthorityTests test, ApproverHandler? handler = null)
         {
             var name = "keypaste-tests-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
             var authority = new SessionAuthority(
                 VaultIdentity.Of(test._directory, test.VaultPath),
-                () => test._session,
-                test._fixture.Handler);
+                () => test._lifetime,
+                handler ?? test._fixture.Handler);
 
             return new Owner(name, new ApproverListener(name, authority));
         }

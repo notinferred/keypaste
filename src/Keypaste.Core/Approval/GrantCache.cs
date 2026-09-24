@@ -33,8 +33,8 @@ public readonly record struct GrantKey(string ConnectionId, string Handle, strin
 /// read this field" would be worse in three ways: it keeps a capability alive rather than a datum,
 /// it re-enters the vault on every hit, and the vault may have changed underneath so the second
 /// answer differs from the one the human approved. Storing the value makes a grant exactly what was
-/// approved, makes expiry an overwrite, and lets the approver drop its unlocked vault on idle
-/// without invalidating grants a human already gave.
+/// approved and makes expiry an overwrite. A cache belongs to one unlocked lifetime, which disposes
+/// it when a lock ends that lifetime (D-0313).
 /// </para>
 /// <para>
 /// <b>A hit hands out a copy.</b> The caller disposes what it is given; the cache keeps its own
@@ -124,16 +124,22 @@ public sealed class GrantCache : IDisposable
     /// <param name="value">The released field. The cache takes a copy; the caller keeps ownership of its own.</param>
     /// <param name="ttl">How long the grant lives.</param>
     /// <exception cref="ArgumentNullException"><paramref name="value"/> is null.</exception>
-    /// <exception cref="ObjectDisposedException">The cache has been disposed.</exception>
+    /// <remarks>
+    /// A cache that has been disposed keeps nothing: its lifetime has ended, and a request decided
+    /// across that lock is refused by the owner rather than stored for later (D-0313).
+    /// </remarks>
     public void Store(GrantKey key, ReleasedField value, TimeSpan ttl)
     {
         ArgumentNullException.ThrowIfNull(value);
 
         lock (_gate)
         {
-            // Before the copy, not after: a copy taken and then abandoned by the throw would be a
-            // secret nothing is left holding to zero.
-            ObjectDisposedException.ThrowIf(_disposed, this);
+            // Before the copy, not after: a copy taken and then abandoned would be a secret nothing
+            // is left holding to zero.
+            if (_disposed)
+            {
+                return;
+            }
 
             // The copy's ownership transfers to the dictionary, and every route out of it — Forget,
             // Revoke, Expire, Dispose — zeroes it. CA2000 cannot see a lifetime that leaves the method.

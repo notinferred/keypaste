@@ -26,6 +26,8 @@ namespace Keypaste.Core.Ipc;
 /// </remarks>
 public sealed class ApproverListener : IDisposable
 {
+    private static readonly TimeSpan _deliveryBound = TimeSpan.FromSeconds(1);
+
     private readonly string _pipeName;
     private readonly IApproverHandler _handler;
     private NamedPipeServerStream? _pending;
@@ -141,7 +143,10 @@ public sealed class ApproverListener : IDisposable
                     return;
                 }
 
-                await framer.WriteAsync(reply, cancellationToken).ConfigureAwait(false);
+                // Not the stop token: a request a lock or a shutdown withdrew has its denial to
+                // deliver, and the bridge audits that rather than a reply that never came (D-0313).
+                using var delivery = new CancellationTokenSource(_deliveryBound);
+                await framer.WriteAsync(reply, delivery.Token).ConfigureAwait(false);
             }
         }
         catch (Exception)

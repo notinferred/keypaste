@@ -13,6 +13,7 @@ on:
       - 'tests/Keypaste.AppDriver/**'
       - 'scripts/verify-keepassxc-workflows.sh'
       - 'scripts/verify-session-authority.sh'
+      - 'scripts/verify-lock-boundary.sh'
       - 'src/Keypaste.Mcp/**'
       - 'scripts/install-keepassxc-windows.sh'
       - 'src/Keypaste.Cli/**'

@@ -29,6 +29,12 @@ namespace Keypaste.App.Session;
 /// <see cref="SessionId"/> for every unlock (D-0309).
 /// </para>
 /// <para>
+/// <b>Every lock ends the unlock's <see cref="SessionLifetime"/> first</b>, before the vault is
+/// disposed, whatever the reason: manual, idle, minimize, an access change, a replaced vault or
+/// shutdown. That one transition is what withdraws requests an agent has waiting and zeroes the
+/// grants they were given (D-0313).
+/// </para>
+/// <para>
 /// <b>It names no Avalonia type, and must not.</b> Everything below is testable with a
 /// <see cref="TimeProvider"/> and no application, no window and no display — which is where the
 /// security assertions live (docs/PRODUCT.md law 4.5). A dispatcher timer would have been fewer lines and
@@ -63,7 +69,7 @@ internal sealed class AppVaultSession : IDisposable
 
     private Vault? _vault;
     private VaultClaim? _claim;
-    private string? _session;
+    private SessionLifetime? _lifetime;
     private ITimer? _timer;
     private DateTimeOffset _activityWall;
     private long _activityStamp;
@@ -111,8 +117,58 @@ internal sealed class AppVaultSession : IDisposable
         {
             lock (_gate)
             {
-                return _session;
+                return _lifetime?.Id;
             }
+        }
+    }
+
+    /// <summary>
+    /// This unlock's lifetime as agents may be answered under it, or <see langword="null"/> when
+    /// locked or past its idle deadline.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Reading this is not activity.</b> Agents are answered through it, and PRODUCT §2 says their
+    /// traffic cannot extend the idle deadline, so it never marks activity.
+    /// </para>
+    /// <para>
+    /// <b>A deadline that has passed is honoured here, not only by the timer.</b> A machine that
+    /// slept past it wakes with the timer still pending, and an agent's request can arrive before
+    /// anybody activates the window. The request is refused and the lock is taken on the thread pool,
+    /// never on the caller's thread, which may be the listener the lock stops.
+    /// </para>
+    /// </remarks>
+    internal SessionLifetime? Lifetime
+    {
+        get
+        {
+            lock (_gate)
+            {
+                if (_vault is null)
+                {
+                    return null;
+                }
+
+                if (Idle() < _idleTimeout)
+                {
+                    return _lifetime;
+                }
+            }
+
+            ThreadPool.QueueUserWorkItem(_ => Reevaluate());
+            return null;
+        }
+    }
+
+    /// <summary>The open vault, while <paramref name="lifetime"/> is still the current one.</summary>
+    /// <param name="lifetime">The lifetime a request belongs to.</param>
+    /// <returns>The vault, or <see langword="null"/> once that lifetime has ended.</returns>
+    /// <remarks>So a request begun under one unlock can never read the vault a later unlock opened.</remarks>
+    internal Vault? UnlockedFor(SessionLifetime lifetime)
+    {
+        lock (_gate)
+        {
+            return ReferenceEquals(lifetime, _lifetime) && lifetime.IsLive ? _vault : null;
         }
     }
 
@@ -321,6 +377,8 @@ internal sealed class AppVaultSession : IDisposable
     private UnlockOutcome Adopt(Vault opened, VaultClaim claim)
     {
         VaultLockReason? replaced = null;
+        SessionLifetime? ended = null;
+        Vault? previous = null;
 
         lock (_gate)
         {
@@ -338,7 +396,8 @@ internal sealed class AppVaultSession : IDisposable
 
             if (_vault is not null)
             {
-                _vault.Dispose();
+                ended = _lifetime;
+                previous = _vault;
                 replaced = VaultLockReason.Replaced;
             }
 
@@ -349,11 +408,13 @@ internal sealed class AppVaultSession : IDisposable
 
             _vault = opened;
             _claim = claim;
-            _session = VaultOwner.NewSession();
+            _lifetime = new SessionLifetime();
             _warned = false;
             MarkActivity();
             Rearm();
         }
+
+        Retire(ended, previous);
 
         if (replaced is { } reason)
         {
@@ -572,25 +633,47 @@ internal sealed class AppVaultSession : IDisposable
     internal void Lock(VaultLockReason reason)
     {
         bool locked;
+        SessionLifetime? ended;
+        Vault? vault;
 
         lock (_gate)
         {
             locked = _vault is not null;
+            ended = _lifetime;
+            _lifetime = null;
+            vault = _vault;
+            _vault = null;
 
             _timer?.Dispose();
             _timer = null;
-            _vault?.Dispose();
-            _vault = null;
-            _session = null;
             _claim?.Dispose();
             _claim = null;
             _warned = false;
         }
 
+        Retire(ended, vault);
+
         if (locked)
         {
             Locked?.Invoke(this, reason);
         }
+    }
+
+    /// <summary>Ends a lifetime, then disposes the vault it was answered from.</summary>
+    /// <remarks>
+    /// <para>
+    /// In that order, so nothing waiting on the lifetime can be released from the vault as it goes.
+    /// </para>
+    /// <para>
+    /// Outside <c>_gate</c>, because ending a lifetime runs the cancellations of everything waiting
+    /// on it, and those must not run while this session's lock is held. The lifetime and vault are
+    /// already detached, so nothing reaches them through the session meanwhile.
+    /// </para>
+    /// </remarks>
+    private static void Retire(SessionLifetime? lifetime, Vault? vault)
+    {
+        lifetime?.Dispose();
+        vault?.Dispose();
     }
 
     public void Dispose()

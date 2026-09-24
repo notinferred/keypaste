@@ -289,9 +289,12 @@ internal sealed partial class App : Application, IDisposable
         _shell = null;
         _unlock?.Dispose();
         _unlock = null;
-        _host?.Dispose();
-        _host = null;
+
+        // The session before the host: quitting is a lock, so what an agent has waiting is answered
+        // as locked before the endpoint stops, not dropped with it (D-0313).
         _session?.Dispose();
         _session = null;
+        _host?.Dispose();
+        _host = null;
     }
 }

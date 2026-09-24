@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
@@ -7,13 +8,19 @@ namespace Keypaste.Core.Ownership;
 
 /// <summary>
 /// What a vault's owner answers its endpoint with: a request is considered only when it comes from
-/// a connection attached to the session now holding the vault it names (D-0310).
+/// a connection attached to the session now holding the vault it names (D-0310), and is released
+/// only while that session's lifetime is live (D-0313).
 /// </summary>
 /// <remarks>
 /// <para>
-/// The session is read on every operation rather than remembered at attachment, so a request that
+/// The lifetime is read on every operation rather than remembered at attachment, so a request that
 /// reaches the owner after a lock, or after a later unlock, is refused instead of being answered
 /// from whatever the vault holds by then.
+/// </para>
+/// <para>
+/// A request that was already being decided when the lock came is withdrawn by the lifetime's end
+/// and answered as a lock denial. Its answer commits under the lock that ends the lifetime, so a
+/// value either left before the lock or does not leave at all.
 /// </para>
 /// <para>
 /// Reaching the endpoint at all is what the operating system authenticates (THREATS.md T-10). The
@@ -22,23 +29,25 @@ namespace Keypaste.Core.Ownership;
 /// </remarks>
 public sealed class SessionAuthority : IApproverHandler
 {
+    private const string _lockedReason = "the vault is locked";
+
     private readonly VaultIdentity _vault;
-    private readonly Func<string?> _session;
+    private readonly Func<SessionLifetime?> _lifetime;
     private readonly ApproverHandler _inner;
     private readonly ConcurrentDictionary<string, Attachment> _attached = new(StringComparer.Ordinal);
 
     /// <summary>Builds the authority for one owned vault.</summary>
     /// <param name="vault">The vault this process holds.</param>
-    /// <param name="session">The current session, or null while the vault is locked.</param>
+    /// <param name="lifetime">The current unlocked lifetime, or null while the vault is locked.</param>
     /// <param name="inner">What decides a request once it belongs to the current session.</param>
-    public SessionAuthority(VaultIdentity vault, Func<string?> session, ApproverHandler inner)
+    public SessionAuthority(VaultIdentity vault, Func<SessionLifetime?> lifetime, ApproverHandler inner)
     {
         ArgumentNullException.ThrowIfNull(vault);
-        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(lifetime);
         ArgumentNullException.ThrowIfNull(inner);
 
         _vault = vault;
-        _session = session;
+        _lifetime = lifetime;
         _inner = inner;
     }
 
@@ -56,14 +65,14 @@ public sealed class SessionAuthority : IApproverHandler
                 AttachReply.Refused(AuditMethod.NoSession, "the keypaste process that answered holds a different vault"));
         }
 
-        if (_session() is not { } session)
+        if (Live() is not { } lifetime)
         {
-            return ValueTask.FromResult(AttachReply.Refused(AuditMethod.VaultLocked, "the vault is locked"));
+            return ValueTask.FromResult(AttachReply.Refused(AuditMethod.VaultLocked, _lockedReason));
         }
 
-        _attached[connectionId] = new Attachment(request.Vault, session);
+        _attached[connectionId] = new Attachment(request.Vault, lifetime.Id);
 
-        return ValueTask.FromResult(AttachReply.To(session));
+        return ValueTask.FromResult(AttachReply.To(lifetime.Id));
     }
 
     /// <inheritdoc/>
@@ -71,12 +80,19 @@ public sealed class SessionAuthority : IApproverHandler
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        if (Refusal(request.Vault, request.Session, connectionId) is { } refusal)
+        if (!TryAdmit(request.Vault, request.Session, connectionId, out var lifetime, out var refusal))
         {
             return new NamesReply(false, [], refusal.Reason, true);
         }
 
-        var reply = await _inner.ListAsync(request, connectionId, cancellationToken).ConfigureAwait(false);
+        using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Ended);
+
+        var reply = await _inner.ListAsync(request, connectionId, withdrawn.Token).ConfigureAwait(false);
+
+        if (!lifetime.TryCommit())
+        {
+            return new NamesReply(false, [], _lockedReason, true);
+        }
 
         return reply with { Session = request.Session };
     }
@@ -89,7 +105,7 @@ public sealed class SessionAuthority : IApproverHandler
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        if (Refusal(request.Vault, request.Session, connectionId) is { } refusal)
+        if (!TryAdmit(request.Vault, request.Session, connectionId, out var lifetime, out var refusal))
         {
             return new CredentialReply
             {
@@ -99,7 +115,24 @@ public sealed class SessionAuthority : IApproverHandler
             };
         }
 
-        var reply = await _inner.RequestAsync(request, connectionId, cancellationToken).ConfigureAwait(false);
+        using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Ended);
+
+        var reply = await _inner.RequestAsync(request, connectionId, withdrawn.Token).ConfigureAwait(false);
+
+        if (!lifetime.TryCommit() && (reply.Decision == AuditDecision.Granted || reply.Method == AuditMethod.Cancelled))
+        {
+            // The released string is dropped here, never sent: the lock came before the release.
+            return new CredentialReply
+            {
+                Decision = AuditDecision.Denied,
+                Method = AuditMethod.VaultLocked,
+                Reason = reply.Decision == AuditDecision.Granted
+                    ? "the vault was locked before this was released"
+                    : "the vault was locked before anybody answered",
+                Entry = reply.Entry,
+                Session = request.Session,
+            };
+        }
 
         return reply with { Session = request.Session };
     }
@@ -113,34 +146,44 @@ public sealed class SessionAuthority : IApproverHandler
         _inner.Disconnected(connectionId);
     }
 
-    private (AuditMethod Method, string Reason)? Refusal(string vault, string session, string connectionId)
+    private SessionLifetime? Live() => _lifetime() is { IsLive: true } lifetime ? lifetime : null;
+
+    private bool TryAdmit(
+        string vault,
+        string session,
+        string connectionId,
+        [NotNullWhen(true)] out SessionLifetime? lifetime,
+        out (AuditMethod Method, string Reason) refusal)
     {
         ArgumentNullException.ThrowIfNull(connectionId);
 
-        var current = _session();
+        lifetime = Live();
+        refusal = default;
 
-        if (current is null)
+        if (lifetime is null)
         {
-            return (AuditMethod.VaultLocked, "the vault is locked");
+            refusal = (AuditMethod.VaultLocked, _lockedReason);
+        }
+        else if (!_attached.TryGetValue(connectionId, out var attachment))
+        {
+            refusal = (AuditMethod.NoSession, "the request came from a connection attached to no session");
+        }
+        else if (!string.Equals(attachment.Vault, vault, StringComparison.Ordinal))
+        {
+            refusal = (AuditMethod.NoSession, "the request named a different vault from its attachment");
+        }
+        else if (!string.Equals(attachment.Session, session, StringComparison.Ordinal)
+            || !string.Equals(session, lifetime.Id, StringComparison.Ordinal))
+        {
+            refusal = (AuditMethod.NoSession, "the request belongs to a session that has ended");
+        }
+        else
+        {
+            return true;
         }
 
-        if (!_attached.TryGetValue(connectionId, out var attachment))
-        {
-            return (AuditMethod.NoSession, "the request came from a connection attached to no session");
-        }
-
-        if (!string.Equals(attachment.Vault, vault, StringComparison.Ordinal))
-        {
-            return (AuditMethod.NoSession, "the request named a different vault from its attachment");
-        }
-
-        if (!string.Equals(attachment.Session, session, StringComparison.Ordinal)
-            || !string.Equals(session, current, StringComparison.Ordinal))
-        {
-            return (AuditMethod.NoSession, "the request belongs to a session that has ended");
-        }
-
-        return null;
+        lifetime = null;
+        return false;
     }
 
     private readonly record struct Attachment(string Vault, string Session);

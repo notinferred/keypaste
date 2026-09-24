@@ -12,8 +12,14 @@ namespace Keypaste.App.Session;
 /// <remarks>
 /// <para>
 /// Until approving in the desktop exists (STEPS 4.4), listing is answered under the bridge's own
-/// exposure and every credential request is refused: there is nowhere in the app to ask a person,
-/// and no standing rule is consulted, so nothing is released without a person's answer.
+/// exposure and every credential request is refused: the app asks through
+/// <see cref="NoDesktopApproval"/>, and no standing rule is consulted, so nothing is released
+/// without a person's answer.
+/// </para>
+/// <para>
+/// Everything that answers agents is built per unlock and belongs to that unlock's
+/// <see cref="SessionLifetime"/>, so a lock withdraws what is waiting and zeroes the grants given,
+/// before the listener stops (D-0313).
 /// </para>
 /// <para>
 /// A failure to listen does not stop the unlock. The app is a password manager without MCP
@@ -26,18 +32,21 @@ internal sealed class SessionHost : IDisposable
 
     private readonly AppVaultSession _session;
     private readonly string? _approverOverride;
+    private readonly Func<IApprovalChannel> _approvals;
     private readonly Lock _gate = new();
     private Hosted? _hosted;
     private bool _disposed;
 
     /// <param name="session">The session whose vault is served.</param>
     /// <param name="approverOverride">The value of <c>KEYPASTE_APPROVER</c>, or null.</param>
-    internal SessionHost(AppVaultSession session, string? approverOverride)
+    /// <param name="approvals">Where a person is asked, per unlock; null is <see cref="NoDesktopApproval"/>.</param>
+    internal SessionHost(AppVaultSession session, string? approverOverride, Func<IApprovalChannel>? approvals = null)
     {
         ArgumentNullException.ThrowIfNull(session);
 
         _session = session;
         _approverOverride = approverOverride;
+        _approvals = approvals ?? (() => new NoDesktopApproval());
         _session.Opened += OnOpened;
         _session.Locked += OnLocked;
 
@@ -68,7 +77,7 @@ internal sealed class SessionHost : IDisposable
 
             StopLocked();
 
-            if (_session.Identity is not { } vault)
+            if (_session.Identity is not { } vault || _session.Lifetime is not { } lifetime)
             {
                 return;
             }
@@ -85,7 +94,7 @@ internal sealed class SessionHost : IDisposable
                 return;
             }
 
-            var hosted = Hosted.TryStart(pipe, vault, _session, out var failure);
+            var hosted = Hosted.TryStart(pipe, vault, _session, lifetime, _approvals(), out var failure);
             _hosted = hosted;
             Endpoint = hosted is null ? null : pipe;
             Failure = failure;
@@ -130,40 +139,46 @@ internal sealed class SessionHost : IDisposable
     {
         private readonly ApproverListener _listener;
         private readonly ApprovalGate _approvals;
-        private readonly GrantCache _grants;
         private readonly CancellationTokenSource _stop = new();
         private readonly Task _run;
 
-        private Hosted(ApproverListener listener, ApprovalGate approvals, GrantCache grants)
+        private Hosted(ApproverListener listener, ApprovalGate approvals)
         {
             _listener = listener;
             _approvals = approvals;
-            _grants = grants;
             _run = listener.RunAsync(_stop.Token);
         }
 
-        internal static Hosted? TryStart(string pipe, VaultIdentity vault, AppVaultSession session, out string? failure)
+        internal static Hosted? TryStart(
+            string pipe,
+            VaultIdentity vault,
+            AppVaultSession session,
+            SessionLifetime lifetime,
+            IApprovalChannel channel,
+            out string? failure)
         {
-            var grants = new GrantCache(TimeProvider.System);
-            var approvals = new ApprovalGate(new NoDesktopApproval(), TimeProvider.System, ApprovalLimits.Default);
+            // Owned by the lifetime, which zeroes it when a lock ends it (D-0313).
+#pragma warning disable CA2000
+            var grants = lifetime.Own(new GrantCache(TimeProvider.System));
+#pragma warning restore CA2000
+            var approvals = new ApprovalGate(channel, TimeProvider.System, ApprovalLimits.Default);
 
             var handler = new ApproverHandler(
-                new VaultCredentialSource(() => session.Unlocked),
-                new VaultEntryNameLister(() => session.Unlocked),
+                new VaultCredentialSource(() => session.UnlockedFor(lifetime)),
+                new VaultEntryNameLister(() => session.UnlockedFor(lifetime)),
                 approvals,
                 grants,
                 PolicyGate.None);
 
             try
             {
-                var listener = new ApproverListener(pipe, new SessionAuthority(vault, () => session.SessionId, handler));
+                var listener = new ApproverListener(pipe, new SessionAuthority(vault, () => session.Lifetime, handler));
                 failure = null;
-                return new Hosted(listener, approvals, grants);
+                return new Hosted(listener, approvals);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 approvals.Dispose();
-                grants.Dispose();
                 failure = $"keypaste could not listen for agents: {ex.Message}";
                 return null;
             }
@@ -184,7 +199,6 @@ internal sealed class SessionHost : IDisposable
 
             _listener.Dispose();
             _approvals.Dispose();
-            _grants.Dispose();
             _stop.Dispose();
         }
     }

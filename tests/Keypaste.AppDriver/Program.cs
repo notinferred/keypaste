@@ -2,6 +2,7 @@ using Keypaste.App;
 using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
+using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
 
@@ -24,7 +25,11 @@ namespace Keypaste.AppDriver;
 /// <para>
 /// <c>hold</c> is the one act that does not exit: it unlocks as the app does, serves the vault as the
 /// app does, prints the session it holds, and then locks or unlocks again on each line read from
-/// standard input until it closes. <c>scripts/verify-session-authority.sh</c> drives it (U.1).
+/// standard input until it closes, which it answers as the app answers quitting.
+/// <c>scripts/verify-session-authority.sh</c> drives it (U.1). With <c>--held-prompt</c> a request
+/// that needs a person is put in front of one who never answers, printing <c>asking</c> and then
+/// <c>withdrawn</c>, so <c>scripts/verify-lock-boundary.sh</c> can lock the app with a real request
+/// waiting at its session (U.2). The app itself still has nowhere to ask until STEPS 4.4.
 /// </para>
 /// </remarks>
 internal static class Program
@@ -41,7 +46,7 @@ internal static class Program
         "       backup-restore <vault> <backup-file-name>\n" +
         "       export <vault> <destination>\n" +
         "       access <vault> [--password] [--attach <keyfile> | --remove-keyfile]\n" +
-        "       hold <vault>   (then 'lock' or 'unlock' per line of standard input)\n" +
+        "       hold <vault> [--held-prompt]   (then 'lock' or 'unlock' per line of standard input)\n" +
         "KEYPASTE_HOME must be set. KEYPASTE_DRIVER_PASSWORD is the password typed (empty for none),\n" +
         "KEYPASTE_DRIVER_KEYFILE the keyfile chosen, KEYPASTE_DRIVER_NEW_PASSWORD a new password or entry password.";
 
@@ -72,7 +77,8 @@ internal static class Program
                 ["backup-restore", var vault, var backup] => await driver.RestoreBackupAsync(vault, backup).ConfigureAwait(true),
                 ["export", var vault, var destination] => await driver.ExportAsync(vault, destination).ConfigureAwait(true),
                 ["access", var vault, .. var change] => await driver.ChangeAccessAsync(vault, change).ConfigureAwait(true),
-                ["hold", var vault] => await driver.HoldAsync(vault).ConfigureAwait(true),
+                ["hold", var vault] => await driver.HoldAsync(vault, heldPrompt: false).ConfigureAwait(true),
+                ["hold", var vault, "--held-prompt"] => await driver.HoldAsync(vault, heldPrompt: true).ConfigureAwait(true),
                 _ => Usage(),
             };
         }
@@ -372,10 +378,13 @@ internal sealed class Driver(string home)
         return act(entries);
     }
 
-    internal async Task<int> HoldAsync(string vault)
+    internal async Task<int> HoldAsync(string vault, bool heldPrompt)
     {
         using var session = new AppVaultSession(TimeProvider.System, AppVaultSession.MaximumIdleTimeout, home);
-        using var host = new SessionHost(session, Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable));
+        using var host = new SessionHost(
+            session,
+            Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable),
+            heldPrompt ? () => new HeldPrompt() : null);
 
         if (await HoldOnceAsync(session, host, vault).ConfigureAwait(true) is { } refused)
         {
@@ -404,7 +413,30 @@ internal sealed class Driver(string home)
             }
         }
 
+        // Standard input closing is quitting, and the app locks before its endpoint stops.
+        session.Dispose();
+        Console.Out.WriteLine("shut down");
         return 0;
+    }
+
+    /// <summary>A person in front of the prompt who never answers.</summary>
+    private sealed class HeldPrompt : IApprovalChannel
+    {
+        public async ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken)
+        {
+            Console.Out.WriteLine($"asking {prompt.Entry}");
+
+            try
+            {
+                await Task.Delay(Timeout.Infinite, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                Console.Out.WriteLine("withdrawn");
+            }
+
+            return ApprovalAnswer.Denied;
+        }
     }
 
     private async Task<int?> HoldOnceAsync(AppVaultSession session, SessionHost host, string vault)

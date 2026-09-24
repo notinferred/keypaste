@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Runtime.InteropServices;
 using Keypaste.Cli.Approval;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
@@ -35,11 +36,12 @@ namespace Keypaste.Cli.Commands;
 /// process prints is for the person watching it, not the record.
 /// </para>
 /// <para>
-/// <b>The vault stays unlocked for as long as this runs.</b> There is no idle auto-lock in this
-/// version — closing the terminal is the lock — and that is stated in docs/approvals.md rather than
-/// left for somebody to discover. Stage 4.1 owns idle locking, and
-/// <see cref="VaultCredentialSource"/> already takes the vault through a delegate so adding it
-/// later changes nothing here.
+/// <b>The vault stays unlocked for as long as this runs.</b> There is no idle auto-lock — closing
+/// the terminal is the lock — and that is stated in docs/approvals.md rather than left for somebody
+/// to discover. Ctrl+C, SIGTERM and closing the terminal end the unlock's
+/// <see cref="SessionLifetime"/> before the listener stops, the same transition the desktop's locks
+/// take, so a request waiting at the prompt is withdrawn and denied and every grant is zeroed
+/// (D-0313).
 /// </para>
 /// </remarks>
 internal static class AgentCommand
@@ -138,8 +140,9 @@ internal static class AgentCommand
         PolicyLoad policy,
         CliContext context)
     {
-        var session = VaultOwner.NewSession();
+        using var lifetime = new SessionLifetime();
         using var grants = new GrantCache(TimeProvider.System);
+        lifetime.Own(grants);
         using var gate = new ApprovalGate(
             new TerminalApprovalChannel(context.Prompt, context.Stderr),
             TimeProvider.System,
@@ -153,7 +156,7 @@ internal static class AgentCommand
             new PolicyGate(policy.Rules, TimeProvider.System),
             line => context.Stderr.WriteLine($"keypaste: {line}"));
 
-        var authority = new SessionAuthority(claim.Vault, () => session, handler);
+        var authority = new SessionAuthority(claim.Vault, () => lifetime, handler);
 
         ApproverListener? listener = null;
 
@@ -174,19 +177,14 @@ internal static class AgentCommand
 
             using var stop = new CancellationTokenSource();
 
-            void Interrupt(object? sender, ConsoleCancelEventArgs e)
-            {
-                // Ctrl+C stops the listener rather than the process, so the vault is disposed and
-                // the grants are zeroed on the way out instead of being abandoned mid-flight.
-                e.Cancel = true;
-                stop.Cancel();
-            }
-
-            Console.CancelKeyPress += Interrupt;
+            // A signal ends the lifetime and then stops the listener, rather than ending the
+            // process, so a waiting request is answered as locked, the vault is disposed and the
+            // grants are zeroed on the way out instead of being abandoned mid-flight.
+            var signals = LockOnSignals(lifetime, stop);
 
             try
             {
-                Announce(claim.Vault.Path, pipeName, session, limits, policy, context);
+                Announce(claim.Vault.Path, pipeName, lifetime.Id, limits, policy, context);
 
                 // Blocking on the listener is the command. There is no synchronization context in
                 // a console app, so this is a wait rather than a deadlock waiting to happen.
@@ -194,7 +192,10 @@ internal static class AgentCommand
             }
             finally
             {
-                Console.CancelKeyPress -= Interrupt;
+                foreach (var signal in signals)
+                {
+                    signal.Dispose();
+                }
             }
         }
         finally
@@ -204,6 +205,30 @@ internal static class AgentCommand
 
         context.Stderr.WriteLine("keypaste: the agent has stopped. The vault is locked and every grant is gone.");
         return CliApp.ExitSuccess;
+    }
+
+    private static List<PosixSignalRegistration> LockOnSignals(SessionLifetime lifetime, CancellationTokenSource stop)
+    {
+        List<PosixSignalRegistration> registrations = [];
+
+        foreach (var signal in new[] { PosixSignal.SIGINT, PosixSignal.SIGTERM, PosixSignal.SIGHUP })
+        {
+            try
+            {
+                registrations.Add(PosixSignalRegistration.Create(signal, context =>
+                {
+                    context.Cancel = true;
+                    lifetime.End();
+                    stop.Cancel();
+                }));
+            }
+            catch (PlatformNotSupportedException)
+            {
+                // One fewer route to the same lock is not an error.
+            }
+        }
+
+        return registrations;
     }
 
     /// <summary>

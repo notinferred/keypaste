@@ -201,7 +201,7 @@ public sealed class ApproverHandler
 
         if (outcome.Kind == PolicyOutcomeKind.Granted)
         {
-            return Preapproved(request, name, display, outcome.Rule!);
+            return Preapproved(request, name, display, outcome.Rule!, cancellationToken);
         }
 
         var ttl = _gate.Limits.EffectiveTtlSeconds(request.TtlSeconds);
@@ -213,6 +213,11 @@ public sealed class ApproverHandler
         {
             _narrate?.Invoke($"refused {display} for {prompt.Client}: {Explain(answer)}");
             return Refused(Method(answer), Explain(answer), display);
+        }
+
+        if (Withdrawn(display, cancellationToken) is { } withdrawn)
+        {
+            return withdrawn;
         }
 
         // Last of all. Nothing has decrypted a field until a person said yes to this exact request.
@@ -269,9 +274,15 @@ public sealed class ApproverHandler
         CredentialRequest request,
         EntryName name,
         string display,
-        PolicyRule rule)
+        PolicyRule rule,
+        CancellationToken cancellationToken)
     {
         var ttl = _gate.Limits.EffectiveTtlSeconds(request.TtlSeconds, rule.MaximumTtlSeconds);
+
+        if (Withdrawn(display, cancellationToken) is { } withdrawn)
+        {
+            return withdrawn;
+        }
 
         if (!_source.TryRead(name, request.Field, out var released, out var readFailure))
         {
@@ -338,6 +349,16 @@ public sealed class ApproverHandler
 
         return granted;
     }
+
+    /// <summary>Refuses, before anything is read, a request withdrawn while it was being decided.</summary>
+    /// <remarks>
+    /// A lock withdraws requests through this token (D-0313), so after one nothing more is decrypted
+    /// for them. The owner's commit check, not this one, is what guarantees nothing is released.
+    /// </remarks>
+    private static CredentialReply? Withdrawn(string display, CancellationToken cancellationToken) =>
+        cancellationToken.IsCancellationRequested
+            ? Refused(AuditMethod.Cancelled, "the request was withdrawn before anything was read", display)
+            : null;
 
     /// <summary>
     /// What counts as "the same request" for the cooldown: the same connection asking for the same
