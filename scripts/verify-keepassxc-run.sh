@@ -87,8 +87,9 @@ kpxc rm "$(native "$db")" env/gate/RECYCLED >/dev/null || die "keepassxc-cli rm 
 tree=$(kpxc ls -R -f "$(native "$db")") || die "keepassxc-cli cannot list the vault it made"
 grep -qx 'env/gate/EXPIRED' <<<"$tree" || die "KeePassXC did not keep EXPIRED in env/gate. Tree: ${tree}"
 grep -qx 'Recycle Bin/RECYCLED' <<<"$tree" || die "KeePassXC did not recycle RECYCLED. Tree: ${tree}"
-kpxc export -f xml "$(native "$db")" | tr -d '\t' | grep -q '<Expires>True</Expires>' \
-  || die "the vault KeePassXC made carries no expiry"
+exported=$(kpxc export -f xml "$(native "$db")") || die "keepassxc-cli cannot export the vault it made"
+# Matched whole: grep -q on the end of a pipe exits at the first match, and pipefail then fails on the writer it cut off.
+grep -q '<Expires>True</Expires>' <<<"$exported" || die "the vault KeePassXC made carries no expiry"
 
 step "keypaste run refuses the set whole, naming each entry and why, and starts nothing"
 set +e
