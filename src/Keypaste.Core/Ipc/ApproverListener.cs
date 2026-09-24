@@ -120,26 +120,26 @@ public sealed class ApproverListener : IDisposable
 
     private async Task ServeAsync(NamedPipeServerStream pipe, string connectionId, CancellationToken cancellationToken)
     {
+        var framer = new MessageFramer(pipe);
+        Task<byte[]?>? next = null;
+
         try
         {
-            using var framer = new MessageFramer(pipe);
+            next = framer.ReadAsync(cancellationToken).AsTask();
 
-            while (!cancellationToken.IsCancellationRequested)
+            while (await next.ConfigureAwait(false) is { } frame)
             {
-                var frame = await framer.ReadAsync(cancellationToken).ConfigureAwait(false);
+                // Read ahead while the request is decided. A peer sends nothing until it has its
+                // reply, so this read ending first means it hung up or spoke out of turn.
+                next = framer.ReadAsync(cancellationToken).AsTask();
 
-                if (frame is null)
-                {
-                    return;
-                }
-
-                var reply = await AnswerAsync(frame, connectionId, cancellationToken).ConfigureAwait(false);
+                var reply = await AnswerWhileWaitedForAsync(frame, connectionId, next, cancellationToken).ConfigureAwait(false);
 
                 if (reply is null)
                 {
-                    // Unparseable, or a kind this version does not serve. Ending the connection is
-                    // the whole response: replying to a message we could not read would mean
-                    // guessing what it asked for.
+                    // Unparseable, a kind this version does not serve, or a peer no longer waiting.
+                    // Ending the connection is the whole response: replying to a message we could
+                    // not read would mean guessing what it asked for.
                     return;
                 }
 
@@ -159,7 +159,54 @@ public sealed class ApproverListener : IDisposable
         }
         finally
         {
+            framer.Dispose();
+
+            // Closing the pipe ends a read still pending; its outcome is nobody's to act on.
+            _ = next?.ContinueWith(static read => read.Exception, TaskScheduler.Default);
             _handler.Disconnected(connectionId);
+        }
+    }
+
+    /// <summary>Answers one request, withdrawing it if its peer stops waiting first.</summary>
+    /// <param name="frame">The request.</param>
+    /// <param name="connectionId">The connection it came on.</param>
+    /// <param name="peer">The read of the peer's next frame, which ends early only if it hung up or spoke out of turn.</param>
+    /// <param name="cancellationToken">Cancelled when the listener stops.</param>
+    /// <returns>The reply, or null when the request was unreadable or nobody is waiting for it.</returns>
+    /// <remarks>
+    /// A prompt raised for a peer that has gone comes down rather than waiting out its window for an
+    /// answer nobody will receive. A stopping listener is not a peer that went: its withdrawn requests
+    /// still have their denials to deliver (D-0313).
+    /// </remarks>
+    private async Task<byte[]?> AnswerWhileWaitedForAsync(
+        byte[] frame,
+        string connectionId,
+        Task peer,
+        CancellationToken cancellationToken)
+    {
+        using var exchange = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var answering = AnswerAsync(frame, connectionId, exchange.Token).AsTask();
+
+        if (await Task.WhenAny(answering, peer).ConfigureAwait(false) == peer
+            && !cancellationToken.IsCancellationRequested)
+        {
+            await exchange.CancelAsync().ConfigureAwait(false);
+            await Settled(answering).ConfigureAwait(false);
+            return null;
+        }
+
+        return await answering.ConfigureAwait(false);
+    }
+
+    private static async Task Settled(Task answering)
+    {
+        try
+        {
+            await answering.ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // The answer has nobody to go to; what matters is that deciding it has finished.
         }
     }
 

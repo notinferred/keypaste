@@ -23,8 +23,8 @@ internal sealed class AppAuthority : IDisposable
 
     /// <param name="session">The session the app unlocks, which this now owns.</param>
     /// <param name="approverOverride">The value of <c>KEYPASTE_APPROVER</c>, or null.</param>
-    /// <param name="approvals">Where a person is asked, per unlock; null is the app's own (D-0316).</param>
-    internal AppAuthority(AppVaultSession session, string? approverOverride, Func<IApprovalChannel>? approvals = null)
+    /// <param name="approvals">Where a person is asked, per unlock: launch passes <see cref="WindowApprovalChannel"/> (D-0326).</param>
+    internal AppAuthority(AppVaultSession session, string? approverOverride, Func<IApprovalChannel> approvals)
     {
         ArgumentNullException.ThrowIfNull(session);
 

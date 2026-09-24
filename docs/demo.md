@@ -235,7 +235,7 @@ Repeat the credential request on the same MCP connection while its approval rema
 | `DENIED. No keypaste agent is running` (in source, `Nobody can approve this right now`) | The left terminal is not running, or the two are on different pipes. Same vault, and pass the same `--approver` to both if you set one. In source, an app with this vault unlocked keeps `keypaste agent` from starting on it; lock the vault in the app first. |
 | Claude asks you to paste the key | It did not reach for the tool. Say `use the keypaste MCP server to read env/demo/STRIPE_KEY`. |
 | `DENIED. That entry is outside what this server was configured to expose` | The entry is not under `env/`. The default exposure is `env/**` and approval cannot widen it. |
-| The dialog never appears | Your MCP client is running somewhere you are not looking. There is no native dialog yet; the approval prompt is that terminal. |
+| The dialog never appears | Your MCP client is running somewhere you are not looking. The approval prompt is that terminal: `v0.3.0` has no native dialog. |
 | The server shows as failed to start | Check the absolute executable path and permissions, then whether `~/.keypaste` is writable for auditing. |
 
 <a id="the-honest-limits"></a>

@@ -35,8 +35,12 @@ namespace Keypaste.AppDriver;
 /// waiting at its session (U.2). With <c>--approving-prompt</c> a person approves every request,
 /// printing <c>asking</c> and <c>approved</c>, and the lines <c>edit</c>, <c>delete</c> and
 /// <c>relocate</c> act on the held vault through the entries screen, so
-/// <c>scripts/verify-current-state.sh</c> can change it between two real requests (U.3). The app
-/// itself still has nowhere to ask until STEPS 4.4.
+/// <c>scripts/verify-current-state.sh</c> can change it between two real requests (U.3). With
+/// neither, a request is put to the person in the app's own prompt window, as launch does, drawn on
+/// a headless display: <c>prompt</c> prints what the window shows and <c>prompt withdrawn</c> when it
+/// comes down, and the lines <c>approve</c>, <c>deny</c> and <c>close</c> click its buttons through
+/// the display's hit-testing or close it, so <c>scripts/verify-desktop-approval.sh</c> can answer a
+/// real request as a person would (4.4).
 /// </para>
 /// </remarks>
 internal static class Program
@@ -55,7 +59,8 @@ internal static class Program
         "       access <vault> [--password] [--attach <keyfile> | --remove-keyfile]\n" +
         "       hold <vault> [--locked] [--held-prompt | --approving-prompt]\n" +
         "            (then per line of standard input: lock, unlock, edit <entry-path>, delete <entry-path>,\n" +
-        "             relocate <entry-path> <destination-group-path> <new-title>)\n" +
+        "             relocate <entry-path> <destination-group-path> <new-title>, and with the app's own\n" +
+        "             prompt: approve, deny, close)\n" +
         "KEYPASTE_HOME must be set. KEYPASTE_DRIVER_PASSWORD is the password typed (empty for none),\n" +
         "KEYPASTE_DRIVER_KEYFILE the keyfile chosen, KEYPASTE_DRIVER_NEW_PASSWORD a new password or entry password.";
 
@@ -102,7 +107,7 @@ internal static class Program
         }
     }
 
-    private static Task<int> HoldAsync(Driver driver, string vault, string[] options)
+    private static async Task<int> HoldAsync(Driver driver, string vault, string[] options)
     {
         var locked = false;
         Func<IApprovalChannel>? prompt = null;
@@ -121,11 +126,17 @@ internal static class Program
                     prompt = () => new Driver.ApprovingPrompt();
                     break;
                 default:
-                    return Task.FromResult(Usage());
+                    return Usage();
             }
         }
 
-        return driver.HoldAsync(vault, prompt, locked);
+        if (prompt is not null)
+        {
+            return await driver.HoldAsync(vault, prompt, locked, screen: null).ConfigureAwait(true);
+        }
+
+        using var screen = new PromptScreen();
+        return await driver.HoldAsync(vault, screen.Open, locked, screen).ConfigureAwait(true);
     }
 
     private static int Usage()
@@ -437,7 +448,7 @@ internal sealed class Driver(string home)
         return act(entries);
     }
 
-    internal async Task<int> HoldAsync(string vault, Func<IApprovalChannel>? prompt, bool startLocked)
+    internal async Task<int> HoldAsync(string vault, Func<IApprovalChannel> prompt, bool startLocked, PromptScreen? screen)
     {
         // The authority owns the session from here, and disposing it is quitting.
 #pragma warning disable CA2000
@@ -485,6 +496,11 @@ internal sealed class Driver(string home)
 
                 case ["relocate", var entry, var group, var title]:
                     OnEntries(session, entries => Relocate(entries, entry, group, title));
+                    break;
+
+                case [("approve" or "deny" or "close") and var answer]:
+                    await (screen ?? throw new DriverException("hold answers a prompt only with the app's own"))
+                        .AnswerAsync(answer).ConfigureAwait(true);
                     break;
 
                 default:

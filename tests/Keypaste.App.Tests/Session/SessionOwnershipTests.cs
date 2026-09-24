@@ -95,7 +95,7 @@ public sealed class SessionOwnershipTests
     {
         using var fixture = new TempVault();
         using var session = new AppVaultSession(new ManualClock(), home: fixture.Home);
-        using var host = new SessionHost(session, approverOverride: null);
+        using var host = new SessionHost(session, approverOverride: null, () => new NobodyToAsk());
 
         Assert.Null(host.Endpoint);
         Unlock(session, fixture.Path_, TempVault.Password);
@@ -148,7 +148,7 @@ public sealed class SessionOwnershipTests
         session.Unlocked!.AddEntry(new VaultEntry { GroupPath = "env/dev", Title = "STRIPE_KEY", Password = "entry-secret" });
         session.Unlocked.Save();
 
-        using var host = new SessionHost(session, approverOverride: null);
+        using var host = new SessionHost(session, approverOverride: null, () => new NobodyToAsk());
         Assert.NotNull(host.Endpoint);
 
         var front = "keypaste-relay-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));

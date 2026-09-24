@@ -59,6 +59,7 @@ public sealed class ApprovalPromptTests
                 "Entry",
                 "EntryWasAltered",
                 "Field",
+                "Label",
                 "Reason",
                 "ReasonWasAltered",
                 "ReasonWasTruncated",
@@ -141,6 +142,21 @@ public sealed class ApprovalPromptTests
         var prompt = For(client: new string('z', 300) + "\u202e");
 
         Assert.Equal(ApprovalPrompt.MaximumClientLength, prompt.Client.Length);
+    }
+
+    /// <summary>
+    /// The label is written by whoever starts the bridge, which is not proof of anything either, so
+    /// it is sanitized and capped like the name; a bridge with none has none rather than a stand-in.
+    /// </summary>
+    [Fact]
+    public void TheClientLabel_IsSanitizedAndCapped_AndAbsentWhenNoneWasGiven()
+    {
+        var label = ApprovalPrompt.For(
+            "claude-code", new EntryName("env/dev", "STRIPE_KEY"), "password", "deploy", 300, new string('l', 300) + "‮");
+
+        Assert.Equal(ApprovalPrompt.MaximumClientLength, label.Label!.Length);
+        Assert.Null(For().Label);
+        Assert.Null(ApprovalPrompt.For("c", new EntryName("", "t"), "password", "r", 1, "").Label);
     }
 
     [Fact]

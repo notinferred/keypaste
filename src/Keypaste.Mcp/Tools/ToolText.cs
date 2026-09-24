@@ -55,14 +55,13 @@ internal static class ToolText
     /// has started one.
     /// </remarks>
     internal const string NoApprover = """
-        keypaste: DENIED. Nobody can approve this right now: no keypaste agent holds this vault
-        unlocked. keypaste never releases a credential without a person saying yes to that specific
-        request.
+        keypaste: DENIED. Nobody can approve this right now: nothing holds this vault unlocked, neither
+        the keypaste desktop app nor a keypaste agent. keypaste never releases a credential without a
+        person saying yes to that specific request.
 
-        Ask the person you are working with to run `keypaste agent --vault <their vault>` in a
-        terminal, and then try again. The keypaste desktop app cannot approve requests yet, so if it
-        has this vault unlocked they need to lock it there first. Until then, every request will be
-        refused. This call was recorded in the audit log as denied.
+        Ask the person you are working with to unlock this vault in the keypaste desktop app, or to
+        run `keypaste agent --vault <their vault>` in a terminal, and then try again. Until then,
+        every request will be refused. This call was recorded in the audit log as denied.
         """;
 
     /// <summary>Why a listing was refused when nothing holds the vault.</summary>

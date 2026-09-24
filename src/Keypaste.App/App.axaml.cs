@@ -44,7 +44,10 @@ internal sealed partial class App : Application, IDisposable
             _preferences = new DesktopPreferences(home);
             _session = Compose(_preferences, TimeProvider.System);
             _session.Locked += OnLocked;
-            _authority = new AppAuthority(_session, Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable));
+            _authority = new AppAuthority(
+                _session,
+                Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable),
+                () => new WindowApprovalChannel(TimeProvider.System));
 
             _window = new MainWindow();
             _activity = Observe(_window, _session, TimeProvider.System, () => _shell?.ClearCountdown());

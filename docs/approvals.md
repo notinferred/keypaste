@@ -1,8 +1,8 @@
 # Approving an agent's request
 
-A person approves credential requests unless a live approval or a matching policy rule covers them. This guide describes the current terminal workflow; [policy rules](policy.md) allow matching requests without a prompt.
+A person approves credential requests unless a live approval or a matching policy rule covers them. This guide describes the published terminal workflow and, in source, [approving in the desktop app](#approving-in-the-desktop-app); [policy rules](policy.md) allow matching requests without a prompt at `keypaste agent`.
 
-The focused product will put approval and denial in the app and use one unlock session for desktop, MCP and env launches. That integration is not implemented. The current desktop and terminal approver unlock independently; [STEPS](STEPS.md) owns the remaining work. In source, one vault has one owner: while the app has a vault unlocked, `keypaste agent` on that vault is refused with a message naming the app, and the app answers `list_entry_names` for that vault but refuses every credential request until approval in the app exists.
+In source, one vault has one owner: while the app has a vault unlocked, `keypaste agent` on that vault is refused with a message naming the app, and the app asks about that vault's credential requests itself. The desktop and a terminal approver on another vault still unlock independently, and launching env projects through the app's session is unfinished; [STEPS](STEPS.md) owns the remaining work.
 
 <a id="the-short-version"></a>
 
@@ -94,20 +94,30 @@ An explicit refusal tells the agent not to retry. The same request is refused fo
 
 Only one request is displayed at a time. Additional requests on that connection, including entry listings, receive `BUSY` immediately. They are not queued, and the response does not identify the call already in progress.
 
+In source, a request whose client gives up, or whose `keypaste-mcp` goes away, is withdrawn from the prompt rather than waiting out its 45 seconds.
+
+## Approving in the desktop app
+
+In source, when the desktop app has a vault unlocked, a credential request for that vault opens a keypaste prompt window over whatever you are doing. It shows who is asking (the name the client gave itself, which is not verified), the client label from its configuration, the entry, the field, how long a grant would last, and the agent's reason, under a line saying the agent wrote it.
+
+Approve releases that one field. It works a second after the prompt appears, so a click meant for another window cannot approve. Deny, Escape and closing the window refuse, and focus starts on Deny, so Enter refuses too. Nobody answering for 45 seconds refuses. Locking the app, quitting it and the client giving up each refuse the request and take the prompt down. The one-prompt-at-a-time rule, the one-minute refusal cooldown and connection-scoped grants apply as they do at `keypaste agent`. The app's grants last at most 300 seconds.
+
+The app does not read `policy.toml`: every release from the app needs a press of Approve. Agent Activity does not yet list waiting requests, grants or the audit history.
+
 ## When no agent is running
 
 Everything is denied, and the agent is told exactly how to fix it:
 
 ```
-keypaste: DENIED. Nobody can approve this right now: no keypaste agent holds this vault
-unlocked. keypaste never releases a credential without a person saying yes to that specific
-request.
+keypaste: DENIED. Nobody can approve this right now: nothing holds this vault unlocked, neither
+the keypaste desktop app nor a keypaste agent. keypaste never releases a credential without a
+person saying yes to that specific request.
 
-Ask the person you are working with to run `keypaste agent --vault <their vault>` in a
-terminal, and then try again.
+Ask the person you are working with to unlock this vault in the keypaste desktop app, or to
+run `keypaste agent --vault <their vault>` in a terminal, and then try again.
 ```
 
-That is the source wording; `v0.3.0` says "No keypaste agent is running, so there is nobody to approve this." In source it adds that the desktop cannot approve yet, so a vault it has unlocked must be locked there first.
+That is the source wording; `v0.3.0` says "No keypaste agent is running, so there is nobody to approve this."
 
 The MCP client may start its bridge before you start an approver. Calls are refused until an approver is available.
 
@@ -123,7 +133,7 @@ It does not add the returned field value to the log. Names and reason excerpts a
 
 ## Limits
 
-The vault stays unlocked while `keypaste agent` runs; it has no idle auto-lock. Stop that process to lock it. The desktop app holds a separate session, so locking the desktop does not lock the approver; in source the two cannot hold the same vault at once. Approval prompts appear only in the approver terminal; there is no native dialog. An already-open approver also retains its in-memory vault snapshot: reopen it after a desktop or external edit to use the updated values. In source, once another program changes the file it refuses every request as `vault-changed` instead, until you restart it.
+The vault stays unlocked while `keypaste agent` runs; it has no idle auto-lock. Stop that process to lock it. The desktop app holds a separate session, so locking the desktop does not lock the approver; in source the two cannot hold the same vault at once. In `v0.3.0` approval prompts appear only in the approver terminal; in source the desktop asks in its own window for the vault it has unlocked. An already-open approver also retains its in-memory vault snapshot: reopen it after a desktop or external edit to use the updated values. In source, once another program changes the file it refuses every request as `vault-changed` instead, until you restart it.
 
 TTL limits cached approval reuse. Expiry clears the cache buffer but cannot erase strings or copies retained by clients, transcripts or session files. Stopping the approver cannot revoke these copies; rotate the credential at its provider when needed. [SECURITY.md](../SECURITY.md) describes the memory limits.
 

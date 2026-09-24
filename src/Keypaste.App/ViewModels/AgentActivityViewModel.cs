@@ -44,8 +44,7 @@ internal sealed class AgentActivityViewModel : ObservableObject
                 CultureInfo.InvariantCulture,
                 $"This app (process {serving.Owner.ProcessId}) holds this vault for agents, in session {serving.Session}. ")
             + "MCP clients set up for this vault reach it here and can list the entry names they are allowed to see. "
-            + "Approving credential requests here is not available yet, so every credential request is refused; "
-            + "to approve them, lock this vault here and run keypaste agent.",
+            + "Each credential request is asked about in a prompt window, and nothing is released unless you press Approve.",
         AuthorityStatus.NotServing notServing => $"Agents cannot reach this vault: {notServing.Reason}",
         AuthorityStatus.HeldBy held => held.Sentence,
         _ => "Agents cannot reach this vault right now.",

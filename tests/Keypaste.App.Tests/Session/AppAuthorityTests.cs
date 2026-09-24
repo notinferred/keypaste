@@ -159,7 +159,7 @@ public sealed class AppAuthorityTests
     {
         // The authority owns the session, as it does at launch.
 #pragma warning disable CA2000
-        return new AppAuthority(new AppVaultSession(clock ?? new ManualClock(), home: fixture.Home), approverOverride, prompt);
+        return new AppAuthority(new AppVaultSession(clock ?? new ManualClock(), home: fixture.Home), approverOverride, prompt ?? (() => new NobodyToAsk()));
 #pragma warning restore CA2000
     }
 

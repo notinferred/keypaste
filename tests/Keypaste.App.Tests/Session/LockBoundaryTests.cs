@@ -88,7 +88,7 @@ public sealed class LockBoundaryTests
         using var fixture = new TempVault();
         var clock = new ManualClock();
         using var session = new AppVaultSession(clock, home: fixture.Home);
-        using var host = new SessionHost(session, approverOverride: null);
+        using var host = new SessionHost(session, approverOverride: null, () => new NobodyToAsk());
         Unlock(session, fixture.Path_);
 
         await using var client = await ConnectAsync(host);

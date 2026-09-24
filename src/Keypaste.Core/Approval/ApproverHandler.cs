@@ -211,7 +211,7 @@ public sealed class ApproverHandler
         }
 
         var ttl = _gate.Limits.EffectiveTtlSeconds(request.TtlSeconds);
-        var prompt = ApprovalPrompt.For(request.ClientName, name, request.Field, request.Reason, ttl);
+        var prompt = ApprovalPrompt.For(request.ClientName, name, request.Field, request.Reason, ttl, request.ClientLabel);
 
         var answer = await _gate.AskAsync(CooldownKey(key), prompt, cancellationToken).ConfigureAwait(false);
 

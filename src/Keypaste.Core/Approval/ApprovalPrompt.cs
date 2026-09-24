@@ -9,12 +9,12 @@ namespace Keypaste.Core.Approval;
 /// button, no deadline, no window size, no layout. THREATS.md T-2 requires that the agent's stated
 /// reason "never influence the default button, the timeout, or the layout", and the way to make
 /// that true is to hand a channel a value that has nowhere to express any of them. A channel
-/// renders these five strings and nothing else; the deadline belongs to
+/// renders these values and nothing else; the deadline belongs to
 /// <see cref="ApprovalGate"/>, which owns it whatever the channel does.
 /// </para>
 /// <para>
 /// Every untrusted string is put through <see cref="EntryNameSanitizer"/> by
-/// <see cref="For(string?, EntryName, string, string, int)"/> rather than by the caller, so no
+/// <see cref="For(string?, EntryName, string, string, int, string?)"/> rather than by the caller, so no
 /// channel can be handed raw text by a caller that forgot. Two of the three are attacker-chosen:
 /// the client name is asserted during an unauthenticated handshake (T-3), and the reason is written
 /// by the agent for the express purpose of persuading the person reading it (T-2).
@@ -36,6 +36,14 @@ public sealed record ApprovalPrompt
 
     /// <summary>What the requesting client calls itself, sanitized. Never proof of anything.</summary>
     public required string Client { get; init; }
+
+    /// <summary>The bridge's <c>--client-label</c>, sanitized, or null when it was started without one.</summary>
+    /// <remarks>
+    /// Written in the client's configuration rather than asserted by the client, so it can say which
+    /// configured connection is asking; whoever starts the bridge chooses it, so it authenticates
+    /// nothing either (THREATS.md T-3, T-14).
+    /// </remarks>
+    public string? Label { get; init; }
 
     /// <summary>The entry, sanitized for display. Not an address: sanitizing is lossy.</summary>
     public required string Entry { get; init; }
@@ -79,6 +87,7 @@ public sealed record ApprovalPrompt
     /// <param name="field">The requested field, already validated against <see cref="CredentialFields"/>.</param>
     /// <param name="reason">The agent's stated reason, verbatim.</param>
     /// <param name="effectiveTtlSeconds">The TTL that will actually apply.</param>
+    /// <param name="clientLabel">The bridge's <c>--client-label</c>, or null.</param>
     /// <returns>A prompt safe for any channel to render.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="entry"/>, <paramref name="field"/> or <paramref name="reason"/> is null.</exception>
     public static ApprovalPrompt For(
@@ -86,7 +95,8 @@ public sealed record ApprovalPrompt
         EntryName entry,
         string field,
         string reason,
-        int effectiveTtlSeconds)
+        int effectiveTtlSeconds,
+        string? clientLabel = null)
     {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(field);
@@ -102,6 +112,9 @@ public sealed record ApprovalPrompt
             Client = client is { Length: > 0 }
                 ? EntryNameSanitizer.Sanitize(client, MaximumClientLength).Text
                 : "an unnamed client",
+            Label = clientLabel is { Length: > 0 }
+                ? EntryNameSanitizer.Sanitize(clientLabel, MaximumClientLength).Text
+                : null,
             Entry = shownEntry.Text,
             EntryWasAltered = shownEntry.WasAltered,
             Field = field,

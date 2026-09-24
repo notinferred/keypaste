@@ -273,6 +273,17 @@ public sealed class ApproverHandlerTests
         Assert.Equal(ApprovalLimits.DefaultMaximumTtlSeconds, fixture.Channel.LastPrompt!.TtlSeconds);
     }
 
+    /// <summary>The person is shown which configured connection is asking, as the bridge was labelled.</summary>
+    [Fact]
+    public async Task ThePromptCarriesTheBridgesLabel()
+    {
+        using var fixture = new ApproverFixture();
+
+        await fixture.Handler.RequestAsync(Request() with { ClientLabel = "deploy-bot" }, "conn-1", Token);
+
+        Assert.Equal("deploy-bot", fixture.Channel.LastPrompt!.Label, StringComparer.Ordinal);
+    }
+
     [Fact]
     public async Task AFieldKeypasteDoesNotRelease_NeverReachesAPerson()
     {

@@ -3,8 +3,8 @@
 # keypaste-mcp, and tests/Keypaste.AppDriver unlocking through the app's unlock screen and serving the
 # vault as the app does.
 #
-# A real keypaste-mcp request reaches the app's session, is answered from its vault, and its audit line
-# names that session. With the app locked the request is refused and audited. `keypaste agent` and a
+# A real keypaste-mcp request reaches the app's session, is put to the person in the app's prompt, whose
+# refusal is audited naming that session. With the app locked the request is refused and audited. `keypaste agent` and a
 # second app on the same vault are each refused with a message naming the app, before any password is
 # asked for. Unlocking again starts a new session. A killed app leaves nothing holding the vault. The
 # stale-session and unattached cases run over a real pipe in SessionAuthorityTests, because the shipped
@@ -81,15 +81,20 @@ wait_for() {
 session_of() { grep 'holding session' "$HOLD_OUT" | tail -1 | sed -E 's/^holding session ([0-9a-f]+).*/\1/'; }
 process_of() { grep 'holding session' "$HOLD_OUT" | tail -1 | sed -E 's/.* as process ([0-9]+).*/\1/'; }
 
-# One bridge process: initialize, list, then ask for the credential.
+# One bridge process: initialize, list, then ask for the credential. Given $3, the request reaches the
+# app's prompt, the $3th this app has raised, and the person denies it there.
 ask() {
-  local out="$1" err="$2"
+  local out="$1" err="$2" prompt="${3:-}"
   {
     printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}'
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
     printf '%s\n' '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"list_entry_names","arguments":{}}}'
     sleep 2
     printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci session probe\",\"ttl_seconds\":60}}}"
+    if [ -n "$prompt" ]; then
+      wait_for '^prompt client' "$HOLD_OUT" "$prompt"
+      echo deny >&"$HOLD_IN"
+    fi
     sleep 3
   } | "$MCP" --vault "$VAULT" --audit-log "$AUDIT" --client-label ci-probe >"$out" 2>"$err" \
     || die "keypaste-mcp exited non-zero"
@@ -114,17 +119,17 @@ FIRST="$(session_of)"
 
 OUT="$WORK/served-stdout.txt"
 ERR="$WORK/served-stderr.txt"
-ask "$OUT" "$ERR"
+ask "$OUT" "$ERR" 1
 
 jq -e 'select(.id == 2) | .result.isError == false' <"$OUT" >/dev/null || die "the listing from the app's session was refused"
 grep -q 'DEPLOY_KEY' "$OUT" || die "the listing did not come back from the app's vault"
 jq -e 'select(.id == 3) | .result.isError == true' <"$OUT" >/dev/null \
-  || die "a credential was released although the app cannot yet approve"
+  || die "a credential was released although the person denied it"
 grep -q "$SECRET" "$OUT" && die "a credential reached the client from the app's session"
 
 last_lines | head -1 | jq -e --arg s "$FIRST" '.tool == "list_entry_names" and .decision == "granted" and .session == $s' >/dev/null \
   || die "the listing's audit line does not name the app's session $FIRST"
-last_lines | tail -1 | jq -e --arg s "$FIRST" '.tool == "request_credential" and .decision == "denied" and .session == $s' >/dev/null \
+last_lines | tail -1 | jq -e --arg s "$FIRST" '.tool == "request_credential" and .decision == "denied" and .method == "prompt" and .session == $s' >/dev/null \
   || die "the request's audit line does not name the app's session $FIRST"
 
 # ------------------------------------------------------------------- a second owner is refused
@@ -168,7 +173,7 @@ SECOND="$(session_of)"
 
 OUT="$WORK/again-stdout.txt"
 ERR="$WORK/again-stderr.txt"
-ask "$OUT" "$ERR"
+ask "$OUT" "$ERR" 2
 last_lines | head -1 | jq -e --arg s "$SECOND" '.decision == "granted" and .session == $s' >/dev/null \
   || die "the listing after unlocking again does not name the new session $SECOND"
 

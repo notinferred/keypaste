@@ -276,6 +276,58 @@ public sealed class ApproverListenerTests
         Assert.NotNull(await polite.ListAsync(new NamesRequest(["env/**"]), Token));
     }
 
+    /// <summary>
+    /// A bridge that hangs up while its request waits for a person withdraws that request, so the
+    /// prompt comes down rather than waiting out its window for an answer nobody will receive.
+    /// </summary>
+    [Fact]
+    public async Task AHangUpWhileARequestWaits_WithdrawsIt()
+    {
+        var handler = new RecordingHandler { HoldRequests = true };
+        await using var host = Host.Start(handler);
+
+        var client = await ConnectAsync(host.PipeName);
+        using var givingUp = CancellationTokenSource.CreateLinkedTokenSource(Token);
+        var waiting = client.RequestAsync(Request(), givingUp.Token).AsTask();
+        await handler.Asking.Task.WaitAsync(_connectTimeout, Token);
+
+        // As the bridge does when its client cancels: the exchange gives up, then the connection goes.
+        await givingUp.CancelAsync();
+        Assert.Null(await waiting);
+        await client.DisposeAsync();
+
+        await handler.Withdrawn.Task.WaitAsync(_connectTimeout, Token);
+        await handler.Gone.Task.WaitAsync(_connectTimeout, Token);
+        Assert.Single(handler.Disconnections);
+    }
+
+    /// <summary>
+    /// A peer that sends while its request is being decided has broken the one-exchange-at-a-time
+    /// protocol: the request is withdrawn and the connection ends, with no reply.
+    /// </summary>
+    [Fact]
+    public async Task APeerThatSpeaksOutOfTurn_LosesItsRequestAndItsConnection()
+    {
+        var handler = new RecordingHandler { HoldRequests = true };
+        await using var host = Host.Start(handler);
+
+        await using var rude = new NamedPipeClientStream(
+            ".", host.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+        await rude.ConnectAsync(Token);
+        byte[] request = [.. ApproverProtocol.Encode(Request()), (byte)'\n'];
+        await rude.WriteAsync(request, Token);
+        await rude.FlushAsync(Token);
+        await handler.Asking.Task.WaitAsync(_connectTimeout, Token);
+
+        await rude.WriteAsync(Encoding.UTF8.GetBytes("{}\n"), Token);
+        await rude.FlushAsync(Token);
+
+        await handler.Withdrawn.Task.WaitAsync(_connectTimeout, Token);
+        var buffer = new byte[1];
+        Assert.Equal(0, await rude.ReadAsync(buffer, Token));
+        Assert.Single(handler.Disconnections);
+    }
+
     [Fact]
     public async Task AClientThatHasBeenDisposed_AnswersNullRatherThanThrowing()
     {
@@ -352,6 +404,13 @@ public sealed class ApproverListenerTests
 
         internal TaskCompletionSource Gone { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+        /// <summary>When set, a credential request waits until it is withdrawn, as one in front of a person does.</summary>
+        internal bool HoldRequests { get; init; }
+
+        internal TaskCompletionSource Asking { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        internal TaskCompletionSource Withdrawn { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         /// <summary>What the approver has to say. One ordinary entry unless a test says otherwise.</summary>
         internal IReadOnlyList<EntryName> Names { get; set; } = [new EntryName("env/dev", "STRIPE_KEY")];
 
@@ -368,12 +427,34 @@ public sealed class ApproverListenerTests
             return ValueTask.FromResult(new NamesReply(true, Names, string.Empty, true));
         }
 
-        public ValueTask<CredentialReply> RequestAsync(CredentialRequest request, string connectionId, CancellationToken cancellationToken)
+        public async ValueTask<CredentialReply> RequestAsync(CredentialRequest request, string connectionId, CancellationToken cancellationToken)
         {
             Credentials.Add(request);
             ConnectionIds.Add(connectionId);
 
-            return ValueTask.FromResult(new CredentialReply
+            if (HoldRequests)
+            {
+                Asking.TrySetResult();
+
+                try
+                {
+                    await Task.Delay(Timeout.Infinite, cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    Withdrawn.TrySetResult();
+                }
+
+                return new CredentialReply
+                {
+                    Decision = AuditDecision.Denied,
+                    Method = AuditMethod.Cancelled,
+                    Reason = "withdrawn",
+                    TtlSeconds = 0,
+                };
+            }
+
+            return new CredentialReply
             {
                 Decision = AuditDecision.Granted,
                 Method = AuditMethod.Prompt,
@@ -381,7 +462,7 @@ public sealed class ApproverListenerTests
                 Entry = request.Entry,
                 TtlSeconds = 300,
                 Value = Value,
-            });
+            };
         }
 
         public void Disconnected(string connectionId)

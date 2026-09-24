@@ -12,10 +12,10 @@ namespace Keypaste.App.Session;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Until approving in the desktop exists (STEPS 4.4), listing is answered under the bridge's own
-/// exposure and every credential request is refused: the app asks through
-/// <see cref="NoDesktopApproval"/>, and no standing rule is consulted, so nothing is released
-/// without a person's answer.
+/// Listing is answered under the bridge's own exposure, and a credential request is put to the
+/// person through the channel the app composes, which launch makes <see cref="WindowApprovalChannel"/>
+/// (D-0326). No standing rule is consulted, so nothing is released from the app without a person's
+/// answer.
 /// </para>
 /// <para>
 /// Everything that answers agents is built per unlock and belongs to that unlock's
@@ -40,14 +40,15 @@ internal sealed class SessionHost : IDisposable
 
     /// <param name="session">The session whose vault is served.</param>
     /// <param name="approverOverride">The value of <c>KEYPASTE_APPROVER</c>, or null.</param>
-    /// <param name="approvals">Where a person is asked, per unlock; null is <see cref="NoDesktopApproval"/>.</param>
-    internal SessionHost(AppVaultSession session, string? approverOverride, Func<IApprovalChannel>? approvals = null)
+    /// <param name="approvals">Where a person is asked, per unlock.</param>
+    internal SessionHost(AppVaultSession session, string? approverOverride, Func<IApprovalChannel> approvals)
     {
         ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(approvals);
 
         _session = session;
         _approverOverride = approverOverride;
-        _approvals = approvals ?? (() => new NoDesktopApproval());
+        _approvals = approvals;
         _session.Opened += OnOpened;
         _session.Locked += OnLocked;
 
@@ -196,9 +197,9 @@ internal sealed class SessionHost : IDisposable
         {
             // Owned by the lifetime, which zeroes it when a lock ends it (D-0313).
 #pragma warning disable CA2000
-            var grants = lifetime.Own(new GrantCache(TimeProvider.System));
+            var grants = lifetime.Own(new GrantCache(session.Clock));
 #pragma warning restore CA2000
-            var approvals = new ApprovalGate(channel, TimeProvider.System, ApprovalLimits.Default);
+            var approvals = new ApprovalGate(channel, session.Clock, ApprovalLimits.Default);
 
             var handler = new ApproverHandler(
                 new VaultCredentialSource(() => session.UnlockedFor(lifetime)),
@@ -243,12 +244,5 @@ internal sealed class SessionHost : IDisposable
             _approvals.Dispose();
             _stop.Dispose();
         }
-    }
-
-    /// <summary>The app has nowhere to ask a person yet, so every request that needs one is refused.</summary>
-    private sealed class NoDesktopApproval : IApprovalChannel
-    {
-        public ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken) =>
-            ValueTask.FromResult(ApprovalAnswer.NoChannel);
     }
 }

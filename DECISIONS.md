@@ -6,6 +6,8 @@
 
 | id | date | decision | supersedes |
 |---|---|---|---|
+| D-0327 | 2026-09-23 | While a request is decided, the approver listener reads the connection ahead: a peer that hangs up or sends mid-exchange has its request withdrawn and its connection ended, and a stopping listener still delivers the denials of what it withdrew | Requests that stayed in front of a person after their bridge had gone |
+| D-0326 | 2026-09-23 | The app asks about each credential request in its own fixed-layout prompt window with no default button, focus on Deny, and Approve armed only after one second on screen; it consults no policy file, so every release from the app follows a press of Approve | D-0311 and D-0316's app channel with nowhere to ask |
 | D-0324 | 2026-09-23 | A vault's owner refuses as `invalid-request` any credential request outside the tool's entry, field, reason or TTL limits, checked by the one core rule (`CredentialRequestRules`) the bridge also words its refusals from. A TTL outside 1 to 3600 seconds is refused rather than clamped | The owner re-checking only the field and clamping any TTL |
 | D-0321 | 2026-09-23 | The app's agent status is read from its own session authority: the session a request would be answered under, a listener still accepting and the claim held. Never from connecting to the vault's endpoint, which another process can hold or a stopped lifetime can leave listening | Agent Activity's status from whether a listener had been built |
 | D-0318 | 2026-09-23 | A change to an open vault reports the entries it touched, old and new names, before it is saved, and the owner zeroes every connection's grants for them; an access change touches every entry | Grants that kept serving the value approved before an edit |

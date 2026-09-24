@@ -19,7 +19,7 @@ max_ttl_seconds = 300
 max_per_hour    = 20
 ```
 
-`keypaste agent` reads the file but never writes it. There is no command to edit authorization rules that an agent could persuade someone to run.
+`keypaste agent` reads the file but never writes it. There is no command to edit authorization rules that an agent could persuade someone to run. In source, the desktop app does not read it: every release from a vault the app holds needs a press of Approve in [its prompt](approvals.md#approving-in-the-desktop-app).
 
 <a id="read-this-part-before-you-write-a-rule"></a>
 

@@ -11,6 +11,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- hold draws the app's own prompt window on a headless display and clicks it (4.4). -->
+    <PackageReference Include="Avalonia.Headless" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="../../src/Keypaste.App/Keypaste.App.csproj" />
   </ItemGroup>
 
