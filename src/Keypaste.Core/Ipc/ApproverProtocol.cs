@@ -40,6 +40,7 @@ public static class ApproverProtocol
     internal const string NamesKind = "names";
     internal const string CredentialKind = "credential";
     internal const string AttachKind = "attach";
+    internal const string EnvKind = "env";
 
     /// <summary>Stands in for a reply whose own envelope will not fit a frame.</summary>
     /// <remarks>
@@ -372,6 +373,88 @@ public static class ApproverProtocol
             WriteOptional(writer, "value", reply.Value);
         });
 
+    /// <summary>Encodes a request for a project's env set.</summary>
+    /// <param name="request">What to ask for.</param>
+    /// <returns>The frame's bytes, without a delimiter.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    public static byte[] Encode(EnvRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return Write(writer =>
+        {
+            writer.WriteNumber("v", Version);
+            writer.WriteString("kind", EnvKind);
+            writer.WriteString("vault", request.Vault);
+            writer.WriteString("session", request.Session);
+            writer.WriteString("project", request.Project);
+            WriteStrings(writer, "command", request.Command);
+            writer.WriteString("directory", request.Directory);
+        });
+    }
+
+    /// <summary>Encodes the answer to an env request, bounded to one frame.</summary>
+    /// <param name="reply">The set, or why none of it.</param>
+    /// <returns>The frame's bytes. Never over <see cref="MessageFramer.MaximumPayloadBytes"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
+    /// <remarks>
+    /// A set that will not fit is refused whole as <see cref="EnvOutcome.TooLarge"/>, never trimmed:
+    /// a child started with part of its set runs with the wrong credentials (D-0337).
+    /// </remarks>
+    public static byte[] Encode(EnvReply reply)
+    {
+        ArgumentNullException.ThrowIfNull(reply);
+
+        var frame = WriteEnv(reply);
+
+        if (frame.Length <= MessageFramer.MaximumPayloadBytes)
+        {
+            return frame;
+        }
+
+        var tooLarge = EnvResolved.Refused(reply.Set.Project, EnvOutcome.TooLarge);
+        var refusal = WriteEnv(new EnvReply(tooLarge, tooLarge.Refusal));
+
+        return refusal.Length <= MessageFramer.MaximumPayloadBytes
+            ? refusal
+            : WriteEnv(new EnvReply(EnvResolved.Refused(string.Empty, EnvOutcome.TooLarge), Oversized));
+    }
+
+    private static byte[] WriteEnv(EnvReply reply) =>
+        Write(writer =>
+        {
+            writer.WriteNumber("v", Version);
+            writer.WriteString("kind", EnvKind);
+            writer.WriteString("project", reply.Set.Project);
+            writer.WriteNumber("outcome", (int)reply.Set.Outcome);
+            writer.WriteString("reason", reply.Reason);
+
+            writer.WriteStartArray("problems");
+            foreach (var problem in reply.Set.Problems)
+            {
+                writer.WriteStartObject();
+                writer.WriteString("key", problem.Key);
+                writer.WriteString("reason", problem.Reason);
+                writer.WriteEndObject();
+            }
+
+            writer.WriteEndArray();
+
+            if (reply.Set.Outcome == EnvOutcome.Resolved)
+            {
+                writer.WriteStartArray("variables");
+                foreach (var variable in reply.Set.Variables)
+                {
+                    writer.WriteStartObject();
+                    writer.WriteString("key", variable.Key);
+                    writer.WriteString("value", variable.Value);
+                    writer.WriteEndObject();
+                }
+
+                writer.WriteEndArray();
+            }
+        });
+
     /// <summary>Which kind of message a frame is, without committing to parsing it.</summary>
     /// <param name="frame">The frame's bytes.</param>
     /// <returns>The kind, or <see cref="ApproverMessageKind.Unknown"/> for anything unrecognised.</returns>
@@ -394,6 +477,7 @@ public static class ApproverProtocol
                 NamesKind => ApproverMessageKind.Names,
                 CredentialKind => ApproverMessageKind.Credential,
                 AttachKind => ApproverMessageKind.Attach,
+                EnvKind => ApproverMessageKind.Env,
                 _ => ApproverMessageKind.Unknown,
             };
         }
@@ -655,6 +739,127 @@ public static class ApproverProtocol
 
             return true;
         }
+    }
+
+    /// <summary>Decodes a request for a project's env set.</summary>
+    /// <param name="frame">The frame's bytes.</param>
+    /// <param name="request">The decoded request.</param>
+    /// <returns><see langword="true"/> when the frame was a well-formed env request.</returns>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out EnvRequest? request)
+    {
+        request = null;
+
+        if (!TryParse(frame, out var document))
+        {
+            return false;
+        }
+
+        using (document)
+        {
+            var root = document.RootElement;
+
+            if (!IsKind(root, EnvKind)
+                || !TryString(root, "vault", out var vault)
+                || !TryString(root, "session", out var session)
+                || !TryString(root, "project", out var project)
+                || !TryStrings(root, "command", out var command)
+                || !TryString(root, "directory", out var directory))
+            {
+                return false;
+            }
+
+            request = new EnvRequest(project, command, directory) { Vault = vault, Session = session };
+            return true;
+        }
+    }
+
+    /// <summary>Decodes the answer to an env request.</summary>
+    /// <param name="frame">The frame's bytes.</param>
+    /// <param name="reply">The decoded reply.</param>
+    /// <returns><see langword="true"/> when the frame was a well-formed env reply.</returns>
+    /// <remarks>
+    /// Values are accepted only on a released set, and a released set must carry its list, so a
+    /// reply that says no never delivers a value alongside.
+    /// </remarks>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out EnvReply? reply)
+    {
+        reply = null;
+
+        if (!TryParse(frame, out var document))
+        {
+            return false;
+        }
+
+        using (document)
+        {
+            var root = document.RootElement;
+
+            if (!IsKind(root, EnvKind)
+                || !TryString(root, "project", out var project)
+                || !TryInteger(root, "outcome", out var number)
+                || !Enum.IsDefined((EnvOutcome)number)
+                || !TryString(root, "reason", out var reason)
+                || !TryPairs(root, "problems", "reason", out var problems))
+            {
+                return false;
+            }
+
+            var outcome = (EnvOutcome)number;
+
+            if (outcome == EnvOutcome.Resolved)
+            {
+                if (problems.Count > 0 || !TryPairs(root, "variables", "value", out var variables))
+                {
+                    return false;
+                }
+
+                reply = new EnvReply(
+                    EnvResolved.Released(project, [.. variables.Select(pair => new EnvVariable(pair.Key, pair.Value))]),
+                    reason);
+                return true;
+            }
+
+            if (root.TryGetProperty("variables", out _))
+            {
+                return false;
+            }
+
+            reply = new EnvReply(
+                EnvResolved.Refused(project, outcome, [.. problems.Select(pair => new EnvProblem(pair.Key, pair.Value))]),
+                reason);
+            return true;
+        }
+    }
+
+    private static bool TryPairs(
+        JsonElement root,
+        string name,
+        string second,
+        [NotNullWhen(true)] out List<KeyValuePair<string, string>>? pairs)
+    {
+        pairs = null;
+
+        if (!root.TryGetProperty(name, out var element) || element.ValueKind != JsonValueKind.Array)
+        {
+            return false;
+        }
+
+        var decoded = new List<KeyValuePair<string, string>>(element.GetArrayLength());
+
+        foreach (var item in element.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.Object
+                || !TryString(item, "key", out var key)
+                || !TryString(item, second, out var value))
+            {
+                return false;
+            }
+
+            decoded.Add(new(key, value));
+        }
+
+        pairs = decoded;
+        return true;
     }
 
     private static byte[] Write(Action<Utf8JsonWriter> body)

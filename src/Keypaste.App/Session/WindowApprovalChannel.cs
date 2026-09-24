@@ -1,3 +1,4 @@
+using Avalonia.Controls;
 using Avalonia.Threading;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
@@ -7,7 +8,7 @@ namespace Keypaste.App.Session;
 
 /// <summary>
 /// Asks the person at this desktop, in a prompt window of its own, whether an agent may have one
-/// field (D-0326).
+/// field (D-0326) or a <c>keypaste run --session</c> may have a project's variables (D-0341).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -28,14 +29,30 @@ internal sealed class WindowApprovalChannel(TimeProvider clock) : IApprovalChann
     private readonly TimeProvider _clock = clock ?? throw new ArgumentNullException(nameof(clock));
 
     /// <summary>Raised on the UI thread once a prompt window is on screen.</summary>
-    internal event EventHandler<ApprovalWindow>? Shown;
+    internal event EventHandler<Window>? Shown;
 
-    public async ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken)
+    public ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(prompt);
 
         var request = new ApprovalViewModel(prompt);
-        ApprovalWindow? window = null;
+        return ShowAsync(request, () => new ApprovalWindow(request), cancellationToken);
+    }
+
+    public ValueTask<ApprovalAnswer> AskAsync(EnvReleasePrompt prompt, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(prompt);
+
+        var request = new EnvApprovalViewModel(prompt);
+        return ShowAsync(request, () => new EnvApprovalWindow(request), cancellationToken);
+    }
+
+    private async ValueTask<ApprovalAnswer> ShowAsync(
+        PromptViewModel request,
+        Func<Window> create,
+        CancellationToken cancellationToken)
+    {
+        Window? window = null;
 
         void TakeDown()
         {
@@ -59,7 +76,7 @@ internal sealed class WindowApprovalChannel(TimeProvider clock) : IApprovalChann
 
             try
             {
-                window = new ApprovalWindow(request);
+                window = create();
                 window.Show();
                 Shown?.Invoke(this, window);
                 _ = ArmAsync(request, cancellationToken);
@@ -82,11 +99,11 @@ internal sealed class WindowApprovalChannel(TimeProvider clock) : IApprovalChann
         }
     }
 
-    private async Task ArmAsync(ApprovalViewModel request, CancellationToken cancellationToken)
+    private async Task ArmAsync(PromptViewModel request, CancellationToken cancellationToken)
     {
         try
         {
-            await Task.Delay(ApprovalViewModel.ArmingDelay, _clock, cancellationToken).ConfigureAwait(false);
+            await Task.Delay(PromptViewModel.ArmingDelay, _clock, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {

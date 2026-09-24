@@ -164,16 +164,29 @@ internal sealed class FakeChannel : IApprovalChannel
 
     internal ApprovalPrompt? LastPrompt { get; private set; }
 
+    internal EnvReleasePrompt? LastEnvPrompt { get; private set; }
+
     /// <summary>Completes once a held prompt is up.</summary>
     internal Task Waiting => _waiting.Task;
 
     /// <summary>Whether a held prompt was withdrawn.</summary>
     internal bool Withdrawn { get; private set; }
 
-    public async ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken)
+    public ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken)
+    {
+        LastPrompt = prompt;
+        return AnswerAsync(cancellationToken);
+    }
+
+    public ValueTask<ApprovalAnswer> AskAsync(EnvReleasePrompt prompt, CancellationToken cancellationToken)
+    {
+        LastEnvPrompt = prompt;
+        return AnswerAsync(cancellationToken);
+    }
+
+    private async ValueTask<ApprovalAnswer> AnswerAsync(CancellationToken cancellationToken)
     {
         Asked++;
-        LastPrompt = prompt;
 
         if (!Hold)
         {

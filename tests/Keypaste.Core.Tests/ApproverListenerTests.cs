@@ -398,6 +398,8 @@ public sealed class ApproverListenerTests
 
         internal ConcurrentBag<CredentialRequest> Credentials { get; } = [];
 
+        internal ConcurrentBag<EnvRequest> Envs { get; } = [];
+
         internal ConcurrentBag<string> ConnectionIds { get; } = [];
 
         internal ConcurrentBag<string> Disconnections { get; } = [];
@@ -463,6 +465,14 @@ public sealed class ApproverListenerTests
                 TtlSeconds = 300,
                 Value = Value,
             };
+        }
+
+        public ValueTask<EnvReply> ReleaseEnvAsync(EnvRequest request, string connectionId, CancellationToken cancellationToken)
+        {
+            Envs.Add(request);
+
+            return ValueTask.FromResult(
+                new EnvReply(EnvResolved.Released(request.Project, [new EnvVariable("STRIPE_KEY", Value)]), string.Empty));
         }
 
         public void Disconnected(string connectionId)

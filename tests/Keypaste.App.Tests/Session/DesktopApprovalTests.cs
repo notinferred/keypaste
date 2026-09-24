@@ -151,7 +151,7 @@ public sealed class DesktopApprovalTests
             var window = await app.PromptAsync();
 
             Click(window, "Approve");
-            app.Clock.Advance(ApprovalViewModel.ArmingDelay - TimeSpan.FromMilliseconds(1));
+            app.Clock.Advance(PromptViewModel.ArmingDelay - TimeSpan.FromMilliseconds(1));
             WindowInput.Drain();
             Click(window, "Approve");
             await Task.Delay(200, Token);
@@ -245,16 +245,16 @@ public sealed class DesktopApprovalTests
 
     private static List<Button> Buttons(Window window) => [.. window.GetVisualDescendants().OfType<Button>()];
 
-    private static string? Text(Window window, string name) => window.FindControl<TextBlock>(name)!.Text;
+    internal static string? Text(Window window, string name) => window.FindControl<TextBlock>(name)!.Text;
 
     /// <summary>A key press alone: the release would reach a window the press may already have closed.</summary>
-    private static void Key(Window window, PhysicalKey key)
+    internal static void Key(Window window, PhysicalKey key)
     {
         window.KeyPressQwerty(key, RawInputModifiers.None);
         WindowInput.Drain();
     }
 
-    private static void Click(Window window, string name)
+    internal static void Click(Window window, string name)
     {
         var button = window.FindControl<Button>(name)!;
         WindowInput.Press(window, button);
@@ -262,7 +262,7 @@ public sealed class DesktopApprovalTests
     }
 
     /// <summary>The app's authority, composed with its own prompt, holding a vault with one credential in it.</summary>
-    private sealed class PromptedApp : IAsyncDisposable
+    internal sealed class PromptedApp : IAsyncDisposable
     {
         private readonly TempVault _fixture;
         private ApproverClient? _client;
@@ -291,7 +291,7 @@ public sealed class DesktopApprovalTests
 
         internal string SessionId { get; private set; } = string.Empty;
 
-        internal List<ApprovalWindow> Windows { get; } = [];
+        internal List<Window> Windows { get; } = [];
 
         internal static async Task<PromptedApp> StartAsync()
         {
@@ -345,7 +345,7 @@ public sealed class DesktopApprovalTests
                 cancellationToken ?? Token).AsTask();
 
         /// <summary>Waits for the prompt a request raised to be on screen and drawn.</summary>
-        internal async Task<ApprovalWindow> PromptAsync()
+        internal async Task<Window> PromptAsync()
         {
             await Until(() => Windows.Count > 0);
             var window = Windows[^1];
@@ -356,11 +356,17 @@ public sealed class DesktopApprovalTests
         /// <summary>Lets the arming delay pass, as a person reading the prompt does.</summary>
         internal void Arm()
         {
-            Clock.Advance(ApprovalViewModel.ArmingDelay);
+            Clock.Advance(PromptViewModel.ArmingDelay);
             WindowInput.Drain();
         }
 
-        internal static async Task WithdrawnAsync(ApprovalWindow window) => await Until(() => !window.IsVisible);
+        internal static async Task WithdrawnAsync(Window window) => await Until(() => !window.IsVisible);
+
+        /// <summary>A <c>keypaste run --session</c> request for the <c>ci</c> project on this bridge's connection.</summary>
+        internal Task<EnvReply?> AskEnv(CancellationToken? cancellationToken = null) =>
+            _client!.ReleaseEnvAsync(
+                new EnvRequest("ci", ["deploy", "--to", "staging area"], Path.Combine(_fixture.Home, "work")) { Vault = Vault, Session = SessionId },
+                cancellationToken ?? Token).AsTask();
 
         internal async Task HangUpAsync()
         {

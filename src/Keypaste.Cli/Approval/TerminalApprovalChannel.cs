@@ -36,12 +36,24 @@ internal sealed class TerminalApprovalChannel(ISecretPrompt prompt, TextWriter s
     private readonly ISecretPrompt _prompt = prompt ?? throw new ArgumentNullException(nameof(prompt));
     private readonly TextWriter _stderr = stderr ?? throw new ArgumentNullException(nameof(stderr));
 
-    public async ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt request, CancellationToken cancellationToken)
+    public ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
         Render(request);
+        return AnswerAsync(cancellationToken);
+    }
 
+    public ValueTask<ApprovalAnswer> AskAsync(EnvReleasePrompt request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        Render(request);
+        return AnswerAsync(cancellationToken);
+    }
+
+    private async ValueTask<ApprovalAnswer> AnswerAsync(CancellationToken cancellationToken)
+    {
         string? answer;
 
         try
@@ -85,6 +97,29 @@ internal sealed class TerminalApprovalChannel(ISecretPrompt prompt, TextWriter s
 
         return string.Equals(trimmed, "y", StringComparison.OrdinalIgnoreCase)
             || string.Equals(trimmed, "yes", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void Render(EnvReleasePrompt request)
+    {
+        _stderr.WriteLine();
+        _stderr.WriteLine(Rule);
+        _stderr.WriteLine("keypaste: `keypaste run --session` is asking for a project's variables.");
+        _stderr.WriteLine();
+        _stderr.WriteLine($"  project    {request.Project}");
+        _stderr.WriteLine($"  variables  {(request.Keys.Count == 0 ? "(none)" : string.Join(' ', request.Keys))}");
+        _stderr.WriteLine($"  command    {request.Command}");
+        _stderr.WriteLine($"  in         {request.Directory}");
+
+        if (request.CommandWasAltered || request.DirectoryWasAltered)
+        {
+            _stderr.WriteLine();
+            _stderr.WriteLine("  Characters that cannot be shown were scrubbed from the command or directory above.");
+        }
+
+        _stderr.WriteLine();
+        _stderr.WriteLine("  Approving puts every value into that command's environment. No value is shown here.");
+        _stderr.WriteLine("  The command is what the runner says it will start; only approve one you started.");
+        _stderr.WriteLine();
     }
 
     private void Render(ApprovalPrompt request)

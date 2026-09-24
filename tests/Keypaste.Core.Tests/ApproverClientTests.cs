@@ -139,6 +139,9 @@ public sealed class ApproverClientTests
             };
         }
 
+        public ValueTask<EnvReply> ReleaseEnvAsync(EnvRequest request, string connectionId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
         public void Disconnected(string connectionId)
         {
         }

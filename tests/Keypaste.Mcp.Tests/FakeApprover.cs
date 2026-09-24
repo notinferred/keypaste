@@ -197,6 +197,9 @@ internal sealed class FakeApprover : IAsyncDisposable
             return approver.Answer with { Session = approver.Session };
         }
 
+        public ValueTask<EnvReply> ReleaseEnvAsync(EnvRequest request, string connectionId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
         public void Disconnected(string connectionId)
         {
         }

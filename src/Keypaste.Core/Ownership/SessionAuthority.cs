@@ -23,6 +23,11 @@ namespace Keypaste.Core.Ownership;
 /// value either left before the lock or does not leave at all.
 /// </para>
 /// <para>
+/// An env set for <c>keypaste run --session</c> is admitted the same way and resolved under the
+/// lifetime the runner attached to, never a later one, with the person asked through the owner's
+/// own gate (D-0341).
+/// </para>
+/// <para>
 /// Reaching the endpoint at all is what the operating system authenticates (THREATS.md T-10). The
 /// session identifier is not a secret; it says which unlocked lifetime a request belongs to.
 /// </para>
@@ -34,13 +39,19 @@ public sealed class SessionAuthority : IApproverHandler
     private readonly VaultIdentity _vault;
     private readonly Func<SessionLifetime?> _lifetime;
     private readonly ApproverHandler _inner;
+    private readonly SessionEnvironments? _environments;
     private readonly ConcurrentDictionary<string, Attachment> _attached = new(StringComparer.Ordinal);
 
     /// <summary>Builds the authority for one owned vault.</summary>
     /// <param name="vault">The vault this process holds.</param>
     /// <param name="lifetime">The current unlocked lifetime, or null while the vault is locked.</param>
     /// <param name="inner">What decides a request once it belongs to the current session.</param>
-    public SessionAuthority(VaultIdentity vault, Func<SessionLifetime?> lifetime, ApproverHandler inner)
+    /// <param name="environments">What env sets are released with, or null to refuse every one.</param>
+    public SessionAuthority(
+        VaultIdentity vault,
+        Func<SessionLifetime?> lifetime,
+        ApproverHandler inner,
+        SessionEnvironments? environments = null)
     {
         ArgumentNullException.ThrowIfNull(vault);
         ArgumentNullException.ThrowIfNull(lifetime);
@@ -49,6 +60,7 @@ public sealed class SessionAuthority : IApproverHandler
         _vault = vault;
         _lifetime = lifetime;
         _inner = inner;
+        _environments = environments;
     }
 
     /// <summary>The session a request attaching now would be answered under, or null while the vault is locked.</summary>
@@ -164,6 +176,55 @@ public sealed class SessionAuthority : IApproverHandler
     }
 
     /// <inheritdoc/>
+    public async ValueTask<EnvReply> ReleaseEnvAsync(EnvRequest request, string connectionId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (!TryAdmit(request.Vault, request.Session, connectionId, out var admitted, out var refusal))
+        {
+            return Refused(
+                request.Project,
+                refusal.Method == AuditMethod.VaultLocked ? EnvOutcome.Locked : EnvOutcome.NoSession,
+                refusal.Reason);
+        }
+
+        if (_environments is not { } environments)
+        {
+            return Refused(request.Project, EnvOutcome.NoSession, "the keypaste process holding this vault does not release env sets");
+        }
+
+        if (EnvReleasePrompt.Problem(request.Project, request.Command, request.Directory) is { } problem)
+        {
+            return Refused(request.Project, EnvOutcome.Invalid, problem);
+        }
+
+        // Every run is a new connection, so the cooldown names the request and not the connection:
+        // a loop that asks again after a refusal is refused without a second prompt (T-11).
+        var cooldownKey = string.Join('\0', ["env", request.Project, request.Directory, .. request.Command]);
+        var answer = ApprovalAnswer.NoChannel;
+
+        var resolver = new SessionEnvResolver(
+            () => ReferenceEquals(Live(), admitted) ? admitted : null,
+            environments.VaultFor,
+            environments.Clock);
+
+        var resolved = await resolver.ResolveAsync(
+            request.Project,
+            async (preview, withdrawn) =>
+            {
+                var prompt = EnvReleasePrompt.For(preview, request.Command, request.Directory);
+                answer = await environments.Gate.AskAsync(cooldownKey, prompt, withdrawn).ConfigureAwait(false);
+
+                // A withdrawn question is not a refusal: the resolver tells a lock from a hang-up.
+                withdrawn.ThrowIfCancellationRequested();
+                return answer == ApprovalAnswer.Approved;
+            },
+            cancellationToken).ConfigureAwait(false);
+
+        return new EnvReply(resolved, resolved.Outcome == EnvOutcome.Declined ? Declined(answer) : resolved.Refusal);
+    }
+
+    /// <inheritdoc/>
     public void Disconnected(string connectionId)
     {
         ArgumentNullException.ThrowIfNull(connectionId);
@@ -173,6 +234,19 @@ public sealed class SessionAuthority : IApproverHandler
     }
 
     private SessionLifetime? Live() => _lifetime() is { IsLive: true } lifetime ? lifetime : null;
+
+    private static EnvReply Refused(string project, EnvOutcome outcome, string reason) =>
+        new(EnvResolved.Refused(project, outcome), reason);
+
+    private static string Declined(ApprovalAnswer answer) => answer switch
+    {
+        ApprovalAnswer.Denied => "the person asked said no",
+        ApprovalAnswer.TimedOut => "nobody answered the prompt in time",
+        ApprovalAnswer.Busy => "another request is waiting for an answer; ask again once it has one",
+        ApprovalAnswer.Cooldown => "the same request was refused a moment ago; wait a minute before asking again",
+        ApprovalAnswer.Cancelled => "the request was withdrawn before anybody answered",
+        _ => "the prompt could not be shown, so nobody was asked",
+    };
 
     private bool TryAdmit(
         string vault,

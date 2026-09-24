@@ -93,7 +93,7 @@ Advertise a target or change its public install URL only after the applicable re
 
 [STEPS](STEPS.md) owns the five active tracks: daily vault use and recovery, a shared unlock session, native MCP approvals, project environments and desktop delivery. T5 retains the existing packaging, signing, installation and upgrade evidence. R.1a verifies an integrated candidate before 4.7c2 publishes it; R.1 verifies the local workflow on public downloads. L.1 supplies usable guides, download instructions and routes for reports.
 
-The intended desktop workflow has one session governing vault use, new credential releases and project launches. The current app and terminal approver have separate unlocked vaults, and `keypaste run` opens its own. A successful CLI demo or existing installer check does not establish the shared session or native approval workflow.
+The intended desktop workflow has one session governing vault use, new credential releases and project launches. The current app and terminal approver have separate unlocked vaults, and `keypaste run` opens its own unless source's `--session` asks the process holding it. A successful CLI demo or existing installer check does not establish the shared session or native approval workflow.
 
 File sharing, relay hosting, accounts, teams, payment, mobile clients, complete KeePassXC parity, additional platforms and package-manager coverage are not prerequisites for the local desktop release. Optional future distribution belongs to [BACKLOG](BACKLOG.md). Public download instructions and a route for user reports belong with the release; marketing campaigns and an announcement at every milestone are not release gates.
 

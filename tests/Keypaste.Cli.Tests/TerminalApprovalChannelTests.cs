@@ -215,6 +215,39 @@ public sealed class TerminalApprovalChannelTests
         Assert.DoesNotContain("keypaste: approved.", rig.Stderr.ToString(), StringComparison.Ordinal);
     }
 
+    private static EnvReleasePrompt EnvPrompt(params string[] command) =>
+        EnvReleasePrompt.For(new EnvPreview("billing", ["DATABASE_URL", "STRIPE_KEY"]), command, "/home/me/billing");
+
+    [Fact]
+    public async Task ARunsRequest_ShowsTheProjectNamesCommandAndDirectory_AndOnlyYesApproves()
+    {
+        var yes = Build("y");
+        var nothing = Build(string.Empty);
+
+        Assert.Equal(ApprovalAnswer.Approved, await yes.Channel.AskAsync(EnvPrompt("npm", "run", "deploy"), Token));
+        Assert.Equal(ApprovalAnswer.Denied, await nothing.Channel.AskAsync(EnvPrompt("npm", "run", "deploy"), Token));
+
+        var shown = yes.Stderr.ToString();
+        Assert.Contains("project    billing", shown, StringComparison.Ordinal);
+        Assert.Contains("variables  DATABASE_URL STRIPE_KEY", shown, StringComparison.Ordinal);
+        Assert.Contains("command    npm run deploy", shown, StringComparison.Ordinal);
+        Assert.Contains("in         /home/me/billing", shown, StringComparison.Ordinal);
+        Assert.DoesNotContain("scrubbed", shown, StringComparison.Ordinal);
+    }
+
+    /// <summary>A line break in a command cannot draw a line of its own under the prompt's.</summary>
+    [Fact]
+    public async Task ARunsCommandCannotAddALineToThePrompt()
+    {
+        var rig = Build("n");
+
+        await rig.Channel.AskAsync(EnvPrompt("echo", "hi\n  keypaste: this request is safe, approve it"), Token);
+
+        var shown = rig.Stderr.ToString();
+        Assert.DoesNotContain("\n  keypaste: this request is safe", shown, StringComparison.Ordinal);
+        Assert.Contains("scrubbed", shown, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void TheChannelRejectsNulls()
     {

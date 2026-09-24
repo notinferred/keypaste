@@ -31,6 +31,15 @@ public enum EnvOutcome
 
     /// <summary>The set's names changed while the person was being asked about them.</summary>
     ChangedWhileAsked = 8,
+
+    /// <summary>The request did not come from a connection attached to the session holding the vault.</summary>
+    NoSession = 9,
+
+    /// <summary>The set is larger than one reply on the owner's endpoint can carry.</summary>
+    TooLarge = 10,
+
+    /// <summary>The request itself could not be asked about, such as a command too long to show whole.</summary>
+    Invalid = 11,
 }
 
 /// <summary>Why one entry of an env set cannot be released. Never carries its value.</summary>
@@ -81,7 +90,10 @@ public sealed class EnvResolved
         EnvOutcome.Unreadable => "the vault file could not be read to confirm it is unchanged",
         EnvOutcome.Locked => "the vault was locked before the set was released",
         EnvOutcome.Declined => "the set was not confirmed",
-        _ => "the set's names changed while it was being confirmed",
+        EnvOutcome.ChangedWhileAsked => "the set's names changed while it was being confirmed",
+        EnvOutcome.NoSession => "the request belongs to no session holding the vault",
+        EnvOutcome.TooLarge => "the set is too large to send in one reply",
+        _ => "the request could not be asked about",
     };
 
     /// <summary>A key as a refusal shows it, including one with no title.</summary>

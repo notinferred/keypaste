@@ -12,10 +12,10 @@ namespace Keypaste.App.Session;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Listing is answered under the bridge's own exposure, and a credential request is put to the
-/// person through the channel the app composes, which launch makes <see cref="WindowApprovalChannel"/>
-/// (D-0326). No standing rule is consulted, so nothing is released from the app without a person's
-/// answer.
+/// Listing is answered under the bridge's own exposure, and a credential request, or a
+/// <c>keypaste run --session</c> request for an env set, is put to the person through the channel
+/// the app composes, which launch makes <see cref="WindowApprovalChannel"/> (D-0326, D-0341). No
+/// standing rule is consulted, so nothing is released from the app without a person's answer.
 /// </para>
 /// <para>
 /// Everything that answers agents is built per unlock and belongs to that unlock's
@@ -246,7 +246,11 @@ internal sealed class SessionHost : IDisposable
                 grants,
                 PolicyGate.None);
 
-            var authority = new SessionAuthority(vault, () => session.Lifetime, handler);
+            var authority = new SessionAuthority(
+                vault,
+                () => session.Lifetime,
+                handler,
+                new SessionEnvironments(approvals, session.UnlockedFor, session.Clock));
 
             try
             {

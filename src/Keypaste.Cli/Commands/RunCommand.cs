@@ -1,5 +1,9 @@
 using Keypaste.Core;
+using Keypaste.Core.Approval;
+using Keypaste.Core.Audit;
+using Keypaste.Core.Ipc;
 using Keypaste.Core.Launch;
+using Keypaste.Core.Ownership;
 
 namespace Keypaste.Cli.Commands;
 
@@ -27,13 +31,27 @@ internal readonly record struct RunArguments(
 /// the child's environment, which is where a program can read them from and is also the limit of
 /// what keypaste can promise about them (SECURITY.md).
 /// </para>
+/// <para>
+/// With <c>--session</c> the first phase is a question instead: the set comes from the process
+/// holding the vault unlocked, over its endpoint, after the person there approves this command, and
+/// nothing here opens the vault or reads a password, then or as a fallback (D-0341).
+/// </para>
 /// </remarks>
 internal static class RunCommand
 {
+    internal const string SessionOption = "session";
+    internal const string ApproverOption = "approver";
+
+    /// <summary>How long to wait for the owner's answer: its longest window, and time for the reply to arrive.</summary>
+    /// <remarks>The owner decides the timeout; this only bounds an owner that never answers.</remarks>
+    private static readonly TimeSpan _answerBound = TimeSpan.FromSeconds(ApprovalLimits.MaximumWindowSeconds + 15);
+
     private static readonly OptionSpec[] _options =
     [
         new("vault", TakesValue: true),
         new("keyfile", TakesValue: true),
+        new(SessionOption, TakesValue: false),
+        new(ApproverOption, TakesValue: true),
     ];
 
     internal static int Execute(string[] args, CliContext context)
@@ -73,6 +91,21 @@ internal static class RunCommand
         if (!VaultLocator.TryResolve(line, context.Environment, out var path, out var locateError))
         {
             return Fail(context, locateError);
+        }
+
+        if (line.HasFlag(SessionOption))
+        {
+            if (line.Value("keyfile") is not null)
+            {
+                return Fail(context, "--session uses the vault another keypaste process has unlocked, so it takes no --keyfile");
+            }
+
+            return FromSession(path, line.Value(ApproverOption), project, split.Command, context);
+        }
+
+        if (line.Value(ApproverOption) is not null)
+        {
+            return Fail(context, "--approver names the process to ask, which only --session does");
         }
 
         return VaultSession.OpenThen(
@@ -117,17 +150,100 @@ internal static class RunCommand
     private static (int Exit, EnvResolved? Loaded) Load(
         Vault vault,
         string project,
+        CliContext context) =>
+        Admit(EnvResolution.Resolve(vault, project, TimeProvider.System), project, refusal: null, context);
+
+    /// <summary>Asks the process holding the vault for the set, and starts the child only with what it released.</summary>
+    /// <remarks>Every way of not getting the set ends here with a reason and no child; none of them opens the vault.</remarks>
+    private static int FromSession(
+        string vaultPath,
+        string? approver,
+        string project,
+        IReadOnlyList<string> command,
         CliContext context)
     {
-        var resolved = EnvResolution.Resolve(vault, project, TimeProvider.System);
+        string pipe;
 
+        try
+        {
+            var home = KeypasteHome.Resolve(context.Environment.Get(KeypasteHome.EnvironmentVariable));
+            pipe = ApproverEndpoint.Resolve(
+                approver,
+                context.Environment.Get(ApproverEndpoint.EnvironmentVariable),
+                VaultIdentity.Of(home, vaultPath))!;
+        }
+        catch (ArgumentException ex)
+        {
+            return Fail(context, $"--{ApproverOption}: {ex.Message}");
+        }
+
+        var (reply, refusal) = AskAsync(pipe, vaultPath, project, command, context).GetAwaiter().GetResult();
+
+        if (reply is null)
+        {
+            context.Stderr.WriteLine($"keypaste run: {Shown(refusal)}, so nothing was started");
+            return CliApp.ExitInternalError;
+        }
+
+        var (exit, resolved) = Admit(reply.Set, project, reply.Reason, context);
+
+        return resolved is null ? exit : Start(command, resolved, context);
+    }
+
+    private static async Task<(EnvReply? Reply, string Refusal)> AskAsync(
+        string pipe,
+        string vaultPath,
+        string project,
+        IReadOnlyList<string> command,
+        CliContext context)
+    {
+        using var bound = new CancellationTokenSource(_answerBound);
+
+        await using var client = await ApproverClient.TryConnectAsync(pipe, TimeSpan.FromMilliseconds(500), bound.Token);
+
+        if (client is null)
+        {
+            return (null, $"nothing holds {vaultPath} unlocked; unlock it in the keypaste app or start `keypaste agent`");
+        }
+
+        var attached = await client.AttachAsync(new AttachRequest(vaultPath), bound.Token);
+
+        if (attached is not { Attached: true, Session: { } session })
+        {
+            return (null, attached?.Reason ?? "the keypaste process holding the vault did not answer");
+        }
+
+        context.Stderr.WriteLine(
+            $"keypaste run: asking the keypaste process holding {vaultPath} to release '{project}'; answer in its prompt");
+        context.Stderr.Flush();
+
+        var reply = await client.ReleaseEnvAsync(
+            new EnvRequest(project, command, Environment.CurrentDirectory) { Vault = vaultPath, Session = session },
+            bound.Token);
+
+        return (reply, bound.IsCancellationRequested
+            ? "no answer came in time"
+            : "the keypaste process holding the vault did not answer");
+    }
+
+    /// <summary>What a resolved set comes to: the set to start with, or the exit code and a reason on stderr.</summary>
+    /// <param name="resolved">The set, however it was resolved.</param>
+    /// <param name="project">The project asked for.</param>
+    /// <param name="refusal">The owner's words for a refusal, when an owner resolved it.</param>
+    /// <param name="context">Where the reason goes.</param>
+    private static (int Exit, EnvResolved? Loaded) Admit(
+        EnvResolved resolved,
+        string project,
+        string? refusal,
+        CliContext context)
+    {
         switch (resolved.Outcome)
         {
             case EnvOutcome.Resolved:
                 break;
 
             case EnvOutcome.NoProject:
-                context.Stderr.WriteLine($"keypaste run: {resolved.Refusal}");
+                context.Stderr.WriteLine($"keypaste run: {(refusal is null ? resolved.Refusal : Shown(resolved.Refusal))}");
                 return (CliApp.ExitNotFound, null);
 
             case EnvOutcome.Unusable:
@@ -144,7 +260,9 @@ internal static class RunCommand
                 return (CliApp.ExitInternalError, null);
 
             default:
-                context.Stderr.WriteLine($"keypaste run: {resolved.Refusal}");
+                context.Stderr.WriteLine(refusal is { Length: > 0 }
+                    ? $"keypaste run: {Shown(refusal)}, so nothing was started"
+                    : $"keypaste run: {resolved.Refusal}");
                 return (CliApp.ExitInternalError, null);
         }
 
@@ -198,6 +316,9 @@ internal static class RunCommand
         }
     }
 
+    /// <summary>Another process's words, made safe for this terminal.</summary>
+    private static string Shown(string text) => EntryNameSanitizer.SanitizeProse(text, 512).Text;
+
     private static int Fail(CliContext context, string message)
     {
         context.Stderr.WriteLine($"keypaste run: {message}");
@@ -206,10 +327,15 @@ internal static class RunCommand
 
     internal static void WriteUsage(TextWriter writer)
     {
-        writer.WriteLine("usage: keypaste run <project> -- <command> [args...]");
+        writer.WriteLine("usage: keypaste run [--vault <path>] [--keyfile <path>] <project> -- <command> [args...]");
+        writer.WriteLine("       keypaste run --session [--vault <path>] [--approver <name>] <project> -- <command> [args...]");
         writer.WriteLine();
         writer.WriteLine("runs a command with the project's variables in its environment. nothing is");
         writer.WriteLine("written to disk, and the vault is closed before the command starts.");
+        writer.WriteLine();
+        writer.WriteLine("with --session, no password is asked for here: the keypaste app or `keypaste agent`");
+        writer.WriteLine("holding the vault unlocked shows you the project, its variable names, the command");
+        writer.WriteLine("and this directory, and the command starts only if you approve it there.");
         writer.WriteLine();
         writer.WriteLine("the -- is required: without it, 'keypaste run dev npm start' cannot be told");
         writer.WriteLine("apart from a project called 'npm'. everything after it belongs to the command.");

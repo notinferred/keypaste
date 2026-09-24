@@ -27,4 +27,12 @@ public interface IApprovalChannel
     /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
     /// <returns>What the human said, or why they were not asked.</returns>
     ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken);
+
+    /// <summary>Shows a request for a project's env set to a human and waits for their answer.</summary>
+    /// <param name="prompt">What to show. Already sanitized; render it as inert text.</param>
+    /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
+    /// <returns>What the human said, or why they were not asked.</returns>
+    /// <remarks>A channel that cannot show this has asked nobody, which is a no.</remarks>
+    ValueTask<ApprovalAnswer> AskAsync(EnvReleasePrompt prompt, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(ApprovalAnswer.NoChannel);
 }

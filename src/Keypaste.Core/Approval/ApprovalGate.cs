@@ -62,7 +62,7 @@ public sealed class ApprovalGate : IDisposable
 
     /// <summary>The request a person is being asked about now, or null when nobody is being asked.</summary>
     public WaitingRequest? Waiting =>
-        _asking is { } asking ? new WaitingRequest(asking.Prompt, asking.Window.Remaining(_clock)) : null;
+        _asking is { Prompt: { } prompt } asking ? new WaitingRequest(prompt, asking.Window.Remaining(_clock)) : null;
 
     /// <summary>Asks a human, and answers for them when they cannot be asked.</summary>
     /// <param name="cooldownKey">
@@ -73,13 +73,44 @@ public sealed class ApprovalGate : IDisposable
     /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
     /// <returns>The answer, which is a denial unless it is <see cref="ApprovalAnswer.Approved"/>.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="cooldownKey"/> or <paramref name="prompt"/> is null.</exception>
-    public async ValueTask<ApprovalAnswer> AskAsync(
+    public ValueTask<ApprovalAnswer> AskAsync(
         string cooldownKey,
         ApprovalPrompt prompt,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(cooldownKey);
         ArgumentNullException.ThrowIfNull(prompt);
+
+        return AskThroughAsync(cooldownKey, prompt, token => _channel.AskAsync(prompt, token), cancellationToken);
+    }
+
+    /// <summary>Asks a human about a project's env set, under the same window, slot and cooldown.</summary>
+    /// <param name="cooldownKey">What counts as "the same request" after a refusal.</param>
+    /// <param name="prompt">What the human is shown.</param>
+    /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
+    /// <returns>The answer, which is a denial unless it is <see cref="ApprovalAnswer.Approved"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="cooldownKey"/> or <paramref name="prompt"/> is null.</exception>
+    /// <remarks>
+    /// One slot for both kinds, so an env prompt and an agent's prompt are never on screen together
+    /// (THREATS.md T-11). <see cref="Waiting"/> lists only an agent's request.
+    /// </remarks>
+    public ValueTask<ApprovalAnswer> AskAsync(
+        string cooldownKey,
+        EnvReleasePrompt prompt,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(cooldownKey);
+        ArgumentNullException.ThrowIfNull(prompt);
+
+        return AskThroughAsync(cooldownKey, null, token => _channel.AskAsync(prompt, token), cancellationToken);
+    }
+
+    private async ValueTask<ApprovalAnswer> AskThroughAsync(
+        string cooldownKey,
+        ApprovalPrompt? listed,
+        Func<CancellationToken, ValueTask<ApprovalAnswer>> ask,
+        CancellationToken cancellationToken)
+    {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         if (cancellationToken.IsCancellationRequested)
@@ -101,9 +132,9 @@ public sealed class ApprovalGate : IDisposable
 
         try
         {
-            _asking = new Asking(prompt, Deadline.Starting(_clock, Limits.Window));
+            _asking = new Asking(listed, Deadline.Starting(_clock, Limits.Window));
 
-            var answer = await AskOnceAsync(prompt, cancellationToken).ConfigureAwait(false);
+            var answer = await AskOnceAsync(ask, cancellationToken).ConfigureAwait(false);
 
             if (answer == ApprovalAnswer.Denied)
             {
@@ -120,7 +151,7 @@ public sealed class ApprovalGate : IDisposable
     }
 
     private async ValueTask<ApprovalAnswer> AskOnceAsync(
-        ApprovalPrompt prompt,
+        Func<CancellationToken, ValueTask<ApprovalAnswer>> ask,
         CancellationToken cancellationToken)
     {
         using var withdraw = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -132,7 +163,7 @@ public sealed class ApprovalGate : IDisposable
             // Separately from SettleAsync, because a channel can throw before it ever returns a
             // task — a missing dialog binary is exactly that shape — and an exception thrown
             // synchronously here would leave the gate entirely rather than becoming a denial.
-            asking = _channel.AskAsync(prompt, withdraw.Token).AsTask();
+            asking = ask(withdraw.Token).AsTask();
         }
         catch (OperationCanceledException)
         {
@@ -196,7 +227,7 @@ public sealed class ApprovalGate : IDisposable
     /// Public so the approver can consult it <em>before</em> evaluating the policy, which is what
     /// makes "a person's explicit no outranks a rule; a rule never resurrects it" a property of the
     /// ordering rather than an accident of how the branches happen to fall today (DECISIONS.md
-    /// D-0029). <see cref="AskAsync"/> keeps its own check, so removing this one narrows nothing.
+    /// D-0029). <see cref="AskAsync(string, ApprovalPrompt, CancellationToken)"/> keeps its own check, so removing this one narrows nothing.
     /// </remarks>
     public bool IsInCooldown(string cooldownKey)
     {
@@ -243,5 +274,5 @@ public sealed class ApprovalGate : IDisposable
         _oneAtATime.Dispose();
     }
 
-    private sealed record Asking(ApprovalPrompt Prompt, Deadline Window);
+    private sealed record Asking(ApprovalPrompt? Prompt, Deadline Window);
 }

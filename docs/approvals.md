@@ -106,6 +106,10 @@ The app does not read `policy.toml`: every release from the app needs a press of
 
 Agent Activity lists the request in front of you and the grants in force, each with the client, its label, the entry, the field and the seconds left, and counts them down. Revoke ends one grant and Revoke all ends every one, so the next request for them opens the prompt again; a revoke is not recorded in the audit log. Below the lists is this session's history: the audit records naming the app's current session, as `keypaste log` prints them. It says when the log is missing or cannot be read rather than showing an empty history, and the Log screen shows the whole file.
 
+## Runs that ask for a project's variables
+
+In source, `keypaste run --session <project> -- <command>` asks the process holding the vault for the project's whole set instead of opening the vault itself ([replace-dotenv](replace-dotenv.md#run-your-app)). The app shows it in a prompt window of its own and `keypaste agent` in its terminal, naming the project, the variable names, the command and the directory the run was started in, never a value. Approve, or `y` at the agent, starts the command with the set; the same rules as a credential request apply otherwise: Approve works after a second, Deny, Escape, closing, `n`, a lock and 45 seconds without an answer refuse, one prompt is shown at a time, and refusing a run refuses the same project, command and directory for a minute. The command shown is what the run says it will start, and a program running as you could claim one and start another, so approve only a run you started ([THREATS.md](../THREATS.md) T-30). No standing rule releases a set, and a run's release is not written to the audit log.
+
 ## When no agent is running
 
 Everything is denied, and the agent is told exactly how to fix it:

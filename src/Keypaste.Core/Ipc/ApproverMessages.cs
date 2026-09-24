@@ -16,6 +16,9 @@ public enum ApproverMessageKind
 
     /// <summary>Binds a connection to the session holding a named vault.</summary>
     Attach = 3,
+
+    /// <summary>A project's env set for <c>keypaste run --session</c>, subject to a human saying yes.</summary>
+    Env = 4,
 }
 
 /// <summary>Asks the owner of a vault to attach this connection to its current session.</summary>
@@ -194,4 +197,34 @@ public sealed record CredentialReply
     /// <returns>The decision and method, and never the value.</returns>
     public override string ToString() =>
         $"CredentialReply {{ Decision = {Decision}, Method = {Method}, Value = {(Value is null ? "none" : "<redacted>")} }}";
+}
+
+/// <summary>
+/// Asks the owner to release a project's env set to a runner, which starts the command with it.
+/// </summary>
+/// <remarks>
+/// The command and directory are what the person is shown; the owner runs nothing. They are the
+/// runner's claim, and a program running as the same user could claim one command and run another
+/// (THREATS.md T-30).
+/// </remarks>
+/// <param name="Project">The project whose set is asked for.</param>
+/// <param name="Command">The command the runner will start, one argument per item.</param>
+/// <param name="Directory">The directory it will start in.</param>
+public sealed record EnvRequest(string Project, IReadOnlyList<string> Command, string Directory)
+{
+    /// <summary>The vault this connection attached to.</summary>
+    public string Vault { get; init; } = string.Empty;
+
+    /// <summary>The session this connection attached to.</summary>
+    public string Session { get; init; } = string.Empty;
+}
+
+/// <summary>The owner's answer to an <see cref="EnvRequest"/>: the whole set, or why none of it.</summary>
+/// <param name="Set">The set, with its values only when its outcome is <see cref="EnvOutcome.Resolved"/>.</param>
+/// <param name="Reason">keypaste's own words for a refusal, or empty.</param>
+public sealed record EnvReply(EnvResolved Set, string Reason)
+{
+    /// <summary>A description with every value left out.</summary>
+    /// <returns>The outcome, and never a value.</returns>
+    public override string ToString() => $"EnvReply {{ Outcome = {Set.Outcome}, Variables = {Set.Variables.Count} }}";
 }

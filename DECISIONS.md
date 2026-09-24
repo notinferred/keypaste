@@ -6,6 +6,7 @@
 
 | id | date | decision | supersedes |
 |---|---|---|---|
+| D-0341 | 2026-09-24 | `keypaste run --session` gets a set only from the process holding the vault, through the endpoint's `env` message under that owner's current session and gate, after a prompt naming the project, variable names, command and directory; it never opens the vault or reads a password, even as a fallback | `keypaste run` always unlocking on its own |
 | D-0340 | 2026-09-24 | The app launches a project only through `EnvLaunch` into the platform's terminal (`%ComSpec% /s /k` on Windows; the first of `x-terminal-emulator`, `gnome-terminal`, `konsole`, `xterm` on Linux, the command as `$1` of a fixed `sh -c` script; none on macOS), after a confirmation that is the session resolver's, and never captures what the child prints | Env Sets only copying `keypaste run` |
 | D-0339 | 2026-09-24 | A project's directory and command live on the machine in `~/.keypaste/projects.json`, keyed by full vault path and project, with no field for a value and never in the vault; an unreadable file is never replaced | — |
 | D-0337 | 2026-09-24 | An env set leaves the vault only through `EnvResolution`, whole or not at all: an untitled, unexportable, duplicate or case-colliding name or an expiry at or before now refuses it, naming each entry without its value; a recycled entry is outside the set (D-0248); a session release reads again after confirmation and commits under its lifetime | `run` checking names only and skipping untitled entries |

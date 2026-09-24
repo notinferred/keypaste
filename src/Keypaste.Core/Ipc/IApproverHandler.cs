@@ -6,9 +6,10 @@ namespace Keypaste.Core.Ipc;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The two methods stay two methods, and that is DECISIONS.md D-0022's separation surviving the
+/// Listing and releasing stay separate methods, and that is DECISIONS.md D-0022's separation surviving the
 /// move onto a socket. Listing yields <see cref="EntryName"/>, which has nowhere to put a secret;
-/// releasing yields a <see cref="CredentialReply"/>, which is the only type here that has. Collapsing
+/// releasing yields a <see cref="CredentialReply"/>, or an <see cref="EnvReply"/> for a runner, the
+/// only types here that have. Collapsing
 /// them into one "handle a request" method would give the listing path a way to return a credential,
 /// which is the single change most likely to turn <c>list_entry_names</c> into an exfiltration tool.
 /// </para>
@@ -41,6 +42,13 @@ public interface IApproverHandler
     /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
     /// <returns>The decision, and the field value on the one path that has one.</returns>
     ValueTask<CredentialReply> RequestAsync(CredentialRequest request, string connectionId, CancellationToken cancellationToken);
+
+    /// <summary>Decides one request for a project's env set, asking a human before any of it leaves.</summary>
+    /// <param name="request">The project, and the command and directory the runner will start it in.</param>
+    /// <param name="connectionId">Who is asking.</param>
+    /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
+    /// <returns>The whole set, or why none of it was released.</returns>
+    ValueTask<EnvReply> ReleaseEnvAsync(EnvRequest request, string connectionId, CancellationToken cancellationToken);
 
     /// <summary>Tells the handler a connection has gone, so its grants can go with it.</summary>
     /// <param name="connectionId">The connection that ended.</param>

@@ -250,6 +250,9 @@ public sealed class OwnerDenialTests : IDisposable
             return inner.RequestAsync(request, connectionId, cancellationToken);
         }
 
+        public ValueTask<EnvReply> ReleaseEnvAsync(EnvRequest request, string connectionId, CancellationToken cancellationToken) =>
+            inner.ReleaseEnvAsync(request, connectionId, cancellationToken);
+
         public void Disconnected(string connectionId) => inner.Disconnected(connectionId);
     }
 }

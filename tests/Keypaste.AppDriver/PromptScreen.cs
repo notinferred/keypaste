@@ -24,7 +24,7 @@ internal sealed class PromptScreen : IDisposable
     private readonly HeadlessUnitTestSession _display = HeadlessUnitTestSession.StartNew(typeof(PromptScreen));
     private readonly TaskCompletionSource _closing = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly Task _running;
-    private ApprovalWindow? _open;
+    private Window? _open;
 
     // The display runs its dispatcher only inside a dispatch, so one stays open for the screen's
     // life: that is the main loop the app's own posts, from the threads a request arrives on, run in.
@@ -89,14 +89,16 @@ internal sealed class PromptScreen : IDisposable
                 }
             });
 
-    private void OnShown(object? sender, ApprovalWindow window)
+    private void OnShown(object? sender, Window window)
     {
         _open = window;
         window.CaptureRenderedFrame();
 
-        Console.Out.WriteLine(
-            $"prompt client={Text(window, "ClientText")} label={Text(window, "LabelText")} " +
-            $"entry={Text(window, "EntryText")} field={Text(window, "FieldText")} for={Text(window, "LifetimeText")}");
+        Console.Out.WriteLine(window is EnvApprovalWindow
+            ? $"env-prompt project={Text(window, "ProjectText")} command={Text(window, "CommandText")} " +
+                $"directory={Text(window, "DirectoryText")} keys={Text(window, "KeysText")?.ReplaceLineEndings(",")}"
+            : $"prompt client={Text(window, "ClientText")} label={Text(window, "LabelText")} " +
+                $"entry={Text(window, "EntryText")} field={Text(window, "FieldText")} for={Text(window, "LifetimeText")}");
 
         window.Closed += (_, _) =>
         {

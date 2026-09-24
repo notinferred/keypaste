@@ -156,7 +156,11 @@ internal static class AgentCommand
             new PolicyGate(policy.Rules, TimeProvider.System),
             line => context.Stderr.WriteLine($"keypaste: {line}"));
 
-        var authority = new SessionAuthority(claim.Vault, () => lifetime, handler);
+        var authority = new SessionAuthority(
+            claim.Vault,
+            () => lifetime,
+            handler,
+            new SessionEnvironments(gate, asked => ReferenceEquals(asked, lifetime) && asked.IsLive ? vault : null, TimeProvider.System));
 
         ApproverListener? listener = null;
 

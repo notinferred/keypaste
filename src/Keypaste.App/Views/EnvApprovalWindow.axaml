@@ -1,0 +1,92 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Keypaste.App.ViewModels"
+        x:Class="Keypaste.App.Views.EnvApprovalWindow"
+        x:DataType="vm:EnvApprovalViewModel"
+        Title="keypaste: a run is asking for a project's variables"
+        Width="560" Height="620"
+        MinWidth="560" MaxWidth="560" MinHeight="620" MaxHeight="620"
+        CanResize="False"
+        SizeToContent="Manual"
+        Topmost="True"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource KpSurface0}">
+
+  <!-- Fixed rows, as in ApprovalWindow: the command, directory and names are what the runner sent,
+       so each sits in a box of its own that wraps and scrolls and none of them can move the question
+       or the buttons (THREATS.md T-2, T-30). Nothing is trimmed, so no part of a command is hidden
+       past an edge. No button is the default: Enter approves nothing, and Escape denies. -->
+
+  <Grid RowDefinitions="36,30,24,84,24,52,24,*,24,40,56" Margin="24">
+
+    <TextBlock Grid.Row="0"
+               Text="A run is asking for a project's variables"
+               FontSize="18"
+               Foreground="{DynamicResource KpTextPrimary}" />
+
+    <Grid Grid.Row="1" ColumnDefinitions="110,*">
+      <TextBlock Grid.Column="0" Text="Project" Foreground="{DynamicResource KpTextMuted}" />
+      <TextBlock Grid.Column="1" Name="ProjectText" Text="{Binding Project}" TextTrimming="CharacterEllipsis"
+                 FontFamily="{DynamicResource KpMono}"
+                 Foreground="{DynamicResource KpTextPrimary}" />
+    </Grid>
+
+    <TextBlock Grid.Row="2" Text="Command it will start" Foreground="{DynamicResource KpTextMuted}" />
+    <Border Grid.Row="3" Theme="{StaticResource KpCard}">
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="10">
+        <TextBlock Name="CommandText" Text="{Binding Command}" TextWrapping="Wrap"
+                   FontFamily="{DynamicResource KpMono}"
+                   Foreground="{DynamicResource KpTextPrimary}" />
+      </ScrollViewer>
+    </Border>
+
+    <TextBlock Grid.Row="4" Text="In directory" Foreground="{DynamicResource KpTextMuted}" />
+    <Border Grid.Row="5" Theme="{StaticResource KpCard}">
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="10">
+        <TextBlock Name="DirectoryText" Text="{Binding Directory}" TextWrapping="Wrap"
+                   FontFamily="{DynamicResource KpMono}"
+                   Foreground="{DynamicResource KpTextPrimary}" />
+      </ScrollViewer>
+    </Border>
+
+    <TextBlock Grid.Row="6" Text="Variables it will receive (names only)" Foreground="{DynamicResource KpTextMuted}" />
+    <Border Grid.Row="7" Theme="{StaticResource KpCard}">
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="10">
+        <TextBlock Name="KeysText" Text="{Binding Keys}" TextWrapping="Wrap"
+                   FontFamily="{DynamicResource KpMono}"
+                   Foreground="{DynamicResource KpTextSecondary}" />
+      </ScrollViewer>
+    </Border>
+
+    <TextBlock Grid.Row="8"
+               Name="ScrubbedText"
+               Text="{Binding Scrubbed}"
+               TextWrapping="Wrap"
+               FontSize="12"
+               Foreground="{DynamicResource KpTextSecondary}" />
+
+    <TextBlock Grid.Row="9"
+               Text="The command is what the run says it will start. Approve only a run you started: every value goes into its environment."
+               TextWrapping="Wrap"
+               FontSize="12"
+               Foreground="{DynamicResource KpTextMuted}" />
+
+    <StackPanel Grid.Row="10"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Bottom"
+                Spacing="8">
+      <Button Name="Deny"
+              Content="Deny"
+              Width="110"
+              IsCancel="True"
+              Command="{Binding DenyCommand}" />
+      <Button Name="Approve"
+              Content="Approve"
+              Width="110"
+              Command="{Binding ApproveCommand}" />
+    </StackPanel>
+
+  </Grid>
+
+</Window>
