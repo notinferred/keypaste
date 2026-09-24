@@ -5,6 +5,7 @@ using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Clients;
 using Keypaste.Core.Ipc;
 
 namespace Keypaste.AppDriver;
@@ -61,7 +62,8 @@ internal static class Program
         "       hold <vault> [--locked] [--held-prompt | --approving-prompt]\n" +
         "            (then per line of standard input: lock, unlock, edit <entry-path>, delete <entry-path>,\n" +
         "             relocate <entry-path> <destination-group-path> <new-title>, and with the app's own\n" +
-        "             prompt: approve, deny, close)\n" +
+        "             prompt: approve, deny, close; connect <client> [label=<l>] [expose=<g,g>],\n" +
+        "             connect-remove <client>, confirm, cancel, check, pick <n>)\n" +
         "KEYPASTE_HOME must be set. KEYPASTE_DRIVER_PASSWORD is the password typed (empty for none),\n" +
         "KEYPASTE_DRIVER_KEYFILE the keyfile chosen, KEYPASTE_DRIVER_NEW_PASSWORD a new password or entry password.";
 
@@ -459,6 +461,7 @@ internal sealed class Driver(string home)
             prompt);
 #pragma warning restore CA2000
         var session = authority.Session;
+        using var connect = new ConnectScreen(this, authority);
 
         if (startLocked)
         {
@@ -474,6 +477,7 @@ internal sealed class Driver(string home)
             switch (command.Split(' ', StringSplitOptions.RemoveEmptyEntries))
             {
                 case ["lock"]:
+                    connect.Close();
                     session.Lock(VaultLockReason.Manual);
                     Console.Out.WriteLine("locked");
                     Report(authority);
@@ -507,6 +511,30 @@ internal sealed class Driver(string home)
                     Revoke(authority, which);
                     break;
 
+                case ["connect", var client, .. var rest]:
+                    await connect.PreviewConnectAsync(client, rest).ConfigureAwait(true);
+                    break;
+
+                case ["connect-remove", var client]:
+                    await connect.PreviewRemoveAsync(client).ConfigureAwait(true);
+                    break;
+
+                case ["confirm"]:
+                    await connect.ConfirmAsync().ConfigureAwait(true);
+                    break;
+
+                case ["cancel"]:
+                    connect.Cancel();
+                    break;
+
+                case ["check"]:
+                    connect.Check();
+                    break;
+
+                case ["pick", var which]:
+                    connect.Pick(which);
+                    break;
+
                 case [("approve" or "deny" or "close") and var answer]:
                     await (screen ?? throw new DriverException("hold answers a prompt only with the app's own"))
                         .AnswerAsync(answer).ConfigureAwait(true);
@@ -518,6 +546,7 @@ internal sealed class Driver(string home)
         }
 
         // Standard input closing is quitting, as the app quits.
+        connect.Close();
         authority.Dispose();
         Console.Out.WriteLine("shut down");
         Report(authority);
@@ -579,6 +608,162 @@ internal sealed class Driver(string home)
     // Its ticks are posted nowhere: each command reads once, and a timer thread must not rewrite
     // the lists while they are printed.
     private AgentActivityViewModel OpenActivity(AppAuthority authority) => new(authority, home, TimeProvider.System, _ => { });
+
+    /// <summary>
+    /// Agent Activity's Connect section, kept open across lines as the screen stays open, and closed
+    /// by a lock as the shell closes it.
+    /// </summary>
+    /// <remarks>
+    /// It uses the programs the app would: each client's own command on PATH, and the
+    /// <c>keypaste-mcp</c> the app finds. What the section says is printed as it changes, so the check
+    /// can be started on one line and its prompt answered on the next.
+    /// </remarks>
+    private sealed class ConnectScreen(Driver driver, AppAuthority authority) : IDisposable
+    {
+        private AgentActivityViewModel? _screen;
+
+        private ConnectClientViewModel Model
+        {
+            get
+            {
+                if (_screen is null)
+                {
+                    _screen = driver.OpenActivity(authority);
+                    _screen.Connect!.PropertyChanged += (_, changed) => Print(changed.PropertyName);
+                }
+
+                return _screen.Connect!;
+            }
+        }
+
+        internal async Task PreviewConnectAsync(string client, string[] rest)
+        {
+            var model = Model;
+            model.SelectedClient = McpClientCatalog.Find(client) ?? throw new DriverException($"no client called {client}");
+
+            foreach (var option in rest)
+            {
+                switch (option.Split('=', 2))
+                {
+                    case ["label", var label]:
+                        model.Label = label;
+                        break;
+                    case ["expose", var globs]:
+                        model.Exposure = globs;
+                        break;
+                    default:
+                        throw new DriverException($"connect does not understand '{option}'");
+                }
+            }
+
+            await PressAsync(model.PreviewConnectCommand, "Preview connect").ConfigureAwait(true);
+            Shown(model);
+        }
+
+        internal async Task PreviewRemoveAsync(string client)
+        {
+            var model = Model;
+            model.SelectedClient = McpClientCatalog.Find(client) ?? throw new DriverException($"no client called {client}");
+
+            await PressAsync(model.PreviewRemoveCommand, "Preview remove").ConfigureAwait(true);
+            Shown(model);
+        }
+
+        internal async Task ConfirmAsync()
+        {
+            await PressAsync(Model.ConfirmCommand, "Run it").ConfigureAwait(true);
+            Console.Out.WriteLine($"message {Model.Message}");
+        }
+
+        internal void Cancel()
+        {
+            Press(Model.CancelCommand, "Cancel");
+            Console.Out.WriteLine($"message {Model.Message}");
+        }
+
+        /// <summary>Starts the check and returns; what it says arrives as it goes, ending with <c>check end</c>.</summary>
+        internal void Check() => Run(Model.CheckCommand, "Check the connection");
+
+        internal void Pick(string which)
+        {
+            var model = Model;
+            var index = int.Parse(which, CultureInfo.InvariantCulture) - 1;
+            model.SelectedCheckEntry = index >= 0 && index < model.CheckEntries.Count
+                ? model.CheckEntries[index]
+                : throw new DriverException($"the check lists no entry {which}");
+
+            Run(model.AskCommand, "Ask for it");
+        }
+
+        /// <summary>Closes the screen, as a lock or quitting does.</summary>
+        internal void Close()
+        {
+            _screen?.Dispose();
+            _screen = null;
+        }
+
+        public void Dispose() => Close();
+
+        private static void Run(AsyncRelayCommand command, string button)
+        {
+            if (!command.CanExecute(null))
+            {
+                throw new DriverException($"the {button} button is disabled");
+            }
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await command.ExecuteAsync().ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    Console.Out.WriteLine($"check threw {ex.GetType().Name}: {ex.Message}");
+                }
+
+                Console.Out.WriteLine("check end");
+            });
+        }
+
+        private void Print(string? property)
+        {
+            var model = _screen?.Connect;
+            if (model is null)
+            {
+                return;
+            }
+
+            switch (property)
+            {
+                case nameof(ConnectClientViewModel.CheckMessage) when model.HasCheckMessage:
+                    Console.Out.WriteLine($"check {model.CheckMessage}");
+                    break;
+                case nameof(ConnectClientViewModel.IsPicking) when model.IsPicking:
+                    foreach (var (entry, i) in model.CheckEntries.Select((entry, i) => (entry, i)))
+                    {
+                        Console.Out.WriteLine($"check-entry n={i + 1} {entry.Name}");
+                    }
+
+                    break;
+            }
+        }
+
+        private static void Shown(ConnectClientViewModel model)
+        {
+            foreach (var line in model.Preview.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            {
+                Console.Out.WriteLine($"preview {line}");
+            }
+
+            if (model.HasMessage)
+            {
+                Console.Out.WriteLine($"message {model.Message}");
+            }
+
+            Console.Out.WriteLine("preview end");
+        }
+    }
 
     private static string Describe(ActivityRow row) =>
         $"client={row.Client} label={row.Label} entry={row.Entry} field={row.Field} left={row.Left}";

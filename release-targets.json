@@ -122,10 +122,12 @@
     },
     "app": {
       "binaries": [
-        "keypaste-app"
+        "keypaste-app",
+        "keypaste-mcp"
       ],
       "projects": [
-        "src/Keypaste.App/Keypaste.App.csproj"
+        "src/Keypaste.App/Keypaste.App.csproj",
+        "src/Keypaste.Mcp/Keypaste.Mcp.csproj"
       ],
       "runtime_identifiers": [
         "linux-x64",

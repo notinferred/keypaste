@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Keypaste.FakeMcpClient</RootNamespace>
+    <!-- Named as Claude Code's command, because the catalogue launches `claude`; only
+         verify-connect-client.sh puts its directory on PATH (2.6a). -->
+    <AssemblyName>claude</AssemblyName>
+
+    <!-- Not a test project: a stand-in client the desktop's Connect registers with, so no gate ever
+         writes a real client's configuration. -->
+    <IsTestProject>false</IsTestProject>
+  </PropertyGroup>
+
+</Project>

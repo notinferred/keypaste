@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Keypaste.Core.Clients;
 
 /// <summary>How keypaste gets itself registered with one MCP client.</summary>
@@ -78,10 +80,18 @@ public sealed record McpClient(
     internal const string ClaudeCodeId = "claude-code";
 }
 
+/// <summary>How a client starts the bridge: an executable and any arguments that come before ours.</summary>
+/// <param name="Path">Absolute path to <c>keypaste-mcp</c>, or to the AppImage that carries it.</param>
+/// <param name="Arguments">
+/// What selects the bridge inside that file: <c>mcp</c> for an AppImage, whose <c>AppRun</c>
+/// dispatches on it, and nothing for the bridge itself.
+/// </param>
+public sealed record McpServerCommand(string Path, IReadOnlyList<string> Arguments);
+
 /// <summary>
 /// What keypaste asks a client to launch: the bridge, and the flags that bound it.
 /// </summary>
-/// <param name="ServerPath">Absolute path to <c>keypaste-mcp</c>.</param>
+/// <param name="Server">How to start <c>keypaste-mcp</c>.</param>
 /// <param name="VaultPath">Absolute path to the vault. Absolute always — a client's working directory is not ours.</param>
 /// <param name="ClientLabel">What this client is called in the audit log.</param>
 /// <param name="Expose">
@@ -90,22 +100,60 @@ public sealed record McpClient(
 /// reader can learn what the default is.
 /// </param>
 public sealed record McpServerRegistration(
-    string ServerPath,
+    McpServerCommand Server,
     string VaultPath,
     string ClientLabel,
     IReadOnlyList<string> Expose)
 {
+    /// <summary>The longest label the audit log keeps as written.</summary>
+    public const int MaximumLabelLength = 64;
+
+    /// <summary>
+    /// Builds a registration the bridge will accept, or says why not before anything is written.
+    /// </summary>
+    /// <remarks>
+    /// The globs go through the bridge's own <see cref="EntryExposure"/> rule, because a client
+    /// configured with one it refuses would fail on every launch, far from the person who typed it.
+    /// A label must survive the audit log's sanitizer unchanged, so the name a person chose is the
+    /// name the log and the prompt show.
+    /// </remarks>
+    public static bool TryCreate(
+        McpServerCommand server,
+        string vaultPath,
+        string clientLabel,
+        IReadOnlyList<string> expose,
+        [NotNullWhen(true)] out McpServerRegistration? registration,
+        out string error)
+    {
+        ArgumentNullException.ThrowIfNull(server);
+        ArgumentException.ThrowIfNullOrEmpty(vaultPath);
+        ArgumentNullException.ThrowIfNull(clientLabel);
+        ArgumentNullException.ThrowIfNull(expose);
+
+        registration = null;
+
+        if (clientLabel.Length == 0 || EntryNameSanitizer.Sanitize(clientLabel, MaximumLabelLength).WasAltered)
+        {
+            error = $"a label is 1 to {MaximumLabelLength} characters the audit log keeps as written: "
+                + "no control, invisible or structural characters";
+            return false;
+        }
+
+        if (expose.Count > 0 && !EntryExposure.TryCreate(expose, out _, out var globError))
+        {
+            error = $"exposure: {globError}";
+            return false;
+        }
+
+        registration = new McpServerRegistration(server, System.IO.Path.GetFullPath(vaultPath), clientLabel, [.. expose]);
+        error = string.Empty;
+        return true;
+    }
+
     /// <summary>The full argv a client should launch, executable first.</summary>
     public IReadOnlyList<string> CommandLine()
     {
-        var line = new List<string>
-        {
-            ServerPath,
-            "--vault",
-            VaultPath,
-            "--client-label",
-            ClientLabel,
-        };
+        List<string> line = [Server.Path, .. Server.Arguments, "--vault", VaultPath, "--client-label", ClientLabel];
 
         foreach (var glob in Expose)
         {
@@ -115,13 +163,36 @@ public sealed record McpServerRegistration(
 
         return line;
     }
+
+    /// <summary>
+    /// The <c>mcpServers</c> entry for a client configured by file, one line per element.
+    /// </summary>
+    /// <remarks>
+    /// Shown for pasting and never written: see <see cref="McpWiring.ConfigFile"/>.
+    /// </remarks>
+    public IReadOnlyList<string> ConfigBlock()
+    {
+        var rest = CommandLine().Skip(1).Select(JsonQuote);
+
+        return
+        [
+            JsonQuote(McpClientCatalog.ServerName) + ": {",
+            "  " + JsonQuote("command") + ": " + JsonQuote(Server.Path) + ",",
+            "  " + JsonQuote("args") + ": [" + string.Join(", ", rest) + "]",
+            "}",
+        ];
+    }
+
+    private static string JsonQuote(string value) =>
+        "\""
+        + value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal)
+        + "\"";
 }
 
 /// <summary>Every client keypaste knows about, and nothing about this machine.</summary>
 /// <remarks>
-/// Pure on purpose: it holds the knowledge, the CLI does the probing and the running. That split
-/// is docs/PRODUCT.md law 4.2, and it is what lets the desktop app's future "Connect to…" button
-/// (step 4.3) reuse this without a second copy of the argument grammar.
+/// Pure on purpose: it holds the knowledge, and <see cref="McpClientSetup"/> does the probing and
+/// the running for both <c>keypaste setup</c> and the desktop's Connect (docs/PRODUCT.md law 4.2).
 /// </remarks>
 public static class McpClientCatalog
 {

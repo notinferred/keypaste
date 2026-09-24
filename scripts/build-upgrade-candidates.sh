@@ -34,6 +34,8 @@ for prefix in "$@"; do
   dotnet publish "$ROOT/src/Keypaste.App/Keypaste.App.csproj" -c Release -r "$rid" --self-contained \
     --no-restore -o "$published" -p:VersionPrefix="$prefix" -p:VersionSuffix="$SUFFIX" >&2
 
+  "$ROOT/scripts/publish-desktop-bridge.sh" "$rid" "$published" -p:VersionPrefix="$prefix" -p:VersionSuffix="$SUFFIX" >&2
+
   binary="$published/keypaste-app"
   [ "$rid" = win-x64 ] && binary="$published/keypaste-app.exe"
   "$binary" --selftest >&2

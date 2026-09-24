@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Keypaste.App.ViewModels"
+             xmlns:clients="using:Keypaste.Core.Clients"
              x:Class="Keypaste.App.Views.AgentActivityView"
              x:DataType="vm:AgentActivityViewModel"
              Background="{DynamicResource KpSurface0}">
@@ -31,6 +32,85 @@
                  TextWrapping="Wrap"
                  FontSize="13"
                  Foreground="{DynamicResource KpTextSecondary}" />
+
+      <!-- The preview is core's McpSetupPlan.Display, and Connect runs that same plan. -->
+      <Panel IsVisible="{Binding Connect, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <StackPanel Spacing="8" DataContext="{Binding Connect}" x:DataType="vm:ConnectClientViewModel">
+        <TextBlock Text="Connect a client" FontSize="16" Foreground="{DynamicResource KpTextPrimary}" />
+        <TextBlock Text="Points an AI client at this vault. It can then list the names its exposure allows and ask for one credential at a time, which you answer here."
+                   TextWrapping="Wrap"
+                   MaxWidth="640"
+                   HorizontalAlignment="Left"
+                   FontSize="13"
+                   Foreground="{DynamicResource KpTextSecondary}" />
+        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" MaxWidth="640" HorizontalAlignment="Left">
+          <TextBlock Grid.Row="0" Grid.Column="0" Text="Client" VerticalAlignment="Center" Margin="0,0,12,8"
+                     Foreground="{DynamicResource KpTextSecondary}" />
+          <ComboBox Grid.Row="0" Grid.Column="1" Margin="0,0,0,8" MinWidth="240"
+                    ItemsSource="{Binding Clients}"
+                    SelectedItem="{Binding SelectedClient}"
+                    AutomationProperties.Name="Client">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="clients:McpClient">
+                <TextBlock Text="{Binding DisplayName}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+          <TextBlock Grid.Row="1" Grid.Column="0" Text="Label" VerticalAlignment="Center" Margin="0,0,12,8"
+                     Foreground="{DynamicResource KpTextSecondary}" />
+          <TextBox Grid.Row="1" Grid.Column="1" Margin="0,0,0,8"
+                   Text="{Binding Label}"
+                   AutomationProperties.Name="Label" />
+          <TextBlock Grid.Row="2" Grid.Column="0" Text="Exposure" VerticalAlignment="Center" Margin="0,0,12,0"
+                     Foreground="{DynamicResource KpTextSecondary}" />
+          <TextBox Grid.Row="2" Grid.Column="1"
+                   Text="{Binding Exposure}"
+                   PlaceholderText="env/** (the default). Separate more patterns with commas."
+                   AutomationProperties.Name="Exposure" />
+        </Grid>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button Content="Preview connect" Command="{Binding PreviewConnectCommand}" />
+          <Button Content="Preview remove" Command="{Binding PreviewRemoveCommand}" />
+        </StackPanel>
+        <StackPanel Spacing="8" IsVisible="{Binding HasPreview}">
+          <Border Background="{DynamicResource KpSurface1}"
+                  BorderBrush="{DynamicResource KpBorderSubtle}"
+                  BorderThickness="1"
+                  CornerRadius="{DynamicResource KpRadiusMd}">
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" Padding="16">
+              <SelectableTextBlock Text="{Binding Preview}"
+                                   FontFamily="{DynamicResource KpMono}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource KpTextPrimary}" />
+            </ScrollViewer>
+          </Border>
+          <TextBlock Text="{Binding PreviewNote}" TextWrapping="Wrap" MaxWidth="640" HorizontalAlignment="Left"
+                     FontSize="13" Foreground="{DynamicResource KpTextSecondary}" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Content="Run it" Command="{Binding ConfirmCommand}" />
+            <Button Content="Cancel" Command="{Binding CancelCommand}" />
+          </StackPanel>
+        </StackPanel>
+        <TextBlock Text="{Binding Message}" IsVisible="{Binding HasMessage}" TextWrapping="Wrap" MaxWidth="640"
+                   HorizontalAlignment="Left" FontSize="13" Foreground="{DynamicResource KpTextPrimary}" />
+        <Button Content="Check the connection" Command="{Binding CheckCommand}" />
+        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsPicking}">
+          <ComboBox ItemsSource="{Binding CheckEntries}"
+                    SelectedItem="{Binding SelectedCheckEntry}"
+                    MinWidth="240"
+                    AutomationProperties.Name="Entry to ask for">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="clients:McpListedEntry">
+                <TextBlock Text="{Binding Name}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+          <Button Content="Ask for it" Command="{Binding AskCommand}" />
+        </StackPanel>
+        <TextBlock Text="{Binding CheckMessage}" IsVisible="{Binding HasCheckMessage}" TextWrapping="Wrap" MaxWidth="640"
+                   HorizontalAlignment="Left" FontSize="13" Foreground="{DynamicResource KpTextPrimary}" />
+      </StackPanel>
+      </Panel>
 
       <StackPanel Spacing="8" IsVisible="{Binding IsAvailable}">
         <TextBlock Text="Waiting for you" FontSize="16" Foreground="{DynamicResource KpTextPrimary}" />

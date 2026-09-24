@@ -1,31 +1,30 @@
 using System.Diagnostics;
-using System.Text;
 
-namespace Keypaste.Cli.Clipboard;
+namespace Keypaste.Core.Processes;
 
 /// <summary>The outcome of running an external tool.</summary>
 /// <param name="ToolFound">Whether the executable existed at all.</param>
 /// <param name="ExitCode">Its exit code, when it ran.</param>
 /// <param name="StandardOutput">Its captured stdout.</param>
 /// <param name="StandardError">Its captured stderr.</param>
-internal readonly record struct ProcessResult(
+public readonly record struct ProcessResult(
     bool ToolFound,
     int ExitCode,
     string StandardOutput,
     string StandardError)
 {
     /// <summary>Whether the tool ran and reported success.</summary>
-    internal bool Succeeded => ToolFound && ExitCode == 0;
+    public bool Succeeded => ToolFound && ExitCode == 0;
 }
 
 /// <summary>
 /// Runs an external tool, writing text to its standard input.
 /// </summary>
 /// <remarks>
-/// A seam so the per-platform clipboard implementations — argument construction, stdin encoding,
-/// the order of closing and waiting — can be unit-tested without spawning <c>clip.exe</c>.
+/// A seam so the CLI's clipboard tools and each MCP client's own registration command can be
+/// unit-tested without spawning <c>clip.exe</c> or a real client.
 /// </remarks>
-internal interface IProcessRunner
+public interface IProcessRunner
 {
     /// <summary>Runs <paramref name="fileName"/> and returns what it did.</summary>
     /// <param name="fileName">Executable path.</param>
@@ -42,7 +41,7 @@ internal interface IProcessRunner
 }
 
 /// <summary>Runs tools as real child processes.</summary>
-internal sealed class SystemProcessRunner : IProcessRunner
+public sealed class SystemProcessRunner : IProcessRunner
 {
     /// <inheritdoc/>
     public ProcessResult Run(

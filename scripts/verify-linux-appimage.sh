@@ -7,9 +7,11 @@
 #   - a desktop entry or AppStream record that drops the full version, the internal and unsigned
 #     label or keypaste as developer, or an AppRun other than the repository's;
 #   - a payload whose files differ from the staged payload, whose binary reports another version
-#     or fails --selftest, or whose binaries do not publish as keypaste.
+#     or fails --selftest, or whose binaries do not publish as keypaste;
+#   - an image whose AppRun does not start the bridge it carries for `mcp`, which is what a client
+#     connected from the app is told to run (2.6a).
 #
-# The image is never executed. The squashfs starts where the runtime's ELF ends, at its section
+# The image itself is never executed. The squashfs starts where the runtime's ELF ends, at its section
 # header table's end, and `unsquashfs -o` reads it from there. Installing it is 4.7b.
 #
 # <version> names the package; <binary-version> is what the payload reports. They differ only on a
@@ -127,6 +129,8 @@ host="$root/usr/bin/keypaste-app"
 "$host" --selftest || die "the unpacked keypaste-app failed --selftest"
 reported="$("$host" --version | tr -d '[:space:]')"
 [ "$reported" = "$binary_version" ] || die "the unpacked binary reports $reported, expected $binary_version"
+[ -x "$root/usr/bin/keypaste-mcp" ] || die "the image carries no keypaste-mcp for a connected client to start"
+case "$("$root/AppRun" mcp --help 2>&1)" in "usage: keypaste-mcp"*) ;; *) die "the image's AppRun does not start keypaste-mcp for mcp" ;; esac
 "$ROOT/scripts/verify-publisher-metadata.sh" "$root/usr/bin"
 
 echo "$(basename "$image"): keypaste $version, internal and unsigned; $(listing "$payload" | wc -l | tr -d ' ') payload files unpack byte-identical at offset $offset and pass --selftest."

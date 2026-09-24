@@ -118,6 +118,7 @@ test_desktop() {
   integration_script scripts/verify-session-lifecycle.sh
   integration_script scripts/verify-desktop-approval.sh
   integration_script scripts/verify-agent-activity.sh
+  integration_script scripts/verify-connect-client.sh
 }
 
 selftests=(
@@ -263,14 +264,14 @@ profile_compat() {
 # Backend tests read workflows, scripts and the release definition, so those paths select backend too.
 profiles_for_path() {
   case "$1" in
-    src/Keypaste.App/*|tests/Keypaste.App.Tests/*|tests/Keypaste.MinimizeObserver/*|tests/Keypaste.AppDriver/*) echo desktop ;;
+    src/Keypaste.App/*|tests/Keypaste.App.Tests/*|tests/Keypaste.MinimizeObserver/*|tests/Keypaste.AppDriver/*|tests/Keypaste.FakeMcpClient/*) echo desktop ;;
     tests/Keypaste.Consistency.Tests/*|keypaste.app.slnx) echo desktop ;;
     src/Keypaste.Cli/Keypaste.Cli.csproj) echo scripts backend integration desktop ;;
     src/*|third_party/*) echo backend integration desktop ;;
     tests/Directory.Build.props) echo backend desktop ;;
     tests/*) echo backend ;;
     keypaste.slnx) echo backend integration ;;
-    scripts/verify-session-authority.sh|scripts/verify-lock-boundary.sh|scripts/verify-current-state.sh|scripts/verify-session-lifecycle.sh|scripts/verify-desktop-approval.sh|scripts/verify-agent-activity.sh) echo scripts desktop ;;
+    scripts/verify-session-authority.sh|scripts/verify-lock-boundary.sh|scripts/verify-current-state.sh|scripts/verify-session-lifecycle.sh|scripts/verify-desktop-approval.sh|scripts/verify-agent-activity.sh|scripts/verify-connect-client.sh) echo scripts desktop ;;
     scripts/*) echo scripts backend integration ;;
     .github/*|release-targets.json) echo scripts backend ;;
     README.md|site/public/index.html|docs/PRODUCT.md) echo scripts integration ;;

@@ -6,6 +6,8 @@
 
 | id | date | decision | supersedes |
 |---|---|---|---|
+| D-0334 | 2026-09-23 | The desktop packages carry the NativeAOT `keypaste-mcp` beside `keypaste-app`, and both package verifiers require it; in an AppImage, whose mount path changes each launch, a client is registered as the image file with `mcp`, which `AppRun` dispatches to the bridge (founder amendment of 2.6a) | Desktop payloads holding the app alone |
+| D-0333 | 2026-09-23 | Connecting an MCP client, from `keypaste setup` or the app, runs only the `McpSetupPlan` core composed and showed, and the app's connection check starts that registration's own command line and asks through it, never keeping a released value | `setup` composing and running client commands in the CLI alone |
 | D-0331 | 2026-09-23 | Agent Activity's history is the audit records naming the app's current session, rendered by `AuditText` with the filter and counts stated; a missing or unreadable log is shown there as unavailable, while the Log screen and `keypaste log` keep treating an absent log as normal | — |
 | D-0330 | 2026-09-23 | Agent Activity reads the waiting request and the grants in force from the session authority (`SessionAuthority.Activity`), never from the prompt window's events, and Revoke ends grants there without starting a cooldown, so the next matching request is asked again | — |
 | D-0327 | 2026-09-23 | While a request is decided, the approver listener reads the connection ahead: a peer that hangs up or sends mid-exchange has its request withdrawn and its connection ended, and a stopping listener still delivers the denials of what it withdrew | Requests that stayed in front of a person after their bridge had gone |

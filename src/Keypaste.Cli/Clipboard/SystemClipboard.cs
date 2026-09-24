@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Keypaste.Cli.Prompting;
+using Keypaste.Core.Processes;
 
 namespace Keypaste.Cli.Clipboard;
 

@@ -6,6 +6,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 All of this is source only: there is still no desktop download, and the published CLI is unchanged. Each entry that names a step links its record, which holds the full account.
 
+Agent Activity can now connect Claude Code or Codex to the vault the desktop has unlocked. It shows the exact commands, with the vault, the label and the exposure, and runs them only when you press Run it. For Cursor and Claude Desktop it shows the block to paste. Check the connection asks once through the bridge the client will start, in the app's own prompt, and Remove takes keypaste out of the client again. The internal desktop packages now include `keypaste-mcp`, and `keypaste setup --dry-run` prints the same commands the app shows, quoting any argument with a space in it ([2.6a](docs/steps/2.6a.md)).
+
 Agent Activity now lists the request waiting in the desktop's prompt and the grants in force, with the client, label, entry, field and time left, and Revoke or Revoke all makes the next request ask again. Below them is this session's audit history, which says when the log is missing or unreadable instead of looking empty ([4.3b](docs/steps/4.3b.md)).
 
 The desktop now asks about an agent's credential request in its own prompt window, showing the client, its label, the entry, the field, the lifetime and the agent's reason, and releases only when you press Approve, which works a second after the window appears. Deny, closing it, the timeout, locking and the client giving up each refuse. At the app and at `keypaste agent`, a request whose client cancels or whose `keypaste-mcp` goes away is now withdrawn at once. The app does not read `policy.toml` ([4.4](docs/steps/4.4.md)).

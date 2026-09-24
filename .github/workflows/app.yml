@@ -11,6 +11,7 @@ on:
       - 'tests/Keypaste.MinimizeObserver/**'
       - 'tests/Keypaste.Consistency.Tests/**'
       - 'tests/Keypaste.AppDriver/**'
+      - 'tests/Keypaste.FakeMcpClient/**'
       - 'scripts/verify-keepassxc-workflows.sh'
       - 'scripts/verify-session-authority.sh'
       - 'scripts/verify-lock-boundary.sh'
@@ -18,6 +19,7 @@ on:
       - 'scripts/verify-session-lifecycle.sh'
       - 'scripts/verify-desktop-approval.sh'
       - 'scripts/verify-agent-activity.sh'
+      - 'scripts/verify-connect-client.sh'
       - 'src/Keypaste.Mcp/**'
       - 'scripts/install-keepassxc-windows.sh'
       - 'src/Keypaste.Cli/**'
@@ -39,6 +41,7 @@ on:
       - 'scripts/build-linux-appimage.sh'
       - 'scripts/verify-linux-appimage.sh'
       - 'scripts/verify-publisher-metadata.sh'
+      - 'scripts/publish-desktop-bridge.sh'
       - 'scripts/sign-windows.sh'
       - 'scripts/verify-windows-signature.sh'
       - 'scripts/rehearse-windows-signing.sh'
@@ -207,6 +210,19 @@ jobs:
           fi
           dotnet publish src/Keypaste.App/Keypaste.App.csproj "${args[@]}"
 
+      - name: Install the native toolchain for the bridge (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang zlib1g-dev
+
+      # A client connected from the app starts this copy, so the package carries it (2.6a).
+      - name: Add the NativeAOT bridge to the payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          suffix='${{ steps.suffix.outputs.suffix }}'
+          # No empty array: macOS bash 3.2 refuses one under set -u.
+          scripts/publish-desktop-bridge.sh '${{ matrix.rid }}' 'artifacts/app/${{ matrix.rid }}' ${suffix:+"-p:VersionSuffix=$suffix"}
+
       - name: Verify the native assets for this RID are there
         shell: bash
         run: |
@@ -288,7 +304,7 @@ jobs:
           out="artifacts/app/${{ matrix.rid }}"
           if [ -n "$REHEARSAL" ]; then
             scripts/sign-windows.sh --component app --rehearsal "$REHEARSAL" "$out"
-            scripts/verify-windows-signature.sh "$REHEARSAL" "$out/keypaste-app.exe" "$out/keypaste-app.dll" "$out/Keypaste.Core.dll" "$out/KeePassLib.dll"
+            scripts/verify-windows-signature.sh "$REHEARSAL" "$out/keypaste-app.exe" "$out/keypaste-app.dll" "$out/Keypaste.Core.dll" "$out/KeePassLib.dll" "$out/keypaste-mcp.exe"
             "$out/keypaste-app.exe" --selftest
           else
             scripts/sign-windows.sh --component app "$out"

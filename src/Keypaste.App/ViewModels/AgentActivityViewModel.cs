@@ -43,9 +43,15 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
     private (string? Session, long Length, DateTime Written)? _historyRead;
     private bool _disposed;
 
-    internal AgentActivityViewModel(AppAuthority? authority, string? home, TimeProvider? clock = null, Action<Action>? post = null)
+    internal AgentActivityViewModel(
+        AppAuthority? authority,
+        string? home,
+        TimeProvider? clock = null,
+        Action<Action>? post = null,
+        ClientConnector? connector = null)
     {
         _authority = authority;
+        Connect = authority is null ? null : new ConnectClientViewModel(authority.Session, connector ?? ClientConnector.ForThisProcess());
         _auditPath = KeypasteHome.AuditPath(home);
         _post = post ?? (run => run());
 
@@ -57,6 +63,9 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
 
         _timer = (clock ?? TimeProvider.System).CreateTimer(_ => _post(Tick), null, _tick, _tick);
     }
+
+    /// <summary>Connecting a client to this vault, and checking the connection.</summary>
+    internal ConnectClientViewModel? Connect { get; }
 
     /// <summary>One true sentence about what agents can do with this vault.</summary>
     internal string Status
@@ -238,5 +247,6 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
 
         _disposed = true;
         _timer.Dispose();
+        Connect?.Dispose();
     }
 }

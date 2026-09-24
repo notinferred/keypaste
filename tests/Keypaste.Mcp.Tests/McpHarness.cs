@@ -106,6 +106,26 @@ internal sealed class McpHarness : IAsyncDisposable
     /// <summary>Starts the server with the given arguments and connects a client to it.</summary>
     internal async Task<McpClient> StartAsync(params string[] argv)
     {
+        var channels = Serve(argv);
+
+        _client = await McpClient.CreateAsync(
+            new StreamClientTransport(channels.ClientWrites, channels.ClientReads),
+            new McpClientOptions
+            {
+                ClientInfo = new Implementation { Name = ClientName, Version = ClientVersion },
+            },
+            loggerFactory: null,
+            CancellationToken.None);
+
+        return _client;
+    }
+
+    /// <summary>
+    /// Starts the server with the given arguments and hands back its streams, for a client other
+    /// than the SDK's to speak over.
+    /// </summary>
+    internal HarnessChannels Serve(params string[] argv)
+    {
         var arguments = argv
             .Concat(["--vault", VaultPath, "--audit-log", AuditPath, "--client-label", ClientLabel])
             .ToArray();
@@ -146,16 +166,7 @@ internal sealed class McpHarness : IAsyncDisposable
         _server = McpServer.Create(_transport, serverOptions, loggerFactory: null, serviceProvider: null);
         _serving = _server.RunAsync();
 
-        _client = await McpClient.CreateAsync(
-            new StreamClientTransport(channels.ClientWrites, channels.ClientReads),
-            new McpClientOptions
-            {
-                ClientInfo = new Implementation { Name = ClientName, Version = ClientVersion },
-            },
-            loggerFactory: null,
-            CancellationToken.None);
-
-        return _client;
+        return channels;
     }
 
     /// <summary>

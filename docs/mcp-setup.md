@@ -12,7 +12,7 @@ Enter the master password and review requests in that terminal. Without the appr
 
 The MCP client starts the bridge, while you start the approver. This keeps software-triggered requests from opening a master-password prompt.
 
-These are the current CLI/MCP instructions. Locking the desktop does not stop a terminal approver holding another vault. In source, the bridge reaches whichever keypaste process holds the vault its `--vault` names: a desktop that has it unlocked answers listings and asks about each credential request in its own prompt window ([approvals](approvals.md#approving-in-the-desktop-app)), and `keypaste agent` on a vault the desktop holds is refused naming the app. A bridge with no `--vault` is refused, and `keypaste setup` always writes one. [STEPS](STEPS.md) covers the rest of the focused target: connecting a client from the app and launching env projects through its session.
+These are the current CLI/MCP instructions. Locking the desktop does not stop a terminal approver holding another vault. In source, the bridge reaches whichever keypaste process holds the vault its `--vault` names: a desktop that has it unlocked answers listings and asks about each credential request in its own prompt window ([approvals](approvals.md#approving-in-the-desktop-app)), and `keypaste agent` on a vault the desktop holds is refused naming the app. A bridge with no `--vault` is refused, and `keypaste setup` always writes one. In source the app can also connect a client itself ([below](#from-the-desktop-app)). [STEPS](STEPS.md) covers the rest of the focused target: launching env projects through the app's session.
 
 ## Before you start
 
@@ -48,6 +48,16 @@ exposure       env/** (the default; nothing else in the vault can even be named)
 `--dry-run` prints commands without changing configuration. `--remove` removes keypaste while preserving other servers. Repeating setup is idempotent and can update a moved vault path.
 
 `setup` configures paths and exposure. Credential release still requires a running approver and authorization.
+
+## From the desktop app
+
+In source, Agent Activity has a Connect a client section for the vault the app has unlocked. Choose the client, the label the audit log and the prompt will call it (its id unless you change it) and any exposure beyond the default `env/**`, then press Preview connect. The app shows exactly what it will run: for Claude Code and Codex, the client's own removal of any earlier keypaste entry and then its `mcp add`, with the `keypaste-mcp` path, `--vault`, `--client-label` and each `--expose`. Nothing is written until you press Run it, and Cancel or changing a field drops the preview. For Cursor and Claude Desktop the app shows the block to paste and writes nothing, as `setup` does.
+
+The app registers the `keypaste-mcp` beside it, or the first one on `PATH`. The internal desktop packages carry one. An AppImage is mounted somewhere new each time it starts, so from an AppImage the client is told to start the image file itself with `mcp`: moving or deleting the `.AppImage` breaks the registration until you connect again.
+
+Check the connection starts that registered command as the client would, lists the names its exposure allows and asks for one of them, the only one or the one you pick, with a reason saying it is a connection check. The request opens the app's prompt window like any other, and Approve or Deny each end the check. A released password is discarded unread, and the audit record appears in the session's history below. Preview remove and Run it take keypaste out of the client and leave its other servers alone.
+
+No master password, keyfile or session identifier is written into a client's configuration.
 
 The following sections show manual configuration, including clients `setup` does not recognize.
 

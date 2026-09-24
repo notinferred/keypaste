@@ -1,5 +1,3 @@
-using System.Text;
-using Keypaste.Cli.Clipboard;
 using Keypaste.Core.Clients;
 
 namespace Keypaste.Cli.Commands;
@@ -41,18 +39,6 @@ internal static class SetupCommand
         new("remove", TakesValue: false),
     ];
 
-    /// <summary>The bridge's file name, without the platform's extension.</summary>
-    private const string _serverFileName = "keypaste-mcp";
-
-    /// <summary>How long a client's own command may take before keypaste gives up on it.</summary>
-    private static readonly TimeSpan _clientTimeout = TimeSpan.FromSeconds(30);
-
-    /// <summary>A shorter budget for "are you installed", which must not stall the whole report.</summary>
-    private static readonly TimeSpan _probeTimeout = TimeSpan.FromSeconds(10);
-
-    /// <summary>Stands in until each client's own label replaces it.</summary>
-    private const string _clientLabelPlaceholder = "";
-
     internal static int Execute(string[] args, CliContext context)
     {
         if (!CommandLine.TryParse(args, 1, _options, out var line, out var error))
@@ -78,29 +64,49 @@ internal static class SetupCommand
         var removing = line.HasFlag("remove");
         var dryRun = line.HasFlag("dry-run");
 
-        McpServerRegistration? registration = null;
+        McpServerCommand? server = null;
+        string vault = string.Empty;
+        IReadOnlyList<string> expose = [];
         if (!removing)
         {
-            if (!TryBuildRegistration(line, context, out registration, out var reason))
+            if (!TryReadTarget(line, context, out server, out vault, out expose, out var reason))
             {
                 context.Stderr.WriteLine($"keypaste: {reason}");
                 return CliApp.ExitUsageError;
             }
+        }
 
-            WriteHeader(context, registration!);
+        List<(McpClient Client, McpServerRegistration? Registration)> targets = [];
+        foreach (var client in clients)
+        {
+            McpServerRegistration? registration = null;
+            if (!removing && !McpServerRegistration.TryCreate(server!, vault, Label(line, client), expose, out registration, out var invalid))
+            {
+                context.Stderr.WriteLine($"keypaste: {invalid}");
+                return CliApp.ExitUsageError;
+            }
+
+            targets.Add((client, registration));
+        }
+
+        if (!removing)
+        {
+            WriteHeader(context, targets[0].Registration!);
         }
 
         var installed = 0;
 
-        foreach (var client in clients)
+        foreach (var (client, registration) in targets)
         {
-            if (client.Wiring == McpWiring.ConfigFile)
+            var plan = removing ? McpClientSetup.Remove(client) : McpClientSetup.Connect(client, registration!);
+
+            if (!plan.RunsCommands)
             {
-                ReportManual(context, client, registration, removing);
+                ReportManual(context, client, plan);
                 continue;
             }
 
-            if (!IsInstalled(client, context))
+            if (!McpClientSetup.IsInstalled(client, context.ProcessRunner))
             {
                 context.Stdout.WriteLine($"  {client.Id,-16} not installed on this machine");
                 continue;
@@ -108,27 +114,17 @@ internal static class SetupCommand
 
             installed++;
 
-            var arguments = removing
-                ? client.RemoveArguments()
-                : client.AddArguments(registration! with { ClientLabel = Label(line, client) });
-
             if (dryRun)
             {
-                context.Stdout.WriteLine(
-                    $"  {client.Id,-16} would run: {client.Executable} {string.Join(' ', arguments)}");
+                foreach (var command in plan.Commands)
+                {
+                    context.Stdout.WriteLine($"  {client.Id,-16} would run: {command.Display}");
+                }
+
                 continue;
             }
 
-            if (!removing)
-            {
-                // Clear any previous entry first, because the clients disagree about what adding
-                // twice means: Codex overwrites, Claude Code refuses with "already exists". Running
-                // setup again is the ordinary case — the vault moved, or the binary did — so it has
-                // to be the same command either way rather than one that works only once.
-                Clear(client, context);
-            }
-
-            Apply(client, arguments, context, removing);
+            Report(context, client, McpClientSetup.Apply(plan, context.ProcessRunner), removing);
         }
 
         if (installed == 0)
@@ -140,65 +136,15 @@ internal static class SetupCommand
 
         if (!dryRun && !removing)
         {
-            WriteNextStep(context, registration!);
+            WriteNextStep(context, targets[0].Registration!);
         }
 
         return CliApp.ExitSuccess;
     }
 
-    /// <summary>
-    /// Whether the client's own command can be launched at all.
-    /// </summary>
-    /// <remarks>
-    /// <c>--version</c> rather than <c>mcp list</c>: listing makes a client check the health of
-    /// every server it already has, which on a machine with a few of them takes long enough that a
-    /// four-client report would look hung. All this has to answer is whether the executable exists,
-    /// which is <see cref="ProcessResult.ToolFound"/> and nothing else.
-    /// </remarks>
-    private static bool IsInstalled(McpClient client, CliContext context)
+    private static void Report(CliContext context, McpClient client, McpSetupResult result, bool removing)
     {
-        var result = context.ProcessRunner.Run(
-            client.Executable!,
-            ["--version"],
-            stdin: null,
-            new UTF8Encoding(false),
-            _probeTimeout);
-
-        return result.ToolFound;
-    }
-
-    /// <summary>
-    /// Removes any existing registration, ignoring whether there was one.
-    /// </summary>
-    /// <remarks>
-    /// Deliberately silent: "there was nothing to remove" is the expected outcome on a first run
-    /// and is not news. A failure here is not fatal either — the add that follows is what the user
-    /// asked for, and it will report its own outcome.
-    /// </remarks>
-    private static void Clear(McpClient client, CliContext context)
-    {
-        context.ProcessRunner.Run(
-            client.Executable!,
-            client.RemoveArguments(),
-            stdin: null,
-            new UTF8Encoding(false),
-            _clientTimeout);
-    }
-
-    private static void Apply(
-        McpClient client,
-        IReadOnlyList<string> arguments,
-        CliContext context,
-        bool removing)
-    {
-        var result = context.ProcessRunner.Run(
-            client.Executable!,
-            arguments,
-            stdin: null,
-            new UTF8Encoding(false),
-            _clientTimeout);
-
-        if (result.Succeeded)
+        if (result.Status == McpSetupStatus.Done)
         {
             context.Stdout.WriteLine($"  {client.Id,-16} {(removing ? "removed" : "configured")}");
             return;
@@ -208,20 +154,15 @@ internal static class SetupCommand
         // what that client's scopes or config are, and paraphrasing would only lose detail.
         context.Stdout.WriteLine($"  {client.Id,-16} {client.DisplayName} refused");
 
-        var said = FirstLine(result.StandardError) ?? FirstLine(result.StandardOutput);
-        if (said is not null)
+        if (result.ClientSaid is { } said)
         {
             context.Stderr.WriteLine($"keypaste: {client.DisplayName} said: {said}");
         }
     }
 
-    private static void ReportManual(
-        CliContext context,
-        McpClient client,
-        McpServerRegistration? registration,
-        bool removing)
+    private static void ReportManual(CliContext context, McpClient client, McpSetupPlan plan)
     {
-        if (removing || registration is null)
+        if (plan.PasteBlock is not { } block)
         {
             context.Stdout.WriteLine($"  {client.Id,-16} remove keypaste by hand — see docs/mcp-setup.md");
             return;
@@ -229,98 +170,52 @@ internal static class SetupCommand
 
         context.Stdout.WriteLine($"  {client.Id,-16} has no command of its own; add this by hand:");
         context.Stdout.WriteLine();
-        context.Stdout.WriteLine("      " + Quote(McpClientCatalog.ServerName) + ": {");
-        context.Stdout.WriteLine("        " + Quote("command") + ": " + Quote(registration.ServerPath) + ",");
+        foreach (var blockLine in block)
+        {
+            context.Stdout.WriteLine("      " + blockLine);
+        }
 
-        var labelled = registration with { ClientLabel = client.Id };
-        var rest = labelled.CommandLine().Skip(1).Select(Quote);
-        context.Stdout.WriteLine("        " + Quote("args") + ": [" + string.Join(", ", rest) + "]");
-        context.Stdout.WriteLine("      }");
         context.Stdout.WriteLine();
         context.Stdout.WriteLine("      docs/mcp-setup.md says which file, per platform.");
     }
 
-    private static bool TryBuildRegistration(
+    private static bool TryReadTarget(
         CommandLine line,
         CliContext context,
-        out McpServerRegistration? registration,
+        out McpServerCommand? server,
+        out string vault,
+        out IReadOnlyList<string> expose,
         out string reason)
     {
-        registration = null;
+        server = null;
+        expose = [];
 
-        if (!VaultLocator.TryResolve(line, context.Environment, out var vault, out reason))
+        if (!VaultLocator.TryResolve(line, context.Environment, out vault, out reason))
         {
             return false;
         }
-
-        vault = Path.GetFullPath(vault);
-
-        if (!TryFindServer(line.Value("server-path"), context, out var server))
-        {
-            // Naming the directory it looked in is the difference between a one-minute fix and
-            // a puzzle: the usual cause is the two binaries having been built to separate trees.
-            var lookedIn = Path.GetDirectoryName(Environment.ProcessPath) ?? "(unknown)";
-            reason = $"cannot find {_serverFileName}. Looked beside keypaste, in {lookedIn}, "
-                + "and on PATH. Build it, or pass --server-path.";
-            return false;
-        }
-
-        var expose = line.Value("expose") is { Length: > 0 } globs
-            ? globs.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            : [];
-
-        // The label is filled in per client below; a single run wires several, and the audit log
-        // exists to tell them apart.
-        registration = new McpServerRegistration(server, vault, _clientLabelPlaceholder, expose);
-        reason = string.Empty;
-        return true;
-    }
-
-    /// <summary>
-    /// Locates <c>keypaste-mcp</c>, preferring the copy that shipped beside this binary.
-    /// </summary>
-    /// <remarks>
-    /// Beside-first is deliberate: the two are released together, and a mismatched pair is a class
-    /// of bug nobody would enjoy diagnosing. PATH is the fallback, and <c>--server-path</c> beats
-    /// both, because a developer running out of a build tree is a real case.
-    /// </remarks>
-    private static bool TryFindServer(string? explicitPath, CliContext context, out string server)
-    {
-        if (explicitPath is { Length: > 0 })
-        {
-            server = Path.GetFullPath(explicitPath);
-            return File.Exists(server);
-        }
-
-        var executableName = OperatingSystem.IsWindows() ? _serverFileName + ".exe" : _serverFileName;
 
         var beside = Path.GetDirectoryName(Environment.ProcessPath);
-        if (beside is { Length: > 0 })
+        server = line.Value("server-path") is { Length: > 0 } explicitPath
+            ? File.Exists(Path.GetFullPath(explicitPath)) ? new McpServerCommand(Path.GetFullPath(explicitPath), []) : null
+            : McpServerLocator.Find(beside, context.Environment.Get("PATH"));
+
+        if (server is null)
         {
-            var candidate = Path.Combine(beside, executableName);
-            if (File.Exists(candidate))
-            {
-                server = candidate;
-                return true;
-            }
+            // Naming where it looked is the difference between a one-minute fix and a puzzle: the
+            // usual cause is the two binaries having been built to separate trees.
+            reason = $"cannot find {McpServerLocator.FileName}. Looked beside keypaste, "
+                + $"{McpServerLocator.Places(beside ?? "(unknown)")}. Build it, or pass --server-path.";
+            return false;
         }
 
-        var path = context.Environment.Get("PATH");
-        if (path is { Length: > 0 })
-        {
-            foreach (var directory in path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
-            {
-                var candidate = Path.Combine(directory.Trim(), executableName);
-                if (File.Exists(candidate))
-                {
-                    server = Path.GetFullPath(candidate);
-                    return true;
-                }
-            }
-        }
-
-        server = string.Empty;
-        return false;
+        // The label is filled in per client; a single run wires several, and the audit log exists
+        // to tell them apart.
+        expose = line.Value("expose") is { Length: > 0 } globs
+            ? globs.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            : [];
+        reason = string.Empty;
+        return true;
     }
 
     private static bool TrySelectClients(
@@ -356,7 +251,7 @@ internal static class SetupCommand
 
     private static void WriteHeader(CliContext context, McpServerRegistration registration)
     {
-        context.Stdout.WriteLine($"keypaste-mcp   {registration.ServerPath}");
+        context.Stdout.WriteLine($"keypaste-mcp   {registration.Server.Path}");
         context.Stdout.WriteLine($"vault          {registration.VaultPath}");
         context.Stdout.WriteLine(registration.Expose.Count == 0
             ? "exposure       env/** (the default; nothing else in the vault can even be named)"
@@ -387,23 +282,6 @@ internal static class SetupCommand
 
     private static string KnownClientIds() =>
         string.Join(", ", McpClientCatalog.All.Select(client => client.Id));
-
-    private static string Quote(string value) =>
-        "\""
-        + value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal)
-        + "\"";
-
-    private static string? FirstLine(string text)
-    {
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return null;
-        }
-
-        return text.Split('\n', StringSplitOptions.RemoveEmptyEntries)
-            .Select(candidate => candidate.Trim())
-            .FirstOrDefault(candidate => candidate.Length > 0);
-    }
 
     private static void WriteUsage(TextWriter writer)
     {

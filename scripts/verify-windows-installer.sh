@@ -7,10 +7,12 @@
 #     unsigned labels, a ProductVersion other than the numeric prefix, or a publisher other than keypaste;
 #   - a per-machine package, or a signature on a package the definition declares unsigned;
 #   - an administrative extraction whose files differ from the staged payload, whose binary reports
-#     another version than the payload's or fails --selftest, or whose binaries do not publish as keypaste.
+#     another version than the payload's or fails --selftest, or whose binaries do not publish as keypaste;
+#   - an extraction with no keypaste-mcp.exe answering --help beside the app, which is what a client
+#     connected from the app is told to start (2.6a).
 #
 # The extraction uses `msiexec /a`, which lays the files out without installing, registering or
-# running anything from the package. Installing it is 4.7b.
+# running anything from the package; the extracted binaries are then run. Installing it is 4.7b.
 #
 # <version> names the package; <binary-version> is what the payload reports. They differ only on a
 # dispatch, where app.yml names the package <binary-version>-dryrun.
@@ -108,6 +110,9 @@ diff <(listing "$payload") <(listing "$extracted") > "$work/payload.diff" \
 
 "$host" --selftest || die "the extracted keypaste-app.exe failed --selftest"
 expect "the extracted binary's version" "$("$host" --version | tr -d '[:space:]')" "$binary_version"
+bridge="$(dirname "$host")/keypaste-mcp.exe"
+[ -f "$bridge" ] || die "the extraction carries no keypaste-mcp.exe beside keypaste-app.exe for a connected client to start"
+case "$("$bridge" --help 2>&1)" in "usage: keypaste-mcp"*) ;; *) die "the extracted keypaste-mcp.exe does not answer --help" ;; esac
 "$ROOT/scripts/verify-publisher-metadata.sh" "$extracted"
 
 echo "$(basename "$msi"): keypaste $version, per-user, internal and unsigned; $(listing "$payload" | wc -l | tr -d ' ') payload files extract byte-identical and pass --selftest."
