@@ -28,7 +28,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     internal ShellViewModel(
         AppVaultSession session,
         string? home,
-        SessionHost? host,
+        AppAuthority? authority,
         Action<Core.Settings.AppTheme>? applyTheme = null,
         IAppClipboard? clipboard = null,
         TimeProvider? clock = null,
@@ -43,7 +43,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         _notice = notice;
         _picker = picker;
         Home = home;
-        Host = host;
+        Authority = authority;
         ApplyTheme = applyTheme ?? (_ => { });
         Preferences = preferences ?? new DesktopPreferences(home);
 
@@ -95,7 +95,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     internal string? Home { get; }
 
     /// <summary>What serves this vault to agents, or null where nothing does.</summary>
-    internal SessionHost? Host { get; }
+    internal AppAuthority? Authority { get; }
 
     /// <summary>How a theme choice reaches the application object.</summary>
     /// <remarks>
@@ -219,7 +219,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
     private AgentActivityViewModel Activity()
     {
-        var activity = new AgentActivityViewModel(Host);
+        var activity = new AgentActivityViewModel(Authority);
         _ = activity.RefreshAsync();
         return activity;
     }

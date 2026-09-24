@@ -59,10 +59,28 @@ public sealed class VaultClaim : IDisposable
         string vaultPath,
         OwnerKind kind,
         [NotNullWhen(true)] out VaultClaim? claim,
-        [NotNullWhen(false)] out string? refusal)
+        [NotNullWhen(false)] out string? refusal) =>
+        TryAcquire(home, vaultPath, kind, out claim, out refusal, out _);
+
+    /// <summary>Takes the claim on a vault, or says who holds it.</summary>
+    /// <param name="home">keypaste's home directory.</param>
+    /// <param name="vaultPath">The vault about to be opened or created.</param>
+    /// <param name="kind">What kind of process this is.</param>
+    /// <param name="claim">The claim, when it was free.</param>
+    /// <param name="refusal">Why not, as a sentence naming the holder when one is known.</param>
+    /// <param name="holder">The process holding the vault, when it is held and names itself.</param>
+    /// <returns><see langword="true"/> when this process now holds the vault.</returns>
+    public static bool TryAcquire(
+        string home,
+        string vaultPath,
+        OwnerKind kind,
+        [NotNullWhen(true)] out VaultClaim? claim,
+        [NotNullWhen(false)] out string? refusal,
+        out VaultOwner? holder)
     {
         claim = null;
         refusal = null;
+        holder = null;
 
         var vault = VaultIdentity.Of(home, vaultPath);
         var directory = Path.Combine(home, DirectoryName);
@@ -81,7 +99,8 @@ public sealed class VaultClaim : IDisposable
             }
             catch (IOException) when (File.Exists(lockPath))
             {
-                refusal = $"this vault is already unlocked in {Holder(ownerPath)}. Lock it there first.";
+                holder = Holder(ownerPath);
+                refusal = $"this vault is already unlocked in {holder?.Describe() ?? VaultOwner.Unknown}. Lock it there first.";
                 return false;
             }
 
@@ -137,7 +156,7 @@ public sealed class VaultClaim : IDisposable
             CultureInfo.InvariantCulture,
             $"kind={owner.Kind}\npid={owner.ProcessId}\nvault={owner.VaultPath}\n");
 
-    private static string Holder(string ownerPath)
+    private static VaultOwner? Holder(string ownerPath)
     {
         try
         {
@@ -170,11 +189,11 @@ public sealed class VaultClaim : IDisposable
                 }
             }
 
-            return kind is { } k && pid is { } p ? new VaultOwner(k, p, vault).Describe() : VaultOwner.Unknown;
+            return kind is { } k && pid is { } p ? new VaultOwner(k, p, vault) : null;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return VaultOwner.Unknown;
+            return null;
         }
     }
 

@@ -23,10 +23,13 @@ namespace Keypaste.AppDriver;
 /// driver could not arrange the act.
 /// </para>
 /// <para>
-/// <c>hold</c> is the one act that does not exit: it unlocks as the app does, serves the vault as the
-/// app does, prints the session it holds, and then locks or unlocks again on each line read from
-/// standard input until it closes, which it answers as the app answers quitting.
-/// <c>scripts/verify-session-authority.sh</c> drives it (U.1). With <c>--held-prompt</c> a request
+/// <c>hold</c> is the one act that does not exit: it composes the app's <see cref="AppAuthority"/> as
+/// launch does, unlocks, prints the session it holds, and then locks or unlocks again on each line
+/// read from standard input until it closes, which it answers as the app answers quitting. Each of
+/// those prints a <c>status</c> line as the authority reports it.
+/// <c>scripts/verify-session-authority.sh</c> drives it (U.1). With <c>--locked</c> it starts at the
+/// unlock screen, as a launch does, and waits for <c>unlock</c>, so
+/// <c>scripts/verify-session-lifecycle.sh</c> can relaunch after a crash (4.4b). With <c>--held-prompt</c> a request
 /// that needs a person is put in front of one who never answers, printing <c>asking</c> and then
 /// <c>withdrawn</c>, so <c>scripts/verify-lock-boundary.sh</c> can lock the app with a real request
 /// waiting at its session (U.2). With <c>--approving-prompt</c> a person approves every request,
@@ -50,7 +53,7 @@ internal static class Program
         "       backup-restore <vault> <backup-file-name>\n" +
         "       export <vault> <destination>\n" +
         "       access <vault> [--password] [--attach <keyfile> | --remove-keyfile]\n" +
-        "       hold <vault> [--held-prompt | --approving-prompt]\n" +
+        "       hold <vault> [--locked] [--held-prompt | --approving-prompt]\n" +
         "            (then per line of standard input: lock, unlock, edit <entry-path>, delete <entry-path>,\n" +
         "             relocate <entry-path> <destination-group-path> <new-title>)\n" +
         "KEYPASTE_HOME must be set. KEYPASTE_DRIVER_PASSWORD is the password typed (empty for none),\n" +
@@ -83,9 +86,7 @@ internal static class Program
                 ["backup-restore", var vault, var backup] => await driver.RestoreBackupAsync(vault, backup).ConfigureAwait(true),
                 ["export", var vault, var destination] => await driver.ExportAsync(vault, destination).ConfigureAwait(true),
                 ["access", var vault, .. var change] => await driver.ChangeAccessAsync(vault, change).ConfigureAwait(true),
-                ["hold", var vault] => await driver.HoldAsync(vault, null).ConfigureAwait(true),
-                ["hold", var vault, "--held-prompt"] => await driver.HoldAsync(vault, () => new Driver.HeldPrompt()).ConfigureAwait(true),
-                ["hold", var vault, "--approving-prompt"] => await driver.HoldAsync(vault, () => new Driver.ApprovingPrompt()).ConfigureAwait(true),
+                ["hold", var vault, .. var options] => await HoldAsync(driver, vault, options).ConfigureAwait(true),
                 _ => Usage(),
             };
         }
@@ -99,6 +100,32 @@ internal static class Program
             Console.Error.WriteLine($"driver failed: {ex.GetType().Name}: {ex.Message}");
             return 3;
         }
+    }
+
+    private static Task<int> HoldAsync(Driver driver, string vault, string[] options)
+    {
+        var locked = false;
+        Func<IApprovalChannel>? prompt = null;
+
+        foreach (var option in options)
+        {
+            switch (option)
+            {
+                case "--locked":
+                    locked = true;
+                    break;
+                case "--held-prompt" when prompt is null:
+                    prompt = () => new Driver.HeldPrompt();
+                    break;
+                case "--approving-prompt" when prompt is null:
+                    prompt = () => new Driver.ApprovingPrompt();
+                    break;
+                default:
+                    return Task.FromResult(Usage());
+            }
+        }
+
+        return driver.HoldAsync(vault, prompt, locked);
     }
 
     private static int Usage()
@@ -410,15 +437,22 @@ internal sealed class Driver(string home)
         return act(entries);
     }
 
-    internal async Task<int> HoldAsync(string vault, Func<IApprovalChannel>? prompt)
+    internal async Task<int> HoldAsync(string vault, Func<IApprovalChannel>? prompt, bool startLocked)
     {
-        using var session = new AppVaultSession(TimeProvider.System, AppVaultSession.MaximumIdleTimeout, home);
-        using var host = new SessionHost(
-            session,
+        // The authority owns the session from here, and disposing it is quitting.
+#pragma warning disable CA2000
+        using var authority = new AppAuthority(
+            new AppVaultSession(TimeProvider.System, AppVaultSession.MaximumIdleTimeout, home),
             Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable),
             prompt);
+#pragma warning restore CA2000
+        var session = authority.Session;
 
-        if (await HoldOnceAsync(session, host, vault).ConfigureAwait(true) is { } refused)
+        if (startLocked)
+        {
+            Report(authority);
+        }
+        else if (await HoldOnceAsync(authority, vault).ConfigureAwait(true) is { } refused)
         {
             return refused;
         }
@@ -430,10 +464,11 @@ internal sealed class Driver(string home)
                 case ["lock"]:
                     session.Lock(VaultLockReason.Manual);
                     Console.Out.WriteLine("locked");
+                    Report(authority);
                     break;
 
                 case ["unlock"]:
-                    if (await HoldOnceAsync(session, host, vault).ConfigureAwait(true) is { } again)
+                    if (await HoldOnceAsync(authority, vault).ConfigureAwait(true) is { } again)
                     {
                         return again;
                     }
@@ -457,9 +492,10 @@ internal sealed class Driver(string home)
             }
         }
 
-        // Standard input closing is quitting, and the app locks before its endpoint stops.
-        session.Dispose();
+        // Standard input closing is quitting, as the app quits.
+        authority.Dispose();
         Console.Out.WriteLine("shut down");
+        Report(authority);
         return 0;
     }
 
@@ -494,20 +530,44 @@ internal sealed class Driver(string home)
         }
     }
 
-    private async Task<int?> HoldOnceAsync(AppVaultSession session, SessionHost host, string vault)
+    private async Task<int?> HoldOnceAsync(AppAuthority authority, string vault)
     {
+        var session = authority.Session;
         using var unlock = Screen(session);
 
         if (await UnlockAsync(unlock, session, vault).ConfigureAwait(true) is { } refused)
         {
+            if (unlock.HasOwner)
+            {
+                Console.Out.WriteLine($"owner: {unlock.Owner}");
+            }
+
+            Report(authority);
             return refused;
         }
 
-        Console.Out.WriteLine(host.Endpoint is { } endpoint
-            ? $"holding session {session.SessionId} as process {Environment.ProcessId} on {endpoint}"
-            : $"holding session {session.SessionId} as process {Environment.ProcessId}, not served: {host.Failure}");
+        Console.Out.WriteLine(Report(authority) is AuthorityStatus.Serving serving
+            ? $"holding session {serving.Session} as process {serving.Owner.ProcessId} on {serving.Endpoint}"
+            : $"holding session {session.SessionId} as process {Environment.ProcessId}, not served");
 
         return null;
+    }
+
+    /// <summary>Prints what the authority says agents meet now.</summary>
+    private static AuthorityStatus Report(AppAuthority authority)
+    {
+        var status = authority.Status;
+
+        Console.Out.WriteLine(status switch
+        {
+            AuthorityStatus.Serving serving =>
+                $"status serving {serving.Session} as process {serving.Owner.ProcessId} on {serving.Endpoint}",
+            AuthorityStatus.HeldBy held => $"status held by {held.Owner.Describe()}",
+            AuthorityStatus.NotServing notServing => $"status not serving: {notServing.Reason}",
+            _ => "status locked",
+        });
+
+        return status;
     }
 
     private UnlockViewModel Screen(AppVaultSession session) => new(session, home, _picker, () => { });

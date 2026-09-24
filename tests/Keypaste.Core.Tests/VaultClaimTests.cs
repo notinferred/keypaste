@@ -36,9 +36,19 @@ public sealed class VaultClaimTests : IDisposable
 
         using (first)
         {
-            Assert.False(VaultClaim.TryAcquire(_home, Vault(), OwnerKind.DesktopApp, out _, out var refusal));
+            Assert.False(VaultClaim.TryAcquire(_home, Vault(), OwnerKind.DesktopApp, out _, out var refusal, out var holder));
             Assert.Contains("keypaste agent (process", refusal, StringComparison.Ordinal);
+            Assert.Equal(new VaultOwner(OwnerKind.TerminalAgent, Environment.ProcessId, first.Vault.Path), holder);
         }
+    }
+
+    [Fact]
+    public void AClaimTaken_NamesNoHolder()
+    {
+        Assert.True(VaultClaim.TryAcquire(_home, Vault(), OwnerKind.DesktopApp, out var claim, out _, out var holder));
+
+        Assert.Null(holder);
+        claim.Dispose();
     }
 
     [Fact]

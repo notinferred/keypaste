@@ -119,6 +119,18 @@ internal sealed class AppVaultSession : IDisposable
         }
     }
 
+    /// <summary>This process as the vault's claim names it, or <see langword="null"/> when locked.</summary>
+    internal VaultOwner? Owner
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _claim?.Owner;
+            }
+        }
+    }
+
     /// <summary>This unlock's session identifier, or <see langword="null"/> when locked.</summary>
     internal string? SessionId
     {
@@ -183,6 +195,9 @@ internal sealed class AppVaultSession : IDisposable
 
     /// <summary>Why the last unlock or create was refused as <see cref="UnlockOutcome.HeldElsewhere"/>.</summary>
     internal string? HeldElsewhere { get; private set; }
+
+    /// <summary>The process that held the vault when the last unlock or create was refused, when it named itself.</summary>
+    internal VaultOwner? HeldBy { get; private set; }
 
     /// <summary>Raised once per idle period, <see cref="WarningWindow"/> before locking.</summary>
     internal event EventHandler<TimeSpan>? LockingSoon;
@@ -349,15 +364,17 @@ internal sealed class AppVaultSession : IDisposable
             {
                 claim = held;
                 HeldElsewhere = null;
+                HeldBy = null;
                 return true;
             }
         }
 
         // Ownership passes to Adopt, or back through Release on every refusal after this.
 #pragma warning disable CA2000
-        var taken = VaultClaim.TryAcquire(_home, path, OwnerKind.DesktopApp, out claim, out var refusal);
+        var taken = VaultClaim.TryAcquire(_home, path, OwnerKind.DesktopApp, out claim, out var refusal, out var holder);
 #pragma warning restore CA2000
         HeldElsewhere = refusal;
+        HeldBy = holder;
         return taken;
     }
 

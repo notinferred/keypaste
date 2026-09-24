@@ -16,7 +16,8 @@ public sealed class LockBoundaryTests
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
-    public static TheoryData<string> Locks => ["manual", "minimized", "idle", "shutdown"];
+    // Quitting is AppAuthorityTests', through the composition launch runs.
+    public static TheoryData<string> Locks => ["manual", "minimized", "idle"];
 
     [Theory]
     [MemberData(nameof(Locks))]
@@ -44,9 +45,6 @@ public sealed class LockBoundaryTests
                 break;
             case "idle":
                 clock.Advance(AppVaultSession.DefaultIdleTimeout);
-                break;
-            case "shutdown":
-                session.Dispose();
                 break;
         }
 

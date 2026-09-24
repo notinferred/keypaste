@@ -115,6 +115,7 @@ test_desktop() {
   integration_script scripts/verify-session-authority.sh
   integration_script scripts/verify-lock-boundary.sh
   integration_script scripts/verify-current-state.sh
+  integration_script scripts/verify-session-lifecycle.sh
 }
 
 selftests=(
@@ -267,7 +268,7 @@ profiles_for_path() {
     tests/Directory.Build.props) echo backend desktop ;;
     tests/*) echo backend ;;
     keypaste.slnx) echo backend integration ;;
-    scripts/verify-session-authority.sh|scripts/verify-lock-boundary.sh|scripts/verify-current-state.sh) echo scripts desktop ;;
+    scripts/verify-session-authority.sh|scripts/verify-lock-boundary.sh|scripts/verify-current-state.sh|scripts/verify-session-lifecycle.sh) echo scripts desktop ;;
     scripts/*) echo scripts backend integration ;;
     .github/*|release-targets.json) echo scripts backend ;;
     README.md|site/public/index.html|docs/PRODUCT.md) echo scripts integration ;;

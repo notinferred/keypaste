@@ -15,6 +15,7 @@ on:
       - 'scripts/verify-session-authority.sh'
       - 'scripts/verify-lock-boundary.sh'
       - 'scripts/verify-current-state.sh'
+      - 'scripts/verify-session-lifecycle.sh'
       - 'src/Keypaste.Mcp/**'
       - 'scripts/install-keepassxc-windows.sh'
       - 'src/Keypaste.Cli/**'

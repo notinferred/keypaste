@@ -63,6 +63,25 @@ internal sealed class SessionHost : IDisposable
     /// <summary>Why nothing is being served for an unlocked vault, or null.</summary>
     internal string? Failure { get; private set; }
 
+    /// <summary>
+    /// The session agents reaching <see cref="Endpoint"/> would be answered under, read from the
+    /// authority answering them, or null when nothing here answers.
+    /// </summary>
+    /// <remarks>
+    /// Null once the accept loop has ended, and whenever the authority would refuse a request as
+    /// locked, whatever a pipe of that name would accept.
+    /// </remarks>
+    internal (string Session, string Endpoint)? Serving
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _hosted?.Serving is { } session && Endpoint is { } endpoint ? (session, endpoint) : null;
+            }
+        }
+    }
+
     private void OnOpened(object? sender, EventArgs e) => Start();
 
     private void OnLocked(object? sender, VaultLockReason reason) => Stop();
@@ -139,15 +158,22 @@ internal sealed class SessionHost : IDisposable
     private sealed class Hosted : IDisposable
     {
         private readonly ApproverListener _listener;
+        private readonly SessionAuthority _authority;
         private readonly ApprovalGate _approvals;
         private readonly AppVaultSession _session;
         private readonly GrantCache _grants;
         private readonly CancellationTokenSource _stop = new();
         private readonly Task _run;
 
-        private Hosted(ApproverListener listener, ApprovalGate approvals, AppVaultSession session, GrantCache grants)
+        private Hosted(
+            ApproverListener listener,
+            SessionAuthority authority,
+            ApprovalGate approvals,
+            AppVaultSession session,
+            GrantCache grants)
         {
             _listener = listener;
+            _authority = authority;
             _approvals = approvals;
             _session = session;
             _grants = grants;
@@ -156,6 +182,9 @@ internal sealed class SessionHost : IDisposable
             _session.Edited += OnEdited;
             _run = listener.RunAsync(_stop.Token);
         }
+
+        /// <summary>The session the authority answers under while the listener still accepts, or null.</summary>
+        internal string? Serving => _run.IsCompleted ? null : _authority.Serving;
 
         internal static Hosted? TryStart(
             string pipe,
@@ -178,11 +207,13 @@ internal sealed class SessionHost : IDisposable
                 grants,
                 PolicyGate.None);
 
+            var authority = new SessionAuthority(vault, () => session.Lifetime, handler);
+
             try
             {
-                var listener = new ApproverListener(pipe, new SessionAuthority(vault, () => session.Lifetime, handler));
+                var listener = new ApproverListener(pipe, authority);
                 failure = null;
-                return new Hosted(listener, approvals, session, grants);
+                return new Hosted(listener, authority, approvals, session, grants);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {

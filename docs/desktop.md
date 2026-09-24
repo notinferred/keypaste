@@ -6,7 +6,7 @@ The desktop app opens the same `.kdbx` vaults as the CLI and locks its session w
 
 ## Current limits
 
-Approvals currently happen in a separate terminal. An AI request goes through `keypaste-mcp` to a `keypaste agent` you started and unlocked yourself. Agent Activity only reports whether that process is running. Unlocking or locking the desktop does not control it.
+Approvals currently happen in a separate terminal. An AI request goes through `keypaste-mcp` to a `keypaste agent` you started and unlocked yourself. In source, the unlocked app itself answers `keypaste-mcp` for its vault with entry names only, and Agent Activity names the app's process and session while it does. When `keypaste agent` already holds the vault, the unlock screen names it as the owner and the app leaves it running.
 
 The focused target is one unlock session for desktop use, MCP requests and env launches, with approval and denial in the app. In source, locking already ends that session for agents in one step: a request still waiting at the app is denied as locked and grants are cleared. Approval in the app, launches and serving the latest saved values are unfinished work in [STEPS](STEPS.md); the earlier terminal-owned design is no longer the required architecture.
 
@@ -166,7 +166,7 @@ CI builds and packages on three operating systems; desktop tests read secret sur
 10. Set `idle_timeout_seconds = 137` in `app.toml` and relaunch. Settings must display it, locking must occur at 137 seconds, and the file must remain unchanged.
 11. Set a long idle timeout to isolate minimize locking. Enable "Lock when the window is minimized", minimize and restore: expect the unlock screen. Disable it, minimize and restore: expect an unlocked vault and a running idle countdown. Enable it again, quit and relaunch without opening Settings; minimizing must lock. A password copied before locking must no longer paste. Recorded runner results do not replace a person's check on a real macOS or Linux desktop.
 12. The Log screen matches `keypaste log` for the same `~/.keypaste/audit.jsonl`.
-13. Agent Activity says the right thing both with and without a `keypaste agent` running.
+13. Agent Activity names this app's process and session while the vault is unlocked. With `keypaste agent` holding the vault first, the unlock is refused and the unlock screen names the agent.
 14. Entries lists titles and groups. Filter by a group and search for part of a title or group path; case changes still match. Selecting an entry shows a username, a URL and notes, and a row of dots where the password is.
 15. Copy a password and check the countdown and progress bar. It must paste before the timeout and be absent afterward.
 16. Copy, then `Ctrl/Cmd+L`. Paste: nothing.

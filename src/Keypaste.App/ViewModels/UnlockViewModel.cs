@@ -50,6 +50,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     private string? _keyfilePath;
     private string? _newVaultPath;
     private string _message = string.Empty;
+    private string _owner = string.Empty;
     private bool _busy;
     private bool _creating;
     private bool _restoreOnly;
@@ -234,6 +235,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
             if (Set(ref _selectedPath, value))
             {
                 Message = string.Empty;
+                Owner = string.Empty;
                 KeyfilePath = RememberedKeyfile(value);
                 Look();
                 Raise(nameof(SelectedName));
@@ -284,6 +286,24 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     }
 
     internal bool HasMessage => _message.Length > 0;
+
+    /// <summary>
+    /// Which process holds the selected vault, from the claim that refused the last unlock, or
+    /// nothing. Unlike <see cref="Message"/> it stays while the person types.
+    /// </summary>
+    internal string Owner
+    {
+        get => _owner;
+        private set
+        {
+            if (Set(ref _owner, value))
+            {
+                Raise(nameof(HasOwner));
+            }
+        }
+    }
+
+    internal bool HasOwner => _owner.Length > 0;
 
     /// <summary>Whether Argon2 is running.</summary>
     internal bool Busy
@@ -553,6 +573,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
 
         Busy = true;
         Message = string.Empty;
+        Owner = string.Empty;
 
         try
         {
@@ -574,6 +595,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
             if (outcome == UnlockOutcome.HeldElsewhere)
             {
                 Message = HeldElsewhere();
+                ShowOwner();
                 ResetPassword();
                 return;
             }
@@ -685,6 +707,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
             }
 
             Message = _session.HeldElsewhere is not null ? HeldElsewhere() : ExplainCreation(outcome);
+            ShowOwner();
 
             // The passwords go whatever the answer was. A refusal means starting the pair again,
             // which is what `keypaste init` makes a person do and is the only way the buffers are
@@ -798,6 +821,9 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         var reason = _session.HeldElsewhere ?? "another keypaste process holds this vault.";
         return char.ToUpperInvariant(reason[0]) + reason[1..];
     }
+
+    private void ShowOwner() =>
+        Owner = _session.HeldBy is { } holder ? new AuthorityStatus.HeldBy(holder).Sentence : string.Empty;
 
     private static string Explain(UnlockOutcome outcome, bool withKeyfile = false) => outcome switch
     {

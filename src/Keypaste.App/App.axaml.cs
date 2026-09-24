@@ -23,7 +23,7 @@ namespace Keypaste.App;
 internal sealed partial class App : Application, IDisposable
 {
     private AppVaultSession? _session;
-    private SessionHost? _host;
+    private AppAuthority? _authority;
     private DesktopPreferences? _preferences;
     private MinimizeLock? _minimize;
     private ActivityWatch? _activity;
@@ -44,7 +44,7 @@ internal sealed partial class App : Application, IDisposable
             _preferences = new DesktopPreferences(home);
             _session = Compose(_preferences, TimeProvider.System);
             _session.Locked += OnLocked;
-            _host = new SessionHost(_session, Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable));
+            _authority = new AppAuthority(_session, Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable));
 
             _window = new MainWindow();
             _activity = Observe(_window, _session, TimeProvider.System, () => _shell?.ClearCountdown());
@@ -247,7 +247,7 @@ internal sealed partial class App : Application, IDisposable
         _shell = new ShellViewModel(
             _session,
             Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable),
-            _host,
+            _authority,
             ApplyTheme,
             new AvaloniaClipboard(_window),
             TimeProvider.System,
@@ -290,11 +290,8 @@ internal sealed partial class App : Application, IDisposable
         _unlock?.Dispose();
         _unlock = null;
 
-        // The session before the host: quitting is a lock, so what an agent has waiting is answered
-        // as locked before the endpoint stops, not dropped with it (D-0313).
-        _session?.Dispose();
+        _authority?.Dispose();
+        _authority = null;
         _session = null;
-        _host?.Dispose();
-        _host = null;
     }
 }

@@ -201,6 +201,13 @@
                  FontSize="13"
                  Foreground="{DynamicResource KpTextSecondary}" />
 
+      <TextBlock x:Name="Owner"
+                 Text="{Binding Owner}"
+                 IsVisible="{Binding HasOwner}"
+                 TextWrapping="Wrap"
+                 FontSize="13"
+                 Foreground="{DynamicResource KpTextSecondary}" />
+
       <Grid ColumnDefinitions="Auto,Auto,*,Auto" IsVisible="{Binding IsOpening}">
         <Button Grid.Column="0"
                 Content="Create…"

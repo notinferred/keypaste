@@ -51,6 +51,10 @@ public sealed class SessionAuthority : IApproverHandler
         _inner = inner;
     }
 
+    /// <summary>The session a request attaching now would be answered under, or null while the vault is locked.</summary>
+    /// <remarks>Read the way every request reads it, so a status built on it says what an agent would meet.</remarks>
+    public string? Serving => Live()?.Id;
+
     /// <inheritdoc/>
     public ValueTask<AttachReply> AttachAsync(AttachRequest request, string connectionId, CancellationToken cancellationToken)
     {
