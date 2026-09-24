@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Keypaste.EnvReporter</RootNamespace>
+
+    <!-- Not a test project: the real child the app's Run starts in V-E.1b, which reports what its
+         own environment holds over a pipe rather than through a file. -->
+    <IsTestProject>false</IsTestProject>
+  </PropertyGroup>
+
+</Project>

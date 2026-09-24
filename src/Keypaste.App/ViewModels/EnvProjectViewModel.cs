@@ -41,7 +41,10 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         ClipboardCountdown clipboard,
         string name,
         Action<string?> report,
-        Action<string?>? announce = null)
+        Action<string?>? announce = null,
+        IVaultFilePicker? picker = null,
+        ProjectLaunching? launching = null,
+        Action? imported = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(clipboard);
@@ -65,6 +68,9 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         ConfirmReplaceCommand = new RelayCommand(ConfirmReplace, () => Replacing is not null);
         CancelReplaceCommand = new RelayCommand(CancelReplace, () => Replacing is not null);
 
+        Import = new EnvImportViewModel(session, name, picker, report, _announce, imported ?? Reload);
+        Launch = new ProjectLaunchViewModel(session, name, picker, launching ?? ProjectLaunching.ForThisMachine(), report, _announce);
+
         Reload();
     }
 
@@ -79,6 +85,12 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     /// only have been made outside keypaste, and the card above the command shows the drawn form.
     /// </remarks>
     internal string DisplayName => EntryNameSanitizer.Sanitize(Name).Text;
+
+    /// <summary>Imports a <c>.env</c> into this project.</summary>
+    internal EnvImportViewModel Import { get; }
+
+    /// <summary>Where this project runs on this machine, and its Run and Open terminal.</summary>
+    internal ProjectLaunchViewModel Launch { get; }
 
     /// <summary>The clipboard a row copies through.</summary>
     internal ClipboardCountdown Clipboard { get; }
@@ -351,6 +363,8 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         Replacing = null;
         NewValue.Dispose();
         ReplacementValue.Dispose();
+        Import.Dispose();
+        Launch.Dispose();
     }
 
     private async Task CopyRunCommandAsync() =>

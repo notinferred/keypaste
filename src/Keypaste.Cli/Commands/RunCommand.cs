@@ -1,5 +1,5 @@
-using Keypaste.Cli.Execution;
 using Keypaste.Core;
+using Keypaste.Core.Launch;
 
 namespace Keypaste.Cli.Commands;
 
@@ -80,7 +80,7 @@ internal static class RunCommand
             line,
             context,
             vault => Load(vault, project, context),
-            environment => Start(split.Command, environment, context));
+            resolved => Start(split.Command, resolved, context));
     }
 
     /// <summary>
@@ -112,9 +112,9 @@ internal static class RunCommand
         return new RunArguments(args, [], HasSeparator: false);
     }
 
-    /// <summary>Resolves the project's variables and merges them over the current environment.</summary>
+    /// <summary>Resolves the project's variables.</summary>
     /// <remarks>A set with any entry that cannot be released starts nothing, and each such entry is named.</remarks>
-    private static (int Exit, IReadOnlyDictionary<string, string>? Loaded) Load(
+    private static (int Exit, EnvResolved? Loaded) Load(
         Vault vault,
         string project,
         CliContext context)
@@ -148,22 +148,19 @@ internal static class RunCommand
                 return (CliApp.ExitInternalError, null);
         }
 
-        var variables = resolved.Variables;
-        var merged = EnvironmentMerge.Build(context.Environment.All(), variables);
-
-        if (EnvironmentMerge.OverridesPath(variables))
+        if (EnvironmentMerge.OverridesPath(resolved.Variables))
         {
             context.Stderr.WriteLine(
                 $"warning: '{project}' defines PATH; the command itself is still resolved against yours");
         }
 
-        return (CliApp.ExitSuccess, merged);
+        return (CliApp.ExitSuccess, resolved);
     }
 
     /// <summary>Starts the child and reports its exit code as keypaste's own.</summary>
     private static int Start(
         IReadOnlyList<string> command,
-        IReadOnlyDictionary<string, string> environment,
+        EnvResolved resolved,
         CliContext context)
     {
         // Everything keypaste has to say is said before the child owns the console, so a warning
@@ -176,7 +173,11 @@ internal static class RunCommand
             arguments[i - 1] = command[i];
         }
 
-        var result = context.ProcessLauncher.Run(new ChildStart(command[0], arguments, environment));
+        var result = EnvLaunch.Start(
+            resolved,
+            new LaunchTarget(command[0], arguments),
+            context.Environment.All(),
+            context.ProcessLauncher);
 
         switch (result.Outcome)
         {

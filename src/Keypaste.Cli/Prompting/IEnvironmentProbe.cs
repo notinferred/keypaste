@@ -22,35 +22,5 @@ internal sealed class SystemEnvironmentProbe : IEnvironmentProbe
     public string? Get(string name) => Environment.GetEnvironmentVariable(name);
 
     /// <inheritdoc/>
-    public IReadOnlyDictionary<string, string> All()
-    {
-        // Filled by indexer rather than through the dictionary copy constructor: on Windows the
-        // comparer is case-insensitive, and a parent block that happens to hold two names
-        // differing only in case would make the constructor throw on a duplicate key.
-        var values = new Dictionary<string, string>(Execution.EnvironmentMerge.Comparer);
-
-        foreach (System.Collections.DictionaryEntry entry in Environment.GetEnvironmentVariables())
-        {
-            if (entry.Key is string name && entry.Value is string value)
-            {
-                values[name] = value;
-            }
-        }
-
-        // A child is the user's own program, so it gets the user's temporary directory - not the
-        // private one keypaste redirected its own saves into and deletes when it exits.
-        foreach (var (name, value) in Keypaste.Core.ProcessTemporaryDirectory.OriginalTemporaryVariables)
-        {
-            if (value is null)
-            {
-                values.Remove(name);
-            }
-            else
-            {
-                values[name] = value;
-            }
-        }
-
-        return values;
-    }
+    public IReadOnlyDictionary<string, string> All() => Keypaste.Core.Launch.EnvironmentMerge.Inherited();
 }

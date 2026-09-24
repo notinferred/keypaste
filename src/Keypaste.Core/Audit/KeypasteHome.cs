@@ -22,6 +22,9 @@ public static class KeypasteHome
     /// <summary>The desktop app's settings.</summary>
     public const string SettingsFileName = "app.toml";
 
+    /// <summary>The desktop app's project mappings: a directory and a command for each env set.</summary>
+    public const string ProjectsFileName = "projects.json";
+
     /// <summary>Resolves keypaste's home directory. The directory is not created.</summary>
     /// <remarks>
     /// <see cref="Environment.SpecialFolder.UserProfile"/> rather than <c>ApplicationData</c> because
@@ -69,4 +72,9 @@ public static class KeypasteHome
     /// </remarks>
     public static string SettingsPath(string? fromEnvironment) =>
         Path.Combine(Resolve(fromEnvironment), SettingsFileName);
+
+    /// <summary>Resolves the desktop app's project mappings. The file is not created.</summary>
+    /// <remarks>It names directories and commands on this machine and never holds a value (D-0339).</remarks>
+    public static string ProjectsPath(string? fromEnvironment) =>
+        Path.Combine(Resolve(fromEnvironment), ProjectsFileName);
 }

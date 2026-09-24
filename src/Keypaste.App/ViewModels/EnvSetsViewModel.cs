@@ -24,6 +24,8 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
 {
     private readonly AppVaultSession _session;
     private readonly ClipboardCountdown _clipboard;
+    private readonly IVaultFilePicker? _picker;
+    private readonly ProjectLaunching _launching;
 
     private IReadOnlyList<string> _projectNames = [];
     private EnvProjectViewModel? _open;
@@ -32,13 +34,19 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
     private bool _isAdding;
     private string _newProject = string.Empty;
 
-    internal EnvSetsViewModel(AppVaultSession session, ClipboardCountdown clipboard)
+    internal EnvSetsViewModel(
+        AppVaultSession session,
+        ClipboardCountdown clipboard,
+        IVaultFilePicker? picker = null,
+        ProjectLaunching? launching = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(clipboard);
 
         _session = session;
         _clipboard = clipboard;
+        _picker = picker;
+        _launching = launching ?? ProjectLaunching.ForThisMachine();
 
         OpenCommand = new RelayCommand<string>(Open);
         CopyRunCommandCommand = new RelayCommand<string>(
@@ -226,7 +234,10 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
                 _clipboard,
                 project,
                 message => Error = message,
-                outcome => Notice = outcome);
+                outcome => Notice = outcome,
+                _picker,
+                _launching,
+                Reload);
     }
 
     private void BeginAdd()

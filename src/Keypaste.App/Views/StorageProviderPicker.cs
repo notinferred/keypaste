@@ -70,4 +70,27 @@ internal sealed class StorageProviderPicker(TopLevel top) : IVaultFilePicker
 
         return picked.Count > 0 ? picked[0].TryGetLocalPath() : null;
     }
+
+    public async Task<string?> PickDotEnvAsync()
+    {
+        // No type filter: .env, .env.local and env.production are all the same kind of file.
+        var picked = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Import a .env file",
+            AllowMultiple = false,
+        }).ConfigureAwait(true);
+
+        return picked.Count > 0 ? picked[0].TryGetLocalPath() : null;
+    }
+
+    public async Task<string?> PickFolderAsync()
+    {
+        var picked = await top.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = "Choose the project's directory",
+            AllowMultiple = false,
+        }).ConfigureAwait(true);
+
+        return picked.Count > 0 ? picked[0].TryGetLocalPath() : null;
+    }
 }

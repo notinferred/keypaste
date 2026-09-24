@@ -37,4 +37,11 @@ internal interface IVaultFilePicker
     /// What the file turns out to be is <see cref="Keypaste.Core.VaultKeyfile.Inspect"/>'s to say.
     /// </remarks>
     Task<string?> PickKeyfileAsync();
+
+    /// <summary>Asks which <c>.env</c> file to import. Null when the person cancelled.</summary>
+    /// <remarks>Read, never written or deleted: the app leaves the file where it was.</remarks>
+    Task<string?> PickDotEnvAsync();
+
+    /// <summary>Asks which directory a project runs in. Null when the person cancelled.</summary>
+    Task<string?> PickFolderAsync();
 }

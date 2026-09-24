@@ -87,7 +87,7 @@
     <ContentControl Grid.Row="3" Content="{Binding OpenProject}" IsVisible="{Binding HasOpenProject}">
       <ContentControl.DataTemplates>
         <DataTemplate DataType="vm:EnvProjectViewModel">
-          <Grid RowDefinitions="Auto,Auto,Auto,Auto,*">
+          <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,*">
 
             <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,0,0,12">
               <StackPanel Grid.Column="0" Spacing="2">
@@ -104,7 +104,93 @@
                       Command="{Binding $parent[ContentControl].((vm:EnvSetsViewModel)DataContext).CloseCommand}" />
             </Grid>
 
-            <Border Grid.Row="1"
+            <!-- Where the project runs on this machine, what it runs, and the .env import. The
+                 confirmation card names the command, the directory and the variables' names;
+                 nothing here ever holds a value. -->
+            <StackPanel Grid.Row="1" Spacing="8" Margin="0,0,0,12">
+
+              <Border Background="{DynamicResource KpSurface2}"
+                      CornerRadius="{DynamicResource KpRadiusSm}"
+                      Padding="12">
+                <StackPanel Spacing="8">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBox Grid.Column="0" Text="{Binding Launch.Directory}"
+                             PlaceholderText="Project directory" />
+                    <Button Grid.Column="1" Content="Choose…" Margin="8,0,0,0"
+                            Command="{Binding Launch.ChooseDirectoryCommand}" />
+                  </Grid>
+                  <TextBox Text="{Binding Launch.Command}"
+                           FontFamily="{DynamicResource KpMono}"
+                           PlaceholderText="npm run dev" />
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="Save" Command="{Binding Launch.SaveCommand}" />
+                    <Button Content="Run" Command="{Binding Launch.RunProjectCommand}" />
+                    <Button Content="Open terminal" Command="{Binding Launch.OpenTerminalCommand}" />
+                    <Button Content="Import .env" Command="{Binding Import.ChooseCommand}" />
+                  </StackPanel>
+                  <TextBlock FontSize="11" TextWrapping="Wrap"
+                             IsVisible="{Binding !Launch.IsSupported}"
+                             Foreground="{DynamicResource KpTextMuted}"
+                             Text="This app opens terminals on Windows and Linux only. Copy the run command instead." />
+                </StackPanel>
+              </Border>
+
+              <Border IsVisible="{Binding Launch.IsConfirming}"
+                      BorderBrush="{DynamicResource KpAccent}"
+                      BorderThickness="1"
+                      CornerRadius="{DynamicResource KpRadiusSm}"
+                      Padding="12">
+                <StackPanel Spacing="6">
+                  <TextBlock Text="{Binding Launch.ConfirmTitle}" TextWrapping="Wrap"
+                             Foreground="{DynamicResource KpTextPrimary}" />
+                  <TextBlock Text="{Binding Launch.ConfirmStarts}" TextWrapping="Wrap"
+                             FontFamily="{DynamicResource KpMono}"
+                             Foreground="{DynamicResource KpTextPrimary}" />
+                  <TextBlock Text="{Binding Launch.ConfirmDirectory, StringFormat='in {0}'}" TextWrapping="Wrap"
+                             FontSize="12"
+                             Foreground="{DynamicResource KpTextSecondary}" />
+                  <TextBlock Text="{Binding Launch.ConfirmKeys}" TextWrapping="Wrap"
+                             FontSize="12" FontFamily="{DynamicResource KpMono}"
+                             Foreground="{DynamicResource KpTextSecondary}" />
+                  <TextBlock FontSize="11" TextWrapping="Wrap"
+                             Foreground="{DynamicResource KpTextMuted}"
+                             Text="Everything run in that terminal can read these values." />
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="Start" Command="{Binding Launch.ConfirmLaunchCommand}" />
+                    <Button Content="Cancel" Command="{Binding Launch.CancelLaunchCommand}" />
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+
+              <Border IsVisible="{Binding Import.IsPreviewing}"
+                      Background="{DynamicResource KpSurface2}"
+                      CornerRadius="{DynamicResource KpRadiusSm}"
+                      Padding="12">
+                <StackPanel Spacing="6">
+                  <TextBlock Text="{Binding Import.Source, StringFormat='Import {0}?'}" TextWrapping="Wrap"
+                             Foreground="{DynamicResource KpTextPrimary}" />
+                  <ItemsControl ItemsSource="{Binding Import.Rows}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="x:String">
+                        <TextBlock Text="{Binding}" FontSize="12"
+                                   FontFamily="{DynamicResource KpMono}"
+                                   Foreground="{DynamicResource KpTextSecondary}" />
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <TextBlock Text="{Binding Import.Notes}" TextWrapping="Wrap" FontSize="11"
+                             IsVisible="{Binding Import.HasNotes}"
+                             Foreground="{DynamicResource KpTextMuted}" />
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="Import" Command="{Binding Import.ConfirmCommand}" />
+                    <Button Content="Cancel" Command="{Binding Import.CancelCommand}" />
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+
+            </StackPanel>
+
+            <Border Grid.Row="2"
                     IsVisible="{Binding IsAdding}"
                     Background="{DynamicResource KpSurface2}"
                     CornerRadius="{DynamicResource KpRadiusSm}"
@@ -166,7 +252,7 @@
             </Border>
 
             <!-- The one place KpDanger appears here. -->
-            <Border Grid.Row="2"
+            <Border Grid.Row="3"
                     IsVisible="{Binding IsRemoving}"
                     BorderBrush="{DynamicResource KpDanger}"
                     BorderThickness="1"
@@ -184,7 +270,7 @@
               </StackPanel>
             </Border>
 
-            <Border Grid.Row="3"
+            <Border Grid.Row="4"
                     IsVisible="{Binding IsReplacing}"
                     Background="{DynamicResource KpSurface2}"
                     CornerRadius="{DynamicResource KpRadiusSm}"
@@ -209,7 +295,7 @@
               </StackPanel>
             </Border>
 
-            <ScrollViewer Grid.Row="4">
+            <ScrollViewer Grid.Row="5">
               <ItemsControl ItemsSource="{Binding Variables}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:EnvVariableRow">

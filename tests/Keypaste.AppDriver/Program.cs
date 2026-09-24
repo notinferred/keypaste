@@ -943,5 +943,9 @@ internal sealed class Driver(string home)
         public Task<string?> PickExportDestinationAsync(string suggestedName) => Task.FromResult(ExportPath);
 
         public Task<string?> PickKeyfileAsync() => Task.FromResult(KeyfilePath);
+
+        public Task<string?> PickDotEnvAsync() => Task.FromResult<string?>(null);
+
+        public Task<string?> PickFolderAsync() => Task.FromResult<string?>(null);
     }
 }

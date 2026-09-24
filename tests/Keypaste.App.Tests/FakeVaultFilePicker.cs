@@ -64,4 +64,12 @@ internal sealed class FakeVaultFilePicker : IVaultFilePicker
         KeyfileCalls++;
         return Task.FromResult(KeyfilePath);
     }
+
+    internal string? DotEnvPath { get; set; }
+
+    internal string? FolderPath { get; set; }
+
+    public Task<string?> PickDotEnvAsync() => Task.FromResult(DotEnvPath);
+
+    public Task<string?> PickFolderAsync() => Task.FromResult(FolderPath);
 }

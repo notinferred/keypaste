@@ -210,37 +210,16 @@ internal static class EnvPullCommand
         CliContext context)
     {
         var store = new EnvStore(vault);
-        var existing = store.Read(project).ToDictionary(v => v.Key, v => v.Value, StringComparer.Ordinal);
+        var plan = EnvImport.Plan(store, project, document);
 
-        if (Collision(document.Variables, existing) is { } collision)
+        if (plan.Refusal is { } collision)
         {
             return Fail(context, collision);
         }
 
-        List<string> created = [];
-        List<string> updated = [];
-        var unchanged = 0;
-
-        foreach (var variable in document.Variables)
-        {
-            if (!existing.TryGetValue(variable.Key, out var current))
-            {
-                created.Add(variable.Key);
-            }
-            else if (!string.Equals(current, variable.Value, StringComparison.Ordinal))
-            {
-                updated.Add(variable.Key);
-            }
-            else
-            {
-                unchanged++;
-            }
-        }
-
-        // Sorted, like every other listing keypaste prints, so the plan reads the same way as the
-        // `env ls` the user runs straight afterwards.
-        created.Sort(StringComparer.Ordinal);
-        updated.Sort(StringComparer.Ordinal);
+        var created = plan.Created;
+        var updated = plan.Updated;
+        var unchanged = plan.Unchanged;
 
         var groupPath = EnvConvention.GroupPath(project);
         context.Stderr.WriteLine(
@@ -271,24 +250,8 @@ internal static class EnvPullCommand
             }
         }
 
-        var write = new HashSet<string>(created.Concat(updated), StringComparer.Ordinal);
-
-        foreach (var variable in document.Variables)
+        if (!EnvImport.TryApply(store, plan, out var rejection))
         {
-            // Unchanged variables are skipped rather than rewritten. TrySet cannot tell that the
-            // new value equals the old one, so it would spend a KDBX history slot — of the ten the
-            // format keeps — recording a change that did not happen, and bump the modification
-            // time of an entry the user also maintains in KeePassXC.
-            if (!write.Contains(variable.Key))
-            {
-                continue;
-            }
-
-            if (store.TrySet(project, variable.Key, variable.Value, out var rejection) != EnvSetOutcome.Rejected)
-            {
-                continue;
-            }
-
             // Everything that could be refused was checked before the confirmation, so reaching
             // here means the check and the writer disagree. Nothing has been saved, so the file on
             // disk is still untouched — say so and stop rather than write part of the set.
@@ -302,44 +265,6 @@ internal static class EnvPullCommand
         context.Stderr.WriteLine(
             $"Imported {Count(created.Count + updated.Count, "variable")} into {groupPath}.");
         return CliApp.ExitSuccess;
-    }
-
-    /// <summary>
-    /// Finds a pair of names that differ only in case, in the file or against the vault.
-    /// </summary>
-    /// <remarks>
-    /// Two such names are two variables on Linux and one on Windows, so there is no import that
-    /// means the same thing everywhere. <see cref="EnvStore.TrySet"/> refuses the second one
-    /// anyway; catching it here means the refusal arrives before the confirmation rather than
-    /// halfway through the loop.
-    /// </remarks>
-    private static string? Collision(
-        IReadOnlyList<DotEnvVariable> variables,
-        Dictionary<string, string> existing)
-    {
-        var seen = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var variable in variables)
-        {
-            if (seen.TryGetValue(variable.Key, out var other) &&
-                !string.Equals(other, variable.Key, StringComparison.Ordinal))
-            {
-                return $"the file sets both '{other}' and '{variable.Key}', which differ only in case";
-            }
-
-            seen[variable.Key] = variable.Key;
-
-            foreach (var name in existing.Keys)
-            {
-                if (string.Equals(name, variable.Key, StringComparison.OrdinalIgnoreCase) &&
-                    !string.Equals(name, variable.Key, StringComparison.Ordinal))
-                {
-                    return $"the project already has '{name}', which differs from '{variable.Key}' only in case";
-                }
-            }
-        }
-
-        return null;
     }
 
     /// <summary>Offers to remove the file, and says plainly what removing it does not do.</summary>
@@ -496,7 +421,7 @@ internal static class EnvPullCommand
         return CliApp.ExitSuccess;
     }
 
-    private static void WriteNames(CliContext context, string label, List<string> names)
+    private static void WriteNames(CliContext context, string label, IReadOnlyList<string> names)
     {
         if (names.Count > 0)
         {

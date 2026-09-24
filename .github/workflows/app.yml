@@ -12,6 +12,7 @@ on:
       - 'tests/Keypaste.Consistency.Tests/**'
       - 'tests/Keypaste.AppDriver/**'
       - 'tests/Keypaste.FakeMcpClient/**'
+      - 'tests/Keypaste.EnvReporter/**'
       - 'scripts/verify-keepassxc-workflows.sh'
       - 'scripts/verify-session-authority.sh'
       - 'scripts/verify-lock-boundary.sh'

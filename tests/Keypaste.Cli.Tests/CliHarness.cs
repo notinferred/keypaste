@@ -2,10 +2,10 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using Keypaste.Cli.Clipboard;
-using Keypaste.Cli.Execution;
 using Keypaste.Cli.Prompting;
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
+using Keypaste.Core.Launch;
 using Keypaste.Core.Processes;
 
 namespace Keypaste.Cli.Tests;

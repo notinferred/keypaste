@@ -1,5 +1,5 @@
 using Keypaste.Cli.Commands;
-using Keypaste.Cli.Execution;
+using Keypaste.Core.Launch;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;

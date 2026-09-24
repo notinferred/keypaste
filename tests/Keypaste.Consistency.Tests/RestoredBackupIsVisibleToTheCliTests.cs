@@ -121,5 +121,9 @@ public sealed class RestoredBackupIsVisibleToTheCliTests
         public Task<string?> PickExportDestinationAsync(string suggestedName) => Task.FromResult<string?>(null);
 
         public Task<string?> PickKeyfileAsync() => Task.FromResult<string?>(null);
+
+        public Task<string?> PickDotEnvAsync() => Task.FromResult<string?>(null);
+
+        public Task<string?> PickFolderAsync() => Task.FromResult<string?>(null);
     }
 }

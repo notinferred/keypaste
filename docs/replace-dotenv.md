@@ -74,7 +74,7 @@ See [SECURITY.md](../SECURITY.md) for the deletion and exposure limits.
 keypaste run dev -- npm start
 ```
 
-This command currently asks for the vault password on each invocation; an unlocked desktop does not satisfy it. Env Sets in the desktop only copies the command. Reusing one desktop unlock to launch an app or terminal is planned in [STEPS](STEPS.md), not available yet.
+This command currently asks for the vault password on each invocation; an unlocked desktop does not satisfy it. In source, the desktop's Env Sets screen can instead import the `.env` and, once you save the project's directory and command, open a terminal running it with the set from the unlocked app after you confirm it ([desktop](desktop.md#what-the-screens-show)). Using the desktop's unlock from `keypaste run` is planned in [STEPS](STEPS.md) as E.1c.
 
 keypaste places variables in the child environment without writing a plaintext env file. CI points temporary directories at an empty folder and checks that the injection fixture leaves it empty. The child can still write or forward values; review its logging and behavior.
 
