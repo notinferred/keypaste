@@ -6,6 +6,7 @@
 
 | id | date | decision | supersedes |
 |---|---|---|---|
+| D-0365 | 2026-09-25 | Founder direction amends PRODUCT §2: with `--allow-run`, MCP may start one command the person approves exactly (program, arguments, directory, variable names, reason) or covers by a grant of at most 15 minutes, with values injected and scrubbed from its output; no shell, and nothing enables it by default | PRODUCT §2's bar on shell execution over MCP, for `--allow-run` only |
 | D-0364 | 2026-09-25 | keypaste.com's tables move to a new PlanetScale database with SQL-created roles `keypaste_signup_writer` (INSERT on `signup`) and `keypaste_share` (the `share` table only), each behind its own uncached `verify-full` Hyperdrive config, and `SHARE_ENABLED` is set in `wrangler.jsonc`, so share links are served | the deleted signup Hyperdrive config `9ef85ab2…` |
 | D-0363 | 2026-09-25 | Agent Activity's history reads a missing audit log as a session with no records yet and only an unreadable log as unavailable | D-0331 |
 | D-0362 | 2026-09-25 | A share passphrase has at least 20 characters, and the CLI and desktop point to six generated words, because the status answer's passphrase check lets whoever holds a link test guesses offline without spending a view; the check stays so a mistyped passphrase costs no view | — |

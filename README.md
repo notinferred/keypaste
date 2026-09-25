@@ -29,7 +29,7 @@ The published `v0.3.0` CLI stores logins and environment variables in a local KD
 **For developers and their agents**
 
 - MCP approval: an agent asks for one field of one entry and gives its reason. You answer Deny, Allow once or Allow for 1 hour, and every request lands in a hash-chained audit log.
-- Inject-only runs: `keypaste run` puts values in a command's environment and nothing on disk. With `--allow-run`, an agent can run a command you approve and gets back its output with each value replaced, though a command it can edit can still reveal a value ([T-35](THREATS.md#t-35--a-run-keeps-values-out-of-the-result-not-out-of-the-agents-reach)). The `run` tool awaits the founder's amendment of [PRODUCT §2](docs/PRODUCT.md), which still rules out shell execution over MCP.
+- Inject-only runs: `keypaste run` puts values in a command's environment and nothing on disk. With `--allow-run`, an agent can run a command you approve and gets back its output with each value replaced, though a command it can edit can still reveal a value ([T-35](THREATS.md#t-35--a-run-keeps-values-out-of-the-result-not-out-of-the-agents-reach)). [PRODUCT §2](docs/PRODUCT.md) bounds it: no shell, and you approve the exact command.
 - Env profiles: one set of keys per project, with a value for dev, staging and prod. Prod always needs a live answer.
 - `.env.keypaste`: `KEY=kp://project/profile/KEY` references and no values, safe to commit.
 - Scoped tokens for CI, such as `read:acme-api/staging/*`: inject-only, and expiring after 30 days by default.
