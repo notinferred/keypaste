@@ -1,10 +1,54 @@
-# keypaste
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/keypaste-lockup-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="assets/brand/keypaste-lockup-light.svg">
+    <img alt="keypaste" src="assets/brand/keypaste-lockup-light.svg" width="240">
+  </picture>
+</h1>
 
-keypaste is being built as a local, KeePass-compatible password manager with project environments and human-approved AI access. The intended desktop workflow is one unlock session for the vault, native MCP approvals and project launches.
+<p align="center">keypaste keeps your logins and your projects' secrets in one KeePass-compatible vault, and gives an AI agent a secret only when you allow it: once, or for 1 hour.</p>
 
-The published CLI already stores passwords and environment variables in a local KDBX vault, injects variables into child processes, and lets AI agents request one credential at a time through scoped approvals and a local audit log. The shared desktop session is not implemented yet.
+<p align="center">
+  <img src="docs/screenshots/secrets.png" width="880" alt="The keypaste desktop app on its Secrets screen: a github login open with its username, masked password, URL, notes and kp:// reference, and the list of logins and env variables beside it.">
+</p>
 
-## Current CLI demo
+<p align="center"><sub>The desktop app, built from source. It has no public release yet.</sub></p>
+
+## What it does
+
+The published `v0.3.0` CLI stores logins and environment variables in a local KDBX vault, runs commands with them, and asks you before an agent receives one. Everything else below is in source until the next release, and the desktop app has no public release; [FEATURES](docs/FEATURES.md) records what exists where.
+
+**As a password manager**
+
+- One KDBX 4 file on your disk, with no account and no network. KeePassXC opens and edits the same file, and CI checks both directions against `keepassxc-cli` on Linux, macOS and Windows.
+- Logins with a title, username, password, URL and notes, in groups. Search covers titles, usernames and URLs and never reads a password.
+- A generator for 8 to 256 characters from a shell-safe alphabet, or passphrases of 6 to 32 words from the EFF list. `keypaste rotate` replaces a password with a generated one and never prints it.
+- History for every change, restored in one step, and rolling encrypted backups beside the vault.
+- `keypaste import` copies another KDBX file in, or keeps editing it in place.
+
+**For developers and their agents**
+
+- MCP approval: an agent asks for one field of one entry and gives its reason. You answer Deny, Allow once or Allow for 1 hour, and every request lands in a hash-chained audit log.
+- Inject-only runs: `keypaste run` puts values in a command's environment and nothing on disk. With `--allow-run`, an agent can run a command you approve with secrets it never sees.
+- Env profiles: one set of keys per project, with a value for dev, staging and prod. Prod always needs a live answer.
+- `.env.keypaste`: `KEY=kp://project/profile/KEY` references and no values, safe to commit.
+- Scoped tokens for CI, such as `read:acme-api/staging/*`: inject-only, and expiring after 30 days by default.
+- Share links: one field, encrypted on your machine, opened a set number of times before it expires. The command exists; the keypaste.com service behind it is coming.
+
+<table>
+  <tr>
+    <td width="33%"><img src="docs/screenshots/approval-prompt.png" alt="The approval prompt: claude-code wants 1 secret, env/acme-api/DATABASE_URL, with the agent's reason and the choices Deny, Allow once and Allow for 1 hour."></td>
+    <td width="33%"><img src="docs/screenshots/env-profiles.png" alt="Env profiles: a matrix of acme-api's keys across dev, staging and prod, with masked values, and the .env.keypaste preview holding only kp:// references."></td>
+    <td width="33%"><img src="docs/screenshots/agents.png" alt="Agents: a request waiting for you, active grants with the time left and Revoke, and each MCP client's policy."></td>
+  </tr>
+  <tr>
+    <td>An agent's request, in the app</td>
+    <td>Env profiles and <code>.env.keypaste</code></td>
+    <td>Grants, clients and their policies</td>
+  </tr>
+</table>
+
+## The approval, in the terminal
 
 ![An agent asks keypaste for one credential; a person approves it; the audit log records it.](docs/demo/keypaste-demo.gif)
 
@@ -26,11 +70,11 @@ keypaste: an agent is asking for a credential.
 
 [The demo](docs/demo.md) shows a credential request, approval and deploy in about sixty seconds.
 
-The vault is a file on your disk and works without an account or network. You can transport the encrypted file with your existing file-sync service; keypaste has no merge or managed-sync workflow. CI checks read/write compatibility against a real `keepassxc-cli` on Linux, macOS and Windows on qualifying pushes to `main` and every pull request. KDBX compatibility does not mean complete KeePassXC feature coverage. The code is open source under AGPL-3.0.
+You can transport the encrypted file with your existing file-sync service; keypaste has no merge or managed-sync workflow. KDBX compatibility does not mean complete KeePassXC feature coverage. The code is open source under AGPL-3.0.
 
 The published download is pre-1.0 CLI/MCP `v0.3.0`. Replace `v0.2.0`: a save racing another program's save could undo it without keeping the lost change in history. Replace `v0.1.0`: it could also delete a vault through `env export`, modify the wrong entry through `env rm`, and return the wrong password through `get`. [CHANGELOG](CHANGELOG.md#030) lists what `v0.3.0` repairs. Published versions are immutable, so both remain available with those defects.
 
-The [desktop app](docs/desktop.md) creates and edits vaults and restores entry history in source, but has no public release. Credential approvals still use a separately unlocked terminal process; locking the app does not lock that process. The app's env screen copies a run command rather than launching a project. [RELEASE](docs/RELEASE.md) defines distribution status, [STEPS](docs/STEPS.md) owns the focused desktop plan, and [PRODUCT](docs/PRODUCT.md) defines product commitments. Broader ideas are in [BACKLOG](docs/BACKLOG.md).
+The [desktop app](docs/desktop.md) holds the vault unlocked for one session: it answers agents in its own prompt window, launches projects with their variables and locks everything at once. [RELEASE](docs/RELEASE.md) defines distribution status, [STEPS](docs/STEPS.md) owns the plan, and [PRODUCT](docs/PRODUCT.md) defines product commitments. Broader ideas are in [BACKLOG](docs/BACKLOG.md).
 
 ## Install
 
@@ -238,7 +282,7 @@ keypaste env export billing .env --dotenv
 keypaste env export billing --dotenv --stdout
 ```
 
-Export requires `--dotenv`. File output warns with the destination path and asks for confirmation; overwriting also requires `--force`. keypaste reports a `.git` ancestor and creates owner-readable files on Linux and macOS. Windows has no equivalent permission control and reports that limit. Export refuses to overwrite its source vault or any other KeePass vault, even with `--force`; in `v0.1.0`, `--force` could destroy the vault. Prefer `keypaste run` when a file is unnecessary.
+In `v0.3.0`, export requires `--dotenv`. In Unreleased source, `keypaste env export billing -p staging > .env.keypaste` without it writes one `kp://` reference per variable and no value, which `keypaste run --env-file .env.keypaste -- <command>` resolves; [Replace your `.env`](docs/replace-dotenv.md#profiles-and-references) covers profiles and references. With `--dotenv`, file output warns with the destination path and asks for confirmation; overwriting also requires `--force`. keypaste reports a `.git` ancestor and creates owner-readable files on Linux and macOS. Windows has no equivalent permission control and reports that limit. Export refuses to overwrite its source vault or any other KeePass vault, even with `--force`; in `v0.1.0`, `--force` could destroy the vault. Prefer `keypaste run` when a file is unnecessary.
 
 Export uses single quotes where possible for consistent reading by `motdotla/dotenv`, `python-dotenv`, `godotenv`, Docker Compose v2 and `sh`. Values containing apostrophes or carriage returns need escapes; keypaste names those keys on stderr because readers differ in escape handling.
 

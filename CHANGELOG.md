@@ -6,6 +6,30 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 All of this is source only: there is still no desktop download, and the published CLI is unchanged. Each entry that names a step links its record, which holds the full account.
 
+keypaste has a new brand: the k monogram, amber on ink, Instrument Sans and Fragment Mono ([BRAND](docs/BRAND.md)). The desktop app is rebuilt on it, with Secrets, Agents, Activity, Env profiles and Sharing screens, a new lock screen and restyled prompt windows, and keypaste.com and the README use it too.
+
+Every approval prompt, in the desktop and in `keypaste agent`, offers Deny, Allow once, which keeps nothing, and Allow for 1 hour (`d`, `o` and `h` at the terminal), whatever lifetime the agent asked for. `--max-ttl` shortens the hour. An entry in a protected profile such as `prod` offers Allow once only.
+
+A project holds profiles: `env/<project>` is dev and `env/<project>/<profile>` any other. `-p` picks one in `env` and `run`, `env diff` compares key names across profiles without printing a value, and profiles named `prod` or `production` are protected. `kp://<project>/<profile>/<KEY>` and `kp:///<group>/<title>#<field>` name a value without holding it.
+
+`keypaste env export` now writes a `.env.keypaste` of `kp://` references and no values, safe to commit; `--dotenv` still writes plaintext. `keypaste run --env-file .env.keypaste` resolves every reference or starts nothing.
+
+`keypaste token create` makes a scoped, inject-only token for CI, such as `read:acme-api/staging/*`, printed once and expiring after 30 days by default. `keypaste run --token` injects what its scope covers through the process holding the vault, which audits it, and `token bundle` seals the sets into a file for `run --bundle`. A protected profile needs `--allow-prod` and still asks you live.
+
+`keypaste share` encrypts one field on this machine and uploads only ciphertext. The link holds the key, opens 1 to 10 times, expires after 5 minutes to 7 days, can require a passphrase and can be revoked; `share ls` lists your links. keypaste.com does not serve links yet.
+
+`keypaste import <file.kdbx>` copies another KeePass file into the vault with its fields, attachments and history, leaving its recycle bin behind and never writing the file. `--dry-run` shows the plan and `--in-place` keeps editing the file itself. The desktop has the same as its Import .kdbx dialog.
+
+`keypaste-mcp --allow-run` offers agents a `run` tool. After you approve the exact command, directory, variable names and reason, or under a grant of at most 15 minutes for that command line, it runs the command with the values in its environment and returns its output with each value replaced. Nothing adds `--allow-run` for you.
+
+`~/.keypaste/clients.toml` narrows one MCP client at a time: Ask every time, Session grants up to 1 hour, or Inject only. Set it with `keypaste mcp policy` or on the desktop's Agents screen.
+
+`keypaste rotate <entry>` and the entry pane's Rotate replace a password with a generated one, keeping the old value in history and never showing the new one.
+
+`keypaste grants` lists the grants the process holding the vault has given, never a value; `grants revoke <id|agent>` and `--all` end them. `keypaste lock` locks the desktop app or `keypaste agent` holding the vault.
+
+The CLI shows what needs you in amber, what is done in green and what was refused in red, and groups its help into secrets, agents and vault commands. `--json` gives machine-readable output from `ls`, `env ls`, `log`, `grants`, `token ls`, `share ls` and `mcp policy`. `set`, `get --reveal`, `mcp serve` and `mcp setup` join `add`, `get --show`, `agent` and `setup`. Audit lines now name the vault, the entries used and a run's command.
+
 The desktop's Entries screen no longer overlaps with an entry open: the search box, Add, Organize and Delete run across the list and the entry's pane, and the dividers sit between the panes instead of over them. The main window can no longer be made narrower than 960 px, the least width at which the screen fits ([F.22](docs/steps/F.22.md)).
 
 Closing the desktop's main window now quits the app even while an agent's request waits in its prompt window: the request is refused as `vault-locked` and the prompt closes. Before, the prompt kept the app running with the vault unlocked, and Approve on it still released the value ([F.21](docs/steps/F.21.md)).
