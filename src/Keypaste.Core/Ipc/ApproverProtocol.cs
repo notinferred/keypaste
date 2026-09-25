@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
+using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 
 namespace Keypaste.Core.Ipc;
@@ -914,6 +915,380 @@ public static class ApproverProtocol
                 reason);
             return true;
         }
+    }
+
+    /// <summary>The most grants one reply lists, and the most ids one revoke names.</summary>
+    public const int MaximumGrantRows = 256;
+
+    /// <summary>Encodes a request for the grants in force.</summary>
+    /// <param name="request">The attachment it is made under.</param>
+    /// <returns>The frame's bytes, without a delimiter.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    public static byte[] Encode(GrantsRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return WriteAttached(GrantsKind, request.Vault, request.Session, _ => { });
+    }
+
+    /// <summary>Encodes the grants in force, bounded to what one frame can carry.</summary>
+    /// <param name="reply">The grants, or why none were listed.</param>
+    /// <returns>The frame's bytes. Never over <see cref="MessageFramer.MaximumPayloadBytes"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
+    /// <remarks>
+    /// Rows are dropped whole from the end, past <see cref="MaximumGrantRows"/> or past the frame, and
+    /// <c>complete</c> is then false, as a names reply is bounded.
+    /// </remarks>
+    public static byte[] Encode(GrantsReply reply)
+    {
+        ArgumentNullException.ThrowIfNull(reply);
+
+        var budget = MessageFramer.MaximumPayloadBytes - WriteGrants(reply, 0, false).Length;
+        var buffer = new ArrayBufferWriter<byte>(256);
+        using var measure = new Utf8JsonWriter(buffer);
+        var used = 0;
+        var kept = 0;
+
+        foreach (var grant in reply.Grants.Take(MaximumGrantRows))
+        {
+            buffer.Clear();
+            measure.Reset(buffer);
+            WriteGrant(measure, grant);
+            measure.Flush();
+
+            var cost = buffer.WrittenCount + (kept == 0 ? 0 : 1);
+
+            if (used + cost > budget)
+            {
+                break;
+            }
+
+            used += cost;
+            kept++;
+        }
+
+        var frame = WriteGrants(reply, kept, reply.Complete && kept == reply.Grants.Count);
+
+        return frame.Length <= MessageFramer.MaximumPayloadBytes
+            ? frame
+            : WriteGrants(new GrantsReply(reply.Answered, [], false, Undersized), 0, false);
+    }
+
+    private static byte[] WriteGrants(GrantsReply reply, int count, bool complete) =>
+        Write(writer =>
+        {
+            writer.WriteNumber("v", Version);
+            writer.WriteString("kind", GrantsKind);
+            writer.WriteBoolean("answered", reply.Answered);
+            writer.WriteBoolean("complete", complete);
+            writer.WriteString("reason", reply.Reason);
+            writer.WriteStartArray("grants");
+
+            for (var i = 0; i < count; i++)
+            {
+                WriteGrant(writer, reply.Grants[i]);
+            }
+
+            writer.WriteEndArray();
+        });
+
+    private static void WriteGrant(Utf8JsonWriter writer, GrantSummary grant)
+    {
+        writer.WriteStartObject();
+        writer.WriteString("id", grant.Id);
+        writer.WriteString("kind", grant.Kind);
+        writer.WriteString("client", grant.Client);
+        writer.WriteString("scope", grant.Scope);
+        writer.WriteString("field", grant.Field);
+        writer.WriteNumber("seconds_left", grant.SecondsLeft);
+        writer.WriteEndObject();
+    }
+
+    /// <summary>Encodes a request to end grants.</summary>
+    /// <param name="request">Which grants, and the attachment it is made under.</param>
+    /// <returns>The frame's bytes, without a delimiter.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    public static byte[] Encode(RevokeGrantsRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return WriteAttached(RevokeGrantsKind, request.Vault, request.Session, writer =>
+        {
+            WriteStrings(writer, "ids", request.Ids);
+
+            if (request.Client is null)
+            {
+                writer.WriteNull("client");
+            }
+            else
+            {
+                writer.WriteString("client", request.Client);
+            }
+
+            writer.WriteBoolean("all", request.All);
+        });
+    }
+
+    /// <summary>Encodes how many grants were ended.</summary>
+    /// <param name="reply">The count, or why none.</param>
+    /// <returns>The frame's bytes, without a delimiter.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
+    public static byte[] Encode(RevokeGrantsReply reply)
+    {
+        ArgumentNullException.ThrowIfNull(reply);
+
+        return Write(writer =>
+        {
+            writer.WriteNumber("v", Version);
+            writer.WriteString("kind", RevokeGrantsKind);
+            writer.WriteNumber("revoked", reply.Revoked);
+            writer.WriteString("reason", reply.Reason);
+        });
+    }
+
+    /// <summary>Encodes a request to lock now.</summary>
+    /// <param name="request">The attachment it is made under.</param>
+    /// <returns>The frame's bytes, without a delimiter.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    public static byte[] Encode(LockRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return WriteAttached(LockKind, request.Vault, request.Session, _ => { });
+    }
+
+    /// <summary>Encodes whether the owner is locking.</summary>
+    /// <param name="reply">The answer.</param>
+    /// <returns>The frame's bytes, without a delimiter.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
+    public static byte[] Encode(LockReply reply)
+    {
+        ArgumentNullException.ThrowIfNull(reply);
+
+        return Write(writer =>
+        {
+            writer.WriteNumber("v", Version);
+            writer.WriteString("kind", LockKind);
+            writer.WriteBoolean("locking", reply.Locking);
+            writer.WriteString("reason", reply.Reason);
+        });
+    }
+
+    /// <summary>Decodes a request for the grants in force.</summary>
+    /// <param name="frame">The frame's bytes.</param>
+    /// <param name="request">The decoded request.</param>
+    /// <returns><see langword="true"/> when the frame was a well-formed grants request.</returns>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out GrantsRequest? request)
+    {
+        request = TryAttached(frame, GrantsKind, out var vault, out var session, out _)
+            ? new GrantsRequest { Vault = vault, Session = session }
+            : null;
+
+        return request is not null;
+    }
+
+    /// <summary>Decodes the grants in force.</summary>
+    /// <param name="frame">The frame's bytes.</param>
+    /// <param name="reply">The decoded reply.</param>
+    /// <returns><see langword="true"/> when the frame was a well-formed grants reply of at most <see cref="MaximumGrantRows"/> rows.</returns>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out GrantsReply? reply)
+    {
+        reply = null;
+
+        if (!TryParse(frame, out var document))
+        {
+            return false;
+        }
+
+        using (document)
+        {
+            var root = document.RootElement;
+
+            if (!IsKind(root, GrantsKind)
+                || !TryBoolean(root, "answered", out var answered)
+                || !TryString(root, "reason", out var reason)
+                || !root.TryGetProperty("grants", out var rows)
+                || rows.ValueKind != JsonValueKind.Array
+                || rows.GetArrayLength() > MaximumGrantRows)
+            {
+                return false;
+            }
+
+            var grants = new List<GrantSummary>(rows.GetArrayLength());
+
+            foreach (var row in rows.EnumerateArray())
+            {
+                if (row.ValueKind != JsonValueKind.Object
+                    || !TryString(row, "id", out var id)
+                    || !TryString(row, "kind", out var kind)
+                    || !TryString(row, "client", out var client)
+                    || !TryString(row, "scope", out var scope)
+                    || !TryString(row, "field", out var field)
+                    || !TryInteger(row, "seconds_left", out var seconds)
+                    || seconds < 0)
+                {
+                    return false;
+                }
+
+                grants.Add(new GrantSummary(id, kind, client, scope, field, seconds));
+            }
+
+            reply = new GrantsReply(answered, grants, TrueOnly(root, "complete"), reason);
+            return true;
+        }
+    }
+
+    /// <summary>Decodes a request to end grants.</summary>
+    /// <param name="frame">The frame's bytes.</param>
+    /// <param name="request">The decoded request.</param>
+    /// <returns><see langword="true"/> when the frame was well formed: at most <see cref="MaximumGrantRows"/> ids, each one a <see cref="GrantId"/>.</returns>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out RevokeGrantsRequest? request)
+    {
+        request = null;
+
+        if (!TryAttached(frame, RevokeGrantsKind, out var vault, out var session, out var root)
+            || !TryStrings(root, "ids", out var ids)
+            || ids.Count > MaximumGrantRows
+            || !ids.All(GrantId.IsId)
+            || !root.TryGetProperty("client", out var clientElement)
+            || clientElement.ValueKind is not (JsonValueKind.String or JsonValueKind.Null)
+            || !TryBoolean(root, "all", out var all))
+        {
+            return false;
+        }
+
+        request = new RevokeGrantsRequest(ids, clientElement.GetString(), all) { Vault = vault, Session = session };
+        return true;
+    }
+
+    /// <summary>Decodes how many grants were ended.</summary>
+    /// <param name="frame">The frame's bytes.</param>
+    /// <param name="reply">The decoded reply.</param>
+    /// <returns><see langword="true"/> when the frame was a well-formed revoke reply.</returns>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out RevokeGrantsReply? reply)
+    {
+        reply = null;
+
+        if (!TryParse(frame, out var document))
+        {
+            return false;
+        }
+
+        using (document)
+        {
+            var root = document.RootElement;
+
+            if (!IsKind(root, RevokeGrantsKind)
+                || !TryInteger(root, "revoked", out var revoked)
+                || revoked < 0
+                || !TryString(root, "reason", out var reason))
+            {
+                return false;
+            }
+
+            reply = new RevokeGrantsReply(revoked, reason);
+            return true;
+        }
+    }
+
+    /// <summary>Decodes a request to lock now.</summary>
+    /// <param name="frame">The frame's bytes.</param>
+    /// <param name="request">The decoded request.</param>
+    /// <returns><see langword="true"/> when the frame was a well-formed lock request.</returns>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out LockRequest? request)
+    {
+        request = TryAttached(frame, LockKind, out var vault, out var session, out _)
+            ? new LockRequest { Vault = vault, Session = session }
+            : null;
+
+        return request is not null;
+    }
+
+    /// <summary>Decodes whether the owner is locking.</summary>
+    /// <param name="frame">The frame's bytes.</param>
+    /// <param name="reply">The decoded reply.</param>
+    /// <returns><see langword="true"/> when the frame was a well-formed lock reply.</returns>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out LockReply? reply)
+    {
+        reply = null;
+
+        if (!TryParse(frame, out var document))
+        {
+            return false;
+        }
+
+        using (document)
+        {
+            var root = document.RootElement;
+
+            if (!IsKind(root, LockKind)
+                || !TryBoolean(root, "locking", out var locking)
+                || !TryString(root, "reason", out var reason))
+            {
+                return false;
+            }
+
+            reply = new LockReply(locking, reason);
+            return true;
+        }
+    }
+
+    private static byte[] WriteAttached(string kind, string vault, string session, Action<Utf8JsonWriter> body) =>
+        Write(writer =>
+        {
+            writer.WriteNumber("v", Version);
+            writer.WriteString("kind", kind);
+            writer.WriteString("vault", vault);
+            writer.WriteString("session", session);
+            body(writer);
+        });
+
+    /// <summary>Reads a request's kind, vault and session, and hands back a copy of its root for the rest.</summary>
+    private static bool TryAttached(
+        ReadOnlySpan<byte> frame,
+        string kind,
+        [NotNullWhen(true)] out string? vault,
+        [NotNullWhen(true)] out string? session,
+        out JsonElement root)
+    {
+        vault = null;
+        session = null;
+        root = default;
+
+        if (!TryParse(frame, out var document))
+        {
+            return false;
+        }
+
+        using (document)
+        {
+            var parsed = document.RootElement;
+
+            if (!IsKind(parsed, kind)
+                || !TryString(parsed, "vault", out vault)
+                || !TryString(parsed, "session", out session))
+            {
+                vault = null;
+                session = null;
+                return false;
+            }
+
+            root = parsed.Clone();
+            return true;
+        }
+    }
+
+    private static bool TryBoolean(JsonElement root, string name, out bool value)
+    {
+        value = false;
+
+        if (!root.TryGetProperty(name, out var element) || element.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+        {
+            return false;
+        }
+
+        value = element.GetBoolean();
+        return true;
     }
 
     private static bool TryPairs(

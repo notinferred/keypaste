@@ -38,7 +38,7 @@ namespace Keypaste.Cli.Commands;
 /// <para>
 /// <b>The vault stays unlocked for as long as this runs.</b> There is no idle auto-lock — closing
 /// the terminal is the lock — and that is stated in docs/approvals.md rather than left for somebody
-/// to discover. Ctrl+C, SIGTERM and closing the terminal end the unlock's
+/// to discover. Ctrl+C, SIGTERM, closing the terminal and <c>keypaste lock</c> end the unlock's
 /// <see cref="SessionLifetime"/> before the listener stops, the same transition the desktop's locks
 /// take, so a request waiting at the prompt is withdrawn and denied and every grant is zeroed
 /// (D-0313).
@@ -161,6 +161,9 @@ internal static class AgentCommand
             new PolicyGate(policy.Rules, TimeProvider.System),
             Narrate);
 
+        using var stop = new CancellationTokenSource();
+
+        // `keypaste lock` ends the lifetime and stops the listener, the same way a signal does.
         var authority = new SessionAuthority(
             claim.Vault,
             () => lifetime,
@@ -170,7 +173,8 @@ internal static class AgentCommand
                 asked => ReferenceEquals(asked, lifetime) && asked.IsLive ? vault : null,
                 TimeProvider.System,
                 envGrants,
-                Narrate));
+                Narrate),
+            lockNow: () => Stop(lifetime, stop));
 
         ApproverListener? listener = null;
 
@@ -188,8 +192,6 @@ internal static class AgentCommand
                 console.WriteLine("keypaste: another keypaste process may be listening on that name.");
                 return CliApp.ExitInternalError;
             }
-
-            using var stop = new CancellationTokenSource();
 
             // A signal ends the lifetime and then stops the listener, rather than ending the
             // process, so a waiting request is answered as locked, the vault is disposed and the
@@ -221,6 +223,21 @@ internal static class AgentCommand
         return CliApp.ExitSuccess;
     }
 
+    /// <summary>Ends the lifetime, then stops the listener; a stop that arrives after the agent has gone does nothing.</summary>
+    private static void Stop(SessionLifetime lifetime, CancellationTokenSource stop)
+    {
+        lifetime.End();
+
+        try
+        {
+            stop.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Already stopped.
+        }
+    }
+
     private static List<PosixSignalRegistration> LockOnSignals(SessionLifetime lifetime, CancellationTokenSource stop)
     {
         List<PosixSignalRegistration> registrations = [];
@@ -232,8 +249,7 @@ internal static class AgentCommand
                 registrations.Add(PosixSignalRegistration.Create(signal, context =>
                 {
                     context.Cancel = true;
-                    lifetime.End();
-                    stop.Cancel();
+                    Stop(lifetime, stop);
                 }));
             }
             catch (PlatformNotSupportedException)

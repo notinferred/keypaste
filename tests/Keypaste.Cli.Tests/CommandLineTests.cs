@@ -90,4 +90,54 @@ public sealed class CommandLineTests
         Assert.Equal(["one", "two"], line.Operands);
         Assert.True(line.HasFlag("show"));
     }
+
+    private static readonly OptionSpec[] _shortSpec =
+    [
+        new("profile", TakesValue: true, Short: 'p'),
+        new("json", TakesValue: false, Short: 'j'),
+    ];
+
+    [Fact]
+    public void AShortOption_IsItsLongOption()
+    {
+        Assert.True(CommandLine.TryParse(["ls", "-j"], 1, _shortSpec, out var line, out _));
+
+        Assert.True(line.HasFlag("json"));
+        Assert.Empty(line.Operands);
+    }
+
+    [Fact]
+    public void AShortOption_TakesTheNextValue()
+    {
+        Assert.True(CommandLine.TryParse(["run", "-p", "-staging", "api"], 1, _shortSpec, out var line, out _));
+
+        Assert.Equal("-staging", line.Value("profile"), StringComparer.Ordinal);
+        Assert.Equal(["api"], line.Operands);
+    }
+
+    [Fact]
+    public void AnUndeclaredShortToken_StaysAnOperand()
+    {
+        Assert.True(CommandLine.TryParse(["run", "-x", "-"], 1, _shortSpec, out var line, out _));
+
+        Assert.Equal(["-x", "-"], line.Operands);
+    }
+
+    [Fact]
+    public void ShortAndLong_Together_AreGivenTwice()
+    {
+        Assert.False(CommandLine.TryParse(["run", "-p", "a", "--profile", "b"], 1, _shortSpec, out _, out var error));
+
+        Assert.Contains("--profile", error, StringComparison.Ordinal);
+        Assert.Contains("more than once", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DoubleDashStillEndsOptions()
+    {
+        Assert.True(CommandLine.TryParse(["run", "--", "-p", "x"], 1, _shortSpec, out var line, out _));
+
+        Assert.Null(line.Value("profile"));
+        Assert.Equal(["-p", "x"], line.Operands);
+    }
 }

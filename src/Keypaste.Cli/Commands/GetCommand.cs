@@ -5,7 +5,7 @@ namespace Keypaste.Cli.Commands;
 
 /// <summary>Retrieves a password: <c>keypaste get &lt;entry&gt;</c>.</summary>
 /// <remarks>
-/// Without <c>--show</c> the secret goes to the clipboard and never to stdout. That is the whole
+/// Without <c>--reveal</c> (or its older spelling <c>--show</c>) the secret goes to the clipboard and never to stdout. That is the whole
 /// point of the verb: a password on stdout ends up in shell history, scrollback, and CI logs.
 /// </remarks>
 internal static class GetCommand
@@ -23,6 +23,7 @@ internal static class GetCommand
         new("vault", TakesValue: true),
         new("keyfile", TakesValue: true),
         new("show", TakesValue: false),
+        new("reveal", TakesValue: false),
         new("timeout", TakesValue: true),
     ];
 
@@ -36,8 +37,14 @@ internal static class GetCommand
 
         if (line.WantsHelp)
         {
-            context.Stdout.WriteLine("usage: keypaste get <entry> [--show] [--timeout <seconds>]");
+            context.Stdout.WriteLine("usage: keypaste get <entry> [--reveal | --show] [--timeout <seconds>]");
             return CliApp.ExitSuccess;
+        }
+
+        if (line.HasFlag("show") && line.HasFlag("reveal"))
+        {
+            context.Stderr.WriteLine("keypaste get: --reveal and --show are the same option; give one");
+            return CliApp.ExitUsageError;
         }
 
         if (line.Operands.Count != 1)
@@ -63,7 +70,7 @@ internal static class GetCommand
         }
 
         var entryPath = line.Operands[0];
-        var show = line.HasFlag("show");
+        var show = line.HasFlag("show") || line.HasFlag("reveal");
 
         return VaultSession.Open(path, line, context, vault =>
         {

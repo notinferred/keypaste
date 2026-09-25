@@ -1,3 +1,4 @@
+using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 
 namespace Keypaste.Core.Ipc;
@@ -248,3 +249,79 @@ public sealed record EnvReply(EnvResolved Set, string Reason)
     /// <returns>The outcome, and never a value.</returns>
     public override string ToString() => $"EnvReply {{ Outcome = {Set.Outcome}, Variables = {Set.Variables.Count} }}";
 }
+
+/// <summary>One grant in force, as <c>keypaste grants</c> lists it. It has no member for a value.</summary>
+/// <param name="Id">The id a revoke names it by, from <see cref="GrantId"/>.</param>
+/// <param name="Kind"><c>credential</c> for an agent's field, <c>env</c> for a <c>keypaste run --session</c> set.</param>
+/// <param name="Client">Who it was granted to, as the prompt showed it.</param>
+/// <param name="Scope">What it releases: the entry, or the project and profile.</param>
+/// <param name="Field">Which field, or <c>set</c> for an env set.</param>
+/// <param name="SecondsLeft">How long it has left, rounded up so a live grant never reads as over.</param>
+public sealed record GrantSummary(string Id, string Kind, string Client, string Scope, string Field, int SecondsLeft)
+{
+    /// <summary>A credential grant's row.</summary>
+    /// <param name="grant">The grant, as the owner's cache lists it.</param>
+    /// <returns>Its id, client, entry, field and remaining seconds.</returns>
+    public static GrantSummary From(GrantInForce grant)
+    {
+        ArgumentNullException.ThrowIfNull(grant);
+
+        return new GrantSummary(
+            GrantId.Of(grant.Key),
+            "credential",
+            grant.Approved.Client,
+            grant.Approved.Entry,
+            grant.Key.Field,
+            (int)Math.Ceiling(Math.Max(0, grant.Remaining.TotalSeconds)));
+    }
+}
+
+/// <summary>Asks the owner which grants its current session holds.</summary>
+public sealed record GrantsRequest
+{
+    /// <summary>The vault this connection attached to.</summary>
+    public string Vault { get; init; } = string.Empty;
+
+    /// <summary>The session this connection attached to.</summary>
+    public string Session { get; init; } = string.Empty;
+}
+
+/// <summary>The grants in force, or why none were listed.</summary>
+/// <param name="Answered">Whether the owner admitted the request at all.</param>
+/// <param name="Grants">The grants, soonest to end first.</param>
+/// <param name="Complete">Whether these are all of them; a reply that would not fit one frame drops rows and says so.</param>
+/// <param name="Reason">keypaste's own words for a refusal, or empty.</param>
+public sealed record GrantsReply(bool Answered, IReadOnlyList<GrantSummary> Grants, bool Complete, string Reason);
+
+/// <summary>Asks the owner to end grants of its current session.</summary>
+/// <param name="Ids">The ids to end.</param>
+/// <param name="Client">Ends every grant given to this client, or null.</param>
+/// <param name="All">Ends every grant.</param>
+public sealed record RevokeGrantsRequest(IReadOnlyList<string> Ids, string? Client, bool All)
+{
+    /// <summary>The vault this connection attached to.</summary>
+    public string Vault { get; init; } = string.Empty;
+
+    /// <summary>The session this connection attached to.</summary>
+    public string Session { get; init; } = string.Empty;
+}
+
+/// <summary>How many grants were ended, or why none were.</summary>
+/// <param name="Revoked">How many grants ended.</param>
+/// <param name="Reason">keypaste's own words for a refusal, or empty.</param>
+public sealed record RevokeGrantsReply(int Revoked, string Reason);
+
+/// <summary>Asks the owner to lock now.</summary>
+public sealed record LockRequest
+{
+    /// <summary>The vault this connection attached to.</summary>
+    public string Vault { get; init; } = string.Empty;
+
+    /// <summary>The session this connection attached to.</summary>
+    public string Session { get; init; } = string.Empty;
+}
+
+/// <summary>Whether the owner is locking.</summary>
+/// <param name="Locking">Whether the lock was started; it completes after this reply leaves.</param>
+/// <param name="Reason">keypaste's own words for a refusal, or empty.</param>
+public sealed record LockReply(bool Locking, string Reason);

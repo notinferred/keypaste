@@ -24,10 +24,11 @@ internal static class ConsoleMarks
                 return glyph;
             }
 
+            // The round trip catches a Windows console code page, whose encoding substitutes a
+            // best-fit character instead of honouring the exception fallback.
             var strict = (Encoding)writer.Encoding.Clone();
             strict.EncoderFallback = EncoderFallback.ExceptionFallback;
-            strict.GetBytes(glyph);
-            return glyph;
+            return strict.GetString(strict.GetBytes(glyph)) == glyph ? glyph : ascii;
         }
         catch (Exception)
         {

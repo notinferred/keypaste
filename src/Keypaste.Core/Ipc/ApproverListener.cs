@@ -234,6 +234,18 @@ public sealed class ApproverListener : IDisposable
                 return ApproverProtocol.Encode(
                     await _handler.ReleaseEnvAsync(envProfile, connectionId, cancellationToken).ConfigureAwait(false));
 
+            case ApproverMessageKind.Grants when ApproverProtocol.TryDecode(frame, out GrantsRequest? grants):
+                return ApproverProtocol.Encode(
+                    await _handler.GrantsAsync(grants, connectionId, cancellationToken).ConfigureAwait(false));
+
+            case ApproverMessageKind.RevokeGrants when ApproverProtocol.TryDecode(frame, out RevokeGrantsRequest? revoke):
+                return ApproverProtocol.Encode(
+                    await _handler.RevokeGrantsAsync(revoke, connectionId, cancellationToken).ConfigureAwait(false));
+
+            case ApproverMessageKind.Lock when ApproverProtocol.TryDecode(frame, out LockRequest? lockNow):
+                return ApproverProtocol.Encode(
+                    await _handler.LockAsync(lockNow, connectionId, cancellationToken).ConfigureAwait(false));
+
             default:
                 return null;
         }

@@ -151,6 +151,10 @@ Patterns match the group path and the entry title as two separate things, so `*`
 
 Anyone who can edit the vault can influence its entry names. keypaste removes control characters, invisible Unicode and structural punctuation, then labels the listing as data. Sanitization cannot eliminate prompt injection; [THREATS.md](../THREATS.md) T-1 describes the residual risk.
 
+## Seeing and ending access
+
+In source, `keypaste mcp serve` is `keypaste agent` and `keypaste mcp setup` is `keypaste setup`. From another terminal, `keypaste grants --vault <path>` lists the grants the process holding that vault has given, one row per agent, entry and field with an id and the time left, and never a value; `--json` prints the same rows as one JSON array. `keypaste grants revoke <id>` ends one grant, `keypaste grants revoke <agent>` ends every grant that agent holds, and `--all` ends them all. `keypaste lock --vault <path>` asks the desktop app or `keypaste agent` holding the vault to lock now: every grant ends and `keypaste agent` stops. None of these asks for a password; they reach the holder over the same per-user endpoint as `keypaste run --session`, and nothing holding the vault is not an error.
+
 ## The audit log
 
 Every call, allowed or refused, appends one JSON line to `~/.keypaste/audit.jsonl`. Set `KEYPASTE_HOME` to move the directory, or `--audit-log` to move just the file.

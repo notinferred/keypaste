@@ -664,6 +664,64 @@ public sealed class VerbTests
     }
 
     /// <summary>
+    /// One array on one line: groups and entries under their raw names, in the text listing's order,
+    /// with no value and nothing from keypaste's own groups.
+    /// </summary>
+    [Fact]
+    public void Ls_Json_GroupsAndEntries_NoValues_NoReserved()
+    {
+        using var harness = new CliHarness();
+        harness.SeedVault(Master, ("Banking/Chase", "chase-secret"));
+        Author(harness, ".keypaste/tokens", "t1", "token-verifier");
+        Author(harness, ".Keypaste", "planted", "planted-secret");
+
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run("ls", "--json", "--vault", harness.VaultPath));
+
+        Assert.Equal(
+            """[{"type":"group","path":"Banking"},{"type":"entry","path":"Banking/Chase","group":"Banking","title":"Chase"}]""" + Environment.NewLine,
+            harness.Out);
+        Assert.DoesNotContain("secret", harness.Out, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Ls_Text_SkipsReserved()
+    {
+        using var harness = new CliHarness();
+        harness.SeedVault(Master, ("Banking/Chase", "chase-secret"));
+        Author(harness, ".keypaste/shares", "s1", "revoke-token");
+
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run("ls", "--flat", "--vault", harness.VaultPath));
+
+        Assert.Equal(["Banking/", "Banking/Chase"], harness.Out.ReplaceLineEndings("\n").TrimEnd().Split('\n'));
+    }
+
+    [Fact]
+    public void Get_Reveal_IsShow()
+    {
+        using var harness = new CliHarness();
+        harness.SeedVault(Master, ("solo", "solo-secret"));
+
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run("get", "solo", "--vault", harness.VaultPath, "--reveal"));
+
+        Assert.Equal("solo-secret" + Environment.NewLine, harness.Out);
+        Assert.Equal(0, harness.Clipboard.SetCount);
+    }
+
+    [Fact]
+    public void Get_RevealAndShow_IsUsage()
+    {
+        using var harness = new CliHarness();
+
+        harness.AssertExit(CliApp.ExitUsageError, harness.Run("get", "solo", "--vault", harness.VaultPath, "--reveal", "--show"));
+
+        Assert.Empty(harness.Out);
+        Assert.Empty(harness.Prompt.PromptsSeen);
+    }
+
+    /// <summary>
     /// Writes an entry the CLI itself cannot create: <c>add</c> reads a separator in the argument
     /// as a group, so a title containing one has to come through the core, the way KeePassXC does.
     /// </summary>

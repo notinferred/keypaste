@@ -1,3 +1,5 @@
+using System.Text.Json;
+using Keypaste.Cli.Output;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 
@@ -38,6 +40,7 @@ internal static class LogCommand
         new(DeniedOption, TakesValue: false),
         new(ClientOption, TakesValue: true),
         new(SinceOption, TakesValue: true),
+        new(CliJson.Option, TakesValue: false),
     ];
 
     internal static int Execute(string[] args, CliContext context)
@@ -123,12 +126,19 @@ internal static class LogCommand
         }
 
         var path = Resolve(line.Value(LogOption), context);
+        var json = line.HasFlag(CliJson.Option);
 
         // An absent log is not a failure: it is what a machine looks like before any agent has
         // asked for anything. `verify` treats the same absence as an error, because there it is the
         // difference between "checked and fine" and "nothing was checked".
         if (!File.Exists(path))
         {
+            if (json)
+            {
+                context.Stdout.WriteLine("[]");
+                return CliApp.ExitSuccess;
+            }
+
             context.Stdout.WriteLine($"No audit log at {path} yet.");
             context.Stdout.WriteLine("Nothing has asked keypaste for a credential on this machine.");
             return CliApp.ExitSuccess;
@@ -161,7 +171,16 @@ internal static class LogCommand
         }
 
         Alarm(report, context);
-        Render(path, shown, entries.Count, unreadable, filters, report, context);
+
+        if (json)
+        {
+            var unverified = report.Unverified;
+            CliJson.WriteArray(context.Stdout, shown, (writer, entry) => WriteJson(writer, entry, !unverified.Contains(entry.Line)));
+        }
+        else
+        {
+            Render(path, shown, entries.Count, unreadable, filters, report, context);
+        }
 
         return report.Verdict == AuditChainVerdict.Broken
             ? CliApp.ExitTamperDetected
@@ -208,6 +227,24 @@ internal static class LogCommand
         {
             context.Stdout.WriteLine(written);
         }
+    }
+
+    /// <summary>One record as <c>--json</c> writes it: what the record says, and whether the chain vouches for it.</summary>
+    private static void WriteJson(Utf8JsonWriter json, AuditEntry entry, bool verified)
+    {
+        json.WriteNumber("line", entry.Line);
+        json.WriteString("time", entry.Timestamp);
+        json.WriteString("tool", entry.Tool);
+        json.WriteString("client", entry.Client);
+        json.WriteString("label", entry.Label);
+        json.WriteString("name", entry.Name);
+        json.WriteString("entry", entry.Entry);
+        json.WriteString("field", entry.Field);
+        json.WriteString("decision", entry.Decision);
+        json.WriteString("method", entry.Method);
+        json.WriteString("reason", entry.Reason);
+        json.WriteString("session", entry.Session);
+        json.WriteBoolean("verified", verified);
     }
 
     private static void Alarm(AuditChainReport report, CliContext context)

@@ -41,6 +41,7 @@ public sealed class SessionAuthority : IApproverHandler
     private readonly Func<SessionLifetime?> _lifetime;
     private readonly ApproverHandler _inner;
     private readonly SessionEnvironments? _environments;
+    private readonly Action? _lockNow;
     private readonly ConcurrentDictionary<string, Attachment> _attached = new(StringComparer.Ordinal);
 
     /// <summary>Builds the authority for one owned vault.</summary>
@@ -48,11 +49,13 @@ public sealed class SessionAuthority : IApproverHandler
     /// <param name="lifetime">The current unlocked lifetime, or null while the vault is locked.</param>
     /// <param name="inner">What decides a request once it belongs to the current session.</param>
     /// <param name="environments">What env sets are released with, or null to refuse every one.</param>
+    /// <param name="lockNow">What <c>keypaste lock</c> runs, after its reply has left; null refuses it.</param>
     public SessionAuthority(
         VaultIdentity vault,
         Func<SessionLifetime?> lifetime,
         ApproverHandler inner,
-        SessionEnvironments? environments = null)
+        SessionEnvironments? environments = null,
+        Action? lockNow = null)
     {
         ArgumentNullException.ThrowIfNull(vault);
         ArgumentNullException.ThrowIfNull(lifetime);
@@ -62,6 +65,7 @@ public sealed class SessionAuthority : IApproverHandler
         _lifetime = lifetime;
         _inner = inner;
         _environments = environments;
+        _lockNow = lockNow;
     }
 
     /// <summary>The session a request attaching now would be answered under, or null while the vault is locked.</summary>
@@ -280,6 +284,76 @@ public sealed class SessionAuthority : IApproverHandler
             cancellationToken).ConfigureAwait(false);
 
         return new EnvReply(resolved, resolved.Outcome == EnvOutcome.Declined ? Declined(answer) : resolved.Refusal);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>Names only: <see cref="GrantSummary"/> has no member a value could travel in (D-0351).</remarks>
+    public ValueTask<GrantsReply> GrantsAsync(GrantsRequest request, string connectionId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (!TryAdmit(request.Vault, request.Session, connectionId, out _, out var refusal))
+        {
+            return ValueTask.FromResult(new GrantsReply(false, [], true, refusal.Reason));
+        }
+
+        return ValueTask.FromResult(
+            new GrantsReply(true, [.. _inner.Activity().Grants.Select(GrantSummary.From)], true, string.Empty));
+    }
+
+    /// <inheritdoc/>
+    public ValueTask<RevokeGrantsReply> RevokeGrantsAsync(
+        RevokeGrantsRequest request,
+        string connectionId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (!TryAdmit(request.Vault, request.Session, connectionId, out _, out var refusal))
+        {
+            return ValueTask.FromResult(new RevokeGrantsReply(0, refusal.Reason));
+        }
+
+        var grants = _inner.Activity().Grants;
+
+        if (request.All)
+        {
+            _inner.RevokeAll();
+            return ValueTask.FromResult(new RevokeGrantsReply(grants.Count, string.Empty));
+        }
+
+        var ids = request.Ids.Select(id => id.ToLowerInvariant()).ToHashSet(StringComparer.Ordinal);
+        var ended = grants
+            .Where(grant => ids.Contains(GrantId.Of(grant.Key))
+                || (request.Client is { } client && string.Equals(grant.Approved.Client, client, StringComparison.Ordinal)))
+            .ToList();
+
+        foreach (var grant in ended)
+        {
+            _inner.Revoke(grant.Key);
+        }
+
+        return ValueTask.FromResult(new RevokeGrantsReply(ended.Count, string.Empty));
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>The lock runs after this returns, so the reply leaves before the lifetime ends and the listener stops.</remarks>
+    public ValueTask<LockReply> LockAsync(LockRequest request, string connectionId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (!TryAdmit(request.Vault, request.Session, connectionId, out _, out var refusal))
+        {
+            return ValueTask.FromResult(new LockReply(false, refusal.Reason));
+        }
+
+        if (_lockNow is not { } lockNow)
+        {
+            return ValueTask.FromResult(new LockReply(false, "the keypaste process holding this vault cannot be locked from outside"));
+        }
+
+        _ = Task.Run(lockNow, CancellationToken.None);
+        return ValueTask.FromResult(new LockReply(true, string.Empty));
     }
 
     /// <inheritdoc/>
