@@ -6,6 +6,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 All of this is source only: there is still no desktop download, and the published CLI is unchanged. Each entry that names a step links its record, which holds the full account.
 
+Closing the desktop's main window now quits the app even while an agent's request waits in its prompt window: the request is refused as `vault-locked` and the prompt closes. Before, the prompt kept the app running with the vault unlocked, and Approve on it still released the value ([F.21](docs/steps/F.21.md)).
+
 `keypaste run --session <project> -- <command>` now takes the project's variables from the desktop app or `keypaste agent` holding the vault unlocked, and asks for no password. The app shows the project, the variable names, the command and the directory in a prompt window, and `keypaste agent` shows them in its terminal. The command starts only on Approve or `y`. Deny, a lock, the timeout or nothing holding the vault ends the run with a reason and starts nothing ([E.1c](docs/steps/E.1c.md)).
 
 The desktop's Env Sets screen can now import a `.env` into a project, listing each variable as new, replacing a stored value or unchanged and writing only when you press Import. A project can be given a directory and a command on this machine: Run opens a terminal there running the command, and Open terminal opens one at a prompt, each with the project's variables from the unlocked app and only after a card naming the command, the directory and the variable names. A set with an expired entry or a bad name, a lock or Cancel starts nothing. Windows and Linux only ([E.1b](docs/steps/E.1b.md)).

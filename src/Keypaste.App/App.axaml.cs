@@ -31,6 +31,7 @@ internal sealed partial class App : Application, IDisposable
     private MainWindow? _window;
     private UnlockViewModel? _unlock;
     private ShellViewModel? _shell;
+    private IClassicDesktopStyleApplicationLifetime? _desktop;
     private bool _shuttingDown;
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
@@ -39,28 +40,49 @@ internal sealed partial class App : Application, IDisposable
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            var home = Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable);
-
-            _preferences = new DesktopPreferences(home);
-            _session = Compose(_preferences, TimeProvider.System);
-            _session.Locked += OnLocked;
-            _authority = new AppAuthority(
-                _session,
-                Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable),
-                () => new WindowApprovalChannel(TimeProvider.System));
-
-            _window = new MainWindow();
-            _activity = Observe(_window, _session, TimeProvider.System, () => _shell?.ClearCountdown());
-            _shortcuts = Bind(_window, _session, () => _unlock, () => _shell);
-            _minimize = Watch(_window, _preferences, _session, () => _unlock?.CancelPendingRestore());
-            ShowUnlock(home);
-
-            desktop.MainWindow = _window;
-            desktop.ShutdownRequested += OnShutdownRequested;
+            Launch(desktop);
         }
 
         base.OnFrameworkInitializationCompleted();
     }
+
+    /// <summary>
+    /// Composes the app into a desktop lifetime: the session, the authority serving it, the main
+    /// window and what quitting does.
+    /// </summary>
+    /// <param name="desktop">The lifetime the app runs in.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="desktop"/> is null.</exception>
+    /// <remarks><c>internal</c> for the reason <see cref="Watch"/> is: a test runs what launch runs.</remarks>
+    internal void Launch(IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        ArgumentNullException.ThrowIfNull(desktop);
+
+        var home = Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable);
+
+        _preferences = new DesktopPreferences(home);
+        _session = Compose(_preferences, TimeProvider.System);
+        _session.Locked += OnLocked;
+        _authority = new AppAuthority(
+            _session,
+            Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable),
+            () => new WindowApprovalChannel(TimeProvider.System));
+
+        _window = new MainWindow();
+        _activity = Observe(_window, _session, TimeProvider.System, () => _shell?.ClearCountdown());
+        _shortcuts = Bind(_window, _session, () => _unlock, () => _shell);
+        _minimize = Watch(_window, _preferences, _session, () => _unlock?.CancelPendingRestore());
+        ShowUnlock(home);
+
+        _desktop = desktop;
+        desktop.MainWindow = _window;
+
+        // A prompt window still open must not keep the vault served once the main window closes (F.21).
+        desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
+        desktop.ShutdownRequested += OnShutdownRequested;
+    }
+
+    /// <summary>The authority <see cref="Launch"/> composed, or null before it or after quitting.</summary>
+    internal AppAuthority? Authority => _authority;
 
     /// <summary>
     /// Turns the saved preferences into behaviour: the palette the app paints in and the timeout
@@ -197,11 +219,7 @@ internal sealed partial class App : Application, IDisposable
         {
             await shell.Clipboard.CloseAsync().ConfigureAwait(true);
             Dispose();
-
-            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-            {
-                desktop.Shutdown();
-            }
+            _desktop?.Shutdown();
         });
     }
 
