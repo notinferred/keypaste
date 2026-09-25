@@ -6,6 +6,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 All of this is source only: there is still no desktop download, and the published CLI is unchanged. Each entry that names a step links its record, which holds the full account.
 
+The desktop's Entries screen no longer overlaps with an entry open: the search box, Add, Organize and Delete run across the list and the entry's pane, and the dividers sit between the panes instead of over them. The main window can no longer be made narrower than 960 px, the least width at which the screen fits ([F.22](docs/steps/F.22.md)).
+
 Closing the desktop's main window now quits the app even while an agent's request waits in its prompt window: the request is refused as `vault-locked` and the prompt closes. Before, the prompt kept the app running with the vault unlocked, and Approve on it still released the value ([F.21](docs/steps/F.21.md)).
 
 `keypaste run --session <project> -- <command>` now takes the project's variables from the desktop app or `keypaste agent` holding the vault unlocked, and asks for no password. The app shows the project, the variable names, the command and the directory in a prompt window, and `keypaste agent` shows them in its terminal. The command starts only on Approve or `y`. Deny, a lock, the timeout or nothing holding the vault ends the run with a reason and starts nothing ([E.1c](docs/steps/E.1c.md)).

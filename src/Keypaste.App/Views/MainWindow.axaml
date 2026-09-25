@@ -3,7 +3,7 @@
         x:Class="Keypaste.App.Views.MainWindow"
         Title="keypaste"
         Width="1000" Height="680"
-        MinWidth="720" MinHeight="520"
+        MinWidth="960" MinHeight="520"
         Background="{DynamicResource KpSurface0}"
         WindowStartupLocation="CenterScreen">
 
