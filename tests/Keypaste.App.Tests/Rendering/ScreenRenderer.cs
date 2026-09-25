@@ -5,6 +5,7 @@ using Avalonia.Layout;
 using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.VisualTree;
 using Keypaste.App.Controls;
 using Keypaste.App.Navigation;
 using Keypaste.App.Session;
@@ -44,6 +45,7 @@ public sealed class ScreenRenderer
         using var demo = new DemoVault();
         DrawUnlock(demo, output!);
         DrawShell(demo, output!);
+        DrawEnv(demo, output!);
         DrawApproval(output!);
         DrawComponents(output!);
     });
@@ -94,23 +96,56 @@ public sealed class ScreenRenderer
             Save(window, output, $"{destination.Shortcut:00}-{Slug(destination.Title)}");
         }
 
-        // Env profiles: another profile selected, then the add form, drawn tall enough for both panels.
-        shell.Current = Destinations.Of(DestinationKind.EnvSets);
-        if (shell.Content is EnvSetsViewModel profiles && profiles.OpenProject is { } project)
-        {
-            window.Height = 1000;
-            project.SelectedProfile = "staging";
-            Save(window, output, "40-env-staging");
-            project.BeginAddCommand.Execute(null);
-            Save(window, output, "41-env-add");
-            window.Height = _height;
-        }
-
         shell.Current = Destinations.Of(DestinationKind.Entries);
         shell.ShowToast("Copied the username. The clipboard clears in 30s.");
         Save(window, output, "90-toast");
 
         window.Close();
+    }
+
+    /// <summary>Env profiles in its own shell, with a file picker so Import and Export draw enabled.</summary>
+    private static void DrawEnv(DemoVault demo, string output)
+    {
+        using var session = new AppVaultSession(new ManualClock());
+
+        using (var master = TempVault.Secret(_master))
+        {
+            Assert.Equal(UnlockOutcome.Opened, session.TryUnlock(demo.Path, master.Value));
+        }
+
+        using var shell = new ShellViewModel(session, demo.Home, null, clipboard: new FakeClipboard(), clock: new ManualClock(), picker: new FakeVaultFilePicker());
+        var window = new MainWindow { Width = _width, Height = 1000 };
+        window.FindControl<ContentControl>("Root")!.Content = new ShellView { DataContext = shell };
+        window.Show();
+
+        shell.Current = Destinations.Of(DestinationKind.EnvSets);
+        var project = Assert.IsType<EnvSetsViewModel>(shell.Content).OpenProject!;
+        project.SelectedProfile = "staging";
+        Save(window, output, "40-env-staging");
+
+        Hold(window, "REDIS_URL", () => Save(window, output, "42-env-held"));
+
+        Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+        Save(window, output, "43-env-light");
+        Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
+
+        window.Width = 960;
+        Save(window, output, "44-env-narrow");
+        Hold(window, "DATABASE_URL", () => Save(window, output, "45-env-narrow-held"));
+        window.Width = _width;
+
+        project.BeginAddCommand.Execute(null);
+        Save(window, output, "41-env-add");
+
+        window.Close();
+
+        static void Hold(Window window, string key, Action draw)
+        {
+            var cell = window.GetVisualDescendants().OfType<RevealedValue>().Single(value => value.DataContext is EnvVariableRow row && row.Key == key);
+            cell.BeginReveal();
+            draw();
+            cell.EndReveal();
+        }
     }
 
     private static void DrawApproval(string output)
@@ -261,7 +296,12 @@ public sealed class ScreenRenderer
                 vault.AddEntry(new VaultEntry
                 {
                     Title = key,
-                    Password = key == "REDIS_URL" ? "demo-redis_url" : "demo-staging-" + key.ToLowerInvariant(),
+                    Password = key switch
+                    {
+                        "REDIS_URL" => "demo-redis_url",
+                        "DATABASE_URL" => "postgres://api:demo-staging-pass@db.staging.acme.internal:5432/api",
+                        _ => "demo-staging-" + key.ToLowerInvariant(),
+                    },
                     GroupPath = "env/acme-api/staging",
                 });
             }

@@ -55,31 +55,41 @@ internal sealed record EnvProfileCell(
 
     internal bool ShowsLabel => Variable is null;
 
+    /// <summary>Draws the hold target's cell above its row neighbours, which a held value may cover.</summary>
+    internal int Layer => HasVariable ? 1 : 0;
+
     internal bool IsMissing => State == EnvCellState.Missing;
 
-    internal bool IsSet => State == EnvCellState.Set && SameValueAs.Count == 0;
+    internal bool IsSet => State != EnvCellState.Missing;
 
-    /// <summary>The design's amber "differs": a value run would refuse, or one another profile reuses.</summary>
-    internal bool Differs => State == EnvCellState.Unusable || (State == EnvCellState.Set && SameValueAs.Count > 0);
+    /// <summary>What the cell draws in every column: the mask, or that the key is missing.</summary>
+    internal string Label => IsMissing ? "missing" : "••••••";
 
-    /// <summary>What a cell without a hold-to-reveal value says.</summary>
-    internal string Label => State switch
-    {
-        EnvCellState.Missing => "missing",
-        EnvCellState.Unusable => "unusable",
-        _ when SameValueAs.Count > 0 => "same as " + string.Join(", ", SameValueAs),
-        _ => "••••••",
-    };
-
-    /// <summary>The amber note beside a revealable value that differs, or empty.</summary>
+    /// <summary>The design's amber "differs", after the mask: what run refuses in the value, or which profile it repeats.</summary>
     internal string Note => State switch
     {
-        EnvCellState.Unusable => "unusable",
+        EnvCellState.Unusable => ShortProblem,
         EnvCellState.Set when SameValueAs.Count > 0 => "same as " + string.Join(", ", SameValueAs),
         _ => string.Empty,
     };
 
     internal bool HasNote => Note.Length > 0;
+
+    /// <summary>The first thing wrong with an unusable value, short enough for a cell; the tip has the rest.</summary>
+    private string ShortProblem
+    {
+        get
+        {
+            var first = Problem?.Split("; ")[0];
+
+            return first switch
+            {
+                null or "" => "unusable",
+                _ when first.StartsWith("expired", StringComparison.Ordinal) => "expired",
+                _ => DisplayTextSanitizer.Sanitize(first).Text,
+            };
+        }
+    }
 
     /// <summary>What hovering the cell explains; names profiles and rules, never a value.</summary>
     internal string? Tip => State switch

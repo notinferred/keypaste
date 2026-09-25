@@ -20,7 +20,7 @@
       <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
       <Setter Property="MinHeight" Value="0" />
       <Setter Property="Height" Value="22" />
-      <Setter Property="Padding" Value="0,0,2,0" />
+      <Setter Property="Padding" Value="0" />
       <Setter Property="BorderThickness" Value="0" />
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="VerticalAlignment" Value="Center" />
@@ -34,6 +34,16 @@
     </Style>
     <Style Selector="ComboBox.project:pointerover">
       <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+    </Style>
+    <Style Selector="ComboBox.project /template/ PathIcon#DropDownGlyph">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="ComboBox.project ComboBoxItem">
+      <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
+      <Setter Property="FontSize" Value="12.5" />
+      <Setter Property="MinHeight" Value="30" />
+      <Setter Property="Padding" Value="10,0" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
     </Style>
 
     <!-- A matrix cell or column header that is pressed rather than a boxed button. -->
@@ -52,8 +62,27 @@
     <Style Selector="Button.flat:pressed /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="Transparent" />
     </Style>
-    <Style Selector="Button.flat:pointerover TextBlock">
-      <Setter Property="TextDecorations" Value="Underline" />
+    <Style Selector="Button.flat:pointerover TextBlock.th">
+      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+    </Style>
+
+    <!-- A cell's face sits 6px out from its text, so hovering it lights a pill without moving the text. -->
+    <Style Selector="Button.flat.cell">
+      <Setter Property="Padding" Value="6,3" />
+      <Setter Property="Margin" Value="-6,-3" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="Button.flat.cell:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
+    </Style>
+    <!-- A held value runs on over the cells and actions to its right, so its cell draws above them. -->
+    <Style Selector="ItemsControl.cells > ContentPresenter" x:DataType="vm:EnvProfileCell">
+      <Setter Property="ZIndex" Value="{Binding Layer}" />
+    </Style>
+    <Style Selector="TextBlock.under">
+      <Setter Property="Opacity" Value="0" />
     </Style>
 
     <Style Selector="TextBlock.th.selected">
@@ -77,7 +106,8 @@
       <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
     </Style>
 
-    <!-- The profile toggle in the .env.keypaste header: 11.5/500, 4px pills on the panel ink. -->
+    <!-- The profile toggle in the .env.keypaste header: 11.5/500, 4px pills on the panel ink. Terminal
+         surfaces stay dark in both themes, so everything on them uses the raw palette. -->
     <Style Selector="Button.profile-segment">
       <Setter Property="FontFamily" Value="{DynamicResource KpSans}" />
       <Setter Property="FontSize" Value="11.5" />
@@ -89,24 +119,30 @@
     </Style>
     <Style Selector="Button.profile-segment /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="Transparent" />
-      <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+      <Setter Property="Foreground" Value="{DynamicResource KpGrey5}" />
     </Style>
     <Style Selector="Button.profile-segment:pointerover /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="Transparent" />
-      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+      <Setter Property="Foreground" Value="{DynamicResource KpPaper}" />
     </Style>
     <Style Selector="Button.profile-segment.selected /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
-      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+      <Setter Property="Background" Value="{DynamicResource KpInk4}" />
+      <Setter Property="Foreground" Value="{DynamicResource KpPaper}" />
     </Style>
 
     <Style Selector="Border.terminal TextBlock.preview">
       <Setter Property="FontSize" Value="12" />
       <Setter Property="LineHeight" Value="20.4" />
-      <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
     </Style>
     <Style Selector="Border.terminal TextBlock.preview.comment">
-      <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+      <Setter Property="Foreground" Value="{DynamicResource KpGrey5}" />
+    </Style>
+    <Style Selector="Border.terminal Button.row-action">
+      <Setter Property="Foreground" Value="{DynamicResource KpGrey5}" />
+    </Style>
+    <Style Selector="Border.terminal Button.row-action:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource KpInk3}" />
+      <Setter Property="Foreground" Value="{DynamicResource KpPaper}" />
     </Style>
 
     <Style Selector="Border.banner">
@@ -128,11 +164,22 @@
           <StackPanel Grid.Column="0" Spacing="6" VerticalAlignment="Bottom">
             <TextBlock Classes="h1" Text="Env profiles" />
             <StackPanel Orientation="Horizontal" Spacing="0" IsVisible="{Binding HasOpenProject}">
-              <ComboBox Classes="project"
+              <!-- Fluent keeps a 32px column for its own glyph, hidden here; the chevron is drawn beside the name. -->
+              <ComboBox Classes="project" Margin="0,0,-32,0"
                         ItemsSource="{Binding ProjectChoices}"
                         SelectedItem="{Binding SelectedProject}"
-                        ToolTip.Tip="Choose a project" />
-              <TextBlock Classes="subtitle" VerticalAlignment="Center" Margin="4,0,0,0" Text="· one set of keys, a value per environment" />
+                        ToolTip.Tip="Choose a project">
+                <ComboBox.SelectionBoxItemTemplate>
+                  <DataTemplate x:DataType="x:String">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                      <TextBlock Text="{Binding}" VerticalAlignment="Center" />
+                      <ctl:KpIcon Icon="chevron-down" Size="12" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </DataTemplate>
+                </ComboBox.SelectionBoxItemTemplate>
+              </ComboBox>
+              <TextBlock Classes="subtitle" VerticalAlignment="Center" Margin="6,0" Text="·" />
+              <TextBlock Classes="subtitle" VerticalAlignment="Center" Text="one set of keys, a value per environment" />
               <Button Classes="icon ghost sm" Width="22" Height="22" Margin="8,0,0,0"
                       ToolTip.Tip="New project"
                       Command="{Binding BeginAddCommand}"
@@ -226,95 +273,6 @@
                   </StackPanel>
                 </Border>
 
-                <Border Classes="card filled" IsVisible="{Binding IsAddingProfile}">
-                  <StackPanel Spacing="10">
-                    <TextBlock Classes="section" Text="New profile" />
-                    <TextBlock Classes="caption"
-                               Text="Lowercase letters, digits and dashes, such as staging or prod-eu. Its first key creates it, and prod and production profiles always ask before release." />
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                      <TextBox Classes="mono" Text="{Binding NewProfile}" PlaceholderText="staging" Width="200" />
-                      <Button Classes="primary" Content="Add key" Command="{Binding ConfirmAddProfileCommand}" />
-                      <Button Classes="ghost" Content="Cancel" Command="{Binding CancelAddProfileCommand}" />
-                    </StackPanel>
-                  </StackPanel>
-                </Border>
-
-                <Border Classes="card filled" IsVisible="{Binding IsAdding}">
-                  <StackPanel Spacing="10">
-                    <TextBlock Classes="section" Text="{Binding SelectedProfile, StringFormat='Add a key to {0}'}" />
-                    <TextBox Classes="mono" Text="{Binding NewKey}" PlaceholderText="STRIPE_KEY" Width="320" HorizontalAlignment="Left" />
-                    <CheckBox Content="Generate a value" IsChecked="{Binding GenerateValue}" />
-                    <StackPanel Spacing="6" IsVisible="{Binding GenerateValue}">
-                      <StackPanel Orientation="Horizontal" Spacing="12">
-                        <RadioButton GroupName="NewVariableSecretKind" Content="Characters" IsChecked="{Binding Generator.UseCharacters}" />
-                        <RadioButton GroupName="NewVariableSecretKind" Content="Words" IsChecked="{Binding Generator.UseWords}" />
-                        <NumericUpDown Width="104"
-                                       IsVisible="{Binding Generator.UseWords}"
-                                       Minimum="{Binding Generator.MinimumWords}"
-                                       Maximum="{Binding Generator.MaximumWords}"
-                                       Increment="1"
-                                       FormatString="0"
-                                       Value="{Binding Generator.WordCount}" />
-                        <TextBox Width="44"
-                                 MaxLength="1"
-                                 IsVisible="{Binding Generator.UseWords}"
-                                 Text="{Binding Generator.Separator}" />
-                      </StackPanel>
-                      <TextBlock Classes="caption" Text="{Binding Generator.Strength}" />
-                      <TextBlock Classes="caption" IsVisible="{Binding Generator.UseWords}" Text="{Binding Generator.Provenance}" />
-                      <TextBlock Classes="caption"
-                                 IsVisible="{Binding Generator.Error, Converter={x:Static ObjectConverters.IsNotNull}}"
-                                 Foreground="{DynamicResource KpTextSecondary}"
-                                 Text="{Binding Generator.Error}" />
-                    </StackPanel>
-                    <ctl:MaskedInput x:Name="NewEnvValue"
-                                     IsVisible="{Binding !GenerateValue}"
-                                     AllowsPaste="True"
-                                     Width="420"
-                                     HorizontalAlignment="Left"
-                                     Sink="{Binding NewValue}"
-                                     MaskedLength="{Binding NewValue.MaskedLength}"
-                                     Placeholder="Existing value" />
-                    <TextBlock Classes="caption" IsVisible="{Binding !GenerateValue}"
-                               Text="Type it or press Ctrl/Cmd+V to paste." />
-                    <TextBlock Classes="caption" IsVisible="{Binding NewValue.Note.Length}"
-                               Text="{Binding NewValue.Note}" />
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                      <Button Classes="primary" Content="Add" Command="{Binding ConfirmAddCommand}" />
-                      <Button Classes="ghost" Content="Cancel" Command="{Binding CancelAddCommand}" />
-                    </StackPanel>
-                  </StackPanel>
-                </Border>
-
-                <Border Classes="card filled" IsVisible="{Binding IsReplacing}">
-                  <StackPanel Spacing="10">
-                    <TextBlock Classes="section" Text="{Binding ReplacePrompt}" TextWrapping="Wrap" />
-                    <ctl:MaskedInput x:Name="ReplacementEnvValue"
-                                     AllowsPaste="True"
-                                     Width="420"
-                                     HorizontalAlignment="Left"
-                                     Sink="{Binding ReplacementValue}"
-                                     MaskedLength="{Binding ReplacementValue.MaskedLength}"
-                                     Placeholder="New value" />
-                    <TextBlock Classes="caption" IsVisible="{Binding ReplacementValue.Note.Length}"
-                               Text="{Binding ReplacementValue.Note}" />
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                      <Button Classes="primary" Content="Replace" Command="{Binding ConfirmReplaceCommand}" />
-                      <Button Classes="ghost" Content="Cancel" Command="{Binding CancelReplaceCommand}" />
-                    </StackPanel>
-                  </StackPanel>
-                </Border>
-
-                <Border Classes="card" IsVisible="{Binding IsRemoving}" BorderBrush="{DynamicResource KpDanger}">
-                  <StackPanel Spacing="10">
-                    <TextBlock Classes="body primary" Text="{Binding RemovePrompt}" />
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                      <Button Classes="danger" Content="Remove" Command="{Binding ConfirmRemoveCommand}" />
-                      <Button Classes="ghost" Content="Keep it" Command="{Binding CancelRemoveCommand}" />
-                    </StackPanel>
-                  </StackPanel>
-                </Border>
-
                 <!-- The matrix: every key against every profile. A cell holds no value; the selected
                      profile's cells reveal theirs on a hold, through a control that publishes nothing to
                      the accessibility bus (THREATS.md T-22). -->
@@ -343,6 +301,22 @@
                               </DataTemplate>
                             </ItemsControl.ItemTemplate>
                           </ItemsControl>
+                          <!-- The selected profile, which holds, edits, the preview and the run command use, sits
+                               on an amber bar along the head's lower edge. -->
+                          <ItemsControl Grid.Column="1" ItemsSource="{Binding Columns}" Margin="0,0,0,-9"
+                                        VerticalAlignment="Bottom" IsHitTestVisible="False">
+                            <ItemsControl.ItemsPanel>
+                              <ItemsPanelTemplate>
+                                <UniformGrid Rows="1" />
+                              </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="vm:EnvProfileColumn">
+                                <Border Height="2" Margin="12,0,24,0" Background="{DynamicResource KpAccent}"
+                                        IsVisible="{Binding IsSelected}" />
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
                           <Button Grid.Column="2" Classes="flat" HorizontalAlignment="Right"
                                   Command="{Binding BeginAddProfileCommand}"
                                   ToolTip.Tip="Add a profile, such as staging or prod">
@@ -361,7 +335,7 @@
                               <Grid ColumnDefinitions="1.6*,3*,76" MinHeight="18">
                                 <TextBlock Grid.Column="0" Classes="mono primary" Text="{Binding DisplayKey}"
                                            TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                                <ItemsControl Grid.Column="1" ItemsSource="{Binding Cells}">
+                                <ItemsControl Grid.Column="1" Classes="cells" ItemsSource="{Binding Cells}" ZIndex="1" ClipToBounds="False">
                                   <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
                                       <UniformGrid Rows="1" />
@@ -369,39 +343,42 @@
                                   </ItemsControl.ItemsPanel>
                                   <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:EnvProfileCell">
-                                      <Panel Margin="12,0,0,0" VerticalAlignment="Center">
-                                        <Panel IsVisible="{Binding HasVariable}">
-                                          <!-- Not a TextBlock: its automation peer would publish the value as the
-                                               element's name. RevealedValue draws the characters itself, and takes the
-                                               cell's width so a hold changes no size the accessibility surface
-                                               reports (D-0232). -->
-                                          <ContentControl Content="{Binding Variable}" Cursor="Hand" VerticalAlignment="Center">
-                                            <ContentControl.ContentTemplate>
-                                              <DataTemplate x:DataType="vm:EnvVariableRow">
-                                                <ctl:RevealedValue Source="{Binding}"
-                                                                   MaskedLength="6"
-                                                                   Width="{Binding $parent[ContentControl].Bounds.Width}"
-                                                                   FontFamily="{DynamicResource KpMono}"
-                                                                   FontSize="13"
-                                                                   VerticalAlignment="Center"
-                                                                   RenderOptions.TextRenderingMode="Antialias"
-                                                                   Foreground="{DynamicResource KpTextSecondary}" />
-                                              </DataTemplate>
-                                            </ContentControl.ContentTemplate>
-                                          </ContentControl>
-                                          <TextBlock Classes="mono sm amber" Text="{Binding Note}" IsVisible="{Binding HasNote}"
-                                                     Margin="58,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"
-                                                     TextTrimming="CharacterEllipsis" />
-                                        </Panel>
-                                        <Button Classes="flat" IsVisible="{Binding ShowsLabel}" Command="{Binding Act}"
-                                                ToolTip.Tip="{Binding Tip}">
-                                          <TextBlock Classes="mono"
-                                                     Classes.secondary="{Binding IsSet}"
-                                                     Classes.amber="{Binding Differs}"
-                                                     Classes.danger="{Binding IsMissing}"
-                                                     Text="{Binding Label}"
-                                                     TextTrimming="CharacterEllipsis" />
+                                      <!-- Every column draws a cell alike: the mask or "missing", then an amber note on a
+                                           value that differs. In the selected profile the hold target lies over it. -->
+                                      <Panel Margin="12,0,0,0" VerticalAlignment="Center" ToolTip.Tip="{Binding Tip}">
+                                        <Button Classes="flat cell" Command="{Binding Act}"
+                                                IsHitTestVisible="{Binding ShowsLabel}" Focusable="{Binding ShowsLabel}">
+                                          <Grid ColumnDefinitions="Auto,*">
+                                            <TextBlock Classes="mono"
+                                                       Classes.secondary="{Binding IsSet}"
+                                                       Classes.danger="{Binding IsMissing}"
+                                                       Classes.under="{Binding HasVariable}"
+                                                       Text="{Binding Label}" />
+                                            <TextBlock Grid.Column="1" Classes="mono amber" Margin="8,0,0,0"
+                                                       Text="{Binding Note}" IsVisible="{Binding HasNote}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                          </Grid>
                                         </Button>
+                                        <!-- Not a TextBlock: its automation peer would publish the value as the
+                                             element's name. RevealedValue draws the characters itself, and takes the
+                                             cell's width so a hold changes no size the accessibility surface reports
+                                             (D-0232); a held value covers the note on its own face and is cut to the cell. -->
+                                        <ContentControl Content="{Binding Variable}" IsVisible="{Binding HasVariable}"
+                                                        Cursor="Hand" VerticalAlignment="Center" ClipToBounds="False">
+                                          <ContentControl.ContentTemplate>
+                                            <DataTemplate x:DataType="vm:EnvVariableRow">
+                                              <ctl:RevealedValue Source="{Binding}"
+                                                                 MaskedLength="6"
+                                                                 Width="{Binding $parent[ContentControl].Bounds.Width}"
+                                                                 FontFamily="{DynamicResource KpMono}"
+                                                                 FontSize="12.5"
+                                                                 VerticalAlignment="Center"
+                                                                 RenderOptions.TextRenderingMode="Antialias"
+                                                                 Foreground="{DynamicResource KpTextSecondary}"
+                                                                 RevealBackground="{DynamicResource KpBgHover}" />
+                                            </DataTemplate>
+                                          </ContentControl.ContentTemplate>
+                                        </ContentControl>
                                       </Panel>
                                     </DataTemplate>
                                   </ItemsControl.ItemTemplate>
@@ -457,20 +434,110 @@
                   </ItemsControl>
                 </StackPanel>
 
-                <Grid ColumnDefinitions="*,12,*">
+                <!-- A form opens under the matrix, beside the footer and rows that open it. -->
+                <Border Classes="card filled" IsVisible="{Binding IsAddingProfile}" ctl:ShowInView.OnShow="True">
+                  <StackPanel Spacing="10">
+                    <TextBlock Classes="section" Text="New profile" />
+                    <TextBlock Classes="caption"
+                               Text="Lowercase letters, digits and dashes, such as staging or prod-eu. Its first key creates it, and prod and production profiles always ask before release." />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <TextBox Classes="mono" Text="{Binding NewProfile}" PlaceholderText="staging" Width="200" />
+                      <Button Classes="primary" Content="Add key" Command="{Binding ConfirmAddProfileCommand}" />
+                      <Button Classes="ghost" Content="Cancel" Command="{Binding CancelAddProfileCommand}" />
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+
+                <Border Classes="card filled" IsVisible="{Binding IsAdding}" ctl:ShowInView.OnShow="True">
+                  <StackPanel Spacing="10">
+                    <TextBlock Classes="section" Text="{Binding SelectedProfile, StringFormat='Add a key to {0}'}" />
+                    <TextBox Classes="mono" Text="{Binding NewKey}" PlaceholderText="STRIPE_KEY" Width="320" HorizontalAlignment="Left" />
+                    <CheckBox Content="Generate a value" IsChecked="{Binding GenerateValue}" />
+                    <StackPanel Spacing="6" IsVisible="{Binding GenerateValue}">
+                      <StackPanel Orientation="Horizontal" Spacing="12">
+                        <RadioButton GroupName="NewVariableSecretKind" Content="Characters" IsChecked="{Binding Generator.UseCharacters}" />
+                        <RadioButton GroupName="NewVariableSecretKind" Content="Words" IsChecked="{Binding Generator.UseWords}" />
+                        <NumericUpDown Width="104"
+                                       IsVisible="{Binding Generator.UseWords}"
+                                       Minimum="{Binding Generator.MinimumWords}"
+                                       Maximum="{Binding Generator.MaximumWords}"
+                                       Increment="1"
+                                       FormatString="0"
+                                       Value="{Binding Generator.WordCount}" />
+                        <TextBox Width="44"
+                                 MaxLength="1"
+                                 IsVisible="{Binding Generator.UseWords}"
+                                 Text="{Binding Generator.Separator}" />
+                      </StackPanel>
+                      <TextBlock Classes="caption" Text="{Binding Generator.Strength}" />
+                      <TextBlock Classes="caption" IsVisible="{Binding Generator.UseWords}" Text="{Binding Generator.Provenance}" />
+                      <TextBlock Classes="caption"
+                                 IsVisible="{Binding Generator.Error, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                 Foreground="{DynamicResource KpTextSecondary}"
+                                 Text="{Binding Generator.Error}" />
+                    </StackPanel>
+                    <ctl:MaskedInput x:Name="NewEnvValue"
+                                     IsVisible="{Binding !GenerateValue}"
+                                     AllowsPaste="True"
+                                     Width="420"
+                                     HorizontalAlignment="Left"
+                                     Sink="{Binding NewValue}"
+                                     MaskedLength="{Binding NewValue.MaskedLength}"
+                                     Placeholder="Existing value" />
+                    <TextBlock Classes="caption" IsVisible="{Binding !GenerateValue}"
+                               Text="Type it or press Ctrl/Cmd+V to paste." />
+                    <TextBlock Classes="caption" IsVisible="{Binding NewValue.Note.Length}"
+                               Text="{Binding NewValue.Note}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Button Classes="primary" Content="Add" Command="{Binding ConfirmAddCommand}" />
+                      <Button Classes="ghost" Content="Cancel" Command="{Binding CancelAddCommand}" />
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+
+                <Border Classes="card filled" IsVisible="{Binding IsReplacing}" ctl:ShowInView.OnShow="True">
+                  <StackPanel Spacing="10">
+                    <TextBlock Classes="section" Text="{Binding ReplacePrompt}" TextWrapping="Wrap" />
+                    <ctl:MaskedInput x:Name="ReplacementEnvValue"
+                                     AllowsPaste="True"
+                                     Width="420"
+                                     HorizontalAlignment="Left"
+                                     Sink="{Binding ReplacementValue}"
+                                     MaskedLength="{Binding ReplacementValue.MaskedLength}"
+                                     Placeholder="New value" />
+                    <TextBlock Classes="caption" IsVisible="{Binding ReplacementValue.Note.Length}"
+                               Text="{Binding ReplacementValue.Note}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Button Classes="primary" Content="Replace" Command="{Binding ConfirmReplaceCommand}" />
+                      <Button Classes="ghost" Content="Cancel" Command="{Binding CancelReplaceCommand}" />
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+
+                <Border Classes="card" IsVisible="{Binding IsRemoving}" BorderBrush="{DynamicResource KpDanger}" ctl:ShowInView.OnShow="True">
+                  <StackPanel Spacing="10">
+                    <TextBlock Classes="body primary" Text="{Binding RemovePrompt}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Button Classes="danger" Content="Remove" Command="{Binding ConfirmRemoveCommand}" />
+                      <Button Classes="ghost" Content="Keep it" Command="{Binding CancelRemoveCommand}" />
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+
+                <ctl:AutoFitColumns MinColumnWidth="360" Spacing="12">
 
                   <!-- The .env.keypaste the selected profile exports: references only, safe to commit. -->
-                  <Border Grid.Column="0" Classes="terminal" VerticalAlignment="Top">
+                  <Border Classes="terminal" VerticalAlignment="Top">
                     <StackPanel>
                       <Border Height="36" Padding="12,0,6,0" BorderThickness="0,0,0,1"
                               BorderBrush="{DynamicResource KpTerminalDivider}">
                         <Grid ColumnDefinitions="Auto,*,Auto">
                           <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                            <ctl:KpIcon Icon="file-code" Size="13" Foreground="{DynamicResource KpTextMuted}" />
-                            <TextBlock Text=".env.keypaste" FontSize="11.5" Foreground="{DynamicResource KpTextMuted}"
+                            <ctl:KpIcon Icon="file-code" Size="13" Foreground="{DynamicResource KpGrey5}" />
+                            <TextBlock Text=".env.keypaste" FontSize="11.5" Foreground="{DynamicResource KpGrey5}"
                                        VerticalAlignment="Center" />
                           </StackPanel>
-                          <Border Grid.Column="2" Background="{DynamicResource KpBgPanel}" CornerRadius="6" Padding="2"
+                          <Border Grid.Column="2" Background="{DynamicResource KpInk1}" CornerRadius="6" Padding="2"
                                   VerticalAlignment="Center">
                             <ItemsControl ItemsSource="{Binding Columns}">
                               <ItemsControl.ItemsPanel>
@@ -488,30 +555,33 @@
                           </Border>
                         </Grid>
                       </Border>
-                      <ItemsControl ItemsSource="{Binding ReferenceLines}" Margin="14,12">
-                        <ItemsControl.ItemTemplate>
-                          <DataTemplate x:DataType="vm:EnvPreviewLine">
-                            <TextBlock Classes="preview" Classes.comment="{Binding IsComment}" Text="{Binding Text}"
-                                       TextWrapping="Wrap" Margin="0,0,0,2" />
-                          </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                      </ItemsControl>
+                      <!-- Lines stay whole, as the file has them; a narrow panel scrolls sideways. -->
+                      <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                        <ItemsControl ItemsSource="{Binding ReferenceLines}" Margin="14,12">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:EnvPreviewLine">
+                              <TextBlock Classes="preview" Classes.comment="{Binding IsComment}" Text="{Binding Text}"
+                                         TextWrapping="NoWrap" Margin="0,0,0,2" />
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </ScrollViewer>
                     </StackPanel>
                   </Border>
 
                   <!-- Run with this profile: the command, copyable, and where it runs on this machine. -->
-                  <Border Grid.Column="2" Classes="card" Padding="18" VerticalAlignment="Top">
+                  <Border Classes="card" Padding="18" VerticalAlignment="Top">
                     <StackPanel Spacing="12">
                       <StackPanel Orientation="Horizontal" Spacing="8">
                         <ctl:KpIcon Icon="terminal" Size="15" Foreground="{DynamicResource KpTextMuted}" />
                         <TextBlock Classes="section" Text="Run with this profile" VerticalAlignment="Center" />
                       </StackPanel>
 
-                      <Border Background="{DynamicResource KpTerminal}" BorderBrush="{DynamicResource KpBorderSubtle}"
-                              BorderThickness="1" CornerRadius="6" Padding="12,4,4,4">
+                      <Border Classes="terminal" CornerRadius="6" Padding="12,5,5,5">
                         <Grid ColumnDefinitions="Auto,*,Auto">
-                          <TextBlock Classes="mono amber" Text="›" Margin="0,0,8,0" VerticalAlignment="Center" />
-                          <TextBlock Grid.Column="1" Classes="mono primary" Text="{Binding RunCommand}"
+                          <TextBlock Text="›" FontSize="12.5" Margin="0,0,8,0" VerticalAlignment="Center"
+                                     Foreground="{DynamicResource KpAmber}" />
+                          <TextBlock Grid.Column="1" FontSize="12.5" Foreground="{DynamicResource KpPaper}" Text="{Binding RunCommand}"
                                      TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
                                      ToolTip.Tip="{Binding RunCommand}" />
                           <Button Grid.Column="2" Classes="ghost row-action" Margin="8,0,0,0"
@@ -568,7 +638,7 @@
                       </Border>
                     </StackPanel>
                   </Border>
-                </Grid>
+                </ctl:AutoFitColumns>
 
               </StackPanel>
             </DataTemplate>
