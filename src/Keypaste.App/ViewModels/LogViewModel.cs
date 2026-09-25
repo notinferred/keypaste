@@ -1,3 +1,5 @@
+using System.Globalization;
+using Keypaste.App.Clipboard;
 using Keypaste.Core.Audit;
 
 namespace Keypaste.App.ViewModels;
@@ -7,17 +9,17 @@ internal enum LogFilter
 {
     All,
 
-    /// <summary>What agents and tokens asked for.</summary>
+    /// <summary>What agents and tokens asked for, and what came of it, approvals included.</summary>
     Agents,
 
-    /// <summary>What the person answered or did: approvals, refusals they gave, shares, bundles.</summary>
+    /// <summary>What the person did themselves: shares, revoked links, bundles.</summary>
     You,
 
     /// <summary>Every refusal, whoever or whatever refused.</summary>
     Denied,
 }
 
-/// <summary>A filter, and the words the heading states it in (D-0032).</summary>
+/// <summary>A filter, and the words the footer states it in, so a filtered table never reads as the whole log.</summary>
 internal sealed record LogFilterOption(LogFilter Filter, string Words);
 
 /// <summary>
@@ -30,8 +32,9 @@ internal sealed record LogFilterOption(LogFilter Filter, string Words);
 /// </para>
 /// <para>
 /// <b>The records are the core's.</b> <see cref="AuditHistory"/> reads them through <see cref="AuditReader"/> and
-/// checks the chain with <see cref="AuditChainVerifier"/>, as <c>keypaste log</c> does; the sentences about the file
-/// as a whole — the count, the filter, the notes and the verdict — are <see cref="AuditText"/>'s (D-0032).
+/// checks the chain with <see cref="AuditChainVerifier"/>, as <c>keypaste log</c> does. <see cref="AuditText"/> words
+/// the file for a terminal; this screen states the same counts, marks and verdict in a window's layout, and never shows
+/// a filtered table without saying how many records it hid.
 /// </para>
 /// <para>
 /// <b>The chain is checked on every load.</b> A row the chain cannot vouch for is marked, or a record somebody
@@ -45,24 +48,29 @@ internal sealed class LogViewModel : ObservableObject
 
     private readonly string _path;
     private readonly TimeProvider _clock;
+    private readonly ClipboardCountdown? _clipboard;
 
     private AuditHistory _history = new(AuditReadKind.Missing, [], [], string.Empty);
     private IReadOnlyList<LogRow> _all = [];
-    private IReadOnlyList<LogRow> _rows = [];
-    private IReadOnlyList<string> _notes = [];
+    private List<LogRow> _rows = [];
+    private ChainVerdict? _verdict;
+    private bool _unverifiedShown;
+    private bool _unreadShown;
     private string _summary = string.Empty;
     private string _message = string.Empty;
     private bool _verdictShown;
     private LogFilterOption _filter;
 
-    internal LogViewModel(string? home, TimeProvider? clock = null)
+    internal LogViewModel(string? home, TimeProvider? clock = null, ClipboardCountdown? clipboard = null)
     {
         _path = KeypasteHome.AuditPath(home);
         _clock = clock ?? TimeProvider.System;
+        _clipboard = clipboard;
         _filter = Filters[0];
 
         RefreshCommand = new RelayCommand(Refresh);
-        VerifyCommand = new RelayCommand(ToggleVerdict, () => _history.Verdict.Count > 0);
+        VerifyCommand = new RelayCommand(ToggleVerdict, () => _verdict is not null);
+        CopyHashCommand = new RelayCommand(() => _ = CopyHashAsync(), () => _clipboard is not null && _verdict is { HasHash: true });
 
         Refresh();
     }
@@ -71,7 +79,7 @@ internal sealed class LogViewModel : ObservableObject
     [
         new(LogFilter.All, string.Empty),
         new(LogFilter.Agents, "agent and token requests only"),
-        new(LogFilter.You, "your answers and actions only"),
+        new(LogFilter.You, "your own actions only"),
         new(LogFilter.Denied, "refused calls only"),
     ];
 
@@ -131,18 +139,35 @@ internal sealed class LogViewModel : ObservableObject
 
     internal bool FilterEmpty => HasTable && _rows.Count == 0;
 
-    /// <summary>What the table is and is not showing, in the core's words: count, filter and file.</summary>
+    /// <summary>How many records the table shows of how many the file holds, and under which filter.</summary>
     internal string Summary => _summary;
 
-    /// <summary>The core's notes on the rows shown: unverified rows, unread reasons, lines that are not records.</summary>
-    internal string Notes => string.Join(Environment.NewLine, _notes);
+    /// <summary>The log file, in full.</summary>
+    internal string LogPath => _path;
 
-    internal bool HasNotes => _notes.Count > 0;
+    /// <summary>The log file with the home folder written as <c>~</c>, for the footer.</summary>
+    internal string ShortPath => Shorten(_path);
 
-    /// <summary>What the hash chain says about the whole file.</summary>
-    internal IReadOnlyList<string> VerdictLines => _history.Verdict;
+    /// <summary>Whether a row shown is one the hash chain does not vouch for, which the legend then explains.</summary>
+    internal bool HasUnverifiedNote => _unverifiedShown;
 
-    internal string VerdictText => string.Join(Environment.NewLine, _history.Verdict);
+    /// <summary>Whether a row shown was served under a reason nobody read (THREATS.md T-12).</summary>
+    internal bool HasUnreadNote => _unreadShown;
+
+    /// <summary>How many lines of the file are not records, said when there are any.</summary>
+    internal string UnreadableNote => _history.Unreadable switch
+    {
+        0 => string.Empty,
+        1 => "1 line of this log could not be read as a record. Verify chain says why.",
+        var n => string.Create(CultureInfo.InvariantCulture, $"{n} lines of this log could not be read as records. Verify chain says why."),
+    };
+
+    internal bool HasUnreadableNote => HasTable && _history.Unreadable > 0;
+
+    internal bool HasNotes => HasUnverifiedNote || HasUnreadNote || HasUnreadableNote;
+
+    /// <summary>What the hash chain says about the whole file, or null when the file was not checked.</summary>
+    internal ChainVerdict? Verdict => _verdict;
 
     /// <summary>Whether the verdict has been asked for.</summary>
     internal bool VerdictShown => _verdictShown;
@@ -154,6 +179,12 @@ internal sealed class LogViewModel : ObservableObject
 
     internal bool HasMessage => _message.Length > 0;
 
+    /// <summary>Whether no log has been written yet, which the screen draws as its empty state rather than a notice.</summary>
+    internal bool IsEmpty => _history.Kind == AuditReadKind.Missing;
+
+    /// <summary>Whether the message is drawn as a notice above the table.</summary>
+    internal bool HasNotice => HasMessage && !IsEmpty;
+
     /// <summary>Whether the message is the chain being broken, which the screen marks as a warning.</summary>
     internal bool IsBroken => _history.Kind == AuditReadKind.Broken;
 
@@ -161,10 +192,14 @@ internal sealed class LogViewModel : ObservableObject
 
     internal RelayCommand VerifyCommand { get; }
 
+    /// <summary>Copies the latest hash, which is not a secret, so it can be kept somewhere else.</summary>
+    internal RelayCommand CopyHashCommand { get; }
+
     /// <summary>Re-reads the log from disk and re-checks it; the verdict folds away, because it described the last read.</summary>
     internal void Refresh()
     {
         _history = AuditHistory.Read(_path);
+        _verdict = _history.Report is { } report ? ChainVerdict.From(report, _clock.LocalTimeZone) : null;
         _verdictShown = false;
         _message = _history.Kind switch
         {
@@ -178,16 +213,48 @@ internal sealed class LogViewModel : ObservableObject
         _all = [.. _history.Entries.Reverse().Select(entry => LogRow.From(entry, !_history.Unverified.Contains(entry.Line), _clock))];
 
         Raise(nameof(HasTable));
-        Raise(nameof(VerdictLines));
-        Raise(nameof(VerdictText));
+        Raise(nameof(Verdict));
         Raise(nameof(VerdictShown));
         Raise(nameof(VerifyLabel));
         Raise(nameof(Message));
         Raise(nameof(HasMessage));
+        Raise(nameof(IsEmpty));
+        Raise(nameof(HasNotice));
         Raise(nameof(IsBroken));
+        Raise(nameof(UnreadableNote));
+        Raise(nameof(HasUnreadableNote));
         VerifyCommand.RaiseCanExecuteChanged();
+        CopyHashCommand.RaiseCanExecuteChanged();
 
         Apply();
+    }
+
+    /// <summary><c>8 records</c>, or <c>2 of 8 records · refused calls only</c> when a filter hides some.</summary>
+    internal static string Tally(int shown, int total, string words)
+    {
+        var noun = total == 1 ? "record" : "records";
+
+        return words.Length == 0
+            ? string.Create(CultureInfo.InvariantCulture, $"{total} {noun}")
+            : string.Create(CultureInfo.InvariantCulture, $"{shown} of {total} {noun} · {words}");
+    }
+
+    private static string DayWords(DateTime? date, DateTime today) => date switch
+    {
+        null => "Undated",
+        { } day when day == today => "Today",
+        { } day when day == today.AddDays(-1) => "Yesterday",
+        { } day when day.Year == today.Year => day.ToString("dddd, MMMM d", CultureInfo.InvariantCulture),
+        { } day => day.ToString("MMMM d, yyyy", CultureInfo.InvariantCulture),
+    };
+
+    private static string Shorten(string path)
+    {
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+        return home.Length > 0 && path.StartsWith(home + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+            ? "~" + path[home.Length..]
+            : path;
     }
 
     private void Apply()
@@ -195,25 +262,51 @@ internal sealed class LogViewModel : ObservableObject
         Func<LogRow, bool> keep = _filter.Filter switch
         {
             LogFilter.Agents => row => !row.ByYou,
-            LogFilter.You => row => row.AnsweredOrDoneByYou,
+            LogFilter.You => row => row.ByYou,
             LogFilter.Denied => row => row.Denied,
             _ => _ => true,
         };
 
-        _rows = [.. _all.Where(keep)];
-
-        var shown = _rows.Select(row => row.Source).Reverse().ToList();
-        IReadOnlyList<string> words = _filter.Words.Length == 0 ? [] : [_filter.Words];
-
-        _summary = HasTable ? AuditText.Heading(_path, shown.Count, _history.Total, words) : string.Empty;
-        _notes = HasTable ? AuditText.Notes(shown, _history.Unreadable, _history.Unverified) : [];
+        _rows = Divide([.. _all.Where(keep)]);
+        _unverifiedShown = _rows.Any(row => row.Unverified);
+        _unreadShown = _rows.Any(row => row.ReasonUnread);
+        _summary = HasTable ? Tally(_rows.Count, _history.Total, _filter.Words) : string.Empty;
 
         Raise(nameof(Rows));
         Raise(nameof(HasRows));
         Raise(nameof(FilterEmpty));
         Raise(nameof(Summary));
-        Raise(nameof(Notes));
+        Raise(nameof(HasUnverifiedNote));
+        Raise(nameof(HasUnreadNote));
         Raise(nameof(HasNotes));
+    }
+
+    /// <summary>Marks the first row of each day with its divider; a table of today alone needs none.</summary>
+    private List<LogRow> Divide(List<LogRow> rows)
+    {
+        var today = TimeZoneInfo.ConvertTime(_clock.GetUtcNow(), _clock.LocalTimeZone).Date;
+        var days = rows.Select(row => row.Date).Distinct().Count();
+
+        for (var i = 0; i < rows.Count; i++)
+        {
+            var date = rows[i].Date;
+            var starts = i == 0 ? days > 1 || date != today : date != rows[i - 1].Date;
+
+            if (starts)
+            {
+                rows[i] = rows[i] with { Day = DayWords(date, today) };
+            }
+        }
+
+        return rows;
+    }
+
+    private async Task CopyHashAsync()
+    {
+        if (_clipboard is not null && _verdict is { HasHash: true } verdict)
+        {
+            await _clipboard.CopyPlainAsync(verdict.Hash, "Latest hash").ConfigureAwait(true);
+        }
     }
 
     private void Choose(bool chosen, LogFilter filter)

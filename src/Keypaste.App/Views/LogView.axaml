@@ -17,6 +17,7 @@
         <Grid ColumnDefinitions="*,Auto">
           <StackPanel Grid.Column="0" Spacing="6" VerticalAlignment="Bottom">
             <TextBlock Classes="h1" Text="Activity" />
+            <!-- Not the handoff's "stored inside the vault, signed": the log is plaintext machine state, hash-chained. -->
             <TextBlock Classes="subtitle"
                        Text="Every agent request, grant, token run and share. Kept on this machine, hash-chained, append-only." />
           </StackPanel>
@@ -28,6 +29,7 @@
                       VerticalAlignment="Bottom">
             <Button Classes="ghost sm"
                     Name="VerifyChain"
+                    IsVisible="{Binding HasTable}"
                     Content="{Binding VerifyLabel}"
                     Command="{Binding VerifyCommand}" />
             <Button Classes="icon ghost sm"
@@ -37,7 +39,7 @@
                     Command="{Binding RefreshCommand}">
               <ctl:KpIcon Icon="refresh-cw" Size="14" />
             </Button>
-            <Border Classes="segmented" Name="Filter" IsEnabled="{Binding HasTable}">
+            <Border Classes="segmented" Name="Filter" IsVisible="{Binding HasTable}">
               <StackPanel Orientation="Horizontal">
                 <RadioButton Classes="segment" GroupName="LogFilter" Content="All" IsChecked="{Binding ShowAll}" />
                 <RadioButton Classes="segment" GroupName="LogFilter" Content="Agents" IsChecked="{Binding ShowAgents}" />
@@ -48,10 +50,10 @@
           </StackPanel>
         </Grid>
 
-        <!-- One sentence about the file as a whole. A broken chain is marked, but a log never written to is normal. -->
+        <!-- One sentence about a file that is unreadable, unchecked or edited. A log never written to is the empty state below. -->
         <Border Classes="card filled"
                 Padding="12,10"
-                IsVisible="{Binding HasMessage}">
+                IsVisible="{Binding HasNotice}">
           <Grid ColumnDefinitions="Auto,*">
             <ctl:KpIcon Grid.Column="0"
                         Icon="info"
@@ -75,21 +77,126 @@
           </Grid>
         </Border>
 
-        <!-- The chain's verdict, in the core's words, on request. -->
-        <Border Classes="terminal"
-                Padding="16,12"
+        <!-- The chain's verdict on request: a status line, the hash worth keeping, and what the check proves. -->
+        <Border Classes="card"
+                Name="Verdict"
+                Padding="16,14"
                 IsVisible="{Binding VerdictShown}">
-          <SelectableTextBlock Name="Verdict"
-                               Text="{Binding VerdictText}"
-                               TextWrapping="Wrap"
-                               FontFamily="{DynamicResource KpMono}"
-                               FontSize="12"
-                               Foreground="{DynamicResource KpTextSecondary}" />
+          <StackPanel Spacing="12">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <Border Grid.Column="0"
+                      Classes="dot"
+                      Classes.ok="{Binding Verdict.IsOk}"
+                      Classes.danger="{Binding Verdict.IsDanger}"
+                      Margin="0,0,10,0" />
+              <TextBlock Grid.Column="1"
+                         Text="{Binding Verdict.Headline}"
+                         FontSize="14"
+                         FontWeight="SemiBold"
+                         TextTrimming="CharacterEllipsis"
+                         VerticalAlignment="Center"
+                         Foreground="{DynamicResource KpTextPrimary}" />
+              <Button Grid.Column="2"
+                      Classes="ghost sm"
+                      Name="CopyHash"
+                      Margin="12,-4,-6,-4"
+                      IsVisible="{Binding Verdict.HasHash}"
+                      Command="{Binding CopyHashCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <ctl:KpIcon Icon="copy" Size="13" />
+                  <TextBlock Text="Copy latest hash" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
+            </Grid>
+
+            <SelectableTextBlock Text="{Binding Verdict.Hash}"
+                                 IsVisible="{Binding Verdict.HasHash}"
+                                 Margin="16,-6,0,0"
+                                 FontFamily="{DynamicResource KpMono}"
+                                 FontSize="12"
+                                 TextTrimming="CharacterEllipsis"
+                                 Foreground="{DynamicResource KpTextMuted}" />
+
+            <ItemsControl ItemsSource="{Binding Verdict.Breaks}" IsVisible="{Binding Verdict.HasBreaks}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel Spacing="4" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                  <TextBlock Text="{Binding}"
+                             TextWrapping="Wrap"
+                             FontSize="13"
+                             FontWeight="Medium"
+                             Foreground="{DynamicResource KpTextPrimary}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <ItemsControl ItemsSource="{Binding Verdict.Paragraphs}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel Spacing="8" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                  <TextBlock Text="{Binding}"
+                             TextWrapping="Wrap"
+                             FontSize="13"
+                             LineHeight="19"
+                             MaxWidth="760"
+                             HorizontalAlignment="Left"
+                             Foreground="{DynamicResource KpTextSecondary}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <Grid ColumnDefinitions="Auto,*" ToolTip.Tip="{Binding Verdict.Path}">
+              <ctl:KpIcon Grid.Column="0"
+                          Icon="file-lock-2"
+                          Size="13"
+                          Margin="0,0,8,0"
+                          Foreground="{DynamicResource KpTextMuted}" />
+              <TextBlock Grid.Column="1"
+                         Text="{Binding ShortPath}"
+                         FontFamily="{DynamicResource KpMono}"
+                         FontSize="11.5"
+                         TextTrimming="PathSegmentEllipsis"
+                         VerticalAlignment="Center"
+                         Foreground="{DynamicResource KpTextMuted}" />
+            </Grid>
+          </StackPanel>
         </Border>
 
+        <!-- Nothing has been written yet, which is normal: said once, in the middle of the page. -->
+        <StackPanel Name="Empty"
+                    IsVisible="{Binding IsEmpty}"
+                    HorizontalAlignment="Center"
+                    Margin="0,88,0,0"
+                    Spacing="10">
+          <Border Classes="tile" Width="44" Height="44" CornerRadius="10" HorizontalAlignment="Center">
+            <ctl:KpIcon Icon="activity" Size="20" Foreground="{DynamicResource KpTextMuted}" />
+          </Border>
+          <TextBlock Text="No activity yet"
+                     Margin="0,4,0,0"
+                     FontSize="15"
+                     FontWeight="SemiBold"
+                     HorizontalAlignment="Center"
+                     Foreground="{DynamicResource KpTextPrimary}" />
+          <TextBlock Text="{Binding Message}"
+                     MaxWidth="380"
+                     TextWrapping="Wrap"
+                     TextAlignment="Center"
+                     FontSize="13"
+                     Foreground="{DynamicResource KpTextSecondary}" />
+        </StackPanel>
+
         <Border Classes="table" IsVisible="{Binding HasTable}">
-          <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-            <StackPanel MinWidth="680">
+          <ScrollViewer Name="TableScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+            <!-- As wide as the table when it fits, so its star columns trim; at most 680 narrower, where it scrolls. -->
+            <StackPanel MinWidth="680" Width="{Binding #TableScroll.Viewport.Width}">
 
               <Border Classes="table-head">
                 <Grid ColumnDefinitions="64,110,100,1.6*,*,100" ColumnSpacing="12">
@@ -102,31 +209,39 @@
                 </Grid>
               </Border>
 
-                  <ItemsControl Name="Rows" ItemsSource="{Binding Rows}">
-                    <ItemsControl.ItemsPanel>
-                      <ItemsPanelTemplate>
-                        <VirtualizingStackPanel />
-                      </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="vm:LogRow">
+              <ItemsControl Name="Rows" ItemsSource="{Binding Rows}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <VirtualizingStackPanel />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:LogRow">
+                    <StackPanel>
+
+                      <!-- The first row of a day carries the day, so the TIME column can stay a clock. -->
+                      <Border IsVisible="{Binding StartsDay}"
+                              Padding="16,6"
+                              BorderThickness="0,1,0,0"
+                              BorderBrush="{DynamicResource KpBorderSubtle}"
+                              Background="{DynamicResource KpBgPanel}">
+                        <TextBlock Text="{Binding Day}"
+                                   FontSize="11.5"
+                                   FontWeight="Medium"
+                                   Foreground="{DynamicResource KpTextMuted}" />
+                      </Border>
+
+                      <Panel>
                         <Border Classes="table-row" ToolTip.Tip="{Binding Detail}">
                           <Grid ColumnDefinitions="64,110,100,1.6*,*,100" ColumnSpacing="12">
 
-                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                              <TextBlock Text="?"
-                                         IsVisible="{Binding Unverified}"
-                                         FontFamily="{DynamicResource KpMono}"
-                                         FontSize="11.5"
-                                         FontWeight="SemiBold"
-                                         Foreground="{DynamicResource KpWarn}"
-                                         ToolTip.Tip="The hash chain does not vouch for this row." />
-                              <TextBlock Text="{Binding Time}"
-                                         ToolTip.Tip="{Binding When}"
-                                         FontFamily="{DynamicResource KpMono}"
-                                         FontSize="11.5"
-                                         Foreground="{DynamicResource KpTextMuted}" />
-                            </StackPanel>
+                            <TextBlock Grid.Column="0"
+                                       Text="{Binding Time}"
+                                       ToolTip.Tip="{Binding When}"
+                                       FontFamily="{DynamicResource KpMono}"
+                                       FontSize="11.5"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource KpTextMuted}" />
 
                             <TextBlock Grid.Column="1"
                                        Text="{Binding Actor}"
@@ -159,58 +274,108 @@
                                        VerticalAlignment="Center"
                                        Foreground="{DynamicResource KpTextMuted}" />
 
-                            <StackPanel Grid.Column="5" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                              <Border Classes="dot"
+                            <Grid Grid.Column="5" ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+                              <Border Grid.Column="0"
+                                      Classes="dot"
+                                      Margin="0,0,6,0"
                                       Classes.ok="{Binding IsOk}"
                                       Classes.danger="{Binding IsDanger}"
                                       Classes.info="{Binding IsInfo}" />
-                              <TextBlock Text="{Binding Result}"
+                              <!-- It may run into the row's end padding, as the design's unclipped cell does, before it trims. -->
+                              <TextBlock Grid.Column="1"
+                                         Text="{Binding Result}"
+                                         Margin="0,0,-12,0"
                                          FontSize="12.5"
                                          FontWeight="Medium"
+                                         TextTrimming="CharacterEllipsis"
                                          VerticalAlignment="Center"
                                          Classes.ok="{Binding IsOk}"
                                          Classes.danger="{Binding IsDanger}"
                                          Classes.info="{Binding IsInfo}"
                                          Classes.muted="{Binding IsMuted}" />
-                              <TextBlock Text="(!)"
-                                         IsVisible="{Binding ReasonUnread}"
-                                         FontFamily="{DynamicResource KpMono}"
-                                         FontSize="11"
-                                         VerticalAlignment="Center"
-                                         Foreground="{DynamicResource KpWarn}"
-                                         ToolTip.Tip="Served from an earlier approval, under a reason that person never saw." />
-                            </StackPanel>
+                              <Border Grid.Column="2"
+                                      Margin="4,0,0,0"
+                                      Background="Transparent"
+                                      IsVisible="{Binding ReasonUnread}"
+                                      ToolTip.Tip="Served from an earlier approval, under a reason that person never saw.">
+                                <ctl:KpIcon Icon="alert-triangle" Size="12" Foreground="{DynamicResource KpWarn}" />
+                              </Border>
+                            </Grid>
 
                           </Grid>
                         </Border>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
 
-                  <Border Classes="table-row" IsVisible="{Binding FilterEmpty}">
-                    <TextBlock Text="Nothing in this log matches this filter."
-                               FontSize="12.5"
-                               Foreground="{DynamicResource KpTextMuted}" />
-                  </Border>
+                        <!-- A row the chain cannot vouch for is marked at its edge, so the TIME column stays aligned. -->
+                        <Border IsVisible="{Binding Unverified}"
+                                Width="2"
+                                Margin="0,1,0,0"
+                                HorizontalAlignment="Left"
+                                Background="{DynamicResource KpWarn}" />
+                      </Panel>
+
+                    </StackPanel>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+
+              <Border Classes="table-row" IsVisible="{Binding FilterEmpty}">
+                <TextBlock Text="Nothing in this log matches this filter."
+                           FontSize="12.5"
+                           Foreground="{DynamicResource KpTextMuted}" />
+              </Border>
 
             </StackPanel>
           </ScrollViewer>
         </Border>
 
-        <!-- What the table is and is not showing, and what its marks mean, in the core's words (D-0032). -->
-        <StackPanel Spacing="4" Margin="0,-8,0,0" IsVisible="{Binding HasTable}">
-          <SelectableTextBlock Name="Notes"
-                               Text="{Binding Notes}"
-                               IsVisible="{Binding HasNotes}"
-                               TextWrapping="Wrap"
-                               FontSize="12"
-                               Foreground="{DynamicResource KpTextSecondary}" />
-          <SelectableTextBlock Name="Summary"
-                               Text="{Binding Summary}"
-                               TextWrapping="Wrap"
-                               FontFamily="{DynamicResource KpMono}"
-                               FontSize="11"
-                               Foreground="{DynamicResource KpTextMuted}" />
+        <!-- What the table's marks mean, and how much of the log it shows. -->
+        <StackPanel Spacing="6" Margin="0,-8,0,0" IsVisible="{Binding HasTable}">
+          <StackPanel Name="Notes" Spacing="4" IsVisible="{Binding HasNotes}">
+            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasUnverifiedNote}">
+              <Border Width="2" Height="12" Margin="5,0" VerticalAlignment="Center" Background="{DynamicResource KpWarn}" />
+              <TextBlock FontSize="12"
+                         VerticalAlignment="Center"
+                         Foreground="{DynamicResource KpTextSecondary}"
+                         Text="The hash chain does not vouch for rows marked like this. Verify chain says why." />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasUnreadNote}">
+              <ctl:KpIcon Icon="alert-triangle" Size="12" VerticalAlignment="Center" Foreground="{DynamicResource KpWarn}" />
+              <TextBlock FontSize="12"
+                         VerticalAlignment="Center"
+                         Foreground="{DynamicResource KpTextSecondary}"
+                         Text="Served from an earlier approval, under a reason that person never saw." />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasUnreadableNote}">
+              <ctl:KpIcon Icon="info" Size="12" VerticalAlignment="Center" Foreground="{DynamicResource KpTextMuted}" />
+              <TextBlock FontSize="12"
+                         VerticalAlignment="Center"
+                         Foreground="{DynamicResource KpTextSecondary}"
+                         Text="{Binding UnreadableNote}" />
+            </StackPanel>
+          </StackPanel>
+
+          <Grid ColumnDefinitions="Auto,Auto,*">
+            <TextBlock Grid.Column="0"
+                       Name="Summary"
+                       Text="{Binding Summary}"
+                       FontSize="12"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource KpTextMuted}" />
+            <TextBlock Grid.Column="1"
+                       Text="·"
+                       Margin="8,0"
+                       FontSize="12"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource KpTextMuted}" />
+            <TextBlock Grid.Column="2"
+                       Text="{Binding ShortPath}"
+                       ToolTip.Tip="{Binding LogPath}"
+                       FontFamily="{DynamicResource KpMono}"
+                       FontSize="11"
+                       TextTrimming="PathSegmentEllipsis"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource KpTextMuted}" />
+          </Grid>
         </StackPanel>
 
       </StackPanel>

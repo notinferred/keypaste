@@ -19,8 +19,8 @@ public sealed class LogViewModelTests : IDisposable
     public void Dispose() => _home.Dispose();
 
     /// <summary>
-    /// The rows are <see cref="AuditReader"/>'s records, newest first, and the heading and notes are
-    /// <see cref="AuditText"/>'s, so the table cannot drift from what <c>keypaste log</c> reads (D-0032).
+    /// The rows are <see cref="AuditReader"/>'s records, newest first, and the footer counts the file's records, so
+    /// the table cannot drift from what <c>keypaste log</c> reads.
     /// </summary>
     [Fact]
     public void The_rows_are_the_core_readers_records_newest_first()
@@ -29,15 +29,31 @@ public sealed class LogViewModelTests : IDisposable
 
         var model = new LogViewModel(_home.Home);
 
-        Assert.True(AuditReader.TryRead(_home.LogPath, out var entries, out var unreadable, out var error), error);
-        var report = AuditChainVerifier.Verify(_home.LogPath);
+        Assert.True(AuditReader.TryRead(_home.LogPath, out var entries, out _, out var error), error);
 
         Assert.Equal(entries.Reverse(), model.Rows.Select(row => row.Source));
         Assert.Equal("GITHUB_TOKEN", model.Rows[0].Secrets);
         Assert.Equal("prod", model.Rows[0].Where);
         Assert.All(model.Rows, row => Assert.True(row.Verified));
-        Assert.Equal(AuditText.Heading(_home.LogPath, entries.Count, entries.Count, []), model.Summary);
-        Assert.Equal(string.Join(Environment.NewLine, AuditText.Notes(entries, unreadable, report.Unverified)), model.Notes);
+        Assert.Equal("2 records", model.Summary);
+        Assert.Equal(_home.LogPath, model.LogPath);
+        Assert.False(model.HasNotes);
+    }
+
+    /// <summary>A table that runs over several days carries each day once, above its first row.</summary>
+    [Fact]
+    public void Each_day_is_divided_once()
+    {
+        _home.Append("env/dev/A", "env/dev/B");
+
+        var model = new LogViewModel(_home.Home, new FixedClock(new DateTimeOffset(2026, 7, 29, 10, 0, 0, TimeSpan.Zero)));
+
+        Assert.Equal("Yesterday", model.Rows[0].Day);
+        Assert.Null(model.Rows[1].Day);
+
+        var same = new LogViewModel(_home.Home, new FixedClock(new DateTimeOffset(2026, 7, 28, 23, 0, 0, TimeSpan.Zero)));
+
+        Assert.All(same.Rows, row => Assert.False(row.StartsDay));
     }
 
     /// <summary>A machine no agent has asked anything of is normal, and is told so in one sentence.</summary>
@@ -49,9 +65,10 @@ public sealed class LogViewModelTests : IDisposable
         Assert.False(File.Exists(_home.LogPath));
         Assert.Empty(model.Rows);
         Assert.False(model.HasTable);
-        Assert.True(model.HasMessage);
+        Assert.True(model.IsEmpty);
+        Assert.False(model.HasNotice);
         Assert.Equal(LogViewModel.NothingYet, model.Message);
-        Assert.Empty(model.VerdictLines);
+        Assert.Null(model.Verdict);
         Assert.False(model.VerifyCommand.CanExecute(null));
     }
 
@@ -67,7 +84,7 @@ public sealed class LogViewModelTests : IDisposable
         Assert.True(model.HasRows);
         Assert.False(model.HasMessage);
         Assert.Equal("STRIPE_KEY", Assert.Single(model.Rows).Secrets);
-        Assert.Contains(_home.LogPath, model.Summary, StringComparison.Ordinal);
+        Assert.Equal("1 record", model.Summary);
     }
 
     /// <summary>A record keypaste-mcp appends while the window is open shows up on a refresh.</summary>
@@ -111,13 +128,18 @@ public sealed class LogViewModelTests : IDisposable
         var model = new LogViewModel(_home.Home);
 
         Assert.False(model.VerdictShown);
-        Assert.NotEmpty(model.VerdictLines);
+        Assert.NotNull(model.Verdict);
         Assert.True(model.VerifyCommand.CanExecute(null));
 
         model.VerifyCommand.Execute(null);
 
+        var report = AuditChainVerifier.Verify(_home.LogPath);
         Assert.True(model.VerdictShown);
-        Assert.Contains("verified in", model.VerdictText, StringComparison.Ordinal);
+        Assert.Equal("Chain verified · 1 record · latest seq 1", model.Verdict!.Headline);
+        Assert.Equal(report.LatestHash, model.Verdict.Hash);
+        Assert.Equal(LogTone.Ok, model.Verdict.Tone);
+        Assert.Equal(_home.LogPath, model.Verdict.Path);
+        Assert.DoesNotContain(model.Verdict.Paragraphs, paragraph => paragraph.Contains('\n', StringComparison.Ordinal));
 
         // It described the file as it was read a moment ago, so a fresh read folds it away.
         model.Refresh();
@@ -144,12 +166,15 @@ public sealed class LogViewModelTests : IDisposable
         Assert.Contains("edited", model.Message, StringComparison.Ordinal);
         Assert.Equal(2, model.Rows.Count);
         Assert.True(model.Rows[^1].Unverified);
-        Assert.Contains(AuditText.UnverifiedMark, model.Notes, StringComparison.Ordinal);
+        Assert.True(model.HasUnverifiedNote);
+        Assert.Equal(LogTone.Danger, model.Verdict!.Tone);
+        Assert.Equal("Chain broken at seq 1", model.Verdict.Headline);
+        Assert.Contains(AuditText.Describe(AuditChainFault.Altered), Assert.Single(model.Verdict.Breaks), StringComparison.Ordinal);
     }
 
     /// <summary>
-    /// Agents keeps what agents and tokens asked for, You keeps what a person answered or did, Denied keeps every
-    /// refusal, and the heading says which, with its counts.
+    /// Agents keeps what agents and tokens asked for, approvals included, You keeps only what the person did
+    /// themselves, so the two never share a row; Denied keeps every refusal, and the footer says which, with its counts.
     /// </summary>
     [Fact]
     public void Each_filter_keeps_its_records_and_says_so()
@@ -175,16 +200,38 @@ public sealed class LogViewModelTests : IDisposable
 
         model.Filter = model.Filters.Single(option => option.Filter == LogFilter.Agents);
         Assert.Equal(["github", "AWS_SECRET_ACCESS_KEY", "REDIS_URL", "DATABASE_URL"], model.Rows.Select(row => row.Secrets));
+        Assert.DoesNotContain(model.Rows, row => row.Actor == LogRow.You);
 
         model.Filter = model.Filters.Single(option => option.Filter == LogFilter.You);
-        Assert.Equal(["github", "github", "DATABASE_URL"], model.Rows.Select(row => row.Secrets));
+        Assert.Equal("github", Assert.Single(model.Rows).Secrets);
         Assert.Equal(LogRow.You, model.Rows[0].Actor);
+        Assert.Equal("maya@acme.dev", model.Rows[0].Where);
 
         model.Filter = model.Filters.Single(option => option.Filter == LogFilter.Denied);
-        Assert.All(model.Rows, row => Assert.Equal("Denied", row.Result));
-        Assert.Equal(2, model.Rows.Count);
-        Assert.Equal(AuditText.Heading(_home.LogPath, 2, 5, ["refused calls only"]), model.Summary);
+        Assert.All(model.Rows, row => Assert.True(row.Denied));
+        Assert.Equal(["Denied", "No answer"], model.Rows.Select(row => row.Result));
+        Assert.Equal("2 of 5 records · refused calls only", model.Summary);
         Assert.False(model.FilterEmpty);
+    }
+
+    /// <summary>A filter that keeps nothing says so in the table rather than drawing an empty one.</summary>
+    [Fact]
+    public void A_filter_that_keeps_nothing_says_so()
+    {
+        _home.Append("env/dev/STRIPE_KEY");
+
+        var model = new LogViewModel(_home.Home);
+        model.Filter = model.Filters.Single(option => option.Filter == LogFilter.You);
+
+        Assert.True(model.FilterEmpty);
+        Assert.Equal("0 of 1 record · your own actions only", model.Summary);
+    }
+
+    private sealed class FixedClock(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
+
+        public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.Utc;
     }
 
     private static AuditRecord Bridge(AuditDecision decision, AuditMethod method, string entry) => new()

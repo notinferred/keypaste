@@ -1,6 +1,7 @@
 using System.Globalization;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Sharing;
 using Keypaste.Core.Tokens;
 
 namespace Keypaste.App.ViewModels;
@@ -21,9 +22,12 @@ internal enum LogTone
 /// Every string is built from an <see cref="AuditEntry"/>, which the core's reader has already sanitized, so nothing an
 /// agent wrote reaches the screen on other terms than it reaches <c>keypaste log</c>. No record holds a value.
 /// </remarks>
-internal sealed class LogRow
+internal sealed record LogRow
 {
     internal const string You = "you";
+
+    /// <summary>What a row the hash chain does not vouch for is told, on its tooltip and in the legend.</summary>
+    internal const string UnverifiedWords = "The hash chain does not vouch for this row.";
 
     private const string _none = "—";
 
@@ -32,8 +36,16 @@ internal sealed class LogRow
     /// <summary>The record this row was drawn from.</summary>
     internal AuditEntry Source { get; }
 
-    /// <summary>Local time: HH:mm today, the date on an earlier day.</summary>
+    /// <summary>Local time of day, to the second; the day is <see cref="Day"/>'s divider.</summary>
     internal string Time { get; private init; } = string.Empty;
+
+    /// <summary>The local date the record was written on, or null when it has no timestamp.</summary>
+    internal DateTime? Date { get; private init; }
+
+    /// <summary>The divider drawn above this row when it starts a day, or null; the screen sets it per filter.</summary>
+    internal string? Day { get; init; }
+
+    internal bool StartsDay => Day is not null;
 
     /// <summary>The full local timestamp, for the tooltip.</summary>
     internal string When { get; private init; } = string.Empty;
@@ -72,9 +84,6 @@ internal sealed class LogRow
     /// <summary>Whether the person did this themselves, rather than an agent or a token asking.</summary>
     internal bool ByYou { get; private init; }
 
-    /// <summary>Whether a person answered this or did it themselves: approvals, refusals they gave, shares, bundles.</summary>
-    internal bool AnsweredOrDoneByYou => ByYou || Is(Source.Method, "prompt");
-
     internal bool Denied => !Source.Granted;
 
     internal static LogRow From(AuditEntry entry, bool verified, TimeProvider clock)
@@ -85,18 +94,26 @@ internal sealed class LogRow
         var byYou = Is(entry.Method, "share-created") || Is(entry.Method, "share-revoked") || Is(entry.Tool, "token bundle");
         var (secrets, where) = Place(entry);
         var (result, tone) = Outcome(entry);
+        var local = entry.At is { } at ? TimeZoneInfo.ConvertTime(at, clock.LocalTimeZone) : (DateTimeOffset?)null;
+
+        if (Is(entry.Method, "share-created") && ShareAuditReason.TryRead(entry.Reason, out var recipient, out var expires))
+        {
+            where = recipient;
+            result = entry.At is { } created && Lifetime(expires - created) is { } lifetime ? $"Link · {lifetime}" : "Link";
+        }
 
         return new LogRow(entry)
         {
-            Time = Clock(entry, clock),
-            When = Stamp(entry, clock),
+            Time = local?.ToString("HH:mm:ss", CultureInfo.InvariantCulture) ?? _none,
+            Date = local?.Date,
+            When = local?.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) ?? entry.Timestamp,
             Actor = byYou ? You : ActorOf(entry),
             Action = ActionOf(entry),
             Secrets = secrets,
             Where = where,
             Result = result,
             Tone = tone,
-            Detail = DetailOf(entry),
+            Detail = DetailOf(entry, verified),
             Verified = verified,
             ByYou = byYou,
         };
@@ -174,7 +191,8 @@ internal sealed class LogRow
     {
         if (!entry.Granted)
         {
-            return ("Denied", LogTone.Danger);
+            // Nobody answered, so nobody refused: still a refusal, but not one a person gave.
+            return Is(entry.Method, "timed-out") ? ("No answer", LogTone.Muted) : ("Denied", LogTone.Danger);
         }
 
         return entry.Method switch
@@ -193,9 +211,14 @@ internal sealed class LogRow
         };
     }
 
-    private static string? DetailOf(AuditEntry entry)
+    private static string? DetailOf(AuditEntry entry, bool verified)
     {
         var lines = new List<string>();
+
+        if (!verified)
+        {
+            lines.Add(UnverifiedWords);
+        }
 
         if (entry.Reason.Length > 0)
         {
@@ -220,25 +243,19 @@ internal sealed class LogRow
         return lines.Count == 0 ? null : string.Join(Environment.NewLine, lines);
     }
 
-    private static string Clock(AuditEntry entry, TimeProvider clock)
+    /// <summary>A link's lifetime from the moment it was recorded, to the minute: <c>24h</c>, <c>7d</c>, <c>45m</c>.</summary>
+    private static string? Lifetime(TimeSpan span)
     {
-        if (entry.At is not { } at)
+        var minutes = (int)Math.Round(span.TotalMinutes);
+
+        return minutes switch
         {
-            return _none;
-        }
-
-        var local = TimeZoneInfo.ConvertTime(at, clock.LocalTimeZone);
-        var today = TimeZoneInfo.ConvertTime(clock.GetUtcNow(), clock.LocalTimeZone).Date;
-
-        return local.Date == today
-            ? local.ToString("HH:mm", CultureInfo.InvariantCulture)
-            : local.ToString("MMM d", CultureInfo.InvariantCulture);
+            <= 0 => null,
+            < 60 => $"{minutes}m",
+            _ when minutes % 1_440 == 0 && minutes >= 2_880 => $"{minutes / 1_440}d",
+            _ => $"{(int)Math.Round(minutes / 60.0)}h",
+        };
     }
-
-    private static string Stamp(AuditEntry entry, TimeProvider clock) =>
-        entry.At is { } at
-            ? TimeZoneInfo.ConvertTime(at, clock.LocalTimeZone).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)
-            : entry.Timestamp;
 
     private static string Span(int seconds) => seconds switch
     {

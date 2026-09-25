@@ -43,6 +43,9 @@ internal sealed record AuditHistory(AuditReadKind Kind, IReadOnlyList<string> Li
     /// <summary>The physical line numbers the hash chain does not vouch for.</summary>
     internal IReadOnlySet<int> Unverified { get; init; } = new HashSet<int>();
 
+    /// <summary>What the chain check found, for a screen that states the verdict in its own layout.</summary>
+    internal AuditChainReport? Report { get; init; }
+
     /// <summary>Reads the log at <paramref name="path"/>, keeping the records <paramref name="keep"/> accepts.</summary>
     /// <param name="path">The log.</param>
     /// <param name="keep">Which records the table holds, or null for all of them.</param>
@@ -85,6 +88,7 @@ internal sealed record AuditHistory(AuditReadKind Kind, IReadOnlyList<string> Li
             Total = entries.Count,
             Unreadable = unreadable,
             Unverified = unverified,
+            Report = report,
         };
     }
 }

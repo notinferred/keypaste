@@ -1,5 +1,4 @@
 using System.Buffers.Text;
-using System.Globalization;
 using Keypaste.Core.Audit;
 
 namespace Keypaste.Core.Sharing;
@@ -154,7 +153,7 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
             return Refused($"the vault could not be saved ({unsaved}), so the link was withdrawn");
         }
 
-        if (!TryAudit(AuditMethod.ShareCreated, what, request.Field, CreatedReason(info)))
+        if (!TryAudit(AuditMethod.ShareCreated, what, request.Field, ShareAuditReason.Created(info)))
         {
             await _client.RevokeAsync(info.Id, revokeToken, CancellationToken.None).ConfigureAwait(false);
             TryForget(vault, store, info.Id, save: true);
@@ -275,15 +274,6 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
         };
 
         return [.. chosen.Where(pair => pair.Value.Length > 0).Select(pair => new ShareField(pair.Name, pair.Value))];
-    }
-
-    private static string CreatedReason(ShareInfo info)
-    {
-        var views = info.Views == 1 ? "1 view" : $"{info.Views} views";
-        var to = info.Recipient ?? "anyone with the link";
-        var passphrase = info.Passphrase ? ", passphrase" : string.Empty;
-
-        return string.Create(CultureInfo.InvariantCulture, $"share {info.Id}: {views}, expires {ShareStore.Iso(info.Expires)}, to {to}{passphrase}");
     }
 
     private static string Path(EntryName name) => name.GroupPath.Length == 0 ? name.Title : name.GroupPath + "/" + name.Title;

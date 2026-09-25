@@ -34,6 +34,7 @@ public sealed class LogViewTests
 
         Assert.Contains("STRIPE_KEY", shown);
         Assert.Contains(model.Summary, shown);
+        Assert.Contains(model.ShortPath, shown);
         Assert.Contains(model.Rows[0].Result, shown);
     });
 }

@@ -148,7 +148,7 @@ The app writes forward slashes in `recent.toml`, including `C:/Users/…` on Win
 
 ## The Activity screen
 
-The Activity screen reads `~/.keypaste/audit.jsonl` through the same reader and chain check as `keypaste log` and shows it as a table, newest first, filtered to All, Agents (agent and token requests), You (what a person answered or did) or Denied. Its count, filter and notes lines are the ones `keypaste log` prints ([D-0032](decisions-archive.md)), and a row the hash chain does not vouch for is marked `?`. The reader and `keypaste log` need no unlocked vault; the current desktop exposes this screen only after unlock. Verify chain shows the chain's verdict.
+The Activity screen reads `~/.keypaste/audit.jsonl` through the same reader and chain check as `keypaste log` and shows it as a table, newest first, with a divider for each earlier day, filtered to All, Agents (agent and token requests and what came of them, approvals included), You (shares, revoked links and bundles you made yourself) or Denied (every refusal; a prompt nobody answered reads No answer). The footer states how many of the file's records the filter shows, and a row the hash chain does not vouch for is marked with an amber bar at its left edge, where `keypaste log` prints `?`. The reader and `keypaste log` need no unlocked vault; the current desktop exposes this screen only after unlock. Verify chain shows the chain's verdict and can copy the latest hash; anchoring a later check to that hash is `keypaste log verify --expect`.
 
 A missing log is normal before the MCP bridge has initialized one. Requests and bridge events populate it; opening the desktop Activity screen does not require a prior credential release.
 
