@@ -50,9 +50,9 @@ The published `v0.3.0` CLI stores logins and environment variables in a local KD
 
 ## The approval, in the terminal
 
-![An agent asks keypaste for one credential; a person approves it; the audit log records it.](docs/demo/keypaste-demo.gif)
+![An agent asks keypaste for one credential and a person allows it once; asked again, the person denies it; the audit log records both.](docs/demo/keypaste-demo.gif)
 
-<sub>Recorded with the published v0.3.0, which asks <code>Approve? [y/N]</code> and allows up to 300 seconds. In source, for the next release, the prompt is:</sub>
+<sub>Rendered from the current source's output, for the next release, with a scripted MCP client in place of the agent; the published v0.3.0 asks <code>Approve? [y/N]</code> and allows up to 300 seconds. The prompt as text:</sub>
 
 ```
 ────────────────────────────────────────────────────────────
