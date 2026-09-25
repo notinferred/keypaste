@@ -7,8 +7,8 @@ namespace Keypaste.Core;
 /// resolve, and the child gets each value under the file's name for it.
 /// </summary>
 /// <remarks>
-/// An env reference is judged with its whole profile, as <see cref="EnvResolution"/> judges a set,
-/// so an unusable profile refuses the file. An entry reference is read from the vault as its file
+/// Each profile is judged on the keys the file references from it, as the session path judges
+/// them, so an unusable key the file never names refuses nothing. An entry reference is read from the vault as its file
 /// holds it (D-0317), never from a reserved group, and its field must hold something. A refusal
 /// names each variable and its reference, never a value.
 /// </remarks>
@@ -62,8 +62,12 @@ public static class EnvReferenceResolution
 
         var now = clock.GetUtcNow();
         var sets = new Dictionary<(string Project, string Profile), EnvResolved>();
+        var keysBySet = envs.GroupBy(env => (env.Project, env.Profile)).ToDictionary(
+            group => group.Key,
+            group => (IReadOnlyList<string>)[.. group.Select(env => env.Key).Distinct(StringComparer.Ordinal)]);
         List<EnvVariable> variables = [];
         List<EnvProblem> problems = [];
+        var withheld = false;
 
         foreach (var line in document.Lines)
         {
@@ -75,7 +79,7 @@ public static class EnvReferenceResolution
                 case EnvReference env:
                     if (!sets.TryGetValue((env.Project, env.Profile), out var set))
                     {
-                        set = EnvResolution.Resolve(entries!, groupPaths!, env.Project, env.Profile, now);
+                        set = EnvResolution.Resolve(entries!, groupPaths!, env.Project, env.Profile, keysBySet[(env.Project, env.Profile)], now);
                         sets[(env.Project, env.Profile)] = set;
                     }
 
@@ -95,10 +99,19 @@ public static class EnvReferenceResolution
             {
                 problems.Add(new EnvProblem(line.Name, $"({line.Reference}) {why}"));
             }
+            else if (value is null)
+            {
+                withheld = true;
+            }
             else
             {
                 variables.Add(new EnvVariable(line.Name, value!));
             }
+        }
+
+        if (withheld && problems.Count == 0)
+        {
+            problems.Add(new EnvProblem(string.Empty, "a referenced profile cannot be used"));
         }
 
         if (problems.Count == 0 && !EnvNameRules.TryCheck(variables, out var names))
@@ -158,19 +171,36 @@ public static class EnvReferenceResolution
             : EnvResolved.Released(released.Project, variables, released.Profile);
     }
 
+    private const string _missing = "is not in this profile's set";
+
+    /// <summary>A value, a reason, or neither when the line is withheld because another line of its profile is refused.</summary>
     private static (string? Value, string? Why) Pick(EnvResolved set, EnvReference env)
     {
         if (set.Outcome != EnvOutcome.Resolved)
         {
-            return (null, set.Outcome == EnvOutcome.Unusable
-                ? $"'{EnvProfileNames.GroupPath(env.Project, env.Profile)}' cannot be used: " +
-                  string.Join("; ", set.Problems.Select(problem => $"{EnvResolved.Display(problem.Key)} {problem.Reason}"))
-                : set.Refusal);
+            if (set.Outcome != EnvOutcome.Unusable)
+            {
+                return (null, set.Refusal);
+            }
+
+            // The set holds only the file's keys, so each problem is reported on the line naming its
+            // key; a line whose key is sound is withheld with the rest of the file.
+            var own = set.Problems.Where(problem => string.Equals(problem.Key, env.Key, StringComparison.Ordinal)).ToList();
+
+            if (own.Count == 0)
+            {
+                return (null, null);
+            }
+
+            return (null, own is [{ Reason: _missing }]
+                ? $"{env.Key} {_missing}"
+                : $"'{EnvProfileNames.GroupPath(env.Project, env.Profile)}' cannot be used: " +
+                  string.Join("; ", own.Select(problem => $"{EnvResolved.Display(problem.Key)} {problem.Reason}")));
         }
 
         return set.Variables.FirstOrDefault(variable => string.Equals(variable.Key, env.Key, StringComparison.Ordinal)) is { } found
             ? (found.Value, null)
-            : (null, $"{env.Key} is not in this profile's set");
+            : (null, $"{env.Key} {_missing}");
     }
 
     private static (string? Value, string? Why) Read(IReadOnlyList<VaultEntry> entries, EntryReference reference, DateTimeOffset now)

@@ -110,15 +110,34 @@ public sealed class EnvReferenceResolutionTests : IDisposable
     }
 
     [Fact]
-    public void An_unusable_profile_refuses_every_reference_to_it()
+    public void An_unusable_key_the_file_never_names_refuses_nothing_as_on_the_session_path()
     {
-        _vault.AddEntry(new VaultEntry { GroupPath = "env/acme-api/staging", Title = "BAD-NAME", Password = "x" });
+        _vault.AddEntry(new VaultEntry { GroupPath = "env/acme-api/staging", Title = "bad-name", Password = "x" });
+        _vault.AddEntry(new VaultEntry { GroupPath = "env/acme-api/staging", Title = "OLD_KEY", Password = "x" });
+        _vault.SetExpiryUnchecked(new EntryName("env/acme-api/staging", "OLD_KEY"), _clock.GetUtcNow().AddDays(-1));
+        _vault.Save();
+        var document = Document("S=kp://acme-api/staging/STRIPE_KEY\n");
+
+        var direct = EnvReferenceResolution.Resolve(_vault, document, _clock);
+        var session = EnvReferenceResolution.Apply(document, EnvResolution.Resolve(_vault, "acme-api", "staging", ["STRIPE_KEY"], _clock));
+
+        Assert.Equal([new EnvVariable("S", "sk_staging_sentinel")], direct.Variables);
+        Assert.Equal(direct.Variables, session.Variables);
+    }
+
+    [Fact]
+    public void An_unusable_referenced_key_refuses_the_file_on_its_own_line()
+    {
+        _vault.AddEntry(new VaultEntry { GroupPath = "env/acme-api/staging", Title = "OLD_KEY", Password = "x" });
+        _vault.SetExpiryUnchecked(new EntryName("env/acme-api/staging", "OLD_KEY"), _clock.GetUtcNow().AddDays(-1));
         _vault.Save();
 
-        var resolved = Resolve("DB=kp://acme-api/staging/DATABASE_URL\n");
+        var resolved = Resolve("DB=kp://acme-api/staging/DATABASE_URL\nOLD=kp://acme-api/staging/OLD_KEY\n");
 
         Assert.Equal(EnvOutcome.Unusable, resolved.Outcome);
-        Assert.Contains("'env/acme-api/staging' cannot be used: BAD-NAME", Assert.Single(resolved.Problems).Reason, StringComparison.Ordinal);
+        var problem = Assert.Single(resolved.Problems);
+        Assert.Equal("OLD", problem.Key);
+        Assert.Contains("'env/acme-api/staging' cannot be used: OLD_KEY expired", problem.Reason, StringComparison.Ordinal);
         AssertNoValue(resolved);
     }
 

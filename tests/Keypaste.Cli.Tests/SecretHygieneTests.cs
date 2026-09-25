@@ -429,7 +429,7 @@ public sealed class SecretHygieneTests
         Assert.Equal(CliApp.ExitInternalError, harness.Run("run", "--env-file", file, "--vault", harness.VaultPath, "--", "node"));
 
         Assert.Contains("NOPE", harness.Err, StringComparison.Ordinal);
-        Assert.Contains("BAD-NAME", harness.Err, StringComparison.Ordinal);
+        Assert.DoesNotContain("BAD-NAME", harness.Err, StringComparison.Ordinal);
         Assert.Empty(harness.ProcessLauncher.Started);
         foreach (var sentinel in new[] { SentinelPassword, SentinelUsername, SentinelNotes })
         {
