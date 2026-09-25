@@ -29,9 +29,9 @@ public sealed class AgentClientsTests
 
         Assert.Equal(["Claude Code", "Cursor", "Every other client"], model.Clients.Select(card => card.Name));
         var connected = model.Clients[0];
-        Assert.Equal(("CC", "Connected", "Claude Code · MCP stdio"), (connected.Initials, connected.Status, connected.Detail));
+        Assert.Equal(("claude-code", "cc", "Connected", "Claude Code · MCP stdio"), (connected.Title, connected.Initials, connected.Status, connected.Detail));
         Assert.Equal("Session grants up to 1h", connected.PolicyText);
-        Assert.Equal("Idle", model.Clients[1].Status);
+        Assert.Equal(("cursor", "cu", "Idle"), (model.Clients[1].Title, model.Clients[1].Initials, model.Clients[1].Status));
         Assert.Equal(3, AgentActivityViewModel.PolicyOptions.Count);
     }
 

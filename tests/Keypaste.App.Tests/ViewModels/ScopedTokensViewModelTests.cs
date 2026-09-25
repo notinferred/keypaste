@@ -148,4 +148,116 @@ public sealed class ScopedTokensViewModelTests : IDisposable
         entries.Search = "ci";
         Assert.DoesNotContain(entries.Rows, row => ReservedGroups.IsReserved(row.GroupPath));
     }
+
+    [Fact]
+    public async Task TheForm_MintsATokenHeldOnlyForAHoldOrACopy_AndForgetsItOnDone()
+    {
+        var clipboard = new FakeClipboard();
+        using var countdown = new ClipboardCountdown(clipboard, _clock);
+        List<string> said = [];
+        using var screen = new ScopedTokensViewModel(_session, countdown, said.Add);
+
+        screen.OpenFormCommand.Execute(null);
+        screen.Name = "ci-staging";
+        screen.Scope = "read:acme-api/staging/*";
+        screen.SetExpiryCommand.Execute("7d");
+        screen.CreateCommand.Execute(null);
+
+        Assert.False(screen.IsFormOpen);
+        var minted = Assert.IsType<MintedToken>(screen.Minted);
+        var token = minted.Reveal()!;
+        Assert.Equal(TokenCheck.Valid, new TokenStore(_session.Unlocked!).Verify(token, _clock.GetUtcNow(), out _));
+        Assert.Equal("7 days", Assert.Single(screen.Rows).Expires);
+        Assert.Equal(token.Length, minted.MaskedLength);
+        Assert.DoesNotContain(token[13..], Shown(screen), StringComparison.Ordinal);
+        Assert.DoesNotContain(token[13..], string.Join('\n', said), StringComparison.Ordinal);
+
+        screen.CopyMintedCommand.Execute(null);
+        await countdown.SettledAsync();
+        Assert.Equal(token, clipboard.Content);
+        Assert.True(clipboard.ContentWasSetAsASecret);
+
+        screen.DoneMintedCommand.Execute(null);
+
+        Assert.Null(screen.Minted);
+        Assert.Null(minted.Reveal());
+        Assert.False(screen.CopyMintedCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void TheForm_SaysWhyNoTokenWasMade_AndKeepsWhatWasTyped()
+    {
+        using var screen = new ScopedTokensViewModel(_session);
+
+        screen.OpenFormCommand.Execute(null);
+        screen.Name = "prod";
+        screen.Scope = "read:acme-api/prod/*";
+        screen.CreateCommand.Execute(null);
+
+        Assert.True(screen.IsFormOpen);
+        Assert.True(screen.HasFormError);
+        Assert.Contains("protected", screen.FormError, StringComparison.Ordinal);
+        Assert.Null(screen.Minted);
+        Assert.Empty(screen.Rows);
+        Assert.Equal("read:acme-api/prod/*", screen.Scope);
+    }
+
+    [Fact]
+    public void RevokeCommand_RemovesTheRow_AndSaysSo()
+    {
+        List<string> said = [];
+        using var screen = new ScopedTokensViewModel(_session, toast: said.Add);
+        Assert.True(screen.Create("ci", "read:acme-api/staging/*", TimeSpan.FromDays(30), false).Ok);
+
+        screen.RevokeCommand.Execute(Assert.Single(screen.Rows));
+
+        Assert.Empty(screen.Rows);
+        Assert.True(screen.HasNoRows);
+        Assert.Equal(["Revoked ci"], said);
+    }
+
+    [Fact]
+    public void AskingToRevoke_OnlyConfirms_AndCancelKeepsTheToken()
+    {
+        using var screen = new ScopedTokensViewModel(_session);
+        Assert.True(screen.Create("ci", "read:acme-api/staging/*", TimeSpan.FromDays(30), false).Ok);
+
+        screen.AskRevokeCommand.Execute(Assert.Single(screen.Rows));
+
+        var asking = Assert.Single(screen.Rows);
+        Assert.True(asking.IsConfirming);
+        Assert.Equal("Revoke ci? Anything using it stops working.", asking.ConfirmText);
+
+        screen.CancelRevokeCommand.Execute(null);
+
+        Assert.False(Assert.Single(screen.Rows).IsConfirming);
+        Assert.Single(new TokenStore(_session.Unlocked!).List());
+    }
+
+    [Fact]
+    public void NewToken_IsNotOffered_WhileTheFormOrAMintedTokenShows()
+    {
+        using var screen = new ScopedTokensViewModel(_session);
+        Assert.True(screen.CanOpenForm);
+
+        screen.OpenFormCommand.Execute(null);
+        Assert.False(screen.OpenFormCommand.CanExecute(null));
+
+        screen.Name = "ci-staging";
+        screen.Scope = "read:acme-api/staging/*";
+        screen.CreateCommand.Execute(null);
+        Assert.True(screen.HasMinted);
+        Assert.False(screen.CanOpenForm);
+
+        screen.DoneMintedCommand.Execute(null);
+        Assert.True(screen.CanOpenForm);
+    }
+
+    private static string Shown(ScopedTokensViewModel screen) =>
+        string.Join(
+            '\n',
+            [
+                screen.Name, screen.Scope, screen.FormError, screen.Message, screen.Minted?.Name ?? string.Empty, screen.Minted?.Note ?? string.Empty,
+                .. screen.Rows.Select(row => row.ToString()),
+            ]);
 }

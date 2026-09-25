@@ -32,8 +32,12 @@ public sealed class AgentActivityViewModelTests
         Assert.Equal("example · password", waiting.What);
         Assert.Equal("claude-code · label ci-probe", waiting.Who);
         Assert.Equal("answered for you in 45 s", waiting.Left);
+        Assert.Equal("45s left", waiting.LeftText);
+        Assert.True(model.HasWaiting);
         Assert.Empty(model.Grants);
         Assert.True(model.IsAvailable);
+        var serving = Assert.IsType<AuthorityStatus.Serving>(app.Authority.Status);
+        Assert.Equal($"Answering agents from this app · process {serving.Owner.ProcessId} · session {serving.Session}", model.Serving);
 
         app.Clock.Advance(TimeSpan.FromSeconds(5));
 
@@ -244,6 +248,31 @@ public sealed class AgentActivityViewModelTests
         Assert.Equal("keypaste run · label none configured", row.Who);
         Assert.Equal("acme-api · staging · npm start · set", row.What);
         Assert.Equal("ends in 900 s", row.Left);
+    }
+
+    [Fact]
+    public async Task A_grant_row_says_its_time_left_as_the_table_shows_it_and_a_revoke_says_so()
+    {
+        await using var app = await App.StartAsync();
+        app.Person.Answer = ApprovalAnswer.Approved;
+        await app.RequestAsync();
+
+        List<string> said = [];
+        using var model = new AgentActivityViewModel(app.Authority, app.Fixture.Home, app.Clock, toast: said.Add);
+
+        var grant = Assert.Single(model.Grants);
+        Assert.Equal(("claude-code", "example · password", "1h left", 1d), (grant.Client, grant.Detail, grant.LeftText, grant.Fraction));
+
+        app.Clock.Advance(TimeSpan.FromSeconds(181));
+
+        grant = Assert.Single(model.Grants);
+        Assert.Equal("57m left", grant.LeftText);
+        Assert.Equal(3419d / 3600, grant.Fraction, 3);
+
+        model.RevokeCommand.Execute(grant);
+
+        Assert.Empty(model.Grants);
+        Assert.Equal(["Revoked claude-code's grant"], said);
     }
 
     private static string Everything(AgentActivityViewModel model) =>

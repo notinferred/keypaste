@@ -33,6 +33,7 @@ public sealed class AgentActivityViewTests
             "nowhere",
             _ => null);
         using var model = new AgentActivityViewModel(authority, fixture.Home, new ManualClock(), connector: connector);
+        model.ToggleConnectCommand.Execute(null);
         var window = new Window { Content = new AgentActivityView { DataContext = model } };
         window.Show();
 

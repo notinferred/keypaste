@@ -20,6 +20,9 @@ internal sealed class ActivityRow
     {
         Grant = grant;
         Id = grant is { } key ? GrantId.Of(key) : null;
+        Detail = $"{prompt.Entry} · {prompt.Field}";
+        LeftText = Humanized(remaining);
+        Fraction = Share(remaining, prompt.TtlSeconds > 0 ? prompt.TtlSeconds : ApprovalLimits.DefaultMaximumTtlSeconds);
     }
 
     private ActivityRow(int number, string client, string label, string entry, string field, string left)
@@ -52,6 +55,15 @@ internal sealed class ActivityRow
     /// <summary>The grant's id, as <c>keypaste grants</c> shows it, or null for a waiting request.</summary>
     internal string? Id { get; private init; }
 
+    /// <summary>What a grant releases, as the Agents table's second line: the entry and field, or a run's keys and set.</summary>
+    internal string Detail { get; private init; } = string.Empty;
+
+    /// <summary>A grant's or a waiting request's time left as the Agents screen says it: <c>42m left</c>.</summary>
+    internal string LeftText { get; private init; } = string.Empty;
+
+    /// <summary>The share of a grant's length still to run, from 0 to 1, for its bar.</summary>
+    internal double Fraction { get; private init; }
+
     /// <summary>The client and its label on one line.</summary>
     internal string Who => $"{Client} · label {Label}";
 
@@ -75,6 +87,9 @@ internal sealed class ActivityRow
             "ends in " + Seconds(grant.Remaining))
         {
             Id = GrantId.OfEnv(grant.Key),
+            Detail = EnvDetail(grant),
+            LeftText = Humanized(grant.Remaining),
+            Fraction = Share(grant.Remaining, EnvGrantCache.GrantSeconds(ApprovalLimits.Default)),
         };
 
     /// <summary>An agent's run a person is being asked about.</summary>
@@ -85,7 +100,10 @@ internal sealed class ActivityRow
             waiting.Prompt.Label ?? "none configured",
             $"{waiting.Prompt.Command} · {string.Join(", ", waiting.Prompt.Variables.Select(variable => variable.Name))}",
             "run",
-            "answered for you in " + Seconds(waiting.Remaining));
+            "answered for you in " + Seconds(waiting.Remaining))
+        {
+            LeftText = Humanized(waiting.Remaining),
+        };
 
     /// <summary>A <c>keypaste run --session</c> request a person is being asked about.</summary>
     internal static ActivityRow WaitingEnv(int number, WaitingEnv waiting) =>
@@ -95,7 +113,35 @@ internal sealed class ActivityRow
             "none configured",
             $"{waiting.Prompt.Project} · {waiting.Prompt.Profile} · {waiting.Prompt.Command}",
             "set",
-            "answered for you in " + Seconds(waiting.Remaining));
+            "answered for you in " + Seconds(waiting.Remaining))
+        {
+            LeftText = Humanized(waiting.Remaining),
+        };
+
+    /// <summary>The keys a run's grant releases and its set, or the command a <c>keypaste run --session</c> grant repeats.</summary>
+    private static string EnvDetail(EnvGrantInForce grant)
+    {
+        var set = $"{grant.Project}/{grant.Profile}";
+
+        return grant.Entries.Count == 0
+            ? $"{grant.Command} · {set}"
+            : $"{string.Join(", ", grant.Entries.Select(entry => entry[(entry.LastIndexOf('/') + 1)..]))} · {set}";
+    }
+
+    /// <summary>Whole minutes under an hour, then hours and minutes; rounded up, as <see cref="Seconds"/> is.</summary>
+    private static string Humanized(TimeSpan remaining)
+    {
+        var seconds = (int)Math.Ceiling(Math.Max(0, remaining.TotalSeconds));
+        var minutes = (seconds + 59) / 60;
+
+        return seconds < 60 ? string.Create(CultureInfo.InvariantCulture, $"{seconds}s left")
+            : minutes < 60 ? string.Create(CultureInfo.InvariantCulture, $"{minutes}m left")
+            : minutes % 60 == 0 ? string.Create(CultureInfo.InvariantCulture, $"{minutes / 60}h left")
+            : string.Create(CultureInfo.InvariantCulture, $"{minutes / 60}h {minutes % 60}m left");
+    }
+
+    private static double Share(TimeSpan remaining, int lengthSeconds) =>
+        lengthSeconds <= 0 ? 0 : Math.Clamp(remaining.TotalSeconds / lengthSeconds, 0, 1);
 
     // Rounded up, so a grant with half a second left does not read as over.
     private static string Seconds(TimeSpan remaining) =>

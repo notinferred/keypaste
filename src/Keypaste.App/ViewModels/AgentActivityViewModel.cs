@@ -1,4 +1,5 @@
 using System.Globalization;
+using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
@@ -40,9 +41,12 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
     private string _clientsSignature = string.Empty;
     private string _clientsProblem = string.Empty;
     private readonly Action<Action> _post;
+    private readonly Action<string> _toast;
     private readonly ITimer _timer;
+    private bool _isConnectOpen;
 
     private string _status = string.Empty;
+    private string _serving = string.Empty;
     private string _unavailable = string.Empty;
     private IReadOnlyList<ActivityRow> _waiting = [];
     private IReadOnlyList<ActivityRow> _grants = [];
@@ -56,10 +60,15 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
         string? home,
         TimeProvider? clock = null,
         Action<Action>? post = null,
-        ClientConnector? connector = null)
+        ClientConnector? connector = null,
+        Action<string>? toast = null,
+        ClipboardCountdown? clipboard = null)
     {
         _authority = authority;
+        _toast = toast ?? (_ => { });
         Connect = authority is null ? null : new ConnectClientViewModel(authority.Session, connector ?? ClientConnector.ForThisProcess());
+        Tokens = authority is null ? null : new ScopedTokensViewModel(authority.Session, clipboard, _toast);
+        ToggleConnectCommand = new RelayCommand(() => IsConnectOpen = !IsConnectOpen, () => Connect is not null);
         _auditPath = KeypasteHome.AuditPath(home);
         _clientsPath = KeypasteHome.ClientsPath(home);
         _clock = clock ?? TimeProvider.System;
@@ -113,12 +122,39 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
     /// <summary>Connecting a client to this vault, and checking the connection.</summary>
     internal ConnectClientViewModel? Connect { get; }
 
+    /// <summary>Whether the Connect a client card is open.</summary>
+    internal bool IsConnectOpen
+    {
+        get => _isConnectOpen;
+        set => Set(ref _isConnectOpen, value && Connect is not null);
+    }
+
+    internal RelayCommand ToggleConnectCommand { get; }
+
+    /// <summary>The vault's scoped tokens, minting one and revoking one.</summary>
+    internal ScopedTokensViewModel? Tokens { get; }
+
     /// <summary>One true sentence about what agents can do with this vault.</summary>
     internal string Status
     {
         get => _status;
         private set => Set(ref _status, value);
     }
+
+    /// <summary>Which process and session answer agents, on one line, or empty when none does.</summary>
+    internal string Serving
+    {
+        get => _serving;
+        private set
+        {
+            if (Set(ref _serving, value))
+            {
+                Raise(nameof(IsServing));
+            }
+        }
+    }
+
+    internal bool IsServing => _serving.Length > 0;
 
     /// <summary>Why waiting requests and grants cannot be read, or empty when they were.</summary>
     internal string Unavailable
@@ -143,10 +179,14 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
 
     internal bool NothingWaiting => IsAvailable && _waiting.Count == 0;
 
+    internal bool HasWaiting => _waiting.Count > 0;
+
     /// <summary>The grants in force, soonest to end first.</summary>
     internal IReadOnlyList<ActivityRow> Grants => _grants;
 
     internal bool NoGrants => IsAvailable && _grants.Count == 0;
+
+    internal bool HasGrants => _grants.Count > 0;
 
     /// <summary>The audit log history is read from.</summary>
     internal string AuditPath => _auditPath;
@@ -199,6 +239,9 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
     {
         var status = _authority?.Status ?? new AuthorityStatus.Locked();
         Status = Describe(status);
+        Serving = status is AuthorityStatus.Serving answering
+            ? string.Create(CultureInfo.InvariantCulture, $"Answering agents from this app · process {answering.Owner.ProcessId} · session {answering.Session}")
+            : string.Empty;
 
         string? session = null;
 
@@ -228,8 +271,10 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
 
         Raise(nameof(Waiting));
         Raise(nameof(NothingWaiting));
+        Raise(nameof(HasWaiting));
         Raise(nameof(Grants));
         Raise(nameof(NoGrants));
+        Raise(nameof(HasGrants));
         RevokeAllCommand.RaiseCanExecuteChanged();
 
         ReadHistory(session, forceHistory);
@@ -386,8 +431,13 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
     {
         if (row?.Id is { } id)
         {
-            _authority?.Revoke(id);
+            var ended = _authority?.Revoke(id) == true;
             Read(forceHistory: false);
+
+            if (ended)
+            {
+                _toast($"Revoked {row.Client}'s grant");
+            }
         }
     }
 
@@ -407,5 +457,6 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
         _disposed = true;
         _timer.Dispose();
         Connect?.Dispose();
+        Tokens?.Dispose();
     }
 }
