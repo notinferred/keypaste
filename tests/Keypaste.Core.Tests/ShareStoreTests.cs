@@ -27,7 +27,7 @@ public sealed class ShareStoreTests : IDisposable
         string link;
         using (var vault = _fixture.Open())
         {
-            var outcome = await _fixture.Service().CreateAsync(vault, ShareFixture.Request(passphrase: "a long passphrase", to: "sam@acme.dev"), CancellationToken.None);
+            var outcome = await _fixture.Service().CreateAsync(vault, ShareFixture.Request(passphrase: "a long enough passphrase", to: "sam@acme.dev"), CancellationToken.None);
             Assert.True(outcome.Ok, outcome.Message);
             link = outcome.Link!;
         }
@@ -52,7 +52,7 @@ public sealed class ShareStoreTests : IDisposable
             .Select(e => string.Join("|", e.Title, e.Username, e.Password, e.Url, e.Notes)));
         Assert.DoesNotContain(key, shareRecords, StringComparison.Ordinal);
         Assert.DoesNotContain(ShareFixture.StripeValue, shareRecords, StringComparison.Ordinal);
-        Assert.DoesNotContain("a long passphrase", shareRecords, StringComparison.Ordinal);
+        Assert.DoesNotContain("a long enough passphrase", shareRecords, StringComparison.Ordinal);
         Assert.DoesNotContain(key, _fixture.EverythingOnDisk(), StringComparison.Ordinal);
         Assert.DoesNotContain(link, _fixture.EverythingOnDisk(), StringComparison.Ordinal);
         Assert.DoesNotContain(key, File.ReadAllText(_fixture.VaultPath), StringComparison.Ordinal);

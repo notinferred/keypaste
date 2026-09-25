@@ -55,8 +55,8 @@ public sealed class ShareClient(HttpMessageHandler handler, Uri endpoint)
     internal const int MaximumResponseBytes = 64 * 1024;
 
     // site/src/share.js sets this on the 404 of a lookup that found no live share, and on no other answer.
-    private const string GoneHeader = "x-keypaste-share";
-    private const string GoneMark = "gone";
+    private const string _goneHeader = "x-keypaste-share";
+    private const string _goneMark = "gone";
 
     private readonly HttpMessageHandler _handler = handler ?? throw new ArgumentNullException(nameof(handler));
 
@@ -224,8 +224,8 @@ public sealed class ShareClient(HttpMessageHandler handler, Uri endpoint)
             }
 
             var gone = response.StatusCode == HttpStatusCode.NotFound
-                && response.Headers.TryGetValues(GoneHeader, out var marks)
-                && marks.Contains(GoneMark, StringComparer.Ordinal);
+                && response.Headers.TryGetValues(_goneHeader, out var marks)
+                && marks.Contains(_goneMark, StringComparer.Ordinal);
 
             var stream = await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false);
             await using (stream.ConfigureAwait(false))

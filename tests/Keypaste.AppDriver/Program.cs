@@ -593,6 +593,11 @@ internal sealed class Driver(string home)
             Console.Out.WriteLine($"history-message {model.HistoryMessage}");
         }
 
+        if (model.HasHistory)
+        {
+            Console.Out.WriteLine($"history-heading {model.HistoryHeading}");
+        }
+
         foreach (var line in model.History.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries))
         {
             Console.Out.WriteLine($"history {line}");
