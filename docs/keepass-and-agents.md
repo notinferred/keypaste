@@ -72,6 +72,19 @@ One keystroke later the deploy runs, and the exchange is two lines you can read 
 
 `exposure` records a listing allowed by configured globs; `prompt` records a request a person reviewed. [The demo](demo.md) shows the flow in about sixty seconds.
 
+## Moving from another KeePass file
+
+An existing KDBX file can stay where it is: `keypaste import old.kdbx` with no vault configured checks that it unlocks and remembers it, and from then on `--vault old.kdbx` or `KEYPASTE_VAULT` opens it like any other vault.
+
+To bring it into the vault you already use, name that vault. The file is opened read-only and never written; a `<name>.keyx` or `<name>.key` beside it is used as its keyfile unless `--source-keyfile none` says otherwise.
+
+```
+keypaste import old.kdbx --vault mine.kdbx --dry-run
+keypaste import old.kdbx --vault mine.kdbx --into old
+```
+
+Each top-level group lands under `--into`, which defaults to the file's name, and each `env/<project>` set and profile keeps its own path unless your vault already has that project. Entries keep their custom fields, attachments, tags, icons, times and history, with new identities. The file's recycle bin and anything in keypaste's reserved `.keypaste` group stay behind. A row that cannot land, such as a variable name no shell can export, stops the whole import before anything is written, and `--dry-run` shows every row first.
+
 <a id="what-this-does-not-do"></a>
 
 ## Limits

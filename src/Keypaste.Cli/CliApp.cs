@@ -126,6 +126,9 @@ internal static class CliApp
             case "share":
                 return ShareCommand.Execute(args, context);
 
+            case "import":
+                return ImportCommand.Execute(args, context);
+
             case "hello":
                 context.Stdout.WriteLine(CoreInfo.Hello());
                 return ExitSuccess;
