@@ -113,6 +113,43 @@ public sealed class KdbxImportTests : IDisposable
     }
 
     [Fact]
+    public void FieldReferences_PointAtTheCopies()
+    {
+        var source = Source("refs.kdbx", vault =>
+        {
+            vault.AddEntry(new VaultEntry { Title = "Shared", GroupPath = "Team", Username = "svc", Password = "shared-pw" });
+            vault.AddEntry(new VaultEntry { Title = "Dropped", GroupPath = "Other", Password = "dropped-pw" });
+        });
+        var shared = Facts(source, SourcePassword, new EntryName("Team", "Shared")).Uuid;
+        var dropped = Facts(source, SourcePassword, new EntryName("Other", "Dropped")).Uuid;
+        var first = $"{{REF:P@I:{shared}}}";
+        var second = $"{{ref:u@i:{shared.ToLowerInvariant()}}}";
+        var outside = $"{{REF:P@I:{dropped}}}";
+        using (var vault = Vault.Open(source, SourcePassword))
+        {
+            vault.AddEntry(new VaultEntry { Title = "User", GroupPath = "Team", Password = first });
+            vault.UpdateEntry(new VaultEntry { Title = "User", GroupPath = "Team", Password = first + second, Notes = outside });
+            vault.Save();
+        }
+
+        var targetPath = Path.Combine(_directory, "target.kdbx");
+        using (var target = Target(targetPath))
+        using (var opened = KdbxImport.Open(source, SourcePassword, null))
+        {
+            var plan = opened.DefaultPlan(target, "moved");
+            opened.ApplyTo(target, plan with { Rows = [.. plan.Rows.Where(row => row.SourceGroup == "Team")] });
+            target.Save();
+        }
+
+        var copied = Facts(targetPath, TargetPassword, new EntryName("moved/Team", "Shared")).Uuid;
+        var user = Facts(targetPath, TargetPassword, new EntryName("moved/Team", "User"));
+        Assert.NotEqual(shared, copied);
+        Assert.Equal($"{{REF:P@I:{copied}}}{{ref:u@i:{copied}}}", user.Strings["Password"]);
+        Assert.Equal(outside, user.Strings["Notes"]);
+        Assert.Equal([$"{{REF:P@I:{copied}}}"], user.HistoryPasswords);
+    }
+
+    [Fact]
     public void CreationTimes_AreKept()
     {
         var target = ImportForeignAndSave(out var source);

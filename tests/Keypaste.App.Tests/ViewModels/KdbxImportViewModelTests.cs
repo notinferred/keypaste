@@ -3,6 +3,7 @@ using System.Text;
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
+using Keypaste.Core.Import;
 using Keypaste.Core.Internal;
 using Xunit;
 
@@ -127,6 +128,7 @@ public sealed class KdbxImportViewModelTests : IDisposable
         using var import = NewImport();
         await Unlock(import);
         Assert.NotEmpty(import.Rows);
+        var source = import.Source!;
 
         _session.Lock(VaultLockReason.Idle);
 
@@ -134,7 +136,37 @@ public sealed class KdbxImportViewModelTests : IDisposable
         Assert.Empty(import.Rows);
         Assert.False(import.CanConfirm);
         Assert.Equal(0, import.EntryCount);
+        AssertDisposed(source);
     }
+
+    [Fact]
+    public async Task Cancel_DisposesTheSource()
+    {
+        using var import = NewImport();
+        await Unlock(import);
+        var source = import.Source!;
+
+        import.CancelCommand.Execute(null);
+
+        Assert.False(import.IsDecrypted);
+        AssertDisposed(source);
+    }
+
+    [Fact]
+    public async Task Confirm_DisposesTheSource()
+    {
+        using var import = NewImport();
+        await Unlock(import);
+        var source = import.Source!;
+
+        import.ConfirmCommand.Execute(null);
+
+        Assert.Single(_announced);
+        AssertDisposed(source);
+    }
+
+    private static void AssertDisposed(ImportSource source) =>
+        Assert.Throws<ObjectDisposedException>(() => source.Interop);
 
     private KdbxImportViewModel NewImport() =>
         new(_session, _source, (path, keyfile) => _opened.Add((path, keyfile)), _announced.Add);

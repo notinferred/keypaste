@@ -82,6 +82,27 @@ public sealed class KdbxProbeTests : IDisposable
     }
 
     [Fact]
+    public void Probe_FieldSizeNearIntMax_IsRefused()
+    {
+        var path = Path.Combine(_directory, "huge.kdbx");
+        using (var stream = File.Create(path))
+        using (var writer = new BinaryWriter(stream))
+        {
+            writer.Write(KdbxFormat.FileSignature1);
+            writer.Write(KdbxFormat.FileSignature2);
+            writer.Write((ushort)1);
+            writer.Write((ushort)4);
+            writer.Write((byte)2);
+            writer.Write(0x7FFFFFF0);
+            writer.Write(new byte[64]);
+        }
+
+        Assert.False(KdbxImport.TryProbe(path, out var probe, out var error));
+        Assert.Null(probe);
+        Assert.Contains("ends inside its header", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Probe_FindsASiblingKeyfile()
     {
         var path = Path.Combine(_directory, "acme.kdbx");

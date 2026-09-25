@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.ComponentModel;
 using KeePassLib;
 using KeePassLib.Cryptography.Cipher;
@@ -2081,7 +2082,7 @@ internal sealed class KeePassInterop : IDisposable
                 : BinaryPrimitives.ReadUInt16LittleEndian(header.AsSpan(position + 1));
             position += 1 + sizeWidth;
 
-            if (size < 0 || position + size > header.Length)
+            if (size < 0 || size > header.Length - position)
             {
                 error = $"'{path}' ends inside its header.";
                 return null;
@@ -2154,8 +2155,9 @@ internal sealed class KeePassInterop : IDisposable
     /// <returns>The name of every entry copied.</returns>
     /// <remarks>
     /// Every copy is made before anything is attached, so a failure leaves this vault as it was. A
-    /// copy keeps every field, attachment, icon, time and history item, takes new UUIDs throughout
-    /// and leaves the source's recycle bin behind; where the source came from is not recorded.
+    /// copy keeps every field, attachment, icon, time and history item, takes new UUIDs throughout,
+    /// with field references repointed to match, and leaves the source's recycle bin behind; where
+    /// the source came from is not recorded.
     /// </remarks>
     internal IReadOnlyList<EntryName> ImportFrom(KeePassInterop source, IReadOnlyList<ImportPiece> pieces)
     {
@@ -2165,6 +2167,7 @@ internal sealed class KeePassInterop : IDisposable
         PwUuid binUuid = source.Bin()?.Uuid ?? PwUuid.Zero;
         List<(ImportPiece Piece, PwGroup Copy)> copies = [];
         HashSet<PwUuid> icons = [];
+        Dictionary<string, string> renewed = new(StringComparer.OrdinalIgnoreCase);
 
         foreach (var piece in pieces)
         {
@@ -2180,8 +2183,13 @@ internal sealed class KeePassInterop : IDisposable
                 copy.Groups.Clear();
             }
 
-            Renew(copy, icons);
+            Renew(copy, icons, renewed);
             copies.Add((piece, copy));
+        }
+
+        foreach (var (_, copy) in copies)
+        {
+            Repoint(copy, renewed);
         }
 
         foreach (var uuid in icons)
@@ -2265,7 +2273,10 @@ internal sealed class KeePassInterop : IDisposable
     }
 
     /// <summary>New UUIDs for a copied tree, its entries and their history, and no record of where it was.</summary>
-    private static void Renew(PwGroup group, HashSet<PwUuid> icons)
+    /// <param name="group">The copy.</param>
+    /// <param name="icons">Collects every custom icon the copy names.</param>
+    /// <param name="renewed">Collects each entry's old UUID against its new one, both as hex.</param>
+    private static void Renew(PwGroup group, HashSet<PwUuid> icons, Dictionary<string, string> renewed)
     {
         group.Uuid = new PwUuid(true);
         group.PreviousParentGroup = PwUuid.Zero;
@@ -2273,7 +2284,9 @@ internal sealed class KeePassInterop : IDisposable
 
         foreach (PwEntry entry in group.Entries)
         {
-            entry.SetUuid(new PwUuid(true), true);
+            PwUuid fresh = new(true);
+            renewed[entry.Uuid.ToHexString()] = fresh.ToHexString();
+            entry.SetUuid(fresh, true);
             entry.PreviousParentGroup = PwUuid.Zero;
             Note(entry.CustomIconUuid);
 
@@ -2286,7 +2299,7 @@ internal sealed class KeePassInterop : IDisposable
 
         foreach (PwGroup child in group.Groups)
         {
-            Renew(child, icons);
+            Renew(child, icons, renewed);
         }
 
         void Note(PwUuid icon)
@@ -2295,6 +2308,76 @@ internal sealed class KeePassInterop : IDisposable
             {
                 icons.Add(icon);
             }
+        }
+    }
+
+    /// <summary>The length of a field reference by UUID: <c>{REF:P@I:</c>, 32 hex digits and <c>}</c>.</summary>
+    private const int _uuidReferenceLength = 42;
+
+    private static readonly SearchValues<byte> _hexDigits = SearchValues.Create("0123456789ABCDEFabcdef"u8);
+
+    /// <summary>
+    /// Points every <c>{REF:&lt;field&gt;@I:&lt;uuid&gt;}</c> in a copy, history included, at the copy
+    /// of the entry it named. A reference to an entry that was not copied is left as it is.
+    /// </summary>
+    /// <remarks>
+    /// Values are rewritten as UTF-8 bytes of the same length and keep their protection, so no
+    /// protected value becomes a string.
+    /// </remarks>
+    private static void Repoint(PwGroup copy, Dictionary<string, string> renewed)
+    {
+        foreach (PwEntry entry in copy.GetEntries(true))
+        {
+            RepointEntry(entry);
+            foreach (PwEntry revision in entry.History)
+            {
+                RepointEntry(revision);
+            }
+        }
+
+        void RepointEntry(PwEntry entry)
+        {
+            foreach (var (field, value) in entry.Strings.ToList())
+            {
+                byte[] utf8 = value.ReadUtf8();
+                try
+                {
+                    if (RepointBytes(utf8))
+                    {
+                        entry.Strings.Set(field, new ProtectedString(value.IsProtected, utf8));
+                    }
+                }
+                finally
+                {
+                    CryptographicOperations.ZeroMemory(utf8);
+                }
+            }
+        }
+
+        bool RepointBytes(byte[] utf8)
+        {
+            var changed = false;
+            for (var i = 0; i + _uuidReferenceLength <= utf8.Length; i++)
+            {
+                Span<byte> candidate = utf8.AsSpan(i, _uuidReferenceLength);
+                Span<byte> hex = candidate[9..41];
+
+                if (!Ascii.EqualsIgnoreCase(candidate[..5], "{REF:"u8)
+                    || "TUPANItupani"u8.IndexOf(candidate[5]) < 0
+                    || !Ascii.EqualsIgnoreCase(candidate[6..9], "@I:"u8)
+                    || candidate[41] != (byte)'}'
+                    || hex.ContainsAnyExcept(_hexDigits)
+                    || !renewed.TryGetValue(Encoding.ASCII.GetString(hex), out var fresh))
+                {
+                    continue;
+                }
+
+                Encoding.ASCII.GetBytes(fresh, hex);
+                changed = true;
+                i += _uuidReferenceLength - 1;
+            }
+
+            return changed;
         }
     }
 

@@ -96,6 +96,9 @@ internal sealed class KdbxImportViewModel : ObservableObject, IDisposable
 
     internal bool IsDecrypted => _source is not null;
 
+    /// <summary>The unlocked file, while there is one. A test seam for when its key goes.</summary>
+    internal ImportSource? Source => _source;
+
     /// <summary>The file card's one line.</summary>
     internal string CardText => _source is null
         ? $"{FileName} · {Version} · {Kdf} · Locked"
