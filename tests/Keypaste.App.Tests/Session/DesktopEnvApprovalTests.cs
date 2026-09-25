@@ -17,7 +17,7 @@ namespace Keypaste.App.Tests.Session;
 /// <summary>
 /// A <c>keypaste run --session</c> request over the app's real endpoint raises the app's own prompt
 /// window, drawn by Skia and clicked through hit-testing, naming the project, its variable names,
-/// the command and the directory; only a press of Approve releases the set (V-E.1c).
+/// the command and the directory; only a press of Allow once or the timed allow releases the set (V-E.1c).
 /// </summary>
 public sealed class DesktopEnvApprovalTests
 {
@@ -34,6 +34,7 @@ public sealed class DesktopEnvApprovalTests
             var window = Assert.IsType<EnvApprovalWindow>(await app.PromptAsync());
 
             Assert.Equal("ci", Text(window, "ProjectText"));
+            Assert.Equal("dev", Text(window, "ProfileText"));
             Assert.Equal("DEPLOY_KEY", Text(window, "KeysText"));
             Assert.Equal("deploy --to \"staging area\"", Text(window, "CommandText"));
             Assert.EndsWith("work", Text(window, "DirectoryText"), StringComparison.Ordinal);
@@ -61,7 +62,7 @@ public sealed class DesktopEnvApprovalTests
 
     [Theory]
     [MemberData(nameof(Refusals))]
-    public Task Every_way_but_Approve_releases_nothing_and_takes_the_prompt_down(string how, EnvOutcome outcome) =>
+    public Task Every_way_but_an_allow_releases_nothing_and_takes_the_prompt_down(string how, EnvOutcome outcome) =>
         HeadlessSession.On(async () =>
         {
             await using var app = await PromptedApp.StartAsync();
@@ -117,6 +118,51 @@ public sealed class DesktopEnvApprovalTests
             Assert.Equal(EnvOutcome.Resolved, (await reply.WaitAsync(_wait, Token))?.Set.Outcome);
         });
 
+    [Fact]
+    public Task EnvAllowForTheHour_TheSameRunIsNotAskedAgain() =>
+        HeadlessSession.On(async () =>
+        {
+            await using var app = await PromptedApp.StartAsync();
+            var reply = app.AskEnv();
+            var window = await app.PromptAsync();
+
+            Assert.Equal("Allow this command for 15 minutes", window.FindControl<Button>("Approve")!.Content);
+            Assert.Contains("exactly this command", Text(window, "TimedCaptionText"), StringComparison.Ordinal);
+
+            app.Arm();
+            Click(window, "Approve");
+            Assert.Equal(EnvOutcome.Resolved, (await reply.WaitAsync(_wait, Token))?.Set.Outcome);
+            await PromptedApp.WithdrawnAsync(window);
+
+            var again = await app.AskEnv().WaitAsync(_wait, Token);
+
+            Assert.Equal(EnvOutcome.Resolved, again?.Set.Outcome);
+            Assert.Equal(Sentinel, Assert.Single(again!.Set.Variables).Value);
+            Assert.Single(app.Windows);
+            Assert.Single(app.Authority.Activity.EnvGrants);
+        });
+
+    [Fact]
+    public Task EnvAllowOnce_AsksAgain() =>
+        HeadlessSession.On(async () =>
+        {
+            await using var app = await PromptedApp.StartAsync();
+            var reply = app.AskEnv();
+            var window = await app.PromptAsync();
+
+            app.Arm();
+            Click(window, "AllowOnce");
+            Assert.Equal(EnvOutcome.Resolved, (await reply.WaitAsync(_wait, Token))?.Set.Outcome);
+            await PromptedApp.WithdrawnAsync(window);
+
+            var again = app.AskEnv();
+            var second = await app.PromptAsync(count: 2);
+            Click(second, "Deny");
+
+            Assert.Equal(EnvOutcome.Declined, (await again.WaitAsync(_wait, Token))?.Set.Outcome);
+            Assert.Empty(app.Authority.Activity.EnvGrants);
+        });
+
     /// <summary>A command, directory and names the runner sent cannot move the window or its buttons, however long they are.</summary>
     [Fact]
     public Task A_long_command_leaves_the_window_and_buttons_where_they_were() =>
@@ -152,5 +198,5 @@ public sealed class DesktopEnvApprovalTests
 
     /// <summary>The window's own buttons; a scrolling box adds its scroll bar's, which move nothing that matters.</summary>
     private static List<Button> Buttons(Window window) =>
-        [.. window.GetVisualDescendants().OfType<Button>().Where(button => button.Name is "Deny" or "Approve")];
+        [.. window.GetVisualDescendants().OfType<Button>().Where(button => button.Name is "Deny" or "AllowOnce" or "Approve")];
 }

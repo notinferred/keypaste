@@ -18,22 +18,40 @@
        or the buttons (THREATS.md T-2, T-30). Nothing is trimmed, so no part of a command is hidden
        past an edge. No button is the default: Enter approves nothing, and Escape denies. -->
 
-  <Grid RowDefinitions="36,30,24,84,24,52,24,*,24,40,56" Margin="24">
+  <Grid RowDefinitions="36,30,24,24,84,24,52,24,*,24,40,56,32" Margin="24">
 
-    <TextBlock Grid.Row="0"
-               Text="A run is asking for a project's variables"
-               FontSize="18"
-               Foreground="{DynamicResource KpTextPrimary}" />
+    <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+      <TextBlock Grid.Column="0"
+                 Text="A run is asking for a project's variables"
+                 FontSize="18"
+                 Foreground="{DynamicResource KpTextPrimary}" />
+      <TextBlock Grid.Column="1"
+                 Name="CountdownText"
+                 Text="{Binding Countdown}"
+                 FontFamily="{DynamicResource KpMono}"
+                 Foreground="{DynamicResource KpTextMuted}" />
+    </Grid>
 
-    <Grid Grid.Row="1" ColumnDefinitions="110,*">
+    <Grid Grid.Row="1" ColumnDefinitions="110,*,70,120">
       <TextBlock Grid.Column="0" Text="Project" Foreground="{DynamicResource KpTextMuted}" />
       <TextBlock Grid.Column="1" Name="ProjectText" Text="{Binding Project}" TextTrimming="CharacterEllipsis"
                  FontFamily="{DynamicResource KpMono}"
                  Foreground="{DynamicResource KpTextPrimary}" />
+      <TextBlock Grid.Column="2" Text="Profile" Foreground="{DynamicResource KpTextMuted}" />
+      <TextBlock Grid.Column="3" Name="ProfileText" Text="{Binding Profile}" TextTrimming="CharacterEllipsis"
+                 FontFamily="{DynamicResource KpMono}"
+                 Foreground="{DynamicResource KpTextPrimary}" />
     </Grid>
 
-    <TextBlock Grid.Row="2" Text="Command it will start" Foreground="{DynamicResource KpTextMuted}" />
-    <Border Grid.Row="3" Theme="{StaticResource KpCard}">
+    <Grid Grid.Row="2" ColumnDefinitions="110,*"
+          IsVisible="{Binding Requester, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+      <TextBlock Grid.Column="0" Text="Asked by" Foreground="{DynamicResource KpTextMuted}" />
+      <TextBlock Grid.Column="1" Name="RequesterText" Text="{Binding Requester}" TextTrimming="CharacterEllipsis"
+                 Foreground="{DynamicResource KpTextPrimary}" />
+    </Grid>
+
+    <TextBlock Grid.Row="3" Text="Command it will start" Foreground="{DynamicResource KpTextMuted}" />
+    <Border Grid.Row="4" Theme="{StaticResource KpCard}">
       <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="10">
         <TextBlock Name="CommandText" Text="{Binding Command}" TextWrapping="Wrap"
                    FontFamily="{DynamicResource KpMono}"
@@ -41,8 +59,8 @@
       </ScrollViewer>
     </Border>
 
-    <TextBlock Grid.Row="4" Text="In directory" Foreground="{DynamicResource KpTextMuted}" />
-    <Border Grid.Row="5" Theme="{StaticResource KpCard}">
+    <TextBlock Grid.Row="5" Text="In directory" Foreground="{DynamicResource KpTextMuted}" />
+    <Border Grid.Row="6" Theme="{StaticResource KpCard}">
       <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="10">
         <TextBlock Name="DirectoryText" Text="{Binding Directory}" TextWrapping="Wrap"
                    FontFamily="{DynamicResource KpMono}"
@@ -50,43 +68,62 @@
       </ScrollViewer>
     </Border>
 
-    <TextBlock Grid.Row="6" Text="Variables it will receive (names only)" Foreground="{DynamicResource KpTextMuted}" />
-    <Border Grid.Row="7" Theme="{StaticResource KpCard}">
+    <TextBlock Grid.Row="7" Text="Variables it will receive (names only)" Foreground="{DynamicResource KpTextMuted}" />
+    <Border Grid.Row="8" Theme="{StaticResource KpCard}">
       <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="10">
-        <TextBlock Name="KeysText" Text="{Binding Keys}" TextWrapping="Wrap"
-                   FontFamily="{DynamicResource KpMono}"
-                   Foreground="{DynamicResource KpTextSecondary}" />
+        <StackPanel Spacing="6">
+          <TextBlock Name="KeysText" Text="{Binding Keys}" TextWrapping="Wrap"
+                     FontFamily="{DynamicResource KpMono}"
+                     Foreground="{DynamicResource KpTextSecondary}" />
+          <TextBlock Name="FileLinesText" Text="{Binding FileLines}" TextWrapping="Wrap"
+                     IsVisible="{Binding FileLines, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                     FontFamily="{DynamicResource KpMono}"
+                     Foreground="{DynamicResource KpTextSecondary}" />
+        </StackPanel>
       </ScrollViewer>
     </Border>
 
-    <TextBlock Grid.Row="8"
+    <TextBlock Grid.Row="9"
                Name="ScrubbedText"
                Text="{Binding Scrubbed}"
                TextWrapping="Wrap"
                FontSize="12"
                Foreground="{DynamicResource KpTextSecondary}" />
 
-    <TextBlock Grid.Row="9"
-               Text="The command is what the run says it will start. Approve only a run you started: every value goes into its environment."
+    <TextBlock Grid.Row="10"
+               Text="The command is what the run says it will start. Allow only a run you started: every value goes into its environment."
                TextWrapping="Wrap"
                FontSize="12"
                Foreground="{DynamicResource KpTextMuted}" />
 
-    <StackPanel Grid.Row="10"
+    <StackPanel Grid.Row="11"
                 Orientation="Horizontal"
                 HorizontalAlignment="Right"
                 VerticalAlignment="Bottom"
                 Spacing="8">
       <Button Name="Deny"
               Content="Deny"
-              Width="110"
+              Width="90"
               IsCancel="True"
               Command="{Binding DenyCommand}" />
-      <Button Name="Approve"
-              Content="Approve"
+      <Button Name="AllowOnce"
+              Content="Allow once"
               Width="110"
+              Command="{Binding AllowOnceCommand}" />
+      <Button Name="Approve"
+              Content="{Binding TimedLabel}"
+              MinWidth="150"
+              IsVisible="{Binding OffersTimed}"
               Command="{Binding ApproveCommand}" />
     </StackPanel>
+
+    <TextBlock Grid.Row="12"
+               Name="TimedCaptionText"
+               Text="{Binding TimedCaption}"
+               TextWrapping="Wrap"
+               Margin="0,6,0,0"
+               FontSize="12"
+               Foreground="{DynamicResource KpTextMuted}" />
 
   </Grid>
 

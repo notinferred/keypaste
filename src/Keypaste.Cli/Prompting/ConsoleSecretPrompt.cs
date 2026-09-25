@@ -37,10 +37,20 @@ namespace Keypaste.Cli.Prompting;
 /// </remarks>
 internal sealed class ConsoleSecretPrompt : ISecretPrompt
 {
+    /// <summary>How often a choice looks for a key, and so how soon it notices a withdrawal.</summary>
+    internal static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(100);
+
+    /// <summary>How long a choice is on screen before a key allows anything: a key pressed for the last prompt must not answer this one (D-0326).</summary>
+    internal static readonly TimeSpan ArmingDelay = TimeSpan.FromSeconds(1);
+
+    private static readonly TimeSpan _redrawInterval = TimeSpan.FromSeconds(1);
+
     private readonly TextWriter _prompts;
     private readonly Func<ConsoleKeyInfo> _readKey;
+    private readonly Func<bool> _keyAvailable;
     private readonly Func<bool> _isInputRedirected;
     private readonly Stream _redirectedInput;
+    private readonly TimeProvider _clock;
 
     /// <summary>Creates a prompt writing to <paramref name="prompts"/> (in practice stderr).</summary>
     internal ConsoleSecretPrompt(TextWriter prompts)
@@ -53,10 +63,23 @@ internal sealed class ConsoleSecretPrompt : ISecretPrompt
         Func<ConsoleKeyInfo> readKey,
         Func<bool> isInputRedirected,
         Stream? redirectedInput)
+        : this(prompts, readKey, () => Console.KeyAvailable, isInputRedirected, redirectedInput, TimeProvider.System)
+    {
+    }
+
+    internal ConsoleSecretPrompt(
+        TextWriter prompts,
+        Func<ConsoleKeyInfo> readKey,
+        Func<bool> keyAvailable,
+        Func<bool> isInputRedirected,
+        Stream? redirectedInput,
+        TimeProvider clock)
     {
         _prompts = prompts;
         _readKey = readKey;
+        _keyAvailable = keyAvailable;
         _isInputRedirected = isInputRedirected;
+        _clock = clock;
 
         // The raw stdin stream, decoded as UTF-8 by hand below. Console.In would decode with the
         // console input code page — typically an OEM page on Windows — and silently mangle a
@@ -151,6 +174,94 @@ internal sealed class ConsoleSecretPrompt : ISecretPrompt
         }
 
         return ReadRedirectedLine();
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Keys are polled rather than awaited, so a withdrawn question stops the read instead of leaving
+    /// a reader parked on the terminal. Keys typed before the choice was drawn are discarded, and a
+    /// key that allows counts only once the choice has been on screen for <see cref="ArmingDelay"/>;
+    /// a key that denies counts at once. Each draw is one write with no escape sequence, which a
+    /// Windows console without virtual terminal processing would print, and is what lets
+    /// <c>AgentConsole</c> keep other lines from splicing into it.
+    /// </remarks>
+    public char? ReadChoice(Func<string> prompt, string choices, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(prompt);
+        ArgumentNullException.ThrowIfNull(choices);
+
+        if (!IsInteractive)
+        {
+            return ReadRedirectedLine() is { } line ? Choice(line, choices) : null;
+        }
+
+        while (_keyAvailable())
+        {
+            _readKey();
+        }
+
+        var width = 0;
+        var shownAt = Draw(prompt, ref width);
+        var drawnAt = shownAt;
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            if (_keyAvailable())
+            {
+                var key = _readKey().KeyChar;
+
+                if (IsDenyKey(key))
+                {
+                    return 'd';
+                }
+
+                var lower = char.ToLowerInvariant(key);
+                if (choices.Contains(lower, StringComparison.Ordinal) && _clock.GetElapsedTime(shownAt) >= ArmingDelay)
+                {
+                    return lower;
+                }
+
+                continue;
+            }
+
+            if (_clock.GetElapsedTime(drawnAt) >= _redrawInterval)
+            {
+                drawnAt = Draw(prompt, ref width);
+            }
+
+            cancellationToken.WaitHandle.WaitOne(PollInterval);
+        }
+
+        return null;
+    }
+
+    /// <summary>What one line of redirected input chooses: a key in <paramref name="choices"/>, spelled as the key or as its word, and otherwise <c>'d'</c>.</summary>
+    internal static char Choice(string line, string choices)
+    {
+        ArgumentNullException.ThrowIfNull(line);
+        ArgumentNullException.ThrowIfNull(choices);
+
+        var word = line.Trim().Split(' ', 2)[0].ToLowerInvariant() switch
+        {
+            "once" => "o",
+            "hour" => "h",
+            var other => other,
+        };
+
+        return word.Length == 1 && choices.Contains(word[0], StringComparison.Ordinal) ? word[0] : 'd';
+    }
+
+    private static bool IsDenyKey(char key) =>
+        key is '\r' or '\n' or '\u001B' or '\u0003' or 'd' or 'D' or 'n' or 'N';
+
+    /// <summary>Draws the line over the last one, blanking whatever of a wider last line it would leave behind.</summary>
+    private long Draw(Func<string> prompt, ref int width)
+    {
+        var line = prompt();
+        _prompts.Write(line.Length < width ? "\r" + line.PadRight(width) + "\r" + line : "\r" + line);
+        _prompts.Flush();
+        width = line.Length;
+        return _clock.GetTimestamp();
     }
 
     /// <summary>

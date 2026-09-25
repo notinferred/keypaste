@@ -63,7 +63,7 @@ internal static class ToolSchemas
               "type": "integer",
               "minimum": 1,
               "maximum": 3600,
-              "description": "How long the grant should last, in seconds."
+              "description": "How long you would like it for. The person chooses once or a timed grant; standing rules honour this number."
             }
           },
           "required": ["entry", "field", "reason", "ttl_seconds"],

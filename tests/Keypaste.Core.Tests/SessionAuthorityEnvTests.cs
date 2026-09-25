@@ -279,6 +279,201 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         Assert.Equal(0, _fixture.Channel.Asked);
     }
 
+    [Fact]
+    public async Task AnHourAnswer_LetsTheSameRunThroughUnasked_WithTheLatestValues()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        using var grants = new EnvGrantCache(_fixture.Clock);
+        var authority = EnvAuthority(grants);
+
+        var first = await RunAsync(authority, Request("session-one"));
+
+        new EnvStore(_vault).TrySet("dev", "TOKEN", "rotated-after-the-answer", out _);
+        _vault.Save();
+        _fixture.Channel.Answer = ApprovalAnswer.Denied;
+        var second = await RunAsync(authority, Request("session-one"));
+
+        Assert.Equal(EnvOutcome.Resolved, first.Set.Outcome);
+        Assert.Equal(EnvOutcome.Resolved, second.Set.Outcome);
+        Assert.Equal("rotated-after-the-answer", second.Set.Variables.Single(variable => variable.Key == "TOKEN").Value);
+        Assert.Equal(1, _fixture.Channel.Asked);
+    }
+
+    /// <summary>A replay by any program of the person's is the grant's accepted risk (T-34), so each one it serves is said out loud.</summary>
+    [Fact]
+    public async Task ARunServedByAGrant_IsNarrated_AndAnAskedOneIsNot()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        using var grants = new EnvGrantCache(_fixture.Clock);
+        List<string> narrated = [];
+        var authority = EnvAuthority(grants, narrated.Add);
+
+        await RunAsync(authority, Request("session-one"));
+        Assert.Empty(narrated);
+
+        _fixture.Clock.Advance(TimeSpan.FromSeconds(60));
+        await RunAsync(authority, Request("session-one"));
+
+        var line = Assert.Single(narrated);
+        Assert.Equal(
+            $"released dev/dev to `deploy --to \"staging area\"` from a timed grant ({EnvGrantCache.CeilingSeconds - 60}s left)",
+            line);
+        Assert.DoesNotContain(_token1, line, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AnHourAnswer_DoesNotCoverAnotherCommandDirectoryOrProject()
+    {
+        new EnvStore(_vault).TrySet("other", "KEY", _token1, out _);
+        _vault.Save();
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        using var grants = new EnvGrantCache(_fixture.Clock);
+        var authority = EnvAuthority(grants);
+
+        await RunAsync(authority, Request("session-one"));
+
+        _fixture.Channel.Answer = ApprovalAnswer.Denied;
+        var command = await RunAsync(authority, Request("session-one", command: ["deploy", "--to", "production"]));
+        var directory = await RunAsync(authority, Request("session-one") with { Directory = Path.Combine(_directory, "elsewhere") });
+        var project = await RunAsync(authority, Request("session-one", project: "other"));
+
+        Assert.All([command, directory, project], reply => Assert.Equal(EnvOutcome.Declined, reply.Set.Outcome));
+        Assert.Equal(4, _fixture.Channel.Asked);
+    }
+
+    [Fact]
+    public async Task AllowOnce_AsksAgainNextRun()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
+        using var grants = new EnvGrantCache(_fixture.Clock);
+        var authority = EnvAuthority(grants);
+
+        var first = await RunAsync(authority, Request("session-one"));
+        var second = await RunAsync(authority, Request("session-one"));
+
+        Assert.Equal(EnvOutcome.Resolved, first.Set.Outcome);
+        Assert.Equal(EnvOutcome.Resolved, second.Set.Outcome);
+        Assert.Equal(2, _fixture.Channel.Asked);
+        Assert.Empty(grants.InForce());
+    }
+
+    [Fact]
+    public async Task AProtectedProfile_OffersNoTimedChoice_AndStoresNothing()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        using var grants = new EnvGrantCache(_fixture.Clock);
+        var authority = EnvAuthority(grants);
+
+        var first = await RunAsync(authority, Request("session-one") with { Profile = "prod" });
+        var second = await RunAsync(authority, Request("session-one") with { Profile = "prod" });
+
+        Assert.Equal(EnvOutcome.Resolved, first.Set.Outcome);
+        Assert.Equal(EnvOutcome.Resolved, second.Set.Outcome);
+        Assert.Equal(0, _fixture.Channel.LastEnvPrompt!.GrantSeconds);
+        Assert.Equal(2, _fixture.Channel.Asked);
+        Assert.Empty(grants.InForce());
+    }
+
+    [Fact]
+    public async Task TheEnvGrant_IsCappedAtFifteenMinutes()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        using var grants = new EnvGrantCache(_fixture.Clock);
+        var authority = EnvAuthority(grants);
+
+        await RunAsync(authority, Request("session-one"));
+        Assert.Equal(EnvGrantCache.CeilingSeconds, _fixture.Channel.LastEnvPrompt!.GrantSeconds);
+
+        _fixture.Clock.Advance(TimeSpan.FromSeconds(EnvGrantCache.CeilingSeconds));
+        await RunAsync(authority, Request("session-one"));
+
+        Assert.Equal(2, _fixture.Channel.Asked);
+    }
+
+    [Fact]
+    public async Task Lock_ForgetsEnvGrants()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        using var grants = new EnvGrantCache(_fixture.Clock);
+        _lifetime!.Own(grants);
+        var authority = EnvAuthority(grants);
+
+        await RunAsync(authority, Request("session-one"));
+        var key = Assert.Single(authority.Activity.EnvGrants).Key;
+
+        _lifetime.End();
+
+        Assert.Empty(grants.InForce());
+        Assert.False(grants.TryUse(key, ["DATABASE_URL", "TOKEN"], out _));
+        Assert.Same(ApproverActivity.None, authority.Activity);
+    }
+
+    [Fact]
+    public async Task RevokeAll_ForgetsEnvGrants()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        using var grants = new EnvGrantCache(_fixture.Clock);
+        var authority = EnvAuthority(grants);
+
+        await RunAsync(authority, Request("session-one"));
+        authority.RevokeAll();
+        await RunAsync(authority, Request("session-one"));
+
+        Assert.Equal(2, _fixture.Channel.Asked);
+    }
+
+    [Fact]
+    public async Task Activity_ListsEnvGrants_WithNamesOnly()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        using var grants = new EnvGrantCache(_fixture.Clock);
+        var authority = EnvAuthority(grants);
+
+        await RunAsync(authority, Request("session-one"));
+
+        var grant = Assert.Single(authority.Activity.EnvGrants);
+        Assert.Equal("dev", grant.Project);
+        Assert.Equal("dev", grant.Profile);
+        Assert.Equal("deploy --to \"staging area\"", grant.Command);
+        Assert.Equal(TimeSpan.FromSeconds(EnvGrantCache.CeilingSeconds), grant.Remaining);
+        Assert.DoesNotContain(_token1, grant.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain(_token2, grant.ToString(), StringComparison.Ordinal);
+
+        authority.RevokeEnvGrant(grant.Key);
+        await RunAsync(authority, Request("session-one"));
+
+        Assert.Equal(2, _fixture.Channel.Asked);
+    }
+
+    /// <summary>The owner's authority itself, with timed env grants, answering runs without a pipe.</summary>
+    private SessionAuthority EnvAuthority(EnvGrantCache grants, Action<string>? narrate = null) =>
+        new(
+            VaultIdentity.Of(_directory, VaultPath),
+            () => _lifetime,
+            _fixture.Handler,
+            new SessionEnvironments(
+                _fixture.Gate,
+                lifetime => ReferenceEquals(lifetime, _lifetime) && lifetime.IsLive ? _vault : null,
+                _fixture.Clock,
+                grants,
+                narrate));
+
+    /// <summary>One run: a new connection that attaches and asks once, as every <c>keypaste run --session</c> is.</summary>
+    private async Task<EnvReply> RunAsync(SessionAuthority authority, EnvRequest request)
+    {
+        var connection = Guid.NewGuid().ToString("N");
+        await authority.AttachAsync(new AttachRequest(VaultPath), connection, Token);
+
+        try
+        {
+            return await authority.ReleaseEnvAsync(request, connection, Token);
+        }
+        finally
+        {
+            authority.Disconnected(connection);
+        }
+    }
+
     private ApproverHandler CredentialHandler() =>
         new(
             new VaultCredentialSource(() => _vault),

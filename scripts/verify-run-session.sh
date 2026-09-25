@@ -8,11 +8,11 @@
 # the command and the directory; Approve starts the child with the set, and the runner prints no value and
 # asks for no password. Deny, a lock while the prompt waits and the timeout each exit non-zero with no
 # child, and a set E.1a refuses is refused before any prompt. With nothing holding the vault the run says
-# so. With `keypaste agent` holding it, y releases and n refuses.
+# so. With `keypaste agent` holding it, o releases once and n refuses.
 #
 # NEGATIVE CONTROL: every run is given the master password on its standard input, so a runner that fell
 # back to opening the vault itself would start the child on a refusal and fail here. This also fails if a
-# child starts without a press of Approve or a y, if a value reaches the runner's own output or the app's,
+# child starts without a press of Approve or an o, if a value reaches the runner's own output or the app's,
 # or if a prompt stays up after its run is answered. These checks must never be skipped or soft-passed.
 set -euo pipefail
 
@@ -205,7 +205,7 @@ exec {HOLD_IN}>&-
 wait_for '^shut down' "$HOLD_OUT"
 HOLD_PID=""
 
-# ------------------------------------------------------------- keypaste agent holds it: y and n
+# ------------------------------------------------------------- keypaste agent holds it: o and n
 exec {AGENT_IN}>&-
 exec {AGENT_IN}> >(exec "$CLI" agent --vault "$VAULT" >/dev/null 2>"$AGENT_ERR" {HOLD_IN}>&-)
 AGENT_SHELL=$!
@@ -217,8 +217,8 @@ start_run ci agent-yes
 wait_for "is asking for a project's variables" "$AGENT_ERR" 1
 grep -q 'variables  DB_URL DEPLOY_KEY' "$AGENT_ERR" || die "keypaste agent did not show the variable names"
 grep -q 'command    .* agent-yes' "$AGENT_ERR" || die "keypaste agent did not show the command"
-printf 'y\n' >&"$AGENT_IN"
-released "y at keypaste agent"
+printf 'o\n' >&"$AGENT_IN"
+released "o at keypaste agent"
 
 start_run ci agent-no
 wait_for "is asking for a project's variables" "$AGENT_ERR" 2
@@ -226,6 +226,6 @@ printf 'n\n' >&"$AGENT_IN"
 refused "n at keypaste agent" "said no"
 grep -qE "$DEPLOY|$DATABASE" "$AGENT_ERR" && die "a value reached keypaste agent's terminal"
 
-echo "ok: keypaste run --session took the set from the app only on Approve and from keypaste agent only on y,"
+echo "ok: keypaste run --session took the set from the app only on Approve and from keypaste agent only on o,"
 echo "    showing the project, names, command and directory and never a value or a password prompt; Deny, n,"
 echo "    a lock, the timeout, an unusable set and no owner each started nothing"

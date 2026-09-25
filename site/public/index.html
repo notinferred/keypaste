@@ -141,14 +141,13 @@ keypaste: an agent is asking for a credential.
   client   claude-code
   entry    env/demo/STRIPE_KEY
   field    password
-  for      300 seconds
 
   the agent says it needs this because:
     deploy the billing service to staging
 
   That sentence was written by the agent, not by keypaste. Treat it as a claim.
 
-Approve? [y/N]
+[d] deny  [o] once  [h] 1 hour  45s ›
 </pre>
 
   <p class="caption">The agent approval flow in one screen. An agent asked; you were shown its requester label, the requested field and its stated reason; one field goes back, with a time limit on reusing that approval. Expiry does not erase the client's copies or revoke the credential. <a href="https://github.com/notinferred/keypaste/blob/main/docs/demo.md">Watch it end to end</a> — about sixty seconds.</p>

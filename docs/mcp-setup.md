@@ -147,7 +147,7 @@ Patterns match the group path and the entry title as two separate things, so `*`
 
 `list_entry_names` takes no arguments and returns only exposed group paths and entry names. It cannot return usernames, passwords, URLs or notes, or widen exposure.
 
-`request_credential` takes `entry`, `field`, `reason` and `ttl_seconds`. It forwards the request to `keypaste agent` for approval or a matching policy rule and returns one field. `--max-ttl` caps approval reuse, not the lifetime of the returned credential. Without an approver it refuses and names the startup command. [The demo](demo.md) shows this flow.
+`request_credential` takes `entry`, `field`, `reason` and `ttl_seconds`. It forwards the request to `keypaste agent` for approval or a matching policy rule and returns one field. The person chooses whether an approval is reused; `--max-ttl` sets how long, not the lifetime of the returned credential. Without an approver it refuses and names the startup command. [The demo](demo.md) shows this flow.
 
 Anyone who can edit the vault can influence its entry names. keypaste removes control characters, invisible Unicode and structural punctuation, then labels the listing as data. Sanitization cannot eliminate prompt injection; [THREATS.md](../THREATS.md) T-1 describes the residual risk.
 
@@ -167,7 +167,8 @@ jq -c . < ~/.keypaste/audit.jsonl
          "reason_excerpt":"deploy the billing service to staging","reason_len":37,
          "reason_sha256":"..."},
  "decision":"granted","method":"prompt",
- "reason":"a person approved this request for 300 seconds",
+ "reason":"a person approved this request for 1 hour",
+ "granted_seconds":3600,
  "exposure":["env/**"],
  "prev":"0000...0000","hash":"0c806dbd...14b3c7"}
 ```
@@ -191,6 +192,8 @@ jq -c . < ~/.keypaste/audit.jsonl
 | `vault-locked` / `invalid-request` / `failed` | No vault open; the arguments were wrong; something went wrong. |
 | `not-initialized` | The client called a tool before finishing the MCP handshake. Denied, with the fix named; nothing was decided. |
 | `not-implemented` | Written by the early implementation of roadmap step 2.1, before approval existed; this is a step ID, not a released version. Nothing writes it now, and it is listed because the log is append-only: old records keep the word they were written with. |
+
+A granted line carries `granted_seconds`: how long the release may be reused, which is the hour a person chose, `0` for "allow once", or a standing rule's lifetime. Lines written before it existed have none.
 
 The returned value is excluded from the log. `field` records the requested field. Current source logs the sanitized resolved entry path when available, including for opaque handles, otherwise the sanitized request argument. Published `v0.1.0` records the request argument. Keep secret values out of entry names and reason excerpts.
 

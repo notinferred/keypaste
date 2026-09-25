@@ -577,6 +577,11 @@ public sealed class AuditLog : IDisposable
             writer.WriteString("method", Wire(record.Method));
             writer.WriteString("reason", record.Reason);
 
+            if (record.Decision == AuditDecision.Granted && record.GrantedSeconds is { } granted)
+            {
+                writer.WriteNumber("granted_seconds", granted);
+            }
+
             writer.WriteStartArray("exposure");
             foreach (var glob in record.Exposure)
             {

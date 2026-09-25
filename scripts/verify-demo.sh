@@ -23,8 +23,9 @@
 # NEGATIVE CONTROL: this script fails if scripts/demo/deploy.sh exits zero with no STRIPE_KEY set,
 # if it exits non-zero with one, if any of the key beyond its masked prefix and suffix reaches its
 # output, if the approval dialog the shipped agent draws differs by one character from the block in
-# EITHER page, if the `Approve? [y/N]` line is missing from either, if either stops carrying the
-# dialog at all, if an approved request does not return the credential, if a refused one does, if
+# EITHER page, if the `[d] deny  [o] once  [h] 1 hour` choice line is missing from either, if either
+# stops carrying the dialog at all, if a request allowed for an hour or once does not return the
+# credential with the lifetime the person chose, if a refused one does, if
 # the credential reaches the audit log, if the rendered `keypaste log` table header differs from
 # either page's, if either committed fixture is missing or not executable, if an option the page
 # tells you to type is absent from the shipped usage text, or if `keypaste generate` stops saying
@@ -149,9 +150,9 @@ printf '%s\n%s\n' "$MASTER" "$SECRET" | "$CLI" env set demo STRIPE_KEY --vault "
   || die "could not store the demo credential"
 
 # --------------------------------------------------------------------------- start the approver
-# One answer per request on stdin: y, then n. ConsoleSecretPrompt reads redirected input a byte at
-# a time precisely so this works.
-printf '%s\ny\nn\n' "$MASTER" \
+# One answer per request on stdin: h, then o, then d. ConsoleSecretPrompt reads redirected input a
+# byte at a time precisely so this works.
+printf '%s\nh\no\nd\n' "$MASTER" \
   | "$CLI" agent --vault "$VAULT" --approver "$PIPE" --approval-timeout 30 >/dev/null 2>"$AGENT_ERR" &
 AGENT_PID=$!
 
@@ -238,11 +239,12 @@ for page in $TRANSCRIPT_PAGES; do
 done
 
 # The one line this harness cannot observe, asserted against the page instead of faked.
-# ConsoleSecretPrompt.ReadLine writes its prompt only when stdin is a terminal, and CI has none -
-# so `Approve? [y/N] ` and `Master password: ` never reach stderr here. They are still the lines a
-# human's screen ends on, which is why the page must carry them and why this check is not dropped.
+# ConsoleSecretPrompt draws the choice line only when stdin is a terminal, and CI has none - so the
+# choices and `Master password: ` never reach stderr here. They are still the lines a human's screen
+# ends on, which is why the page must carry them and why this check is not dropped. Only the prefix
+# is matched: the countdown and its mark are drawn live.
 for page in $TRANSCRIPT_PAGES; do
-  grep -qF 'Approve? [y/N]' "$page" || die "$page does not show the question a person actually answers"
+  grep -qF '[d] deny  [o] once  [h] 1 hour' "$page" || die "$page does not show the choices a person actually answers"
 done
 grep -qF 'Master password:' "$DOC" || die "$DOC does not show the master password prompt"
 
@@ -255,27 +257,44 @@ grep -q "$SECRET" "$OUT" || die "an approved request did not return the credenti
 jq -e --arg s "$SECRET" 'select(.id == 2) | .result.structuredContent.value == $s' <"$OUT" >/dev/null \
   || die "the structured result does not carry the released value"
 
-# The page prints `for      300 seconds` against a request for 900. That is the --max-ttl clamp, and
-# if it stopped applying the page would be describing a grant four times longer than the one issued.
-jq -e 'select(.id == 2) | .result.structuredContent.expires_in_seconds == 300' <"$OUT" >/dev/null \
-  || die "the released grant was not clamped to the approver's --max-ttl, which the page states as 300"
+# The person chose an hour; the agent asked for 900 and does not decide it.
+jq -e 'select(.id == 2) | .result.structuredContent.expires_in_seconds == 3600' <"$OUT" >/dev/null \
+  || die "the released grant does not last the hour the person chose, which the page states as 1 hour"
 
 [ -f "$AUDIT" ] || die "no audit log was written"
 grep -q '"decision":"granted"' "$AUDIT" || die "the approval was not recorded as granted"
 grep -q '"method":"prompt"'    "$AUDIT" || die "the approval was not recorded as coming from a person"
+grep -q '"granted_seconds":3600' "$AUDIT" || die "the approval's audit line does not carry the hour granted"
 grep -q "$SECRET" "$AUDIT" && die "the audit log contains the released credential"
 
 grep -qF "$REASON" "$AGENT_ERR" || die "the agent's stated reason was not shown to the human"
+grep -qF 'keypaste: allowed for 1 hour.' "$AGENT_ERR" || die "the approver did not say how long it allowed the request for"
+in_doc 'keypaste: allowed for 1 hour.' "the timed allow's line"
+
+# ------------------------------------------------------------------------------ once: nothing is kept
+# A second bridge, so a second connection that the first one's grant does not cover.
+OUT="$WORK/once-stdout.txt"
+ERR="$WORK/once-stderr.txt"
+ask 3 "$OUT" "$ERR"
+
+jq -e 'select(.id == 3) | .result.isError == false' <"$OUT" >/dev/null \
+  || die "a request allowed once was reported as an error"
+jq -e --arg s "$SECRET" 'select(.id == 3) | .result.structuredContent.value == $s' <"$OUT" >/dev/null \
+  || die "a request allowed once did not return the credential"
+jq -e 'select(.id == 3) | .result.structuredContent.expires_in_seconds == 0' <"$OUT" >/dev/null \
+  || die "a request allowed once reported a lifetime nobody granted"
+grep '"method":"prompt"' "$AUDIT" | grep '"decision":"granted"' | grep -q '"granted_seconds":0' \
+  || die "the once release was not audited as a person's grant of 0 seconds"
 
 # ------------------------------------------------------------------------------- D. the paired no
-# A second bridge, so a second connection: the first one's grant belongs to a process that has gone,
+# A third bridge, so a third connection: the first one's grant belongs to a process that has gone,
 # which is what makes this a fresh question rather than a cache hit. Without this the checks above
 # would pass on an approver whose only behaviour is yes.
 OUT="$WORK/deny-stdout.txt"
 ERR="$WORK/deny-stderr.txt"
-ask 3 "$OUT" "$ERR"
+ask 4 "$OUT" "$ERR"
 
-jq -e 'select(.id == 3) | .result.isError == true' <"$OUT" >/dev/null \
+jq -e 'select(.id == 4) | .result.isError == true' <"$OUT" >/dev/null \
   || die "a refused request was not reported as an error"
 
 grep -q "$SECRET" "$OUT" && die "a refused request returned the credential"

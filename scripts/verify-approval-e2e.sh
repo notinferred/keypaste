@@ -78,9 +78,10 @@ grep -q 'keypaste agent' "$OUT" || die "the no-agent refusal does not name the c
 grep -q "$SECRET" "$OUT" && die "a credential was returned with no agent running"
 
 # --------------------------------------------------------------------------- start the approver
-# The master password first, then one answer per request: y, then n. ConsoleSecretPrompt reads
-# redirected input one byte at a time precisely so this works.
-printf '%s\ny\nn\n' "$MASTER" \
+# The master password first, then one answer per request: h, then d. The second request comes from
+# a new bridge, so a new connection, and is asked again. ConsoleSecretPrompt reads redirected input
+# one byte at a time precisely so this works.
+printf '%s\nh\nd\n' "$MASTER" \
   | "$CLI" agent --vault "$VAULT" --approver "$PIPE" --approval-timeout 30 >/dev/null 2>"$AGENT_ERR" &
 AGENT_PID=$!
 

@@ -184,6 +184,223 @@ public sealed class ConsoleSecretPromptTests
         Assert.Null(prompt.ReadSecret("Master password: "));
     }
 
+    [Fact]
+    public void ReadChoice_ReturnsAChoiceKey_IgnoringOthers()
+    {
+        using var prompts = new StringWriter(CultureInfo.InvariantCulture);
+        var prompt = Choosing(prompts, "x?1 O");
+
+        Assert.Equal('o', prompt.ReadChoice(() => "[d] deny  [o] once  ", "oh", TestContext.Current.CancellationToken));
+
+        // Drawn without echoing what was typed.
+        Assert.Equal("\r[d] deny  [o] once  ", prompts.ToString());
+    }
+
+    /// <summary>
+    /// A key typed before the choice was drawn — a double-tap or auto-repeat on the last prompt —
+    /// answers nothing, however long the choice then stays up.
+    /// </summary>
+    [Fact]
+    public void ReadChoice_DiscardsKeysTypedBeforeItWasDrawn()
+    {
+        using var prompts = new StringWriter(CultureInfo.InvariantCulture);
+        var clock = new SteppedClock();
+        var typedAhead = new Queue<char>("hH");
+        var drawn = false;
+        var prompt = new ConsoleSecretPrompt(
+            prompts,
+            () =>
+            {
+                clock.Advance(ConsoleSecretPrompt.ArmingDelay);
+                return Key(typedAhead.Count > 0 ? typedAhead.Dequeue() : 'o');
+            },
+            () => typedAhead.Count > 0 || drawn,
+            () => false,
+            null,
+            clock);
+
+        Assert.Equal('o', prompt.ReadChoice(
+            () =>
+            {
+                drawn = true;
+                return "choose ";
+            },
+            "oh",
+            TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>An allowing key counts only after the choice has been on screen for the arming delay (D-0326).</summary>
+    [Fact]
+    public void ReadChoice_IgnoresAnAllowingKey_UntilArmed()
+    {
+        var keys = new Queue<(char Key, TimeSpan After)>(
+        [
+            ('h', TimeSpan.Zero),
+            ('o', ConsoleSecretPrompt.ArmingDelay - TimeSpan.FromMilliseconds(1)),
+            ('h', TimeSpan.FromMilliseconds(1)),
+        ]);
+
+        Assert.Equal('h', Timed(keys));
+        Assert.Empty(keys);
+    }
+
+    [Fact]
+    public void ReadChoice_DenyingKey_CountsAtOnce()
+    {
+        var keys = new Queue<(char Key, TimeSpan After)>([('o', TimeSpan.Zero), ('d', TimeSpan.Zero)]);
+
+        Assert.Equal('d', Timed(keys));
+    }
+
+    [Theory]
+    [InlineData(Enter)]
+    [InlineData('\n')]
+    [InlineData(Escape)]
+    [InlineData((char)0x03)]
+    [InlineData('n')]
+    [InlineData('d')]
+    public void ReadChoice_DenyKeys_ReturnD(char key)
+    {
+        using var prompts = new StringWriter(CultureInfo.InvariantCulture);
+        var prompt = Choosing(prompts, key + "o");
+
+        Assert.Equal('d', prompt.ReadChoice(() => "choose ", "oh", TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public void ReadChoice_Redirected_ReadsOneLine()
+    {
+        using var prompts = new StringWriter(CultureInfo.InvariantCulture);
+        using var input = Piped("  Once \nhour please\ny\nh");
+        var prompt = new ConsoleSecretPrompt(prompts, ThrowingKeySource, () => true, input);
+        var token = TestContext.Current.CancellationToken;
+
+        Assert.Equal('o', prompt.ReadChoice(() => "choose ", "oh", token));
+        Assert.Equal('h', prompt.ReadChoice(() => "choose ", "oh", token));
+        Assert.Equal('d', prompt.ReadChoice(() => "choose ", "oh", token));
+        Assert.Equal('d', prompt.ReadChoice(() => "choose ", "o", token));
+        Assert.Null(prompt.ReadChoice(() => "choose ", "oh", token));
+        Assert.Empty(prompts.ToString());
+    }
+
+    [Fact]
+    public async Task ReadChoice_Cancelled_StopsPolling()
+    {
+        using var prompts = new StringWriter(CultureInfo.InvariantCulture);
+        using var withdraw = new CancellationTokenSource();
+        var polls = 0;
+        var prompt = new ConsoleSecretPrompt(
+            prompts,
+            ThrowingKeySource,
+            () =>
+            {
+                Interlocked.Increment(ref polls);
+                return false;
+            },
+            () => false,
+            null,
+            TimeProvider.System);
+
+        var reading = Task.Run(() => prompt.ReadChoice(() => "choose ", "oh", withdraw.Token), TestContext.Current.CancellationToken);
+        await Task.Delay(ConsoleSecretPrompt.PollInterval * 3, TestContext.Current.CancellationToken);
+        await withdraw.CancelAsync();
+
+        Assert.Null(await reading.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+
+        var stopped = Volatile.Read(ref polls);
+        await Task.Delay(ConsoleSecretPrompt.PollInterval * 3, TestContext.Current.CancellationToken);
+        Assert.Equal(stopped, Volatile.Read(ref polls));
+    }
+
+    [Fact]
+    public void ReadChoice_RedrawsTheCountdown()
+    {
+        using var prompts = new StringWriter(CultureInfo.InvariantCulture);
+        var clock = new SteppedClock();
+        var polls = 0;
+        var left = 10;
+        var prompt = new ConsoleSecretPrompt(
+            prompts,
+            () => Key('o'),
+            () =>
+            {
+                if (prompts.GetStringBuilder().Length == 0)
+                {
+                    return false;
+                }
+
+                if (++polls > 3)
+                {
+                    return true;
+                }
+
+                clock.Advance(TimeSpan.FromSeconds(1));
+                return false;
+            },
+            () => false,
+            null,
+            clock);
+
+        Assert.Equal('o', prompt.ReadChoice(() => $"{left--}s ", "oh", TestContext.Current.CancellationToken));
+
+        // No escape sequence, which a console without virtual terminal processing prints: a line
+        // narrower than the last is padded over it with spaces and drawn again.
+        Assert.Equal("\r10s \r9s  \r9s \r8s \r7s ", prompts.ToString());
+    }
+
+    private static ConsoleKeyInfo Key(char key) => new(key, ConsoleKey.None, false, false, false);
+
+    /// <summary>Keys that arrive once the choice is drawn, all of them armed.</summary>
+    private static ConsoleSecretPrompt Choosing(StringWriter prompts, string keystrokes)
+    {
+        var clock = new SteppedClock();
+        var index = 0;
+        return new ConsoleSecretPrompt(
+            prompts,
+            () =>
+            {
+                clock.Advance(ConsoleSecretPrompt.ArmingDelay);
+                return Key(keystrokes[index++]);
+            },
+            () => prompts.GetStringBuilder().Length > 0 && index < keystrokes.Length,
+            () => false,
+            null,
+            clock);
+    }
+
+    /// <summary>Reads a choice from keys that each arrive a set time after the one before, the first after the draw.</summary>
+    private static char? Timed(Queue<(char Key, TimeSpan After)> keys)
+    {
+        using var prompts = new StringWriter(CultureInfo.InvariantCulture);
+        var clock = new SteppedClock();
+        var prompt = new ConsoleSecretPrompt(
+            prompts,
+            () =>
+            {
+                var (key, after) = keys.Dequeue();
+                clock.Advance(after);
+                return Key(key);
+            },
+            () => prompts.GetStringBuilder().Length > 0 && keys.Count > 0,
+            () => false,
+            null,
+            clock);
+
+        return prompt.ReadChoice(() => "choose ", "oh", TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>A monotonic clock the test moves, so a redraw is due exactly when the test says.</summary>
+    private sealed class SteppedClock : TimeProvider
+    {
+        private long _stamp;
+
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+
+        public override long GetTimestamp() => Interlocked.Read(ref _stamp);
+
+        internal void Advance(TimeSpan by) => Interlocked.Add(ref _stamp, by.Ticks);
+    }
+
     /// <summary>Stdin as the CLI really sees it: a byte stream, not a decoded reader.</summary>
     private static MemoryStream Piped(string text) => new(Encoding.UTF8.GetBytes(text));
 

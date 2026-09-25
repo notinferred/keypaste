@@ -1,6 +1,10 @@
+using System.Diagnostics.CodeAnalysis;
+using Keypaste.Cli.Approval;
 using Keypaste.Cli.Commands;
+using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Ipc;
 using Keypaste.Core.Policy;
 using Xunit;
 
@@ -126,6 +130,79 @@ public sealed class AgentPolicyTests : IDisposable
         harness.Dispose();
     }
 
+    /// <summary>
+    /// A standing rule never releases an entry in a protected profile: the person at the terminal is
+    /// shown it, with no timed choice, however broadly the rule is written.
+    /// </summary>
+    [Fact]
+    public async Task AProtectedProfileEntry_IsPromptedDespiteARule()
+    {
+        var path = Path.Combine(_home, KeypasteHome.PolicyFileName);
+        File.WriteAllText(path, Valid.Replace("env/dev/**", "env/**", StringComparison.Ordinal));
+        var policy = PolicyLoader.Load(path);
+        Assert.True(policy.HasRules);
+
+        var prompt = new FakeSecretPrompt();
+        prompt.Enqueue("h");
+        using var stderr = new StringWriter();
+        var console = new AgentConsole(stderr, interactive: false);
+        using var grants = new GrantCache(TimeProvider.System);
+        using var gate = new ApprovalGate(
+            new TerminalApprovalChannel(prompt, console, ApprovalLimits.Default.Window, TimeProvider.System),
+            TimeProvider.System,
+            ApprovalLimits.Default);
+        var source = new ProdEntry();
+        var handler = new ApproverHandler(source, source, gate, grants, new PolicyGate(policy.Rules, TimeProvider.System));
+
+        var reply = await handler.RequestAsync(
+            new CredentialRequest
+            {
+                Entry = ProdEntry.Path,
+                Field = "password",
+                Reason = "rotate the production key",
+                TtlSeconds = 300,
+                Exposure = ["env/**"],
+                ClientName = "claude-code",
+                ClientLabel = "claude-code",
+            },
+            "conn-1",
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(AuditMethod.Prompt, reply.Method);
+        Assert.Equal(AuditDecision.Denied, reply.Decision);
+        Assert.Contains("this entry is in a protected profile: it is asked about every time.", stderr.ToString(), StringComparison.Ordinal);
+        Assert.Equal("[d] deny  [o] once  45s › ", Assert.Single(prompt.PromptsSeen));
+    }
+
+    /// <summary>One entry in a protected profile.</summary>
+    private sealed class ProdEntry : ICredentialSource, IEntryNameLister
+    {
+        internal const string Path = "env/acme/prod/API_KEY";
+
+        private static readonly EntryName _name = new("env/acme/prod", "API_KEY");
+
+        public bool TryResolve(string entryArgument, [NotNullWhen(true)] out EntryName? name, out CredentialFailure failure)
+        {
+            name = _name;
+            failure = CredentialFailure.None;
+            return true;
+        }
+
+        public bool TryRead(EntryName name, string field, [NotNullWhen(true)] out ReleasedField? value, out CredentialFailure failure)
+        {
+            value = new ReleasedField(field, "prod-sentinel");
+            failure = CredentialFailure.None;
+            return true;
+        }
+
+        public bool TryList(EntryExposure exposure, [NotNullWhen(true)] out IReadOnlyList<EntryName>? names, out CredentialFailure failure)
+        {
+            names = [_name];
+            failure = CredentialFailure.None;
+            return true;
+        }
+    }
+
     // internal, not private: .editorconfig applies the _camelCase field rule to private consts too.
     internal const string Valid = """
         [[allow]]
@@ -156,7 +233,7 @@ public sealed class AgentPolicyTests : IDisposable
             "test-session",
             ApprovalLimits.Default,
             PolicyLoader.Load(path),
-            harness.NewContext());
+            new AgentConsole(harness.NewContext().Stderr, interactive: false));
 
         return (harness, harness.Err);
     }

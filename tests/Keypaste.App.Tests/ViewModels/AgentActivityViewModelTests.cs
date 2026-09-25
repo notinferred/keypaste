@@ -61,13 +61,13 @@ public sealed class AgentActivityViewModelTests
         var grant = Assert.Single(model.Grants);
         Assert.Equal("example · password", grant.What);
         Assert.Equal("claude-code · label ci-probe", grant.Who);
-        Assert.Equal("ends in 60 s", grant.Left);
+        Assert.Equal("ends in 3600 s", grant.Left);
         Assert.NotNull(grant.Grant);
         Assert.True(model.RevokeAllCommand.CanExecute(null));
 
         app.Clock.Advance(TimeSpan.FromSeconds(10));
 
-        Assert.Equal("ends in 50 s", Assert.Single(model.Grants).Left);
+        Assert.Equal("ends in 3590 s", Assert.Single(model.Grants).Left);
         Assert.DoesNotContain(reply.Value!, Everything(model), StringComparison.Ordinal);
     }
 

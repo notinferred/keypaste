@@ -19,10 +19,17 @@
 
   <Grid RowDefinitions="36,150,40,24,*,40,56" Margin="24">
 
-    <TextBlock Grid.Row="0"
-               Text="An agent is asking for a credential"
-               FontSize="18"
-               Foreground="{DynamicResource KpTextPrimary}" />
+    <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+      <TextBlock Grid.Column="0"
+                 Text="An agent is asking for a credential"
+                 FontSize="18"
+                 Foreground="{DynamicResource KpTextPrimary}" />
+      <TextBlock Grid.Column="1"
+                 Name="CountdownText"
+                 Text="{Binding Countdown}"
+                 FontFamily="{DynamicResource KpMono}"
+                 Foreground="{DynamicResource KpTextMuted}" />
+    </Grid>
 
     <Grid Grid.Row="1" ColumnDefinitions="110,*" RowDefinitions="30,30,30,30,30">
       <TextBlock Grid.Row="0" Grid.Column="0" Text="Requested by" Foreground="{DynamicResource KpTextMuted}" />
@@ -79,12 +86,17 @@
                 Spacing="8">
       <Button Name="Deny"
               Content="Deny"
-              Width="110"
+              Width="90"
               IsCancel="True"
               Command="{Binding DenyCommand}" />
-      <Button Name="Approve"
-              Content="Approve"
+      <Button Name="AllowOnce"
+              Content="Allow once"
               Width="110"
+              Command="{Binding AllowOnceCommand}" />
+      <Button Name="Approve"
+              Content="{Binding TimedLabel}"
+              MinWidth="150"
+              IsVisible="{Binding OffersTimed}"
               Command="{Binding ApproveCommand}" />
     </StackPanel>
 

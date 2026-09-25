@@ -106,6 +106,16 @@ internal sealed class SessionHost : IDisposable
         }
     }
 
+    /// <summary>Ends one timed grant a person gave a repeated <c>keypaste run --session</c>.</summary>
+    /// <param name="key">The grant, as <see cref="ApproverActivity.EnvGrants"/> listed it.</param>
+    internal void RevokeEnvGrant(string key)
+    {
+        lock (_gate)
+        {
+            _hosted?.RevokeEnvGrant(key);
+        }
+    }
+
     /// <summary>Ends every grant in the authority.</summary>
     internal void RevokeAll()
     {
@@ -223,6 +233,8 @@ internal sealed class SessionHost : IDisposable
 
         internal void Revoke(GrantKey key) => _authority.Revoke(key);
 
+        internal void RevokeEnvGrant(string key) => _authority.RevokeEnvGrant(key);
+
         internal void RevokeAll() => _authority.RevokeAll();
 
         internal static Hosted? TryStart(
@@ -236,6 +248,7 @@ internal sealed class SessionHost : IDisposable
             // Owned by the lifetime, which zeroes it when a lock ends it (D-0313).
 #pragma warning disable CA2000
             var grants = lifetime.Own(new GrantCache(session.Clock));
+            var envGrants = lifetime.Own(new EnvGrantCache(session.Clock));
 #pragma warning restore CA2000
             var approvals = new ApprovalGate(channel, session.Clock, ApprovalLimits.Default);
 
@@ -244,13 +257,14 @@ internal sealed class SessionHost : IDisposable
                 new VaultEntryNameLister(() => session.UnlockedFor(lifetime)),
                 approvals,
                 grants,
-                PolicyGate.None);
+                PolicyGate.None,
+                requiresLiveApproval: EnvProfileNames.RequiresLiveApproval);
 
             var authority = new SessionAuthority(
                 vault,
                 () => session.Lifetime,
                 handler,
-                new SessionEnvironments(approvals, session.UnlockedFor, session.Clock));
+                new SessionEnvironments(approvals, session.UnlockedFor, session.Clock, envGrants));
 
             try
             {

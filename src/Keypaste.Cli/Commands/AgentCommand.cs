@@ -140,11 +140,16 @@ internal static class AgentCommand
         PolicyLoad policy,
         CliContext context)
     {
+        var console = new AgentConsole(context.Stderr, context.Prompt.IsInteractive);
+        void Narrate(string line) => console.WriteLine($"keypaste: {line}");
+
         using var lifetime = new SessionLifetime();
         using var grants = new GrantCache(TimeProvider.System);
         lifetime.Own(grants);
+        using var envGrants = new EnvGrantCache(TimeProvider.System);
+        lifetime.Own(envGrants);
         using var gate = new ApprovalGate(
-            new TerminalApprovalChannel(context.Prompt, context.Stderr),
+            new TerminalApprovalChannel(context.Prompt, console, limits.Window, TimeProvider.System),
             TimeProvider.System,
             limits);
 
@@ -154,13 +159,18 @@ internal static class AgentCommand
             gate,
             grants,
             new PolicyGate(policy.Rules, TimeProvider.System),
-            line => context.Stderr.WriteLine($"keypaste: {line}"));
+            Narrate);
 
         var authority = new SessionAuthority(
             claim.Vault,
             () => lifetime,
             handler,
-            new SessionEnvironments(gate, asked => ReferenceEquals(asked, lifetime) && asked.IsLive ? vault : null, TimeProvider.System));
+            new SessionEnvironments(
+                gate,
+                asked => ReferenceEquals(asked, lifetime) && asked.IsLive ? vault : null,
+                TimeProvider.System,
+                envGrants,
+                Narrate));
 
         ApproverListener? listener = null;
 
@@ -174,8 +184,8 @@ internal static class AgentCommand
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                context.Stderr.WriteLine($"keypaste: could not listen on '{pipeName}': {ex.Message}");
-                context.Stderr.WriteLine("keypaste: another keypaste process may be listening on that name.");
+                console.WriteLine($"keypaste: could not listen on '{pipeName}': {ex.Message}");
+                console.WriteLine("keypaste: another keypaste process may be listening on that name.");
                 return CliApp.ExitInternalError;
             }
 
@@ -188,7 +198,7 @@ internal static class AgentCommand
 
             try
             {
-                Announce(claim.Vault.Path, pipeName, lifetime.Id, limits, policy, context);
+                Announce(claim.Vault.Path, pipeName, lifetime.Id, limits, policy, console);
 
                 // Blocking on the listener is the command. There is no synchronization context in
                 // a console app, so this is a wait rather than a deadlock waiting to happen.
@@ -207,7 +217,7 @@ internal static class AgentCommand
             listener?.Dispose();
         }
 
-        context.Stderr.WriteLine("keypaste: the agent has stopped. The vault is locked and every grant is gone.");
+        console.WriteLine("keypaste: the agent has stopped. The vault is locked and every grant is gone.");
         return CliApp.ExitSuccess;
     }
 
@@ -256,26 +266,26 @@ internal static class AgentCommand
         string session,
         ApprovalLimits limits,
         PolicyLoad policy,
-        CliContext context)
+        AgentConsole console)
     {
-        context.Stderr.WriteLine($"keypaste: watching {vaultPath}");
+        console.WriteLine($"keypaste: watching {vaultPath}");
 
         if (policy.Status == PolicyStatus.Rejected)
         {
-            context.Stderr.WriteLine($"keypaste: policy: {policy.Reason}");
-            context.Stderr.WriteLine(
+            console.WriteLine($"keypaste: policy: {policy.Reason}");
+            console.WriteLine(
                 "keypaste: policy: every request will be shown to you. Fix it and restart, or run `keypaste policy ls`.");
         }
         else if (policy.HasRules)
         {
-            context.Stderr.WriteLine($"keypaste: policy: {policy.Reason}. `keypaste policy ls` shows them.");
+            console.WriteLine($"keypaste: policy: {policy.Reason}. `keypaste policy ls` shows them.");
         }
         else
         {
-            context.Stderr.WriteLine($"keypaste: policy: {policy.Reason}.");
+            console.WriteLine($"keypaste: policy: {policy.Reason}.");
         }
 
-        context.Stderr.WriteLine(
+        console.WriteLine(
             string.Create(
                 CultureInfo.InvariantCulture,
                 $"keypaste: listening on {pipeName} for session {session}, {limits.Window.TotalSeconds:0} seconds to answer, grants last at most {limits.MaximumTtlSeconds} seconds"));
@@ -283,7 +293,7 @@ internal static class AgentCommand
         // The claim changes when a rule is in force, because with one it is no longer true. Saying
         // "nothing is released without you saying yes" while a standing rule releases things
         // silently is the kind of small untruth this product cannot afford to print.
-        context.Stderr.WriteLine(
+        console.WriteLine(
             policy.HasRules
                 ? "keypaste: nothing is released without you saying yes, unless a policy rule covers it. Press Ctrl+C to stop."
                 : "keypaste: nothing is released without you saying yes. Press Ctrl+C to stop.");
@@ -365,7 +375,7 @@ internal static class AgentCommand
         writer.WriteLine($"  --keyfile <path>           the keyfile it needs too, or set {VaultLocator.KeyfileEnvironmentVariable}");
         writer.WriteLine($"  --approver <name>          which pipe to listen on, or set {ApproverEndpoint.EnvironmentVariable}");
         writer.WriteLine($"  --approval-timeout <secs>  how long you have to answer, {ApprovalLimits.MinimumWindowSeconds}-{ApprovalLimits.MaximumWindowSeconds}, default {ApprovalLimits.DefaultWindowSeconds}");
-        writer.WriteLine($"  --max-ttl <secs>           the longest grant to issue, default {ApprovalLimits.DefaultMaximumTtlSeconds}");
+        writer.WriteLine($"  --max-ttl <secs>           how long an [h] grant lasts, default {ApprovalLimits.DefaultMaximumTtlSeconds}");
         writer.WriteLine($"  --policy <path>            standing rules, default ~/{KeypasteHome.DirectoryName}/{KeypasteHome.PolicyFileName}");
         writer.WriteLine();
         writer.WriteLine("A rule in the policy file releases a credential without asking. Anything wrong");

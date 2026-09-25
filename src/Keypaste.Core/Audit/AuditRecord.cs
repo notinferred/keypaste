@@ -255,4 +255,8 @@ public sealed record AuditRecord
 
     /// <summary>The unlocked session that answered, or null when the request reached none.</summary>
     public string? Session { get; init; }
+
+    /// <summary>How long what was released stays granted, in seconds: zero for a person's "allow once".</summary>
+    /// <remarks>Written only on a <see cref="AuditDecision.Granted"/> line, and absent from lines written before it existed.</remarks>
+    public int? GrantedSeconds { get; init; }
 }

@@ -269,7 +269,7 @@ fixture() {
 # One approved request, so ~/.keypaste holds an audit chain the transitions must not break.
 audit_record() {
   local pipe="keypaste-upgrade-check-$$-$RANDOM" agent_pid
-  printf '%s\ny\n' "$MASTER" | "$KP" agent --vault "$VAULT_NATIVE" --approver "$pipe" --approval-timeout 55 \
+  printf '%s\nh\n' "$MASTER" | "$KP" agent --vault "$VAULT_NATIVE" --approver "$pipe" --approval-timeout 55 \
     > /dev/null 2> "$OUT/agent-stderr.txt" &
   agent_pid=$!
   for _ in $(seq 1 150); do

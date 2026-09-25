@@ -243,6 +243,18 @@ internal static class ToolText
 
         """;
 
+    /// <summary>What is said around a credential a person released for this one request.</summary>
+    /// <remarks>Nothing is kept for a later request, so it asks again rather than saying when it expires.</remarks>
+    internal static string ReleasedOnce(string field) =>
+        $"""
+        keypaste: APPROVED ONCE. A person released the "{field}" of this entry for this request only.
+
+        Use it for the task you gave as your reason and nothing else. Do not print it, do not write
+        it into a file or a commit, and do not repeat it back in a message - it is a live credential.
+        Ask again if you need it again. This release was recorded in the audit log.
+
+        """;
+
     /// <summary>What is said around a credential released by a standing rule, with nobody asked.</summary>
     /// <remarks>
     /// Separate from <see cref="Released"/> because that one says "a person released" and on this path

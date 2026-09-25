@@ -195,14 +195,13 @@ public sealed class ApprovalPromptTests
     }
 
     /// <summary>
-    /// The human is shown the TTL that will actually apply, not the one the agent asked for.
-    /// Showing a requested hour when five minutes will be granted would make the prompt a worse
-    /// source of truth than the audit log.
+    /// A standing rule's release lasts what the agent asked for, never past the operator's ceiling.
+    /// A person's timed grant is not bounded this way: they chose its length on screen.
     /// </summary>
     [Fact]
-    public void TheTtlShownIsTheOneThatWillApply()
+    public void ARulesReleaseIsBoundedByTheRequestAndTheCeiling()
     {
-        var limits = ApprovalLimits.Default;
+        var limits = ApprovalLimits.Default with { MaximumTtlSeconds = 300 };
 
         Assert.Equal(300, limits.EffectiveTtlSeconds(3600));
         Assert.Equal(60, limits.EffectiveTtlSeconds(60));

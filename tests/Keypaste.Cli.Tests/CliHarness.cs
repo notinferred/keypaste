@@ -185,6 +185,16 @@ internal sealed class FakeSecretPrompt : ISecretPrompt
 
         return _answers.Count == 0 ? null : _answers.Dequeue();
     }
+
+    /// <summary>Answers as a redirected choice does: one queued line, its first word.</summary>
+    public char? ReadChoice(Func<string> prompt, string choices, CancellationToken cancellationToken)
+    {
+        var shown = prompt();
+        PromptsSeen.Add(shown);
+        OnPrompt?.Invoke(shown);
+
+        return _answers.Count == 0 ? null : ConsoleSecretPrompt.Choice(_answers.Dequeue(), choices);
+    }
 }
 
 /// <summary>An in-memory clipboard that counts what happened to it.</summary>

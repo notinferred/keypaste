@@ -359,6 +359,80 @@ public sealed class ApprovalGateTests
         Assert.Null(owned.Waiting);
     }
 
+    [Fact]
+    public async Task ApprovedOnce_IsReturnedAsGiven()
+    {
+        var (gate, _) = Build(new ScriptedChannel(ApprovalAnswer.ApprovedOnce));
+        using var owned = gate;
+
+        var answer = await owned.AskAsync("k", Prompt(), TestContext.Current.CancellationToken);
+
+        Assert.Equal(ApprovalAnswer.ApprovedOnce, answer);
+        Assert.True(answer.Releases());
+    }
+
+    /// <summary>"Allow once" after the window closed is as late as any other yes.</summary>
+    [Fact]
+    public async Task ApprovedOnce_AfterTheWindow_IsTimedOut()
+    {
+        var channel = new ScriptedChannel(ApprovalAnswer.ApprovedOnce) { Park = true, IgnoreWithdrawal = true };
+        var (gate, clock) = Build(channel);
+        using var owned = gate;
+
+        var asking = owned.AskAsync("k", Prompt(), TestContext.Current.CancellationToken).AsTask();
+        await channel.Entered.WaitAsync(TestContext.Current.CancellationToken);
+
+        clock.Advance(TimeSpan.FromSeconds(ApprovalLimits.DefaultWindowSeconds));
+        channel.Release();
+
+        Assert.Equal(ApprovalAnswer.TimedOut, await asking);
+    }
+
+    [Fact]
+    public async Task ApprovedOnce_ForAWithdrawnRequest_IsCancelled()
+    {
+        var channel = new ScriptedChannel(ApprovalAnswer.ApprovedOnce) { Park = true };
+        var (gate, _) = Build(channel);
+        using var owned = gate;
+        using var caller = new CancellationTokenSource();
+
+        var asking = owned.AskAsync("k", Prompt(), caller.Token).AsTask();
+        await channel.Entered.WaitAsync(TestContext.Current.CancellationToken);
+        await caller.CancelAsync();
+
+        Assert.Equal(ApprovalAnswer.Cancelled, await asking);
+        Assert.True(channel.WasWithdrawn);
+    }
+
+    [Fact]
+    public async Task ApprovedOnce_StartsNoCooldown()
+    {
+        var channel = new ScriptedChannel(ApprovalAnswer.ApprovedOnce);
+        var (gate, _) = Build(channel);
+        using var owned = gate;
+
+        await owned.AskAsync("same", Prompt(), TestContext.Current.CancellationToken);
+
+        Assert.False(owned.IsInCooldown("same"));
+        Assert.Equal(ApprovalAnswer.ApprovedOnce, await owned.AskAsync("same", Prompt(), TestContext.Current.CancellationToken));
+        Assert.Equal(2, channel.Asked);
+    }
+
+    [Theory]
+    [InlineData(ApprovalAnswer.NoChannel)]
+    [InlineData(ApprovalAnswer.Denied)]
+    [InlineData(ApprovalAnswer.TimedOut)]
+    [InlineData(ApprovalAnswer.Cancelled)]
+    [InlineData(ApprovalAnswer.Busy)]
+    [InlineData(ApprovalAnswer.Cooldown)]
+    [InlineData(ApprovalAnswer.Failed)]
+    public void OnlyTheTwoAllowAnswers_Release(ApprovalAnswer answer)
+    {
+        Assert.False(answer.Releases());
+        Assert.True(ApprovalAnswer.Approved.Releases());
+        Assert.True(ApprovalAnswer.ApprovedOnce.Releases());
+    }
+
     /// <summary>A channel that answers what it was told to, when it is told to.</summary>
     /// <remarks>
     /// Both completion sources are built with
