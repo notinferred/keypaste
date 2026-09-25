@@ -118,7 +118,7 @@ public sealed class SecretsScreenTests : IDisposable
         Assert.Matches("^uuid [0-9a-f]{4}…[0-9a-f]{4} · field Password$", detail.KdbxEntry);
         Assert.Equal("Password", detail.ValueLabel);
         Assert.Equal("New password", detail.ReplacementPlaceholder);
-        Assert.Contains("20-character password", detail.RotatePrompt, StringComparison.Ordinal);
+        Assert.Contains("20-character one? keypaste only changes its copy", detail.RotatePrompt, StringComparison.Ordinal);
     }
 
     [Fact]

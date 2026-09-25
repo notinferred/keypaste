@@ -119,7 +119,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         EnvPlace.Of(_groupPath, _title) is { } place
             ? $"Replace {DisplayTitle} in {place.Project} · {place.Profile} with a new random {PasswordGenerator.DefaultLength}-character value? "
                 + $"Every app that injects this key in {place.Profile} gets it on its next run, so a connection string or URL here stops working. The old value stays in history."
-            : $"Replace the value with a new {PasswordGenerator.DefaultLength}-character password? The old one stays in history.";
+            : $"Replace the saved password with a new {PasswordGenerator.DefaultLength}-character one? keypaste only changes its copy: set the new password on the site or service too, or you will need the old one from history to sign in.";
 
     /// <summary>When the entry was created, as the metadata row shows it.</summary>
     internal string Created
