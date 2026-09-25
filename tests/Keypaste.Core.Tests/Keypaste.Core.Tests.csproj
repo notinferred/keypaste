@@ -15,4 +15,9 @@
     <ProjectReference Include="../../src/Keypaste.Core/Keypaste.Core.csproj" />
   </ItemGroup>
 
+  <!-- The child an agent's run starts in the capture tests: built beside these tests, never referenced. -->
+  <ItemGroup>
+    <ProjectReference Include="../Keypaste.EnvReporter/Keypaste.EnvReporter.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
 </Project>

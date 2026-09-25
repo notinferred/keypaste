@@ -77,4 +77,15 @@ public static class KeypasteHome
     /// <remarks>It names directories and commands on this machine and never holds a value (D-0339).</remarks>
     public static string ProjectsPath(string? fromEnvironment) =>
         Path.Combine(Resolve(fromEnvironment), ProjectsFileName);
+
+    /// <summary>The per-client policies, keyed by each bridge's <c>--client-label</c>.</summary>
+    public const string ClientsFileName = "clients.toml";
+
+    /// <summary>Resolves the per-client policy file. The file is not created.</summary>
+    /// <remarks>
+    /// Not <c>policy.toml</c>, whose every table is an allow rule, and not <c>app.toml</c>, which only
+    /// the desktop reads: <c>keypaste agent</c> enforces the same file (D-0360).
+    /// </remarks>
+    public static string ClientsPath(string? fromEnvironment) =>
+        Path.Combine(Resolve(fromEnvironment), ClientsFileName);
 }

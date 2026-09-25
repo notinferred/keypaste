@@ -36,4 +36,12 @@ public interface IApprovalChannel
     /// <remarks>A channel that cannot show this has asked nobody, which is a no.</remarks>
     ValueTask<ApprovalAnswer> AskAsync(EnvReleasePrompt prompt, CancellationToken cancellationToken) =>
         ValueTask.FromResult(ApprovalAnswer.NoChannel);
+
+    /// <summary>Shows an agent's request to run a command with secrets to a human and waits for their answer.</summary>
+    /// <param name="prompt">What to show. Already checked and sanitized; render it as inert text.</param>
+    /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
+    /// <returns>What the human said, or why they were not asked.</returns>
+    /// <remarks>A channel that cannot show this has asked nobody, which is a no.</remarks>
+    ValueTask<ApprovalAnswer> AskAsync(RunPrompt prompt, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(ApprovalAnswer.NoChannel);
 }

@@ -29,6 +29,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
     private IReadOnlyList<EntryRow> _all = [];
     private IReadOnlyList<EntryRow> _rows = [];
+    private readonly EntryActivitySource? _activity;
     private IReadOnlyList<GroupNode> _groups = [];
     private GroupNode? _selectedGroup;
     private EntryName? _selection;
@@ -52,13 +53,14 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     private GroupNode? _moveTarget;
     private IReadOnlyList<GroupNode> _moveTargets = [];
 
-    internal EntriesViewModel(AppVaultSession session, ClipboardCountdown clipboard)
+    internal EntriesViewModel(AppVaultSession session, ClipboardCountdown clipboard, EntryActivitySource? activity = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(clipboard);
 
         _session = session;
         _clipboard = clipboard;
+        _activity = activity;
         NewPassword = new SecretField(clipboard);
 
         BeginAddCommand = new RelayCommand(BeginAdd, () => !IsAdding);
@@ -86,6 +88,12 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         CancelGroupCommand = new RelayCommand(CloseGroupForms, () => IsCreatingGroup || IsRenamingGroup);
 
         Reload();
+
+        if (_activity is not null)
+        {
+            _activity.Changed += OnActivity;
+            ApplyActivity();
+        }
     }
 
     /// <summary>The group tree, flattened, with "All entries" first.</summary>
@@ -566,6 +574,27 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         Filter();
 
         Select(wanted is not null && _all.Any(row => row.Name == wanted) ? wanted : null);
+        ApplyActivity();
+    }
+
+    private void OnActivity(object? sender, EventArgs e) => ApplyActivity();
+
+    /// <summary>Gives every row and the open pane the latest picture of what agents did, never a value.</summary>
+    private void ApplyActivity()
+    {
+        if (_activity?.Current is not { } picture)
+        {
+            return;
+        }
+
+        var now = _session.Clock.GetUtcNow();
+
+        foreach (var row in _all)
+        {
+            row.Apply(picture, now);
+        }
+
+        Detail?.Apply(picture);
     }
 
     /// <summary>
@@ -599,6 +628,11 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     /// <summary>Nothing derived from the vault outlives this.</summary>
     public void Dispose()
     {
+        if (_activity is not null)
+        {
+            _activity.Changed -= OnActivity;
+        }
+
         _all = [];
         Rows = [];
         Groups = [];
@@ -732,6 +766,11 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         if (moved)
         {
             Detail = name is null ? null : Build(name);
+
+            if (Detail is not null && _activity?.Current is { } picture)
+            {
+                Detail.Apply(picture);
+            }
         }
 
         IsConfirmingDelete = false;

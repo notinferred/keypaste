@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Clients;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
 
@@ -28,7 +29,7 @@ internal sealed record ServerOptions
 {
     internal const string Usage = """
         usage: keypaste-mcp [--vault <path>] [--expose <glob>]... [--client-label <name>]
-                            [--audit-log <path>] [--approver <name>]
+                            [--allow-run] [--audit-log <path>] [--approver <name>]
 
         An MCP server that lets an AI agent ask for one credential, with your approval and a full
         audit trail. It speaks the protocol on stdin and stdout, so it is started by an MCP client
@@ -36,7 +37,9 @@ internal sealed record ServerOptions
 
           --vault <path>        which vault to expose, or set KEYPASTE_VAULT
           --expose <glob>       what may be named, repeatable. Defaults to env/**
-          --client-label <name> what to call this client in the audit log
+          --client-label <name> what to call this client in the audit log and in clients.toml
+          --allow-run           offer the run tool: start a command you approve with secrets
+                                in its environment. A command can still reveal them.
           --audit-log <path>    where to append the audit trail, or set KEYPASTE_HOME
           --approver <name>     which pipe to ask instead of the vault's own, or set KEYPASTE_APPROVER
 
@@ -72,6 +75,12 @@ internal sealed record ServerOptions
     /// <summary>Whether <c>--help</c> was asked for.</summary>
     internal bool WantsHelp { get; init; }
 
+    /// <summary>Whether <c>--allow-run</c> was given: the run tool is offered only then (D-0358).</summary>
+    internal bool AllowRun { get; init; }
+
+    /// <summary>The configured vault's identity key, for audit lines, or null without a vault.</summary>
+    internal string? VaultKey { get; init; }
+
     /// <summary>Parses the command line.</summary>
     /// <param name="argv">The arguments, excluding the program name.</param>
     /// <param name="vaultFromEnvironment">The value of <c>KEYPASTE_VAULT</c>, or null.</param>
@@ -97,6 +106,7 @@ internal sealed record ServerOptions
         string? label = null;
         string? auditPath = null;
         string? approver = null;
+        var allowRun = false;
         List<string> globs = [];
 
         for (var i = 0; i < argv.Length; i++)
@@ -108,6 +118,12 @@ internal sealed record ServerOptions
             {
                 options = Help();
                 return true;
+            }
+
+            if (string.Equals(argument, "--allow-run", StringComparison.Ordinal))
+            {
+                allowRun = true;
+                continue;
             }
 
             if (!TryTakeValue(argv, ref i, out var name, out var value, out error))
@@ -168,19 +184,26 @@ internal sealed record ServerOptions
             return false;
         }
 
+        // The same rule a clients.toml row is held to, so a label a policy can name is the only kind a
+        // bridge starts with, and one the owner would reject on attach never reaches it.
+        if (label is not null && (string.Equals(label, ClientPolicies.AnyClient, StringComparison.Ordinal)
+            || !ClientPolicies.IsValidLabel(label, out _)))
+        {
+            error = $"--client-label must be 1 to {ClientPolicies.MaximumLabelLength} characters with no quote, backslash, slash or control character, and not \"*\"";
+            return false;
+        }
+
         // A missing vault is deliberately not fatal. Malformed configuration should stop the
         // server; absent state should not, because a server that starts and says "no vault is
         // configured" is diagnosable, and one that exits leaves the client's log as the only clue.
         VaultLocation.TryResolve(vault, vaultFromEnvironment, out var vaultPath, out _);
 
         string? pipeName;
+        var identity = vaultPath.Length > 0 ? VaultIdentity.Of(KeypasteHome.Resolve(homeFromEnvironment), vaultPath) : null;
 
         try
         {
-            pipeName = ApproverEndpoint.Resolve(
-                approver,
-                approverFromEnvironment,
-                vaultPath.Length > 0 ? VaultIdentity.Of(KeypasteHome.Resolve(homeFromEnvironment), vaultPath) : null);
+            pipeName = ApproverEndpoint.Resolve(approver, approverFromEnvironment, identity);
         }
         catch (ArgumentException ex)
         {
@@ -194,6 +217,8 @@ internal sealed record ServerOptions
             Exposure = exposure,
             ClientLabel = label,
             ApproverName = pipeName,
+            AllowRun = allowRun,
+            VaultKey = identity?.Key,
             AuditPath = auditPath is { Length: > 0 }
                 ? Path.GetFullPath(auditPath)
                 : KeypasteHome.AuditPath(homeFromEnvironment),

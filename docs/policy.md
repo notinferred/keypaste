@@ -145,6 +145,24 @@ keypaste: released env/dev/STRIPE_KEY to allow#1 for 300s without asking
 
 <a id="the-honest-limits"></a>
 
+## Narrowing one client
+
+`policy.toml` adds releases; `~/.keypaste/clients.toml` only takes them away, one client at a time, keyed by the same `--client-label`. Each client has one of three policies:
+
+| Policy | What it does |
+|---|---|
+| `session` | Session grants up to 1 hour: a person may give a timed grant and, in `keypaste agent`, a rule here may apply. The default. |
+| `ask` | Ask every time: no timed grant is offered or used and no rule here applies. |
+| `inject-only` | `request_credential` is refused before anything is read; `run` under `--allow-run` is still asked about. |
+
+```sh
+keypaste mcp policy                       # list them; --json prints the rows
+keypaste mcp policy '*' ask               # every client without a row of its own
+keypaste mcp policy claude-code session
+```
+
+The desktop's Agents screen sets the same file. Unlike this file's `"*"`, the `*` row there also covers a bridge started with no label, because it can only narrow; put the strict policy on `*`, since a label is whatever the client's configuration says and an agent that can edit that configuration can change it ([THREATS.md](../THREATS.md) T-36). The holder of the vault reads the file at every request, so a change applies to the next one. A file it cannot read or parse refuses every agent request until it is fixed or deleted. No policy covers `keypaste run --session` from an agent's own shell.
+
 ## Limits
 
 A rule covers the vault's current contents. Anyone able to edit or synchronize that subtree can change what it covers. Moving `personal/bank` into `env/dev` makes it match `env/dev/**`. Policy releases show no prompt, and nobody reviews the stated reason at release time. Narrow `entries`, a low `max_per_hour` and a short `--max-ttl` limit access. Each policy request is checked against the rule and its allowance; policy releases do not populate the prompt approval cache. The returned lifetime cannot erase client copies or expire credentials at their provider.

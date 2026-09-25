@@ -91,6 +91,16 @@ internal sealed class AppAuthority : IDisposable
     /// <param name="key">The grant, as <see cref="Activity"/> listed it.</param>
     internal void Revoke(GrantKey key) => _host.Revoke(key);
 
+    /// <summary>The MCP clients attached to the live session, as they describe themselves (display only).</summary>
+    internal IReadOnlyList<Core.Clients.ConnectedClient> Clients => _host.Clients;
+
+    /// <summary>What the live session has released, newest first, never a value.</summary>
+    internal IReadOnlyList<Core.Ownership.ReleaseSeen> Released => _host.Released;
+
+    /// <summary>Ends every grant given to a bridge started with this label, as a stricter policy for it does.</summary>
+    /// <param name="label">The raw label.</param>
+    internal void RevokeClient(string label) => _host.RevokeClient(label);
+
     /// <summary>Ends every grant this session has given.</summary>
     internal void RevokeAll() => _host.RevokeAll();
 

@@ -80,6 +80,19 @@ public sealed record ApprovalPrompt
     /// </summary>
     public required int TtlSeconds { get; init; }
 
+    /// <summary>Why <see cref="TtlSeconds"/> is zero, when it is.</summary>
+    public OnceOnly OnceOnly { get; init; }
+
+    /// <summary>An entry as every prompt, grant and audit line shows it.</summary>
+    /// <param name="entry">The entry.</param>
+    /// <returns>Group separators kept, everything else scrubbed.</returns>
+    public static string Shown(EntryName entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+
+        return Display(entry).Text;
+    }
+
     /// <summary>Builds the prompt for one request, sanitizing everything untrusted on the way in.</summary>
     /// <param name="client">The client's asserted name, or null when it did not give one.</param>
     /// <param name="entry">The entry the request resolved to.</param>

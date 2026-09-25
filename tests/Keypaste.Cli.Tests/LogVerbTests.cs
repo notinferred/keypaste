@@ -462,6 +462,31 @@ public sealed class LogVerbTests : IDisposable
     }
 
     [Fact]
+    public void Log_Json_CarriesEntriesCommandAndVault()
+    {
+        Write(
+            new DateTimeOffset(2026, 7, 26, 14, 0, 0, TimeSpan.Zero),
+            Record("claude-code", "env/acme", AuditDecision.Granted, AuditMethod.Prompt) with
+            {
+                Tool = "run",
+                Vault = "0123456789abcdef",
+                Entries = ["env/acme/DATABASE_URL", "env/acme/TOKEN"],
+                Command = "npm run migrate",
+            },
+            Record("claude-desktop", "env/dev/DB_URL", AuditDecision.Denied, AuditMethod.OutOfScope));
+
+        _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("log", "--json"));
+
+        using var document = System.Text.Json.JsonDocument.Parse(_cli.Out);
+        var records = document.RootElement.EnumerateArray().ToList();
+        Assert.Equal("0123456789abcdef", records[0].GetProperty("vault").GetString());
+        Assert.Equal(["env/acme/DATABASE_URL", "env/acme/TOKEN"], records[0].GetProperty("entries").EnumerateArray().Select(entry => entry.GetString()));
+        Assert.Equal("npm run migrate", records[0].GetProperty("command").GetString());
+        Assert.Equal(string.Empty, records[1].GetProperty("vault").GetString());
+        Assert.Equal(0, records[1].GetProperty("entries").GetArrayLength());
+    }
+
+    [Fact]
     public void Log_Json_SaysHowLongAPersonsGrantLasts()
     {
         Write(

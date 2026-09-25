@@ -166,6 +166,63 @@
         </ItemsControl>
       </StackPanel>
 
+      <!-- Who reaches this vault and how each is asked (D-0360, D-0361). Names are what clients say
+           about themselves and the labels in their configuration: display only (T-3, T-36). -->
+      <StackPanel Spacing="8">
+        <TextBlock Text="MCP clients" FontSize="16" Foreground="{DynamicResource KpTextPrimary}" />
+        <StackPanel Spacing="6" IsVisible="{Binding HasClientsProblem}">
+          <TextBlock Name="ClientsProblemText" Text="{Binding ClientsProblem}" TextWrapping="Wrap" MaxWidth="640"
+                     HorizontalAlignment="Left" FontSize="13" Foreground="{DynamicResource KpDanger}" />
+          <Button Name="ResetClients" Content="Reset" HorizontalAlignment="Left" Command="{Binding ResetClientsCommand}" />
+        </StackPanel>
+        <ItemsControl Name="ClientCards" ItemsSource="{Binding Clients}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <WrapPanel />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ClientCardRow">
+              <Border Theme="{StaticResource KpCard}" Width="260" Margin="0,0,8,8">
+                <StackPanel Spacing="6">
+                  <Grid ColumnDefinitions="32,*,Auto">
+                    <Border Grid.Column="0" Width="32" Height="32" CornerRadius="6" Background="{DynamicResource KpSurface2}">
+                      <TextBlock Text="{Binding Initials}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                 FontFamily="{DynamicResource KpMono}" FontSize="12" Foreground="{DynamicResource KpTextPrimary}" />
+                    </Border>
+                    <StackPanel Grid.Column="1" Margin="8,0" VerticalAlignment="Center">
+                      <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" FontSize="13.5" FontWeight="SemiBold"
+                                 Foreground="{DynamicResource KpTextPrimary}" />
+                      <TextBlock Text="{Binding Detail}" TextTrimming="CharacterEllipsis" FontSize="11.5"
+                                 Foreground="{DynamicResource KpTextMuted}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                      <Border Classes="dot" Classes.ok="{Binding IsConnected}" Classes.idle="{Binding !IsConnected}" />
+                      <TextBlock Text="{Binding Status}" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
+                    </StackPanel>
+                  </Grid>
+                  <TextBlock Text="POLICY" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
+                  <ComboBox ItemsSource="{Binding Options}"
+                            SelectedItem="{Binding PolicyText}"
+                            IsEnabled="{Binding CanSetPolicy}"
+                            HorizontalAlignment="Stretch"
+                            AutomationProperties.Name="Policy" />
+                  <TextBlock Text="{Binding Hint}" TextWrapping="Wrap" FontSize="11.5"
+                             IsVisible="{Binding Hint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                             Foreground="{DynamicResource KpTextMuted}" />
+                  <TextBlock Text="{Binding LastSeenText, StringFormat='last seen {0}'}" FontSize="11.5"
+                             IsVisible="{Binding LastSeenText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                             Foreground="{DynamicResource KpTextMuted}" />
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock Text="A client appears once its bridge has asked for something. A label is written in the client's configuration, so an agent that can edit that file can change it: put the strictest policy on every other client (*)."
+                   TextWrapping="Wrap" MaxWidth="640" HorizontalAlignment="Left" FontSize="12"
+                   Foreground="{DynamicResource KpTextMuted}" />
+      </StackPanel>
+
       <!-- This session's audit records as `keypaste log` renders them (D-0331); the Log screen has
            the whole file. -->
       <StackPanel Spacing="8">

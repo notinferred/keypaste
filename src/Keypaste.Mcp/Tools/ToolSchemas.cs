@@ -71,6 +71,72 @@ internal static class ToolSchemas
         }
         """;
 
+    /// <summary>The arguments of <c>run</c>: the command, where, which variables and why.</summary>
+    /// <remarks>The bounds are <c>RunRequestRules</c>'s, which the bridge and the owner apply again.</remarks>
+    internal const string RunInputJson = """
+        {
+          "type": "object",
+          "properties": {
+            "command": {
+              "type": "array",
+              "items": { "type": "string", "maxLength": 4096 },
+              "minItems": 1,
+              "maxItems": 256,
+              "description": "The program and its arguments, one per item. No shell; the person approves exactly this."
+            },
+            "directory": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024,
+              "description": "Absolute path of an existing directory to run in."
+            },
+            "project": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "The env project whose set to inject. Give this or env."
+            },
+            "profile": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,31}$",
+              "description": "The project's profile. Defaults to dev."
+            },
+            "keys": {
+              "type": "array",
+              "items": { "type": "string", "maxLength": 128 },
+              "minItems": 1,
+              "maxItems": 32,
+              "uniqueItems": true,
+              "description": "Only these keys of the set. Omit for the whole set."
+            },
+            "env": {
+              "type": "object",
+              "minProperties": 1,
+              "maxProperties": 32,
+              "additionalProperties": { "type": "string", "maxLength": 2048, "pattern": "^kp://" },
+              "description": "Variable name to kp:// reference. Give this or project."
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "description": "Shown verbatim to the person who approves or denies. Be specific and honest."
+            },
+            "timeout_seconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 600,
+              "description": "How long the command may run once started. Defaults to 120."
+            }
+          },
+          "required": ["command", "directory", "reason"],
+          "additionalProperties": false
+        }
+        """;
+
+    /// <summary>The parsed schema for <c>run</c>.</summary>
+    internal static readonly JsonElement RunInput = Parse(RunInputJson);
+
     /// <summary>The parsed schema for <c>list_entry_names</c>.</summary>
     internal static readonly JsonElement ListInput = Parse(ListInputJson);
 

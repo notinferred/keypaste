@@ -1,0 +1,138 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Keypaste.App.ViewModels"
+        x:Class="Keypaste.App.Views.RunApprovalWindow"
+        x:DataType="vm:RunApprovalViewModel"
+        Icon="avares://keypaste-app/Assets/keypaste.ico"
+        Title="keypaste: an agent wants to run a command with your secrets"
+        Width="560" Height="720"
+        MinWidth="560" MaxWidth="560" MinHeight="720" MaxHeight="720"
+        CanResize="False"
+        SizeToContent="Manual"
+        Topmost="True"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource KpSurface0}">
+
+  <!-- Fixed rows, as in the other prompt windows: the program, command, directory and reason are the
+       agent's, so each sits in a box of its own that wraps and scrolls and none of them can move the
+       question or the buttons (THREATS.md T-2, T-35). Nothing is trimmed or ellipsized, so no part of
+       a command is hidden past an edge. No button is the default: Enter approves nothing, and Escape
+       denies. -->
+
+  <Grid RowDefinitions="36,22,22,108,24,*,24,72,40,52,56,32" Margin="24">
+
+    <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+      <TextBlock Grid.Column="0"
+                 Name="TitleText"
+                 Text="{Binding Title}"
+                 FontSize="16"
+                 FontWeight="SemiBold"
+                 TextWrapping="Wrap"
+                 Foreground="{DynamicResource KpTextPrimary}" />
+      <TextBlock Grid.Column="1"
+                 Name="CountdownText"
+                 Text="{Binding Countdown}"
+                 FontFamily="{DynamicResource KpMono}"
+                 Foreground="{DynamicResource KpTextMuted}" />
+    </Grid>
+
+    <TextBlock Grid.Row="1" Name="SubtitleText" Text="{Binding Subtitle}" TextWrapping="Wrap"
+               FontSize="12" Foreground="{DynamicResource KpTextMuted}" />
+
+    <TextBlock Grid.Row="2" Name="ClientText" Text="{Binding Client}" TextWrapping="Wrap"
+               FontSize="12" Foreground="{DynamicResource KpTextSecondary}" />
+
+    <Border Grid.Row="3" Theme="{StaticResource KpCard}">
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="10">
+        <StackPanel Spacing="4">
+          <TextBlock Name="ToolText" Text="{Binding Tool}" FontFamily="{DynamicResource KpMono}" FontSize="11.5"
+                     Foreground="{DynamicResource KpTextMuted}" />
+          <TextBlock Name="ProgramText" Text="{Binding Program}" TextWrapping="Wrap" FontFamily="{DynamicResource KpMono}"
+                     FontSize="11.5" Foreground="{DynamicResource KpTextSecondary}" />
+          <TextBlock Name="CommandText" Text="{Binding Command}" TextWrapping="Wrap" FontFamily="{DynamicResource KpMono}"
+                     FontSize="11.5" Foreground="{DynamicResource KpTextPrimary}" />
+          <TextBlock Name="DirectoryText" Text="{Binding Directory}" TextWrapping="Wrap" FontFamily="{DynamicResource KpMono}"
+                     FontSize="11.5" Foreground="{DynamicResource KpTextSecondary}" />
+        </StackPanel>
+      </ScrollViewer>
+    </Border>
+
+    <TextBlock Grid.Row="4" Text="Secrets it will receive (names only)" VerticalAlignment="Bottom"
+               Foreground="{DynamicResource KpTextMuted}" />
+    <Border Grid.Row="5" Theme="{StaticResource KpCard}" Margin="0,4,0,0">
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="10">
+        <ItemsControl Name="VariablesList" ItemsSource="{Binding Variables}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:RunVariableRow">
+              <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                <StackPanel Grid.Column="0">
+                  <TextBlock Text="{Binding Name}" TextWrapping="Wrap" FontFamily="{DynamicResource KpMono}"
+                             Foreground="{DynamicResource KpTextPrimary}" />
+                  <TextBlock Text="{Binding Source}" TextWrapping="Wrap" FontFamily="{DynamicResource KpMono}" FontSize="11"
+                             Foreground="{DynamicResource KpTextMuted}" />
+                </StackPanel>
+                <TextBlock Grid.Column="1" Text="{Binding Tag}" FontSize="11" Margin="8,0,0,0"
+                           Foreground="{DynamicResource KpTextMuted}" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Border>
+
+    <TextBlock Grid.Row="6" Text="The agent says it needs this because" VerticalAlignment="Bottom"
+               Foreground="{DynamicResource KpTextMuted}" />
+    <Border Grid.Row="7" Theme="{StaticResource KpCard}" Margin="0,4,0,0">
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="10">
+        <StackPanel Spacing="4">
+          <TextBlock Name="ReasonText" Text="{Binding Reason}" TextWrapping="Wrap" Foreground="{DynamicResource KpTextPrimary}" />
+          <TextBlock Name="ScrubbedText" Text="{Binding Scrubbed}" TextWrapping="Wrap" FontSize="12"
+                     IsVisible="{Binding Scrubbed, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                     Foreground="{DynamicResource KpTextSecondary}" />
+        </StackPanel>
+      </ScrollViewer>
+    </Border>
+
+    <TextBlock Grid.Row="8" Name="AttributionText" Text="{Binding Attribution}" TextWrapping="Wrap" FontSize="12"
+               Margin="0,6,0,0" Foreground="{DynamicResource KpTextMuted}" />
+
+    <StackPanel Grid.Row="9" Spacing="2">
+      <TextBlock Name="ExplainerText" Text="{Binding Explainer}" TextWrapping="Wrap" FontSize="12"
+                 Foreground="{DynamicResource KpTextSecondary}" />
+      <TextBlock Name="OnceOnlyText" Text="{Binding OnceOnlyText}" TextWrapping="Wrap" FontSize="12"
+                 IsVisible="{Binding OnceOnlyText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                 Foreground="{DynamicResource KpTextSecondary}" />
+    </StackPanel>
+
+    <StackPanel Grid.Row="10"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Bottom"
+                Spacing="8">
+      <Button Name="Deny"
+              Content="Deny"
+              Width="90"
+              IsCancel="True"
+              Command="{Binding DenyCommand}" />
+      <Button Name="AllowOnce"
+              Content="Allow once"
+              Width="110"
+              Command="{Binding AllowOnceCommand}" />
+      <Button Name="Approve"
+              Content="{Binding TimedLabel}"
+              MinWidth="150"
+              IsVisible="{Binding OffersTimed}"
+              Command="{Binding ApproveCommand}" />
+    </StackPanel>
+
+    <TextBlock Grid.Row="11"
+               Name="TimedCaptionText"
+               Text="{Binding TimedCaption}"
+               TextWrapping="Wrap"
+               Margin="0,6,0,0"
+               FontSize="12"
+               Foreground="{DynamicResource KpTextMuted}" />
+
+  </Grid>
+
+</Window>

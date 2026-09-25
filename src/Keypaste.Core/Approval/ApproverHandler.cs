@@ -1,4 +1,5 @@
 using Keypaste.Core.Audit;
+using Keypaste.Core.Clients;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Policy;
 
@@ -48,6 +49,7 @@ public sealed class ApproverHandler
     private readonly PolicyGate _policy;
     private readonly Action<string>? _narrate;
     private readonly Func<EntryName, bool> _requiresLiveApproval;
+    private readonly ClientPolicySource? _clients;
 
     /// <summary>Builds the handler over its five seams.</summary>
     /// <param name="source">Where entries are resolved and one field is read.</param>
@@ -60,6 +62,10 @@ public sealed class ApproverHandler
     /// Which entries are asked about every time, with no grant and no policy release; null means
     /// <see cref="EnvProfileNames.RequiresLiveApproval"/>, so a host that forgets it still asks live
     /// about a protected profile.
+    /// </param>
+    /// <param name="clients">
+    /// The per-client policies in <c>clients.toml</c>, or null to hold every client to
+    /// <see cref="ClientPolicy.SessionGrants"/>, which is what keypaste did before they existed.
     /// </param>
     /// <exception cref="ArgumentNullException">Any of the five seams is null.</exception>
     /// <remarks>
@@ -75,7 +81,8 @@ public sealed class ApproverHandler
         GrantCache grants,
         PolicyGate policy,
         Action<string>? narrate = null,
-        Func<EntryName, bool>? requiresLiveApproval = null)
+        Func<EntryName, bool>? requiresLiveApproval = null,
+        ClientPolicySource? clients = null)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(lister);
@@ -90,6 +97,24 @@ public sealed class ApproverHandler
         _policy = policy;
         _narrate = narrate;
         _requiresLiveApproval = requiresLiveApproval ?? EnvProfileNames.RequiresLiveApproval;
+        _clients = clients;
+    }
+
+    /// <summary>The policy a bridge with this label is held to now.</summary>
+    /// <param name="label">The bridge's raw <c>--client-label</c>, or null.</param>
+    /// <param name="policy">Its policy, when the file could be used.</param>
+    /// <param name="problem">Why <c>clients.toml</c> could not be used, otherwise empty.</param>
+    /// <returns>False only for a clients file that cannot be read or parsed, which refuses every release.</returns>
+    public bool TryPolicyFor(string? label, out ClientPolicy policy, out string problem)
+    {
+        if (_clients is null)
+        {
+            policy = ClientPolicy.SessionGrants;
+            problem = string.Empty;
+            return true;
+        }
+
+        return _clients.TryFor(label, out policy, out problem);
     }
 
     /// <summary>Which entry names may be shown under the bridge's exposure.</summary>
@@ -144,6 +169,19 @@ public sealed class ApproverHandler
             return Refused(AuditMethod.Failed, $"the exposure this bridge was configured with is not usable: {globError}");
         }
 
+        // Before anything is resolved, so a client held to inject-only learns nothing of the vault
+        // from a credential request, and before the grant cache, so a grant it held earlier serves nothing.
+        if (!TryPolicyFor(request.ClientLabel, out var clientPolicy, out var clientsProblem))
+        {
+            _narrate?.Invoke($"refused a request: the clients file is not usable: {clientsProblem}");
+            return Refused(AuditMethod.Failed, $"the clients file is not usable: {clientsProblem}");
+        }
+
+        if (clientPolicy == ClientPolicy.InjectOnly)
+        {
+            return Refused(AuditMethod.InjectOnly, "this client's policy is inject only; it may use run, never receive a value");
+        }
+
         if (!_source.TryResolve(request.Entry, out var name, out var failure))
         {
             // A name that resolves to nothing and one outside the exposure get the same answer:
@@ -169,8 +207,12 @@ public sealed class ApproverHandler
         var display = ApprovalPrompt.For(request.ClientName, name, request.Field, request.Reason, 0).Entry;
         var key = new GrantKey(connectionId, handle, request.Field);
 
-        // A protected profile is asked about every time: no grant serves it and no rule releases it.
-        var liveOnly = _requiresLiveApproval(name);
+        // A protected profile, or a client whose policy is Ask every time, is asked about every time:
+        // no grant serves it and no rule releases it.
+        var onceOnly = _requiresLiveApproval(name)
+            ? OnceOnly.ProtectedProfile
+            : clientPolicy == ClientPolicy.AskEveryTime ? OnceOnly.ClientPolicy : OnceOnly.None;
+        var liveOnly = onceOnly != OnceOnly.None;
 
         // Declared before the try so the copy the cache hands out is zeroed on every path — the
         // repo's idiom for a disposable that only exists on one branch.
@@ -232,14 +274,17 @@ public sealed class ApproverHandler
         // The person chooses once or the timed grant on screen, so its length is the approver's
         // ceiling and never the agent's ttl_seconds.
         var grantSeconds = liveOnly ? 0 : _gate.Limits.MaximumTtlSeconds;
-        var prompt = ApprovalPrompt.For(request.ClientName, name, request.Field, request.Reason, grantSeconds, request.ClientLabel);
+        var prompt = ApprovalPrompt.For(request.ClientName, name, request.Field, request.Reason, grantSeconds, request.ClientLabel) with
+        {
+            OnceOnly = onceOnly,
+        };
 
         var answer = await _gate.AskAsync(CooldownKey(key), prompt, cancellationToken).ConfigureAwait(false);
 
         if (!answer.Releases())
         {
             _narrate?.Invoke($"refused {display} for {prompt.Client}: {Explain(answer)}");
-            return Refused(Method(answer), Explain(answer), display);
+            return Refused(answer.ToAuditMethod(), Explain(answer), display);
         }
 
         if (Withdrawn(display, cancellationToken) is { } withdrawn)
@@ -456,17 +501,6 @@ public sealed class ApproverHandler
         Reason = reason,
         Entry = entry,
         TtlSeconds = 0,
-    };
-
-    private static AuditMethod Method(ApprovalAnswer answer) => answer switch
-    {
-        ApprovalAnswer.Denied => AuditMethod.Prompt,
-        ApprovalAnswer.TimedOut => AuditMethod.TimedOut,
-        ApprovalAnswer.Cancelled => AuditMethod.Cancelled,
-        ApprovalAnswer.Busy => AuditMethod.Busy,
-        ApprovalAnswer.Cooldown => AuditMethod.Cooldown,
-        ApprovalAnswer.NoChannel => AuditMethod.NoApprover,
-        _ => AuditMethod.Failed,
     };
 
     private static string Explain(ApprovalAnswer answer) => answer switch

@@ -1,4 +1,6 @@
+using System.ComponentModel;
 using Keypaste.Core;
+using Keypaste.Core.Activity;
 
 namespace Keypaste.App.ViewModels;
 
@@ -35,8 +37,75 @@ namespace Keypaste.App.ViewModels;
 /// of a filtered list as well as an unfiltered one.
 /// </para>
 /// </remarks>
-internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fields = MatchedFields.None)
+internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fields = MatchedFields.None) : INotifyPropertyChanged
 {
+    private EntryUseState _use;
+    private string _lastUsedText = string.Empty;
+
+    /// <inheritdoc/>
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    /// <summary>Whether agents use this entry now, recently, or not: the row's dot.</summary>
+    internal EntryUseState Use
+    {
+        get => _use;
+        private set
+        {
+            if (_use != value)
+            {
+                _use = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Use)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsInUse)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsRecent)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsIdle)));
+            }
+        }
+    }
+
+    internal bool IsInUse => _use == EntryUseState.InUse;
+
+    internal bool IsRecent => _use == EntryUseState.Recent;
+
+    internal bool IsIdle => _use == EntryUseState.Idle;
+
+    /// <summary>"in use", "4m ago", "3h ago", "2d ago" or "never"; empty until activity is read.</summary>
+    internal string LastUsedText
+    {
+        get => _lastUsedText;
+        private set
+        {
+            if (!string.Equals(_lastUsedText, value, StringComparison.Ordinal))
+            {
+                _lastUsedText = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LastUsedText)));
+            }
+        }
+    }
+
+    /// <summary>Takes this entry's use from the latest picture, without rebuilding the list.</summary>
+    /// <param name="activity">The picture.</param>
+    /// <param name="now">The time to measure from.</param>
+    internal void Apply(EntryActivity activity, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(activity);
+
+        var use = activity.Use(Name);
+        Use = use.State;
+        LastUsedText = UseText.LastUsed(use, now);
+    }
+
+    /// <summary>Rows are the same row when they name the same entry for the same reason; their use is not identity.</summary>
+    /// <param name="other">The other row.</param>
+    /// <returns>Whether they are equal.</returns>
+    public bool Equals(EntryRow? other) =>
+        other is not null
+        && string.Equals(Title, other.Title, StringComparison.Ordinal)
+        && string.Equals(GroupPath, other.GroupPath, StringComparison.Ordinal)
+        && Fields == other.Fields;
+
+    /// <inheritdoc/>
+    public override int GetHashCode() => HashCode.Combine(Title, GroupPath, Fields);
+
     /// <summary>The row's identity, which is what core reads and writes through.</summary>
     /// <remarks>
     /// Carries the title the vault holds and is never sanitized. <see cref="Path"/> is the two

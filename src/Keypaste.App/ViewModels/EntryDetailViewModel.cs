@@ -1,6 +1,7 @@
 using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.Core;
+using Keypaste.Core.Activity;
 
 namespace Keypaste.App.ViewModels;
 
@@ -33,6 +34,12 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     private string _draftUsername = string.Empty;
     private string _draftUrl = string.Empty;
     private string _draftNotes = string.Empty;
+    private bool _isConfirmingRotate;
+    private string _created = string.Empty;
+    private string _rotated = string.Empty;
+    private EntryAgentAccess? _agentAccess;
+    private string _agentAccessSummary = "None active";
+    private string _lastUsedText = "never";
 
     internal EntryDetailViewModel(
         AppVaultSession session,
@@ -71,6 +78,90 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         EditCommand = new RelayCommand(BeginEdit, () => !IsEditing);
         CancelCommand = new RelayCommand(CancelEdit, () => IsEditing);
         SaveCommand = new RelayCommand(SaveEdit, () => IsEditing);
+        RotateCommand = new RelayCommand(() => IsConfirmingRotate = true, () => !IsConfirmingRotate && !IsEditing);
+        ConfirmRotateCommand = new RelayCommand(ConfirmRotate, () => IsConfirmingRotate);
+        CancelRotateCommand = new RelayCommand(() => IsConfirmingRotate = false, () => IsConfirmingRotate);
+
+        ReadTimes();
+    }
+
+    /// <summary>Replaces the password with a generated one, after asking.</summary>
+    internal RelayCommand RotateCommand { get; }
+
+    internal RelayCommand ConfirmRotateCommand { get; }
+
+    internal RelayCommand CancelRotateCommand { get; }
+
+    /// <summary>Whether the pane is asking whether to rotate.</summary>
+    internal bool IsConfirmingRotate
+    {
+        get => _isConfirmingRotate;
+        private set
+        {
+            if (Set(ref _isConfirmingRotate, value))
+            {
+                RotateCommand.RaiseCanExecuteChanged();
+                ConfirmRotateCommand.RaiseCanExecuteChanged();
+                CancelRotateCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    /// <summary>What the confirm row asks.</summary>
+    internal string RotatePrompt { get; } =
+        $"Replace the value with a new {PasswordGenerator.DefaultLength}-character password? The old one stays in history.";
+
+    /// <summary>When the entry was created, as the metadata row shows it.</summary>
+    internal string Created
+    {
+        get => _created;
+        private set => Set(ref _created, value);
+    }
+
+    /// <summary>When its current password was set, as the metadata row shows it.</summary>
+    internal string Rotated
+    {
+        get => _rotated;
+        private set => Set(ref _rotated, value);
+    }
+
+    /// <summary>What agents did with this entry, or null before the first reading.</summary>
+    internal EntryAgentAccess? AgentAccess
+    {
+        get => _agentAccess;
+        private set => Set(ref _agentAccess, value);
+    }
+
+    /// <summary>The Agent access card's one line.</summary>
+    internal string AgentAccessSummary
+    {
+        get => _agentAccessSummary;
+        private set => Set(ref _agentAccessSummary, value);
+    }
+
+    /// <summary>When an agent last received it: "in use", "4m ago" or "never".</summary>
+    internal string LastUsedText
+    {
+        get => _lastUsedText;
+        private set => Set(ref _lastUsedText, value);
+    }
+
+    /// <summary>Takes the latest picture of what agents did, never a value.</summary>
+    /// <param name="activity">The picture.</param>
+    internal void Apply(EntryActivity activity)
+    {
+        ArgumentNullException.ThrowIfNull(activity);
+
+        if (_entryPath.Length == 0)
+        {
+            return;
+        }
+
+        var now = _session.Clock.GetUtcNow();
+        var access = activity.Access(Name);
+        AgentAccess = access;
+        AgentAccessSummary = UseText.Summary(access, now);
+        LastUsedText = UseText.LastUsed(access.Use, now);
     }
 
     /// <summary>Where a failure goes. Owned by the entries screen, which draws the banner.</summary>
@@ -398,6 +489,62 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
 
     private async Task CopyUsernameAsync() =>
         await _clipboard.CopyPlainAsync(Username, "Username").ConfigureAwait(true);
+
+    private void ReadTimes()
+    {
+        if (_session.Unlocked is not { } vault)
+        {
+            return;
+        }
+
+        try
+        {
+            var now = _session.Clock.GetUtcNow();
+            Created = UseText.Dated(vault.ReadTimes(Name)?.Created, now);
+            Rotated = UseText.Dated(EntryRotation.LastRotated(vault, Name), now);
+        }
+        catch (VaultException e)
+        {
+            Report(e.Message);
+        }
+    }
+
+    private void ConfirmRotate()
+    {
+        IsConfirmingRotate = false;
+
+        if (_session.Unlocked is not { } vault)
+        {
+            Report("The vault is locked.");
+            return;
+        }
+
+        try
+        {
+            if (EntryRotation.Rotate(vault, Name, SecretRecipe.Default) != RotateOutcome.Rotated)
+            {
+                Report($"'{_entryPath}' could not be rotated here.");
+                return;
+            }
+
+            vault.Save();
+        }
+        catch (VaultChangedOnDiskException)
+        {
+            Report("Something else changed this vault since you opened it. Lock and unlock to see it, then make your change again.");
+            return;
+        }
+        catch (VaultException e)
+        {
+            Report(e.Message);
+            return;
+        }
+
+        Reload();
+        ReadTimes();
+        History.Refresh();
+        Report(null);
+    }
 
     private void BeginEdit()
     {

@@ -224,6 +224,7 @@ check_integration() {
   esac
   integration_script scripts/verify-mcp-stdio.sh
   integration_script scripts/verify-approval-e2e.sh
+  integration_script scripts/verify-mcp-run.sh
   integration_script scripts/verify-policy-e2e.sh
   integration_script scripts/verify-log-chain.sh
   integration_script scripts/verify-demo.sh
@@ -267,7 +268,8 @@ profile_compat() {
 # Backend tests read workflows, scripts and the release definition, so those paths select backend too.
 profiles_for_path() {
   case "$1" in
-    src/Keypaste.App/*|tests/Keypaste.App.Tests/*|tests/Keypaste.MinimizeObserver/*|tests/Keypaste.AppDriver/*|tests/Keypaste.FakeMcpClient/*|tests/Keypaste.EnvReporter/*) echo desktop ;;
+    src/Keypaste.App/*|tests/Keypaste.App.Tests/*|tests/Keypaste.MinimizeObserver/*|tests/Keypaste.AppDriver/*|tests/Keypaste.FakeMcpClient/*) echo desktop ;;
+    tests/Keypaste.EnvReporter/*) echo backend desktop ;;
     tests/Keypaste.Consistency.Tests/*|keypaste.app.slnx) echo desktop ;;
     src/Keypaste.Cli/Keypaste.Cli.csproj) echo scripts backend integration desktop ;;
     src/*|third_party/*) echo backend integration desktop ;;

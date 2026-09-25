@@ -156,9 +156,12 @@
             <StackPanel Orientation="Horizontal"
                         Spacing="6"
                         Margin="8,0"
-                        ToolTip.Tip="{Binding VaultPath}"
+                        ToolTip.Tip="{Binding VaultStatusDetail}"
                         WindowDecorationProperties.ElementRole="User">
-              <Border Classes="dot ok" />
+              <Border Classes="dot"
+                      Classes.ok="{Binding VaultStatusOk}"
+                      Classes.warn="{Binding VaultStatusAccent}"
+                      Classes.danger="{Binding VaultStatusDanger}" />
               <TextBlock Classes="mono sm muted"
                          Text="{Binding VaultStatus}"
                          VerticalAlignment="Center" />

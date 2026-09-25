@@ -1,6 +1,7 @@
 using System.Globalization;
 using Keypaste.App.Session;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Clients;
 
 namespace Keypaste.App.ViewModels;
 
@@ -31,6 +32,13 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
 
     private readonly AppAuthority? _authority;
     private readonly string _auditPath;
+    private readonly string _clientsPath;
+    private readonly TimeProvider _clock;
+    private IReadOnlyList<AuditEntry> _auditEntries = [];
+    private (long Length, DateTime Written)? _auditRead;
+    private IReadOnlyList<ClientCardRow> _clients = [];
+    private string _clientsSignature = string.Empty;
+    private string _clientsProblem = string.Empty;
     private readonly Action<Action> _post;
     private readonly ITimer _timer;
 
@@ -53,7 +61,17 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
         _authority = authority;
         Connect = authority is null ? null : new ConnectClientViewModel(authority.Session, connector ?? ClientConnector.ForThisProcess());
         _auditPath = KeypasteHome.AuditPath(home);
+        _clientsPath = KeypasteHome.ClientsPath(home);
+        _clock = clock ?? TimeProvider.System;
         _post = post ?? (run => run());
+        SetPolicyCommand = new RelayCommand<PolicyChoice>(chosen =>
+        {
+            if (chosen is not null)
+            {
+                SetPolicy(chosen.Row, chosen.Policy);
+            }
+        });
+        ResetClientsCommand = new RelayCommand(ResetClients, () => _clientsProblem.Length > 0);
 
         RefreshCommand = new RelayCommand(Refresh);
         RevokeCommand = new RelayCommand<ActivityRow>(Revoke, row => row?.Id is not null);
@@ -61,8 +79,36 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
 
         Refresh();
 
-        _timer = (clock ?? TimeProvider.System).CreateTimer(_ => _post(Tick), null, _tick, _tick);
+        _timer = _clock.CreateTimer(_ => _post(Tick), null, _tick, _tick);
     }
+
+    /// <summary>The MCP clients of this vault, with the policy each is held to; the <c>*</c> card last.</summary>
+    internal IReadOnlyList<ClientCardRow> Clients => _clients;
+
+    /// <summary>The words each policy is chosen by.</summary>
+    internal static IReadOnlyList<string> PolicyOptions => ClientCardRow.PolicyOptions;
+
+    /// <summary>Gives a client a policy, writing <c>clients.toml</c>.</summary>
+    internal RelayCommand<PolicyChoice> SetPolicyCommand { get; }
+
+    /// <summary>Replaces a clients file that cannot be read with an empty one.</summary>
+    internal RelayCommand ResetClientsCommand { get; }
+
+    /// <summary>Why <c>clients.toml</c> cannot be used, or empty. While it is set, every agent request is refused.</summary>
+    internal string ClientsProblem
+    {
+        get => _clientsProblem;
+        private set
+        {
+            if (Set(ref _clientsProblem, value))
+            {
+                Raise(nameof(HasClientsProblem));
+                ResetClientsCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    internal bool HasClientsProblem => _clientsProblem.Length > 0;
 
     /// <summary>Connecting a client to this vault, and checking the connection.</summary>
     internal ConnectClientViewModel? Connect { get; }
@@ -161,7 +207,12 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
             var activity = _authority!.Activity;
             session = serving.Session;
             Unavailable = string.Empty;
-            _waiting = [.. activity.Waiting.Select((waiting, i) => ActivityRow.Waiting(i + 1, waiting))];
+            _waiting =
+            [
+                .. activity.Waiting.Select((waiting, i) => ActivityRow.Waiting(i + 1, waiting)),
+                .. activity.WaitingRuns.Select((waiting, i) => ActivityRow.WaitingRun(activity.Waiting.Count + i + 1, waiting)),
+                .. activity.WaitingEnvs.Select((waiting, i) => ActivityRow.WaitingEnv(activity.Waiting.Count + activity.WaitingRuns.Count + i + 1, waiting)),
+            ];
             _grants =
             [
                 .. activity.Grants.Select((grant, i) => ActivityRow.Granted(i + 1, grant)),
@@ -182,6 +233,110 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
         RevokeAllCommand.RaiseCanExecuteChanged();
 
         ReadHistory(session, forceHistory);
+        ReadClients(forceHistory);
+    }
+
+    /// <summary>Builds the client cards from who is attached, this vault's audit lines and <c>clients.toml</c>.</summary>
+    private void ReadClients(bool force)
+    {
+        var file = new FileInfo(_auditPath);
+        (long, DateTime)? stamp = file.Exists ? (file.Length, file.LastWriteTimeUtc) : null;
+
+        if (force || stamp != _auditRead)
+        {
+            _auditRead = stamp;
+            _auditEntries = stamp is not null && AuditReader.TryRead(_auditPath, out var entries, out _, out _) ? entries : [];
+        }
+
+        ClientPolicies policies;
+
+        if (ClientPolicies.TryLoad(_clientsPath, out var loaded, out var problem))
+        {
+            policies = loaded;
+            ClientsProblem = string.Empty;
+        }
+        else
+        {
+            policies = ClientPolicies.Empty;
+            ClientsProblem = $"{_clientsPath}: {problem}. Every agent request is refused until it is fixed, deleted or reset.";
+        }
+
+        var now = _clock.GetUtcNow();
+        var cards = McpClientCards.Build(
+            _authority?.Clients ?? [],
+            _auditEntries,
+            _authority?.Session.Identity?.Key ?? string.Empty,
+            policies,
+            now);
+
+        var signature = string.Join('\n', cards.Select(card => $"{card.Key}|{card.Status}|{card.Connections}|{card.Policy}|{card.LastSeen}"))
+            + "\n*|" + policies.For(ClientPolicies.AnyClient) + "|" + ClientsProblem;
+
+        if (!force && string.Equals(signature, _clientsSignature, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _clientsSignature = signature;
+        _clients =
+        [
+            .. cards.Select(card => new ClientCardRow(card, card.Policy, now, (row, policy) => SetPolicy(row, policy))),
+            new ClientCardRow(null, policies.For(ClientPolicies.AnyClient), now, (row, policy) => SetPolicy(row, policy)),
+        ];
+        Raise(nameof(Clients));
+    }
+
+    private void SetPolicy(ClientCardRow row, ClientPolicy policy)
+    {
+        if (row.Label is not { } label || !row.CanSetPolicy)
+        {
+            return;
+        }
+
+        if (!ClientPolicies.TryLoad(_clientsPath, out var current, out var problem))
+        {
+            ClientsProblem = $"{_clientsPath}: {problem}. Every agent request is refused until it is fixed, deleted or reset.";
+            return;
+        }
+
+        var before = row.Label == ClientPolicies.AnyClient ? current.For(null) : current.For(label);
+
+        if (!ClientPolicies.TrySave(_clientsPath, current.With(label, policy), out var error))
+        {
+            ClientsProblem = $"{_clientsPath} could not be written: {error}";
+            return;
+        }
+
+        row.Held(policy);
+
+        // A stricter policy also ends what that client already holds, so this list matches it.
+        // The catch-all row cannot name the clients it covers, so it ends every grant instead.
+        if (policy != ClientPolicy.SessionGrants && policy != before)
+        {
+            if (label == ClientPolicies.AnyClient)
+            {
+                _authority?.RevokeAll();
+            }
+            else
+            {
+                _authority?.RevokeClient(label);
+            }
+        }
+
+        Read(forceHistory: false);
+    }
+
+    private void ResetClients()
+    {
+        if (ClientPolicies.TrySave(_clientsPath, ClientPolicies.Empty, out var error))
+        {
+            ClientsProblem = string.Empty;
+            ReadClients(force: true);
+        }
+        else
+        {
+            ClientsProblem = $"{_clientsPath} could not be written: {error}";
+        }
     }
 
     private void ReadHistory(string? session, bool force)

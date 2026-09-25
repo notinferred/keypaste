@@ -303,8 +303,16 @@
                BorderThickness="0">
         <ListBox.ItemTemplate>
           <DataTemplate x:DataType="vm:EntryRow">
-            <Grid ColumnDefinitions="*,Auto,Auto">
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto">
               <TextBlock Grid.Column="0" Text="{Binding DisplayTitle}" TextTrimming="CharacterEllipsis" />
+              <!-- When an agent last received it: amber in use, green recent, grey idle. A time, never a value. -->
+              <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="5" Margin="12,0,0,0"
+                          IsVisible="{Binding LastUsedText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                <Border Classes="dot" Classes.warn="{Binding IsInUse}" Classes.ok="{Binding IsRecent}" Classes.idle="{Binding IsIdle}"
+                        VerticalAlignment="Center" />
+                <TextBlock Text="{Binding LastUsedText}" FontSize="11" FontFamily="{DynamicResource KpMono}"
+                           Foreground="{DynamicResource KpTextMuted}" />
+              </StackPanel>
               <!-- Why the row is in a result whose reason is nowhere else on it. A field name from
                    a fixed vocabulary; the value that matched is never drawn. -->
               <TextBlock Grid.Column="1"
@@ -393,9 +401,40 @@
               <StackPanel Orientation="Horizontal" Spacing="8"
                           IsVisible="{Binding !IsEditing}">
                 <Button Content="Edit" Command="{Binding EditCommand}" />
+                <Button x:Name="RotateFromPane" Content="Rotate" Command="{Binding RotateCommand}" />
                 <Button x:Name="OrganizeFromPane" Content="Rename or move"
                         Command="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).OrganizeCommand}" />
               </StackPanel>
+
+              <!-- Rotate asks first: the old value stays in history and the new one is never shown here. -->
+              <StackPanel Spacing="6" IsVisible="{Binding IsConfirmingRotate}">
+                <TextBlock Text="{Binding RotatePrompt}" TextWrapping="Wrap" FontSize="12"
+                           Foreground="{DynamicResource KpTextPrimary}" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button x:Name="ConfirmRotate" Content="Rotate" Command="{Binding ConfirmRotateCommand}" />
+                  <Button Content="Cancel" Command="{Binding CancelRotateCommand}" />
+                </StackPanel>
+              </StackPanel>
+
+              <!-- Agent access: who received this entry and what grant covers it now, never a value. -->
+              <Border Theme="{StaticResource KpCard}" IsVisible="{Binding !IsEditing}">
+                <StackPanel Spacing="4">
+                  <TextBlock Text="Agent access" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
+                  <TextBlock x:Name="AgentAccessSummary" Text="{Binding AgentAccessSummary}" TextWrapping="Wrap"
+                             Foreground="{DynamicResource KpTextPrimary}" />
+                  <TextBlock Text="{Binding LastUsedText, StringFormat='last used {0}'}" FontSize="11"
+                             FontFamily="{DynamicResource KpMono}" Foreground="{DynamicResource KpTextMuted}" />
+                </StackPanel>
+              </Border>
+
+              <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto" IsVisible="{Binding !IsEditing}">
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="Created" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
+                <TextBlock Grid.Row="0" Grid.Column="1" x:Name="CreatedText" Text="{Binding Created}" FontSize="11"
+                           FontFamily="{DynamicResource KpMono}" Foreground="{DynamicResource KpTextSecondary}" />
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="Rotated" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
+                <TextBlock Grid.Row="1" Grid.Column="1" x:Name="RotatedText" Text="{Binding Rotated}" FontSize="11"
+                           FontFamily="{DynamicResource KpMono}" Foreground="{DynamicResource KpTextSecondary}" />
+              </Grid>
 
               <!-- History. Read when the toggle asks for it, never on selection: one reading
                    materialises every superseded password (EntryHistoryViewModel). -->

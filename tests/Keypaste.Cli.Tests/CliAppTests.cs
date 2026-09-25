@@ -117,7 +117,7 @@ public sealed class CliAppTests
 
         Assert.Equal(CliApp.ExitUsageError, harness.Run("mcp"));
         Assert.Empty(harness.Out);
-        Assert.StartsWith("usage: keypaste mcp <serve|setup> [options]", harness.Err, StringComparison.Ordinal);
+        Assert.StartsWith("usage: keypaste mcp <serve|setup|policy> [options]", harness.Err, StringComparison.Ordinal);
         Assert.Contains("the MCP server itself is keypaste-mcp", harness.Err, StringComparison.Ordinal);
     }
 
@@ -132,7 +132,7 @@ public sealed class CliAppTests
             .Select(line => line.Split(' ', StringSplitOptions.RemoveEmptyEntries)[0])
             .ToList();
 
-        Assert.Equal(18, verbs.Count);
+        Assert.Equal(19, verbs.Count);
 
         foreach (var verb in verbs)
         {
@@ -155,6 +155,7 @@ public sealed class CliAppTests
             "SECRETS",
             "  get       copy a secret to the clipboard, or print it with --reveal",
             "  set       create or update a secret",
+            "  rotate    replace a secret with a new generated one",
             "  run       run a command with secrets in its environment",
             "  env       import, export and diff .env profiles",
             "",
@@ -180,7 +181,7 @@ public sealed class CliAppTests
             $"  --vault <path>    which vault to use, or set {VaultLocator.EnvironmentVariable}",
             $"  --keyfile <path>  the keyfile it needs too, or set {VaultLocator.KeyfileEnvironmentVariable}",
             "  --json            machine-readable output from ls, env ls, log, grants,",
-            "                    token ls and share ls",
+            "                    token ls, share ls and mcp policy",
             "  -h, --help        help for any command",
             "",
             "  agent is mcp serve, setup is mcp setup, version prints the version.",

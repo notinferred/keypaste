@@ -55,7 +55,7 @@ public sealed class SessionEnvResolver
     /// <param name="confirm">Asks about the set's names and answers whether to release it, or null to ask nobody.</param>
     /// <param name="cancellationToken">Withdraws the request.</param>
     /// <returns>The set, or why nothing was released.</returns>
-    public async ValueTask<EnvResolved> ResolveAsync(
+    public ValueTask<EnvResolved> ResolveAsync(
         string project,
         string profile,
         IReadOnlyList<string>? keys,
@@ -65,12 +65,43 @@ public sealed class SessionEnvResolver
         ArgumentNullException.ThrowIfNull(project);
         ArgumentNullException.ThrowIfNull(profile);
 
+        return ResolveAsync(vault => EnvResolution.Resolve(vault, project, profile, keys, _clock), project, profile, confirm, cancellationToken);
+    }
+
+    /// <summary>Resolves a reference document's variables, asking <paramref name="confirm"/> about their names first when given.</summary>
+    /// <param name="document">A document with no problems and no literals.</param>
+    /// <param name="confirm">Asks about the names and answers whether to release them, or null to ask nobody.</param>
+    /// <param name="cancellationToken">Withdraws the request.</param>
+    /// <returns>The variables in the document's order, or why none of them.</returns>
+    /// <remarks>The same read, confirm, read again, same names, commit flow as a set.</remarks>
+    public ValueTask<EnvResolved> ResolveReferencesAsync(
+        EnvReferenceDocument document,
+        Func<EnvPreview, CancellationToken, ValueTask<bool>>? confirm,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+
+        return ResolveAsync(
+            vault => EnvReferenceResolution.Resolve(vault, document, _clock),
+            EnvReferenceResolution.MixedProject,
+            EnvReferenceResolution.MixedProfile,
+            confirm,
+            cancellationToken);
+    }
+
+    private async ValueTask<EnvResolved> ResolveAsync(
+        Func<Vault, EnvResolved> resolve,
+        string project,
+        string profile,
+        Func<EnvPreview, CancellationToken, ValueTask<bool>>? confirm,
+        CancellationToken cancellationToken)
+    {
         if (_lifetime() is not { IsLive: true } lifetime)
         {
             return Locked(project, profile);
         }
 
-        var resolved = Read(lifetime, project, profile, keys);
+        var resolved = Read(lifetime, resolve, project, profile);
 
         if (resolved.Outcome != EnvOutcome.Resolved)
         {
@@ -89,15 +120,15 @@ public sealed class SessionEnvResolver
             }
             catch (OperationCanceledException) when (withdrawn.IsCancellationRequested)
             {
-                return lifetime.IsLive ? EnvResolved.Refused(project, EnvOutcome.Declined, profile: profile) : Locked(project, profile);
+                return lifetime.IsLive ? EnvResolved.Refused(preview.Project, EnvOutcome.Declined, profile: preview.Profile) : Locked(project, profile);
             }
 
             if (!confirmed)
             {
-                return EnvResolved.Refused(project, EnvOutcome.Declined, profile: profile);
+                return EnvResolved.Refused(preview.Project, EnvOutcome.Declined, profile: preview.Profile);
             }
 
-            resolved = Read(lifetime, project, profile, keys);
+            resolved = Read(lifetime, resolve, project, profile);
 
             if (resolved.Outcome != EnvOutcome.Resolved)
             {
@@ -106,14 +137,14 @@ public sealed class SessionEnvResolver
 
             if (!resolved.Preview.Keys.SequenceEqual(preview.Keys, StringComparer.Ordinal))
             {
-                return EnvResolved.Refused(project, EnvOutcome.ChangedWhileAsked, profile: profile);
+                return EnvResolved.Refused(preview.Project, EnvOutcome.ChangedWhileAsked, profile: preview.Profile);
             }
         }
 
         return lifetime.TryCommit() ? resolved : Locked(project, profile);
     }
 
-    private EnvResolved Read(SessionLifetime lifetime, string project, string profile, IReadOnlyList<string>? keys)
+    private EnvResolved Read(SessionLifetime lifetime, Func<Vault, EnvResolved> resolve, string project, string profile)
     {
         if (_vaultFor(lifetime) is not { } vault)
         {
@@ -122,7 +153,7 @@ public sealed class SessionEnvResolver
 
         try
         {
-            return EnvResolution.Resolve(vault, project, profile, keys, _clock);
+            return resolve(vault);
         }
         catch (ObjectDisposedException)
         {

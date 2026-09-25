@@ -577,6 +577,81 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     }
 
     /// <summary>Answers however the test says, and counts how often it was asked.</summary>
+    /// <summary>
+    /// A run, whatever the person answers: the injected value is the password sentinel, the child
+    /// prints it in every form the scrubber knows, and it reaches neither the result, the wire nor the
+    /// log. A reference outside the exposure starts nothing and names nothing.
+    /// </summary>
+    [Theory]
+    [InlineData(ApprovalAnswer.ApprovedOnce)]
+    [InlineData(ApprovalAnswer.Approved)]
+    [InlineData(ApprovalAnswer.Denied)]
+    [InlineData(ApprovalAnswer.TimedOut)]
+    public async Task ARun_LeavesNoValueAnywhere_WhateverTheAnswer(ApprovalAnswer answer)
+    {
+        _human.Answer = answer;
+        var pipe = "keypaste-hygiene-run-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
+        using var envGrants = new EnvGrantCache(TimeProvider.System);
+        using var gate = new ApprovalGate(_human, TimeProvider.System, ApprovalLimits.Default);
+        using var grants = new GrantCache(TimeProvider.System);
+        using var lifetime = new Keypaste.Core.Ownership.SessionLifetime(TestSession.Id);
+        var authority = new Keypaste.Core.Ownership.SessionAuthority(
+            Keypaste.Core.Ownership.VaultIdentity.Of(Path.GetDirectoryName(_vault!.Path)!, _vault.Path),
+            () => lifetime,
+            new ApproverHandler(new VaultCredentialSource(() => _vault), new VaultEntryNameLister(() => _vault), gate, grants, PolicyGate.None),
+            new Keypaste.Core.Ownership.SessionEnvironments(gate, _ => _vault, TimeProvider.System, envGrants));
+        using var stop = new CancellationTokenSource();
+        using var listener = new ApproverListener(pipe, authority);
+        var serving = listener.RunAsync(stop.Token);
+
+        await using (var harness = new McpHarness(pipe, _vault.Path))
+        {
+            var client = await harness.StartAsync("--allow-run");
+            var work = Directory.CreateDirectory(Path.Combine(_directory, "work")).FullName;
+
+            var run = await client.CallToolAsync(
+                ToolText.RunToolName,
+                new Dictionary<string, object?>
+                {
+                    ["command"] = new[] { Keypaste.Core.Tests.Reporter.Path, "--stdout", "STRIPE_KEY", "--forms", "STRIPE_KEY", "--env" },
+                    ["directory"] = work,
+                    ["project"] = "dev",
+                    ["reason"] = "print the key to prove it cannot be read back",
+                },
+                cancellationToken: Token);
+
+            var outside = await client.CallToolAsync(
+                ToolText.RunToolName,
+                new Dictionary<string, object?>
+                {
+                    ["command"] = new[] { Keypaste.Core.Tests.Reporter.Path, "--stdout", "BANK" },
+                    ["directory"] = work,
+                    ["env"] = new Dictionary<string, string> { ["BANK"] = "kp:///personal/bank" },
+                    ["reason"] = "read a bank password",
+                },
+                cancellationToken: Token);
+
+            Assert.Equal(!answer.Releases(), run.IsError);
+            Assert.True(outside.IsError);
+
+            foreach (var sentinel in _everySentinel)
+            {
+                AssertNowhere(harness, sentinel, TextOf(run) + TextOf(outside), $"run answered {answer}");
+            }
+        }
+
+        await stop.CancelAsync();
+
+        try
+        {
+            await serving;
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or IOException or ObjectDisposedException)
+        {
+            // Tearing the listener down is how it stops.
+        }
+    }
+
     private sealed class ScriptedHuman : IApprovalChannel
     {
         internal ApprovalAnswer Answer { get; set; } = ApprovalAnswer.Denied;
@@ -592,6 +667,12 @@ public sealed class SecretHygieneTests : IAsyncLifetime
             return Throw
                 ? throw new InvalidOperationException("the approval channel is not available")
                 : ValueTask.FromResult(Answer);
+        }
+
+        public ValueTask<ApprovalAnswer> AskAsync(RunPrompt prompt, CancellationToken cancellationToken)
+        {
+            Asked++;
+            return ValueTask.FromResult(Answer);
         }
     }
 }

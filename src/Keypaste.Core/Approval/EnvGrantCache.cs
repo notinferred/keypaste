@@ -85,14 +85,29 @@ public sealed class EnvGrantCache : IDisposable
     /// <param name="command">The command, as the prompt showed it.</param>
     /// <param name="keys">The variable names the person approved.</param>
     /// <param name="ttl">How long the grant lasts.</param>
+    /// <param name="client">The agent client it is given to, as the prompt showed it, or null for <c>keypaste run --session</c>.</param>
+    /// <param name="label">The bridge's raw <c>--client-label</c>, or null.</param>
+    /// <param name="entries">The entries it releases, or null for each key of <paramref name="project"/>'s <paramref name="profile"/>.</param>
     /// <remarks>A cache that has been disposed keeps nothing: its lifetime has ended.</remarks>
-    public void Store(string key, string project, string profile, string command, IReadOnlyList<string> keys, TimeSpan ttl)
+    public void Store(
+        string key,
+        string project,
+        string profile,
+        string command,
+        IReadOnlyList<string> keys,
+        TimeSpan ttl,
+        string? client = null,
+        string? label = null,
+        IReadOnlyList<EntryName>? entries = null)
     {
         ArgumentNullException.ThrowIfNull(key);
         ArgumentNullException.ThrowIfNull(project);
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(keys);
+
+        IReadOnlyList<EntryName> released = entries
+            ?? [.. keys.Select(name => new EntryName(EnvProfileNames.GroupPath(project, profile), name))];
 
         lock (_gate)
         {
@@ -106,7 +121,12 @@ public sealed class EnvGrantCache : IDisposable
                 Forget(key, replaced);
             }
 
-            var grant = new Grant(project, profile, command, [.. keys], Deadline.Starting(_clock, ttl));
+            var grant = new Grant(project, profile, command, [.. keys], Deadline.Starting(_clock, ttl))
+            {
+                Client = client,
+                Label = label,
+                Entries = [.. released],
+            };
             _grants[key] = grant;
             grant.Expiry = _clock.CreateTimer(_ => Expire(key, grant), null, ttl, Timeout.InfiniteTimeSpan);
         }
@@ -121,7 +141,12 @@ public sealed class EnvGrantCache : IDisposable
             return _grants
                 .Where(pair => !pair.Value.Expires.HasExpired(_clock))
                 .Select(pair => new EnvGrantInForce(
-                    pair.Key, pair.Value.Project, pair.Value.Profile, pair.Value.Command, pair.Value.Expires.Remaining(_clock)))
+                    pair.Key, pair.Value.Project, pair.Value.Profile, pair.Value.Command, pair.Value.Expires.Remaining(_clock))
+                {
+                    Client = pair.Value.Client,
+                    Label = pair.Value.Label,
+                    Entries = [.. pair.Value.Entries.Select(ApprovalPrompt.Shown)],
+                })
                 .OrderBy(grant => grant.Remaining)
                 .ToList();
         }
@@ -140,6 +165,34 @@ public sealed class EnvGrantCache : IDisposable
                 Forget(key, grant);
             }
         }
+    }
+
+    /// <summary>Ends every grant whose key starts with <paramref name="prefix"/>, such as every run grant of one connection.</summary>
+    /// <param name="prefix">The start of the keys to end.</param>
+    public void RevokePrefix(string prefix)
+    {
+        ArgumentNullException.ThrowIfNull(prefix);
+
+        RevokeWhere((key, _) => key.StartsWith(prefix, StringComparison.Ordinal));
+    }
+
+    /// <summary>Ends every grant given to a bridge started with this <c>--client-label</c>.</summary>
+    /// <param name="label">The raw label.</param>
+    public void RevokeLabel(string label)
+    {
+        ArgumentNullException.ThrowIfNull(label);
+
+        RevokeWhere((_, grant) => string.Equals(grant.Label, label, StringComparison.Ordinal));
+    }
+
+    /// <summary>Ends every grant releasing an entry an edit touched, so no value the vault no longer holds there is served again (D-0318).</summary>
+    /// <param name="edit">What the edit touched.</param>
+    public void RevokeEntries(VaultEdit edit)
+    {
+        ArgumentNullException.ThrowIfNull(edit);
+
+        var touched = edit.Entries.ToHashSet();
+        RevokeWhere((_, grant) => edit.IsEverything || grant.Entries.Any(touched.Contains));
     }
 
     /// <summary>Ends every grant.</summary>
@@ -175,6 +228,17 @@ public sealed class EnvGrantCache : IDisposable
         }
     }
 
+    private void RevokeWhere(Func<string, Grant, bool> ends)
+    {
+        lock (_gate)
+        {
+            foreach (var (key, grant) in _grants.Where(pair => ends(pair.Key, pair.Value)).ToList())
+            {
+                Forget(key, grant);
+            }
+        }
+    }
+
     /// <summary>Forgets the grant a timer was armed for, if it is still the one under that key.</summary>
     private void Expire(string key, Grant armed)
     {
@@ -206,5 +270,11 @@ public sealed class EnvGrantCache : IDisposable
         internal Deadline Expires { get; } = expires;
 
         internal ITimer? Expiry { get; set; }
+
+        internal string? Client { get; init; }
+
+        internal string? Label { get; init; }
+
+        internal IReadOnlyList<EntryName> Entries { get; init; } = [];
     }
 }

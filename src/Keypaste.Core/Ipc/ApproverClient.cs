@@ -238,6 +238,20 @@ public sealed class ApproverClient : IAsyncDisposable
         return frame is not null && ApproverProtocol.TryDecode(frame, out EnvReply? reply) ? reply : null;
     }
 
+    /// <summary>Asks for the secrets an agent's run would inject.</summary>
+    /// <param name="request">The program, command, directory, variables and reason.</param>
+    /// <param name="cancellationToken">Cancels the exchange, which withdraws the question.</param>
+    /// <returns>The reply, or null when the owner could not be reached or understood.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    public async ValueTask<RunReply?> ReleaseRunAsync(RunRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken).ConfigureAwait(false);
+
+        return frame is not null && ApproverProtocol.TryDecode(frame, out RunReply? reply) ? reply : null;
+    }
+
     private async ValueTask<byte[]?> ExchangeAsync(byte[] request, CancellationToken cancellationToken)
     {
         if (_disposed)

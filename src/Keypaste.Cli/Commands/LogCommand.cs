@@ -255,6 +255,15 @@ internal static class LogCommand
             json.WriteNull("granted_seconds");
         }
 
+        json.WriteString("vault", entry.Vault);
+        json.WriteStartArray("entries");
+        foreach (var named in entry.Entries)
+        {
+            json.WriteStringValue(named);
+        }
+
+        json.WriteEndArray();
+        json.WriteString("command", entry.Command);
         json.WriteBoolean("verified", verified);
     }
 

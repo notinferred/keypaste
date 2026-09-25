@@ -21,6 +21,22 @@ namespace Keypaste.App.ViewModels;
 /// the Secrets screen reads, and is dropped the moment it is counted.
 /// </para>
 /// </remarks>
+/// <summary>How a status dot is drawn.</summary>
+internal enum StatusTone
+{
+    /// <summary>All is as it should be.</summary>
+    Ok = 0,
+
+    /// <summary>Needs attention soon.</summary>
+    Accent = 1,
+
+    /// <summary>Something is wrong.</summary>
+    Danger = 2,
+
+    /// <summary>Nothing to report.</summary>
+    Muted = 3,
+}
+
 internal sealed class ShellViewModel : ObservableObject, IDisposable
 {
     /// <summary>How long a toast stays up.</summary>
@@ -43,6 +59,11 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     private IReadOnlyList<ProjectRow> _projects = [];
     private bool _mcpRunning;
     private string _mcpDetail = string.Empty;
+    private string _vaultStatus = string.Empty;
+    private StatusTone _vaultStatusTone;
+    private string _vaultStatusDetail = string.Empty;
+    private int _ticks;
+    private readonly Vault? _watched;
     private bool _disposed;
 
     internal ShellViewModel(
@@ -89,16 +110,25 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         _current = Destinations.All[0];
         _session.LockingSoon += OnLockingSoon;
         _session.Edited += OnEdited;
+        _watched = _session.Unlocked;
+
+        if (authority is not null && _session.Identity is { } identity)
+        {
+            EntryActivity = new EntryActivitySource(authority, Core.Audit.KeypasteHome.AuditPath(home), identity.Key, _clock, post);
+        }
+
+        if (_watched is not null)
+        {
+            _watched.Saved += OnSaved;
+        }
 
         // Built here rather than left to the first navigation. Assigning Current to the destination
         // it already holds changes nothing, so Show never ran and the shell opened on a blank pane.
         Show(_current);
         ReadAuthority();
+        ReadVaultStatus();
 
-        if (authority is not null)
-        {
-            _statusTimer = _clock.CreateTimer(_ => Post(ReadAuthority), null, _statusTick, _statusTick);
-        }
+        _statusTimer = _clock.CreateTimer(_ => Post(OnStatusTick), null, _statusTick, _statusTick);
     }
 
     /// <summary>What the restore that opened this vault did, until it is dismissed or the vault locks.</summary>
@@ -130,6 +160,9 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>What serves this vault to agents, or null where nothing does.</summary>
     internal AppAuthority? Authority { get; }
+
+    /// <summary>What agents did with this vault's entries, read every few seconds; null where nothing serves agents.</summary>
+    internal EntryActivitySource? EntryActivity { get; }
 
     /// <summary>How a theme choice reaches the application object.</summary>
     /// <remarks>
@@ -215,8 +248,40 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     /// <summary>The open vault's full path, for the tooltip.</summary>
     internal string VaultPath => _session.VaultPath ?? string.Empty;
 
-    /// <summary>The titlebar's status line.</summary>
-    internal string VaultStatus => VaultName.Length > 0 ? $"{VaultName} · unlocked" : string.Empty;
+    /// <summary>The titlebar's status line: whether the file holds what is open.</summary>
+    internal string VaultStatus
+    {
+        get => _vaultStatus;
+        private set => Set(ref _vaultStatus, value);
+    }
+
+    /// <summary>The colour of the titlebar's dot.</summary>
+    internal StatusTone VaultStatusTone
+    {
+        get => _vaultStatusTone;
+        private set
+        {
+            if (Set(ref _vaultStatusTone, value))
+            {
+                Raise(nameof(VaultStatusOk));
+                Raise(nameof(VaultStatusAccent));
+                Raise(nameof(VaultStatusDanger));
+            }
+        }
+    }
+
+    internal bool VaultStatusOk => _vaultStatusTone == StatusTone.Ok;
+
+    internal bool VaultStatusAccent => _vaultStatusTone == StatusTone.Accent;
+
+    internal bool VaultStatusDanger => _vaultStatusTone == StatusTone.Danger;
+
+    /// <summary>The titlebar's tooltip: when the file was saved, and where it is.</summary>
+    internal string VaultStatusDetail
+    {
+        get => _vaultStatusDetail;
+        private set => Set(ref _vaultStatusDetail, value);
+    }
 
     /// <summary>Locks now.</summary>
     internal RelayCommand LockCommand { get; }
@@ -404,7 +469,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
     private EntriesViewModel Entries()
     {
-        var entries = new EntriesViewModel(_session, Clipboard);
+        var entries = new EntriesViewModel(_session, Clipboard, EntryActivity);
 
         if (_search.Length > 0)
         {
@@ -493,13 +558,14 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         if (status is AuthorityStatus.Serving)
         {
             var activity = Authority!.Activity;
-            var grants = activity.Grants.Count;
-            var waiting = activity.Waiting.Count;
+            var grants = activity.Grants.Count + activity.EnvGrants.Count;
+            var waiting = activity.Waiting.Count + activity.WaitingRuns.Count + activity.WaitingEnvs.Count;
+            var clients = Core.Clients.McpClientCards.Count(Authority.Clients);
 
             McpRunning = true;
             McpDetail = waiting > 0
-                ? string.Create(CultureInfo.InvariantCulture, $"{waiting} waiting for you · {Grants(grants)}")
-                : Grants(grants);
+                ? string.Create(CultureInfo.InvariantCulture, $"{waiting} waiting for you · {Clients(clients)}")
+                : Clients(clients);
             SetCount(DestinationKind.AgentActivity, grants + waiting, live: true);
             return;
         }
@@ -514,14 +580,70 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         SetCount(DestinationKind.AgentActivity, 0);
     }
 
-    private static string Grants(int count) => count switch
+    private static string Clients(int count) => count switch
     {
-        0 => "no grants in force",
-        1 => "1 grant in force",
-        _ => string.Create(CultureInfo.InvariantCulture, $"{count} grants in force"),
+        0 => "stdio · no clients",
+        1 => "stdio · 1 client",
+        _ => string.Create(CultureInfo.InvariantCulture, $"stdio · {count} clients"),
     };
 
-    private void OnEdited(object? sender, VaultEdit edit) => Post(Count);
+    private void OnStatusTick()
+    {
+        ReadAuthority();
+
+        // The file is hashed at most every five seconds; an edit or a save says so at once.
+        if (++_ticks % 5 == 0)
+        {
+            ReadVaultStatus();
+        }
+    }
+
+    private void ReadVaultStatus()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        if (_session.Unlocked is not { } vault || VaultName.Length == 0)
+        {
+            VaultStatus = string.Empty;
+            VaultStatusDetail = string.Empty;
+            VaultStatusTone = StatusTone.Ok;
+            return;
+        }
+
+        VaultSaveState state;
+
+        try
+        {
+            state = vault.SaveState();
+        }
+        catch (ObjectDisposedException)
+        {
+            return;
+        }
+
+        (VaultStatus, VaultStatusTone) = state.Status switch
+        {
+            VaultSaveStatus.Saved => ($"{VaultName} · saved", StatusTone.Ok),
+            VaultSaveStatus.Unsaved => ($"{VaultName} · unsaved changes", StatusTone.Accent),
+            VaultSaveStatus.ChangedOnDisk => ($"{VaultName} · changed on disk", StatusTone.Danger),
+            _ => ($"{VaultName} · file unreadable", StatusTone.Danger),
+        };
+
+        VaultStatusDetail = state.SavedAt is { } saved
+            ? $"Saved {saved.ToLocalTime().ToString("HH:mm:ss", CultureInfo.InvariantCulture)} · {VaultPath}"
+            : VaultPath;
+    }
+
+    private void OnSaved(object? sender, EventArgs e) => Post(ReadVaultStatus);
+
+    private void OnEdited(object? sender, VaultEdit edit) => Post(() =>
+    {
+        Count();
+        ReadVaultStatus();
+    });
 
     private void Post(Action action)
     {
@@ -548,8 +670,15 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         _disposed = true;
         _session.LockingSoon -= OnLockingSoon;
         _session.Edited -= OnEdited;
+
+        if (_watched is not null)
+        {
+            _watched.Saved -= OnSaved;
+        }
+
         _statusTimer?.Dispose();
         _toastTimer?.Dispose();
+        EntryActivity?.Dispose();
         Notice = null;
         Toast = null;
         Projects = [];

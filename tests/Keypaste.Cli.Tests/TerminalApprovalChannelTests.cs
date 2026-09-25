@@ -429,4 +429,113 @@ public sealed class TerminalApprovalChannelTests
         Assert.Throws<ArgumentNullException>(() => new TerminalApprovalChannel(new FakeSecretPrompt(), null!, _window, TimeProvider.System));
         Assert.Throws<ArgumentNullException>(() => new TerminalApprovalChannel(new FakeSecretPrompt(), console, _window, null!));
     }
+
+    private static RunPrompt RunPromptFor(int grantSeconds = 900, OnceOnly onceOnly = OnceOnly.None) =>
+        RunPrompt.For(
+            new Keypaste.Core.Ipc.RunRequest
+            {
+                Program = "/usr/bin/npm",
+                Command = ["npm", "run", "migrate"],
+                Directory = "/home/me/acme/api",
+                Project = "acme-api",
+                Reason = "run the pending migration",
+                Exposure = ["env/**"],
+                ClientName = "claude-code",
+                ClientLabel = "claude-code",
+            },
+            "acme-api",
+            "dev",
+            [
+                new RunPromptVariable("DATABASE_URL", "env/acme-api/DATABASE_URL", "password"),
+                new RunPromptVariable("STRIPE_SECRET_KEY", "env/acme-api/STRIPE_SECRET_KEY", "password"),
+            ],
+            grantSeconds,
+            onceOnly);
+
+    [Fact]
+    public async Task TheRunDialog_IsExactlyTheBlock()
+    {
+        var rig = Build("d");
+
+        Assert.Equal(ApprovalAnswer.Denied, await rig.Channel.AskAsync(RunPromptFor(), Token));
+
+        string[] expected =
+        [
+            string.Empty,
+            TerminalApprovalChannel.Rule,
+            "keypaste: an agent wants to run a command with your secrets.",
+            string.Empty,
+            "  client     claude-code (claude-code)",
+            "  tool       keypaste.run",
+            "  runs       /usr/bin/npm",
+            "  command    npm run migrate",
+            "  in         /home/me/acme/api",
+            "  project    acme-api",
+            "  profile    dev",
+            "  injects    DATABASE_URL        env/acme-api/DATABASE_URL        inject only",
+            "  injects    STRIPE_SECRET_KEY   env/acme-api/STRIPE_SECRET_KEY   inject only",
+            string.Empty,
+            "  the agent says it needs this because:",
+            "    run the pending migration",
+            string.Empty,
+            "  That sentence was written by the agent, not by keypaste. Treat it as a claim.",
+            "  keypaste puts these values into that command's environment and returns its output with each",
+            "  value's literal and escaped forms removed. The agent sees the names; the command itself can read",
+            "  the values and reveal them, so approve only a command you would run yourself.",
+            string.Empty,
+            "  [h] lets claude-code run this command line here again for 15 minutes without asking.",
+            "  It can change the files that command runs (scripts, package.json) in that time.",
+            "keypaste: denied. Nothing was released.",
+            TerminalApprovalChannel.Rule,
+            string.Empty,
+        ];
+
+        Assert.Equal(string.Join(Environment.NewLine, expected), rig.Stderr.ToString());
+        Assert.Equal("[d] deny  [o] once  [h] 15 minutes  45s › ", Assert.Single(rig.Prompt.PromptsSeen));
+    }
+
+    [Fact]
+    public async Task TheRunDialog_TimedLineNamesTheClient_AndHAllowsForIt()
+    {
+        var rig = Build("h");
+
+        Assert.Equal(ApprovalAnswer.Approved, await rig.Channel.AskAsync(RunPromptFor(), Token));
+        Assert.Contains("[h] lets claude-code run this command line here again for 15 minutes", rig.Stderr.ToString(), StringComparison.Ordinal);
+        Assert.Contains("keypaste: allowed for 15 minutes.", rig.Stderr.ToString(), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(OnceOnly.ProtectedProfile, "  this profile is protected: it is asked about every time.")]
+    [InlineData(OnceOnly.ClientPolicy, "  this client's policy is Ask every time: no timed grant is offered.")]
+    public async Task ARunPromptOfferingNone_H_Denies_AndSaysWhy(OnceOnly onceOnly, string why)
+    {
+        var rig = Build("h");
+
+        Assert.Equal(ApprovalAnswer.Denied, await rig.Channel.AskAsync(RunPromptFor(0, onceOnly), Token));
+        Assert.Contains(why, rig.Stderr.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("[h]", Assert.Single(rig.Prompt.PromptsSeen), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ALoaderName_IsFlaggedInTheRunDialog()
+    {
+        var rig = Build("d");
+        var prompt = RunPromptFor() with { Variables = [new RunPromptVariable("NODE_OPTIONS", "env/acme-api/NODE_OPTIONS", "password")] };
+
+        await rig.Channel.AskAsync(prompt, Token);
+
+        Assert.Contains("inject only  (changes how programs start)", rig.Stderr.ToString(), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(OnceOnly.ProtectedProfile, "  this entry is in a protected profile: it is asked about every time.")]
+    [InlineData(OnceOnly.ClientPolicy, "  this client's policy is Ask every time: no timed grant is offered.")]
+    public async Task TheCredentialDialog_SaysWhyItIsOnceOnly(OnceOnly onceOnly, string why)
+    {
+        var rig = Build("d");
+
+        await rig.Channel.AskAsync(Prompt(grantSeconds: 0) with { OnceOnly = onceOnly }, Token);
+
+        Assert.Contains(why, rig.Stderr.ToString(), StringComparison.Ordinal);
+    }
 }

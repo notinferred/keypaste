@@ -1,6 +1,7 @@
 using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Clients;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Policy;
@@ -101,6 +102,40 @@ internal sealed class SessionHost : IDisposable
             {
                 return _hosted?.Activity ?? ApproverActivity.None;
             }
+        }
+    }
+
+    /// <summary>The bridges attached to the live session that said who their client is.</summary>
+    internal IReadOnlyList<ConnectedClient> Clients
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _hosted?.Clients ?? [];
+            }
+        }
+    }
+
+    /// <summary>What the live session has released, newest first.</summary>
+    internal IReadOnlyList<ReleaseSeen> Released
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _hosted?.Released ?? [];
+            }
+        }
+    }
+
+    /// <summary>Ends every grant given to a bridge started with this label.</summary>
+    /// <param name="label">The raw label.</param>
+    internal void RevokeClient(string label)
+    {
+        lock (_gate)
+        {
+            _hosted?.RevokeClient(label);
         }
     }
 
@@ -245,6 +280,7 @@ internal sealed class SessionHost : IDisposable
         private readonly ApprovalGate _approvals;
         private readonly AppVaultSession _session;
         private readonly GrantCache _grants;
+        private readonly EnvGrantCache _envGrants;
         private readonly Lazy<AuditLog?> _audit;
         private readonly CancellationTokenSource _stop = new();
         private readonly Task _run;
@@ -255,6 +291,7 @@ internal sealed class SessionHost : IDisposable
             ApprovalGate approvals,
             AppVaultSession session,
             GrantCache grants,
+            EnvGrantCache envGrants,
             Lazy<AuditLog?> audit)
         {
             _listener = listener;
@@ -262,6 +299,7 @@ internal sealed class SessionHost : IDisposable
             _approvals = approvals;
             _session = session;
             _grants = grants;
+            _envGrants = envGrants;
             _audit = audit;
 
             // An edit in the app withdraws the grants naming what it touched before it is saved (D-0318).
@@ -273,6 +311,12 @@ internal sealed class SessionHost : IDisposable
         internal string? Serving => _run.IsCompleted ? null : _authority.Serving;
 
         internal ApproverActivity Activity => _run.IsCompleted ? ApproverActivity.None : _authority.Activity;
+
+        internal IReadOnlyList<ConnectedClient> Clients => _run.IsCompleted ? [] : _authority.Clients;
+
+        internal IReadOnlyList<ReleaseSeen> Released => _authority.Released;
+
+        internal void RevokeClient(string label) => _authority.RevokeClient(label);
 
         internal void Revoke(GrantKey key) => _authority.Revoke(key);
 
@@ -302,7 +346,8 @@ internal sealed class SessionHost : IDisposable
                 approvals,
                 grants,
                 PolicyGate.None,
-                requiresLiveApproval: EnvProfileNames.RequiresLiveApproval);
+                requiresLiveApproval: EnvProfileNames.RequiresLiveApproval,
+                clients: new ClientPolicySource(KeypasteHome.ClientsPath(session.Home)));
 
             // Opened when a token first arrives, so an unlock creates no log; one that cannot be opened refuses every token.
             var audit = new Lazy<AuditLog?>(() =>
@@ -313,13 +358,14 @@ internal sealed class SessionHost : IDisposable
                 () => session.Lifetime,
                 handler,
                 new SessionEnvironments(approvals, session.UnlockedFor, session.Clock, envGrants, Audit: () => audit.Value),
-                requestLock);
+                requestLock,
+                session.Clock);
 
             try
             {
                 var listener = new ApproverListener(pipe, authority);
                 failure = null;
-                return new Hosted(listener, authority, approvals, session, grants, audit);
+                return new Hosted(listener, authority, approvals, session, grants, envGrants, audit);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
@@ -329,7 +375,11 @@ internal sealed class SessionHost : IDisposable
             }
         }
 
-        private void OnEdited(object? sender, VaultEdit edit) => _grants.RevokeEntries(edit);
+        private void OnEdited(object? sender, VaultEdit edit)
+        {
+            _grants.RevokeEntries(edit);
+            _envGrants.RevokeEntries(edit);
+        }
 
         public void Dispose()
         {

@@ -7,6 +7,16 @@ namespace Keypaste.Core.Approval;
 /// <param name="Remaining">How long is left before the gate answers for them.</param>
 public sealed record WaitingRequest(ApprovalPrompt Prompt, TimeSpan Remaining);
 
+/// <summary>An agent's run in front of a person, as a list shows it.</summary>
+/// <param name="Prompt">What the person is being shown.</param>
+/// <param name="Remaining">How long is left before the gate answers for them.</param>
+public sealed record WaitingRun(RunPrompt Prompt, TimeSpan Remaining);
+
+/// <summary>A <c>keypaste run --session</c> request in front of a person, as a list shows it.</summary>
+/// <param name="Prompt">What the person is being shown.</param>
+/// <param name="Remaining">How long is left before the gate answers for them.</param>
+public sealed record WaitingEnv(EnvReleasePrompt Prompt, TimeSpan Remaining);
+
 /// <summary>
 /// Puts one request in front of a human, enforces the deadline, and denies everything else.
 /// </summary>
@@ -64,6 +74,14 @@ public sealed class ApprovalGate : IDisposable
     public WaitingRequest? Waiting =>
         _asking is { Prompt: { } prompt } asking ? new WaitingRequest(prompt, asking.Window.Remaining(_clock)) : null;
 
+    /// <summary>The agent's run a person is being asked about now, or null.</summary>
+    public WaitingRun? WaitingRun =>
+        _asking is { Run: { } run } asking ? new WaitingRun(run, asking.Window.Remaining(_clock)) : null;
+
+    /// <summary>The <c>keypaste run --session</c> request a person is being asked about now, or null.</summary>
+    public WaitingEnv? WaitingEnv =>
+        _asking is { Env: { } env } asking ? new WaitingEnv(env, asking.Window.Remaining(_clock)) : null;
+
     /// <summary>Asks a human, and answers for them when they cannot be asked.</summary>
     /// <param name="cooldownKey">
     /// What counts as "the same request" for the purposes of the post-denial cooldown. The caller
@@ -81,7 +99,7 @@ public sealed class ApprovalGate : IDisposable
         ArgumentNullException.ThrowIfNull(cooldownKey);
         ArgumentNullException.ThrowIfNull(prompt);
 
-        return AskThroughAsync(cooldownKey, prompt, token => _channel.AskAsync(prompt, token), cancellationToken);
+        return AskThroughAsync(cooldownKey, new Asked(prompt, null, null), token => _channel.AskAsync(prompt, token), cancellationToken);
     }
 
     /// <summary>Asks a human about a project's env set, under the same window, slot and cooldown.</summary>
@@ -91,8 +109,8 @@ public sealed class ApprovalGate : IDisposable
     /// <returns>The answer, which is a denial unless <see cref="ApprovalAnswers.Releases"/> says otherwise.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="cooldownKey"/> or <paramref name="prompt"/> is null.</exception>
     /// <remarks>
-    /// One slot for both kinds, so an env prompt and an agent's prompt are never on screen together
-    /// (THREATS.md T-11). <see cref="Waiting"/> lists only an agent's request.
+    /// One slot for every kind, so an env prompt and an agent's prompt are never on screen together
+    /// (THREATS.md T-11). <see cref="Waiting"/> lists only an agent's credential request.
     /// </remarks>
     public ValueTask<ApprovalAnswer> AskAsync(
         string cooldownKey,
@@ -102,12 +120,29 @@ public sealed class ApprovalGate : IDisposable
         ArgumentNullException.ThrowIfNull(cooldownKey);
         ArgumentNullException.ThrowIfNull(prompt);
 
-        return AskThroughAsync(cooldownKey, null, token => _channel.AskAsync(prompt, token), cancellationToken);
+        return AskThroughAsync(cooldownKey, new Asked(null, null, prompt), token => _channel.AskAsync(prompt, token), cancellationToken);
+    }
+
+    /// <summary>Asks a human about an agent's run, under the same window, slot and cooldown.</summary>
+    /// <param name="cooldownKey">What counts as "the same request" after a refusal.</param>
+    /// <param name="prompt">What the human is shown.</param>
+    /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
+    /// <returns>The answer, which is a denial unless <see cref="ApprovalAnswers.Releases"/> says otherwise.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="cooldownKey"/> or <paramref name="prompt"/> is null.</exception>
+    public ValueTask<ApprovalAnswer> AskAsync(
+        string cooldownKey,
+        RunPrompt prompt,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(cooldownKey);
+        ArgumentNullException.ThrowIfNull(prompt);
+
+        return AskThroughAsync(cooldownKey, new Asked(null, prompt, null), token => _channel.AskAsync(prompt, token), cancellationToken);
     }
 
     private async ValueTask<ApprovalAnswer> AskThroughAsync(
         string cooldownKey,
-        ApprovalPrompt? listed,
+        Asked listed,
         Func<CancellationToken, ValueTask<ApprovalAnswer>> ask,
         CancellationToken cancellationToken)
     {
@@ -132,7 +167,7 @@ public sealed class ApprovalGate : IDisposable
 
         try
         {
-            _asking = new Asking(listed, Deadline.Starting(_clock, Limits.Window));
+            _asking = new Asking(listed.Prompt, listed.Run, listed.Env, Deadline.Starting(_clock, Limits.Window));
 
             var answer = await AskOnceAsync(ask, cancellationToken).ConfigureAwait(false);
 
@@ -278,5 +313,7 @@ public sealed class ApprovalGate : IDisposable
         _oneAtATime.Dispose();
     }
 
-    private sealed record Asking(ApprovalPrompt? Prompt, Deadline Window);
+    private sealed record Asking(ApprovalPrompt? Prompt, RunPrompt? Run, EnvReleasePrompt? Env, Deadline Window);
+
+    private readonly record struct Asked(ApprovalPrompt? Prompt, RunPrompt? Run, EnvReleasePrompt? Env);
 }

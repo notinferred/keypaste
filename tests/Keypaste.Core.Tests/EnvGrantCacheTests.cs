@@ -1,4 +1,5 @@
 using Keypaste.Core.Approval;
+using Keypaste.Core.Ipc;
 using Xunit;
 
 namespace Keypaste.Core.Tests;
@@ -134,7 +135,9 @@ public sealed class EnvGrantCacheTests
         var listed = cache.InForce();
 
         Assert.Equal(["short", "long"], listed.Select(grant => grant.Key));
-        Assert.Equal(new EnvGrantInForce("short", "billing", "dev", "npm run deploy", TimeSpan.FromMinutes(5)), listed[0]);
+        Assert.Equal(
+            new EnvGrantInForce("short", "billing", "dev", "npm run deploy", TimeSpan.FromMinutes(5)) { Entries = ["env/billing/DATABASE_URL", "env/billing/STRIPE_KEY"] },
+            listed[0]);
     }
 
     [Fact]
@@ -154,5 +157,74 @@ public sealed class EnvGrantCacheTests
     {
         Assert.Equal(900, EnvGrantCache.GrantSeconds(ApprovalLimits.Default));
         Assert.Equal(300, EnvGrantCache.GrantSeconds(ApprovalLimits.Default with { MaximumTtlSeconds = 300 }));
+    }
+
+    [Fact]
+    public void RevokePrefix_EndsOnlyThoseGrants()
+    {
+        using var cache = new EnvGrantCache(new ManualClock());
+        Store(cache, "run\0conn-1\0a");
+        Store(cache, "run\0conn-1\0b");
+        Store(cache, "run\0conn-10\0a");
+
+        cache.RevokePrefix("run\0conn-1\0");
+
+        Assert.Equal(["run\0conn-10\0a"], cache.InForce().Select(grant => grant.Key));
+    }
+
+    [Fact]
+    public void RevokeLabel_EndsOnlyThatLabelsGrants()
+    {
+        using var cache = new EnvGrantCache(new ManualClock());
+        cache.Store("a", "p", "dev", "npm test", _names, _ttl, "Claude Code", "claude-code");
+        cache.Store("b", "p", "dev", "npm test", _names, _ttl, "Cursor", "cursor");
+        Store(cache, "c");
+
+        cache.RevokeLabel("claude-code");
+
+        Assert.Equal(["b", "c"], cache.InForce().Select(grant => grant.Key).Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void InForce_CarriesClientLabelAndEntries()
+    {
+        using var cache = new EnvGrantCache(new ManualClock());
+        cache.Store("a", "p", "dev", "npm test", ["GH"], _ttl, "Claude Code", "claude-code", [new EntryName("personal", "github")]);
+        Store(cache, "b");
+
+        var run = cache.InForce().Single(grant => grant.Key == "a");
+        var env = cache.InForce().Single(grant => grant.Key == "b");
+
+        Assert.Equal(("Claude Code", "claude-code"), (run.Client, run.Label));
+        Assert.Equal(["personal/github"], run.Entries);
+        Assert.Equal(["env/billing/DATABASE_URL", "env/billing/STRIPE_KEY"], env.Entries);
+        Assert.Null(env.Client);
+    }
+
+    [Fact]
+    public void RevokeEntries_EndsEveryGrantReleasingAnEditedEntry()
+    {
+        using var cache = new EnvGrantCache(new ManualClock());
+        Store(cache, "env-set");
+        cache.Store("run", "p", "dev", "npm test", ["GH"], _ttl, "Claude Code", "claude-code", [new EntryName("personal", "github")]);
+
+        cache.RevokeEntries(VaultEdit.Of(new EntryName("env/billing", "STRIPE_KEY")));
+        Assert.Equal(["run"], cache.InForce().Select(grant => grant.Key));
+
+        cache.RevokeEntries(VaultEdit.Everything);
+        Assert.Empty(cache.InForce());
+    }
+
+    [Fact]
+    public void ARunGrant_IsListedAsRun_UnderItsClient()
+    {
+        using var cache = new EnvGrantCache(new ManualClock());
+        cache.Store("run", "p", "dev", "npm test", ["GH"], _ttl, "Claude Code", "claude-code", [new EntryName("personal", "github")]);
+        Store(cache, "env");
+
+        var rows = GrantSummary.Of(ApproverActivity.None with { EnvGrants = cache.InForce() });
+
+        Assert.Contains(rows, row => row.Kind == "run" && row.Client == "Claude Code");
+        Assert.Contains(rows, row => row.Kind == "env" && row.Client == GrantSummary.EnvClient);
     }
 }

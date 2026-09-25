@@ -94,11 +94,18 @@ internal sealed class PromptScreen : IDisposable
         _open = window;
         window.CaptureRenderedFrame();
 
-        Console.Out.WriteLine(window is EnvApprovalWindow
-            ? $"env-prompt project={Text(window, "ProjectText")} command={Text(window, "CommandText")} " +
-                $"directory={Text(window, "DirectoryText")} keys={Text(window, "KeysText")?.ReplaceLineEndings(",")}"
-            : $"prompt client={Text(window, "ClientText")} label={Text(window, "LabelText")} " +
-                $"entry={Text(window, "EntryText")} field={Text(window, "FieldText")} for={Text(window, "LifetimeText")}");
+        Console.Out.WriteLine(window switch
+        {
+            EnvApprovalWindow =>
+                $"env-prompt project={Text(window, "ProjectText")} command={Text(window, "CommandText")} " +
+                $"directory={Text(window, "DirectoryText")} keys={Text(window, "KeysText")?.ReplaceLineEndings(",")}",
+            RunApprovalWindow =>
+                $"run-prompt title={Text(window, "TitleText")} program={Text(window, "ProgramText")} " +
+                $"command={Text(window, "CommandText")} directory={Text(window, "DirectoryText")}",
+            _ =>
+                $"prompt client={Text(window, "ClientText")} label={Text(window, "LabelText")} " +
+                $"entry={Text(window, "EntryText")} field={Text(window, "FieldText")} for={Text(window, "LifetimeText")}",
+        });
 
         window.Closed += (_, _) =>
         {

@@ -16,7 +16,7 @@ internal sealed class ApprovalViewModel : PromptViewModel
         TimedSeconds = prompt.TtlSeconds;
         Lifetime = prompt.TtlSeconds > 0
             ? $"once, or for {ApprovalLimits.Describe(prompt.TtlSeconds)}"
-            : "once only: protected profile";
+            : prompt.OnceOnly == OnceOnly.ClientPolicy ? "once only: this client's policy" : "once only: protected profile";
         Reason = prompt.Reason;
         Scrubbed = (prompt.EntryWasAltered, prompt.ReasonWasAltered) switch
         {

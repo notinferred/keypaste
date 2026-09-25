@@ -88,6 +88,21 @@ public interface IApproverHandler
             "this keypaste process does not accept tokens"));
     }
 
+    /// <summary>Decides one agent's request to run a command with approved secrets, asking a human before any of it leaves.</summary>
+    /// <param name="request">The program, command, directory, variables and reason.</param>
+    /// <param name="connectionId">Who is asking, and what a timed grant is scoped to.</param>
+    /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
+    /// <returns>The variables, or why none. A handler that does not serve runs refuses.</returns>
+    ValueTask<RunReply> ReleaseRunAsync(RunRequest request, string connectionId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return ValueTask.FromResult(new RunReply(
+            EnvResolved.Refused(request.Project ?? string.Empty, EnvOutcome.NoSession, profile: request.Profile),
+            Audit.AuditMethod.NoSession,
+            "this keypaste process does not run commands for agents"));
+    }
+
     /// <summary>Tells the handler a connection has gone, so its grants can go with it.</summary>
     /// <param name="connectionId">The connection that ended.</param>
     void Disconnected(string connectionId);

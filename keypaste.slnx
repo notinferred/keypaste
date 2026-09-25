@@ -25,6 +25,7 @@
     <Project Path="tests/Keypaste.PoolStarver/Keypaste.PoolStarver.csproj" />
     <Project Path="tests/Keypaste.VaultSaver/Keypaste.VaultSaver.csproj" />
     <Project Path="tests/Keypaste.VaultRestorer/Keypaste.VaultRestorer.csproj" />
+    <Project Path="tests/Keypaste.EnvReporter/Keypaste.EnvReporter.csproj" />
   </Folder>
   <Folder Name="/third_party/">
     <Project Path="third_party/KeePassLib/KeePassLib.csproj" />

@@ -250,6 +250,10 @@ public sealed class ApproverListener : IDisposable
                 return ApproverProtocol.Encode(
                     await _handler.ReleaseTokenEnvAsync(tokenEnv, connectionId, cancellationToken).ConfigureAwait(false));
 
+            case ApproverMessageKind.Run when ApproverProtocol.TryDecode(frame, out RunRequest? run):
+                return ApproverProtocol.Encode(
+                    await _handler.ReleaseRunAsync(run, connectionId, cancellationToken).ConfigureAwait(false));
+
             default:
                 return null;
         }

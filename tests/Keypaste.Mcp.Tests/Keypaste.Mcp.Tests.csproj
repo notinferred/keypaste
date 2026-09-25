@@ -33,6 +33,12 @@
   -->
   <ItemGroup>
     <Compile Include="../Keypaste.Core.Tests/PoolSnapshot.cs" Link="PoolSnapshot.cs" />
+    <Compile Include="../Keypaste.Core.Tests/Reporter.cs" Link="Reporter.cs" />
+  </ItemGroup>
+
+  <!-- The child an agent's run starts in the capture tests: built beside these tests, never referenced. -->
+  <ItemGroup>
+    <ProjectReference Include="../Keypaste.EnvReporter/Keypaste.EnvReporter.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
 </Project>

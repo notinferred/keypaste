@@ -4,6 +4,7 @@ using Keypaste.Cli.Approval;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Clients;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Policy;
@@ -130,7 +131,8 @@ internal static class AgentCommand
 
         using (claim)
         {
-            return VaultSession.Open(vaultPath, line, context, vault => Serve(vault, claim, pipeName, limits, policy, context));
+            var clients = new ClientPolicySource(KeypasteHome.ClientsPath(context.Environment.Get(KeypasteHome.EnvironmentVariable)));
+            return VaultSession.Open(vaultPath, line, context, vault => Serve(vault, claim, pipeName, limits, policy, clients, context));
         }
     }
 
@@ -140,6 +142,7 @@ internal static class AgentCommand
         string pipeName,
         ApprovalLimits limits,
         PolicyLoad policy,
+        ClientPolicySource clients,
         CliContext context)
     {
         var console = new AgentConsole(context.Stderr, context.Prompt.IsInteractive, context.ConsoleStyle);
@@ -161,7 +164,8 @@ internal static class AgentCommand
             gate,
             grants,
             new PolicyGate(policy.Rules, TimeProvider.System),
-            Narrate);
+            Narrate,
+            clients: clients);
 
         using var audit = OpenAudit(context);
 

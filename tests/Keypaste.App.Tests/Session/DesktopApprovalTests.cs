@@ -487,6 +487,24 @@ public sealed class DesktopApprovalTests
                 new EnvRequest("ci", ["deploy", "--to", "staging area"], Path.Combine(_fixture.Home, "work")) { Vault = Vault, Session = SessionId },
                 cancellationToken ?? Token).AsTask();
 
+        /// <summary>An agent's run of the <c>ci</c> set on this bridge's connection.</summary>
+        internal Task<RunReply?> AskRun(CancellationToken? cancellationToken = null) =>
+            _client!.ReleaseRunAsync(
+                new RunRequest
+                {
+                    Program = OperatingSystem.IsWindows() ? @"C:\tools\deploy.exe" : "/usr/bin/deploy",
+                    Command = ["deploy", "--to", "staging"],
+                    Directory = Path.Combine(_fixture.Home, "work"),
+                    Project = "ci",
+                    Reason = "deploy the billing service",
+                    Exposure = ["env/**"],
+                    ClientName = "claude-code",
+                    ClientLabel = Label,
+                    Vault = Vault,
+                    Session = SessionId,
+                },
+                cancellationToken ?? Token).AsTask();
+
         internal async Task HangUpAsync()
         {
             await _client!.DisposeAsync();

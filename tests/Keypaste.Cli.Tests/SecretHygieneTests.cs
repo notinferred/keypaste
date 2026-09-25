@@ -42,6 +42,11 @@ public sealed class SecretHygieneTests
     [InlineData("set", "secrets/new", "--generate", "--words", "4")]
     [InlineData("share", "ls", "--offline")]
     [InlineData("share", "ls", "--offline", "--json")]
+    [InlineData("rotate", "secrets/target")]
+    [InlineData("rotate", "secrets/target", "--words", "6")]
+    [InlineData("rotate", "secrets/absent")]
+    [InlineData("mcp", "policy")]
+    [InlineData("mcp", "policy", "--json")]
     public void NoVerb_LeaksAFieldValue_ToStdoutOrStderr(params string[] verb)
     {
         using var harness = new CliHarness();

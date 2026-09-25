@@ -44,6 +44,8 @@ public sealed class ApprovalPromptTests
     /// put either. They are set from the sanitizer's own result rather than from anything the agent
     /// sends, so a reason cannot choose their value — it can only cause its own to be true by
     /// containing something that had to be scrubbed, which is precisely the fact being reported.
+    /// <c>OnceOnly</c> is an enum the approver sets from the entry's profile and the client's policy
+    /// file, never from the request's text: it says why no timed grant is offered, and nothing else.
     /// </remarks>
     [Fact]
     public void ThePromptHasNoMember_AReasonCouldUseToChangeTheDefaultOrTheDeadline()
@@ -60,6 +62,7 @@ public sealed class ApprovalPromptTests
                 "EntryWasAltered",
                 "Field",
                 "Label",
+                "OnceOnly",
                 "Reason",
                 "ReasonWasAltered",
                 "ReasonWasTruncated",

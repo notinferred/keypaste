@@ -143,13 +143,23 @@ Each exposure glob authorizes disclosure of matching entry names. Review additio
 
 Patterns match the group path and the entry title as two separate things, so `*` stays inside one path segment and `**` spans any number of them. A title containing a slash is matched as a title, so it can never impersonate a deeper group.
 
-## The two tools
+## The tools
 
 `list_entry_names` takes no arguments and returns only exposed group paths and entry names. It cannot return usernames, passwords, URLs or notes, or widen exposure.
 
 `request_credential` takes `entry`, `field`, `reason` and `ttl_seconds`. It forwards the request to `keypaste agent` for approval or a matching policy rule and returns one field. The person chooses whether an approval is reused; `--max-ttl` sets how long, not the lifetime of the returned credential. Without an approver it refuses and names the startup command. [The demo](demo.md) shows this flow.
 
 Anyone who can edit the vault can influence its entry names. keypaste removes control characters, invisible Unicode and structural punctuation, then labels the listing as data. Sanitization cannot eliminate prompt injection; [THREATS.md](../THREATS.md) T-1 describes the residual risk.
+
+## Running a command with secrets (`--allow-run`)
+
+Add `--allow-run` to the bridge's arguments and it offers a third tool, `run`. Nothing adds it for you: `keypaste setup` and the desktop's Connect leave it out, so an existing configuration never gains command execution on upgrade.
+
+`run` takes `command` (the program and its arguments, one per item, never through a shell), `directory` (an existing absolute path), either `project` with an optional `profile` and `keys` or `env` mapping variable names to `kp://` references, a `reason` and an optional `timeout_seconds` (default 120, at most 600). The person holding the vault is shown the exact program, command line, resolved directory, each variable with the entry it comes from and the agent's reason, and answers Deny, Allow once or allow for up to 15 minutes; the timed choice covers only that command line in that directory on that connection. `PATH`, `KEYPASTE_*` and literal values cannot be set, and a program is searched for only in absolute `PATH` entries.
+
+The bridge writes the audit line, then starts the command with the values in its environment and stdin closed, and returns its exit code and the last 16384 characters of each stream with every literal or escaped occurrence of a value replaced by `[keypaste:NAME]`. When the client asked for progress, the bridge reports every 10 seconds while a person decides and while the command runs; a client that times tool calls out sooner should raise its limit. If the client cancels, the command is stopped with what it started (on macOS, only what is still found under it).
+
+The scrubbing is a safety net, not a boundary: a command can still print a value in another form, write it to a file, send it over the network, and any process of the same user can read its environment while it runs. Approve only commands whose behaviour you know; [THREATS.md](../THREATS.md) T-35 lists the limits.
 
 ## Seeing and ending access
 
@@ -194,8 +204,11 @@ jq -c . < ~/.keypaste/audit.jsonl
 | `timed-out` / `busy` / `cooldown` | Nobody answered in time; the connection was already carrying another call, so this one was refused rather than queued behind it; or the same request was refused a moment ago. |
 | `cancelled` | The client stopped waiting before anybody answered. Nobody decided anything. |
 | `vault-locked` / `invalid-request` / `failed` | No vault open; the arguments were wrong; something went wrong. |
+| `inject-only` | The client's policy in `clients.toml` is inject only, so a request for a value was refused before anything was read ([policy.md](policy.md)). |
 | `not-initialized` | The client called a tool before finishing the MCP handshake. Denied, with the fix named; nothing was decided. |
 | `not-implemented` | Written by the early implementation of roadmap step 2.1, before approval existed; this is a step ID, not a released version. Nothing writes it now, and it is listed because the log is append-only: old records keep the word they were written with. |
+
+Current source also writes `vault`, the identity key of the vault that answered, and `entries`, the entries a release or run used; a `run` line carries the first 256 characters of the command line as `command` and the SHA-256 of the whole resolved argument list as `command_sha256`, and its `method` is `prompt` or `grant-cache` like a credential's.
 
 A granted line carries `granted_seconds`: how long the release may be reused, which is the hour a person chose, `0` for "allow once", or a standing rule's lifetime. Lines written before it existed have none.
 

@@ -142,5 +142,28 @@ grep -q '"decision":"denied"' "$NOINIT_AUDIT" \
 jq -se 'any(.[]; .id == 7 and .result.isError == true)' <"$NOINIT_OUT" >/dev/null \
   || die "a tool call before initialize did not return isError=true"
 
+# 8. --allow-run adds exactly one tool, and its hints say what it is: it runs a program the agent
+#    names, so it is destructive and open-world, while the other two stay neither.
+RUN_OUT="$WORK/run-stdout.txt"
+: >"$RUN_OUT"
+{
+  printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}'
+  for _ in $(seq 1 100); do
+    grep -q '"id":1' "$RUN_OUT" 2>/dev/null && break
+    sleep 0.1
+  done
+  printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
+  printf '%s\n' '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
+  sleep 3
+} | "$BIN_PATH" --vault "$WORK/vault.kdbx" --audit-log "$WORK/run-audit.jsonl" --client-label ci-probe --allow-run \
+      >"$RUN_OUT" 2>/dev/null || die "keypaste-mcp --allow-run exited non-zero"
+
+run_tools="$(jq -c 'select(.id == 2) | .result.tools' <"$RUN_OUT" | head -n 1)"
+[ "$(printf '%s' "$run_tools" | jq 'length')" = "3" ] || die "--allow-run did not list exactly 3 tools"
+printf '%s' "$run_tools" | jq -e 'any(.[]; .name == "run" and .annotations.destructiveHint == true and .annotations.openWorldHint == true)' >/dev/null \
+  || die "run is missing destructiveHint=true or openWorldHint=true"
+printf '%s' "$run_tools" | jq -e 'all(.[] | select(.name != "run"); .annotations.destructiveHint == false and .annotations.openWorldHint == false)' >/dev/null \
+  || die "a tool other than run lost its false hints"
+
 echo "ok: keypaste-mcp speaks MCP over stdio, exposes two tools, denies both calls, audits them,"
-echo "    and refuses a tool call that arrives before the initialize handshake"
+echo "    refuses a tool call that arrives before the initialize handshake, and adds run only with --allow-run"

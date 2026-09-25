@@ -78,7 +78,7 @@ public sealed record EnvReleasePrompt
             return "the request names no command";
         }
 
-        if (Joined(command).Length > MaximumCommandLength)
+        if (CommandLine(command).Length > MaximumCommandLength)
         {
             return $"the command is longer than the {MaximumCommandLength} characters a prompt shows whole";
         }
@@ -99,7 +99,7 @@ public sealed record EnvReleasePrompt
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(directory);
 
-        var shownCommand = OneLine(Joined(command), MaximumCommandLength);
+        var shownCommand = OneLine(CommandLine(command), MaximumCommandLength);
         var shownDirectory = OneLine(directory, MaximumDirectoryLength);
 
         return new EnvReleasePrompt
@@ -123,8 +123,12 @@ public sealed record EnvReleasePrompt
     }
 
     /// <summary>The command as one line, quoting an argument that is empty or holds a space or a quote.</summary>
-    private static string Joined(IReadOnlyList<string> command)
+    /// <param name="command">The command, one argument per item.</param>
+    /// <returns>The line a prompt shows.</returns>
+    public static string CommandLine(IReadOnlyList<string> command)
     {
+        ArgumentNullException.ThrowIfNull(command);
+
         var line = new StringBuilder();
 
         foreach (var argument in command)

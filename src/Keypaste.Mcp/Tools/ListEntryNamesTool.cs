@@ -157,7 +157,7 @@ internal sealed class ListEntryNamesTool(
     /// rather than under-reporting one, which is the safe direction.
     /// </remarks>
     private CallToolResult Record(AuditRecord record, CallToolResult answer) =>
-        audit.TryAppend(record, out _) ? answer : ToolResults.Refuse(ToolText.AuditUnavailable);
+        audit.TryAppend(record with { Vault = options.VaultKey }, out _) ? answer : ToolResults.Refuse(ToolText.AuditUnavailable);
 
     /// <summary>
     /// Builds the reply: a datamarked block for the model to read, and a structured payload that

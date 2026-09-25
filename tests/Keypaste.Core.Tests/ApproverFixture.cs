@@ -82,6 +82,8 @@ internal sealed class FakeSource : ICredentialSource, IEntryNameLister
 
     internal int Reads { get; private set; }
 
+    internal int Resolves { get; private set; }
+
     /// <summary>Runs inside a read or a listing, so a test can lock the owner in the middle of one.</summary>
     internal Action? During { get; set; }
 
@@ -91,6 +93,7 @@ internal sealed class FakeSource : ICredentialSource, IEntryNameLister
     public bool TryResolve(string entryArgument, [NotNullWhen(true)] out EntryName? name, out CredentialFailure failure)
     {
         name = null;
+        Resolves++;
 
         if (Locked)
         {
@@ -166,6 +169,8 @@ internal sealed class FakeChannel : IApprovalChannel
 
     internal EnvReleasePrompt? LastEnvPrompt { get; private set; }
 
+    internal RunPrompt? LastRunPrompt { get; private set; }
+
     /// <summary>Completes once a held prompt is up.</summary>
     internal Task Waiting => _waiting.Task;
 
@@ -181,6 +186,12 @@ internal sealed class FakeChannel : IApprovalChannel
     public ValueTask<ApprovalAnswer> AskAsync(EnvReleasePrompt prompt, CancellationToken cancellationToken)
     {
         LastEnvPrompt = prompt;
+        return AnswerAsync(cancellationToken);
+    }
+
+    public ValueTask<ApprovalAnswer> AskAsync(RunPrompt prompt, CancellationToken cancellationToken)
+    {
+        LastRunPrompt = prompt;
         return AnswerAsync(cancellationToken);
     }
 

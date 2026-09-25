@@ -79,6 +79,15 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         return AnswerAsync(OfferedSeconds(request), started, cancellationToken);
     }
 
+    public ValueTask<ApprovalAnswer> AskAsync(RunPrompt request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var started = _clock.GetTimestamp();
+        _console.WriteLine(Render(request, RuleLine));
+        return AnswerAsync(request.GrantSeconds, started, cancellationToken);
+    }
+
     /// <summary>The timed grant an env prompt offers: none to a requester that is not the person's own run.</summary>
     private static int OfferedSeconds(EnvReleasePrompt request) =>
         request.Requester is null ? request.GrantSeconds : 0;
@@ -247,9 +256,77 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
 
         if (request.TtlSeconds == 0)
         {
-            lines.Add("  this entry is in a protected profile: it is asked about every time.");
+            lines.Add(request.OnceOnly == OnceOnly.ClientPolicy
+                ? _clientPolicyLine
+                : "  this entry is in a protected profile: it is asked about every time.");
         }
 
         return string.Join(Environment.NewLine, lines);
     }
+
+    private const string _clientPolicyLine = "  this client's policy is Ask every time: no timed grant is offered.";
+
+    /// <summary>The run dialog: who, the exact program and command line, where, each variable and its source, and the agent's claim last.</summary>
+    internal static string Render(RunPrompt request, string rule)
+    {
+        var client = request.Label is { } label ? $"{request.Client} ({label})" : request.Client;
+        var nameWidth = request.Variables.Max(variable => variable.Name.Length);
+        var entryWidth = request.Variables.Max(variable => Source(variable).Length);
+
+        List<string> lines =
+        [
+            string.Empty,
+            rule,
+            "keypaste: an agent wants to run a command with your secrets.",
+            string.Empty,
+            $"  client     {client}",
+            $"  tool       {RunPrompt.ToolName}",
+            $"  runs       {request.Program}",
+            $"  command    {request.Command}",
+            $"  in         {request.Directory}",
+            $"  project    {request.Project}",
+            $"  profile    {request.Profile}",
+        ];
+
+        lines.AddRange(request.Variables.Select(variable =>
+            $"  injects    {variable.Name.PadRight(nameWidth)}   {Source(variable).PadRight(entryWidth)}   inject only"
+            + (variable.ChangesHowProgramsStart ? "  (changes how programs start)" : string.Empty)));
+
+        lines.Add(string.Empty);
+        lines.Add("  the agent says it needs this because:");
+        lines.Add($"    {request.Reason}");
+
+        if (request.ReasonWasTruncated)
+        {
+            lines.Add("    (cut short — the full text is hashed in the audit log)");
+        }
+
+        if (request.ReasonWasAltered)
+        {
+            lines.Add(string.Empty);
+            lines.Add("  The reason above is not what the agent sent: it was scrubbed.");
+        }
+
+        lines.Add(string.Empty);
+        lines.Add("  That sentence was written by the agent, not by keypaste. Treat it as a claim.");
+        lines.Add("  keypaste puts these values into that command's environment and returns its output with each");
+        lines.Add("  value's literal and escaped forms removed. The agent sees the names; the command itself can read");
+        lines.Add("  the values and reveal them, so approve only a command you would run yourself.");
+        lines.Add(string.Empty);
+
+        lines.Add(request.OnceOnly switch
+        {
+            _ when request.GrantSeconds > 0 =>
+                $"  [h] lets {request.Label ?? request.Client} run this command line here again for {ApprovalLimits.Describe(request.GrantSeconds)} without asking."
+                + Environment.NewLine
+                + "  It can change the files that command runs (scripts, package.json) in that time.",
+            OnceOnly.ClientPolicy => _clientPolicyLine,
+            _ => "  this profile is protected: it is asked about every time.",
+        });
+
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    private static string Source(RunPromptVariable variable) =>
+        string.Equals(variable.Field, "password", StringComparison.Ordinal) ? variable.Entry : $"{variable.Entry} · {variable.Field}";
 }

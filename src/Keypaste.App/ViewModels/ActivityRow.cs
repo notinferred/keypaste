@@ -1,4 +1,5 @@
 using System.Globalization;
+using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Ipc;
 
@@ -63,12 +64,38 @@ internal sealed class ActivityRow
     internal static ActivityRow Granted(int number, GrantInForce grant) =>
         new(number, grant.Approved, grant.Remaining, "ends in", grant.Key);
 
-    /// <summary>A timed grant a person gave a repeated <c>keypaste run --session</c>; its names were sanitized for the prompt that gave it.</summary>
+    /// <summary>A timed grant a person gave a repeated <c>keypaste run --session</c> or an agent's run; its names were sanitized for the prompt that gave it.</summary>
     internal static ActivityRow EnvGranted(int number, EnvGrantInForce grant) =>
-        new(number, GrantSummary.EnvClient, "none configured", $"{grant.Project} · {grant.Profile} · {grant.Command}", "set", "ends in " + Seconds(grant.Remaining))
+        new(
+            number,
+            grant.Client ?? GrantSummary.EnvClient,
+            grant.Label is { } label ? EntryNameSanitizer.Sanitize(label, ApprovalPrompt.MaximumClientLength).Text : "none configured",
+            $"{grant.Project} · {grant.Profile} · {grant.Command}",
+            grant.Client is null ? "set" : "run",
+            "ends in " + Seconds(grant.Remaining))
         {
             Id = GrantId.OfEnv(grant.Key),
         };
+
+    /// <summary>An agent's run a person is being asked about.</summary>
+    internal static ActivityRow WaitingRun(int number, WaitingRun waiting) =>
+        new(
+            number,
+            waiting.Prompt.Client,
+            waiting.Prompt.Label ?? "none configured",
+            $"{waiting.Prompt.Command} · {string.Join(", ", waiting.Prompt.Variables.Select(variable => variable.Name))}",
+            "run",
+            "answered for you in " + Seconds(waiting.Remaining));
+
+    /// <summary>A <c>keypaste run --session</c> request a person is being asked about.</summary>
+    internal static ActivityRow WaitingEnv(int number, WaitingEnv waiting) =>
+        new(
+            number,
+            waiting.Prompt.Requester ?? GrantSummary.EnvClient,
+            "none configured",
+            $"{waiting.Prompt.Project} · {waiting.Prompt.Profile} · {waiting.Prompt.Command}",
+            "set",
+            "answered for you in " + Seconds(waiting.Remaining));
 
     // Rounded up, so a grant with half a second left does not read as over.
     private static string Seconds(TimeSpan remaining) =>

@@ -1186,6 +1186,22 @@ internal sealed class KeePassInterop : IDisposable
         return revisions;
     }
 
+    /// <summary>When the one entry with this name was created and last modified, or null when there is none.</summary>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal EntryTimes? ReadTimes(EntryName name)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (Locate(name) is not { } found)
+        {
+            return null;
+        }
+
+        return new EntryTimes(
+            new DateTimeOffset(DateTime.SpecifyKind(found.Entry.CreationTime, DateTimeKind.Utc)),
+            new DateTimeOffset(DateTime.SpecifyKind(found.Entry.LastModificationTime, DateTimeKind.Utc)));
+    }
+
     /// <summary>Puts the revision at this position in <see cref="ReadHistory"/>'s order back as the
     /// entry's current values.</summary>
     /// <returns>The number of entries restored: 0 if nothing matched, otherwise 1.</returns>

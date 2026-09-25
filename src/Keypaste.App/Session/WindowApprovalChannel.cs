@@ -52,6 +52,14 @@ internal sealed class WindowApprovalChannel(TimeProvider clock, TimeSpan answerW
         return ShowAsync(request, () => new EnvApprovalWindow(request), cancellationToken);
     }
 
+    public ValueTask<ApprovalAnswer> AskAsync(RunPrompt prompt, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(prompt);
+
+        var request = new RunApprovalViewModel(prompt);
+        return ShowAsync(request, () => new RunApprovalWindow(request), cancellationToken);
+    }
+
     private async ValueTask<ApprovalAnswer> ShowAsync(
         PromptViewModel request,
         Func<Window> create,

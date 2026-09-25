@@ -14,6 +14,7 @@ public sealed class Vault : IDisposable
     private readonly KeePassInterop _interop;
     private readonly Lock _state = new();
     private byte[]? _stamp;
+    private DateTimeOffset? _savedAt;
     private bool _pending;
     private bool _disposed;
     private bool _backedUp;
@@ -25,6 +26,7 @@ public sealed class Vault : IDisposable
         _interop = interop;
         Path = path;
         _stamp = stamp ? SourceSnapshot.Digest(path) : null;
+        _savedAt = _stamp is null ? null : WrittenAt(path);
     }
 
     /// <summary>The path of the file backing this vault.</summary>
@@ -58,6 +60,51 @@ public sealed class Vault : IDisposable
     /// any save of it, so whatever was released from those entries is withdrawn first (D-0318).
     /// </remarks>
     public event EventHandler<VaultEdit>? Edited;
+
+    /// <summary>Raised after a save has written the file, outside the state lock.</summary>
+    public event EventHandler? Saved;
+
+    /// <summary>Whether the file holds what this vault holds, and when it was last written.</summary>
+    /// <returns>
+    /// <see cref="VaultSaveStatus.Unsaved"/> while a change is not saved or nothing was ever read from
+    /// the file; <see cref="VaultSaveStatus.Unreadable"/> when the file cannot be read;
+    /// <see cref="VaultSaveStatus.ChangedOnDisk"/> when something else wrote it; otherwise
+    /// <see cref="VaultSaveStatus.Saved"/>.
+    /// </returns>
+    /// <remarks>Hashes the whole file, as <see cref="ReadSaved(out IReadOnlyList{VaultEntry}?)"/> does, so a caller polls it sparingly.</remarks>
+    public VaultSaveState SaveState()
+    {
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            if (_pending || _stamp is not { } stamp)
+            {
+                return new VaultSaveState(VaultSaveStatus.Unsaved, _savedAt);
+            }
+
+            if (SourceSnapshot.Digest(Path) is not { } current)
+            {
+                return new VaultSaveState(VaultSaveStatus.Unreadable, _savedAt);
+            }
+
+            return new VaultSaveState(
+                CryptographicOperations.FixedTimeEquals(stamp, current) ? VaultSaveStatus.Saved : VaultSaveStatus.ChangedOnDisk,
+                _savedAt);
+        }
+    }
+
+    /// <summary>When the entry with this name was created and last modified.</summary>
+    /// <param name="name">The entry.</param>
+    /// <returns>Its times, or null when no entry answers to that name.</returns>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    public EntryTimes? ReadTimes(EntryName name)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+
+        return _interop.ReadTimes(name);
+    }
 
     /// <summary>The KDBX UUID of the entry called <paramref name="name"/>, as hex, or
     /// <see langword="null"/> if none has that name. A test seam; keypaste addresses entries by
@@ -1228,6 +1275,7 @@ public sealed class Vault : IDisposable
             lock (_state)
             {
                 _stamp = stamp;
+                _savedAt = WrittenAt(Path);
                 _pending = false;
             }
 
@@ -1236,6 +1284,20 @@ public sealed class Vault : IDisposable
         finally
         {
             clock.Publish(succeeded);
+        }
+
+        Saved?.Invoke(this, EventArgs.Empty);
+    }
+
+    private static DateTimeOffset? WrittenAt(string path)
+    {
+        try
+        {
+            return File.Exists(path) ? new DateTimeOffset(File.GetLastWriteTimeUtc(path), TimeSpan.Zero) : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
         }
     }
 
