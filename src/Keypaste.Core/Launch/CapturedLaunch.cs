@@ -167,6 +167,7 @@ public static class CapturedLaunch
             if (cancellationToken.IsCancellationRequested && !exited.IsCompleted)
             {
                 containment.KillAll(process);
+                await Task.WhenAny(exited, Task.Delay(_afterKill, CancellationToken.None)).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
             }
 

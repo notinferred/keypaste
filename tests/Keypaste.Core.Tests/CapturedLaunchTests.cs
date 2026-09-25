@@ -18,7 +18,22 @@ public sealed class CapturedLaunchTests : IDisposable
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
-    public void Dispose() => Directory.Delete(_directory, recursive: true);
+    public void Dispose()
+    {
+        // Windows can keep a killed child's working directory busy for a moment after it has exited.
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                Directory.Delete(_directory, recursive: true);
+                return;
+            }
+            catch (IOException) when (attempt < 20)
+            {
+                Thread.Sleep(100);
+            }
+        }
+    }
 
     private ChildStart Reporter(IReadOnlyDictionary<string, string>? environment, params string[] steps) =>
         new(Tests.Reporter.Path, steps, environment ?? Environment(("A", "1")), _directory);
