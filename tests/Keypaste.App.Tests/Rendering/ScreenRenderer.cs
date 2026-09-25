@@ -46,7 +46,157 @@ public sealed class ScreenRenderer
         DrawShell(demo, output!);
         DrawApproval(output!);
         DrawComponents(output!);
+        DrawLockAndImport(demo, output!);
     });
+
+    /// <summary>The lock screen's states and the KDBX import dialog over the shell.</summary>
+    private static void DrawLockAndImport(DemoVault demo, string output)
+    {
+        Core.Recent.RecentVaults.Save(
+            Core.Audit.KeypasteHome.RecentPath(demo.Home),
+            [new Core.Recent.RecentVault(demo.Path, DateTimeOffset.UtcNow)]);
+
+        var picker = new FakeVaultFilePicker();
+
+        using (var session = new AppVaultSession(new ManualClock()))
+        using (var unlock = new UnlockViewModel(session, demo.Home, picker, () => { }, lockedBy: VaultLockReason.Idle))
+        {
+            var window = Show(new UnlockView { DataContext = unlock });
+
+            foreach (var c in "hunter22")
+            {
+                unlock.Type(c);
+            }
+
+            Save(window, output, "80-lock-idle");
+
+            picker.NewPath = Path.Combine(demo.Home, "work.kdbx");
+            Assert.True(unlock.StartCreateCommand.CanExecute(null));
+            Wait(unlock.StartCreateAsync());
+            Save(window, output, "82-lock-create");
+            window.Close();
+        }
+
+        var empty = Directory.CreateTempSubdirectory("keypaste-screens-empty-").FullName;
+
+        try
+        {
+            using var session = new AppVaultSession(new ManualClock());
+            using var welcome = new UnlockViewModel(session, empty, picker, () => { });
+            var window = Show(new UnlockView { DataContext = welcome });
+            Save(window, output, "81-lock-welcome");
+            window.Close();
+        }
+        finally
+        {
+            Directory.Delete(empty, recursive: true);
+        }
+
+        var source = Path.Combine(demo.Home, "personal.kdbx");
+
+        using (var foreign = Vault.Create(source, "keepassxc-demo"))
+        {
+            foreign.AddEntry(new VaultEntry { Title = "Checking", Username = "maya.ortiz", Password = "demo-bank-1", GroupPath = "Banking" });
+            foreign.AddEntry(new VaultEntry { Title = "Savings", Username = "maya.ortiz", Password = "demo-bank-2", GroupPath = "Banking" });
+            foreign.AddEntry(new VaultEntry { Title = "fastmail", Username = "maya@fastmail.com", Password = "demo-mail", GroupPath = "Email" });
+            foreign.AddEntry(new VaultEntry { Title = "homelab", Username = "maya", Password = "demo-ssh-1", GroupPath = "SSH" });
+            foreign.AddEntry(new VaultEntry { Title = "nas", Username = "admin", Password = "demo-ssh-2", GroupPath = "SSH" });
+            foreign.AddEntry(new VaultEntry { Title = "POSTGRES_URL", Password = "demo-pg", GroupPath = "env/acme-jobs" });
+            foreign.AddEntry(new VaultEntry { Title = "QUEUE_TOKEN", Password = "demo-queue", GroupPath = "env/acme-jobs" });
+            foreign.AddEntry(new VaultEntry { Title = "old router", Password = "demo-old", GroupPath = "Email" });
+            foreign.RemoveEntry(new EntryName("Email", "old router"));
+            foreign.Save();
+        }
+
+        using (var session = new AppVaultSession(new ManualClock()))
+        {
+            using (var master = TempVault.Secret(_master))
+            {
+                Assert.Equal(UnlockOutcome.Opened, session.TryUnlock(demo.Path, master.Value));
+            }
+
+            picker.ExistingPath = source;
+            using var shell = new ShellViewModel(session, demo.Home, null, clipboard: new FakeClipboard(), clock: new ManualClock(), picker: picker);
+            var window = Show(new ShellView { DataContext = shell });
+
+            Wait(shell.ImportCommand.ExecuteAsync());
+            var import = shell.Import!;
+
+            foreach (var c in "keepass")
+            {
+                import.TypePassword(c);
+            }
+
+            Save(window, output, "93-import-locked");
+
+            import.ClearPassword();
+
+            foreach (var c in "keepassxc-demo")
+            {
+                import.TypePassword(c);
+            }
+
+            Wait(import.UnlockAsync());
+            Assert.True(import.IsDecrypted, import.Message);
+            Save(window, output, "94-import-mapped");
+
+            import.Rows.First(row => row.SourceGroup == "SSH").Destination = ".keypaste/ssh";
+            Save(window, output, "95-import-blocked");
+
+            import.Rows.First(row => row.SourceGroup == "SSH").Destination = "personal/SSH";
+            import.KeepEditingInPlace = true;
+            Save(window, output, "96-import-in-place");
+
+            import.KeepEditingInPlace = false;
+            import.ConfirmCommand.Execute(null);
+            Assert.Null(shell.Import);
+            Save(window, output, "97-import-done");
+            window.Close();
+        }
+
+        Core.Recent.RecentVaults.Save(
+            Core.Audit.KeypasteHome.RecentPath(demo.Home),
+            [
+                new Core.Recent.RecentVault(demo.Path, DateTimeOffset.UtcNow),
+                new Core.Recent.RecentVault(source, DateTimeOffset.UtcNow.AddMinutes(-5)),
+                new Core.Recent.RecentVault(Path.Combine(demo.Home, "moved.kdbx"), DateTimeOffset.UtcNow.AddDays(-2)),
+            ]);
+
+        using (var session = new AppVaultSession(new ManualClock()))
+        using (var unlock = new UnlockViewModel(session, demo.Home, picker, () => { }, lockedBy: VaultLockReason.Requested))
+        {
+            var window = Show(new UnlockView { DataContext = unlock });
+            Save(window, output, "83-lock-recent");
+
+            Assert.True(unlock.OffersRestore);
+            unlock.StartRestoreCommand.Execute(null);
+            Save(window, output, "84-lock-restore");
+            window.Close();
+        }
+    }
+
+    private static MainWindow Show(Control content)
+    {
+        var window = new MainWindow { Width = _width, Height = _height };
+        window.FindControl<ContentControl>("Root")!.Content = content;
+        window.Show();
+        WindowInput.Drain();
+        return window;
+    }
+
+    /// <summary>Runs the dispatcher until <paramref name="task"/> is done, for work that hops off the UI thread.</summary>
+    private static void Wait(Task task)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+
+        while (!task.IsCompleted && DateTime.UtcNow < deadline)
+        {
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            Thread.Sleep(5);
+        }
+
+        task.GetAwaiter().GetResult();
+    }
 
     private static void DrawUnlock(DemoVault demo, string output)
     {

@@ -64,7 +64,8 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         IVaultFilePicker picker,
         Action unlocked,
         Action<Action>? post = null,
-        string? message = null)
+        string? message = null,
+        VaultLockReason? lockedBy = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(picker);
@@ -86,12 +87,29 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         ChooseKeyfileCommand = new AsyncRelayCommand(ChooseKeyfileAsync, () => !_busy);
         ClearKeyfileCommand = new RelayCommand(() => KeyfilePath = null, () => !_busy && _keyfilePath is not null);
         Reload();
+        LockNote = lockedBy is { } reason ? DescribeLock(reason, session.Clock.GetLocalNow(), session.IdleTimeout) : string.Empty;
 
         if (message is not null)
         {
             Message = message;
         }
     }
+
+    /// <summary>Why the vault on this screen was locked, when this screen follows a lock; otherwise empty.</summary>
+    internal string LockNote { get; }
+
+    internal bool HasLockNote => LockNote.Length > 0;
+
+    /// <summary>The screen's heading: which vault is locked, or an invitation to open one.</summary>
+    internal string Heading => _selectedPath is null
+        ? "Open a vault"
+        : _restoreOnly ? $"{SelectedName} can't be opened" : $"{SelectedName} is locked";
+
+    /// <summary>What the heading of the create form says.</summary>
+    internal string CreateHeading => $"Create {NewVaultName}";
+
+    /// <summary>Whether the recent list has a vault in it other than the one already selected.</summary>
+    internal bool ShowsRecent => Recent.Any(item => !string.Equals(item.Path, _selectedPath, PathIdentity.Comparison));
 
     /// <summary>The vaults this machine has opened, most recent first.</summary>
     internal IReadOnlyList<RecentVaultItem> Recent { get; private set; } = [];
@@ -240,6 +258,8 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
                 Look();
                 Raise(nameof(SelectedName));
                 Raise(nameof(HasSelection));
+                Raise(nameof(Heading));
+                Raise(nameof(ShowsRecent));
             }
         }
     }
@@ -434,13 +454,30 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         return true;
     }
 
+    /// <summary>Offers a file with the keyfile it opens with, as keeping an imported file in place does.</summary>
+    /// <returns><see langword="true"/> when it is a KDBX vault and is now selected.</returns>
+    internal bool Offer(string path, string? keyfile)
+    {
+        if (!Offer(path))
+        {
+            return false;
+        }
+
+        if (keyfile is not null)
+        {
+            KeyfilePath = System.IO.Path.GetFullPath(keyfile);
+        }
+
+        return true;
+    }
+
     /// <summary>
     /// Selects a path that holds no readable vault, for restoring only, when backups sit beside it.
     /// </summary>
     /// <remarks>
     /// A damaged or missing vault is the case backups exist for (docs/PRODUCT.md law 5.7), and
     /// refusing to select one would leave its backups unreachable from the only screen that can
-    /// restore them. Nothing here can be unlocked, and <see cref="Offer"/> still answers false.
+    /// restore them. Nothing here can be unlocked, and <see cref="Offer(string)"/> still answers false.
     /// </remarks>
     private bool OfferForRestore(string path, string why)
     {
@@ -468,6 +505,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         Raise(nameof(HasBackups));
         Raise(nameof(OffersRestore));
         Raise(nameof(IsRestoreOnly));
+        Raise(nameof(Heading));
         Raise(nameof(CanTypePassword));
         UnlockCommand.RaiseCanExecuteChanged();
         StartRestoreCommand.RaiseCanExecuteChanged();
@@ -668,6 +706,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         Message = string.Empty;
         KeyfilePath = null;
         Raise(nameof(NewVaultName));
+        Raise(nameof(CreateHeading));
         IsCreating = true;
         CreateCommand.RaiseCanExecuteChanged();
     }
@@ -825,6 +864,36 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     private void ShowOwner() =>
         Owner = _session.HeldBy is { } holder ? new AuthorityStatus.HeldBy(holder).Sentence : string.Empty;
 
+    /// <summary>The lock note for <paramref name="reason"/>, or empty where the screen already says why.</summary>
+    internal static string DescribeLock(VaultLockReason reason, DateTimeOffset at, TimeSpan idleTimeout)
+    {
+        var time = at.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+
+        return reason switch
+        {
+            VaultLockReason.Idle => $"Locked at {time} after {Duration(idleTimeout)} without use",
+            VaultLockReason.Manual => $"You locked it at {time}",
+            VaultLockReason.Minimized => $"Locked at {time} when the window was minimized",
+            VaultLockReason.Requested => $"Locked at {time} by keypaste lock",
+            _ => string.Empty,
+        };
+    }
+
+    private static string Duration(TimeSpan span)
+    {
+        static string Unit(int count, string unit) =>
+            string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{count} {unit}{(count == 1 ? string.Empty : "s")}");
+
+        var minutes = (int)Math.Round(span.TotalMinutes);
+
+        return minutes switch
+        {
+            < 60 => Unit(minutes, "minute"),
+            _ when minutes % 60 == 0 => Unit(minutes / 60, "hour"),
+            _ => $"{Unit(minutes / 60, "hour")} {Unit(minutes % 60, "minute")}",
+        };
+    }
+
     private static string Explain(UnlockOutcome outcome, bool withKeyfile = false) => outcome switch
     {
         // Naming both factors when both were given, or a good password and the wrong file sends the
@@ -860,6 +929,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         Raise(nameof(Recent));
         Raise(nameof(HasRecent));
         Raise(nameof(HasNoRecent));
+        Raise(nameof(ShowsRecent));
     }
 
     private void AfterTyping()

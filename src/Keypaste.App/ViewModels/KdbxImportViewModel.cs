@@ -21,12 +21,13 @@ namespace Keypaste.App.ViewModels;
 /// typed for the file stays in a buffer that is cleared once it has been tried.
 /// </para>
 /// </remarks>
-internal sealed class KdbxImportViewModel : ObservableObject, IDisposable
+internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisposable
 {
     private readonly AppVaultSession _session;
     private readonly KdbxProbe? _probe;
     private readonly Action<string, string?> _openInPlace;
     private readonly Action<string> _announce;
+    private readonly Func<Task<string?>>? _pickKeyfile;
     private readonly SecretBuffer _password = new();
 
     private ImportSource? _source;
@@ -46,11 +47,13 @@ internal sealed class KdbxImportViewModel : ObservableObject, IDisposable
     /// locks the vault it has and asks for this one's password.
     /// </param>
     /// <param name="announce">Says what an import did, once it is saved.</param>
+    /// <param name="pickKeyfile">Asks which keyfile opens the file; null where nothing can ask.</param>
     internal KdbxImportViewModel(
         AppVaultSession session,
         string path,
         Action<string, string?> openInPlace,
-        Action<string> announce)
+        Action<string> announce,
+        Func<Task<string?>>? pickKeyfile = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(path);
@@ -60,6 +63,7 @@ internal sealed class KdbxImportViewModel : ObservableObject, IDisposable
         _session = session;
         _openInPlace = openInPlace;
         _announce = announce;
+        _pickKeyfile = pickKeyfile;
 
         if (KdbxImport.TryProbe(path, out var probe, out var error))
         {
@@ -74,9 +78,56 @@ internal sealed class KdbxImportViewModel : ObservableObject, IDisposable
         UnlockCommand = new AsyncRelayCommand(UnlockAsync, () => !_busy && _probe is not null && _source is null);
         ConfirmCommand = new RelayCommand(Confirm, () => CanConfirm);
         CancelCommand = new RelayCommand(Dispose);
+        ChooseKeyfileCommand = new AsyncRelayCommand(ChooseKeyfileAsync, () => !_busy && _source is null && _pickKeyfile is not null);
+        ClearKeyfileCommand = new RelayCommand(() => KeyfilePath = null, () => !_busy && _source is null && _keyfilePath is not null);
 
         _session.Locked += OnLocked;
     }
+
+    /// <summary>Raised once, when the dialog is done: cancelled, confirmed or dropped by a lock.</summary>
+    internal event EventHandler? Closed;
+
+    /// <summary>Whether the file's header was read, so there is something to unlock or open.</summary>
+    internal bool IsReadable => _probe is not null;
+
+    /// <summary>The file card's second line: the header before unlock, and what unlocked it after.</summary>
+    internal string CardDetail => _source is null
+        ? $"{Version} · {Kdf} · {Cipher}"
+        : $"{Version} · {Kdf} · {Entries(EntryCount)} · {KeyFactors}";
+
+    /// <summary>Whether the password and keyfile are still wanted before rows can show.</summary>
+    internal bool NeedsUnlock => !_disposed && _probe is not null && _source is null && !_keepInPlace;
+
+    /// <summary>Whether the group mapping shows: the file is unlocked and is being copied.</summary>
+    internal bool ShowsRows => _source is not null && !_keepInPlace;
+
+    /// <summary>The unlock button's words, which say when Argon2 is running.</summary>
+    internal string UnlockText => _busy ? "Unlocking…" : "Unlock";
+
+    /// <summary>What the file holds that no import copies, such as its recycle bin.</summary>
+    internal string SkippedText => _source is { Skipped.Count: > 0 } source
+        ? "Not copied: " + string.Join(", ", source.Skipped.Select(skip => $"{Show(skip.SourceGroup)} ({Entries(skip.EntryCount)})"))
+        : string.Empty;
+
+    internal bool HasSkipped => SkippedText.Length > 0;
+
+    /// <summary>What keeping the file in place does to the vault that is open now.</summary>
+    internal string InPlaceNote => _session.VaultPath is { } open
+        ? $"{Show(System.IO.Path.GetFileName(open))} locks and {FileName} opens as the vault, asking for its password. Nothing is copied."
+        : $"{FileName} opens as the vault. Nothing is copied.";
+
+    internal bool HasMessage => _message.Length > 0;
+
+    /// <summary>The keyfile's name; the full path is a tooltip.</summary>
+    internal string KeyfileName => _keyfilePath is null ? string.Empty : Show(System.IO.Path.GetFileName(_keyfilePath));
+
+    internal bool HasKeyfile => _keyfilePath is not null;
+
+    /// <summary>Asks for the file's keyfile.</summary>
+    internal AsyncRelayCommand ChooseKeyfileCommand { get; }
+
+    /// <summary>Stops using a keyfile, including one found beside the file.</summary>
+    internal RelayCommand ClearKeyfileCommand { get; }
 
     internal string FileName => Show(_probe?.FileName);
 
@@ -111,7 +162,15 @@ internal sealed class KdbxImportViewModel : ObservableObject, IDisposable
     internal string? KeyfilePath
     {
         get => _keyfilePath;
-        set => Set(ref _keyfilePath, string.IsNullOrEmpty(value) ? null : value);
+        set
+        {
+            if (Set(ref _keyfilePath, string.IsNullOrEmpty(value) ? null : value))
+            {
+                Raise(nameof(KeyfileName));
+                Raise(nameof(HasKeyfile));
+                ClearKeyfileCommand.RaiseCanExecuteChanged();
+            }
+        }
     }
 
     internal AsyncRelayCommand UnlockCommand { get; }
@@ -149,7 +208,13 @@ internal sealed class KdbxImportViewModel : ObservableObject, IDisposable
     internal string Message
     {
         get => _message;
-        private set => Set(ref _message, value);
+        private set
+        {
+            if (Set(ref _message, value))
+            {
+                Raise(nameof(HasMessage));
+            }
+        }
     }
 
     internal bool Busy
@@ -159,7 +224,10 @@ internal sealed class KdbxImportViewModel : ObservableObject, IDisposable
         {
             if (Set(ref _busy, value))
             {
+                Raise(nameof(UnlockText));
                 UnlockCommand.RaiseCanExecuteChanged();
+                ChooseKeyfileCommand.RaiseCanExecuteChanged();
+                ClearKeyfileCommand.RaiseCanExecuteChanged();
             }
         }
     }
@@ -203,6 +271,15 @@ internal sealed class KdbxImportViewModel : ObservableObject, IDisposable
             Raise(nameof(PasswordLength));
         }
     }
+
+    void ISecretSink.Type(char value) => TypePassword(value);
+
+    void ISecretSink.Backspace() => BackspacePassword();
+
+    void ISecretSink.Clear() => ClearPassword();
+
+    // A master password is typed, never pasted, as on the unlock screen.
+    Task ISecretSink.Paste() => Task.CompletedTask;
 
     /// <summary>Unlocks the file off the UI thread and lays out its rows.</summary>
     /// <remarks>Internal so a test can await what <see cref="UnlockCommand"/> starts.</remarks>
@@ -262,6 +339,27 @@ internal sealed class KdbxImportViewModel : ObservableObject, IDisposable
         _password.Dispose();
         Rows.Clear();
         Refresh();
+        Closed?.Invoke(this, EventArgs.Empty);
+    }
+
+    private async Task ChooseKeyfileAsync()
+    {
+        if (_pickKeyfile is null || await _pickKeyfile().ConfigureAwait(true) is not { } picked || _disposed)
+        {
+            return;
+        }
+
+        var full = System.IO.Path.GetFullPath(picked);
+        var inspection = VaultKeyfile.Inspect(full);
+
+        if (!inspection.Accepted)
+        {
+            Message = UnlockViewModel.ExplainKeyfile(inspection.Outcome);
+            return;
+        }
+
+        Message = string.Empty;
+        KeyfilePath = full;
     }
 
     private void Confirm()
@@ -355,6 +453,11 @@ internal sealed class KdbxImportViewModel : ObservableObject, IDisposable
 
     private void Refresh()
     {
+        Raise(nameof(NeedsUnlock));
+        Raise(nameof(ShowsRows));
+        Raise(nameof(CardDetail));
+        Raise(nameof(SkippedText));
+        Raise(nameof(HasSkipped));
         Raise(nameof(IsDecrypted));
         Raise(nameof(EntryCount));
         Raise(nameof(KeyFactors));
@@ -363,6 +466,8 @@ internal sealed class KdbxImportViewModel : ObservableObject, IDisposable
         Raise(nameof(CanConfirm));
         UnlockCommand.RaiseCanExecuteChanged();
         ConfirmCommand.RaiseCanExecuteChanged();
+        ChooseKeyfileCommand.RaiseCanExecuteChanged();
+        ClearKeyfileCommand.RaiseCanExecuteChanged();
     }
 
     private void OnLocked(object? sender, VaultLockReason reason) => Dispose();
@@ -395,6 +500,8 @@ internal sealed class ImportRowViewModel : ObservableObject
 
     internal int Count => _row.EntryCount;
 
+    internal string CountText => Count.ToString(CultureInfo.InvariantCulture);
+
     /// <summary>The group path it lands at in the open vault.</summary>
     internal string Destination
     {
@@ -414,9 +521,15 @@ internal sealed class ImportRowViewModel : ObservableObject
     /// <summary>Whether <see cref="Problem"/> stops the import.</summary>
     internal bool Blocks => _blocks;
 
+    internal bool HasProblem => _problem.Length > 0;
+
     internal void Show(string problem, bool blocks)
     {
-        Set(ref _problem, problem, nameof(Problem));
+        if (Set(ref _problem, problem, nameof(Problem)))
+        {
+            Raise(nameof(HasProblem));
+        }
+
         Set(ref _blocks, blocks, nameof(Blocks));
     }
 

@@ -4,258 +4,484 @@
              xmlns:ctl="using:Keypaste.App.Controls"
              x:Class="Keypaste.App.Views.UnlockView"
              x:DataType="vm:UnlockViewModel"
-             Background="{DynamicResource KpSurface0}">
+             Background="{DynamicResource KpBgApp}">
 
-  <!-- The app's first impression. A centred card, generous padding, the vault's file name as the
-       heading, a quiet recent list and one primary button. No key art, no shield, no padlock. -->
+  <!-- The lock screen: a 360px column on a 16px hairline grid. The mark, which vault is locked, one
+       password field and one amber button; the other ways in (another vault, a new one, a backup,
+       a recent file) are quiet lines below it. -->
 
-  <Border HorizontalAlignment="Center" VerticalAlignment="Center"
-          Width="460"
-          Background="{DynamicResource KpSurface1}"
-          BorderBrush="{DynamicResource KpBorderSubtle}"
-          BorderThickness="1"
-          CornerRadius="{DynamicResource KpRadiusMd}"
-          Padding="{DynamicResource KpCardPadding}"
-          DragDrop.AllowDrop="True">
+  <UserControl.Resources>
 
-    <StackPanel Spacing="16">
-
-      <TextBlock Text="keypaste"
-                 FontSize="13"
-                 Foreground="{DynamicResource KpTextMuted}" />
-
-      <!-- Opening an existing vault. -->
-      <StackPanel Spacing="16" IsVisible="{Binding IsOpening}">
-
-        <TextBlock Text="{Binding SelectedName}"
-                   IsVisible="{Binding HasSelection}"
-                   FontSize="22"
-                   TextTrimming="CharacterEllipsis"
-                   Foreground="{DynamicResource KpTextPrimary}" />
-
-        <TextBlock Text="Open a vault"
-                   IsVisible="{Binding !HasSelection}"
-                   FontSize="22"
-                   Foreground="{DynamicResource KpTextPrimary}" />
-
-        <TextBlock Text="No vaults yet. Create one, drag a .kdbx file here, or browse for one."
-                   IsVisible="{Binding HasNoRecent}"
-                   TextWrapping="Wrap"
-                   Foreground="{DynamicResource KpTextSecondary}" />
-
-        <ListBox ItemsSource="{Binding Recent}"
-                 IsVisible="{Binding HasRecent}"
-                 MaxHeight="150"
-                 Background="Transparent"
-                 BorderThickness="0"
-                 SelectedItem="{Binding SelectedRecent}"
-                 x:Name="RecentList">
-          <ListBox.ItemTemplate>
-            <DataTemplate x:DataType="vm:RecentVaultItem">
-              <StackPanel Spacing="1" ToolTip.Tip="{Binding Path}">
-                <TextBlock Text="{Binding Name}"
+    <!-- The design's focused field: panel ink, amber border and glow, an amber caret after the dots.
+         No letter spacing: the drawn-mask tests search the frame for the dots as the font draws them. -->
+    <ControlTheme x:Key="LockField" TargetType="ctl:MaskedInput">
+      <Setter Property="Focusable" Value="True" />
+      <Setter Property="Height" Value="40" />
+      <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="Frame"
+                  Background="{DynamicResource KpBgPanel}"
+                  BorderBrush="{DynamicResource KpBorderDefault}"
+                  BorderThickness="1"
+                  CornerRadius="{DynamicResource KpRadiusButton}"
+                  Padding="12,0"
+                  ClipToBounds="True">
+            <Panel VerticalAlignment="Center">
+              <TextBlock Text="{TemplateBinding Placeholder}"
+                         IsVisible="{TemplateBinding IsEmpty}"
+                         FontFamily="{DynamicResource KpSans}"
+                         FontSize="13"
+                         Margin="6,0,0,0"
+                         VerticalAlignment="Center"
+                         Foreground="{DynamicResource KpTextMuted}" />
+              <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="{TemplateBinding Display}"
+                           VerticalAlignment="Center"
                            Foreground="{DynamicResource KpTextPrimary}" />
-                <TextBlock Text="missing"
-                           IsVisible="{Binding !Exists}"
-                           FontSize="11"
-                           Foreground="{DynamicResource KpTextMuted}" />
+                <Border Name="Caret"
+                        Width="1.5"
+                        Height="18"
+                        Margin="2,0,0,0"
+                        IsVisible="False"
+                        Background="{DynamicResource KpAccent}" />
               </StackPanel>
-            </DataTemplate>
-          </ListBox.ItemTemplate>
-        </ListBox>
+            </Panel>
+          </Border>
+        </ControlTemplate>
+      </Setter>
 
-        <ctl:MaskedInput x:Name="Password"
-                         MaskedLength="{Binding MaskedLength}"
-                         Placeholder="Master password"
-                         IsEnabled="{Binding CanTypePassword}" />
+      <Style Selector="^:pointerover /template/ Border#Frame">
+        <Setter Property="BorderBrush" Value="{DynamicResource KpBorderStrong}" />
+      </Style>
+      <Style Selector="^:focus /template/ Border#Frame">
+        <Setter Property="BorderBrush" Value="{DynamicResource KpFocusRing}" />
+        <Setter Property="BoxShadow" Value="{StaticResource KpFieldGlow}" />
+      </Style>
+      <Style Selector="^:focus /template/ Border#Caret">
+        <Setter Property="IsVisible" Value="True" />
+      </Style>
+      <Style Selector="^:disabled /template/ Border#Frame">
+        <Setter Property="Opacity" Value="0.5" />
+      </Style>
+    </ControlTheme>
 
-        <StackPanel Orientation="Horizontal" Spacing="8" IsEnabled="{Binding CanTypePassword}">
-          <Button Content="Keyfile…" Command="{Binding ChooseKeyfileCommand}" />
-          <TextBlock Text="{Binding KeyfileName}" VerticalAlignment="Center"
-                     TextTrimming="CharacterEllipsis" MaxWidth="220"
-                     ToolTip.Tip="{Binding KeyfilePath}"
-                     Foreground="{DynamicResource KpTextSecondary}" />
-          <Button Content="No keyfile" Command="{Binding ClearKeyfileCommand}" IsVisible="{Binding HasKeyfile}" />
-        </StackPanel>
-      </StackPanel>
+    <!-- #18191C hairlines every 16px on the app ink. -->
+    <DrawingBrush x:Key="LockGrid" TileMode="Tile" DestinationRect="0,0,16,16" Stretch="None">
+      <DrawingBrush.Drawing>
+        <DrawingGroup>
+          <GeometryDrawing Brush="{DynamicResource KpBgApp}" Geometry="M0,0 H16 V16 H0 Z" />
+          <GeometryDrawing Brush="{DynamicResource KpBgPanel}" Geometry="M0,0 H16 V1 H0 Z M0,1 H1 V16 H0 Z" />
+        </DrawingGroup>
+      </DrawingBrush.Drawing>
+    </DrawingBrush>
 
-      <!-- Putting a backup in the vault's place. Locked throughout: the check shows counts and a
-           time, never a name or a value, and nothing here is reachable once the vault is open. -->
-      <StackPanel IsVisible="{Binding IsRestoring}">
-      <StackPanel Spacing="12" DataContext="{Binding Restore}" x:DataType="vm:RestoreBackupViewModel">
+  </UserControl.Resources>
 
-        <TextBlock Text="Restore a backup"
-                   FontSize="22"
-                   Foreground="{DynamicResource KpTextPrimary}" />
+  <UserControl.Styles>
+    <Style Selector="TextBlock.lock-title">
+      <Setter Property="FontSize" Value="22" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="LetterSpacing" Value="-0.66" />
+      <Setter Property="TextAlignment" Value="Center" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+    </Style>
+    <Style Selector="TextBlock.lock-subtitle">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="TextAlignment" Value="Center" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+    </Style>
+    <Style Selector="TextBlock.lock-note">
+      <Setter Property="FontSize" Value="12.5" />
+      <Setter Property="LineHeight" Value="18" />
+      <Setter Property="TextAlignment" Value="Center" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
+    </Style>
 
-        <TextBlock Text="{Binding Note}"
-                   TextWrapping="Wrap"
-                   FontSize="13"
-                   Foreground="{DynamicResource KpTextSecondary}" />
+    <Style Selector="Button.wide">
+      <Setter Property="Height" Value="38" />
+      <Setter Property="MinHeight" Value="38" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="FontSize" Value="13.5" />
+    </Style>
 
-        <ListBox ItemsSource="{Binding Rows}"
-                 SelectedItem="{Binding Selected}"
-                 IsEnabled="{Binding IsChoosing}"
-                 MaxHeight="150"
-                 Background="Transparent"
-                 BorderThickness="0"
-                 x:Name="BackupList">
-          <ListBox.ItemTemplate>
-            <DataTemplate x:DataType="vm:BackupRow">
-              <StackPanel Spacing="1">
-                <TextBlock Text="{Binding Taken}"
-                           Foreground="{DynamicResource KpTextPrimary}" />
-                <TextBlock Text="damaged"
-                           IsVisible="{Binding IsDamaged}"
-                           FontSize="11"
-                           Foreground="{DynamicResource KpTextMuted}" />
-              </StackPanel>
-            </DataTemplate>
-          </ListBox.ItemTemplate>
-        </ListBox>
+    <!-- The design's "Touch YubiKey" line, used for every quieter way in. -->
+    <Style Selector="Button.quiet">
+      <Setter Property="Padding" Value="4,3" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="FontSize" Value="12.5" />
+      <Setter Property="FontWeight" Value="Normal" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.quiet /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
+    </Style>
+    <Style Selector="Button.quiet:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+    </Style>
+    <Style Selector="Button.quiet:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.quiet:disabled /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextDisabled}" />
+    </Style>
+    <Style Selector="Button.quiet ctl|KpIcon">
+      <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+    </Style>
 
-        <ctl:MaskedInput x:Name="BackupPassword"
-                         MaskedLength="{Binding MaskedLength}"
-                         Placeholder="That backup's master password"
-                         IsEnabled="{Binding IsChoosing}" />
+    <Style Selector="ListBox.recent > ListBoxItem">
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="Padding" Value="10,0" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="ListBox.recent > ListBoxItem ctl|KpIcon">
+      <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+    </Style>
+    <Style Selector="ListBox.recent > ListBoxItem:selected ctl|KpIcon">
+      <Setter Property="Foreground" Value="{DynamicResource KpAccent}" />
+    </Style>
+  </UserControl.Styles>
 
-        <StackPanel Orientation="Horizontal" Spacing="8" IsEnabled="{Binding IsChoosing}">
-          <Button Content="That backup's keyfile…" Command="{Binding ChooseKeyfileCommand}" />
-          <TextBlock Text="{Binding KeyfileName}" VerticalAlignment="Center"
-                     TextTrimming="CharacterEllipsis" MaxWidth="220"
-                     ToolTip.Tip="{Binding KeyfilePath}"
-                     Foreground="{DynamicResource KpTextSecondary}" />
-          <Button Content="No keyfile" Command="{Binding ClearKeyfileCommand}" IsVisible="{Binding HasKeyfile}" />
-        </StackPanel>
+  <Border Background="{StaticResource LockGrid}" DragDrop.AllowDrop="True">
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+      <StackPanel Width="360"
+                  Margin="24,48,24,32"
+                  HorizontalAlignment="Center"
+                  VerticalAlignment="Center"
+                  Spacing="18">
 
-        <!-- Replacing a vault is the one act on this screen that is not ordinary. -->
-        <Border IsVisible="{Binding IsConfirming}"
-                BorderBrush="{DynamicResource KpDanger}"
-                BorderThickness="1"
-                CornerRadius="{DynamicResource KpRadiusSm}"
-                Padding="12">
-          <StackPanel Spacing="8">
-            <TextBlock Text="{Binding Taken}" TextWrapping="Wrap"
-                       Foreground="{DynamicResource KpTextPrimary}" />
-            <TextBlock Text="{Binding Holds}" TextWrapping="Wrap"
-                       Foreground="{DynamicResource KpTextPrimary}" />
-            <TextBlock Text="{Binding Replaces}" TextWrapping="Wrap"
-                       Foreground="{DynamicResource KpTextPrimary}" />
-            <TextBlock Text="{Binding Warning}" TextWrapping="Wrap"
-                       FontSize="13"
-                       Foreground="{DynamicResource KpTextSecondary}" />
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <Button Content="Restore this backup" Command="{Binding ConfirmCommand}"
-                      Foreground="{DynamicResource KpDanger}" />
-              <Button Content="Leave the vault as it is" Command="{Binding CancelCommand}" />
+        <ctl:BrandMark Width="56" Height="56" HorizontalAlignment="Center" />
+
+        <!-- Opening an existing vault, or choosing one when there is none yet. -->
+        <StackPanel Spacing="18" IsVisible="{Binding IsOpening}">
+
+          <StackPanel Spacing="6">
+            <TextBlock Classes="lock-title" Text="{Binding Heading}" ToolTip.Tip="{Binding SelectedPath}" />
+            <TextBlock Classes="lock-subtitle"
+                       Text="Agents are paused until you unlock."
+                       IsVisible="{Binding HasSelection}" />
+            <TextBlock Classes="lock-subtitle"
+                       Text="Choose a .kdbx file, drag one here, or create a new vault."
+                       IsVisible="{Binding !HasSelection}" />
+            <StackPanel Orientation="Horizontal"
+                        Spacing="6"
+                        Margin="0,4,0,0"
+                        HorizontalAlignment="Center"
+                        IsVisible="{Binding HasLockNote}">
+              <ctl:KpIcon Icon="clock" Size="12" Foreground="{DynamicResource KpTextMuted}" />
+              <TextBlock Classes="muted" FontSize="12" Text="{Binding LockNote}" VerticalAlignment="Center" />
             </StackPanel>
           </StackPanel>
-        </Border>
 
-        <TextBlock Text="{Binding Message}"
-                   IsVisible="{Binding HasMessage}"
-                   TextWrapping="Wrap"
-                   FontSize="13"
-                   Foreground="{DynamicResource KpTextSecondary}" />
-      </StackPanel>
-      </StackPanel>
+          <StackPanel Spacing="18" IsVisible="{Binding HasSelection}">
+            <ctl:MaskedInput x:Name="Password"
+                             Theme="{StaticResource LockField}"
+                             MaskedLength="{Binding MaskedLength}"
+                             Placeholder="Master password"
+                             IsEnabled="{Binding CanTypePassword}" />
 
-      <!-- Making one. The path is already chosen by the time this shows. -->
-      <StackPanel Spacing="16" IsVisible="{Binding IsCreating}">
+            <Button Classes="primary wide"
+                    IsDefault="True"
+                    Command="{Binding UnlockCommand}">
+              <Panel>
+                <TextBlock Text="Unlock" IsVisible="{Binding !Busy}" />
+                <TextBlock Text="Unlocking…" IsVisible="{Binding Busy}" />
+              </Panel>
+            </Button>
 
-        <TextBlock Text="{Binding NewVaultName}"
-                   FontSize="22"
-                   TextTrimming="CharacterEllipsis"
-                   Foreground="{DynamicResource KpTextPrimary}" />
+            <Panel HorizontalAlignment="Center" IsEnabled="{Binding CanTypePassword}">
+              <Button Classes="quiet"
+                      IsVisible="{Binding !HasKeyfile}"
+                      Command="{Binding ChooseKeyfileCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <ctl:KpIcon Icon="file-key" Size="14" />
+                  <TextBlock Text="Unlock with a key file too" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
+              <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasKeyfile}">
+                <ctl:KpIcon Icon="file-key" Size="14" Foreground="{DynamicResource KpAccent}" />
+                <TextBlock Classes="mono secondary"
+                           FontSize="12"
+                           Text="{Binding KeyfileName}"
+                           ToolTip.Tip="{Binding KeyfilePath}"
+                           MaxWidth="240"
+                           TextTrimming="CharacterEllipsis"
+                           VerticalAlignment="Center" />
+                <Button Classes="icon ghost sm"
+                        Width="22" Height="22"
+                        ToolTip.Tip="Unlock without a key file"
+                        Command="{Binding ClearKeyfileCommand}">
+                  <ctl:KpIcon Icon="x" Size="12" />
+                </Button>
+              </StackPanel>
+            </Panel>
+          </StackPanel>
 
-        <TextBlock Text="Choose a master password. There is no way to recover it."
-                   TextWrapping="Wrap"
-                   FontSize="13"
-                   Foreground="{DynamicResource KpTextSecondary}" />
+          <StackPanel Spacing="10" IsVisible="{Binding !HasSelection}">
+            <Button Classes="primary wide" Command="{Binding BrowseCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <ctl:KpIcon Icon="folder-open" Size="15" />
+                <TextBlock Text="Open a vault…" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+            <Button Classes="wide" Command="{Binding StartCreateCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <ctl:KpIcon Icon="plus" Size="15" />
+                <TextBlock Text="Create a new vault…" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
 
-        <ctl:MaskedInput x:Name="NewPassword"
-                         MaskedLength="{Binding NewMaskedLength}"
-                         Placeholder="New master password" />
-
-        <ctl:MaskedInput x:Name="ConfirmPassword"
-                         MaskedLength="{Binding ConfirmMaskedLength}"
-                         Placeholder="Confirm master password" />
-
-        <TextBlock Text="A keyfile is optional. keypaste uses one you already have, such as a KeePassXC keyfile, and never makes one. Losing it locks the vault."
-                   TextWrapping="Wrap"
-                   FontSize="12"
-                   Foreground="{DynamicResource KpTextMuted}" />
-        <StackPanel Orientation="Horizontal" Spacing="8">
-          <Button Content="Add a keyfile…" Command="{Binding ChooseKeyfileCommand}" />
-          <TextBlock Text="{Binding KeyfileName}" VerticalAlignment="Center"
-                     TextTrimming="CharacterEllipsis" MaxWidth="220"
-                     ToolTip.Tip="{Binding KeyfilePath}"
-                     Foreground="{DynamicResource KpTextSecondary}" />
-          <Button Content="No keyfile" Command="{Binding ClearKeyfileCommand}" IsVisible="{Binding HasKeyfile}" />
         </StackPanel>
-      </StackPanel>
 
-      <TextBlock Text="{Binding Message}"
-                 IsVisible="{Binding HasMessage}"
-                 TextWrapping="Wrap"
-                 FontSize="13"
-                 Foreground="{DynamicResource KpTextSecondary}" />
+        <!-- Making one. The path is already chosen by the time this shows. -->
+        <StackPanel Spacing="18" IsVisible="{Binding IsCreating}">
 
-      <TextBlock x:Name="Owner"
-                 Text="{Binding Owner}"
-                 IsVisible="{Binding HasOwner}"
-                 TextWrapping="Wrap"
-                 FontSize="13"
-                 Foreground="{DynamicResource KpTextSecondary}" />
+          <StackPanel Spacing="6">
+            <TextBlock Classes="lock-title" Text="{Binding CreateHeading}" />
+            <TextBlock Classes="lock-subtitle" Text="Choose a master password. There is no way to recover it." />
+          </StackPanel>
 
-      <Grid ColumnDefinitions="Auto,Auto,*,Auto" IsVisible="{Binding IsOpening}">
-        <Button Grid.Column="0"
-                Content="Create…"
-                Command="{Binding StartCreateCommand}" />
-        <Button Grid.Column="1"
-                Content="Browse…"
-                Margin="8,0,0,0"
-                Command="{Binding BrowseCommand}" />
-        <Button Grid.Column="3"
-                Content="Unlock"
-                IsDefault="True"
-                Command="{Binding UnlockCommand}"
-                Classes="accent" />
-      </Grid>
+          <StackPanel Spacing="10">
+            <ctl:MaskedInput x:Name="NewPassword"
+                             Theme="{StaticResource LockField}"
+                             MaskedLength="{Binding NewMaskedLength}"
+                             Placeholder="New master password" />
+            <ctl:MaskedInput x:Name="ConfirmPassword"
+                             Theme="{StaticResource LockField}"
+                             MaskedLength="{Binding ConfirmMaskedLength}"
+                             Placeholder="Confirm master password" />
+          </StackPanel>
 
-      <Button Content="Restore a backup…"
-              IsVisible="{Binding OffersRestore}"
-              Command="{Binding StartRestoreCommand}"
-              HorizontalAlignment="Left" />
+          <Button Classes="primary wide"
+                  IsDefault="True"
+                  Content="Create vault"
+                  Command="{Binding CreateCommand}" />
 
-      <Grid ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding IsRestoring}">
-        <Button Grid.Column="0"
-                Content="Back"
-                Command="{Binding CloseRestoreCommand}" />
-        <Button Grid.Column="2"
-                Content="Check this backup"
-                Command="{Binding Restore.CheckCommand}"
-                IsVisible="{Binding Restore.IsChoosing}"
-                Classes="accent" />
-      </Grid>
+          <StackPanel Spacing="8">
+            <Panel HorizontalAlignment="Center">
+              <Button Classes="quiet"
+                      IsVisible="{Binding !HasKeyfile}"
+                      Command="{Binding ChooseKeyfileCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <ctl:KpIcon Icon="file-key" Size="14" />
+                  <TextBlock Text="Add a key file" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
+              <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasKeyfile}">
+                <ctl:KpIcon Icon="file-key" Size="14" Foreground="{DynamicResource KpAccent}" />
+                <TextBlock Classes="mono secondary"
+                           FontSize="12"
+                           Text="{Binding KeyfileName}"
+                           ToolTip.Tip="{Binding KeyfilePath}"
+                           MaxWidth="240"
+                           TextTrimming="CharacterEllipsis"
+                           VerticalAlignment="Center" />
+                <Button Classes="icon ghost sm"
+                        Width="22" Height="22"
+                        ToolTip.Tip="No key file"
+                        Command="{Binding ClearKeyfileCommand}">
+                  <ctl:KpIcon Icon="x" Size="12" />
+                </Button>
+              </StackPanel>
+            </Panel>
+            <TextBlock Classes="caption"
+                       TextAlignment="Center"
+                       Text="A key file is optional. keypaste uses one you already have, such as a KeePassXC key file, and never makes one. Losing it locks the vault." />
+          </StackPanel>
+        </StackPanel>
 
-      <Grid ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding IsCreating}">
-        <Button Grid.Column="0"
+        <!-- Putting a backup in the vault's place. Locked throughout: the check shows counts and a
+             time, never a name or a value, and nothing here is reachable once the vault is open. -->
+        <StackPanel IsVisible="{Binding IsRestoring}">
+          <StackPanel Spacing="18" DataContext="{Binding Restore}" x:DataType="vm:RestoreBackupViewModel">
+
+            <StackPanel Spacing="6">
+              <TextBlock Classes="lock-title" Text="Restore a backup" />
+              <TextBlock Classes="lock-subtitle" Text="{Binding Note}" />
+            </StackPanel>
+
+            <Border BorderBrush="{DynamicResource KpBorderDefault}"
+                    BorderThickness="1"
+                    CornerRadius="{DynamicResource KpRadiusButton}"
+                    Background="{DynamicResource KpBgPanel}"
+                    Padding="4">
+              <ListBox x:Name="BackupList"
+                       Classes="recent"
+                       ItemsSource="{Binding Rows}"
+                       SelectedItem="{Binding Selected}"
+                       IsEnabled="{Binding IsChoosing}"
+                       MaxHeight="150">
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:BackupRow">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                      <ctl:KpIcon Grid.Column="0" Icon="history" Size="14" Margin="0,0,10,0" />
+                      <TextBlock Grid.Column="1" Classes="mono" Text="{Binding Taken}" VerticalAlignment="Center" />
+                      <Border Grid.Column="2" Classes="chip" IsVisible="{Binding IsDamaged}">
+                        <TextBlock Text="damaged" />
+                      </Border>
+                    </Grid>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+            </Border>
+
+            <ctl:MaskedInput x:Name="BackupPassword"
+                             Theme="{StaticResource LockField}"
+                             MaskedLength="{Binding MaskedLength}"
+                             Placeholder="That backup's master password"
+                             IsEnabled="{Binding IsChoosing}" />
+
+            <Panel HorizontalAlignment="Center" IsEnabled="{Binding IsChoosing}">
+              <Button Classes="quiet"
+                      IsVisible="{Binding !HasKeyfile}"
+                      Command="{Binding ChooseKeyfileCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <ctl:KpIcon Icon="file-key" Size="14" />
+                  <TextBlock Text="That backup's key file" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
+              <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasKeyfile}">
+                <ctl:KpIcon Icon="file-key" Size="14" Foreground="{DynamicResource KpAccent}" />
+                <TextBlock Classes="mono secondary"
+                           FontSize="12"
+                           Text="{Binding KeyfileName}"
+                           ToolTip.Tip="{Binding KeyfilePath}"
+                           MaxWidth="240"
+                           TextTrimming="CharacterEllipsis"
+                           VerticalAlignment="Center" />
+                <Button Classes="icon ghost sm"
+                        Width="22" Height="22"
+                        ToolTip.Tip="No key file"
+                        Command="{Binding ClearKeyfileCommand}">
+                  <ctl:KpIcon Icon="x" Size="12" />
+                </Button>
+              </StackPanel>
+            </Panel>
+
+            <Button Classes="primary wide"
+                    Content="Check this backup"
+                    IsVisible="{Binding IsChoosing}"
+                    Command="{Binding CheckCommand}" />
+
+            <!-- Replacing a vault is the one act on this screen that is not ordinary. -->
+            <Border IsVisible="{Binding IsConfirming}"
+                    BorderBrush="{DynamicResource KpDanger}"
+                    BorderThickness="1"
+                    CornerRadius="{DynamicResource KpRadiusCard}"
+                    Background="{DynamicResource KpBgCard}"
+                    Padding="14">
+              <StackPanel Spacing="8">
+                <TextBlock Classes="body primary" Text="{Binding Taken}" />
+                <TextBlock Classes="body primary" Text="{Binding Holds}" />
+                <TextBlock Classes="body primary" Text="{Binding Replaces}" />
+                <TextBlock Classes="caption" Text="{Binding Warning}" />
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                  <Button Classes="danger" Content="Restore this backup" Command="{Binding ConfirmCommand}" />
+                  <Button Classes="ghost" Content="Leave the vault as it is" Command="{Binding CancelCommand}" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <TextBlock Classes="lock-note"
+                       Text="{Binding Message}"
+                       IsVisible="{Binding HasMessage}" />
+          </StackPanel>
+        </StackPanel>
+
+        <TextBlock Classes="lock-note"
+                   Text="{Binding Message}"
+                   IsVisible="{Binding HasMessage}" />
+
+        <TextBlock x:Name="Owner"
+                   Classes="lock-note"
+                   Text="{Binding Owner}"
+                   IsVisible="{Binding HasOwner}" />
+
+        <!-- The other ways in, quieter than the one the screen is for. -->
+        <WrapPanel HorizontalAlignment="Center" Margin="-60,0" IsVisible="{Binding IsOpening}">
+          <Button Classes="quiet"
+                  Margin="8,0"
+                  IsVisible="{Binding HasSelection}"
+                  Command="{Binding BrowseCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <ctl:KpIcon Icon="folder-open" Size="14" />
+              <TextBlock Text="Open another vault" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button Classes="quiet"
+                  Margin="8,0"
+                  IsVisible="{Binding HasSelection}"
+                  Command="{Binding StartCreateCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <ctl:KpIcon Icon="plus" Size="14" />
+              <TextBlock Text="New vault" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button Classes="quiet"
+                  Margin="8,0"
+                  IsVisible="{Binding OffersRestore}"
+                  Command="{Binding StartRestoreCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <ctl:KpIcon Icon="history" Size="14" />
+              <TextBlock Text="Restore a backup" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+        </WrapPanel>
+
+        <Button Classes="quiet"
+                HorizontalAlignment="Center"
+                IsVisible="{Binding IsCreating}"
                 Content="Cancel"
                 Command="{Binding CancelCreateCommand}" />
-        <Button Grid.Column="2"
-                Content="Create vault"
-                IsDefault="True"
-                Command="{Binding CreateCommand}"
-                Classes="accent" />
-      </Grid>
 
-      <TextBlock Text="Opening…"
-                 IsVisible="{Binding Busy}"
-                 FontSize="12"
-                 Foreground="{DynamicResource KpTextMuted}" />
+        <Button Classes="quiet"
+                HorizontalAlignment="Center"
+                IsVisible="{Binding IsRestoring}"
+                Content="Back"
+                Command="{Binding CloseRestoreCommand}" />
 
-    </StackPanel>
+        <StackPanel Spacing="6" Margin="0,6,0,0">
+          <StackPanel.IsVisible>
+            <MultiBinding Converter="{x:Static BoolConverters.And}">
+              <Binding Path="IsOpening" />
+              <Binding Path="ShowsRecent" />
+            </MultiBinding>
+          </StackPanel.IsVisible>
+          <TextBlock Classes="th" Text="RECENT VAULTS" Margin="10,0" />
+          <ListBox x:Name="RecentList"
+                   Classes="recent"
+                   ItemsSource="{Binding Recent}"
+                   SelectedItem="{Binding SelectedRecent}"
+                   MaxHeight="180">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:RecentVaultItem">
+                <Grid ColumnDefinitions="Auto,*,Auto" ToolTip.Tip="{Binding Path}">
+                  <ctl:KpIcon Grid.Column="0" Icon="file-lock-2" Size="14" Margin="0,0,10,0" />
+                  <TextBlock Grid.Column="1"
+                             Classes="mono"
+                             Text="{Binding Name}"
+                             TextTrimming="CharacterEllipsis"
+                             VerticalAlignment="Center" />
+                  <Border Grid.Column="2" Classes="chip" IsVisible="{Binding !Exists}">
+                    <TextBlock Text="missing" />
+                  </Border>
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </StackPanel>
+
+      </StackPanel>
+    </ScrollViewer>
   </Border>
 
 </UserControl>

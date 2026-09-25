@@ -58,12 +58,11 @@
       <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
       <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
     </Style>
+    <!-- "Import .kdbx": a 32px row on a 1px dashed #3A3D43 outline, which Border cannot draw. -->
     <Style Selector="Button.import">
       <Setter Property="Height" Value="32" />
-      <Setter Property="BorderThickness" Value="1" />
-    </Style>
-    <Style Selector="Button.import /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="BorderBrush" Value="{DynamicResource KpBorderStrong}" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="VerticalContentAlignment" Value="Stretch" />
     </Style>
 
     <Style Selector="Button.mcp-card">
@@ -213,12 +212,20 @@
                 </ListBox.ItemTemplate>
               </ListBox>
 
-              <Button Classes="ghost sidebar-row import"
-                      IsVisible="{Binding ImportAvailable}">
-                <StackPanel Orientation="Horizontal" Spacing="10">
-                  <ctl:KpIcon Icon="file-input" Size="15" Foreground="{DynamicResource KpTextMuted}" />
-                  <TextBlock Text="Import .kdbx" FontSize="13" FontWeight="Normal" VerticalAlignment="Center" />
-                </StackPanel>
+              <Button Name="ImportKdbx"
+                      Classes="ghost sidebar-row import"
+                      IsVisible="{Binding ImportAvailable}"
+                      Command="{Binding ImportCommand}">
+                <Panel>
+                  <Rectangle RadiusX="7" RadiusY="7"
+                             Stroke="{DynamicResource KpBorderStrong}"
+                             StrokeThickness="1"
+                             StrokeDashArray="4,3" />
+                  <StackPanel Orientation="Horizontal" Spacing="10" Margin="10,0" VerticalAlignment="Center">
+                    <ctl:KpIcon Icon="file-input" Size="15" Foreground="{DynamicResource KpTextMuted}" />
+                    <TextBlock Text="Import .kdbx" FontSize="13" FontWeight="Normal" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Panel>
               </Button>
 
               <Button Name="McpCard"
@@ -360,6 +367,11 @@
         </Grid>
       </Grid>
     </Grid>
+
+    <!-- The KDBX import dialog, modal over the whole window. -->
+    <Border Classes="backdrop" IsVisible="{Binding HasImport}" Padding="24">
+      <views:KdbxImportView DataContext="{Binding Import}" />
+    </Border>
 
     <!-- Toasts, bottom right. The clipboard countdown is one; ShowToast says anything else. -->
     <StackPanel HorizontalAlignment="Right"
