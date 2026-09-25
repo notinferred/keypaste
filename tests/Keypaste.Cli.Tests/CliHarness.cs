@@ -49,6 +49,9 @@ internal sealed class CliHarness : IDisposable
 
     internal FakeClock Clock { get; } = new();
 
+    /// <summary>The directory commands run in, for <c>projects.json</c> inference and <c>.env.keypaste</c>.</summary>
+    internal string WorkingDirectory { get; set; } = System.Environment.CurrentDirectory;
+
     internal int Run(params string[] args) => CliApp.Run(args, NewContext());
 
     /// <summary>The context <see cref="Run"/> uses, for tests that call below the verb layer.</summary>
@@ -64,6 +67,7 @@ internal sealed class CliHarness : IDisposable
         ProcessRunner = ProcessRunner,
         ConsoleStyle = ConsoleStyle,
         Clock = Clock,
+        WorkingDirectory = WorkingDirectory,
     };
 
     /// <summary>Creates a vault with one entry per supplied spec, via the CLI itself.</summary>
@@ -272,6 +276,11 @@ internal sealed class FakeConsoleStyle : IConsoleStyle
 {
     /// <summary>Every line passed to <see cref="Alarm"/>, in order.</summary>
     internal List<string> Alarms { get; } = [];
+
+    /// <summary>Whether stderr is to be taken for an interactive terminal.</summary>
+    internal bool Terminal { get; set; }
+
+    public bool IsTerminal(TextWriter writer) => Terminal;
 
     public void Alarm(TextWriter writer, string text)
     {

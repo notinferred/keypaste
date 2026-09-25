@@ -31,6 +31,11 @@ public sealed class SecretHygieneTests
     [InlineData("env", "ls")]
     [InlineData("env", "ls", "hygiene")]
     [InlineData("env", "rm", "hygiene", "API_KEY", "--yes")]
+    [InlineData("env", "ls", "--json")]
+    [InlineData("env", "ls", "hygiene", "--json")]
+    [InlineData("env", "ls", "hygiene", "--profiles")]
+    [InlineData("env", "export", "hygiene")]
+    [InlineData("env", "diff", "hygiene")]
     public void NoVerb_LeaksAFieldValue_ToStdoutOrStderr(params string[] verb)
     {
         using var harness = new CliHarness();
@@ -268,5 +273,75 @@ public sealed class SecretHygieneTests
 
         harness.Stdout.GetStringBuilder().Clear();
         harness.Stderr.GetStringBuilder().Clear();
+    }
+
+    [Fact]
+    public void EnvExportReferences_NeverContainsAValue()
+    {
+        using var harness = new CliHarness();
+        Seed(harness);
+        var path = Path.Combine(harness.Directory, ".env.keypaste");
+
+        harness.Prompt.Enqueue(Master);
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("env", "export", "hygiene", "--vault", harness.VaultPath));
+        harness.Prompt.Enqueue(Master);
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("env", "export", "hygiene", path, "--vault", harness.VaultPath));
+
+        Assert.Contains("kp://hygiene/dev/API_KEY", harness.Out + File.ReadAllText(path), StringComparison.Ordinal);
+        Assert.DoesNotContain(SentinelPassword, harness.Out + harness.Err + File.ReadAllText(path), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EnvDiff_NeverPrintsAValue()
+    {
+        using var harness = new CliHarness();
+        Seed(harness);
+
+        using (var vault = Vault.Open(harness.VaultPath, Master))
+        {
+            var store = new EnvStore(vault);
+            store.TrySet("hygiene", "prod", "API_KEY", SentinelPassword, out _);
+            store.TrySet("hygiene", "prod", "OTHER", SentinelNotes, out _);
+            vault.SetExpiryUnchecked(new EntryName("env/hygiene/prod", "OTHER"), new DateTimeOffset(2020, 1, 1, 0, 0, 0, TimeSpan.Zero));
+            vault.Save();
+        }
+
+        harness.Prompt.Enqueue(Master);
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("env", "diff", "hygiene", "--vault", harness.VaultPath));
+
+        Assert.Contains("same value in dev and prod", harness.Out, StringComparison.Ordinal);
+        Assert.Contains("OTHER", harness.Out, StringComparison.Ordinal);
+        foreach (var sentinel in new[] { SentinelPassword, SentinelNotes })
+        {
+            Assert.DoesNotContain(sentinel, harness.Out + harness.Err, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void RunReferenceFailure_NeverPrintsAValue()
+    {
+        using var harness = new CliHarness();
+        Seed(harness);
+        harness.ConsoleStyle.Terminal = true;
+
+        using (var vault = Vault.Open(harness.VaultPath, Master))
+        {
+            vault.AddEntry(new VaultEntry { GroupPath = "env/hygiene", Title = "BAD-NAME", Password = SentinelNotes });
+            vault.Save();
+        }
+
+        var file = Path.Combine(harness.Directory, "refs.env");
+        File.WriteAllText(file, "API=kp://hygiene/dev/API_KEY\nNOPE=kp://hygiene/dev/ABSENT\nUSER=kp:///secrets/target#username\n");
+
+        harness.Prompt.Enqueue(Master);
+        Assert.Equal(CliApp.ExitInternalError, harness.Run("run", "--env-file", file, "--vault", harness.VaultPath, "--", "node"));
+
+        Assert.Contains("NOPE", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("BAD-NAME", harness.Err, StringComparison.Ordinal);
+        Assert.Empty(harness.ProcessLauncher.Started);
+        foreach (var sentinel in new[] { SentinelPassword, SentinelUsername, SentinelNotes })
+        {
+            Assert.DoesNotContain(sentinel, harness.Out + harness.Err, StringComparison.Ordinal);
+        }
     }
 }
