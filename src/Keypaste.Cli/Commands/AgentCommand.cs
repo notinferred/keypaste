@@ -31,9 +31,11 @@ namespace Keypaste.Cli.Commands;
 /// opened (D-0309).
 /// </para>
 /// <para>
-/// <b>It writes no audit lines.</b> <c>keypaste-mcp</c> is the only process that appends to the
-/// log, so there is one writer, one key order and one schema (DECISIONS.md D-0020). What this
-/// process prints is for the person watching it, not the record.
+/// <b>It writes audit lines for scoped tokens and nothing else.</b> <c>keypaste-mcp</c> records what
+/// agents asked for (DECISIONS.md D-0020); a <c>keypaste run --token</c> is recorded here, by the
+/// owner that verified it, because the runner is the side that could skip it. A log that cannot be
+/// opened refuses every token and nothing else. What this process prints is for the person
+/// watching it, not the record.
 /// </para>
 /// <para>
 /// <b>The vault stays unlocked for as long as this runs.</b> There is no idle auto-lock — closing
@@ -161,6 +163,8 @@ internal static class AgentCommand
             new PolicyGate(policy.Rules, TimeProvider.System),
             Narrate);
 
+        using var audit = OpenAudit(context);
+
         using var stop = new CancellationTokenSource();
 
         // `keypaste lock` ends the lifetime and stops the listener, the same way a signal does.
@@ -173,7 +177,8 @@ internal static class AgentCommand
                 asked => ReferenceEquals(asked, lifetime) && asked.IsLive ? vault : null,
                 TimeProvider.System,
                 envGrants,
-                Narrate),
+                Narrate,
+                () => audit),
             lockNow: () => Stop(lifetime, stop));
 
         ApproverListener? listener = null;
@@ -236,6 +241,21 @@ internal static class AgentCommand
         {
             // Already stopped.
         }
+    }
+
+    private static AuditLog? OpenAudit(CliContext context)
+    {
+        if (AuditLog.TryOpen(
+                KeypasteHome.AuditPath(context.Environment.Get(KeypasteHome.EnvironmentVariable)),
+                TimeProvider.System,
+                out var audit,
+                out var error))
+        {
+            return audit;
+        }
+
+        context.Stderr.WriteLine($"keypaste: tokens are refused: {error}");
+        return null;
     }
 
     private static List<PosixSignalRegistration> LockOnSignals(SessionLifetime lifetime, CancellationTokenSource stop)

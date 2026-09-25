@@ -543,7 +543,9 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
         var wantedGroup = _selectedGroup?.Path;
 
-        _all = [.. vault.ReadEntries().Select(entry => new EntryRow(entry.Title, entry.GroupPath))];
+        _all = [.. vault.ReadEntries()
+            .Where(entry => !ReservedGroups.IsReserved(entry.GroupPath))
+            .Select(entry => new EntryRow(entry.Title, entry.GroupPath))];
         Groups = GroupNode.Flatten(vault.ReadGroupPaths());
         MoveTargets = Groups;
         Raise(nameof(TotalCount));
@@ -705,7 +707,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         // either one being in the result is what puts the pair on screen.
         Dictionary<EntryName, MatchedFields> found = [];
 
-        foreach (var match in vault.Search(query))
+        foreach (var match in vault.Search(query).Where(match => !ReservedGroups.IsReserved(match.Name.GroupPath)))
         {
             found[match.Name] = match.Fields;
         }

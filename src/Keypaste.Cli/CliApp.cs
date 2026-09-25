@@ -96,6 +96,9 @@ internal static class CliApp
             case "run":
                 return RunCommand.Execute(args, context);
 
+            case "token":
+                return TokenCommand.Execute(args, context);
+
             case "agent":
                 return AgentCommand.Execute(args, context);
 

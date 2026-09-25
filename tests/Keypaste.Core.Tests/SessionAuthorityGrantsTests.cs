@@ -73,7 +73,7 @@ public sealed class SessionAuthorityGrantsTests : IDisposable
         Assert.True(reply.Complete);
         var grant = Assert.Single(reply.Grants);
         Assert.Equal(GrantId.Of(Assert.Single(owner.Authority.Activity.Grants).Key), grant.Id);
-        Assert.Equal(new GrantSummary(grant.Id, "credential", "claude-code", "env/dev/STRIPE_KEY", "password", 60), grant);
+        Assert.Equal(new GrantSummary(grant.Id, "credential", "claude-code", "env/dev/STRIPE_KEY", "password", 3600), grant);
         Assert.DoesNotContain(ApproverFixture.Sentinel, grant.ToString(), StringComparison.Ordinal);
         Assert.DoesNotContain(ApproverFixture.Sentinel, System.Text.Encoding.UTF8.GetString(ApproverProtocol.Encode(reply)), StringComparison.Ordinal);
     }

@@ -66,6 +66,8 @@ internal static class RunCommand
         new(ApproverOption, TakesValue: true),
         new(EnvFileOption, TakesValue: true),
         EnvCommand.ProfileOption,
+        new(RunWithToken.TokenOption, TakesValue: true),
+        new(RunWithToken.BundleOption, TakesValue: true),
     ];
 
     internal static int Execute(string[] args, CliContext context)
@@ -93,6 +95,11 @@ internal static class RunCommand
         if (split.Command.Count == 0)
         {
             return Fail(context, "no command given after --");
+        }
+
+        if (line.Value(RunWithToken.TokenOption) is not null || line.Value(RunWithToken.BundleOption) is not null)
+        {
+            return RunWithToken.Execute(line, split.Command, context);
         }
 
         if (line.Operands.Count > 1)

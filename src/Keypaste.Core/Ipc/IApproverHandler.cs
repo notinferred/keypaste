@@ -74,6 +74,20 @@ public interface IApproverHandler
     ValueTask<LockReply> LockAsync(LockRequest request, string connectionId, CancellationToken cancellationToken) =>
         ValueTask.FromResult(new LockReply(false, "this keypaste process does not lock on request"));
 
+    /// <summary>Decides one request for a set authorized by a scoped token rather than a prompt.</summary>
+    /// <param name="request">The token, the set and the command the runner will start with it.</param>
+    /// <param name="connectionId">Who is asking.</param>
+    /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
+    /// <returns>The set, or why none of it was released. A handler that does not verify tokens refuses.</returns>
+    ValueTask<EnvReply> ReleaseTokenEnvAsync(TokenEnvRequest request, string connectionId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return ValueTask.FromResult(new EnvReply(
+            EnvResolved.Refused(request.Project, EnvOutcome.NoSession, profile: request.Profile),
+            "this keypaste process does not accept tokens"));
+    }
+
     /// <summary>Tells the handler a connection has gone, so its grants can go with it.</summary>
     /// <param name="connectionId">The connection that ended.</param>
     void Disconnected(string connectionId);

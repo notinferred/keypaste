@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Tokens;
 
 namespace Keypaste.Core.Ownership;
 
@@ -287,6 +288,166 @@ public sealed class SessionAuthority : IApproverHandler
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// <para>
+    /// The order is the security property. The token is verified against the vault as its file holds
+    /// it, never echoed and never distinguished between unknown and revoked; its scope must cover the
+    /// set; a protected profile needs the token to allow it and then a live answer every time, with
+    /// no grant ever stored. Nobody is asked otherwise.
+    /// </para>
+    /// <para>
+    /// This owner, not the runner, writes the audit line for every outcome once the token is looked
+    /// at, before it replies: a runner is the untrusted side that could skip it. A release whose line
+    /// cannot be written is refused and nothing is sent (T-6).
+    /// </para>
+    /// </remarks>
+    public async ValueTask<EnvReply> ReleaseTokenEnvAsync(TokenEnvRequest request, string connectionId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (!TryAdmit(request.Vault, request.Session, connectionId, out var admitted, out var refusal))
+        {
+            return Refused(
+                request.Project,
+                request.Profile,
+                refusal.Method == AuditMethod.VaultLocked ? EnvOutcome.Locked : EnvOutcome.NoSession,
+                refusal.Reason);
+        }
+
+        if (_environments is not { } environments)
+        {
+            return Refused(request.Project, request.Profile, EnvOutcome.NoSession, "the keypaste process holding this vault does not release env sets");
+        }
+
+        if ((EnvReleasePrompt.Problem(request.Project, request.Command, request.Directory)
+            ?? (EnvProfileNames.IsValid(request.Profile, out var invalidProfile) ? null : invalidProfile)) is { } problem)
+        {
+            return Refused(request.Project, request.Profile, EnvOutcome.Invalid, problem);
+        }
+
+        if (environments.VaultFor(admitted) is not { } vault)
+        {
+            return Refused(request.Project, request.Profile, EnvOutcome.Locked, _lockedReason);
+        }
+
+        TokenCheck check;
+        TokenInfo? info;
+
+        try
+        {
+            check = new TokenStore(vault).Verify(request.Token, environments.Clock.GetUtcNow(), out info);
+        }
+        catch (ObjectDisposedException)
+        {
+            // The lock disposed the vault between handing it over and reading it.
+            return Refused(request.Project, request.Profile, EnvOutcome.Locked, _lockedReason);
+        }
+
+        var reply = check switch
+        {
+            TokenCheck.Valid => await ReleaseUnderTokenAsync(request, info!, admitted, environments, cancellationToken).ConfigureAwait(false),
+            TokenCheck.Unsaved => Refused(request.Project, request.Profile, EnvOutcome.Unsaved),
+            TokenCheck.ChangedOnDisk => Refused(request.Project, request.Profile, EnvOutcome.ChangedOnDisk),
+            TokenCheck.Unreadable => Refused(request.Project, request.Profile, EnvOutcome.Unreadable),
+            TokenCheck.Expired => Refused(request.Project, request.Profile, EnvOutcome.Unauthorized, "the token has expired"),
+            _ => Refused(request.Project, request.Profile, EnvOutcome.Unauthorized, "the token is not valid for this vault"),
+        };
+
+        return Audited(environments.Audit, request, info, reply);
+    }
+
+    private async ValueTask<EnvReply> ReleaseUnderTokenAsync(
+        TokenEnvRequest request,
+        TokenInfo info,
+        SessionLifetime admitted,
+        SessionEnvironments environments,
+        CancellationToken cancellationToken)
+    {
+        var liveOnly = EnvProfileNames.IsProtected(request.Profile);
+
+        if (!info.Covers(request.Project, request.Profile) || (liveOnly && !info.AllowProd))
+        {
+            return Refused(
+                request.Project,
+                request.Profile,
+                EnvOutcome.Unauthorized,
+                $"the token's scope does not cover {request.Project}/{request.Profile}");
+        }
+
+        // Every run is a new connection, so the cooldown names the token and the request (T-11).
+        var cooldownKey = string.Join('\0', ["token", info.Id, request.Project, request.Profile, request.Directory, .. request.Command]);
+        var answer = ApprovalAnswer.NoChannel;
+
+        var resolver = new SessionEnvResolver(
+            () => ReferenceEquals(Live(), admitted) ? admitted : null,
+            environments.VaultFor,
+            environments.Clock);
+
+        async ValueTask<bool> AskLive(EnvPreview preview, CancellationToken withdrawn)
+        {
+            var prompt = EnvReleasePrompt.For(preview, request.Command, request.Directory) with
+            {
+                Requester = $"token '{EntryNameSanitizer.Sanitize(info.Name).Text}' ({info.Prefix})",
+                GrantSeconds = 0,
+            };
+            answer = await environments.Gate.AskAsync(cooldownKey, prompt, withdrawn).ConfigureAwait(false);
+
+            // A withdrawn question is not a refusal: the resolver tells a lock from a hang-up.
+            withdrawn.ThrowIfCancellationRequested();
+            return answer.Releases();
+        }
+
+        var resolved = await resolver.ResolveAsync(
+            request.Project,
+            request.Profile,
+            info.KeysFor(request.Project, request.Profile),
+            liveOnly ? AskLive : null,
+            cancellationToken).ConfigureAwait(false);
+
+        return new EnvReply(resolved, resolved.Outcome == EnvOutcome.Declined ? Declined(answer) : resolved.Refusal);
+    }
+
+    /// <summary>The reply, once its audit line is written; a release whose line cannot be written becomes a refusal.</summary>
+    private static EnvReply Audited(Func<AuditLog?>? audit, TokenEnvRequest request, TokenInfo? info, EnvReply reply)
+    {
+        var released = reply.Set.Outcome == EnvOutcome.Resolved;
+        var said = released
+            ? $"{reply.Set.Variables.Count} variable(s)"
+            : reply.Reason.Length > 0 ? reply.Reason : reply.Set.Refusal;
+
+        var record = new AuditRecord
+        {
+            Tool = "run",
+            Client = new AuditClient("keypaste run --token", CoreInfo.Version, null),
+            Args = new AuditArgs
+            {
+                Entry = EntryNameSanitizer.SanitizePath(
+                    $"{EnvConvention.RootGroup}/{request.Project}/{request.Profile}",
+                    maximumLength: AuditArgs.EntryLength).Text,
+            },
+            Decision = released ? AuditDecision.Granted : AuditDecision.Denied,
+            Method = AuditMethod.Token,
+            Reason = info is null ? said : $"token {info.Id} '{EntryNameSanitizer.Sanitize(info.Name).Text}': {said}",
+            Session = request.Session,
+        };
+
+        bool written;
+
+        try
+        {
+            written = audit?.Invoke() is { } log && log.TryAppend(record, out _);
+        }
+        catch (ObjectDisposedException)
+        {
+            written = false;
+        }
+
+        return written || !released
+            ? reply
+            : Refused(request.Project, request.Profile, EnvOutcome.Unreadable, "the audit log could not be written");
+    }
+
+    /// <inheritdoc/>
     /// <remarks>Names only: <see cref="GrantSummary"/> has no member a value could travel in (D-0351).</remarks>
     public ValueTask<GrantsReply> GrantsAsync(GrantsRequest request, string connectionId, CancellationToken cancellationToken)
     {
@@ -373,6 +534,12 @@ public sealed class SessionAuthority : IApproverHandler
 
     private static EnvReply Refused(string project, string profile, EnvOutcome outcome, string reason) =>
         new(EnvResolved.Refused(project, outcome, profile: profile), reason);
+
+    private static EnvReply Refused(string project, string profile, EnvOutcome outcome)
+    {
+        var refused = EnvResolved.Refused(project, outcome, profile: profile);
+        return new(refused, refused.Refusal);
+    }
 
     private static string Declined(ApprovalAnswer answer) => answer switch
     {
