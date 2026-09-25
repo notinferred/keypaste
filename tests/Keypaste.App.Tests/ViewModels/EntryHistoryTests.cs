@@ -129,7 +129,9 @@ public sealed class EntryHistoryTests : IDisposable
         Assert.NotNull(revisions);
         Assert.Equal(revisions.Select(revision => revision.ModifiedUtc), history.Rows.Select(row => row.ModifiedUtc));
         Assert.All(history.Rows, row => Assert.Equal(DateTimeKind.Utc, row.ModifiedUtc.Kind));
-        Assert.All(history.Rows, row => Assert.NotEmpty(row.When));
+        Assert.All(history.Rows, row => Assert.Equal(
+            row.ModifiedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture),
+            row.When));
     }
 
     [Fact]
