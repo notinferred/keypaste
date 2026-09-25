@@ -1,6 +1,7 @@
 using Keypaste.App.Session;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
+using Keypaste.Core.HardwareKeys;
 using Keypaste.Core.Recent;
 
 namespace Keypaste.App.ViewModels;
@@ -48,6 +49,8 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     private IReadOnlyList<RecentVault> _remembered = [];
     private string? _selectedPath;
     private string? _keyfilePath;
+    private int? _hardwareKeySlot;
+    private bool _waitingForTouch;
     private string? _newVaultPath;
     private string _message = string.Empty;
     private bool _failed;
@@ -88,6 +91,11 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         CloseRestoreCommand = new RelayCommand(CloseRestore, () => _restore is { Busy: false });
         ChooseKeyfileCommand = new AsyncRelayCommand(ChooseKeyfileAsync, () => !_busy);
         ClearKeyfileCommand = new RelayCommand(() => KeyfilePath = null, () => !_busy && _keyfilePath is not null);
+        UseHardwareKeyCommand = new RelayCommand(() => HardwareKeySlot = 2, () => !_busy && OffersHardwareKey && _hardwareKeySlot is null);
+        SwitchSlotCommand = new RelayCommand(() => HardwareKeySlot = _hardwareKeySlot == 1 ? 2 : 1, () => !_busy && _hardwareKeySlot is not null);
+        ClearHardwareKeyCommand = new RelayCommand(() => HardwareKeySlot = null, () => !_busy && _hardwareKeySlot is not null);
+        CancelTouchCommand = new RelayCommand(_session.CancelHardwareKeyWait, () => _waitingForTouch);
+        _session.WaitingForTouch += OnWaitingForTouch;
         Reload();
         LockNote = lockedBy is { } reason ? DescribeLock(reason, session.Clock.GetLocalNow(), session.IdleTimeout) : string.Empty;
 
@@ -232,6 +240,62 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
 
     internal bool HasKeyfile => _keyfilePath is not null;
 
+    /// <summary>Whether this build reaches hardware keys, so the screen offers one.</summary>
+    internal bool OffersHardwareKey => _session.HardwareKeys is not null;
+
+    /// <summary>Asks for the YubiKey as well, in slot 2 until another is chosen.</summary>
+    internal RelayCommand UseHardwareKeyCommand { get; }
+
+    /// <summary>Moves between the YubiKey's two slots.</summary>
+    internal RelayCommand SwitchSlotCommand { get; }
+
+    /// <summary>Stops asking for the YubiKey.</summary>
+    internal RelayCommand ClearHardwareKeyCommand { get; }
+
+    /// <summary>Stops waiting for a touch, so the unlock fails and opens nothing.</summary>
+    internal RelayCommand CancelTouchCommand { get; }
+
+    /// <summary>
+    /// The YubiKey slot the vault needs as well, or <see langword="null"/>. Selecting a remembered
+    /// vault fills it with the slot that vault last opened with, and a successful open remembers it.
+    /// </summary>
+    internal int? HardwareKeySlot
+    {
+        get => _hardwareKeySlot;
+        private set
+        {
+            if (Set(ref _hardwareKeySlot, value))
+            {
+                Raise(nameof(UsesHardwareKey));
+                Raise(nameof(HardwareKeyLabel));
+                Raise(nameof(OtherSlotLabel));
+                UnlockCommand.RaiseCanExecuteChanged();
+                UseHardwareKeyCommand.RaiseCanExecuteChanged();
+                SwitchSlotCommand.RaiseCanExecuteChanged();
+                ClearHardwareKeyCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    internal bool UsesHardwareKey => _hardwareKeySlot is not null;
+
+    internal string HardwareKeyLabel => _hardwareKeySlot is { } slot ? $"YubiKey, slot {slot}" : string.Empty;
+
+    internal string OtherSlotLabel => _hardwareKeySlot == 1 ? "Use slot 2" : "Use slot 1";
+
+    /// <summary>Whether the YubiKey is waiting to be touched.</summary>
+    internal bool IsWaitingForTouch
+    {
+        get => _waitingForTouch;
+        private set
+        {
+            if (Set(ref _waitingForTouch, value))
+            {
+                CancelTouchCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
     /// <summary>Whether the create fields are showing instead of the unlock ones.</summary>
     internal bool IsCreating
     {
@@ -273,6 +337,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
                 Message = string.Empty;
                 Owner = string.Empty;
                 KeyfilePath = RememberedKeyfile(value);
+                HardwareKeySlot = OffersHardwareKey ? Remembered(value)?.HardwareKeySlot : null;
                 Look();
                 Raise(nameof(SelectedName));
                 Raise(nameof(HasSelection));
@@ -361,12 +426,16 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
                 BrowseCommand.RaiseCanExecuteChanged();
                 ChooseKeyfileCommand.RaiseCanExecuteChanged();
                 ClearKeyfileCommand.RaiseCanExecuteChanged();
+                UseHardwareKeyCommand.RaiseCanExecuteChanged();
+                SwitchSlotCommand.RaiseCanExecuteChanged();
+                ClearHardwareKeyCommand.RaiseCanExecuteChanged();
             }
         }
     }
 
-    // A keyfile alone is a whole answer: KeePassXC makes vaults with no password (D-0282).
-    private bool CanUnlock => !_busy && CanTypePassword && (_master.Length > 0 || _keyfilePath is not null);
+    // A keyfile or a hardware key alone is a whole answer: KeePassXC makes vaults with no password (D-0282).
+    private bool CanUnlock =>
+        !_busy && CanTypePassword && (_master.Length > 0 || _keyfilePath is not null || _hardwareKeySlot is not null);
 
     // The confirmation is not required to be non-empty here: an empty one that does not match is
     // VaultCreation's refusal to make, not a reason to grey out the button and explain nothing.
@@ -552,7 +621,8 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         ResetPassword();
         Message = string.Empty;
         Restore = new RestoreBackupViewModel(
-            path, _session.Clock, () => _session.IdleTimeout, _post, OnRestoredAsync, _keyfilePath, _picker.PickKeyfileAsync);
+            path, _session.Clock, () => _session.IdleTimeout, _post, OnRestoredAsync, _keyfilePath, _picker.PickKeyfileAsync,
+            _hardwareKeySlot is { } slot ? () => _session.NewHardwareKey(slot) : null);
     }
 
     private void CloseRestore()
@@ -570,19 +640,20 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
             return;
         }
 
-        var outcome = await Task.Run(() => _session.TryUnlock(path, password.Value, keyfile)).ConfigureAwait(true);
+        var slot = _hardwareKeySlot;
+        var outcome = await Task.Run(() => _session.TryUnlock(path, password.Value, keyfile, slot)).ConfigureAwait(true);
 
         CloseRestore();
         KeyfilePath = keyfile;
 
         if (outcome != UnlockOutcome.Opened)
         {
-            Message = "The backup was restored. Unlock it with the password and keyfile that backup was made under.";
+            Message = "The backup was restored. Unlock it with the password, keyfile and YubiKey that backup was made under.";
             return;
         }
 
         Notice = Describe(report);
-        Remember(path, keyfile);
+        Remember(path, keyfile, slot);
         _unlocked();
     }
 
@@ -645,13 +716,15 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         {
             // Argon2 is a good fraction of a second by design. Off the UI thread, or the window
             // stops painting and the app looks broken at the exact moment it is working hardest.
+            // A hardware key waits for its touch there too, while this screen says to touch it.
             var keyfile = _keyfilePath;
-            var outcome = await Task.Run(() => _session.TryUnlock(path, _master.Value, keyfile))
+            var slot = _hardwareKeySlot;
+            var outcome = await Task.Run(() => _session.TryUnlock(path, _master.Value, keyfile, slot))
                 .ConfigureAwait(true);
 
             if (outcome == UnlockOutcome.Opened)
             {
-                Remember(path, keyfile);
+                Remember(path, keyfile, slot);
                 ResetPassword();
                 Notice = FragileNotice(keyfile);
                 _unlocked();
@@ -666,9 +739,16 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
                 return;
             }
 
+            if (outcome == UnlockOutcome.HardwareKeyFailed)
+            {
+                Fail(ExplainHardwareKey(_session.LastHardwareKeyFailure, slot));
+                ResetPassword();
+                return;
+            }
+
             var explained = outcome == UnlockOutcome.KeyfileUnusable && keyfile is not null
                 ? ExplainKeyfile(VaultKeyfile.Inspect(keyfile).Outcome)
-                : Explain(outcome, keyfile is not null);
+                : Explain(outcome, keyfile is not null, slot is not null);
 
             Fail(HasBackups && outcome != UnlockOutcome.KeyfileUnusable
                 ? $"{explained} If the file is damaged, or its password or keyfile was changed and lost, restore a backup."
@@ -854,10 +934,24 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         _ => "That file can't be used as a keyfile.",
     };
 
-    private string? RememberedKeyfile(string? vaultPath) =>
+    private string? RememberedKeyfile(string? vaultPath) => Remembered(vaultPath)?.KeyfilePath;
+
+    private RecentVault? Remembered(string? vaultPath) =>
         vaultPath is null
             ? null
-            : _remembered.FirstOrDefault(vault => string.Equals(vault.Path, vaultPath, PathIdentity.Comparison))?.KeyfilePath;
+            : _remembered.FirstOrDefault(vault => string.Equals(vault.Path, vaultPath, PathIdentity.Comparison));
+
+    /// <summary>Why a hardware key gave no answer, in the register of <see cref="Explain"/>.</summary>
+    internal static string ExplainHardwareKey(HardwareKeyException? failure, int? slot) => failure?.Failure switch
+    {
+        HardwareKeyFailure.NotFound => "No YubiKey found. Plug it in and unlock again.",
+        HardwareKeyFailure.MoreThanOne => "More than one YubiKey is plugged in. Leave only the one this vault uses.",
+        HardwareKeyFailure.SlotNotConfigured =>
+            $"That YubiKey's slot {slot} isn't set up for challenge-response. If the vault uses the other slot, switch to it.",
+        HardwareKeyFailure.TimedOut => "The YubiKey wasn't touched in time. Unlock again and touch it when it flashes.",
+        HardwareKeyFailure.Cancelled => "Stopped waiting for the YubiKey. Nothing was opened.",
+        _ => failure?.Message ?? "The YubiKey didn't answer.",
+    };
 
     /// <summary>
     /// What went wrong making a vault, in the same register as <see cref="Explain"/>.
@@ -922,10 +1016,15 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     /// What went wrong opening, in words that do not shout: red text under the field and never an
     /// icon or a dialog, because a mistyped password is routine.
     /// </summary>
-    private static string Explain(UnlockOutcome outcome, bool withKeyfile = false) => outcome switch
+    private static string Explain(UnlockOutcome outcome, bool withKeyfile = false, bool withHardwareKey = false) => outcome switch
     {
         // Naming both factors when both were given, or a good password and the wrong file sends the
-        // person to retype the half that was right (D-0284).
+        // person to retype the half that was right (D-0284). A wrong key or slot is refused the same
+        // way, because it answers, only differently.
+        UnlockOutcome.WrongPassword when withKeyfile && withHardwareKey =>
+            "That password, keyfile and YubiKey didn't open this vault. If the vault uses the other slot, switch to it.",
+        UnlockOutcome.WrongPassword when withHardwareKey =>
+            "That password and YubiKey didn't open this vault. If the vault uses the other slot, switch to it.",
         UnlockOutcome.WrongPassword when withKeyfile => "That password and keyfile didn't open this vault.",
         UnlockOutcome.WrongPassword => "That password didn't open this vault.",
         UnlockOutcome.KeyfileUnusable => "That keyfile can't be used.",
@@ -934,12 +1033,20 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         _ => "That vault couldn't be opened.",
     };
 
-    private void Remember(string path, string? keyfile)
+    private void Remember(string path, string? keyfile, int? hardwareKeySlot = null)
     {
-        _remembered = RecentVaults.Remember(_remembered, path, DateTimeOffset.UtcNow, keyfile);
+        _remembered = RecentVaults.Remember(_remembered, path, DateTimeOffset.UtcNow, keyfile, hardwareKeySlot);
         RecentVaults.Save(KeypasteHome.RecentPath(_home), _remembered);
         Project();
     }
+
+    private void OnWaitingForTouch(object? sender, bool waiting) => _post(() =>
+    {
+        if (!_disposed)
+        {
+            IsWaitingForTouch = waiting;
+        }
+    });
 
     private void Reload()
     {
@@ -1033,6 +1140,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         }
 
         _disposed = true;
+        _session.WaitingForTouch -= OnWaitingForTouch;
         _restore?.Dispose();
         _master.Dispose();
         _new.Dispose();

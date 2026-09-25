@@ -56,7 +56,99 @@ public sealed class ScreenRenderer
         DrawLockAndImport(demo, output!);
         DrawPrompts(output!);
         DrawTrashWithRows(demo, output!);
+        DrawHardwareKey(output!);
     });
+
+    /// <summary>A vault that also needs a YubiKey: the unlock screen offering it, waiting for a touch, a save waiting for one, and adding one in Settings.</summary>
+    private static void DrawHardwareKey(string output)
+    {
+        var home = Directory.CreateTempSubdirectory("keypaste-screens-yubikey-").FullName;
+        var path = Path.Combine(home, "acme.kdbx");
+        var device = new Core.Tests.HardwareKeys.SoftwareYubiKey(new byte[20]);
+
+        try
+        {
+            using (var key = new Core.HardwareKeys.HardwareKey(device, 2))
+            using (var vault = Vault.CreateWith(path, _master, null, key))
+            {
+                vault.AddEntry(new VaultEntry { Title = "github", Password = "demo-gh-7Hq2x", GroupPath = "Work" });
+                vault.Save();
+            }
+
+            Core.Recent.RecentVaults.Save(
+                Core.Audit.KeypasteHome.RecentPath(home), [new Core.Recent.RecentVault(path, DateTimeOffset.UtcNow, null, 2)]);
+
+            using var session = new AppVaultSession(new ManualClock(), home: home, hardwareKeys: device);
+            using (var unlock = new UnlockViewModel(session, home, new FakeVaultFilePicker(), () => { }, action => Avalonia.Threading.Dispatcher.UIThread.Post(action)))
+            {
+                var window = Show(new UnlockView { DataContext = unlock });
+                foreach (var c in "hunter22")
+                {
+                    unlock.Type(c);
+                }
+
+                Save(window, output, "70-yubikey-unlock");
+
+                device.NeverTouched = true;
+                var unlocking = unlock.UnlockAsync();
+                var deadline = DateTime.UtcNow.AddSeconds(10);
+                while (!unlock.IsWaitingForTouch && DateTime.UtcNow < deadline)
+                {
+                    WindowInput.Drain();
+                    Thread.Sleep(1);
+                }
+
+                Save(window, output, "71-yubikey-touch");
+                unlock.CancelTouchCommand.Execute(null);
+                Wait(unlocking);
+                window.Close();
+            }
+
+            device.NeverTouched = false;
+            using (var master = TempVault.Secret(_master))
+            {
+                Assert.Equal(UnlockOutcome.Opened, session.TryUnlock(path, master.Value, null, 2));
+            }
+
+            using var shell = new ShellViewModel(session, home, null, clipboard: new FakeClipboard(), post: action => Avalonia.Threading.Dispatcher.UIThread.Post(action));
+            var shellWindow = Show(new ShellView { DataContext = shell });
+
+            device.NeverTouched = true;
+            var vaultOpen = session.Unlocked!;
+            vaultOpen.AddEntry(new VaultEntry { Title = "stripe", Password = "demo-sk", GroupPath = "Work" });
+            var saving = Task.Run(vaultOpen.Save);
+            var until = DateTime.UtcNow.AddSeconds(10);
+            while (!shell.IsWaitingForTouch && DateTime.UtcNow < until)
+            {
+                WindowInput.Drain();
+                Thread.Sleep(1);
+            }
+
+            Save(shellWindow, output, "72-yubikey-save-touch");
+            shell.CancelTouchCommand.Execute(null);
+            Assert.ThrowsAny<VaultException>(() => Wait(saving));
+            shellWindow.Close();
+            device.NeverTouched = false;
+
+            using var settings = new SettingsViewModel(session, home, new DesktopPreferences(home), _ => { }, new FakeVaultFilePicker());
+            foreach (var c in _master)
+            {
+                settings.Access.TypeCurrent(c);
+            }
+
+            settings.Access.AttachHardwareKey = true;
+            settings.Access.NewSlotOne = true;
+            settings.Access.ReviewCommand.Execute(null);
+            var settingsWindow = Show(new SettingsView { DataContext = settings });
+            settingsWindow.Height = 1900;
+            Save(settingsWindow, output, "73-yubikey-settings");
+            settingsWindow.Close();
+        }
+        finally
+        {
+            Directory.Delete(home, recursive: true);
+        }
+    }
 
     /// <summary>
     /// Agents with what a working session holds: two clients attached over the app's own endpoint

@@ -9,7 +9,8 @@ namespace Keypaste.Core.Recent;
 /// <param name="Path">The absolute path, in this platform's own form.</param>
 /// <param name="OpenedAt">When it was last opened successfully.</param>
 /// <param name="KeyfilePath">The keyfile it was last opened with, or <see langword="null"/>.</param>
-public sealed record RecentVault(string Path, DateTimeOffset OpenedAt, string? KeyfilePath = null);
+/// <param name="HardwareKeySlot">The hardware key slot it was last opened with, 1 or 2, or <see langword="null"/>.</param>
+public sealed record RecentVault(string Path, DateTimeOffset OpenedAt, string? KeyfilePath = null, int? HardwareKeySlot = null);
 
 /// <summary>
 /// The vaults the desktop app has opened on this machine, most recent first.
@@ -22,7 +23,7 @@ public sealed record RecentVault(string Path, DateTimeOffset OpenedAt, string? K
 /// </para>
 /// <para>
 /// <b>It holds paths and nothing else</b>: each vault's, and the keyfile it last opened with, whose
-/// location the desktop remembers as KeePassXC does (T-27). No entry names, no counts, no
+/// location the desktop remembers as KeePassXC does (T-27), and which hardware key slot it opened with. No entry names, no counts, no
 /// fingerprints of the contents, and never key material. docs/PRODUCT.md law 3.5 is about
 /// telemetry and this file never leaves the machine, but a vault path is still information about a person — <c>~/work/acme-prod.kdbx</c> says something — which is
 /// why it is capped, written owner-only, and forgettable from the UI in one click.
@@ -63,6 +64,9 @@ public static class RecentVaults
 
     /// <inheritdoc cref="PathKey"/>
     internal const string KeyfileKey = "keyfile";
+
+    /// <inheritdoc cref="PathKey"/>
+    internal const string HardwareKeySlotKey = "hardware_key_slot";
 
     private static readonly string[] _header =
     [
@@ -128,6 +132,7 @@ public static class RecentVaults
     /// <param name="path">The vault that was opened.</param>
     /// <param name="openedAt">When.</param>
     /// <param name="keyfilePath">The keyfile it was opened with, or <see langword="null"/> for none.</param>
+    /// <param name="hardwareKeySlot">The hardware key slot it was opened with, or <see langword="null"/> for none.</param>
     /// <returns>The new list, most recent first, at most <see cref="Capacity"/> long.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="existing"/> or <paramref name="path"/> is null.</exception>
     /// <remarks>
@@ -138,14 +143,15 @@ public static class RecentVaults
         IReadOnlyList<RecentVault> existing,
         string path,
         DateTimeOffset openedAt,
-        string? keyfilePath = null)
+        string? keyfilePath = null,
+        int? hardwareKeySlot = null)
     {
         ArgumentNullException.ThrowIfNull(existing);
         ArgumentNullException.ThrowIfNull(path);
 
         var full = System.IO.Path.GetFullPath(path);
         var keyfile = string.IsNullOrEmpty(keyfilePath) ? null : System.IO.Path.GetFullPath(keyfilePath);
-        var vaults = new List<RecentVault> { new(full, openedAt, keyfile) };
+        var vaults = new List<RecentVault> { new(full, openedAt, keyfile, hardwareKeySlot) };
 
         foreach (var vault in existing)
         {
@@ -201,6 +207,11 @@ public static class RecentVaults
             if (vault.KeyfilePath is { } keyfile)
             {
                 lines.Add($"{KeyfileKey} = \"{Portable(keyfile)}\"");
+            }
+
+            if (vault.HardwareKeySlot is { } slot)
+            {
+                lines.Add(string.Create(CultureInfo.InvariantCulture, $"{HardwareKeySlotKey} = {slot}"));
             }
 
             lines.Add(string.Empty);
@@ -271,7 +282,13 @@ public static class RecentVaults
             ? FullPath(named.Value.Text)
             : null;
 
-        vault = new RecentVault(full, openedAt, keyfile);
+        int? slot = table.TryGet(HardwareKeySlotKey, out var slotted)
+            && slotted.Value.Kind == TomlValueKind.Number
+            && slotted.Value.Number is 1 or 2
+                ? slotted.Value.Number
+                : null;
+
+        vault = new RecentVault(full, openedAt, keyfile, slot);
         return true;
     }
 

@@ -165,6 +165,13 @@ namespace KeePassLib.Keys
 		/// key file, user account, computer ID, etc.).
 		/// </summary>
 		private byte[] CreateRawCompositeKey32()
+#if KEYPASTE_CHALLENGE_RESPONSE
+		{
+			return CreateRawCompositeKey32(null);
+		}
+
+		private byte[] CreateRawCompositeKey32(byte[] pbChallenge)
+#endif
 		{
 			ValidateUserKeys();
 
@@ -180,6 +187,15 @@ namespace KeePassLib.Keys
 					cbData += pbKeyData.Length;
 				}
 			}
+
+#if KEYPASTE_CHALLENGE_RESPONSE
+			byte[] pbResponses = ((pbChallenge != null) ? ChallengeResponse(pbChallenge) : null);
+			if(pbResponses != null)
+			{
+				lData.Add(pbResponses);
+				cbData += pbResponses.Length;
+			}
+#endif
 
 			byte[] pbAllData = new byte[cbData];
 			int p = 0;
@@ -233,6 +249,19 @@ namespace KeePassLib.Keys
 		/// Generate a 32-byte (256-bit) key from the composite key.
 		/// </summary>
 		public ProtectedBinary GenerateKey32(KdfParameters p)
+#if KEYPASTE_CHALLENGE_RESPONSE
+		{
+			return GenerateKey32(p, true);
+		}
+
+		/// <summary>
+		/// Challenge-response keys are challenged with the KDF seed and folded into
+		/// the KDF input when <paramref name="bChallengeKdfSeed" /> is set, as
+		/// KeePassXC does from KDBX 4; otherwise they are left out, as KeePassXC
+		/// does for KDBX 3.1, which folds them into the final key instead.
+		/// </summary>
+		internal ProtectedBinary GenerateKey32(KdfParameters p, bool bChallengeKdfSeed)
+#endif
 		{
 			if(p == null) { Debug.Assert(false); throw new ArgumentNullException("p"); }
 
@@ -241,7 +270,12 @@ namespace KeePassLib.Keys
 
 			try
 			{
+#if KEYPASTE_CHALLENGE_RESPONSE
+				pbRaw32 = CreateRawCompositeKey32((bChallengeKdfSeed &&
+					ContainsType(typeof(IChallengeResponseUserKey))) ? KdfSeed(p) : null);
+#else
 				pbRaw32 = CreateRawCompositeKey32();
+#endif
 				if((pbRaw32 == null) || (pbRaw32.Length != 32))
 					{ Debug.Assert(false); return null; }
 
@@ -277,8 +311,19 @@ namespace KeePassLib.Keys
 		}
 
 		internal ProtectedBinary GenerateKey32Ex(KdfParameters p, IStatusLogger sl)
+#if KEYPASTE_CHALLENGE_RESPONSE
+		{
+			return GenerateKey32Ex(p, sl, true);
+		}
+
+		internal ProtectedBinary GenerateKey32Ex(KdfParameters p, IStatusLogger sl,
+			bool bChallengeKdfSeed)
+		{
+			if(sl == null) return GenerateKey32(p, bChallengeKdfSeed);
+#else
 		{
 			if(sl == null) return GenerateKey32(p);
+#endif
 
 			CkGkTaskInfo ti = new CkGkTaskInfo();
 
@@ -286,7 +331,11 @@ namespace KeePassLib.Keys
 			{
 				if(ti == null) { Debug.Assert(false); return; }
 
+#if KEYPASTE_CHALLENGE_RESPONSE
+				try { ti.Key = GenerateKey32(p, bChallengeKdfSeed); }
+#else
 				try { ti.Key = GenerateKey32(p); }
+#endif
 				catch(ThreadAbortException exAbort)
 				{
 					ti.Exception = exAbort;
@@ -319,6 +368,67 @@ namespace KeePassLib.Keys
 			Debug.Assert(ti.Key != null);
 			return ti.Key;
 		}
+
+#if KEYPASTE_CHALLENGE_RESPONSE
+		/// <summary>
+		/// The SHA-256 of every challenge-response key's answer to
+		/// <paramref name="pbChallenge" />, concatenated in the order the keys were
+		/// added, or <c>null</c> when there are none: KeePassXC's
+		/// <c>CompositeKey::challenge</c>.
+		/// </summary>
+		internal byte[] ChallengeResponse(byte[] pbChallenge)
+		{
+			if(pbChallenge == null) throw new ArgumentNullException("pbChallenge");
+
+			List<byte[]> lResponses = new List<byte[]>();
+			int cbResponses = 0;
+			try
+			{
+				foreach(IUserKey pKey in m_lUserKeys)
+				{
+					IChallengeResponseUserKey crKey = (pKey as IChallengeResponseUserKey);
+					if(crKey == null) continue;
+
+					byte[] pbResponse = crKey.GetResponse(pbChallenge);
+					if(pbResponse == null) throw new InvalidOperationException();
+					lResponses.Add(pbResponse);
+					cbResponses += pbResponse.Length;
+				}
+
+				if(lResponses.Count == 0) return null;
+
+				byte[] pbAll = new byte[cbResponses];
+				int p = 0;
+				foreach(byte[] pbResponse in lResponses)
+				{
+					Array.Copy(pbResponse, 0, pbAll, p, pbResponse.Length);
+					p += pbResponse.Length;
+				}
+
+				byte[] pbHash = CryptoUtil.HashSha256(pbAll);
+				MemUtil.ZeroByteArray(pbAll);
+				return pbHash;
+			}
+			finally
+			{
+				foreach(byte[] pbResponse in lResponses)
+					MemUtil.ZeroByteArray(pbResponse);
+			}
+		}
+
+		/// <summary>
+		/// The seed KeePassXC challenges from KDBX 4: the KDF's own seed, which is
+		/// AES-KDF's transform seed or Argon2's salt and is regenerated on every save.
+		/// </summary>
+		private static byte[] KdfSeed(KdfParameters p)
+		{
+			byte[] pbSeed = (p.KdfUuid.Equals(new AesKdf().Uuid) ?
+				p.GetByteArray(AesKdf.ParamSeed) : p.GetByteArray(Argon2Kdf.ParamSalt));
+			if((pbSeed == null) || (pbSeed.Length == 0)) throw new ArgumentException("p");
+
+			return pbSeed;
+		}
+#endif
 
 		private void ValidateUserKeys()
 		{

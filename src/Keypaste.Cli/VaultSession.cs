@@ -65,7 +65,7 @@ internal static class VaultSession
             if (namesHardwareKeys)
             {
                 context.Stderr.WriteLine(
-                    "keypaste: a vault that also needs a hardware key cannot be opened; keypaste does not support hardware keys yet.");
+                    "keypaste: a vault that also needs a hardware key opens only in the desktop app; the CLI cannot ask a YubiKey yet.");
             }
 
             return CliApp.ExitAuthFailed;

@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
+using Keypaste.Core.HardwareKeys;
 using Keypaste.Core.Ownership;
 
 namespace Keypaste.App.Session;
@@ -68,6 +69,8 @@ internal sealed class AppVaultSession : IDisposable
     private readonly string _home;
 
     private Vault? _vault;
+    private HardwareKey? _hardwareKey;
+    private HardwareKey? _waitingKey;
     private VaultClaim? _claim;
     private SessionLifetime? _lifetime;
     private ITimer? _timer;
@@ -80,14 +83,78 @@ internal sealed class AppVaultSession : IDisposable
     /// <param name="clock">The clock idleness is measured on.</param>
     /// <param name="idleTimeout">How long the app may sit untouched, or null for the default.</param>
     /// <param name="home">keypaste's home, where the vault's claim is kept; null resolves it as the app does.</param>
-    internal AppVaultSession(TimeProvider clock, TimeSpan? idleTimeout = null, string? home = null)
+    /// <param name="hardwareKeys">What reaches hardware keys, or null where none can be reached.</param>
+    internal AppVaultSession(
+        TimeProvider clock, TimeSpan? idleTimeout = null, string? home = null, IChallengeResponseDevice? hardwareKeys = null)
     {
         ArgumentNullException.ThrowIfNull(clock);
 
         _clock = clock;
         _idleTimeout = Clamp(idleTimeout ?? DefaultIdleTimeout);
         _home = home ?? KeypasteHome.Resolve(Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable));
+        HardwareKeys = hardwareKeys;
         Environments = new SessionEnvResolver(() => Lifetime, UnlockedFor, clock);
+    }
+
+    /// <summary>What reaches hardware keys, or null where none can be reached.</summary>
+    internal IChallengeResponseDevice? HardwareKeys { get; }
+
+    /// <summary>Raised with <see langword="true"/> when a hardware key this session asked waits to be touched, and <see langword="false"/> when it stops.</summary>
+    /// <remarks>Raised on whichever thread asked or answered, which may be the UI thread pumping a save.</remarks>
+    internal event EventHandler<bool>? WaitingForTouch;
+
+    /// <summary>Why the last unlock was refused as <see cref="UnlockOutcome.HardwareKeyFailed"/>.</summary>
+    internal HardwareKeyException? LastHardwareKeyFailure { get; private set; }
+
+    /// <summary>The hardware key slot the open vault uses, or null when it uses none or is locked.</summary>
+    internal int? HardwareKeySlot
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _vault is null ? null : _hardwareKey?.Slot;
+            }
+        }
+    }
+
+    /// <summary>A factor answered by <paramref name="slot"/> of the connected key, whose touch this session reports.</summary>
+    /// <exception cref="InvalidOperationException">This session reaches no hardware keys.</exception>
+    internal HardwareKey NewHardwareKey(int slot)
+    {
+        var key = new HardwareKey(
+            HardwareKeys ?? throw new InvalidOperationException("This session reaches no hardware keys."), slot);
+        key.WaitingForTouch += OnWaitingForTouch;
+        return key;
+    }
+
+    /// <summary>Stops waiting for whichever hardware key is waiting to be touched, so what asked it fails and writes nothing.</summary>
+    internal void CancelHardwareKeyWait()
+    {
+        HardwareKey? waiting;
+        lock (_gate)
+        {
+            waiting = _waitingKey;
+        }
+
+        waiting?.CancelWait();
+    }
+
+    private void OnWaitingForTouch(object? sender, bool waiting)
+    {
+        lock (_gate)
+        {
+            if (waiting)
+            {
+                _waitingKey = sender as HardwareKey;
+            }
+            else if (ReferenceEquals(_waitingKey, sender))
+            {
+                _waitingKey = null;
+            }
+        }
+
+        WaitingForTouch?.Invoke(this, waiting);
     }
 
     /// <summary>Resolves env sets from this session's vault, released only while the unlock that asked is live.</summary>
@@ -278,6 +345,10 @@ internal sealed class AppVaultSession : IDisposable
     /// opens when <paramref name="keyfilePath"/> is given, and a wrong password when it is not.
     /// </param>
     /// <param name="keyfilePath">The keyfile the vault needs as well, or <see langword="null"/>.</param>
+    /// <param name="hardwareKeySlot">
+    /// The slot of the hardware key the vault needs as well, or <see langword="null"/>. The key is
+    /// asked now and on every save while the vault stays open.
+    /// </param>
     /// <returns>What happened.</returns>
     /// <remarks>
     /// <para>
@@ -294,9 +365,12 @@ internal sealed class AppVaultSession : IDisposable
     /// and unlock policy be tested without an async harness.
     /// </para>
     /// </remarks>
-    internal UnlockOutcome TryUnlock(string path, ReadOnlySpan<char> master, string? keyfilePath = null)
+    internal UnlockOutcome TryUnlock(
+        string path, ReadOnlySpan<char> master, string? keyfilePath = null, int? hardwareKeySlot = null)
     {
         ArgumentNullException.ThrowIfNull(path);
+
+        LastHardwareKeyFailure = null;
 
         if (!File.Exists(path))
         {
@@ -320,15 +394,26 @@ internal sealed class AppVaultSession : IDisposable
             return UnlockOutcome.KeyfileUnusable;
         }
 
+        if (hardwareKeySlot is not null && HardwareKeys is null)
+        {
+            LastHardwareKeyFailure = new HardwareKeyException(
+                HardwareKeyFailure.Unavailable, "This build of keypaste can't reach hardware keys.");
+            return UnlockOutcome.HardwareKeyFailed;
+        }
+
         if (!TryClaim(path, out var claim))
         {
             return UnlockOutcome.HeldElsewhere;
         }
 
-        return Open(path, master, keyfilePath, claim);
+        // Owned by the vault's session from Adopt on, and disposed here on every refusal.
+#pragma warning disable CA2000
+        var hardwareKey = hardwareKeySlot is { } slot ? NewHardwareKey(slot) : null;
+#pragma warning restore CA2000
+        return Open(path, master, keyfilePath, hardwareKey, claim);
     }
 
-    private UnlockOutcome Open(string path, ReadOnlySpan<char> master, string? keyfilePath, VaultClaim claim)
+    private UnlockOutcome Open(string path, ReadOnlySpan<char> master, string? keyfilePath, HardwareKey? hardwareKey, VaultClaim claim)
     {
         Vault opened;
 
@@ -338,26 +423,29 @@ internal sealed class AppVaultSession : IDisposable
             // Dispose, and a second TryUnlock replacing it — disposes it. CA2000 cannot see a
             // lifetime that leaves the method. Same shape and same reason as GrantCache.Store.
 #pragma warning disable CA2000
-            opened = Vault.Open(path, master, keyfilePath);
+            opened = Vault.Open(path, master, keyfilePath, hardwareKey);
 #pragma warning restore CA2000
         }
-        catch (InvalidMasterPasswordException)
+        catch (VaultException ex)
         {
+            hardwareKey?.Dispose();
             Release(claim);
-            return UnlockOutcome.WrongPassword;
-        }
-        catch (UnreadableKeyfileException)
-        {
-            Release(claim);
-            return UnlockOutcome.KeyfileUnusable;
-        }
-        catch (VaultException)
-        {
-            Release(claim);
-            return UnlockOutcome.Failed;
+
+            switch (ex)
+            {
+                case InvalidMasterPasswordException:
+                    return UnlockOutcome.WrongPassword;
+                case UnreadableKeyfileException:
+                    return UnlockOutcome.KeyfileUnusable;
+                case HardwareKeyException failed:
+                    LastHardwareKeyFailure = failed;
+                    return UnlockOutcome.HardwareKeyFailed;
+                default:
+                    return UnlockOutcome.Failed;
+            }
         }
 
-        return Adopt(opened, claim);
+        return Adopt(opened, claim, hardwareKey);
     }
 
     /// <summary>Takes the claim on a vault, or reuses the one this session already holds on it.</summary>
@@ -405,11 +493,13 @@ internal sealed class AppVaultSession : IDisposable
     /// place that disposes whatever it replaced. Two of these would be two chances to leak a vault
     /// that is still holding a master key.
     /// </remarks>
-    private UnlockOutcome Adopt(Vault opened, VaultClaim claim)
+    private UnlockOutcome Adopt(Vault opened, VaultClaim claim, HardwareKey? hardwareKey)
     {
         VaultLockReason? replaced = null;
         SessionLifetime? ended = null;
         Vault? previous = null;
+        HardwareKey? previousKey = null;
+        var adopted = false;
 
         lock (_gate)
         {
@@ -421,37 +511,47 @@ internal sealed class AppVaultSession : IDisposable
                 {
                     claim.Dispose();
                 }
-
-                return UnlockOutcome.Failed;
             }
-
-            if (_vault is not null)
+            else
             {
-                ended = _lifetime;
-                previous = _vault;
-                replaced = VaultLockReason.Replaced;
-            }
+                adopted = true;
 
-            if (!ReferenceEquals(claim, _claim))
-            {
-                _claim?.Dispose();
-            }
+                if (_vault is not null)
+                {
+                    ended = _lifetime;
+                    previous = _vault;
+                    replaced = VaultLockReason.Replaced;
+                }
 
-            if (previous is not null)
-            {
-                previous.Edited -= OnVaultEdited;
-            }
+                if (!ReferenceEquals(claim, _claim))
+                {
+                    _claim?.Dispose();
+                }
 
-            opened.Edited += OnVaultEdited;
-            _vault = opened;
-            _claim = claim;
-            _lifetime = new SessionLifetime();
-            _warned = false;
-            MarkActivity();
-            Rearm();
+                if (previous is not null)
+                {
+                    previous.Edited -= OnVaultEdited;
+                }
+
+                opened.Edited += OnVaultEdited;
+                _vault = opened;
+                previousKey = _hardwareKey;
+                _hardwareKey = hardwareKey;
+                _claim = claim;
+                _lifetime = new SessionLifetime();
+                _warned = false;
+                MarkActivity();
+                Rearm();
+            }
         }
 
-        Retire(ended, previous);
+        if (!adopted)
+        {
+            hardwareKey?.Dispose();
+            return UnlockOutcome.Failed;
+        }
+
+        Retire(ended, previous, previousKey);
 
         if (replaced is { } reason)
         {
@@ -510,7 +610,7 @@ internal sealed class AppVaultSession : IDisposable
             return outcome;
         }
 
-        return Adopt(created, claim) == UnlockOutcome.Opened
+        return Adopt(created, claim, hardwareKey: null) == UnlockOutcome.Opened
             ? VaultCreationOutcome.Created
             : VaultCreationOutcome.Failed;
     }
@@ -539,6 +639,11 @@ internal sealed class AppVaultSession : IDisposable
     /// person stays where they were, as in KeePassXC. If that reopen fails the session locks instead,
     /// with <see cref="VaultLockReason.AccessChanged"/>.
     /// </para>
+    /// <para>
+    /// A hardware key the change attaches, from <see cref="NewHardwareKey"/>, becomes this session's
+    /// with the reopened vault and is disposed on every other outcome. The key's answer to the save
+    /// is reused by the checks and the reopen, so it is touched once.
+    /// </para>
     /// </remarks>
     internal AccessChangeResult ChangeAccess(
         ReadOnlySpan<char> current,
@@ -548,16 +653,43 @@ internal sealed class AppVaultSession : IDisposable
     {
         ArgumentNullException.ThrowIfNull(change);
 
+        var attached = change.HardwareKeyChange == AccessHardwareKeyChange.Attach ? change.HardwareKey : null;
+        var adopted = false;
+
+        try
+        {
+            return Rekey(current, change, newPassword, confirmation, attached, out adopted);
+        }
+        finally
+        {
+            if (!adopted)
+            {
+                attached?.Dispose();
+            }
+        }
+    }
+
+    private AccessChangeResult Rekey(
+        ReadOnlySpan<char> current,
+        VaultAccessChange change,
+        ReadOnlySpan<char> newPassword,
+        ReadOnlySpan<char> confirmation,
+        HardwareKey? attached,
+        out bool adopted)
+    {
+        adopted = false;
+
         if (Unlocked is not { } vault)
         {
             return new AccessChangeResult(AccessChangeOutcome.Locked);
         }
 
         var keyfile = vault.KeyfilePath;
+        var hardwareKey = vault.HardwareKey;
 
         try
         {
-            using var check = Vault.Open(vault.Path, current, keyfile);
+            using var check = Vault.Open(vault.Path, current, keyfile, hardwareKey);
         }
         catch (InvalidMasterPasswordException)
         {
@@ -578,12 +710,19 @@ internal sealed class AppVaultSession : IDisposable
             _ => keyfile,
         };
 
+        var hardwareKeyAfter = change.HardwareKeyChange switch
+        {
+            AccessHardwareKeyChange.Attach => attached,
+            AccessHardwareKeyChange.Remove => null,
+            _ => hardwareKey,
+        };
+
         Vault reopened;
         try
         {
             // Owned by the session once swapped in; Swap disposes it when it is not.
 #pragma warning disable CA2000
-            reopened = Vault.Open(vault.Path, change.SetPassword ? newPassword : current, keyfileAfter);
+            reopened = Vault.Open(vault.Path, change.SetPassword ? newPassword : current, keyfileAfter, hardwareKeyAfter);
 #pragma warning restore CA2000
         }
         catch (VaultException)
@@ -592,15 +731,21 @@ internal sealed class AppVaultSession : IDisposable
             return new AccessChangeResult(AccessChangeOutcome.ChangedAndLocked, result);
         }
 
-        return Swap(vault, reopened)
-            ? new AccessChangeResult(AccessChangeOutcome.Changed, result)
-            : new AccessChangeResult(AccessChangeOutcome.ChangedAndLocked, result);
+        if (!Swap(vault, reopened, hardwareKeyAfter))
+        {
+            return new AccessChangeResult(AccessChangeOutcome.ChangedAndLocked, result);
+        }
+
+        adopted = attached is not null;
+        return new AccessChangeResult(AccessChangeOutcome.Changed, result);
     }
 
     /// <summary>Puts <paramref name="reopened"/> in the place of <paramref name="expected"/>, keeping the idle countdown.</summary>
     /// <returns>False, having disposed <paramref name="reopened"/>, when the session locked or moved on meanwhile.</returns>
-    private bool Swap(Vault expected, Vault reopened)
+    private bool Swap(Vault expected, Vault reopened, HardwareKey? hardwareKey)
     {
+        HardwareKey? replaced;
+
         lock (_gate)
         {
             if (_disposed || !ReferenceEquals(_vault, expected))
@@ -613,8 +758,16 @@ internal sealed class AppVaultSession : IDisposable
             _vault.Dispose();
             reopened.Edited += OnVaultEdited;
             _vault = reopened;
-            return true;
+            replaced = _hardwareKey;
+            _hardwareKey = hardwareKey;
         }
+
+        if (!ReferenceEquals(replaced, hardwareKey))
+        {
+            replaced?.Dispose();
+        }
+
+        return true;
     }
 
     private void OnVaultEdited(object? sender, VaultEdit edit) => Edited?.Invoke(this, edit);
@@ -676,6 +829,10 @@ internal sealed class AppVaultSession : IDisposable
         bool locked;
         SessionLifetime? ended;
         Vault? vault;
+        HardwareKey? hardwareKey;
+
+        // A save waiting for a touch fails and writes nothing, rather than finishing into a closed vault.
+        CancelHardwareKeyWait();
 
         lock (_gate)
         {
@@ -684,6 +841,8 @@ internal sealed class AppVaultSession : IDisposable
             _lifetime = null;
             vault = _vault;
             _vault = null;
+            hardwareKey = _hardwareKey;
+            _hardwareKey = null;
 
             if (vault is not null)
             {
@@ -697,7 +856,7 @@ internal sealed class AppVaultSession : IDisposable
             _warned = false;
         }
 
-        Retire(ended, vault);
+        Retire(ended, vault, hardwareKey);
 
         if (locked)
         {
@@ -705,7 +864,7 @@ internal sealed class AppVaultSession : IDisposable
         }
     }
 
-    /// <summary>Ends a lifetime, then disposes the vault it was answered from.</summary>
+    /// <summary>Ends a lifetime, then disposes the vault it was answered from and the hardware key's last answer.</summary>
     /// <remarks>
     /// <para>
     /// In that order, so nothing waiting on the lifetime can be released from the vault as it goes.
@@ -716,10 +875,11 @@ internal sealed class AppVaultSession : IDisposable
     /// already detached, so nothing reaches them through the session meanwhile.
     /// </para>
     /// </remarks>
-    private static void Retire(SessionLifetime? lifetime, Vault? vault)
+    private static void Retire(SessionLifetime? lifetime, Vault? vault, HardwareKey? hardwareKey)
     {
         lifetime?.Dispose();
         vault?.Dispose();
+        hardwareKey?.Dispose();
     }
 
     public void Dispose()

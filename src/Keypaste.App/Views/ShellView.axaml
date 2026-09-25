@@ -386,6 +386,22 @@
       <views:KdbxImportView DataContext="{Binding Import}" />
     </Border>
 
+    <!-- A save waiting for the YubiKey. Modal, so nothing else is edited while the save is half done. -->
+    <Border Classes="backdrop" IsVisible="{Binding IsWaitingForTouch}" Padding="24">
+      <Border Name="TouchDialog" Classes="dialog" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="360">
+        <StackPanel Spacing="12">
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <Border Classes="dot waiting" />
+            <TextBlock Text="Touch your YubiKey" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"
+                       Foreground="{DynamicResource KpTextPrimary}" />
+          </StackPanel>
+          <TextBlock Classes="caption" TextWrapping="Wrap"
+                     Text="The vault is saved once the key answers. Cancel leaves the change unsaved." />
+          <Button Classes="ghost" Content="Cancel" HorizontalAlignment="Left" Command="{Binding CancelTouchCommand}" />
+        </StackPanel>
+      </Border>
+    </Border>
+
     <!-- Toasts, bottom right. The clipboard countdown is one; ShowToast says anything else. -->
     <StackPanel HorizontalAlignment="Right"
                 VerticalAlignment="Bottom"

@@ -266,6 +266,7 @@ public static class VaultBackups
     /// bytes, so it opens under exactly the factors the vault had when it was taken — which is also
     /// why a later access change does not reach the copies already on disk.
     /// </param>
+    /// <param name="hardwareKey">The hardware key the backup was made under, or <see langword="null"/>.</param>
     /// <returns>What the backup holds, bound to the bytes that were opened.</returns>
     /// <exception cref="VaultRestoreException">
     /// <see cref="List"/> does not name the file, it has no KDBX header, or it changed while it was
@@ -275,11 +276,13 @@ public static class VaultBackups
     /// The password does not open the backup, or its body is damaged. One answer on purpose: nothing
     /// finer can be said of a file that did not decrypt.
     /// </exception>
+    /// <exception cref="HardwareKeys.HardwareKeyException">The hardware key did not answer.</exception>
     public static VaultBackupSummary Inspect(
         string vaultPath,
         VaultBackup backup,
         ReadOnlySpan<char> password,
-        string? keyfilePath = null)
+        string? keyfilePath = null,
+        HardwareKeys.HardwareKey? hardwareKey = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(vaultPath);
         ArgumentNullException.ThrowIfNull(backup);
@@ -293,12 +296,12 @@ public static class VaultBackups
         int entries, groups, projects;
         try
         {
-            using var vault = Vault.Open(listed.Path, password, keyfilePath);
+            using var vault = Vault.Open(listed.Path, password, keyfilePath, hardwareKey);
             entries = vault.ReadEntries().Count;
             groups = vault.ReadGroupPaths().Count;
             projects = new EnvStore(vault).Projects().Count;
         }
-        catch (VaultException ex) when (ex is not UnreadableKeyfileException)
+        catch (VaultException ex) when (ex is not UnreadableKeyfileException and not HardwareKeys.HardwareKeyException)
         {
             throw new InvalidMasterPasswordException(
                 "That password does not open this backup, or the backup is damaged.", ex);

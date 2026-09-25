@@ -23,6 +23,8 @@
   -->
   <ItemGroup>
     <Compile Include="../Keypaste.Core.Tests/PublisherMetadata.cs" Link="PublisherMetadata.cs" />
+    <!-- The same software YubiKey the core's hardware-key tests prove against KeePassXC's vectors. -->
+    <Compile Include="../Keypaste.Core.Tests/HardwareKeys/SoftwareYubiKey.cs" Link="HardwareKeys/SoftwareYubiKey.cs" />
   </ItemGroup>
 
 </Project>

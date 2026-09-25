@@ -5,7 +5,7 @@ using Keypaste.Core.Recent;
 
 namespace Keypaste.App.ViewModels;
 
-/// <summary>What an access change does to the keyfile, as the Settings form offers it.</summary>
+/// <summary>What an access change does to the keyfile or the hardware key, as the Settings form offers it.</summary>
 internal enum KeyfileChoice
 {
     Keep = 0,
@@ -14,8 +14,8 @@ internal enum KeyfileChoice
 }
 
 /// <summary>
-/// Changing what unlocks the open vault: its master password, its keyfile, or both, behind the
-/// current password and a confirmation that says what the change costs the backups.
+/// Changing what unlocks the open vault: its master password, its keyfile, its YubiKey, or several,
+/// behind the current password and a confirmation that says what the change costs the backups.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -40,6 +40,8 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
     private SecretBuffer _confirm = new();
     private bool _setPassword;
     private KeyfileChoice _keyfile;
+    private KeyfileChoice _hardwareKey;
+    private int _newSlot = 2;
     private string? _newKeyfilePath;
     private bool _confirming;
     private bool _busy;
@@ -139,6 +141,63 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
         set => Choose(value, KeyfileChoice.Remove);
     }
 
+    /// <summary>Whether this build reaches hardware keys, so a YubiKey can be added.</summary>
+    internal bool OffersHardwareKey => _session.HardwareKeys is not null;
+
+    /// <summary>Whether the open vault needs a YubiKey, so that removing one is offered.</summary>
+    internal bool HasHardwareKey => Now()?.Slot is not null;
+
+    internal string AttachHardwareKeyLabel => HasHardwareKey ? "Use a different YubiKey slot" : "Add a YubiKey";
+
+    internal bool KeepHardwareKey
+    {
+        get => _hardwareKey == KeyfileChoice.Keep;
+        set => ChooseHardwareKey(value, KeyfileChoice.Keep);
+    }
+
+    internal bool AttachHardwareKey
+    {
+        get => _hardwareKey == KeyfileChoice.Attach;
+        set => ChooseHardwareKey(value, KeyfileChoice.Attach);
+    }
+
+    internal bool RemoveHardwareKey
+    {
+        get => _hardwareKey == KeyfileChoice.Remove;
+        set => ChooseHardwareKey(value, KeyfileChoice.Remove);
+    }
+
+    /// <summary>Whether the YubiKey to add answers from slot 1.</summary>
+    internal bool NewSlotOne
+    {
+        get => _newSlot == 1;
+        set => ChooseSlot(value, 1);
+    }
+
+    /// <summary>Whether the YubiKey to add answers from slot 2.</summary>
+    internal bool NewSlotTwo
+    {
+        get => _newSlot == 2;
+        set => ChooseSlot(value, 2);
+    }
+
+    /// <summary>
+    /// What adding a YubiKey costs, said before the change: a lost key locks the vault, only a spare
+    /// programmed with the same secret opens it too, and every save asks the key.
+    /// </summary>
+    internal string HardwareKeyWarning => _hardwareKey switch
+    {
+        KeyfileChoice.Attach =>
+            "If this YubiKey is lost or broken, the vault cannot be opened: not by keypaste, not by KeePassXC, and not from any " +
+            "backup made after this change. The only way back in is a second YubiKey programmed with the same secret in the same slot, " +
+            "which you make with YubiKey Manager before you need it; keypaste cannot copy a secret out of a key. " +
+            "Every save asks the key again, so a slot that needs a touch is touched on every save.",
+        KeyfileChoice.Remove => "Afterwards the vault opens without the YubiKey. Backups already kept still need it.",
+        _ => string.Empty,
+    };
+
+    internal bool HasHardwareKeyWarning => HardwareKeyWarning.Length > 0;
+
     /// <summary>The keyfile to attach, once one has been chosen.</summary>
     internal string? NewKeyfilePath => _newKeyfilePath;
 
@@ -161,14 +220,21 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
                 _ => now.Keyfile,
             };
 
-            return $"Afterwards the vault {Opens((_setPassword || now.Password, keyfileAfter))}";
+            int? slotAfter = _hardwareKey switch
+            {
+                KeyfileChoice.Attach => _newSlot,
+                KeyfileChoice.Remove => null,
+                _ => now.Slot,
+            };
+
+            return $"Afterwards the vault {Opens((_setPassword || now.Password, keyfileAfter, slotAfter))}";
         }
     }
 
     /// <summary>What the change costs the copies already taken (V.1a2).</summary>
     internal string BackupCost => _session.VaultPath is { } path
         ? $"The vault as it is now is kept in {VaultBackups.DirectoryFor(path)} before it changes. That copy, and every " +
-          "copy already there, still opens with the current password and keyfile, not the new ones. If those were " +
+          "copy already there, still opens with the current password, keyfile and YubiKey, not the new ones. If those were " +
           "exposed, delete the copies."
         : string.Empty;
 
@@ -195,7 +261,7 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
 
     private bool CanReview =>
         IsEditing
-        && (_setPassword || _keyfile != KeyfileChoice.Keep)
+        && (_setPassword || _keyfile != KeyfileChoice.Keep || _hardwareKey != KeyfileChoice.Keep)
         && (_keyfile != KeyfileChoice.Attach || _newKeyfilePath is not null)
         && (!_setPassword || _new.Length > 0)
         && (_current.Length > 0 || Now() is { Password: false });
@@ -230,21 +296,34 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
 
         Busy = true;
 
-        var change = new VaultAccessChange(
-            _setPassword,
-            _keyfile switch
-            {
-                KeyfileChoice.Attach => AccessKeyfileChange.Attach,
-                KeyfileChoice.Remove => AccessKeyfileChange.Remove,
-                _ => AccessKeyfileChange.Keep,
-            },
-            _keyfile == KeyfileChoice.Attach ? _newKeyfilePath : null);
-
         string message;
         try
         {
+            // The session owns the key it attaches, and disposes it on every outcome but a change.
+#pragma warning disable CA2000
+            var change = new VaultAccessChange(
+                _setPassword,
+                _keyfile switch
+                {
+                    KeyfileChoice.Attach => AccessKeyfileChange.Attach,
+                    KeyfileChoice.Remove => AccessKeyfileChange.Remove,
+                    _ => AccessKeyfileChange.Keep,
+                },
+                _keyfile == KeyfileChoice.Attach ? _newKeyfilePath : null)
+            {
+                HardwareKeyChange = _hardwareKey switch
+                {
+                    KeyfileChoice.Attach => AccessHardwareKeyChange.Attach,
+                    KeyfileChoice.Remove => AccessHardwareKeyChange.Remove,
+                    _ => AccessHardwareKeyChange.Keep,
+                },
+                HardwareKey = _hardwareKey == KeyfileChoice.Attach ? _session.NewHardwareKey(_newSlot) : null,
+            };
+#pragma warning restore CA2000
+
             // Argon2 several times over: the check of the current password, the core's checks of
-            // the new bytes, and the reopen. Off the UI thread, as unlocking is.
+            // the new bytes, and the reopen. Off the UI thread, as unlocking is; a YubiKey being
+            // added is asked by the save there, and touched once.
             var result = await Task.Run(() => _session.ChangeAccess(_current.Value, change, _new.Value, _confirm.Value))
                 .ConfigureAwait(true);
 
@@ -288,20 +367,27 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
         _confirm.Dispose();
     }
 
-    private static string Opens((bool Password, string? Keyfile) factors) => factors switch
+    private static string Opens((bool Password, string? Keyfile, int? Slot) factors)
     {
-        (true, { } keyfile) => $"opens with its master password and the keyfile {Path.GetFileName(keyfile)}.",
-        (true, null) => "opens with its master password.",
-        (false, { } keyfile) => $"opens with the keyfile {Path.GetFileName(keyfile)} alone, and has no master password.",
-        _ => "has no factor keypaste can name.",
-    };
+        var withKey = factors.Slot is { } used ? $" and the YubiKey in slot {used}" : string.Empty;
+
+        return factors switch
+        {
+            (true, { } keyfile, null) => $"opens with its master password and the keyfile {Path.GetFileName(keyfile)}.",
+            (true, { } keyfile, _) => $"opens with its master password, the keyfile {Path.GetFileName(keyfile)}{withKey}.",
+            (true, null, _) => $"opens with its master password{withKey}.",
+            (false, { } keyfile, _) => $"opens with the keyfile {Path.GetFileName(keyfile)}{withKey}, and has no master password.",
+            (false, null, { } slot) => $"opens with the YubiKey in slot {slot} alone, and has no master password.",
+            _ => "has no factor keypaste can name.",
+        };
+    }
 
     /// <summary>The open vault's factors, or null once it has locked.</summary>
-    private (bool Password, string? Keyfile)? Now()
+    private (bool Password, string? Keyfile, int? Slot)? Now()
     {
         try
         {
-            return _session.Unlocked is { } vault ? (vault.HasPassword, vault.KeyfilePath) : null;
+            return _session.Unlocked is { } vault ? (vault.HasPassword, vault.KeyfilePath, vault.HardwareKey?.Slot) : null;
         }
         catch (ObjectDisposedException)
         {
@@ -312,7 +398,7 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
     private string Explain(AccessChangeResult result) => result.Outcome switch
     {
         AccessChangeOutcome.Changed =>
-            $"Changed. {Factors} The previous version is kept at {result.Result?.Kept?.Path}, and opens with the old password and keyfile.",
+            $"Changed. {Factors} The previous version is kept at {result.Result?.Kept?.Path}, and opens with the old password, keyfile and YubiKey.",
         AccessChangeOutcome.WrongCurrentSecret => "That isn't the vault's current password. Nothing was changed.",
         AccessChangeOutcome.Locked => "The vault locked before the change was made. Nothing was changed.",
         AccessChangeOutcome.ChangedAndLocked => string.Empty,
@@ -321,9 +407,14 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
             VaultAccessOutcome.NothingToChange => "Nothing would change.",
             VaultAccessOutcome.EmptyPassword => "A new master password can't be empty. Nothing was changed.",
             VaultAccessOutcome.PasswordsDoNotMatch => "Those two new passwords aren't the same. Nothing was changed.",
-            VaultAccessOutcome.WouldLeaveNoPassword =>
+            VaultAccessOutcome.WouldLeaveNoPassword when _keyfile == KeyfileChoice.Remove =>
                 "This vault's keyfile is all that opens it, so it can go only if a master password is set in the same change. Nothing was changed.",
+            VaultAccessOutcome.WouldLeaveNoPassword =>
+                "This vault has no master password or keyfile, so its YubiKey can go only if a master password is set in the same change. Nothing was changed.",
             VaultAccessOutcome.NoKeyfileToRemove => "This vault has no keyfile to remove. Nothing was changed.",
+            VaultAccessOutcome.NoHardwareKeyToRemove => "This vault has no YubiKey to remove. Nothing was changed.",
+            VaultAccessOutcome.HardwareKeyNotFound =>
+                $"No YubiKey with slot {_newSlot} programmed is plugged in. Plug it in, or program the slot for HMAC-SHA1 challenge-response in YubiKey Manager. Nothing was changed.",
             VaultAccessOutcome.KeyfileUnusable => $"{UnlockViewModel.ExplainKeyfile(result.Result.Keyfile.Outcome)} Nothing was changed.",
             VaultAccessOutcome.KeyfileIsFragile =>
                 "keypaste won't attach that file: it would be keyed by its exact bytes, so one edit to it loses the vault. Choose a KeePass keyfile. Nothing was changed.",
@@ -332,7 +423,7 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
         },
     };
 
-    /// <summary>Points the recent list at the keyfile the vault now needs, so the next unlock offers it.</summary>
+    /// <summary>Points the recent list at the keyfile and YubiKey slot the vault now needs, so the next unlock offers them.</summary>
     private void RememberKeyfile()
     {
         if (_session.Unlocked is not { } vault)
@@ -341,7 +432,9 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
         }
 
         var recent = KeypasteHome.RecentPath(_home);
-        RecentVaults.Save(recent, RecentVaults.Remember(RecentVaults.Load(recent), vault.Path, DateTimeOffset.UtcNow, vault.KeyfilePath));
+        RecentVaults.Save(
+            recent,
+            RecentVaults.Remember(RecentVaults.Load(recent), vault.Path, DateTimeOffset.UtcNow, vault.KeyfilePath, vault.HardwareKey?.Slot));
     }
 
     private async Task ChooseKeyfileAsync()
@@ -380,6 +473,28 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
         }
 
         _keyfile = choice;
+        RaiseState();
+    }
+
+    private void ChooseHardwareKey(bool selected, KeyfileChoice choice)
+    {
+        if (!selected || !IsEditing || _hardwareKey == choice)
+        {
+            return;
+        }
+
+        _hardwareKey = choice;
+        RaiseState();
+    }
+
+    private void ChooseSlot(bool selected, int slot)
+    {
+        if (!selected || !IsEditing || _newSlot == slot)
+        {
+            return;
+        }
+
+        _newSlot = slot;
         RaiseState();
     }
 
@@ -425,6 +540,8 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
         _confirming = false;
         _setPassword = false;
         _keyfile = KeyfileChoice.Keep;
+        _hardwareKey = KeyfileChoice.Keep;
+        _newSlot = 2;
         _newKeyfilePath = null;
         Message = message;
         RaiseState();
@@ -458,6 +575,15 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
         Raise(nameof(BackupCost));
         Raise(nameof(KeyfileWarning));
         Raise(nameof(HasKeyfileWarning));
+        Raise(nameof(HasHardwareKey));
+        Raise(nameof(AttachHardwareKeyLabel));
+        Raise(nameof(KeepHardwareKey));
+        Raise(nameof(AttachHardwareKey));
+        Raise(nameof(RemoveHardwareKey));
+        Raise(nameof(NewSlotOne));
+        Raise(nameof(NewSlotTwo));
+        Raise(nameof(HardwareKeyWarning));
+        Raise(nameof(HasHardwareKeyWarning));
         ReviewCommand.RaiseCanExecuteChanged();
         ConfirmCommand.RaiseCanExecuteChanged();
         CancelCommand.RaiseCanExecuteChanged();

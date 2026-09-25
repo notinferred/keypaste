@@ -50,6 +50,16 @@ This guard adds `PreviousParentGroup` to the same version floor upstream already
 |---|---|
 | `Serialization/KdbxFile.cs` | `GetMinKdbxVersion()`'s group and entry handlers raise the minimum to 4.1 when the object carries a non-zero `PreviousParentGroup` |
 
+### `KEYPASTE_CHALLENGE_RESPONSE`
+
+KeePass has no hardware-key factor; KeePassXC's YubiKey challenge-response changes how the key is derived, so a vault it protects cannot be opened by upstream KeePassLib at all. This guard adds that derivation as KeePassXC's `CompositeKey::rawKey`, `CompositeKey::challenge`, `Kdbx4Reader` and `Kdbx3Reader` define it. A challenge-response key contributes no `KeyData`; `CompositeKey` asks it for its raw answer to a challenge and appends the SHA-256 of every answer, concatenated in the order the keys were added, after the ordinary components. From KDBX 4 the challenge is the KDF seed (AES-KDF's transform seed or Argon2's salt, regenerated on every save) and the hash is part of the KDF input. For KDBX 3.1 the KDF input leaves it out, the challenge is the master seed, and the cipher key is SHA-256 of master seed, answer hash and transformed key. A key with no challenge-response component derives exactly what upstream derives. keypaste implements the key in `KeePassInterop.cs`, and the padding to 64 bytes the device receives in `Keypaste.Core/HardwareKeys/HardwareKey.cs`.
+
+| File | Change |
+|---|---|
+| `Keys/IChallengeResponseUserKey.cs` | New: the interface a challenge-response key implements |
+| `Keys/CompositeKey.cs` | `CreateRawCompositeKey32`, `GenerateKey32` and `GenerateKey32Ex` gain overloads that challenge; `ChallengeResponse` and `KdfSeed` are added |
+| `Serialization/KdbxFile.cs` | `ComputeKeys` challenges the KDF seed from KDBX 4, and the master seed into the cipher key before it |
+
 ### Files excluded from compilation
 
 | Path | Reason |

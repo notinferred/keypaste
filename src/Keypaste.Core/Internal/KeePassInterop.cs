@@ -7,6 +7,7 @@ using KeePassLib.Keys;
 using KeePassLib.Security;
 using KeePassLib.Serialization;
 using KeePassLib.Utility;
+using Keypaste.Core.HardwareKeys;
 using Keypaste.Core.Import;
 
 namespace Keypaste.Core.Internal;
@@ -45,12 +46,13 @@ internal sealed class KeePassInterop : IDisposable
 
     /// <summary>Creates a new KDBX4 vault protected by the given UTF-8 master password.</summary>
     /// <remarks>The caller owns <paramref name="utf8Password"/> and is responsible for zeroing it.</remarks>
-    internal static KeePassInterop Create(string path, byte[] utf8Password, string? keyfilePath = null)
+    internal static KeePassInterop Create(
+        string path, byte[] utf8Password, string? keyfilePath = null, HardwareKey? hardwareKey = null)
     {
         PwDatabase database = new();
         try
         {
-            database.New(IOConnectionInfo.FromPath(path), BuildKey(utf8Password, keyfilePath));
+            database.New(IOConnectionInfo.FromPath(path), BuildKey(utf8Password, keyfilePath, hardwareKey));
             ApplyKeypasteFormatSettings(database);
             ApplyWriteSafety(database);
         }
@@ -66,10 +68,12 @@ internal sealed class KeePassInterop : IDisposable
     /// <summary>Opens an existing vault.</summary>
     /// <remarks>The caller owns <paramref name="utf8Password"/> and is responsible for zeroing it.</remarks>
     /// <exception cref="InvalidMasterPasswordException">The password does not open the vault.</exception>
+    /// <exception cref="HardwareKeyException">The hardware key did not answer.</exception>
     /// <exception cref="VaultException">The vault could not be read.</exception>
-    internal static KeePassInterop Open(string path, byte[] utf8Password, string? keyfilePath = null)
+    internal static KeePassInterop Open(
+        string path, byte[] utf8Password, string? keyfilePath = null, HardwareKey? hardwareKey = null)
     {
-        var database = OpenDatabase(path, utf8Password, keyfilePath);
+        var database = OpenDatabase(path, utf8Password, keyfilePath, hardwareKey);
         ApplyWriteSafety(database);
         return new KeePassInterop(database);
     }
@@ -81,12 +85,13 @@ internal sealed class KeePassInterop : IDisposable
     internal static KeePassInterop OpenReadOnly(string path, byte[] utf8Password, string? keyfilePath) =>
         new(OpenDatabase(path, utf8Password, keyfilePath)) { _readOnly = true };
 
-    private static PwDatabase OpenDatabase(string path, byte[] utf8Password, string? keyfilePath)
+    private static PwDatabase OpenDatabase(
+        string path, byte[] utf8Password, string? keyfilePath, HardwareKey? hardwareKey = null)
     {
         PwDatabase database = new();
         try
         {
-            database.Open(IOConnectionInfo.FromPath(path), BuildKey(utf8Password, keyfilePath), null);
+            database.Open(IOConnectionInfo.FromPath(path), BuildKey(utf8Password, keyfilePath, hardwareKey), null);
         }
         catch (InvalidCompositeKeyException ex)
         {
@@ -96,10 +101,19 @@ internal sealed class KeePassInterop : IDisposable
             // which factors were OFFERED is, and a message naming only the password sends somebody
             // with a good password and the wrong keyfile to retype the one thing that was right.
             throw new InvalidMasterPasswordException(
-                string.IsNullOrEmpty(keyfilePath)
-                    ? "The master password is incorrect, or the vault is not a readable KDBX file."
-                    : "The master password or the keyfile is incorrect, or the vault is not a readable KDBX file.",
+                (string.IsNullOrEmpty(keyfilePath), hardwareKey is null) switch
+                {
+                    (true, true) => "The master password is incorrect, or the vault is not a readable KDBX file.",
+                    (false, true) => "The master password or the keyfile is incorrect, or the vault is not a readable KDBX file.",
+                    (true, false) => "The master password or the hardware key is incorrect, or the vault is not a readable KDBX file.",
+                    (false, false) => "The master password, the keyfile or the hardware key is incorrect, or the vault is not a readable KDBX file.",
+                },
                 ex);
+        }
+        catch (HardwareKeyException)
+        {
+            database.Close();
+            throw;
         }
         catch (Exception ex)
         {
@@ -153,17 +167,22 @@ internal sealed class KeePassInterop : IDisposable
     /// <summary>The keyfile the vault's key includes, or <see langword="null"/>.</summary>
     internal string? KeyfilePath => (_database.MasterKey.GetUserKey(typeof(KcpKeyFile)) as KcpKeyFile)?.Path;
 
+    /// <summary>The hardware key the vault's key includes, or <see langword="null"/>.</summary>
+    internal HardwareKey? HardwareKey =>
+        (_database.MasterKey.GetUserKey(typeof(ChallengeResponseKey)) as ChallengeResponseKey)?.Factor;
+
     /// <summary>Replaces the vault's key in memory. Nothing is written until a save is given the change.</summary>
     /// <param name="utf8NewPassword">The new password, or <see langword="null"/> to keep the current one if there is one.</param>
     /// <param name="keyfilePath">The keyfile the new key includes, or <see langword="null"/> for none.</param>
     /// <param name="keepCurrentKeyfile">Whether <paramref name="keyfilePath"/> is the keyfile the vault opened with.</param>
+    /// <param name="hardwareKey">The hardware key the new key includes, or <see langword="null"/> for none.</param>
     /// <remarks>
     /// A kept keyfile keeps the key material it was opened with, so a file edited since then cannot
     /// slip a different key into the vault; the verifying key re-reads it from disk and refuses
     /// instead. The KDF, cipher and format version are the vault's own and are not touched.
     /// </remarks>
     /// <exception cref="VaultException">The keyfile could not be read.</exception>
-    internal KeyChange ChangeKey(byte[]? utf8NewPassword, string? keyfilePath, bool keepCurrentKeyfile)
+    internal KeyChange ChangeKey(byte[]? utf8NewPassword, string? keyfilePath, bool keepCurrentKeyfile, HardwareKey? hardwareKey)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -184,6 +203,13 @@ internal sealed class KeePassInterop : IDisposable
         {
             next.AddUserKey(keepCurrentKeyfile ? current.GetUserKey(typeof(KcpKeyFile)) : ReadKeyfile(keyfilePath));
             verify.AddUserKey(ReadKeyfile(keyfilePath));
+        }
+
+        if (hardwareKey is not null)
+        {
+            ChallengeResponseKey challenged = new(hardwareKey);
+            next.AddUserKey(challenged);
+            verify.AddUserKey(challenged);
         }
 
         var change = new KeyChange(current, _database.MasterKeyChanged, verify);
@@ -1719,14 +1745,15 @@ internal sealed class KeePassInterop : IDisposable
     /// <para>
     /// Only then. An empty password with no keyfile still builds the key it always did, because
     /// that is not a passwordless vault, it is a wrong password, and it has to keep being refused
-    /// as one.
+    /// as one. A hardware key counts as the keyfile does, because KeePassXC adds no password
+    /// component for an empty field beside either.
     /// </para>
     /// </remarks>
-    private static CompositeKey BuildKey(byte[] utf8Password, string? keyfilePath)
+    private static CompositeKey BuildKey(byte[] utf8Password, string? keyfilePath, HardwareKey? hardwareKey = null)
     {
         CompositeKey key = new();
 
-        if (utf8Password.Length > 0 || string.IsNullOrEmpty(keyfilePath))
+        if (utf8Password.Length > 0 || (string.IsNullOrEmpty(keyfilePath) && hardwareKey is null))
         {
             // bRememberPassword: false — the key material is the SHA-256 of the password; there is
             // no reason to also retain the password itself for the lifetime of the database object.
@@ -1741,7 +1768,26 @@ internal sealed class KeePassInterop : IDisposable
             key.AddUserKey(new KcpKeyFile(keyfilePath, true));
         }
 
+        if (hardwareKey is not null)
+        {
+            key.AddUserKey(new ChallengeResponseKey(hardwareKey));
+        }
+
         return key;
+    }
+
+    /// <summary>A hardware key as KeePassLib takes one: no key data of its own, only an answer to the file's challenge.</summary>
+    /// <remarks>
+    /// The vendored <c>CompositeKey</c> folds the SHA-256 of the answer into the key where KeePassXC
+    /// does (third_party/KeePassLib/UPSTREAM.md, <c>KEYPASTE_CHALLENGE_RESPONSE</c>).
+    /// </remarks>
+    private sealed class ChallengeResponseKey(HardwareKey factor) : IChallengeResponseUserKey
+    {
+        internal HardwareKey Factor { get; } = factor;
+
+        public ProtectedBinary KeyData => null!;
+
+        public byte[] GetResponse(byte[] pbChallenge) => Factor.Respond(pbChallenge);
     }
 
     private static void ApplyKeypasteFormatSettings(PwDatabase database)

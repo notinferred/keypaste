@@ -41,10 +41,14 @@
                          a PreviousParentGroup. Upstream writes that field only at 4.1 but
                          never asks for 4.1 on its account, so a recycled entry loses the
                          place it came from on the next save.
+      KEYPASTE_CHALLENGE_RESPONSE
+                         folds a hardware key's challenge-response answer into the key the
+                         way KeePassXC does: into the KDF input from KDBX 4, into the final
+                         key for KDBX 3.1. Upstream KeePass has no such key.
 
-      All three are grep-able markers. Every site they guard is listed in UPSTREAM.md.
+      All four are grep-able markers. Every site they guard is listed in UPSTREAM.md.
     -->
-    <DefineConstants>TRACE;NETSTANDARD2_0;KEYPASTE_NO_DPAPI;KEYPASTE_NO_GFX;KEYPASTE_KDBX_4_1_MOVES</DefineConstants>
+    <DefineConstants>TRACE;NETSTANDARD2_0;KEYPASTE_NO_DPAPI;KEYPASTE_NO_GFX;KEYPASTE_KDBX_4_1_MOVES;KEYPASTE_CHALLENGE_RESPONSE</DefineConstants>
 
     <!--
       docs/PRODUCT.md §3.9: dependencies on the secret path are minimised. This project has

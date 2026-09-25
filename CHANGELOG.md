@@ -24,6 +24,8 @@ A project holds profiles: `env/<project>` is dev and `env/<project>/<profile>` a
 
 `~/.keypaste/clients.toml` narrows one MCP client at a time: Ask every time, Session grants up to 1 hour, or Inject only. Set it with `keypaste mcp policy` or on the desktop's Agents screen.
 
+The desktop app unlocks a vault that also needs a YubiKey, as KeePassXC protects one with HMAC-SHA1 challenge-response, and Settings adds or removes the key after saying what a lost one costs. It shows Touch your YubiKey while the key waits, on unlocking and on every save. It has not yet been tried with a physical key, and the CLI cannot open such a vault (T-37).
+
 `keypaste rotate <entry>` and the entry pane's Rotate replace a password with a generated one, keeping the old value in history and never showing the new one.
 
 `keypaste grants` lists the grants the process holding the vault has given, never a value; `grants revoke <id|agent>` and `--all` end them. `keypaste lock` locks the desktop app or `keypaste agent` holding the vault.

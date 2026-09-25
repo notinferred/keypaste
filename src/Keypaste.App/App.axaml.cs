@@ -4,6 +4,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using Keypaste.App.Clipboard;
+using Keypaste.App.HardwareKeys;
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
@@ -115,7 +116,8 @@ internal sealed partial class App : Application, IDisposable
         return new AppVaultSession(
             clock,
             preferences.IdleTimeout,
-            KeypasteHome.Resolve(Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable)));
+            KeypasteHome.Resolve(Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable)),
+            new YubiKeyHardware());
     }
 
     /// <summary>

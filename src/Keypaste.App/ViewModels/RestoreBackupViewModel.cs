@@ -1,5 +1,6 @@
 using System.Globalization;
 using Keypaste.Core;
+using Keypaste.Core.HardwareKeys;
 
 namespace Keypaste.App.ViewModels;
 
@@ -58,6 +59,7 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
     private readonly Action<Action> _post;
     private readonly Func<VaultRestoreReport, SecretBuffer, string?, Task> _restored;
     private readonly Func<Task<string?>> _pickKeyfile;
+    private readonly Func<HardwareKey>? _newHardwareKey;
 
     private SecretBuffer _password = new();
     private VaultBackupSummary? _validated;
@@ -75,7 +77,8 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
         Action<Action> post,
         Func<VaultRestoreReport, SecretBuffer, string?, Task> restored,
         string? keyfilePath,
-        Func<Task<string?>> pickKeyfile)
+        Func<Task<string?>> pickKeyfile,
+        Func<HardwareKey>? newHardwareKey = null)
     {
         _vaultPath = vaultPath;
         _clock = clock;
@@ -84,6 +87,7 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
         _restored = restored;
         _keyfilePath = keyfilePath;
         _pickKeyfile = pickKeyfile;
+        _newHardwareKey = newHardwareKey;
 
         CheckCommand = new AsyncRelayCommand(CheckAsync, () => CanCheck);
         ConfirmCommand = new AsyncRelayCommand(ConfirmAsync, () => IsConfirming && !_busy);
@@ -119,6 +123,9 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
     internal string KeyfileName => _keyfilePath is null ? string.Empty : Path.GetFileName(_keyfilePath);
 
     internal bool HasKeyfile => _keyfilePath is not null;
+
+    /// <summary>Whether the check asks the YubiKey the unlock screen had chosen, as a copy made under one needs.</summary>
+    internal bool UsesHardwareKey => _newHardwareKey is not null;
 
     internal BackupRow? Selected
     {
@@ -201,7 +208,8 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
 #pragma warning restore CA1822
 
     private bool CanCheck =>
-        !_busy && IsChoosing && _selected is { IsDamaged: false } && (_password.Length > 0 || _keyfilePath is not null);
+        !_busy && IsChoosing && _selected is { IsDamaged: false }
+        && (_password.Length > 0 || _keyfilePath is not null || _newHardwareKey is not null);
 
     internal void Type(char c) => Edit(() => _password.Append(c));
 
@@ -233,7 +241,8 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
         {
             // Argon2, as unlocking is, so off the UI thread for the same reason.
             var keyfile = _keyfilePath;
-            _validated = await Task.Run(() => VaultBackups.Inspect(_vaultPath, row.Backup, _password.Value, keyfile))
+            using var hardwareKey = _newHardwareKey?.Invoke();
+            _validated = await Task.Run(() => VaultBackups.Inspect(_vaultPath, row.Backup, _password.Value, keyfile, hardwareKey))
                 .ConfigureAwait(true);
 
             Arm();
