@@ -411,7 +411,8 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
             entry => string.Equals(entry.Session, session, StringComparison.Ordinal),
             ["this session"]);
 
-        if (history.Kind == AuditReadKind.Intact && history.Entries.Count == 0)
+        // No log yet is the first run before any agent asked, as the Activity screen reads it too.
+        if (history.Kind == AuditReadKind.Missing || (history.Kind == AuditReadKind.Intact && history.Entries.Count == 0))
         {
             Show([], "The audit log has no records from this session yet.");
             return;
@@ -419,7 +420,6 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
 
         Show(history.Lines, history.Kind switch
         {
-            AuditReadKind.Missing => $"History unavailable: there is no audit log at {_auditPath}.",
             AuditReadKind.Unreadable => $"History unavailable: the audit log couldn't be read: {history.Error}",
             AuditReadKind.Unchecked => "History unavailable: the audit log couldn't be checked, so nothing from it is shown here.",
             AuditReadKind.Broken => "This log has been edited since keypaste wrote it. Verify chain on the Activity screen says where.",

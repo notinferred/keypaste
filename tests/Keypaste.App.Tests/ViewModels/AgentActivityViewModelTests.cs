@@ -180,14 +180,15 @@ public sealed class AgentActivityViewModelTests
     }
 
     [Fact]
-    public async Task A_missing_log_is_unavailable_rather_than_a_session_with_no_history()
+    public async Task A_missing_log_reads_as_a_session_with_no_records_yet()
     {
         await using var app = await App.StartAsync();
 
         using var model = app.Model();
 
         Assert.False(model.HasHistory);
-        Assert.Equal($"History unavailable: there is no audit log at {model.AuditPath}.", model.HistoryMessage);
+        Assert.Equal("The audit log has no records from this session yet.", model.HistoryMessage);
+        Assert.DoesNotContain(model.AuditPath, model.HistoryMessage, StringComparison.Ordinal);
     }
 
     [Fact]
