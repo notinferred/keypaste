@@ -6,6 +6,7 @@
 
 | id | date | decision | supersedes |
 |---|---|---|---|
+| D-0362 | 2026-09-25 | A share passphrase has at least 20 characters, and the CLI and desktop point to six generated words, because the status answer's passphrase check lets whoever holds a link test guesses offline without spending a view; the check stays so a mistyped passphrase costs no view | — |
 | D-0361 | 2026-09-25 | Audit lines gain `vault` (the vault's identity key), `entries` and a 256-character `command` head with its SHA-256; last-used and in-use signals come from that vault's granted lines, the owner's release ledger and its live grants, and a bridge's client name, version and label on attach are display and counting only | — |
 | D-0360 | 2026-09-25 | Per-client policy lives in `~/.keypaste/clients.toml` keyed by `--client-label`, with `*` also covering unlabeled bridges: `session` (default), `ask` (no timed grant, no standing rule) or `inject-only` (`request_credential` refused, `run` allowed); it only narrows, the owner re-reads it at each request, and an unreadable file refuses every agent request | — |
 | D-0359 | 2026-09-25 | Run output is scrubbed as bytes of each injected value's literal, JSON, backslash, shell-quoted, percent and URI-password forms and each line of 8 or more characters, in UTF-8, UTF-16 and on Windows the ANSI and OEM code pages, before a cut head is dropped; each stream keeps its last 256 KiB and returns its last 16384 characters | — |

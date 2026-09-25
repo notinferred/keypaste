@@ -59,11 +59,11 @@ public sealed class ShareServiceTests : IDisposable
     public async Task Create_Login_SharesTheNonEmptyLoginFields()
     {
         using var vault = _fixture.Open();
-        var outcome = await _fixture.Service().CreateAsync(vault, ShareFixture.Request(ShareFixture.Chase, "login", passphrase: "a long passphrase"), CancellationToken.None);
+        var outcome = await _fixture.Service().CreateAsync(vault, ShareFixture.Request(ShareFixture.Chase, "login", passphrase: "a long enough passphrase"), CancellationToken.None);
 
         Assert.True(outcome.Ok, outcome.Message);
         Assert.True(ShareLink.TryParse(outcome.Link!, out var id, out var key));
-        Assert.True(ShareCrypto.TryOpen(_fixture.Server.Shares[id].Envelope, key, "a long passphrase", out var payload, out _));
+        Assert.True(ShareCrypto.TryOpen(_fixture.Server.Shares[id].Envelope, key, "a long enough passphrase", out var payload, out _));
         Assert.Equal(["username", "password", "url"], payload.Fields.Select(f => f.Name));
         Assert.Contains("passphrase", _fixture.AuditText(), StringComparison.Ordinal);
     }
@@ -189,8 +189,8 @@ public sealed class ShareServiceTests : IDisposable
     [InlineData("password", 11, 24, null, "1 to 10")]
     [InlineData("password", 1, 0, null, "5 minutes to 7 days")]
     [InlineData("password", 1, 24 * 8, null, "5 minutes to 7 days")]
-    [InlineData("password", 1, 24, "short", "at least 8")]
-    [InlineData("password", 1, 24, "café ✓ long enough", "Latin")]
+    [InlineData("password", 1, 24, "nineteen characters", "at least 20")]
+    [InlineData("password", 1, 24, "café ✓ long enough, surely", "Latin")]
     public async Task Create_RefusesLimitsOutsideTheRules_BeforeAsking(string field, int views, int hours, string? passphrase, string expected)
     {
         using var vault = _fixture.Open();

@@ -94,7 +94,9 @@ internal static class ShareCommand
         writer.WriteLine("holds the key, so it is copied to the clipboard; --print writes it to stdout instead.");
         writer.WriteLine("--ttl takes 5m to 7d (default 24h), --views 1 to 10 (default 1). --to is a label");
         writer.WriteLine("for your own list and is never sent. <entry> may be a kp:// reference, which names");
-        writer.WriteLine("its own field.");
+        writer.WriteLine("its own field. --passphrase asks for one the recipient must also type; whoever holds");
+        writer.WriteLine("the link can guess it offline, so it has at least 20 characters, and");
+        writer.WriteLine("`keypaste generate --words 6` makes one.");
         return exit;
     }
 
@@ -447,7 +449,7 @@ internal static class ShareCommand
         if (first.Length < ShareService.MinimumPassphraseLength || !ShareCrypto.AcceptsPassphrase(first.Value))
         {
             first.Dispose();
-            context.Stderr.WriteLine($"keypaste share: a passphrase has at least {ShareService.MinimumPassphraseLength} characters: Latin letters, digits, spaces and punctuation");
+            context.Stderr.WriteLine($"keypaste share: {ShareService.PassphraseLengthRule}, of Latin letters, digits, spaces and punctuation");
             return null;
         }
 

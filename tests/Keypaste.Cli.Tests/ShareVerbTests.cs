@@ -143,7 +143,7 @@ public sealed class ShareVerbTests : IDisposable
     public void Share_Passphrase_PromptsTwice_AndMismatchRefuses()
     {
         _cli.Prompt.Interactive = true;
-        _cli.Prompt.Enqueue(_master, "a long passphrase", "a long passphrase");
+        _cli.Prompt.Enqueue(_master, "a long enough passphrase", "a long enough passphrase");
 
         var exit = ShareCommand.Execute(["share", "env/acme-api/STRIPE_KEY", "--passphrase", "--print", "--vault", _cli.VaultPath], _cli.NewContext(), _server);
 
@@ -151,12 +151,12 @@ public sealed class ShareVerbTests : IDisposable
         Assert.Equal(["Master password: ", "Passphrase: ", "Repeat passphrase: "], _cli.Prompt.SecretPrompts);
         Assert.Contains("  passphrase: send it separately", _cli.Err, StringComparison.Ordinal);
         Assert.True(ShareLink.TryParse(_cli.Out.Trim(), out var id, out var key));
-        Assert.True(ShareCrypto.TryOpen(_server.Shares[id].Envelope, key, "a long passphrase", out _, out _));
+        Assert.True(ShareCrypto.TryOpen(_server.Shares[id].Envelope, key, "a long enough passphrase", out _, out _));
         Assert.False(ShareCrypto.TryOpen(_server.Shares[id].Envelope, key, ReadOnlySpan<char>.Empty, out _, out _));
         Assert.All(_cli.Prompt.IssuedSecrets, buffer => Assert.True(buffer.IsZeroed));
 
         Clear();
-        _cli.Prompt.Enqueue(_master, "a long passphrase", "another passphrase");
+        _cli.Prompt.Enqueue(_master, "a long enough passphrase", "another long passphrase");
         exit = ShareCommand.Execute(["share", "env/acme-api/STRIPE_KEY", "--passphrase", "--print", "--vault", _cli.VaultPath], _cli.NewContext(), _server);
 
         Assert.Equal(CliApp.ExitUsageError, exit);
@@ -164,11 +164,11 @@ public sealed class ShareVerbTests : IDisposable
         Assert.Single(_server.Requests);
 
         Clear();
-        _cli.Prompt.Enqueue(_master, "short", "short");
+        _cli.Prompt.Enqueue(_master, "nineteen characters", "nineteen characters");
         exit = ShareCommand.Execute(["share", "env/acme-api/STRIPE_KEY", "--passphrase", "--print", "--vault", _cli.VaultPath], _cli.NewContext(), _server);
 
         Assert.Equal(CliApp.ExitUsageError, exit);
-        Assert.Contains("at least 8 characters", _cli.Err, StringComparison.Ordinal);
+        Assert.Contains("at least 20 characters; `keypaste generate --words 6` makes one", _cli.Err, StringComparison.Ordinal);
         Assert.Single(_server.Requests);
     }
 

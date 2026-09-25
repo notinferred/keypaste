@@ -276,7 +276,7 @@
                                AllowsPaste="True"
                                Sink="{Binding Passphrase}"
                                MaskedLength="{Binding Passphrase.MaskedLength}"
-                               Placeholder="Passphrase, at least 8 characters" />
+                               Placeholder="Passphrase, at least 20 characters, such as six generated words" />
               <TextBlock Classes="caption"
                          Text="Not stored. Send it another way than the link." />
             </StackPanel>

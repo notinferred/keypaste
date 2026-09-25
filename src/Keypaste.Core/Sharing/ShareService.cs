@@ -48,7 +48,15 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
     public const int MaximumViews = 10;
 
     /// <summary>The shortest passphrase accepted.</summary>
-    public const int MinimumPassphraseLength = 8;
+    /// <remarks>
+    /// The status answer carries a passphrase check, so whoever holds the link can test guesses
+    /// offline without spending a view (T-33); only a long passphrase survives that.
+    /// </remarks>
+    public const int MinimumPassphraseLength = 20;
+
+    /// <summary>The rule a refused passphrase is told, with the way to make one that passes.</summary>
+    public static string PassphraseLengthRule { get; } =
+        $"a passphrase has at least {MinimumPassphraseLength} characters; `keypaste generate --words 6` makes one";
 
     /// <summary>The longest recipient label kept.</summary>
     public const int MaximumRecipientLength = 128;
@@ -254,7 +262,7 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
 
         if (request.Passphrase is { Length: > 0 and < MinimumPassphraseLength })
         {
-            return $"a passphrase has at least {MinimumPassphraseLength} characters";
+            return PassphraseLengthRule;
         }
 
         return request.Recipient is { Length: > MaximumRecipientLength }

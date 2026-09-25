@@ -127,7 +127,7 @@ public sealed class SharingViewModelTests : IDisposable
         Assert.NotNull(screen.Error);
         Assert.Empty(_server.Requests);
 
-        foreach (var c in "a long passphrase")
+        foreach (var c in "a long enough passphrase")
         {
             screen.Passphrase.Type(c);
         }
@@ -136,7 +136,7 @@ public sealed class SharingViewModelTests : IDisposable
 
         Assert.Null(screen.Error);
         Assert.True(ShareLink.TryParse(_clipboard.Content!, out var id, out var key));
-        Assert.True(ShareCrypto.TryOpen(_server.Shares[id].Envelope, key, "a long passphrase", out _, out _));
+        Assert.True(ShareCrypto.TryOpen(_server.Shares[id].Envelope, key, "a long enough passphrase", out _, out _));
         Assert.Contains("passphrase", Assert.Single(screen.Rows).Rule, StringComparison.Ordinal);
         Assert.False(screen.Passphrase.HasValue);
     }
