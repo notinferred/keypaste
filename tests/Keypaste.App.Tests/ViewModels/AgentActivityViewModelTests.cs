@@ -119,7 +119,7 @@ public sealed class AgentActivityViewModelTests
         var listed = app.Authority.Grants();
         Assert.Equal(model.Grants.Select(row => row.Id).Order(StringComparer.Ordinal), listed.Select(grant => grant.Id).Order(StringComparer.Ordinal));
         Assert.All(model.Grants, row => Assert.Equal(GrantId.Of(row.Grant!.Value), row.Id));
-        Assert.All(listed, grant => Assert.Equal(new GrantSummary(grant.Id, "credential", "claude-code", "example", "password", 60), grant));
+        Assert.All(listed, grant => Assert.Equal(new GrantSummary(grant.Id, "credential", "claude-code", "example", "password", 3600), grant));
 
         var ended = model.Grants[0];
         model.RevokeCommand.Execute(ended);
@@ -231,6 +231,19 @@ public sealed class AgentActivityViewModelTests
         app.Clock.Advance(TimeSpan.FromSeconds(5));
 
         Assert.Same(before, Assert.Single(model.Grants));
+    }
+
+    [Fact]
+    public void A_runs_timed_grant_is_listed_by_the_id_keypaste_grants_revokes_it_by()
+    {
+        var row = ActivityRow.EnvGranted(3, new EnvGrantInForce("key", "acme-api", "staging", "npm start", TimeSpan.FromSeconds(899.5)));
+
+        Assert.Equal(3, row.Number);
+        Assert.Equal(GrantId.OfEnv("key"), row.Id);
+        Assert.Null(row.Grant);
+        Assert.Equal("keypaste run · label none configured", row.Who);
+        Assert.Equal("acme-api · staging · npm start · set", row.What);
+        Assert.Equal("ends in 900 s", row.Left);
     }
 
     private static string Everything(AgentActivityViewModel model) =>

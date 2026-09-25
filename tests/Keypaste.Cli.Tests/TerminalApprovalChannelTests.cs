@@ -124,6 +124,34 @@ public sealed class TerminalApprovalChannelTests
         Assert.Equal("[d] deny  [o] once  [h] 1 hour   5s › ", Assert.Single(prompt.PromptsSeen));
     }
 
+    [Theory]
+    [InlineData("h", "<Ok>keypaste: allowed for 1 hour.</>")]
+    [InlineData("o", "<Ok>keypaste: allowed once.</>")]
+    [InlineData("d", "<Danger>keypaste: denied. Nothing was released.</>")]
+    public async Task TheDialog_IsColouredOnlyThroughTheConsoleStyle(string answer, string outcome)
+    {
+        var prompt = new FakeSecretPrompt();
+        prompt.Enqueue(answer);
+        var stderr = new StringWriter();
+        var channel = new TerminalApprovalChannel(
+            prompt, new AgentConsole(stderr, interactive: false, new MarkingStyle(stderr)), _window, TimeProvider.System);
+
+        await channel.AskAsync(Prompt(), Token);
+
+        Assert.Contains($"<Accent>{TerminalApprovalChannel.Rule}</>", stderr.ToString(), StringComparison.Ordinal);
+        Assert.Contains(outcome, stderr.ToString(), StringComparison.Ordinal);
+        Assert.Equal("<Accent>[d] deny  [o] once  </><Ok>[h] 1 hour</>  <Accent>45s ›</> ", Assert.Single(prompt.PromptsSeen));
+    }
+
+    /// <summary>Paints by marking each tone, so a test sees what was coloured and how without reading escapes.</summary>
+    private sealed class MarkingStyle(TextWriter painted) : Styling.IConsoleStyle
+    {
+        public void Alarm(TextWriter writer, string text) => writer.WriteLine(text);
+
+        public string Paint(TextWriter writer, Styling.Tone tone, string text) =>
+            ReferenceEquals(writer, painted) ? $"<{tone}>{text}</>" : text;
+    }
+
     [Fact]
     public async Task TheChoiceLine_DropsH_WhenNotOffered()
     {

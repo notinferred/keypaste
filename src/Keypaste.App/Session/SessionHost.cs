@@ -134,7 +134,7 @@ internal sealed class SessionHost : IDisposable
     }
 
     /// <summary>The grants in force, as <c>keypaste grants</c> lists them: names and ids, never a value.</summary>
-    internal IReadOnlyList<GrantSummary> Grants() => [.. Activity.Grants.Select(GrantSummary.From)];
+    internal IReadOnlyList<GrantSummary> Grants() => GrantSummary.Of(Activity);
 
     /// <summary>Ends the grant with this id, as <c>keypaste grants revoke</c> names it.</summary>
     /// <param name="id">The grant's id, from <see cref="Grants"/>.</param>
@@ -145,14 +145,23 @@ internal sealed class SessionHost : IDisposable
 
         lock (_gate)
         {
-            if (_hosted?.Activity.Grants.FirstOrDefault(
-                    inForce => string.Equals(GrantId.Of(inForce.Key), id, StringComparison.OrdinalIgnoreCase)) is not { } grant)
+            var activity = _hosted?.Activity ?? ApproverActivity.None;
+
+            if (activity.Grants.FirstOrDefault(
+                    inForce => string.Equals(GrantId.Of(inForce.Key), id, StringComparison.OrdinalIgnoreCase)) is { } grant)
             {
-                return false;
+                _hosted!.Revoke(grant.Key);
+                return true;
             }
 
-            _hosted.Revoke(grant.Key);
-            return true;
+            if (activity.EnvGrants.FirstOrDefault(
+                    inForce => string.Equals(GrantId.OfEnv(inForce.Key), id, StringComparison.OrdinalIgnoreCase)) is { } envGrant)
+            {
+                _hosted!.RevokeEnvGrant(envGrant.Key);
+                return true;
+            }
+
+            return false;
         }
     }
 

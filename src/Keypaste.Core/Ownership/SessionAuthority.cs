@@ -458,8 +458,7 @@ public sealed class SessionAuthority : IApproverHandler
             return ValueTask.FromResult(new GrantsReply(false, [], true, refusal.Reason));
         }
 
-        return ValueTask.FromResult(
-            new GrantsReply(true, [.. _inner.Activity().Grants.Select(GrantSummary.From)], true, string.Empty));
+        return ValueTask.FromResult(new GrantsReply(true, GrantSummary.Of(Activity), true, string.Empty));
     }
 
     /// <inheritdoc/>
@@ -475,26 +474,32 @@ public sealed class SessionAuthority : IApproverHandler
             return ValueTask.FromResult(new RevokeGrantsReply(0, refusal.Reason));
         }
 
-        var grants = _inner.Activity().Grants;
+        var activity = Activity;
 
         if (request.All)
         {
-            _inner.RevokeAll();
-            return ValueTask.FromResult(new RevokeGrantsReply(grants.Count, string.Empty));
+            RevokeAll();
+            return ValueTask.FromResult(new RevokeGrantsReply(activity.Grants.Count + activity.EnvGrants.Count, string.Empty));
         }
 
         var ids = request.Ids.Select(id => id.ToLowerInvariant()).ToHashSet(StringComparer.Ordinal);
-        var ended = grants
-            .Where(grant => ids.Contains(GrantId.Of(grant.Key))
-                || (request.Client is { } client && string.Equals(grant.Approved.Client, client, StringComparison.Ordinal)))
-            .ToList();
+        bool Named(string id, string client) =>
+            ids.Contains(id) || (request.Client is { } named && string.Equals(client, named, StringComparison.Ordinal));
+
+        var ended = activity.Grants.Where(grant => Named(GrantId.Of(grant.Key), grant.Approved.Client)).ToList();
+        var endedEnv = activity.EnvGrants.Where(grant => Named(GrantId.OfEnv(grant.Key), GrantSummary.EnvClient)).ToList();
 
         foreach (var grant in ended)
         {
             _inner.Revoke(grant.Key);
         }
 
-        return ValueTask.FromResult(new RevokeGrantsReply(ended.Count, string.Empty));
+        foreach (var grant in endedEnv)
+        {
+            RevokeEnvGrant(grant.Key);
+        }
+
+        return ValueTask.FromResult(new RevokeGrantsReply(ended.Count + endedEnv.Count, string.Empty));
     }
 
     /// <inheritdoc/>

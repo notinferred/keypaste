@@ -162,7 +162,11 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
             session = serving.Session;
             Unavailable = string.Empty;
             _waiting = [.. activity.Waiting.Select((waiting, i) => ActivityRow.Waiting(i + 1, waiting))];
-            _grants = [.. activity.Grants.Select((grant, i) => ActivityRow.Granted(i + 1, grant))];
+            _grants =
+            [
+                .. activity.Grants.Select((grant, i) => ActivityRow.Granted(i + 1, grant)),
+                .. activity.EnvGrants.Select((grant, i) => ActivityRow.EnvGranted(activity.Grants.Count + i + 1, grant)),
+            ];
         }
         else
         {

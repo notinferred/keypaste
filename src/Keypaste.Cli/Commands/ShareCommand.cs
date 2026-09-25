@@ -93,7 +93,8 @@ internal static class ShareCommand
         writer.WriteLine("Encrypts one entry's field on this machine and uploads only ciphertext. The link");
         writer.WriteLine("holds the key, so it is copied to the clipboard; --print writes it to stdout instead.");
         writer.WriteLine("--ttl takes 5m to 7d (default 24h), --views 1 to 10 (default 1). --to is a label");
-        writer.WriteLine("for your own list and is never sent.");
+        writer.WriteLine("for your own list and is never sent. <entry> may be a kp:// reference, which names");
+        writer.WriteLine("its own field.");
         return exit;
     }
 
@@ -115,6 +116,23 @@ internal static class ShareCommand
         }
 
         var field = line.Value("field") ?? "password";
+        KpReference? reference = null;
+
+        if (line.Operands[0].StartsWith(KpReferences.Scheme, StringComparison.Ordinal))
+        {
+            if (!KpReferences.TryParse(line.Operands[0], out reference, out var referenceError))
+            {
+                return Refuse(context, referenceError, CliApp.ExitUsageError);
+            }
+
+            if (line.Value("field") is not null)
+            {
+                return Refuse(context, "a kp:// reference names its field, so it takes no --field", CliApp.ExitUsageError);
+            }
+
+            field = reference is EntryReference named ? named.Field : "password";
+        }
+
         if (!ShareService.Fields.Contains(field, StringComparer.Ordinal))
         {
             return Refuse(context, "--field is one of password, username, url, notes or login", CliApp.ExitUsageError);
@@ -162,7 +180,9 @@ internal static class ShareCommand
 
         var exit = VaultSession.OpenHeld(path, line, context, vault =>
         {
-            var entry = Resolve(vault, line.Operands[0], context, out var resolveExit);
+            var entry = reference is null
+                ? Resolve(vault, line.Operands[0], context, out var resolveExit)
+                : Resolve(vault, reference, context, out resolveExit);
             if (entry is null)
             {
                 return resolveExit;
@@ -326,6 +346,41 @@ internal static class ShareCommand
             context.Stderr.WriteLine($"  {done} revoked {ShortId(info.Id)} {Dot(context.Stderr)} the link no longer opens");
             return CliApp.ExitSuccess;
         });
+    }
+
+    /// <summary>The entry a <c>kp://</c> reference names: an env variable's entry, or the named entry.</summary>
+    private static EntryName? Resolve(Vault vault, KpReference reference, CliContext context, out int exit)
+    {
+        exit = CliApp.ExitSuccess;
+
+        var name = reference is EnvReference env
+            ? new EntryName(EnvProfileNames.GroupPath(env.Project, env.Profile), env.Key)
+            : ((EntryReference)reference).Entry;
+
+        if (ReservedGroups.IsReserved(name.GroupPath))
+        {
+            exit = Refuse(context, "keypaste's own records cannot be shared", CliApp.ExitUsageError);
+            return null;
+        }
+
+        VaultEntry? found;
+        try
+        {
+            found = vault.Find(name);
+        }
+        catch (VaultException)
+        {
+            exit = Refuse(context, $"{Clean(reference.ToString())} names more than one entry", CliApp.ExitUsageError);
+            return null;
+        }
+
+        if (found is null)
+        {
+            exit = Refuse(context, $"no entry at {Clean(reference.ToString())}", CliApp.ExitNotFound);
+            return null;
+        }
+
+        return EntryName.Of(found);
     }
 
     /// <summary>An entry path, or a bare title that names exactly one entry outside keypaste's own groups.</summary>

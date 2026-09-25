@@ -462,6 +462,22 @@ public sealed class LogVerbTests : IDisposable
     }
 
     [Fact]
+    public void Log_Json_SaysHowLongAPersonsGrantLasts()
+    {
+        Write(
+            new DateTimeOffset(2026, 7, 26, 14, 0, 0, TimeSpan.Zero),
+            Record("claude-code", "env/dev/STRIPE_KEY", AuditDecision.Granted, AuditMethod.Prompt) with { GrantedSeconds = 3600 },
+            Record("claude-desktop", "env/dev/DB_URL", AuditDecision.Denied, AuditMethod.OutOfScope));
+
+        _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("log", "--json"));
+
+        using var document = System.Text.Json.JsonDocument.Parse(_cli.Out);
+        var records = document.RootElement.EnumerateArray().ToList();
+        Assert.Equal(3600, records[0].GetProperty("granted_seconds").GetInt32());
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, records[1].GetProperty("granted_seconds").ValueKind);
+    }
+
+    [Fact]
     public void Log_Json_WithNoLogYet_IsAnEmptyArray()
     {
         _cli.Environment[KeypasteHome.EnvironmentVariable] = Path.Combine(_cli.Directory, ".keypaste");

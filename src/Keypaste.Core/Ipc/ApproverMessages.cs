@@ -272,8 +272,39 @@ public sealed record GrantSummary(string Id, string Kind, string Client, string 
             grant.Approved.Client,
             grant.Approved.Entry,
             grant.Key.Field,
-            (int)Math.Ceiling(Math.Max(0, grant.Remaining.TotalSeconds)));
+            SecondsOf(grant.Remaining));
     }
+
+    /// <summary>A timed grant's row for a repeated <c>keypaste run --session</c>.</summary>
+    /// <param name="grant">The grant, as the owner's env grants list it.</param>
+    /// <returns>Its id, the project and profile, and remaining seconds.</returns>
+    public static GrantSummary From(EnvGrantInForce grant)
+    {
+        ArgumentNullException.ThrowIfNull(grant);
+
+        return new GrantSummary(
+            GrantId.OfEnv(grant.Key),
+            "env",
+            EnvClient,
+            $"{grant.Project} · {grant.Profile}",
+            "set",
+            SecondsOf(grant.Remaining));
+    }
+
+    /// <summary>Every grant an activity holds, agents' and runs' alike, soonest to end first.</summary>
+    /// <param name="activity">What the owner's current session holds.</param>
+    /// <returns>One row per grant.</returns>
+    public static IReadOnlyList<GrantSummary> Of(ApproverActivity activity)
+    {
+        ArgumentNullException.ThrowIfNull(activity);
+
+        return [.. activity.Grants.Select(From).Concat(activity.EnvGrants.Select(From)).OrderBy(grant => grant.SecondsLeft)];
+    }
+
+    /// <summary>Who an env grant is listed as given to.</summary>
+    public const string EnvClient = "keypaste run";
+
+    private static int SecondsOf(TimeSpan remaining) => (int)Math.Ceiling(Math.Max(0, remaining.TotalSeconds));
 }
 
 /// <summary>Asks the owner which grants its current session holds.</summary>

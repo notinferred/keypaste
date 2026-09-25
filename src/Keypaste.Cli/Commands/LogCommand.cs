@@ -73,7 +73,7 @@ internal static class LogCommand
     {
         ArgumentNullException.ThrowIfNull(writer);
 
-        writer.WriteLine("usage: keypaste log [--denied] [--client <text>] [--since <when>]");
+        writer.WriteLine("usage: keypaste log [--denied] [--client <text>] [--since <when>] [--json]");
         writer.WriteLine("       keypaste log verify [--expect <hash>]");
         writer.WriteLine();
         writer.WriteLine("Shows every call an AI agent made through the bridge: when, which client,");
@@ -83,6 +83,7 @@ internal static class LogCommand
         writer.WriteLine("  --denied            only the calls that were refused");
         writer.WriteLine("  --client <text>     only clients whose label or name contains this");
         writer.WriteLine($"  --since <when>      {AuditSince.Expected}");
+        writer.WriteLine("  --json              the records as one JSON array, each saying whether the chain vouches for it");
         writer.WriteLine();
         writer.WriteLine("the file:");
         writer.WriteLine($"  --audit-log <path>  which log to read, or set {KeypasteHome.EnvironmentVariable}");
@@ -244,6 +245,16 @@ internal static class LogCommand
         json.WriteString("method", entry.Method);
         json.WriteString("reason", entry.Reason);
         json.WriteString("session", entry.Session);
+
+        if (entry.GrantedSeconds is { } granted)
+        {
+            json.WriteNumber("granted_seconds", granted);
+        }
+        else
+        {
+            json.WriteNull("granted_seconds");
+        }
+
         json.WriteBoolean("verified", verified);
     }
 

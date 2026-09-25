@@ -138,7 +138,9 @@ public sealed class DesktopApprovalTests
             var prompt = ApprovalPrompt.For("claude-code", new EntryName("env/ci", "DEPLOY_KEY"), "password", "deploy", 60);
 
             var asking = channel.AskAsync(prompt, withdrawn.Token).AsTask();
-            await withdrawn.CancelAsync();
+
+            // Cancelled inline: awaiting CancelAsync would free the UI thread to draw the prompt first.
+            withdrawn.Cancel();
             WindowInput.Drain();
 
             Assert.Equal(ApprovalAnswer.Denied, await asking.WaitAsync(_wait, Token));

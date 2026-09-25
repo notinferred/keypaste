@@ -393,6 +393,29 @@ public sealed class SessionAuthorityEnvTests : IDisposable
     }
 
     [Fact]
+    public async Task AnEnvGrant_IsListedAndRevokedById_LikeAnAgentsGrant()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        using var grants = new EnvGrantCache(_fixture.Clock);
+        var authority = EnvAuthority(grants);
+        await RunAsync(authority, Request("session-one"));
+        var key = Assert.Single(authority.Activity.EnvGrants).Key;
+        var connection = Guid.NewGuid().ToString("N");
+        await authority.AttachAsync(new AttachRequest(VaultPath), connection, Token);
+
+        var listed = await authority.GrantsAsync(new GrantsRequest { Vault = VaultPath, Session = "session-one" }, connection, Token);
+        var row = Assert.Single(listed.Grants);
+        var revoked = await authority.RevokeGrantsAsync(
+            new RevokeGrantsRequest([row.Id], null, false) { Vault = VaultPath, Session = "session-one" }, connection, Token);
+
+        Assert.Equal(
+            new GrantSummary(GrantId.OfEnv(key), "env", "keypaste run", "dev · dev", "set", EnvGrantCache.CeilingSeconds),
+            row);
+        Assert.Equal(new RevokeGrantsReply(1, string.Empty), revoked);
+        Assert.Empty(grants.InForce());
+    }
+
+    [Fact]
     public async Task Lock_ForgetsEnvGrants()
     {
         _fixture.Channel.Answer = ApprovalAnswer.Approved;

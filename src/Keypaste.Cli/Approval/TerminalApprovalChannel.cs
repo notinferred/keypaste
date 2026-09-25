@@ -66,7 +66,7 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         ArgumentNullException.ThrowIfNull(request);
 
         var started = _clock.GetTimestamp();
-        _console.WriteLine(Render(request));
+        _console.WriteLine(Render(request, RuleLine));
         return AnswerAsync(request.TtlSeconds, started, cancellationToken);
     }
 
@@ -75,7 +75,7 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         ArgumentNullException.ThrowIfNull(request);
 
         var started = _clock.GetTimestamp();
-        _console.WriteLine(Render(request));
+        _console.WriteLine(Render(request, RuleLine));
         return AnswerAsync(OfferedSeconds(request), started, cancellationToken);
     }
 
@@ -122,8 +122,8 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
             _console.WriteLine(string.Join(
                 Environment.NewLine,
                 string.Empty,
-                "keypaste: the request was withdrawn before you answered. Nothing was released.",
-                Rule));
+                _console.Paint(Tone.Danger, "keypaste: the request was withdrawn before you answered. Nothing was released."),
+                RuleLine));
             return ApprovalAnswer.Denied;
         }
 
@@ -138,20 +138,24 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
             Environment.NewLine,
             answer switch
             {
-                ApprovalAnswer.Approved => $"keypaste: allowed for {ApprovalLimits.Describe(grantSeconds)}.",
-                ApprovalAnswer.ApprovedOnce => "keypaste: allowed once.",
-                _ => "keypaste: denied. Nothing was released.",
+                ApprovalAnswer.Approved => _console.Paint(Tone.Ok, $"keypaste: allowed for {ApprovalLimits.Describe(grantSeconds)}."),
+                ApprovalAnswer.ApprovedOnce => _console.Paint(Tone.Ok, "keypaste: allowed once."),
+                _ => _console.Paint(Tone.Danger, "keypaste: denied. Nothing was released."),
             },
-            Rule));
+            RuleLine));
 
         return answer;
     }
 
     /// <summary>The choice line: what each key does, and how long is left to press one, at one width while it counts down.</summary>
+    /// <remarks>Its colours, when stderr shows any, are the same escapes on every redraw, so the width stays one.</remarks>
     private string Choice(int grantSeconds, int secondsLeft) =>
-        string.Create(
-            CultureInfo.InvariantCulture,
-            $"[d] deny  [o] once  {(grantSeconds > 0 ? $"[h] {ApprovalLimits.Describe(grantSeconds)}  " : string.Empty)}{secondsLeft,2}s {_console.Glyph(Mark.Prompt)} ");
+        _console.Paint(Tone.Accent, "[d] deny  [o] once  ")
+        + (grantSeconds > 0 ? _console.Paint(Tone.Ok, $"[h] {ApprovalLimits.Describe(grantSeconds)}") + "  " : string.Empty)
+        + _console.Paint(Tone.Accent, string.Create(CultureInfo.InvariantCulture, $"{secondsLeft,2}s {_console.Glyph(Mark.Prompt)}"))
+        + " ";
+
+    private string RuleLine => _console.Paint(Tone.Accent, Rule);
 
     private int Remaining(long started)
     {
@@ -159,12 +163,12 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         return left <= TimeSpan.Zero ? 0 : (int)Math.Ceiling(left.TotalSeconds);
     }
 
-    private static string Render(EnvReleasePrompt request)
+    private static string Render(EnvReleasePrompt request, string rule)
     {
         List<string> lines =
         [
             string.Empty,
-            Rule,
+            rule,
             "keypaste: `keypaste run --session` is asking for a project's variables.",
             string.Empty,
             $"  project    {request.Project}",
@@ -206,12 +210,12 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         return string.Join(Environment.NewLine, lines);
     }
 
-    private static string Render(ApprovalPrompt request)
+    private static string Render(ApprovalPrompt request, string rule)
     {
         List<string> lines =
         [
             string.Empty,
-            Rule,
+            rule,
             "keypaste: an agent is asking for a credential.",
             string.Empty,
             $"  client   {request.Client}",

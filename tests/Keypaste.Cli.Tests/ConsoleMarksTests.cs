@@ -40,6 +40,16 @@ public sealed class ConsoleMarksTests
         Assert.Equal("·", ConsoleMarks.For(writer, Mark.Dot));
     }
 
+    [Fact]
+    public void AShortenedTokenPrefix_KeepsItsEllipsisOnlyWhereItCanBeShown()
+    {
+        using var unicode = new StreamWriter(new MemoryStream(), new UTF8Encoding(false));
+        using var bestFit = new StreamWriter(new MemoryStream(), new BestFit());
+
+        Assert.Equal("kpt_7d2e91c0…", ConsoleMarks.Shortened(unicode, "kpt_7d2e91c0…"));
+        Assert.Equal("kpt_7d2e91c0...", ConsoleMarks.Shortened(bestFit, "kpt_7d2e91c0…"));
+    }
+
     /// <summary>Latin-1 that writes <c>?</c> for anything else whatever fallback it is given.</summary>
     private sealed class BestFit : Encoding
     {

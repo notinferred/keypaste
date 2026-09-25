@@ -378,7 +378,7 @@ public sealed class ApproverHandler
     /// costs once escaped. Asking here as well as there is not a second answer to one question — it
     /// is the same function and the same budget — it is that <b>this method narrates</b>, and a line
     /// saying a credential was released before the reply has left the process is a claim nothing
-    /// else in keypaste would ever contradict. The approver writes no audit line (D-0020).
+    /// else in keypaste would ever contradict. The approver writes no audit line for a credential (D-0020).
     /// </para>
     /// <para>
     /// The refusal names which authority the release had, so a rule's release is never written up

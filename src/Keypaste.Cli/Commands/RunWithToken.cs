@@ -313,7 +313,7 @@ internal static class RunWithToken
             var dot = context.ConsoleStyle.Glyph(context.Stderr, Mark.Dot);
             context.Stderr.WriteLine(
                 $"  {context.ConsoleStyle.Paint(context.Stderr, Tone.Ok, context.ConsoleStyle.Glyph(context.Stderr, Mark.Done))} " +
-                $"{resolved.Variables.Count} injected under {TokenSecret.Display(id)} {dot} nothing written to disk");
+                $"{resolved.Variables.Count} injected under {ConsoleMarks.Shortened(context.Stderr, TokenSecret.Display(id))} {dot} nothing written to disk");
         }
 
         // Everything keypaste has to say is said before the child owns the console.

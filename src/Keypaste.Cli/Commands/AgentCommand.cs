@@ -142,7 +142,7 @@ internal static class AgentCommand
         PolicyLoad policy,
         CliContext context)
     {
-        var console = new AgentConsole(context.Stderr, context.Prompt.IsInteractive);
+        var console = new AgentConsole(context.Stderr, context.Prompt.IsInteractive, context.ConsoleStyle);
         void Narrate(string line) => console.WriteLine($"keypaste: {line}");
 
         using var lifetime = new SessionLifetime();

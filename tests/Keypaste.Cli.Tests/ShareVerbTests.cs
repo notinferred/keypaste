@@ -192,6 +192,30 @@ public sealed class ShareVerbTests : IDisposable
         Assert.Single(_server.Requests);
     }
 
+    [Theory]
+    [InlineData("kp://acme-api/dev/STRIPE_KEY")]
+    [InlineData("kp:///env/acme-api/STRIPE_KEY")]
+    public void Share_AReference_SharesTheValueItNames(string reference)
+    {
+        var exit = Share(reference, "--print");
+
+        _cli.AssertExit(CliApp.ExitSuccess, exit);
+        Assert.True(ShareLink.TryParse(_cli.Out.Trim(), out var id, out var key));
+        Assert.True(ShareCrypto.TryOpen(_server.Shares[id].Envelope, key, ReadOnlySpan<char>.Empty, out var payload, out _));
+        Assert.Equal(StripeValue, Assert.Single(payload.Fields).Value);
+    }
+
+    [Theory]
+    [InlineData(CliApp.ExitUsageError, "kp://acme-api/dev/STRIPE_KEY", "--field", "notes")]
+    [InlineData(CliApp.ExitUsageError, "kp://acme-api")]
+    [InlineData(CliApp.ExitNotFound, "kp://acme-api/staging/STRIPE_KEY")]
+    [InlineData(CliApp.ExitUsageError, "kp:///.keypaste/shares/anything")]
+    public void Share_AReferenceThatNamesNothingShareable_IsRefused(int expected, params string[] args)
+    {
+        Assert.Equal(expected, Share([.. args, "--print"]));
+        Assert.Empty(_server.Requests);
+    }
+
     [Fact]
     public void Share_ReservedEntry_IsRefused()
     {

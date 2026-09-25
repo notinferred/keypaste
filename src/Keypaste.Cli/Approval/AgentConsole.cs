@@ -30,25 +30,55 @@ internal sealed class AgentConsole
     internal static string Drawn(string line) => "\r" + line;
 
     /// <summary>Blanks a drawn line and leaves the cursor at its start.</summary>
-    internal static string Cleared(string line) => "\r" + new string(' ', line.Length) + "\r";
+    /// <remarks>Only as wide as what shows, so the colour escapes of a painted line never wrap the blanking onto the next row.</remarks>
+    internal static string Cleared(string line) => "\r" + new string(' ', Shown(line)) + "\r";
 
+    /// <summary>How many columns a line takes: its length without the colour escapes <see cref="IConsoleStyle.Paint"/> writes.</summary>
+    private static int Shown(string line)
+    {
+        var shown = 0;
+
+        for (var i = 0; i < line.Length; i++)
+        {
+            if (line[i] == '\u001b' && i + 1 < line.Length && line[i + 1] == '[')
+            {
+                var end = line.IndexOf('m', i);
+                i = end < 0 ? line.Length : end;
+            }
+            else
+            {
+                shown++;
+            }
+        }
+
+        return shown;
+    }
+
+    private readonly TextWriter _stderr;
     private readonly TextWriter _writer;
     private readonly bool _interactive;
+    private readonly IConsoleStyle? _style;
     private Func<string>? _choice;
 
     /// <summary>Builds the console over stderr.</summary>
     /// <param name="stderr">Where everything is written.</param>
     /// <param name="interactive">Whether stderr's reader is at a terminal, so the choice line is drawn and redrawn.</param>
-    internal AgentConsole(TextWriter stderr, bool interactive)
+    /// <param name="style">How stderr is coloured, or null for plain text.</param>
+    internal AgentConsole(TextWriter stderr, bool interactive, IConsoleStyle? style = null)
     {
         ArgumentNullException.ThrowIfNull(stderr);
 
+        _stderr = stderr;
         _writer = TextWriter.Synchronized(stderr);
         _interactive = interactive;
+        _style = style;
     }
 
     /// <summary>The mark as stderr's encoding can carry it.</summary>
     internal string Glyph(Mark mark) => ConsoleMarks.For(_writer, mark);
+
+    /// <summary>The text in its tone's colour when stderr shows colour, else unchanged.</summary>
+    internal string Paint(Tone tone, string text) => _style?.Paint(_stderr, tone, text) ?? text;
 
     /// <summary>Writes one line, or several separated by newlines, as a whole.</summary>
     /// <param name="line">The text.</param>

@@ -121,6 +121,29 @@ public sealed class CliAppTests
         Assert.Contains("the MCP server itself is keypaste-mcp", harness.Err, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void EveryVerbInHelp_Dispatches()
+    {
+        var verbs = GroupedHelp
+            .Split(Environment.NewLine)
+            .SkipWhile(line => line != "SECRETS")
+            .TakeWhile(line => line != "FLAGS")
+            .Where(line => line.StartsWith("  ", StringComparison.Ordinal))
+            .Select(line => line.Split(' ', StringSplitOptions.RemoveEmptyEntries)[0])
+            .ToList();
+
+        Assert.Equal(18, verbs.Count);
+
+        foreach (var verb in verbs)
+        {
+            using var harness = new CliHarness();
+
+            Assert.Equal(CliApp.ExitSuccess, harness.Run(verb, "--help"));
+            Assert.DoesNotContain("unknown command", harness.Err, StringComparison.Ordinal);
+            Assert.NotEmpty(harness.Out);
+        }
+    }
+
     private static string GroupedHelp => string.Join(
         Environment.NewLine,
         [

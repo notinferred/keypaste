@@ -661,6 +661,8 @@ internal static class RunCommand
         writer.WriteLine("usage: keypaste run [--vault <path>] [--keyfile <path>] [-p <profile>] [project] -- <command> [args...]");
         writer.WriteLine("       keypaste run [--vault <path>] [--keyfile <path>] [-p <profile>] --env-file <file> -- <command> [args...]");
         writer.WriteLine("       keypaste run --session [--vault <path>] [--approver <name>] [-p <profile>] [project] -- <command> [args...]");
+        writer.WriteLine("       keypaste run --token <token|-|env> [--vault <path>] [--approver <name>] [-p <profile>] <project> -- <command> [args...]");
+        writer.WriteLine("       keypaste run --bundle <file> [--token <token|-|env>] [-p <profile>] [project] -- <command> [args...]");
         writer.WriteLine();
         writer.WriteLine("runs a command with the project's variables in its environment. nothing is");
         writer.WriteLine("written to disk, and the vault is closed before the command starts.");
@@ -670,7 +672,11 @@ internal static class RunCommand
         writer.WriteLine();
         writer.WriteLine("with --session, no password is asked for here: the keypaste app or `keypaste agent`");
         writer.WriteLine("holding the vault unlocked shows you the project, its variable names, the command");
-        writer.WriteLine("and this directory, and the command starts only if you approve it there.");
+        writer.WriteLine("and this directory, and the command starts only if you allow it there.");
+        writer.WriteLine();
+        writer.WriteLine($"with --token, a scoped token (default: {RunWithToken.EnvironmentVariable}) is checked by the process");
+        writer.WriteLine("holding the vault, which releases what its scope covers without asking, except a");
+        writer.WriteLine("protected profile. --bundle opens a token bundle with no vault at all.");
         writer.WriteLine();
         writer.WriteLine("the -- is required: without it, 'keypaste run dev npm start' cannot be told");
         writer.WriteLine("apart from a project called 'npm'. everything after it belongs to the command.");

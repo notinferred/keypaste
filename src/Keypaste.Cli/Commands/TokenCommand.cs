@@ -186,7 +186,7 @@ internal static class TokenCommand
             var style = context.ConsoleStyle;
             var dot = style.Glyph(context.Stderr, Mark.Dot);
             context.Stderr.WriteLine(
-                $"  {style.Paint(context.Stderr, Tone.Ok, style.Glyph(context.Stderr, Mark.Done))} {info.Prefix} {dot} {TokenInfo.Mode} {dot} shown once");
+                $"  {style.Paint(context.Stderr, Tone.Ok, style.Glyph(context.Stderr, Mark.Done))} {ConsoleMarks.Shortened(context.Stderr, info.Prefix)} {dot} {TokenInfo.Mode} {dot} shown once");
             context.Stderr.WriteLine($"  scope {Scopes(info)} {dot} expires {Day(info.Expires)}");
             return CliApp.ExitSuccess;
         });
@@ -254,7 +254,7 @@ internal static class TokenCommand
             string[][] rows =
             [
                 ["NAME", "TOKEN", "SCOPE", "MODE", "EXPIRES"],
-                .. tokens.Select(info => new[] { EntryNameSanitizer.Sanitize(info.Name).Text, info.Prefix, Scopes(info), TokenInfo.Mode, string.Empty }),
+                .. tokens.Select(info => new[] { EntryNameSanitizer.Sanitize(info.Name).Text, ConsoleMarks.Shortened(context.Stdout, info.Prefix), Scopes(info), TokenInfo.Mode, string.Empty }),
             ];
 
             var widths = Enumerable.Range(0, 4).Select(column => rows.Max(row => row[column].Length)).ToArray();
@@ -490,7 +490,7 @@ internal static class TokenCommand
         var dot = style.Glyph(context.Stderr, Mark.Dot);
         context.Stderr.WriteLine(
             $"  {style.Paint(context.Stderr, Tone.Ok, style.Glyph(context.Stderr, Mark.Done))} wrote {Path.GetFileName(output)} {dot} {count} values {dot} " +
-            $"encrypted to {info.Prefix} {dot} expires {Day(info.Expires)}");
+            $"encrypted to {ConsoleMarks.Shortened(context.Stderr, info.Prefix)} {dot} expires {Day(info.Expires)}");
         return CliApp.ExitSuccess;
     }
 

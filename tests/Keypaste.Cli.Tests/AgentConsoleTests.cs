@@ -161,4 +161,10 @@ public sealed class AgentConsoleTests
 
         return rows.Select(row => new string([.. row]).TrimEnd()).ToList();
     }
+
+    [Fact]
+    public void Clearing_APaintedLine_BlanksOnlyTheColumnsItShows()
+    {
+        Assert.Equal("\r   \r", AgentConsole.Cleared("\u001b[38;5;214mabc\u001b[0m"));
+    }
 }

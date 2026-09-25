@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text;
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
@@ -138,7 +137,7 @@ internal static class ImportCommand
         var plan = source.DefaultPlan(vault, into);
         var problems = source.Check(vault, plan);
         var output = context.Stdout;
-        var arrow = Carried(output, "→", "->");
+        var arrow = ConsoleMarks.Carried(output, "→", "->");
 
         output.WriteLine($"  {Count(source.EntryCount, "entry", "entries")} in {Count(plan.Rows.Count + source.Skipped.Count, "group", "groups")}");
 
@@ -274,8 +273,8 @@ internal static class ImportCommand
     /// <returns>Whether anything blocks.</returns>
     private static bool Report(ImportPlan plan, IReadOnlyList<ImportProblem> problems, CliContext context)
     {
-        var cross = Carried(context.Stderr, "✗", "x");
-        var arrow = Carried(context.Stderr, "→", "->");
+        var cross = ConsoleMarks.Carried(context.Stderr, "✗", "x");
+        var arrow = ConsoleMarks.Carried(context.Stderr, "→", "->");
         var blocked = false;
 
         foreach (var problem in problems)
@@ -344,26 +343,6 @@ internal static class ImportCommand
         value == 1 ? $"1 {one}" : string.Create(CultureInfo.InvariantCulture, $"{value} {many}");
 
     /// <summary>The glyph where the writer's encoding carries it, otherwise its ASCII stand-in.</summary>
-    private static string Carried(TextWriter writer, string glyph, string ascii)
-    {
-        try
-        {
-            if (writer.Encoding.CodePage is 65001 or 1200 or 1201)
-            {
-                return glyph;
-            }
-
-            var strict = (Encoding)writer.Encoding.Clone();
-            strict.EncoderFallback = EncoderFallback.ExceptionFallback;
-            strict.GetBytes(glyph);
-            return glyph;
-        }
-        catch (Exception)
-        {
-            return ascii;
-        }
-    }
-
     private static void WriteHelp(TextWriter writer)
     {
         writer.WriteLine("usage: keypaste import <file.kdbx> [--into <group>] [--dry-run] [--in-place]");
