@@ -96,6 +96,12 @@ internal static class AddCommand
                 return CliApp.ExitUsageError;
             }
 
+            if (!EnvNameRules.TryCheckNewEntry(name, SetCommand.SiblingTitles(vault, groupPath), out var envError))
+            {
+                context.Stderr.WriteLine($"keypaste add: {EntryNameSanitizer.SanitizeProse(envError, 1024).Text}");
+                return CliApp.ExitUsageError;
+            }
+
             // Throws when the path already names two: a third would deepen a collision `get`
             // already refuses, and nothing keypaste writes gets to make that worse. Asked before
             // any prompt, so a refusal costs nobody a password.

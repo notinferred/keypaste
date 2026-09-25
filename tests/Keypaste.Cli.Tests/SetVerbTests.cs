@@ -69,6 +69,41 @@ public sealed class SetVerbTests : IDisposable
     }
 
     [Fact]
+    public void Set_RefusesANewEnvNameThatWouldMakeTheProfileUnusable()
+    {
+        _harness.Prompt.Enqueue(_master, _value);
+        _harness.AssertExit(CliApp.ExitSuccess, Set("env/acme-api/staging/STRIPE"));
+
+        foreach (var name in new[] { "env/acme-api/staging/bad-name", "env/acme-api/staging/stripe", "env/acme-api/Staging/KEY", "env/KEY" })
+        {
+            _harness.Stderr.GetStringBuilder().Clear();
+            _harness.Prompt.Enqueue(_master);
+            _harness.AssertExit(CliApp.ExitUsageError, Set(name));
+            Assert.Contains("Nothing was written.", _harness.Err, StringComparison.Ordinal);
+        }
+
+        using var vault = Vault.Open(_harness.VaultPath, _master);
+        Assert.Equal(["STRIPE"], vault.ReadEntries().Where(entry => entry.GroupPath.StartsWith("env", StringComparison.Ordinal)).Select(entry => entry.Title));
+    }
+
+    [Fact]
+    public void Set_IntoTheRecycleBin_IsRefused()
+    {
+        _harness.Prompt.Enqueue(_master, _value);
+        _harness.AssertExit(CliApp.ExitSuccess, Set("Banking/Chase"));
+        _harness.Prompt.Enqueue(_master);
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("rm", "Banking/Chase", "--yes", "--vault", _harness.VaultPath));
+        _harness.Stderr.GetStringBuilder().Clear();
+
+        _harness.Prompt.Enqueue(_master, "new-value");
+        Assert.NotEqual(CliApp.ExitSuccess, Set("Recycle Bin/Chase"));
+
+        Assert.Contains("recycle bin", _harness.Err, StringComparison.Ordinal);
+        using var vault = Vault.Open(_harness.VaultPath, _master);
+        Assert.Single(vault.ReadRecycled());
+    }
+
+    [Fact]
     public void Set_Generate()
     {
         _harness.Prompt.Enqueue(_master);

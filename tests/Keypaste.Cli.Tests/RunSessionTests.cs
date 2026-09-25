@@ -24,7 +24,15 @@ public sealed class RunSessionTests : IDisposable
 
     public RunSessionTests()
     {
-        _harness.SeedVault(_master, ("env/dev/TOKEN", _value), ("env/broken/BAD-NAME", _value));
+        _harness.SeedVault(_master, ("env/dev/TOKEN", _value));
+
+        // KeePassXC writes a name keypaste refuses to create.
+        using (var vault = Vault.Open(_harness.VaultPath, _master))
+        {
+            vault.AddEntry(new VaultEntry { GroupPath = "env/broken", Title = "BAD-NAME", Password = _value });
+            vault.Save();
+        }
+
         _harness.Prompt.PromptsSeen.Clear();
         _harness.Environment[ApproverEndpoint.EnvironmentVariable] = _pipe;
         _harness.Environment[KeypasteHome.EnvironmentVariable] = _harness.Directory;

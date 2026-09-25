@@ -85,6 +85,13 @@ internal static class SetCommand
         {
             var existing = vault.Find(name);
 
+            if (existing is null && !EnvNameRules.TryCheckNewEntry(name, SiblingTitles(vault, name.GroupPath), out var envError))
+            {
+                context.Stderr.WriteLine($"keypaste set: {EntryNameSanitizer.SanitizeProse(envError, 1024).Text}");
+                context.Stderr.WriteLine("Nothing was written.");
+                return CliApp.ExitUsageError;
+            }
+
             using var secret = recipe is { } wanted ? GenerateOption.Generate(wanted) : ReadValue(context);
 
             if (secret is null)
@@ -114,6 +121,9 @@ internal static class SetCommand
             return CliApp.ExitSuccess;
         });
     }
+
+    internal static IReadOnlyList<string> SiblingTitles(Vault vault, string groupPath) =>
+        [.. vault.ReadEntries().Where(entry => string.Equals(entry.GroupPath, groupPath, StringComparison.Ordinal)).Select(entry => entry.Title)];
 
     /// <summary>Reads the value from a hidden prompt, twice when a person is typing, or once from stdin.</summary>
     private static SecretBuffer? ReadValue(CliContext context)

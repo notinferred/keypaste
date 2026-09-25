@@ -322,6 +322,25 @@ public sealed class VaultRecycleBinTests : IDisposable
         Assert.Equal(CredentialFailure.NotFound, failure);
     }
 
+    /// <summary>
+    /// An entry written into the bin would be reported created and then be invisible to every read,
+    /// and emptying the bin would destroy it.
+    /// </summary>
+    [Fact]
+    public void AddEntry_IntoTheBin_IsRefusedAndWritesNothing()
+    {
+        using var vault = Seeded(out _);
+        Assert.Equal(DeletionOutcome.Recycled, vault.RemoveEntry(_token));
+        var groups = vault.ReadGroupPaths();
+
+        Assert.Throws<VaultException>(() => vault.AddEntry(new VaultEntry { GroupPath = "Recycle Bin", Title = "Chase", Password = "x" }));
+        Assert.Throws<VaultException>(() => vault.AddEntry(new VaultEntry { GroupPath = "Recycle Bin/Sub", Title = "Chase", Password = "x" }));
+
+        Assert.Single(vault.ReadRecycled());
+        Assert.Equal(groups, vault.ReadGroupPaths());
+        Assert.Null(vault.Find(new EntryName("Recycle Bin", "Chase")));
+    }
+
     // ---------------------------------------------------------------- restoring
 
     [Fact]

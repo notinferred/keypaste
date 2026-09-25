@@ -92,4 +92,63 @@ public static class EnvNameRules
         error = string.Empty;
         return true;
     }
+
+    /// <summary>
+    /// Whether a new entry may be created at <paramref name="target"/>: outside <c>env</c> always,
+    /// inside it only as a valid key in a valid project and profile that no sibling differs from
+    /// only in case, the rules <c>env set</c> applies.
+    /// </summary>
+    /// <param name="target">The entry about to be created.</param>
+    /// <param name="siblingTitles">The titles already in <paramref name="target"/>'s group.</param>
+    /// <param name="error">The reason, or an empty string when there is none.</param>
+    /// <returns><see langword="true"/> when the entry may be created.</returns>
+    /// <remarks>
+    /// A profile is judged whole when it runs, so one bad name written here would refuse every run
+    /// of the profile later, somewhere else.
+    /// </remarks>
+    public static bool TryCheckNewEntry(EntryName target, IReadOnlyList<string> siblingTitles, out string error)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(siblingTitles);
+
+        error = string.Empty;
+        string root = EnvConvention.RootGroup;
+
+        if (!string.Equals(target.GroupPath, root, StringComparison.Ordinal)
+            && !target.GroupPath.StartsWith(root + "/", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        string[] segments = target.GroupPath.Split('/');
+
+        if (segments.Length == 1)
+        {
+            error = $"an entry directly in '{root}' belongs to no project; name it {root}/<project>/<KEY>";
+            return false;
+        }
+
+        if (!EnvConvention.IsValidProject(segments[1], out error)
+            || (segments.Length > 2 && !EnvProfileNames.IsValid(segments[2], out error))
+            || !EnvConvention.IsValidKey(target.Title, out error))
+        {
+            return false;
+        }
+
+        foreach (string segment in segments.Skip(3))
+        {
+            if (!EnvConvention.IsValidProject(segment, out error))
+            {
+                return false;
+            }
+        }
+
+        if (!TryCheckCase([.. siblingTitles, target.Title], out var collision))
+        {
+            error = $"'{target.GroupPath}' {collision}";
+            return false;
+        }
+
+        return true;
+    }
 }

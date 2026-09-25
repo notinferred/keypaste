@@ -2004,6 +2004,9 @@ internal sealed class KeePassInterop : IDisposable
     /// "where should a new entry go", and a person holding two sibling groups of one name in
     /// KeePassXC gets the one KeePassXC also lists first. Finding an entry that already exists is
     /// <see cref="Locate"/>'s question, and that one is answered by traversal.
+    /// A path that leads into the recycle bin is refused before anything is created: every read
+    /// skips the bin, so an entry written there would be reported created and then never found,
+    /// and stepping past the bin to a sibling of its name would draw two trash cans.
     /// </remarks>
     private PwGroup EnsureGroup(string groupPath)
     {
@@ -2012,6 +2015,8 @@ internal sealed class KeePassInterop : IDisposable
         {
             return current;
         }
+
+        PwGroup? bin = Bin();
 
         foreach (string segment in groupPath.Split('/', StringSplitOptions.RemoveEmptyEntries))
         {
@@ -2023,6 +2028,12 @@ internal sealed class KeePassInterop : IDisposable
                     next = child;
                     break;
                 }
+            }
+
+            if (next is not null && ReferenceEquals(next, bin))
+            {
+                throw new VaultException(
+                    $"'{groupPath}' is inside the recycle bin; keypaste does not write there. Restore the entry or choose another group.");
             }
 
             if (next is null)
