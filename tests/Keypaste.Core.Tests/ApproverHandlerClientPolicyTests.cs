@@ -125,6 +125,22 @@ public sealed class ApproverHandlerClientPolicyTests : IDisposable
     }
 
     [Fact]
+    public async Task AClientsPathThatCannotBeReadAsAFile_RefusesEveryRequest()
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Channel.Answer = ApprovalAnswer.Approved;
+        Directory.CreateDirectory(ClientsPath);
+        var handler = Handler(fixture);
+
+        var reply = await handler.RequestAsync(Request("anyone"), "conn-1", Token);
+
+        Assert.Equal(AuditMethod.Failed, reply.Method);
+        Assert.Contains("clients file", reply.Reason, StringComparison.Ordinal);
+        Assert.Equal(0, fixture.Channel.Asked);
+        Assert.False(ClientPolicies.TryLoad(ClientsPath, out _, out _));
+    }
+
+    [Fact]
     public async Task AChangedFile_AppliesToTheNextRequest_EvenAtTheSameLength()
     {
         using var fixture = new ApproverFixture();

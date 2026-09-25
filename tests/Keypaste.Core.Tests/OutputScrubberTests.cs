@@ -72,7 +72,8 @@ public sealed partial class OutputScrubberTests
             "json-relaxed" => System.Text.Json.JsonEncodedText.Encode(Hostile, System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping).Value,
             "json-python-ascii" => "p\\\"a's\\\\s$w0rd\\nsecond-line-\\u00e9%40end",
             "python-repr" => "p\"a\\'s\\\\s$w0rd\\nsecond-line-é%40end",
-            "node-inspect" => "p\"a\\'s\\\\s$w0rd\\nsecond-line-é%40end",
+            // What Node 24's console.log(process.env) prints: backticks, since the value holds both quotes.
+            "node-inspect" => "p\"a's\\\\s$w0rd\\nsecond-line-é%40end",
             "posix-single" => "p\"a'\\''s\\s$w0rd\nsecond-line-é%40end",
             "bash-double" => "p\\\"a's\\\\s\\$w0rd\nsecond-line-é%40end",
             "bash-ansi-c" => "p\"a\\'s\\\\s$w0rd\\nsecond-line-é%40end",
@@ -85,6 +86,17 @@ public sealed partial class OutputScrubberTests
         var scrubbed = Scrub(scrubber, $"before {printed} after");
 
         Assert.Equal("before [keypaste:SECRET] after", scrubbed);
+    }
+
+    [Fact]
+    public void AJsonDumpEscapingSlashes_IsReplaced()
+    {
+        // An AWS-style secret key, as PHP's json_encode(getenv()) prints it.
+        var scrubber = For(("AWS_SECRET_ACCESS_KEY", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"));
+
+        var scrubbed = Scrub(scrubber, "{\"AWS_SECRET_ACCESS_KEY\":\"wJalrXUtnFEMI\\/K7MDENG\\/bPxRfiCYEXAMPLEKEY\"}");
+
+        Assert.Equal("{\"AWS_SECRET_ACCESS_KEY\":\"[keypaste:AWS_SECRET_ACCESS_KEY]\"}", scrubbed);
     }
 
     [Fact]

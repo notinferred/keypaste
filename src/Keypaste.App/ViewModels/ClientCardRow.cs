@@ -39,7 +39,8 @@ internal sealed class ClientCardRow : ObservableObject
         Status = card.Status == ClientStatus.Connected ? "Connected" : "Idle";
         StatusTone = card.Status == ClientStatus.Connected ? StatusTone.Ok : StatusTone.Muted;
         LastSeenText = card.Status == ClientStatus.Connected ? "now" : card.LastSeen is { } seen ? UseText.Ago(seen, now) : "never";
-        CanSetPolicy = card.Label is not null;
+        // A label an older bridge wrote to the log may be one no clients.toml row can hold.
+        CanSetPolicy = card.Label is { } written && ClientPolicies.IsValidLabel(written, out _);
         Hint = CanSetPolicy ? string.Empty : "Start this client's bridge with --client-label to give it its own policy.";
     }
 

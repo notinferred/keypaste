@@ -225,14 +225,13 @@ public sealed class ClientPolicies
 
         try
         {
-            if (!File.Exists(path))
-            {
-                policies = Empty;
-                problem = string.Empty;
-                return true;
-            }
-
             bytes = File.ReadAllBytes(path);
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+        {
+            policies = Empty;
+            problem = string.Empty;
+            return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

@@ -62,15 +62,6 @@ public sealed class ClientPolicySource(string path)
 
         try
         {
-            if (!File.Exists(Path))
-            {
-                _digest = null;
-                _policies = ClientPolicies.Empty;
-                _problem = string.Empty;
-                problem = string.Empty;
-                return true;
-            }
-
             using var stream = new FileStream(Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
 
             if (stream.Length > _maximumBytes)
@@ -80,6 +71,15 @@ public sealed class ClientPolicySource(string path)
 
             bytes = new byte[stream.Length];
             stream.ReadExactly(bytes);
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+        {
+            // Only a path that names nothing is absent; anything else there that cannot be read refuses.
+            _digest = null;
+            _policies = ClientPolicies.Empty;
+            _problem = string.Empty;
+            problem = string.Empty;
+            return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

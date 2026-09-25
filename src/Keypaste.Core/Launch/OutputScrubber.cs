@@ -23,8 +23,8 @@ public sealed record ScrubbedText(string Text, int Replacements, bool Truncated)
 /// </para>
 /// <para>
 /// <b>The forms</b> are each value as it is and as the common dumps of an environment escape it: JSON
-/// from several encoders with <c>\u</c> hex in either case, C-style backslash escapes with either or
-/// both quotes, POSIX single quotes, bash double quotes, percent-encoding in either case with <c>%20</c>
+/// from several encoders with <c>\u</c> hex in either case and <c>/</c> as it is or as <c>\/</c>, C-style
+/// backslash escapes with neither, either or both quotes escaped, POSIX single quotes, bash double quotes, percent-encoding in either case with <c>%20</c>
 /// or <c>+</c>, a URI's userinfo password, and each line of 8 or more characters of a multi-line value,
 /// all again with <c>\n</c> as <c>\r\n</c>. Anything else — base64, a reversed or split value, a
 /// substring, a file, the network — is not caught; the person's approval of the exact command is the
@@ -231,15 +231,24 @@ public sealed class OutputScrubber
         foreach (var text in bases.SelectMany(LineEndings))
         {
             forms.Add(text);
-            forms.Add(JsonEncodedText.Encode(text, JavaScriptEncoder.UnsafeRelaxedJsonEscaping).Value);
-            forms.Add(JsonEncodedText.Encode(text).Value);
 
-            foreach (var asciiOnly in new[] { false, true })
+            // PHP's json_encode also writes '/' as '\/'.
+            foreach (var json in new[]
             {
-                forms.Add(Json(text, asciiOnly, upper: false));
-                forms.Add(Json(text, asciiOnly, upper: true));
+                JsonEncodedText.Encode(text, JavaScriptEncoder.UnsafeRelaxedJsonEscaping).Value,
+                JsonEncodedText.Encode(text).Value,
+                Json(text, asciiOnly: false, upper: false),
+                Json(text, asciiOnly: false, upper: true),
+                Json(text, asciiOnly: true, upper: false),
+                Json(text, asciiOnly: true, upper: true),
+            })
+            {
+                forms.Add(json);
+                forms.Add(json.Replace("/", "\\/", StringComparison.Ordinal));
             }
 
+            // Node quotes a string holding both quotes with backticks and escapes neither.
+            forms.Add(Backslashed(text, single: false, @double: false));
             forms.Add(Backslashed(text, single: true, @double: false));
             forms.Add(Backslashed(text, single: false, @double: true));
             forms.Add(Backslashed(text, single: true, @double: true));

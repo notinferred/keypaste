@@ -73,6 +73,22 @@ public sealed class AgentClientsTests
     }
 
     [Fact]
+    public async Task ALabelNoRowCanHold_CannotBeGivenAPolicy()
+    {
+        await using var app = await App.StartAsync(null);
+        app.Audit("old\"bridge", app.Authority.Session.Identity!.Key);
+
+        using var model = app.Model();
+        var card = model.Clients.Single(row => row.Label == "old\"bridge");
+
+        Assert.False(card.CanSetPolicy);
+
+        card.PolicyText = ClientPolicies.Describe(ClientPolicy.AskEveryTime);
+
+        Assert.False(File.Exists(app.ClientsPath));
+    }
+
+    [Fact]
     public async Task AMalformedFile_IsShown_AndResetWritesAnEmptyOne()
     {
         await using var app = await App.StartAsync(null);
