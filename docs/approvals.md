@@ -1,6 +1,6 @@
 # Approving an agent's request
 
-A person approves credential requests unless a live approval or a matching policy rule covers them. This guide describes the published terminal workflow and, in source, [approving in the desktop app](#approving-in-the-desktop-app); [policy rules](policy.md) allow matching requests without a prompt at `keypaste agent`.
+A person approves credential requests unless a live approval or a matching policy rule covers them. This guide describes the terminal workflow in source, for the next release, and, in source, [approving in the desktop app](#approving-in-the-desktop-app); notes give `v0.3.0`'s differences, and [policy rules](policy.md) allow matching requests without a prompt at `keypaste agent`.
 
 In source, one vault has one owner: while the app has a vault unlocked, `keypaste agent` on that vault is refused with a message naming the app, and the app asks about that vault's credential requests itself. The desktop and a terminal approver on another vault still unlock independently, and launching env projects through the app's session is unfinished; [STEPS](STEPS.md) owns the remaining work.
 
@@ -42,7 +42,7 @@ The third line reports what the policy file says before anything can use it; wit
 |---|---|
 | `--vault <path>` | Which vault to unlock. Or set `KEYPASTE_VAULT`. |
 | `--approval-timeout <seconds>` | How long you get to answer. Default 45, range 5–55. |
-| `--max-ttl <seconds>` | How long `h` lets the same connection reuse an approval, whatever the agent asks for. Default 3600. A standing rule's release is also bounded by what the agent asked for. |
+| `--max-ttl <seconds>` | How long `h` lets the same connection reuse an approval, whatever the agent asks for. Default 3600 (300 in `v0.3.0`). A standing rule's release is also bounded by what the agent asked for. |
 | `--approver <name>` | Which pipe to listen on. Or set `KEYPASTE_APPROVER`. You need this only if you run two. |
 
 Both processes derive the same per-user pipe name, so [MCP configuration](mcp-setup.md) usually needs no change. In source the name is derived from the vault as well, so the bridge's `--vault` must name the vault the approver holds; `v0.3.0` names the pipe `keypaste-agent-…` and prints no session.
@@ -64,6 +64,8 @@ keypaste: an agent is asking for a credential.
 
 [d] deny  [o] once  [h] 1 hour  45s ›
 ```
+
+`v0.3.0` asks `Approve? [y/N]`; `y` releases the value and keeps a grant up to `--max-ttl`, and anything else is a no.
 
 `client` is the connecting program's unauthenticated name. Any process that can start `keypaste-mcp` can claim it; keypaste displays it but does not authorize from it.
 
@@ -103,7 +105,7 @@ Allow once releases that one field and keeps nothing. Allow for 1 hour also lets
 
 The app does not read `policy.toml`: every release from the app needs a press of Allow once or Allow for 1 hour, or a grant one of them kept.
 
-Agent Activity lists the request in front of you and the grants in force, each with the client, its label, the entry, the field and the seconds left, and counts them down. Revoke ends one grant and Revoke all ends every one, so the next request for them opens the prompt again; a revoke is not recorded in the audit log. Below the lists is this session's history: the audit records naming the app's current session, as `keypaste log` prints them. It says when the log is missing or cannot be read rather than showing an empty history, and the Log screen shows the whole file.
+The Agents screen lists the request in front of you and the grants in force, each with the client, its label, the entry, the field and the seconds left, and counts them down. Revoke ends one grant and Revoke all ends every one, so the next request for them opens the prompt again; a revoke is not recorded in the audit log. Below the lists is this session's history: the audit records naming the app's current session, as `keypaste log` prints them. It says when the log is missing, cannot be read or has no records from this session yet rather than showing an empty history, and the Activity screen shows the whole file.
 
 ## Runs that ask for a project's variables
 

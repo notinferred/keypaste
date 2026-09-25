@@ -40,9 +40,11 @@ An agent cannot even name an entry you did not expose: the default is the `env/`
 
 The approver resolves the entry, rechecks exposure, considers a live grant and recent refusal, then consults policy or prompts when required. It reads the field for release only after authorization. The vault is already unlocked; refusal does not imply that no plaintext existed in approver memory.
 
-Approval releases one field and permits reuse on the same connection for its lifetime. Silence for forty-five seconds denies the request. Every tool call is appended to `~/.keypaste/audit.jsonl` before the response. The returned value is excluded, but names and reason excerpts remain logged metadata. Calls are refused if the log cannot be written.
+In source, Allow once releases one field and keeps nothing; Allow for 1 hour also lets the same connection receive that field again without a prompt until the grant ends or the connection closes. The published v0.3.0 asks `Approve? [y/N]`, and `y` keeps a grant for up to `--max-ttl`, 300 seconds by default. Silence for forty-five seconds denies the request. Every tool call is appended to `~/.keypaste/audit.jsonl` before the response. The returned value is excluded, but names and reason excerpts remain logged metadata. Calls are refused if the log cannot be written.
 
 ## What it looks like
+
+<sub>The published v0.3.0 asks <code>Approve? [y/N]</code> and allows up to 300 seconds. In source, for the next release, the prompt is:</sub>
 
 ```
 ────────────────────────────────────────────────────────────
@@ -74,6 +76,8 @@ One keystroke later the deploy runs, and the exchange is two lines you can read 
 
 ## Moving from another KeePass file
 
+`keypaste import` is in source for the next release; the published v0.3.0 does not have it.
+
 An existing KDBX file can stay where it is: `keypaste import old.kdbx` with no vault configured checks that it unlocks and remembers it, and from then on `--vault old.kdbx` or `KEYPASTE_VAULT` opens it like any other vault.
 
 To bring it into the vault you already use, name that vault. The file is opened read-only and never written; a `<name>.keyx` or `<name>.key` beside it is used as its keyfile unless `--source-keyfile none` says otherwise.
@@ -83,7 +87,7 @@ keypaste import old.kdbx --vault mine.kdbx --dry-run
 keypaste import old.kdbx --vault mine.kdbx --into old
 ```
 
-Each top-level group lands under `--into`, which defaults to the file's name, and each `env/<project>` set and profile keeps its own path unless your vault already has that project. Entries keep their custom fields, attachments, tags, icons, times and history, with new identities. The file's recycle bin and anything in keypaste's reserved `.keypaste` group stay behind. A row that cannot land, such as a variable name no shell can export, stops the whole import before anything is written, and `--dry-run` shows every row first.
+Each top-level group lands under `--into`, which defaults to the file's name. An `env/<project>` set and its profiles keep their own path only when the set is valid and your vault does not already have that project; any other env group lands under `--into` too, and `--dry-run` shows why. Entries keep their custom fields, attachments, tags, icons, times and history, with new identities. The file's recycle bin and anything in keypaste's reserved `.keypaste` group stay behind. `--dry-run` shows every row and where it will land first; a row that still cannot land, such as a destination changed to a reserved group or to an env set that is not valid, stops the whole import before anything is written.
 
 <a id="what-this-does-not-do"></a>
 
