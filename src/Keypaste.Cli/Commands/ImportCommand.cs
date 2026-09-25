@@ -103,7 +103,7 @@ internal static class ImportCommand
             }
         }
 
-        context.Stderr.WriteLine($"  {Describe(probe, keyfile)}");
+        context.Stderr.WriteLine($"  {Describe(probe, keyfile, Dot(context))}");
 
         return inPlace
             ? KeepInPlace(probe, keyfile, line.HasFlag("dry-run"), context)
@@ -187,7 +187,7 @@ internal static class ImportCommand
         var style = context.ConsoleStyle;
         var done = style.Paint(context.Stderr, Tone.Ok, style.Glyph(context.Stderr, Mark.Done));
         context.Stderr.WriteLine(
-            $"  {done} {Count(result.Entries, "entry", "entries")} · {Count(source.ProjectCount, "project", "projects")} · copied into {EntryNameSanitizer.SanitizePath(plan.Into).Text}");
+            $"  {done} {string.Join(Dot(context), Count(result.Entries, "entry", "entries"), Count(source.ProjectCount, "project", "projects"), $"copied into {EntryNameSanitizer.SanitizePath(plan.Into).Text}")}");
 
         if (result.DuplicateTitles > 0)
         {
@@ -205,7 +205,7 @@ internal static class ImportCommand
             var style = context.ConsoleStyle;
             var done = style.Paint(context.Stderr, Tone.Ok, style.Glyph(context.Stderr, Mark.Done));
             context.Stderr.WriteLine(
-                $"  {done} {Count(opened.EntryCount, "entry", "entries")} · {Count(opened.ProjectCount, "project", "projects")} · editing in place");
+                $"  {done} {string.Join(Dot(context), Count(opened.EntryCount, "entry", "entries"), Count(opened.ProjectCount, "project", "projects"), "editing in place")}");
             return CliApp.ExitSuccess;
         });
 
@@ -319,7 +319,7 @@ internal static class ImportCommand
         return true;
     }
 
-    private static string Describe(KdbxProbe probe, string? keyfile)
+    private static string Describe(KdbxProbe probe, string? keyfile, string separator)
     {
         var parts = new List<string> { probe.FileName, probe.Version, probe.Kdf, probe.Cipher };
         if (keyfile is not null)
@@ -329,8 +329,10 @@ internal static class ImportCommand
                 : $"key file: {Path.GetFileName(keyfile)}");
         }
 
-        return EntryNameSanitizer.SanitizeProse(string.Join(" · ", parts), 512).Text;
+        return EntryNameSanitizer.SanitizeProse(string.Join(separator, parts), 512).Text;
     }
+
+    private static string Dot(CliContext context) => $" {context.ConsoleStyle.Glyph(context.Stderr, Mark.Dot)} ";
 
     private static string Label(string sourceGroup, bool isRoot) =>
         isRoot ? "(top level)" : EntryNameSanitizer.SanitizePath(sourceGroup).Text;

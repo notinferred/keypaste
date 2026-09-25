@@ -257,6 +257,7 @@ profile_compat() {
   run bash scripts/verify-keepassxc-run.sh artifacts/compat/local-run
   run bash scripts/verify-keepassxc-backup.sh artifacts/compat/local-backup.kdbx
   run bash scripts/verify-keepassxc-organize.sh artifacts/compat/local-organize.kdbx
+  run bash scripts/verify-keepassxc-import.sh artifacts/compat/local-import
   run bash scripts/verify-keepassxc-keyfile.sh artifacts/compat/local-keyfile.kdbx
   run bash scripts/verify-keepassxc-xml-attach.sh artifacts/compat/local-xml-attach
   prepare tests/Keypaste.AppDriver/Keypaste.AppDriver.csproj
