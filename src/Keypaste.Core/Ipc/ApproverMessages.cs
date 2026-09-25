@@ -248,3 +248,28 @@ public sealed record EnvReply(EnvResolved Set, string Reason)
     /// <returns>The outcome, and never a value.</returns>
     public override string ToString() => $"EnvReply {{ Outcome = {Set.Outcome}, Variables = {Set.Variables.Count} }}";
 }
+
+/// <summary>
+/// Asks the owner to release a set to a runner holding a scoped token, which the owner verifies
+/// in place of asking a person.
+/// </summary>
+/// <remarks>
+/// <see cref="ToString"/> leaves the token out, so no interpolated request can print it.
+/// </remarks>
+/// <param name="Token">The token, verified only by the owner.</param>
+/// <param name="Project">The project whose set is asked for.</param>
+/// <param name="Profile">The profile asked for.</param>
+/// <param name="Command">The command the runner will start, one argument per item.</param>
+/// <param name="Directory">The directory it will start in.</param>
+public sealed record TokenEnvRequest(string Token, string Project, string Profile, IReadOnlyList<string> Command, string Directory)
+{
+    /// <summary>The vault this connection attached to.</summary>
+    public string Vault { get; init; } = string.Empty;
+
+    /// <summary>The session this connection attached to.</summary>
+    public string Session { get; init; } = string.Empty;
+
+    /// <summary>A description with the token left out.</summary>
+    /// <returns>The set asked for, never the token.</returns>
+    public override string ToString() => $"TokenEnvRequest {{ Project = {Project}, Profile = {Profile}, Token = <redacted> }}";
+}

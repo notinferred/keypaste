@@ -153,11 +153,17 @@ public sealed class EntryExposure
     /// <remarks>
     /// An exposure built from no globs allows nothing. That is deliberate: "no patterns were given"
     /// must never collapse into "everything is allowed", so applying <see cref="Default"/> is
-    /// something a caller does on purpose.
+    /// something a caller does on purpose. A reserved group is never allowed, whatever the globs
+    /// say, <c>**</c> included: its entries are keypaste's own records (<see cref="ReservedGroups"/>).
     /// </remarks>
     public bool Allows(EntryName name)
     {
         ArgumentNullException.ThrowIfNull(name);
+
+        if (ReservedGroups.IsReserved(name.GroupPath))
+        {
+            return false;
+        }
 
         var segments = Split(name.GroupPath);
 

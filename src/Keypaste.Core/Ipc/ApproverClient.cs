@@ -182,6 +182,20 @@ public sealed class ApproverClient : IAsyncDisposable
         return frame is not null && ApproverProtocol.TryDecode(frame, out EnvReply? reply) ? reply : null;
     }
 
+    /// <summary>Asks for a set under a scoped token.</summary>
+    /// <param name="request">The token, the set, the command and directory.</param>
+    /// <param name="cancellationToken">Cancels the exchange, which withdraws any question.</param>
+    /// <returns>The reply, or null when the owner could not be reached or understood.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    public async ValueTask<EnvReply?> ReleaseTokenEnvAsync(TokenEnvRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken).ConfigureAwait(false);
+
+        return frame is not null && ApproverProtocol.TryDecode(frame, out EnvReply? reply) ? reply : null;
+    }
+
     private async ValueTask<byte[]?> ExchangeAsync(byte[] request, CancellationToken cancellationToken)
     {
         if (_disposed)

@@ -841,6 +841,63 @@ public static class ApproverProtocol
         }
     }
 
+    /// <summary>Encodes a request for a set authorized by a scoped token.</summary>
+    /// <param name="request">What to ask for.</param>
+    /// <returns>The frame's bytes, without a delimiter.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    /// <remarks>The reply is an ordinary env reply.</remarks>
+    public static byte[] Encode(TokenEnvRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return Write(writer =>
+        {
+            writer.WriteNumber("v", Version);
+            writer.WriteString("kind", TokenEnvKind);
+            writer.WriteString("vault", request.Vault);
+            writer.WriteString("session", request.Session);
+            writer.WriteString("token", request.Token);
+            writer.WriteString("project", request.Project);
+            writer.WriteString("profile", request.Profile);
+            WriteStrings(writer, "command", request.Command);
+            writer.WriteString("directory", request.Directory);
+        });
+    }
+
+    /// <summary>Decodes a request for a set authorized by a scoped token.</summary>
+    /// <param name="frame">The frame's bytes.</param>
+    /// <param name="request">The decoded request.</param>
+    /// <returns><see langword="true"/> when the frame was a well-formed token env request.</returns>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out TokenEnvRequest? request)
+    {
+        request = null;
+
+        if (!TryParse(frame, out var document))
+        {
+            return false;
+        }
+
+        using (document)
+        {
+            var root = document.RootElement;
+
+            if (!IsKind(root, TokenEnvKind)
+                || !TryString(root, "vault", out var vault)
+                || !TryString(root, "session", out var session)
+                || !TryString(root, "token", out var token)
+                || !TryString(root, "project", out var project)
+                || !TryString(root, "profile", out var profile)
+                || !TryStrings(root, "command", out var command)
+                || !TryString(root, "directory", out var directory))
+            {
+                return false;
+            }
+
+            request = new TokenEnvRequest(token, project, profile, command, directory) { Vault = vault, Session = session };
+            return true;
+        }
+    }
+
     private static bool TryPairs(
         JsonElement root,
         string name,
