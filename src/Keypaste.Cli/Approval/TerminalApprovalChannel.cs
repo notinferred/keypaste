@@ -201,15 +201,18 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         }
 
         lines.Add(string.Empty);
-        lines.Add("  Approving puts every value into that command's environment. No value is shown here.");
-        lines.Add("  The command is what the runner says it will start; only approve one you started.");
+        lines.Add("  No value is shown here. `keypaste run --session` names the command and keypaste cannot check it,");
+        lines.Add("  so allow only a run you started.");
         lines.Add(string.Empty);
+        lines.Add("  [d] deny: the run gets nothing.");
+        lines.Add("  [o] once: the run starts this command one time with every value in its environment.");
 
         var offered = OfferedSeconds(request);
 
         if (offered > 0)
         {
-            lines.Add($"  [h] lets any program of yours run exactly this command here again for {ApprovalLimits.Describe(offered)} without asking.");
+            var duration = ApprovalLimits.Describe(offered);
+            lines.Add($"  [h] {duration}: the same, and any program of yours can run exactly this command here again for {duration} without asking.");
         }
         else if (request.Requester is null)
         {

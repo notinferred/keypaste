@@ -1,4 +1,5 @@
 using System.Text;
+using Keypaste.Cli.Output;
 using Keypaste.Cli.Styling;
 using Xunit;
 
@@ -48,6 +49,35 @@ public sealed class ConsoleMarksTests
 
         Assert.Equal("kpt_7d2e91c0…", ConsoleMarks.Shortened(unicode, "kpt_7d2e91c0…"));
         Assert.Equal("kpt_7d2e91c0...", ConsoleMarks.Shortened(bestFit, "kpt_7d2e91c0…"));
+    }
+
+    /// <summary>
+    /// A redirected Windows stream once wrote <c>·</c> in the console code page, which Git Bash showed
+    /// as <c>acme-api � staging</c>: it now carries every mark as UTF-8 with no byte order mark.
+    /// </summary>
+    [Fact]
+    public void ARedirectedWindowsStream_CarriesTheMarksAsUtf8()
+    {
+        using var pipe = new MemoryStream();
+        var consoleOpened = false;
+        var writer = StandardStreams.For(utf8: true, () => pipe, () =>
+        {
+            consoleOpened = true;
+            return TextWriter.Null;
+        });
+
+        writer.Write($"acme-api {ConsoleMarks.For(writer, Mark.Dot)} staging {ConsoleMarks.For(writer, Mark.Done)}");
+
+        Assert.False(consoleOpened);
+        Assert.Equal("acme-api · staging ✓"u8.ToArray(), pipe.ToArray());
+    }
+
+    [Fact]
+    public void AConsoleStream_KeepsTheConsoleWriter()
+    {
+        using var console = new StringWriter();
+
+        Assert.Same(console, StandardStreams.For(utf8: false, () => throw new InvalidOperationException("no stream is opened"), () => console));
     }
 
     /// <summary>Latin-1 that writes <c>?</c> for anything else whatever fallback it is given.</summary>

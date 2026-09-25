@@ -378,7 +378,9 @@ public sealed class TerminalApprovalChannelTests
         await rig.Channel.AskAsync(EnvPrompt("deploy"), Token);
 
         Assert.Contains(
-            "  [h] lets any program of yours run exactly this command here again for 15 minutes without asking.",
+            "  [d] deny: the run gets nothing." + Environment.NewLine
+                + "  [o] once: the run starts this command one time with every value in its environment." + Environment.NewLine
+                + "  [h] 15 minutes: the same, and any program of yours can run exactly this command here again for 15 minutes without asking.",
             rig.Stderr.ToString(),
             StringComparison.Ordinal);
         Assert.Equal("[d] deny  [o] once  [h] 15 minutes  45s › ", Assert.Single(rig.Prompt.PromptsSeen));

@@ -44,10 +44,16 @@ chmod +x "$work/appimagetool.AppImage"
 (cd "$work" && ./appimagetool.AppImage --appimage-extract >/dev/null)
 
 appdir="$work/AppDir"
-mkdir -p "$appdir/usr/bin" "$appdir/usr/share/metainfo" "$appdir/usr/share/applications"
+icons="$appdir/usr/share/icons/hicolor"
+mkdir -p "$appdir/usr/bin" "$appdir/usr/share/metainfo" "$appdir/usr/share/applications" \
+  "$icons/scalable/apps" "$icons/256x256/apps"
 cp -R "$payload"/. "$appdir/usr/bin/"
 install -m 755 "$ROOT/packaging/linux/AppRun" "$appdir/AppRun"
 cp "$ROOT/packaging/linux/$ID.svg" "$appdir/"
+cp "$ROOT/packaging/linux/$ID.svg" "$icons/scalable/apps/"
+cp "$ROOT/src/Keypaste.App/Assets/keypaste-256.png" "$icons/256x256/apps/$ID.png"
+# Thumbnailers read .DirIcon as a PNG; left absent, appimagetool links it to the SVG.
+cp "$icons/256x256/apps/$ID.png" "$appdir/.DirIcon"
 sed "s/{version}/$version/g" "$ROOT/packaging/linux/$ID.desktop" > "$appdir/$ID.desktop"
 cp "$appdir/$ID.desktop" "$appdir/usr/share/applications/"
 sed "s/{version}/$version/g" "$ROOT/packaging/linux/$ID.appdata.xml" > "$appdir/usr/share/metainfo/$ID.appdata.xml"
