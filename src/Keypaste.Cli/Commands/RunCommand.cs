@@ -136,7 +136,7 @@ internal static class RunCommand
 
         if (set.File is { } file)
         {
-            context.Stderr.WriteLine($"keypaste run: resolving {OneLine(set.Label)} → project {OneLine(set.Project)} profile {OneLine(set.Profile)}");
+            context.Stderr.WriteLine($"keypaste run: resolving {OneLine(set.Label)} {Arrow(context.Stderr)} project {OneLine(set.Project)} profile {OneLine(set.Profile)}");
 
             if (!context.ConsoleStyle.IsTerminal(context.Stderr))
             {
@@ -617,6 +617,9 @@ internal static class RunCommand
     }
 
     private static string Literal(ReferenceLine line) => OneLine($"{line.Name}={line.Literal}");
+
+    /// <summary>→ where the writer is Unicode, else <c>-&gt;</c>: a legacy console code page writes a control character for it.</summary>
+    private static string Arrow(TextWriter writer) => writer.Encoding.CodePage is 65001 or 1200 or 1201 ? "→" : "->";
 
     /// <summary>Another process's words, made safe for this terminal.</summary>
     private static string Shown(string text) => EntryNameSanitizer.SanitizeProse(text, 512).Text;
