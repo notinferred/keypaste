@@ -381,9 +381,11 @@ public sealed class SessionAuthority : IApproverHandler
             },
             cancellationToken).ConfigureAwait(false);
 
-        Settled(environments, admitted, resolved, GrantSummary.EnvClient, "run --session");
+        var reply = Deliverable(new EnvReply(resolved, resolved.Outcome == EnvOutcome.Declined ? Declined(answer) : resolved.Refusal));
 
-        return new EnvReply(resolved, resolved.Outcome == EnvOutcome.Declined ? Declined(answer) : resolved.Refusal);
+        Settled(environments, admitted, reply.Set, GrantSummary.EnvClient, "run --session");
+
+        return reply;
     }
 
     /// <inheritdoc/>
@@ -568,17 +570,9 @@ public sealed class SessionAuthority : IApproverHandler
             ? await resolver.ResolveAsync(request.Project!, request.Profile, request.Keys, Confirm, cancellationToken).ConfigureAwait(false)
             : await resolver.ResolveReferencesAsync(document, Confirm, cancellationToken).ConfigureAwait(false);
 
-        Settled(environments, admitted, resolved, client, "run", shown);
-
         if (resolved.Outcome == EnvOutcome.Resolved)
         {
-            // Every run is narrated with its command, a grant-served one too: the grant approved a
-            // command line, not what the files it runs do (T-35).
-            environments.Narrate?.Invoke(method == AuditMethod.GrantCache
-                ? $"released {resolved.Variables.Count} variable(s) to {client} for `{command}` from a timed grant ({granted}s left)"
-                : $"released {resolved.Variables.Count} variable(s) to {client} for `{command}` {(granted > 0 ? $"for {granted}s" : "once")}");
-
-            return new RunReply(resolved, method, method == AuditMethod.GrantCache
+            var released = new RunReply(resolved, method, method == AuditMethod.GrantCache
                 ? "served from a run a person had approved on this connection"
                 : granted > 0
                     ? $"a person approved this command line for {ApprovalLimits.Describe(granted)} on this connection"
@@ -588,7 +582,29 @@ public sealed class SessionAuthority : IApproverHandler
                 Entries = shown,
                 Session = request.Session,
             };
+
+            if (!ApproverProtocol.Fits(released))
+            {
+                var tooLarge = EnvResolved.Refused(resolved.Project, EnvOutcome.TooLarge, profile: resolved.Profile);
+                return new RunReply(tooLarge, AuditMethod.Undeliverable, ApproverProtocol.UndeliverableReason(method))
+                {
+                    Entries = shown,
+                    Session = request.Session,
+                };
+            }
+
+            Settled(environments, admitted, resolved, client, "run", shown);
+
+            // Every run is narrated with its command, a grant-served one too: the grant approved a
+            // command line, not what the files it runs do (T-35).
+            environments.Narrate?.Invoke(method == AuditMethod.GrantCache
+                ? $"released {resolved.Variables.Count} variable(s) to {client} for `{command}` from a timed grant ({granted}s left)"
+                : $"released {resolved.Variables.Count} variable(s) to {client} for `{command}` {(granted > 0 ? $"for {granted}s" : "once")}");
+
+            return released;
         }
+
+        Settled(environments, admitted, resolved, client, "run", shown);
 
         if (refused is not null)
         {
@@ -762,7 +778,7 @@ public sealed class SessionAuthority : IApproverHandler
             _ => Refused(request.Project, request.Profile, EnvOutcome.Unauthorized, "the token is not valid for this vault"),
         };
 
-        var audited = Audited(environments.Audit, request, info, reply);
+        var audited = Audited(environments.Audit, request, info, Deliverable(reply));
 
         if (audited.Set.Outcome == EnvOutcome.Resolved && info is not null)
         {
@@ -955,6 +971,12 @@ public sealed class SessionAuthority : IApproverHandler
     /// <summary>A runner's file line as a prompt shows it: one line, nothing that draws anything else.</summary>
     private static string ShownLine(string line) =>
         DisplayTextSanitizer.Sanitize(line.Replace('\n', '\0').Replace('\r', '\0').Replace('\t', '\0')).Text;
+
+    /// <summary>The reply as it will leave: a set too large for one frame is refused whole before anything records it as released.</summary>
+    private static EnvReply Deliverable(EnvReply reply) =>
+        reply.Set.Outcome == EnvOutcome.Resolved && !ApproverProtocol.Fits(reply)
+            ? Refused(reply.Set.Project, reply.Set.Profile, EnvOutcome.TooLarge)
+            : reply;
 
     private static EnvReply Refused(string project, string profile, EnvOutcome outcome, string reason) =>
         new(EnvResolved.Refused(project, outcome, profile: profile), reason);

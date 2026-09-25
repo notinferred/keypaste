@@ -273,6 +273,50 @@ public sealed class SessionAuthorityTokenTests : IDisposable
     }
 
     [Fact]
+    public async Task ASetTooLargeForOneReply_IsAuditedAndRecordedAsRefused()
+    {
+        _vault.AddEntry(new VaultEntry { GroupPath = "env/acme-api/staging", Title = "BIG", Password = new string('x', 70_000) });
+        _vault.Save();
+        var token = Mint("ci", "read:acme-api/staging/*");
+        var pipe = "keypaste-tests-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
+        var authority = Authority();
+        using var stop = new CancellationTokenSource();
+        using var listener = new ApproverListener(pipe, authority);
+        var running = listener.RunAsync(stop.Token);
+
+        try
+        {
+            await using var client = await ApproverClient.TryConnectAsync(pipe, _wait, Cancel);
+            Assert.NotNull(client);
+            var attached = await client.AttachAsync(new AttachRequest(VaultPath), Cancel);
+            Assert.True(attached?.Attached);
+
+            var reply = await client.ReleaseTokenEnvAsync(Request(token, "staging") with { Session = attached!.Session! }, Cancel);
+
+            Assert.NotNull(reply);
+            Assert.Equal(EnvOutcome.TooLarge, reply.Set.Outcome);
+            Assert.Empty(reply.Set.Variables);
+        }
+        finally
+        {
+            await stop.CancelAsync();
+            try
+            {
+                await running;
+            }
+            catch (Exception ex) when (ex is OperationCanceledException or IOException or ObjectDisposedException)
+            {
+                // Tearing the listener down is how it stops.
+            }
+        }
+
+        var line = Assert.Single(Lines());
+        Assert.Equal("denied", line.GetProperty("decision").GetString());
+        Assert.False(line.TryGetProperty("entries", out var entries) && entries.ValueKind == JsonValueKind.Array && entries.GetArrayLength() > 0);
+        Assert.Empty(authority.Released);
+    }
+
+    [Fact]
     public async Task ReleaseTokenEnv_AuditUnwritable_ReleasesNothing()
     {
         var token = Mint("ci", "read:acme-api/staging/*");

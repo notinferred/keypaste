@@ -354,6 +354,29 @@ public static class ApproverProtocol
         return WriteCredential(reply).Length <= MessageFramer.MaximumPayloadBytes;
     }
 
+    /// <summary>Whether <see cref="Encode(EnvReply)"/> would send this reply as it is.</summary>
+    /// <param name="reply">The reply the owner is about to record and return.</param>
+    /// <returns><see langword="true"/> when it fits one frame.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
+    /// <remarks>Asked before a release is audited or recorded, so neither claims values the runner never received.</remarks>
+    internal static bool Fits(EnvReply reply)
+    {
+        ArgumentNullException.ThrowIfNull(reply);
+
+        return WriteEnv(reply).Length <= MessageFramer.MaximumPayloadBytes;
+    }
+
+    /// <summary>Whether <see cref="Encode(RunReply)"/> would send this reply as it is.</summary>
+    /// <param name="reply">The reply the owner is about to record and return.</param>
+    /// <returns><see langword="true"/> when it fits one frame.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
+    internal static bool Fits(RunReply reply)
+    {
+        ArgumentNullException.ThrowIfNull(reply);
+
+        return WriteRun(reply).Length <= MessageFramer.MaximumPayloadBytes;
+    }
+
     private static CredentialReply Bounded(CredentialReply reply, string? entry) =>
         reply.Decision == AuditDecision.Granted
             ? new CredentialReply
