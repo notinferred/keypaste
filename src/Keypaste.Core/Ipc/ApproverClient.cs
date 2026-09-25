@@ -182,6 +182,48 @@ public sealed class ApproverClient : IAsyncDisposable
         return frame is not null && ApproverProtocol.TryDecode(frame, out EnvReply? reply) ? reply : null;
     }
 
+    /// <summary>Asks for the grants the owner's current session holds.</summary>
+    /// <param name="request">The attachment it is made under.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <returns>The reply, or null when the owner could not be reached or understood.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    public async ValueTask<GrantsReply?> GrantsAsync(GrantsRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken).ConfigureAwait(false);
+
+        return frame is not null && ApproverProtocol.TryDecode(frame, out GrantsReply? reply) ? reply : null;
+    }
+
+    /// <summary>Asks the owner to end grants.</summary>
+    /// <param name="request">Which grants, and the attachment it is made under.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <returns>The reply, or null when the owner could not be reached or understood.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    public async ValueTask<RevokeGrantsReply?> RevokeGrantsAsync(RevokeGrantsRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken).ConfigureAwait(false);
+
+        return frame is not null && ApproverProtocol.TryDecode(frame, out RevokeGrantsReply? reply) ? reply : null;
+    }
+
+    /// <summary>Asks the owner to lock now.</summary>
+    /// <param name="request">The attachment it is made under.</param>
+    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <returns>The reply, or null when the owner could not be reached or understood.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    public async ValueTask<LockReply?> LockAsync(LockRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken).ConfigureAwait(false);
+
+        return frame is not null && ApproverProtocol.TryDecode(frame, out LockReply? reply) ? reply : null;
+    }
+
     private async ValueTask<byte[]?> ExchangeAsync(byte[] request, CancellationToken cancellationToken)
     {
         if (_disposed)
