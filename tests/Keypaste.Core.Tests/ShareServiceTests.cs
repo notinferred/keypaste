@@ -116,6 +116,26 @@ public sealed class ShareServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Create_VaultLockedDuringUpload_WithdrawsTheLink()
+    {
+        using var vault = _fixture.Open();
+        _fixture.Server.OnRequest = request =>
+        {
+            if (request.Method == HttpMethod.Post)
+            {
+                vault.Dispose();
+            }
+        };
+
+        var outcome = await _fixture.Service().CreateAsync(vault, ShareFixture.Request(), CancellationToken.None);
+
+        Assert.False(outcome.Ok);
+        Assert.Contains("the link was withdrawn", outcome.Message, StringComparison.Ordinal);
+        Assert.Empty(_fixture.Server.Shares);
+        Assert.Equal(0, ShareRecordsOnDisk());
+    }
+
+    [Fact]
     public async Task Create_AuditFailure_WithdrawsAndForgets()
     {
         _fixture.AuditBroken = true;

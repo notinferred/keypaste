@@ -147,19 +147,17 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
             _client.Endpoint.GetLeftPart(UriPartial.Authority));
 
         var store = new ShareStore(vault);
-        store.Add(info, revokeToken);
-        if (!TrySave(vault, out var unsaved))
+        if (!TryWrite(vault, () => store.Add(info, revokeToken), out var unsaved))
         {
-            store.Remove(info.Id);
             await _client.RevokeAsync(info.Id, revokeToken, CancellationToken.None).ConfigureAwait(false);
+            TryForget(vault, store, info.Id, save: false);
             return Refused($"the vault could not be saved ({unsaved}), so the link was withdrawn");
         }
 
         if (!TryAudit(AuditMethod.ShareCreated, what, request.Field, CreatedReason(info)))
         {
             await _client.RevokeAsync(info.Id, revokeToken, CancellationToken.None).ConfigureAwait(false);
-            store.Remove(info.Id);
-            TrySave(vault, out _);
+            TryForget(vault, store, info.Id, save: true);
             return Refused("the audit log could not be written, so the link was withdrawn");
         }
 
@@ -191,8 +189,7 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
             return new ShareOutcome(false, null, info, failure, ShareClient.Describe(failure));
         }
 
-        store.Remove(info.Id);
-        if (!TrySave(vault, out var unsaved))
+        if (!TryWrite(vault, () => store.Remove(info.Id), out var unsaved))
         {
             return new ShareOutcome(false, null, info, ShareFailure.None, $"the link was revoked, but the vault could not be saved ({unsaved})");
         }
@@ -291,18 +288,36 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
 
     private static string Path(EntryName name) => name.GroupPath.Length == 0 ? name.Title : name.GroupPath + "/" + name.Title;
 
-    private static bool TrySave(Vault vault, out string error)
+    /// <summary>Makes a change and saves it. A vault locked meanwhile is a failure like any other, so the caller still withdraws.</summary>
+    private static bool TryWrite(Vault vault, Action change, out string error)
     {
         try
         {
+            change();
             vault.Save();
             error = string.Empty;
             return true;
         }
-        catch (Exception ex) when (ex is VaultException or IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is VaultException or IOException or UnauthorizedAccessException or ObjectDisposedException)
         {
-            error = ex.Message;
+            error = ex is ObjectDisposedException ? "the vault was locked" : ex.Message;
             return false;
+        }
+    }
+
+    private static void TryForget(Vault vault, ShareStore store, string id, bool save)
+    {
+        try
+        {
+            store.Remove(id);
+            if (save)
+            {
+                vault.Save();
+            }
+        }
+        catch (Exception ex) when (ex is VaultException or IOException or UnauthorizedAccessException or ObjectDisposedException)
+        {
+            // The server has already withdrawn it; a record left behind names a link that no longer opens.
         }
     }
 
