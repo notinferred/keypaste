@@ -1,11 +1,12 @@
 // Share links (D-0355): the server keeps an envelope it cannot open, a view count, an expiry and the
 // SHA-256 of a revoke token. The key is in the link's fragment, which no browser sends here.
 //
-// Every route answers the same 404 until SHARE_ENABLED is "1", which is set only after the founder
-// ratifies sharing and provisions its database; merging this into main deploys it switched off.
+// Until SHARE_ENABLED is "1", which is set only after the founder ratifies sharing and provisions its
+// database, the API answers 503 and the viewer 404; merging this into main deploys it switched off.
 //
 // Unknown, spent, expired and revoked shares, and a wrong revoke token, all answer the one 404, so
-// a caller cannot tell a share that never existed from one somebody opened. Logs name an error's
+// a caller cannot tell a share that never existed from one somebody opened. That 404 alone carries
+// GONE_HEADER: a client forgets a share only on it, never on a 404 from a misrouted request. Logs name an error's
 // name, code and message only: never an id, an envelope or an address.
 import postgres from "postgres";
 
@@ -16,6 +17,7 @@ const ID = /^[A-Za-z0-9_-]{22}$/;
 const B64URL = /^[A-Za-z0-9_-]+$/;
 const SHA256_HEX = /^[0-9a-f]{64}$/;
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"]);
+const GONE_HEADER = "x-keypaste-share";
 
 const API_HEADERS = {
   "content-type": "application/json",
@@ -71,9 +73,12 @@ export function isShareRoute(pathname) {
 export async function handleShare(request, env, ctx) {
   const url = new URL(request.url);
 
-  if (env.SHARE_ENABLED !== "1") return notFound();
+  const isViewer = url.pathname === "/s" || url.pathname.startsWith("/s/");
 
-  if (url.pathname === "/s" || url.pathname.startsWith("/s/")) return viewer(request, env);
+  // A switched-off API must not answer the 404 a client reads as "this share is gone".
+  if (env.SHARE_ENABLED !== "1") return isViewer ? notFound() : unavailable();
+
+  if (isViewer) return viewer(request, env);
 
   const route = match(request.method, url.pathname);
   if (!route) return notFound();
@@ -87,7 +92,7 @@ export async function handleShare(request, env, ctx) {
   }
 
   const store = openStore(env, url, ctx);
-  if (!store) return json(503, { error: "sharing is not available" });
+  if (!store) return unavailable();
 
   try {
     switch (route.kind) {
@@ -102,7 +107,7 @@ export async function handleShare(request, env, ctx) {
     }
   } catch (error) {
     console.error("share failed:", error?.name, error?.code, error?.message);
-    return json(503, { error: "sharing is not available" });
+    return unavailable();
   } finally {
     store.end?.();
   }
@@ -182,7 +187,7 @@ async function create(request, store) {
 
 async function status(id, store) {
   const row = await store.status(id);
-  if (!row) return notFound();
+  if (!row) return gone();
 
   const { kdf, check_iv, check } = JSON.parse(row.envelope);
   return json(200, { views_left: row.views_left, expires_at: new Date(row.expires_at).toISOString(), kdf, check_iv, check });
@@ -190,7 +195,7 @@ async function status(id, store) {
 
 async function open(id, store) {
   const row = await store.open(id);
-  if (!row) return notFound();
+  if (!row) return gone();
 
   return json(200, { envelope: JSON.parse(row.envelope), views_left: row.views_left });
 }
@@ -198,10 +203,10 @@ async function open(id, store) {
 async function revoke(request, id, store) {
   const authorization = request.headers.get("authorization") ?? "";
   const token = authorization.startsWith("Bearer ") ? authorization.slice("Bearer ".length) : "";
-  if (!token || token.length > 128) return notFound();
+  if (!token || token.length > 128) return gone();
 
   const removed = await store.revoke(id, await sha256Hex(token));
-  return removed ? new Response(null, { status: 204, headers: API_HEADERS }) : notFound();
+  return removed ? new Response(null, { status: 204, headers: API_HEADERS }) : gone();
 }
 
 // Re-serialized from the validated fields only, so nothing else a client sent is ever stored.
@@ -335,4 +340,14 @@ function json(status, body) {
 
 function notFound() {
   return json(404, { error: "not found" });
+}
+
+function gone() {
+  const response = notFound();
+  response.headers.set(GONE_HEADER, "gone");
+  return response;
+}
+
+function unavailable() {
+  return json(503, { error: "sharing is not available" });
 }

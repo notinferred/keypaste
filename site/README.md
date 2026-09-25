@@ -122,9 +122,9 @@ Use a dedicated test address for checks that write rows. Verify valid submission
 | `POST /api/share/<id>/open` | 200 with the envelope; spends one view and deletes the row at zero |
 | `DELETE /api/share/<id>` | 204 with `authorization: Bearer <revoke token>` |
 
-Unknown, spent, expired and revoked shares and a wrong revoke token all answer the same 404. A foreign `Origin` answers 403, a malformed request 400, an oversized one 413 and a rate-limited one 429.
+Unknown, spent, expired and revoked shares and a wrong revoke token all answer the same 404, and only that 404 carries `x-keypaste-share: gone`, the one answer on which keypaste forgets a share and its revoke token. A foreign `Origin` answers 403, a malformed request 400, an oversized one 413 and a rate-limited one 429.
 
-**Every share route answers 404 until the Worker variable `SHARE_ENABLED` is `"1"`.** Merging this code deploys it switched off; the founder sets the variable only after sharing is ratified and its database is provisioned. With the variable set and no `SHARE_DB` binding, the routes answer 503.
+**Until the Worker variable `SHARE_ENABLED` is `"1"`, the API routes answer 503 and the viewer 404.** Merging this code deploys it switched off; the founder sets the variable only after sharing is ratified and its database is provisioned. With the variable set and no `SHARE_DB` binding, the routes also answer 503. Switching sharing off never makes a client forget a live share, so it can still be revoked once sharing is back on.
 
 Provisioning, run from `site/` after `npm ci`:
 

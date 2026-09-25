@@ -189,6 +189,21 @@ public sealed class ShareClientTests : IDisposable
         Assert.Equal(ShareFailure.None, await Client.RevokeAsync(created.Id, token, CancellationToken.None));
     }
 
+    [Theory]
+    [InlineData(HttpStatusCode.NotFound)]
+    [InlineData(HttpStatusCode.ServiceUnavailable)]
+    public async Task ANotFoundWithoutTheGoneMark_IsNotAShareThatIsGone(HttpStatusCode answer)
+    {
+        const string token = "revoke-token";
+        var (created, _, _) = await Client.CreateAsync(Envelope(), 1, 300, FakeShareServer.Sha256(token), CancellationToken.None);
+        _server.Answer = _ => FakeShareServer.Json(answer, "{\"error\":\"not found\"}");
+
+        Assert.Equal(ShareFailure.Unavailable, await Client.RevokeAsync(created!.Id, token, CancellationToken.None));
+        var (status, failure) = await Client.StatusAsync(created.Id, CancellationToken.None);
+        Assert.Null(status);
+        Assert.Equal(ShareFailure.Unavailable, failure);
+    }
+
     [Fact]
     public async Task AMalformedId_IsNeverSent()
     {

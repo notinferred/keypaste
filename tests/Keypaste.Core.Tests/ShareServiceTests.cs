@@ -255,6 +255,23 @@ public sealed class ShareServiceTests : IDisposable
         Assert.Equal(0, ShareRecordsOnDisk());
     }
 
+    [Theory]
+    [InlineData(HttpStatusCode.NotFound)]
+    [InlineData(HttpStatusCode.ServiceUnavailable)]
+    public async Task Revoke_WhileSharingIsSwitchedOff_KeepsTheRevokeToken(HttpStatusCode answer)
+    {
+        using var vault = _fixture.Open();
+        var created = await _fixture.Service().CreateAsync(vault, ShareFixture.Request(), CancellationToken.None);
+        _fixture.Server.Answer = _ => FakeShareServer.Json(answer, "{\"error\":\"sharing is not available\"}");
+
+        var outcome = await _fixture.Service().RevokeAsync(vault, created.Info!.Id, CancellationToken.None);
+
+        Assert.False(outcome.Ok);
+        Assert.Equal(ShareFailure.Unavailable, outcome.Failure);
+        Assert.Equal(1, ShareRecordsOnDisk());
+        Assert.DoesNotContain("share-revoked", _fixture.AuditText(), StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task Revoke_NetworkFailure_Keeps()
     {

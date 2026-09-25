@@ -58,24 +58,53 @@ async function create(overrides = {}, options = {}) {
   });
 }
 
-test("with SHARE_ENABLED unset every share route and the viewer answer the same 404", async () => {
+test("with SHARE_ENABLED unset the API answers 503 and the viewer 404, never the gone answer", async () => {
   const disabled = { SHARE_DEV_MEMORY: "1", ASSETS: assets() };
   const id = "AAAAAAAAAAAAAAAAAAAAAA";
-  const answers = [
+  const api = [
     await call("POST", "/api/share", { env: disabled, headers: { "content-type": "application/json" }, body: await createBody() }),
     await call("GET", `/api/share/${id}`, { env: disabled }),
     await call("POST", `/api/share/${id}/open`, { env: disabled }),
     await call("DELETE", `/api/share/${id}`, { env: disabled, headers: { authorization: `Bearer ${REVOKE}` } }),
-    await call("GET", "/s/", { env: disabled }),
-    await call("GET", "/s/viewer.js", { env: disabled }),
   ];
+  const viewer = [await call("GET", "/s/", { env: disabled }), await call("GET", "/s/viewer.js", { env: disabled })];
 
-  const first = await answers[0].text();
-  for (const answer of answers) {
-    assert.equal(answer.status, 404);
-    assert.equal(answer.headers.get("cache-control"), "no-store");
+  for (const answer of api) {
+    assert.equal(answer.status, 503);
+    assert.deepEqual(await answer.json(), { error: "sharing is not available" });
   }
-  for (const answer of answers.slice(1)) assert.equal(await answer.text(), first);
+  for (const answer of viewer) assert.equal(answer.status, 404);
+  for (const answer of [...api, ...viewer]) {
+    assert.equal(answer.headers.get("cache-control"), "no-store");
+    assert.equal(answer.headers.get("x-keypaste-share"), null);
+  }
+});
+
+test("switching sharing off and on again leaves a share revocable", async () => {
+  const { id } = await (await create()).json();
+  const disabled = { SHARE_DEV_MEMORY: "1", ASSETS: assets() };
+
+  const refused = await call("DELETE", `/api/share/${id}`, { env: disabled, headers: { authorization: `Bearer ${REVOKE}` } });
+  assert.equal(refused.status, 503);
+  assert.equal((await call("GET", `/api/share/${id}`)).status, 200);
+
+  assert.equal((await call("DELETE", `/api/share/${id}`, { headers: { authorization: `Bearer ${REVOKE}` } })).status, 204);
+});
+
+test("only a lookup's 404 says the share is gone", async () => {
+  const id = "AAAAAAAAAAAAAAAAAAAAAA";
+  for (const answer of [
+    await call("GET", `/api/share/${id}`),
+    await call("POST", `/api/share/${id}/open`),
+    await call("DELETE", `/api/share/${id}`, { headers: { authorization: `Bearer ${REVOKE}` } }),
+  ]) {
+    assert.equal(answer.status, 404);
+    assert.equal(answer.headers.get("x-keypaste-share"), "gone");
+  }
+
+  const unrouted = await call("GET", `/api/share/${id}/extra`);
+  assert.equal(unrouted.status, 404);
+  assert.equal(unrouted.headers.get("x-keypaste-share"), null);
 });
 
 test("the viewer is served from the assets with its security headers once enabled", async () => {

@@ -67,7 +67,7 @@ internal sealed class FakeShareServer : HttpMessageHandler
         {
             return live
                 ? Json(HttpStatusCode.OK, $"{{\"views_left\":{share!.ViewsLeft},\"expires_at\":\"{share.ExpiresAt:O}\",\"kdf\":null,\"check_iv\":\"x\",\"check\":\"y\"}}")
-                : NotFound();
+                : Gone();
         }
 
         if (request.Method == HttpMethod.Delete)
@@ -75,7 +75,7 @@ internal sealed class FakeShareServer : HttpMessageHandler
             var token = request.Headers.Authorization?.Parameter ?? string.Empty;
             if (share is null || share.RevokeSha256 != Sha256(token))
             {
-                return NotFound();
+                return Gone();
             }
 
             Shares.Remove(id);
@@ -110,4 +110,12 @@ internal sealed class FakeShareServer : HttpMessageHandler
     }
 
     private static HttpResponseMessage NotFound() => Json(HttpStatusCode.NotFound, "{\"error\":\"not found\"}");
+
+    /// <summary>The Worker's answer for a share it no longer has, the only 404 a client forgets a share on.</summary>
+    internal static HttpResponseMessage Gone()
+    {
+        var response = NotFound();
+        response.Headers.Add("x-keypaste-share", "gone");
+        return response;
+    }
 }

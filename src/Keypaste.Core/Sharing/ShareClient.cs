@@ -54,6 +54,10 @@ public sealed class ShareClient(HttpMessageHandler handler, Uri endpoint)
     /// <summary>The largest response body read.</summary>
     internal const int MaximumResponseBytes = 64 * 1024;
 
+    // site/src/share.js sets this on the 404 of a lookup that found no live share, and on no other answer.
+    private const string GoneHeader = "x-keypaste-share";
+    private const string GoneMark = "gone";
+
     private readonly HttpMessageHandler _handler = handler ?? throw new ArgumentNullException(nameof(handler));
 
     /// <summary>The origin this client speaks to.</summary>
@@ -93,7 +97,7 @@ public sealed class ShareClient(HttpMessageHandler handler, Uri endpoint)
         request.Content = new ByteArrayContent(buffer.ToArray());
         request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
 
-        var (status, body, failure) = await SendAsync(request, ct).ConfigureAwait(false);
+        var (status, body, failure, _) = await SendAsync(request, ct).ConfigureAwait(false);
         if (failure != ShareFailure.None)
         {
             return (null, failure, Describe(failure));
@@ -126,14 +130,14 @@ public sealed class ShareClient(HttpMessageHandler handler, Uri endpoint)
         }
 
         using var request = Request(HttpMethod.Get, "/api/share/" + id);
-        var (status, body, failure) = await SendAsync(request, ct).ConfigureAwait(false);
+        var (status, body, failure, gone) = await SendAsync(request, ct).ConfigureAwait(false);
 
         if (failure != ShareFailure.None)
         {
             return (null, failure);
         }
 
-        if (status == HttpStatusCode.NotFound)
+        if (gone)
         {
             return (new ShareStatus(false, 0, null), ShareFailure.None);
         }
@@ -153,7 +157,10 @@ public sealed class ShareClient(HttpMessageHandler handler, Uri endpoint)
         return (new ShareStatus(true, left, expires), ShareFailure.None);
     }
 
-    /// <summary>Revokes a share. A share the server no longer has counts as revoked.</summary>
+    /// <summary>
+    /// Revokes a share. A share the server says it no longer has counts as revoked; any other 404,
+    /// such as a switched-off or misrouted API, does not, so the revoke token is kept.
+    /// </summary>
     public async Task<ShareFailure> RevokeAsync(string id, string revokeToken, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(id);
@@ -167,10 +174,10 @@ public sealed class ShareClient(HttpMessageHandler handler, Uri endpoint)
         using var request = Request(HttpMethod.Delete, "/api/share/" + id);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", revokeToken);
 
-        var (status, _, failure) = await SendAsync(request, ct).ConfigureAwait(false);
+        var (status, _, failure, gone) = await SendAsync(request, ct).ConfigureAwait(false);
 
         return failure != ShareFailure.None ? failure
-            : status is HttpStatusCode.NoContent or HttpStatusCode.NotFound ? ShareFailure.None
+            : status == HttpStatusCode.NoContent || gone ? ShareFailure.None
             : Map(status);
     }
 
@@ -193,7 +200,7 @@ public sealed class ShareClient(HttpMessageHandler handler, Uri endpoint)
         return request;
     }
 
-    private async Task<(HttpStatusCode Status, byte[] Body, ShareFailure Failure)> SendAsync(HttpRequestMessage request, CancellationToken ct)
+    private async Task<(HttpStatusCode Status, byte[] Body, ShareFailure Failure, bool Gone)> SendAsync(HttpRequestMessage request, CancellationToken ct)
     {
         using var client = new HttpClient(_handler, disposeHandler: false) { Timeout = System.Threading.Timeout.InfiniteTimeSpan };
 
@@ -208,13 +215,17 @@ public sealed class ShareClient(HttpMessageHandler handler, Uri endpoint)
 
             if ((int)response.StatusCode is >= 300 and < 400)
             {
-                return (response.StatusCode, [], ShareFailure.Protocol);
+                return (response.StatusCode, [], ShareFailure.Protocol, false);
             }
 
             if (response.Content.Headers.ContentLength > MaximumResponseBytes)
             {
-                return (response.StatusCode, [], ShareFailure.Protocol);
+                return (response.StatusCode, [], ShareFailure.Protocol, false);
             }
+
+            var gone = response.StatusCode == HttpStatusCode.NotFound
+                && response.Headers.TryGetValues(GoneHeader, out var marks)
+                && marks.Contains(GoneMark, StringComparer.Ordinal);
 
             var stream = await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false);
             await using (stream.ConfigureAwait(false))
@@ -228,14 +239,14 @@ public sealed class ShareClient(HttpMessageHandler handler, Uri endpoint)
                 }
 
                 return read > MaximumResponseBytes
-                    ? (response.StatusCode, [], ShareFailure.Protocol)
-                    : (response.StatusCode, body[..read], ShareFailure.None);
+                    ? (response.StatusCode, [], ShareFailure.Protocol, false)
+                    : (response.StatusCode, body[..read], ShareFailure.None, gone);
             }
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException
                                        || (ex is OperationCanceledException && !ct.IsCancellationRequested))
         {
-            return (default, [], ShareFailure.Network);
+            return (default, [], ShareFailure.Network, false);
         }
     }
 
