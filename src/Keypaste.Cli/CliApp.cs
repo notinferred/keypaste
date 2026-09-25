@@ -123,6 +123,9 @@ internal static class CliApp
             case "mcp":
                 return McpCommand.Execute(args, context);
 
+            case "share":
+                return ShareCommand.Execute(args, context);
+
             case "hello":
                 context.Stdout.WriteLine(CoreInfo.Hello());
                 return ExitSuccess;

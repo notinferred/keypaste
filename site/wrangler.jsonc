@@ -7,12 +7,24 @@
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "directory": "./public",
+    // The share viewer is served through the Worker so it answers 404 until SHARE_ENABLED is set.
+    "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",
     // Assets win by default, so the Worker would already see /subscribe - nothing is served from
     // that path. Stated anyway: relying on "there happens to be no file there" is not a routing
     // rule, and this removes the question of how the asset router answers a POST.
-    "run_worker_first": ["/subscribe"]
+    "run_worker_first": ["/subscribe", "/api/*", "/s/*"]
   },
+  // Deletes spent and expired shares. The SHARE_DB Hyperdrive binding is added after the founder
+  // provisions it (site/README.md); without it this sweeps nothing.
+  "triggers": {
+    "crons": ["*/30 * * * *"]
+  },
+  // Capacity, not secrecy: a missing binding means no limit. Keyed by cf-connecting-ip in memory.
+  "ratelimits": [
+    { "name": "SHARE_CREATE_LIMIT", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } },
+    { "name": "SHARE_OPEN_LIMIT", "namespace_id": "1002", "simple": { "limit": 30, "period": 60 } }
+  ],
   "hyperdrive": [
     {
       // Created by hand with `wrangler hyperdrive create` - see site/README.md. The id is an
