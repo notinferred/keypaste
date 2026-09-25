@@ -48,6 +48,7 @@ public sealed class ScreenRenderer
         using var demo = new DemoVault();
         DrawUnlock(demo, output!);
         DrawShell(demo, output!);
+        DrawEnv(demo, output!);
         DrawApproval(output!);
         DrawComponents(output!);
         DrawSecrets(demo, output!);
@@ -194,12 +195,6 @@ public sealed class ScreenRenderer
         using (var vault = Vault.Open(demo.Path, _master))
         {
             vault.UpdateEntry(new VaultEntry { Title = "github", Username = "maya@acme.dev", Password = "demo-gh-rotated-9Qk", Url = "https://github.com", Notes = "Recovery codes are in the safe.", GroupPath = "Work" });
-
-            foreach (var key in new[] { "DATABASE_URL", "STRIPE_SECRET_KEY", "OPENAI_API_KEY" })
-            {
-                vault.AddEntry(new VaultEntry { Title = key, Password = "demo-staging-" + key.ToLowerInvariant(), GroupPath = "env/acme-api/staging" });
-                vault.AddEntry(new VaultEntry { Title = key, Password = "demo-prod-" + key.ToLowerInvariant(), GroupPath = "env/acme-api/prod" });
-            }
 
             vault.Save();
         }
@@ -433,6 +428,51 @@ public sealed class ScreenRenderer
         window.Close();
     }
 
+    /// <summary>Env profiles in its own shell, with a file picker so Import and Export draw enabled.</summary>
+    private static void DrawEnv(DemoVault demo, string output)
+    {
+        using var session = new AppVaultSession(new ManualClock());
+
+        using (var master = TempVault.Secret(_master))
+        {
+            Assert.Equal(UnlockOutcome.Opened, session.TryUnlock(demo.Path, master.Value));
+        }
+
+        using var shell = new ShellViewModel(session, demo.Home, null, clipboard: new FakeClipboard(), clock: new ManualClock(), picker: new FakeVaultFilePicker());
+        var window = new MainWindow { Width = _width, Height = 1000 };
+        window.FindControl<ContentControl>("Root")!.Content = new ShellView { DataContext = shell };
+        window.Show();
+
+        shell.Current = Destinations.Of(DestinationKind.EnvSets);
+        var project = Assert.IsType<EnvSetsViewModel>(shell.Content).OpenProject!;
+        project.SelectedProfile = "staging";
+        Save(window, output, "40-env-staging");
+
+        Hold(window, "REDIS_URL", () => Save(window, output, "42-env-held"));
+
+        Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+        Save(window, output, "43-env-light");
+        Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
+
+        window.Width = 960;
+        Save(window, output, "44-env-narrow");
+        Hold(window, "DATABASE_URL", () => Save(window, output, "45-env-narrow-held"));
+        window.Width = _width;
+
+        project.BeginAddCommand.Execute(null);
+        Save(window, output, "41-env-add");
+
+        window.Close();
+
+        static void Hold(Window window, string key, Action draw)
+        {
+            var cell = window.GetVisualDescendants().OfType<RevealedValue>().Single(value => value.DataContext is EnvVariableRow row && row.Key == key);
+            cell.BeginReveal();
+            draw();
+            cell.EndReveal();
+        }
+    }
+
     private static void DrawApproval(string output)
     {
         var prompt = ApprovalPrompt.For(
@@ -596,6 +636,30 @@ public sealed class ScreenRenderer
             foreach (var key in new[] { "NEXT_PUBLIC_API", "VERCEL_TOKEN" })
             {
                 vault.AddEntry(new VaultEntry { Title = key, Password = "demo-" + key.ToLowerInvariant(), GroupPath = "env/acme-web" });
+            }
+
+            // Env profiles: staging and prod beside the flat dev set, with every state the matrix draws:
+            // an expired staging key, a staging value reused from dev, and a key prod lacks.
+            foreach (var key in new[] { "DATABASE_URL", "STRIPE_SECRET_KEY", "OPENAI_API_KEY", "REDIS_URL", "JWT_SIGNING_KEY", "SENTRY_DSN" })
+            {
+                vault.AddEntry(new VaultEntry
+                {
+                    Title = key,
+                    Password = key switch
+                    {
+                        "REDIS_URL" => "demo-redis_url",
+                        "DATABASE_URL" => "postgres://api:demo-staging-pass@db.staging.acme.internal:5432/api",
+                        _ => "demo-staging-" + key.ToLowerInvariant(),
+                    },
+                    GroupPath = "env/acme-api/staging",
+                });
+            }
+
+            vault.SetExpiryUnchecked(new EntryName("env/acme-api/staging", "OPENAI_API_KEY"), new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero));
+
+            foreach (var key in new[] { "DATABASE_URL", "STRIPE_SECRET_KEY", "REDIS_URL", "JWT_SIGNING_KEY", "SENTRY_DSN" })
+            {
+                vault.AddEntry(new VaultEntry { Title = key, Password = "demo-prod-" + key.ToLowerInvariant(), GroupPath = "env/acme-api/prod" });
             }
 
             vault.Save();

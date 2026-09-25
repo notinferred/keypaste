@@ -68,7 +68,7 @@ internal static class Destinations
         new(DestinationKind.Entries, "Secrets", "vault", OwnsHeader: true),
         new(DestinationKind.AgentActivity, "Agents", "bot", OwnsHeader: true),
         new(DestinationKind.Log, "Activity", "activity", OwnsHeader: true),
-        new(DestinationKind.EnvSets, "Env profiles", "layers"),
+        new(DestinationKind.EnvSets, "Env profiles", "layers", OwnsHeader: true),
         new(DestinationKind.Settings, "Settings", "settings", DestinationPlacement.Footer),
         new(DestinationKind.Trash, "Trash", "trash-2", DestinationPlacement.Footer),
     ];

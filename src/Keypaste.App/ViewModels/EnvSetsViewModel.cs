@@ -26,6 +26,7 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
     private readonly ClipboardCountdown _clipboard;
     private readonly IVaultFilePicker? _picker;
     private readonly ProjectLaunching _launching;
+    private readonly Action<string>? _toast;
 
     private IReadOnlyList<string> _projectNames = [];
     private EnvProjectViewModel? _open;
@@ -38,7 +39,8 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
         AppVaultSession session,
         ClipboardCountdown clipboard,
         IVaultFilePicker? picker = null,
-        ProjectLaunching? launching = null)
+        ProjectLaunching? launching = null,
+        Action<string>? toast = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(clipboard);
@@ -47,6 +49,7 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
         _clipboard = clipboard;
         _picker = picker;
         _launching = launching ?? ProjectLaunching.ForThisMachine();
+        _toast = toast;
 
         OpenCommand = new RelayCommand<string>(Open);
         CopyRunCommandCommand = new RelayCommand<string>(
@@ -68,11 +71,32 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
             if (Set(ref _projectNames, value))
             {
                 Raise(nameof(HasProjects));
+                Raise(nameof(IsEmpty));
+                Raise(nameof(ProjectChoices));
             }
         }
     }
 
     internal bool HasProjects => _projectNames.Count > 0;
+
+    /// <summary>What the header's project picker offers: every project, and the open one while it has no variable yet.</summary>
+    internal IReadOnlyList<string> ProjectChoices =>
+        _open is { } open && !_projectNames.Contains(open.Name, StringComparer.Ordinal)
+            ? [.. _projectNames, open.Name]
+            : _projectNames;
+
+    /// <summary>The open project's name; setting it opens that project.</summary>
+    internal string? SelectedProject
+    {
+        get => _open?.Name;
+        set
+        {
+            if (value is not null && !string.Equals(value, _open?.Name, StringComparison.Ordinal))
+            {
+                Open(value);
+            }
+        }
+    }
 
     /// <summary>The project whose table is showing, or null.</summary>
     internal EnvProjectViewModel? OpenProject
@@ -88,11 +112,17 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
                 // vault, and leaving it alive would keep both after the card was closed.
                 previous?.Dispose();
                 Raise(nameof(HasOpenProject));
+                Raise(nameof(IsEmpty));
+                Raise(nameof(ProjectChoices));
+                Raise(nameof(SelectedProject));
             }
         }
     }
 
     internal bool HasOpenProject => _open is not null;
+
+    /// <summary>Whether there is no project to show, open or in the vault.</summary>
+    internal bool IsEmpty => !HasProjects && !HasOpenProject;
 
     /// <summary>A calm sentence when something did not work, or null.</summary>
     internal string? Error
@@ -184,6 +214,12 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
         {
             OpenProject = null;
         }
+
+        // The screen always shows a project, as the design does; the first one until another is chosen.
+        if (OpenProject is null && Projects.Count > 0)
+        {
+            Open(Projects[0]);
+        }
     }
 
     /// <summary>How many variables a project holds, without opening it.</summary>
@@ -234,10 +270,22 @@ internal sealed class EnvSetsViewModel : ObservableObject, IDisposable
                 _clipboard,
                 project,
                 message => Error = message,
-                outcome => Notice = outcome,
+                Announce,
                 _picker,
                 _launching,
                 Reload);
+    }
+
+    private void Announce(string? outcome)
+    {
+        if (_toast is null)
+        {
+            Notice = outcome;
+        }
+        else if (!string.IsNullOrWhiteSpace(outcome))
+        {
+            _toast(outcome);
+        }
     }
 
     private void BeginAdd()

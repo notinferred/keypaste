@@ -83,6 +83,21 @@ internal sealed class StorageProviderPicker(TopLevel top) : IVaultFilePicker
         return picked.Count > 0 ? picked[0].TryGetLocalPath() : null;
     }
 
+    public async Task<string?> PickReferenceFileAsync(string suggestedName, string? directory)
+    {
+        var start = directory is null ? null : await top.StorageProvider.TryGetFolderFromPathAsync(directory).ConfigureAwait(true);
+
+        var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Export .env.keypaste",
+            SuggestedFileName = suggestedName,
+            SuggestedStartLocation = start,
+            ShowOverwritePrompt = true,
+        }).ConfigureAwait(true);
+
+        return file?.TryGetLocalPath();
+    }
+
     public async Task<string?> PickFolderAsync()
     {
         var picked = await top.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions

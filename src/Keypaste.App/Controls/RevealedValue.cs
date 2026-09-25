@@ -4,6 +4,7 @@ using Avalonia.Automation.Peers;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.VisualTree;
 using Keypaste.App.ViewModels;
 
 namespace Keypaste.App.Controls;
@@ -68,11 +69,18 @@ internal sealed class RevealedValue : Control
     internal static readonly StyledProperty<IBrush?> ForegroundProperty =
         AvaloniaProperty.Register<RevealedValue, IBrush?>(nameof(Foreground));
 
+    /// <summary>What a held value is drawn on, covering whatever sits under the control; none by default.</summary>
+    internal static readonly StyledProperty<IBrush?> RevealBackgroundProperty =
+        AvaloniaProperty.Register<RevealedValue, IBrush?>(nameof(RevealBackground));
+
+    private const double _revealInset = 6;
+    private const double _revealEdge = 16;
+
     private string? _shown;
 
     static RevealedValue()
     {
-        AffectsRender<RevealedValue>(MaskedLengthProperty, FontFamilyProperty, FontSizeProperty, ForegroundProperty);
+        AffectsRender<RevealedValue>(MaskedLengthProperty, FontFamilyProperty, FontSizeProperty, ForegroundProperty, RevealBackgroundProperty);
         AffectsMeasure<RevealedValue>(MaskedLengthProperty, FontFamilyProperty, FontSizeProperty);
     }
 
@@ -104,6 +112,12 @@ internal sealed class RevealedValue : Control
     {
         get => GetValue(ForegroundProperty);
         set => SetValue(ForegroundProperty, value);
+    }
+
+    internal IBrush? RevealBackground
+    {
+        get => GetValue(RevealBackgroundProperty);
+        set => SetValue(RevealBackgroundProperty, value);
     }
 
     /// <summary>Whether a value is on screen right now.</summary>
@@ -184,7 +198,58 @@ internal sealed class RevealedValue : Control
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        context.DrawText(Layout(), default);
+        // Hit testing follows what is drawn, so the whole cell is the hold target and not only the dots.
+        var bounds = new Rect(Bounds.Size);
+        context.FillRectangle(Brushes.Transparent, bounds);
+        var text = Layout();
+
+        if (_shown is null)
+        {
+            context.DrawText(text, default);
+            return;
+        }
+
+        // A held value may run on over whatever lies to its right, on its own face, as far as the
+        // clipping ancestor allows; past that it is cut with an ellipsis.
+        var room = Room(bounds.Width);
+
+        if (text.WidthIncludingTrailingWhitespace > room + 1)
+        {
+            text.MaxLineCount = 1;
+            text.MaxTextWidth = room;
+            text.Trimming = TextTrimming.CharacterEllipsis;
+        }
+
+        var width = Math.Max(bounds.Width, Math.Min(room, text.WidthIncludingTrailingWhitespace + _revealInset));
+        var face = new Rect(-_revealInset, -2, width + _revealInset, bounds.Height + 4);
+
+        using (context.PushClip(face))
+        {
+            if (RevealBackground is { } background)
+            {
+                context.DrawRectangle(background, null, face, 4, 4);
+            }
+
+            context.DrawText(text, default);
+        }
+    }
+
+    /// <summary>How wide a held value may be drawn: the control's own width, or with a face, up to the clipping ancestor's edge.</summary>
+    private double Room(double own)
+    {
+        if (RevealBackground is null)
+        {
+            return Math.Max(0, own);
+        }
+
+        var clip = this.GetVisualAncestors().FirstOrDefault(ancestor => ancestor.ClipToBounds);
+
+        if (clip is null || this.TranslatePoint(default, clip) is not { } origin)
+        {
+            return Math.Max(0, own);
+        }
+
+        return Math.Max(own, clip.Bounds.Width - origin.X - _revealEdge);
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
