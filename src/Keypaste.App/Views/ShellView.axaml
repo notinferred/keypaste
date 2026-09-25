@@ -109,6 +109,14 @@
       <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
       <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
     </Style>
+    <!-- A window near its minimum height gives the footer's second MCP line and the gap above the
+         projects to the project rows (ShellView.axaml.cs sets the class). -->
+    <Style Selector=".short TextBlock#McpDetail">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector=".short Grid#ProjectsSection">
+      <Setter Property="Margin" Value="0,8,0,0" />
+    </Style>
   </UserControl.Styles>
 
   <Panel>
@@ -258,7 +266,8 @@
                                  VerticalAlignment="Center" />
                     </StackPanel>
                   </Grid>
-                  <TextBlock Classes="mono muted"
+                  <TextBlock Name="McpDetail"
+                             Classes="mono muted"
                              FontSize="10.5"
                              FontWeight="Normal"
                              Text="{Binding McpDetail}"
@@ -268,64 +277,64 @@
 
             </StackPanel>
 
-            <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-              <StackPanel Spacing="20">
+            <ListBox Name="Nav"
+                     DockPanel.Dock="Top"
+                     Classes="nav"
+                     ItemsSource="{Binding MainNav}"
+                     SelectedItem="{Binding SelectedMain}">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:NavItem">
+                  <Grid ColumnDefinitions="Auto,*,Auto">
+                    <ctl:KpIcon Grid.Column="0" Icon="{Binding Icon}" Size="16" Margin="0,0,10,0" />
+                    <TextBlock Grid.Column="1" Text="{Binding Title}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="2"
+                               Classes="mono sm muted"
+                               Classes.amber="{Binding IsLive}"
+                               Text="{Binding Count}"
+                               VerticalAlignment="Center" />
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
 
-                <ListBox Name="Nav"
-                         Classes="nav"
-                         ItemsSource="{Binding MainNav}"
-                         SelectedItem="{Binding SelectedMain}">
-                  <ListBox.ItemTemplate>
-                    <DataTemplate x:DataType="vm:NavItem">
-                      <Grid ColumnDefinitions="Auto,*,Auto">
-                        <ctl:KpIcon Grid.Column="0" Icon="{Binding Icon}" Size="16" Margin="0,0,10,0" />
-                        <TextBlock Grid.Column="1" Text="{Binding Title}" VerticalAlignment="Center" />
-                        <TextBlock Grid.Column="2"
-                                   Classes="mono sm muted"
-                                   Classes.amber="{Binding IsLive}"
-                                   Text="{Binding Count}"
-                                   VerticalAlignment="Center" />
-                      </Grid>
+            <!-- Only the project rows scroll, so a short window keeps the heading and its first rows in view. -->
+            <Grid Name="ProjectsSection" RowDefinitions="Auto,*" Margin="0,20,0,0" IsVisible="{Binding HasProjects}">
+              <TextBlock Classes="th" Text="PROJECTS" Margin="10,0,10,6" />
+              <ScrollViewer Grid.Row="1"
+                            HorizontalScrollBarVisibility="Disabled"
+                            VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding Projects}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ProjectRow">
+                      <Button Classes="sidebar-row"
+                              Command="{Binding $parent[ItemsControl].((vm:ShellViewModel)DataContext).OpenProjectCommand}"
+                              CommandParameter="{Binding Name}"
+                              ToolTip.Tip="{Binding Name}">
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                          <ctl:KpIcon Grid.Column="0"
+                                      Icon="folder-git-2"
+                                      Size="14"
+                                      Margin="0,0,10,0"
+                                      Foreground="{DynamicResource KpTextMuted}" />
+                          <TextBlock Grid.Column="1"
+                                     Classes="mono"
+                                     FontSize="12"
+                                     FontWeight="Normal"
+                                     Text="{Binding Name}"
+                                     TextTrimming="CharacterEllipsis"
+                                     VerticalAlignment="Center" />
+                          <TextBlock Grid.Column="2"
+                                     Classes="mono sm muted"
+                                     FontWeight="Normal"
+                                     Text="{Binding Count}"
+                                     VerticalAlignment="Center" />
+                        </Grid>
+                      </Button>
                     </DataTemplate>
-                  </ListBox.ItemTemplate>
-                </ListBox>
-
-                <StackPanel Spacing="2" IsVisible="{Binding HasProjects}">
-                  <TextBlock Classes="th" Text="PROJECTS" Margin="10,0,10,6" />
-                  <ItemsControl ItemsSource="{Binding Projects}">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="vm:ProjectRow">
-                        <Button Classes="sidebar-row"
-                                Command="{Binding $parent[ItemsControl].((vm:ShellViewModel)DataContext).OpenProjectCommand}"
-                                CommandParameter="{Binding Name}"
-                                ToolTip.Tip="{Binding Name}">
-                          <Grid ColumnDefinitions="Auto,*,Auto">
-                            <ctl:KpIcon Grid.Column="0"
-                                        Icon="folder-git-2"
-                                        Size="14"
-                                        Margin="0,0,10,0"
-                                        Foreground="{DynamicResource KpTextMuted}" />
-                            <TextBlock Grid.Column="1"
-                                       Classes="mono"
-                                       FontSize="12"
-                                       FontWeight="Normal"
-                                       Text="{Binding Name}"
-                                       TextTrimming="CharacterEllipsis"
-                                       VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="2"
-                                       Classes="mono sm muted"
-                                       FontWeight="Normal"
-                                       Text="{Binding Count}"
-                                       VerticalAlignment="Center" />
-                          </Grid>
-                        </Button>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                </StackPanel>
-
-              </StackPanel>
-            </ScrollViewer>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </Grid>
 
           </DockPanel>
         </Border>

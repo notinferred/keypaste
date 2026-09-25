@@ -348,16 +348,18 @@
                                       <Panel Margin="12,0,0,0" VerticalAlignment="Center" ToolTip.Tip="{Binding Tip}">
                                         <Button Classes="flat cell" Command="{Binding Act}"
                                                 IsHitTestVisible="{Binding ShowsLabel}" Focusable="{Binding ShowsLabel}">
-                                          <Grid ColumnDefinitions="Auto,*">
-                                            <TextBlock Classes="mono"
+                                          <!-- A narrow cell drops the note below the mask rather than cutting it to a stub. -->
+                                          <WrapPanel Orientation="Horizontal">
+                                            <TextBlock Classes="mono" Margin="0,0,8,0"
                                                        Classes.secondary="{Binding IsSet}"
                                                        Classes.danger="{Binding IsMissing}"
                                                        Classes.under="{Binding HasVariable}"
                                                        Text="{Binding Label}" />
-                                            <TextBlock Grid.Column="1" Classes="mono amber" Margin="8,0,0,0"
+                                            <TextBlock Classes="mono amber"
                                                        Text="{Binding Note}" IsVisible="{Binding HasNote}"
+                                                       MaxWidth="{Binding $parent[Button].Bounds.Width}"
                                                        TextTrimming="CharacterEllipsis" />
-                                          </Grid>
+                                          </WrapPanel>
                                         </Button>
                                         <!-- Not a TextBlock: its automation peer would publish the value as the
                                              element's name. RevealedValue draws the characters itself, and takes the

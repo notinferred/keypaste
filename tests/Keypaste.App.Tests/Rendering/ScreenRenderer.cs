@@ -878,6 +878,7 @@ public sealed class ScreenRenderer
             "work laptop");
         var model = new ApprovalViewModel(prompt);
         model.Tick(TimeSpan.FromSeconds(28));
+        model.Arm();
         var window = new ApprovalWindow(model);
         window.Show();
         Save(window, output, name);
