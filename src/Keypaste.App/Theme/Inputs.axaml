@@ -54,8 +54,104 @@
     <Setter Property="FontSize" Value="13" />
   </Style>
 
+  <!-- The design's switch: a 32x18 track, amber when on, with a 14px ink knob and the label to its
+       right. PART_SwitchKnob is the knob's travel, which ToggleSwitch moves PART_MovingKnobs across. -->
   <Style Selector="ToggleSwitch">
     <Setter Property="FontSize" Value="13" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" Background="{TemplateBinding Background}">
+          <Panel Grid.Column="0" Width="32" Height="18" VerticalAlignment="Center">
+            <Border Name="Track" CornerRadius="9" BorderThickness="1" />
+            <Canvas Name="PART_SwitchKnob" Width="14" HorizontalAlignment="Left">
+              <Grid Name="PART_MovingKnobs" Width="18" Height="18">
+                <Ellipse Name="Knob" Width="14" Height="14" />
+              </Grid>
+            </Canvas>
+          </Panel>
+          <ContentPresenter Grid.Column="1"
+                            Name="PART_ContentPresenter"
+                            Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}"
+                            Foreground="{TemplateBinding Foreground}"
+                            VerticalAlignment="Center"
+                            IsVisible="{TemplateBinding Content, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        </Grid>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="ToggleSwitch /template/ Border#Track">
+    <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KpBorderStrong}" />
+  </Style>
+  <Style Selector="ToggleSwitch /template/ Ellipse#Knob">
+    <Setter Property="Fill" Value="{DynamicResource KpTextMuted}" />
+  </Style>
+  <Style Selector="ToggleSwitch:pointerover /template/ Ellipse#Knob">
+    <Setter Property="Fill" Value="{DynamicResource KpTextSecondary}" />
+  </Style>
+  <Style Selector="ToggleSwitch:checked /template/ Border#Track">
+    <Setter Property="Background" Value="{DynamicResource KpAccent}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KpAccent}" />
+  </Style>
+  <Style Selector="ToggleSwitch:checked /template/ Ellipse#Knob">
+    <Setter Property="Fill" Value="{DynamicResource KpOnAccent}" />
+  </Style>
+  <Style Selector="ToggleSwitch:focus-visible /template/ Border#Track">
+    <Setter Property="BorderBrush" Value="{DynamicResource KpFocusRing}" />
+  </Style>
+  <Style Selector="ToggleSwitch:disabled">
+    <Setter Property="Opacity" Value="0.5" />
+  </Style>
+
+  <!-- A choice between options: a 16px ring that turns amber around a 6px amber dot when picked. -->
+  <Style Selector="RadioButton:not(.segment)">
+    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Padding" Value="0,5" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" Background="{TemplateBinding Background}"
+              Margin="{TemplateBinding Padding}">
+          <Panel Grid.Column="0" Width="16" Height="16" VerticalAlignment="Center">
+            <Ellipse Name="Ring" StrokeThickness="1.5" />
+            <Ellipse Name="Dot" Width="6" Height="6" />
+          </Panel>
+          <ContentPresenter Grid.Column="1"
+                            Name="PART_ContentPresenter"
+                            Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}"
+                            Foreground="{TemplateBinding Foreground}"
+                            VerticalAlignment="Center" />
+        </Grid>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="RadioButton:not(.segment) /template/ Ellipse#Ring">
+    <Setter Property="Stroke" Value="{DynamicResource KpBorderStrong}" />
+    <Setter Property="Fill" Value="{DynamicResource KpBgApp}" />
+  </Style>
+  <Style Selector="RadioButton:not(.segment) /template/ Ellipse#Dot">
+    <Setter Property="Fill" Value="Transparent" />
+  </Style>
+  <Style Selector="RadioButton:not(.segment):pointerover /template/ Ellipse#Ring">
+    <Setter Property="Stroke" Value="{DynamicResource KpTextMuted}" />
+  </Style>
+  <Style Selector="RadioButton:not(.segment):checked /template/ Ellipse#Ring">
+    <Setter Property="Stroke" Value="{DynamicResource KpAccent}" />
+  </Style>
+  <Style Selector="RadioButton:not(.segment):checked /template/ Ellipse#Dot">
+    <Setter Property="Fill" Value="{DynamicResource KpAccent}" />
+  </Style>
+  <Style Selector="RadioButton:not(.segment):focus-visible /template/ Ellipse#Ring">
+    <Setter Property="Stroke" Value="{DynamicResource KpFocusRing}" />
+  </Style>
+  <Style Selector="RadioButton:not(.segment):disabled">
+    <Setter Property="Opacity" Value="0.5" />
   </Style>
 
   <!-- Segmented control -->

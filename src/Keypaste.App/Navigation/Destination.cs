@@ -73,8 +73,8 @@ internal static class Destinations
         new(DestinationKind.Log, "Activity", "activity", OwnsHeader: true),
         new(DestinationKind.EnvSets, "Env profiles", "layers", OwnsHeader: true),
         new(DestinationKind.Sharing, "Sharing", "link", OwnsHeader: true),
-        new(DestinationKind.Settings, "Settings", "settings", DestinationPlacement.Footer),
-        new(DestinationKind.Trash, "Trash", "trash-2", DestinationPlacement.Footer),
+        new(DestinationKind.Settings, "Settings", "settings", DestinationPlacement.Footer, OwnsHeader: true),
+        new(DestinationKind.Trash, "Trash", "trash-2", DestinationPlacement.Footer, OwnsHeader: true),
     ];
 
     internal static IReadOnlyList<Destination> Main { get; } =

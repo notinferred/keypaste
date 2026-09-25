@@ -5,186 +5,326 @@
              x:Class="Keypaste.App.Views.SettingsView"
              x:DataType="vm:SettingsViewModel">
 
-  <ScrollViewer>
-    <StackPanel Spacing="28" MaxWidth="560" HorizontalAlignment="Left">
+  <UserControl.Styles>
+    <!-- A settings card: a heading, then rows split by hairlines. -->
+    <Style Selector="Border.settings">
+      <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style Selector="Border.settings-head">
+      <Setter Property="Padding" Value="20,16,20,4" />
+    </Style>
+    <Style Selector="Border.settings-row">
+      <Setter Property="Padding" Value="20,14" />
+    </Style>
+    <Style Selector="Border.settings-row:nth-child(n+3)">
+      <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
+      <Setter Property="BorderThickness" Value="0,1,0,0" />
+    </Style>
+    <Style Selector="TextBlock.row-label">
+      <Setter Property="FontSize" Value="13.5" />
+      <Setter Property="FontWeight" Value="Medium" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+    </Style>
+    <Style Selector="TextBlock.caption">
+      <Setter Property="FontSize" Value="12.5" />
+      <Setter Property="LineHeight" Value="18.75" />
+    </Style>
+    <Style Selector="TextBlock.fact">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+    </Style>
+    <Style Selector="SelectableTextBlock.fact-value">
+      <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
+    </Style>
+    <!-- Choices read at the size of the row labels they sit under. -->
+    <Style Selector="RadioButton, CheckBox">
+      <Setter Property="FontSize" Value="13.5" />
+    </Style>
+  </UserControl.Styles>
 
-      <StackPanel Spacing="6">
-        <TextBlock Text="Lock the vault after" Foreground="{DynamicResource KpTextPrimary}" />
-        <ComboBox ItemsSource="{Binding IdleChoices}"
-                  SelectedItem="{Binding Idle}"
-                  MinWidth="200">
-          <ComboBox.ItemTemplate>
-            <DataTemplate x:DataType="vm:IdleChoice">
-              <TextBlock Text="{Binding Label}" />
-            </DataTemplate>
-          </ComboBox.ItemTemplate>
-        </ComboBox>
-        <TextBlock TextWrapping="Wrap"
-                   FontSize="12"
-                   Foreground="{DynamicResource KpTextMuted}"
-                   Text="Counted from the last key or click. A machine that sleeps for longer than this wakes locked. Ctrl+L locks now." />
+  <DockPanel>
+
+    <!-- What the last action did, kept in view wherever the page is scrolled to. -->
+    <Border DockPanel.Dock="Bottom"
+            IsVisible="{Binding HasMessage}"
+            BorderBrush="{DynamicResource KpBorderSubtle}"
+            BorderThickness="0,1,0,0"
+            Background="{DynamicResource KpBgPanel}"
+            Padding="32,12">
+      <StackPanel Orientation="Horizontal" Spacing="10">
+        <ctl:KpIcon Icon="info" Size="14" Foreground="{DynamicResource KpTextMuted}" />
+        <TextBlock Text="{Binding Message}" TextWrapping="Wrap" FontSize="12.5" VerticalAlignment="Center"
+                   Foreground="{DynamicResource KpTextSecondary}" />
       </StackPanel>
+    </Border>
 
-      <StackPanel Spacing="6">
-        <TextBlock Text="Theme" Foreground="{DynamicResource KpTextPrimary}" />
-        <ComboBox ItemsSource="{Binding Themes}" SelectedItem="{Binding Theme}" MinWidth="200" />
-      </StackPanel>
+    <ScrollViewer>
+      <StackPanel Margin="{DynamicResource KpScreenPadding}" Spacing="20" MaxWidth="760" HorizontalAlignment="Left">
 
-      <StackPanel Spacing="6" IsVisible="{Binding MinimizeLockSupported}">
-        <CheckBox Content="Lock when the window is minimized"
-                  IsChecked="{Binding LockWhenMinimized}" />
-        <TextBlock TextWrapping="Wrap"
-                   FontSize="12"
-                   Foreground="{DynamicResource KpTextMuted}"
-                   Text="Takes effect at once, and at every launch. Switching to another window is not minimizing and still does not lock; on macOS, hiding the app with Cmd+H is not minimizing either." />
-      </StackPanel>
-
-      <StackPanel Spacing="8">
-        <TextBlock Text="Recent vaults" Foreground="{DynamicResource KpTextPrimary}" />
-        <TextBlock TextWrapping="Wrap"
-                   FontSize="12"
-                   Foreground="{DynamicResource KpTextMuted}"
-                   Text="keypaste remembers the paths of vaults you have opened on this machine, and where the keyfile each one opened with is. It holds no entry names, no secrets and no key material." />
-        <Button Content="Forget them all" Command="{Binding ForgetAllCommand}" HorizontalAlignment="Left" />
-      </StackPanel>
-
-      <!-- What unlocks the vault. Every password field here is a MaskedInput held to D-0099. -->
-      <StackPanel Spacing="8" DataContext="{Binding Access}" x:DataType="vm:VaultAccessViewModel">
-        <TextBlock Text="Master password and keyfile" Foreground="{DynamicResource KpTextPrimary}" />
-        <TextBlock Name="AccessFactors"
-                   TextWrapping="Wrap"
-                   FontSize="12"
-                   Foreground="{DynamicResource KpTextSecondary}"
-                   Text="{Binding Factors}" />
-
-        <ctl:MaskedInput x:Name="CurrentPassword"
-                         MaskedLength="{Binding CurrentMaskedLength}"
-                         Placeholder="Current master password"
-                         IsEnabled="{Binding IsEditing}" />
-
-        <CheckBox Content="Set a new master password"
-                  IsChecked="{Binding SetPassword}"
-                  IsEnabled="{Binding IsEditing}" />
-        <StackPanel Spacing="8" IsVisible="{Binding SetPassword}">
-          <ctl:MaskedInput x:Name="AccessNewPassword"
-                           MaskedLength="{Binding NewMaskedLength}"
-                           Placeholder="New master password"
-                           IsEnabled="{Binding IsEditing}" />
-          <ctl:MaskedInput x:Name="AccessConfirmPassword"
-                           MaskedLength="{Binding ConfirmMaskedLength}"
-                           Placeholder="Confirm new master password"
-                           IsEnabled="{Binding IsEditing}" />
+        <StackPanel Spacing="6">
+          <TextBlock Classes="h1" Text="Settings" />
+          <TextBlock Classes="subtitle" Text="Saved on this machine, and in force as soon as you change them." />
         </StackPanel>
 
-        <StackPanel Spacing="4" IsEnabled="{Binding IsEditing}">
-          <RadioButton GroupName="Keyfile" Content="Keep the keyfile as it is" IsChecked="{Binding KeepKeyfile}" />
-          <RadioButton GroupName="Keyfile" Content="{Binding AttachLabel}" IsChecked="{Binding AttachKeyfile}" />
-          <StackPanel Orientation="Horizontal" Spacing="8" Margin="28,0,0,0" IsVisible="{Binding AttachKeyfile}">
-            <Button Content="Choose keyfile…" Command="{Binding ChooseKeyfileCommand}" />
-            <TextBlock Text="{Binding NewKeyfileName}" VerticalAlignment="Center"
-                       ToolTip.Tip="{Binding NewKeyfilePath}"
-                       Foreground="{DynamicResource KpTextSecondary}" />
-          </StackPanel>
-          <RadioButton GroupName="Keyfile" Content="Stop using a keyfile"
-                       IsVisible="{Binding HasKeyfile}"
-                       IsChecked="{Binding RemoveKeyfile}" />
-        </StackPanel>
-
-        <Button Content="Change…" Command="{Binding ReviewCommand}" HorizontalAlignment="Left"
-                IsVisible="{Binding IsEditing}" />
-
-        <Border IsVisible="{Binding IsConfirming}"
-                BorderBrush="{DynamicResource KpDanger}"
-                BorderThickness="1"
-                CornerRadius="{DynamicResource KpRadiusSm}"
-                Padding="12">
-          <StackPanel Spacing="8">
-            <TextBlock Text="{Binding Summary}" TextWrapping="Wrap"
-                       Foreground="{DynamicResource KpTextPrimary}" />
-            <TextBlock Text="{Binding BackupCost}" TextWrapping="Wrap"
-                       FontSize="12"
-                       Foreground="{DynamicResource KpTextSecondary}" />
-            <TextBlock Text="{Binding KeyfileWarning}" TextWrapping="Wrap"
-                       IsVisible="{Binding HasKeyfileWarning}"
-                       FontSize="12"
-                       Foreground="{DynamicResource KpTextSecondary}" />
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <Button Content="Change access" Command="{Binding ConfirmCommand}"
-                      Foreground="{DynamicResource KpDanger}" />
-              <Button Content="Leave access as it is" Command="{Binding CancelCommand}" />
-            </StackPanel>
+        <!-- Security -->
+        <Border Classes="card filled settings">
+          <StackPanel>
+            <Border Classes="settings-head">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <ctl:KpIcon Icon="shield" Size="16" Foreground="{DynamicResource KpTextMuted}" />
+                <TextBlock Classes="section" Text="Security" />
+              </StackPanel>
+            </Border>
+            <Border Classes="settings-row">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
+                <StackPanel Grid.Column="0" Spacing="4">
+                  <TextBlock Classes="row-label" Text="Lock the vault after" />
+                  <TextBlock Classes="caption"
+                             Text="Counted from the last key or click. A machine that sleeps for longer than this wakes locked. Ctrl+L locks now." />
+                </StackPanel>
+                <ComboBox Grid.Column="1"
+                          ItemsSource="{Binding IdleChoices}"
+                          SelectedItem="{Binding Idle}"
+                          MinWidth="160"
+                          VerticalAlignment="Top">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:IdleChoice">
+                      <TextBlock Text="{Binding Label}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+              </Grid>
+            </Border>
+            <Border Classes="settings-row" IsVisible="{Binding MinimizeLockSupported}">
+              <StackPanel Spacing="4">
+                <ToggleSwitch Content="Lock when the window is minimized"
+                              FontWeight="Medium"
+                              FontSize="13.5"
+                              IsChecked="{Binding LockWhenMinimized}" />
+                <TextBlock Classes="caption" Margin="42,0,0,0"
+                           Text="Takes effect at once, and at every launch. Switching to another window is not minimizing and still does not lock; on macOS, hiding the app with Cmd+H is not minimizing either." />
+              </StackPanel>
+            </Border>
           </StackPanel>
         </Border>
 
-        <TextBlock Text="Changing…"
-                   IsVisible="{Binding Busy}"
-                   FontSize="12"
-                   Foreground="{DynamicResource KpTextMuted}" />
-        <TextBlock Name="AccessMessage"
-                   Text="{Binding Message}"
-                   IsVisible="{Binding HasMessage}"
-                   TextWrapping="Wrap"
-                   FontSize="12"
-                   Foreground="{DynamicResource KpTextSecondary}" />
+        <!-- Appearance -->
+        <Border Classes="card filled settings">
+          <StackPanel>
+            <Border Classes="settings-head">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <ctl:KpIcon Icon="sun" Size="16" Foreground="{DynamicResource KpTextMuted}" />
+                <TextBlock Classes="section" Text="Appearance" />
+              </StackPanel>
+            </Border>
+            <Border Classes="settings-row">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
+                <StackPanel Grid.Column="0" Spacing="4">
+                  <TextBlock Classes="row-label" Text="Theme" />
+                  <TextBlock Classes="caption" Text="System follows the operating system's light or dark setting." />
+                </StackPanel>
+                <ListBox Grid.Column="1"
+                         Name="ThemeChoice"
+                         Classes="segmented"
+                         VerticalAlignment="Center"
+                         ItemsSource="{Binding Themes}"
+                         SelectedItem="{Binding Theme}" />
+              </Grid>
+            </Border>
+          </StackPanel>
+        </Border>
+
+        <!-- What unlocks the vault. Every password field here is a MaskedInput held to D-0099. -->
+        <Border Classes="card filled settings" DataContext="{Binding Access}" x:DataType="vm:VaultAccessViewModel">
+          <StackPanel>
+            <Border Classes="settings-head">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <ctl:KpIcon Icon="key-round" Size="16" Foreground="{DynamicResource KpTextMuted}" />
+                <TextBlock Classes="section" Text="Vault access" />
+              </StackPanel>
+            </Border>
+            <Border Classes="settings-row">
+              <StackPanel Spacing="12">
+                <StackPanel Spacing="4">
+                  <TextBlock Classes="row-label" Text="Master password and keyfile" />
+                  <TextBlock Name="AccessFactors" Classes="caption" Text="{Binding Factors}"
+                             Foreground="{DynamicResource KpTextSecondary}" />
+                </StackPanel>
+
+                <StackPanel Spacing="8" MaxWidth="420" HorizontalAlignment="Left" Width="420">
+                  <ctl:MaskedInput x:Name="CurrentPassword"
+                                   MaskedLength="{Binding CurrentMaskedLength}"
+                                   Placeholder="Current master password"
+                                   IsEnabled="{Binding IsEditing}" />
+
+                  <CheckBox Content="Set a new master password"
+                            IsChecked="{Binding SetPassword}"
+                            IsEnabled="{Binding IsEditing}" />
+                  <StackPanel Spacing="8" IsVisible="{Binding SetPassword}">
+                    <ctl:MaskedInput x:Name="AccessNewPassword"
+                                     MaskedLength="{Binding NewMaskedLength}"
+                                     Placeholder="New master password"
+                                     IsEnabled="{Binding IsEditing}" />
+                    <ctl:MaskedInput x:Name="AccessConfirmPassword"
+                                     MaskedLength="{Binding ConfirmMaskedLength}"
+                                     Placeholder="Confirm new master password"
+                                     IsEnabled="{Binding IsEditing}" />
+                  </StackPanel>
+                </StackPanel>
+
+                <StackPanel Spacing="2" IsEnabled="{Binding IsEditing}">
+                  <TextBlock Classes="label" Text="Keyfile" Margin="0,0,0,4" />
+                  <RadioButton GroupName="Keyfile" Content="Keep the keyfile as it is" IsChecked="{Binding KeepKeyfile}" />
+                  <RadioButton GroupName="Keyfile" Content="{Binding AttachLabel}" IsChecked="{Binding AttachKeyfile}" />
+                  <StackPanel Orientation="Horizontal" Spacing="10" Margin="28,4,0,4" IsVisible="{Binding AttachKeyfile}">
+                    <Button Classes="sm" Command="{Binding ChooseKeyfileCommand}">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ctl:KpIcon Icon="file-key" Size="14" />
+                        <TextBlock Text="Choose keyfile…" />
+                      </StackPanel>
+                    </Button>
+                    <TextBlock Classes="mono secondary" Text="{Binding NewKeyfileName}" VerticalAlignment="Center"
+                               ToolTip.Tip="{Binding NewKeyfilePath}" />
+                  </StackPanel>
+                  <RadioButton GroupName="Keyfile" Content="Stop using a keyfile"
+                               IsVisible="{Binding HasKeyfile}"
+                               IsChecked="{Binding RemoveKeyfile}" />
+                </StackPanel>
+
+                <Button Content="Change…" Command="{Binding ReviewCommand}" HorizontalAlignment="Left"
+                        IsVisible="{Binding IsEditing}" />
+
+                <Border IsVisible="{Binding IsConfirming}"
+                        Classes="card"
+                        Background="{DynamicResource KpDangerTint}"
+                        BorderBrush="{DynamicResource KpDanger}">
+                  <StackPanel Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <ctl:KpIcon Icon="alert-triangle" Size="16" Foreground="{DynamicResource KpDanger}" />
+                      <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" FontSize="13" FontWeight="Medium"
+                                 Foreground="{DynamicResource KpTextPrimary}" />
+                    </StackPanel>
+                    <TextBlock Classes="caption" Text="{Binding BackupCost}" Foreground="{DynamicResource KpTextSecondary}" />
+                    <TextBlock Classes="caption" Text="{Binding KeyfileWarning}"
+                               IsVisible="{Binding HasKeyfileWarning}"
+                               Foreground="{DynamicResource KpTextSecondary}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                      <Button Classes="danger" Content="Change access" Command="{Binding ConfirmCommand}" />
+                      <Button Classes="ghost" Content="Leave access as it is" Command="{Binding CancelCommand}" />
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+
+                <TextBlock Classes="caption" Text="Changing…" IsVisible="{Binding Busy}" />
+                <TextBlock Name="AccessMessage"
+                           Classes="caption"
+                           Text="{Binding Message}"
+                           IsVisible="{Binding HasMessage}"
+                           Foreground="{DynamicResource KpTextSecondary}" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </Border>
+
+        <!-- Backups -->
+        <Border Classes="card filled settings">
+          <StackPanel>
+            <Border Classes="settings-head">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <ctl:KpIcon Icon="history" Size="16" Foreground="{DynamicResource KpTextMuted}" />
+                <TextBlock Classes="section" Text="Backups" />
+              </StackPanel>
+            </Border>
+            <Border Classes="settings-row">
+              <StackPanel Spacing="10">
+                <TextBlock Classes="caption" Text="{Binding BackupsRule}" />
+                <Border Classes="field" Padding="12,9">
+                  <SelectableTextBlock Classes="fact-value" Text="{Binding BackupsPath}" VerticalAlignment="Center" />
+                </Border>
+                <TextBlock Name="BackupsSummary"
+                           FontSize="13"
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource KpTextPrimary}"
+                           Text="{Binding BackupsSummary}" />
+                <TextBlock Classes="caption" Text="{Binding RestoreHint}" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </Border>
+
+        <!-- Export -->
+        <Border Classes="card filled settings">
+          <StackPanel>
+            <Border Classes="settings-head">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <ctl:KpIcon Icon="download" Size="16" Foreground="{DynamicResource KpTextMuted}" />
+                <TextBlock Classes="section" Text="Export" />
+              </StackPanel>
+            </Border>
+            <Border Classes="settings-row">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
+                <TextBlock Grid.Column="0" Classes="caption" Text="{Binding ElsewhereAdvice}" />
+                <Button Grid.Column="1" Command="{Binding ExportCommand}" VerticalAlignment="Top">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ctl:KpIcon Icon="file-lock-2" Size="14" />
+                    <TextBlock Text="Export an encrypted copy…" />
+                  </StackPanel>
+                </Button>
+              </Grid>
+            </Border>
+          </StackPanel>
+        </Border>
+
+        <!-- Recent vaults -->
+        <Border Classes="card filled settings">
+          <StackPanel>
+            <Border Classes="settings-head">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <ctl:KpIcon Icon="folder-open" Size="16" Foreground="{DynamicResource KpTextMuted}" />
+                <TextBlock Classes="section" Text="Recent vaults" />
+              </StackPanel>
+            </Border>
+            <Border Classes="settings-row">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
+                <TextBlock Grid.Column="0" Classes="caption"
+                           Text="keypaste remembers the paths of vaults you have opened on this machine, and where the keyfile each one opened with is. It holds no entry names, no secrets and no key material." />
+                <Button Grid.Column="1" Classes="ghost" Content="Forget them all" Command="{Binding ForgetAllCommand}"
+                        VerticalAlignment="Top" />
+              </Grid>
+            </Border>
+          </StackPanel>
+        </Border>
+
+        <!-- The cheapest support tool this project will ever build: nearly every "it can't find my
+             vault" is answered by showing which paths are actually in use. -->
+        <Border Classes="card filled settings">
+          <StackPanel>
+            <Border Classes="settings-head">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <ctl:KpIcon Icon="bug" Size="16" Foreground="{DynamicResource KpTextMuted}" />
+                <TextBlock Classes="section" Text="Diagnostics" />
+              </StackPanel>
+            </Border>
+            <Border Classes="settings-row">
+              <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="8">
+                <TextBlock Grid.Row="0" Grid.Column="0" Classes="fact" Text="Vault" />
+                <SelectableTextBlock Grid.Row="0" Grid.Column="1" Classes="fact-value" Text="{Binding VaultPath}" />
+                <TextBlock Grid.Row="1" Grid.Column="0" Classes="fact" Text="keypaste home" />
+                <SelectableTextBlock Grid.Row="1" Grid.Column="1" Classes="fact-value" Text="{Binding HomePath}" />
+                <TextBlock Grid.Row="2" Grid.Column="0" Classes="fact" Text="KEYPASTE_HOME" FontFamily="{DynamicResource KpMono}" />
+                <SelectableTextBlock Grid.Row="2" Grid.Column="1" Classes="fact-value" Text="{Binding HomeOverride}" />
+                <TextBlock Grid.Row="3" Grid.Column="0" Classes="fact" Text="Version" />
+                <SelectableTextBlock Grid.Row="3" Grid.Column="1" Classes="fact-value" Text="{Binding Version}" />
+              </Grid>
+            </Border>
+          </StackPanel>
+        </Border>
+
       </StackPanel>
-
-      <StackPanel Spacing="8">
-        <TextBlock Text="Backups and export" Foreground="{DynamicResource KpTextPrimary}" />
-        <TextBlock TextWrapping="Wrap"
-                   FontSize="12"
-                   Foreground="{DynamicResource KpTextMuted}"
-                   Text="{Binding BackupsRule}" />
-        <SelectableTextBlock FontFamily="{DynamicResource KpMono}" FontSize="11"
-                             TextWrapping="Wrap"
-                             Foreground="{DynamicResource KpTextSecondary}"
-                             Text="{Binding BackupsPath}" />
-        <TextBlock Name="BackupsSummary"
-                   TextWrapping="Wrap"
-                   FontSize="12"
-                   Foreground="{DynamicResource KpTextSecondary}"
-                   Text="{Binding BackupsSummary}" />
-        <TextBlock TextWrapping="Wrap"
-                   FontSize="12"
-                   Foreground="{DynamicResource KpTextMuted}"
-                   Text="{Binding RestoreHint}" />
-        <TextBlock TextWrapping="Wrap"
-                   FontSize="12"
-                   Foreground="{DynamicResource KpTextMuted}"
-                   Text="{Binding ElsewhereAdvice}" />
-        <Button Content="Export an encrypted copy…" Command="{Binding ExportCommand}" HorizontalAlignment="Left" />
-      </StackPanel>
-
-      <TextBlock Text="{Binding Message}"
-                 IsVisible="{Binding HasMessage}"
-                 TextWrapping="Wrap"
-                 FontSize="12"
-                 Foreground="{DynamicResource KpTextSecondary}" />
-
-      <!-- The cheapest support tool this project will ever build: nearly every "it can't find my
-           vault" is answered by showing which paths are actually in use. -->
-      <Border Background="{DynamicResource KpSurface2}"
-              BorderBrush="{DynamicResource KpBorderSubtle}"
-              BorderThickness="1"
-              CornerRadius="{DynamicResource KpRadiusSm}"
-              Padding="16">
-        <StackPanel Spacing="6">
-          <TextBlock Text="Where things are" FontSize="12" Foreground="{DynamicResource KpTextSecondary}" />
-          <SelectableTextBlock FontFamily="{DynamicResource KpMono}" FontSize="11"
-                               Foreground="{DynamicResource KpTextMuted}"
-                               Text="{Binding VaultPath, StringFormat='vault          {0}'}" />
-          <SelectableTextBlock FontFamily="{DynamicResource KpMono}" FontSize="11"
-                               Foreground="{DynamicResource KpTextMuted}"
-                               Text="{Binding HomePath, StringFormat='keypaste home  {0}'}" />
-          <SelectableTextBlock FontFamily="{DynamicResource KpMono}" FontSize="11"
-                               Foreground="{DynamicResource KpTextMuted}"
-                               Text="{Binding HomeOverride, StringFormat='KEYPASTE_HOME  {0}'}" />
-          <SelectableTextBlock FontFamily="{DynamicResource KpMono}" FontSize="11"
-                               Foreground="{DynamicResource KpTextMuted}"
-                               Text="{Binding Version, StringFormat='version        {0}'}" />
-        </StackPanel>
-      </Border>
-
-    </StackPanel>
-  </ScrollViewer>
+    </ScrollViewer>
+  </DockPanel>
 
 </UserControl>

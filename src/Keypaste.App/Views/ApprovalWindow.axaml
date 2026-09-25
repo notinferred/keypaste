@@ -1,105 +1,106 @@
-<Window xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:vm="using:Keypaste.App.ViewModels"
-        x:Class="Keypaste.App.Views.ApprovalWindow"
-        x:DataType="vm:ApprovalViewModel"
-        Icon="avares://keypaste-app/Assets/keypaste.ico"
-        Title="keypaste: an agent is asking for a credential"
-        Width="520" Height="500"
-        MinWidth="520" MaxWidth="520" MinHeight="500" MaxHeight="500"
-        CanResize="False"
-        SizeToContent="Manual"
-        Topmost="True"
-        WindowStartupLocation="CenterScreen"
-        Background="{DynamicResource KpSurface0}">
+<views:PromptWindow xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:vm="using:Keypaste.App.ViewModels"
+                    xmlns:views="using:Keypaste.App.Views"
+                    xmlns:ctl="using:Keypaste.App.Controls"
+                    x:Class="Keypaste.App.Views.ApprovalWindow"
+                    x:DataType="vm:ApprovalViewModel"
+                    Icon="avares://keypaste-app/Assets/keypaste.ico"
+                    Title="keypaste: an agent is asking for a credential"
+                    Width="508"
+                    SizeToContent="Height"
+                    CanResize="False"
+                    WindowDecorations="None"
+                    TransparencyLevelHint="Transparent"
+                    Background="Transparent"
+                    Topmost="True"
+                    WindowStartupLocation="CenterScreen">
 
-  <!-- Every row has a fixed height, so nothing the agent writes can move the question, the entry or
+  <Window.Styles>
+    <StyleInclude Source="avares://keypaste-app/Views/PromptStyles.axaml" />
+  </Window.Styles>
+
+  <!-- Every block has a fixed height, so nothing the agent writes can move the question, the entry or
        the buttons (THREATS.md T-2). The reason is one plain TextBlock in a box that scrolls, and no
        button is the default: Enter approves nothing, and Escape denies. -->
 
-  <Grid RowDefinitions="36,150,40,24,*,40,56" Margin="24">
+  <Border Classes="prompt">
+    <StackPanel Spacing="16">
 
-    <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
-      <TextBlock Grid.Column="0"
-                 Text="An agent is asking for a credential"
-                 FontSize="18"
-                 Foreground="{DynamicResource KpTextPrimary}" />
-      <TextBlock Grid.Column="1"
-                 Name="CountdownText"
-                 Text="{Binding Countdown}"
-                 FontFamily="{DynamicResource KpMono}"
-                 Foreground="{DynamicResource KpTextMuted}" />
-    </Grid>
+      <Grid Classes="prompt-head" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+        <Border Grid.Column="0" Classes="prompt-tile">
+          <ctl:KpIcon Icon="bot" Size="18" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
+        </Border>
+        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+          <Grid ColumnDefinitions="Auto,Auto">
+            <TextBlock Grid.Column="0" Name="ClientText" Classes="prompt-title" Text="{Binding Client}"
+                       MaxWidth="220" TextTrimming="CharacterEllipsis" />
+            <TextBlock Grid.Column="1" Classes="prompt-title" Text=" wants 1 secret" />
+          </Grid>
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Classes="prompt-sub" Text="via MCP · label " />
+            <TextBlock Name="LabelText" Classes="prompt-sub" Text="{Binding Label}"
+                       MaxWidth="200" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </StackPanel>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <Border Classes="dot waiting" />
+          <TextBlock Name="CountdownText" Classes="prompt-countdown" Text="{Binding Countdown}" />
+        </StackPanel>
+      </Grid>
 
-    <Grid Grid.Row="1" ColumnDefinitions="110,*" RowDefinitions="30,30,30,30,30">
-      <TextBlock Grid.Row="0" Grid.Column="0" Text="Requested by" Foreground="{DynamicResource KpTextMuted}" />
-      <TextBlock Grid.Row="0" Grid.Column="1" Name="ClientText" Text="{Binding Client}" TextTrimming="CharacterEllipsis"
-                 Foreground="{DynamicResource KpTextPrimary}" />
-      <TextBlock Grid.Row="1" Grid.Column="0" Text="Client label" Foreground="{DynamicResource KpTextMuted}" />
-      <TextBlock Grid.Row="1" Grid.Column="1" Name="LabelText" Text="{Binding Label}" TextTrimming="CharacterEllipsis"
-                 Foreground="{DynamicResource KpTextPrimary}" />
-      <TextBlock Grid.Row="2" Grid.Column="0" Text="Entry" Foreground="{DynamicResource KpTextMuted}" />
-      <TextBlock Grid.Row="2" Grid.Column="1" Name="EntryText" Text="{Binding Entry}" TextTrimming="CharacterEllipsis"
-                 FontFamily="{DynamicResource KpMono}"
-                 Foreground="{DynamicResource KpTextPrimary}" />
-      <TextBlock Grid.Row="3" Grid.Column="0" Text="Field" Foreground="{DynamicResource KpTextMuted}" />
-      <TextBlock Grid.Row="3" Grid.Column="1" Name="FieldText" Text="{Binding Field}"
-                 Foreground="{DynamicResource KpTextPrimary}" />
-      <TextBlock Grid.Row="4" Grid.Column="0" Text="For" Foreground="{DynamicResource KpTextMuted}" />
-      <TextBlock Grid.Row="4" Grid.Column="1" Name="LifetimeText" Text="{Binding Lifetime}"
-                 Foreground="{DynamicResource KpTextPrimary}" />
-    </Grid>
+      <Border Classes="prompt-call" Padding="12,10">
+        <StackPanel>
+          <TextBlock Text="tool: keypaste.request_credential" />
+          <TextBlock Name="EntryText" Classes="value" Text="{Binding Entry}" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+      </Border>
 
-    <TextBlock Grid.Row="2"
-               Name="ScrubbedText"
-               Text="{Binding Scrubbed}"
-               TextWrapping="Wrap"
-               FontSize="12"
-               Foreground="{DynamicResource KpTextSecondary}" />
+      <StackPanel Spacing="8">
+        <Border Classes="prompt-list">
+          <Grid ColumnDefinitions="*,Auto" Height="36" Margin="12,0">
+            <TextBlock Grid.Column="0" Name="FieldText" Text="{Binding Field}" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Classes="tag" Text="value goes to the agent" VerticalAlignment="Center" />
+          </Grid>
+        </Border>
+        <StackPanel Orientation="Horizontal">
+          <TextBlock Classes="prompt-note" TextWrapping="NoWrap" Text="You can allow it " />
+          <TextBlock Name="LifetimeText" Classes="prompt-note" TextWrapping="NoWrap" Text="{Binding Lifetime}"
+                     Foreground="{DynamicResource KpTextSecondary}" />
+        </StackPanel>
+      </StackPanel>
 
-    <TextBlock Grid.Row="3"
-               Text="The agent says it needs this because:"
-               Foreground="{DynamicResource KpTextMuted}" />
+      <StackPanel Spacing="6">
+        <TextBlock Classes="caption" Text="The agent says it needs this because" />
+        <Border Classes="prompt-reason" Height="77">
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="12,9">
+            <StackPanel Spacing="6">
+              <TextBlock Name="ScrubbedText" Classes="prompt-scrubbed" Text="{Binding Scrubbed}"
+                         IsVisible="{Binding Scrubbed, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+              <TextBlock Classes="prompt-scrubbed" Text="{Binding Truncation}"
+                         IsVisible="{Binding Truncation, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+              <TextBlock Name="ReasonText" Text="{Binding Reason}" TextWrapping="Wrap" FontSize="13" LineHeight="19.5"
+                         Foreground="{DynamicResource KpTextSecondary}" />
+            </StackPanel>
+          </ScrollViewer>
+        </Border>
+        <TextBlock Classes="caption" Text="{Binding Attribution}" />
+      </StackPanel>
 
-    <Border Grid.Row="4" Theme="{StaticResource KpCard}">
-      <ScrollViewer HorizontalScrollBarVisibility="Disabled"
-                    VerticalScrollBarVisibility="Auto"
-                    Padding="12">
-        <TextBlock Name="ReasonText"
-                   Text="{Binding Reason}"
-                   TextWrapping="Wrap"
-                   Foreground="{DynamicResource KpTextSecondary}" />
-      </ScrollViewer>
-    </Border>
+      <TextBlock Classes="prompt-note"
+                 Text="Allowing returns the value itself to the agent, which can read it and pass it on. Allow only a request you expected." />
 
-    <TextBlock Grid.Row="5"
-               Text="{Binding Attribution}"
-               TextWrapping="Wrap"
-               Margin="0,8,0,0"
-               FontSize="12"
-               Foreground="{DynamicResource KpTextMuted}" />
-
-    <StackPanel Grid.Row="6"
-                Orientation="Horizontal"
+      <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
+        <Button Grid.Column="0" Name="Deny" Classes="prompt ghost" Content="Deny"
+                IsCancel="True" Command="{Binding DenyCommand}" />
+        <Button Grid.Column="1" Name="AllowOnce" Classes="prompt" Content="Allow once"
+                Command="{Binding AllowOnceCommand}" />
+        <Button Grid.Column="2" Name="Approve" Classes="prompt primary" Content="{Binding TimedLabel}"
                 HorizontalAlignment="Right"
-                VerticalAlignment="Bottom"
-                Spacing="8">
-      <Button Name="Deny"
-              Content="Deny"
-              Width="90"
-              IsCancel="True"
-              Command="{Binding DenyCommand}" />
-      <Button Name="AllowOnce"
-              Content="Allow once"
-              Width="110"
-              Command="{Binding AllowOnceCommand}" />
-      <Button Name="Approve"
-              Content="{Binding TimedLabel}"
-              MinWidth="150"
-              IsVisible="{Binding OffersTimed}"
-              Command="{Binding ApproveCommand}" />
+                IsVisible="{Binding OffersTimed}" Command="{Binding ApproveCommand}" />
+      </Grid>
+
     </StackPanel>
+  </Border>
 
-  </Grid>
-
-</Window>
+</views:PromptWindow>

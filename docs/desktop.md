@@ -238,9 +238,9 @@ dotnet publish src/Keypaste.App -c Release -r osx-arm64 --self-contained --no-re
 Use a disposable vault and set an idle timeout long enough to exclude it as the cause of locking.
 
 1. Enable "Lock when the window is minimized". Use the macOS yellow button or the Linux titlebar/window-menu minimize action, then restore. Expect the unlock screen and a cleared copied password.
-2. Disabled. Untick it, minimize and restore. Expected: still unlocked, and the idle countdown still arrives on time.
-3. After a restart. Tick it, quit, relaunch without opening Settings, minimize. Expected: it locks, and `app.toml` is unchanged afterwards.
+2. Disabled. Switch it off, minimize and restore. Expected: still unlocked, and the idle countdown still arrives on time.
+3. After a restart. Switch it on, quit, relaunch without opening Settings, minimize. Expected: it locks, and `app.toml` is unchanged afterwards.
 
 Switching windows must leave the app unlocked. On macOS, `Cmd+H` hides the app and must also leave it unlocked; `Cmd+M` minimizes it.
 
-Record the OS name, version and build; session type and desktop environment; app build or tag; and each result with the selected platform task. Linux under xfwm4 was observed in [F.2b3b](steps/F.2b3b.md); macOS observation is needed if that desktop target is selected from BACKLOG. If a window manager reports no minimize event, record that result and update `MinimizeLock.IsSupported` to omit the unsupported checkbox. Untested targets remain unobserved.
+Record the OS name, version and build; session type and desktop environment; app build or tag; and each result with the selected platform task. Linux under xfwm4 was observed in [F.2b3b](steps/F.2b3b.md); macOS observation is needed if that desktop target is selected from BACKLOG. If a window manager reports no minimize event, record that result and update `MinimizeLock.IsSupported` to omit the unsupported switch. Untested targets remain unobserved.

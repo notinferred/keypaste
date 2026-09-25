@@ -53,6 +53,8 @@ public sealed class ScreenRenderer
         DrawComponents(output!);
         DrawSecrets(demo, output!);
         DrawLockAndImport(demo, output!);
+        DrawPrompts(output!);
+        DrawTrashWithRows(demo, output!);
     });
 
     /// <summary>
@@ -503,6 +505,88 @@ public sealed class ScreenRenderer
         task.GetAwaiter().GetResult();
     }
 
+    /// <summary>The env release and run prompts beside the credential one, each at its own size.</summary>
+    private static void DrawPrompts(string output)
+    {
+        var directory = OperatingSystem.IsWindows() ? @"C:\Users\maya\acme\api" : "/home/maya/acme/api";
+        var preview = new EnvPreview("acme-api", ["DATABASE_URL", "STRIPE_SECRET_KEY", "STRIPE_RESTRICTED_KEY_FOR_WEBHOOK_SIGNING_IN_PRODUCTION"]);
+        var env = EnvReleasePrompt.For(preview, ["npm", "run", "migrate"], directory) with { GrantSeconds = 900 };
+        DrawWindow(new EnvApprovalWindow(new EnvApprovalViewModel(env)), output, "91b-env-approval");
+
+        var run = new RunPrompt
+        {
+            Client = "claude-code",
+            Label = "work laptop",
+            Reason = "Run the pending database migration for the api service before the deploy.",
+            ReasonWasTruncated = false,
+            ReasonWasAltered = false,
+            Program = OperatingSystem.IsWindows() ? @"C:\Program Files\nodejs\npm.cmd" : "/usr/local/bin/npm",
+            Command = "npm run migrate",
+            Directory = directory,
+            Project = "acme-api",
+            Profile = "dev",
+            Variables = [new("DATABASE_URL", "env/acme-api/DATABASE_URL", "password"), new("STRIPE_SECRET_KEY", "env/acme-api/STRIPE_SECRET_KEY", "password")],
+            GrantSeconds = 900,
+        };
+        DrawWindow(new RunApprovalWindow(new RunApprovalViewModel(run)), output, "91c-run-approval");
+
+        var protectedPrompt = ApprovalPrompt.For(
+            "claude-code",
+            new EntryName("env/acme-api/prod", "DATABASE_URL"),
+            "password",
+            "I need the \u202eproduction database URL to check the schema.",
+            0,
+            null);
+        DrawWindow(new ApprovalWindow(new ApprovalViewModel(protectedPrompt)), output, "91d-approval-once-only");
+    }
+
+    private static void DrawWindow(PromptWindow window, string output, string name)
+    {
+        var prompt = (PromptViewModel)window.DataContext!;
+        prompt.Tick(TimeSpan.FromSeconds(28));
+        prompt.Arm();
+        window.Show();
+        Save(window, output, name);
+        window.Close();
+    }
+
+    /// <summary>The trash with two deleted entries in it; drawn last, because it changes the demo vault.</summary>
+    private static void DrawTrashWithRows(DemoVault demo, string output)
+    {
+        using var session = new AppVaultSession(new ManualClock());
+
+        using (var master = TempVault.Secret(_master))
+        {
+            Assert.Equal(UnlockOutcome.Opened, session.TryUnlock(demo.Path, master.Value));
+        }
+
+        session.Unlocked!.RemoveEntry(new EntryName("Personal", "home wifi"));
+        session.Unlocked.RemoveEntry(new EntryName("env/acme-web", "VERCEL_TOKEN"));
+        session.Unlocked.Save();
+
+        using var shell = new ShellViewModel(session, demo.Home, null, clipboard: new FakeClipboard(), clock: new ManualClock());
+        var window = new MainWindow { Width = _width, Height = _height };
+        window.FindControl<ContentControl>("Root")!.Content = new ShellView { DataContext = shell };
+        window.Show();
+
+        // Settings whole, tall enough that nothing is below the fold.
+        window.Height = 1700;
+        shell.Current = Destinations.Of(DestinationKind.Settings);
+        Save(window, output, "95-settings-whole");
+        window.Height = _height;
+
+        shell.Current = Destinations.Of(DestinationKind.Trash);
+        var trash = (TrashViewModel)shell.Content!;
+        Save(window, output, "93a-trash-no-selection");
+        trash.Selected = trash.Rows[0];
+        Save(window, output, "93-trash-rows");
+
+        trash.PurgeCommand.Execute(null);
+        Save(window, output, "94-trash-confirm");
+
+        window.Close();
+    }
+
     private static void DrawUnlock(DemoVault demo, string output)
     {
         Core.Recent.RecentVaults.Save(
@@ -752,7 +836,9 @@ public sealed class ScreenRenderer
             "Run the database migration for the api service.",
             3600,
             "work laptop");
-        var window = new ApprovalWindow(new ApprovalViewModel(prompt));
+        var model = new ApprovalViewModel(prompt);
+        model.Tick(TimeSpan.FromSeconds(28));
+        var window = new ApprovalWindow(model);
         window.Show();
         Save(window, output, "91-approval");
         window.Close();

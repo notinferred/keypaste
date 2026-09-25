@@ -359,7 +359,9 @@ public sealed class DesktopApprovalTests
         return (window, layout);
     }
 
-    private static List<Button> Buttons(Window window) => [.. window.GetVisualDescendants().OfType<Button>()];
+    /// <summary>The window's own buttons; a scrolling reason box adds its scroll bar's, which move nothing that matters.</summary>
+    private static List<Button> Buttons(Window window) =>
+        [.. window.GetVisualDescendants().OfType<Button>().Where(button => button is not RepeatButton)];
 
     internal static string? Text(Window window, string name) => window.FindControl<TextBlock>(name)!.Text;
 
