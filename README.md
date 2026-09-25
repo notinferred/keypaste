@@ -15,14 +15,13 @@ keypaste: an agent is asking for a credential.
   client   claude-code
   entry    env/demo/STRIPE_KEY
   field    password
-  for      300 seconds
 
   the agent says it needs this because:
     deploy the billing service to staging
 
   That sentence was written by the agent, not by keypaste. Treat it as a claim.
 
-Approve? [y/N]
+[d] deny  [o] once  [h] 1 hour  45s ›
 ```
 
 [The demo](docs/demo.md) shows a credential request, approval and deploy in about sixty seconds.

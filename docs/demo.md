@@ -83,7 +83,7 @@ keypaste agent --vault ~/keypaste-demo.kdbx
 Master password:
 keypaste: watching /home/you/keypaste-demo.kdbx
 keypaste: policy: no file at /home/you/.keypaste/policy.toml, so every request is shown to you.
-keypaste: listening on keypaste-vault-9f3a1c02b7d54e60 for session 5d0c8e1a4b7f2c936e0a1d4b8c7f3e21, 45 seconds to answer, grants last at most 300 seconds
+keypaste: listening on keypaste-vault-9f3a1c02b7d54e60 for session 5d0c8e1a4b7f2c936e0a1d4b8c7f3e21, 45 seconds to answer, grants last at most 3600 seconds
 keypaste: nothing is released without you saying yes. Press Ctrl+C to stop.
 ```
 
@@ -137,32 +137,31 @@ keypaste: an agent is asking for a credential.
   client   claude-code
   entry    env/demo/STRIPE_KEY
   field    password
-  for      300 seconds
 
   the agent says it needs this because:
     deploy the billing service to staging
 
   That sentence was written by the agent, not by keypaste. Treat it as a claim.
 
-Approve? [y/N]
+[d] deny  [o] once  [h] 1 hour  45s ›
 ```
 
-Your run may use different arguments. Claude writes the reason. `client` is the sanitized, unauthenticated MCP handshake name; it can differ from the configured audit and policy label. `entry` is the resolved vault entry, `field` is the requested allowed field, and `for` is the capped lifetime. This request asked for 900 seconds and received 300.
+Your run may use different arguments. Claude writes the reason. `client` is the sanitized, unauthenticated MCP handshake name; it can differ from the configured audit and policy label. `entry` is the resolved vault entry, and `field` is the requested allowed field.
+
+`o` releases it for this request only. `h` also lets the same client ask for the same field again for an hour without asking you. Anything else, including Enter, is a no, and so is saying nothing for 45 seconds.
 
 Claude may call `list_entry_names` first to find the entry, or go straight to the credential. Either is fine, and both appear in the log.
-
-You have 45 seconds. Anything that is not `y` or `yes` is a no, including pressing Enter, and so is saying nothing.
 
 <a id="030--say-yes"></a>
 
 ### Approve
 
-Type `y`:
+Press `h`:
 
 ```
-keypaste: approved.
+keypaste: allowed for 1 hour.
 ────────────────────────────────────────────────────────────
-keypaste: released env/demo/STRIPE_KEY to claude-code for 300s
+keypaste: released env/demo/STRIPE_KEY to claude-code for 3600s
 ```
 
 Claude sets the variable for the child process and runs the deploy again:
@@ -178,7 +177,7 @@ The deploy script prints only a masked prefix, suffix and length. keypaste canno
 
 ## If you say no
 
-Press Enter, or `n`:
+Press `d`, Enter or Escape:
 
 ```
 keypaste: denied. Nothing was released.
