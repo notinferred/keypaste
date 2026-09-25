@@ -13,7 +13,7 @@ public sealed class EnvReferenceFileTests
 
         Assert.Equal(
             "# keypaste references: safe to commit, no value is stored here.\n" +
-            "# `keypaste run -p <profile> -- <command>` resolves them.\n" +
+            "# `keypaste run --env-file .env.keypaste -- <command>` resolves them.\n" +
             "DATABASE_URL=kp://acme-api/staging/DATABASE_URL\n" +
             "STRIPE_SECRET_KEY=kp://acme-api/staging/STRIPE_SECRET_KEY\n",
             text);

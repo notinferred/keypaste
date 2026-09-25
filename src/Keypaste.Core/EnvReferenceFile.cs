@@ -30,7 +30,7 @@ public static class EnvReferenceFile
     /// <summary>The comment block a written file starts with.</summary>
     public const string Header =
         "# keypaste references: safe to commit, no value is stored here.\n" +
-        "# `keypaste run -p <profile> -- <command>` resolves them.\n";
+        "# `keypaste run --env-file .env.keypaste -- <command>` resolves them.\n";
 
     /// <summary>Writes a file referencing every key of one profile.</summary>
     /// <param name="project">The project.</param>
