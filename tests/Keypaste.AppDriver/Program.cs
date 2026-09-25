@@ -40,7 +40,7 @@ namespace Keypaste.AppDriver;
 /// <c>scripts/verify-current-state.sh</c> can change it between two real requests (U.3). With
 /// neither, a request is put to the person in the app's own prompt window, as launch does, drawn on
 /// a headless display: <c>prompt</c> prints what the window shows and <c>prompt withdrawn</c> when it
-/// comes down, and the lines <c>approve</c>, <c>deny</c> and <c>close</c> click its buttons through
+/// comes down, and the lines <c>approve</c> (the timed allow), <c>once</c>, <c>deny</c> and <c>close</c> click its buttons through
 /// the display's hit-testing or close it, so <c>scripts/verify-desktop-approval.sh</c> can answer a
 /// real request as a person would (4.4).
 /// </para>
@@ -62,7 +62,7 @@ internal static class Program
         "       hold <vault> [--locked] [--held-prompt | --approving-prompt]\n" +
         "            (then per line of standard input: lock, unlock, edit <entry-path>, delete <entry-path>,\n" +
         "             relocate <entry-path> <destination-group-path> <new-title>, and with the app's own\n" +
-        "             prompt: approve, deny, close; connect <client> [label=<l>] [expose=<g,g>],\n" +
+        "             prompt: approve, once, deny, close; connect <client> [label=<l>] [expose=<g,g>],\n" +
         "             connect-remove <client>, confirm, cancel, check, pick <n>)\n" +
         "KEYPASTE_HOME must be set. KEYPASTE_DRIVER_PASSWORD is the password typed (empty for none),\n" +
         "KEYPASTE_DRIVER_KEYFILE the keyfile chosen, KEYPASTE_DRIVER_NEW_PASSWORD a new password or entry password.";
@@ -535,7 +535,7 @@ internal sealed class Driver(string home)
                     connect.Pick(which);
                     break;
 
-                case [("approve" or "deny" or "close") and var answer]:
+                case [("approve" or "once" or "deny" or "close") and var answer]:
                     await (screen ?? throw new DriverException("hold answers a prompt only with the app's own"))
                         .AnswerAsync(answer).ConfigureAwait(true);
                     break;

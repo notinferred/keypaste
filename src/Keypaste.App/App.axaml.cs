@@ -7,6 +7,7 @@ using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
+using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
 
@@ -65,7 +66,7 @@ internal sealed partial class App : Application, IDisposable
         _authority = new AppAuthority(
             _session,
             Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable),
-            () => new WindowApprovalChannel(TimeProvider.System));
+            () => new WindowApprovalChannel(TimeProvider.System, ApprovalLimits.Default.Window));
 
         _window = new MainWindow();
         _activity = Observe(_window, _session, TimeProvider.System, () => _shell?.ClearCountdown());

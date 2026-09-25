@@ -25,7 +25,8 @@ namespace Keypaste.Core.Ownership;
 /// <para>
 /// An env set for <c>keypaste run --session</c> is admitted the same way and resolved under the
 /// lifetime the runner attached to, never a later one, with the person asked through the owner's
-/// own gate (D-0341).
+/// own gate (D-0341) unless a timed grant they gave the same run still covers the same names
+/// (THREATS.md T-34).
 /// </para>
 /// <para>
 /// Reaching the endpoint at all is what the operating system authenticates (THREATS.md T-10). The
@@ -68,7 +69,10 @@ public sealed class SessionAuthority : IApproverHandler
     public string? Serving => Live()?.Id;
 
     /// <summary>What the current session has waiting for a person and has granted, or nothing while no session is live.</summary>
-    public ApproverActivity Activity => Live() is null ? ApproverActivity.None : _inner.Activity();
+    public ApproverActivity Activity =>
+        Live() is null
+            ? ApproverActivity.None
+            : _inner.Activity() with { EnvGrants = _environments?.Grants?.InForce() ?? [] };
 
     /// <summary>Ends one grant of the current session, so the next request it would have answered is asked again.</summary>
     /// <param name="key">The grant, as <see cref="Activity"/> listed it.</param>
@@ -80,12 +84,25 @@ public sealed class SessionAuthority : IApproverHandler
         }
     }
 
-    /// <summary>Ends every grant of the current session.</summary>
+    /// <summary>Ends one timed grant a person gave a repeated <c>keypaste run --session</c>.</summary>
+    /// <param name="key">The grant, as <see cref="ApproverActivity.EnvGrants"/> listed it.</param>
+    public void RevokeEnvGrant(string key)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+
+        if (Live() is not null)
+        {
+            _environments?.Grants?.Revoke(key);
+        }
+    }
+
+    /// <summary>Ends every grant of the current session, agents' and runs' alike.</summary>
     public void RevokeAll()
     {
         if (Live() is not null)
         {
             _inner.RevokeAll();
+            _environments?.Grants?.RevokeAll();
         }
     }
 
@@ -204,6 +221,10 @@ public sealed class SessionAuthority : IApproverHandler
         var cooldownKey = string.Join('\0', ["env", request.Project, request.Directory, .. request.Command]);
         var answer = ApprovalAnswer.NoChannel;
 
+        // Every release of a protected profile is asked about live: no timed grant is offered or used.
+        var liveOnly = EnvProfileNames.IsProtected(request.Profile);
+        var grantSeconds = liveOnly ? 0 : EnvGrantCache.GrantSeconds(environments.Gate.Limits);
+
         var resolver = new SessionEnvResolver(
             () => ReferenceEquals(Live(), admitted) ? admitted : null,
             environments.VaultFor,
@@ -213,12 +234,26 @@ public sealed class SessionAuthority : IApproverHandler
             request.Project,
             async (preview, withdrawn) =>
             {
-                var prompt = EnvReleasePrompt.For(preview, request.Command, request.Directory);
+                // Names only: the resolver reads the set again after this, so a grant releases the
+                // latest saved values, and a changed name list is asked about again.
+                if (!liveOnly && environments.Grants?.TryUse(cooldownKey, preview.Keys, out _) == true)
+                {
+                    return true;
+                }
+
+                var prompt = EnvReleasePrompt.For(preview, request.Command, request.Directory) with { GrantSeconds = grantSeconds };
                 answer = await environments.Gate.AskAsync(cooldownKey, prompt, withdrawn).ConfigureAwait(false);
 
                 // A withdrawn question is not a refusal: the resolver tells a lock from a hang-up.
                 withdrawn.ThrowIfCancellationRequested();
-                return answer == ApprovalAnswer.Approved;
+
+                if (answer == ApprovalAnswer.Approved && grantSeconds > 0)
+                {
+                    environments.Grants?.Store(
+                        cooldownKey, prompt.Project, prompt.Profile, prompt.Command, preview.Keys, TimeSpan.FromSeconds(grantSeconds));
+                }
+
+                return answer.Releases();
             },
             cancellationToken).ConfigureAwait(false);
 

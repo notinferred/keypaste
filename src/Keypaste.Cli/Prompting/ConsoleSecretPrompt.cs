@@ -37,10 +37,17 @@ namespace Keypaste.Cli.Prompting;
 /// </remarks>
 internal sealed class ConsoleSecretPrompt : ISecretPrompt
 {
+    /// <summary>How often a choice looks for a key, and so how soon it notices a withdrawal.</summary>
+    internal static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(100);
+
+    private static readonly TimeSpan _redrawInterval = TimeSpan.FromSeconds(1);
+
     private readonly TextWriter _prompts;
     private readonly Func<ConsoleKeyInfo> _readKey;
+    private readonly Func<bool> _keyAvailable;
     private readonly Func<bool> _isInputRedirected;
     private readonly Stream _redirectedInput;
+    private readonly TimeProvider _clock;
 
     /// <summary>Creates a prompt writing to <paramref name="prompts"/> (in practice stderr).</summary>
     internal ConsoleSecretPrompt(TextWriter prompts)
@@ -53,10 +60,23 @@ internal sealed class ConsoleSecretPrompt : ISecretPrompt
         Func<ConsoleKeyInfo> readKey,
         Func<bool> isInputRedirected,
         Stream? redirectedInput)
+        : this(prompts, readKey, () => Console.KeyAvailable, isInputRedirected, redirectedInput, TimeProvider.System)
+    {
+    }
+
+    internal ConsoleSecretPrompt(
+        TextWriter prompts,
+        Func<ConsoleKeyInfo> readKey,
+        Func<bool> keyAvailable,
+        Func<bool> isInputRedirected,
+        Stream? redirectedInput,
+        TimeProvider clock)
     {
         _prompts = prompts;
         _readKey = readKey;
+        _keyAvailable = keyAvailable;
         _isInputRedirected = isInputRedirected;
+        _clock = clock;
 
         // The raw stdin stream, decoded as UTF-8 by hand below. Console.In would decode with the
         // console input code page — typically an OEM page on Windows — and silently mangle a
@@ -151,6 +171,81 @@ internal sealed class ConsoleSecretPrompt : ISecretPrompt
         }
 
         return ReadRedirectedLine();
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Keys are polled rather than awaited, so a withdrawn question stops the read instead of leaving
+    /// a reader parked on the terminal. Each draw is one write, which is what lets
+    /// <c>AgentConsole</c> keep other lines from splicing into it.
+    /// </remarks>
+    public char? ReadChoice(Func<string> prompt, string choices, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(prompt);
+        ArgumentNullException.ThrowIfNull(choices);
+
+        if (!IsInteractive)
+        {
+            return ReadRedirectedLine() is { } line ? Choice(line, choices) : null;
+        }
+
+        var drawnAt = Draw(prompt);
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            if (_keyAvailable())
+            {
+                var key = _readKey().KeyChar;
+
+                if (IsDenyKey(key))
+                {
+                    return 'd';
+                }
+
+                var lower = char.ToLowerInvariant(key);
+                if (choices.Contains(lower, StringComparison.Ordinal))
+                {
+                    return lower;
+                }
+
+                continue;
+            }
+
+            if (_clock.GetElapsedTime(drawnAt) >= _redrawInterval)
+            {
+                drawnAt = Draw(prompt);
+            }
+
+            cancellationToken.WaitHandle.WaitOne(PollInterval);
+        }
+
+        return null;
+    }
+
+    /// <summary>What one line of redirected input chooses: a key in <paramref name="choices"/>, spelled as the key or as its word, and otherwise <c>'d'</c>.</summary>
+    internal static char Choice(string line, string choices)
+    {
+        ArgumentNullException.ThrowIfNull(line);
+        ArgumentNullException.ThrowIfNull(choices);
+
+        var word = line.Trim().Split(' ', 2)[0].ToLowerInvariant() switch
+        {
+            "once" => "o",
+            "hour" => "h",
+            var other => other,
+        };
+
+        return word.Length == 1 && choices.Contains(word[0], StringComparison.Ordinal) ? word[0] : 'd';
+    }
+
+    private static bool IsDenyKey(char key) =>
+        key is '\r' or '\n' or '\u001B' or '\u0003' or 'd' or 'D' or 'n' or 'N';
+
+    private long Draw(Func<string> prompt)
+    {
+        _prompts.Write("\r" + prompt() + "\u001b[K");
+        _prompts.Flush();
+        return _clock.GetTimestamp();
     }
 
     /// <summary>

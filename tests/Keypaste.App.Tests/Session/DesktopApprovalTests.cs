@@ -18,12 +18,14 @@ namespace Keypaste.App.Tests.Session;
 
 /// <summary>
 /// A request over the app's real endpoint raises the app's own prompt window, drawn by Skia and
-/// clicked through the platform's hit-testing, and only a press of Approve releases (V-4.4).
+/// clicked through the platform's hit-testing, and only a press of Allow once or the timed allow
+/// releases (V-4.4).
 /// </summary>
 public sealed class DesktopApprovalTests
 {
     internal const string Sentinel = "SENTINEL-DESKTOP-APPROVAL-3f9a1c";
     internal const string EntryPath = "env/ci/DEPLOY_KEY";
+    internal const string ProdEntryPath = "env/ci/prod/DEPLOY_KEY";
     internal const string Label = "ci-probe";
 
     private static readonly TimeSpan _wait = TimeSpan.FromSeconds(10);
@@ -41,7 +43,7 @@ public sealed class DesktopApprovalTests
             Assert.Equal(Label, Text(window, "LabelText"));
             Assert.Equal(EntryPath, Text(window, "EntryText"));
             Assert.Equal("password", Text(window, "FieldText"));
-            Assert.Equal("60 seconds", Text(window, "LifetimeText"));
+            Assert.Equal("once, or for 1 hour", Text(window, "LifetimeText"));
 
             app.Arm();
             Click(window, "Approve");
@@ -50,6 +52,7 @@ public sealed class DesktopApprovalTests
             Assert.NotNull(answered);
             Assert.Equal(AuditDecision.Granted, answered.Decision);
             Assert.Equal(AuditMethod.Prompt, answered.Method);
+            Assert.Equal(3600, answered.TtlSeconds);
             Assert.Equal(app.SessionId, answered.Session);
             Assert.Equal(Sentinel, answered.Value);
             await PromptedApp.WithdrawnAsync(window);
@@ -67,7 +70,7 @@ public sealed class DesktopApprovalTests
 
     [Theory]
     [MemberData(nameof(Refusals))]
-    public Task Every_way_but_Approve_denies_and_takes_the_prompt_down(string how, AuditMethod method) =>
+    public Task Every_way_but_an_allow_denies_and_takes_the_prompt_down(string how, AuditMethod method) =>
         HeadlessSession.On(async () =>
         {
             await using var app = await PromptedApp.StartAsync();
@@ -128,7 +131,7 @@ public sealed class DesktopApprovalTests
     public Task A_request_withdrawn_before_its_prompt_is_drawn_never_draws_it() =>
         HeadlessSession.On(async () =>
         {
-            var channel = new WindowApprovalChannel(new ManualClock());
+            var channel = new WindowApprovalChannel(new ManualClock(), ApprovalLimits.Default.Window);
             var drawn = 0;
             channel.Shown += (_, _) => drawn++;
             using var withdrawn = new CancellationTokenSource();
@@ -164,7 +167,7 @@ public sealed class DesktopApprovalTests
         });
 
     [Fact]
-    public Task Enter_approves_nothing() =>
+    public Task EnterOnOpen_Denies() =>
         HeadlessSession.On(async () =>
         {
             await using var app = await PromptedApp.StartAsync();
@@ -216,7 +219,7 @@ public sealed class DesktopApprovalTests
             var (imitating, imitatingLayout) = Layout(hostile);
 
             Assert.Equal(ordinaryLayout, imitatingLayout);
-            Assert.Equal(["Deny", "Approve"], Buttons(imitating).Select(button => button.Content as string));
+            Assert.Equal(["Deny", "Allow once", "Allow for 1 hour"], Buttons(imitating).Select(button => button.Content as string));
             Assert.DoesNotContain(Buttons(imitating), button => button.IsDefault);
 
             var reason = imitating.FindControl<TextBlock>("ReasonText")!;
@@ -227,9 +230,120 @@ public sealed class DesktopApprovalTests
             imitating.Close();
         });
 
+    [Fact]
+    public Task AllowOnce_Releases_AndTheNextRequestAsksAgain() =>
+        HeadlessSession.On(async () =>
+        {
+            await using var app = await PromptedApp.StartAsync();
+            var reply = app.Ask();
+            var window = await app.PromptAsync();
+            app.Arm();
+            Click(window, "AllowOnce");
+
+            var answered = await reply.WaitAsync(_wait, Token);
+            Assert.NotNull(answered);
+            Assert.Equal(AuditDecision.Granted, answered.Decision);
+            Assert.Equal(Sentinel, answered.Value);
+            Assert.Equal(0, answered.TtlSeconds);
+            await PromptedApp.WithdrawnAsync(window);
+
+            var again = app.Ask();
+            var second = await app.PromptAsync(count: 2);
+            Click(second, "Deny");
+
+            Assert.Equal(AuditMethod.Prompt, (await again.WaitAsync(_wait, Token))!.Method);
+            Assert.Equal(2, app.Windows.Count);
+        });
+
+    [Fact]
+    public Task AllowForTheHour_Releases_AndTheNextIsServedFromTheGrant() =>
+        HeadlessSession.On(async () =>
+        {
+            await using var app = await PromptedApp.StartAsync();
+            var reply = app.Ask();
+            var window = await app.PromptAsync();
+            app.Arm();
+            Click(window, "Approve");
+
+            Assert.Equal(3600, (await reply.WaitAsync(_wait, Token))!.TtlSeconds);
+            await PromptedApp.WithdrawnAsync(window);
+
+            var again = await app.Ask().WaitAsync(_wait, Token);
+
+            Assert.NotNull(again);
+            Assert.Equal(AuditMethod.GrantCache, again.Method);
+            Assert.Equal(Sentinel, again.Value);
+            Assert.Single(app.Windows);
+        });
+
+    [Theory]
+    [InlineData("AllowOnce")]
+    [InlineData("Approve")]
+    public Task BothAllowButtons_ArmOnlyAfterTheDelay(string button) =>
+        HeadlessSession.On(async () =>
+        {
+            await using var app = await PromptedApp.StartAsync();
+            var reply = app.Ask();
+            var window = await app.PromptAsync();
+
+            Assert.False(window.FindControl<Button>(button)!.IsEffectivelyEnabled);
+            Click(window, button);
+            app.Clock.Advance(PromptViewModel.ArmingDelay - TimeSpan.FromMilliseconds(1));
+            WindowInput.Drain();
+            Click(window, button);
+            await Task.Delay(200, Token);
+            Assert.False(reply.IsCompleted, "a click before the prompt was armed answered it");
+
+            app.Arm();
+            await PromptedApp.UntilAsync(() => window.FindControl<Button>(button)!.IsEffectivelyEnabled);
+            Click(window, button);
+
+            Assert.Equal(AuditDecision.Granted, (await reply.WaitAsync(_wait, Token))!.Decision);
+        });
+
+    [Fact]
+    public Task TheTimedButton_IsHidden_ForALiveOnlyEntry() =>
+        HeadlessSession.On(async () =>
+        {
+            await using var app = await PromptedApp.StartAsync();
+            var reply = app.Ask(entry: ProdEntryPath);
+            var window = await app.PromptAsync();
+
+            Assert.False(window.FindControl<Button>("Approve")!.IsVisible);
+            Assert.True(window.FindControl<Button>("AllowOnce")!.IsVisible);
+            Assert.Equal("once only: protected profile", Text(window, "LifetimeText"));
+
+            app.Arm();
+            Click(window, "AllowOnce");
+            var answered = await reply.WaitAsync(_wait, Token);
+
+            Assert.Equal(AuditDecision.Granted, answered!.Decision);
+            Assert.Equal(0, answered.TtlSeconds);
+        });
+
+    [Fact]
+    public Task Countdown_TicksFromTheWindow() =>
+        HeadlessSession.On(async () =>
+        {
+            await using var app = await PromptedApp.StartAsync();
+            var reply = app.Ask();
+            var window = await app.PromptAsync();
+
+            Assert.Equal("0:45", Text(window, "CountdownText"));
+
+            app.Clock.Advance(TimeSpan.FromSeconds(1));
+            await PromptedApp.UntilAsync(() => Text(window, "CountdownText") == "0:44");
+
+            app.Clock.Advance(TimeSpan.FromSeconds(10));
+            await PromptedApp.UntilAsync(() => Text(window, "CountdownText") == "0:34");
+
+            Click(window, "Deny");
+            await reply.WaitAsync(_wait, Token);
+        });
+
     private static (ApprovalWindow Window, string Layout) Layout(string reason)
     {
-        var prompt = ApprovalPrompt.For("claude-code", new EntryName("env/ci", "DEPLOY_KEY"), "password", reason, 60, Label);
+        var prompt = ApprovalPrompt.For("claude-code", new EntryName("env/ci", "DEPLOY_KEY"), "password", reason, 3600, Label);
         var window = new ApprovalWindow(new ApprovalViewModel(prompt));
         window.Show();
         WindowInput.Drain();
@@ -276,7 +390,7 @@ public sealed class DesktopApprovalTests
 #pragma warning disable CA2000
             Authority = new AppAuthority(new AppVaultSession(Clock, home: fixture.Home), null, () =>
             {
-                var channel = new WindowApprovalChannel(Clock);
+                var channel = new WindowApprovalChannel(Clock, ApprovalLimits.Default.Window);
                 channel.Shown += (_, window) => Windows.Add(window);
                 return channel;
             });
@@ -301,6 +415,7 @@ public sealed class DesktopApprovalTests
             using (var created = Core.Vault.Create(vault, TempVault.Password))
             {
                 created.AddEntry(new VaultEntry { GroupPath = "env/ci", Title = "DEPLOY_KEY", Password = Sentinel });
+                created.AddEntry(new VaultEntry { GroupPath = "env/ci/prod", Title = "DEPLOY_KEY", Password = Sentinel });
                 created.Save();
             }
 
@@ -326,13 +441,14 @@ public sealed class DesktopApprovalTests
             return client;
         }
 
-        internal Task<CredentialReply?> Ask(CancellationToken? cancellationToken = null) => Ask(_client!, cancellationToken);
+        internal Task<CredentialReply?> Ask(CancellationToken? cancellationToken = null, string entry = EntryPath) =>
+            Ask(_client!, cancellationToken, entry);
 
-        internal Task<CredentialReply?> Ask(ApproverClient client, CancellationToken? cancellationToken = null) =>
+        internal Task<CredentialReply?> Ask(ApproverClient client, CancellationToken? cancellationToken = null, string entry = EntryPath) =>
             client.RequestAsync(
                 new CredentialRequest
                 {
-                    Entry = EntryPath,
+                    Entry = entry,
                     Field = "password",
                     Reason = "deploy the billing service",
                     TtlSeconds = 60,
@@ -345,9 +461,10 @@ public sealed class DesktopApprovalTests
                 cancellationToken ?? Token).AsTask();
 
         /// <summary>Waits for the prompt a request raised to be on screen and drawn.</summary>
-        internal async Task<Window> PromptAsync()
+        /// <param name="count">How many prompts this app has raised once that one is up.</param>
+        internal async Task<Window> PromptAsync(int count = 1)
         {
-            await Until(() => Windows.Count > 0);
+            await Until(() => Windows.Count >= count);
             var window = Windows[^1];
             DrawnFrame.Capture(window);
             return window;
@@ -373,6 +490,8 @@ public sealed class DesktopApprovalTests
             await _client!.DisposeAsync();
             _client = null;
         }
+
+        internal static Task UntilAsync(Func<bool> condition) => Until(condition);
 
         private static async Task Until(Func<bool> condition)
         {

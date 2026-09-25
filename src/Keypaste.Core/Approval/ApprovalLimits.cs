@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Keypaste.Core.Approval;
 
 /// <summary>
@@ -31,8 +33,8 @@ public sealed record ApprovalLimits
     /// <summary>The longest window, kept below every MCP client's own request timeout.</summary>
     public const int MaximumWindowSeconds = 55;
 
-    /// <summary>How long a grant lives by default, whatever the agent asked for.</summary>
-    public const int DefaultMaximumTtlSeconds = 300;
+    /// <summary>How long the timed grant a person can choose lasts by default, whatever the agent asked for.</summary>
+    public const int DefaultMaximumTtlSeconds = 3600;
 
     /// <summary>How long the same refused request is auto-denied for.</summary>
     public const int DefaultCooldownSeconds = 60;
@@ -53,7 +55,7 @@ public sealed record ApprovalLimits
     /// <summary>How long a human has to answer before silence becomes a denial.</summary>
     public TimeSpan Window { get; init; } = TimeSpan.FromSeconds(DefaultWindowSeconds);
 
-    /// <summary>The longest grant this approver will issue, however long an agent asks for.</summary>
+    /// <summary>The longest grant this approver will issue, and the length of the timed grant a prompt offers.</summary>
     public int MaximumTtlSeconds { get; init; } = DefaultMaximumTtlSeconds;
 
     /// <summary>How long after a refusal the same request is denied without asking again.</summary>
@@ -63,9 +65,8 @@ public sealed record ApprovalLimits
     /// <param name="requestedSeconds">What the agent asked for.</param>
     /// <returns>The requested value, clamped to at least one second and at most <see cref="MaximumTtlSeconds"/>.</returns>
     /// <remarks>
-    /// The clamped number, not the requested one, is what the human is shown. Showing an agent's
-    /// requested hour when five minutes will be granted would make the prompt a worse source of
-    /// truth than the audit log, which is backwards.
+    /// What a standing rule's release is bounded by. A person's timed grant is not: they chose its
+    /// length on screen, and it is always <see cref="MaximumTtlSeconds"/>.
     /// </remarks>
     public int EffectiveTtlSeconds(int requestedSeconds) =>
         Math.Clamp(requestedSeconds, 1, MaximumTtlSeconds);
@@ -83,4 +84,17 @@ public sealed record ApprovalLimits
     /// </remarks>
     public int EffectiveTtlSeconds(int requestedSeconds, int ruleCeilingSeconds) =>
         Math.Min(EffectiveTtlSeconds(requestedSeconds), Math.Max(ruleCeilingSeconds, 1));
+
+    /// <summary>A number of seconds as a person reads a duration: <c>1 hour</c>, <c>5 minutes</c>, <c>90 seconds</c>.</summary>
+    /// <param name="seconds">The duration.</param>
+    /// <returns>Whole hours or whole minutes when it is one, otherwise seconds.</returns>
+    public static string Describe(int seconds) => seconds switch
+    {
+        > 0 when seconds % 3600 == 0 => Plural(seconds / 3600, "hour"),
+        > 0 when seconds % 60 == 0 => Plural(seconds / 60, "minute"),
+        _ => Plural(seconds, "second"),
+    };
+
+    private static string Plural(int count, string unit) =>
+        string.Create(CultureInfo.InvariantCulture, $"{count} {unit}{(count == 1 ? string.Empty : "s")}");
 }

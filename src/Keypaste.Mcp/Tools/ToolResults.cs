@@ -66,9 +66,12 @@ internal static class ToolResults
                 // and the word written to the log cannot disagree about whether a person was
                 // involved. Telling a model a human approved something no human saw is exactly the
                 // claim keypaste asks to be trusted on.
-                Text = (method == AuditMethod.Policy
-                    ? ToolText.ReleasedByPolicy(field, ttlSeconds)
-                    : ToolText.Released(field, ttlSeconds)) + value,
+                Text = (method switch
+                {
+                    AuditMethod.Policy => ToolText.ReleasedByPolicy(field, ttlSeconds),
+                    AuditMethod.Prompt when ttlSeconds == 0 => ToolText.ReleasedOnce(field),
+                    _ => ToolText.Released(field, ttlSeconds),
+                }) + value,
             },
         ],
         StructuredContent = Structured(field, value, ttlSeconds),

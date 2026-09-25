@@ -1,4 +1,3 @@
-using System.Globalization;
 using Keypaste.Core.Approval;
 
 namespace Keypaste.App.ViewModels;
@@ -14,7 +13,10 @@ internal sealed class ApprovalViewModel : PromptViewModel
         Label = prompt.Label ?? "none configured";
         Entry = prompt.Entry;
         Field = prompt.Field;
-        Lifetime = string.Create(CultureInfo.InvariantCulture, $"{prompt.TtlSeconds} seconds");
+        TimedSeconds = prompt.TtlSeconds;
+        Lifetime = prompt.TtlSeconds > 0
+            ? $"once, or for {ApprovalLimits.Describe(prompt.TtlSeconds)}"
+            : "once only: protected profile";
         Reason = prompt.Reason;
         Scrubbed = (prompt.EntryWasAltered, prompt.ReasonWasAltered) switch
         {
@@ -38,7 +40,7 @@ internal sealed class ApprovalViewModel : PromptViewModel
 
     internal string Field { get; }
 
-    /// <summary>How long a grant would live: the lifetime that will apply, not the one asked for.</summary>
+    /// <summary>What the person can allow: once, or once and the timed grant, never the lifetime the agent asked for.</summary>
     internal string Lifetime { get; }
 
     /// <summary>The agent's words, already sanitized and capped. Untrusted text.</summary>
@@ -48,4 +50,6 @@ internal sealed class ApprovalViewModel : PromptViewModel
     internal string Scrubbed { get; }
 
     internal string Attribution { get; }
+
+    protected override int TimedSeconds { get; }
 }

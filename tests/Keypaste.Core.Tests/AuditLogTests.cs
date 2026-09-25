@@ -670,6 +670,70 @@ public sealed class AuditLogTests : IDisposable
         Assert.Throws<ObjectDisposedException>(() => log.TryAppend(Denial(), out _));
     }
 
+    private static AuditRecord Grant(int? grantedSeconds) => new()
+    {
+        Tool = "request_credential",
+        Client = new AuditClient("claude-code", "1.2.3", "work-laptop"),
+        Args = AuditArgs.ForCredentialRequest("env/dev/STRIPE_KEY", "password", 900, "deploy"),
+        Decision = AuditDecision.Granted,
+        Method = AuditMethod.Prompt,
+        Reason = "a person approved this one request",
+        Exposure = ["env/**"],
+        GrantedSeconds = grantedSeconds,
+    };
+
+    [Theory]
+    [InlineData(3600)]
+    [InlineData(0)]
+    public void AGrantedLine_CarriesGrantedSeconds(int seconds)
+    {
+        using (var log = Open())
+        {
+            Assert.True(log.TryAppend(Grant(seconds), out var error), error);
+        }
+
+        using var parsed = JsonDocument.Parse(Lines()[0]);
+        Assert.Equal(seconds, parsed.RootElement.GetProperty("granted_seconds").GetInt32());
+
+        Assert.True(AuditReader.TryRead(LogPath, out var entries, out _, out var failure), failure);
+        Assert.Equal(seconds, Assert.Single(entries).GrantedSeconds);
+    }
+
+    [Fact]
+    public void ADeniedLine_HasNone()
+    {
+        using (var log = Open())
+        {
+            Assert.True(log.TryAppend(Denial() with { GrantedSeconds = 3600 }, out var error), error);
+        }
+
+        Assert.DoesNotContain("granted_seconds", Lines()[0], StringComparison.Ordinal);
+
+        Assert.True(AuditReader.TryRead(LogPath, out var entries, out _, out var failure), failure);
+        Assert.Null(Assert.Single(entries).GrantedSeconds);
+    }
+
+    /// <summary>Lines written before a grant's length was recorded sit in one chain with lines that record it.</summary>
+    [Fact]
+    public void AMixedLog_StillVerifies()
+    {
+        using (var log = Open())
+        {
+            Assert.True(log.TryAppend(Grant(null), out var error), error);
+            Assert.True(log.TryAppend(Denial(), out error), error);
+            Assert.True(log.TryAppend(Grant(3600), out error), error);
+            Assert.True(log.TryAppend(Grant(0), out error), error);
+        }
+
+        var report = AuditChainVerifier.Verify(LogPath);
+        Assert.Equal(AuditChainVerdict.Intact, report.Verdict);
+        Assert.Equal(4, report.Records);
+
+        Assert.True(AuditReader.TryRead(LogPath, out var entries, out var unreadable, out var failure), failure);
+        Assert.Equal(0, unreadable);
+        Assert.Equal([null, null, 3600, 0], entries.Select(entry => entry.GrantedSeconds));
+    }
+
     [Fact]
     public void TryOpen_RejectsNull()
     {

@@ -258,19 +258,22 @@ public sealed class ApproverHandlerTests
     }
 
     /// <summary>
-    /// The human is shown, and the grant lives for, the TTL that will actually apply — not the hour
-    /// the agent asked for.
+    /// The person chooses the duration on screen, so the prompt offers the approver's ceiling however
+    /// short or long a lifetime the agent asked for.
     /// </summary>
-    [Fact]
-    public async Task TheGrantedTtl_IsTheCappedOneNotTheRequestedOne()
+    [Theory]
+    [InlineData(1)]
+    [InlineData(60)]
+    [InlineData(3600)]
+    public async Task ThePromptOffersTheCeiling_WhateverTheAgentAsked(int requested)
     {
         using var fixture = new ApproverFixture();
         fixture.Channel.Answer = ApprovalAnswer.Approved;
 
-        var reply = await fixture.Handler.RequestAsync(Request(ttl: 3600), "conn-1", Token);
+        var reply = await fixture.Handler.RequestAsync(Request(ttl: requested), "conn-1", Token);
 
-        Assert.Equal(ApprovalLimits.DefaultMaximumTtlSeconds, reply.TtlSeconds);
         Assert.Equal(ApprovalLimits.DefaultMaximumTtlSeconds, fixture.Channel.LastPrompt!.TtlSeconds);
+        Assert.Equal(ApprovalLimits.DefaultMaximumTtlSeconds, reply.TtlSeconds);
     }
 
     /// <summary>The person is shown which configured connection is asking, as the bridge was labelled.</summary>
@@ -289,7 +292,7 @@ public sealed class ApproverHandlerTests
         Assert.Equal(new GrantKey("conn-1", EntryHandle.For(new EntryName("env/dev", "STRIPE_KEY")), "password"), grant.Key);
         Assert.Equal(fixture.Channel.LastPrompt, grant.Approved);
         Assert.Equal("deploy-bot", grant.Approved.Label, StringComparer.Ordinal);
-        Assert.Equal(TimeSpan.FromSeconds(ApprovalLimits.Default.EffectiveTtlSeconds(900)), grant.Remaining);
+        Assert.Equal(TimeSpan.FromSeconds(ApprovalLimits.Default.MaximumTtlSeconds), grant.Remaining);
         Assert.DoesNotContain(Sentinel, grant.ToString(), StringComparison.Ordinal);
     }
 
@@ -499,6 +502,198 @@ public sealed class ApproverHandlerTests
         await fixture.Handler.RequestAsync(Request("env/dev/STRIPE_KEY"), "conn-2", Token);
 
         Assert.Contains(fixture.Narration, line => line.StartsWith("released ", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task AllowOnce_ReleasesTheField_AndStoresNoGrant()
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
+
+        var first = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
+        var second = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
+
+        Assert.Equal(AuditDecision.Granted, first.Decision);
+        Assert.Equal(AuditMethod.Prompt, first.Method);
+        Assert.Equal(Sentinel, first.Value, StringComparer.Ordinal);
+        Assert.Equal(0, first.TtlSeconds);
+        Assert.Equal("a person approved this one request", first.Reason);
+
+        // Nothing was kept, so the identical request is a fresh question rather than a cache hit.
+        Assert.Equal(AuditMethod.Prompt, second.Method);
+        Assert.Equal(2, fixture.Channel.Asked);
+        Assert.Empty(fixture.Handler.Activity().Grants);
+        Assert.Contains(fixture.Narration, line => line.EndsWith(" once", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task AllowForTheHour_StoresAGrantForTheCeiling_NotTheAgentsTtl()
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Channel.Answer = ApprovalAnswer.Approved;
+
+        var first = await fixture.Handler.RequestAsync(Request(ttl: 60), "conn-1", Token);
+
+        fixture.Clock.Advance(TimeSpan.FromSeconds(61));
+        var second = await fixture.Handler.RequestAsync(Request(ttl: 60), "conn-1", Token);
+
+        Assert.Equal(3600, first.TtlSeconds);
+        Assert.Equal("a person approved this request for 1 hour", first.Reason);
+        Assert.Contains(fixture.Narration, line => line.EndsWith(" for 3600s", StringComparison.Ordinal));
+        Assert.Equal(AuditMethod.GrantCache, second.Method);
+        Assert.Equal(3600 - 61, second.TtlSeconds);
+        Assert.Equal(1, fixture.Channel.Asked);
+    }
+
+    [Fact]
+    public async Task TheTimedGrant_CoversOnlyThatConnectionEntryAndField()
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Channel.Answer = ApprovalAnswer.Approved;
+
+        await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
+
+        fixture.Channel.Answer = ApprovalAnswer.Denied;
+        var otherConnection = await fixture.Handler.RequestAsync(Request(), "conn-2", Token);
+        var otherField = await fixture.Handler.RequestAsync(Request(field: "username"), "conn-1", Token);
+        var same = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
+
+        Assert.Equal(AuditDecision.Denied, otherConnection.Decision);
+        Assert.Equal(AuditDecision.Denied, otherField.Decision);
+        Assert.Equal(AuditMethod.GrantCache, same.Method);
+        Assert.Equal(3, fixture.Channel.Asked);
+    }
+
+    [Fact]
+    public async Task MaxTtl_BoundsTheTimedGrant()
+    {
+        using var fixture = new ApproverFixture(limits: ApprovalLimits.Default with { MaximumTtlSeconds = 300 });
+        fixture.Channel.Answer = ApprovalAnswer.Approved;
+
+        var reply = await fixture.Handler.RequestAsync(Request(ttl: 3600), "conn-1", Token);
+
+        Assert.Equal(300, fixture.Channel.LastPrompt!.TtlSeconds);
+        Assert.Equal(300, reply.TtlSeconds);
+        Assert.Equal("a person approved this request for 5 minutes", reply.Reason);
+    }
+
+    /// <summary>A channel that says "timed" to a prompt that offered none releases once and keeps nothing.</summary>
+    [Fact]
+    public async Task AnHourAnswer_ToAPromptOfferingNone_ReleasesOnceOnly()
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Channel.Answer = ApprovalAnswer.Approved;
+        var handler = LiveOnly(fixture);
+
+        var reply = await handler.RequestAsync(Request(), "conn-1", Token);
+
+        Assert.Equal(0, fixture.Channel.LastPrompt!.TtlSeconds);
+        Assert.Equal(AuditDecision.Granted, reply.Decision);
+        Assert.Equal(0, reply.TtlSeconds);
+        Assert.Equal(0, fixture.Grants.Count);
+    }
+
+    [Fact]
+    public async Task ALiveOnlyEntry_IsNeverServedFromAGrant()
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Channel.Answer = ApprovalAnswer.Approved;
+
+        // A grant under exactly the same connection, entry and field, given while it was not live-only.
+        await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
+        Assert.Equal(1, fixture.Grants.Count);
+
+        fixture.Channel.Answer = ApprovalAnswer.Denied;
+        var reply = await LiveOnly(fixture).RequestAsync(Request(), "conn-1", Token);
+
+        Assert.Equal(AuditDecision.Denied, reply.Decision);
+        Assert.Equal(AuditMethod.Prompt, reply.Method);
+        Assert.Equal(2, fixture.Channel.Asked);
+    }
+
+    [Fact]
+    public async Task ALiveOnlyEntry_IsNeverReleasedByPolicy()
+    {
+        using var fixture = new ApproverFixture(ApproverHandlerPolicyTests.Policy());
+        fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
+
+        var reply = await LiveOnly(fixture).RequestAsync(Request() with { ClientLabel = "billing-bot" }, "conn-1", Token);
+
+        Assert.Equal(1, fixture.Channel.Asked);
+        Assert.Equal(0, fixture.Channel.LastPrompt!.TtlSeconds);
+        Assert.Equal(AuditMethod.Prompt, reply.Method);
+
+        // The same rule does release without asking once the entry is not live-only.
+        var ruled = await fixture.Handler.RequestAsync(Request() with { ClientLabel = "billing-bot" }, "conn-1", Token);
+        Assert.Equal(AuditMethod.Policy, ruled.Method);
+    }
+
+    [Fact]
+    public async Task WithoutAPredicate_AProdEntryIsStillLiveOnly()
+    {
+        using var fixture = new ApproverFixture(ApproverHandlerPolicyTests.Policy(entries: "[\"env/**\"]"));
+        fixture.Channel.Answer = ApprovalAnswer.Approved;
+        var prod = new ProdSource();
+        var handler = new ApproverHandler(prod, prod, fixture.Gate, fixture.Grants, fixture.Policy);
+        var request = Request(ProdSource.Address) with { ClientLabel = "billing-bot" };
+
+        var first = await handler.RequestAsync(request, "conn-1", Token);
+        var second = await handler.RequestAsync(request, "conn-1", Token);
+
+        Assert.Equal(AuditMethod.Prompt, first.Method);
+        Assert.Equal(AuditMethod.Prompt, second.Method);
+        Assert.Equal(0, first.TtlSeconds);
+        Assert.Equal(0, fixture.Channel.LastPrompt!.TtlSeconds);
+        Assert.Equal(2, fixture.Channel.Asked);
+        Assert.Equal(0, fixture.Grants.Count);
+    }
+
+    [Fact]
+    public async Task ADenial_StillStartsTheCooldown()
+    {
+        using var fixture = new ApproverFixture();
+        fixture.Channel.Answer = ApprovalAnswer.Denied;
+
+        await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
+
+        fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
+        var again = await fixture.Handler.RequestAsync(Request(), "conn-1", Token);
+
+        Assert.Equal(AuditMethod.Cooldown, again.Method);
+        Assert.Equal(1, fixture.Channel.Asked);
+    }
+
+    private static ApproverHandler LiveOnly(ApproverFixture fixture) =>
+        new(fixture.Source, fixture.Source, fixture.Gate, fixture.Grants, fixture.Policy, fixture.Narration.Add, _ => true);
+
+    /// <summary>A vault holding one entry in a protected profile.</summary>
+    private sealed class ProdSource : ICredentialSource, IEntryNameLister
+    {
+        internal const string Address = "env/acme/prod/API_KEY";
+
+        private static readonly EntryName _entry = new("env/acme/prod", "API_KEY");
+
+        public bool TryResolve(string entryArgument, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out EntryName? name, out CredentialFailure failure)
+        {
+            var found = entryArgument == Address || entryArgument == EntryHandle.For(_entry);
+            name = found ? _entry : null;
+            failure = found ? CredentialFailure.None : CredentialFailure.NotFound;
+            return found;
+        }
+
+        public bool TryRead(EntryName name, string field, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out ReleasedField? value, out CredentialFailure failure)
+        {
+            value = new ReleasedField(field, Sentinel);
+            failure = CredentialFailure.None;
+            return true;
+        }
+
+        public bool TryList(EntryExposure exposure, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out IReadOnlyList<EntryName>? names, out CredentialFailure failure)
+        {
+            names = [_entry];
+            failure = CredentialFailure.None;
+            return true;
+        }
     }
 
     [Fact]

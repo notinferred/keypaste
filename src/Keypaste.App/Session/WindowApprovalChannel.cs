@@ -13,9 +13,9 @@ namespace Keypaste.App.Session;
 /// <remarks>
 /// <para>
 /// The gate owns the deadline, the cooldown and one prompt at a time; this only puts the prompt on
-/// screen and reports the answer. Anything but a press of Approve is a denial: Deny, Escape, closing
-/// the window, and every withdrawal, whether the gate's window ran out, the bridge hung up or the
-/// vault locked.
+/// screen, counts down the gate's window on it and reports the answer. Anything but a press of Allow
+/// once or the timed allow is a denial: Deny, Escape, closing the window, and every withdrawal,
+/// whether the gate's window ran out, the bridge hung up or the vault locked.
 /// </para>
 /// <para>
 /// A withdrawal decides the answer where it happens, on whatever thread that is, and takes the
@@ -24,9 +24,14 @@ namespace Keypaste.App.Session;
 /// dispatcher that has stopped cannot hold a request open past its denial.
 /// </para>
 /// </remarks>
-internal sealed class WindowApprovalChannel(TimeProvider clock) : IApprovalChannel
+/// <param name="clock">The clock the arming delay and the countdown run on.</param>
+/// <param name="answerWindow">The gate's window, which the countdown shows.</param>
+internal sealed class WindowApprovalChannel(TimeProvider clock, TimeSpan answerWindow) : IApprovalChannel
 {
+    private static readonly TimeSpan _tick = TimeSpan.FromSeconds(1);
+
     private readonly TimeProvider _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+    private readonly TimeSpan _answerWindow = answerWindow;
 
     /// <summary>Raised on the UI thread once a prompt window is on screen.</summary>
     internal event EventHandler<Window>? Shown;
@@ -53,6 +58,9 @@ internal sealed class WindowApprovalChannel(TimeProvider clock) : IApprovalChann
         CancellationToken cancellationToken)
     {
         Window? window = null;
+        var started = _clock.GetTimestamp();
+
+        TimeSpan Remaining() => _answerWindow - _clock.GetElapsedTime(started);
 
         void TakeDown()
         {
@@ -67,6 +75,9 @@ internal sealed class WindowApprovalChannel(TimeProvider clock) : IApprovalChann
             OnUiThread(TakeDown);
         });
 
+        using var countdown = _clock.CreateTimer(
+            _ => Dispatcher.UIThread.Post(() => request.Tick(Remaining())), null, _tick, _tick);
+
         Dispatcher.UIThread.Post(() =>
         {
             if (request.IsAnswered)
@@ -76,6 +87,7 @@ internal sealed class WindowApprovalChannel(TimeProvider clock) : IApprovalChann
 
             try
             {
+                request.Tick(Remaining());
                 window = create();
                 window.Show();
                 Shown?.Invoke(this, window);

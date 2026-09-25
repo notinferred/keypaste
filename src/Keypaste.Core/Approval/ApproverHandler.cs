@@ -33,6 +33,11 @@ namespace Keypaste.Core.Approval;
 /// here rather than inside <see cref="ApprovalGate"/>, because a pre-authorized request must not be
 /// able to collide with a prompt somebody is in the middle of answering.
 /// </para>
+/// <para>
+/// A person answers once or for the timed grant the prompt offers, which lasts the approver's
+/// ceiling whatever the agent asked for. An entry in a protected profile skips the grant cache and
+/// the policy and is offered no timed grant, so it is asked about every time.
+/// </para>
 /// </remarks>
 public sealed class ApproverHandler
 {
@@ -42,6 +47,7 @@ public sealed class ApproverHandler
     private readonly GrantCache _grants;
     private readonly PolicyGate _policy;
     private readonly Action<string>? _narrate;
+    private readonly Func<EntryName, bool> _requiresLiveApproval;
 
     /// <summary>Builds the handler over its five seams.</summary>
     /// <param name="source">Where entries are resolved and one field is read.</param>
@@ -50,6 +56,11 @@ public sealed class ApproverHandler
     /// <param name="grants">What a human has already said yes to.</param>
     /// <param name="policy">What a human said yes to in advance.</param>
     /// <param name="narrate">Optional: a line of running commentary for the operator's terminal.</param>
+    /// <param name="requiresLiveApproval">
+    /// Which entries are asked about every time, with no grant and no policy release; null means
+    /// <see cref="EnvProfileNames.RequiresLiveApproval"/>, so a host that forgets it still asks live
+    /// about a protected profile.
+    /// </param>
     /// <exception cref="ArgumentNullException">Any of the five seams is null.</exception>
     /// <remarks>
     /// <paramref name="policy"/> is not nullable, and "nothing is pre-authorized" is the value
@@ -63,7 +74,8 @@ public sealed class ApproverHandler
         ApprovalGate gate,
         GrantCache grants,
         PolicyGate policy,
-        Action<string>? narrate = null)
+        Action<string>? narrate = null,
+        Func<EntryName, bool>? requiresLiveApproval = null)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(lister);
@@ -77,6 +89,7 @@ public sealed class ApproverHandler
         _grants = grants;
         _policy = policy;
         _narrate = narrate;
+        _requiresLiveApproval = requiresLiveApproval ?? EnvProfileNames.RequiresLiveApproval;
     }
 
     /// <summary>Which entry names may be shown under the bridge's exposure.</summary>
@@ -156,13 +169,16 @@ public sealed class ApproverHandler
         var display = ApprovalPrompt.For(request.ClientName, name, request.Field, request.Reason, 0).Entry;
         var key = new GrantKey(connectionId, handle, request.Field);
 
+        // A protected profile is asked about every time: no grant serves it and no rule releases it.
+        var liveOnly = _requiresLiveApproval(name);
+
         // Declared before the try so the copy the cache hands out is zeroed on every path — the
         // repo's idiom for a disposable that only exists on one branch.
         ReleasedField? live = null;
 
         try
         {
-            if (_grants.TryUse(key, out live, out var remaining))
+            if (!liveOnly && _grants.TryUse(key, out live, out var remaining))
             {
                 return Deliver(
                     new CredentialReply
@@ -192,30 +208,35 @@ public sealed class ApproverHandler
             return Refused(AuditMethod.Cooldown, Explain(ApprovalAnswer.Cooldown), display);
         }
 
-        var outcome = _policy.Evaluate(request.ClientLabel, name, request.Field);
-
-        if (outcome.Kind == PolicyOutcomeKind.RateLimited)
+        if (!liveOnly)
         {
-            var spent = outcome.Rule!;
-            _narrate?.Invoke($"refused {display}: {spent.Id} has used its allowance for this hour");
+            var outcome = _policy.Evaluate(request.ClientLabel, name, request.Field);
 
-            return Refused(
-                AuditMethod.PolicyLimit,
-                $"policy rule {spent.Cite()} has used its allowance for this hour",
-                display);
+            if (outcome.Kind == PolicyOutcomeKind.RateLimited)
+            {
+                var spent = outcome.Rule!;
+                _narrate?.Invoke($"refused {display}: {spent.Id} has used its allowance for this hour");
+
+                return Refused(
+                    AuditMethod.PolicyLimit,
+                    $"policy rule {spent.Cite()} has used its allowance for this hour",
+                    display);
+            }
+
+            if (outcome.Kind == PolicyOutcomeKind.Granted)
+            {
+                return Preapproved(request, name, display, outcome.Rule!, cancellationToken);
+            }
         }
 
-        if (outcome.Kind == PolicyOutcomeKind.Granted)
-        {
-            return Preapproved(request, name, display, outcome.Rule!, cancellationToken);
-        }
-
-        var ttl = _gate.Limits.EffectiveTtlSeconds(request.TtlSeconds);
-        var prompt = ApprovalPrompt.For(request.ClientName, name, request.Field, request.Reason, ttl, request.ClientLabel);
+        // The person chooses once or the timed grant on screen, so its length is the approver's
+        // ceiling and never the agent's ttl_seconds.
+        var grantSeconds = liveOnly ? 0 : _gate.Limits.MaximumTtlSeconds;
+        var prompt = ApprovalPrompt.For(request.ClientName, name, request.Field, request.Reason, grantSeconds, request.ClientLabel);
 
         var answer = await _gate.AskAsync(CooldownKey(key), prompt, cancellationToken).ConfigureAwait(false);
 
-        if (answer != ApprovalAnswer.Approved)
+        if (!answer.Releases())
         {
             _narrate?.Invoke($"refused {display} for {prompt.Client}: {Explain(answer)}");
             return Refused(Method(answer), Explain(answer), display);
@@ -234,24 +255,34 @@ public sealed class ApproverHandler
 
         using (released)
         {
-            // Stored even when the reply below turns out not to fit. The size belongs to the entry
-            // rather than to the request, so every retry would end the same way — and re-prompting
-            // for each one is THREATS.md T-11 with a lever attached. From the cache, the second ask
-            // is refused without troubling anybody, and the copy is zeroed at its ordinary TTL.
-            _grants.Store(key, released, TimeSpan.FromSeconds(ttl), prompt);
+            var timed = answer == ApprovalAnswer.Approved && grantSeconds > 0;
+
+            if (timed)
+            {
+                // Stored even when the reply below turns out not to fit. The size belongs to the
+                // entry rather than to the request, so every retry would end the same way — and
+                // re-prompting for each one is THREATS.md T-11 with a lever attached. From the
+                // cache, the second ask is refused without troubling anybody, and the copy is
+                // zeroed at its ordinary TTL. A once answer keeps nothing, so it asks again.
+                _grants.Store(key, released, TimeSpan.FromSeconds(grantSeconds), prompt);
+            }
 
             return Deliver(
                 new CredentialReply
                 {
                     Decision = AuditDecision.Granted,
                     Method = AuditMethod.Prompt,
-                    Reason = "a person approved this request",
+                    Reason = timed
+                        ? $"a person approved this request for {ApprovalLimits.Describe(grantSeconds)}"
+                        : "a person approved this one request",
                     Entry = display,
-                    TtlSeconds = ttl,
+                    TtlSeconds = timed ? grantSeconds : 0,
                     Value = released.Value.ToString(),
                 },
                 display,
-                $"released {display} to {prompt.Client} for {ttl}s");
+                timed
+                    ? $"released {display} to {prompt.Client} for {grantSeconds}s"
+                    : $"released {display} to {prompt.Client} once");
         }
     }
 

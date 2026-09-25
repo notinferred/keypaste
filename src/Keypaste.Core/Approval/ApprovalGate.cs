@@ -14,9 +14,9 @@ public sealed record WaitingRequest(ApprovalPrompt Prompt, TimeSpan Remaining);
 /// <para>
 /// The gate exists so that no channel has to be trusted with the rules. A channel that forgets its
 /// own timeout, throws, answers twice, or answers late cannot turn any of those into a release: the
-/// deadline is measured here, and anything that is not a clean
-/// <see cref="ApprovalAnswer.Approved"/> arriving inside the window is a denial (docs/PRODUCT.md laws 3.2
-/// and 3.7).
+/// deadline is measured here, and anything that is not a clean <see cref="ApprovalAnswer.Approved"/>
+/// or <see cref="ApprovalAnswer.ApprovedOnce"/> arriving inside the window is a denial
+/// (docs/PRODUCT.md laws 3.2 and 3.7).
 /// </para>
 /// <para>
 /// <b>One request in front of a human at a time.</b> The MCP SDK dispatches tool calls
@@ -71,7 +71,7 @@ public sealed class ApprovalGate : IDisposable
     /// </param>
     /// <param name="prompt">What the human is shown.</param>
     /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
-    /// <returns>The answer, which is a denial unless it is <see cref="ApprovalAnswer.Approved"/>.</returns>
+    /// <returns>The answer, which is a denial unless <see cref="ApprovalAnswers.Releases"/> says otherwise.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="cooldownKey"/> or <paramref name="prompt"/> is null.</exception>
     public ValueTask<ApprovalAnswer> AskAsync(
         string cooldownKey,
@@ -88,7 +88,7 @@ public sealed class ApprovalGate : IDisposable
     /// <param name="cooldownKey">What counts as "the same request" after a refusal.</param>
     /// <param name="prompt">What the human is shown.</param>
     /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
-    /// <returns>The answer, which is a denial unless it is <see cref="ApprovalAnswer.Approved"/>.</returns>
+    /// <returns>The answer, which is a denial unless <see cref="ApprovalAnswers.Releases"/> says otherwise.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="cooldownKey"/> or <paramref name="prompt"/> is null.</exception>
     /// <remarks>
     /// One slot for both kinds, so an env prompt and an agent's prompt are never on screen together

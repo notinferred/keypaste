@@ -864,4 +864,70 @@ public sealed class ServerToolsTests
         Assert.Contains("env/dev/STRIPE_KEY", audit, StringComparison.Ordinal);
         Assert.DoesNotContain("k1_0123456789abcdef", audit, StringComparison.Ordinal);
     }
+
+    /// <summary>
+    /// "Allow once" keeps nothing, so the agent is told the release covers this request only and
+    /// expires at once, rather than a lifetime nobody granted.
+    /// </summary>
+    [Fact]
+    public async Task AOnceRelease_SaysThisRequestOnly_AndExpiresInZero()
+    {
+        await using var harness = new McpHarness();
+        harness.Approver.StartApproving(ttlSeconds: 0);
+        var client = await harness.StartAsync();
+
+        var result = await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY"));
+        var text = TextOf(result);
+
+        Assert.False(result.IsError);
+        Assert.Contains("APPROVED ONCE", text, StringComparison.Ordinal);
+        Assert.Contains("for this request only", text, StringComparison.Ordinal);
+        Assert.Contains("Ask again if you need it again.", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("seconds", text, StringComparison.Ordinal);
+        Assert.Contains(FakeApprover.Sentinel, text, StringComparison.Ordinal);
+        Assert.Equal(0, result.StructuredContent!.Value.GetProperty("expires_in_seconds").GetInt32());
+    }
+
+    [Fact]
+    public async Task ATimedRelease_StatesItsSeconds()
+    {
+        await using var harness = new McpHarness();
+        harness.Approver.StartApproving(ttlSeconds: 3600);
+        var client = await harness.StartAsync();
+
+        var result = await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY", ttl: 60));
+        var text = TextOf(result);
+
+        Assert.Contains("for 3600 seconds", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("APPROVED ONCE", text, StringComparison.Ordinal);
+        Assert.Equal(3600, result.StructuredContent!.Value.GetProperty("expires_in_seconds").GetInt32());
+    }
+
+    [Theory]
+    [InlineData(3600)]
+    [InlineData(0)]
+    public async Task TheAuditLine_CarriesGrantedSeconds(int seconds)
+    {
+        await using var harness = new McpHarness();
+        harness.Approver.StartApproving(ttlSeconds: seconds);
+        var client = await harness.StartAsync();
+
+        await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY"));
+
+        using var parsed = JsonDocument.Parse(Assert.Single(harness.AuditLines()));
+        Assert.Equal(seconds, parsed.RootElement.GetProperty("granted_seconds").GetInt32());
+        Assert.Equal(900, parsed.RootElement.GetProperty("args").GetProperty("ttl_seconds").GetInt32());
+    }
+
+    [Fact]
+    public async Task ARefusedCall_HasNoGrantedSeconds()
+    {
+        await using var harness = new McpHarness();
+        harness.Approver.StartRefusing(AuditMethod.Prompt);
+        var client = await harness.StartAsync();
+
+        await CallAsync(client, ToolText.CredentialToolName, Credential(entry: "env/dev/STRIPE_KEY"));
+
+        Assert.DoesNotContain("granted_seconds", Assert.Single(harness.AuditLines()), StringComparison.Ordinal);
+    }
 }
