@@ -92,7 +92,10 @@ public static class McpClientCards
 
         foreach (var entry in audit)
         {
+            // A token run names itself like a client but has no bridge; matched on the method because
+            // a bridge may assert any client name.
             if (!_bridgeTools.Contains(entry.Tool)
+                || string.Equals(entry.Method, "token", StringComparison.Ordinal)
                 || !string.Equals(entry.Vault, vaultKey, StringComparison.Ordinal)
                 || entry.At is not { } at
                 || now - at > SeenWindow

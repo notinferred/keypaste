@@ -36,6 +36,14 @@ public sealed class McpClientCardsTests
     }
 
     [Fact]
+    public void ATokenRun_IsNoMcpClient()
+    {
+        var token = Line(string.Empty, "keypaste run --token", 1, tool: "run") with { Method = "token" };
+
+        Assert.Empty(McpClientCards.Build([], [token], _vault, ClientPolicies.Empty, _now));
+    }
+
+    [Fact]
     public void SeenOnlyInTheLog_IsIdle_WithLastSeen()
     {
         var cards = McpClientCards.Build([], [Line("cursor", "Cursor", 5), Line("cursor", "Cursor", 2)], _vault, ClientPolicies.Empty, _now);
