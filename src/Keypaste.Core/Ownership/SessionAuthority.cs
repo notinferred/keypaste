@@ -905,7 +905,7 @@ public sealed class SessionAuthority : IApproverHandler
             ids.Contains(id) || (request.Client is { } named && string.Equals(client, named, StringComparison.Ordinal));
 
         var ended = activity.Grants.Where(grant => Named(GrantId.Of(grant.Key), grant.Approved.Client)).ToList();
-        var endedEnv = activity.EnvGrants.Where(grant => Named(GrantId.OfEnv(grant.Key), GrantSummary.EnvClient)).ToList();
+        var endedEnv = activity.EnvGrants.Where(grant => Named(GrantId.OfEnv(grant.Key), grant.Client ?? GrantSummary.EnvClient)).ToList();
 
         foreach (var grant in ended)
         {

@@ -551,6 +551,28 @@ public sealed class SessionAuthorityRunTests : IDisposable
     }
 
     [Fact]
+    public async Task RevokingByTheListedClientName_EndsItsRunGrant()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        await using var owner = Owner.Start(this);
+        await using var client = await AttachedAsync(owner);
+        await client.ReleaseRunAsync(Run(), Token);
+        var listed = Assert.Single(GrantSummary.Of(owner.Authority.Activity));
+        Assert.Equal("claude-code-cli", listed.Client);
+
+        var reply = await client.RevokeGrantsAsync(
+            new RevokeGrantsRequest([], listed.Client, All: false) { Vault = VaultPath, Session = "session-one" },
+            Token);
+        _fixture.Channel.Answer = ApprovalAnswer.Denied;
+        var again = await client.ReleaseRunAsync(Run(), Token);
+
+        Assert.Equal(new RevokeGrantsReply(1, string.Empty), reply);
+        Assert.Empty(owner.Authority.Activity.EnvGrants);
+        Assert.Equal(AuditMethod.Prompt, again!.Method);
+        Assert.Equal(2, _fixture.Channel.Asked);
+    }
+
+    [Fact]
     public async Task EveryCommittedRelease_IsInTheLedger_AndANewLifetimeStartsEmpty()
     {
         _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
