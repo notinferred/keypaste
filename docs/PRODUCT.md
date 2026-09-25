@@ -38,6 +38,8 @@ Hardware-key vault unlocking is part of the product, planned after the first int
 
 Sharing and merge, hosted services and sync, accounts and billing, team administration, browser filling, phone and web clients, TOTP, SSH and complete KeePassXC parity are not committed delivery tracks. BACKLOG retains useful options and the conditions for reconsidering them. There is no paid-release or enterprise milestone, promised service pricing, or obligation to implement the backlog.
 
+Amendment of 2026-09-25, by founder direction (D-0357): one-time share links and scoped tokens are in scope. `keypaste share` encrypts one field locally and keypaste.com holds only ciphertext it cannot open, serving it once `SHARE_ENABLED` is set; a scoped token is a pre-approval the person creates for `keypaste run`, with a scope and an expiry, verified and audited by the vault's owner. Merge, sync, accounts and the other exclusions above are unchanged, and §3 applies to both.
+
 ## 3. Security laws
 
 1. The vault master key never leaves the local process, including through telemetry or an encrypted server backup. There are no exceptions.

@@ -55,7 +55,7 @@ In source, Agent Activity has a Connect a client section for the vault the app h
 
 The app registers the `keypaste-mcp` beside it, or the first one on `PATH`. The internal desktop packages carry one. An AppImage is mounted somewhere new each time it starts, so from an AppImage the client is told to start the image file itself with `mcp`: moving or deleting the `.AppImage` breaks the registration until you connect again.
 
-Check the connection starts that registered command as the client would, lists the names its exposure allows and asks for one of them, the only one or the one you pick, with a reason saying it is a connection check. The request opens the app's prompt window like any other, and Approve or Deny each end the check. A released password is discarded unread, and the audit record appears in the session's history below. Preview remove and Run it take keypaste out of the client and leave its other servers alone.
+Check the connection starts that registered command as the client would, lists the names its exposure allows and asks for one of them, the only one or the one you pick, with a reason saying it is a connection check. The request opens the app's prompt window like any other, and Allow once, Allow for 1 hour or Deny each end the check. A released password is discarded unread, and the audit record appears in the session's history below. Preview remove and Run it take keypaste out of the client and leave its other servers alone.
 
 No master password, keyfile or session identifier is written into a client's configuration.
 
@@ -294,7 +294,7 @@ Will it see my desktop edits immediately? No. The current terminal approver hold
 
 The master-password prompt belongs in the process you start. An MCP client can trigger bridge startup, its stdin and stdout carry the protocol, and desktop clients provide no terminal. A configuration password would be plaintext, while client-mediated input would expose it to the requester. [D-0023](decisions-archive.md) records this design.
 
-Do I have to approve every single call? No. A repeat request for the same field of the same entry, from the same connection, inside the lifetime you approved, is served without asking again. Change that with `--max-ttl` on the agent. A [policy rule](policy.md) can authorize matching releases without an initial prompt.
+Do I have to approve every single call? No. After Allow for 1 hour (`h` at the terminal), a repeat request for the same field of the same entry, from the same connection, is served without asking again until the hour is up; Allow once (`o`) keeps nothing. Shorten the hour with `--max-ttl` on the agent. A [policy rule](policy.md) can authorize matching releases without an initial prompt.
 
 Does anything leave my machine? The keypaste bridge uses local stdio and local IPC; it does not send vault data to a hosted service. Your MCP client receives the tool result and may send it to a remote model and retain it in transcripts or session files. The local bridge does not make the rest of that client workflow local. See [the demo's limits](demo.md#the-honest-limits).
 
