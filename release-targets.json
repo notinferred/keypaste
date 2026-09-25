@@ -189,6 +189,14 @@
           "runner": "macos-15",
           "archive": "tar.gz",
           "cpu": "arm64",
+          "packages": [
+            {
+              "kind": "app-bundle",
+              "pattern": "keypaste-app-{version}-{rid}-internal-unsigned.app.zip",
+              "internal": true,
+              "signed": false
+            }
+          ],
           "advertised": false,
           "os_floor": null,
           "floor_evidence": "none",
