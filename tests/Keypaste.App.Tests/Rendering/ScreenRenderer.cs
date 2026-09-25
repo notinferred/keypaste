@@ -50,8 +50,9 @@ public sealed class ScreenRenderer
 
     /// <summary>
     /// Agents with what a working session holds: two clients attached over the app's own endpoint
-    /// whose requests a person allowed for an hour, a client seen only in the log, a policy and
-    /// two tokens, then the token form, a minted token and the Connect card.
+    /// whose requests a person allowed for an hour, a request still waiting at the prompt, a client
+    /// seen only in the log, a policy and two tokens; then the page in a wide window, the token form,
+    /// a minted token, a token revoke being confirmed and the Connect card.
     /// </summary>
     [Fact]
     public Task The_agents_screen_is_drawn_with_grants_clients_and_tokens() => HeadlessSession.On(async () =>
@@ -76,6 +77,8 @@ public sealed class ScreenRenderer
         await AskAsync(claude, serving, demo.Path, "claude-code", "env/acme-api/STRIPE_SECRET_KEY");
         clock.Advance(TimeSpan.FromMinutes(18));
         await AskAsync(cursor, serving, demo.Path, "cursor", "env/acme-web/NEXT_PUBLIC_API");
+        var waiting = AskAsync(cursor, serving, demo.Path, "cursor", Allowing.Held);
+        await WaitUntilAsync(() => authority.Activity.Waiting.Count == 1);
 
         Assert.True(Core.Clients.ClientPolicies.TrySave(
             Core.Audit.KeypasteHome.ClientsPath(demo.Home),
@@ -98,6 +101,12 @@ public sealed class ScreenRenderer
         window.Height = 1500;
         Save(window, output!, "21-agents-full");
 
+        window.Width = 1920;
+        window.Height = 1100;
+        Save(window, output!, "25-agents-wide");
+        window.Width = _width;
+        window.Height = 1500;
+
         agents.RevokeCommand.Execute(agents.Grants[0]);
         tokens.OpenFormCommand.Execute(null);
         tokens.Name = "deploy-preview";
@@ -109,11 +118,27 @@ public sealed class ScreenRenderer
         Save(window, output!, "23-agents-token-minted");
 
         tokens.DoneMintedCommand.Execute(null);
+        tokens.AskRevokeCommand.Execute(tokens.Rows[0]);
+        Save(window, output!, "26-agents-token-revoke");
+
+        tokens.CancelRevokeCommand.Execute(null);
         agents.ToggleConnectCommand.Execute(null);
         Save(window, output!, "24-agents-connect");
 
         window.Close();
+        authority.Session.Lock(VaultLockReason.Manual);
+        await Assert.ThrowsAnyAsync<Exception>(() => waiting);
     });
+
+    private static async Task WaitUntilAsync(Func<bool> condition)
+    {
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        while (!condition())
+        {
+            await Task.Delay(20, deadline.Token);
+        }
+    }
 
     private static async Task<Core.Ipc.ApproverClient> AgentAsync(AuthorityStatus.Serving serving, string vault, Core.Ipc.AttachClient identity)
     {
@@ -142,10 +167,20 @@ public sealed class ScreenRenderer
         Assert.NotNull(reply?.Value);
     }
 
+    /// <summary>Allows every request but one, which it leaves waiting until the session ends.</summary>
     private sealed class Allowing : IApprovalChannel
     {
-        public ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken) =>
-            ValueTask.FromResult(ApprovalAnswer.Approved);
+        internal const string Held = "env/acme-web/VERCEL_TOKEN";
+
+        public async ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken)
+        {
+            if (prompt.Entry == Held)
+            {
+                await Task.Delay(Timeout.Infinite, cancellationToken);
+            }
+
+            return ApprovalAnswer.Approved;
+        }
     }
 
     private static void DrawUnlock(DemoVault demo, string output)

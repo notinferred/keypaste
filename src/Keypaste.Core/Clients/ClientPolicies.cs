@@ -64,7 +64,7 @@ public sealed class ClientPolicies
     [
         "# keypaste: how each MCP client is asked, by the --client-label its bridge was started with.",
         "# \"*\" is every other client. policy: \"session\" (Session grants up to 1h), \"ask\" (Ask every time),",
-        "# \"inject-only\" (Inject only: keypaste never hands it a value; commands you approve can read them).",
+        "# \"inject-only\" (Inject only: keypaste never hands it a value; only commands you approve can read the values).",
     ];
 
     private ClientPolicies(IReadOnlyList<ClientPolicyRow> rows)
@@ -360,7 +360,7 @@ public sealed class ClientPolicies
     public static string Describe(ClientPolicy policy) => policy switch
     {
         ClientPolicy.AskEveryTime => "Ask every time",
-        ClientPolicy.InjectOnly => "Inject only: keypaste never hands it a value; commands you approve can read them",
+        ClientPolicy.InjectOnly => "Inject only: keypaste never hands it a value; only commands you approve can read the values",
         _ => "Session grants up to 1h",
     };
 

@@ -32,8 +32,12 @@ public sealed class AgentActivityViewModelTests
         Assert.Equal("example · password", waiting.What);
         Assert.Equal("claude-code · label ci-probe", waiting.Who);
         Assert.Equal("answered for you in 45 s", waiting.Left);
+        Assert.Equal("45s left", waiting.LeftText);
+        Assert.True(model.HasWaiting);
         Assert.Empty(model.Grants);
         Assert.True(model.IsAvailable);
+        var serving = Assert.IsType<AuthorityStatus.Serving>(app.Authority.Status);
+        Assert.Equal($"Answering agents from this app · process {serving.Owner.ProcessId} · session {serving.Session}", model.Serving);
 
         app.Clock.Advance(TimeSpan.FromSeconds(5));
 

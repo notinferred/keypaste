@@ -8,352 +8,402 @@
              Background="{DynamicResource KpBgApp}">
 
   <ScrollViewer VerticalScrollBarVisibility="Auto">
-    <StackPanel Spacing="28" Margin="32,28" MaxWidth="1016" HorizontalAlignment="Stretch">
+    <!-- A capped star column keeps the page at the left gutter; a MaxWidth on a stretched panel centres it. -->
+    <Grid Margin="32,28">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" MaxWidth="1016" />
+      </Grid.ColumnDefinitions>
+      <StackPanel Spacing="28">
 
-      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
-        <StackPanel Spacing="6">
-          <TextBlock Classes="h1" Text="Agents" />
-          <TextBlock Classes="subtitle" Text="MCP clients and tokens that can ask for secrets. Every request goes through you or a grant." />
-        </StackPanel>
-        <Button Grid.Column="1" VerticalAlignment="Bottom" Padding="12,0" Height="30"
-                Command="{Binding ToggleConnectCommand}">
-          <StackPanel Orientation="Horizontal" Spacing="6">
-            <ctl:KpIcon Icon="plus" Size="13" />
-            <TextBlock Text="Connect client" />
+        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="16">
+          <StackPanel Spacing="6">
+            <TextBlock Classes="h1" Text="Agents" />
+            <TextBlock Classes="subtitle" Text="MCP clients and tokens that can ask for secrets. Every request goes through you or a grant." />
           </StackPanel>
-        </Button>
-      </Grid>
-
-      <Border Classes="card" IsVisible="{Binding IsUnavailable}">
-        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-          <ctl:KpIcon Icon="alert-triangle" Size="15" Foreground="{DynamicResource KpWarn}" VerticalAlignment="Top" Margin="0,2,0,0" />
-          <TextBlock Grid.Column="1" Classes="body secondary" Text="{Binding Status}" />
+          <Grid Grid.Row="1" Grid.ColumnSpan="2" ColumnDefinitions="Auto,*" ColumnSpacing="6" Margin="0,8,0,0"
+                IsVisible="{Binding IsServing}">
+            <Border Classes="dot ok" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Classes="caption" Text="{Binding Serving}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+          </Grid>
+          <Button Grid.Column="1" VerticalAlignment="Bottom" Padding="12,0" Height="30"
+                  Command="{Binding ToggleConnectCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <ctl:KpIcon Icon="plus" Size="13" />
+              <TextBlock Text="Connect client" />
+            </StackPanel>
+          </Button>
         </Grid>
-      </Border>
 
-      <!-- The preview is core's McpSetupPlan.Display, and Connect runs that same plan. -->
-      <Border Classes="card filled" IsVisible="{Binding IsConnectOpen}">
-        <Panel IsVisible="{Binding Connect, Converter={x:Static ObjectConverters.IsNotNull}}">
-          <StackPanel Spacing="14" DataContext="{Binding Connect}" x:DataType="vm:ConnectClientViewModel">
-            <Grid ColumnDefinitions="*,Auto">
-              <StackPanel Spacing="4">
-                <TextBlock Classes="dialog-title" Text="Connect a client" />
-                <TextBlock Classes="caption" MaxWidth="640" HorizontalAlignment="Left"
-                           Text="Points an AI client at this vault. It can then list the names its exposure allows and ask for one credential at a time, which you answer here." />
-              </StackPanel>
-              <Button Grid.Column="1" Classes="icon ghost sm" VerticalAlignment="Top"
-                      Command="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).ToggleConnectCommand}"
-                      AutomationProperties.Name="Close">
-                <ctl:KpIcon Icon="x" Size="14" />
-              </Button>
-            </Grid>
+        <Border Classes="card" IsVisible="{Binding IsUnavailable}">
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+            <ctl:KpIcon Icon="alert-triangle" Size="15" Foreground="{DynamicResource KpWarn}" VerticalAlignment="Top" Margin="0,2,0,0" />
+            <TextBlock Grid.Column="1" Classes="body secondary" Text="{Binding Status}" />
+          </Grid>
+        </Border>
 
-            <Grid ColumnDefinitions="*,*,2*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="6">
-              <TextBlock Classes="label" Text="Client" />
-              <TextBlock Grid.Column="1" Classes="label" Text="Label" />
-              <TextBlock Grid.Column="2" Classes="label" Text="Exposure" />
-              <ComboBox Grid.Row="1" HorizontalAlignment="Stretch"
-                        ItemsSource="{Binding Clients}"
-                        SelectedItem="{Binding SelectedClient}"
-                        AutomationProperties.Name="Client">
-                <ComboBox.ItemTemplate>
-                  <DataTemplate x:DataType="clients:McpClient">
-                    <TextBlock Text="{Binding DisplayName}" />
-                  </DataTemplate>
-                </ComboBox.ItemTemplate>
-              </ComboBox>
-              <TextBox Grid.Row="1" Grid.Column="1" Classes="mono" Text="{Binding Label}" AutomationProperties.Name="Label" />
-              <TextBox Grid.Row="1" Grid.Column="2" Classes="mono"
-                       Text="{Binding Exposure}"
-                       PlaceholderText="env/** (the default). Separate more patterns with commas."
-                       AutomationProperties.Name="Exposure" />
-            </Grid>
+        <!-- The preview is core's McpSetupPlan.Display, and Connect runs that same plan. -->
+        <Border Classes="card filled" IsVisible="{Binding IsConnectOpen}">
+          <Panel IsVisible="{Binding Connect, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <StackPanel Spacing="14" DataContext="{Binding Connect}" x:DataType="vm:ConnectClientViewModel">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="4">
+                  <TextBlock Classes="dialog-title" Text="Connect a client" />
+                  <TextBlock Classes="caption" MaxWidth="640" HorizontalAlignment="Left"
+                             Text="Points an AI client at this vault. It can then list the names its exposure allows and ask for one credential at a time, which you answer here." />
+                </StackPanel>
+                <Button Grid.Column="1" Classes="icon ghost sm" VerticalAlignment="Top"
+                        Command="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).ToggleConnectCommand}"
+                        AutomationProperties.Name="Close">
+                  <ctl:KpIcon Icon="x" Size="14" />
+                </Button>
+              </Grid>
 
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <Button Classes="primary" Content="Preview connect" Command="{Binding PreviewConnectCommand}" />
-              <Button Content="Preview remove" Command="{Binding PreviewRemoveCommand}" />
-            </StackPanel>
-
-            <StackPanel Spacing="10" IsVisible="{Binding HasPreview}">
-              <Border Classes="terminal">
-                <ScrollViewer HorizontalScrollBarVisibility="Auto" Padding="14,12">
-                  <SelectableTextBlock Text="{Binding Preview}"
-                                       FontFamily="{DynamicResource KpMono}"
-                                       FontSize="12"
-                                       Foreground="{DynamicResource KpTextSecondary}" />
-                </ScrollViewer>
-              </Border>
-              <TextBlock Classes="caption" Text="{Binding PreviewNote}" MaxWidth="640" HorizontalAlignment="Left" />
-              <StackPanel Orientation="Horizontal" Spacing="8">
-                <Button Classes="primary" Content="Run it" Command="{Binding ConfirmCommand}" />
-                <Button Classes="ghost" Content="Cancel" Command="{Binding CancelCommand}" />
-              </StackPanel>
-            </StackPanel>
-
-            <TextBlock Classes="body" Text="{Binding Message}" IsVisible="{Binding HasMessage}" MaxWidth="640" HorizontalAlignment="Left" />
-
-            <Border Classes="divider" />
-
-            <StackPanel Spacing="10">
-              <StackPanel Orientation="Horizontal" Spacing="8">
-                <Button Content="Check the connection" Command="{Binding CheckCommand}" />
-                <ComboBox ItemsSource="{Binding CheckEntries}"
-                          SelectedItem="{Binding SelectedCheckEntry}"
-                          IsVisible="{Binding IsPicking}"
-                          MinWidth="240"
-                          AutomationProperties.Name="Entry to ask for">
+              <Grid ColumnDefinitions="*,*,2*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="6">
+                <TextBlock Classes="label" Text="Client" />
+                <TextBlock Grid.Column="1" Classes="label" Text="Label" />
+                <TextBlock Grid.Column="2" Classes="label" Text="Exposure" />
+                <ComboBox Grid.Row="1" HorizontalAlignment="Stretch"
+                          ItemsSource="{Binding Clients}"
+                          SelectedItem="{Binding SelectedClient}"
+                          AutomationProperties.Name="Client">
                   <ComboBox.ItemTemplate>
-                    <DataTemplate x:DataType="clients:McpListedEntry">
-                      <TextBlock Text="{Binding Name}" FontFamily="{DynamicResource KpMono}" />
+                    <DataTemplate x:DataType="clients:McpClient">
+                      <TextBlock Text="{Binding DisplayName}" />
                     </DataTemplate>
                   </ComboBox.ItemTemplate>
                 </ComboBox>
-                <Button Content="Ask for it" Command="{Binding AskCommand}" IsVisible="{Binding IsPicking}" />
-              </StackPanel>
-              <TextBlock Classes="body secondary" Text="{Binding CheckMessage}" IsVisible="{Binding HasCheckMessage}"
-                         MaxWidth="640" HorizontalAlignment="Left" />
-            </StackPanel>
-          </StackPanel>
-        </Panel>
-      </Border>
+                <TextBox Grid.Row="1" Grid.Column="1" Classes="mono" Text="{Binding Label}" AutomationProperties.Name="Label" />
+                <TextBox Grid.Row="1" Grid.Column="2" Classes="mono"
+                         Text="{Binding Exposure}"
+                         PlaceholderText="env/**"
+                         AutomationProperties.Name="Exposure" />
+              </Grid>
+              <TextBlock Classes="caption" Margin="0,-6,0,0"
+                         Text="Exposure is which entry names the client may list: env/** unless you name others. Separate patterns with commas." />
 
-      <StackPanel Spacing="10" IsVisible="{Binding IsAvailable}">
-        <StackPanel Orientation="Horizontal" Spacing="8">
-          <ctl:KpIcon Icon="hourglass" Size="15" Foreground="{DynamicResource KpAccent}" />
-          <TextBlock Classes="section" Text="Active grants" />
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Classes="primary" Content="Preview connect" Command="{Binding PreviewConnectCommand}" />
+                <Button Content="Preview remove" Command="{Binding PreviewRemoveCommand}" />
+              </StackPanel>
+
+              <StackPanel Spacing="10" IsVisible="{Binding HasPreview}">
+                <Border Classes="terminal">
+                  <ScrollViewer HorizontalScrollBarVisibility="Auto" Padding="14,12">
+                    <SelectableTextBlock Text="{Binding Preview}"
+                                         FontFamily="{DynamicResource KpMono}"
+                                         FontSize="12"
+                                         Foreground="{DynamicResource KpTextSecondary}" />
+                  </ScrollViewer>
+                </Border>
+                <TextBlock Classes="caption" Text="{Binding PreviewNote}" MaxWidth="640" HorizontalAlignment="Left" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Classes="primary" Content="Run it" Command="{Binding ConfirmCommand}" />
+                  <Button Classes="ghost" Content="Cancel" Command="{Binding CancelCommand}" />
+                </StackPanel>
+              </StackPanel>
+
+              <TextBlock Classes="body" Text="{Binding Message}" IsVisible="{Binding HasMessage}" MaxWidth="640" HorizontalAlignment="Left" />
+
+              <Border Classes="divider" />
+
+              <StackPanel Spacing="10">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Content="Check the connection" Command="{Binding CheckCommand}" />
+                  <ComboBox ItemsSource="{Binding CheckEntries}"
+                            SelectedItem="{Binding SelectedCheckEntry}"
+                            IsVisible="{Binding IsPicking}"
+                            MinWidth="240"
+                            AutomationProperties.Name="Entry to ask for">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate x:DataType="clients:McpListedEntry">
+                        <TextBlock Text="{Binding Name}" FontFamily="{DynamicResource KpMono}" />
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                  <Button Content="Ask for it" Command="{Binding AskCommand}" IsVisible="{Binding IsPicking}" />
+                  <TextBlock Classes="caption" VerticalAlignment="Center" IsVisible="{Binding NeedsRegistration}"
+                             Text="Connect a client first, then check that its requests reach you here." />
+                </StackPanel>
+                <TextBlock Classes="body secondary" Text="{Binding CheckMessage}" IsVisible="{Binding HasCheckMessage}"
+                           MaxWidth="640" HorizontalAlignment="Left" />
+              </StackPanel>
+            </StackPanel>
+          </Panel>
+        </Border>
+
+        <!-- The prompt window asks; this is the second place a waiting request shows, in case that window was missed. -->
+        <StackPanel Spacing="10" IsVisible="{Binding HasWaiting}">
+          <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
+            <ctl:KpIcon Icon="clock" Size="15" Foreground="{DynamicResource KpAccent}" />
+            <TextBlock Grid.Column="1" Classes="section" Text="Waiting for you" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="2" Classes="caption" Text="Answer in the prompt window" HorizontalAlignment="Right" VerticalAlignment="Center" />
+          </Grid>
+          <Border Classes="table">
+            <ItemsControl ItemsSource="{Binding Waiting}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ActivityRow">
+                  <Border Padding="16,14" BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,0,0,1">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                      <StackPanel Spacing="4" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Client}" FontSize="13.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Classes="mono secondary" FontSize="12" Text="{Binding What}" TextTrimming="CharacterEllipsis" />
+                      </StackPanel>
+                      <TextBlock Grid.Column="1" Classes="mono amber" FontSize="11" Text="{Binding LeftText}" VerticalAlignment="Center" />
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </Border>
         </StackPanel>
-        <TextBlock Classes="caption" IsVisible="{Binding NoGrants}"
-                   Text="No grant is in force, so the next request is asked about." />
-        <Border Classes="table" IsVisible="{Binding HasGrants}">
-          <ItemsControl ItemsSource="{Binding Grants}">
+
+        <StackPanel Spacing="10" IsVisible="{Binding IsAvailable}">
+          <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
+            <ctl:KpIcon Icon="hourglass" Size="15" Foreground="{DynamicResource KpAccent}" />
+            <TextBlock Grid.Column="1" Classes="section" Text="Active grants" VerticalAlignment="Center" />
+            <Button Grid.Column="2" Classes="danger sm" FontSize="12" Content="Revoke all" HorizontalAlignment="Right" VerticalAlignment="Center"
+                    IsVisible="{Binding HasGrants}" Command="{Binding RevokeAllCommand}" />
+          </Grid>
+          <TextBlock Classes="caption" IsVisible="{Binding NoGrants}"
+                     Text="No grant is in force, so the next request is asked about." />
+          <Border Classes="table" IsVisible="{Binding HasGrants}">
+            <ItemsControl ItemsSource="{Binding Grants}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ActivityRow">
+                  <Border Padding="16,14" BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,0,0,1">
+                    <Grid ColumnDefinitions="*,150,Auto" ColumnSpacing="16">
+                      <StackPanel Spacing="4" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Client}" FontSize="13.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Classes="mono secondary" FontSize="12" Text="{Binding Detail}" TextTrimming="CharacterEllipsis" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
+                        <TextBlock Classes="mono sm amber" Text="{Binding LeftText}" />
+                        <ProgressBar Classes="thin" MinWidth="0" Minimum="0" Maximum="1" Value="{Binding Fraction}" />
+                      </StackPanel>
+                      <Button Grid.Column="2" Classes="danger sm" FontSize="12" Content="Revoke" VerticalAlignment="Center"
+                              Command="{Binding $parent[ItemsControl].((vm:AgentActivityViewModel)DataContext).RevokeCommand}"
+                              CommandParameter="{Binding}" />
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </Border>
+        </StackPanel>
+
+        <!-- Who reaches this vault and how each is asked (D-0360, D-0361). Names are what clients say
+             about themselves and the labels in their configuration: display only (T-3, T-36). -->
+        <StackPanel Spacing="10">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <ctl:KpIcon Icon="plug" Size="15" Foreground="{DynamicResource KpTextMuted}" />
+            <TextBlock Classes="section" Text="MCP clients" />
+          </StackPanel>
+          <Border Classes="card" IsVisible="{Binding HasClientsProblem}">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+              <TextBlock Name="ClientsProblemText" Classes="body danger" Text="{Binding ClientsProblem}" VerticalAlignment="Center" />
+              <Button Grid.Column="1" Name="ResetClients" Content="Reset" VerticalAlignment="Center" Command="{Binding ResetClientsCommand}" />
+            </Grid>
+          </Border>
+          <ItemsControl Name="ClientCards" ItemsSource="{Binding Clients}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <ctl:AutoFillPanel MinColumnWidth="240" Spacing="12" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:ActivityRow">
-                <Border Padding="16,14" BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,0,0,1">
-                  <Grid ColumnDefinitions="*,150,Auto" ColumnSpacing="16">
-                    <StackPanel Spacing="4" VerticalAlignment="Center">
-                      <TextBlock Text="{Binding Client}" FontSize="13.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                      <TextBlock Classes="mono secondary" FontSize="12" Text="{Binding Detail}" TextTrimming="CharacterEllipsis" />
+              <DataTemplate x:DataType="vm:ClientCardRow">
+                <Border Classes="card filled">
+                  <StackPanel Spacing="14">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                      <Border Classes="tile">
+                        <TextBlock Text="{Binding Initials}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   FontFamily="{DynamicResource KpMono}" FontSize="12" Foreground="{DynamicResource KpTextPrimary}" />
+                      </Border>
+                      <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" FontSize="14" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding Detail}" TextTrimming="CharacterEllipsis" FontSize="12"
+                                   Foreground="{DynamicResource KpTextMuted}" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center"
+                                  IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                  ToolTip.Tip="{Binding LastSeenText, StringFormat='Last seen {0}'}">
+                        <Border Classes="dot" Classes.ok="{Binding IsConnected}" />
+                        <TextBlock Text="{Binding Status}" FontSize="11.5" FontWeight="Medium"
+                                   Classes.ok="{Binding IsConnected}" Classes.muted="{Binding !IsConnected}" />
+                      </StackPanel>
+                    </Grid>
+                    <StackPanel Spacing="6">
+                      <TextBlock Classes="th" Text="POLICY" />
+                      <ComboBox ItemsSource="{Binding Options}"
+                                SelectedItem="{Binding PolicyText}"
+                                IsEnabled="{Binding CanSetPolicy}"
+                                HorizontalAlignment="Stretch"
+                                Height="32"
+                                AutomationProperties.Name="Policy" />
+                      <TextBlock Classes="caption" Text="{Binding Explanation}" FontSize="11.5" IsVisible="{Binding HasExplanation}" />
+                      <TextBlock Classes="caption" Text="{Binding Hint}" FontSize="11.5"
+                                 IsVisible="{Binding Hint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                     </StackPanel>
-                    <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
-                      <TextBlock Classes="mono sm amber" Text="{Binding LeftText}" />
-                      <ProgressBar Classes="thin" MinWidth="0" Minimum="0" Maximum="1" Value="{Binding Fraction}" />
-                    </StackPanel>
-                    <Button Grid.Column="2" Classes="danger sm" FontSize="12" Content="Revoke" VerticalAlignment="Center"
-                            Command="{Binding $parent[ItemsControl].((vm:AgentActivityViewModel)DataContext).RevokeCommand}"
-                            CommandParameter="{Binding}" />
-                  </Grid>
+                  </StackPanel>
                 </Border>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
-        </Border>
-      </StackPanel>
-
-      <!-- Who reaches this vault and how each is asked (D-0360, D-0361). Names are what clients say
-           about themselves and the labels in their configuration: display only (T-3, T-36). -->
-      <StackPanel Spacing="10">
-        <StackPanel Orientation="Horizontal" Spacing="8">
-          <ctl:KpIcon Icon="plug" Size="15" Foreground="{DynamicResource KpTextMuted}" />
-          <TextBlock Classes="section" Text="MCP clients" />
+          <TextBlock Classes="caption" Text="A client appears here once its bridge has asked for something." />
         </StackPanel>
-        <Border Classes="card" IsVisible="{Binding HasClientsProblem}">
-          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-            <TextBlock Name="ClientsProblemText" Classes="body danger" Text="{Binding ClientsProblem}" VerticalAlignment="Center" />
-            <Button Grid.Column="1" Name="ResetClients" Content="Reset" VerticalAlignment="Center" Command="{Binding ResetClientsCommand}" />
-          </Grid>
-        </Border>
-        <ItemsControl Name="ClientCards" ItemsSource="{Binding Clients}">
-          <ItemsControl.ItemsPanel>
-            <ItemsPanelTemplate>
-              <ctl:AutoFillPanel MinColumnWidth="240" Spacing="12" />
-            </ItemsPanelTemplate>
-          </ItemsControl.ItemsPanel>
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="vm:ClientCardRow">
-              <Border Classes="card filled">
-                <StackPanel Spacing="14">
-                  <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
-                    <Border Classes="tile">
-                      <TextBlock Text="{Binding Initials}" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                 FontFamily="{DynamicResource KpMono}" FontSize="12" Foreground="{DynamicResource KpTextPrimary}" />
-                    </Border>
-                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                      <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" FontSize="14" FontWeight="SemiBold" />
-                      <TextBlock Text="{Binding Detail}" TextTrimming="CharacterEllipsis" FontSize="12"
-                                 Foreground="{DynamicResource KpTextMuted}" />
+
+        <Panel IsVisible="{Binding Tokens, Converter={x:Static ObjectConverters.IsNotNull}}">
+          <StackPanel Spacing="10" DataContext="{Binding Tokens}" x:DataType="vm:ScopedTokensViewModel">
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="8">
+              <ctl:KpIcon Icon="ticket" Size="15" Foreground="{DynamicResource KpTextMuted}" />
+              <TextBlock Grid.Column="1" Classes="section" Text="Scoped tokens" VerticalAlignment="Center" />
+              <Button Grid.Column="3" Classes="link" FontSize="12" Content="New token" Command="{Binding OpenFormCommand}"
+                      IsVisible="{Binding CanOpenForm}" />
+            </Grid>
+
+            <Border Classes="card filled" IsVisible="{Binding IsFormOpen}">
+              <StackPanel Spacing="14">
+                <Grid ColumnDefinitions="*,2*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="6">
+                  <TextBlock Classes="label" Text="Name" />
+                  <TextBlock Grid.Column="1" Classes="label" Text="Scope" />
+                  <TextBlock Grid.Column="2" Classes="label" Text="Expires" />
+                  <TextBox Grid.Row="1" Classes="mono" Text="{Binding Name}" PlaceholderText="ci-staging"
+                           AutomationProperties.Name="Token name" />
+                  <TextBox Grid.Row="1" Grid.Column="1" Classes="mono" Text="{Binding Scope}" PlaceholderText="read:acme-api/staging/*"
+                           AutomationProperties.Name="Token scope" />
+                  <Border Grid.Row="1" Grid.Column="2" Classes="segmented inset" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                      <RadioButton Classes="segment" GroupName="TokenExpiry" Content="7d"
+                                   IsChecked="{Binding Expiry, Mode=OneWay, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=7d}"
+                                   Command="{Binding SetExpiryCommand}" CommandParameter="7d" />
+                      <RadioButton Classes="segment" GroupName="TokenExpiry" Content="30d"
+                                   IsChecked="{Binding Expiry, Mode=OneWay, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=30d}"
+                                   Command="{Binding SetExpiryCommand}" CommandParameter="30d" />
+                      <RadioButton Classes="segment" GroupName="TokenExpiry" Content="90d"
+                                   IsChecked="{Binding Expiry, Mode=OneWay, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=90d}"
+                                   Command="{Binding SetExpiryCommand}" CommandParameter="90d" />
                     </StackPanel>
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center"
-                                IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                                ToolTip.Tip="{Binding LastSeenText, StringFormat='Last seen {0}'}">
-                      <Border Classes="dot" Classes.ok="{Binding IsConnected}" />
-                      <TextBlock Text="{Binding Status}" FontSize="11.5" FontWeight="Medium"
-                                 Classes.ok="{Binding IsConnected}" Classes.muted="{Binding !IsConnected}" />
-                    </StackPanel>
-                  </Grid>
-                  <StackPanel Spacing="6">
-                    <TextBlock Classes="th" Text="POLICY" />
-                    <ComboBox ItemsSource="{Binding Options}"
-                              SelectedItem="{Binding PolicyText}"
-                              IsEnabled="{Binding CanSetPolicy}"
-                              HorizontalAlignment="Stretch"
-                              Height="32"
-                              AutomationProperties.Name="Policy" />
-                    <TextBlock Classes="caption" Text="{Binding Explanation}" FontSize="11.5" IsVisible="{Binding HasExplanation}" />
-                    <TextBlock Classes="caption" Text="{Binding Hint}" FontSize="11.5"
-                               IsVisible="{Binding Hint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                  </StackPanel>
-                </StackPanel>
-              </Border>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-        <TextBlock Classes="caption" MaxWidth="720" HorizontalAlignment="Left"
-                   Text="A client appears once its bridge has asked for something. A label is written in the client's configuration, so an agent that can edit that file can change it: put the strictest policy on every other client (*)." />
-      </StackPanel>
-
-      <Panel IsVisible="{Binding Tokens, Converter={x:Static ObjectConverters.IsNotNull}}">
-        <StackPanel Spacing="10" DataContext="{Binding Tokens}" x:DataType="vm:ScopedTokensViewModel">
-          <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="8">
-            <ctl:KpIcon Icon="ticket" Size="15" Foreground="{DynamicResource KpTextMuted}" />
-            <TextBlock Grid.Column="1" Classes="section" Text="Scoped tokens" VerticalAlignment="Center" />
-            <Button Grid.Column="3" Classes="link" FontSize="12" Content="New token" Command="{Binding OpenFormCommand}" />
-          </Grid>
-
-          <Border Classes="card filled" IsVisible="{Binding IsFormOpen}">
-            <StackPanel Spacing="14">
-              <Grid ColumnDefinitions="*,2*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="6">
-                <TextBlock Classes="label" Text="Name" />
-                <TextBlock Grid.Column="1" Classes="label" Text="Scope" />
-                <TextBlock Grid.Column="2" Classes="label" Text="Expires" />
-                <TextBox Grid.Row="1" Classes="mono" Text="{Binding Name}" PlaceholderText="ci-staging"
-                         AutomationProperties.Name="Token name" />
-                <TextBox Grid.Row="1" Grid.Column="1" Classes="mono" Text="{Binding Scope}" PlaceholderText="read:acme-api/staging/*"
-                         AutomationProperties.Name="Token scope" />
-                <Border Grid.Row="1" Grid.Column="2" Classes="segmented inset" VerticalAlignment="Center">
-                  <StackPanel Orientation="Horizontal">
-                    <RadioButton Classes="segment" GroupName="TokenExpiry" Content="7d"
-                                 IsChecked="{Binding Expiry, Mode=OneWay, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=7d}"
-                                 Command="{Binding SetExpiryCommand}" CommandParameter="7d" />
-                    <RadioButton Classes="segment" GroupName="TokenExpiry" Content="30d"
-                                 IsChecked="{Binding Expiry, Mode=OneWay, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=30d}"
-                                 Command="{Binding SetExpiryCommand}" CommandParameter="30d" />
-                    <RadioButton Classes="segment" GroupName="TokenExpiry" Content="90d"
-                                 IsChecked="{Binding Expiry, Mode=OneWay, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=90d}"
-                                 Command="{Binding SetExpiryCommand}" CommandParameter="90d" />
-                  </StackPanel>
-                </Border>
-              </Grid>
-              <TextBlock Classes="caption"
-                         Text="read:project/profile/KEY, or * for the whole set; separate several with commas. A token only feeds keypaste run: it never prints a value." />
-              <TextBlock Classes="body danger" Text="{Binding FormError}" IsVisible="{Binding HasFormError}" />
-              <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-                <Button Classes="ghost" Content="Cancel" Command="{Binding CancelFormCommand}" />
-                <Button Classes="primary" Content="Create token" Command="{Binding CreateCommand}" />
-              </StackPanel>
-            </StackPanel>
-          </Border>
-
-          <Border Classes="card" BorderBrush="{DynamicResource KpAccent}" Background="{DynamicResource KpAccentTint}"
-                  IsVisible="{Binding HasMinted}">
-            <StackPanel Spacing="12">
-              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-                <ctl:KpIcon Icon="alert-triangle" Size="15" Foreground="{DynamicResource KpAccent}" VerticalAlignment="Top" Margin="0,2,0,0" />
-                <StackPanel Grid.Column="1" Spacing="4">
-                  <TextBlock Classes="body strong" Text="Copy this token now. It will not be shown again." />
-                  <TextBlock Classes="caption" Text="{Binding Minted.Note, FallbackValue=''}" />
-                </StackPanel>
-              </Grid>
-              <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-                <Border Classes="field" Background="{DynamicResource KpBgApp}" BorderBrush="{DynamicResource KpBorderDefault}" MinHeight="40">
-                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                    <!-- Drawn, not a TextBlock: its peer contributes nothing to the automation tree. -->
-                    <ctl:RevealedValue Source="{Binding Minted}"
-                                       MaskedLength="{Binding Minted.MaskedLength, FallbackValue=0}"
-                                       FontFamily="{DynamicResource KpMono}"
-                                       FontSize="14"
-                                       VerticalAlignment="Center"
-                                       ClipToBounds="True"
-                                       Cursor="Hand"
-                                       Foreground="{DynamicResource KpTextPrimary}" />
-                    <TextBlock Grid.Column="1" Classes="caption" Text="Hold to show" VerticalAlignment="Center" />
-                  </Grid>
-                </Border>
-                <Button Grid.Column="1" Classes="primary" Command="{Binding CopyMintedCommand}" VerticalAlignment="Center">
-                  <StackPanel Orientation="Horizontal" Spacing="6">
-                    <ctl:KpIcon Icon="copy" Size="13" />
-                    <TextBlock Text="Copy" />
-                  </StackPanel>
-                </Button>
-                <Button Grid.Column="2" Content="Done" Command="{Binding DoneMintedCommand}" VerticalAlignment="Center" />
-              </Grid>
-            </StackPanel>
-          </Border>
-
-          <TextBlock Classes="body danger" Text="{Binding Message}" IsVisible="{Binding HasMessage}" />
-
-          <Border Classes="table">
-            <StackPanel>
-              <Border Classes="table-head">
-                <Grid ColumnDefinitions="1.1*,1*,1.5*,0.8*,0.6*,64" ColumnSpacing="12">
-                  <TextBlock Classes="th" Text="NAME" />
-                  <TextBlock Grid.Column="1" Classes="th" Text="TOKEN" />
-                  <TextBlock Grid.Column="2" Classes="th" Text="SCOPE" />
-                  <TextBlock Grid.Column="3" Classes="th" Text="MODE" />
-                  <TextBlock Grid.Column="4" Classes="th" Text="EXPIRES" />
+                  </Border>
                 </Grid>
-              </Border>
-              <Border Classes="table-row" Padding="16,12" IsVisible="{Binding HasNoRows}">
-                <TextBlock Classes="caption" Text="No tokens yet. A token lets a script or CI job run with a scoped set, without you or the vault's password." />
-              </Border>
-              <ItemsControl ItemsSource="{Binding Rows}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="vm:ScopedTokenRow">
-                    <Border Classes="table-row" Padding="16,12">
-                      <Grid ColumnDefinitions="1.1*,1*,1.5*,0.8*,0.6*,64" ColumnSpacing="12">
-                        <TextBlock Text="{Binding Name}" FontSize="12.5" FontWeight="Medium" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                        <TextBlock Grid.Column="1" Classes="mono secondary" FontSize="12" Text="{Binding Prefix}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                        <TextBlock Grid.Column="2" Classes="mono secondary" FontSize="12" Text="{Binding Scope}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
-                                   ToolTip.Tip="{Binding Scope}" />
-                        <Border Grid.Column="3" Classes="chip outline">
-                          <TextBlock Text="{Binding Mode}" />
-                        </Border>
-                        <TextBlock Grid.Column="4" FontSize="12.5" Text="{Binding Expires}" VerticalAlignment="Center"
-                                   Classes.muted="{Binding !IsExpired}" Classes.danger="{Binding IsExpired}" />
-                        <Button Grid.Column="5" Classes="ghost sm" FontSize="12" Content="Revoke" HorizontalAlignment="Right" Padding="8,0"
-                                MinHeight="0" Height="24" VerticalAlignment="Center"
-                                Command="{Binding $parent[ItemsControl].((vm:ScopedTokensViewModel)DataContext).RevokeCommand}"
-                                CommandParameter="{Binding}" />
-                      </Grid>
-                    </Border>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-            </StackPanel>
+                <TextBlock Classes="caption"
+                           Text="read:project/profile/KEY, or * for the whole set; separate several with commas. A token only feeds keypaste run: it never prints a value." />
+                <TextBlock Classes="body danger" Text="{Binding FormError}" IsVisible="{Binding HasFormError}" />
+                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                  <Button Classes="ghost" Content="Cancel" Command="{Binding CancelFormCommand}" />
+                  <Button Classes="primary" Content="Create token" Command="{Binding CreateCommand}" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <Border Classes="card" BorderBrush="{DynamicResource KpAccent}" Background="{DynamicResource KpAccentTint}"
+                    IsVisible="{Binding HasMinted}">
+              <StackPanel Spacing="12">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                  <ctl:KpIcon Icon="alert-triangle" Size="15" Foreground="{DynamicResource KpAccent}" VerticalAlignment="Top" Margin="0,2,0,0" />
+                  <StackPanel Grid.Column="1" Spacing="4">
+                    <TextBlock Classes="body strong" Text="Copy this token now. It will not be shown again." />
+                    <TextBlock Classes="caption" Text="{Binding Minted.Note, FallbackValue=''}" />
+                  </StackPanel>
+                </Grid>
+                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                  <Border Classes="field" Background="{DynamicResource KpBgApp}" BorderBrush="{DynamicResource KpBorderDefault}" MinHeight="40">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                      <!-- Drawn, not a TextBlock: its peer contributes nothing to the automation tree. -->
+                      <ctl:RevealedValue Source="{Binding Minted}"
+                                         MaskedLength="24"
+                                         FontFamily="{DynamicResource KpMono}"
+                                         FontSize="14"
+                                         VerticalAlignment="Center"
+                                         ClipToBounds="True"
+                                         Cursor="Hand"
+                                         Foreground="{DynamicResource KpTextPrimary}" />
+                      <TextBlock Grid.Column="1" Classes="caption" Text="Hold to show" VerticalAlignment="Center" />
+                    </Grid>
+                  </Border>
+                  <Button Grid.Column="1" Classes="primary" Command="{Binding CopyMintedCommand}" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <ctl:KpIcon Icon="copy" Size="13" />
+                      <TextBlock Text="Copy" />
+                    </StackPanel>
+                  </Button>
+                  <Button Grid.Column="2" Content="Done" Command="{Binding DoneMintedCommand}" VerticalAlignment="Center" />
+                </Grid>
+              </StackPanel>
+            </Border>
+
+            <TextBlock Classes="body danger" Text="{Binding Message}" IsVisible="{Binding HasMessage}" />
+
+            <Border Classes="table">
+              <StackPanel>
+                <Border Classes="table-head">
+                  <Grid ColumnDefinitions="1.1*,1*,1.5*,0.8*,0.6*,72" ColumnSpacing="12">
+                    <TextBlock Classes="th" Text="NAME" />
+                    <TextBlock Grid.Column="1" Classes="th" Text="TOKEN" />
+                    <TextBlock Grid.Column="2" Classes="th" Text="SCOPE" />
+                    <TextBlock Grid.Column="3" Classes="th" Text="MODE" />
+                    <TextBlock Grid.Column="4" Classes="th" Text="EXPIRES" />
+                  </Grid>
+                </Border>
+                <Border Classes="table-row" Padding="16,12" IsVisible="{Binding HasNoRows}">
+                  <TextBlock Classes="caption" Text="No tokens yet. A token lets a script or CI job run with a scoped set, without you or the vault's password." />
+                </Border>
+                <ItemsControl ItemsSource="{Binding Rows}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ScopedTokenRow">
+                      <Border Classes="table-row" Padding="16,12">
+                        <Panel>
+                          <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" IsVisible="{Binding IsConfirming}">
+                            <TextBlock Text="{Binding ConfirmText}" FontSize="12.5" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Classes="danger sm" FontSize="12" Content="Revoke" VerticalAlignment="Center"
+                                    Command="{Binding $parent[ItemsControl].((vm:ScopedTokensViewModel)DataContext).RevokeCommand}"
+                                    CommandParameter="{Binding}" />
+                            <Button Grid.Column="2" Classes="ghost sm" FontSize="12" Content="Cancel" VerticalAlignment="Center"
+                                    Command="{Binding $parent[ItemsControl].((vm:ScopedTokensViewModel)DataContext).CancelRevokeCommand}" />
+                          </Grid>
+                          <Grid ColumnDefinitions="1.1*,1*,1.5*,0.8*,0.6*,72" ColumnSpacing="12" IsVisible="{Binding !IsConfirming}">
+                            <TextBlock Text="{Binding Name}" FontSize="12.5" FontWeight="Medium" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Classes="mono secondary" FontSize="12" Text="{Binding Prefix}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2" Classes="mono secondary" FontSize="12" Text="{Binding Scope}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                       ToolTip.Tip="{Binding Scope}" />
+                            <Border Grid.Column="3" Classes="chip outline">
+                              <TextBlock Text="{Binding Mode}" />
+                            </Border>
+                            <TextBlock Grid.Column="4" FontSize="12.5" Text="{Binding Expires}" VerticalAlignment="Center"
+                                       Classes.muted="{Binding !IsExpired}" Classes.danger="{Binding IsExpired}" />
+                            <Button Grid.Column="5" Classes="danger sm" FontSize="12" Content="Revoke" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                    Command="{Binding $parent[ItemsControl].((vm:ScopedTokensViewModel)DataContext).AskRevokeCommand}"
+                                    CommandParameter="{Binding}" />
+                          </Grid>
+                        </Panel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </Panel>
+
+        <!-- This session's audit records as `keypaste log` renders them (D-0331); the Activity screen
+             has the whole file. -->
+        <StackPanel Spacing="10">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <ctl:KpIcon Icon="history" Size="15" Foreground="{DynamicResource KpTextMuted}" />
+            <TextBlock Classes="section" Text="This session" />
+          </StackPanel>
+          <TextBlock Classes="caption" Text="{Binding HistoryMessage}" IsVisible="{Binding HasHistoryMessage}" />
+          <Border Classes="terminal" IsVisible="{Binding HasHistory}">
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" MaxHeight="360" Padding="14,12">
+              <SelectableTextBlock Text="{Binding History}"
+                                   FontFamily="{DynamicResource KpMono}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource KpTextSecondary}" />
+            </ScrollViewer>
           </Border>
         </StackPanel>
-      </Panel>
 
-      <!-- This session's audit records as `keypaste log` renders them (D-0331); the Activity screen
-           has the whole file. -->
-      <StackPanel Spacing="10">
-        <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
-          <ctl:KpIcon Icon="history" Size="15" Foreground="{DynamicResource KpTextMuted}" />
-          <TextBlock Grid.Column="1" Classes="section" Text="This session" VerticalAlignment="Center" />
-          <TextBlock Grid.Column="2" Classes="mono sm muted" Text="{Binding AuditPath}" TextTrimming="CharacterEllipsis"
-                     HorizontalAlignment="Right" VerticalAlignment="Center" />
-        </Grid>
-        <TextBlock Classes="caption" Text="{Binding HistoryMessage}" IsVisible="{Binding HasHistoryMessage}" />
-        <Border Classes="terminal" IsVisible="{Binding HasHistory}">
-          <ScrollViewer HorizontalScrollBarVisibility="Auto" MaxHeight="360" Padding="14,12">
-            <SelectableTextBlock Text="{Binding History}"
-                                 FontFamily="{DynamicResource KpMono}"
-                                 FontSize="12"
-                                 Foreground="{DynamicResource KpTextSecondary}" />
-          </ScrollViewer>
-        </Border>
       </StackPanel>
-
-    </StackPanel>
+    </Grid>
   </ScrollViewer>
 
 </UserControl>

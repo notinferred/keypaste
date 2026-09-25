@@ -58,7 +58,7 @@ internal sealed class ActivityRow
     /// <summary>What a grant releases, as the Agents table's second line: the entry and field, or a run's keys and set.</summary>
     internal string Detail { get; private init; } = string.Empty;
 
-    /// <summary>A grant's time left as the Agents table says it: <c>42m left</c>.</summary>
+    /// <summary>A grant's or a waiting request's time left as the Agents screen says it: <c>42m left</c>.</summary>
     internal string LeftText { get; private init; } = string.Empty;
 
     /// <summary>The share of a grant's length still to run, from 0 to 1, for its bar.</summary>
@@ -100,7 +100,10 @@ internal sealed class ActivityRow
             waiting.Prompt.Label ?? "none configured",
             $"{waiting.Prompt.Command} · {string.Join(", ", waiting.Prompt.Variables.Select(variable => variable.Name))}",
             "run",
-            "answered for you in " + Seconds(waiting.Remaining));
+            "answered for you in " + Seconds(waiting.Remaining))
+        {
+            LeftText = Humanized(waiting.Remaining),
+        };
 
     /// <summary>A <c>keypaste run --session</c> request a person is being asked about.</summary>
     internal static ActivityRow WaitingEnv(int number, WaitingEnv waiting) =>
@@ -110,7 +113,10 @@ internal sealed class ActivityRow
             "none configured",
             $"{waiting.Prompt.Project} · {waiting.Prompt.Profile} · {waiting.Prompt.Command}",
             "set",
-            "answered for you in " + Seconds(waiting.Remaining));
+            "answered for you in " + Seconds(waiting.Remaining))
+        {
+            LeftText = Humanized(waiting.Remaining),
+        };
 
     /// <summary>The keys a run's grant releases and its set, or the command a <c>keypaste run --session</c> grant repeats.</summary>
     private static string EnvDetail(EnvGrantInForce grant)

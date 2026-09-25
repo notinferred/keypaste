@@ -216,6 +216,43 @@ public sealed class ScopedTokensViewModelTests : IDisposable
         Assert.Equal(["Revoked ci"], said);
     }
 
+    [Fact]
+    public void AskingToRevoke_OnlyConfirms_AndCancelKeepsTheToken()
+    {
+        using var screen = new ScopedTokensViewModel(_session);
+        Assert.True(screen.Create("ci", "read:acme-api/staging/*", TimeSpan.FromDays(30), false).Ok);
+
+        screen.AskRevokeCommand.Execute(Assert.Single(screen.Rows));
+
+        var asking = Assert.Single(screen.Rows);
+        Assert.True(asking.IsConfirming);
+        Assert.Equal("Revoke ci? Anything using it stops working.", asking.ConfirmText);
+
+        screen.CancelRevokeCommand.Execute(null);
+
+        Assert.False(Assert.Single(screen.Rows).IsConfirming);
+        Assert.Single(new TokenStore(_session.Unlocked!).List());
+    }
+
+    [Fact]
+    public void NewToken_IsNotOffered_WhileTheFormOrAMintedTokenShows()
+    {
+        using var screen = new ScopedTokensViewModel(_session);
+        Assert.True(screen.CanOpenForm);
+
+        screen.OpenFormCommand.Execute(null);
+        Assert.False(screen.OpenFormCommand.CanExecute(null));
+
+        screen.Name = "ci-staging";
+        screen.Scope = "read:acme-api/staging/*";
+        screen.CreateCommand.Execute(null);
+        Assert.True(screen.HasMinted);
+        Assert.False(screen.CanOpenForm);
+
+        screen.DoneMintedCommand.Execute(null);
+        Assert.True(screen.CanOpenForm);
+    }
+
     private static string Shown(ScopedTokensViewModel screen) =>
         string.Join(
             '\n',

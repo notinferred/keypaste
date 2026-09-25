@@ -14,7 +14,13 @@ namespace Keypaste.App.ViewModels;
 /// <param name="Mode">What it can do with what it reads.</param>
 /// <param name="Expires">How long it has left, such as <c>29 days</c>, or <c>expired</c>.</param>
 /// <param name="IsExpired">Whether it has stopped working.</param>
-internal sealed record ScopedTokenRow(string Id, string Name, string Prefix, string Scope, string Mode, string Expires, bool IsExpired);
+internal sealed record ScopedTokenRow(string Id, string Name, string Prefix, string Scope, string Mode, string Expires, bool IsExpired)
+{
+    /// <summary>Whether the row is asking to confirm its revoke, which cannot be undone.</summary>
+    internal bool IsConfirming { get; init; }
+
+    internal string ConfirmText => $"Revoke {Name}? Anything using it stops working.";
+}
 
 /// <summary>
 /// Agents › Scoped tokens: the tokens the session's vault holds, minting one and revoking one.
@@ -47,12 +53,14 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
         _clipboard = clipboard;
         _toast = toast ?? (_ => { });
 
-        OpenFormCommand = new RelayCommand(() => IsFormOpen = true);
+        OpenFormCommand = new RelayCommand(() => IsFormOpen = true, () => CanOpenForm);
         CancelFormCommand = new RelayCommand(CloseForm);
         CreateCommand = new RelayCommand(CreateFromForm);
         CopyMintedCommand = new RelayCommand(CopyMinted, () => _minted is not null && _clipboard is not null);
         DoneMintedCommand = new RelayCommand(() => SetMinted(null));
         RevokeCommand = new RelayCommand<ScopedTokenRow>(RevokeRow, row => row is not null);
+        AskRevokeCommand = new RelayCommand<ScopedTokenRow>(row => Confirm(row?.Id), row => row is not null);
+        CancelRevokeCommand = new RelayCommand(() => Confirm(null));
         SetExpiryCommand = new RelayCommand<string>(chosen => Expiry = chosen!);
         Refresh();
     }
@@ -71,6 +79,7 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
             if (Set(ref _isFormOpen, value))
             {
                 FormError = string.Empty;
+                RaiseCanOpenForm();
             }
         }
     }
@@ -139,6 +148,9 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
 
     internal bool HasNoRows => _rows.Count == 0;
 
+    /// <summary>Whether New token is offered: not while the form or a minted token is showing.</summary>
+    internal bool CanOpenForm => !_isFormOpen && _minted is null;
+
     internal RelayCommand OpenFormCommand { get; }
 
     internal RelayCommand CancelFormCommand { get; }
@@ -152,7 +164,13 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
     /// <summary>Forgets the minted token.</summary>
     internal RelayCommand DoneMintedCommand { get; }
 
+    /// <summary>Deletes the token at once; the row's confirmation is what runs it.</summary>
     internal RelayCommand<ScopedTokenRow> RevokeCommand { get; }
+
+    /// <summary>Asks the row to confirm its revoke.</summary>
+    internal RelayCommand<ScopedTokenRow> AskRevokeCommand { get; }
+
+    internal RelayCommand CancelRevokeCommand { get; }
 
     /// <summary>Every token, by name.</summary>
     internal IReadOnlyList<ScopedTokenRow> Rows
@@ -277,7 +295,7 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
         CloseForm();
         var prefix = _rows.FirstOrDefault(row => row.Name == name)?.Prefix ?? TokenSecret.Prefix;
         SetMinted(new MintedToken(token, name, $"keypaste keeps only a verifier of {prefix}, so nobody can show you this token later."));
-        _toast($"Created {name}. Copy it now: it is shown once");
+        _toast($"Created {name}");
     }
 
     private void CopyMinted()
@@ -312,7 +330,16 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
         Raise(nameof(Minted));
         Raise(nameof(HasMinted));
         CopyMintedCommand.RaiseCanExecuteChanged();
+        RaiseCanOpenForm();
     }
+
+    private void RaiseCanOpenForm()
+    {
+        Raise(nameof(CanOpenForm));
+        OpenFormCommand.RaiseCanExecuteChanged();
+    }
+
+    private void Confirm(string? id) => Rows = [.. _rows.Select(row => row with { IsConfirming = row.Id == id })];
 
     private static bool TrySave(Vault vault, out string error)
     {

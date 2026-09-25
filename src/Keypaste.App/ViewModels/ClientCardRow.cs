@@ -22,20 +22,23 @@ internal sealed class ClientCardRow : ObservableObject
         {
             Label = ClientPolicies.AnyClient;
             Name = "Every other client";
-            Detail = "* · clients without a policy of their own";
+            Title = Name;
+            Detail = "Clients without a policy of their own";
             Initials = "*";
             Status = string.Empty;
             StatusTone = StatusTone.Muted;
             LastSeenText = string.Empty;
             CanSetPolicy = true;
-            Hint = "Clients started without --client-label are held to this policy.";
+            // A label lives in the client's own configuration, which an agent may be able to edit.
+            Hint = "Unlabeled clients and labels without a row here get this policy, so keep it the strictest.";
             return;
         }
 
         Label = card.Label;
         Name = card.Name;
+        Title = card.Label ?? card.Name;
         Detail = $"{card.Name} · {card.Kind}";
-        Initials = InitialsOf(card.Name);
+        Initials = InitialsOf(Title);
         Status = card.Status == ClientStatus.Connected ? "Connected" : "Idle";
         StatusTone = card.Status == ClientStatus.Connected ? StatusTone.Ok : StatusTone.Muted;
         LastSeenText = card.Status == ClientStatus.Connected ? "now" : card.LastSeen is { } seen ? UseText.Ago(seen, now) : "never";
@@ -47,7 +50,11 @@ internal sealed class ClientCardRow : ObservableObject
     /// <summary>The label a policy row is keyed by, <c>*</c> for the catch-all card, or null for an unlabeled client.</summary>
     internal string? Label { get; }
 
+    /// <summary>The program the client says it is, such as <c>Claude Code</c>.</summary>
     internal string Name { get; }
+
+    /// <summary>What the card is headed by: the label the grants table also names it by, else the program.</summary>
+    internal string Title { get; }
 
     internal string Detail { get; }
 
@@ -119,10 +126,12 @@ internal sealed class ClientCardRow : ObservableObject
 
     private static string Words(ClientPolicy policy) => ClientPolicies.Describe(policy).Split(':')[0];
 
-    private static string InitialsOf(string name)
+    /// <summary>Two lower-case letters: the first of two words, or the first two of one (<c>cursor</c> is <c>cu</c>).</summary>
+    private static string InitialsOf(string title)
     {
-        var words = name.Split(['-', ' ', '_'], StringSplitOptions.RemoveEmptyEntries);
-        return string.Concat(words.Take(2).Select(word => char.ToUpperInvariant(word[0])));
+        var words = title.Split(['-', ' ', '_', '.'], StringSplitOptions.RemoveEmptyEntries);
+        var initials = words.Length > 1 ? $"{words[0][0]}{words[1][0]}" : words.FirstOrDefault() ?? string.Empty;
+        return new string([.. initials.Take(2)]).ToLowerInvariant();
     }
 }
 

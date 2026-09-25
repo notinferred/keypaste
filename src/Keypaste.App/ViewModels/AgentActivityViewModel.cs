@@ -46,6 +46,7 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
     private bool _isConnectOpen;
 
     private string _status = string.Empty;
+    private string _serving = string.Empty;
     private string _unavailable = string.Empty;
     private IReadOnlyList<ActivityRow> _waiting = [];
     private IReadOnlyList<ActivityRow> _grants = [];
@@ -140,6 +141,21 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
         private set => Set(ref _status, value);
     }
 
+    /// <summary>Which process and session answer agents, on one line, or empty when none does.</summary>
+    internal string Serving
+    {
+        get => _serving;
+        private set
+        {
+            if (Set(ref _serving, value))
+            {
+                Raise(nameof(IsServing));
+            }
+        }
+    }
+
+    internal bool IsServing => _serving.Length > 0;
+
     /// <summary>Why waiting requests and grants cannot be read, or empty when they were.</summary>
     internal string Unavailable
     {
@@ -162,6 +178,8 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
     internal IReadOnlyList<ActivityRow> Waiting => _waiting;
 
     internal bool NothingWaiting => IsAvailable && _waiting.Count == 0;
+
+    internal bool HasWaiting => _waiting.Count > 0;
 
     /// <summary>The grants in force, soonest to end first.</summary>
     internal IReadOnlyList<ActivityRow> Grants => _grants;
@@ -221,6 +239,9 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
     {
         var status = _authority?.Status ?? new AuthorityStatus.Locked();
         Status = Describe(status);
+        Serving = status is AuthorityStatus.Serving answering
+            ? string.Create(CultureInfo.InvariantCulture, $"Answering agents from this app · process {answering.Owner.ProcessId} · session {answering.Session}")
+            : string.Empty;
 
         string? session = null;
 
@@ -250,6 +271,7 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
 
         Raise(nameof(Waiting));
         Raise(nameof(NothingWaiting));
+        Raise(nameof(HasWaiting));
         Raise(nameof(Grants));
         Raise(nameof(NoGrants));
         Raise(nameof(HasGrants));

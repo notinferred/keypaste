@@ -118,6 +118,6 @@ public sealed class ClientPoliciesTests : IDisposable
     {
         Assert.Equal("Ask every time", ClientPolicies.Describe(ClientPolicy.AskEveryTime));
         Assert.Equal("Session grants up to 1h", ClientPolicies.Describe(ClientPolicy.SessionGrants));
-        Assert.Equal("Inject only: keypaste never hands it a value; commands you approve can read them", ClientPolicies.Describe(ClientPolicy.InjectOnly));
+        Assert.Equal("Inject only: keypaste never hands it a value; only commands you approve can read the values", ClientPolicies.Describe(ClientPolicy.InjectOnly));
     }
 }
