@@ -7,7 +7,7 @@
                     x:DataType="vm:RunApprovalViewModel"
                     Icon="avares://keypaste-app/Assets/keypaste.ico"
                     Title="keypaste: an agent wants to run a command with your secrets"
-                    Width="460"
+                    Width="508"
                     SizeToContent="Height"
                     CanResize="False"
                     WindowDecorations="None"
@@ -20,23 +20,23 @@
     <StyleInclude Source="avares://keypaste-app/Views/PromptStyles.axaml" />
   </Window.Styles>
 
-  <!-- Fixed heights, as in the other prompt windows: the program, command, directory and reason are
-       the agent's, so each sits in a box that wraps and scrolls and none of them can move the
-       question or the buttons (THREATS.md T-2, T-35). Nothing is trimmed or ellipsized, so no part of
-       a command is hidden past an edge. No button is the default: Enter approves nothing, and Escape
-       denies. -->
+  <!-- Fixed heights, as in the other prompt windows: the client, program, command, directory and
+       reason are the agent's, so none of them can move the question or the buttons (THREATS.md T-2,
+       T-35). The header is one fixed row whose lines are trimmed; the call box below holds the
+       command and directory whole, wrapping and scrolling, so no part of either is hidden past an
+       edge. No button is the default: Enter approves nothing, and Escape denies. -->
 
   <Border Classes="prompt">
     <StackPanel Spacing="16">
 
-      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-        <Border Grid.Column="0" Classes="prompt-tile" VerticalAlignment="Top">
+      <Grid Classes="prompt-head" Height="57" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+        <Border Grid.Column="0" Classes="prompt-tile">
           <ctl:KpIcon Icon="bot" Size="18" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
         </Border>
         <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-          <TextBlock Name="TitleText" Classes="prompt-title" Text="{Binding Title}" TextWrapping="Wrap" />
-          <TextBlock Name="SubtitleText" Classes="prompt-sub" Text="{Binding Subtitle}" TextWrapping="Wrap" />
-          <TextBlock Name="ClientText" Classes="prompt-sub" Text="{Binding Client}" TextWrapping="Wrap" FontSize="12" />
+          <TextBlock Name="TitleText" Classes="prompt-title" Text="{Binding Title}" />
+          <TextBlock Name="SubtitleText" Classes="prompt-sub" Text="{Binding Subtitle}" />
+          <TextBlock Name="ClientText" Classes="prompt-sub" Text="{Binding Client}" FontSize="12" />
         </StackPanel>
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
           <Border Classes="dot waiting" />
@@ -44,7 +44,7 @@
         </StackPanel>
       </Grid>
 
-      <Border Classes="prompt-call" Height="104">
+      <Border Classes="prompt-call" Height="94">
         <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="12,10">
           <StackPanel>
             <TextBlock Name="ToolText" Text="{Binding Tool}" />
@@ -58,12 +58,12 @@
         </ScrollViewer>
       </Border>
 
-      <Border Classes="prompt-list" Height="116">
+      <Border Classes="prompt-list" Height="131">
         <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
           <ItemsControl Name="VariablesList" ItemsSource="{Binding Variables}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:RunVariableRow">
-                <Border Classes="prompt-row" Padding="12,7">
+                <Border Classes="prompt-row" Padding="12,6">
                   <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                     <StackPanel Grid.Column="0" Spacing="1">
                       <TextBlock Text="{Binding Name}" TextWrapping="Wrap" />
@@ -81,7 +81,7 @@
 
       <StackPanel Spacing="6">
         <TextBlock Classes="caption" Text="The agent says it needs this because" />
-        <Border Classes="prompt-reason" Height="76">
+        <Border Classes="prompt-reason" Height="77">
           <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="12,9">
             <StackPanel Spacing="6">
               <TextBlock Name="ScrubbedText" Classes="prompt-scrubbed" Text="{Binding Scrubbed}"

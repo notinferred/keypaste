@@ -74,6 +74,15 @@
   <Style Selector="ListBox.nav > ListBoxItem:selected ctl|KpIcon">
     <Setter Property="Foreground" Value="{DynamicResource KpAccent}" />
   </Style>
+  <!-- A ListBox.segmented (Inputs.axaml) marks the chosen segment by its fill alone. -->
+  <Style Selector="ListBox.segmented > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter,
+                   ListBox.segmented > ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter,
+                   ListBox.segmented > ListBoxItem:selected:focus /template/ ContentPresenter#PART_ContentPresenter,
+                   ListBox.segmented > ListBoxItem:selected:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+    <Setter Property="BoxShadow" Value="none" />
+  </Style>
   <!-- The footer rows (Settings, Trash) are quieter than the destinations above them. -->
   <Style Selector="ListBox.nav.quiet > ListBoxItem">
     <Setter Property="Height" Value="30" />

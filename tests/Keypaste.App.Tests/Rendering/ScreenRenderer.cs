@@ -54,7 +54,7 @@ public sealed class ScreenRenderer
     private static void DrawPrompts(string output)
     {
         var directory = OperatingSystem.IsWindows() ? @"C:\Users\maya\acme\api" : "/home/maya/acme/api";
-        var preview = new EnvPreview("acme-api", ["DATABASE_URL", "STRIPE_SECRET_KEY", "SENTRY_DSN"]);
+        var preview = new EnvPreview("acme-api", ["DATABASE_URL", "STRIPE_SECRET_KEY", "STRIPE_RESTRICTED_KEY_FOR_WEBHOOK_SIGNING_IN_PRODUCTION"]);
         var env = EnvReleasePrompt.For(preview, ["npm", "run", "migrate"], directory) with { GrantSeconds = 900 };
         DrawWindow(new EnvApprovalWindow(new EnvApprovalViewModel(env)), output, "91b-env-approval");
 
@@ -122,6 +122,7 @@ public sealed class ScreenRenderer
 
         shell.Current = Destinations.Of(DestinationKind.Trash);
         var trash = (TrashViewModel)shell.Content!;
+        Save(window, output, "93a-trash-no-selection");
         trash.Selected = trash.Rows[0];
         Save(window, output, "93-trash-rows");
 
@@ -193,7 +194,9 @@ public sealed class ScreenRenderer
             "Run the database migration for the api service.",
             3600,
             "work laptop");
-        var window = new ApprovalWindow(new ApprovalViewModel(prompt));
+        var model = new ApprovalViewModel(prompt);
+        model.Tick(TimeSpan.FromSeconds(28));
+        var window = new ApprovalWindow(model);
         window.Show();
         Save(window, output, "91-approval");
         window.Close();

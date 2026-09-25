@@ -7,7 +7,7 @@
                     x:DataType="vm:ApprovalViewModel"
                     Icon="avares://keypaste-app/Assets/keypaste.ico"
                     Title="keypaste: an agent is asking for a credential"
-                    Width="460"
+                    Width="508"
                     SizeToContent="Height"
                     CanResize="False"
                     WindowDecorations="None"
@@ -27,7 +27,7 @@
   <Border Classes="prompt">
     <StackPanel Spacing="16">
 
-      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+      <Grid Classes="prompt-head" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
         <Border Grid.Column="0" Classes="prompt-tile">
           <ctl:KpIcon Icon="bot" Size="18" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
         </Border>
@@ -72,7 +72,7 @@
 
       <StackPanel Spacing="6">
         <TextBlock Classes="caption" Text="The agent says it needs this because" />
-        <Border Classes="prompt-reason" Height="84">
+        <Border Classes="prompt-reason" Height="77">
           <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="12,9">
             <StackPanel Spacing="6">
               <TextBlock Name="ScrubbedText" Classes="prompt-scrubbed" Text="{Binding Scrubbed}"

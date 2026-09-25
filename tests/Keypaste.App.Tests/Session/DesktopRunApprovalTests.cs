@@ -1,9 +1,14 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.VisualTree;
 using Keypaste.App.Tests.Controls;
+using Keypaste.App.Tests.Rendering;
+using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
+using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Xunit;
 using static Keypaste.App.Tests.Session.DesktopApprovalTests;
@@ -29,7 +34,7 @@ public sealed class DesktopRunApprovalTests
             var reply = app.AskRun();
             var window = Assert.IsType<RunApprovalWindow>(await app.PromptAsync());
 
-            Assert.Equal($"{DesktopApprovalTests.Label} wants to run a command with 1 secret", Text(window, "TitleText"));
+            Assert.Equal($"{DesktopApprovalTests.Label} wants 1 secret", Text(window, "TitleText"));
             Assert.StartsWith("via MCP · ", Text(window, "SubtitleText"), StringComparison.Ordinal);
             Assert.EndsWith(" · profile dev", Text(window, "SubtitleText"), StringComparison.Ordinal);
             Assert.Equal("tool: keypaste.run", Text(window, "ToolText"));
@@ -106,6 +111,57 @@ public sealed class DesktopRunApprovalTests
             Click(window, "AllowOnce");
             Assert.Equal(EnvOutcome.Resolved, (await reply.WaitAsync(_wait, Token))?.Set.Outcome);
         });
+
+    /// <summary>What the agent calls itself, where it runs and what it runs cannot move the window or its buttons.</summary>
+    [Fact]
+    public Task A_long_client_directory_and_command_leave_the_window_and_buttons_where_they_were() =>
+        HeadlessSession.On(() =>
+        {
+            var (ordinary, ordinaryLayout) = Layout(Run("claude-code", "/work", "deploy"));
+            var (hostile, hostileLayout) = Layout(Run(
+                string.Join(' ', Enumerable.Repeat("claude-code", 60)),
+                "/" + string.Join('/', Enumerable.Repeat("deep", 200)),
+                "deploy " + string.Join(' ', Enumerable.Repeat("--flag=" + new string('x', 40), 90))));
+
+            Assert.Equal(ordinaryLayout, hostileLayout);
+            Assert.DoesNotContain(Buttons(hostile), button => button.IsDefault);
+
+            ordinary.Close();
+            hostile.Close();
+        });
+
+    private static RunPrompt Run(string client, string directory, string command) => new()
+    {
+        Client = client,
+        Reason = "Deploy the service.",
+        ReasonWasTruncated = false,
+        ReasonWasAltered = false,
+        Program = "/usr/local/bin/deploy",
+        Command = command,
+        Directory = directory,
+        Project = "ci",
+        Profile = "dev",
+        Variables = [new("DEPLOY_KEY", EntryPath, "password")],
+        GrantSeconds = 900,
+    };
+
+    private static (RunApprovalWindow Window, string Layout) Layout(RunPrompt prompt)
+    {
+        var window = new RunApprovalWindow(new RunApprovalViewModel(prompt));
+        window.Show();
+        WindowInput.Drain();
+        DrawnFrame.Capture(window);
+
+        var layout = string.Join(
+            "; ",
+            new[] { $"window {window.Bounds}" }.Concat(
+                Buttons(window).Select(button => $"{button.Content} {button.TranslatePoint(default, window)} {button.Bounds.Size}")));
+
+        return (window, layout);
+    }
+
+    private static List<Button> Buttons(Window window) =>
+        [.. window.GetVisualDescendants().OfType<Button>().Where(button => button.Name is "Deny" or "AllowOnce" or "Approve")];
 
     [Fact]
     public Task EnterOnOpen_Denies() =>

@@ -39,9 +39,9 @@
       <Setter Property="TextWrapping" Value="Wrap" />
       <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
     </Style>
-    <!-- A segment is picked by its fill, not by the list's amber row bar. -->
-    <Style Selector="ListBox.segmented > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="BoxShadow" Value="none" />
+    <!-- Choices read at the size of the row labels they sit under. -->
+    <Style Selector="RadioButton, CheckBox">
+      <Setter Property="FontSize" Value="13.5" />
     </Style>
   </UserControl.Styles>
 
@@ -99,12 +99,12 @@
               </Grid>
             </Border>
             <Border Classes="settings-row" IsVisible="{Binding MinimizeLockSupported}">
-              <StackPanel Spacing="2">
-                <CheckBox Content="Lock when the window is minimized"
-                          FontWeight="Medium"
-                          FontSize="13.5"
-                          IsChecked="{Binding LockWhenMinimized}" />
-                <TextBlock Classes="caption" Margin="28,0,0,0"
+              <StackPanel Spacing="4">
+                <ToggleSwitch Content="Lock when the window is minimized"
+                              FontWeight="Medium"
+                              FontSize="13.5"
+                              IsChecked="{Binding LockWhenMinimized}" />
+                <TextBlock Classes="caption" Margin="42,0,0,0"
                            Text="Takes effect at once, and at every launch. Switching to another window is not minimizing and still does not lock; on macOS, hiding the app with Cmd+H is not minimizing either." />
               </StackPanel>
             </Border>

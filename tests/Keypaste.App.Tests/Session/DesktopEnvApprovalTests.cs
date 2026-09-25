@@ -181,9 +181,26 @@ public sealed class DesktopEnvApprovalTests
             hostile.Close();
         });
 
-    private static (EnvApprovalWindow Window, string Layout) Layout(EnvPreview preview, IReadOnlyList<string> command, string directory)
+    /// <summary>A requester the runner names is one trimmed line, however long it says it is.</summary>
+    [Fact]
+    public Task A_long_requester_leaves_the_window_and_buttons_where_they_were() =>
+        HeadlessSession.On(() =>
+        {
+            var preview = new EnvPreview("ci", ["DEPLOY_KEY"]);
+            var (ordinary, ordinaryLayout) = Layout(preview, ["deploy"], "/work", "claude-code");
+            var (hostile, hostileLayout) = Layout(preview, ["deploy"], "/work", string.Join(' ', Enumerable.Repeat("claude-code", 60)));
+
+            Assert.Equal(ordinaryLayout, hostileLayout);
+
+            ordinary.Close();
+            hostile.Close();
+        });
+
+    private static (EnvApprovalWindow Window, string Layout) Layout(
+        EnvPreview preview, IReadOnlyList<string> command, string directory, string? requester = null)
     {
-        var window = new EnvApprovalWindow(new EnvApprovalViewModel(EnvReleasePrompt.For(preview, command, directory)));
+        var prompt = EnvReleasePrompt.For(preview, command, directory) with { Requester = requester };
+        var window = new EnvApprovalWindow(new EnvApprovalViewModel(prompt));
         window.Show();
         WindowInput.Drain();
         DrawnFrame.Capture(window);

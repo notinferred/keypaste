@@ -25,7 +25,7 @@ internal sealed class RunApprovalViewModel : PromptViewModel
 
         var who = prompt.Label ?? prompt.Client;
 
-        Title = $"{who} wants to run a command with {prompt.Variables.Count} secret{(prompt.Variables.Count == 1 ? string.Empty : "s")}";
+        Title = $"{who} wants {prompt.Variables.Count} secret{(prompt.Variables.Count == 1 ? string.Empty : "s")}";
         Subtitle = $"via MCP · {prompt.Directory} · profile {prompt.Profile}";
         Client = prompt.Label is { } label ? $"{prompt.Client} · label {label}" : prompt.Client;
         Tool = $"tool: {RunPrompt.ToolName}";
@@ -50,7 +50,7 @@ internal sealed class RunApprovalViewModel : PromptViewModel
         };
         TimedSeconds = prompt.GrantSeconds;
         TimedCaption = prompt.GrantSeconds > 0
-            ? $"{who} can run this command line here again without asking until then, and can change the files it runs (scripts, package.json) in that time."
+            ? "This agent can run this command line here again without asking until then, and can change the files it runs (scripts, package.json) in that time."
             : string.Empty;
     }
 

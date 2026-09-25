@@ -7,7 +7,7 @@
                     x:DataType="vm:EnvApprovalViewModel"
                     Icon="avares://keypaste-app/Assets/keypaste.ico"
                     Title="keypaste: a run is asking for a project's variables"
-                    Width="460"
+                    Width="508"
                     SizeToContent="Height"
                     CanResize="False"
                     WindowDecorations="None"
@@ -22,18 +22,19 @@
 
   <!-- Fixed heights, as in ApprovalWindow: the command, directory and names are what the runner
        sent, so each sits in a box that wraps and scrolls and none of them can move the question or
-       the buttons (THREATS.md T-2, T-30). Nothing is trimmed, so no part of a command is hidden past
-       an edge. No button is the default: Enter approves nothing, and Escape denies. -->
+       the buttons (THREATS.md T-2, T-30). Only the header and the requester line are trimmed to one
+       line; no part of a command is hidden past an edge. No button is the default: Enter approves
+       nothing, and Escape denies. -->
 
   <Border Classes="prompt">
     <StackPanel Spacing="16">
 
-      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+      <Grid Classes="prompt-head" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
         <Border Grid.Column="0" Classes="prompt-tile">
           <ctl:KpIcon Icon="terminal" Size="18" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
         </Border>
         <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-          <TextBlock Name="TitleText" Classes="prompt-title" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+          <TextBlock Name="TitleText" Classes="prompt-title" Text="{Binding Title}" />
           <StackPanel Orientation="Horizontal">
             <TextBlock Name="ProjectText" Classes="prompt-sub" Text="{Binding Project}"
                        MaxWidth="160" TextTrimming="CharacterEllipsis" />
@@ -48,11 +49,11 @@
         </StackPanel>
       </Grid>
 
-      <TextBlock Name="RequesterText" Classes="prompt-sub" TextWrapping="Wrap"
+      <TextBlock Name="RequesterText" Classes="prompt-sub" TextTrimming="CharacterEllipsis"
                  Text="{Binding Requester, StringFormat='asked by {0}'}"
                  IsVisible="{Binding Requester, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
-      <Border Classes="prompt-call" Height="84">
+      <Border Classes="prompt-call" Height="58">
         <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="12,10">
           <StackPanel Spacing="2">
             <TextBlock Name="ScrubbedText" Classes="prompt-scrubbed" Text="{Binding Scrubbed}"
@@ -68,7 +69,8 @@
       </Border>
 
       <!-- The names, one row each: the rows draw the dividers and the tags, and KeysText draws the
-           names over them at the same line height, so the list reads as one text. -->
+           names over them at the same line height, so the list reads as one text. A name too long
+           for its column ends in an ellipsis before the tag rather than running under it. -->
       <Border Classes="prompt-list" Height="110">
         <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
           <StackPanel>
@@ -82,7 +84,8 @@
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
-              <TextBlock Name="KeysText" Text="{Binding Keys}" LineHeight="36" Margin="12,0,110,0" />
+              <TextBlock Name="KeysText" Text="{Binding Keys}" LineHeight="36" Margin="12,0,104,0"
+                         TextTrimming="CharacterEllipsis" ClipToBounds="True" />
             </Panel>
             <TextBlock Name="FileLinesText" Classes="tag" Text="{Binding FileLines}" TextWrapping="Wrap" FontSize="11.5"
                        Margin="12,8"
