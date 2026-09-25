@@ -11,7 +11,7 @@ public static class ShareLink
     /// <summary>The bytes of a server-made share id.</summary>
     public const int IdBytes = 16;
 
-    private const string Marker = "/s/#";
+    private const string _marker = "/s/#";
 
     /// <summary>The link for a share made on <paramref name="endpoint"/>.</summary>
     public static string Format(Uri endpoint, string id, string key)
@@ -20,7 +20,7 @@ public static class ShareLink
         ArgumentNullException.ThrowIfNull(id);
         ArgumentNullException.ThrowIfNull(key);
 
-        return endpoint.GetLeftPart(UriPartial.Authority) + Marker + id + "." + key;
+        return endpoint.GetLeftPart(UriPartial.Authority) + _marker + id + "." + key;
     }
 
     /// <summary>Reads the id and key out of a link.</summary>
@@ -31,13 +31,13 @@ public static class ShareLink
         id = string.Empty;
         key = string.Empty;
 
-        var at = link.IndexOf(Marker, StringComparison.Ordinal);
+        var at = link.IndexOf(_marker, StringComparison.Ordinal);
         if (at < 0)
         {
             return false;
         }
 
-        var fragment = link.AsSpan(at + Marker.Length);
+        var fragment = link.AsSpan(at + _marker.Length);
         var dot = fragment.IndexOf('.');
         if (dot < 0
             || !ShareCrypto.IsBase64Url(fragment[..dot], IdBytes)

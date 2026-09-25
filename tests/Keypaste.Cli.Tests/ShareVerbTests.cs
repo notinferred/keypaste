@@ -15,8 +15,8 @@ namespace Keypaste.Cli.Tests;
 /// </summary>
 public sealed class ShareVerbTests : IDisposable
 {
-    private const string Master = "share-master-5e1d";
-    private const string StripeValue = "sk_live_THE-VALUE-THAT-MUST-NOT-PRINT";
+    private const string _master = "share-master-5e1d";
+    private const string _stripeValue = "sk_live_THE-VALUE-THAT-MUST-NOT-PRINT";
 
     private readonly CliHarness _cli = new();
     private readonly FakeShareServer _server = new();
@@ -24,8 +24,8 @@ public sealed class ShareVerbTests : IDisposable
     public ShareVerbTests()
     {
         _cli.SeedVault(
-            Master,
-            ("env/acme-api/STRIPE_KEY", StripeValue),
+            _master,
+            ("env/acme-api/STRIPE_KEY", _stripeValue),
             ("Banking/Chase", "chase-password-1"),
             ("Work/Chase", "chase-password-2"));
         _cli.Environment[KeypasteHome.EnvironmentVariable] = Home;
@@ -44,7 +44,7 @@ public sealed class ShareVerbTests : IDisposable
 
     private int Share(params string[] args)
     {
-        _cli.Prompt.Enqueue(Master);
+        _cli.Prompt.Enqueue(_master);
         return ShareCommand.Execute(["share", .. args, "--vault", _cli.VaultPath], _cli.NewContext(), _server);
     }
 
@@ -91,7 +91,7 @@ public sealed class ShareVerbTests : IDisposable
         Assert.True(ShareLink.TryParse(copied, out var id, out var key));
         Assert.StartsWith("https://keypaste.com/s/#", copied, StringComparison.Ordinal);
         Assert.True(ShareCrypto.TryOpen(_server.Shares[id].Envelope, key, ReadOnlySpan<char>.Empty, out var payload, out _));
-        Assert.Equal(StripeValue, Assert.Single(payload.Fields).Value);
+        Assert.Equal(_stripeValue, Assert.Single(payload.Fields).Value);
 
         Assert.Empty(_cli.Out);
         Assert.Contains($"  ✓ link copied · 1 view · expires {LocalExpiry(TimeSpan.FromHours(24))}", _cli.Err, StringComparison.Ordinal);
@@ -143,7 +143,7 @@ public sealed class ShareVerbTests : IDisposable
     public void Share_Passphrase_PromptsTwice_AndMismatchRefuses()
     {
         _cli.Prompt.Interactive = true;
-        _cli.Prompt.Enqueue(Master, "a long passphrase", "a long passphrase");
+        _cli.Prompt.Enqueue(_master, "a long passphrase", "a long passphrase");
 
         var exit = ShareCommand.Execute(["share", "env/acme-api/STRIPE_KEY", "--passphrase", "--print", "--vault", _cli.VaultPath], _cli.NewContext(), _server);
 
@@ -156,7 +156,7 @@ public sealed class ShareVerbTests : IDisposable
         Assert.All(_cli.Prompt.IssuedSecrets, buffer => Assert.True(buffer.IsZeroed));
 
         Clear();
-        _cli.Prompt.Enqueue(Master, "a long passphrase", "another passphrase");
+        _cli.Prompt.Enqueue(_master, "a long passphrase", "another passphrase");
         exit = ShareCommand.Execute(["share", "env/acme-api/STRIPE_KEY", "--passphrase", "--print", "--vault", _cli.VaultPath], _cli.NewContext(), _server);
 
         Assert.Equal(CliApp.ExitUsageError, exit);
@@ -164,7 +164,7 @@ public sealed class ShareVerbTests : IDisposable
         Assert.Single(_server.Requests);
 
         Clear();
-        _cli.Prompt.Enqueue(Master, "short", "short");
+        _cli.Prompt.Enqueue(_master, "short", "short");
         exit = ShareCommand.Execute(["share", "env/acme-api/STRIPE_KEY", "--passphrase", "--print", "--vault", _cli.VaultPath], _cli.NewContext(), _server);
 
         Assert.Equal(CliApp.ExitUsageError, exit);
@@ -202,7 +202,7 @@ public sealed class ShareVerbTests : IDisposable
         _cli.AssertExit(CliApp.ExitSuccess, exit);
         Assert.True(ShareLink.TryParse(_cli.Out.Trim(), out var id, out var key));
         Assert.True(ShareCrypto.TryOpen(_server.Shares[id].Envelope, key, ReadOnlySpan<char>.Empty, out var payload, out _));
-        Assert.Equal(StripeValue, Assert.Single(payload.Fields).Value);
+        Assert.Equal(_stripeValue, Assert.Single(payload.Fields).Value);
     }
 
     [Theory]

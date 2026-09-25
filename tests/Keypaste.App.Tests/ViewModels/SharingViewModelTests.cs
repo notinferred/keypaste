@@ -14,7 +14,7 @@ namespace Keypaste.App.Tests.ViewModels;
 /// </summary>
 public sealed class SharingViewModelTests : IDisposable
 {
-    private const string StripeValue = "sk_live_THE-VALUE-THAT-MUST-NOT-SHOW";
+    private const string _stripeValue = "sk_live_THE-VALUE-THAT-MUST-NOT-SHOW";
 
     private readonly TempVault _vault = new();
     private readonly FakeShareServer _server = new();
@@ -27,7 +27,7 @@ public sealed class SharingViewModelTests : IDisposable
     {
         using (var vault = Vault.Open(_vault.Path_, TempVault.Password))
         {
-            vault.AddEntry(new VaultEntry { GroupPath = "env/acme-api", Title = "STRIPE_KEY", Password = StripeValue });
+            vault.AddEntry(new VaultEntry { GroupPath = "env/acme-api", Title = "STRIPE_KEY", Password = _stripeValue });
             vault.AddEntry(new VaultEntry { GroupPath = ReservedGroups.Tokens, Title = "hidden", Password = "verifier" });
             vault.Save();
         }
@@ -91,7 +91,7 @@ public sealed class SharingViewModelTests : IDisposable
         Assert.True(_countdown.IsCounting);
         Assert.True(ShareLink.TryParse(_clipboard.Content, out var id, out var key));
         Assert.True(ShareCrypto.TryOpen(_server.Shares[id].Envelope, key, ReadOnlySpan<char>.Empty, out var payload, out _));
-        Assert.Equal(StripeValue, Assert.Single(payload.Fields).Value);
+        Assert.Equal(_stripeValue, Assert.Single(payload.Fields).Value);
 
         var until = TimeZoneInfo.ConvertTime(_server.Now.AddHours(24), _clock.LocalTimeZone).ToString("d MMM HH:mm", System.Globalization.CultureInfo.InvariantCulture);
         Assert.Equal($"Link copied. It opens 3 times, until {until}.", screen.Toast);

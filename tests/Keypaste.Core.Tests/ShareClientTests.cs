@@ -7,7 +7,7 @@ namespace Keypaste.Core.Tests;
 /// <summary>What <c>/api/share</c> is sent, and what each answer means.</summary>
 public sealed class ShareClientTests : IDisposable
 {
-    private const string Id = "Qm9vYmFyQm9vYmFyQm9vYg";
+    private const string _id = "Qm9vYmFyQm9vYmFyQm9vYg";
     private static readonly string _hash = new('a', 64);
 
     private readonly FakeShareServer _server = new();
@@ -117,14 +117,14 @@ public sealed class ShareClientTests : IDisposable
         Assert.Null(created);
         Assert.Equal(ShareFailure.Protocol, failure);
         Assert.Single(_server.Requests);
-        Assert.Equal(ShareFailure.Protocol, await Client.RevokeAsync(Id, "token", CancellationToken.None));
+        Assert.Equal(ShareFailure.Protocol, await Client.RevokeAsync(_id, "token", CancellationToken.None));
         Assert.Equal(2, _server.Requests.Count);
     }
 
     [Fact]
     public async Task AnOversizedBody_IsRefused()
     {
-        var huge = "{\"id\":\"" + Id + "\",\"expires_at\":\"2026-09-25T14:40:00Z\",\"pad\":\"" + new string('x', ShareClient.MaximumResponseBytes) + "\"}";
+        var huge = "{\"id\":\"" + _id + "\",\"expires_at\":\"2026-09-25T14:40:00Z\",\"pad\":\"" + new string('x', ShareClient.MaximumResponseBytes) + "\"}";
         _server.Answer = _ => FakeShareServer.Json(HttpStatusCode.Created, huge);
 
         var (created, failure, _) = await Client.CreateAsync(Envelope(), 1, 300, _hash, CancellationToken.None);
@@ -139,8 +139,8 @@ public sealed class ShareClientTests : IDisposable
         _server.Unreachable = true;
 
         Assert.Equal(ShareFailure.Network, (await Client.CreateAsync(Envelope(), 1, 300, _hash, CancellationToken.None)).Failure);
-        Assert.Equal(ShareFailure.Network, (await Client.StatusAsync(Id, CancellationToken.None)).Failure);
-        Assert.Equal(ShareFailure.Network, await Client.RevokeAsync(Id, "token", CancellationToken.None));
+        Assert.Equal(ShareFailure.Network, (await Client.StatusAsync(_id, CancellationToken.None)).Failure);
+        Assert.Equal(ShareFailure.Network, await Client.RevokeAsync(_id, "token", CancellationToken.None));
     }
 
     [Fact]
@@ -149,7 +149,7 @@ public sealed class ShareClientTests : IDisposable
         _server.Answer = _ => new HttpResponseMessage(HttpStatusCode.Created) { Content = new StreamContent(new StallingStream()) };
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var failure = await new ShareClient(_server, ShareEndpoint.Default) { Timeout = TimeSpan.FromMilliseconds(200) }
-            .RevokeAsync(Id, "token", CancellationToken.None)
+            .RevokeAsync(_id, "token", CancellationToken.None)
             .WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
 
         Assert.Equal(ShareFailure.Network, failure);

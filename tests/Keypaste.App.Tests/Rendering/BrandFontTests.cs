@@ -12,7 +12,7 @@ namespace Keypaste.App.Tests.Rendering;
 /// </summary>
 public sealed class BrandFontTests
 {
-    private const string Sample = "keypaste Secrets DATABASE_URL";
+    private const string _sample = "keypaste Secrets DATABASE_URL";
 
     [Theory]
     [InlineData(FontWeight.Normal)]
@@ -47,7 +47,7 @@ public sealed class BrandFontTests
     [Fact]
     public Task Text_in_a_window_is_Instrument_Sans_unless_it_says_otherwise() => HeadlessSession.On(() =>
     {
-        var block = new TextBlock { Text = Sample };
+        var block = new TextBlock { Text = _sample };
         var window = new Window { Content = block };
         window.Show();
 
@@ -64,5 +64,5 @@ public sealed class BrandFontTests
     }
 
     private static double Width(Typeface typeface) =>
-        new FormattedText(Sample, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, typeface, 14, Brushes.White).Width;
+        new FormattedText(_sample, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, typeface, 14, Brushes.White).Width;
 }

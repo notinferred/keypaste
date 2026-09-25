@@ -67,9 +67,9 @@ public static class ShareCrypto
     /// same key from it; anything else is refused rather than sealed under a key the page cannot
     /// reproduce.
     /// </remarks>
-    private const char FirstNonNfcStable = '̀';
+    private const char _firstNonNfcStable = '̀';
 
-    private const string KdfName = "PBKDF2-SHA256";
+    private const string _kdfName = "PBKDF2-SHA256";
 
     /// <summary>Whether a payload fits in <see cref="MaximumPlaintextBytes"/>.</summary>
     public static bool Fits(SharePayload payload)
@@ -89,7 +89,7 @@ public static class ShareCrypto
     {
         foreach (var c in passphrase)
         {
-            if (c >= FirstNonNfcStable)
+            if (c >= _firstNonNfcStable)
             {
                 return false;
             }
@@ -387,7 +387,7 @@ public static class ShareCrypto
             else
             {
                 json.WriteStartObject("kdf");
-                json.WriteString("name", KdfName);
+                json.WriteString("name", _kdfName);
                 json.WriteNumber("iterations", kdf.Iterations);
                 json.WriteString("salt", kdf.Salt);
                 json.WriteEndObject();
@@ -456,7 +456,7 @@ public static class ShareCrypto
         }
 
         if (element.ValueKind != JsonValueKind.Object
-            || !element.TryGetProperty("name", out var name) || name.ValueKind != JsonValueKind.String || name.GetString() != KdfName
+            || !element.TryGetProperty("name", out var name) || name.ValueKind != JsonValueKind.String || name.GetString() != _kdfName
             || !element.TryGetProperty("iterations", out var iterations) || !iterations.TryGetInt32(out var count)
             || count is < MinimumIterations or > MaximumIterations
             || !TryBytes(element, "salt", SaltBytes, out _))

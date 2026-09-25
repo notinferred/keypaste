@@ -12,10 +12,10 @@ namespace Keypaste.Core.Tests;
 /// </summary>
 public sealed class ShareCryptoTests
 {
-    private const string Secret = "sk_live_51HxTheValueThatMustNotLeak";
-    private const string Passphrase = "correct horse battery";
+    private const string _secret = "sk_live_51HxTheValueThatMustNotLeak";
+    private const string _passphrase = "correct horse battery";
 
-    private static SharePayload Payload(string value = Secret) =>
+    private static SharePayload Payload(string value = _secret) =>
         new("STRIPE_SECRET_KEY", [new ShareField("password", value)], new DateTimeOffset(2026, 9, 24, 14, 40, 0, TimeSpan.Zero));
 
     private static SharePayload Open(SealedShare sealedShare, string passphrase = "")
@@ -49,17 +49,17 @@ public sealed class ShareCryptoTests
         Assert.Equal("STRIPE_SECRET_KEY", payload.Title);
         var field = Assert.Single(payload.Fields);
         Assert.Equal("password", field.Name);
-        Assert.Equal(Secret, field.Value);
+        Assert.Equal(_secret, field.Value);
         Assert.Equal(new DateTimeOffset(2026, 9, 24, 14, 40, 0, TimeSpan.Zero), payload.Created);
     }
 
     [Fact]
     public void RoundTrip_Passphrase()
     {
-        var sealedShare = ShareCrypto.Seal(Payload(), Passphrase);
+        var sealedShare = ShareCrypto.Seal(Payload(), _passphrase);
 
         Assert.True(sealedShare.HasPassphrase);
-        Assert.Equal(Secret, Assert.Single(Open(sealedShare, Passphrase).Fields).Value);
+        Assert.Equal(_secret, Assert.Single(Open(sealedShare, _passphrase).Fields).Value);
     }
 
     [Fact]
@@ -74,7 +74,7 @@ public sealed class ShareCryptoTests
     [Fact]
     public void WrongPassphrase_Fails()
     {
-        var sealedShare = ShareCrypto.Seal(Payload(), Passphrase);
+        var sealedShare = ShareCrypto.Seal(Payload(), _passphrase);
 
         Assert.False(ShareCrypto.TryOpen(sealedShare.Envelope, sealedShare.Key, "correct horse battery!", out _, out _));
     }
@@ -82,7 +82,7 @@ public sealed class ShareCryptoTests
     [Fact]
     public void LinkKeyAlone_DoesNotOpenAPassphraseShare()
     {
-        var sealedShare = ShareCrypto.Seal(Payload(), Passphrase);
+        var sealedShare = ShareCrypto.Seal(Payload(), _passphrase);
 
         Assert.False(ShareCrypto.TryOpen(sealedShare.Envelope, sealedShare.Key, ReadOnlySpan<char>.Empty, out _, out var error));
         Assert.Contains("passphrase", error, StringComparison.Ordinal);
@@ -95,19 +95,19 @@ public sealed class ShareCryptoTests
     [Fact]
     public void LoweredIterations_FailAuthentication()
     {
-        var sealedShare = ShareCrypto.Seal(Payload(), Passphrase);
+        var sealedShare = ShareCrypto.Seal(Payload(), _passphrase);
         var lowered = Edit(sealedShare.Envelope, envelope => envelope["kdf"]!["iterations"] = 1000);
 
-        Assert.False(ShareCrypto.TryOpen(lowered, sealedShare.Key, Passphrase, out _, out _));
+        Assert.False(ShareCrypto.TryOpen(lowered, sealedShare.Key, _passphrase, out _, out _));
     }
 
     [Fact]
     public void SwappedSalt_Fails()
     {
-        var sealedShare = ShareCrypto.Seal(Payload(), Passphrase);
+        var sealedShare = ShareCrypto.Seal(Payload(), _passphrase);
         var swapped = Edit(sealedShare.Envelope, envelope => envelope["kdf"]!["salt"] = Flip(envelope["kdf"]!["salt"]!.GetValue<string>()));
 
-        Assert.False(ShareCrypto.TryOpen(swapped, sealedShare.Key, Passphrase, out _, out _));
+        Assert.False(ShareCrypto.TryOpen(swapped, sealedShare.Key, _passphrase, out _, out _));
     }
 
     [Fact]
@@ -123,26 +123,26 @@ public sealed class ShareCryptoTests
     [Fact]
     public void TheEnvelopeHoldsNoPlaintextTitleOrValue()
     {
-        foreach (var passphrase in new[] { string.Empty, Passphrase })
+        foreach (var passphrase in new[] { string.Empty, _passphrase })
         {
             var sealedShare = ShareCrypto.Seal(Payload(), passphrase);
 
-            Assert.DoesNotContain(Secret, sealedShare.Envelope, StringComparison.Ordinal);
+            Assert.DoesNotContain(_secret, sealedShare.Envelope, StringComparison.Ordinal);
             Assert.DoesNotContain("STRIPE", sealedShare.Envelope, StringComparison.Ordinal);
             Assert.DoesNotContain("password", sealedShare.Envelope, StringComparison.Ordinal);
             Assert.DoesNotContain(sealedShare.Key, sealedShare.Envelope, StringComparison.Ordinal);
             Assert.DoesNotContain(passphrase.Length == 0 ? "\u0000" : passphrase, sealedShare.Envelope, StringComparison.Ordinal);
             Assert.DoesNotContain(sealedShare.Key, sealedShare.ToString(), StringComparison.Ordinal);
-            Assert.DoesNotContain(Secret, Payload().ToString(), StringComparison.Ordinal);
-            Assert.DoesNotContain(Secret, Payload().Fields[0].ToString(), StringComparison.Ordinal);
+            Assert.DoesNotContain(_secret, Payload().ToString(), StringComparison.Ordinal);
+            Assert.DoesNotContain(_secret, Payload().Fields[0].ToString(), StringComparison.Ordinal);
         }
     }
 
     [Fact]
     public void EachSealUsesFreshKeyIvAndSalt()
     {
-        var first = ShareCrypto.Seal(Payload(), Passphrase);
-        var second = ShareCrypto.Seal(Payload(), Passphrase);
+        var first = ShareCrypto.Seal(Payload(), _passphrase);
+        var second = ShareCrypto.Seal(Payload(), _passphrase);
 
         using var a = JsonDocument.Parse(first.Envelope);
         using var b = JsonDocument.Parse(second.Envelope);
@@ -182,17 +182,17 @@ public sealed class ShareCryptoTests
     [Fact]
     public void CheckVerifiesThePassphraseWithoutTheCiphertext()
     {
-        var sealedShare = ShareCrypto.Seal(Payload(), Passphrase);
+        var sealedShare = ShareCrypto.Seal(Payload(), _passphrase);
         var metadata = Edit(sealedShare.Envelope, envelope =>
         {
             envelope.Remove("iv");
             envelope.Remove("ct");
         });
 
-        Assert.True(ShareCrypto.TryCheck(metadata, sealedShare.Key, Passphrase, out var error), error);
+        Assert.True(ShareCrypto.TryCheck(metadata, sealedShare.Key, _passphrase, out var error), error);
         Assert.False(ShareCrypto.TryCheck(metadata, sealedShare.Key, "not the passphrase", out _));
-        Assert.False(ShareCrypto.TryCheck(metadata, Flip(sealedShare.Key), Passphrase, out _));
-        Assert.False(ShareCrypto.TryOpen(metadata, sealedShare.Key, Passphrase, out _, out _));
+        Assert.False(ShareCrypto.TryCheck(metadata, Flip(sealedShare.Key), _passphrase, out _));
+        Assert.False(ShareCrypto.TryOpen(metadata, sealedShare.Key, _passphrase, out _, out _));
     }
 
     /// <summary>

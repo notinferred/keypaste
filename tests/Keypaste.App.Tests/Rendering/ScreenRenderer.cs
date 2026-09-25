@@ -1,11 +1,11 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Media;
-using Keypaste.App.Controls;
-using Avalonia.Headless;
 using Avalonia.Media.Imaging;
+using Keypaste.App.Controls;
 using Keypaste.App.Navigation;
 using Keypaste.App.Session;
 using Keypaste.App.Tests.Clipboard;
@@ -29,16 +29,16 @@ namespace Keypaste.App.Tests.Rendering;
 /// </summary>
 public sealed class ScreenRenderer
 {
-    private const string Variable = "KEYPASTE_SCREENS_OUT";
-    private const string Master = "correct horse battery staple";
-    private const int Width = 1280;
-    private const int Height = 800;
+    private const string _variable = "KEYPASTE_SCREENS_OUT";
+    private const string _master = "correct horse battery staple";
+    private const int _width = 1280;
+    private const int _height = 800;
 
     [Fact]
     public Task Every_screen_is_drawn_to_a_file() => HeadlessSession.On(() =>
     {
-        var output = Environment.GetEnvironmentVariable(Variable);
-        Assert.SkipWhen(string.IsNullOrEmpty(output), $"{Variable} is not set");
+        var output = Environment.GetEnvironmentVariable(_variable);
+        Assert.SkipWhen(string.IsNullOrEmpty(output), $"{_variable} is not set");
         Directory.CreateDirectory(output!);
 
         using var demo = new DemoVault();
@@ -56,7 +56,7 @@ public sealed class ScreenRenderer
 
         using var session = new AppVaultSession(new ManualClock());
         using var unlock = new UnlockViewModel(session, demo.Home, new FakeVaultFilePicker(), () => { });
-        var window = new MainWindow { Width = Width, Height = Height };
+        var window = new MainWindow { Width = _width, Height = _height };
         window.FindControl<ContentControl>("Root")!.Content = new UnlockView { DataContext = unlock };
         window.Show();
         Save(window, output, "00-unlock");
@@ -67,13 +67,13 @@ public sealed class ScreenRenderer
     {
         using var session = new AppVaultSession(new ManualClock());
 
-        using (var master = TempVault.Secret(Master))
+        using (var master = TempVault.Secret(_master))
         {
             Assert.Equal(UnlockOutcome.Opened, session.TryUnlock(demo.Path, master.Value));
         }
 
         using var shell = new ShellViewModel(session, demo.Home, null, clipboard: new FakeClipboard(), clock: new ManualClock());
-        var window = new MainWindow { Width = Width, Height = Height };
+        var window = new MainWindow { Width = _width, Height = _height };
         window.FindControl<ContentControl>("Root")!.Content = new ShellView { DataContext = shell };
         window.Show();
 
@@ -195,7 +195,7 @@ public sealed class ScreenRenderer
             icons,
         ]);
 
-        var window = new Window { Width = Width, Height = 900, Content = new ScrollViewer { Content = page } };
+        var window = new Window { Width = _width, Height = 900, Content = new ScrollViewer { Content = page } };
         window.Show();
         focused.Focus();
         Save(window, output, "92-components");
@@ -225,7 +225,7 @@ public sealed class ScreenRenderer
         {
             Path = System.IO.Path.Combine(_directory, "acme.kdbx");
 
-            using var vault = Vault.Create(Path, Master);
+            using var vault = Vault.Create(Path, _master);
             vault.AddEntry(new VaultEntry { Title = "github", Username = "maya@acme.dev", Password = "demo-gh-7Hq2x", Url = "https://github.com", GroupPath = "Work" });
             vault.AddEntry(new VaultEntry { Title = "aws-console", Username = "maya.ortiz", Password = "demo-aws-51Nf", Url = "https://console.aws.amazon.com", GroupPath = "Work" });
             vault.AddEntry(new VaultEntry { Title = "linear", Username = "maya@acme.dev", Password = "demo-lin-a91K", Url = "https://linear.app", GroupPath = "Work" });

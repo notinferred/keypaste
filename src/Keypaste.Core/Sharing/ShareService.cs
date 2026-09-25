@@ -57,7 +57,7 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
     /// <summary>What <see cref="ShareRequest.Field"/> may name.</summary>
     public static readonly IReadOnlyList<string> Fields = ["password", "username", "url", "notes", "login"];
 
-    private const string Tool = "share";
+    private const string _tool = "share";
 
     private readonly ShareClient _client = client ?? throw new ArgumentNullException(nameof(client));
     private readonly TimeProvider _clock = clock ?? throw new ArgumentNullException(nameof(clock));
@@ -328,7 +328,7 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
         return audit is not null && audit.TryAppend(
             new AuditRecord
             {
-                Tool = Tool,
+                Tool = _tool,
                 Client = new AuditClient("keypaste share", CoreInfo.Version, null),
                 Args = new AuditArgs { Entry = what, Field = field },
                 Decision = AuditDecision.Granted,
