@@ -234,14 +234,17 @@ public sealed class SessionAuthority : IApproverHandler
             request.Project,
             async (preview, withdrawn) =>
             {
+                var prompt = EnvReleasePrompt.For(preview, request.Command, request.Directory) with { GrantSeconds = grantSeconds };
+
                 // Names only: the resolver reads the set again after this, so a grant releases the
                 // latest saved values, and a changed name list is asked about again.
-                if (!liveOnly && environments.Grants?.TryUse(cooldownKey, preview.Keys, out _) == true)
+                if (!liveOnly && environments.Grants?.TryUse(cooldownKey, preview.Keys, out var remaining) == true)
                 {
+                    environments.Narrate?.Invoke(
+                        $"released {prompt.Project}/{prompt.Profile} to `{prompt.Command}` from a timed grant ({(int)remaining.TotalSeconds}s left)");
                     return true;
                 }
 
-                var prompt = EnvReleasePrompt.For(preview, request.Command, request.Directory) with { GrantSeconds = grantSeconds };
                 answer = await environments.Gate.AskAsync(cooldownKey, prompt, withdrawn).ConfigureAwait(false);
 
                 // A withdrawn question is not a refusal: the resolver tells a lock from a hang-up.

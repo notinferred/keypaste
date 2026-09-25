@@ -193,7 +193,63 @@ public sealed class ConsoleSecretPromptTests
         Assert.Equal('o', prompt.ReadChoice(() => "[d] deny  [o] once  ", "oh", TestContext.Current.CancellationToken));
 
         // Drawn without echoing what was typed.
-        Assert.Equal("\r[d] deny  [o] once  \u001b[K", prompts.ToString());
+        Assert.Equal("\r[d] deny  [o] once  ", prompts.ToString());
+    }
+
+    /// <summary>
+    /// A key typed before the choice was drawn — a double-tap or auto-repeat on the last prompt —
+    /// answers nothing, however long the choice then stays up.
+    /// </summary>
+    [Fact]
+    public void ReadChoice_DiscardsKeysTypedBeforeItWasDrawn()
+    {
+        using var prompts = new StringWriter(CultureInfo.InvariantCulture);
+        var clock = new SteppedClock();
+        var typedAhead = new Queue<char>("hH");
+        var drawn = false;
+        var prompt = new ConsoleSecretPrompt(
+            prompts,
+            () =>
+            {
+                clock.Advance(ConsoleSecretPrompt.ArmingDelay);
+                return Key(typedAhead.Count > 0 ? typedAhead.Dequeue() : 'o');
+            },
+            () => typedAhead.Count > 0 || drawn,
+            () => false,
+            null,
+            clock);
+
+        Assert.Equal('o', prompt.ReadChoice(
+            () =>
+            {
+                drawn = true;
+                return "choose ";
+            },
+            "oh",
+            TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>An allowing key counts only after the choice has been on screen for the arming delay (D-0326).</summary>
+    [Fact]
+    public void ReadChoice_IgnoresAnAllowingKey_UntilArmed()
+    {
+        var keys = new Queue<(char Key, TimeSpan After)>(
+        [
+            ('h', TimeSpan.Zero),
+            ('o', ConsoleSecretPrompt.ArmingDelay - TimeSpan.FromMilliseconds(1)),
+            ('h', TimeSpan.FromMilliseconds(1)),
+        ]);
+
+        Assert.Equal('h', Timed(keys));
+        Assert.Empty(keys);
+    }
+
+    [Fact]
+    public void ReadChoice_DenyingKey_CountsAtOnce()
+    {
+        var keys = new Queue<(char Key, TimeSpan After)>([('o', TimeSpan.Zero), ('d', TimeSpan.Zero)]);
+
+        Assert.Equal('d', Timed(keys));
     }
 
     [Theory]
@@ -262,12 +318,17 @@ public sealed class ConsoleSecretPromptTests
         using var prompts = new StringWriter(CultureInfo.InvariantCulture);
         var clock = new SteppedClock();
         var polls = 0;
-        var left = 45;
+        var left = 10;
         var prompt = new ConsoleSecretPrompt(
             prompts,
-            () => new ConsoleKeyInfo('o', ConsoleKey.None, false, false, false),
+            () => Key('o'),
             () =>
             {
+                if (prompts.GetStringBuilder().Length == 0)
+                {
+                    return false;
+                }
+
                 if (++polls > 3)
                 {
                     return true;
@@ -281,19 +342,51 @@ public sealed class ConsoleSecretPromptTests
             clock);
 
         Assert.Equal('o', prompt.ReadChoice(() => $"{left--}s ", "oh", TestContext.Current.CancellationToken));
-        Assert.Equal("\r45s \u001b[K\r44s \u001b[K\r43s \u001b[K\r42s \u001b[K", prompts.ToString());
+
+        // No escape sequence, which a console without virtual terminal processing prints: a line
+        // narrower than the last is padded over it with spaces and drawn again.
+        Assert.Equal("\r10s \r9s  \r9s \r8s \r7s ", prompts.ToString());
     }
 
-    private static ConsoleSecretPrompt Choosing(TextWriter prompts, string keystrokes)
+    private static ConsoleKeyInfo Key(char key) => new(key, ConsoleKey.None, false, false, false);
+
+    /// <summary>Keys that arrive once the choice is drawn, all of them armed.</summary>
+    private static ConsoleSecretPrompt Choosing(StringWriter prompts, string keystrokes)
     {
+        var clock = new SteppedClock();
         var index = 0;
         return new ConsoleSecretPrompt(
             prompts,
-            () => new ConsoleKeyInfo(keystrokes[index++], ConsoleKey.None, false, false, false),
-            () => index < keystrokes.Length,
+            () =>
+            {
+                clock.Advance(ConsoleSecretPrompt.ArmingDelay);
+                return Key(keystrokes[index++]);
+            },
+            () => prompts.GetStringBuilder().Length > 0 && index < keystrokes.Length,
             () => false,
             null,
-            TimeProvider.System);
+            clock);
+    }
+
+    /// <summary>Reads a choice from keys that each arrive a set time after the one before, the first after the draw.</summary>
+    private static char? Timed(Queue<(char Key, TimeSpan After)> keys)
+    {
+        using var prompts = new StringWriter(CultureInfo.InvariantCulture);
+        var clock = new SteppedClock();
+        var prompt = new ConsoleSecretPrompt(
+            prompts,
+            () =>
+            {
+                var (key, after) = keys.Dequeue();
+                clock.Advance(after);
+                return Key(key);
+            },
+            () => prompts.GetStringBuilder().Length > 0 && keys.Count > 0,
+            () => false,
+            null,
+            clock);
+
+        return prompt.ReadChoice(() => "choose ", "oh", TestContext.Current.CancellationToken);
     }
 
     /// <summary>A monotonic clock the test moves, so a redraw is due exactly when the test says.</summary>

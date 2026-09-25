@@ -14,6 +14,11 @@ namespace Keypaste.Cli.Approval;
 /// they were written.
 /// </para>
 /// <para>
+/// The choice line is cleared by overwriting it with spaces rather than with an erase-line escape,
+/// which a Windows console without virtual terminal processing prints instead of obeying. That
+/// needs the choice line to keep one width while it counts down.
+/// </para>
+/// <para>
 /// It locks on the synchronized writer itself, which is the same monitor <see cref="Console.Error"/>
 /// takes for each of its own writes, so a prompt drawing the choice line in one write to that
 /// writer can never land inside a clear, write and redraw done here.
@@ -21,10 +26,11 @@ namespace Keypaste.Cli.Approval;
 /// </remarks>
 internal sealed class AgentConsole
 {
-    private const string _clearLine = "\r\u001b[K";
+    /// <summary>A choice line drawn over one of the same width.</summary>
+    internal static string Drawn(string line) => "\r" + line;
 
-    /// <summary>A choice line drawn over whatever the cursor's line held: back to its start, the line, then clear what is left.</summary>
-    internal static string Drawn(string line) => "\r" + line + "\u001b[K";
+    /// <summary>Blanks a drawn line and leaves the cursor at its start.</summary>
+    internal static string Cleared(string line) => "\r" + new string(' ', line.Length) + "\r";
 
     private readonly TextWriter _writer;
     private readonly bool _interactive;
@@ -56,7 +62,7 @@ internal sealed class AgentConsole
 
             if (pending is not null)
             {
-                _writer.Write(_clearLine);
+                _writer.Write(Cleared(pending()));
             }
 
             _writer.WriteLine(line);
@@ -72,7 +78,7 @@ internal sealed class AgentConsole
 
     /// <summary>Starts a choice: from now until <see cref="EndChoice"/> other lines keep the choice line whole and last.</summary>
     /// <param name="render">The choice line as it should read now.</param>
-    /// <remarks>The prompt reading the choice draws the line and its countdown, each time in one write of <see cref="Drawn"/>.</remarks>
+    /// <remarks>The prompt reading the choice draws the line and its countdown, each time in one write of <see cref="Drawn"/>, at one width.</remarks>
     internal void BeginChoice(Func<string> render)
     {
         ArgumentNullException.ThrowIfNull(render);

@@ -7,8 +7,10 @@ namespace Keypaste.Core.Ownership;
 /// <param name="VaultFor">The vault a lifetime may read, or null once it has ended.</param>
 /// <param name="Clock">What expiry is judged against.</param>
 /// <param name="Grants">The timed grants a person gave repeated runs, or null to ask about every run.</param>
+/// <param name="Narrate">Optional: a line for the operator's terminal when a timed grant releases a set unasked.</param>
 public sealed record SessionEnvironments(
     ApprovalGate Gate,
     Func<SessionLifetime, Vault?> VaultFor,
     TimeProvider Clock,
-    EnvGrantCache? Grants = null);
+    EnvGrantCache? Grants = null,
+    Action<string>? Narrate = null);

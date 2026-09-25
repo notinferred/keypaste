@@ -40,6 +40,9 @@ internal sealed class ConsoleSecretPrompt : ISecretPrompt
     /// <summary>How often a choice looks for a key, and so how soon it notices a withdrawal.</summary>
     internal static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(100);
 
+    /// <summary>How long a choice is on screen before a key allows anything: a key pressed for the last prompt must not answer this one (D-0326).</summary>
+    internal static readonly TimeSpan ArmingDelay = TimeSpan.FromSeconds(1);
+
     private static readonly TimeSpan _redrawInterval = TimeSpan.FromSeconds(1);
 
     private readonly TextWriter _prompts;
@@ -176,7 +179,10 @@ internal sealed class ConsoleSecretPrompt : ISecretPrompt
     /// <inheritdoc/>
     /// <remarks>
     /// Keys are polled rather than awaited, so a withdrawn question stops the read instead of leaving
-    /// a reader parked on the terminal. Each draw is one write, which is what lets
+    /// a reader parked on the terminal. Keys typed before the choice was drawn are discarded, and a
+    /// key that allows counts only once the choice has been on screen for <see cref="ArmingDelay"/>;
+    /// a key that denies counts at once. Each draw is one write with no escape sequence, which a
+    /// Windows console without virtual terminal processing would print, and is what lets
     /// <c>AgentConsole</c> keep other lines from splicing into it.
     /// </remarks>
     public char? ReadChoice(Func<string> prompt, string choices, CancellationToken cancellationToken)
@@ -189,7 +195,14 @@ internal sealed class ConsoleSecretPrompt : ISecretPrompt
             return ReadRedirectedLine() is { } line ? Choice(line, choices) : null;
         }
 
-        var drawnAt = Draw(prompt);
+        while (_keyAvailable())
+        {
+            _readKey();
+        }
+
+        var width = 0;
+        var shownAt = Draw(prompt, ref width);
+        var drawnAt = shownAt;
 
         while (!cancellationToken.IsCancellationRequested)
         {
@@ -203,7 +216,7 @@ internal sealed class ConsoleSecretPrompt : ISecretPrompt
                 }
 
                 var lower = char.ToLowerInvariant(key);
-                if (choices.Contains(lower, StringComparison.Ordinal))
+                if (choices.Contains(lower, StringComparison.Ordinal) && _clock.GetElapsedTime(shownAt) >= ArmingDelay)
                 {
                     return lower;
                 }
@@ -213,7 +226,7 @@ internal sealed class ConsoleSecretPrompt : ISecretPrompt
 
             if (_clock.GetElapsedTime(drawnAt) >= _redrawInterval)
             {
-                drawnAt = Draw(prompt);
+                drawnAt = Draw(prompt, ref width);
             }
 
             cancellationToken.WaitHandle.WaitOne(PollInterval);
@@ -241,10 +254,13 @@ internal sealed class ConsoleSecretPrompt : ISecretPrompt
     private static bool IsDenyKey(char key) =>
         key is '\r' or '\n' or '\u001B' or '\u0003' or 'd' or 'D' or 'n' or 'N';
 
-    private long Draw(Func<string> prompt)
+    /// <summary>Draws the line over the last one, blanking whatever of a wider last line it would leave behind.</summary>
+    private long Draw(Func<string> prompt, ref int width)
     {
-        _prompts.Write("\r" + prompt() + "\u001b[K");
+        var line = prompt();
+        _prompts.Write(line.Length < width ? "\r" + line.PadRight(width) + "\r" + line : "\r" + line);
         _prompts.Flush();
+        width = line.Length;
         return _clock.GetTimestamp();
     }
 

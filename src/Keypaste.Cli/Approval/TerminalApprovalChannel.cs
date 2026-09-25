@@ -147,11 +147,11 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         return answer;
     }
 
-    /// <summary>The choice line: what each key does, and how long is left to press one.</summary>
+    /// <summary>The choice line: what each key does, and how long is left to press one, at one width while it counts down.</summary>
     private string Choice(int grantSeconds, int secondsLeft) =>
         string.Create(
             CultureInfo.InvariantCulture,
-            $"[d] deny  [o] once  {(grantSeconds > 0 ? $"[h] {ApprovalLimits.Describe(grantSeconds)}  " : string.Empty)}{secondsLeft}s {_console.Glyph(Mark.Prompt)} ");
+            $"[d] deny  [o] once  {(grantSeconds > 0 ? $"[h] {ApprovalLimits.Describe(grantSeconds)}  " : string.Empty)}{secondsLeft,2}s {_console.Glyph(Mark.Prompt)} ");
 
     private int Remaining(long started)
     {

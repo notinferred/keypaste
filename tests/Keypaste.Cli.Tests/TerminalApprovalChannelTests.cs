@@ -110,6 +110,20 @@ public sealed class TerminalApprovalChannelTests
         Assert.Equal("[d] deny  [o] once  [h] 5 minutes  45s › ", Assert.Single(rig.Prompt.PromptsSeen));
     }
 
+    /// <summary>The choice line keeps one width as it counts down, which is what lets <see cref="AgentConsole"/> blank it with spaces.</summary>
+    [Fact]
+    public async Task TheChoiceLine_KeepsItsWidth_AtOneDigit()
+    {
+        var prompt = new FakeSecretPrompt();
+        prompt.Enqueue("d");
+        var channel = new TerminalApprovalChannel(
+            prompt, new AgentConsole(new StringWriter(), interactive: false), TimeSpan.FromSeconds(ApprovalLimits.MinimumWindowSeconds), TimeProvider.System);
+
+        await channel.AskAsync(Prompt(), Token);
+
+        Assert.Equal("[d] deny  [o] once  [h] 1 hour   5s › ", Assert.Single(prompt.PromptsSeen));
+    }
+
     [Fact]
     public async Task TheChoiceLine_DropsH_WhenNotOffered()
     {

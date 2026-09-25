@@ -141,6 +141,8 @@ internal static class AgentCommand
         CliContext context)
     {
         var console = new AgentConsole(context.Stderr, context.Prompt.IsInteractive);
+        void Narrate(string line) => console.WriteLine($"keypaste: {line}");
+
         using var lifetime = new SessionLifetime();
         using var grants = new GrantCache(TimeProvider.System);
         lifetime.Own(grants);
@@ -157,7 +159,7 @@ internal static class AgentCommand
             gate,
             grants,
             new PolicyGate(policy.Rules, TimeProvider.System),
-            line => console.WriteLine($"keypaste: {line}"));
+            Narrate);
 
         var authority = new SessionAuthority(
             claim.Vault,
@@ -167,7 +169,8 @@ internal static class AgentCommand
                 gate,
                 asked => ReferenceEquals(asked, lifetime) && asked.IsLive ? vault : null,
                 TimeProvider.System,
-                envGrants));
+                envGrants,
+                Narrate));
 
         ApproverListener? listener = null;
 

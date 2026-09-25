@@ -299,6 +299,28 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         Assert.Equal(1, _fixture.Channel.Asked);
     }
 
+    /// <summary>A replay by any program of the person's is the grant's accepted risk (T-34), so each one it serves is said out loud.</summary>
+    [Fact]
+    public async Task ARunServedByAGrant_IsNarrated_AndAnAskedOneIsNot()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        using var grants = new EnvGrantCache(_fixture.Clock);
+        List<string> narrated = [];
+        var authority = EnvAuthority(grants, narrated.Add);
+
+        await RunAsync(authority, Request("session-one"));
+        Assert.Empty(narrated);
+
+        _fixture.Clock.Advance(TimeSpan.FromSeconds(60));
+        await RunAsync(authority, Request("session-one"));
+
+        var line = Assert.Single(narrated);
+        Assert.Equal(
+            $"released dev/dev to `deploy --to \"staging area\"` from a timed grant ({EnvGrantCache.CeilingSeconds - 60}s left)",
+            line);
+        Assert.DoesNotContain(_token1, line, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task AnHourAnswer_DoesNotCoverAnotherCommandDirectoryOrProject()
     {
@@ -424,7 +446,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
     }
 
     /// <summary>The owner's authority itself, with timed env grants, answering runs without a pipe.</summary>
-    private SessionAuthority EnvAuthority(EnvGrantCache grants) =>
+    private SessionAuthority EnvAuthority(EnvGrantCache grants, Action<string>? narrate = null) =>
         new(
             VaultIdentity.Of(_directory, VaultPath),
             () => _lifetime,
@@ -433,7 +455,8 @@ public sealed class SessionAuthorityEnvTests : IDisposable
                 _fixture.Gate,
                 lifetime => ReferenceEquals(lifetime, _lifetime) && lifetime.IsLive ? _vault : null,
                 _fixture.Clock,
-                grants));
+                grants,
+                narrate));
 
     /// <summary>One run: a new connection that attaches and asks once, as every <c>keypaste run --session</c> is.</summary>
     private async Task<EnvReply> RunAsync(SessionAuthority authority, EnvRequest request)
