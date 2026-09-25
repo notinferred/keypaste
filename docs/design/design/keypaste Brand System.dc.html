@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fragment+Mono"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lucide-static@latest/font/lucide.css"><style>body{margin:0;background:#111214;color:#F2F2F0;font-family:'Instrument Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased}a{color:#F2B544;text-decoration:none}a:hover{color:#F7C566;text-decoration:underline}*{box-sizing:border-box}</style></helmet>
+<div style="max-width:1240px;margin:0 auto">
+<header data-screen-label="Cover" style="padding:40px 48px 64px;display:grid;gap:56px;background-image:linear-gradient(#18191C 1px,transparent 1px),linear-gradient(90deg,#18191C 1px,transparent 1px);background-size:16px 16px">
+<div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096"><span>keypaste / brand + design system</span><span>v1.0 · September 2026</span></div>
+<div style="display:flex;align-items:center;gap:clamp(16px,3vw,32px)">
+<svg viewBox="0 0 64 64" style="width:clamp(72px,13vw,150px);height:auto;flex:none"><rect x="10" y="8" width="10" height="48" fill="#F2F2F0"></rect><polygon points="40,24 54,24 38,40 54,56 40,56 24,40" fill="#F2B544"></polygon></svg>
+<div style="font-size:clamp(54px,10vw,116px);font-weight:600;letter-spacing:-0.045em;line-height:1">keypaste</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:32px;align-items:end">
+<p style="margin:0;max-width:540px;font-size:20px;line-height:1.4;color:#C9CACD;text-wrap:pretty">Secrets for developers and the agents they work with. Open source, reads and writes KDBX, and keeps values on your machine.</p>
+<nav style="display:flex;flex-wrap:wrap;gap:6px 18px;justify-content:flex-end;font-family:'Fragment Mono',monospace;font-size:12px"><a href="#logo">01 logo</a><a href="#color">02 color</a><a href="#type">03 type</a><a href="#space">04 space</a><a href="#components">05 components</a><a href="#icons">06 icons</a><a href="#voice">07 voice</a></nav>
+</div>
+</header>
+<section id="logo" data-screen-label="01 Logo" style="padding:56px 48px;border-top:1px solid #26282C;display:grid;gap:28px">
+<div style="display:flex;align-items:baseline;gap:14px"><span style="font-family:'Fragment Mono',monospace;font-size:12px;color:#F2B544">01</span><h2 style="margin:0;font-size:30px;font-weight:600;letter-spacing:-0.035em">Logo</h2></div>
+<p style="margin:0;max-width:640px;font-size:15px;line-height:1.55;color:#C9CACD;text-wrap:pretty">The mark is a lowercase k made from two parts: the stem is a text cursor and the arm is an insert bracket. Together they mean "paste here". The wordmark is always lowercase, set in Instrument Sans Semibold at −4.5% tracking.</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">
+<div style="height:200px;border-radius:10px;background:#18191C;border:1px solid #26282C;display:flex;flex-direction:column;justify-content:space-between;padding:16px">
+<span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">primary · on ink</span>
+<div style="display:flex;align-items:center;gap:12px;align-self:center"><svg width="48" height="48" viewBox="0 0 64 64"><rect x="10" y="8" width="10" height="48" fill="#F2F2F0"></rect><polygon points="40,24 54,24 38,40 54,56 40,56 24,40" fill="#F2B544"></polygon></svg><span style="font-size:36px;font-weight:600;letter-spacing:-0.045em">keypaste</span></div><span></span>
+</div>
+<div style="height:200px;border-radius:10px;background:#F2F2F0;color:#111214;display:flex;flex-direction:column;justify-content:space-between;padding:16px">
+<span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#55575C">on paper</span>
+<div style="display:flex;align-items:center;gap:12px;align-self:center"><svg width="48" height="48" viewBox="0 0 64 64"><rect x="10" y="8" width="10" height="48" fill="#111214"></rect><polygon points="40,24 54,24 38,40 54,56 40,56 24,40" fill="#D99D2E"></polygon></svg><span style="font-size:36px;font-weight:600;letter-spacing:-0.045em">keypaste</span></div><span></span>
+</div>
+<div style="height:200px;border-radius:10px;background:#F2B544;color:#111214;display:flex;flex-direction:column;justify-content:space-between;padding:16px">
+<span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#3D2E0F">mono · on amber</span>
+<div style="display:flex;align-items:center;gap:12px;align-self:center"><svg width="48" height="48" viewBox="0 0 64 64"><rect x="10" y="8" width="10" height="48" fill="#111214"></rect><polygon points="40,24 54,24 38,40 54,56 40,56 24,40" fill="#111214"></polygon></svg><span style="font-size:36px;font-weight:600;letter-spacing:-0.045em">keypaste</span></div><span></span>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px">
+<div style="border-radius:10px;background:#18191C;border:1px solid #26282C;padding:16px;display:grid;gap:12px">
+<span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">construction · 64-unit grid</span>
+<div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+<div style="width:192px;height:192px;flex:none;background-color:#111214;background-image:linear-gradient(#26282C 1px,transparent 1px),linear-gradient(90deg,#26282C 1px,transparent 1px);background-size:12px 12px;border:1px solid #2C2E33">
+<svg width="192" height="192" viewBox="0 0 64 64"><rect x="10" y="8" width="10" height="48" fill="#F2F2F0" fill-opacity="0.92"></rect><polygon points="40,24 54,24 38,40 54,56 40,56 24,40" fill="#F2B544" fill-opacity="0.92"></polygon></svg>
+</div>
+<div style="display:grid;gap:8px;font-family:'Fragment Mono',monospace;font-size:12px;color:#C9CACD;line-height:1.5">
+<span><span style="color:#8E9096">stem</span> 10 × 48u</span>
+<span><span style="color:#8E9096">arm</span> 14u wide at 45°</span>
+<span><span style="color:#8E9096">arm top</span> sits at x-height, 24u</span>
+<span><span style="color:#8E9096">gap</span> 4u, never closed</span>
+<span><span style="color:#8E9096">clearspace</span> one stem width all round</span>
+</div>
+</div>
+</div>
+<div style="border-radius:10px;background:#18191C;border:1px solid #26282C;padding:16px;display:grid;gap:16px;align-content:space-between">
+<span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">app icon · 128 / 64 / 32 / 16</span>
+<div style="display:flex;align-items:flex-end;gap:20px">
+<svg width="128" height="128" viewBox="0 0 64 64"><rect width="64" height="64" rx="15" fill="#1D1E22"></rect><rect x="16" y="14" width="7" height="36" fill="#F2F2F0"></rect><polygon points="38,26 48,26 36.5,38 48,50 38,50 26.5,38" fill="#F2B544"></polygon></svg>
+<svg width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="15" fill="#1D1E22"></rect><rect x="16" y="14" width="7" height="36" fill="#F2F2F0"></rect><polygon points="38,26 48,26 36.5,38 48,50 38,50 26.5,38" fill="#F2B544"></polygon></svg>
+<svg width="32" height="32" viewBox="0 0 64 64"><rect width="64" height="64" rx="15" fill="#1D1E22"></rect><rect x="16" y="14" width="7" height="36" fill="#F2F2F0"></rect><polygon points="38,26 48,26 36.5,38 48,50 38,50 26.5,38" fill="#F2B544"></polygon></svg>
+<svg width="16" height="16" viewBox="0 0 64 64"><rect width="64" height="64" rx="15" fill="#F2B544"></rect><rect x="14" y="12" width="10" height="40" fill="#111214"></rect><polygon points="36,24 50,24 36,38 50,52 36,52 28,38" fill="#111214"></polygon></svg>
+</div>
+<span style="font-size:13px;color:#8E9096;line-height:1.5">At 16px and below, use the favicon version: amber tile, ink glyph, thicker strokes.</span>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;font-size:13px;line-height:1.5;color:#C9CACD">
+<div style="padding:14px 16px;border-radius:10px;border:1px solid #26282C;display:flex;gap:10px"><i class="icon-check" style="color:#F2B544;font-size:16px"></i><span>Keep the wordmark lowercase, including at the start of a sentence.</span></div>
+<div style="padding:14px 16px;border-radius:10px;border:1px solid #26282C;display:flex;gap:10px"><i class="icon-check" style="color:#F2B544;font-size:16px"></i><span>The arm is amber, or the same color as the stem in one-color use.</span></div>
+<div style="padding:14px 16px;border-radius:10px;border:1px solid #26282C;display:flex;gap:10px"><i class="icon-x" style="color:oklch(0.74 0.14 25);font-size:16px"></i><span>Don't close the gap, round the corners, or add outlines or glows.</span></div>
+<div style="padding:14px 16px;border-radius:10px;border:1px solid #26282C;display:flex;gap:10px"><i class="icon-x" style="color:oklch(0.74 0.14 25);font-size:16px"></i><span>Minimum sizes: 16px for the mark, 88px wide for the lockup.</span></div>
+</div>
+</section>
+<section id="color" data-screen-label="02 Color" style="padding:56px 48px;border-top:1px solid #26282C;display:grid;gap:28px">
+<div style="display:flex;align-items:baseline;gap:14px"><span style="font-family:'Fragment Mono',monospace;font-size:12px;color:#F2B544">02</span><h2 style="margin:0;font-size:30px;font-weight:600;letter-spacing:-0.035em">Color</h2></div>
+<p style="margin:0;max-width:640px;font-size:15px;line-height:1.55;color:#C9CACD;text-wrap:pretty">Dark by default: neutral inks with a hint of blue, layered by lightness, not shadow. Amber is the only accent, used once per view for the primary action or a live signal such as a waiting agent or an active grant.</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));border-radius:10px;overflow:hidden;border:1px solid #26282C;font-family:'Fragment Mono',monospace;font-size:10.5px;line-height:1.5">
+<div style="height:120px;padding:10px;display:flex;flex-direction:column;justify-content:flex-end;background:#111214;color:#8E9096">ink-0 · app<br>#111214</div>
+<div style="height:120px;padding:10px;display:flex;flex-direction:column;justify-content:flex-end;background:#18191C;color:#8E9096">ink-1 · panel<br>#18191C</div>
+<div style="height:120px;padding:10px;display:flex;flex-direction:column;justify-content:flex-end;background:#1D1E22;color:#8E9096">ink-2 · card<br>#1D1E22</div>
+<div style="height:120px;padding:10px;display:flex;flex-direction:column;justify-content:flex-end;background:#24262A;color:#8E9096">ink-3 · hover<br>#24262A</div>
+<div style="height:120px;padding:10px;display:flex;flex-direction:column;justify-content:flex-end;background:#2A2C30;color:#A5A7AC">ink-4 · active<br>#2A2C30</div>
+<div style="height:120px;padding:10px;display:flex;flex-direction:column;justify-content:flex-end;background:#3A3D43;color:#C9CACD">line-3<br>#3A3D43</div>
+<div style="height:120px;padding:10px;display:flex;flex-direction:column;justify-content:flex-end;background:#8E9096;color:#111214">grey-5 · muted<br>#8E9096</div>
+<div style="height:120px;padding:10px;display:flex;flex-direction:column;justify-content:flex-end;background:#C9CACD;color:#111214">grey-3 · body<br>#C9CACD</div>
+<div style="height:120px;padding:10px;display:flex;flex-direction:column;justify-content:flex-end;background:#F2F2F0;color:#111214">paper · text<br>#F2F2F0</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px">
+<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;border-radius:10px;overflow:hidden;font-family:'Fragment Mono',monospace;font-size:10.5px;line-height:1.5;color:#111214">
+<div style="height:120px;padding:10px;display:flex;flex-direction:column;justify-content:flex-end;background:#F2B544">amber · accent<br>#F2B544</div>
+<div style="height:120px;padding:10px;display:flex;flex-direction:column;justify-content:flex-end;background:#F7C566">hover<br>#F7C566</div>
+<div style="height:120px;padding:10px;display:flex;flex-direction:column;justify-content:flex-end;background:#D99D2E">press<br>#D99D2E</div>
+<div style="height:120px;padding:10px;display:flex;flex-direction:column;justify-content:flex-end;background:#2A2419;color:#F2B544">tint<br>12%</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);border-radius:10px;overflow:hidden;font-family:'Fragment Mono',monospace;font-size:10.5px;line-height:1.5;color:#111214">
+<div style="height:120px;padding:10px;display:flex;flex-direction:column;justify-content:flex-end;background:oklch(0.80 0.13 155)">ok<br>granted</div>
+<div style="height:120px;padding:10px;display:flex;flex-direction:column;justify-content:flex-end;background:#F2B544">warn<br>pending</div>
+<div style="height:120px;padding:10px;display:flex;flex-direction:column;justify-content:flex-end;background:oklch(0.74 0.14 25)">danger<br>denied</div>
+<div style="height:120px;padding:10px;display:flex;flex-direction:column;justify-content:flex-end;background:oklch(0.78 0.10 245)">info<br>synced</div>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px">
+<div style="padding:20px;border-radius:10px;background:#F7F7F5;color:#111214;display:grid;gap:12px">
+<span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#6B6D72">light theme · data-theme="light"</span>
+<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:7px;background:#FFFFFF;border:1px solid #DCDCD7"><i class="icon-key-round" style="font-size:16px;color:#6B6D72"></i><span style="font-family:'Fragment Mono',monospace;font-size:13px">STRIPE_SECRET_KEY</span><span style="margin-left:auto;font-size:12px;color:#8A5A00;font-weight:600">in use · 42m</span></div>
+<div style="display:flex;gap:8px"><span style="padding:8px 14px;border-radius:7px;background:#F2B544;font-size:13px;font-weight:600">Allow for 1 hour</span><span style="padding:8px 14px;border-radius:7px;background:#E6E6E2;font-size:13px;font-weight:500">Allow once</span></div>
+</div>
+<div style="padding:20px;border-radius:10px;border:1px solid #26282C;display:grid;gap:10px;align-content:start;font-size:13px;line-height:1.5;color:#C9CACD">
+<span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">rules</span>
+<span>Text on amber is always ink-0. Amber text on ink passes AA (9.9:1).</span>
+<span>Status colors share one lightness and chroma, so no state looks louder than another.</span>
+<span>Never use color alone for state: pair it with a label or icon.</span>
+</div>
+</div>
+</section>
+<section id="type" data-screen-label="03 Type" style="padding:56px 48px;border-top:1px solid #26282C;display:grid;gap:28px">
+<div style="display:flex;align-items:baseline;gap:14px"><span style="font-family:'Fragment Mono',monospace;font-size:12px;color:#F2B544">03</span><h2 style="margin:0;font-size:30px;font-weight:600;letter-spacing:-0.035em">Type</h2></div>
+<p style="margin:0;max-width:640px;font-size:15px;line-height:1.55;color:#C9CACD;text-wrap:pretty">Instrument Sans for the interface, Fragment Mono for anything a machine reads: key names, values, paths, commands, tokens. If you could paste it into a terminal, set it in mono.</p>
+<div style="border-radius:10px;border:1px solid #26282C;overflow:hidden">
+<div style="display:grid;grid-template-columns:120px 1fr;gap:16px;align-items:baseline;padding:16px 20px;border-bottom:1px solid #26282C"><span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">display 54/600</span><span style="font-size:54px;font-weight:600;letter-spacing:-0.045em;line-height:1.05">Access, not values.</span></div>
+<div style="display:grid;grid-template-columns:120px 1fr;gap:16px;align-items:baseline;padding:16px 20px;border-bottom:1px solid #26282C"><span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">h1 30/600</span><span style="font-size:30px;font-weight:600;letter-spacing:-0.035em">Environment profiles</span></div>
+<div style="display:grid;grid-template-columns:120px 1fr;gap:16px;align-items:baseline;padding:16px 20px;border-bottom:1px solid #26282C"><span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">h2 20/600</span><span style="font-size:20px;font-weight:600;letter-spacing:-0.03em">claude-code wants 1 secret</span></div>
+<div style="display:grid;grid-template-columns:120px 1fr;gap:16px;align-items:baseline;padding:16px 20px;border-bottom:1px solid #26282C"><span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">body 14/400</span><span style="font-size:14px;line-height:1.5;color:#C9CACD;max-width:560px">Grants expire on their own. When one runs out, the agent has to ask again. Nothing lingers in its context.</span></div>
+<div style="display:grid;grid-template-columns:120px 1fr;gap:16px;align-items:baseline;padding:16px 20px;border-bottom:1px solid #26282C"><span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">label 12/500</span><span style="font-size:12px;font-weight:500;color:#8E9096">Last used 4 minutes ago · by cursor-agent</span></div>
+<div style="display:grid;grid-template-columns:120px 1fr;gap:16px;align-items:baseline;padding:16px 20px;border-bottom:1px solid #26282C"><span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">mono 13</span><span style="font-family:'Fragment Mono',monospace;font-size:13px">DATABASE_URL=<span style="color:#8E9096">kp://acme/api/dev/DATABASE_URL</span></span></div>
+<div style="display:grid;grid-template-columns:120px 1fr;gap:16px;align-items:baseline;padding:16px 20px"><span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">mono 12 muted</span><span style="font-family:'Fragment Mono',monospace;font-size:12px;color:#8E9096">kpt_live_4f9c…a21e · expires 2026-10-01</span></div>
+</div>
+</section>
+<section id="space" data-screen-label="04 Space" style="padding:56px 48px;border-top:1px solid #26282C;display:grid;gap:28px">
+<div style="display:flex;align-items:baseline;gap:14px"><span style="font-family:'Fragment Mono',monospace;font-size:12px;color:#F2B544">04</span><h2 style="margin:0;font-size:30px;font-weight:600;letter-spacing:-0.035em">Space, radius, depth</h2></div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px">
+<div style="padding:20px;border-radius:10px;border:1px solid #26282C;display:grid;gap:8px;font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">
+<span>spacing · 4px base, 16px grid</span>
+<div style="display:flex;align-items:center;gap:12px"><span style="width:44px">4</span><span style="width:4px;height:12px;background:#F2B544"></span></div>
+<div style="display:flex;align-items:center;gap:12px"><span style="width:44px">8</span><span style="width:8px;height:12px;background:#F2B544"></span></div>
+<div style="display:flex;align-items:center;gap:12px"><span style="width:44px">12</span><span style="width:12px;height:12px;background:#F2B544"></span></div>
+<div style="display:flex;align-items:center;gap:12px"><span style="width:44px">16</span><span style="width:16px;height:12px;background:#F2B544"></span></div>
+<div style="display:flex;align-items:center;gap:12px"><span style="width:44px">24</span><span style="width:24px;height:12px;background:#F2B544"></span></div>
+<div style="display:flex;align-items:center;gap:12px"><span style="width:44px">32</span><span style="width:32px;height:12px;background:#F2B544"></span></div>
+<div style="display:flex;align-items:center;gap:12px"><span style="width:44px">56</span><span style="width:56px;height:12px;background:#F2B544"></span></div>
+</div>
+<div style="padding:20px;border-radius:10px;border:1px solid #26282C;display:grid;gap:14px;align-content:start">
+<span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">radius</span>
+<div style="display:flex;gap:14px;flex-wrap:wrap;font-family:'Fragment Mono',monospace;font-size:10.5px;color:#8E9096;text-align:center">
+<div style="display:grid;gap:6px"><span style="width:56px;height:56px;border-radius:4px;background:#2A2C30"></span>4 chip</div>
+<div style="display:grid;gap:6px"><span style="width:56px;height:56px;border-radius:6px;background:#2A2C30"></span>6 field</div>
+<div style="display:grid;gap:6px"><span style="width:56px;height:56px;border-radius:7px;background:#2A2C30"></span>7 button</div>
+<div style="display:grid;gap:6px"><span style="width:56px;height:56px;border-radius:10px;background:#2A2C30"></span>10 card</div>
+<div style="display:grid;gap:6px"><span style="width:56px;height:56px;border-radius:14px;background:#2A2C30"></span>14 dialog</div>
+</div>
+</div>
+<div style="padding:20px;border-radius:10px;border:1px solid #26282C;display:grid;gap:14px;align-content:start">
+<span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">depth · lightness first, shadow only for overlays</span>
+<div style="position:relative;height:120px;border-radius:10px;background:#111214;border:1px solid #26282C">
+<div style="position:absolute;left:14px;top:14px;right:70px;bottom:14px;border-radius:10px;background:#18191C;border:1px solid #2C2E33;padding:10px;font-family:'Fragment Mono',monospace;font-size:10.5px;color:#8E9096">panel</div>
+<div style="position:absolute;right:14px;top:30px;width:150px;height:64px;border-radius:14px;background:#1D1E22;border:1px solid #3A3D43;box-shadow:0 24px 64px rgba(0,0,0,.55);padding:10px;font-family:'Fragment Mono',monospace;font-size:10.5px;color:#C9CACD">dialog + shadow</div>
+</div>
+</div>
+</div>
+</section>
+<section id="components" data-screen-label="05 Components" style="padding:56px 48px;border-top:1px solid #26282C;display:grid;gap:28px">
+<div style="display:flex;align-items:baseline;gap:14px"><span style="font-family:'Fragment Mono',monospace;font-size:12px;color:#F2B544">05</span><h2 style="margin:0;font-size:30px;font-weight:600;letter-spacing:-0.035em">Components</h2></div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px">
+<div style="padding:20px;border-radius:10px;border:1px solid #26282C;display:grid;gap:16px;align-content:start">
+<span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">button · primary / secondary / ghost / danger</span>
+<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px">
+<span style="height:32px;padding:0 14px;display:flex;align-items:center;gap:6px;border-radius:7px;background:#F2B544;color:#111214;font-weight:600;cursor:pointer" style-hover="background:#F7C566">Allow for 1 hour</span>
+<span style="height:32px;padding:0 14px;display:flex;align-items:center;gap:6px;border-radius:7px;background:#2A2C30;font-weight:500;cursor:pointer" style-hover="background:#33363B">Allow once</span>
+<span style="height:32px;padding:0 14px;display:flex;align-items:center;gap:6px;border-radius:7px;color:#C9CACD;font-weight:500;cursor:pointer" style-hover="background:#24262A">Deny</span>
+<span style="height:32px;padding:0 14px;display:flex;align-items:center;gap:6px;border-radius:7px;background:rgba(240,120,110,.12);color:oklch(0.74 0.14 25);font-weight:500">Revoke all</span>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12px">
+<span style="height:26px;padding:0 10px;display:flex;align-items:center;gap:6px;border-radius:6px;background:#2A2C30;font-weight:500"><i class="icon-copy" style="font-size:13px"></i>Copy</span>
+<span style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:7px;background:#2A2C30"><i class="icon-eye" style="font-size:15px"></i></span>
+<span style="height:32px;padding:0 14px;display:flex;align-items:center;border-radius:7px;background:#1D1E22;color:#55575C;font-size:13px;font-weight:500">Disabled</span>
+<span style="height:32px;padding:0 14px;display:flex;align-items:center;border-radius:7px;background:#F2B544;color:#111214;font-size:13px;font-weight:600;box-shadow:0 0 0 2px #111214,0 0 0 4px #F2B544">Focused</span>
+</div>
+</div>
+<div style="padding:20px;border-radius:10px;border:1px solid #26282C;display:grid;gap:12px;align-content:start">
+<span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">field · text / secret / search</span>
+<div style="display:grid;gap:6px"><span style="font-size:12px;font-weight:500;color:#C9CACD">Key</span><div style="height:34px;padding:0 10px;display:flex;align-items:center;border-radius:6px;background:#111214;border:1px solid #2C2E33;font-family:'Fragment Mono',monospace;font-size:13px">STRIPE_SECRET_KEY</div></div>
+<div style="display:grid;gap:6px"><span style="font-size:12px;font-weight:500;color:#C9CACD">Value</span><div style="height:34px;padding:0 4px 0 10px;display:flex;align-items:center;gap:4px;border-radius:6px;background:#111214;border:1px solid #F2B544;box-shadow:0 0 0 3px rgba(242,181,68,.15);font-family:'Fragment Mono',monospace;font-size:13px;letter-spacing:.12em">••••••••••••••••••••<span style="margin-left:auto;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:5px;color:#8E9096"><i class="icon-eye" style="font-size:14px"></i></span><span style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:5px;color:#8E9096"><i class="icon-copy" style="font-size:14px"></i></span></div></div>
+<div style="height:34px;padding:0 10px;display:flex;align-items:center;gap:8px;border-radius:6px;background:#18191C;border:1px solid #26282C;font-size:13px;color:#8E9096"><i class="icon-search" style="font-size:14px"></i>Search secrets, agents, projects<span style="margin-left:auto;font-family:'Fragment Mono',monospace;font-size:11px;padding:2px 6px;border-radius:4px;background:#24262A">⌘K</span></div>
+</div>
+<div style="padding:20px;border-radius:10px;border:1px solid #26282C;display:grid;gap:16px;align-content:start">
+<span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">badge · env / scope / status</span>
+<div style="display:flex;flex-wrap:wrap;gap:6px;font-family:'Fragment Mono',monospace;font-size:11px">
+<span style="height:22px;padding:0 8px;display:flex;align-items:center;border-radius:4px;background:#24262A;color:#C9CACD">dev</span>
+<span style="height:22px;padding:0 8px;display:flex;align-items:center;border-radius:4px;background:#24262A;color:#C9CACD">staging</span>
+<span style="height:22px;padding:0 8px;display:flex;align-items:center;border-radius:4px;background:rgba(242,181,68,.12);color:#F2B544">prod</span>
+<span style="height:22px;padding:0 8px;display:flex;align-items:center;gap:6px;border-radius:4px;border:1px solid #2C2E33;color:#C9CACD">read:acme/api/*</span>
+<span style="height:22px;padding:0 8px;display:flex;align-items:center;gap:6px;border-radius:4px;border:1px solid #2C2E33;color:#C9CACD">inject-only</span>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:14px;font-size:12px;font-weight:500">
+<span style="display:flex;align-items:center;gap:6px;color:oklch(0.80 0.13 155)"><span style="width:6px;height:6px;border-radius:50%;background:currentColor"></span>Granted</span>
+<span style="display:flex;align-items:center;gap:6px;color:#F2B544"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 0 3px rgba(242,181,68,.2)"></span>Waiting</span>
+<span style="display:flex;align-items:center;gap:6px;color:oklch(0.74 0.14 25)"><span style="width:6px;height:6px;border-radius:50%;background:currentColor"></span>Denied</span>
+<span style="display:flex;align-items:center;gap:6px;color:#8E9096"><span style="width:6px;height:6px;border-radius:50%;background:currentColor"></span>Expired</span>
+</div>
+</div>
+<div style="padding:20px;border-radius:10px;border:1px solid #26282C;display:grid;gap:14px;align-content:start">
+<span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">switch · checkbox · segmented</span>
+<div style="display:flex;align-items:center;gap:10px;font-size:13px"><span style="width:32px;height:18px;border-radius:9px;background:#F2B544;position:relative"><span style="position:absolute;top:2px;left:16px;width:14px;height:14px;border-radius:50%;background:#111214"></span></span>Ask before every agent request</div>
+<div style="display:flex;align-items:center;gap:10px;font-size:13px;color:#C9CACD"><span style="width:32px;height:18px;border-radius:9px;background:#3A3D43;position:relative"><span style="position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#C9CACD"></span></span>Show values in activity log</div>
+<div style="display:flex;align-items:center;gap:10px;font-size:13px"><span style="width:16px;height:16px;border-radius:4px;background:#F2B544;color:#111214;display:flex;align-items:center;justify-content:center"><i class="icon-check" style="font-size:12px"></i></span>Inject only, never reveal</div>
+<div style="display:inline-flex;align-self:start;padding:2px;border-radius:7px;background:#18191C;border:1px solid #26282C;font-size:12px;font-weight:500"><span style="padding:5px 12px;border-radius:5px;background:#2A2C30">dev</span><span style="padding:5px 12px;color:#8E9096">staging</span><span style="padding:5px 12px;color:#8E9096">prod</span></div>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px">
+<div style="padding:20px;border-radius:10px;border:1px solid #26282C;display:grid;gap:12px;align-content:start">
+<span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">approval dialog · the key moment</span>
+<div style="border-radius:14px;background:#1D1E22;border:1px solid #3A3D43;box-shadow:0 24px 64px rgba(0,0,0,.55);padding:18px;display:grid;gap:14px">
+<div style="display:flex;align-items:center;gap:10px"><span style="width:32px;height:32px;border-radius:8px;background:#2A2C30;display:flex;align-items:center;justify-content:center"><i class="icon-bot" style="font-size:17px"></i></span><div style="display:grid;gap:2px"><span style="font-size:15px;font-weight:600;letter-spacing:-0.01em">claude-code wants 2 secrets</span><span style="font-size:12px;color:#8E9096">via MCP · ~/acme/api · profile dev</span></div><span style="margin-left:auto;display:flex;align-items:center;gap:6px;font-family:'Fragment Mono',monospace;font-size:11px;color:#F2B544"><span style="width:6px;height:6px;border-radius:50%;background:#F2B544;box-shadow:0 0 0 3px rgba(242,181,68,.2)"></span>0:28</span></div>
+<div style="border-radius:7px;background:#111214;font-family:'Fragment Mono',monospace;font-size:12.5px">
+<div style="display:flex;justify-content:space-between;padding:9px 12px;border-bottom:1px solid #24262A"><span>DATABASE_URL</span><span style="color:#8E9096">inject only</span></div>
+<div style="display:flex;justify-content:space-between;padding:9px 12px"><span>STRIPE_SECRET_KEY</span><span style="color:#8E9096">inject only</span></div>
+</div>
+<div style="font-size:12px;line-height:1.5;color:#8E9096">keypaste will add these to the process environment. The agent sees the names, never the values.</div>
+<div style="display:flex;gap:8px;font-size:13px"><span style="height:32px;padding:0 12px;display:flex;align-items:center;border-radius:7px;color:#C9CACD;font-weight:500">Deny</span><span style="height:32px;padding:0 12px;display:flex;align-items:center;border-radius:7px;background:#2A2C30;font-weight:500">Allow once</span><span style="margin-left:auto;height:32px;padding:0 14px;display:flex;align-items:center;gap:8px;border-radius:7px;background:#F2B544;color:#111214;font-weight:600">Allow for 1 hour<span style="font-family:'Fragment Mono',monospace;font-size:11px;opacity:.7">⏎</span></span></div>
+</div>
+</div>
+<div style="display:grid;gap:12px;align-content:start">
+<div style="padding:20px;border-radius:10px;border:1px solid #26282C;display:grid;gap:10px">
+<span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">secret row · default / hover / selected</span>
+<div style="border-radius:8px;overflow:hidden;border:1px solid #26282C;font-size:13px">
+<div style="height:40px;padding:0 12px;display:grid;grid-template-columns:18px 1fr auto auto;gap:10px;align-items:center;border-bottom:1px solid #26282C"><i class="icon-key-round" style="font-size:15px;color:#8E9096"></i><span style="font-family:'Fragment Mono',monospace">OPENAI_API_KEY</span><span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">3d ago</span><span style="width:6px;height:6px;border-radius:50%;background:#55575C"></span></div>
+<div style="height:40px;padding:0 12px;display:grid;grid-template-columns:18px 1fr auto auto;gap:10px;align-items:center;background:#24262A;border-bottom:1px solid #26282C"><i class="icon-database" style="font-size:15px;color:#8E9096"></i><span style="font-family:'Fragment Mono',monospace">DATABASE_URL</span><span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">4m ago</span><span style="width:6px;height:6px;border-radius:50%;background:oklch(0.80 0.13 155)"></span></div>
+<div style="height:40px;padding:0 12px;display:grid;grid-template-columns:18px 1fr auto auto;gap:10px;align-items:center;background:rgba(242,181,68,.10);box-shadow:inset 2px 0 0 #F2B544"><i class="icon-credit-card" style="font-size:15px;color:#F2B544"></i><span style="font-family:'Fragment Mono',monospace">STRIPE_SECRET_KEY</span><span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#F2B544">in use</span><span style="width:6px;height:6px;border-radius:50%;background:#F2B544"></span></div>
+</div>
+</div>
+<div style="padding:20px;border-radius:10px;border:1px solid #26282C;display:grid;gap:10px">
+<span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">toast · tooltip</span>
+<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">
+<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:#24262A;border:1px solid #3A3D43;box-shadow:0 8px 24px rgba(0,0,0,.35);font-size:13px"><i class="icon-clipboard-check" style="font-size:15px;color:oklch(0.80 0.13 155)"></i>Copied. Clears in 30s<span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096;margin-left:6px">undo</span></div>
+<div style="padding:5px 8px;border-radius:6px;background:#F2F2F0;color:#111214;font-size:12px;font-weight:500">Reveal · ⌥ click</div>
+</div>
+</div>
+</div>
+</div>
+<div style="padding:20px;border-radius:10px;border:1px solid #26282C;display:grid;gap:12px">
+<span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">terminal block · for docs, onboarding, empty states</span>
+<div style="border-radius:10px;background:#0C0D0E;border:1px solid #26282C;overflow:hidden">
+<div style="height:30px;padding:0 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #1D1E22;font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096"><i class="icon-terminal" style="font-size:13px"></i>zsh · ~/acme/api<span style="margin-left:auto;display:flex;align-items:center;gap:6px"><i class="icon-copy" style="font-size:12px"></i>copy</span></div>
+<div style="padding:14px 16px;font-family:'Fragment Mono',monospace;font-size:13px;line-height:1.8">
+<div><span style="color:#F2B544">›</span> keypaste run --profile dev -- npm start</div>
+<div style="color:#8E9096">  resolved 6 secrets from acme/api/dev</div>
+<div style="color:#8E9096">  <span style="color:oklch(0.80 0.13 155)">✓</span> injected into pid 48213 · nothing written to disk</div>
+</div>
+</div>
+</div>
+</section>
+<section id="icons" data-screen-label="06 Icons" style="padding:56px 48px;border-top:1px solid #26282C;display:grid;gap:28px">
+<div style="display:flex;align-items:baseline;gap:14px"><span style="font-family:'Fragment Mono',monospace;font-size:12px;color:#F2B544">06</span><h2 style="margin:0;font-size:30px;font-weight:600;letter-spacing:-0.035em">Icons</h2></div>
+<p style="margin:0;max-width:640px;font-size:15px;line-height:1.55;color:#C9CACD;text-wrap:pretty">Lucide at a 1.5px stroke: 16px in lists, 14px inside fields, 20px in the sidebar. Icons are muted grey by default and turn amber only when their object is live. No emoji and no filled icons.</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:1px;background:#26282C;border:1px solid #26282C;border-radius:10px;overflow:hidden;font-family:'Fragment Mono',monospace;font-size:10.5px;color:#8E9096">
+<div style="height:88px;background:#111214;display:grid;place-items:center;align-content:center;gap:10px"><i class="icon-vault" style="font-size:20px;color:#F2F2F0"></i>vault</div>
+<div style="height:88px;background:#111214;display:grid;place-items:center;align-content:center;gap:10px"><i class="icon-key-round" style="font-size:20px;color:#F2F2F0"></i>secret</div>
+<div style="height:88px;background:#111214;display:grid;place-items:center;align-content:center;gap:10px"><i class="icon-bot" style="font-size:20px;color:#F2F2F0"></i>agent</div>
+<div style="height:88px;background:#111214;display:grid;place-items:center;align-content:center;gap:10px"><i class="icon-plug" style="font-size:20px;color:#F2F2F0"></i>mcp</div>
+<div style="height:88px;background:#111214;display:grid;place-items:center;align-content:center;gap:10px"><i class="icon-layers" style="font-size:20px;color:#F2F2F0"></i>profile</div>
+<div style="height:88px;background:#111214;display:grid;place-items:center;align-content:center;gap:10px"><i class="icon-folder-git-2" style="font-size:20px;color:#F2F2F0"></i>project</div>
+<div style="height:88px;background:#111214;display:grid;place-items:center;align-content:center;gap:10px"><i class="icon-ticket" style="font-size:20px;color:#F2F2F0"></i>token</div>
+<div style="height:88px;background:#111214;display:grid;place-items:center;align-content:center;gap:10px"><i class="icon-hourglass" style="font-size:20px;color:#F2F2F0"></i>grant</div>
+<div style="height:88px;background:#111214;display:grid;place-items:center;align-content:center;gap:10px"><i class="icon-activity" style="font-size:20px;color:#F2F2F0"></i>activity</div>
+<div style="height:88px;background:#111214;display:grid;place-items:center;align-content:center;gap:10px"><i class="icon-link" style="font-size:20px;color:#F2F2F0"></i>share</div>
+<div style="height:88px;background:#111214;display:grid;place-items:center;align-content:center;gap:10px"><i class="icon-terminal" style="font-size:20px;color:#F2F2F0"></i>run</div>
+<div style="height:88px;background:#111214;display:grid;place-items:center;align-content:center;gap:10px"><i class="icon-file-code" style="font-size:20px;color:#F2F2F0"></i>.env</div>
+<div style="height:88px;background:#111214;display:grid;place-items:center;align-content:center;gap:10px"><i class="icon-file-input" style="font-size:20px;color:#F2F2F0"></i>kdbx import</div>
+<div style="height:88px;background:#111214;display:grid;place-items:center;align-content:center;gap:10px"><i class="icon-usb" style="font-size:20px;color:#F2F2F0"></i>hardware key</div>
+<div style="height:88px;background:#111214;display:grid;place-items:center;align-content:center;gap:10px"><i class="icon-fingerprint" style="font-size:20px;color:#F2F2F0"></i>unlock</div>
+<div style="height:88px;background:#111214;display:grid;place-items:center;align-content:center;gap:10px"><i class="icon-shield-check" style="font-size:20px;color:#F2B544"></i>live state</div>
+</div>
+</section>
+<section id="voice" data-screen-label="07 Voice" style="padding:56px 48px 80px;border-top:1px solid #26282C;display:grid;gap:28px">
+<div style="display:flex;align-items:baseline;gap:14px"><span style="font-family:'Fragment Mono',monospace;font-size:12px;color:#F2B544">07</span><h2 style="margin:0;font-size:30px;font-weight:600;letter-spacing:-0.035em">Voice</h2></div>
+<p style="margin:0;max-width:640px;font-size:15px;line-height:1.55;color:#C9CACD;text-wrap:pretty">Precise and plain. Write like a good CLI's help text: say who wants what, for how long, and what happens next. Use sentence case, "you" for the person, the agent's real name for the agent, and no exclamation marks.</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;font-size:14px;line-height:1.5">
+<div style="padding:18px;border-radius:10px;border:1px solid #26282C;display:grid;gap:10px;align-content:start"><span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">name the actor and the object</span><span style="display:flex;gap:8px"><i class="icon-check" style="color:oklch(0.80 0.13 155);font-size:15px;margin-top:3px"></i>claude-code wants DATABASE_URL</span><span style="display:flex;gap:8px;color:#8E9096"><i class="icon-x" style="color:oklch(0.74 0.14 25);font-size:15px;margin-top:3px"></i>An application is requesting access to a credential</span></div>
+<div style="padding:18px;border-radius:10px;border:1px solid #26282C;display:grid;gap:10px;align-content:start"><span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">always give the duration</span><span style="display:flex;gap:8px"><i class="icon-check" style="color:oklch(0.80 0.13 155);font-size:15px;margin-top:3px"></i>Allow for 1 hour</span><span style="display:flex;gap:8px;color:#8E9096"><i class="icon-x" style="color:oklch(0.74 0.14 25);font-size:15px;margin-top:3px"></i>Trust this app</span></div>
+<div style="padding:18px;border-radius:10px;border:1px solid #26282C;display:grid;gap:10px;align-content:start"><span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">errors say what to do next</span><span style="display:flex;gap:8px"><i class="icon-check" style="color:oklch(0.80 0.13 155);font-size:15px;margin-top:3px"></i>Vault is locked. Touch your YubiKey to continue.</span><span style="display:flex;gap:8px;color:#8E9096"><i class="icon-x" style="color:oklch(0.74 0.14 25);font-size:15px;margin-top:3px"></i>Oops! Something went wrong.</span></div>
+</div>
+<div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-top:32px;border-top:1px solid #26282C;font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096"><span style="display:flex;align-items:center;gap:8px"><svg width="16" height="16" viewBox="0 0 64 64"><rect x="10" y="8" width="10" height="48" fill="#F2F2F0"></rect><polygon points="40,24 54,24 38,40 54,56 40,56 24,40" fill="#F2B544"></polygon></svg>keypaste · open source · reads and writes KDBX 4</span><span>tokens: styles.css · assets/</span></div>
+</section>
+</div>
+</x-dc>
+</body>
+</html>

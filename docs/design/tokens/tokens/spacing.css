@@ -1,0 +1,31 @@
+:root {
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
+  --space-5: 12px;
+  --space-6: 16px;
+  --space-7: 20px;
+  --space-8: 24px;
+  --space-9: 32px;
+  --space-10: 40px;
+  --space-11: 56px;
+
+  --radius-chip: 4px;
+  --radius-field: 6px;
+  --radius-button: 7px;
+  --radius-card: 10px;
+  --radius-dialog: 14px;
+  --radius-icon: 23.4%;
+
+  --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-dialog: 0 24px 64px rgba(0, 0, 0, 0.55);
+
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+
+  --row-compact: 32px;
+  --row-default: 40px;
+  --sidebar-width: 232px;
+}
