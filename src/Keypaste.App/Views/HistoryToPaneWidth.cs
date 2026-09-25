@@ -24,7 +24,7 @@ internal sealed class HistoryToPaneWidth : IValueConverter
     internal const double Browsing = 320d;
 
     /// <summary>Wide enough for two sets of them, side by side.</summary>
-    internal const double Comparing = 560d;
+    internal const double Comparing = 520d;
 
     /// <inheritdoc/>
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>

@@ -14,7 +14,16 @@
   <!-- The columns move when a revision is being compared: the group tree steps aside so the detail
        pane can show a revision's fields beside the current ones. Both outer columns are Auto, so
        what moves them is the pane's width and the tree's visibility. -->
-  <Grid ColumnDefinitions="Auto,1,*,1,Auto" RowDefinitions="Auto,*">
+  <Grid RowDefinitions="Auto,*">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="Auto" />
+      <!-- The dividers' columns are Auto so their margins separate the panes rather than overlap them. -->
+      <ColumnDefinition Width="Auto" />
+      <!-- The main window's MinWidth is what keeps this column's minimum beside the tree and pane. -->
+      <ColumnDefinition Width="*" MinWidth="140" />
+      <ColumnDefinition Width="Auto" />
+      <ColumnDefinition Width="Auto" />
+    </Grid.ColumnDefinitions>
 
     <!-- The group tree. A flat, indented ListBox rather than a TreeView: arrow keys, Home/End and
          type-ahead work for free, and a vault three groups deep does not need expand state. -->
@@ -59,22 +68,25 @@
     </Grid>
 
     <Rectangle Grid.Row="0" Grid.RowSpan="2" Grid.Column="1"
+               x:Name="TreeDivider"
                Width="1" Fill="{DynamicResource KpBorderSubtle}" Margin="12,0"
                IsVisible="{Binding !Detail.History.IsOpen}" />
 
-    <!-- The list. Titles and groups, and nothing from inside an entry: see EntryRow. -->
-    <Grid Grid.Row="0" Grid.Column="2" ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,0,0,8">
+    <!-- The toolbar spans the list and the entry's pane, since the list's column alone is narrower
+         than its buttons once an entry is open (F.22). -->
+    <Grid Grid.Row="0" Grid.Column="2" Grid.ColumnSpan="3" ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,0,0,8">
       <TextBox Grid.Column="0"
                Name="Search"
                Text="{Binding Search}"
                PlaceholderText="Search entries"
                BorderThickness="1" />
-      <Button Grid.Column="1" Content="Add" Margin="8,0,0,0" Command="{Binding BeginAddCommand}" />
+      <Button Grid.Column="1" x:Name="AddEntry" Content="Add" Margin="8,0,0,0" Command="{Binding BeginAddCommand}" />
       <Button Grid.Column="2" x:Name="Organize" Content="Organize" Margin="8,0,0,0"
               Command="{Binding OrganizeCommand}" />
-      <Button Grid.Column="3" Content="Delete" Margin="8,0,0,0" Command="{Binding DeleteCommand}" />
+      <Button Grid.Column="3" x:Name="DeleteEntry" Content="Delete" Margin="8,0,0,0" Command="{Binding DeleteCommand}" />
     </Grid>
 
+    <!-- The list. Titles and groups, and nothing from inside an entry: see EntryRow. -->
     <Grid Grid.Row="1" Grid.Column="2" RowDefinitions="Auto,Auto,Auto,*">
 
       <!-- What the last deletion did, and the way back for the one still on screen. Every other
@@ -313,12 +325,14 @@
 
     </Grid>
 
-    <Rectangle Grid.Row="0" Grid.RowSpan="2" Grid.Column="3"
+    <Rectangle Grid.Row="1" Grid.Column="3"
+               x:Name="PaneDivider"
                Width="1" Fill="{DynamicResource KpBorderSubtle}" Margin="12,0" />
 
     <!-- The detail pane. Username, URL and notes for the one entry somebody chose; the password is
          dots until its cell is held, and no binding here carries it (D-0300). -->
-    <ContentControl Grid.Row="0" Grid.RowSpan="2" Grid.Column="4"
+    <ContentControl Grid.Row="1" Grid.Column="4"
+                    x:Name="EntryPane"
                     Width="{Binding Detail.History.IsOpen, Converter={StaticResource PaneWidth}}"
                     Content="{Binding Detail}">
       <ContentControl.DataTemplates>
@@ -327,7 +341,7 @@
             <StackPanel Spacing="12">
 
               <StackPanel Spacing="2">
-                <TextBlock Text="{Binding DisplayTitle}" FontSize="16"
+                <TextBlock x:Name="EntryTitle" Text="{Binding DisplayTitle}" FontSize="16"
                            TextTrimming="CharacterEllipsis"
                            Foreground="{DynamicResource KpTextPrimary}" />
                 <TextBlock Text="{Binding DisplayPath}" FontSize="11"
