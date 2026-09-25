@@ -65,7 +65,8 @@ internal sealed partial class App : Application, IDisposable
         _authority = new AppAuthority(
             _session,
             Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable),
-            () => new WindowApprovalChannel(TimeProvider.System));
+            () => new WindowApprovalChannel(TimeProvider.System),
+            AppAuthority.RequestLock(_session, action => Dispatcher.UIThread.Post(action)));
 
         _window = new MainWindow();
         _activity = Observe(_window, _session, TimeProvider.System, () => _shell?.ClearCountdown());

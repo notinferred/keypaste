@@ -56,7 +56,7 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
         _post = post ?? (run => run());
 
         RefreshCommand = new RelayCommand(Refresh);
-        RevokeCommand = new RelayCommand<ActivityRow>(Revoke, row => row?.Grant is not null);
+        RevokeCommand = new RelayCommand<ActivityRow>(Revoke, row => row?.Id is not null);
         RevokeAllCommand = new RelayCommand(RevokeAll, () => _grants.Count > 0);
 
         Refresh();
@@ -225,9 +225,9 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
 
     private void Revoke(ActivityRow? row)
     {
-        if (row?.Grant is { } grant)
+        if (row?.Id is { } id)
         {
-            _authority?.Revoke(grant);
+            _authority?.Revoke(id);
             Read(forceHistory: false);
         }
     }

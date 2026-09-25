@@ -1,4 +1,5 @@
 using Keypaste.Core.Approval;
+using Keypaste.Core.Ipc;
 
 namespace Keypaste.App.Session;
 
@@ -24,12 +25,29 @@ internal sealed class AppAuthority : IDisposable
     /// <param name="session">The session the app unlocks, which this now owns.</param>
     /// <param name="approverOverride">The value of <c>KEYPASTE_APPROVER</c>, or null.</param>
     /// <param name="approvals">Where a person is asked, per unlock: launch passes <see cref="WindowApprovalChannel"/> (D-0326).</param>
-    internal AppAuthority(AppVaultSession session, string? approverOverride, Func<IApprovalChannel> approvals)
+    /// <param name="requestLock">What <c>keypaste lock</c> runs: launch passes <see cref="RequestLock"/>; null refuses it.</param>
+    internal AppAuthority(
+        AppVaultSession session,
+        string? approverOverride,
+        Func<IApprovalChannel> approvals,
+        Action? requestLock = null)
     {
         ArgumentNullException.ThrowIfNull(session);
 
         Session = session;
-        _host = new SessionHost(session, approverOverride, approvals);
+        _host = new SessionHost(session, approverOverride, approvals, requestLock);
+    }
+
+    /// <summary>What <c>keypaste lock</c> does to the app: locks the session as requested, on the thread <paramref name="post"/> runs it on.</summary>
+    /// <param name="session">The session to lock.</param>
+    /// <param name="post">Runs an action on the UI thread; launch posts through the dispatcher.</param>
+    /// <returns>The action the authority runs after its reply has left.</returns>
+    internal static Action RequestLock(AppVaultSession session, Action<Action> post)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(post);
+
+        return () => post(() => session.Lock(VaultLockReason.Requested));
     }
 
     /// <summary>The session agents are answered from.</summary>
@@ -75,6 +93,14 @@ internal sealed class AppAuthority : IDisposable
 
     /// <summary>Ends every grant this session has given.</summary>
     internal void RevokeAll() => _host.RevokeAll();
+
+    /// <summary>The grants in force with the ids <c>keypaste grants</c> shows, never a value.</summary>
+    internal IReadOnlyList<GrantSummary> Grants() => _host.Grants();
+
+    /// <summary>Ends the grant with this id.</summary>
+    /// <param name="id">The grant's id, from <see cref="Grants"/>.</param>
+    /// <returns>Whether a grant with that id was in force.</returns>
+    internal bool Revoke(string id) => _host.Revoke(id);
 
     /// <summary>Quits: the session locks before its endpoint stops, so what an agent has waiting is answered as locked rather than dropped with the endpoint (D-0313).</summary>
     public void Dispose()

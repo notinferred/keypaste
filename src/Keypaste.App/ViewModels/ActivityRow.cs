@@ -22,6 +22,7 @@ internal sealed class ActivityRow
         Field = prompt.Field;
         Left = lifetime + " " + Seconds(remaining);
         Grant = grant;
+        Id = grant is { } key ? GrantId.Of(key) : null;
     }
 
     /// <summary>The row's place in its list, from 1, which is how the driver names one to revoke.</summary>
@@ -40,6 +41,9 @@ internal sealed class ActivityRow
 
     /// <summary>The grant to revoke, or null for a waiting request.</summary>
     internal GrantKey? Grant { get; }
+
+    /// <summary>The grant's id, as <c>keypaste grants</c> shows it, or null for a waiting request.</summary>
+    internal string? Id { get; }
 
     /// <summary>The client and its label on one line.</summary>
     internal string Who => $"{Client} · label {Label}";

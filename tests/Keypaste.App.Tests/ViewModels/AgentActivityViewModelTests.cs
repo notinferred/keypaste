@@ -104,6 +104,35 @@ public sealed class AgentActivityViewModelTests
     }
 
     [Fact]
+    public async Task RevokeById_EndsThatGrant()
+    {
+        await using var app = await App.StartAsync();
+        app.Person.Answer = ApprovalAnswer.Approved;
+
+        await using var second = await app.ConnectAsync();
+        await app.RequestAsync();
+        await app.RequestAsync(second);
+
+        using var model = app.Model();
+
+        Assert.Equal(2, model.Grants.Count);
+        var listed = app.Authority.Grants();
+        Assert.Equal(model.Grants.Select(row => row.Id).Order(StringComparer.Ordinal), listed.Select(grant => grant.Id).Order(StringComparer.Ordinal));
+        Assert.All(model.Grants, row => Assert.Equal(GrantId.Of(row.Grant!.Value), row.Id));
+        Assert.All(listed, grant => Assert.Equal(new GrantSummary(grant.Id, "credential", "claude-code", "example", "password", 60), grant));
+
+        var ended = model.Grants[0];
+        model.RevokeCommand.Execute(ended);
+
+        var kept = Assert.Single(model.Grants);
+        Assert.NotEqual(ended.Id, kept.Id);
+        Assert.Equal(kept.Id, Assert.Single(app.Authority.Grants()).Id);
+        Assert.False(app.Authority.Revoke(ended.Id!));
+        Assert.True(app.Authority.Revoke(kept.Id!.ToUpperInvariant()));
+        Assert.Empty(app.Authority.Grants());
+    }
+
+    [Fact]
     public async Task History_is_the_audit_records_naming_this_session()
     {
         await using var app = await App.StartAsync();
@@ -262,8 +291,18 @@ public sealed class AgentActivityViewModelTests
 
         internal AgentActivityViewModel Model() => new(Authority, Fixture.Home, Clock);
 
-        internal Task<CredentialReply?> RequestAsync() =>
-            _client.RequestAsync(
+        /// <summary>A second connection attached to the same session, as a second agent would be.</summary>
+        internal async Task<ApproverClient> ConnectAsync()
+        {
+            var serving = Assert.IsType<AuthorityStatus.Serving>(Authority.Status);
+            var client = await ApproverClient.TryConnectAsync(serving.Endpoint, _connect, Token);
+            Assert.NotNull(client);
+            Assert.True((await client.AttachAsync(new AttachRequest(Fixture.Path_), Token))!.Attached);
+            return client;
+        }
+
+        internal Task<CredentialReply?> RequestAsync(ApproverClient? on = null) =>
+            (on ?? _client).RequestAsync(
                 new CredentialRequest
                 {
                     Entry = "example",

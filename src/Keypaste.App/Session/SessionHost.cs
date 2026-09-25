@@ -34,6 +34,7 @@ internal sealed class SessionHost : IDisposable
     private readonly AppVaultSession _session;
     private readonly string? _approverOverride;
     private readonly Func<IApprovalChannel> _approvals;
+    private readonly Action? _requestLock;
     private readonly Lock _gate = new();
     private Hosted? _hosted;
     private bool _disposed;
@@ -41,7 +42,12 @@ internal sealed class SessionHost : IDisposable
     /// <param name="session">The session whose vault is served.</param>
     /// <param name="approverOverride">The value of <c>KEYPASTE_APPROVER</c>, or null.</param>
     /// <param name="approvals">Where a person is asked, per unlock.</param>
-    internal SessionHost(AppVaultSession session, string? approverOverride, Func<IApprovalChannel> approvals)
+    /// <param name="requestLock">What <c>keypaste lock</c> runs, or null to refuse it.</param>
+    internal SessionHost(
+        AppVaultSession session,
+        string? approverOverride,
+        Func<IApprovalChannel> approvals,
+        Action? requestLock = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(approvals);
@@ -49,6 +55,7 @@ internal sealed class SessionHost : IDisposable
         _session = session;
         _approverOverride = approverOverride;
         _approvals = approvals;
+        _requestLock = requestLock;
         _session.Opened += OnOpened;
         _session.Locked += OnLocked;
 
@@ -115,6 +122,29 @@ internal sealed class SessionHost : IDisposable
         }
     }
 
+    /// <summary>The grants in force, as <c>keypaste grants</c> lists them: names and ids, never a value.</summary>
+    internal IReadOnlyList<GrantSummary> Grants() => [.. Activity.Grants.Select(GrantSummary.From)];
+
+    /// <summary>Ends the grant with this id, as <c>keypaste grants revoke</c> names it.</summary>
+    /// <param name="id">The grant's id, from <see cref="Grants"/>.</param>
+    /// <returns>Whether a grant with that id was in force.</returns>
+    internal bool Revoke(string id)
+    {
+        ArgumentNullException.ThrowIfNull(id);
+
+        lock (_gate)
+        {
+            if (_hosted?.Activity.Grants.FirstOrDefault(
+                    inForce => string.Equals(GrantId.Of(inForce.Key), id, StringComparison.OrdinalIgnoreCase)) is not { } grant)
+            {
+                return false;
+            }
+
+            _hosted.Revoke(grant.Key);
+            return true;
+        }
+    }
+
     private void OnOpened(object? sender, EventArgs e) => Start();
 
     private void OnLocked(object? sender, VaultLockReason reason) => Stop();
@@ -147,7 +177,7 @@ internal sealed class SessionHost : IDisposable
                 return;
             }
 
-            var hosted = Hosted.TryStart(pipe, vault, _session, lifetime, _approvals(), out var failure);
+            var hosted = Hosted.TryStart(pipe, vault, _session, lifetime, _approvals(), _requestLock, out var failure);
             _hosted = hosted;
             Endpoint = hosted is null ? null : pipe;
             Failure = failure;
@@ -231,6 +261,7 @@ internal sealed class SessionHost : IDisposable
             AppVaultSession session,
             SessionLifetime lifetime,
             IApprovalChannel channel,
+            Action? requestLock,
             out string? failure)
         {
             // Owned by the lifetime, which zeroes it when a lock ends it (D-0313).
@@ -250,7 +281,8 @@ internal sealed class SessionHost : IDisposable
                 vault,
                 () => session.Lifetime,
                 handler,
-                new SessionEnvironments(approvals, session.UnlockedFor, session.Clock));
+                new SessionEnvironments(approvals, session.UnlockedFor, session.Clock),
+                requestLock);
 
             try
             {
