@@ -166,7 +166,7 @@ public sealed class GenerateCommandTests
         using var harness = new CliHarness();
 
         Assert.Equal(CliApp.ExitSuccess, harness.Run("help"));
-        Assert.Contains("  generate  print a password or passphrase; it is not stored", harness.Out, StringComparison.Ordinal);
+        Assert.Contains("  generate  print a passphrase (--words N); it is not stored", harness.Out, StringComparison.Ordinal);
     }
 
     /// <summary>

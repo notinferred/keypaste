@@ -173,7 +173,7 @@ public sealed class CliAppTests
             "  add       add an entry",
             "  ls        list groups and entries",
             "  rm        remove an entry",
-            "  generate  print a password or passphrase; it is not stored",
+            "  generate  print a passphrase (--words N); it is not stored",
             "  access    change the master password or keyfile",
             "  policy    show the standing rules that skip the prompt",
             "",
