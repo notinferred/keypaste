@@ -107,6 +107,9 @@ internal static class CliApp
             case "log":
                 return LogCommand.Execute(args, context);
 
+            case "import":
+                return ImportCommand.Execute(args, context);
+
             case "hello":
                 context.Stdout.WriteLine(CoreInfo.Hello());
                 return ExitSuccess;

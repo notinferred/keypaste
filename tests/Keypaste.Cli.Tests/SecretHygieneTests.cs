@@ -269,4 +269,33 @@ public sealed class SecretHygieneTests
         harness.Stdout.GetStringBuilder().Clear();
         harness.Stderr.GetStringBuilder().Clear();
     }
+
+    /// <summary>
+    /// <c>import</c> reads every value of another vault and prints its plan, its refusals and its
+    /// count; the swept vault is the source, copied whole and previewed, into a second one.
+    /// </summary>
+    [Fact]
+    public void Import_NeverEchoesAValue_FromTheVaultItCopies()
+    {
+        using var harness = new CliHarness();
+        Seed(harness);
+        harness.Environment[Core.Audit.KeypasteHome.EnvironmentVariable] = Path.Combine(harness.Directory, "home");
+
+        var target = Path.Combine(harness.Directory, "target.kdbx");
+        harness.Prompt.Enqueue(Master, Master);
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("init", target));
+
+        foreach (var shape in new[] { new[] { "--dry-run" }, [], ["--into", ".keypaste"] })
+        {
+            harness.Prompt.Enqueue(Master, Master);
+            harness.Run(["import", harness.VaultPath, "--vault", target, .. shape]);
+        }
+
+        Assert.Contains("copied into vault", harness.Err, StringComparison.Ordinal);
+        foreach (var sentinel in new[] { SentinelPassword, SentinelUsername, SentinelNotes, SentinelUrl, Master })
+        {
+            Assert.DoesNotContain(sentinel, harness.Out, StringComparison.Ordinal);
+            Assert.DoesNotContain(sentinel, harness.Err, StringComparison.Ordinal);
+        }
+    }
 }
