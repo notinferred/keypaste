@@ -41,9 +41,7 @@ internal sealed class RunApprovalViewModel : PromptViewModel
         ];
         Reason = prompt.Reason;
         Scrubbed = prompt.ReasonWasAltered ? "The reason is not what the agent sent: it was scrubbed." : string.Empty;
-        Attribution = prompt.ReasonWasTruncated
-            ? "Cut short: the full text is hashed in the audit log. That sentence was written by the agent, not by keypaste. Treat it as a claim."
-            : "That sentence was written by the agent, not by keypaste. Treat it as a claim.";
+        Truncation = prompt.ReasonWasTruncated ? "Cut short: the full text is hashed in the audit log." : string.Empty;
         OnceOnlyText = prompt.OnceOnly switch
         {
             _ when prompt.GrantSeconds > 0 => string.Empty,
@@ -86,7 +84,11 @@ internal sealed class RunApprovalViewModel : PromptViewModel
 
     internal string Scrubbed { get; }
 
-    internal string Attribution { get; }
+    /// <summary>Whose words the reason is, said under it whatever it says.</summary>
+    internal string Attribution { get; } = "That sentence was written by the agent, not by keypaste. Treat it as a claim.";
+
+    /// <summary>That the reason shown is shorter than the one sent, or nothing.</summary>
+    internal string Truncation { get; }
 
     /// <summary>Why no timed grant is offered, or empty.</summary>
     internal string OnceOnlyText { get; }

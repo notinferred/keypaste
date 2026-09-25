@@ -69,8 +69,8 @@ internal static class Destinations
         new(DestinationKind.AgentActivity, "Agents", "bot"),
         new(DestinationKind.Log, "Activity", "activity"),
         new(DestinationKind.EnvSets, "Env profiles", "layers"),
-        new(DestinationKind.Settings, "Settings", "settings", DestinationPlacement.Footer),
-        new(DestinationKind.Trash, "Trash", "trash-2", DestinationPlacement.Footer),
+        new(DestinationKind.Settings, "Settings", "settings", DestinationPlacement.Footer, OwnsHeader: true),
+        new(DestinationKind.Trash, "Trash", "trash-2", DestinationPlacement.Footer, OwnsHeader: true),
     ];
 
     internal static IReadOnlyList<Destination> Main { get; } =

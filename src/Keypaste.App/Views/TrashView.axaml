@@ -1,104 +1,142 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Keypaste.App.ViewModels"
+             xmlns:ctl="using:Keypaste.App.Controls"
              x:Class="Keypaste.App.Views.TrashView"
              x:DataType="vm:TrashViewModel">
 
-  <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto">
+  <UserControl.Styles>
+    <!-- The list is the table's body: square rows split by hairlines, selected as any row is. -->
+    <Style Selector="ListBox.table-body > ListBoxItem">
+      <Setter Property="CornerRadius" Value="0" />
+      <Setter Property="Margin" Value="0" />
+      <Setter Property="Padding" Value="16,0" />
+      <Setter Property="MinHeight" Value="48" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
+      <Setter Property="BorderThickness" Value="0,1,0,0" />
+    </Style>
+    <Style Selector="ListBox.table-body > ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource KpBgPanel}" />
+    </Style>
+  </UserControl.Styles>
 
-    <TextBlock Grid.Row="0"
-               Text="{Binding Note}"
-               TextWrapping="Wrap"
-               MaxWidth="560"
-               HorizontalAlignment="Left"
-               FontSize="12"
-               Foreground="{DynamicResource KpTextSecondary}"
-               Margin="0,0,0,12" />
+  <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto" Margin="{DynamicResource KpScreenPadding}" MaxWidth="1080" HorizontalAlignment="Stretch">
 
+    <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="24" Margin="0,0,0,20">
+      <StackPanel Grid.Column="0" Spacing="6">
+        <TextBlock Classes="h1" Text="Trash" />
+        <TextBlock Classes="subtitle" Text="{Binding Note}" MaxWidth="620" HorizontalAlignment="Left" />
+      </StackPanel>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top"
+                  IsVisible="{Binding !IsEmpty}">
+        <Button Name="RestoreButton" Command="{Binding RestoreCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <ctl:KpIcon Icon="history" Size="14" />
+            <TextBlock Text="Restore" />
+          </StackPanel>
+        </Button>
+        <Button Name="PurgeButton" Classes="danger" Command="{Binding PurgeCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <ctl:KpIcon Icon="trash-2" Size="14" />
+            <TextBlock Text="Delete for good" />
+          </StackPanel>
+        </Button>
+      </StackPanel>
+    </Grid>
+
+    <!-- The one place KpDanger appears here. A restore is ordinary; erasing a value is not. -->
     <Border Grid.Row="1"
-            IsVisible="{Binding HasNotice}"
-            Background="{DynamicResource KpAccentQuiet}"
-            CornerRadius="{DynamicResource KpRadiusSm}"
-            Padding="12,8"
-            Margin="0,0,0,12">
-      <TextBlock Text="{Binding Notice}"
-                 TextWrapping="Wrap"
-                 FontSize="12"
-                 Foreground="{DynamicResource KpTextSecondary}" />
+            IsVisible="{Binding IsConfirmingPurge}"
+            Margin="0,0,0,12"
+            Classes="card"
+            Background="{DynamicResource KpDangerTint}"
+            BorderBrush="{DynamicResource KpDanger}">
+      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+        <ctl:KpIcon Grid.Column="0" Icon="alert-triangle" Size="16" Foreground="{DynamicResource KpDanger}" />
+        <TextBlock Grid.Column="1" Text="{Binding PurgePrompt}" TextWrapping="Wrap" FontSize="13"
+                   VerticalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+          <Button Classes="ghost" Content="Keep it" Command="{Binding CancelPurgeCommand}" />
+          <Button Classes="danger" Content="Delete for good" Command="{Binding ConfirmPurgeCommand}" />
+        </StackPanel>
+      </Grid>
     </Border>
 
     <Border Grid.Row="2"
-            IsVisible="{Binding HasError}"
-            Background="{DynamicResource KpAccentQuiet}"
-            CornerRadius="{DynamicResource KpRadiusSm}"
-            Padding="12,8"
+            IsVisible="{Binding HasNotice}"
+            Classes="card"
+            Background="{DynamicResource KpBgPanel}"
+            Padding="12,9"
             Margin="0,0,0,12">
-      <TextBlock Text="{Binding Error}"
-                 TextWrapping="Wrap"
-                 FontSize="12"
-                 Foreground="{DynamicResource KpTextSecondary}" />
+      <StackPanel Orientation="Horizontal" Spacing="10">
+        <ctl:KpIcon Icon="circle-check" Size="15" Foreground="{DynamicResource KpOk}" />
+        <TextBlock Text="{Binding Notice}" TextWrapping="Wrap" FontSize="12.5" VerticalAlignment="Center"
+                   Foreground="{DynamicResource KpTextSecondary}" />
+      </StackPanel>
     </Border>
 
-    <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" Margin="0,0,0,12"
-                IsVisible="{Binding !IsEmpty}">
-      <Button Content="Restore" Command="{Binding RestoreCommand}" />
-      <Button Content="Delete for good" Command="{Binding PurgeCommand}" />
-    </StackPanel>
-
-    <TextBlock Grid.Row="4"
-               IsVisible="{Binding IsEmpty}"
-               Text="{Binding EmptyNote}"
-               TextWrapping="Wrap"
-               MaxWidth="480"
-               HorizontalAlignment="Left"
-               VerticalAlignment="Top"
-               Foreground="{DynamicResource KpTextSecondary}" />
+    <Border Grid.Row="3"
+            IsVisible="{Binding HasError}"
+            Classes="card"
+            Background="{DynamicResource KpDangerTint}"
+            BorderBrush="Transparent"
+            Padding="12,9"
+            Margin="0,0,0,12">
+      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+        <ctl:KpIcon Grid.Column="0" Icon="alert-triangle" Size="15" VerticalAlignment="Top" Foreground="{DynamicResource KpDanger}" />
+        <TextBlock Grid.Column="1" Text="{Binding Error}" TextWrapping="Wrap" FontSize="12.5"
+                   Foreground="{DynamicResource KpTextPrimary}" />
+      </Grid>
+    </Border>
 
     <!-- Names, where they came from and when. A row carries no field value: RecycledEntry has
          none, and this list is held for as long as the screen is open. -->
-    <ListBox Grid.Row="4"
-             IsVisible="{Binding !IsEmpty}"
-             ItemsSource="{Binding Rows}"
-             SelectedItem="{Binding Selected}">
-      <ListBox.ItemTemplate>
-        <DataTemplate x:DataType="vm:TrashRow">
-          <StackPanel Spacing="2" Margin="0,4">
-            <TextBlock Text="{Binding DisplayTitle}"
-                       Foreground="{DynamicResource KpTextPrimary}" />
-            <TextBlock Text="{Binding Summary}"
-                       FontSize="11"
-                       Foreground="{DynamicResource KpTextMuted}" />
-          </StackPanel>
-        </DataTemplate>
-      </ListBox.ItemTemplate>
-    </ListBox>
+    <Border Grid.Row="4" Classes="table" VerticalAlignment="Top">
+      <Grid RowDefinitions="Auto,*">
+        <Border Grid.Row="0" Classes="table-head">
+          <Grid ColumnDefinitions="1.3*,1.3*,160" ColumnSpacing="16">
+            <TextBlock Grid.Column="0" Classes="th" Text="NAME" />
+            <TextBlock Grid.Column="1" Classes="th" Text="DELETED FROM" />
+            <TextBlock Grid.Column="2" Classes="th" Text="DELETED" />
+          </Grid>
+        </Border>
 
-    <StackPanel Grid.Row="5" Spacing="12" Margin="0,12,0,0">
-
-      <!-- The one place KpDanger appears here. A restore is ordinary; erasing a value is not. -->
-      <Border IsVisible="{Binding IsConfirmingPurge}"
-              BorderBrush="{DynamicResource KpDanger}"
-              BorderThickness="1"
-              CornerRadius="{DynamicResource KpRadiusSm}"
-              Padding="12">
-        <StackPanel Spacing="8">
-          <TextBlock Text="{Binding PurgePrompt}" TextWrapping="Wrap"
-                     Foreground="{DynamicResource KpTextPrimary}" />
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button Content="Delete for good" Command="{Binding ConfirmPurgeCommand}"
-                    Foreground="{DynamicResource KpDanger}" />
-            <Button Content="Keep it" Command="{Binding CancelPurgeCommand}" />
-          </StackPanel>
+        <StackPanel Grid.Row="1" Spacing="10" Margin="16,40" HorizontalAlignment="Center"
+                    IsVisible="{Binding IsEmpty}">
+          <ctl:KpIcon Icon="trash-2" Size="24" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextDisabled}" />
+          <TextBlock Text="{Binding EmptyNote}" TextWrapping="Wrap" MaxWidth="420" TextAlignment="Center"
+                     FontSize="13" Foreground="{DynamicResource KpTextMuted}" />
         </StackPanel>
-      </Border>
 
-      <TextBlock Text="{Binding ReaderFloor}"
-                 TextWrapping="Wrap"
-                 MaxWidth="560"
-                 HorizontalAlignment="Left"
-                 FontSize="11"
-                 Foreground="{DynamicResource KpTextMuted}" />
-    </StackPanel>
+        <ListBox Grid.Row="1"
+                 Classes="table-body"
+                 IsVisible="{Binding !IsEmpty}"
+                 ItemsSource="{Binding Rows}"
+                 SelectedItem="{Binding Selected}">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:TrashRow">
+              <Grid ColumnDefinitions="1.3*,1.3*,160" ColumnSpacing="16">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
+                  <ctl:KpIcon Icon="key-round" Size="16" Foreground="{DynamicResource KpTextMuted}" />
+                  <TextBlock Text="{Binding DisplayTitle}" FontSize="13.5" FontWeight="Medium"
+                             TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                  <TextBlock Classes="mono muted" FontSize="12" Text="{Binding Where}" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Classes="amber" FontSize="11.5" Text="comes back at the root"
+                             IsVisible="{Binding !CameFromALiveGroup}" />
+                </StackPanel>
+                <TextBlock Grid.Column="2" Classes="mono muted" FontSize="11.5" Text="{Binding When}" VerticalAlignment="Center" />
+              </Grid>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </Grid>
+    </Border>
+
+    <TextBlock Grid.Row="5" Classes="caption" Text="{Binding ReaderFloor}" MaxWidth="620" HorizontalAlignment="Left"
+               Margin="0,16,0,0" />
 
   </Grid>
 </UserControl>

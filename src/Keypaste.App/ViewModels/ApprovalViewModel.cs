@@ -25,9 +25,7 @@ internal sealed class ApprovalViewModel : PromptViewModel
             (false, true) => "The reason is not what the agent sent: it was scrubbed.",
             _ => string.Empty,
         };
-        Attribution = prompt.ReasonWasTruncated
-            ? "Cut short: the full text is hashed in the audit log. That sentence was written by the agent, not by keypaste. Treat it as a claim."
-            : "That sentence was written by the agent, not by keypaste. Treat it as a claim.";
+        Truncation = prompt.ReasonWasTruncated ? "Cut short: the full text is hashed in the audit log." : string.Empty;
     }
 
     /// <summary>What the requesting client calls itself. Never proof of anything.</summary>
@@ -49,7 +47,11 @@ internal sealed class ApprovalViewModel : PromptViewModel
     /// <summary>What was scrubbed from the entry or the reason, or nothing.</summary>
     internal string Scrubbed { get; }
 
-    internal string Attribution { get; }
+    /// <summary>Whose words the reason is, said under it whatever it says.</summary>
+    internal string Attribution { get; } = "That sentence was written by the agent, not by keypaste. Treat it as a claim.";
+
+    /// <summary>That the reason shown is shorter than the one sent, or nothing.</summary>
+    internal string Truncation { get; }
 
     protected override int TimedSeconds { get; }
 }

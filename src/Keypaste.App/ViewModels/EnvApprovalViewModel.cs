@@ -20,6 +20,8 @@ internal sealed class EnvApprovalViewModel : PromptViewModel
         Project = prompt.Project;
         Profile = prompt.Profile;
         Requester = prompt.Requester ?? string.Empty;
+        Title = $"{(prompt.Requester is null ? "keypaste run" : "A run")} wants {prompt.Keys.Count} secret{(prompt.Keys.Count == 1 ? string.Empty : "s")}";
+        KeyNames = prompt.Keys;
         Keys = prompt.Keys.Count == 0 ? "(none)" : string.Join(Environment.NewLine, prompt.Keys);
         FileLines = string.Join(Environment.NewLine, prompt.FileLines);
         Command = prompt.Command;
@@ -30,6 +32,9 @@ internal sealed class EnvApprovalViewModel : PromptViewModel
         TimedSeconds = prompt.Requester is null ? prompt.GrantSeconds : 0;
     }
 
+    /// <summary>Who asks and how many secrets, as the design's heading says it.</summary>
+    internal string Title { get; }
+
     internal string Project { get; }
 
     internal string Profile { get; }
@@ -39,6 +44,9 @@ internal sealed class EnvApprovalViewModel : PromptViewModel
 
     /// <summary>The variable names, one per line.</summary>
     internal string Keys { get; }
+
+    /// <summary>The same names as rows, which the prompt draws each with its tag.</summary>
+    internal IReadOnlyList<string> KeyNames { get; }
 
     /// <summary>What a reference file makes of the set, one line each, or empty.</summary>
     internal string FileLines { get; }
