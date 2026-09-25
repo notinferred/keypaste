@@ -227,6 +227,16 @@ internal static class RunCommand
                 return false;
             }
 
+            // A file of literals only is a plaintext .env, whose every line would otherwise be echoed as a literal.
+            if (named.Lines.All(fileLine => fileLine.Reference is null))
+            {
+                exit = Fail(
+                    context,
+                    $"{OneLine(envFile)} names no {KpReferences.Scheme} reference, so it looks like a plaintext .env; nothing was started and none of its values were shown. " +
+                    $"Import it with `keypaste env pull <project> {OneLine(envFile)}`, then run with the project or an `env export` reference file");
+                return false;
+            }
+
             set = RunSet.For(profileGiven ? EnvReferenceFile.WithProfile(named, profile) : named, envFile);
             return true;
         }

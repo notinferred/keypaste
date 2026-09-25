@@ -402,6 +402,26 @@ public sealed class RunCommandTests
         Assert.False(environment.ContainsKey("DATABASE_URL"));
     }
 
+    [Fact]
+    public void Run_EnvFileOfLiteralsOnly_IsRefusedWithoutShowingAValueOrAskingForThePassword()
+    {
+        using var harness = Profiled();
+        harness.Prompt.PromptsSeen.Clear();
+        var file = Write(harness, "plain.env", "STRIPE_SECRET=sk_live_51Habc123\nDB_PASSWORD=hunter2\n");
+
+        harness.AssertExit(CliApp.ExitUsageError, harness.Run("run", "--env-file", file, "--vault", harness.VaultPath, "--", "node"));
+
+        Assert.Contains("names no kp:// reference", harness.Err, StringComparison.Ordinal);
+        foreach (var value in new[] { "sk_live_51Habc123", "hunter2" })
+        {
+            Assert.DoesNotContain(value, harness.Err, StringComparison.Ordinal);
+            Assert.DoesNotContain(value, harness.Out, StringComparison.Ordinal);
+        }
+
+        Assert.Empty(harness.ProcessLauncher.Started);
+        Assert.Empty(harness.Prompt.PromptsSeen);
+    }
+
     [Theory]
     [InlineData("A=kp://acme-api/dev/STRIPE_KEY\nA=kp://acme-api/staging/DATABASE_URL\n", "line 2: 'A' is set more than once")]
     [InlineData("A=kp://acme-api/dev/STRIPE_KEY\nB=kp://\n", "line 2: 'B' is not a usable reference")]
