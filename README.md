@@ -33,7 +33,7 @@ The published `v0.3.0` CLI stores logins and environment variables in a local KD
 - Env profiles: one set of keys per project, with a value for dev, staging and prod. Prod always needs a live answer.
 - `.env.keypaste`: `KEY=kp://project/profile/KEY` references and no values, safe to commit.
 - Scoped tokens for CI, such as `read:acme-api/staging/*`: inject-only, and expiring after 30 days by default.
-- Share links: one field, encrypted on your machine, opened a set number of times before it expires. The command exists; the keypaste.com service behind it is coming.
+- Share links: one field, or an entry's login (username, password and URL), encrypted on your machine, opened 1 to 10 times (once by default) before it expires. The command exists; the keypaste.com service behind it is coming.
 
 <table>
   <tr>

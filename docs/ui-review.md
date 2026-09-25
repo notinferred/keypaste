@@ -14,7 +14,7 @@ The target is one unlock session. An agent request should appear in the app with
 
 Project actions should identify the env set and command before launch. The app should make clear that the child receives a snapshot, and that subsequent vault edits or locks cannot erase values already delivered. Lock must stop new session-backed launches and credential releases.
 
-These are target behaviors. Today the desktop and terminal approver unlock independently, approvals appear in the terminal, and Env Sets copies a `keypaste run` command. The Agent Activity screen reports whether a terminal approver is running. [Desktop guidance](desktop.md) owns the current user instructions.
+These are target behaviors. Today the desktop and terminal approver unlock independently, approvals appear in the terminal, and Env profiles copies a `keypaste run` command. The Agents screen reports whether a terminal approver is running. [Desktop guidance](desktop.md) owns the current user instructions.
 
 ## Existing source and known gaps
 

@@ -276,7 +276,7 @@ Evidence: `RecentVaultsTests` checks persistence, capacity, removal and the keyf
 
 ## T-25 — A value on screen, because somebody asked to see it
 
-Env Sets can reveal one value while its control is held, supporting comparison with a `.env` file or provider dashboard. The entry pane reveals its current password and a superseded one the same way, each while its control is held (D-0300); choosing which revision to restore means reading it, and no CLI verb can read one (D-0231). A revision copies through the same clearing countdown as the current password and env values.
+Env profiles can reveal one value while its control is held, supporting comparison with a `.env` file or provider dashboard. The entry pane reveals its current password and a superseded one the same way, each while its control is held (D-0300); choosing which revision to restore means reading it, and no CLI verb can read one (D-0231). A revision copies through the same clearing countdown as the current password and env values.
 
 Release, dragging off, loss of pointer capture, the pointer leaving the window or removal from the visual tree ends reveal. Lock replaces the shell content, removing the control. The view model enforces one reveal at a time without storing the characters. At press time the row reads the open vault and passes the value to the control's private field rather than a styled property.
 
