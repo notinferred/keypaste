@@ -124,7 +124,7 @@ public static class EnvNameRules
 
         if (segments.Length == 1)
         {
-            error = $"an entry directly in '{root}' belongs to no project; name it {root}/<project>/<KEY>";
+            error = $"an entry directly in '{root}' belongs to no project; name it {root}/PROJECT/KEY";
             return false;
         }
 
@@ -137,7 +137,7 @@ public static class EnvNameRules
         // D-0347: a group below a profile, or a subgroup named for the default profile, is never read.
         if (segments.Length > 3)
         {
-            error = $"'{target.GroupPath}' is never read: a set is {root}/<project> or {root}/<project>/<profile>";
+            error = $"'{target.GroupPath}' is never read: a set is {root}/PROJECT or {root}/PROJECT/PROFILE";
             return false;
         }
 

@@ -82,6 +82,8 @@ public sealed class SetVerbTests : IDisposable
             Assert.Contains("Nothing was written.", _harness.Err, StringComparison.Ordinal);
         }
 
+        Assert.Contains("'env/acme-api/staging/sub' is never read: a set is env/PROJECT or env/PROJECT/PROFILE", _harness.Err, StringComparison.Ordinal);
+
         using var vault = Vault.Open(_harness.VaultPath, _master);
         Assert.Equal(["STRIPE"], vault.ReadEntries().Where(entry => entry.GroupPath.StartsWith("env", StringComparison.Ordinal)).Select(entry => entry.Title));
     }
@@ -198,7 +200,8 @@ public sealed class SetVerbTests : IDisposable
 
     [Theory]
     [InlineData("KEY", "env/acme-api/dev", "the dev profile is env/acme-api itself")]
-    [InlineData("KEY", "env/acme-api/staging/sub", "'env/acme-api/staging/sub' is never read")]
+    [InlineData("KEY", "env/acme-api/staging/sub", "'env/acme-api/staging/sub' is never read: a set is env/PROJECT or env/PROJECT/PROFILE")]
+    [InlineData("KEY", "env", "an entry directly in 'env' belongs to no project; name it env/PROJECT/KEY")]
     public void Add_WhereNoProfileReads_IsRefused(string title, string group, string reason)
     {
         _harness.Prompt.Enqueue(_master);
