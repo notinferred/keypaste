@@ -92,7 +92,12 @@ public sealed class ScreenRenderer
 
         Assert.True(Core.Clients.ClientPolicies.TrySave(
             Core.Audit.KeypasteHome.ClientsPath(demo.Home),
-            Core.Clients.ClientPolicies.Empty.With("cursor", Core.Clients.ClientPolicy.AskEveryTime).With("local-evals", Core.Clients.ClientPolicy.InjectOnly),
+            // The strict policy sits on every other client (T-36); the two holding grants keep session grants, as they must to hold them.
+            Core.Clients.ClientPolicies.Empty
+                .With(Core.Clients.ClientPolicies.AnyClient, Core.Clients.ClientPolicy.AskEveryTime)
+                .With("claude-code", Core.Clients.ClientPolicy.SessionGrants)
+                .With("cursor", Core.Clients.ClientPolicy.SessionGrants)
+                .With("local-evals", Core.Clients.ClientPolicy.InjectOnly),
             out var saveError), saveError);
 
         using var shell = new ShellViewModel(authority.Session, demo.Home, authority, clipboard: new FakeClipboard(), clock: clock);
@@ -614,7 +619,7 @@ public sealed class ScreenRenderer
 
         var clock = new ManualClock();
         using var shares = DemoShares(session.Unlocked!, clock);
-        using var shell = new ShellViewModel(session, demo.Home, null, clipboard: new FakeClipboard(), clock: clock) { ShareTransport = shares };
+        using var shell = new ShellViewModel(session, demo.Home, null, clipboard: new FakeClipboard(), clock: clock, picker: new FakeVaultFilePicker()) { ShareTransport = shares };
         var window = new MainWindow { Width = _width, Height = _height };
         window.FindControl<ContentControl>("Root")!.Content = new ShellView { DataContext = shell };
         window.Show();
