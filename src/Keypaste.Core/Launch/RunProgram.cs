@@ -25,6 +25,9 @@ public static class RunProgram
 {
     private static readonly string[] _windowsExtensions = [".exe", ".com", ".cmd", ".bat"];
 
+    // As many links as a Linux path lookup follows before it gives up with ELOOP.
+    private const int _maximumLinks = 40;
+
     /// <summary>Finds the program a command's first item names.</summary>
     /// <param name="named">The command's first item.</param>
     /// <param name="directory">The directory the run starts in, already resolved.</param>
@@ -99,46 +102,65 @@ public static class RunProgram
 
         try
         {
-            var full = Path.GetFullPath(directory);
-            var root = Path.GetPathRoot(full);
+            var linksLeft = _maximumLinks;
 
-            if (string.IsNullOrEmpty(root) || !Directory.Exists(full))
+            if (Resolve(Path.GetFullPath(directory), ref linksLeft) is not { } real || !Directory.Exists(real))
             {
                 return false;
             }
 
-            var current = root;
-
-            foreach (var segment in full[root.Length..].Split(
-                [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries))
-            {
-                current = Path.Combine(current, segment);
-                var info = new DirectoryInfo(current);
-
-                if (!info.Exists)
-                {
-                    return false;
-                }
-
-                if (info.LinkTarget is not null)
-                {
-                    if (info.ResolveLinkTarget(returnFinalTarget: true) is not { } target)
-                    {
-                        return false;
-                    }
-
-                    current = Path.GetFullPath(target.FullName);
-                }
-            }
-
-            resolved = current;
+            resolved = real;
             error = string.Empty;
-            return Directory.Exists(resolved);
+            return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {
             return false;
         }
+    }
+
+    // A link's target is walked again, so a link inside it is followed too and one directory has one
+    // spelling: macOS's /var is itself a link to /private/var. The budget is shared across the whole
+    // walk, so a directory of links pointing at links cannot make it expensive.
+    private static string? Resolve(string full, ref int linksLeft)
+    {
+        var root = Path.GetPathRoot(full);
+
+        if (string.IsNullOrEmpty(root) || !Directory.Exists(full))
+        {
+            return null;
+        }
+
+        var current = root;
+
+        foreach (var segment in full[root.Length..].Split(
+            [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries))
+        {
+            current = Path.Combine(current, segment);
+            var info = new DirectoryInfo(current);
+
+            if (!info.Exists)
+            {
+                return null;
+            }
+
+            if (info.LinkTarget is not null)
+            {
+                if (linksLeft-- == 0 || info.ResolveLinkTarget(returnFinalTarget: true) is not { } target)
+                {
+                    return null;
+                }
+
+                if (Resolve(Path.GetFullPath(target.FullName), ref linksLeft) is not { } real)
+                {
+                    return null;
+                }
+
+                current = real;
+            }
+        }
+
+        return current;
     }
 
     private static IEnumerable<string> Candidates(string path, string? pathExtensions)

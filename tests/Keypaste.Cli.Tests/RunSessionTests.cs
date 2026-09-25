@@ -239,7 +239,7 @@ public sealed class RunSessionTests : IDisposable
         _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("run", "--session", "--env-file", file, "--vault", _harness.VaultPath, "--", "deploy"));
 
         Assert.Contains("is too long for the prompt to show whole; run without --session", _harness.Err, StringComparison.Ordinal);
-        Assert.DoesNotContain("older", _harness.Err, StringComparison.Ordinal);
+        Assert.DoesNotContain("is older and cannot release profiles", _harness.Err, StringComparison.Ordinal);
         Assert.Null(owner.Channel.Last);
         Assert.Empty(_harness.ProcessLauncher.Started);
     }

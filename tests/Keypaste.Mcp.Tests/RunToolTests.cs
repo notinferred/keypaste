@@ -343,8 +343,9 @@ public sealed class RunToolTests : IDisposable
         await using var harness = new McpHarness(owner.PipeName, VaultPath);
         var client = await harness.StartAsync("--expose", "env/**", "--allow-run");
         var pidFile = Path.Combine(_directory, "pid");
+        var release = Path.Combine(_directory, "release");
 
-        var first = client.CallToolAsync(ToolText.RunToolName, Run("--pid-file", pidFile, "--sleep", "4"), cancellationToken: Token).AsTask();
+        var first = client.CallToolAsync(ToolText.RunToolName, Run("--pid-file", pidFile, "--wait-for", release), cancellationToken: Token).AsTask();
 
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
         while (!File.Exists(pidFile))
@@ -357,6 +358,8 @@ public sealed class RunToolTests : IDisposable
 
         Assert.True(second.IsError);
         Assert.Equal(ToolText.RunBusy, TextOf(second));
+
+        await File.WriteAllTextAsync(release, "go", Token);
         Assert.False((await first).IsError);
     }
 

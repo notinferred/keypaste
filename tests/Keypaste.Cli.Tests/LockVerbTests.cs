@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -42,7 +43,7 @@ public sealed class LockVerbTests : IDisposable
     [Fact]
     public void Lock_NothingUnlocked_ExitsZero()
     {
-        _harness.Environment[Core.Ipc.ApproverEndpoint.EnvironmentVariable] = "keypaste-tests-nobody-" + Guid.NewGuid().ToString("N");
+        _harness.Environment[Core.Ipc.ApproverEndpoint.EnvironmentVariable] = "keypaste-tests-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
 
         _harness.AssertExit(CliApp.ExitSuccess, Lock());
 

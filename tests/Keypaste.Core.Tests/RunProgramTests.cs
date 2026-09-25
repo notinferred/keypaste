@@ -104,4 +104,27 @@ public sealed class RunProgramTests : IDisposable
             Path.GetFullPath(Path.Combine(RunProgram.TryResolveDirectory(real, out var target, out _) ? target : real, "api")),
             resolved);
     }
+
+    [Fact]
+    public void ALinkWhoseTargetPassesThroughAnotherLink_ResolvesToTheRealDirectory()
+    {
+        var real = Path.Combine(_root, "real");
+        Directory.CreateDirectory(Path.Combine(real, "api"));
+        var hop = Path.Combine(_root, "hop");
+        var deep = Path.Combine(_root, "deep");
+
+        try
+        {
+            Directory.CreateSymbolicLink(hop, real);
+            Directory.CreateSymbolicLink(deep, Path.Combine(hop, "api"));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Assert.Skip($"this account cannot create a symbolic link: {ex.Message}");
+        }
+
+        Assert.True(RunProgram.TryResolveDirectory(Path.Combine(real, "api"), out var direct, out _));
+        Assert.True(RunProgram.TryResolveDirectory(deep, out var throughLinks, out _));
+        Assert.Equal(direct, throughLinks);
+    }
 }

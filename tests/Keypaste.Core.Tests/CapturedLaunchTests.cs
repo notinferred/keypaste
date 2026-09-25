@@ -86,6 +86,12 @@ public sealed class CapturedLaunchTests : IDisposable
             .Select(line => line[..line.IndexOf('=', StringComparison.Ordinal)])
             .ToHashSet(EnvironmentMerge.Comparer);
 
+        // macOS adds this to every process it starts: a text encoding number, never a value given here.
+        if (OperatingSystem.IsMacOS())
+        {
+            seen.Remove("__CF_USER_TEXT_ENCODING");
+        }
+
         Assert.Equal(given.Keys.ToHashSet(EnvironmentMerge.Comparer), seen);
         Assert.DoesNotContain("KEYPASTE_TOKEN", seen);
     }

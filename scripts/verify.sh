@@ -110,7 +110,7 @@ test_backend() {
   run dotnet test keypaste.slnx --no-build -c Release
 }
 test_desktop() {
-  run dotnet test keypaste.app.slnx --no-build -c Release
+  run dotnet test keypaste.app.slnx --no-build -c Release -- --long-running 120
   run dotnet test tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj --no-build -c Release
   integration_script scripts/verify-session-authority.sh
   integration_script scripts/verify-lock-boundary.sh

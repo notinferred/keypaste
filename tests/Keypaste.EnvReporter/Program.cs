@@ -154,6 +154,16 @@ internal static class Program
                     File.WriteAllText(args[++i], Environment.ProcessId.ToString(CultureInfo.InvariantCulture));
                     break;
 
+                case "--wait-for":
+                    var release = args[++i];
+                    var giveUp = DateTime.UtcNow + TimeSpan.FromSeconds(60);
+                    while (!File.Exists(release) && DateTime.UtcNow < giveUp)
+                    {
+                        Thread.Sleep(50);
+                    }
+
+                    break;
+
                 case "--sleep":
                     Thread.Sleep(TimeSpan.FromSeconds(double.Parse(args[++i], CultureInfo.InvariantCulture)));
                     break;
