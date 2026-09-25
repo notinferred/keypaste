@@ -12,7 +12,8 @@ namespace Keypaste.App;
 /// <remarks>
 /// Handled at the window, on the tunnelling pass, so a focused list or text field cannot eat
 /// them first. <c>Ctrl/Cmd+L</c> is the honest counterweight to a five-minute idle timeout:
-/// a default that short is only defensible when locking now is one keystroke.
+/// a default that short is only defensible when locking now is one keystroke. <c>Ctrl/Cmd+K</c>
+/// goes to the titlebar search and a digit to the sidebar row in that position.
 /// </remarks>
 internal sealed class Shortcuts : IDisposable
 {
@@ -88,6 +89,13 @@ internal sealed class Shortcuts : IDisposable
             return;
         }
 
+        if (e.Key == Key.K)
+        {
+            shell.FocusSearch();
+            e.Handled = true;
+            return;
+        }
+
         var digit = e.Key switch
         {
             Key.D1 or Key.NumPad1 => 1,
@@ -96,6 +104,9 @@ internal sealed class Shortcuts : IDisposable
             Key.D4 or Key.NumPad4 => 4,
             Key.D5 or Key.NumPad5 => 5,
             Key.D6 or Key.NumPad6 => 6,
+            Key.D7 or Key.NumPad7 => 7,
+            Key.D8 or Key.NumPad8 => 8,
+            Key.D9 or Key.NumPad9 => 9,
             _ => 0,
         };
 

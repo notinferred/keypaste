@@ -1,0 +1,90 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ctl="using:Keypaste.App.Controls">
+
+  <!--
+    Lists. Every ListBoxItem is a row: radius 7, hover raises one ink step, selected gets a 10%
+    amber tint and a 2px amber bar on the left, and a KpIcon in a selected row turns amber.
+    Classes:
+      ListBox.nav   the sidebar: 34px rows, selected is #2A2C30 with no bar
+      ListBox.rows  a tall list such as Secrets (52px rows); the default look, named for intent
+  -->
+
+  <Style Selector="ListBox">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+
+  <Style Selector="ListBoxItem">
+    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusButton}" />
+    <Setter Property="Padding" Value="10,6" />
+    <Setter Property="Margin" Value="0,1" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+  </Style>
+  <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource KpBgCard}" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+  </Style>
+  <Style Selector="ListBoxItem:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
+  </Style>
+  <Style Selector="ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter,
+                   ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter,
+                   ListBoxItem:selected:focus /template/ ContentPresenter#PART_ContentPresenter,
+                   ListBoxItem:selected:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource KpAccentTint}" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+    <Setter Property="BoxShadow" Value="{StaticResource KpSelectedBar}" />
+  </Style>
+  <Style Selector="ListBoxItem:selected ctl|KpIcon">
+    <Setter Property="Foreground" Value="{DynamicResource KpAccent}" />
+  </Style>
+
+  <Style Selector="ListBox.rows > ListBoxItem">
+    <Setter Property="MinHeight" Value="52" />
+    <Setter Property="Padding" Value="10,0" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="ListBox.nav > ListBoxItem">
+    <Setter Property="MinHeight" Value="34" />
+    <Setter Property="Height" Value="34" />
+    <Setter Property="Padding" Value="10,0" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="FontSize" Value="13.5" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
+  </Style>
+  <Style Selector="ListBox.nav > ListBoxItem ctl|KpIcon">
+    <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+  </Style>
+  <Style Selector="ListBox.nav > ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+  </Style>
+  <Style Selector="ListBox.nav > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter,
+                   ListBox.nav > ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter,
+                   ListBox.nav > ListBoxItem:selected:focus /template/ ContentPresenter#PART_ContentPresenter,
+                   ListBox.nav > ListBoxItem:selected:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+    <Setter Property="BoxShadow" Value="none" />
+  </Style>
+  <Style Selector="ListBox.nav > ListBoxItem:selected ctl|KpIcon">
+    <Setter Property="Foreground" Value="{DynamicResource KpAccent}" />
+  </Style>
+  <!-- The footer rows (Settings, Trash) are quieter than the destinations above them. -->
+  <Style Selector="ListBox.nav.quiet > ListBoxItem">
+    <Setter Property="Height" Value="30" />
+    <Setter Property="MinHeight" Value="30" />
+    <Setter Property="FontSize" Value="12.5" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+  </Style>
+
+  <!-- Thin, dark scrollbars. -->
+  <Style Selector="ScrollBar">
+    <Setter Property="AllowAutoHide" Value="True" />
+  </Style>
+
+</Styles>

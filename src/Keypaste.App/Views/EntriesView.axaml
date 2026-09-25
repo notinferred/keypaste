@@ -467,7 +467,7 @@
                                          MaskedLength="{Binding History.Selected.MaskedLength}"
                                          AutomationProperties.Name="{Binding History.Selected.RevealLabel}"
                                          FontFamily="{DynamicResource KpMono}"
-                                         FontSize="13"
+                                         FontSize="12"
                                          VerticalAlignment="Center"
                                          Foreground="{DynamicResource KpTextSecondary}" />
                       <Button Grid.Column="1" x:Name="CopyRevisionPassword" Content="Copy"

@@ -2,8 +2,8 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:ctl="using:Keypaste.App.Controls">
 
-  <!-- Styles for the controls this app actually uses, and no others. Six components was the
-       budget; a component library in 4.1 would be speculation. -->
+  <!-- Control themes for this app's own controls. Stock controls are restyled by class in
+       Buttons.axaml, Inputs.axaml, Lists.axaml, Surfaces.axaml and Typography.axaml. -->
 
   <ControlTheme x:Key="{x:Type ctl:MaskedInput}" TargetType="ctl:MaskedInput">
     <Setter Property="Focusable" Value="True" />
@@ -11,10 +11,10 @@
     <Setter Property="Template">
       <ControlTemplate>
         <Border Name="Frame"
-                Background="{DynamicResource KpSurface2}"
-                BorderBrush="{DynamicResource KpBorderSubtle}"
+                Background="{DynamicResource TextControlBackground}"
+                BorderBrush="{DynamicResource KpBorderDefault}"
                 BorderThickness="1"
-                CornerRadius="{DynamicResource KpRadiusSm}"
+                CornerRadius="{DynamicResource KpRadiusField}"
                 Padding="{DynamicResource KpFieldPadding}">
           <Panel>
             <TextBlock Text="{TemplateBinding Placeholder}"
@@ -29,11 +29,15 @@
       </ControlTemplate>
     </Setter>
 
+    <Style Selector="^:pointerover /template/ Border#Frame">
+      <Setter Property="BorderBrush" Value="{DynamicResource KpBorderStrong}" />
+    </Style>
+
     <!-- A keyboard-first app whose focus is invisible is not keyboard-first. This is never
          removed, and that is a review rule rather than a preference. -->
     <Style Selector="^:focus /template/ Border#Frame">
       <Setter Property="BorderBrush" Value="{DynamicResource KpFocusRing}" />
-      <Setter Property="BorderThickness" Value="2" />
+      <Setter Property="BoxShadow" Value="{StaticResource KpFieldGlow}" />
     </Style>
 
     <Style Selector="^:disabled /template/ Border#Frame">
@@ -42,10 +46,14 @@
   </ControlTheme>
 
   <ControlTheme x:Key="KpCard" TargetType="Border">
-    <Setter Property="Background" Value="{DynamicResource KpSurface1}" />
+    <Setter Property="Background" Value="{DynamicResource KpBgPanel}" />
     <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusMd}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusCard}" />
+  </ControlTheme>
+
+  <ControlTheme x:Key="{x:Type ctl:KpIcon}" TargetType="ctl:KpIcon">
+    <Setter Property="VerticalAlignment" Value="Center" />
   </ControlTheme>
 
 </ResourceDictionary>

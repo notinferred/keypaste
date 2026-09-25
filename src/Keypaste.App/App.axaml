@@ -1,22 +1,32 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="Keypaste.App.App"
-             RequestedThemeVariant="Default">
+             RequestedThemeVariant="Dark">
 
-  <!-- Default follows the operating system, through IPlatformSettings.GetColorValues(). Settings
-       offers System / Light / Dark and writes the choice to ~/.keypaste/app.toml. -->
-
-  <Application.Styles>
-    <FluentTheme />
-  </Application.Styles>
+  <!-- Dark first, as the design is. Settings offers System / Light / Dark and writes the choice to
+       ~/.keypaste/app.toml; with no file the app starts dark (AppSettings.Default).
+       Resources come before styles because the styles read tokens as static resources. -->
 
   <Application.Resources>
     <ResourceDictionary>
       <ResourceDictionary.MergedDictionaries>
         <ResourceInclude Source="avares://keypaste-app/Theme/Tokens.axaml" />
+        <ResourceInclude Source="avares://keypaste-app/Theme/Fluent.axaml" />
+        <ResourceInclude Source="avares://keypaste-app/Theme/Icons.axaml" />
+        <ResourceInclude Source="avares://keypaste-app/Theme/Brand.axaml" />
         <ResourceInclude Source="avares://keypaste-app/Theme/Controls.axaml" />
       </ResourceDictionary.MergedDictionaries>
     </ResourceDictionary>
   </Application.Resources>
+
+  <Application.Styles>
+    <FluentTheme />
+    <StyleInclude Source="avares://keypaste-app/Theme/Typography.axaml" />
+    <StyleInclude Source="avares://keypaste-app/Theme/Buttons.axaml" />
+    <StyleInclude Source="avares://keypaste-app/Theme/Inputs.axaml" />
+    <StyleInclude Source="avares://keypaste-app/Theme/Lists.axaml" />
+    <StyleInclude Source="avares://keypaste-app/Theme/Surfaces.axaml" />
+    <StyleInclude Source="avares://keypaste-app/Theme/Chrome.axaml" />
+  </Application.Styles>
 
 </Application>

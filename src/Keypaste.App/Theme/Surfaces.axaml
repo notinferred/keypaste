@@ -1,0 +1,180 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!--
+    Surfaces, as classes on Border. Depth is lightness; only overlays (dialog, toast) cast shadows.
+      card              radius 10, hairline border, no fill, padding 16
+      card.filled       the same on the panel ink (#18191C): MCP client cards, forms
+      dialog            overlay surface: #1D1E22, strong border, radius 14, shadow, padding 20
+      toast             bottom-right notice: #24262A, strong border, radius 10, shadow
+      backdrop          the modal scrim behind a dialog
+      field             a read-only value in a field-shaped box (a kp:// reference)
+      terminal          a command or file preview; stays dark in the light theme
+      table             a bordered, clipped table; rows inside use table-head / table-row
+      chip              4px badge on #24262A; chip.outline for a bordered one; put a
+                        TextBlock inside, which is drawn mono 11
+      keycap            a keyboard shortcut hint
+      dot               6px status dot: add ok, warn, danger, info or idle; waiting adds the halo
+      tile              the 32px initials / icon square
+  -->
+
+  <Style Selector="Border.card">
+    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusCard}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="16" />
+  </Style>
+  <Style Selector="Border.card.filled">
+    <Setter Property="Background" Value="{DynamicResource KpBgPanel}" />
+  </Style>
+
+  <Style Selector="Border.dialog">
+    <Setter Property="Background" Value="{DynamicResource KpBgCard}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KpBorderStrong}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusDialog}" />
+    <Setter Property="BoxShadow" Value="{StaticResource KpShadowDialog}" />
+    <Setter Property="Padding" Value="20" />
+  </Style>
+
+  <Style Selector="Border.toast">
+    <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KpBorderStrong}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusCard}" />
+    <Setter Property="BoxShadow" Value="{StaticResource KpShadowPopover}" />
+    <Setter Property="Padding" Value="14,10" />
+  </Style>
+
+  <Style Selector="Border.backdrop">
+    <Setter Property="Background" Value="{DynamicResource KpBackdrop}" />
+  </Style>
+  <Style Selector="Panel.backdrop">
+    <Setter Property="Background" Value="{DynamicResource KpBackdrop}" />
+  </Style>
+
+  <Style Selector="Border.field">
+    <Setter Property="Background" Value="{DynamicResource KpBgPanel}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusField}" />
+    <Setter Property="Padding" Value="12,0" />
+    <Setter Property="MinHeight" Value="36" />
+  </Style>
+
+  <Style Selector="Border.terminal">
+    <Setter Property="Background" Value="{DynamicResource KpTerminal}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KpLine1}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusCard}" />
+    <Setter Property="ClipToBounds" Value="True" />
+  </Style>
+  <Style Selector="Border.terminal TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource KpGrey3}" />
+  </Style>
+
+  <Style Selector="Border.table">
+    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusCard}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="ClipToBounds" Value="True" />
+  </Style>
+  <Style Selector="Border.table-head">
+    <Setter Property="Background" Value="{DynamicResource KpBgPanel}" />
+    <Setter Property="Padding" Value="16,9" />
+  </Style>
+  <Style Selector="Border.table-row">
+    <Setter Property="Padding" Value="16,11" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
+    <Setter Property="BorderThickness" Value="0,1,0,0" />
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="Border.table-row:pointerover">
+    <Setter Property="Background" Value="{DynamicResource KpBgPanel}" />
+  </Style>
+
+  <Style Selector="Border.chip">
+    <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusChip}" />
+    <Setter Property="Padding" Value="7,0" />
+    <Setter Property="MinHeight" Value="20" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+  </Style>
+  <Style Selector="Border.chip.outline">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KpBorderDefault}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="8,0" />
+    <Setter Property="MinHeight" Value="22" />
+  </Style>
+  <Style Selector="Border.chip.amber">
+    <Setter Property="Background" Value="{DynamicResource KpAccentTintStrong}" />
+  </Style>
+  <Style Selector="Border.chip > TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.chip.outline > TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+  </Style>
+  <Style Selector="Border.chip.amber > TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource KpAccentText}" />
+  </Style>
+
+  <Style Selector="Border.keycap">
+    <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusChip}" />
+    <Setter Property="Padding" Value="6,1" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.keycap > TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
+    <Setter Property="FontSize" Value="10.5" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+  </Style>
+
+  <Style Selector="Border.dot">
+    <Setter Property="Width" Value="6" />
+    <Setter Property="Height" Value="6" />
+    <Setter Property="CornerRadius" Value="3" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Background" Value="{DynamicResource KpTextMuted}" />
+  </Style>
+  <Style Selector="Border.dot.ok">
+    <Setter Property="Background" Value="{DynamicResource KpOk}" />
+  </Style>
+  <Style Selector="Border.dot.warn">
+    <Setter Property="Background" Value="{DynamicResource KpWarn}" />
+  </Style>
+  <Style Selector="Border.dot.danger">
+    <Setter Property="Background" Value="{DynamicResource KpDanger}" />
+  </Style>
+  <Style Selector="Border.dot.info">
+    <Setter Property="Background" Value="{DynamicResource KpInfo}" />
+  </Style>
+  <Style Selector="Border.dot.idle">
+    <Setter Property="Background" Value="{DynamicResource KpIdle}" />
+  </Style>
+  <Style Selector="Border.dot.waiting">
+    <Setter Property="Background" Value="{DynamicResource KpWarn}" />
+    <Setter Property="BoxShadow" Value="{StaticResource KpWaitingHalo}" />
+  </Style>
+
+  <Style Selector="Border.tile">
+    <Setter Property="Width" Value="32" />
+    <Setter Property="Height" Value="32" />
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
+  </Style>
+
+  <Style Selector="Border.divider">
+    <Setter Property="Height" Value="1" />
+    <Setter Property="Background" Value="{DynamicResource KpBorderSubtle}" />
+  </Style>
+
+</Styles>

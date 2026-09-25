@@ -3,6 +3,7 @@
         xmlns:vm="using:Keypaste.App.ViewModels"
         x:Class="Keypaste.App.Views.ApprovalWindow"
         x:DataType="vm:ApprovalViewModel"
+        Icon="avares://keypaste-app/Assets/keypaste.ico"
         Title="keypaste: an agent is asking for a credential"
         Width="520" Height="500"
         MinWidth="520" MaxWidth="520" MinHeight="500" MaxHeight="500"

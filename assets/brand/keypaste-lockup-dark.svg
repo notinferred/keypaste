@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="308" height="72" viewBox="0 -4 308 72">
+  <!-- keypaste lockup, on dark backgrounds. The wordmark is live text: Instrument Sans 600, -0.045em. -->
+  <rect x="10" y="8" width="10" height="48" fill="#F2F2F0"/>
+  <polygon points="40,24 54,24 38,40 54,56 40,56 24,40" fill="#F2B544"/>
+  <text x="87" y="51.8" fill="#F2F2F0" font-family="'Instrument Sans', system-ui, sans-serif" font-size="55" font-weight="600" letter-spacing="-2.475">keypaste</text>
+</svg>

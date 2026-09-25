@@ -112,7 +112,8 @@ The app provides these shortcuts and focus navigation. Verify the full keyboard-
 
 | | |
 |---|---|
-| `Ctrl/Cmd+1` … `6` | Entries, Env Sets, Agent Activity, Log, Settings, Trash |
+| `Ctrl/Cmd+1` … `6` | Secrets (entries), Agents, Activity (the log), Env profiles, Settings, Trash |
+| `Ctrl/Cmd+K` | The titlebar search, which filters Secrets |
 | `Ctrl/Cmd+O` | Open a vault, on the unlock screen |
 | `Ctrl/Cmd+L` | Lock now |
 | `Tab` / `Shift+Tab` | Move between controls |
@@ -167,7 +168,7 @@ CI builds and packages on three operating systems; desktop tests read secret sur
 6. Complete launch, unlock, all six destinations and `Ctrl/Cmd+L` using only the keyboard.
 7. Set a one-minute timeout. Check that the countdown appears, typing cancels it, and inactivity locks. Quit and relaunch without opening Settings; the timeout must remain one minute.
 8. Suspend the machine for longer than the timeout. It wakes locked.
-9. The theme follows the OS, and both light and dark read as calm. Choose Dark, quit and relaunch: the first frame is dark, with no flash of the light one on the way.
+9. With no `app.toml` the app starts dark; System follows the OS, and both light and dark read as calm. Choose Light, quit and relaunch: the first frame is light, with no flash of the dark one on the way.
 10. Set `idle_timeout_seconds = 137` in `app.toml` and relaunch. Settings must display it, locking must occur at 137 seconds, and the file must remain unchanged.
 11. Set a long idle timeout to isolate minimize locking. Enable "Lock when the window is minimized", minimize and restore: expect the unlock screen. Disable it, minimize and restore: expect an unlocked vault and a running idle countdown. Enable it again, quit and relaunch without opening Settings; minimizing must lock. A password copied before locking must no longer paste. Recorded runner results do not replace a person's check on a real macOS or Linux desktop.
 12. The Log screen matches `keypaste log` for the same `~/.keypaste/audit.jsonl`.

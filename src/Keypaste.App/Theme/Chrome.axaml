@@ -1,0 +1,17 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:chrome="using:Avalonia.Controls.Chrome">
+
+  <!-- The caption buttons Avalonia draws over the extended client area on Windows and Linux. The
+       app draws its own titlebar underneath, so the drawn title text is hidden rather than shown
+       twice, and the fullscreen button is dropped: the design has minimize, maximize and close. -->
+
+  <Style Selector="chrome|WindowDrawnDecorations /template/ Panel#PART_TitleTextPanel > TextBlock">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+
+  <Style Selector="chrome|WindowDrawnDecorations /template/ Button#PART_FullScreenButton">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+
+</Styles>

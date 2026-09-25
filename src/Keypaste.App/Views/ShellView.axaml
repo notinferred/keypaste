@@ -1,14 +1,14 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Keypaste.App.ViewModels"
-             xmlns:nav="using:Keypaste.App.Navigation"
              xmlns:views="using:Keypaste.App.Views"
+             xmlns:ctl="using:Keypaste.App.Controls"
              x:Class="Keypaste.App.Views.ShellView"
              x:DataType="vm:ShellViewModel"
-             Background="{DynamicResource KpSurface0}">
+             Background="{DynamicResource KpBgApp}">
 
-  <!-- Implicit templates, matched by the type of whatever Content holds. Adding a destination in
-       4.2 means adding a view model and a template here, and nothing else. -->
+  <!-- Implicit templates, matched by the type of whatever Content holds. Adding a destination
+       means a line in Destinations.All, a view model in ShellViewModel.Show and a template here. -->
   <UserControl.DataTemplates>
 
     <DataTemplate DataType="vm:EntriesViewModel">
@@ -37,143 +37,374 @@
 
   </UserControl.DataTemplates>
 
-  <Grid ColumnDefinitions="220,*">
+  <UserControl.Styles>
+    <Style Selector="Border.content.padded">
+      <Setter Property="Padding" Value="18,10,18,16" />
+    </Style>
 
-    <!-- The sidebar is a ListBox on purpose: arrow keys, Home/End and type-ahead all work for
-         free, the accessibility roles are right, and there is no custom key handling to get
-         wrong. SelectedItem drives navigation. -->
-    <Border Grid.Column="0"
-            Background="{DynamicResource KpSurface1}"
-            BorderBrush="{DynamicResource KpBorderSubtle}"
-            BorderThickness="0,0,1,0">
-      <DockPanel Margin="12">
+    <!-- A project row and the footer of the sidebar are buttons drawn as rows. -->
+    <Style Selector="Button.sidebar-row">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Height" Value="30" />
+      <Setter Property="Padding" Value="10,0" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
+    </Style>
+    <Style Selector="Button.sidebar-row /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
+    </Style>
+    <Style Selector="Button.sidebar-row:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+    </Style>
+    <Style Selector="Button.import">
+      <Setter Property="Height" Value="32" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.import /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="BorderBrush" Value="{DynamicResource KpBorderStrong}" />
+    </Style>
 
-        <StackPanel DockPanel.Dock="Top" Margin="8,8,8,20" Spacing="2">
-          <TextBlock Text="{Binding VaultName}"
-                     ToolTip.Tip="{Binding VaultPath}"
-                     FontSize="14"
-                     TextTrimming="CharacterEllipsis"
-                     Foreground="{DynamicResource KpTextPrimary}" />
-          <TextBlock Text="unlocked"
-                     FontSize="11"
-                     Foreground="{DynamicResource KpTextMuted}" />
-        </StackPanel>
+    <Style Selector="Button.mcp-card">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Padding" Value="10" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.mcp-card /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource KpBgApp}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
+    </Style>
+    <Style Selector="Button.mcp-card:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource KpBgApp}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource KpBorderStrong}" />
+    </Style>
 
-        <Button DockPanel.Dock="Bottom"
-                Content="Lock now"
-                HorizontalAlignment="Stretch"
-                HorizontalContentAlignment="Center"
-                Margin="8,12,8,0"
-                Command="{Binding LockCommand}" />
+    <Style Selector="ctl|KpIcon.mcp">
+      <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+    </Style>
+    <Style Selector="ctl|KpIcon.mcp.live">
+      <Setter Property="Foreground" Value="{DynamicResource KpAccent}" />
+    </Style>
 
-        <ListBox Name="Nav"
-                 ItemsSource="{Binding Destinations_}"
-                 SelectedItem="{Binding Current}"
-                 Background="Transparent"
-                 BorderThickness="0">
-          <ListBox.ItemTemplate>
-            <DataTemplate x:DataType="nav:Destination">
-              <TextBlock Text="{Binding Title}" />
-            </DataTemplate>
-          </ListBox.ItemTemplate>
-        </ListBox>
+    <Style Selector="Button.titlebar-lock">
+      <Setter Property="Height" Value="26" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="10,0" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontWeight" Value="Normal" />
+    </Style>
+    <Style Selector="Button.titlebar-lock /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
+    </Style>
+    <Style Selector="Button.titlebar-lock:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+    </Style>
+  </UserControl.Styles>
 
-      </DockPanel>
-    </Border>
+  <Panel>
 
-    <Grid Grid.Column="1" RowDefinitions="Auto,Auto,*">
+    <Grid RowDefinitions="40,*">
 
+      <!-- Titlebar: the window's title area, drawn by the app, draggable everywhere but its controls. -->
       <Border Grid.Row="0"
+              Name="TitleBar"
+              Background="{DynamicResource KpBgPanel}"
               BorderBrush="{DynamicResource KpBorderSubtle}"
               BorderThickness="0,0,0,1"
-              Padding="24,18">
-        <Grid ColumnDefinitions="*,Auto,Auto">
-          <TextBlock Grid.Column="0"
-                     Text="{Binding CurrentTitle}"
-                     FontSize="18"
-                     Foreground="{DynamicResource KpTextPrimary}" />
+              WindowDecorationProperties.ElementRole="TitleBar">
+        <Grid ColumnDefinitions="232,*,Auto" Margin="{x:Static views:WindowChrome.CaptionInset}">
 
-          <!-- The clipboard toast, beside the idle countdown because both are quiet statements
-               about time passing. KpAccentQuiet, never KpDanger: a working auto-clear is the most
-               normal thing this feature does. -->
-          <Border Grid.Column="1"
-                  IsVisible="{Binding Clipboard.IsVisible}"
-                  Background="{DynamicResource KpAccentQuiet}"
-                  CornerRadius="{DynamicResource KpRadiusSm}"
-                  Padding="10,6"
-                  Margin="0,0,12,0">
-            <StackPanel Spacing="4">
-              <StackPanel Orientation="Horizontal" Spacing="10">
-                <TextBlock VerticalAlignment="Center"
-                           FontSize="12"
-                           Foreground="{DynamicResource KpTextSecondary}"
-                           IsVisible="{Binding Clipboard.IsCounting}"
-                           Text="{Binding Clipboard.Label, StringFormat='{}{0} copied'}" />
-                <TextBlock VerticalAlignment="Center"
-                           FontSize="12"
-                           Foreground="{DynamicResource KpTextMuted}"
-                           IsVisible="{Binding Clipboard.IsCounting}"
-                           Text="{Binding Clipboard.SecondsLeft, StringFormat='clearing in {0}s'}" />
-                <TextBlock VerticalAlignment="Center"
-                           FontSize="12"
-                           TextWrapping="Wrap"
-                           MaxWidth="320"
-                           Foreground="{DynamicResource KpTextSecondary}"
-                           Text="{Binding Clipboard.Failure}" />
-                <Button Content="Clear now"
-                        Padding="8,2"
-                        FontSize="11"
-                        IsVisible="{Binding Clipboard.IsCounting}"
-                        Command="{Binding Clipboard.ClearNowCommand}" />
-              </StackPanel>
+          <TextBox Grid.Column="1"
+                   Name="ShellSearch"
+                   Classes="search"
+                   MaxWidth="440"
+                   Margin="16,0"
+                   VerticalAlignment="Center"
+                   Text="{Binding Search}"
+                   PlaceholderText="Search secrets, agents, projects"
+                   WindowDecorationProperties.ElementRole="User">
+            <TextBox.InnerLeftContent>
+              <ctl:KpIcon Icon="search" Size="13" Margin="2,0,0,0" Foreground="{DynamicResource KpTextMuted}" />
+            </TextBox.InnerLeftContent>
+            <TextBox.InnerRightContent>
+              <Border Classes="keycap" Margin="0,0,5,0">
+                <TextBlock Text="{x:Static vm:ShellViewModel.SearchShortcut}" />
+              </Border>
+            </TextBox.InnerRightContent>
+          </TextBox>
 
-              <ProgressBar Height="2"
-                           Minimum="0"
-                           Maximum="1"
-                           Value="{Binding Clipboard.Fraction}"
-                           IsVisible="{Binding Clipboard.IsCounting}"
-                           Foreground="{DynamicResource KpAccent}"
-                           Background="Transparent" />
+          <StackPanel Grid.Column="2"
+                      Orientation="Horizontal"
+                      Spacing="6"
+                      Margin="0,0,12,0"
+                      VerticalAlignment="Center">
+
+            <!-- Muted, never red. An auto-lock is the most normal thing this app does. -->
+            <TextBlock Classes="mono sm muted"
+                       Text="{Binding Countdown}"
+                       IsVisible="{Binding HasCountdown}"
+                       VerticalAlignment="Center"
+                       Margin="0,0,6,0" />
+
+            <StackPanel Orientation="Horizontal"
+                        Spacing="6"
+                        Margin="8,0"
+                        ToolTip.Tip="{Binding VaultPath}"
+                        WindowDecorationProperties.ElementRole="User">
+              <Border Classes="dot ok" />
+              <TextBlock Classes="mono sm muted"
+                         Text="{Binding VaultStatus}"
+                         VerticalAlignment="Center" />
             </StackPanel>
+
+            <Button Classes="titlebar-lock"
+                    Command="{Binding LockCommand}"
+                    ToolTip.Tip="Lock now"
+                    WindowDecorationProperties.ElementRole="User">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <ctl:KpIcon Icon="lock" Size="12" />
+                <TextBlock Text="lock" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
+
+        </Grid>
+      </Border>
+
+      <Grid Grid.Row="1" ColumnDefinitions="232,*">
+
+        <!-- The sidebar. Nav is a ListBox on purpose: arrow keys, Home/End and type-ahead all work
+             for free, the accessibility roles are right, and there is no custom key handling to get
+             wrong. SelectedMain drives navigation. -->
+        <Border Grid.Column="0"
+                Background="{DynamicResource KpBgPanel}"
+                BorderBrush="{DynamicResource KpBorderSubtle}"
+                BorderThickness="0,0,1,0">
+          <DockPanel Margin="10,16">
+
+            <ctl:BrandLockup DockPanel.Dock="Top"
+                             Margin="8,0,8,20"
+                             MarkSize="22"
+                             FontSize="19" />
+
+            <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,12,0,0">
+
+              <ListBox Name="FooterNav"
+                       Classes="nav quiet"
+                       ItemsSource="{Binding FooterNav}"
+                       SelectedItem="{Binding SelectedFooter}">
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:NavItem">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                      <ctl:KpIcon Icon="{Binding Icon}" Size="14" />
+                      <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+
+              <Button Classes="ghost sidebar-row import"
+                      IsVisible="{Binding ImportAvailable}">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                  <ctl:KpIcon Icon="file-input" Size="15" Foreground="{DynamicResource KpTextMuted}" />
+                  <TextBlock Text="Import .kdbx" FontSize="13" FontWeight="Normal" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
+
+              <Button Name="McpCard"
+                      Classes="mcp-card"
+                      Command="{Binding OpenAgentsCommand}">
+                <StackPanel Spacing="4">
+                  <Grid ColumnDefinitions="Auto,*,Auto">
+                    <ctl:KpIcon Grid.Column="0"
+                                Icon="plug"
+                                Size="14"
+                                Margin="0,0,8,0"
+                                Classes="mcp"
+                                Classes.live="{Binding McpRunning}" />
+                    <TextBlock Grid.Column="1"
+                               Text="MCP server"
+                               FontSize="12.5"
+                               FontWeight="Medium"
+                               Foreground="{DynamicResource KpTextPrimary}"
+                               VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="5">
+                      <Border Classes="dot" Classes.ok="{Binding McpRunning}" />
+                      <TextBlock Text="{Binding McpState}"
+                                 FontSize="11"
+                                 Classes="muted"
+                                 Classes.ok="{Binding McpRunning}"
+                                 VerticalAlignment="Center" />
+                    </StackPanel>
+                  </Grid>
+                  <TextBlock Classes="mono muted"
+                             FontSize="10.5"
+                             FontWeight="Normal"
+                             Text="{Binding McpDetail}"
+                             TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+              </Button>
+
+            </StackPanel>
+
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+              <StackPanel Spacing="20">
+
+                <ListBox Name="Nav"
+                         Classes="nav"
+                         ItemsSource="{Binding MainNav}"
+                         SelectedItem="{Binding SelectedMain}">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:NavItem">
+                      <Grid ColumnDefinitions="Auto,*,Auto">
+                        <ctl:KpIcon Grid.Column="0" Icon="{Binding Icon}" Size="16" Margin="0,0,10,0" />
+                        <TextBlock Grid.Column="1" Text="{Binding Title}" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="2"
+                                   Classes="mono sm muted"
+                                   Classes.amber="{Binding IsLive}"
+                                   Text="{Binding Count}"
+                                   VerticalAlignment="Center" />
+                      </Grid>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+
+                <StackPanel Spacing="2" IsVisible="{Binding HasProjects}">
+                  <TextBlock Classes="th" Text="PROJECTS" Margin="10,0,10,6" />
+                  <ItemsControl ItemsSource="{Binding Projects}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:ProjectRow">
+                        <Button Classes="sidebar-row"
+                                Command="{Binding $parent[ItemsControl].((vm:ShellViewModel)DataContext).OpenProjectCommand}"
+                                CommandParameter="{Binding Name}"
+                                ToolTip.Tip="{Binding Name}">
+                          <Grid ColumnDefinitions="Auto,*,Auto">
+                            <ctl:KpIcon Grid.Column="0"
+                                        Icon="folder-git-2"
+                                        Size="14"
+                                        Margin="0,0,10,0"
+                                        Foreground="{DynamicResource KpTextMuted}" />
+                            <TextBlock Grid.Column="1"
+                                       Classes="mono"
+                                       FontSize="12"
+                                       FontWeight="Normal"
+                                       Text="{Binding Name}"
+                                       TextTrimming="CharacterEllipsis"
+                                       VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2"
+                                       Classes="mono sm muted"
+                                       FontWeight="Normal"
+                                       Text="{Binding Count}"
+                                       VerticalAlignment="Center" />
+                          </Grid>
+                        </Button>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+
+              </StackPanel>
+            </ScrollViewer>
+
+          </DockPanel>
+        </Border>
+
+        <Grid Grid.Column="1" RowDefinitions="Auto,Auto,*">
+
+          <!-- Until a screen draws its own title (Destination.OwnsHeader), the shell draws it. -->
+          <TextBlock Grid.Row="0"
+                     Classes="h1"
+                     Text="{Binding CurrentTitle}"
+                     IsVisible="{Binding ShowsHeader}"
+                     Margin="18,14,18,0" />
+
+          <!-- Said once, after a restore landed here. Quiet: the restore worked, and this is what it did. -->
+          <Border Grid.Row="1"
+                  IsVisible="{Binding HasNotice}"
+                  Classes="card"
+                  Background="{DynamicResource KpAccentTint}"
+                  BorderBrush="{DynamicResource KpBorderSubtle}"
+                  Padding="12,8"
+                  Margin="18,10,18,0">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <ctl:KpIcon Grid.Column="0" Icon="info" Size="14" Margin="0,0,10,0" Foreground="{DynamicResource KpAccent}" />
+              <TextBlock Grid.Column="1"
+                         Name="Notice"
+                         Text="{Binding Notice}"
+                         TextWrapping="Wrap"
+                         FontSize="12.5"
+                         VerticalAlignment="Center"
+                         Foreground="{DynamicResource KpTextSecondary}" />
+              <Button Grid.Column="2"
+                      Classes="ghost sm"
+                      Content="Dismiss"
+                      Margin="12,0,0,0"
+                      Command="{Binding DismissNoticeCommand}" />
+            </Grid>
           </Border>
 
-          <!-- Muted, never red. An auto-lock is the most normal thing this app does. -->
-          <TextBlock Grid.Column="2"
-                     Text="{Binding Countdown}"
-                     IsVisible="{Binding HasCountdown}"
-                     VerticalAlignment="Center"
-                     FontSize="12"
-                     Foreground="{DynamicResource KpTextMuted}" />
+          <Border Grid.Row="2" Classes="content" Classes.padded="{Binding ShowsHeader}">
+            <ContentControl Content="{Binding Content}" />
+          </Border>
+
         </Grid>
-      </Border>
-
-      <!-- Said once, after a restore landed here. Quiet: the restore worked, and this is what it did. -->
-      <Border Grid.Row="1"
-              IsVisible="{Binding HasNotice}"
-              Background="{DynamicResource KpAccentQuiet}"
-              CornerRadius="{DynamicResource KpRadiusSm}"
-              Padding="12,8"
-              Margin="24,16,24,0">
-        <Grid ColumnDefinitions="*,Auto">
-          <TextBlock Grid.Column="0"
-                     Name="Notice"
-                     Text="{Binding Notice}"
-                     TextWrapping="Wrap"
-                     FontSize="12"
-                     VerticalAlignment="Center"
-                     Foreground="{DynamicResource KpTextSecondary}" />
-          <Button Grid.Column="1"
-                  Content="Dismiss"
-                  Padding="8,2"
-                  FontSize="11"
-                  Margin="12,0,0,0"
-                  Command="{Binding DismissNoticeCommand}" />
-        </Grid>
-      </Border>
-
-      <ContentControl Grid.Row="2" Content="{Binding Content}" Margin="24" />
-
+      </Grid>
     </Grid>
-  </Grid>
+
+    <!-- Toasts, bottom right. The clipboard countdown is one; ShowToast says anything else. -->
+    <StackPanel HorizontalAlignment="Right"
+                VerticalAlignment="Bottom"
+                Margin="20"
+                Spacing="8"
+                MaxWidth="420">
+
+      <!-- Never KpDanger: a working auto-clear is the most normal thing this feature does. -->
+      <Border Name="ClipboardToast" Classes="toast" IsVisible="{Binding Clipboard.IsVisible}">
+        <StackPanel Spacing="8">
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <ctl:KpIcon Icon="clipboard-check" Size="15" Foreground="{DynamicResource KpOk}" />
+            <TextBlock VerticalAlignment="Center"
+                       IsVisible="{Binding Clipboard.IsCounting}"
+                       Text="{Binding Clipboard.Label, StringFormat='{}{0} copied.'}" />
+            <TextBlock VerticalAlignment="Center"
+                       Classes="muted"
+                       IsVisible="{Binding Clipboard.IsCounting}"
+                       Text="{Binding Clipboard.SecondsLeft, StringFormat='Clears in {0}s'}" />
+            <TextBlock VerticalAlignment="Center"
+                       TextWrapping="Wrap"
+                       MaxWidth="320"
+                       Classes="secondary"
+                       Text="{Binding Clipboard.Failure}" />
+            <Button Classes="link"
+                    Content="Clear now"
+                    VerticalAlignment="Center"
+                    IsVisible="{Binding Clipboard.IsCounting}"
+                    Command="{Binding Clipboard.ClearNowCommand}" />
+          </StackPanel>
+          <ProgressBar Classes="thin"
+                       Minimum="0"
+                       Maximum="1"
+                       Value="{Binding Clipboard.Fraction}"
+                       IsVisible="{Binding Clipboard.IsCounting}" />
+        </StackPanel>
+      </Border>
+
+      <Border Name="Toast" Classes="toast" IsVisible="{Binding HasToast}">
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <ctl:KpIcon Icon="circle-check" Size="15" Foreground="{DynamicResource KpOk}" />
+          <TextBlock Text="{Binding Toast}" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="360" />
+        </StackPanel>
+      </Border>
+
+    </StackPanel>
+
+  </Panel>
 
 </UserControl>

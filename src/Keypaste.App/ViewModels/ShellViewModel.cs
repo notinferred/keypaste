@@ -1,30 +1,48 @@
+using System.Globalization;
 using Keypaste.App.Clipboard;
 using Keypaste.App.Navigation;
 using Keypaste.App.Session;
+using Keypaste.Core;
 
 namespace Keypaste.App.ViewModels;
 
 /// <summary>
-/// The main window once a vault is open: a sidebar, a content region, and a way out.
+/// The main window once a vault is open: a titlebar, a sidebar, a content region and a toast.
 /// </summary>
 /// <remarks>
 /// <para>
 /// <b>Everything here is disposed on lock.</b> The whole shell leaves the visual tree rather than
 /// being hidden, so "locked" has exactly one meaning and nothing that was derived from an open
-/// vault can survive it. In 4.1 there is almost nothing to survive; making it a rule now is what
-/// stops 4.2 quietly caching an entry list.
+/// vault can survive it. The sidebar's counts and project names are derived from the vault too,
+/// and go with it.
+/// </para>
+/// <para>
+/// <b>The sidebar reads names and counts, never values.</b> A count comes from the same entry list
+/// the Secrets screen reads, and is dropped the moment it is counted.
 /// </para>
 /// </remarks>
 internal sealed class ShellViewModel : ObservableObject, IDisposable
 {
+    /// <summary>How long a toast stays up.</summary>
+    internal static readonly TimeSpan ToastDuration = TimeSpan.FromSeconds(2.8);
+
+    private static readonly TimeSpan _statusTick = TimeSpan.FromSeconds(1);
+
     private readonly AppVaultSession _session;
     private readonly IVaultFilePicker? _picker;
     private readonly TimeProvider _clock;
     private readonly Action<Action>? _post;
+    private readonly ITimer? _statusTimer;
+    private ITimer? _toastTimer;
     private string? _notice;
     private Destination _current;
     private object? _content;
     private string _countdown = string.Empty;
+    private string _search = string.Empty;
+    private string? _toast;
+    private IReadOnlyList<ProjectRow> _projects = [];
+    private bool _mcpRunning;
+    private string _mcpDetail = string.Empty;
     private bool _disposed;
 
     internal ShellViewModel(
@@ -51,8 +69,8 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         _clock = clock ?? TimeProvider.System;
         _post = post;
 
-        // Owned here rather than by each screen, so a copy made on Entries is still counting down
-        // after a move to Env Sets — and is cleared by the lock, because this is disposed with
+        // Owned here rather than by each screen, so a copy made on Secrets is still counting down
+        // after a move to Env profiles — and is cleared by the lock, because this is disposed with
         // everything else the shell built.
         Clipboard = new ClipboardCountdown(
             clipboard ?? NoClipboard.Instance,
@@ -61,14 +79,26 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
         LockCommand = new RelayCommand(() => _session.Lock(VaultLockReason.Manual));
         DismissNoticeCommand = new RelayCommand(() => Notice = null);
+        DismissToastCommand = new RelayCommand(() => Toast = null);
+        OpenProjectCommand = new RelayCommand<string>(OpenProject);
+        OpenAgentsCommand = new RelayCommand(() => Current = Destinations.Of(DestinationKind.AgentActivity));
+
+        MainNav = [.. Destinations.Main.Select(d => new NavItem(d))];
+        FooterNav = [.. Destinations.Footer.Select(d => new NavItem(d))];
 
         _current = Destinations.All[0];
         _session.LockingSoon += OnLockingSoon;
+        _session.Edited += OnEdited;
 
         // Built here rather than left to the first navigation. Assigning Current to the destination
-        // it already holds changes nothing, so Show never ran and the shell opened on a blank pane —
-        // invisible in 4.1, when the first destination was an empty state with nothing to miss.
+        // it already holds changes nothing, so Show never ran and the shell opened on a blank pane.
         Show(_current);
+        ReadAuthority();
+
+        if (authority is not null)
+        {
+            _statusTimer = _clock.CreateTimer(_ => Post(ReadAuthority), null, _statusTick, _statusTick);
+        }
     }
 
     /// <summary>What the restore that opened this vault did, until it is dismissed or the vault locks.</summary>
@@ -117,14 +147,65 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     /// </remarks>
     internal DesktopPreferences Preferences { get; }
 
-    /// <summary>The six places the sidebar offers.</summary>
-    /// <remarks>
-    /// An instance property over a static list, because a binding needs one. The trailing
-    /// underscore keeps it from colliding with the <see cref="Navigation.Destinations"/> class it
-    /// reads from.
-    /// </remarks>
+    /// <summary>Every destination, in sidebar order.</summary>
+    /// <remarks>The trailing underscore keeps it from colliding with the <see cref="Navigation.Destinations"/> class.</remarks>
 #pragma warning disable CA1822
     internal IReadOnlyList<Destination> Destinations_ => Navigation.Destinations.All;
+#pragma warning restore CA1822
+
+    /// <summary>The sidebar's main rows.</summary>
+    internal IReadOnlyList<NavItem> MainNav { get; }
+
+    /// <summary>The sidebar's quieter rows at the bottom: Settings and Trash.</summary>
+    internal IReadOnlyList<NavItem> FooterNav { get; }
+
+    /// <summary>The main row for <see cref="Current"/>, or null while a footer row is current.</summary>
+    internal NavItem? SelectedMain
+    {
+        get => MainNav.FirstOrDefault(item => item.Destination == _current);
+        set
+        {
+            if (value is not null)
+            {
+                Current = value.Destination;
+            }
+        }
+    }
+
+    /// <summary>The footer row for <see cref="Current"/>, or null while a main row is current.</summary>
+    internal NavItem? SelectedFooter
+    {
+        get => FooterNav.FirstOrDefault(item => item.Destination == _current);
+        set
+        {
+            if (value is not null)
+            {
+                Current = value.Destination;
+            }
+        }
+    }
+
+    /// <summary>The vault's env projects, by name, with their variable counts.</summary>
+    internal IReadOnlyList<ProjectRow> Projects
+    {
+        get => _projects;
+        private set
+        {
+            if (Set(ref _projects, value))
+            {
+                Raise(nameof(HasProjects));
+            }
+        }
+    }
+
+    internal bool HasProjects => _projects.Count > 0;
+
+    /// <summary>Opens Env profiles on a project.</summary>
+    internal RelayCommand<string> OpenProjectCommand { get; }
+
+    /// <summary>Whether the sidebar offers "Import .kdbx". Nothing imports yet, so it does not.</summary>
+#pragma warning disable CA1822
+    internal bool ImportAvailable => false;
 #pragma warning restore CA1822
 
     /// <summary>The open vault's file name. The full path is a tooltip, never a heading.</summary>
@@ -134,8 +215,102 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     /// <summary>The open vault's full path, for the tooltip.</summary>
     internal string VaultPath => _session.VaultPath ?? string.Empty;
 
+    /// <summary>The titlebar's status line.</summary>
+    internal string VaultStatus => VaultName.Length > 0 ? $"{VaultName} · unlocked" : string.Empty;
+
     /// <summary>Locks now.</summary>
     internal RelayCommand LockCommand { get; }
+
+    /// <summary>Whether this app is answering agents for the vault, as its authority says.</summary>
+    internal bool McpRunning
+    {
+        get => _mcpRunning;
+        private set
+        {
+            if (Set(ref _mcpRunning, value))
+            {
+                Raise(nameof(McpState));
+            }
+        }
+    }
+
+    internal string McpState => _mcpRunning ? "running" : "stopped";
+
+    /// <summary>The MCP card's second line: what the authority knows, and nothing it does not.</summary>
+    internal string McpDetail
+    {
+        get => _mcpDetail;
+        private set => Set(ref _mcpDetail, value);
+    }
+
+    /// <summary>Opens Agents, from the MCP card.</summary>
+    internal RelayCommand OpenAgentsCommand { get; }
+
+    /// <summary>The titlebar search. It filters Secrets, and moves there to do it.</summary>
+    internal string Search
+    {
+        get => _search;
+        set
+        {
+            if (!Set(ref _search, value ?? string.Empty))
+            {
+                return;
+            }
+
+            if (_search.Length > 0 && _current.Kind != DestinationKind.Entries)
+            {
+                Current = Destinations.Of(DestinationKind.Entries);
+            }
+            else if (Content is EntriesViewModel entries)
+            {
+                entries.Search = _search;
+            }
+        }
+    }
+
+    /// <summary>Raised when <c>Ctrl/Cmd+K</c> asks for the titlebar search.</summary>
+    internal event EventHandler? SearchFocusRequested;
+
+    internal void FocusSearch() => SearchFocusRequested?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>The shortcut hint on the search field, in the platform's own spelling.</summary>
+    public static string SearchShortcut => OperatingSystem.IsMacOS() ? "⌘K" : "Ctrl K";
+
+    /// <summary>A short confirmation in the bottom-right corner, or null.</summary>
+    internal string? Toast
+    {
+        get => _toast;
+        private set
+        {
+            if (Set(ref _toast, value))
+            {
+                Raise(nameof(HasToast));
+            }
+        }
+    }
+
+    internal bool HasToast => _toast is not null;
+
+    internal RelayCommand DismissToastCommand { get; }
+
+    /// <summary>
+    /// Says <paramref name="message"/> in a toast for <see cref="ToastDuration"/>. A second call
+    /// replaces the first and restarts the time.
+    /// </summary>
+    /// <remarks>Never put a secret in it: a toast is a line of plain text on screen.</remarks>
+    internal void ShowToast(string message)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(message);
+
+        if (_disposed)
+        {
+            return;
+        }
+
+        _toastTimer?.Dispose();
+        Toast = message;
+        _toastTimer = _clock.CreateTimer(_ => Post(() => Toast = null), null, ToastDuration, Timeout.InfiniteTimeSpan);
+    }
 
     /// <summary>Where the sidebar is.</summary>
     internal Destination Current
@@ -146,6 +321,9 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             if (value is not null && Set(ref _current, value))
             {
                 Raise(nameof(CurrentTitle));
+                Raise(nameof(ShowsHeader));
+                Raise(nameof(SelectedMain));
+                Raise(nameof(SelectedFooter));
                 Show(value);
             }
         }
@@ -153,6 +331,9 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>The current destination's title, for the content header.</summary>
     internal string CurrentTitle => _current.Title;
+
+    /// <summary>Whether the shell draws the title above a screen that does not draw its own.</summary>
+    internal bool ShowsHeader => !_current.OwnsHeader;
 
     /// <summary>Whatever the current destination shows.</summary>
     internal object? Content
@@ -165,8 +346,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     /// A quiet line that appears shortly before the vault locks, and disappears on any input.
     /// </summary>
     /// <remarks>
-    /// Muted, not red, and not a dialog. <c>the Ideas table in DECISIONS.md</c> names "red scary warnings for normal
-    /// actions" as an anti-pattern, and an auto-lock is the most normal thing this app does.
+    /// Muted, not red, and not a dialog: an auto-lock is the most normal thing this app does.
     /// </remarks>
     internal string Countdown
     {
@@ -186,7 +366,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     internal void ClearCountdown() => Countdown = string.Empty;
 
     /// <summary>Moves to a destination by its shortcut digit.</summary>
-    /// <param name="digit">1 through 6.</param>
+    /// <param name="digit">A destination's position in the sidebar, from 1.</param>
     /// <returns><see langword="true"/> when a destination matched.</returns>
     internal bool GoTo(int digit)
     {
@@ -209,19 +389,151 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
         Content = destination.Kind switch
         {
-            // Real in 4.1, and it needs no unlocked vault: the audit log is machine state, which is
-            // why `keypaste log` reads it without one.
+            // The audit log is machine state, which is why `keypaste log` reads it without a vault.
             DestinationKind.Log => new LogViewModel(Home),
             DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker),
             DestinationKind.AgentActivity => Activity(),
-            DestinationKind.Entries => new EntriesViewModel(_session, Clipboard),
+            DestinationKind.Entries => Entries(),
             DestinationKind.EnvSets => new EnvSetsViewModel(_session, Clipboard, _picker),
             DestinationKind.Trash => new TrashViewModel(_session),
             _ => null,
         };
+
+        Count();
+    }
+
+    private EntriesViewModel Entries()
+    {
+        var entries = new EntriesViewModel(_session, Clipboard);
+
+        if (_search.Length > 0)
+        {
+            entries.Search = _search;
+        }
+
+        return entries;
     }
 
     private AgentActivityViewModel Activity() => new(Authority, Home, _clock, _post);
+
+    private void OpenProject(string? project)
+    {
+        if (project is null)
+        {
+            return;
+        }
+
+        Current = Destinations.Of(DestinationKind.EnvSets);
+
+        if (Content is EnvSetsViewModel env)
+        {
+            env.OpenCommand.Execute(project);
+        }
+    }
+
+    /// <summary>Counts entries and env projects for the sidebar, reading names only.</summary>
+    private void Count()
+    {
+        if (_disposed || _session.Unlocked is not { } vault)
+        {
+            Projects = [];
+            return;
+        }
+
+        IReadOnlyList<string> names;
+        Dictionary<string, int> perGroup = new(StringComparer.Ordinal);
+        int total;
+
+        try
+        {
+            var entries = vault.ReadEntries();
+            total = entries.Count;
+
+            foreach (var entry in entries)
+            {
+                if (entry.Title.Length > 0)
+                {
+                    perGroup[entry.GroupPath] = perGroup.GetValueOrDefault(entry.GroupPath) + 1;
+                }
+            }
+
+            names = new EnvStore(vault).Projects();
+        }
+        catch (ObjectDisposedException)
+        {
+            return;
+        }
+
+        Projects = [.. names.Select(name => new ProjectRow(name, perGroup.GetValueOrDefault(EnvConvention.GroupPath(name))))];
+        SetCount(DestinationKind.Entries, total);
+        SetCount(DestinationKind.EnvSets, names.Count);
+    }
+
+    private void SetCount(DestinationKind kind, int count, bool live = false)
+    {
+        foreach (var item in MainNav.Concat(FooterNav))
+        {
+            if (item.Destination.Kind == kind)
+            {
+                item.Count = count > 0 ? count.ToString(CultureInfo.InvariantCulture) : string.Empty;
+                item.IsLive = live && count > 0;
+            }
+        }
+    }
+
+    private void ReadAuthority()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        var status = Authority?.Status ?? new AuthorityStatus.Locked();
+
+        if (status is AuthorityStatus.Serving)
+        {
+            var activity = Authority!.Activity;
+            var grants = activity.Grants.Count;
+            var waiting = activity.Waiting.Count;
+
+            McpRunning = true;
+            McpDetail = waiting > 0
+                ? string.Create(CultureInfo.InvariantCulture, $"{waiting} waiting for you · {Grants(grants)}")
+                : Grants(grants);
+            SetCount(DestinationKind.AgentActivity, grants + waiting, live: true);
+            return;
+        }
+
+        McpRunning = false;
+        McpDetail = status switch
+        {
+            AuthorityStatus.HeldBy => "another keypaste holds this vault",
+            AuthorityStatus.NotServing => "agents cannot reach this vault",
+            _ => "not serving agents",
+        };
+        SetCount(DestinationKind.AgentActivity, 0);
+    }
+
+    private static string Grants(int count) => count switch
+    {
+        0 => "no grants in force",
+        1 => "1 grant in force",
+        _ => string.Create(CultureInfo.InvariantCulture, $"{count} grants in force"),
+    };
+
+    private void OnEdited(object? sender, VaultEdit edit) => Post(Count);
+
+    private void Post(Action action)
+    {
+        if (_post is { } post)
+        {
+            post(action);
+        }
+        else
+        {
+            action();
+        }
+    }
 
     private void OnLockingSoon(object? sender, TimeSpan remaining) =>
         Countdown = $"Locking in {Math.Max(1, (int)remaining.TotalSeconds)} seconds.";
@@ -235,7 +547,12 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
         _disposed = true;
         _session.LockingSoon -= OnLockingSoon;
+        _session.Edited -= OnEdited;
+        _statusTimer?.Dispose();
+        _toastTimer?.Dispose();
         Notice = null;
+        Toast = null;
+        Projects = [];
         (Content as IDisposable)?.Dispose();
         Content = null;
 

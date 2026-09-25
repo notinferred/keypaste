@@ -3,6 +3,7 @@
         xmlns:vm="using:Keypaste.App.ViewModels"
         x:Class="Keypaste.App.Views.EnvApprovalWindow"
         x:DataType="vm:EnvApprovalViewModel"
+        Icon="avares://keypaste-app/Assets/keypaste.ico"
         Title="keypaste: a run is asking for a project's variables"
         Width="560" Height="620"
         MinWidth="560" MaxWidth="560" MinHeight="620" MaxHeight="620"

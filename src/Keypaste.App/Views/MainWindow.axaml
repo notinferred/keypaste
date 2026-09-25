@@ -1,16 +1,30 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="using:Keypaste.App.Views"
         x:Class="Keypaste.App.Views.MainWindow"
         Title="keypaste"
+        Icon="avares://keypaste-app/Assets/keypaste.ico"
         Width="1000" Height="680"
         MinWidth="960" MinHeight="520"
-        Background="{DynamicResource KpSurface0}"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="{x:Static views:WindowChrome.TitleBarHeight}"
+        Background="{DynamicResource KpBgApp}"
         WindowStartupLocation="CenterScreen">
 
   <!-- One window for the app's whole life. Unlock and the shell are two content states of it, not
        two windows: re-creating a window on lock loses its position and monitor, steals focus on
-       macOS, and would mean two of every key binding and idle observer. -->
+       macOS, and would mean two of every key binding and idle observer.
 
-  <ContentControl Name="Root" />
+       The client area extends into the title area. The shell draws its own titlebar there; any
+       other content gets DragStrip, so the window can still be moved from its top edge. -->
+
+  <Panel>
+    <ContentControl Name="Root" />
+    <Border Name="DragStrip"
+            Height="{x:Static views:WindowChrome.TitleBarHeight}"
+            VerticalAlignment="Top"
+            Background="Transparent"
+            WindowDecorationProperties.ElementRole="TitleBar" />
+  </Panel>
 
 </Window>

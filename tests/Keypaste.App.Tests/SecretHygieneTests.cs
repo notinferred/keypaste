@@ -488,7 +488,7 @@ public sealed class SecretHygieneTests
         using var session = Unlocked(fixture);
         using var shell = new ShellViewModel(session, fixture.Home, authority: null);
 
-        shell.Current = Destinations.All[1];
+        shell.Current = Destinations.Of(DestinationKind.EnvSets);
         var env = Assert.IsType<EnvSetsViewModel>(shell.Content);
 
         // First, that there are cards at all.
@@ -513,7 +513,7 @@ public sealed class SecretHygieneTests
         using var session = Unlocked(fixture);
         using var shell = new ShellViewModel(session, fixture.Home, authority: null);
 
-        shell.Current = Destinations.All[1];
+        shell.Current = Destinations.Of(DestinationKind.EnvSets);
         var env = Assert.IsType<EnvSetsViewModel>(shell.Content);
         env.OpenCommand.Execute(SentinelProject);
 
@@ -556,7 +556,7 @@ public sealed class SecretHygieneTests
         using var session = Unlocked(fixture);
         using var shell = new ShellViewModel(session, fixture.Home, authority: null);
 
-        shell.Current = Destinations.All[1];
+        shell.Current = Destinations.Of(DestinationKind.EnvSets);
         var env = Assert.IsType<EnvSetsViewModel>(shell.Content);
         env.OpenCommand.Execute(SentinelProject);
 
@@ -655,7 +655,7 @@ public sealed class SecretHygieneTests
         entries.DeleteCommand.Execute(null);
         entries.ConfirmDeleteCommand.Execute(null);
 
-        shell.Current = Destinations.All[5];
+        shell.Current = Destinations.Of(DestinationKind.Trash);
         var trash = Assert.IsType<TrashViewModel>(shell.Content);
         Assert.Contains(trash.Rows, row => row.Title == SentinelTitle);
 

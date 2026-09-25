@@ -1,79 +1,173 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
 
   <!--
-    The dark palette was written first and the light one derived from it, which is what "dark mode
-    first-class" means in practice: a dark theme derived from a light one reads as a light theme
-    with the lights off, and this product is looked at in the evening.
+    The design tokens from docs/design/tokens, dark first. The single accent is amber, used once per
+    view for the primary action or a live signal, and text on amber is always ink. Status colours
+    share one oklch lightness and chroma; they are converted to sRGB here because Avalonia has no
+    oklch. Depth is lightness, not shadow: shadows are for overlays only.
 
-    One accent, muted. KpDanger appears only on a destructive confirmation — never on the idle
-    countdown, never on a wrong password. the Ideas table in DECISIONS.md names "red scary warnings for normal actions"
-    as an anti-pattern and mistyping a password is the most normal action there is.
+    Semantic brushes (KpBg*, KpBorder*, KpText*, KpAccent*, status) change with the theme and are
+    what views use. The raw palette below them (KpInk*, KpLine*, KpAmber…) does not change and is
+    for the rare surface that stays dark in both themes, such as a terminal preview.
   -->
 
   <ResourceDictionary.ThemeDictionaries>
 
     <ResourceDictionary x:Key="Dark">
-      <SolidColorBrush x:Key="KpSurface0" Color="#14161A" />
-      <SolidColorBrush x:Key="KpSurface1" Color="#1A1D22" />
-      <SolidColorBrush x:Key="KpSurface2" Color="#22262C" />
-      <SolidColorBrush x:Key="KpSurface3" Color="#2B3038" />
+      <SolidColorBrush x:Key="KpBgApp" Color="#111214" />
+      <SolidColorBrush x:Key="KpBgPanel" Color="#18191C" />
+      <SolidColorBrush x:Key="KpBgCard" Color="#1D1E22" />
+      <SolidColorBrush x:Key="KpBgHover" Color="#24262A" />
+      <SolidColorBrush x:Key="KpBgActive" Color="#2A2C30" />
+      <SolidColorBrush x:Key="KpBgActiveHover" Color="#33363B" />
 
-      <SolidColorBrush x:Key="KpTextPrimary" Color="#E8EAED" />
-      <SolidColorBrush x:Key="KpTextSecondary" Color="#A8AEB8" />
-      <SolidColorBrush x:Key="KpTextMuted" Color="#767D89" />
+      <SolidColorBrush x:Key="KpBorderSubtle" Color="#26282C" />
+      <SolidColorBrush x:Key="KpBorderDefault" Color="#2C2E33" />
+      <SolidColorBrush x:Key="KpBorderStrong" Color="#3A3D43" />
 
-      <SolidColorBrush x:Key="KpBorderSubtle" Color="#2E333B" />
-      <SolidColorBrush x:Key="KpBorderStrong" Color="#3D444E" />
+      <SolidColorBrush x:Key="KpTextPrimary" Color="#F2F2F0" />
+      <SolidColorBrush x:Key="KpTextSecondary" Color="#C9CACD" />
+      <SolidColorBrush x:Key="KpTextMuted" Color="#8E9096" />
+      <SolidColorBrush x:Key="KpTextDisabled" Color="#55575C" />
 
-      <SolidColorBrush x:Key="KpAccent" Color="#7C9CBF" />
-      <SolidColorBrush x:Key="KpAccentQuiet" Color="#26313D" />
-      <SolidColorBrush x:Key="KpAccentContrast" Color="#0F1216" />
+      <SolidColorBrush x:Key="KpAccentText" Color="#F2B544" />
+      <SolidColorBrush x:Key="KpFocusGap" Color="#111214" />
+      <SolidColorBrush x:Key="KpMarkStem" Color="#F2F2F0" />
 
-      <SolidColorBrush x:Key="KpDanger" Color="#C98A8A" />
-      <SolidColorBrush x:Key="KpFocusRing" Color="#7C9CBF" />
+      <!-- Kept from the first palette so every view written against it still resolves. -->
+      <SolidColorBrush x:Key="KpSurface0" Color="#111214" />
+      <SolidColorBrush x:Key="KpSurface1" Color="#18191C" />
+      <SolidColorBrush x:Key="KpSurface2" Color="#1D1E22" />
+      <SolidColorBrush x:Key="KpSurface3" Color="#24262A" />
     </ResourceDictionary>
 
     <ResourceDictionary x:Key="Light">
-      <SolidColorBrush x:Key="KpSurface0" Color="#FBFBFC" />
+      <SolidColorBrush x:Key="KpBgApp" Color="#F7F7F5" />
+      <SolidColorBrush x:Key="KpBgPanel" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="KpBgCard" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="KpBgHover" Color="#EFEFEC" />
+      <SolidColorBrush x:Key="KpBgActive" Color="#E6E6E2" />
+      <SolidColorBrush x:Key="KpBgActiveHover" Color="#DDDDD8" />
+
+      <SolidColorBrush x:Key="KpBorderSubtle" Color="#E8E8E4" />
+      <SolidColorBrush x:Key="KpBorderDefault" Color="#DCDCD7" />
+      <SolidColorBrush x:Key="KpBorderStrong" Color="#C4C4BE" />
+
+      <SolidColorBrush x:Key="KpTextPrimary" Color="#111214" />
+      <SolidColorBrush x:Key="KpTextSecondary" Color="#3A3C40" />
+      <SolidColorBrush x:Key="KpTextMuted" Color="#6B6D72" />
+      <SolidColorBrush x:Key="KpTextDisabled" Color="#A3A5A9" />
+
+      <SolidColorBrush x:Key="KpAccentText" Color="#8A5A00" />
+      <SolidColorBrush x:Key="KpFocusGap" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="KpMarkStem" Color="#111214" />
+
+      <SolidColorBrush x:Key="KpSurface0" Color="#F7F7F5" />
       <SolidColorBrush x:Key="KpSurface1" Color="#FFFFFF" />
-      <SolidColorBrush x:Key="KpSurface2" Color="#F3F4F6" />
-      <SolidColorBrush x:Key="KpSurface3" Color="#E9EBEF" />
-
-      <SolidColorBrush x:Key="KpTextPrimary" Color="#1A1D22" />
-      <SolidColorBrush x:Key="KpTextSecondary" Color="#5A616B" />
-      <SolidColorBrush x:Key="KpTextMuted" Color="#8B929C" />
-
-      <SolidColorBrush x:Key="KpBorderSubtle" Color="#E2E5EA" />
-      <SolidColorBrush x:Key="KpBorderStrong" Color="#C9CED6" />
-
-      <SolidColorBrush x:Key="KpAccent" Color="#3E6087" />
-      <SolidColorBrush x:Key="KpAccentQuiet" Color="#E8EEF5" />
-      <SolidColorBrush x:Key="KpAccentContrast" Color="#FFFFFF" />
-
-      <SolidColorBrush x:Key="KpDanger" Color="#A64B4B" />
-      <SolidColorBrush x:Key="KpFocusRing" Color="#3E6087" />
+      <SolidColorBrush x:Key="KpSurface2" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="KpSurface3" Color="#EFEFEC" />
     </ResourceDictionary>
 
   </ResourceDictionary.ThemeDictionaries>
 
-  <!-- Generous on purpose. Fluent's defaults are tuned tighter than "bank lobby". -->
+  <!-- The same in both themes. -->
+  <SolidColorBrush x:Key="KpAccent" Color="#F2B544" />
+  <SolidColorBrush x:Key="KpAccentHover" Color="#F7C566" />
+  <SolidColorBrush x:Key="KpAccentPress" Color="#D99D2E" />
+  <SolidColorBrush x:Key="KpAccentTint" Color="#1AF2B544" />
+  <SolidColorBrush x:Key="KpAccentTintStrong" Color="#1FF2B544" />
+  <SolidColorBrush x:Key="KpAccentHalo" Color="#33F2B544" />
+  <SolidColorBrush x:Key="KpOnAccent" Color="#111214" />
+  <SolidColorBrush x:Key="KpFocusRing" Color="#F2B544" />
+  <SolidColorBrush x:Key="KpMarkArm" Color="#F2B544" />
+
+  <SolidColorBrush x:Key="KpOk" Color="#72D699" />
+  <SolidColorBrush x:Key="KpDanger" Color="#F7857D" />
+  <SolidColorBrush x:Key="KpDangerTint" Color="#1FF0786E" />
+  <SolidColorBrush x:Key="KpDangerTintHover" Color="#33F0786E" />
+  <SolidColorBrush x:Key="KpInfo" Color="#7FBEF3" />
+  <SolidColorBrush x:Key="KpWarn" Color="#F2B544" />
+  <SolidColorBrush x:Key="KpIdle" Color="#55575C" />
+
+  <SolidColorBrush x:Key="KpTerminal" Color="#0C0D0E" />
+  <SolidColorBrush x:Key="KpTerminalDivider" Color="#1D1E22" />
+  <SolidColorBrush x:Key="KpBackdrop" Color="#9908090A" />
+
+  <!-- The first palette's accent pair, mapped onto amber. -->
+  <SolidColorBrush x:Key="KpAccentQuiet" Color="#1FF2B544" />
+  <SolidColorBrush x:Key="KpAccentContrast" Color="#111214" />
+
+  <!-- The raw palette. -->
+  <SolidColorBrush x:Key="KpInk0" Color="#111214" />
+  <SolidColorBrush x:Key="KpInk1" Color="#18191C" />
+  <SolidColorBrush x:Key="KpInk2" Color="#1D1E22" />
+  <SolidColorBrush x:Key="KpInk3" Color="#24262A" />
+  <SolidColorBrush x:Key="KpInk4" Color="#2A2C30" />
+  <SolidColorBrush x:Key="KpInk5" Color="#33363B" />
+  <SolidColorBrush x:Key="KpLine1" Color="#26282C" />
+  <SolidColorBrush x:Key="KpLine2" Color="#2C2E33" />
+  <SolidColorBrush x:Key="KpLine3" Color="#3A3D43" />
+  <SolidColorBrush x:Key="KpGrey7" Color="#55575C" />
+  <SolidColorBrush x:Key="KpGrey5" Color="#8E9096" />
+  <SolidColorBrush x:Key="KpGrey3" Color="#C9CACD" />
+  <SolidColorBrush x:Key="KpPaper" Color="#F2F2F0" />
+  <SolidColorBrush x:Key="KpAmber" Color="#F2B544" />
+
+  <!-- Type: the faces embedded in Assets/Fonts, named by URI. Registering them as a font collection
+       instead (AppBuilder.ConfigureFonts, FontManagerOptions) left headless test sessions hanging once
+       a window with a text box outlived its test. Instrument Sans reaches every control through the
+       Window style (Typography.axaml) and ContentControlThemeFontFamily (Fluent.axaml). Letter
+       spacing is in pixels, so the design's em values are multiplied out at each size. -->
+  <FontFamily x:Key="KpSans">avares://keypaste-app/Assets/Fonts#Instrument Sans</FontFamily>
+  <FontFamily x:Key="KpMono">avares://keypaste-app/Assets/Fonts#Fragment Mono</FontFamily>
+
+  <!-- 4px base: 2, 4, 6, 8, 12, 16, 20, 24, 32, 40, 56. -->
+  <x:Double x:Key="KpGap2">2</x:Double>
+  <x:Double x:Key="KpGap4">4</x:Double>
+  <x:Double x:Key="KpGap6">6</x:Double>
+  <x:Double x:Key="KpGap8">8</x:Double>
+  <x:Double x:Key="KpGap12">12</x:Double>
+  <x:Double x:Key="KpGap16">16</x:Double>
+  <x:Double x:Key="KpGap20">20</x:Double>
+  <x:Double x:Key="KpGap24">24</x:Double>
+  <x:Double x:Key="KpGap32">32</x:Double>
+  <x:Double x:Key="KpGap40">40</x:Double>
+  <x:Double x:Key="KpGap56">56</x:Double>
+
+  <!-- The first spacing scale, which views still use. -->
   <x:Double x:Key="KpSpace1">4</x:Double>
   <x:Double x:Key="KpSpace2">8</x:Double>
   <x:Double x:Key="KpSpace3">12</x:Double>
   <x:Double x:Key="KpSpace4">16</x:Double>
   <x:Double x:Key="KpSpace5">24</x:Double>
   <x:Double x:Key="KpSpace6">32</x:Double>
-  <x:Double x:Key="KpSpace7">48</x:Double>
+  <x:Double x:Key="KpSpace7">40</x:Double>
 
+  <CornerRadius x:Key="KpRadiusChip">4</CornerRadius>
+  <CornerRadius x:Key="KpRadiusField">6</CornerRadius>
+  <CornerRadius x:Key="KpRadiusButton">7</CornerRadius>
+  <CornerRadius x:Key="KpRadiusCard">10</CornerRadius>
+  <CornerRadius x:Key="KpRadiusDialog">14</CornerRadius>
   <CornerRadius x:Key="KpRadiusSm">6</CornerRadius>
   <CornerRadius x:Key="KpRadiusMd">10</CornerRadius>
 
-  <Thickness x:Key="KpCardPadding">32</Thickness>
-  <Thickness x:Key="KpFieldPadding">12,10</Thickness>
+  <Thickness x:Key="KpCardPadding">20</Thickness>
+  <Thickness x:Key="KpFieldPadding">12,9</Thickness>
+  <Thickness x:Key="KpScreenPadding">32,28</Thickness>
 
-  <!-- Monospace for the log pane and for every file path, so a column lines up and a path is
-       unambiguous about its own characters. -->
-  <FontFamily x:Key="KpMono">ui-monospace,SFMono-Regular,Menlo,Consolas,DejaVu Sans Mono,monospace</FontFamily>
+  <BoxShadows x:Key="KpShadowDialog">0 24 64 0 #8C000000</BoxShadows>
+  <BoxShadows x:Key="KpShadowPopover">0 8 24 0 #59000000</BoxShadows>
+  <BoxShadows x:Key="KpFieldGlow">0 0 0 3 #26F2B544</BoxShadows>
+  <BoxShadows x:Key="KpWaitingHalo">0 0 0 3 #33F2B544</BoxShadows>
+  <BoxShadows x:Key="KpSelectedBar">inset 2 0 0 0 #F2B544</BoxShadows>
+
+  <!-- Motion: 120ms and 200ms on one curve, no bounce, for overlays appearing (dialog, toast).
+       Hover, press and selection change instantly: a fade leaves a control's drawn state depending
+       on when it is looked at, and the frame and accessibility tests read exactly that state. -->
+  <sys:TimeSpan x:Key="KpDurationFast">0:0:0.12</sys:TimeSpan>
+  <sys:TimeSpan x:Key="KpDurationBase">0:0:0.2</sys:TimeSpan>
+  <SplineEasing x:Key="KpEase" X1="0.2" Y1="0.8" X2="0.2" Y2="1" />
 
 </ResourceDictionary>

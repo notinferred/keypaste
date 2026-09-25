@@ -1,0 +1,128 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- The type scale as classes on TextBlock (and SelectableTextBlock). Letter spacing is in pixels:
+       the design's em values multiplied by each size. Avalonia has no text-transform, so an
+       uppercase label such as a table header is written in capitals. -->
+
+  <Style Selector="Window">
+    <Setter Property="Background" Value="{DynamicResource KpBgApp}" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+    <Setter Property="FontFamily" Value="{DynamicResource KpSans}" />
+    <Setter Property="FontSize" Value="14" />
+  </Style>
+
+  <Style Selector=":is(TextBlock).display">
+    <Setter Property="FontSize" Value="54" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="LetterSpacing" Value="-2.43" />
+  </Style>
+
+  <Style Selector=":is(TextBlock).h1">
+    <Setter Property="FontSize" Value="24" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="LetterSpacing" Value="-0.72" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+  </Style>
+
+  <Style Selector=":is(TextBlock).h2">
+    <Setter Property="FontSize" Value="20" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="LetterSpacing" Value="-0.6" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+  </Style>
+
+  <!-- A section heading inside a screen: "Active grants", "MCP clients". -->
+  <Style Selector=":is(TextBlock).section">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+  </Style>
+
+  <Style Selector=":is(TextBlock).dialog-title">
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="LetterSpacing" Value="-0.16" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+  </Style>
+
+  <Style Selector=":is(TextBlock).body">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="LineHeight" Value="19.5" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+
+  <!-- The line under a screen's h1. -->
+  <Style Selector=":is(TextBlock).subtitle">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+
+  <!-- A field's label. -->
+  <Style Selector=":is(TextBlock).label">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
+  </Style>
+
+  <!-- A helper line under a field. -->
+  <Style Selector=":is(TextBlock).caption">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+
+  <!-- Table header and sidebar section label: 11/500, +0.04em, muted, written in capitals. -->
+  <Style Selector=":is(TextBlock).th">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="LetterSpacing" Value="0.44" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+  </Style>
+
+  <!-- Anything machine-readable: keys, values, refs, paths, commands, tokens, timestamps. -->
+  <Style Selector=":is(TextBlock).mono">
+    <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
+    <Setter Property="FontSize" Value="12.5" />
+  </Style>
+  <Style Selector=":is(TextBlock).mono.sm">
+    <Setter Property="FontSize" Value="11" />
+  </Style>
+  <Style Selector=":is(TextBlock).mono.lg">
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+  <Style Selector=":is(TextBlock).mono.xl">
+    <Setter Property="FontSize" Value="22" />
+    <Setter Property="LetterSpacing" Value="-0.22" />
+  </Style>
+
+  <Style Selector=":is(TextBlock).primary">
+    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+  </Style>
+  <Style Selector=":is(TextBlock).secondary">
+    <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
+  </Style>
+  <Style Selector=":is(TextBlock).muted">
+    <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+  </Style>
+  <Style Selector=":is(TextBlock).amber">
+    <Setter Property="Foreground" Value="{DynamicResource KpAccentText}" />
+  </Style>
+  <Style Selector=":is(TextBlock).ok">
+    <Setter Property="Foreground" Value="{DynamicResource KpOk}" />
+  </Style>
+  <Style Selector=":is(TextBlock).danger">
+    <Setter Property="Foreground" Value="{DynamicResource KpDanger}" />
+  </Style>
+  <Style Selector=":is(TextBlock).info">
+    <Setter Property="Foreground" Value="{DynamicResource KpInfo}" />
+  </Style>
+  <Style Selector=":is(TextBlock).strong">
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector=":is(TextBlock).medium">
+    <Setter Property="FontWeight" Value="Medium" />
+  </Style>
+
+</Styles>
