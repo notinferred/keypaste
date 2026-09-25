@@ -87,7 +87,8 @@
       </Style>
     </ControlTheme>
 
-    <!-- The field a destination is typed into: text until hovered or focused. -->
+    <!-- The field a destination is typed into: text until hovered or focused, and a red-bordered
+         field while it blocks the import, so the fix is visible where the problem is. -->
     <ControlTheme x:Key="DestinationField" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
       <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
       <Setter Property="FontSize" Value="12" />
@@ -101,6 +102,10 @@
       <Style Selector="^:pointerover /template/ Border#PART_BorderElement">
         <Setter Property="Background" Value="{DynamicResource KpBgApp}" />
         <Setter Property="BorderBrush" Value="{DynamicResource KpBorderDefault}" />
+      </Style>
+      <Style Selector="^.blocked /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{DynamicResource KpBgApp}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource KpDanger}" />
       </Style>
       <Style Selector="^:focus /template/ Border#PART_BorderElement">
         <Setter Property="Background" Value="{DynamicResource KpBgApp}" />
@@ -133,6 +138,7 @@
   </UserControl.Styles>
 
   <Border Classes="dialog"
+          KeyboardNavigation.TabNavigation="Cycle"
           Width="520"
           MaxWidth="520"
           HorizontalAlignment="Center"
@@ -151,7 +157,7 @@
       </Grid>
 
       <!-- The file card, on a dashed hairline. -->
-      <Panel IsVisible="{Binding IsReadable}">
+      <Panel>
         <Rectangle RadiusX="10" RadiusY="10"
                    Stroke="{DynamicResource KpBorderStrong}"
                    StrokeThickness="1"
@@ -160,7 +166,16 @@
           <ctl:KpIcon Grid.Column="0" Icon="file-lock-2" Size="22" Margin="0,0,12,0" Foreground="{DynamicResource KpTextMuted}" />
           <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
             <TextBlock Classes="mono lg" Text="{Binding FileName}" TextTrimming="CharacterEllipsis" />
-            <TextBlock FontSize="12" Classes="muted" Text="{Binding CardDetail}" TextTrimming="CharacterEllipsis" />
+            <TextBlock FontSize="12"
+                       Classes="muted"
+                       Text="{Binding CardDetail}"
+                       TextTrimming="CharacterEllipsis"
+                       IsVisible="{Binding IsReadable}" />
+            <TextBlock FontSize="12"
+                       Classes="danger"
+                       Text="{Binding Message}"
+                       TextWrapping="Wrap"
+                       IsVisible="{Binding IsUnreadable}" />
           </StackPanel>
           <StackPanel Grid.Column="2"
                       Orientation="Horizontal"
@@ -176,9 +191,18 @@
                       Spacing="5"
                       Margin="12,0,0,0"
                       VerticalAlignment="Center"
-                      IsVisible="{Binding !IsDecrypted}">
+                      IsVisible="{Binding IsLocked}">
             <ctl:KpIcon Icon="lock" Size="13" Foreground="{DynamicResource KpTextMuted}" />
             <TextBlock FontSize="12" Classes="muted" Text="Locked" VerticalAlignment="Center" />
+          </StackPanel>
+          <StackPanel Grid.Column="2"
+                      Orientation="Horizontal"
+                      Spacing="5"
+                      Margin="12,0,0,0"
+                      VerticalAlignment="Center"
+                      IsVisible="{Binding IsUnreadable}">
+            <ctl:KpIcon Icon="alert-triangle" Size="13" Foreground="{DynamicResource KpDanger}" />
+            <TextBlock FontSize="12" Classes="danger" Text="Can't read" VerticalAlignment="Center" />
           </StackPanel>
         </Grid>
       </Panel>
@@ -192,6 +216,11 @@
                          FontFamily="{DynamicResource KpMono}"
                          FontSize="14"
                          Placeholder="Its master password" />
+        <TextBlock FontSize="12.5"
+                   Classes="danger"
+                   TextWrapping="Wrap"
+                   Text="{Binding Message}"
+                   IsVisible="{Binding HasMessage}" />
         <Grid ColumnDefinitions="Auto,*,Auto">
           <ctl:KpIcon Grid.Column="0" Icon="file-key" Size="14" Margin="0,0,8,0"
                       Foreground="{DynamicResource KpTextMuted}" />
@@ -251,6 +280,7 @@
                                   Foreground="{DynamicResource KpTextMuted}" />
                       <TextBox Grid.Column="3"
                                Theme="{StaticResource DestinationField}"
+                               Classes.blocked="{Binding Blocks}"
                                FontSize="12"
                                FontWeight="Normal"
                                Text="{Binding Destination}"
@@ -289,19 +319,26 @@
                    IsVisible="{Binding KeepEditingInPlace}" />
       </StackPanel>
 
-      <TextBlock Classes="body secondary"
+      <TextBlock Classes="danger"
                  FontSize="12.5"
+                 TextWrapping="Wrap"
                  Text="{Binding Message}"
-                 IsVisible="{Binding HasMessage}" />
+                 IsVisible="{Binding HasTrailingMessage}" />
 
       <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
         <Button Classes="ghost dialog-action" Content="Cancel" Command="{Binding CancelCommand}" />
+        <Button x:Name="ChooseAnother"
+                Classes="dialog-action"
+                IsVisible="{Binding CanChooseAnother}"
+                Content="Choose another file…"
+                Command="{Binding ChooseAnotherCommand}" />
         <Button Classes="primary dialog-action"
                 IsVisible="{Binding NeedsUnlock}"
                 Content="{Binding UnlockText}"
                 Command="{Binding UnlockCommand}" />
-        <Button Classes="primary dialog-action"
-                IsVisible="{Binding !NeedsUnlock}"
+        <Button x:Name="ImportConfirm"
+                Classes="primary dialog-action"
+                IsVisible="{Binding ShowsConfirm}"
                 Content="{Binding ConfirmText}"
                 Command="{Binding ConfirmCommand}" />
       </StackPanel>

@@ -102,6 +102,15 @@
       <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
     </Style>
 
+    <!-- A refusal, directly under the field it is about. -->
+    <Style Selector="TextBlock.lock-error">
+      <Setter Property="FontSize" Value="12.5" />
+      <Setter Property="LineHeight" Value="18" />
+      <Setter Property="Margin" Value="2,0" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Foreground" Value="{DynamicResource KpDanger}" />
+    </Style>
+
     <Style Selector="Button.wide">
       <Setter Property="Height" Value="38" />
       <Setter Property="MinHeight" Value="38" />
@@ -166,7 +175,7 @@
           <StackPanel Spacing="6">
             <TextBlock Classes="lock-title" Text="{Binding Heading}" ToolTip.Tip="{Binding SelectedPath}" />
             <TextBlock Classes="lock-subtitle"
-                       Text="Agents are paused until you unlock."
+                       Text="{Binding Subtitle}"
                        IsVisible="{Binding HasSelection}" />
             <TextBlock Classes="lock-subtitle"
                        Text="Choose a .kdbx file, drag one here, or create a new vault."
@@ -182,11 +191,14 @@
           </StackPanel>
 
           <StackPanel Spacing="18" IsVisible="{Binding HasSelection}">
-            <ctl:MaskedInput x:Name="Password"
-                             Theme="{StaticResource LockField}"
-                             MaskedLength="{Binding MaskedLength}"
-                             Placeholder="Master password"
-                             IsEnabled="{Binding CanTypePassword}" />
+            <StackPanel Spacing="8">
+              <ctl:MaskedInput x:Name="Password"
+                               Theme="{StaticResource LockField}"
+                               MaskedLength="{Binding MaskedLength}"
+                               Placeholder="Master password"
+                               IsEnabled="{Binding CanTypePassword}" />
+              <TextBlock Classes="lock-error" Text="{Binding Message}" IsVisible="{Binding IsError}" />
+            </StackPanel>
 
             <Button Classes="primary wide"
                     IsDefault="True"
@@ -259,6 +271,7 @@
                              Theme="{StaticResource LockField}"
                              MaskedLength="{Binding ConfirmMaskedLength}"
                              Placeholder="Confirm master password" />
+            <TextBlock Classes="lock-error" Text="{Binding Message}" IsVisible="{Binding IsError}" />
           </StackPanel>
 
           <Button Classes="primary wide"
@@ -295,7 +308,7 @@
             </Panel>
             <TextBlock Classes="caption"
                        TextAlignment="Center"
-                       Text="A key file is optional. keypaste uses one you already have, such as a KeePassXC key file, and never makes one. Losing it locks the vault." />
+                       Text="Optional, and one you already have. Losing it locks the vault." />
           </StackPanel>
         </StackPanel>
 
@@ -334,11 +347,14 @@
               </ListBox>
             </Border>
 
-            <ctl:MaskedInput x:Name="BackupPassword"
-                             Theme="{StaticResource LockField}"
-                             MaskedLength="{Binding MaskedLength}"
-                             Placeholder="That backup's master password"
-                             IsEnabled="{Binding IsChoosing}" />
+            <StackPanel Spacing="8">
+              <ctl:MaskedInput x:Name="BackupPassword"
+                               Theme="{StaticResource LockField}"
+                               MaskedLength="{Binding MaskedLength}"
+                               Placeholder="That backup's master password"
+                               IsEnabled="{Binding IsChoosing}" />
+              <TextBlock Classes="lock-error" Text="{Binding Message}" IsVisible="{Binding IsError}" />
+            </StackPanel>
 
             <Panel HorizontalAlignment="Center" IsEnabled="{Binding IsChoosing}">
               <Button Classes="quiet"
@@ -393,13 +409,18 @@
 
             <TextBlock Classes="lock-note"
                        Text="{Binding Message}"
-                       IsVisible="{Binding HasMessage}" />
+                       IsVisible="{Binding HasNote}" />
           </StackPanel>
         </StackPanel>
 
         <TextBlock Classes="lock-note"
                    Text="{Binding Message}"
-                   IsVisible="{Binding HasMessage}" />
+                   IsVisible="{Binding HasNote}" />
+
+        <TextBlock Classes="lock-error"
+                   TextAlignment="Center"
+                   Text="{Binding Message}"
+                   IsVisible="{Binding HasLooseError}" />
 
         <TextBlock x:Name="Owner"
                    Classes="lock-note"

@@ -50,6 +50,8 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
     private const string _refusedWithKeyfile =
         "That password and keyfile don't open this backup, or the backup is damaged. Try another copy.";
 
+    private const string _expired = "That was left waiting a while, so the password was cleared. Nothing was changed.";
+
     private readonly string _vaultPath;
     private readonly TimeProvider _clock;
     private readonly Func<TimeSpan> _idleTimeout;
@@ -159,11 +161,18 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
             if (Set(ref _message, value))
             {
                 Raise(nameof(HasMessage));
+                Raise(nameof(IsError));
+                Raise(nameof(HasNote));
             }
         }
     }
 
     internal bool HasMessage => _message.Length > 0;
+
+    /// <summary>Whether <see cref="Message"/> is a refusal, drawn in red under the password; only the idle note is not.</summary>
+    internal bool IsError => HasMessage && !string.Equals(_message, _expired, StringComparison.Ordinal);
+
+    internal bool HasNote => HasMessage && !IsError;
 
     internal string Taken => _validated is { } summary
         ? $"Backup taken {summary.Backup.TakenAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.CurrentCulture)}."
@@ -373,7 +382,7 @@ internal sealed class RestoreBackupViewModel : ObservableObject, IDisposable
     {
         if (!_disposed && !_busy && (_validated is not null || _password.Length > 0))
         {
-            Forget("That was left waiting a while, so the password was cleared. Nothing was changed.");
+            Forget(_expired);
         }
     }
 

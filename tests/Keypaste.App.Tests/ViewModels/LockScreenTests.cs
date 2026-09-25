@@ -92,6 +92,43 @@ public sealed class LockScreenTests : IDisposable
     }
 
     [Fact]
+    public void A_handed_over_file_is_opened_rather_than_called_locked()
+    {
+        var foreign = Path.Combine(_vault.Home, "handed.kdbx");
+        KeePassInterop.WriteForeignUnchecked(foreign, Encoding.UTF8.GetBytes("in-place"), null, "Argon2id", "ChaCha20");
+
+        using var session = new AppVaultSession(new ManualClock());
+        using var model = new UnlockViewModel(session, _vault.Home, new FakeVaultFilePicker(), () => { });
+
+        Assert.True(model.Offer(foreign, null));
+        Assert.Equal("Open handed.kdbx", model.Heading);
+        Assert.Contains("keep editing it in place", model.Subtitle, StringComparison.Ordinal);
+        Assert.False(model.HasMessage);
+
+        Assert.True(model.Offer(_vault.Path_));
+        Assert.EndsWith("is locked", model.Heading, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_wrong_password_is_an_error_and_a_note_is_not()
+    {
+        using var session = new AppVaultSession(new ManualClock());
+        using var model = new UnlockViewModel(session, _vault.Home, new FakeVaultFilePicker(), () => { });
+        Assert.True(model.Offer(_vault.Path_));
+
+        model.Type('x');
+        await model.UnlockAsync();
+
+        Assert.True(model.IsError);
+        Assert.False(model.HasNote);
+        Assert.False(model.HasLooseError);
+
+        model.Message = "A note.";
+        Assert.False(model.IsError);
+        Assert.True(model.HasNote);
+    }
+
+    [Fact]
     public void A_file_that_is_not_a_vault_is_not_offered_with_a_keyfile()
     {
         using var session = new AppVaultSession(new ManualClock());

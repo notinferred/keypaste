@@ -268,9 +268,9 @@ internal sealed partial class App : Application, IDisposable
             message,
             next is null ? reason : null);
 
-        if (next is { } file && _unlock.Offer(file.Path, file.Keyfile))
+        if (next is { } file)
         {
-            _unlock.Message = $"Unlock {Path.GetFileName(file.Path)} to keep editing it in place.";
+            _unlock.Offer(file.Path, file.Keyfile);
         }
 
         _window.FindControl<ContentControl>("Root")!.Content =

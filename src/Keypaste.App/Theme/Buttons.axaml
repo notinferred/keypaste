@@ -46,9 +46,11 @@
     <Setter Property="Background" Value="{DynamicResource AccentButtonBackgroundPressed}" />
     <Setter Property="Foreground" Value="{DynamicResource AccentButtonForegroundPressed}" />
   </Style>
+  <!-- A disabled primary stays amber, faded, so a form that is waiting for input keeps its one amber action. -->
   <Style Selector="Button.primary:disabled /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="{DynamicResource AccentButtonBackgroundDisabled}" />
-    <Setter Property="Foreground" Value="{DynamicResource AccentButtonForegroundDisabled}" />
+    <Setter Property="Background" Value="{DynamicResource KpAccent}" />
+    <Setter Property="Foreground" Value="{DynamicResource KpOnAccent}" />
+    <Setter Property="Opacity" Value="0.45" />
   </Style>
   <Style Selector="Button.accent">
     <Setter Property="FontWeight" Value="SemiBold" />

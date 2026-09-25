@@ -282,7 +282,8 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             path,
             _openInPlace ?? ((_, _) => _session.Lock(VaultLockReason.Manual)),
             Imported,
-            _picker is null ? null : _picker.PickKeyfileAsync);
+            _picker is null ? null : _picker.PickKeyfileAsync,
+            _picker is null ? null : PickImportAsync);
 
         import.Closed += (_, _) =>
         {

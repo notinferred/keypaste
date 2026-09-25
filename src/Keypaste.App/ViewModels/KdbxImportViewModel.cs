@@ -28,6 +28,8 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
     private readonly Action<string, string?> _openInPlace;
     private readonly Action<string> _announce;
     private readonly Func<Task<string?>>? _pickKeyfile;
+    private readonly Func<Task>? _chooseAnother;
+    private readonly string _fileName;
     private readonly SecretBuffer _password = new();
 
     private ImportSource? _source;
@@ -48,12 +50,14 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
     /// </param>
     /// <param name="announce">Says what an import did, once it is saved.</param>
     /// <param name="pickKeyfile">Asks which keyfile opens the file; null where nothing can ask.</param>
+    /// <param name="chooseAnother">Asks for another file when this one cannot be read; null where nothing can ask.</param>
     internal KdbxImportViewModel(
         AppVaultSession session,
         string path,
         Action<string, string?> openInPlace,
         Action<string> announce,
-        Func<Task<string?>>? pickKeyfile = null)
+        Func<Task<string?>>? pickKeyfile = null,
+        Func<Task>? chooseAnother = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(path);
@@ -64,6 +68,8 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
         _openInPlace = openInPlace;
         _announce = announce;
         _pickKeyfile = pickKeyfile;
+        _chooseAnother = chooseAnother;
+        _fileName = System.IO.Path.GetFileName(path);
 
         if (KdbxImport.TryProbe(path, out var probe, out var error))
         {
@@ -72,7 +78,7 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
         }
         else
         {
-            _message = DisplayTextSanitizer.Sanitize(error).Text;
+            _message = WhyUnreadable(path, error);
         }
 
         UnlockCommand = new AsyncRelayCommand(UnlockAsync, () => !_busy && _probe is not null && _source is null);
@@ -80,6 +86,7 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
         CancelCommand = new RelayCommand(Dispose);
         ChooseKeyfileCommand = new AsyncRelayCommand(ChooseKeyfileAsync, () => !_busy && _source is null && _pickKeyfile is not null);
         ClearKeyfileCommand = new RelayCommand(() => KeyfilePath = null, () => !_busy && _source is null && _keyfilePath is not null);
+        ChooseAnotherCommand = new AsyncRelayCommand(() => _chooseAnother!(), () => _chooseAnother is not null && !_disposed);
 
         _session.Locked += OnLocked;
     }
@@ -90,13 +97,27 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
     /// <summary>Whether the file's header was read, so there is something to unlock or open.</summary>
     internal bool IsReadable => _probe is not null;
 
+    /// <summary>Whether the header could not be read: the card says so and only another file or Cancel is offered.</summary>
+    internal bool IsUnreadable => _probe is null;
+
+    /// <summary>Asks for another file in place of one that cannot be read.</summary>
+    internal AsyncRelayCommand ChooseAnotherCommand { get; }
+
+    internal bool CanChooseAnother => IsUnreadable && _chooseAnother is not null;
+
     /// <summary>The file card's second line: the header before unlock, and what unlocked it after.</summary>
     internal string CardDetail => _source is null
         ? $"{Version} · {Kdf} · {Cipher}"
         : $"{Version} · {Kdf} · {Entries(EntryCount)} · {KeyFactors}";
 
+    /// <summary>Whether a message shows below the dialog's body rather than under the password field or on the card.</summary>
+    internal bool HasTrailingMessage => HasMessage && !NeedsUnlock && IsReadable;
+
     /// <summary>Whether the password and keyfile are still wanted before rows can show.</summary>
     internal bool NeedsUnlock => !_disposed && _probe is not null && _source is null && !_keepInPlace;
+
+    /// <summary>Whether the confirm button shows: the file was read and nothing more is needed to unlock it.</summary>
+    internal bool ShowsConfirm => IsReadable && !NeedsUnlock;
 
     /// <summary>Whether the group mapping shows: the file is unlocked and is being copied.</summary>
     internal bool ShowsRows => _source is not null && !_keepInPlace;
@@ -112,9 +133,16 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
     internal bool HasSkipped => SkippedText.Length > 0;
 
     /// <summary>What keeping the file in place does to the vault that is open now.</summary>
-    internal string InPlaceNote => _session.VaultPath is { } open
-        ? $"{Show(System.IO.Path.GetFileName(open))} locks and {FileName} opens as the vault, asking for its password. Nothing is copied."
-        : $"{FileName} opens as the vault. Nothing is copied.";
+    /// <remarks>
+    /// The file's key is not carried over from this dialog: the unlock screen asks for it, so after a
+    /// decrypt here the note says it will be asked for again.
+    /// </remarks>
+    internal string InPlaceNote => (_session.VaultPath, _source) switch
+    {
+        ({ } open, null) => $"{Show(System.IO.Path.GetFileName(open))} locks and {FileName} opens as the vault, asking for its password. Nothing is copied.",
+        ({ } open, _) => $"{Show(System.IO.Path.GetFileName(open))} locks and {FileName} opens as the vault; you type its password once more there. Nothing is copied.",
+        _ => $"{FileName} opens as the vault. Nothing is copied.",
+    };
 
     internal bool HasMessage => _message.Length > 0;
 
@@ -129,7 +157,7 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
     /// <summary>Stops using a keyfile, including one found beside the file.</summary>
     internal RelayCommand ClearKeyfileCommand { get; }
 
-    internal string FileName => Show(_probe?.FileName);
+    internal string FileName => Show(_probe?.FileName ?? _fileName);
 
     internal string Version => _probe?.Version ?? string.Empty;
 
@@ -146,6 +174,9 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
     internal int EntryCount => _source?.EntryCount ?? 0;
 
     internal bool IsDecrypted => _source is not null;
+
+    /// <summary>Whether the file was read but not yet unlocked.</summary>
+    internal bool IsLocked => _probe is not null && _source is null;
 
     /// <summary>The unlocked file, while there is one. A test seam for when its key goes.</summary>
     internal ImportSource? Source => _source;
@@ -213,6 +244,7 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
             if (Set(ref _message, value))
             {
                 Raise(nameof(HasMessage));
+                Raise(nameof(HasTrailingMessage));
             }
         }
     }
@@ -388,7 +420,7 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
         {
             var result = source.ApplyTo(vault, plan);
             vault.Save();
-            _announce($"Imported {Entries(result.Entries)} into {Show(plan.Into)}");
+            _announce($"Imported {Entries(result.Entries)} from {FileName}");
         }
         catch (VaultChangedOnDiskException)
         {
@@ -438,9 +470,9 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
             foreach (var row in Rows)
             {
                 var own = problems.Where(problem => problem.Index == row.Row.Index).ToList();
-                row.Show(
-                    string.Join("; ", own.Select(problem => DisplayTextSanitizer.Sanitize(problem.Message).Text)),
-                    own.Any(problem => problem.Blocks));
+                var blocks = own.Any(problem => problem.Blocks);
+                var text = string.Join("; ", own.Select(problem => DisplayTextSanitizer.Sanitize(problem.Message).Text));
+                row.Show(blocks ? $"{text}. Type another destination or untick {row.SourceGroup}." : text, blocks);
             }
 
             _blocked = problems.Any(problem => problem.Blocks);
@@ -454,11 +486,15 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
     private void Refresh()
     {
         Raise(nameof(NeedsUnlock));
+        Raise(nameof(ShowsConfirm));
+        Raise(nameof(HasTrailingMessage));
+        Raise(nameof(InPlaceNote));
         Raise(nameof(ShowsRows));
         Raise(nameof(CardDetail));
         Raise(nameof(SkippedText));
         Raise(nameof(HasSkipped));
         Raise(nameof(IsDecrypted));
+        Raise(nameof(IsLocked));
         Raise(nameof(EntryCount));
         Raise(nameof(KeyFactors));
         Raise(nameof(CardText));
@@ -468,6 +504,15 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
         ConfirmCommand.RaiseCanExecuteChanged();
         ChooseKeyfileCommand.RaiseCanExecuteChanged();
         ClearKeyfileCommand.RaiseCanExecuteChanged();
+        ChooseAnotherCommand.RaiseCanExecuteChanged();
+    }
+
+    /// <summary>The probe's refusal about this file, without the directory it names.</summary>
+    private static string WhyUnreadable(string path, string error)
+    {
+        var quoted = $"'{System.IO.Path.GetFullPath(path)}' ";
+        var why = error.StartsWith(quoted, StringComparison.Ordinal) ? "This file " + error[quoted.Length..] : error;
+        return DisplayTextSanitizer.Sanitize(why).Text;
     }
 
     private void OnLocked(object? sender, VaultLockReason reason) => Dispose();

@@ -50,6 +50,8 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     private string? _keyfilePath;
     private string? _newVaultPath;
     private string _message = string.Empty;
+    private bool _failed;
+    private string? _handOffPath;
     private string _owner = string.Empty;
     private bool _busy;
     private bool _creating;
@@ -103,7 +105,21 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     /// <summary>The screen's heading: which vault is locked, or an invitation to open one.</summary>
     internal string Heading => _selectedPath is null
         ? "Open a vault"
-        : _restoreOnly ? $"{SelectedName} can't be opened" : $"{SelectedName} is locked";
+        : _restoreOnly ? $"{SelectedName} can't be opened"
+        : IsHandOff ? $"Open {SelectedName}"
+        : $"{SelectedName} is locked";
+
+    /// <summary>
+    /// Whether the selection is a file the import dialog handed over to keep editing in place. keypaste
+    /// has not opened it before, so the screen asks for it rather than calling it locked.
+    /// </summary>
+    internal bool IsHandOff => _handOffPath is not null
+        && string.Equals(_handOffPath, _selectedPath, PathIdentity.Comparison);
+
+    /// <summary>The line under the heading while a vault is selected.</summary>
+    internal string Subtitle => IsHandOff
+        ? "Enter its master password to keep editing it in place."
+        : "Agents are paused until you unlock.";
 
     /// <summary>What the heading of the create form says.</summary>
     internal string CreateHeading => $"Create {NewVaultName}";
@@ -152,6 +168,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
                 Raise(nameof(IsRestoring));
                 Raise(nameof(IsOpening));
                 Raise(nameof(OffersRestore));
+                Raise(nameof(HasLooseError));
                 StartRestoreCommand.RaiseCanExecuteChanged();
                 CloseRestoreCommand.RaiseCanExecuteChanged();
                 BrowseCommand.RaiseCanExecuteChanged();
@@ -225,6 +242,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
             {
                 Raise(nameof(IsOpening));
                 Raise(nameof(OffersRestore));
+                Raise(nameof(HasLooseError));
                 StartRestoreCommand.RaiseCanExecuteChanged();
                 BrowseCommand.RaiseCanExecuteChanged();
             }
@@ -259,7 +277,10 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
                 Raise(nameof(SelectedName));
                 Raise(nameof(HasSelection));
                 Raise(nameof(Heading));
+                Raise(nameof(IsHandOff));
+                Raise(nameof(Subtitle));
                 Raise(nameof(ShowsRecent));
+                RaiseMessage();
             }
         }
     }
@@ -284,7 +305,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
             }
             else if (value is not null && !OfferForRestore(value.Path, "That file isn't there any more"))
             {
-                Message = "That file isn't there any more.";
+                Fail("That file isn't there any more.");
             }
         }
     }
@@ -292,20 +313,23 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     /// <summary>How many characters have been typed. The control renders this many dots.</summary>
     internal int MaskedLength => _master.Length;
 
-    /// <summary>One calm sentence, or nothing.</summary>
+    /// <summary>One calm sentence, or nothing: a note, or with <see cref="IsError"/> what was refused.</summary>
     internal string Message
     {
         get => _message;
-        set
-        {
-            if (Set(ref _message, value))
-            {
-                Raise(nameof(HasMessage));
-            }
-        }
+        set => Say(value, failed: false);
     }
 
     internal bool HasMessage => _message.Length > 0;
+
+    /// <summary>Whether <see cref="Message"/> says something was refused or failed, which the screen draws in red.</summary>
+    internal bool IsError => _failed && HasMessage;
+
+    /// <summary>A note, drawn in the quiet slot below the form.</summary>
+    internal bool HasNote => HasMessage && !_failed;
+
+    /// <summary>A refusal with no field to sit under: nothing is selected, so there is no password field.</summary>
+    internal bool HasLooseError => IsError && IsOpening && !HasSelection;
 
     /// <summary>
     /// Which process holds the selected vault, from the claim that refused the last unlock, or
@@ -434,7 +458,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         {
             if (!OfferForRestore(path, "That file isn't there any more"))
             {
-                Message = "That file isn't there any more.";
+                Fail("That file isn't there any more.");
             }
 
             return false;
@@ -444,7 +468,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         {
             if (!OfferForRestore(path, "That isn't a readable KeePass vault"))
             {
-                Message = "That isn't a KeePass vault.";
+                Fail("That isn't a KeePass vault.");
             }
 
             return false;
@@ -454,7 +478,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         return true;
     }
 
-    /// <summary>Offers a file with the keyfile it opens with, as keeping an imported file in place does.</summary>
+    /// <summary>Offers a file the import dialog handed over to keep editing in place, with the keyfile it opens with.</summary>
     /// <returns><see langword="true"/> when it is a KDBX vault and is now selected.</returns>
     internal bool Offer(string path, string? keyfile)
     {
@@ -468,6 +492,10 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
             KeyfilePath = System.IO.Path.GetFullPath(keyfile);
         }
 
+        _handOffPath = _selectedPath;
+        Raise(nameof(IsHandOff));
+        Raise(nameof(Heading));
+        Raise(nameof(Subtitle));
         return true;
     }
 
@@ -632,7 +660,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
 
             if (outcome == UnlockOutcome.HeldElsewhere)
             {
-                Message = HeldElsewhere();
+                Fail(HeldElsewhere());
                 ShowOwner();
                 ResetPassword();
                 return;
@@ -642,9 +670,9 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
                 ? ExplainKeyfile(VaultKeyfile.Inspect(keyfile).Outcome)
                 : Explain(outcome, keyfile is not null);
 
-            Message = HasBackups && outcome != UnlockOutcome.KeyfileUnusable
+            Fail(HasBackups && outcome != UnlockOutcome.KeyfileUnusable
                 ? $"{explained} If the file is damaged, or its password or keyfile was changed and lost, restore a backup."
-                : explained;
+                : explained);
             ResetPassword();
         }
         finally
@@ -698,7 +726,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
 
         if (VaultCreation.Inspect(full) == VaultDestination.Occupied)
         {
-            Message = "There's already a file there. Choose a name that isn't taken.";
+            Fail("There's already a file there. Choose a name that isn't taken.");
             return;
         }
 
@@ -745,7 +773,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
                 return;
             }
 
-            Message = _session.HeldElsewhere is not null ? HeldElsewhere() : ExplainCreation(outcome);
+            Fail(_session.HeldElsewhere is not null ? HeldElsewhere() : ExplainCreation(outcome));
             ShowOwner();
 
             // The passwords go whatever the answer was. A refusal means starting the pair again,
@@ -791,16 +819,20 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
 
         if (!inspection.Accepted)
         {
-            Message = ExplainKeyfile(inspection.Outcome);
+            Fail(ExplainKeyfile(inspection.Outcome));
             return;
         }
 
         KeyfilePath = full;
-        Message = inspection.IsFragile
-            ? _creating
-                ? "keypaste won't make a vault that needs this file: it is keyed by the file's exact bytes, so one edit to it loses the vault. Choose a KeePass keyfile."
-                : FragileNotice(full)!
-            : string.Empty;
+
+        if (inspection.IsFragile && _creating)
+        {
+            Fail("keypaste won't make a vault that needs this file: it is keyed by the file's exact bytes, so one edit to it loses the vault. Choose a KeePass keyfile.");
+        }
+        else
+        {
+            Message = inspection.IsFragile ? FragileNotice(full)! : string.Empty;
+        }
     }
 
     /// <summary>The T-28 warning for a keyfile keyed by its hash, or null for any other.</summary>
@@ -847,14 +879,6 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         _ => "That vault couldn't be created.",
     };
 
-    /// <summary>
-    /// The four things that can go wrong, in words that do not shout.
-    /// </summary>
-    /// <remarks>
-    /// None of these is an error state in the UI sense — no red, no icon, no dialog. Every one of
-    /// them is something a person does routinely, and the Ideas table in DECISIONS.md names scary warnings for normal
-    /// actions as an anti-pattern.
-    /// </remarks>
     private string HeldElsewhere()
     {
         var reason = _session.HeldElsewhere ?? "another keypaste process holds this vault.";
@@ -894,6 +918,10 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         };
     }
 
+    /// <summary>
+    /// What went wrong opening, in words that do not shout: red text under the field and never an
+    /// icon or a dialog, because a mistyped password is routine.
+    /// </summary>
     private static string Explain(UnlockOutcome outcome, bool withKeyfile = false) => outcome switch
     {
         // Naming both factors when both were given, or a good password and the wrong file sends the
@@ -930,6 +958,27 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         Raise(nameof(HasRecent));
         Raise(nameof(HasNoRecent));
         Raise(nameof(ShowsRecent));
+    }
+
+    private void Fail(string text) => Say(text, failed: true);
+
+    private void Say(string text, bool failed)
+    {
+        var changed = Set(ref _message, text, nameof(Message));
+
+        if (changed || _failed != failed)
+        {
+            _failed = failed;
+            RaiseMessage();
+        }
+    }
+
+    private void RaiseMessage()
+    {
+        Raise(nameof(HasMessage));
+        Raise(nameof(IsError));
+        Raise(nameof(HasNote));
+        Raise(nameof(HasLooseError));
     }
 
     private void AfterTyping()

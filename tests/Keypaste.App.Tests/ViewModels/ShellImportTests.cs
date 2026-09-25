@@ -95,7 +95,7 @@ public sealed class ShellImportTests : IDisposable
         import.ConfirmCommand.Execute(null);
 
         Assert.Null(shell.Import);
-        Assert.Equal("Imported 3 entries into foreign", shell.Toast);
+        Assert.Equal("Imported 3 entries from foreign.kdbx", shell.Toast);
         Assert.Equal(VaultSaveStatus.Saved, _session.Unlocked!.SaveState().Status);
         Assert.NotNull(_session.Unlocked!.Find(new EntryName("foreign/Banking", "Checking")));
     }

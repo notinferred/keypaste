@@ -70,10 +70,28 @@ public sealed class ScreenRenderer
 
             Save(window, output, "80-lock-idle");
 
+            Wait(unlock.UnlockAsync());
+            Assert.True(unlock.IsError);
+            Save(window, output, "85-lock-wrong-password");
+
             picker.NewPath = Path.Combine(demo.Home, "work.kdbx");
             Assert.True(unlock.StartCreateCommand.CanExecute(null));
             Wait(unlock.StartCreateAsync());
             Save(window, output, "82-lock-create");
+
+            foreach (var c in "one")
+            {
+                unlock.TypeNew(c);
+            }
+
+            foreach (var c in "two")
+            {
+                unlock.TypeConfirm(c);
+            }
+
+            Wait(unlock.CreateAsync());
+            Assert.True(unlock.IsError);
+            Save(window, output, "86-lock-create-mismatch");
             window.Close();
         }
 
@@ -129,7 +147,9 @@ public sealed class ScreenRenderer
 
             Save(window, output, "93-import-locked");
 
-            import.ClearPassword();
+            Wait(import.UnlockAsync());
+            Assert.True(import.HasMessage);
+            Save(window, output, "98-import-wrong-password");
 
             foreach (var c in "keepassxc-demo")
             {
@@ -151,6 +171,22 @@ public sealed class ScreenRenderer
             import.ConfirmCommand.Execute(null);
             Assert.Null(shell.Import);
             Save(window, output, "97-import-done");
+
+            var damaged = Path.Combine(demo.Home, "notes.kdbx");
+            File.WriteAllText(damaged, "not a vault");
+            shell.OpenImport(damaged);
+            Assert.True(shell.Import!.IsUnreadable);
+            Save(window, output, "99-import-unreadable");
+            shell.Import!.CancelCommand.Execute(null);
+            window.Close();
+        }
+
+        using (var session = new AppVaultSession(new ManualClock()))
+        using (var handOff = new UnlockViewModel(session, demo.Home, picker, () => { }))
+        {
+            Assert.True(handOff.Offer(source, null));
+            var window = Show(new UnlockView { DataContext = handOff });
+            Save(window, output, "87-lock-hand-off");
             window.Close();
         }
 
@@ -171,6 +207,26 @@ public sealed class ScreenRenderer
             Assert.True(unlock.OffersRestore);
             unlock.StartRestoreCommand.Execute(null);
             Save(window, output, "84-lock-restore");
+
+            var restore = unlock.Restore!;
+
+            foreach (var c in "wrong")
+            {
+                restore.Type(c);
+            }
+
+            Wait(restore.CheckAsync());
+            Assert.True(restore.IsError);
+            Save(window, output, "88-lock-restore-refused");
+
+            foreach (var c in _master)
+            {
+                restore.Type(c);
+            }
+
+            Wait(restore.CheckAsync());
+            Assert.True(restore.IsConfirming, restore.Message);
+            Save(window, output, "89-lock-restore-confirm");
             window.Close();
         }
     }
