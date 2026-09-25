@@ -1,5 +1,6 @@
 using Keypaste.Core;
 using Keypaste.Core.Approval;
+using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Policy;
@@ -195,6 +196,7 @@ internal sealed class SessionHost : IDisposable
         private readonly ApprovalGate _approvals;
         private readonly AppVaultSession _session;
         private readonly GrantCache _grants;
+        private readonly Lazy<AuditLog?> _audit;
         private readonly CancellationTokenSource _stop = new();
         private readonly Task _run;
 
@@ -203,13 +205,15 @@ internal sealed class SessionHost : IDisposable
             SessionAuthority authority,
             ApprovalGate approvals,
             AppVaultSession session,
-            GrantCache grants)
+            GrantCache grants,
+            Lazy<AuditLog?> audit)
         {
             _listener = listener;
             _authority = authority;
             _approvals = approvals;
             _session = session;
             _grants = grants;
+            _audit = audit;
 
             // An edit in the app withdraws the grants naming what it touched before it is saved (D-0318).
             _session.Edited += OnEdited;
@@ -246,17 +250,21 @@ internal sealed class SessionHost : IDisposable
                 grants,
                 PolicyGate.None);
 
+            // Opened when a token first arrives, so an unlock creates no log; one that cannot be opened refuses every token.
+            var audit = new Lazy<AuditLog?>(() =>
+                AuditLog.TryOpen(KeypasteHome.AuditPath(session.Home), TimeProvider.System, out var opened, out _) ? opened : null);
+
             var authority = new SessionAuthority(
                 vault,
                 () => session.Lifetime,
                 handler,
-                new SessionEnvironments(approvals, session.UnlockedFor, session.Clock));
+                new SessionEnvironments(approvals, session.UnlockedFor, session.Clock, () => audit.Value));
 
             try
             {
                 var listener = new ApproverListener(pipe, authority);
                 failure = null;
-                return new Hosted(listener, authority, approvals, session, grants);
+                return new Hosted(listener, authority, approvals, session, grants, audit);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
@@ -284,6 +292,10 @@ internal sealed class SessionHost : IDisposable
 
             _listener.Dispose();
             _approvals.Dispose();
+            if (_audit.IsValueCreated)
+            {
+                _audit.Value?.Dispose();
+            }
             _stop.Dispose();
         }
     }

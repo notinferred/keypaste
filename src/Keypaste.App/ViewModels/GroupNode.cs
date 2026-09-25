@@ -56,7 +56,7 @@ internal sealed class GroupNode
     /// Builds the tree, flattened depth-first into the order a list should draw it.
     /// </summary>
     /// <param name="groupPaths">Every group path in the vault.</param>
-    /// <returns>The root "everything" node first, then every group, parents before children.</returns>
+    /// <returns>The root "everything" node first, then every group, parents before children, and never a reserved group.</returns>
     /// <remarks>
     /// Flattened rather than nested because the view draws an indented list rather than a
     /// <c>TreeView</c>: a tree control brings expand state, keyboard conventions and a virtualisation
@@ -69,7 +69,7 @@ internal sealed class GroupNode
         var everything = new GroupNode("All entries", string.Empty, 0);
         var byPath = new Dictionary<string, GroupNode>(StringComparer.Ordinal);
 
-        foreach (var path in groupPaths.OrderBy(p => p, StringComparer.Ordinal))
+        foreach (var path in groupPaths.Where(p => !ReservedGroups.IsReserved(p)).OrderBy(p => p, StringComparer.Ordinal))
         {
             EnsureNode(path, everything, byPath);
         }
