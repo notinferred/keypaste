@@ -37,6 +37,7 @@ public sealed class DrawnMaskTests
     [
         "CurrentPassword", "AccessNewPassword", "AccessConfirmPassword",
         "NewEntryPassword", "ReplacementPassword", "NewEnvValue", "ReplacementEnvValue",
+        "SharePassphrase",
     ];
 
     [Theory]

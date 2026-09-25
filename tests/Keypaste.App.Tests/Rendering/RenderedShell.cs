@@ -136,6 +136,10 @@ internal sealed class RenderedShell : IDisposable
                 replacing.BeginReplace(replacing.Variables.Single(row => row.Key == "STRIPE_KEY"));
                 break;
 
+            case "SharePassphrase":
+                Show<SharingViewModel>(DestinationKind.Sharing).RequirePassphrase = true;
+                break;
+
             default:
                 throw new ArgumentOutOfRangeException(nameof(name), name, "no such field in the shell");
         }

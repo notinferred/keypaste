@@ -118,7 +118,7 @@ The app provides these shortcuts and focus navigation. Verify the full keyboard-
 
 | | |
 |---|---|
-| `Ctrl/Cmd+1` … `6` | Secrets (entries), Agents, Activity (the log), Env profiles, Settings, Trash |
+| `Ctrl/Cmd+1` … `7` | Secrets (entries), Agents, Activity (the log), Env profiles, Sharing, Settings, Trash |
 | `Ctrl/Cmd+K` | The titlebar search, which filters Secrets |
 | `Ctrl/Cmd+O` | Open a vault, on the unlock screen |
 | `Ctrl/Cmd+L` | Lock now |

@@ -1,4 +1,3 @@
-using System.Globalization;
 using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.Core;
@@ -19,8 +18,22 @@ internal enum ShareStatusTone
     Ok = 2,
 }
 
-/// <summary>One share link in the Sharing screen's list: names and limits, never a key or a value.</summary>
-internal sealed record SharingRow(string Id, string What, string Recipient, string Rule, string Status, ShareStatusTone StatusTone);
+/// <summary>
+/// One share link in the Sharing screen's list: names and limits, never a key or a value.
+/// <c>Opens</c> is whether the link may still open, so revoking it means something.
+/// </summary>
+internal sealed record SharingRow(string Id, string What, string Recipient, string Rule, string Status, ShareStatusTone StatusTone, bool Opens)
+{
+    /// <summary>The second line: who it went to and its limits.</summary>
+    internal string Detail => $"{Recipient} · {Rule}";
+
+    internal bool IsOk => StatusTone == ShareStatusTone.Ok;
+
+    internal bool IsAccent => StatusTone == ShareStatusTone.Accent;
+
+    /// <summary>A link that may still open is revoked; one that cannot is only forgotten.</summary>
+    internal string RevokeLabel => Opens ? "Revoke" : "Remove";
+}
 
 /// <summary>
 /// The Sharing screen: the links made from this vault, and the form that makes one (D-0354).
@@ -29,7 +42,8 @@ internal sealed record SharingRow(string Id, string What, string Recipient, stri
 /// The link carries the key, so it leaves only through the clipboard's countdown, and a link the
 /// clipboard would not take is withdrawn at once. The screen keeps no link; the toast names the
 /// limits, not the link. Everything read out of the vault goes on <see cref="Dispose"/>, which the
-/// shell calls on every lock.
+/// shell calls on every lock. Nothing is asked of the network because the screen opened: statuses
+/// are checked on request, and whether the share server takes links is learned from its answer.
 /// </remarks>
 internal sealed class SharingViewModel : ObservableObject, IDisposable
 {
@@ -42,6 +56,8 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
     private readonly AppVaultSession _session;
     private readonly ClipboardCountdown _clipboard;
     private readonly ShareService _service;
+    private readonly Action<string> _showToast;
+    private readonly bool _misconfigured;
     private Dictionary<string, EntryName> _entries = new(StringComparer.Ordinal);
 
     private IReadOnlyList<SharingRow> _rows = [];
@@ -53,10 +69,20 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
     private string _ttl = "24h";
     private int _views = 1;
     private bool _requirePassphrase;
-    private string? _toast;
     private string? _error;
+    private string? _unavailable;
 
-    internal SharingViewModel(AppVaultSession session, ClipboardCountdown clipboard, ShareService service)
+    /// <param name="session">The open vault.</param>
+    /// <param name="clipboard">Where the link goes, with its clear countdown.</param>
+    /// <param name="service">The share server's client.</param>
+    /// <param name="showToast">Says what a share or revocation did.</param>
+    /// <param name="unavailable">Why no link can be made from here at all, such as an endpoint that did not resolve, or null.</param>
+    internal SharingViewModel(
+        AppVaultSession session,
+        ClipboardCountdown clipboard,
+        ShareService service,
+        Action<string>? showToast = null,
+        string? unavailable = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(clipboard);
@@ -65,17 +91,32 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
         _session = session;
         _clipboard = clipboard;
         _service = service;
+        _showToast = showToast ?? (_ => { });
+        _unavailable = unavailable;
+        _misconfigured = unavailable is not null;
         Passphrase = new SecretField(clipboard);
 
-        CreateCommand = new AsyncRelayCommand(CreateAsync, () => _selectedWhat is not null);
+        CreateCommand = new AsyncRelayCommand(CreateAsync, () => _selectedWhat is not null && _unavailable is null);
         RevokeCommand = new AsyncRelayCommand(RevokeAsync, () => _selected is not null);
+        RevokeRowCommand = new RelayCommand<SharingRow>(row =>
+        {
+            Selected = row;
+            RevokeCommand.Execute(null);
+        });
         RefreshCommand = new AsyncRelayCommand(() => LoadAsync(online: true));
+        RetryCommand = new RelayCommand(() => Unavailable = null);
 
         _ = LoadAsync(online: false);
     }
 
-    /// <summary>The fields a link can carry.</summary>
+    /// <summary>What the Expires control offers.</summary>
 #pragma warning disable CA1822
+    internal IReadOnlyList<string> TtlChoices => TtlOptions;
+
+    /// <summary>What the Views control offers.</summary>
+    internal IReadOnlyList<int> ViewChoices => ViewOptions;
+
+    /// <summary>The fields a link can carry.</summary>
     internal IReadOnlyList<string> FieldOptions => ShareService.Fields;
 #pragma warning restore CA1822
 
@@ -83,8 +124,17 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
     internal IReadOnlyList<SharingRow> Rows
     {
         get => _rows;
-        private set => Set(ref _rows, value);
+        private set
+        {
+            if (Set(ref _rows, value))
+            {
+                Raise(nameof(IsEmpty));
+            }
+        }
     }
+
+    /// <summary>Whether the vault remembers no link.</summary>
+    internal bool IsEmpty => _rows.Count == 0;
 
     /// <summary>The entries that can be shared, by path; keypaste's own records are not among them.</summary>
     internal IReadOnlyList<string> Candidates
@@ -123,7 +173,7 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
     internal string Field
     {
         get => _field;
-        set => Set(ref _field, value);
+        set => Set(ref _field, value ?? "password");
     }
 
     /// <summary>A label for the person's own list. Never sent.</summary>
@@ -137,7 +187,7 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
     internal string Ttl
     {
         get => _ttl;
-        set => Set(ref _ttl, value);
+        set => Set(ref _ttl, value ?? "24h");
     }
 
     /// <summary>One of <see cref="ViewOptions"/>.</summary>
@@ -157,19 +207,40 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
     /// <summary>The passphrase, entered through the masked field.</summary>
     internal SecretField Passphrase { get; }
 
-    /// <summary>What the last share or revocation did, or null.</summary>
-    internal string? Toast
-    {
-        get => _toast;
-        private set => Set(ref _toast, value);
-    }
-
     /// <summary>A calm sentence when something did not work, or null.</summary>
     internal string? Error
     {
         get => _error;
-        private set => Set(ref _error, value);
+        private set
+        {
+            if (Set(ref _error, value))
+            {
+                Raise(nameof(HasError));
+            }
+        }
     }
+
+    internal bool HasError => _error is not null;
+
+    /// <summary>Why no link can be made right now, or null while sharing is thought to work.</summary>
+    internal string? Unavailable
+    {
+        get => _unavailable;
+        private set
+        {
+            if (Set(ref _unavailable, value))
+            {
+                Raise(nameof(IsUnavailable));
+                Raise(nameof(CanRetry));
+                CreateCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    internal bool IsUnavailable => _unavailable is not null;
+
+    /// <summary>Whether trying again could change the answer: the server's could, a bad endpoint's cannot.</summary>
+    internal bool CanRetry => _unavailable is not null && !_misconfigured;
 
     /// <summary>Uploads the share and copies its link.</summary>
     internal AsyncRelayCommand CreateCommand { get; }
@@ -177,8 +248,14 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
     /// <summary>Revokes the selected link and forgets it.</summary>
     internal AsyncRelayCommand RevokeCommand { get; }
 
-    /// <summary>Asks keypaste.com how many views each link has left.</summary>
+    /// <summary>Revokes the link on the row it is pressed for.</summary>
+    internal RelayCommand<SharingRow> RevokeRowCommand { get; }
+
+    /// <summary>Asks the share server how many views each link has left.</summary>
     internal AsyncRelayCommand RefreshCommand { get; }
+
+    /// <summary>Lets the form ask the share server again after it said it was unavailable.</summary>
+    internal RelayCommand RetryCommand { get; }
 
     /// <summary>Nothing read out of the vault outlives this.</summary>
     public void Dispose()
@@ -188,14 +265,12 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
         _entries = new(StringComparer.Ordinal);
         Selected = null;
         SelectedWhat = null;
-        Toast = null;
         Error = null;
         Passphrase.Dispose();
     }
 
     private async Task CreateAsync()
     {
-        Toast = null;
         Error = null;
 
         if (_session.Unlocked is not { } vault)
@@ -222,7 +297,15 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
 
         if (!outcome.Ok)
         {
-            Error = Sentence(outcome.Message);
+            if (outcome.Failure is ShareFailure.Unavailable or ShareFailure.Network)
+            {
+                Unavailable = Sentence(outcome.Message);
+            }
+            else
+            {
+                Error = Sentence(outcome.Message);
+            }
+
             return;
         }
 
@@ -238,8 +321,7 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
         }
 
         var info = outcome.Info!;
-        var until = TimeZoneInfo.ConvertTime(info.Expires, _session.Clock.LocalTimeZone).ToString("d MMM HH:mm", CultureInfo.InvariantCulture);
-        Toast = $"Link copied. It opens {(info.Views == 1 ? "1 time" : $"{info.Views} times")}, until {until}.";
+        _showToast($"Link copied. Expires in {ShareInfo.FormatTtl(info.Expires - info.Created)}, {(info.Views == 1 ? "1 view" : $"{info.Views} views")}.");
         Passphrase.Clear();
 
         await LoadAsync(online: true).ConfigureAwait(true);
@@ -247,7 +329,6 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
 
     private async Task RevokeAsync()
     {
-        Toast = null;
         Error = null;
 
         if (_selected is not { } row)
@@ -264,7 +345,7 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
         var outcome = await _service.RevokeAsync(vault, row.Id, CancellationToken.None).ConfigureAwait(true);
         if (outcome.Ok)
         {
-            Toast = "Revoked. The link no longer opens.";
+            _showToast(row.Opens ? "Revoked. The link no longer opens." : "Removed from the list.");
         }
         else
         {
@@ -305,24 +386,34 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
 
         var wanted = _selected?.Id;
         var listed = await _service.ListAsync(vault, online, CancellationToken.None).ConfigureAwait(true);
-        Rows = [.. listed.Select(Row)];
+        Rows = [.. listed.Select(share => Row(share, online))];
         Selected = wanted is null ? null : Rows.FirstOrDefault(row => row.Id == wanted);
     }
 
-    private static SharingRow Row((ShareInfo Info, string Status, int? ViewsLeft) listed)
+    private static SharingRow Row((ShareInfo Info, string Status, int? ViewsLeft) listed, bool online)
     {
         var (info, status, left) = listed;
         var tone = left is not { } views ? ShareStatusTone.Muted
             : views == info.Views ? ShareStatusTone.Ok
             : ShareStatusTone.Accent;
 
+        // The server answers the same for a link opened to its last view and one revoked elsewhere.
+        var (text, opens) = status switch
+        {
+            "gone" => ("Opened or revoked", false),
+            "expired" => ("Expired", false),
+            "unknown" => (online ? "Status unknown" : "Not checked", true),
+            _ => (status, true),
+        };
+
         return new SharingRow(
             info.Id,
             EntryNameSanitizer.SanitizePath(info.What).Text,
             info.Recipient is { } to ? EntryNameSanitizer.SanitizeProse(to).Text : "Anyone with the link",
             info.Rule,
-            status,
-            tone);
+            text,
+            tone,
+            opens);
     }
 
     private static TimeSpan TtlOf(string ttl) => ttl switch
@@ -339,6 +430,9 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
         return buffer;
     }
 
+    // The wordmark stays lowercase even at the start of a sentence.
     private static string Sentence(string message) =>
-        message.Length == 0 ? message : char.ToUpperInvariant(message[0]) + message[1..] + ".";
+        message.Length == 0 ? message
+        : message.StartsWith("keypaste", StringComparison.Ordinal) ? message + "."
+        : char.ToUpperInvariant(message[0]) + message[1..] + ".";
 }

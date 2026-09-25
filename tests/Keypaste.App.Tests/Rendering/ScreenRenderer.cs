@@ -72,7 +72,9 @@ public sealed class ScreenRenderer
             Assert.Equal(UnlockOutcome.Opened, session.TryUnlock(demo.Path, master.Value));
         }
 
-        using var shell = new ShellViewModel(session, demo.Home, null, clipboard: new FakeClipboard(), clock: new ManualClock());
+        var clock = new ManualClock();
+        using var shares = DemoShares(session.Unlocked!, clock);
+        using var shell = new ShellViewModel(session, demo.Home, null, clipboard: new FakeClipboard(), clock: clock) { ShareTransport = shares };
         var window = new MainWindow { Width = _width, Height = _height };
         window.FindControl<ContentControl>("Root")!.Content = new ShellView { DataContext = shell };
         window.Show();
@@ -80,6 +82,12 @@ public sealed class ScreenRenderer
         foreach (var destination in Destinations.All)
         {
             shell.Current = destination;
+
+            if (shell.Content is SharingViewModel sharing)
+            {
+                DrawSharing(window, output, sharing, shares, $"{destination.Shortcut:00}-{Slug(destination.Title)}");
+                continue;
+            }
 
             if (shell.Content is EntriesViewModel entries)
             {
@@ -99,6 +107,64 @@ public sealed class ScreenRenderer
         Save(window, output, "90-toast");
 
         window.Close();
+    }
+
+    /// <summary>
+    /// Four links as the vault would remember them, one per status, and a share server that knows
+    /// the two still open: one untouched, one opened once.
+    /// </summary>
+    private static FakeShareServer DemoShares(Vault vault, ManualClock clock)
+    {
+        var now = clock.GetUtcNow();
+        var server = new FakeShareServer { Now = now };
+        var store = new Core.Sharing.ShareStore(vault);
+
+        void Add(string what, string field, string? to, TimeSpan ttl, TimeSpan age, int views, bool passphrase, int? viewsLeft)
+        {
+            var id = System.Buffers.Text.Base64Url.EncodeToString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16));
+            var created = now - age;
+            store.Add(new Core.Sharing.ShareInfo(id, what, field, to, created, created + ttl, views, passphrase, "https://keypaste.com"), "demo-revoke-" + id);
+
+            if (viewsLeft is { } left)
+            {
+                server.Shares[id] = new FakeShareServer.Share("{}", left, created + ttl, FakeShareServer.Sha256("demo-revoke-" + id));
+            }
+        }
+
+        Add("env/acme-api/STRIPE_SECRET_KEY", "password", "maya@acme.dev", TimeSpan.FromHours(24), TimeSpan.FromHours(2), 1, true, viewsLeft: null);
+        Add("Work/aws-console", "login", null, TimeSpan.FromDays(7), TimeSpan.FromDays(1), 3, true, viewsLeft: 2);
+        Add("Personal/home wifi", "password", "sam", TimeSpan.FromHours(24), TimeSpan.FromMinutes(20), 1, false, viewsLeft: 1);
+        Add("Work/github", "password", "jordan@acme.dev", TimeSpan.FromHours(1), TimeSpan.FromHours(3), 1, false, viewsLeft: null);
+        vault.Save();
+
+        return server;
+    }
+
+    /// <summary>The Sharing screen with statuses checked and the form filled, then as it is once the server answers that it takes no shares.</summary>
+    private static void DrawSharing(Window window, string output, SharingViewModel sharing, FakeShareServer shares, string name)
+    {
+        Wait(sharing.RefreshCommand.ExecuteAsync());
+        sharing.SelectedWhat = "env/acme-api/STRIPE_SECRET_KEY";
+        sharing.Recipient = "sam@acme.dev";
+        sharing.RequirePassphrase = true;
+        Save(window, output, name);
+
+        shares.Answer = _ => FakeShareServer.Json(System.Net.HttpStatusCode.NotFound, "{\"error\":\"not found\"}");
+        sharing.RequirePassphrase = false;
+        Wait(sharing.CreateCommand.ExecuteAsync());
+        Save(window, output, name + "-unavailable");
+        shares.Answer = null;
+    }
+
+    private static void Wait(Task task)
+    {
+        while (!task.IsCompleted)
+        {
+            WindowInput.Drain();
+            Thread.Sleep(1);
+        }
+
+        task.GetAwaiter().GetResult();
     }
 
     private static void DrawApproval(string output)
