@@ -27,6 +27,19 @@ public sealed class EnvReferenceFileTests
             document.Lines.Select(line => (line.Name, line.Reference, line.Literal)));
     }
 
+    [Theory]
+    [InlineData("refs.env", "refs.env")]
+    [InlineData("my refs.env", "<this file>")]
+    [InlineData("x\nEVIL=kp://acme-api/prod/KEY", "<this file>")]
+    public void Format_NamesTheFileItIsSavedAs_OnlyWhenThatNameIsSafeToRepeat(string fileName, string named)
+    {
+        var text = EnvReferenceFile.Format("acme-api", "staging", ["KEY"], fileName);
+
+        Assert.Contains($"# `keypaste run --env-file {named} -- <command>` resolves them.\n", text, StringComparison.Ordinal);
+        Assert.True(EnvReferenceFile.TryParse(Encoding.UTF8.GetBytes(text), out var document));
+        Assert.Equal(["KEY"], document.Lines.Select(line => line.Name));
+    }
+
     [Fact]
     public void Parse_LiteralsPassThrough()
     {

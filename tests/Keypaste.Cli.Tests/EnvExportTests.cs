@@ -613,7 +613,7 @@ public sealed class EnvExportTests
 
         harness.AssertExit(CliApp.ExitSuccess, exit);
         Assert.Equal(
-            EnvReferenceFile.Header + "API_KEY=kp://billing/dev/API_KEY\nPORT=kp://billing/dev/PORT\n",
+            EnvReferenceFile.Header() + "API_KEY=kp://billing/dev/API_KEY\nPORT=kp://billing/dev/PORT\n",
             harness.Out);
         Assert.Equal("  ✓ wrote 2 references · 0 values · safe to commit", harness.Err.TrimEnd());
         Assert.Empty(harness.ConsoleStyle.Alarms);
@@ -644,6 +644,20 @@ public sealed class EnvExportTests
         Assert.Empty(harness.Out);
 
         Assert.Equal(CliApp.ExitUsageError, harness.Run("env", "export", "billing", harness.VaultPath, "--force", "--vault", harness.VaultPath));
+    }
+
+    [Fact]
+    public void References_ToAFile_NameThatFileInTheirHeader()
+    {
+        using var harness = SeededWithTwo();
+        var target = Target(harness, "refs.env");
+
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run("env", "export", "billing", target, "--vault", harness.VaultPath));
+
+        var written = File.ReadAllText(target);
+        Assert.Contains("# `keypaste run --env-file refs.env -- <command>` resolves them.", written, StringComparison.Ordinal);
+        Assert.DoesNotContain(EnvReferenceFile.FileName, written, StringComparison.Ordinal);
     }
 
     [Fact]

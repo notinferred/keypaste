@@ -288,7 +288,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
             return $"{EnvProfileNames.GroupPath(Name, SelectedProfile)} {names}";
         }
 
-        var text = EnvReferenceFile.Format(Name, SelectedProfile, [.. variables.Select(variable => variable.Key)]);
+        var text = EnvReferenceFile.Format(Name, SelectedProfile, [.. variables.Select(variable => variable.Key)], Path.GetFileName(target));
 
         if (!EnvReferenceFile.TryWrite(target, text, replace, out var writeError))
         {

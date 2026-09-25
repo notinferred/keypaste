@@ -168,7 +168,11 @@ internal static class EnvExportCommand
                 return CliApp.ExitInternalError;
             }
 
-            var text = EnvReferenceFile.Format(project, profile, [.. variables.Select(variable => variable.Key)]);
+            var text = EnvReferenceFile.Format(
+                project,
+                profile,
+                [.. variables.Select(variable => variable.Key)],
+                targetPath is null ? EnvReferenceFile.FileName : Path.GetFileName(targetPath));
 
             if (targetPath is null)
             {

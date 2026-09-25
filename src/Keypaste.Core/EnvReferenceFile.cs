@@ -29,22 +29,37 @@ public static class EnvReferenceFile
     public const string FileName = ".env.keypaste";
 
     /// <summary>The comment block a written file starts with.</summary>
-    public const string Header =
-        "# keypaste references: safe to commit, no value is stored here.\n" +
-        "# `keypaste run --env-file .env.keypaste -- <command>` resolves them.\n";
+    /// <param name="fileName">The name the file is saved under, which its instructions name.</param>
+    /// <returns>Two comment lines.</returns>
+    /// <remarks>
+    /// A name a shell would split, or one that could end the comment line, is not repeated: the line
+    /// says "this file" instead, so no file name can add a line of its own.
+    /// </remarks>
+    public static string Header(string fileName = FileName)
+    {
+        ArgumentNullException.ThrowIfNull(fileName);
+
+        var named = fileName.Length > 0 && fileName.All(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '_' or '-')
+            ? fileName
+            : "<this file>";
+
+        return "# keypaste references: safe to commit, no value is stored here.\n" +
+            $"# `keypaste run --env-file {named} -- <command>` resolves them.\n";
+    }
 
     /// <summary>Writes a file referencing every key of one profile.</summary>
     /// <param name="project">The project.</param>
     /// <param name="profile">The profile.</param>
     /// <param name="keys">The variable names, in the order written.</param>
+    /// <param name="fileName">The name the file is saved under, for its header.</param>
     /// <returns>The file's text.</returns>
-    public static string Format(string project, string profile, IReadOnlyList<string> keys)
+    public static string Format(string project, string profile, IReadOnlyList<string> keys, string fileName = FileName)
     {
         ArgumentNullException.ThrowIfNull(project);
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(keys);
 
-        var text = new StringBuilder(Header);
+        var text = new StringBuilder(Header(fileName));
 
         foreach (var key in keys)
         {
