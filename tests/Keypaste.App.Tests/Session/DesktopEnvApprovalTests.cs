@@ -1,6 +1,8 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Input;
+using Avalonia.Media;
 using Avalonia.VisualTree;
 using Keypaste.App.Session;
 using Keypaste.App.Tests.Controls;
@@ -35,7 +37,7 @@ public sealed class DesktopEnvApprovalTests
 
             Assert.Equal("ci", Text(window, "ProjectText"));
             Assert.Equal("dev", Text(window, "ProfileText"));
-            Assert.Equal("DEPLOY_KEY", Text(window, "KeysText"));
+            Assert.Equal(["DEPLOY_KEY"], KeyNameBlocks(window).Select(block => block.Text));
             Assert.Equal("deploy --to \"staging area\"", Text(window, "CommandText"));
             Assert.EndsWith("work", Text(window, "DirectoryText"), StringComparison.Ordinal);
 
@@ -49,6 +51,34 @@ public sealed class DesktopEnvApprovalTests
             await PromptedApp.WithdrawnAsync(window);
             AutomationSurface.AssertNothingExposes(window, Sentinel);
         });
+
+    [Fact]
+    public Task A_long_variable_name_wraps_whole_rather_than_ending_in_an_ellipsis() =>
+        HeadlessSession.On(() =>
+        {
+            var longKey = "STRIPE_RESTRICTED_KEY_FOR_WEBHOOK_SIGNING_IN_PRODUCTION_" + new string('A', 30);
+            var preview = new EnvPreview("acme-api", ["DATABASE_URL", longKey]);
+            var window = new EnvApprovalWindow(new EnvApprovalViewModel(EnvReleasePrompt.For(preview, ["npm", "test"], "work")));
+            window.Show();
+
+            try
+            {
+                window.CaptureRenderedFrame();
+                var drawn = Assert.Single(KeyNameBlocks(window), block => block.Text == longKey);
+
+                Assert.True(longKey.Length >= 80);
+                Assert.Equal(TextTrimming.None, drawn.TextTrimming);
+                Assert.Equal(TextWrapping.Wrap, drawn.TextWrapping);
+                Assert.True(drawn.TextLayout.TextLines.Count > 1);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+
+    internal static IReadOnlyList<TextBlock> KeyNameBlocks(Window window) =>
+        [.. window.FindControl<ItemsControl>("KeysList")!.GetVisualDescendants().OfType<TextBlock>().Where(block => block.Classes.Contains("key"))];
 
     public static TheoryData<string, EnvOutcome> Refusals => new()
     {

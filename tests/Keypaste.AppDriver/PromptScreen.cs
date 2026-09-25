@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Keypaste.App.Session;
 using Keypaste.App.Views;
 using Keypaste.Core.Approval;
@@ -98,7 +99,7 @@ internal sealed class PromptScreen : IDisposable
         {
             EnvApprovalWindow =>
                 $"env-prompt project={Text(window, "ProjectText")} command={Text(window, "CommandText")} " +
-                $"directory={Text(window, "DirectoryText")} keys={Text(window, "KeysText")?.ReplaceLineEndings(",")}",
+                $"directory={Text(window, "DirectoryText")} keys={string.Join(',', KeyNames(window))}",
             RunApprovalWindow =>
                 $"run-prompt title={Text(window, "TitleText")} program={Text(window, "ProgramText")} " +
                 $"command={Text(window, "CommandText")} directory={Text(window, "DirectoryText")}",
@@ -119,6 +120,10 @@ internal sealed class PromptScreen : IDisposable
     }
 
     private static string? Text(Window window, string name) => window.FindControl<TextBlock>(name)?.Text;
+
+    private static IEnumerable<string?> KeyNames(Window window) =>
+        window.FindControl<ItemsControl>("KeysList")?.GetVisualDescendants().OfType<TextBlock>()
+            .Where(block => block.Classes.Contains("key")).Select(block => block.Text) ?? [];
 
     private static Button Button(Window window, string name) =>
         window.FindControl<Button>(name) ?? throw new DriverException($"the prompt has no {name} button");

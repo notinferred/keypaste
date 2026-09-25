@@ -3,6 +3,7 @@
                     xmlns:vm="using:Keypaste.App.ViewModels"
                     xmlns:views="using:Keypaste.App.Views"
                     xmlns:ctl="using:Keypaste.App.Controls"
+                    xmlns:sys="using:System"
                     x:Class="Keypaste.App.Views.EnvApprovalWindow"
                     x:DataType="vm:EnvApprovalViewModel"
                     Icon="avares://keypaste-app/Assets/keypaste.ico"
@@ -68,25 +69,24 @@
         </ScrollViewer>
       </Border>
 
-      <!-- The names, one row each: the rows draw the dividers and the tags, and KeysText draws the
-           names over them at the same line height, so the list reads as one text. A name too long
-           for its column ends in an ellipsis before the tag rather than running under it. -->
+      <!-- The names, one row each with its tag. A name wraps rather than ending in an ellipsis: two
+           long names that share a prefix must still read as two different variables. -->
       <Border Classes="prompt-list" Height="110">
         <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
           <StackPanel>
-            <Panel>
-              <ItemsControl ItemsSource="{Binding KeyNames}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate>
-                    <Border Classes="prompt-row" Height="36">
-                      <TextBlock Classes="tag" Text="inject only" HorizontalAlignment="Right" VerticalAlignment="Center" />
-                    </Border>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-              <TextBlock Name="KeysText" Text="{Binding Keys}" LineHeight="36" Margin="12,0,104,0"
-                         TextTrimming="CharacterEllipsis" ClipToBounds="True" />
-            </Panel>
+            <ItemsControl Name="KeysList" ItemsSource="{Binding KeyNames}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="sys:String">
+                  <Border Classes="prompt-row" MinHeight="36" Padding="12,6">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                      <TextBlock Classes="key" Text="{Binding}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="1" Classes="tag" Text="inject only" VerticalAlignment="Center" />
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Name="NoKeysText" Text="(none)" Margin="12,8" IsVisible="{Binding HasNoKeys}" />
             <TextBlock Name="FileLinesText" Classes="tag" Text="{Binding FileLines}" TextWrapping="Wrap" FontSize="11.5"
                        Margin="12,8"
                        IsVisible="{Binding FileLines, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
