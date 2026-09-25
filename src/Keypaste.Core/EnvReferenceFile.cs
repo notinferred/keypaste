@@ -1,3 +1,4 @@
+using System.Globalization;
 
 namespace Keypaste.Core;
 
@@ -82,7 +83,7 @@ public static class EnvReferenceFile
             }
             else
             {
-                problems.Add(new DotEnvProblem(variable.Line, $"'{variable.Key}' is not a usable reference: {error}"));
+                problems.Add(new DotEnvProblem(variable.Line, string.Create(CultureInfo.InvariantCulture, $"line {variable.Line}: '{variable.Key}' is not a usable reference: {error}")));
             }
         }
 

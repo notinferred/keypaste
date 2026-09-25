@@ -309,8 +309,7 @@ internal static class RunCommand
 
         foreach (var problem in document.Problems.Take(10))
         {
-            var where = problem.Line > 0 ? $"line {problem.Line}: " : string.Empty;
-            context.Stderr.WriteLine($"  {EntryNameSanitizer.SanitizeProse(where + problem.Message, 512).Text}");
+            context.Stderr.WriteLine($"  {EntryNameSanitizer.SanitizeProse(problem.Message, 512).Text}");
         }
 
         exit = CliApp.ExitUsageError;

@@ -402,6 +402,20 @@ public sealed class RunCommandTests
         Assert.False(environment.ContainsKey("DATABASE_URL"));
     }
 
+    [Theory]
+    [InlineData("A=kp://acme-api/dev/STRIPE_KEY\nA=kp://acme-api/staging/DATABASE_URL\n", "line 2: 'A' is set more than once")]
+    [InlineData("A=kp://acme-api/dev/STRIPE_KEY\nB=kp://\n", "line 2: 'B' is not a usable reference")]
+    public void Run_EnvFileProblem_NamesItsLineOnce(string content, string expected)
+    {
+        using var harness = Profiled();
+        var file = Write(harness, "refs.env", content);
+
+        harness.AssertExit(CliApp.ExitUsageError, harness.Run("run", "--env-file", file, "--vault", harness.VaultPath, "--", "node"));
+
+        Assert.Contains("  " + expected, harness.Err, StringComparison.Ordinal);
+        Assert.DoesNotContain("line 2: line 2:", harness.Err, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Run_ProfileFlag_RewritesTheFilesProfiles()
     {
