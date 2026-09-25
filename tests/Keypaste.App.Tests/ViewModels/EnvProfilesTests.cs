@@ -157,9 +157,106 @@ public sealed class EnvProfilesTests : IDisposable
         Assert.Null(entries.Detail.Profiles);
     }
 
+    [Fact]
+    public void TheScreen_OpensTheFirstProject_AndThePickerSwitchesIt()
+    {
+        using var screen = new EnvSetsViewModel(_session, _countdown);
+
+        Assert.Equal("acme-api", screen.SelectedProject);
+        Assert.Equal(["acme-api"], screen.ProjectChoices);
+
+        screen.SelectedProject = "billing";
+        Assert.Equal("billing", screen.OpenProject?.Name);
+        Assert.Equal(["acme-api", "billing"], screen.ProjectChoices);
+    }
+
+    [Fact]
+    public void MatrixCells_FollowTheSelectedProfile_AndHoldNoValue()
+    {
+        using var screen = new EnvSetsViewModel(_session, _countdown);
+        var project = Open(screen);
+
+        Assert.Equal(["dev", "prod"], project.Columns.Select(column => column.Name));
+        Assert.Equal([true, false], project.Columns.Select(column => column.IsSelected));
+
+        var sentry = project.Rows.Single(row => row.Key == "SENTRY_DSN");
+        Assert.Equal(["missing", "••••••"], sentry.Cells.Select(cell => cell.Label));
+        Assert.Null(sentry.Variable);
+        Assert.Equal("DATABASE_URL", project.Rows.Single(row => row.Key == "DATABASE_URL").Variable?.Key);
+
+        sentry.Cells[0].Act.Execute(null);
+        Assert.Equal("dev", project.SelectedProfile);
+        Assert.True(project.IsAdding);
+        Assert.Equal("SENTRY_DSN", project.NewKey);
+        project.CancelAddCommand.Execute(null);
+
+        project.Columns.Single(column => column.Name == "prod").Select.Execute(null);
+        Assert.Equal("prod", project.SelectedProfile);
+        Assert.Equal("SENTRY_DSN", project.Rows.Single(row => row.Key == "SENTRY_DSN").Variable?.Key);
+
+        project.BeginAddProfileCommand.Execute(null);
+        project.NewProfile = "staging";
+        project.ConfirmAddProfileCommand.Execute(null);
+        Assert.Equal(["dev", "staging", "prod"], project.Columns.Select(column => column.Name));
+        Assert.True(project.IsAdding);
+
+        foreach (var text in project.Rows.SelectMany(row => row.Cells).SelectMany(cell => new[] { cell.Label, cell.Note, cell.Tip ?? string.Empty }))
+        {
+            Assert.DoesNotContain(_prodValue, text, StringComparison.Ordinal);
+            Assert.DoesNotContain("dev-db", text, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task Export_WritesTheChosenFile_AndSaysSo()
+    {
+        var path = Path.Combine(_fixture.Home, "exported", EnvReferenceFile.FileName);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, "old");
+        var picker = new ReferencePicker(path);
+        using var screen = new EnvSetsViewModel(_session, _countdown, picker);
+        var project = Open(screen);
+
+        await project.ExportReferencesCommand.ExecuteAsync();
+
+        Assert.Equal(1, picker.Calls);
+        Assert.Equal(project.ReferencePreview, File.ReadAllText(path));
+        Assert.StartsWith("Wrote 1 reference", screen.Notice, StringComparison.Ordinal);
+        Assert.Null(screen.Error);
+
+        picker.Path = _fixture.Path_;
+        await project.ExportReferencesCommand.ExecuteAsync();
+        Assert.Contains("is a vault", screen.Error, StringComparison.Ordinal);
+    }
+
     private static EnvProjectViewModel Open(EnvSetsViewModel screen)
     {
         screen.OpenCommand.Execute("acme-api");
         return screen.OpenProject!;
+    }
+
+    private sealed class ReferencePicker(string path) : IVaultFilePicker
+    {
+        internal string? Path { get; set; } = path;
+
+        internal int Calls { get; private set; }
+
+        public Task<string?> PickExistingAsync() => Task.FromResult<string?>(null);
+
+        public Task<string?> PickNewAsync() => Task.FromResult<string?>(null);
+
+        public Task<string?> PickExportDestinationAsync(string suggestedName) => Task.FromResult<string?>(null);
+
+        public Task<string?> PickKeyfileAsync() => Task.FromResult<string?>(null);
+
+        public Task<string?> PickDotEnvAsync() => Task.FromResult<string?>(null);
+
+        public Task<string?> PickFolderAsync() => Task.FromResult<string?>(null);
+
+        public Task<string?> PickReferenceFileAsync(string suggestedName, string? directory)
+        {
+            Calls++;
+            return Task.FromResult(Path);
+        }
     }
 }

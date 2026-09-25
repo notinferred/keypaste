@@ -459,7 +459,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker),
             DestinationKind.AgentActivity => Activity(),
             DestinationKind.Entries => Entries(),
-            DestinationKind.EnvSets => new EnvSetsViewModel(_session, Clipboard, _picker),
+            DestinationKind.EnvSets => new EnvSetsViewModel(_session, Clipboard, _picker, toast: ShowToast),
             DestinationKind.Trash => new TrashViewModel(_session),
             _ => null,
         };

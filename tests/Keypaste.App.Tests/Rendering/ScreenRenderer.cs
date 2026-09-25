@@ -94,6 +94,18 @@ public sealed class ScreenRenderer
             Save(window, output, $"{destination.Shortcut:00}-{Slug(destination.Title)}");
         }
 
+        // Env profiles: another profile selected, then the add form, drawn tall enough for both panels.
+        shell.Current = Destinations.Of(DestinationKind.EnvSets);
+        if (shell.Content is EnvSetsViewModel profiles && profiles.OpenProject is { } project)
+        {
+            window.Height = 1000;
+            project.SelectedProfile = "staging";
+            Save(window, output, "40-env-staging");
+            project.BeginAddCommand.Execute(null);
+            Save(window, output, "41-env-add");
+            window.Height = _height;
+        }
+
         shell.Current = Destinations.Of(DestinationKind.Entries);
         shell.ShowToast("Copied the username. The clipboard clears in 30s.");
         Save(window, output, "90-toast");
@@ -240,6 +252,25 @@ public sealed class ScreenRenderer
             foreach (var key in new[] { "NEXT_PUBLIC_API", "VERCEL_TOKEN" })
             {
                 vault.AddEntry(new VaultEntry { Title = key, Password = "demo-" + key.ToLowerInvariant(), GroupPath = "env/acme-web" });
+            }
+
+            // Env profiles: staging and prod beside the flat dev set, with every state the matrix draws:
+            // an expired staging key, a staging value reused from dev, and a key prod lacks.
+            foreach (var key in new[] { "DATABASE_URL", "STRIPE_SECRET_KEY", "OPENAI_API_KEY", "REDIS_URL", "JWT_SIGNING_KEY", "SENTRY_DSN" })
+            {
+                vault.AddEntry(new VaultEntry
+                {
+                    Title = key,
+                    Password = key == "REDIS_URL" ? "demo-redis_url" : "demo-staging-" + key.ToLowerInvariant(),
+                    GroupPath = "env/acme-api/staging",
+                });
+            }
+
+            vault.SetExpiryUnchecked(new EntryName("env/acme-api/staging", "OPENAI_API_KEY"), new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero));
+
+            foreach (var key in new[] { "DATABASE_URL", "STRIPE_SECRET_KEY", "REDIS_URL", "JWT_SIGNING_KEY", "SENTRY_DSN" })
+            {
+                vault.AddEntry(new VaultEntry { Title = key, Password = "demo-prod-" + key.ToLowerInvariant(), GroupPath = "env/acme-api/prod" });
             }
 
             vault.Save();

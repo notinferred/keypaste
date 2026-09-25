@@ -5,344 +5,578 @@
              x:Class="Keypaste.App.Views.EnvSetsView"
              x:DataType="vm:EnvSetsViewModel">
 
-  <Grid RowDefinitions="Auto,Auto,Auto,*">
+  <!-- A row action keeps its word as its content, for the accessibility name, and draws its icon. -->
+  <UserControl.Resources>
+    <DataTemplate x:Key="CopyGlyph"><ctl:KpIcon Icon="copy" Size="13" /></DataTemplate>
+    <DataTemplate x:Key="ReplaceGlyph"><ctl:KpIcon Icon="rotate-cw" Size="13" /></DataTemplate>
+    <DataTemplate x:Key="RemoveGlyph"><ctl:KpIcon Icon="trash-2" Size="13" /></DataTemplate>
+  </UserControl.Resources>
 
-    <Border Grid.Row="0"
-            IsVisible="{Binding HasNotice}"
-            Background="{DynamicResource KpAccentQuiet}"
-            CornerRadius="{DynamicResource KpRadiusSm}"
-            Padding="12,8"
-            Margin="0,0,0,12">
-      <TextBlock Text="{Binding Notice}"
-                 TextWrapping="Wrap"
-                 FontSize="12"
-                 Foreground="{DynamicResource KpTextSecondary}" />
-    </Border>
+  <UserControl.Styles>
+    <!-- The project name in the subtitle is the picker: mono, muted, no box. -->
+    <Style Selector="ComboBox.project">
+      <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Height" Value="22" />
+      <Setter Property="Padding" Value="0,0,2,0" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="ComboBox.project /template/ Border#Background">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="ComboBox.project:pointerover /template/ Border#Background">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="ComboBox.project:pointerover">
+      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+    </Style>
 
-    <Border Grid.Row="1"
-            IsVisible="{Binding HasError}"
-            Background="{DynamicResource KpAccentQuiet}"
-            CornerRadius="{DynamicResource KpRadiusSm}"
-            Padding="12,8"
-            Margin="0,0,0,12">
-      <TextBlock Text="{Binding Error}"
-                 TextWrapping="Wrap"
-                 FontSize="12"
-                 Foreground="{DynamicResource KpTextSecondary}" />
-    </Border>
+    <!-- A matrix cell or column header that is pressed rather than a boxed button. -->
+    <Style Selector="Button.flat">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.flat /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.flat:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.flat:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.flat:pointerover TextBlock">
+      <Setter Property="TextDecorations" Value="Underline" />
+    </Style>
 
-    <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
-      <Button Content="New project" Command="{Binding BeginAddCommand}" IsVisible="{Binding !IsAdding}" />
-      <TextBox Text="{Binding NewProject}" PlaceholderText="billing-api" Width="220"
-               IsVisible="{Binding IsAdding}" />
-      <Button Content="Create" Command="{Binding ConfirmAddCommand}" IsVisible="{Binding IsAdding}" />
-      <Button Content="Cancel" Command="{Binding CancelAddCommand}" IsVisible="{Binding IsAdding}" />
-    </StackPanel>
+    <Style Selector="TextBlock.th.selected">
+      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+    </Style>
 
-    <!-- The cards. A card knows a project's name and the command that injects it; the values behind
-         it are read only when it is opened. -->
-    <ScrollViewer Grid.Row="3" IsVisible="{Binding !HasOpenProject}">
-      <StackPanel Spacing="12">
+    <!-- A row's copy, replace and remove show while the row is hovered or holds focus. -->
+    <Style Selector="Border.matrix-row StackPanel.row-actions">
+      <Setter Property="Opacity" Value="0" />
+    </Style>
+    <Style Selector="Border.matrix-row:pointerover StackPanel.row-actions, Border.matrix-row:focus-within StackPanel.row-actions">
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="Button.row-action">
+      <Setter Property="Width" Value="24" />
+      <Setter Property="Height" Value="24" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+    </Style>
 
-        <TextBlock IsVisible="{Binding !HasProjects}"
-                   TextWrapping="Wrap"
-                   MaxWidth="480"
-                   HorizontalAlignment="Left"
-                   Foreground="{DynamicResource KpTextSecondary}"
-                   Text="No projects yet. A project is a group under env/ in your vault — keypaste env set billing-api STRIPE_KEY makes one, and so does New project here." />
+    <!-- The profile toggle in the .env.keypaste header: 11.5/500, 4px pills on the panel ink. -->
+    <Style Selector="Button.profile-segment">
+      <Setter Property="FontFamily" Value="{DynamicResource KpSans}" />
+      <Setter Property="FontSize" Value="11.5" />
+      <Setter Property="FontWeight" Value="Medium" />
+      <Setter Property="Padding" Value="9,3" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.profile-segment /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+    </Style>
+    <Style Selector="Button.profile-segment:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+    </Style>
+    <Style Selector="Button.profile-segment.selected /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+    </Style>
 
-        <ItemsControl ItemsSource="{Binding Projects}">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="x:String">
-              <Border Theme="{StaticResource KpCard}" Margin="0,0,0,12">
-                <Grid ColumnDefinitions="*,Auto">
-                  <StackPanel Grid.Column="0" Spacing="4">
-                    <TextBlock Text="{Binding}" FontSize="16"
-                               Foreground="{DynamicResource KpTextPrimary}" />
-                    <TextBlock FontSize="11"
-                               FontFamily="{DynamicResource KpMono}"
-                               Foreground="{DynamicResource KpTextMuted}"
-                               Text="{Binding, StringFormat='keypaste run {0} -- '}" />
-                  </StackPanel>
-                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8"
-                              VerticalAlignment="Center">
-                    <Button Content="Copy run command"
-                            Command="{Binding $parent[ItemsControl].((vm:EnvSetsViewModel)DataContext).CopyRunCommandCommand}"
-                            CommandParameter="{Binding}" />
-                    <Button Content="Open"
-                            Command="{Binding $parent[ItemsControl].((vm:EnvSetsViewModel)DataContext).OpenCommand}"
-                            CommandParameter="{Binding}" />
-                  </StackPanel>
-                </Grid>
-              </Border>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
+    <Style Selector="Border.terminal TextBlock.preview">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="LineHeight" Value="20.4" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
+    </Style>
+    <Style Selector="Border.terminal TextBlock.preview.comment">
+      <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+    </Style>
 
-      </StackPanel>
-    </ScrollViewer>
+    <Style Selector="Border.banner">
+      <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusButton}" />
+      <Setter Property="Padding" Value="12,9" />
+    </Style>
+  </UserControl.Styles>
 
-    <!-- The open project's table. Masked, with reveal-on-hold on a control that publishes nothing
-         to the accessibility bus (THREATS.md T-22). -->
-    <ContentControl Grid.Row="3" Content="{Binding OpenProject}" IsVisible="{Binding HasOpenProject}">
-      <ContentControl.DataTemplates>
-        <DataTemplate DataType="vm:EnvProjectViewModel">
-          <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,*">
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <Grid Margin="32,28">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" MaxWidth="1080" />
+        <ColumnDefinition Width="0" />
+      </Grid.ColumnDefinitions>
+      <StackPanel Grid.Column="0" Spacing="24">
 
-            <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,0,0,12">
-              <StackPanel Grid.Column="0" Spacing="2">
-                <TextBlock Text="{Binding DisplayName}" FontSize="18"
-                           Foreground="{DynamicResource KpTextPrimary}" />
-                <TextBlock Text="{Binding Summary}" FontSize="11"
-                           Foreground="{DynamicResource KpTextMuted}" />
+        <!-- Header: the title, the project picker, and the file actions. -->
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel Grid.Column="0" Spacing="6" VerticalAlignment="Bottom">
+            <TextBlock Classes="h1" Text="Env profiles" />
+            <StackPanel Orientation="Horizontal" Spacing="0" IsVisible="{Binding HasOpenProject}">
+              <ComboBox Classes="project"
+                        ItemsSource="{Binding ProjectChoices}"
+                        SelectedItem="{Binding SelectedProject}"
+                        ToolTip.Tip="Choose a project" />
+              <TextBlock Classes="subtitle" VerticalAlignment="Center" Margin="4,0,0,0" Text="· one set of keys, a value per environment" />
+              <Button Classes="icon ghost sm" Width="22" Height="22" Margin="8,0,0,0"
+                      ToolTip.Tip="New project"
+                      Command="{Binding BeginAddCommand}"
+                      IsVisible="{Binding !IsAdding}">
+                <ctl:KpIcon Icon="plus" Size="13" />
+              </Button>
+            </StackPanel>
+            <TextBlock Classes="subtitle" IsVisible="{Binding !HasOpenProject}"
+                       Text="One set of keys per project, a value per environment." />
+          </StackPanel>
+
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Bottom"
+                      IsVisible="{Binding HasOpenProject}">
+            <Button Command="{Binding OpenProject.Import.ChooseCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <ctl:KpIcon Icon="file-up" Size="13" />
+                <TextBlock Text="Import .env" />
               </StackPanel>
-              <Button Grid.Column="1" Content="Copy run command" Margin="8,0,0,0"
-                      Command="{Binding CopyRunCommandCommand}" />
-              <Button Grid.Column="2" Content="Add variable" Margin="8,0,0,0"
-                      Command="{Binding BeginAddCommand}" />
-              <Button Grid.Column="3" Content="Back" Margin="8,0,0,0"
-                      Command="{Binding $parent[ContentControl].((vm:EnvSetsViewModel)DataContext).CloseCommand}" />
-            </Grid>
+            </Button>
+            <Button Command="{Binding OpenProject.ExportReferencesCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <ctl:KpIcon Icon="file-down" Size="13" />
+                <TextBlock Text="Export .env.keypaste" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
+        </Grid>
 
-            <!-- Where the project runs on this machine, what it runs, and the .env import. The
-                 confirmation card names the command, the directory and the variables' names;
-                 nothing here ever holds a value. -->
-            <StackPanel Grid.Row="1" Spacing="8" Margin="0,0,0,12">
+        <Border Classes="banner" IsVisible="{Binding HasError}" Background="{DynamicResource KpDangerTint}">
+          <Grid ColumnDefinitions="Auto,*">
+            <ctl:KpIcon Icon="alert-triangle" Size="14" Margin="0,1,10,0" VerticalAlignment="Top"
+                        Foreground="{DynamicResource KpDanger}" />
+            <TextBlock Grid.Column="1" Text="{Binding Error}" TextWrapping="Wrap" FontSize="12.5"
+                       Foreground="{DynamicResource KpTextSecondary}" />
+          </Grid>
+        </Border>
 
-              <Border Background="{DynamicResource KpSurface2}"
-                      CornerRadius="{DynamicResource KpRadiusSm}"
-                      Padding="12">
+        <Border Classes="banner" IsVisible="{Binding HasNotice}" Background="{DynamicResource KpAccentTint}">
+          <Grid ColumnDefinitions="Auto,*">
+            <ctl:KpIcon Icon="info" Size="14" Margin="0,1,10,0" VerticalAlignment="Top"
+                        Foreground="{DynamicResource KpAccent}" />
+            <TextBlock Grid.Column="1" Text="{Binding Notice}" TextWrapping="Wrap" FontSize="12.5"
+                       Foreground="{DynamicResource KpTextSecondary}" />
+          </Grid>
+        </Border>
+
+        <Border Classes="card filled" IsVisible="{Binding IsAdding}">
+          <StackPanel Spacing="10">
+            <TextBlock Classes="section" Text="New project" />
+            <TextBlock Classes="caption"
+                       Text="A project is a group under env/ in your vault. It appears in the vault once its first key is added." />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBox Classes="mono" Text="{Binding NewProject}" PlaceholderText="billing-api" Width="240" />
+              <Button Classes="primary" Content="Create" Command="{Binding ConfirmAddCommand}" />
+              <Button Classes="ghost" Content="Cancel" Command="{Binding CancelAddCommand}" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="card" IsVisible="{Binding IsEmpty}" Padding="20">
+          <StackPanel Spacing="12">
+            <TextBlock Classes="section" Text="No projects yet" />
+            <TextBlock Classes="caption" MaxWidth="560" HorizontalAlignment="Left"
+                       Text="A project is a group under env/ in your vault, with a value per profile. keypaste env set billing-api STRIPE_KEY makes one, and so does New project." />
+            <Button Content="New project" Command="{Binding BeginAddCommand}" IsVisible="{Binding !IsAdding}"
+                    HorizontalAlignment="Left" />
+          </StackPanel>
+        </Border>
+
+        <ContentControl Content="{Binding OpenProject}" IsVisible="{Binding HasOpenProject}">
+          <ContentControl.DataTemplates>
+            <DataTemplate DataType="vm:EnvProjectViewModel">
+              <StackPanel Spacing="24">
+
+                <!-- The .env import: read and checked whole, previewed by name, written only on Import. -->
+                <Border Classes="card filled" IsVisible="{Binding Import.IsPreviewing}">
+                  <StackPanel Spacing="10">
+                    <TextBlock Classes="section" Text="{Binding Import.Source, StringFormat='Import {0}?'}" TextWrapping="Wrap" />
+                    <ItemsControl ItemsSource="{Binding Import.Rows}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="x:String">
+                          <TextBlock Classes="mono secondary" Text="{Binding}" FontSize="12" LineHeight="20" />
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Classes="caption" Text="{Binding Import.Notes}" IsVisible="{Binding Import.HasNotes}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Button Classes="primary" Content="Import" Command="{Binding Import.ConfirmCommand}" />
+                      <Button Classes="ghost" Content="Cancel" Command="{Binding Import.CancelCommand}" />
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+
+                <Border Classes="card filled" IsVisible="{Binding IsAddingProfile}">
+                  <StackPanel Spacing="10">
+                    <TextBlock Classes="section" Text="New profile" />
+                    <TextBlock Classes="caption"
+                               Text="Lowercase letters, digits and dashes, such as staging or prod-eu. Its first key creates it, and prod and production profiles always ask before release." />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <TextBox Classes="mono" Text="{Binding NewProfile}" PlaceholderText="staging" Width="200" />
+                      <Button Classes="primary" Content="Add key" Command="{Binding ConfirmAddProfileCommand}" />
+                      <Button Classes="ghost" Content="Cancel" Command="{Binding CancelAddProfileCommand}" />
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+
+                <Border Classes="card filled" IsVisible="{Binding IsAdding}">
+                  <StackPanel Spacing="10">
+                    <TextBlock Classes="section" Text="{Binding SelectedProfile, StringFormat='Add a key to {0}'}" />
+                    <TextBox Classes="mono" Text="{Binding NewKey}" PlaceholderText="STRIPE_KEY" Width="320" HorizontalAlignment="Left" />
+                    <CheckBox Content="Generate a value" IsChecked="{Binding GenerateValue}" />
+                    <StackPanel Spacing="6" IsVisible="{Binding GenerateValue}">
+                      <StackPanel Orientation="Horizontal" Spacing="12">
+                        <RadioButton GroupName="NewVariableSecretKind" Content="Characters" IsChecked="{Binding Generator.UseCharacters}" />
+                        <RadioButton GroupName="NewVariableSecretKind" Content="Words" IsChecked="{Binding Generator.UseWords}" />
+                        <NumericUpDown Width="104"
+                                       IsVisible="{Binding Generator.UseWords}"
+                                       Minimum="{Binding Generator.MinimumWords}"
+                                       Maximum="{Binding Generator.MaximumWords}"
+                                       Increment="1"
+                                       FormatString="0"
+                                       Value="{Binding Generator.WordCount}" />
+                        <TextBox Width="44"
+                                 MaxLength="1"
+                                 IsVisible="{Binding Generator.UseWords}"
+                                 Text="{Binding Generator.Separator}" />
+                      </StackPanel>
+                      <TextBlock Classes="caption" Text="{Binding Generator.Strength}" />
+                      <TextBlock Classes="caption" IsVisible="{Binding Generator.UseWords}" Text="{Binding Generator.Provenance}" />
+                      <TextBlock Classes="caption"
+                                 IsVisible="{Binding Generator.Error, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                 Foreground="{DynamicResource KpTextSecondary}"
+                                 Text="{Binding Generator.Error}" />
+                    </StackPanel>
+                    <ctl:MaskedInput x:Name="NewEnvValue"
+                                     IsVisible="{Binding !GenerateValue}"
+                                     AllowsPaste="True"
+                                     Width="420"
+                                     HorizontalAlignment="Left"
+                                     Sink="{Binding NewValue}"
+                                     MaskedLength="{Binding NewValue.MaskedLength}"
+                                     Placeholder="Existing value" />
+                    <TextBlock Classes="caption" IsVisible="{Binding !GenerateValue}"
+                               Text="Type it or press Ctrl/Cmd+V to paste." />
+                    <TextBlock Classes="caption" IsVisible="{Binding NewValue.Note.Length}"
+                               Text="{Binding NewValue.Note}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Button Classes="primary" Content="Add" Command="{Binding ConfirmAddCommand}" />
+                      <Button Classes="ghost" Content="Cancel" Command="{Binding CancelAddCommand}" />
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+
+                <Border Classes="card filled" IsVisible="{Binding IsReplacing}">
+                  <StackPanel Spacing="10">
+                    <TextBlock Classes="section" Text="{Binding ReplacePrompt}" TextWrapping="Wrap" />
+                    <ctl:MaskedInput x:Name="ReplacementEnvValue"
+                                     AllowsPaste="True"
+                                     Width="420"
+                                     HorizontalAlignment="Left"
+                                     Sink="{Binding ReplacementValue}"
+                                     MaskedLength="{Binding ReplacementValue.MaskedLength}"
+                                     Placeholder="New value" />
+                    <TextBlock Classes="caption" IsVisible="{Binding ReplacementValue.Note.Length}"
+                               Text="{Binding ReplacementValue.Note}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Button Classes="primary" Content="Replace" Command="{Binding ConfirmReplaceCommand}" />
+                      <Button Classes="ghost" Content="Cancel" Command="{Binding CancelReplaceCommand}" />
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+
+                <Border Classes="card" IsVisible="{Binding IsRemoving}" BorderBrush="{DynamicResource KpDanger}">
+                  <StackPanel Spacing="10">
+                    <TextBlock Classes="body primary" Text="{Binding RemovePrompt}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Button Classes="danger" Content="Remove" Command="{Binding ConfirmRemoveCommand}" />
+                      <Button Classes="ghost" Content="Keep it" Command="{Binding CancelRemoveCommand}" />
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+
+                <!-- The matrix: every key against every profile. A cell holds no value; the selected
+                     profile's cells reveal theirs on a hold, through a control that publishes nothing to
+                     the accessibility bus (THREATS.md T-22). -->
                 <StackPanel Spacing="8">
-                  <Grid ColumnDefinitions="*,Auto">
-                    <TextBox Grid.Column="0" Text="{Binding Launch.Directory}"
-                             PlaceholderText="Project directory" />
-                    <Button Grid.Column="1" Content="Choose…" Margin="8,0,0,0"
-                            Command="{Binding Launch.ChooseDirectoryCommand}" />
-                  </Grid>
-                  <TextBox Text="{Binding Launch.Command}"
-                           FontFamily="{DynamicResource KpMono}"
-                           PlaceholderText="npm run dev" />
-                  <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button Content="Save" Command="{Binding Launch.SaveCommand}" />
-                    <Button Content="Run" Command="{Binding Launch.RunProjectCommand}" />
-                    <Button Content="Open terminal" Command="{Binding Launch.OpenTerminalCommand}" />
-                    <Button Content="Import .env" Command="{Binding Import.ChooseCommand}" />
-                  </StackPanel>
-                  <TextBlock FontSize="11" TextWrapping="Wrap"
-                             IsVisible="{Binding !Launch.IsSupported}"
-                             Foreground="{DynamicResource KpTextMuted}"
-                             Text="This app opens terminals on Windows and Linux only. Copy the run command instead." />
-                </StackPanel>
-              </Border>
+                  <Border Classes="table">
+                    <StackPanel>
+                      <Border Classes="table-head">
+                        <Grid ColumnDefinitions="1.6*,3*,76">
+                          <TextBlock Grid.Column="0" Classes="th" Text="KEY" VerticalAlignment="Center" />
+                          <ItemsControl Grid.Column="1" ItemsSource="{Binding Columns}">
+                            <ItemsControl.ItemsPanel>
+                              <ItemsPanelTemplate>
+                                <UniformGrid Rows="1" />
+                              </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="vm:EnvProfileColumn">
+                                <Button Classes="flat" Margin="12,0,0,0" Command="{Binding Select}"
+                                        ToolTip.Tip="{Binding Name, StringFormat='Edit, preview and run {0}'}">
+                                  <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <TextBlock Classes="th" Classes.selected="{Binding IsSelected}" Text="{Binding Header}" />
+                                    <ctl:KpIcon Icon="shield-check" Size="12" IsVisible="{Binding IsProtected}"
+                                                Foreground="{DynamicResource KpAccent}" />
+                                  </StackPanel>
+                                </Button>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                          <Button Grid.Column="2" Classes="flat" HorizontalAlignment="Right"
+                                  Command="{Binding BeginAddProfileCommand}"
+                                  ToolTip.Tip="Add a profile, such as staging or prod">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                              <ctl:KpIcon Icon="plus" Size="12" Foreground="{DynamicResource KpTextMuted}" />
+                              <TextBlock Classes="th" Text="PROFILE" />
+                            </StackPanel>
+                          </Button>
+                        </Grid>
+                      </Border>
 
-              <Border IsVisible="{Binding Launch.IsConfirming}"
-                      BorderBrush="{DynamicResource KpAccent}"
-                      BorderThickness="1"
-                      CornerRadius="{DynamicResource KpRadiusSm}"
-                      Padding="12">
-                <StackPanel Spacing="6">
-                  <TextBlock Text="{Binding Launch.ConfirmTitle}" TextWrapping="Wrap"
-                             Foreground="{DynamicResource KpTextPrimary}" />
-                  <TextBlock Text="{Binding Launch.ConfirmStarts}" TextWrapping="Wrap"
-                             FontFamily="{DynamicResource KpMono}"
-                             Foreground="{DynamicResource KpTextPrimary}" />
-                  <TextBlock Text="{Binding Launch.ConfirmDirectory, StringFormat='in {0}'}" TextWrapping="Wrap"
-                             FontSize="12"
-                             Foreground="{DynamicResource KpTextSecondary}" />
-                  <TextBlock Text="{Binding Launch.ConfirmKeys}" TextWrapping="Wrap"
-                             FontSize="12" FontFamily="{DynamicResource KpMono}"
-                             Foreground="{DynamicResource KpTextSecondary}" />
-                  <TextBlock FontSize="11" TextWrapping="Wrap"
-                             Foreground="{DynamicResource KpTextMuted}"
-                             Text="Everything run in that terminal can read these values." />
-                  <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button Content="Start" Command="{Binding Launch.ConfirmLaunchCommand}" />
-                    <Button Content="Cancel" Command="{Binding Launch.CancelLaunchCommand}" />
-                  </StackPanel>
-                </StackPanel>
-              </Border>
+                      <ItemsControl ItemsSource="{Binding Rows}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:EnvKeyRow">
+                            <Border Classes="table-row matrix-row">
+                              <Grid ColumnDefinitions="1.6*,3*,76" MinHeight="18">
+                                <TextBlock Grid.Column="0" Classes="mono primary" Text="{Binding DisplayKey}"
+                                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                <ItemsControl Grid.Column="1" ItemsSource="{Binding Cells}">
+                                  <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                      <UniformGrid Rows="1" />
+                                    </ItemsPanelTemplate>
+                                  </ItemsControl.ItemsPanel>
+                                  <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:EnvProfileCell">
+                                      <Panel Margin="12,0,0,0" VerticalAlignment="Center">
+                                        <Panel IsVisible="{Binding HasVariable}">
+                                          <!-- Not a TextBlock: its automation peer would publish the value as the
+                                               element's name. RevealedValue draws the characters itself, and takes the
+                                               cell's width so a hold changes no size the accessibility surface
+                                               reports (D-0232). -->
+                                          <ContentControl Content="{Binding Variable}" Cursor="Hand" VerticalAlignment="Center">
+                                            <ContentControl.ContentTemplate>
+                                              <DataTemplate x:DataType="vm:EnvVariableRow">
+                                                <ctl:RevealedValue Source="{Binding}"
+                                                                   MaskedLength="6"
+                                                                   Width="{Binding $parent[ContentControl].Bounds.Width}"
+                                                                   FontFamily="{DynamicResource KpMono}"
+                                                                   FontSize="13"
+                                                                   VerticalAlignment="Center"
+                                                                   RenderOptions.TextRenderingMode="Antialias"
+                                                                   Foreground="{DynamicResource KpTextSecondary}" />
+                                              </DataTemplate>
+                                            </ContentControl.ContentTemplate>
+                                          </ContentControl>
+                                          <TextBlock Classes="mono sm amber" Text="{Binding Note}" IsVisible="{Binding HasNote}"
+                                                     Margin="58,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"
+                                                     TextTrimming="CharacterEllipsis" />
+                                        </Panel>
+                                        <Button Classes="flat" IsVisible="{Binding ShowsLabel}" Command="{Binding Act}"
+                                                ToolTip.Tip="{Binding Tip}">
+                                          <TextBlock Classes="mono"
+                                                     Classes.secondary="{Binding IsSet}"
+                                                     Classes.amber="{Binding Differs}"
+                                                     Classes.danger="{Binding IsMissing}"
+                                                     Text="{Binding Label}"
+                                                     TextTrimming="CharacterEllipsis" />
+                                        </Button>
+                                      </Panel>
+                                    </DataTemplate>
+                                  </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <ContentControl Grid.Column="2" Content="{Binding Variable}" Margin="0,-4"
+                                                HorizontalAlignment="Right" VerticalAlignment="Center">
+                                  <ContentControl.ContentTemplate>
+                                    <DataTemplate x:DataType="vm:EnvVariableRow">
+                                      <StackPanel Classes="row-actions" Orientation="Horizontal" Spacing="2">
+                                        <Button Classes="ghost row-action" Content="Copy" ContentTemplate="{StaticResource CopyGlyph}"
+                                                ToolTip.Tip="Copy the value; the clipboard clears itself"
+                                                Command="{Binding CopyValueCommand}" />
+                                        <Button Classes="ghost row-action" Content="Replace" ContentTemplate="{StaticResource ReplaceGlyph}"
+                                                ToolTip.Tip="Replace the value"
+                                                Command="{Binding ReplaceCommand}" />
+                                        <Button Classes="ghost row-action" Content="Remove" ContentTemplate="{StaticResource RemoveGlyph}"
+                                                ToolTip.Tip="Remove this key from the profile"
+                                                Command="{Binding RemoveCommand}" />
+                                      </StackPanel>
+                                    </DataTemplate>
+                                  </ContentControl.ContentTemplate>
+                                </ContentControl>
+                              </Grid>
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
 
-              <Border IsVisible="{Binding Import.IsPreviewing}"
-                      Background="{DynamicResource KpSurface2}"
-                      CornerRadius="{DynamicResource KpRadiusSm}"
-                      Padding="12">
-                <StackPanel Spacing="6">
-                  <TextBlock Text="{Binding Import.Source, StringFormat='Import {0}?'}" TextWrapping="Wrap"
-                             Foreground="{DynamicResource KpTextPrimary}" />
-                  <ItemsControl ItemsSource="{Binding Import.Rows}">
+                      <Border Classes="table-row" Padding="16,8">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <TextBlock Classes="caption" VerticalAlignment="Center" IsVisible="{Binding !HasRows}"
+                                     Text="{Binding SelectedProfile, StringFormat='No keys yet. Add the first one to {0}.'}" />
+                          <Button Grid.Column="1" Classes="ghost sm" Command="{Binding BeginAddCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                              <ctl:KpIcon Icon="plus" Size="13" />
+                              <TextBlock Text="{Binding SelectedProfile, StringFormat='Add a key to {0}'}" />
+                            </StackPanel>
+                          </Button>
+                        </Grid>
+                      </Border>
+                    </StackPanel>
+                  </Border>
+
+                  <TextBlock Classes="caption"
+                             Text="Hold a masked value to see it. Click another profile's cell or header to work in that profile." />
+
+                  <ItemsControl ItemsSource="{Binding ProfileProblems}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="x:String">
-                        <TextBlock Text="{Binding}" FontSize="12"
-                                   FontFamily="{DynamicResource KpMono}"
-                                   Foreground="{DynamicResource KpTextSecondary}" />
+                        <TextBlock Classes="caption amber" Text="{Binding}" />
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
-                  <TextBlock Text="{Binding Import.Notes}" TextWrapping="Wrap" FontSize="11"
-                             IsVisible="{Binding Import.HasNotes}"
-                             Foreground="{DynamicResource KpTextMuted}" />
-                  <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button Content="Import" Command="{Binding Import.ConfirmCommand}" />
-                    <Button Content="Cancel" Command="{Binding Import.CancelCommand}" />
-                  </StackPanel>
                 </StackPanel>
-              </Border>
 
-            </StackPanel>
+                <Grid ColumnDefinitions="*,12,*">
 
-            <Border Grid.Row="2"
-                    IsVisible="{Binding IsAdding}"
-                    Background="{DynamicResource KpSurface2}"
-                    CornerRadius="{DynamicResource KpRadiusSm}"
-                    Padding="12"
-                    Margin="0,0,0,12">
-              <StackPanel Spacing="8">
-                <TextBox Text="{Binding NewKey}" PlaceholderText="STRIPE_KEY" />
-                <CheckBox Content="Generate a value" IsChecked="{Binding GenerateValue}" />
-                <StackPanel Spacing="4" IsVisible="{Binding GenerateValue}">
-                  <StackPanel Orientation="Horizontal" Spacing="12">
-                    <RadioButton GroupName="NewVariableSecretKind" Content="Characters" IsChecked="{Binding Generator.UseCharacters}" />
-                    <RadioButton GroupName="NewVariableSecretKind" Content="Words" IsChecked="{Binding Generator.UseWords}" />
-                    <NumericUpDown Width="104"
-                                   IsVisible="{Binding Generator.UseWords}"
-                                   Minimum="{Binding Generator.MinimumWords}"
-                                   Maximum="{Binding Generator.MaximumWords}"
-                                   Increment="1"
-                                   FormatString="0"
-                                   Value="{Binding Generator.WordCount}" />
-                    <TextBox Width="44"
-                             MaxLength="1"
-                             IsVisible="{Binding Generator.UseWords}"
-                             Text="{Binding Generator.Separator}" />
-                  </StackPanel>
-                  <TextBlock FontSize="11"
-                             TextWrapping="Wrap"
-                             Foreground="{DynamicResource KpTextMuted}"
-                             Text="{Binding Generator.Strength}" />
-                  <TextBlock FontSize="11"
-                             TextWrapping="Wrap"
-                             IsVisible="{Binding Generator.UseWords}"
-                             Foreground="{DynamicResource KpTextMuted}"
-                             Text="{Binding Generator.Provenance}" />
-                  <TextBlock FontSize="11"
-                             TextWrapping="Wrap"
-                             IsVisible="{Binding Generator.Error, Converter={x:Static ObjectConverters.IsNotNull}}"
-                             Foreground="{DynamicResource KpTextSecondary}"
-                             Text="{Binding Generator.Error}" />
-                </StackPanel>
-                <ctl:MaskedInput x:Name="NewEnvValue"
-                                 IsVisible="{Binding !GenerateValue}"
-                                 AllowsPaste="True"
-                                 Sink="{Binding NewValue}"
-                                 MaskedLength="{Binding NewValue.MaskedLength}"
-                                 Placeholder="Existing value" />
-                <TextBlock FontSize="11" TextWrapping="Wrap"
-                           IsVisible="{Binding !GenerateValue}"
-                           Foreground="{DynamicResource KpTextMuted}"
-                           Text="Type it or press Ctrl/Cmd+V to paste." />
-                <TextBlock FontSize="11" TextWrapping="Wrap"
-                           IsVisible="{Binding NewValue.Note.Length}"
-                           Foreground="{DynamicResource KpTextMuted}"
-                           Text="{Binding NewValue.Note}" />
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Button Content="Add" Command="{Binding ConfirmAddCommand}" />
-                  <Button Content="Cancel" Command="{Binding CancelAddCommand}" />
-                </StackPanel>
-              </StackPanel>
-            </Border>
+                  <!-- The .env.keypaste the selected profile exports: references only, safe to commit. -->
+                  <Border Grid.Column="0" Classes="terminal" VerticalAlignment="Top">
+                    <StackPanel>
+                      <Border Height="36" Padding="12,0,6,0" BorderThickness="0,0,0,1"
+                              BorderBrush="{DynamicResource KpTerminalDivider}">
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                          <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <ctl:KpIcon Icon="file-code" Size="13" Foreground="{DynamicResource KpTextMuted}" />
+                            <TextBlock Text=".env.keypaste" FontSize="11.5" Foreground="{DynamicResource KpTextMuted}"
+                                       VerticalAlignment="Center" />
+                          </StackPanel>
+                          <Border Grid.Column="2" Background="{DynamicResource KpBgPanel}" CornerRadius="6" Padding="2"
+                                  VerticalAlignment="Center">
+                            <ItemsControl ItemsSource="{Binding Columns}">
+                              <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                  <StackPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                              </ItemsControl.ItemsPanel>
+                              <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:EnvProfileColumn">
+                                  <Button Classes="profile-segment" Classes.selected="{Binding IsSelected}"
+                                          Content="{Binding DisplayName}" Command="{Binding Select}" />
+                                </DataTemplate>
+                              </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                          </Border>
+                        </Grid>
+                      </Border>
+                      <ItemsControl ItemsSource="{Binding ReferenceLines}" Margin="14,12">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:EnvPreviewLine">
+                            <TextBlock Classes="preview" Classes.comment="{Binding IsComment}" Text="{Binding Text}"
+                                       TextWrapping="Wrap" Margin="0,0,0,2" />
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </Border>
 
-            <!-- The one place KpDanger appears here. -->
-            <Border Grid.Row="3"
-                    IsVisible="{Binding IsRemoving}"
-                    BorderBrush="{DynamicResource KpDanger}"
-                    BorderThickness="1"
-                    CornerRadius="{DynamicResource KpRadiusSm}"
-                    Padding="12"
-                    Margin="0,0,0,12">
-              <StackPanel Spacing="8">
-                <TextBlock Text="{Binding RemovePrompt}" TextWrapping="Wrap"
-                           Foreground="{DynamicResource KpTextPrimary}" />
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Button Content="Remove" Command="{Binding ConfirmRemoveCommand}"
-                          Foreground="{DynamicResource KpDanger}" />
-                  <Button Content="Keep it" Command="{Binding CancelRemoveCommand}" />
-                </StackPanel>
-              </StackPanel>
-            </Border>
-
-            <Border Grid.Row="4"
-                    IsVisible="{Binding IsReplacing}"
-                    Background="{DynamicResource KpSurface2}"
-                    CornerRadius="{DynamicResource KpRadiusSm}"
-                    Padding="12"
-                    Margin="0,0,0,12">
-              <StackPanel Spacing="8">
-                <TextBlock Text="{Binding ReplacePrompt}" TextWrapping="Wrap"
-                           Foreground="{DynamicResource KpTextPrimary}" />
-                <ctl:MaskedInput x:Name="ReplacementEnvValue"
-                                 AllowsPaste="True"
-                                 Sink="{Binding ReplacementValue}"
-                                 MaskedLength="{Binding ReplacementValue.MaskedLength}"
-                                 Placeholder="New value" />
-                <TextBlock FontSize="11" TextWrapping="Wrap"
-                           IsVisible="{Binding ReplacementValue.Note.Length}"
-                           Foreground="{DynamicResource KpTextMuted}"
-                           Text="{Binding ReplacementValue.Note}" />
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Button Content="Replace" Command="{Binding ConfirmReplaceCommand}" />
-                  <Button Content="Cancel" Command="{Binding CancelReplaceCommand}" />
-                </StackPanel>
-              </StackPanel>
-            </Border>
-
-            <ScrollViewer Grid.Row="5">
-              <ItemsControl ItemsSource="{Binding Variables}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="vm:EnvVariableRow">
-                    <Grid ColumnDefinitions="200,*,Auto,Auto,Auto" Margin="0,0,0,8">
-
-                      <StackPanel Grid.Column="0" Spacing="2">
-                        <TextBlock Text="{Binding DisplayKey}"
-                                   FontFamily="{DynamicResource KpMono}"
-                                   TextTrimming="CharacterEllipsis"
-                                   Foreground="{DynamicResource KpTextPrimary}" />
-                        <TextBlock Text="{Binding Warning}"
-                                   IsVisible="{Binding !IsUsableName}"
-                                   FontSize="11"
-                                   TextWrapping="Wrap"
-                                   Foreground="{DynamicResource KpTextMuted}" />
+                  <!-- Run with this profile: the command, copyable, and where it runs on this machine. -->
+                  <Border Grid.Column="2" Classes="card" Padding="18" VerticalAlignment="Top">
+                    <StackPanel Spacing="12">
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ctl:KpIcon Icon="terminal" Size="15" Foreground="{DynamicResource KpTextMuted}" />
+                        <TextBlock Classes="section" Text="Run with this profile" VerticalAlignment="Center" />
                       </StackPanel>
 
-                      <!-- Not a TextBlock: its automation peer publishes its text as the element's
-                           name, which is a read path over the same bus a TextBox's value pattern
-                           uses. RevealedValue draws the characters itself and its peer contributes
-                           nothing. -->
-                      <ctl:RevealedValue Grid.Column="1"
-                                         Source="{Binding}"
-                                         MaskedLength="{Binding MaskedLength}"
-                                         FontFamily="{DynamicResource KpMono}"
-                                         FontSize="13"
-                                         VerticalAlignment="Center"
-                                         Margin="12,0"
-                                         Foreground="{DynamicResource KpTextSecondary}" />
+                      <Border Background="{DynamicResource KpTerminal}" BorderBrush="{DynamicResource KpBorderSubtle}"
+                              BorderThickness="1" CornerRadius="6" Padding="12,4,4,4">
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                          <TextBlock Classes="mono amber" Text="›" Margin="0,0,8,0" VerticalAlignment="Center" />
+                          <TextBlock Grid.Column="1" Classes="mono primary" Text="{Binding RunCommand}"
+                                     TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                     ToolTip.Tip="{Binding RunCommand}" />
+                          <Button Grid.Column="2" Classes="ghost row-action" Margin="8,0,0,0"
+                                  ToolTip.Tip="Copy the command" Command="{Binding CopyRunCommandCommand}">
+                            <ctl:KpIcon Icon="copy" Size="13" />
+                          </Button>
+                        </Grid>
+                      </Border>
 
-                      <Button Grid.Column="2" Content="Copy" Command="{Binding CopyValueCommand}" />
-                      <Button Grid.Column="3" Content="Replace" Margin="8,0,0,0"
-                              Command="{Binding ReplaceCommand}" />
-                      <Button Grid.Column="4" Content="Remove" Margin="8,0,0,0"
-                              Command="{Binding RemoveCommand}" />
+                      <TextBlock Classes="body muted" FontSize="12.5" LineHeight="18.75"
+                                 Text="Values go straight into the child process environment. Nothing is written to disk, and agents running the command see only the key names." />
+                      <TextBlock Classes="body muted" FontSize="12.5" LineHeight="18.75"
+                                 Text="Prod values always need a live approval, even inside a grant." />
 
-                    </Grid>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-            </ScrollViewer>
+                      <Border Classes="divider" Margin="0,2" />
 
-          </Grid>
-        </DataTemplate>
-      </ContentControl.DataTemplates>
-    </ContentControl>
+                      <TextBlock Classes="label" Text="On this machine" />
+                      <Grid ColumnDefinitions="*,Auto">
+                        <TextBox Grid.Column="0" Classes="mono" Text="{Binding Launch.Directory}"
+                                 PlaceholderText="Project directory" />
+                        <Button Grid.Column="1" Content="Choose…" Margin="8,0,0,0"
+                                Command="{Binding Launch.ChooseDirectoryCommand}" />
+                      </Grid>
+                      <Grid ColumnDefinitions="*,Auto">
+                        <TextBox Grid.Column="0" Classes="mono" Text="{Binding Launch.Command}" PlaceholderText="npm start" />
+                        <Button Grid.Column="1" Content="Save" Margin="8,0,0,0" Command="{Binding Launch.SaveCommand}" />
+                      </Grid>
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Command="{Binding Launch.RunProjectCommand}">
+                          <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ctl:KpIcon Icon="terminal" Size="13" />
+                            <TextBlock Text="Run in a terminal" />
+                          </StackPanel>
+                        </Button>
+                        <Button Classes="ghost" Content="Open terminal" Command="{Binding Launch.OpenTerminalCommand}" />
+                      </StackPanel>
+                      <TextBlock Classes="caption" IsVisible="{Binding !Launch.IsSupported}"
+                                 Text="This app opens terminals on Windows and Linux only. Copy the run command instead." />
 
-  </Grid>
+                      <!-- The confirmation names the command, the directory and the variables' names, never a value. -->
+                      <Border Classes="card" IsVisible="{Binding Launch.IsConfirming}" BorderBrush="{DynamicResource KpAccent}"
+                              Background="{DynamicResource KpAccentTint}" Padding="14">
+                        <StackPanel Spacing="6">
+                          <TextBlock Classes="body primary" Text="{Binding Launch.ConfirmTitle}" />
+                          <TextBlock Classes="mono primary" Text="{Binding Launch.ConfirmStarts}" TextWrapping="Wrap" />
+                          <TextBlock Classes="caption" Text="{Binding Launch.ConfirmDirectory, StringFormat='in {0}'}" />
+                          <TextBlock Classes="mono secondary" FontSize="12" Text="{Binding Launch.ConfirmKeys}" TextWrapping="Wrap" />
+                          <TextBlock Classes="caption" Text="Everything run in that terminal can read these values." />
+                          <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                            <Button Classes="primary" Content="Start" Command="{Binding Launch.ConfirmLaunchCommand}" />
+                            <Button Classes="ghost" Content="Cancel" Command="{Binding Launch.CancelLaunchCommand}" />
+                          </StackPanel>
+                        </StackPanel>
+                      </Border>
+                    </StackPanel>
+                  </Border>
+                </Grid>
+
+              </StackPanel>
+            </DataTemplate>
+          </ContentControl.DataTemplates>
+        </ContentControl>
+
+      </StackPanel>
+    </Grid>
+  </ScrollViewer>
 
 </UserControl>

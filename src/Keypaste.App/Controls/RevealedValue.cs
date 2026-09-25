@@ -184,6 +184,8 @@ internal sealed class RevealedValue : Control
     {
         ArgumentNullException.ThrowIfNull(context);
 
+        // Hit testing follows what is drawn, so the whole cell is the hold target and not only the dots.
+        context.FillRectangle(Brushes.Transparent, new Rect(Bounds.Size));
         context.DrawText(Layout(), default);
     }
 
