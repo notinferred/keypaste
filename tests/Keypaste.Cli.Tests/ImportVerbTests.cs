@@ -105,17 +105,31 @@ public sealed class ImportVerbTests : IDisposable
     public void Import_Blocked_Exits1_WritingNothing()
     {
         Seed();
-        var source = Source("acme.kdbx", vault => vault.AddEntry(new VaultEntry { Title = "bad-key", GroupPath = "env/acme-api", Password = "x" }));
+        var source = Source("acme.kdbx");
         var before = File.ReadAllBytes(_cli.VaultPath);
 
         _cli.Prompt.Enqueue(_sourcePassword, _master);
-        var exit = _cli.Run("import", source, "--vault", _cli.VaultPath);
+        var exit = _cli.Run("import", source, "--into", "Recycle Bin", "--vault", _cli.VaultPath);
 
         _cli.AssertExit(CliApp.ExitUsageError, exit);
-        Assert.Contains("  ✗ env/acme-api → env/acme-api: 'bad-key' is not a valid environment variable name", _cli.Err, StringComparison.Ordinal);
+        Assert.Contains("Recycle Bin is the recycle bin's name", _cli.Err, StringComparison.Ordinal);
         Assert.Contains("nothing was written", _cli.Err, StringComparison.Ordinal);
         Assert.DoesNotContain("✓", _cli.Err, StringComparison.Ordinal);
         Assert.Equal(before, File.ReadAllBytes(_cli.VaultPath));
+    }
+
+    [Fact]
+    public void Import_AnEnvGroupThatIsNotAValidSet_LandsUnderInto()
+    {
+        Seed();
+        var source = Source("acme.kdbx", vault => vault.AddEntry(new VaultEntry { Title = "bad-key", GroupPath = "env/acme-api", Password = "x" }));
+
+        _cli.Prompt.Enqueue(_sourcePassword, _master);
+        _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("import", source, "--into", "Imported", "--dry-run", "--vault", _cli.VaultPath));
+        Assert.Contains(
+            "Imported/env/acme-api      (not a valid env set: 'bad-key' is not a valid environment variable name",
+            _cli.Out,
+            StringComparison.Ordinal);
     }
 
     [Fact]

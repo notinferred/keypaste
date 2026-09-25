@@ -316,12 +316,43 @@ public sealed class KdbxImportTests : IDisposable
         });
         using var target = Target();
         using var opened = KdbxImport.Open(source, SourcePassword, null);
-        var plan = opened.DefaultPlan(target, null);
+        var byDefault = opened.DefaultPlan(target, null);
+        var plan = new ImportPlan([.. byDefault.Rows.Select(row => row with { Destination = row.SourceGroup })], byDefault.Into);
         var problems = opened.Check(target, plan);
 
+        Assert.Empty(opened.Check(target, byDefault));
+        Assert.Equal("acme/env/acme-api/dev", Row(byDefault, "env/acme-api/dev").Destination);
+        Assert.Equal("env/acme-api", Row(byDefault, "env/acme-api").Destination);
         Assert.Contains(problems, p => p.Blocks && p.Index == Row(plan, "env/acme-api/dev").Index && p.Message.Contains("default profile", StringComparison.Ordinal));
         Assert.Contains(problems, p => p.Blocks && p.Index == Row(plan, "env/acme-api/Bad_Name").Index && p.Message.Contains("not a profile name", StringComparison.Ordinal));
         Assert.DoesNotContain(problems, p => p.Index == Row(plan, "env/acme-api").Index);
+    }
+
+    [Fact]
+    public void EnvGroupThatIsNotAValidSet_DefaultsUnderInto()
+    {
+        var source = Source("servers.kdbx", vault =>
+        {
+            vault.AddEntry(new VaultEntry { Title = "ssh root", GroupPath = "env/Work Servers", Password = "r" });
+            vault.AddEntry(new VaultEntry { Title = "db pass", GroupPath = "env/Work Servers/Staging", Password = "d" });
+            vault.AddEntry(new VaultEntry { Title = "API_KEY", GroupPath = "env/acme-api", Password = "a" });
+            vault.AddEntry(new VaultEntry { Title = "bad key", GroupPath = "env/acme-api/staging", Password = "s" });
+        });
+        using var target = Target();
+        using var opened = KdbxImport.Open(source, SourcePassword, null);
+
+        var plan = opened.DefaultPlan(target, "Imported");
+
+        Assert.Equal("Imported/env/Work Servers", Row(plan, "env/Work Servers").Destination);
+        Assert.Equal("Imported/env/Work Servers/Staging", Row(plan, "env/Work Servers/Staging").Destination);
+        Assert.Equal("env/acme-api", Row(plan, "env/acme-api").Destination);
+        Assert.Equal("Imported/env/acme-api/staging", Row(plan, "env/acme-api/staging").Destination);
+        Assert.StartsWith("not a valid env set: ", Row(plan, "env/Work Servers").Rerouted, StringComparison.Ordinal);
+        Assert.Null(Row(plan, "env/acme-api").Rerouted);
+        Assert.Empty(opened.Check(target, plan));
+
+        opened.ApplyTo(target, plan);
+        Assert.NotNull(target.Find(new EntryName("Imported/env/Work Servers/Staging", "db pass")));
     }
 
     [Fact]
@@ -363,9 +394,11 @@ public sealed class KdbxImportTests : IDisposable
         });
         using var target = Target();
         using var opened = KdbxImport.Open(source, SourcePassword, null);
-        var plan = opened.DefaultPlan(target, null);
+        var byDefault = opened.DefaultPlan(target, null);
+        var plan = new ImportPlan([.. byDefault.Rows.Select(row => row with { Destination = row.SourceGroup })], byDefault.Into);
         var problems = opened.Check(target, plan);
 
+        Assert.DoesNotContain(opened.Check(target, byDefault), p => p.Blocks);
         Assert.Contains(problems, p => p.Blocks && p.Index == Row(plan, "env/one").Index && p.Message.Contains("not a valid environment variable name", StringComparison.Ordinal));
         Assert.Contains(problems, p => p.Blocks && p.Index == Row(plan, "env/two").Index && p.Message.Contains("differ only in case", StringComparison.Ordinal));
         Assert.Contains(problems, p => p.Blocks && p.Index == Row(plan, "env/three").Index && p.Message.Contains("twice", StringComparison.Ordinal));

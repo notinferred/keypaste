@@ -153,10 +153,9 @@ internal static class ImportCommand
         {
             var row = plan.Rows[i];
             var destination = EntryNameSanitizer.SanitizePath(row.Destination).Text;
-            var note = row.SourceGroup.StartsWith(EnvConvention.RootGroup + "/", StringComparison.Ordinal)
-                && !string.Equals(row.Destination, row.SourceGroup, StringComparison.Ordinal)
-                    ? $"      ({EntryNameSanitizer.SanitizePath(row.SourceGroup).Text} exists here)"
-                    : string.Empty;
+            var note = row.Rerouted is { } rerouted
+                ? $"      ({EntryNameSanitizer.SanitizeProse(rerouted, 256).Text})"
+                : string.Empty;
             output.WriteLine($"    {labels[i].PadRight(width)}  {Number(row.EntryCount, countWidth)}  {arrow} {destination}{note}");
         }
 
@@ -349,9 +348,10 @@ internal static class ImportCommand
         writer.WriteLine("                       [--source-keyfile <path|none>] [--vault <path>] [--keyfile <path>]");
         writer.WriteLine();
         writer.WriteLine("  copies every entry of another KeePass file into your vault, with its fields, attachments");
-        writer.WriteLine("  and history, under a group named after the file. The file itself is never changed. Its");
-        writer.WriteLine("  recycle bin is left behind. With no vault configured, or --in-place, the file is kept where");
-        writer.WriteLine("  it is and remembered as a vault to open.");
+        writer.WriteLine("  and history, under a group named after the file. An env set that is valid and new to your");
+        writer.WriteLine("  vault keeps its env/... path; any other env group goes under that group too. The file");
+        writer.WriteLine("  itself is never changed. Its recycle bin is left behind. With no vault configured, or");
+        writer.WriteLine("  --in-place, the file is kept where it is and remembered as a vault to open.");
         writer.WriteLine();
         writer.WriteLine("  --into <group>            the group to copy into (default: the file's name)");
         writer.WriteLine("  --dry-run                 show where each group would land, and write nothing");

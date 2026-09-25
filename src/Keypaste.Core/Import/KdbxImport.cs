@@ -19,7 +19,11 @@ public sealed record KdbxProbe(string Path, string FileName, string Version, str
 /// <param name="Destination">The group path it lands at, which the person may change.</param>
 /// <param name="Include">Whether the row is copied.</param>
 /// <param name="IsRootEntries">Whether the row is the entries directly in the source's root group.</param>
-public sealed record ImportRow(int Index, string SourceGroup, int EntryCount, string Destination, bool Include, bool IsRootEntries);
+public sealed record ImportRow(int Index, string SourceGroup, int EntryCount, string Destination, bool Include, bool IsRootEntries)
+{
+    /// <summary>Why a default plan put an env set under the import group instead of at its own path, or null.</summary>
+    public string? Rerouted { get; init; }
+}
 
 /// <summary>Something about one row, or about the whole import when <see cref="Index"/> is -1.</summary>
 /// <param name="Index">The row's <see cref="ImportRow.Index"/>, or -1.</param>

@@ -65,8 +65,9 @@ public sealed class ImportSource : IDisposable
     /// </param>
     /// <returns>
     /// Every top-level group at <c>&lt;into&gt;/&lt;name&gt;</c>, the root's own entries at
-    /// <c>&lt;into&gt;</c>, and each env set at its own path unless the target already has that
-    /// project, when it goes to <c>&lt;into&gt;/env/…</c>.
+    /// <c>&lt;into&gt;</c>, and each env set at its own path when it is a valid set new to the
+    /// target; a project the target already has, or one whose set <see cref="Check"/> would block,
+    /// goes with all its profiles to <c>&lt;into&gt;/env/…</c> as plain groups.
     /// </returns>
     public ImportPlan DefaultPlan(Vault target, string? into)
     {
@@ -75,12 +76,47 @@ public sealed class ImportSource : IDisposable
 
         var groups = target.ReadGroupPaths().ToHashSet(StringComparer.Ordinal);
         var intoGroup = into ?? DefaultInto(groups);
+        var titles = Titles(target);
+        var rerouted = new Dictionary<string, string>(StringComparer.Ordinal);
+        List<ImportRow> rows = [];
 
-        return new ImportPlan(
-            [.. _units.Select((unit, index) => new ImportRow(
-                index, unit.SourceGroup, unit.EntryCount, Destination(unit, intoGroup, groups), true, unit.IsRootEntries))],
-            intoGroup);
+        foreach (var (unit, index) in _units.Select((unit, index) => (unit, index)))
+        {
+            var reason = unit.IsRootEntries || unit.Project is not { } project
+                ? null
+                : groups.Contains(EnvConvention.GroupPath(project))
+                    ? $"{EnvConvention.GroupPath(project)} exists here"
+                    : rerouted.TryGetValue(project, out var earlier)
+                        ? earlier
+                        : RefuseEnvSet(unit, unit.SourceGroup, titles.GetValueOrDefault(unit.SourceGroup) ?? []) is { } refused
+                            ? $"not a valid env set: {refused}"
+                            : null;
+
+            var destination = unit.IsRootEntries
+                ? intoGroup
+                : unit.Project is not null && reason is null ? unit.SourceGroup : intoGroup + "/" + unit.SourceGroup;
+
+            // A project that moves takes its profiles with it; a profile that moves goes alone.
+            if (reason is not null && unit.Project is { } moved && string.Equals(unit.SourceGroup, EnvConvention.GroupPath(moved), StringComparison.Ordinal))
+            {
+                rerouted.TryAdd(moved, reason);
+            }
+
+            if (!titles.TryGetValue(destination, out var there))
+            {
+                titles[destination] = there = [];
+            }
+
+            there.AddRange(unit.Titles);
+            rows.Add(new ImportRow(index, unit.SourceGroup, unit.EntryCount, destination, true, unit.IsRootEntries) { Rerouted = reason });
+        }
+
+        return new ImportPlan(rows, intoGroup);
     }
+
+    private static Dictionary<string, List<string>> Titles(Vault target) =>
+        target.Search(string.Empty).GroupBy(match => match.Name.GroupPath, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Select(match => match.Name.Title).ToList(), StringComparer.Ordinal);
 
     /// <summary>What stops a plan, or is worth saying about it, against the vault it would change.</summary>
     /// <param name="target">The vault imported into.</param>
@@ -101,8 +137,7 @@ public sealed class ImportSource : IDisposable
 
         var groupCounts = target.ReadGroupPaths().CountBy(path => path, StringComparer.Ordinal)
             .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
-        var titles = target.Search(string.Empty).GroupBy(match => match.Name.GroupPath, StringComparer.Ordinal)
-            .ToDictionary(group => group.Key, group => group.Select(match => match.Name.Title).ToList(), StringComparer.Ordinal);
+        var titles = Titles(target);
 
         foreach (var row in plan.Rows)
         {
@@ -294,18 +329,6 @@ public sealed class ImportSource : IDisposable
             || string.Equals(group, EnvConvention.RootGroup, StringComparison.Ordinal)
             || string.Equals(group, KeePassInterop.RecycleBinName, StringComparison.Ordinal)
             || ReservedGroups.IsReserved(group);
-    }
-
-    private static string Destination(Unit unit, string into, HashSet<string> groups)
-    {
-        if (unit.IsRootEntries)
-        {
-            return into;
-        }
-
-        return unit.Project is { } project && !groups.Contains(EnvConvention.GroupPath(project))
-            ? unit.SourceGroup
-            : into + "/" + unit.SourceGroup;
     }
 
     private static bool IsEnv(string destination) =>
