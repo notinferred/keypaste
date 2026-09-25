@@ -65,9 +65,16 @@ internal sealed class ClientCardRow : ObservableObject
 
     internal string Hint { get; }
 
-    /// <summary>The policy's words, as the select lists them.</summary>
+    /// <summary>The policy's words, as the select lists them: <see cref="ClientPolicies.Describe"/> up to its explanation.</summary>
     internal static IReadOnlyList<string> PolicyOptions { get; } =
-        [.. Enum.GetValues<ClientPolicy>().Select(ClientPolicies.Describe)];
+        [.. Enum.GetValues<ClientPolicy>().Select(Words)];
+
+    /// <summary>What the policy held means beyond its name, or empty.</summary>
+    internal string Explanation => ClientPolicies.Describe(_policy) is var described && described.IndexOf(':', StringComparison.Ordinal) is var colon and >= 0
+        ? described[(colon + 1)..].Trim() + "."
+        : string.Empty;
+
+    internal bool HasExplanation => Explanation.Length > 0;
 
     /// <summary>The same words, for the card's own select.</summary>
     internal IReadOnlyList<string> Options { get; } = PolicyOptions;
@@ -88,11 +95,11 @@ internal sealed class ClientCardRow : ObservableObject
     /// <summary>The policy's words, for a select bound to <see cref="PolicyOptions"/>.</summary>
     internal string PolicyText
     {
-        get => ClientPolicies.Describe(_policy);
+        get => Words(_policy);
         set
         {
-            if (Enum.GetValues<ClientPolicy>().FirstOrDefault(policy => ClientPolicies.Describe(policy) == value) is var chosen
-                && ClientPolicies.Describe(chosen) == value)
+            if (Enum.GetValues<ClientPolicy>().FirstOrDefault(policy => Words(policy) == value) is var chosen
+                && Words(chosen) == value)
             {
                 Policy = chosen;
             }
@@ -105,8 +112,12 @@ internal sealed class ClientCardRow : ObservableObject
         if (Set(ref _policy, policy, nameof(Policy)))
         {
             Raise(nameof(PolicyText));
+            Raise(nameof(Explanation));
+            Raise(nameof(HasExplanation));
         }
     }
+
+    private static string Words(ClientPolicy policy) => ClientPolicies.Describe(policy).Split(':')[0];
 
     private static string InitialsOf(string name)
     {

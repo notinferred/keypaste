@@ -48,6 +48,106 @@ public sealed class ScreenRenderer
         DrawComponents(output!);
     });
 
+    /// <summary>
+    /// Agents with what a working session holds: two clients attached over the app's own endpoint
+    /// whose requests a person allowed for an hour, a client seen only in the log, a policy and
+    /// two tokens, then the token form, a minted token and the Connect card.
+    /// </summary>
+    [Fact]
+    public Task The_agents_screen_is_drawn_with_grants_clients_and_tokens() => HeadlessSession.On(async () =>
+    {
+        var output = Environment.GetEnvironmentVariable(_variable);
+        Assert.SkipWhen(string.IsNullOrEmpty(output), $"{_variable} is not set");
+        Directory.CreateDirectory(output!);
+
+        using var demo = new DemoVault();
+        var clock = new ManualClock();
+        using var authority = new AppAuthority(new AppVaultSession(clock, TimeSpan.FromHours(8), demo.Home), null, () => new Allowing());
+
+        using (var master = TempVault.Secret(_master))
+        {
+            Assert.Equal(UnlockOutcome.Opened, authority.Session.TryUnlock(demo.Path, master.Value));
+        }
+
+        var serving = Assert.IsType<AuthorityStatus.Serving>(authority.Status);
+        await using var claude = await AgentAsync(serving, demo.Path, new Core.Ipc.AttachClient("claude", "2.0", "claude-code"));
+        await using var cursor = await AgentAsync(serving, demo.Path, new Core.Ipc.AttachClient("cursor", "1.4", "cursor"));
+        await AskAsync(claude, serving, demo.Path, "claude-code", "env/acme-api/DATABASE_URL");
+        await AskAsync(claude, serving, demo.Path, "claude-code", "env/acme-api/STRIPE_SECRET_KEY");
+        clock.Advance(TimeSpan.FromMinutes(18));
+        await AskAsync(cursor, serving, demo.Path, "cursor", "env/acme-web/NEXT_PUBLIC_API");
+
+        Assert.True(Core.Clients.ClientPolicies.TrySave(
+            Core.Audit.KeypasteHome.ClientsPath(demo.Home),
+            Core.Clients.ClientPolicies.Empty.With("cursor", Core.Clients.ClientPolicy.AskEveryTime).With("local-evals", Core.Clients.ClientPolicy.InjectOnly),
+            out var saveError), saveError);
+
+        using var shell = new ShellViewModel(authority.Session, demo.Home, authority, clipboard: new FakeClipboard(), clock: clock);
+        var window = new MainWindow { Width = _width, Height = _height };
+        window.FindControl<ContentControl>("Root")!.Content = new ShellView { DataContext = shell };
+        window.Show();
+
+        shell.Current = Destinations.Of(DestinationKind.AgentActivity);
+        var agents = Assert.IsType<AgentActivityViewModel>(shell.Content);
+        var tokens = agents.Tokens!;
+        Assert.True(tokens.Create("ci-github-actions", "read:acme-api/staging/*", TimeSpan.FromDays(30), false).Ok);
+        Assert.True(tokens.Create("local-evals", "read:acme-api/dev/OPENAI_API_KEY", TimeSpan.FromDays(7), false).Ok);
+        agents.Refresh();
+        Save(window, output!, "20-agents");
+
+        window.Height = 1500;
+        Save(window, output!, "21-agents-full");
+
+        agents.RevokeCommand.Execute(agents.Grants[0]);
+        tokens.OpenFormCommand.Execute(null);
+        tokens.Name = "deploy-preview";
+        tokens.Scope = "read:acme-web/preview/*";
+        tokens.Expiry = "7d";
+        Save(window, output!, "22-agents-new-token");
+
+        tokens.CreateCommand.Execute(null);
+        Save(window, output!, "23-agents-token-minted");
+
+        tokens.DoneMintedCommand.Execute(null);
+        agents.ToggleConnectCommand.Execute(null);
+        Save(window, output!, "24-agents-connect");
+
+        window.Close();
+    });
+
+    private static async Task<Core.Ipc.ApproverClient> AgentAsync(AuthorityStatus.Serving serving, string vault, Core.Ipc.AttachClient identity)
+    {
+        var client = await Core.Ipc.ApproverClient.TryConnectAsync(serving.Endpoint, TimeSpan.FromSeconds(10), CancellationToken.None);
+        Assert.NotNull(client);
+        Assert.True((await client.AttachAsync(new Core.Ipc.AttachRequest(vault) { Client = identity }, CancellationToken.None))!.Attached);
+        return client;
+    }
+
+    private static async Task AskAsync(Core.Ipc.ApproverClient client, AuthorityStatus.Serving serving, string vault, string label, string entry)
+    {
+        var reply = await client.RequestAsync(
+            new Core.Ipc.CredentialRequest
+            {
+                Entry = entry,
+                Field = "password",
+                Reason = "run the api tests",
+                TtlSeconds = 3600,
+                Exposure = ["env/**"],
+                ClientName = label,
+                ClientLabel = label,
+                Vault = vault,
+                Session = serving.Session,
+            },
+            CancellationToken.None);
+        Assert.NotNull(reply?.Value);
+    }
+
+    private sealed class Allowing : IApprovalChannel
+    {
+        public ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(ApprovalAnswer.Approved);
+    }
+
     private static void DrawUnlock(DemoVault demo, string output)
     {
         Core.Recent.RecentVaults.Save(

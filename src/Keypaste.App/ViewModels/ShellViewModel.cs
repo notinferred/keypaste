@@ -479,7 +479,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         return entries;
     }
 
-    private AgentActivityViewModel Activity() => new(Authority, Home, _clock, _post);
+    private AgentActivityViewModel Activity() => new(Authority, Home, _clock, _post, toast: ShowToast, clipboard: Clipboard);
 
     private void OpenProject(string? project)
     {
@@ -511,7 +511,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
         try
         {
-            var entries = vault.ReadEntries();
+            var entries = vault.ReadEntries().Where(entry => !Core.ReservedGroups.IsReserved(entry.GroupPath)).ToList();
             total = entries.Count;
 
             foreach (var entry in entries)

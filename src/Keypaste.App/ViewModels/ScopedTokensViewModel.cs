@@ -1,3 +1,5 @@
+using System.Globalization;
+using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.Core;
 using Keypaste.Core.Tokens;
@@ -19,27 +21,150 @@ internal sealed record ScopedTokenRow(string Id, string Name, string Prefix, str
 /// </summary>
 /// <remarks>
 /// The desktop owns the vault while it is unlocked, so this is where tokens are made and revoked
-/// then; the CLI verbs that save are refused while it holds it. A minted token is handed back once
-/// from <see cref="Create"/> and kept nowhere here.
+/// then; the CLI verbs that save are refused while it holds it. <see cref="Create"/> hands a minted
+/// token back once. The form keeps it in <see cref="Minted"/> only until it is dismissed or the
+/// screen closes, drawn while held and copied through the clipboard countdown, never in a property.
 /// </remarks>
 internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
 {
     private readonly AppVaultSession _session;
+    private readonly ClipboardCountdown? _clipboard;
+    private readonly Action<string> _toast;
     private IReadOnlyList<ScopedTokenRow> _rows = [];
+    private bool _isFormOpen;
+    private string _name = string.Empty;
+    private string _scope = string.Empty;
+    private string _expiry = ExpiryOptions[1];
+    private string _formError = string.Empty;
+    private string _message = string.Empty;
+    private MintedToken? _minted;
 
-    internal ScopedTokensViewModel(AppVaultSession session)
+    internal ScopedTokensViewModel(AppVaultSession session, ClipboardCountdown? clipboard = null, Action<string>? toast = null)
     {
         ArgumentNullException.ThrowIfNull(session);
 
         _session = session;
+        _clipboard = clipboard;
+        _toast = toast ?? (_ => { });
+
+        OpenFormCommand = new RelayCommand(() => IsFormOpen = true);
+        CancelFormCommand = new RelayCommand(CloseForm);
+        CreateCommand = new RelayCommand(CreateFromForm);
+        CopyMintedCommand = new RelayCommand(CopyMinted, () => _minted is not null && _clipboard is not null);
+        DoneMintedCommand = new RelayCommand(() => SetMinted(null));
+        RevokeCommand = new RelayCommand<ScopedTokenRow>(RevokeRow, row => row is not null);
+        SetExpiryCommand = new RelayCommand<string>(chosen => Expiry = chosen!);
         Refresh();
     }
+
+    /// <summary>The lifetimes the form offers.</summary>
+    internal static IReadOnlyList<string> ExpiryOptions { get; } = ["7d", "30d", "90d"];
+
+    /// <summary>Chooses one of <see cref="ExpiryOptions"/>.</summary>
+    internal RelayCommand<string> SetExpiryCommand { get; }
+
+    internal bool IsFormOpen
+    {
+        get => _isFormOpen;
+        private set
+        {
+            if (Set(ref _isFormOpen, value))
+            {
+                FormError = string.Empty;
+            }
+        }
+    }
+
+    /// <summary>What the new token is called: lowercase letters, digits and dashes.</summary>
+    internal string Name
+    {
+        get => _name;
+        set => Set(ref _name, value ?? string.Empty);
+    }
+
+    /// <summary>The new token's scopes, comma-separated, as <c>--scope</c> takes them.</summary>
+    internal string Scope
+    {
+        get => _scope;
+        set => Set(ref _scope, value ?? string.Empty);
+    }
+
+    /// <summary>One of <see cref="ExpiryOptions"/>.</summary>
+    internal string Expiry
+    {
+        get => _expiry;
+        set
+        {
+            if (value is not null && ExpiryOptions.Contains(value))
+            {
+                Set(ref _expiry, value);
+            }
+        }
+    }
+
+    /// <summary>Why the form made no token, or empty.</summary>
+    internal string FormError
+    {
+        get => _formError;
+        private set
+        {
+            if (Set(ref _formError, value))
+            {
+                Raise(nameof(HasFormError));
+            }
+        }
+    }
+
+    internal bool HasFormError => _formError.Length > 0;
+
+    /// <summary>Why a revoke did nothing, or empty.</summary>
+    internal string Message
+    {
+        get => _message;
+        private set
+        {
+            if (Set(ref _message, value))
+            {
+                Raise(nameof(HasMessage));
+            }
+        }
+    }
+
+    internal bool HasMessage => _message.Length > 0;
+
+    /// <summary>The token just minted, until it is dismissed; it hands its value only to a hold or a copy.</summary>
+    internal MintedToken? Minted => _minted;
+
+    internal bool HasMinted => _minted is not null;
+
+    internal bool HasNoRows => _rows.Count == 0;
+
+    internal RelayCommand OpenFormCommand { get; }
+
+    internal RelayCommand CancelFormCommand { get; }
+
+    /// <summary>Mints a token from the form and keeps it until Done.</summary>
+    internal RelayCommand CreateCommand { get; }
+
+    /// <summary>Copies the minted token; the clipboard clears itself as a copied password does.</summary>
+    internal RelayCommand CopyMintedCommand { get; }
+
+    /// <summary>Forgets the minted token.</summary>
+    internal RelayCommand DoneMintedCommand { get; }
+
+    internal RelayCommand<ScopedTokenRow> RevokeCommand { get; }
 
     /// <summary>Every token, by name.</summary>
     internal IReadOnlyList<ScopedTokenRow> Rows
     {
         get => _rows;
-        private set => Set(ref _rows, value);
+        private set
+        {
+            if (Set(ref _rows, value))
+            {
+                Raise(nameof(HasNoRows));
+            }
+        }
     }
 
     /// <summary>Reads the vault's tokens again.</summary>
@@ -124,7 +249,70 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
         return failure;
     }
 
-    public void Dispose() => Rows = [];
+    public void Dispose()
+    {
+        SetMinted(null);
+        Rows = [];
+    }
+
+    private void CloseForm()
+    {
+        IsFormOpen = false;
+        Name = string.Empty;
+        Scope = string.Empty;
+    }
+
+    private void CreateFromForm()
+    {
+        var name = _name.Trim();
+        var days = int.Parse(_expiry[..^1], CultureInfo.InvariantCulture);
+        var (ok, token, message) = Create(name, _scope, TimeSpan.FromDays(days), allowProd: false);
+
+        if (!ok || token is null)
+        {
+            FormError = message.Length == 0 ? "No token was made." : char.ToUpperInvariant(message[0]) + message[1..].TrimEnd('.') + ".";
+            return;
+        }
+
+        CloseForm();
+        var prefix = _rows.FirstOrDefault(row => row.Name == name)?.Prefix ?? TokenSecret.Prefix;
+        SetMinted(new MintedToken(token, name, $"keypaste keeps only a verifier of {prefix}, so nobody can show you this token later."));
+        _toast($"Created {name}. Copy it now: it is shown once");
+    }
+
+    private void CopyMinted()
+    {
+        if (_minted?.Reveal() is { } token && _clipboard is not null)
+        {
+            _ = _clipboard.CopyAsync(token, _minted.Name);
+            _toast($"Copied {_minted.Name}. Clipboard clears in 30s");
+        }
+    }
+
+    private void RevokeRow(ScopedTokenRow? row)
+    {
+        if (row is null)
+        {
+            return;
+        }
+
+        var failure = Revoke(row);
+        Message = failure ?? string.Empty;
+
+        if (failure is null)
+        {
+            _toast($"Revoked {row.Name}");
+        }
+    }
+
+    private void SetMinted(MintedToken? minted)
+    {
+        _minted?.Forget();
+        _minted = minted;
+        Raise(nameof(Minted));
+        Raise(nameof(HasMinted));
+        CopyMintedCommand.RaiseCanExecuteChanged();
+    }
 
     private static bool TrySave(Vault vault, out string error)
     {
@@ -161,4 +349,27 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
 
         static string Plural(int n, string unit) => $"{n} {unit}{(n == 1 ? string.Empty : "s")}";
     }
+}
+
+/// <summary>A token just minted: drawn only while held and copied on request, then forgotten.</summary>
+/// <param name="token">The whole token, which no property returns.</param>
+/// <param name="name">What it is called.</param>
+/// <param name="note">What to do with it, naming its prefix and never its secret.</param>
+internal sealed class MintedToken(string token, string name, string note) : IRevealSource
+{
+    private string? _token = token;
+
+    internal string Name { get; } = name;
+
+    internal string Note { get; } = note;
+
+    public int MaskedLength => _token?.Length ?? 0;
+
+    public string? Reveal() => _token;
+
+    public void Conceal()
+    {
+    }
+
+    internal void Forget() => _token = null;
 }

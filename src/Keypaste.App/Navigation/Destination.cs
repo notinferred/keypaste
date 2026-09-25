@@ -66,7 +66,7 @@ internal static class Destinations
     internal static IReadOnlyList<Destination> All { get; } =
     [
         new(DestinationKind.Entries, "Secrets", "vault"),
-        new(DestinationKind.AgentActivity, "Agents", "bot"),
+        new(DestinationKind.AgentActivity, "Agents", "bot", OwnsHeader: true),
         new(DestinationKind.Log, "Activity", "activity"),
         new(DestinationKind.EnvSets, "Env profiles", "layers"),
         new(DestinationKind.Settings, "Settings", "settings", DestinationPlacement.Footer),
