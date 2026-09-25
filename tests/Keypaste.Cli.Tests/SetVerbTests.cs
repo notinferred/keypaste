@@ -74,7 +74,7 @@ public sealed class SetVerbTests : IDisposable
         _harness.Prompt.Enqueue(_master, _value);
         _harness.AssertExit(CliApp.ExitSuccess, Set("env/acme-api/staging/STRIPE"));
 
-        foreach (var name in new[] { "env/acme-api/staging/bad-name", "env/acme-api/staging/stripe", "env/acme-api/Staging/KEY", "env/KEY" })
+        foreach (var name in new[] { "env/acme-api/staging/bad-name", "env/acme-api/staging/stripe", "env/acme-api/Staging/KEY", "env/KEY", "env/acme-api/dev/KEY", "env/acme-api/staging/sub/KEY" })
         {
             _harness.Stderr.GetStringBuilder().Clear();
             _harness.Prompt.Enqueue(_master);
@@ -194,6 +194,19 @@ public sealed class SetVerbTests : IDisposable
 
         Assert.Contains($"keypaste add: {shown} is keypaste's own group; it cannot be written here", _harness.Err, StringComparison.Ordinal);
         Assert.Empty(_harness.Prompt.PromptsSeen);
+    }
+
+    [Theory]
+    [InlineData("KEY", "env/acme-api/dev", "the dev profile is env/acme-api itself")]
+    [InlineData("KEY", "env/acme-api/staging/sub", "'env/acme-api/staging/sub' is never read")]
+    public void Add_WhereNoProfileReads_IsRefused(string title, string group, string reason)
+    {
+        _harness.Prompt.Enqueue(_master);
+        _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("add", title, "--group", group, "--vault", _harness.VaultPath));
+
+        Assert.Contains(reason, _harness.Err, StringComparison.Ordinal);
+        using var vault = Vault.Open(_harness.VaultPath, _master);
+        Assert.DoesNotContain(vault.ReadEntries(), entry => entry.GroupPath.StartsWith("env", StringComparison.Ordinal));
     }
 
     [Fact]

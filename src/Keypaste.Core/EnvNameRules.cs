@@ -129,18 +129,27 @@ public static class EnvNameRules
         }
 
         if (!EnvConvention.IsValidProject(segments[1], out error)
-            || (segments.Length > 2 && !EnvProfileNames.IsValid(segments[2], out error))
-            || !EnvConvention.IsValidKey(target.Title, out error))
+            || (segments.Length > 2 && !EnvProfileNames.IsValid(segments[2], out error)))
         {
             return false;
         }
 
-        foreach (string segment in segments.Skip(3))
+        // D-0347: a group below a profile, or a subgroup named for the default profile, is never read.
+        if (segments.Length > 3)
         {
-            if (!EnvConvention.IsValidProject(segment, out error))
-            {
-                return false;
-            }
+            error = $"'{target.GroupPath}' is never read: a set is {root}/<project> or {root}/<project>/<profile>";
+            return false;
+        }
+
+        if (segments.Length == 3 && string.Equals(segments[2], EnvProfileNames.Default, StringComparison.Ordinal))
+        {
+            error = $"the {EnvProfileNames.Default} profile is {root}/{segments[1]} itself; name it {root}/{segments[1]}/{target.Title}";
+            return false;
+        }
+
+        if (!EnvConvention.IsValidKey(target.Title, out error))
+        {
+            return false;
         }
 
         if (!TryCheckCase([.. siblingTitles, target.Title], out var collision))
