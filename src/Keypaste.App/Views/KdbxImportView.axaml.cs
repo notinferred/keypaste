@@ -2,6 +2,7 @@ using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -44,18 +45,33 @@ internal sealed partial class KdbxImportView : UserControl
     private KdbxImportViewModel? Model => DataContext as KdbxImportViewModel;
 
     // Esc and Enter are taken at the window, so they work wherever focus sits while the dialog is open.
+    // Esc is taken on the way down, before the password field clears itself with it; Enter on the way
+    // up, after the password field has submitted the unlock.
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
         _root = TopLevel.GetTopLevel(this);
+        _root?.AddHandler(KeyDownEvent, OnRootEscape, RoutingStrategies.Tunnel);
         _root?.AddHandler(KeyDownEvent, OnRootKeyDown);
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
+        _root?.RemoveHandler(KeyDownEvent, OnRootEscape);
         _root?.RemoveHandler(KeyDownEvent, OnRootKeyDown);
         _root = null;
         base.OnDetachedFromVisualTree(e);
+    }
+
+    private void OnRootEscape(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape || e.Handled || Model is not { } model)
+        {
+            return;
+        }
+
+        model.CancelCommand.Execute(null);
+        e.Handled = true;
     }
 
     private void OnRootKeyDown(object? sender, KeyEventArgs e)
@@ -65,12 +81,7 @@ internal sealed partial class KdbxImportView : UserControl
             return;
         }
 
-        if (e.Key == Key.Escape)
-        {
-            model.CancelCommand.Execute(null);
-            e.Handled = true;
-        }
-        else if (e.Key == Key.Enter && model.ShowsConfirm && model.ConfirmCommand.CanExecute(null))
+        if (e.Key == Key.Enter && model.ShowsConfirm && model.ConfirmCommand.CanExecute(null))
         {
             model.ConfirmCommand.Execute(null);
             e.Handled = true;

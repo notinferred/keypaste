@@ -60,6 +60,59 @@ public sealed class ImportDialogKeyboardTests
         Assert.True(closed);
     });
 
+    [Fact]
+    public Task Escape_in_the_password_field_cancels_the_dialog() => HeadlessSession.On(() =>
+    {
+        using var fixture = new TempVault();
+        using var session = Open(fixture);
+        using var import = new KdbxImportViewModel(session, Source(fixture), (_, _) => { }, _ => { });
+        var closed = false;
+        import.Closed += (_, _) => closed = true;
+        var window = Show(import);
+
+        Assert.Equal("ImportPassword", (window.FocusManager?.GetFocusedElement() as Control)?.Name);
+        window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+        window.KeyReleaseQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+
+        Assert.True(closed);
+    });
+
+    [Theory]
+    [InlineData("cancel")]
+    [InlineData("escape")]
+    public Task Closing_the_dialog_gives_the_keyboard_back_to_Import_kdbx(string how) => HeadlessSession.On(() =>
+    {
+        using var fixture = new TempVault();
+        using var session = Open(fixture);
+        var picker = new FakeVaultFilePicker { ExistingPath = Source(fixture) };
+        using var shell = new ShellViewModel(session, fixture.Home, null, clock: new ManualClock(), picker: picker);
+        var window = new Window { Width = 1280, Height = 800, Content = new ShellView { DataContext = shell } };
+        window.Show();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        var button = window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "ImportKdbx");
+        button.Focus();
+        Drain(shell.ImportCommand.ExecuteAsync());
+        Assert.NotNull(shell.Import);
+        Assert.False(button.IsFocused);
+
+        if (how == "cancel")
+        {
+            shell.Import!.CancelCommand.Execute(null);
+        }
+        else
+        {
+            window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+            window.KeyReleaseQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+        }
+
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        Assert.False(shell.HasImport);
+        Assert.Same(button, window.FocusManager?.GetFocusedElement());
+        window.Close();
+    });
+
     private static AppVaultSession Open(TempVault fixture)
     {
         var session = new AppVaultSession(new ManualClock(), home: fixture.Home);
