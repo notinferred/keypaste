@@ -114,6 +114,12 @@ public static class EnvImport
             return new EnvImportPlan(project, profile, [], [], invalid);
         }
 
+        if (document.Variables.FirstOrDefault(v => v.Value.StartsWith(KpReferences.Scheme, StringComparison.Ordinal)) is { } reference)
+        {
+            return new EnvImportPlan(project, profile, [], [],
+                $"{reference.Key} holds a {KpReferences.Scheme} reference: this is a reference file ({EnvReferenceFile.FileName}); use it with `run --env-file`, not import");
+        }
+
         var existing = store.Read(project, profile).ToDictionary(v => v.Key, v => v.Value, StringComparer.Ordinal);
 
         if (Collision(document.Variables, existing) is { } collision)

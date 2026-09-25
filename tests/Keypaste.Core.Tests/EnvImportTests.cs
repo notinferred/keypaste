@@ -77,6 +77,26 @@ public sealed class EnvImportTests : IDisposable
     }
 
     [Fact]
+    public void A_reference_file_from_env_export_is_refused_and_the_vault_keeps_its_values()
+    {
+        using var vault = Opened(store =>
+        {
+            Set(store, "dev", "API_KEY", "real-key");
+            Set(store, "dev", "DATABASE_URL", "postgres://real");
+        });
+        var store = new EnvStore(vault);
+        var exported = EnvReferenceFile.Format("dev", EnvProfileNames.Default, ["API_KEY", "DATABASE_URL"]);
+
+        var plan = EnvImport.Plan(store, "dev", Parsed(exported));
+
+        Assert.NotNull(plan.Refusal);
+        Assert.Contains(EnvReferenceFile.FileName, plan.Refusal, StringComparison.Ordinal);
+        Assert.False(plan.WritesAnything);
+        Assert.False(EnvImport.TryApply(store, plan, out _));
+        Assert.Equal([new EnvVariable("API_KEY", "real-key"), new EnvVariable("DATABASE_URL", "postgres://real")], store.Read("dev"));
+    }
+
+    [Fact]
     public void A_file_with_problems_is_never_planned()
     {
         using var vault = Opened(_ => { });
