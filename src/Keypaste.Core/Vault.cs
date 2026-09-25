@@ -1,3 +1,4 @@
+using Keypaste.Core.Import;
 using Keypaste.Core.Internal;
 
 namespace Keypaste.Core;
@@ -655,6 +656,36 @@ public sealed class Vault : IDisposable
                 : null);
         renamedPath = path;
         return outcome;
+    }
+
+    /// <summary>Copies groups of another vault into this one, all or none. Call <see cref="Save"/> to persist it.</summary>
+    /// <param name="source">The vault copied from; <see cref="ImportSource.ApplyTo"/> has checked every destination.</param>
+    /// <param name="pieces">What to copy, and where.</param>
+    /// <returns>What was copied.</returns>
+    internal ImportResult Import(ImportSource source, IReadOnlyList<ImportPiece> pieces)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(pieces);
+
+        var groupsBefore = 0;
+        VaultEdit edit = VaultEdit.Of();
+        var copied = Change(
+            () =>
+            {
+                groupsBefore = _interop.ReadGroupPaths().Count;
+                return _interop.ImportFrom(source.Interop, pieces);
+            },
+            names => edit = VaultEdit.Of(names));
+
+        var shared = _interop.Search(string.Empty)
+            .CountBy(match => match.Name)
+            .Where(pair => pair.Value > 1)
+            .Select(pair => pair.Key)
+            .ToHashSet();
+
+        return new ImportResult(
+            copied.Count, _interop.ReadGroupPaths().Count - groupsBefore, copied.Count(shared.Contains), edit);
     }
 
     /// <summary>Writes a protected custom string onto an entry. A test seam; nothing else uses it.</summary>
