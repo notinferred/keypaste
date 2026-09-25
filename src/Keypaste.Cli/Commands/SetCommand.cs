@@ -60,7 +60,8 @@ internal static class SetCommand
 
         var target = line.Operands[0];
         var slash = target.LastIndexOf('/');
-        var name = new EntryName(slash < 0 ? string.Empty : target[..slash], target[(slash + 1)..]);
+        var name = new EntryName(WrittenGroup.Normalize(slash < 0 ? string.Empty : target[..slash]), target[(slash + 1)..]);
+        var entryPath = name.GroupPath.Length == 0 ? name.Title : name.GroupPath + "/" + name.Title;
 
         if (name.Title.Length == 0)
         {
@@ -70,7 +71,7 @@ internal static class SetCommand
 
         if (ReservedGroups.IsReserved(name.GroupPath))
         {
-            context.Stderr.WriteLine($"keypaste set: {Shown(target)} is keypaste's own group; it cannot be written here");
+            context.Stderr.WriteLine($"keypaste set: {Shown(entryPath)} is keypaste's own group; it cannot be written here");
             return CliApp.ExitUsageError;
         }
 
@@ -107,8 +108,8 @@ internal static class SetCommand
             var style = context.ConsoleStyle;
             var done = style.Paint(context.Stderr, Tone.Ok, style.Glyph(context.Stderr, Mark.Done));
             context.Stderr.WriteLine(existing is null
-                ? $"  {done} created {Shown(target)}"
-                : $"  {done} updated {Shown(target)} {style.Glyph(context.Stderr, Mark.Dot)} the old value stays in history");
+                ? $"  {done} created {Shown(entryPath)}"
+                : $"  {done} updated {Shown(entryPath)} {style.Glyph(context.Stderr, Mark.Dot)} the old value stays in history");
 
             return CliApp.ExitSuccess;
         });

@@ -61,7 +61,7 @@ internal static class AddCommand
         }
 
         var title = slash < 0 ? target : target[(slash + 1)..];
-        var groupPath = slash < 0 ? groupFlag ?? string.Empty : target[..slash];
+        var groupPath = WrittenGroup.Normalize(slash < 0 ? groupFlag ?? string.Empty : target[..slash]);
 
         if (title.Length == 0)
         {

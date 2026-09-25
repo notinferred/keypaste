@@ -174,7 +174,8 @@ internal static class LogCommand
 
         if (json)
         {
-            CliJson.WriteArray(context.Stdout, shown, WriteJson);
+            var unverified = report.Unverified;
+            CliJson.WriteArray(context.Stdout, shown, (writer, entry) => WriteJson(writer, entry, !unverified.Contains(entry.Line)));
         }
         else
         {
@@ -228,8 +229,8 @@ internal static class LogCommand
         }
     }
 
-    /// <summary>One record as <c>--json</c> writes it: what the record says, as recorded.</summary>
-    private static void WriteJson(Utf8JsonWriter json, AuditEntry entry)
+    /// <summary>One record as <c>--json</c> writes it: what the record says, and whether the chain vouches for it.</summary>
+    private static void WriteJson(Utf8JsonWriter json, AuditEntry entry, bool verified)
     {
         json.WriteNumber("line", entry.Line);
         json.WriteString("time", entry.Timestamp);
@@ -243,6 +244,7 @@ internal static class LogCommand
         json.WriteString("method", entry.Method);
         json.WriteString("reason", entry.Reason);
         json.WriteString("session", entry.Session);
+        json.WriteBoolean("verified", verified);
     }
 
     private static void Alarm(AuditChainReport report, CliContext context)

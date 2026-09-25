@@ -369,6 +369,14 @@ public sealed class LogVerbTests : IDisposable
 
         _cli.AssertExit(CliApp.ExitTamperDetected, _cli.Run("log", "verify"));
         Assert.Contains("keypaste never writes one there", _cli.Out, StringComparison.Ordinal);
+
+        _cli.Stdout.GetStringBuilder().Clear();
+        _cli.AssertExit(CliApp.ExitTamperDetected, _cli.Run("log", "--json"));
+        using var document = System.Text.Json.JsonDocument.Parse(_cli.Out);
+        var records = document.RootElement.EnumerateArray().ToList();
+        var forged = Assert.Single(records, record => record.GetProperty("entry").GetString() == "env/prod/PAYROLL_DB");
+        Assert.False(forged.GetProperty("verified").GetBoolean());
+        Assert.True(records[0].GetProperty("verified").GetBoolean());
     }
 
     /// <summary>
@@ -446,6 +454,7 @@ public sealed class LogVerbTests : IDisposable
         Assert.Equal("nobody was asked", record.GetProperty("reason").GetString());
         Assert.True(record.TryGetProperty("method", out _));
         Assert.True(record.TryGetProperty("session", out _));
+        Assert.True(record.GetProperty("verified").GetBoolean());
 
         _cli.Stdout.GetStringBuilder().Clear();
         _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("log", "--client", "nobody-like-this", "--json"));

@@ -112,26 +112,65 @@ public sealed class SetVerbTests : IDisposable
     }
 
     [Theory]
-    [InlineData(".keypaste/tokens/t1")]
-    [InlineData(".keypaste/x")]
-    [InlineData(".KEYPASTE/x")]
-    public void Set_Reserved_IsRefused(string path)
+    [InlineData(".keypaste/tokens/t1", ".keypaste/tokens/t1")]
+    [InlineData(".keypaste/x", ".keypaste/x")]
+    [InlineData(".KEYPASTE/x", ".KEYPASTE/x")]
+    [InlineData("/.keypaste/tokens/x", ".keypaste/tokens/x")]
+    [InlineData(".keypaste//x", ".keypaste/x")]
+    [InlineData("//.keypaste/x", ".keypaste/x")]
+    public void Set_Reserved_IsRefused(string path, string shown)
     {
         _harness.AssertExit(CliApp.ExitUsageError, Set(path));
 
-        Assert.Contains($"keypaste set: {path} is keypaste's own group; it cannot be written here", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains($"keypaste set: {shown} is keypaste's own group; it cannot be written here", _harness.Err, StringComparison.Ordinal);
+        Assert.Empty(_harness.Prompt.PromptsSeen);
+    }
+
+    [Theory]
+    [InlineData("/Banking/Chase")]
+    [InlineData("Banking//Chase")]
+    [InlineData("//Banking/Chase")]
+    public void Set_WithEmptySegments_UpdatesTheExistingEntry(string path)
+    {
+        _harness.Prompt.Enqueue(_master, "old-value");
+        _harness.AssertExit(CliApp.ExitSuccess, Set("Banking/Chase"));
+        _harness.Stderr.GetStringBuilder().Clear();
+
+        _harness.Prompt.Enqueue(_master, _value);
+        _harness.AssertExit(CliApp.ExitSuccess, Set(path));
+
+        Assert.Contains("  ✓ updated Banking/Chase", _harness.Err, StringComparison.Ordinal);
+        using var vault = Vault.Open(_harness.VaultPath, _master);
+        Assert.Equal(_value, vault.Find(new EntryName("Banking", "Chase"))?.Password);
+        Assert.Single(vault.ReadEntries(), entry => entry.Title == "Chase");
+    }
+
+    [Theory]
+    [InlineData(".Keypaste/shares/s1", null, ".Keypaste/shares/s1")]
+    [InlineData("s1", ".keypaste", ".keypaste/s1")]
+    [InlineData("/.keypaste/tokens/s1", null, ".keypaste/tokens/s1")]
+    [InlineData("s1", "/.keypaste", ".keypaste/s1")]
+    [InlineData("s1", ".keypaste//tokens", ".keypaste/tokens/s1")]
+    public void Add_Reserved_IsRefused(string target, string? group, string shown)
+    {
+        string[] groupArgs = group is null ? [] : ["--group", group];
+
+        _harness.AssertExit(CliApp.ExitUsageError, _harness.Run(["add", target, .. groupArgs, "--vault", _harness.VaultPath]));
+
+        Assert.Contains($"keypaste add: {shown} is keypaste's own group; it cannot be written here", _harness.Err, StringComparison.Ordinal);
         Assert.Empty(_harness.Prompt.PromptsSeen);
     }
 
     [Fact]
-    public void Add_Reserved_IsRefused()
+    public void Add_WithALeadingSlash_FindsTheExistingEntry()
     {
-        _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("add", ".Keypaste/shares/s1", "--vault", _harness.VaultPath));
-        _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("add", "s1", "--group", ".keypaste", "--vault", _harness.VaultPath));
+        _harness.Prompt.Enqueue(_master, _value);
+        _harness.AssertExit(CliApp.ExitSuccess, Set("Banking/Chase"));
 
-        Assert.Contains("keypaste add: .Keypaste/shares/s1 is keypaste's own group; it cannot be written here", _harness.Err, StringComparison.Ordinal);
-        Assert.Contains("keypaste add: .keypaste/s1 is keypaste's own group", _harness.Err, StringComparison.Ordinal);
-        Assert.Empty(_harness.Prompt.PromptsSeen);
+        _harness.Prompt.Enqueue(_master);
+        _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("add", "/Banking/Chase", "--vault", _harness.VaultPath));
+
+        Assert.Contains("keypaste add: 'Banking/Chase' already exists", _harness.Err, StringComparison.Ordinal);
     }
 
     [Fact]
