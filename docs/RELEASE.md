@@ -25,18 +25,18 @@ A desktop release is complete when every target it advertises is published and i
 | `cited` | An external source states the floor | An `os_floor`, `floor_citation` and `floor_caveat`; this does not establish an observed installation. |
 | `none` | No floor is claimed | No `os_floor`. |
 
-`macOS 13` and `Windows 10 1809` are cited .NET 10 floors. Keypaste has no recorded installation on those minimum versions. The Linux x64 check establishes Debian 12 compatibility; success there alone does not prove the stated glibc 2.35 minimum. R.0c owns CLI/MCP installation evidence; 4.7b installed internal desktop candidates on runner images, not on these floors.
+`macOS 14` and `Windows 10 1809` are cited .NET 10 floors. Keypaste has no recorded installation on those minimum versions. The Linux x64 check establishes Debian 12 compatibility; success there alone does not prove the stated glibc 2.35 minimum. R.0c owns CLI/MCP installation evidence; 4.7b installed internal desktop candidates on runner images, not on these floors.
 
 <a id="current-distribution--2026-09-07"></a>
 
 ## Current distribution
 
-[release-targets.json](../release-targets.json) owns the matrix and publication dates. The public CLI/MCP release is `v0.3.0` at `https://dl.keypaste.com/v0.3.0/`. It includes `setup` and the changes listed under 0.3.0 in CHANGELOG. `v0.2.0` and `v0.1.0` remain available as superseded, immutable releases, each with the defects SECURITY.md names. Later source changes belong to Unreleased.
+[release-targets.json](../release-targets.json) owns the matrix and publication dates. The public CLI/MCP release is `v0.3.0` at `https://dl.keypaste.com/v0.3.0/`. It includes `setup` and the changes listed under 0.3.0 in CHANGELOG. `v0.2.0` and `v0.1.0` remain available as superseded, immutable releases, each with the defects SECURITY.md names. Later source changes are listed under 0.4.0, which is not yet published.
 
 | OS / CPU | RID | Public CLI/MCP | OS floor | Floor evidence | Desktop package in CI | Public desktop installer |
 |---|---|---|---|---|---|---|
 | Windows x64 | `win-x64` | ZIP; unsigned | Windows 10 1809 or later | `cited`; .NET 10 floor, no installation on the floor | Self-contained ZIP; internal unsigned per-user MSI | None; 4.7c1 built the path, which refuses an unsigned package; 4.7c2 publishes |
-| macOS ARM64 | `osx-arm64` | tar.gz; unnotarized | macOS 13 or later | `cited`; .NET 10 floor, no installation on the floor | Self-contained tar.gz; internal unsigned, unnotarized `keypaste.app` in a zip | None; desktop delivery is in [BACKLOG](BACKLOG.md) |
+| macOS ARM64 | `osx-arm64` | tar.gz; unnotarized | macOS 14 or later | `cited`; .NET 10 floor, no installation on the floor | Self-contained tar.gz; internal unsigned, unnotarized `keypaste.app` in a zip | None; desktop delivery is in [BACKLOG](BACKLOG.md) |
 | Linux x64 | `linux-x64` | tar.gz | glibc 2.35 | `container-check`; Debian 12 runs it, Alpine refuses it | Self-contained tar.gz; internal unsigned AppImage; glibc 2.39 | None; 4.7c1 built the path, which refuses an unsigned package; 4.7c2 publishes |
 | Linux ARM64 | `linux-arm64` | tar.gz | glibc 2.35 | `unverified`; same build inputs as x64, no container check | None; RID declared but absent from package matrix | None |
 | macOS Intel / Windows ARM64 | `osx-x64` / `win-arm64` | Source route | No claim | `none` | None | None |

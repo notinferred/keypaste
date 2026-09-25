@@ -1343,14 +1343,14 @@ sed_inplace() {
 }
 
 cp README.md "$FAKE/README.md"
-printf '\nmacOS 14 or later is required.\n' >> "$FAKE/README.md"
+printf '\nmacOS 15 or later is required.\n' >> "$FAKE/README.md"
 expect_repo_refusal "doc-claims-a-floor-nothing-holds" "no target in the definition holds that floor" \
   "$FAKE/release-targets.json" "$FAKE"
 cp README.md "$FAKE/README.md"
 
 # A page that stops mentioning a floor and a page that never had one look identical to a check that
 # only reads what is written. These two are why the presence rule is required rather than conditional.
-sed_inplace '/^\*\*macOS 13 or later\.\*\*/d' "$FAKE/README.md"
+sed_inplace '/^\*\*macOS 14 or later\.\*\*/d' "$FAKE/README.md"
 expect_repo_refusal "doc-drops-a-floor" "no longer states its floor" \
   "$FAKE/release-targets.json" "$FAKE"
 cp README.md "$FAKE/README.md"

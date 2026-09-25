@@ -91,7 +91,7 @@
           "archive": "tar.gz",
           "cpu": "arm64",
           "advertised": true,
-          "os_floor": "macOS 13 or later",
+          "os_floor": "macOS 14 or later",
           "floor_evidence": "cited",
           "install_check": "macos",
           "advertised_on": [

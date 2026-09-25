@@ -2,9 +2,9 @@
 
 Published versions are available at `https://dl.keypaste.com/v<version>/` with checksums and corresponding source. CLI/MCP binaries are unsigned and un-notarized; the desktop has no public release. [RELEASE.md](docs/RELEASE.md) records platform support and verification requirements. The release workflow requires a section matching each tag.
 
-## Unreleased
+## 0.4.0
 
-All of this is source only: there is still no desktop download, and the published CLI is unchanged. Each entry that names a step links its record, which holds the full account.
+Upgrade the bridge and `keypaste agent` together: they must be the same version, and the bridge now needs `--vault`, so re-run `keypaste setup` for each client. Approval prompts answer `d`, `o` or `h` instead of `y` or `n`. `env export` now writes `kp://` references by default and values only with `--dotenv`. `rm` moves entries to the vault's recycle bin, which saves the vault as KDBX 4.1; KeePass 2.48 and KeePassXC 2.7 or later open it. The desktop entries below are in the desktop source, which this release does not publish: the desktop needs a signed package first ([RELEASE](docs/RELEASE.md)). Each entry that names a step links its record, which holds the full account.
 
 keypaste has a new brand: the k monogram, amber on ink, Instrument Sans and Fragment Mono ([BRAND](docs/BRAND.md)). The desktop app is rebuilt on it, with Secrets, Agents, Activity, Env profiles and Sharing screens, a new lock screen and restyled prompt windows, and keypaste.com and the README use it too.
 

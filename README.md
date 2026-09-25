@@ -96,7 +96,7 @@ mkdir -p ~/.local/bin && mv keypaste keypaste-mcp ~/.local/bin/
 ```
 <!-- /install:macos -->
 
-**macOS 13 or later.** This floor follows [.NET 10 support](https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md); no run backs this floor. Intel Macs have no published binary and require a source build. [GitHub offers native Intel runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners), but this release matrix does not yet build or test that target.
+**macOS 14 or later.** This floor follows [.NET 10 support](https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md); no run backs this floor. Intel Macs have no published binary and require a source build. [GitHub offers native Intel runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners), but this release matrix does not yet build or test that target.
 
 <a id="linux--x64-and-arm64"></a>
 
@@ -204,7 +204,7 @@ keypaste rm github --yes
 
 `ls` prints a names-only group tree. `get` copies the password to the clipboard and clears it after twenty seconds; `--show` writes it to stdout instead. Password prompts never echo input. Command data goes to stdout and diagnostics to stderr, so `keypaste get x --show` can be piped. Set `KEYPASTE_VAULT` or pass `--vault` to each command.
 
-In `v0.3.0`, `rm` permanently deletes the entry and its history. In Unreleased source it moves the entry to the vault's recycle bin, where KeePassXC can see and restore it, unless the vault's recycle bin is switched off. `get --show` and explicit env export expose plaintext. The standalone passphrase generator described below is an Unreleased source feature.
+In `v0.3.0`, `rm` permanently deletes the entry and its history. In 0.4.0, which is not yet published, it moves the entry to the vault's recycle bin, where KeePassXC can see and restore it, unless the vault's recycle bin is switched off. `get --show` and explicit env export expose plaintext. The standalone passphrase generator described below is an Unreleased source feature.
 
 ### Generating one
 
@@ -218,7 +218,7 @@ keypaste env set billing STRIPE_KEY --generate
 
 Characters come from an 85-character alphabet: letters, digits and `!#%()*+,-./:;=?@[]^_{}~`. The punctuation that breaks in a shell, in YAML or in a URL is left out on purpose. Twenty characters is the default, about 128 bits; `--length` takes 8 to 256. `--no-symbols` leaves letters and digits, `--no-lookalikes` drops `Il1O0`, and both cost entropy to solve a problem the Copy button and `keypaste run` are there to remove.
 
-**Unreleased source feature:** `--words N` generates a passphrase instead, drawn from the [EFF long word list](third_party/eff-large-wordlist/UPSTREAM.md) of 7,776 words vendored into keypaste and pinned by digest. These options and `keypaste generate` are absent from the published `v0.3.0` download. Each word is worth about 12.9 bits, so the six-word minimum is about 78 bits; `--words` takes 6 to 32, and `--separator` chooses what goes between them, a full stop by default. A hyphen is refused, because four of the list's words are spelled with one and a hyphen-joined passphrase cannot be split back into the words you counted.
+**New in 0.4.0, not yet published:** `--words N` generates a passphrase instead, drawn from the [EFF long word list](third_party/eff-large-wordlist/UPSTREAM.md) of 7,776 words vendored into keypaste and pinned by digest. These options and `keypaste generate` are absent from the published `v0.3.0` download. Each word is worth about 12.9 bits, so the six-word minimum is about 78 bits; `--words` takes 6 to 32, and `--separator` chooses what goes between them, a full stop by default. A hyphen is refused, because four of the list's words are spelled with one and a hyphen-joined passphrase cannot be split back into the words you counted.
 
 ```sh
 keypaste add github --generate --words 6
@@ -236,7 +236,7 @@ keypaste env set billing STRIPE_KEY --generate --words 8 --separator _
 | 4 | wrong master password |
 | 5 | the audit log is not the file keypaste wrote |
 
-When stdin is not a terminal each prompt consumes one line in order. `init` takes the new password twice; `add` and `env set` take the master password followed by a value unless generating one. In Unreleased source, `access --password` takes the current master password and then the new one twice; `access` refuses with 1 before changing anything it would not change safely and with 4 for a wrong current password. Commands that do not open a vault, such as `log`, need no master password. Consult command help before scripting confirmation or export prompts.
+When stdin is not a terminal each prompt consumes one line in order. `init` takes the new password twice; `add` and `env set` take the master password followed by a value unless generating one. In 0.4.0, `access --password` takes the current master password and then the new one twice; `access` refuses with 1 before changing anything it would not change safely and with 4 for a wrong current password. Commands that do not open a vault, such as `log`, need no master password. Consult command help before scripting confirmation or export prompts.
 
 ## Environment variables
 
@@ -284,7 +284,7 @@ keypaste env export billing .env --dotenv
 keypaste env export billing --dotenv --stdout
 ```
 
-In `v0.3.0`, export requires `--dotenv`. In Unreleased source, `keypaste env export billing -p staging > .env.keypaste` without it writes one `kp://` reference per variable and no value, which `keypaste run --env-file .env.keypaste -- <command>` resolves; [Replace your `.env`](docs/replace-dotenv.md#profiles-and-references) covers profiles and references. With `--dotenv`, file output warns with the destination path and asks for confirmation; overwriting also requires `--force`. keypaste reports a `.git` ancestor and creates owner-readable files on Linux and macOS. Windows has no equivalent permission control and reports that limit. Export refuses to overwrite its source vault or any other KeePass vault, even with `--force`; in `v0.1.0`, `--force` could destroy the vault. Prefer `keypaste run` when a file is unnecessary.
+In `v0.3.0`, export requires `--dotenv`. In 0.4.0, `keypaste env export billing -p staging > .env.keypaste` without it writes one `kp://` reference per variable and no value, which `keypaste run --env-file .env.keypaste -- <command>` resolves; [Replace your `.env`](docs/replace-dotenv.md#profiles-and-references) covers profiles and references. With `--dotenv`, file output warns with the destination path and asks for confirmation; overwriting also requires `--force`. keypaste reports a `.git` ancestor and creates owner-readable files on Linux and macOS. Windows has no equivalent permission control and reports that limit. Export refuses to overwrite its source vault or any other KeePass vault, even with `--force`; in `v0.1.0`, `--force` could destroy the vault. Prefer `keypaste run` when a file is unnecessary.
 
 Export uses single quotes where possible for consistent reading by `motdotla/dotenv`, `python-dotenv`, `godotenv`, Docker Compose v2 and `sh`. Values containing apostrophes or carriage returns need escapes; keypaste names those keys on stderr because readers differ in escape handling.
 
