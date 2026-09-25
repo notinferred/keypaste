@@ -149,8 +149,8 @@
 <div style="padding:18px;border-radius:10px;border:1px solid #26282C;display:grid;gap:12px;align-content:start">
 <span style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><i class="icon-terminal" style="font-size:15px;color:#8E9096"></i>Run with this profile</span>
 <div style="padding:10px 12px;border-radius:6px;background:#0C0D0E;border:1px solid #26282C;font-family:'Fragment Mono',monospace;font-size:12.5px;display:flex;align-items:center;gap:8px"><span style="color:#F2B544">›</span>{{ runCmd }}<i class="icon-copy" style="margin-left:auto;font-size:13px;color:#8E9096"></i></div>
-<span style="font-size:12.5px;line-height:1.5;color:#8E9096">Values go straight into the child process environment. Nothing is written to disk, and agents running the command see only the key names.</span>
-<span style="font-size:12.5px;line-height:1.5;color:#8E9096">Prod values always need a live approval, even inside a grant.</span>
+<span style="font-size:12.5px;line-height:1.5;color:#8E9096">Values go only into the command's environment and are never written to disk. The command, anything it starts and other programs running as you can read them.</span>
+<span style="font-size:12.5px;line-height:1.5;color:#8E9096">Through an agent or a token, a prod profile is asked about live every time and never kept in a grant.</span>
 </div>
 </div>
 </div>
