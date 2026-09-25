@@ -1,0 +1,349 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Keypaste.App.ViewModels"
+             xmlns:ctl="using:Keypaste.App.Controls"
+             x:Class="Keypaste.App.Views.KdbxImportView"
+             x:DataType="vm:KdbxImportViewModel">
+
+  <!-- The KDBX import dialog, drawn over the shell on the modal backdrop: the file, what unlocks it,
+       where each of its groups lands, and whether to keep editing the file itself instead. -->
+
+  <UserControl.Resources>
+
+    <!-- The design's 32x18 switch: amber track and an ink knob when on. -->
+    <ControlTheme x:Key="Switch" TargetType="ToggleButton">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Grid ColumnDefinitions="Auto,*" Background="Transparent">
+            <Border Name="Track"
+                    Width="32" Height="18"
+                    CornerRadius="9"
+                    VerticalAlignment="Top"
+                    Margin="0,1,10,0"
+                    Background="{DynamicResource KpBgActive}">
+              <Border Name="Knob"
+                      Width="14" Height="14"
+                      CornerRadius="7"
+                      HorizontalAlignment="Left"
+                      Margin="2,0,0,0"
+                      Background="{DynamicResource KpTextMuted}" />
+            </Border>
+            <ContentPresenter Grid.Column="1"
+                              Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                              VerticalAlignment="Center" />
+          </Grid>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:checked /template/ Border#Track">
+        <Setter Property="Background" Value="{DynamicResource KpAccent}" />
+      </Style>
+      <Style Selector="^:checked /template/ Border#Knob">
+        <Setter Property="Margin" Value="16,0,0,0" />
+        <Setter Property="Background" Value="{DynamicResource KpOnAccent}" />
+      </Style>
+      <Style Selector="^:focus-visible /template/ Border#Track">
+        <Setter Property="BoxShadow" Value="{StaticResource KpFieldGlow}" />
+      </Style>
+      <Style Selector="^:disabled">
+        <Setter Property="Opacity" Value="0.5" />
+      </Style>
+    </ControlTheme>
+
+    <!-- A 16px include box: hairline when off, a quiet filled box with a check when on. -->
+    <ControlTheme x:Key="IncludeBox" TargetType="CheckBox">
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Margin" Value="0,0,10,0" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="Box"
+                  Width="16" Height="16"
+                  CornerRadius="{DynamicResource KpRadiusChip}"
+                  BorderThickness="1"
+                  BorderBrush="{DynamicResource KpBorderStrong}"
+                  Background="Transparent">
+            <ctl:KpIcon Name="Check" Icon="check" Size="12" IsVisible="False"
+                        HorizontalAlignment="Center"
+                        Foreground="{DynamicResource KpTextPrimary}" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:checked /template/ Border#Box">
+        <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
+      </Style>
+      <Style Selector="^:checked /template/ ctl|KpIcon#Check">
+        <Setter Property="IsVisible" Value="True" />
+      </Style>
+      <Style Selector="^:pointerover /template/ Border#Box">
+        <Setter Property="BorderBrush" Value="{DynamicResource KpTextMuted}" />
+      </Style>
+      <Style Selector="^:focus-visible /template/ Border#Box">
+        <Setter Property="BorderBrush" Value="{DynamicResource KpFocusRing}" />
+      </Style>
+    </ControlTheme>
+
+    <!-- The field a destination is typed into: text until hovered or focused, and a red-bordered
+         field while it blocks the import, so the fix is visible where the problem is. -->
+    <ControlTheme x:Key="DestinationField" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+      <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="MinHeight" Value="22" />
+      <Setter Property="Height" Value="22" />
+      <Setter Property="Padding" Value="6,0" />
+      <Setter Property="Margin" Value="-7,0,0,0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Style Selector="^:pointerover /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{DynamicResource KpBgApp}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource KpBorderDefault}" />
+      </Style>
+      <Style Selector="^.blocked /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{DynamicResource KpBgApp}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource KpDanger}" />
+      </Style>
+      <Style Selector="^:focus /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{DynamicResource KpBgApp}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource KpFocusRing}" />
+      </Style>
+    </ControlTheme>
+
+  </UserControl.Resources>
+
+  <UserControl.Styles>
+    <Style Selector="Button.dialog-action">
+      <Setter Property="Height" Value="34" />
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="Padding" Value="12,0" />
+      <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style Selector="Button.dialog-action.primary">
+      <Setter Property="Padding" Value="14,0" />
+    </Style>
+
+    <Style Selector="Border.map-row">
+      <Setter Property="Padding" Value="12,7" />
+      <Setter Property="BorderBrush" Value="{DynamicResource KpBorderDefault}" />
+      <Setter Property="BorderThickness" Value="0,0,0,1" />
+    </Style>
+    <Style Selector="ContentPresenter:nth-last-child(1) > Border.map-row">
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+
+  </UserControl.Styles>
+
+  <Border Classes="dialog"
+          KeyboardNavigation.TabNavigation="Cycle"
+          Width="520"
+          MaxWidth="520"
+          HorizontalAlignment="Center"
+          VerticalAlignment="Center">
+    <StackPanel Spacing="16">
+
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <ctl:KpIcon Grid.Column="0" Icon="file-input" Size="18" Margin="0,0,10,0" Foreground="{DynamicResource KpAccent}" />
+        <TextBlock Grid.Column="1" Classes="dialog-title" Text="Import a KDBX vault" VerticalAlignment="Center" />
+        <Button Grid.Column="2"
+                Classes="icon ghost sm"
+                ToolTip.Tip="Cancel"
+                Command="{Binding CancelCommand}">
+          <ctl:KpIcon Icon="x" Size="15" />
+        </Button>
+      </Grid>
+
+      <!-- The file card, on a dashed hairline. -->
+      <Panel>
+        <Rectangle RadiusX="10" RadiusY="10"
+                   Stroke="{DynamicResource KpBorderStrong}"
+                   StrokeThickness="1"
+                   StrokeDashArray="4,3" />
+        <Grid ColumnDefinitions="Auto,*,Auto" Margin="14">
+          <ctl:KpIcon Grid.Column="0" Icon="file-lock-2" Size="22" Margin="0,0,12,0" Foreground="{DynamicResource KpTextMuted}" />
+          <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+            <TextBlock Classes="mono lg" Text="{Binding FileName}" TextTrimming="CharacterEllipsis" />
+            <TextBlock FontSize="12"
+                       Classes="muted"
+                       Text="{Binding CardDetail}"
+                       TextTrimming="CharacterEllipsis"
+                       IsVisible="{Binding IsReadable}" />
+            <TextBlock FontSize="12"
+                       Classes="danger"
+                       Text="{Binding Message}"
+                       TextWrapping="Wrap"
+                       IsVisible="{Binding IsUnreadable}" />
+          </StackPanel>
+          <StackPanel Grid.Column="2"
+                      Orientation="Horizontal"
+                      Spacing="5"
+                      Margin="12,0,0,0"
+                      VerticalAlignment="Center"
+                      IsVisible="{Binding IsDecrypted}">
+            <ctl:KpIcon Icon="lock-open" Size="13" Foreground="{DynamicResource KpOk}" />
+            <TextBlock FontSize="12" Classes="ok" Text="Decrypted" VerticalAlignment="Center" />
+          </StackPanel>
+          <StackPanel Grid.Column="2"
+                      Orientation="Horizontal"
+                      Spacing="5"
+                      Margin="12,0,0,0"
+                      VerticalAlignment="Center"
+                      IsVisible="{Binding IsLocked}">
+            <ctl:KpIcon Icon="lock" Size="13" Foreground="{DynamicResource KpTextMuted}" />
+            <TextBlock FontSize="12" Classes="muted" Text="Locked" VerticalAlignment="Center" />
+          </StackPanel>
+          <StackPanel Grid.Column="2"
+                      Orientation="Horizontal"
+                      Spacing="5"
+                      Margin="12,0,0,0"
+                      VerticalAlignment="Center"
+                      IsVisible="{Binding IsUnreadable}">
+            <ctl:KpIcon Icon="alert-triangle" Size="13" Foreground="{DynamicResource KpDanger}" />
+            <TextBlock FontSize="12" Classes="danger" Text="Can't read" VerticalAlignment="Center" />
+          </StackPanel>
+        </Grid>
+      </Panel>
+
+      <!-- What opens the file. The password goes to a buffer and is cleared once it has been tried. -->
+      <StackPanel Spacing="8" IsVisible="{Binding NeedsUnlock}">
+        <TextBlock Classes="label" Text="Password for this file" />
+        <ctl:MaskedInput x:Name="ImportPassword"
+                         Sink="{Binding}"
+                         MaskedLength="{Binding PasswordLength}"
+                         FontFamily="{DynamicResource KpMono}"
+                         FontSize="14"
+                         Placeholder="Its master password" />
+        <TextBlock FontSize="12.5"
+                   Classes="danger"
+                   TextWrapping="Wrap"
+                   Text="{Binding Message}"
+                   IsVisible="{Binding HasMessage}" />
+        <Grid ColumnDefinitions="Auto,*,Auto">
+          <ctl:KpIcon Grid.Column="0" Icon="file-key" Size="14" Margin="0,0,8,0"
+                      Foreground="{DynamicResource KpTextMuted}" />
+          <TextBlock Grid.Column="1"
+                     Classes="mono secondary"
+                     FontSize="12"
+                     Text="{Binding KeyfileName}"
+                     ToolTip.Tip="{Binding KeyfilePath}"
+                     IsVisible="{Binding HasKeyfile}"
+                     TextTrimming="CharacterEllipsis"
+                     VerticalAlignment="Center" />
+          <TextBlock Grid.Column="1"
+                     Classes="muted"
+                     FontSize="12"
+                     Text="No key file"
+                     IsVisible="{Binding !HasKeyfile}"
+                     VerticalAlignment="Center" />
+          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12">
+            <Button Classes="link" Content="Choose…" Command="{Binding ChooseKeyfileCommand}" />
+            <Button Classes="link" Content="Remove" IsVisible="{Binding HasKeyfile}" Command="{Binding ClearKeyfileCommand}" />
+          </StackPanel>
+        </Grid>
+      </StackPanel>
+
+      <!-- Where each group of the file lands in the open vault. -->
+      <StackPanel Spacing="8" IsVisible="{Binding ShowsRows}">
+        <TextBlock Classes="label" Text="Map groups to projects" />
+        <Border BorderBrush="{DynamicResource KpBorderDefault}"
+                BorderThickness="1"
+                CornerRadius="{DynamicResource KpRadiusButton}"
+                ClipToBounds="True">
+          <ScrollViewer MaxHeight="232" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Rows}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ImportRowViewModel">
+                  <Border Classes="map-row">
+                    <Grid ColumnDefinitions="Auto,*,20,*" RowDefinitions="Auto,Auto">
+                      <CheckBox Grid.Column="0"
+                                Theme="{StaticResource IncludeBox}"
+                                IsChecked="{Binding Include}"
+                                ToolTip.Tip="Copy this group" />
+                      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <TextBlock Classes="mono secondary"
+                                   FontSize="12"
+                                   Text="{Binding SourceGroup}"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock Classes="mono muted"
+                                   FontSize="11"
+                                   Text="{Binding CountText}"
+                                   VerticalAlignment="Center" />
+                      </StackPanel>
+                      <ctl:KpIcon Grid.Column="2"
+                                  Icon="arrow-right"
+                                  Size="12"
+                                  Margin="0,0,8,0"
+                                  HorizontalAlignment="Center"
+                                  Foreground="{DynamicResource KpTextMuted}" />
+                      <TextBox Grid.Column="3"
+                               Theme="{StaticResource DestinationField}"
+                               Classes.blocked="{Binding Blocks}"
+                               FontSize="12"
+                               FontWeight="Normal"
+                               Text="{Binding Destination}"
+                               IsEnabled="{Binding Include}" />
+                      <TextBlock Grid.Row="1"
+                                 Grid.Column="1"
+                                 Grid.ColumnSpan="3"
+                                 Margin="0,4,0,0"
+                                 FontSize="11.5"
+                                 TextWrapping="Wrap"
+                                 Classes="muted"
+                                 Classes.danger="{Binding Blocks}"
+                                 Text="{Binding Problem}"
+                                 IsVisible="{Binding HasProblem}" />
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Border>
+        <TextBlock Classes="caption" Text="{Binding SkippedText}" IsVisible="{Binding HasSkipped}" />
+      </StackPanel>
+
+      <StackPanel Spacing="6" IsVisible="{Binding IsReadable}">
+        <ToggleButton Theme="{StaticResource Switch}" IsChecked="{Binding KeepEditingInPlace}">
+          <TextBlock FontSize="13"
+                     FontWeight="Normal"
+                     TextWrapping="Wrap"
+                     Foreground="{DynamicResource KpTextPrimary}"
+                     Text="Keep editing this file in place, so KeePassXC and other KDBX apps stay in sync" />
+        </ToggleButton>
+        <TextBlock Classes="caption"
+                   Margin="42,0,0,0"
+                   Text="{Binding InPlaceNote}"
+                   IsVisible="{Binding KeepEditingInPlace}" />
+      </StackPanel>
+
+      <TextBlock Classes="danger"
+                 FontSize="12.5"
+                 TextWrapping="Wrap"
+                 Text="{Binding Message}"
+                 IsVisible="{Binding HasTrailingMessage}" />
+
+      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+        <Button Classes="ghost dialog-action" Content="Cancel" Command="{Binding CancelCommand}" />
+        <Button x:Name="ChooseAnother"
+                Classes="dialog-action"
+                IsVisible="{Binding CanChooseAnother}"
+                Content="Choose another file…"
+                Command="{Binding ChooseAnotherCommand}" />
+        <Button Classes="primary dialog-action"
+                IsVisible="{Binding NeedsUnlock}"
+                Content="{Binding UnlockText}"
+                Command="{Binding UnlockCommand}" />
+        <Button x:Name="ImportConfirm"
+                Classes="primary dialog-action"
+                IsVisible="{Binding ShowsConfirm}"
+                Content="{Binding ConfirmText}"
+                Command="{Binding ConfirmCommand}" />
+      </StackPanel>
+
+    </StackPanel>
+  </Border>
+
+</UserControl>

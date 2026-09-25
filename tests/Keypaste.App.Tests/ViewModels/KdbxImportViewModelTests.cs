@@ -96,7 +96,7 @@ public sealed class KdbxImportViewModelTests : IDisposable
 
         import.ConfirmCommand.Execute(null);
 
-        Assert.Equal(["Imported 3 entries into foreign"], _announced);
+        Assert.Equal(["Imported 3 entries from foreign.kdbx"], _announced);
         Assert.False(import.IsDecrypted);
         Assert.Empty(_opened);
 
@@ -167,6 +167,53 @@ public sealed class KdbxImportViewModelTests : IDisposable
 
     private static void AssertDisposed(ImportSource source) =>
         Assert.Throws<ObjectDisposedException>(() => source.Interop);
+
+    [Fact]
+    public async Task A_wrong_password_is_an_error_under_the_field()
+    {
+        using var import = NewImport();
+        import.TypePassword('x');
+
+        await import.UnlockAsync();
+
+        Assert.Equal("That password and key file do not open foreign.kdbx.", import.Message);
+        Assert.True(import.NeedsUnlock);
+        Assert.False(import.HasTrailingMessage);
+    }
+
+    [Fact]
+    public async Task An_unreadable_file_is_named_and_offers_only_another_file()
+    {
+        var notes = Path.Combine(_vault.Home, "notes.kdbx");
+        await File.WriteAllTextAsync(notes, "not a vault", TestContext.Current.CancellationToken);
+        var asked = 0;
+
+        using var import = new KdbxImportViewModel(
+            _session, notes, (_, _) => { }, _announced.Add, chooseAnother: () => { asked++; return Task.CompletedTask; });
+
+        Assert.True(import.IsUnreadable);
+        Assert.Equal("notes.kdbx", import.FileName);
+        Assert.Equal("This file is not a KDBX vault.", import.Message);
+        Assert.False(import.ShowsConfirm);
+        Assert.False(import.NeedsUnlock);
+        Assert.True(import.CanChooseAnother);
+
+        await import.ChooseAnotherCommand.ExecuteAsync();
+        Assert.Equal(1, asked);
+    }
+
+    [Fact]
+    public async Task A_blocked_row_says_how_to_unblock_it()
+    {
+        using var import = NewImport();
+        await Unlock(import);
+        var row = import.Rows.First(row => row.SourceGroup == "Banking");
+
+        row.Destination = ".keypaste/tokens";
+
+        Assert.True(row.Blocks);
+        Assert.EndsWith("Type another destination or untick Banking.", row.Problem, StringComparison.Ordinal);
+    }
 
     private KdbxImportViewModel NewImport() =>
         new(_session, _source, (path, keyfile) => _opened.Add((path, keyfile)), _announced.Add);

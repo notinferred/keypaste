@@ -65,6 +65,8 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     private string _vaultStatusDetail = string.Empty;
     private int _ticks;
     private readonly Vault? _watched;
+    private readonly Action<string, string?>? _openInPlace;
+    private KdbxImportViewModel? _import;
     private bool _disposed;
 
     internal ShellViewModel(
@@ -77,13 +79,15 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         Action<Action>? post = null,
         DesktopPreferences? preferences = null,
         string? notice = null,
-        IVaultFilePicker? picker = null)
+        IVaultFilePicker? picker = null,
+        Action<string, string?>? openInPlace = null)
     {
         ArgumentNullException.ThrowIfNull(session);
 
         _session = session;
         _notice = notice;
         _picker = picker;
+        _openInPlace = openInPlace;
         Home = home;
         Authority = authority;
         ApplyTheme = applyTheme ?? (_ => { });
@@ -104,6 +108,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         DismissToastCommand = new RelayCommand(() => Toast = null);
         OpenProjectCommand = new RelayCommand<string>(OpenProject);
         OpenAgentsCommand = new RelayCommand(() => Current = Destinations.Of(DestinationKind.AgentActivity));
+        ImportCommand = new AsyncRelayCommand(PickImportAsync, () => _picker is not null && _import is null);
 
         MainNav = [.. Destinations.Main.Select(d => new NavItem(d))];
         FooterNav = [.. Destinations.Footer.Select(d => new NavItem(d))];
@@ -237,10 +242,75 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     /// <summary>Opens Env profiles on a project.</summary>
     internal RelayCommand<string> OpenProjectCommand { get; }
 
-    /// <summary>Whether the sidebar offers "Import .kdbx". Nothing imports yet, so it does not.</summary>
+    /// <summary>Whether the sidebar offers "Import .kdbx".</summary>
 #pragma warning disable CA1822
-    internal bool ImportAvailable => false;
+    internal bool ImportAvailable => true;
 #pragma warning restore CA1822
+
+    /// <summary>Asks which KDBX file to import, then shows the import dialog over the shell.</summary>
+    internal AsyncRelayCommand ImportCommand { get; }
+
+    /// <summary>The KDBX import dialog while it is open, or null.</summary>
+    internal KdbxImportViewModel? Import
+    {
+        get => _import;
+        private set
+        {
+            if (Set(ref _import, value))
+            {
+                Raise(nameof(HasImport));
+                ImportCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    internal bool HasImport => _import is not null;
+
+    /// <summary>Shows the import dialog for <paramref name="path"/>, replacing one already open.</summary>
+    internal void OpenImport(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+
+        if (_disposed)
+        {
+            return;
+        }
+
+        _import?.Dispose();
+
+        var import = new KdbxImportViewModel(
+            _session,
+            path,
+            _openInPlace ?? ((_, _) => _session.Lock(VaultLockReason.Manual)),
+            Imported,
+            _picker is null ? null : _picker.PickKeyfileAsync,
+            _picker is null ? null : PickImportAsync);
+
+        import.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(Import, import))
+            {
+                Import = null;
+            }
+        };
+
+        Import = import;
+    }
+
+    /// <summary>Says what an import copied, and rebuilds the screen so it lists the new entries.</summary>
+    private void Imported(string message)
+    {
+        ShowToast(message);
+        Show(_current);
+    }
+
+    private async Task PickImportAsync()
+    {
+        if (_picker is not null && await _picker.PickExistingAsync().ConfigureAwait(true) is { } path)
+        {
+            OpenImport(path);
+        }
+    }
 
     /// <summary>The open vault's file name. The full path is a tooltip, never a heading.</summary>
     internal string VaultName =>
@@ -711,6 +781,8 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         _statusTimer?.Dispose();
         _toastTimer?.Dispose();
         EntryActivity?.Dispose();
+        _import?.Dispose();
+        Import = null;
         Notice = null;
         Toast = null;
         Projects = [];

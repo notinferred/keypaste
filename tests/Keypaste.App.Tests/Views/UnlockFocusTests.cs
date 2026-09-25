@@ -130,6 +130,33 @@ public sealed class UnlockFocusTests
         Assert.DoesNotContain('s', password.Display);
     });
 
+    [Fact]
+    public Task The_create_form_takes_focus_when_it_opens_and_gives_it_back_on_cancel() => HeadlessSession.On(() =>
+    {
+        using var fixture = new TempVault();
+        fixture.RememberSelf();
+
+        var picker = new FakeVaultFilePicker { NewPath = Path.Combine(fixture.Home, "created.kdbx") };
+        using var session = new AppVaultSession(new ManualClock());
+        using var model = new UnlockViewModel(session, fixture.Home, picker, () => { });
+
+        var window = Show(model);
+        model.StartCreateAsync().GetAwaiter().GetResult();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        Assert.True(Field(window, "NewPassword").IsFocused);
+        window.KeyTextInput("a");
+        Assert.Equal(1, model.NewMaskedLength);
+
+        model.CancelCreateAsync().GetAwaiter().GetResult();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        Assert.True(Password(window).IsFocused);
+    });
+
+    private static MaskedInput Field(Window window, string name) =>
+        window.GetVisualDescendants().OfType<MaskedInput>().Single(input => input.Name == name);
+
     // By name, not Single(): the screen carries the two create fields as well since 4.8, and they
     // are in the tree whether or not the create form is showing.
     private static MaskedInput Password(Window window) =>

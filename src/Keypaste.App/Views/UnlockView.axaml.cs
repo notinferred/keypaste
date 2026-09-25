@@ -10,6 +10,8 @@ namespace Keypaste.App.Views;
 
 internal sealed partial class UnlockView : UserControl
 {
+    private UnlockViewModel? _watched;
+
     public UnlockView()
     {
         AvaloniaXamlLoader.Load(this);
@@ -46,6 +48,38 @@ internal sealed partial class UnlockView : UserControl
         // ListBoxItem focus after Loaded runs, which silently stole the first keystrokes whenever a
         // recent list existed. Found by running it, not by reading it.
         Loaded += (_, _) => Dispatcher.UIThread.Post(() => password.Focus(), DispatcherPriority.Background);
+
+        DataContextChanged += (_, _) =>
+        {
+            if (_watched is not null)
+            {
+                _watched.PropertyChanged -= OnModelChanged;
+            }
+
+            _watched = Model;
+
+            if (_watched is not null)
+            {
+                _watched.PropertyChanged += OnModelChanged;
+            }
+        };
+    }
+
+    /// <summary>Each form takes the keyboard as it appears, so typing never lands on a field that is gone.</summary>
+    private void OnModelChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        var field = e.PropertyName switch
+        {
+            nameof(UnlockViewModel.IsCreating) when Model is { IsCreating: true } => "NewPassword",
+            nameof(UnlockViewModel.IsRestoring) when Model is { IsRestoring: true } => "BackupPassword",
+            nameof(UnlockViewModel.IsOpening) when Model is { IsOpening: true } => "Password",
+            _ => null,
+        };
+
+        if (field is not null && this.FindControl<MaskedInput>(field) is { } input)
+        {
+            Dispatcher.UIThread.Post(() => input.Focus(), DispatcherPriority.Background);
+        }
     }
 
     private UnlockViewModel? Model => DataContext as UnlockViewModel;
