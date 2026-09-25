@@ -17,7 +17,7 @@ namespace Keypaste.Core.Tests;
 /// <para>
 /// This file holds every resolver to one answer. The fixtures are what KeePassXC puts in a file
 /// and keypaste's own writers refuse to create, which is why nothing here goes through
-/// <see cref="EnvStore.TrySet"/>.
+/// <see cref="EnvStore.TrySet(string, string, string, out string)"/>.
 /// </para>
 /// </remarks>
 public sealed class EntryIdentityTests : IDisposable

@@ -23,9 +23,10 @@ public sealed class EnvImportPlan
 {
     private readonly IReadOnlyList<DotEnvVariable> _variables;
 
-    internal EnvImportPlan(string project, IReadOnlyList<EnvImportKey> keys, IReadOnlyList<DotEnvVariable> variables, string? refusal)
+    internal EnvImportPlan(string project, string profile, IReadOnlyList<EnvImportKey> keys, IReadOnlyList<DotEnvVariable> variables, string? refusal)
     {
         Project = project;
+        Profile = profile;
         Keys = keys;
         _variables = variables;
         Refusal = refusal;
@@ -33,6 +34,9 @@ public sealed class EnvImportPlan
 
     /// <summary>The project imported into.</summary>
     public string Project { get; }
+
+    /// <summary>The profile of the project imported into.</summary>
+    public string Profile { get; }
 
     /// <summary>Every variable in the file, ordinal-sorted by name.</summary>
     public IReadOnlyList<EnvImportKey> Keys { get; }
@@ -70,7 +74,7 @@ public sealed class EnvImportPlan
 /// <c>env pull</c> and the app's Env Sets screen.
 /// </summary>
 /// <remarks>
-/// Everything that could refuse a variable is checked by <see cref="Plan"/>, before anybody is
+/// Everything that could refuse a variable is checked by <see cref="Plan(EnvStore, string, string, DotEnvDocument)"/>, before anybody is
 /// asked to confirm, so a confirmed import either writes the whole plan or nothing.
 /// </remarks>
 public static class EnvImport
@@ -82,10 +86,22 @@ public static class EnvImport
     /// <returns>What importing would do, or why it cannot.</returns>
     /// <exception cref="ArgumentException"><paramref name="document"/> has problems.</exception>
     /// <exception cref="VaultException">The project already contains a duplicate name.</exception>
-    public static EnvImportPlan Plan(EnvStore store, string project, DotEnvDocument document)
+    public static EnvImportPlan Plan(EnvStore store, string project, DotEnvDocument document) =>
+        Plan(store, project, EnvProfileNames.Default, document);
+
+    /// <summary>Plans an import into one profile of a project.</summary>
+    /// <param name="store">The project's vault.</param>
+    /// <param name="project">The project name.</param>
+    /// <param name="profile">The profile name.</param>
+    /// <param name="document">A file <see cref="DotEnv.TryParse"/> read without problems.</param>
+    /// <returns>What importing would do, or why it cannot.</returns>
+    /// <exception cref="ArgumentException"><paramref name="document"/> has problems.</exception>
+    /// <exception cref="VaultException">The profile already contains a duplicate name.</exception>
+    public static EnvImportPlan Plan(EnvStore store, string project, string profile, DotEnvDocument document)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(project);
+        ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(document);
 
         if (document.Problems.Count > 0)
@@ -93,16 +109,16 @@ public static class EnvImport
             throw new ArgumentException("a file with problems is never imported", nameof(document));
         }
 
-        if (!EnvConvention.IsValidProject(project, out var invalid))
+        if (!EnvConvention.IsValidProject(project, out var invalid) || !EnvProfileNames.IsValid(profile, out invalid))
         {
-            return new EnvImportPlan(project, [], [], invalid);
+            return new EnvImportPlan(project, profile, [], [], invalid);
         }
 
-        var existing = store.Read(project).ToDictionary(v => v.Key, v => v.Value, StringComparer.Ordinal);
+        var existing = store.Read(project, profile).ToDictionary(v => v.Key, v => v.Value, StringComparer.Ordinal);
 
         if (Collision(document.Variables, existing) is { } collision)
         {
-            return new EnvImportPlan(project, [], [], collision);
+            return new EnvImportPlan(project, profile, [], [], collision);
         }
 
         var keys = document.Variables
@@ -114,7 +130,7 @@ public static class EnvImport
             .OrderBy(key => key.Key, StringComparer.Ordinal)
             .ToList();
 
-        return new EnvImportPlan(project, keys, document.Variables, null);
+        return new EnvImportPlan(project, profile, keys, document.Variables, null);
     }
 
     /// <summary>Writes every new and replaced variable of a plan. The caller must <see cref="Vault.Save"/> to persist it.</summary>
@@ -123,7 +139,7 @@ public static class EnvImport
     /// <param name="rejection">What the store refused, when this returns false.</param>
     /// <returns>Whether every variable was written. When false, the caller must not save.</returns>
     /// <remarks>
-    /// Unchanged variables are skipped rather than rewritten: <see cref="EnvStore.TrySet"/> cannot
+    /// Unchanged variables are skipped rather than rewritten: <see cref="EnvStore.TrySet(string, string, string, out string)"/> cannot
     /// tell that the new value equals the old one, so it would spend one of the ten history slots
     /// KDBX keeps on a change that did not happen.
     /// </remarks>
@@ -140,7 +156,7 @@ public static class EnvImport
 
         foreach (var variable in plan.ToWrite)
         {
-            if (store.TrySet(plan.Project, variable.Key, variable.Value, out rejection) == EnvSetOutcome.Rejected)
+            if (store.TrySet(plan.Project, plan.Profile, variable.Key, variable.Value, out rejection) == EnvSetOutcome.Rejected)
             {
                 return false;
             }
@@ -153,7 +169,7 @@ public static class EnvImport
     /// <summary>Finds a pair of names that differ only in case, in the file or against the vault.</summary>
     /// <remarks>
     /// Two such names are two variables on Linux and one on Windows, so there is no import that
-    /// means the same thing everywhere. <see cref="EnvStore.TrySet"/> refuses the second one
+    /// means the same thing everywhere. <see cref="EnvStore.TrySet(string, string, string, out string)"/> refuses the second one
     /// anyway; catching it here means the refusal arrives before the confirmation rather than
     /// halfway through the writes.
     /// </remarks>

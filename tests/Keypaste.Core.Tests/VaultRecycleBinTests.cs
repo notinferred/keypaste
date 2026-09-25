@@ -364,7 +364,7 @@ public sealed class VaultRecycleBinTests : IDisposable
     /// <summary>
     /// Restoring onto a name something else now answers to would make both entries unusable:
     /// <see cref="Vault.Find(EntryName)"/> refuses, a release is denied as ambiguous, and
-    /// <see cref="EnvStore.Read"/> throws for the whole project. A recovery must not do that.
+    /// <see cref="EnvStore.Read(string)"/> throws for the whole project. A recovery must not do that.
     /// </summary>
     [Fact]
     public void RestoreRecycled_IsRefusedAndWritesNothing_WhenTheNameIsTakenAgain()

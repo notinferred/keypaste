@@ -1,6 +1,6 @@
 namespace Keypaste.Core;
 
-/// <summary>What a call to <see cref="EnvStore.TrySet"/> did.</summary>
+/// <summary>What a call to <see cref="EnvStore.TrySet(string, string, string, out string)"/> did.</summary>
 public enum EnvSetOutcome
 {
     /// <summary>The variable was refused; the reason is in the call's error output.</summary>
@@ -23,12 +23,17 @@ public sealed record EnvVariable(string Key, string Value)
     /// </summary>
     /// <remarks>
     /// False only for variables written by something other than keypaste, since
-    /// <see cref="EnvStore.TrySet"/> refuses to create one. Reading them anyway is deliberate:
+    /// <see cref="EnvStore.TrySet(string, string, string, out string)"/> refuses to create one. Reading them anyway is deliberate:
     /// hiding a variable that KeePassXC displays would make the two tools disagree about the
     /// contents of one file (docs/PRODUCT.md law 4.6).
     /// </remarks>
     public bool IsUsableName => EnvConvention.IsValidKey(Key, out _);
 }
+
+/// <summary>One profile of a project, as a listing shows it.</summary>
+/// <param name="Name">The profile's name.</param>
+/// <param name="IsProtected">Whether every release through a session is asked about live (<see cref="EnvProfileNames.IsProtected"/>).</param>
+public sealed record EnvProfileInfo(string Name, bool IsProtected);
 
 /// <summary>
 /// Reads and writes environment-variable sets in a <see cref="Vault"/>, following
@@ -59,7 +64,7 @@ public sealed class EnvStore(Vault vault)
     /// <exception cref="ObjectDisposedException">The vault has been disposed.</exception>
     /// <remarks>
     /// Only the immediate children of the <c>env</c> group count as projects. A group nested more
-    /// deeply is not reported, because <see cref="Read"/> could not find its variables either.
+    /// deeply is not reported, because <see cref="Read(string)"/> could not find its variables either.
     /// </remarks>
     public IReadOnlyList<string> Projects()
     {
@@ -108,6 +113,66 @@ public sealed class EnvStore(Vault vault)
         return false;
     }
 
+    /// <summary>The profiles a project has: <c>dev</c> first, then the others ordinal-sorted, protected ones last.</summary>
+    /// <param name="project">The project name.</param>
+    /// <returns>The profiles, empty when the project does not exist.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="project"/> is null.</exception>
+    /// <exception cref="ObjectDisposedException">The vault has been disposed.</exception>
+    /// <remarks>
+    /// A subgroup keypaste would not resolve is left out here and named by <see cref="ProfileProblems"/>,
+    /// so a listing never offers a profile that <c>run</c> would refuse.
+    /// </remarks>
+    public IReadOnlyList<EnvProfileInfo> Profiles(string project)
+    {
+        if (!ProjectExists(project))
+        {
+            return [];
+        }
+
+        var others = Subgroups(project)
+            .Where(name => !string.Equals(name, EnvProfileNames.Default, StringComparison.Ordinal) && EnvProfileNames.IsValid(name, out _))
+            .Select(name => new EnvProfileInfo(name, EnvProfileNames.IsProtected(name)))
+            .OrderBy(profile => profile.IsProtected)
+            .ThenBy(profile => profile.Name, StringComparer.Ordinal);
+
+        return [new EnvProfileInfo(EnvProfileNames.Default, false), .. others];
+    }
+
+    /// <summary>The subgroups of a project that are never read, each with why, in keypaste's words.</summary>
+    /// <param name="project">The project name.</param>
+    /// <returns>One sentence per ignored subgroup, ordinal by name.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="project"/> is null.</exception>
+    /// <exception cref="ObjectDisposedException">The vault has been disposed.</exception>
+    public IReadOnlyList<string> ProfileProblems(string project)
+    {
+        List<string> problems = [];
+
+        foreach (var name in Subgroups(project).Order(StringComparer.Ordinal))
+        {
+            var group = EnvConvention.GroupPath(project) + "/" + name;
+
+            if (string.Equals(name, EnvProfileNames.Default, StringComparison.Ordinal))
+            {
+                problems.Add($"'{group}' is ignored: the {EnvProfileNames.Default} profile is the project group itself; move its entries up");
+            }
+            else if (!EnvProfileNames.IsValid(name, out var invalid))
+            {
+                problems.Add($"'{group}' is ignored: {invalid}");
+            }
+        }
+
+        return problems;
+    }
+
+    /// <summary>Whether a project has a profile keypaste resolves, even an empty one.</summary>
+    /// <param name="project">The project name.</param>
+    /// <param name="profile">The profile name.</param>
+    /// <returns><see langword="true"/> if the profile's group exists and its name is one keypaste reads.</returns>
+    /// <exception cref="ArgumentNullException">Any argument is null.</exception>
+    /// <exception cref="ObjectDisposedException">The vault has been disposed.</exception>
+    public bool ProfileExists(string project, string profile) =>
+        GroupOf(project, profile) is { } group && _vault.ReadGroupPaths().Contains(group, StringComparer.Ordinal);
+
     /// <summary>Reads one project's variables, ordinal-sorted by name.</summary>
     /// <param name="project">The project name.</param>
     /// <returns>The variables, empty if the project has none or does not exist.</returns>
@@ -118,10 +183,23 @@ public sealed class EnvStore(Vault vault)
     /// there is no correct answer to "what is the value of that variable", so it fails closed
     /// rather than silently picking one (docs/PRODUCT.md law 3.7).
     /// </exception>
-    public IReadOnlyList<EnvVariable> Read(string project)
+    public IReadOnlyList<EnvVariable> Read(string project) => Read(project, EnvProfileNames.Default);
+
+    /// <summary>Reads one profile of a project, ordinal-sorted by name.</summary>
+    /// <param name="project">The project name.</param>
+    /// <param name="profile">The profile name.</param>
+    /// <returns>The variables, empty if the profile has none, does not exist or has a name keypaste never reads.</returns>
+    /// <exception cref="ArgumentNullException">Any argument is null.</exception>
+    /// <exception cref="ObjectDisposedException">The vault has been disposed.</exception>
+    /// <exception cref="VaultException">Two entries in the profile share a name.</exception>
+    public IReadOnlyList<EnvVariable> Read(string project, string profile)
     {
-        string groupPath = EnvConvention.GroupPath(project);
         List<EnvVariable> variables = [];
+
+        if (GroupOf(project, profile) is not { } groupPath)
+        {
+            return variables;
+        }
 
         foreach (VaultEntry entry in _vault.ReadEntries())
         {
@@ -143,7 +221,7 @@ public sealed class EnvStore(Vault vault)
             if (string.Equals(variables[i].Key, variables[i - 1].Key, StringComparison.Ordinal))
             {
                 throw new VaultException(
-                    $"'{EnvConvention.GroupPath(project)}' contains more than one entry named " +
+                    $"'{groupPath}' contains more than one entry named " +
                     $"'{variables[i].Key}'. Remove the duplicate in KeePassXC.");
             }
         }
@@ -168,17 +246,34 @@ public sealed class EnvStore(Vault vault)
     /// Updating keeps the entry's other fields, its identity, and its history — see
     /// <see cref="Vault.UpdateEntry"/> for what that means for a rotated secret.
     /// </remarks>
-    public EnvSetOutcome TrySet(string project, string key, string value, out string error)
+    public EnvSetOutcome TrySet(string project, string key, string value, out string error) =>
+        TrySet(project, EnvProfileNames.Default, key, value, out error);
+
+    /// <summary>
+    /// Sets a variable in one profile, creating the profile's group if it is missing. The caller must
+    /// <see cref="Vault.Save"/> to persist it.
+    /// </summary>
+    /// <param name="project">The project name.</param>
+    /// <param name="profile">The profile name.</param>
+    /// <param name="key">The variable name.</param>
+    /// <param name="value">The value.</param>
+    /// <param name="error">A message naming the problem when the result is <see cref="EnvSetOutcome.Rejected"/>, otherwise empty.</param>
+    /// <returns>Whether the variable was created, updated, or refused.</returns>
+    /// <exception cref="ArgumentNullException">Any argument is null.</exception>
+    /// <exception cref="ObjectDisposedException">The vault has been disposed.</exception>
+    /// <exception cref="VaultException">The profile already contains a duplicate name.</exception>
+    public EnvSetOutcome TrySet(string project, string profile, string key, string value, out string error)
     {
         ArgumentNullException.ThrowIfNull(value);
 
         if (!EnvConvention.IsValidProject(project, out error)
+            || !EnvProfileNames.IsValid(profile, out error)
             || !EnvConvention.IsValidKey(key, out error))
         {
             return EnvSetOutcome.Rejected;
         }
 
-        IReadOnlyList<EnvVariable> existing = Read(project);
+        IReadOnlyList<EnvVariable> existing = Read(project, profile);
 
         foreach (EnvVariable variable in existing)
         {
@@ -193,7 +288,7 @@ public sealed class EnvStore(Vault vault)
             }
         }
 
-        EntryName name = new(EnvConvention.GroupPath(project), key);
+        EntryName name = new(EnvProfileNames.GroupPath(project, profile), key);
         VaultEntry? current = _vault.Find(name);
 
         if (current is null)
@@ -229,7 +324,7 @@ public sealed class EnvStore(Vault vault)
     /// <exception cref="ArgumentNullException"><paramref name="project"/> or <paramref name="key"/> is null.</exception>
     /// <exception cref="ObjectDisposedException">The vault has been disposed.</exception>
     /// <exception cref="VaultException">
-    /// The project contains more than one entry with that name. <see cref="Read"/> refuses the same
+    /// The project contains more than one entry with that name. <see cref="Read(string)"/> refuses the same
     /// file for the same reason: there is no correct answer to which of them was meant.
     /// </exception>
     /// <remarks>
@@ -239,8 +334,41 @@ public sealed class EnvStore(Vault vault)
     /// what keeps a KeePassXC-authored title of <c>nested/TOKEN</c> in <c>env/dev</c> distinct from
     /// a <c>TOKEN</c> in <c>env/dev/nested</c>: they share a path and are different entries.
     /// </remarks>
-    public DeletionOutcome Remove(string project, string key)
+    public DeletionOutcome Remove(string project, string key) => Remove(project, EnvProfileNames.Default, key);
+
+    /// <summary>Removes a variable from one profile. The caller must <see cref="Vault.Save"/> to persist it.</summary>
+    /// <param name="project">The project name.</param>
+    /// <param name="profile">The profile name.</param>
+    /// <param name="key">The variable name.</param>
+    /// <returns>What happened, <see cref="DeletionOutcome.NothingMatched"/> when the profile or the variable does not exist.</returns>
+    /// <exception cref="ArgumentNullException">Any argument is null.</exception>
+    /// <exception cref="ObjectDisposedException">The vault has been disposed.</exception>
+    /// <exception cref="VaultException">The profile contains more than one entry with that name.</exception>
+    public DeletionOutcome Remove(string project, string profile, string key)
     {
-        return _vault.RemoveEntry(new EntryName(EnvConvention.GroupPath(project), key));
+        ArgumentNullException.ThrowIfNull(key);
+
+        return GroupOf(project, profile) is { } group
+            ? _vault.RemoveEntry(new EntryName(group, key))
+            : DeletionOutcome.NothingMatched;
+    }
+
+    /// <summary>The group a profile lives in, or null for a name keypaste never reads.</summary>
+    private static string? GroupOf(string project, string profile)
+    {
+        ArgumentNullException.ThrowIfNull(project);
+
+        return EnvProfileNames.IsValid(profile, out _) ? EnvProfileNames.GroupPath(project, profile) : null;
+    }
+
+    /// <summary>The names of a project's direct subgroups, whatever they are called.</summary>
+    private IEnumerable<string> Subgroups(string project)
+    {
+        var prefix = EnvConvention.GroupPath(project) + "/";
+
+        return _vault.ReadGroupPaths()
+            .Where(path => path.StartsWith(prefix, StringComparison.Ordinal))
+            .Select(path => path[prefix.Length..])
+            .Where(name => name.Length > 0 && !name.Contains('/'));
     }
 }

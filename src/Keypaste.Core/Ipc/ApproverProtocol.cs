@@ -378,23 +378,53 @@ public static class ApproverProtocol
             WriteOptional(writer, "value", reply.Value);
         });
 
+    /// <summary>The most keys or file lines one env request names.</summary>
+    public const int MaximumEnvListLength = 1024;
+
+    /// <summary>The longest file line one env request carries.</summary>
+    public const int MaximumFileLineLength = 512;
+
     /// <summary>Encodes a request for a project's env set.</summary>
     /// <param name="request">What to ask for.</param>
     /// <returns>The frame's bytes, without a delimiter.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    /// <remarks>
+    /// The whole default profile travels as the original <c>env</c> kind, byte for byte; anything
+    /// else is <c>env-profile</c>, which an owner from before profiles does not answer, so a runner
+    /// asking an older owner for a profile gets nothing rather than the default set.
+    /// </remarks>
     public static byte[] Encode(EnvRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        var profiled = !string.Equals(request.Profile, EnvProfileNames.Default, StringComparison.Ordinal)
+            || request.Keys is not null
+            || request.FileLines is not null;
+
         return Write(writer =>
         {
             writer.WriteNumber("v", Version);
-            writer.WriteString("kind", EnvKind);
+            writer.WriteString("kind", profiled ? EnvProfileKind : EnvKind);
             writer.WriteString("vault", request.Vault);
             writer.WriteString("session", request.Session);
             writer.WriteString("project", request.Project);
             WriteStrings(writer, "command", request.Command);
             writer.WriteString("directory", request.Directory);
+
+            if (profiled)
+            {
+                writer.WriteString("profile", request.Profile);
+
+                if (request.Keys is { } keys)
+                {
+                    WriteStrings(writer, "keys", keys);
+                }
+
+                if (request.FileLines is { } lines)
+                {
+                    WriteStrings(writer, "file_lines", lines);
+                }
+            }
         });
     }
 
@@ -417,7 +447,7 @@ public static class ApproverProtocol
             return frame;
         }
 
-        var tooLarge = EnvResolved.Refused(reply.Set.Project, EnvOutcome.TooLarge);
+        var tooLarge = EnvResolved.Refused(reply.Set.Project, EnvOutcome.TooLarge, profile: reply.Set.Profile);
         var refusal = WriteEnv(new EnvReply(tooLarge, tooLarge.Refusal));
 
         return refusal.Length <= MessageFramer.MaximumPayloadBytes
@@ -431,6 +461,7 @@ public static class ApproverProtocol
             writer.WriteNumber("v", Version);
             writer.WriteString("kind", EnvKind);
             writer.WriteString("project", reply.Set.Project);
+            writer.WriteString("profile", reply.Set.Profile);
             writer.WriteNumber("outcome", (int)reply.Set.Outcome);
             writer.WriteString("reason", reply.Reason);
 
@@ -755,6 +786,11 @@ public static class ApproverProtocol
     /// <param name="frame">The frame's bytes.</param>
     /// <param name="request">The decoded request.</param>
     /// <returns><see langword="true"/> when the frame was a well-formed env request.</returns>
+    /// <remarks>
+    /// An <c>env</c> frame is the whole default profile. An <c>env-profile</c> frame must name a
+    /// profile keypaste resolves, and any keys and file lines it carries are bounded here, before
+    /// anything is resolved or shown.
+    /// </remarks>
     public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out EnvRequest? request)
     {
         request = null;
@@ -767,8 +803,9 @@ public static class ApproverProtocol
         using (document)
         {
             var root = document.RootElement;
+            var profiled = IsKind(root, EnvProfileKind);
 
-            if (!IsKind(root, EnvKind)
+            if (!(profiled || IsKind(root, EnvKind))
                 || !TryString(root, "vault", out var vault)
                 || !TryString(root, "session", out var session)
                 || !TryString(root, "project", out var project)
@@ -779,8 +816,34 @@ public static class ApproverProtocol
             }
 
             request = new EnvRequest(project, command, directory) { Vault = vault, Session = session };
+
+            if (!profiled)
+            {
+                return true;
+            }
+
+            if (!TryString(root, "profile", out var profile)
+                || !EnvProfileNames.IsValid(profile, out _)
+                || !TryOptionalStrings(root, "keys", out var keys)
+                || !TryOptionalStrings(root, "file_lines", out var lines)
+                || keys?.Count > MaximumEnvListLength
+                || keys?.Any(key => !EnvConvention.IsValidKey(key, out _)) == true
+                || lines?.Count > MaximumEnvListLength
+                || lines?.Any(line => line.Length > MaximumFileLineLength) == true)
+            {
+                request = null;
+                return false;
+            }
+
+            request = request with { Profile = profile, Keys = keys, FileLines = lines };
             return true;
         }
+    }
+
+    private static bool TryOptionalStrings(JsonElement root, string name, out IReadOnlyList<string>? values)
+    {
+        values = null;
+        return !root.TryGetProperty(name, out _) || TryStrings(root, name, out values);
     }
 
     /// <summary>Decodes the answer to an env request.</summary>
@@ -814,6 +877,18 @@ public static class ApproverProtocol
                 return false;
             }
 
+            var profile = EnvProfileNames.Default;
+
+            if (root.TryGetProperty("profile", out _))
+            {
+                if (!TryString(root, "profile", out var named))
+                {
+                    return false;
+                }
+
+                profile = named;
+            }
+
             var outcome = (EnvOutcome)number;
 
             if (outcome == EnvOutcome.Resolved)
@@ -824,7 +899,7 @@ public static class ApproverProtocol
                 }
 
                 reply = new EnvReply(
-                    EnvResolved.Released(project, [.. variables.Select(pair => new EnvVariable(pair.Key, pair.Value))]),
+                    EnvResolved.Released(project, [.. variables.Select(pair => new EnvVariable(pair.Key, pair.Value))], profile),
                     reason);
                 return true;
             }
@@ -835,7 +910,7 @@ public static class ApproverProtocol
             }
 
             reply = new EnvReply(
-                EnvResolved.Refused(project, outcome, [.. problems.Select(pair => new EnvProblem(pair.Key, pair.Value))]),
+                EnvResolved.Refused(project, outcome, [.. problems.Select(pair => new EnvProblem(pair.Key, pair.Value))], profile),
                 reason);
             return true;
         }

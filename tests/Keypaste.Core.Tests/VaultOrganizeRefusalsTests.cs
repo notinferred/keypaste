@@ -364,7 +364,7 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
     }
 
     /// <summary>
-    /// An entry directly in <c>env</c> is a write to nowhere: <see cref="EnvStore.Read"/> reads
+    /// An entry directly in <c>env</c> is a write to nowhere: <see cref="EnvStore.Read(string)"/> reads
     /// <c>env/&lt;project&gt;</c>, so nothing would ever find it again.
     /// </summary>
     [Fact]

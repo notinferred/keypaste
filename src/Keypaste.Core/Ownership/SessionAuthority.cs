@@ -199,9 +199,26 @@ public sealed class SessionAuthority : IApproverHandler
             return Refused(request.Project, request.Profile, EnvOutcome.Invalid, problem);
         }
 
+        if (!EnvProfileNames.IsValid(request.Profile, out var invalid))
+        {
+            return Refused(request.Project, request.Profile, EnvOutcome.Invalid, invalid);
+        }
+
+        foreach (var key in request.Keys ?? [])
+        {
+            if (!EnvConvention.IsValidKey(key, out invalid))
+            {
+                return Refused(request.Project, request.Profile, EnvOutcome.Invalid, invalid);
+            }
+        }
+
         // Every run is a new connection, so the cooldown names the request and not the connection:
         // a loop that asks again after a refusal is refused without a second prompt (T-11).
-        var cooldownKey = string.Join('\0', ["env", request.Project, request.Directory, .. request.Command]);
+        var cooldownKey = string.Join('\0', [
+            "env", request.Project, request.Profile, request.Directory, .. request.Command,
+            "\u0001", .. (request.Keys ?? []).Order(StringComparer.Ordinal),
+            "\u0002", .. request.FileLines ?? []]);
+        var fileLines = (request.FileLines ?? []).Select(ShownLine).ToList();
         var answer = ApprovalAnswer.NoChannel;
 
         var resolver = new SessionEnvResolver(
@@ -211,9 +228,11 @@ public sealed class SessionAuthority : IApproverHandler
 
         var resolved = await resolver.ResolveAsync(
             request.Project,
+            request.Profile,
+            request.Keys,
             async (preview, withdrawn) =>
             {
-                var prompt = EnvReleasePrompt.For(preview, request.Command, request.Directory);
+                var prompt = EnvReleasePrompt.For(preview, request.Command, request.Directory) with { FileLines = fileLines };
                 answer = await environments.Gate.AskAsync(cooldownKey, prompt, withdrawn).ConfigureAwait(false);
 
                 // A withdrawn question is not a refusal: the resolver tells a lock from a hang-up.
@@ -235,6 +254,10 @@ public sealed class SessionAuthority : IApproverHandler
     }
 
     private SessionLifetime? Live() => _lifetime() is { IsLive: true } lifetime ? lifetime : null;
+
+    /// <summary>A runner's file line as a prompt shows it: one line, nothing that draws anything else.</summary>
+    private static string ShownLine(string line) =>
+        DisplayTextSanitizer.Sanitize(line.Replace('\n', '\0').Replace('\r', '\0').Replace('\t', '\0')).Text;
 
     private static EnvReply Refused(string project, string profile, EnvOutcome outcome, string reason) =>
         new(EnvResolved.Refused(project, outcome, profile: profile), reason);

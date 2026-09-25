@@ -279,6 +279,110 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         Assert.Equal(0, _fixture.Channel.Asked);
     }
 
+    [Fact]
+    public async Task AProfileRequest_ReleasesThatProfile()
+    {
+        AddStaging();
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        await using var owner = Owner.Start(this);
+        await using var client = await AttachedAsync(owner);
+
+        var reply = await client.ReleaseEnvAsync(Request("session-one") with { Profile = "staging" }, Token);
+
+        Assert.NotNull(reply);
+        Assert.Equal(EnvOutcome.Resolved, reply.Set.Outcome);
+        Assert.Equal("staging", reply.Set.Profile);
+        Assert.Equal([new EnvVariable("TOKEN", _stagingToken)], reply.Set.Variables);
+
+        var subset = await client.ReleaseEnvAsync(Request("session-one") with { Keys = ["TOKEN"] }, Token);
+        Assert.Equal([new EnvVariable("TOKEN", _token1)], subset?.Set.Variables);
+        Assert.Equal("dev", subset?.Set.Profile);
+    }
+
+    [Fact]
+    public async Task AnInvalidProfile_IsRefusedBeforeAsking()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        await using var owner = Owner.Start(this);
+
+        await using (var client = await AttachedAsync(owner))
+        {
+            var missing = await client.ReleaseEnvAsync(Request("session-one") with { Profile = "qa" }, Token);
+            Assert.Equal(EnvOutcome.NoProfile, missing?.Set.Outcome);
+            Assert.Equal("qa", missing?.Set.Profile);
+
+            // The wire never carries a profile keypaste would not resolve: the owner hangs up unasked.
+            Assert.Null(await client.ReleaseEnvAsync(Request("session-one") with { Profile = "Prod" }, Token));
+        }
+
+        var authority = new SessionAuthority(
+            VaultIdentity.Of(_directory, VaultPath),
+            () => _lifetime,
+            _fixture.Handler,
+            new SessionEnvironments(_fixture.Gate, lifetime => ReferenceEquals(lifetime, _lifetime) ? _vault : null, _fixture.Clock));
+        Assert.True((await authority.AttachAsync(new AttachRequest(VaultPath), "in-process", Token)).Attached);
+
+        var badProfile = await authority.ReleaseEnvAsync(Request("session-one") with { Profile = "Prod" }, "in-process", Token);
+        var badKey = await authority.ReleaseEnvAsync(Request("session-one") with { Keys = ["BAD-KEY"] }, "in-process", Token);
+
+        Assert.Equal(EnvOutcome.Invalid, badProfile.Set.Outcome);
+        Assert.Equal("Prod", badProfile.Set.Profile);
+        Assert.Equal(EnvOutcome.Invalid, badKey.Set.Outcome);
+        Assert.Equal(0, _fixture.Channel.Asked);
+    }
+
+    [Fact]
+    public async Task ThePromptNamesTheProfile()
+    {
+        AddStaging();
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        await using var owner = Owner.Start(this);
+        await using var client = await AttachedAsync(owner);
+
+        await client.ReleaseEnvAsync(
+            Request("session-one") with { Profile = "staging", Keys = ["TOKEN"], FileLines = ["API_TOKEN ← TOKEN", "PROXY=http://p‮"] },
+            Token);
+
+        var prompt = Assert.IsType<EnvReleasePrompt>(_fixture.Channel.LastEnvPrompt);
+        Assert.Equal("staging", prompt.Profile);
+        Assert.Equal(["TOKEN"], prompt.Keys);
+        Assert.Equal("API_TOKEN ← TOKEN", prompt.FileLines[0]);
+        Assert.DoesNotContain('‮', prompt.FileLines[1]);
+        Assert.DoesNotContain(_stagingToken, prompt.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TheCooldownIsPerProfile()
+    {
+        AddStaging();
+        _fixture.Channel.Answer = ApprovalAnswer.Denied;
+        await using var owner = Owner.Start(this);
+
+        await using (var first = await AttachedAsync(owner))
+        {
+            Assert.Equal(EnvOutcome.Declined, (await first.ReleaseEnvAsync(Request("session-one") with { Profile = "staging" }, Token))?.Set.Outcome);
+        }
+
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        await using var second = await AttachedAsync(owner);
+
+        var dev = await second.ReleaseEnvAsync(Request("session-one"), Token);
+        var stagingAgain = await second.ReleaseEnvAsync(Request("session-one") with { Profile = "staging" }, Token);
+
+        Assert.Equal(EnvOutcome.Resolved, dev?.Set.Outcome);
+        Assert.Equal(EnvOutcome.Declined, stagingAgain?.Set.Outcome);
+        Assert.Contains("refused a moment ago", stagingAgain?.Reason, StringComparison.Ordinal);
+        Assert.Equal(2, _fixture.Channel.Asked);
+    }
+
+    private const string _stagingToken = "sk_live_env_owner_staging_sentinel";
+
+    private void AddStaging()
+    {
+        Assert.NotEqual(EnvSetOutcome.Rejected, new EnvStore(_vault).TrySet("dev", "staging", "TOKEN", _stagingToken, out _));
+        _vault.Save();
+    }
+
     private ApproverHandler CredentialHandler() =>
         new(
             new VaultCredentialSource(() => _vault),

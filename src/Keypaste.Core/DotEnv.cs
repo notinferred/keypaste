@@ -83,7 +83,7 @@ public sealed class DotEnvDocument
 /// <item><description>
 /// <b>A key repeated in one file is an error.</b> dotenv keeps the first, godotenv keeps the last;
 /// since they disagree there is no answer to give, so it fails closed (docs/PRODUCT.md law 3.7), exactly
-/// as <see cref="EnvStore.Read"/> does for two entries sharing a name.
+/// as <see cref="EnvStore.Read(string)"/> does for two entries sharing a name.
 /// </description></item>
 /// <item><description>
 /// <b>A key outside <see cref="EnvConvention.IsValidKey"/> is an error.</b> dotenv's key pattern
