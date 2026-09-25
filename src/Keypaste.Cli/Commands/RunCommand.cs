@@ -136,14 +136,20 @@ internal static class RunCommand
 
         if (set.File is { } file)
         {
+            // A literal is shown to the person before anything is unlocked, so one that cannot be
+            // shown exactly as the child would get it is refused rather than shortened (T-31).
+            if (file.Lines.FirstOrDefault(fileLine => fileLine.Reference is null && Literal(fileLine) != Written(fileLine)) is { } hidden)
+            {
+                return Fail(
+                    context,
+                    $"{OneLine(set.Label)} line {hidden.Line}: the value of {OneLine(hidden.Name)} is too long or holds characters that cannot be shown on one line");
+            }
+
             context.Stderr.WriteLine($"keypaste run: resolving {OneLine(set.Label)} {Arrow(context.Stderr)} project {OneLine(set.Project)} profile {OneLine(set.Profile)}");
 
-            if (!context.ConsoleStyle.IsTerminal(context.Stderr))
+            foreach (var literal in file.Lines.Where(fileLine => fileLine.Reference is null))
             {
-                foreach (var literal in file.Lines.Where(fileLine => fileLine.Reference is null))
-                {
-                    context.Stderr.WriteLine($"keypaste run: literal {Literal(literal)}");
-                }
+                context.Stderr.WriteLine($"keypaste run: literal {Literal(literal)}");
             }
         }
 
@@ -333,12 +339,12 @@ internal static class RunCommand
             return Fail(context, $"--{ApproverOption}: {ex.Message}");
         }
 
-        if (!TryRequest(set, command, context, out var request, out var exit))
+        if (!TryRequest(set, command, vaultPath, context, out var request, out var exit))
         {
             return exit;
         }
 
-        var (reply, refusal) = AskAsync(pipe, vaultPath, request with { Vault = vaultPath }, context).GetAwaiter().GetResult();
+        var (reply, refusal) = AskAsync(pipe, vaultPath, request, context).GetAwaiter().GetResult();
 
         if (reply is null)
         {
@@ -378,9 +384,10 @@ internal static class RunCommand
     }
 
     /// <summary>The request a set makes: a project's profile, or a reference file's keys and lines under one profile.</summary>
-    private static bool TryRequest(RunSet set, IReadOnlyList<string> command, CliContext context, out EnvRequest request, out int exit)
+    private static bool TryRequest(
+        RunSet set, IReadOnlyList<string> command, string vaultPath, CliContext context, out EnvRequest request, out int exit)
     {
-        request = new EnvRequest(set.Project, command, context.WorkingDirectory) { Profile = set.Profile };
+        request = new EnvRequest(set.Project, command, context.WorkingDirectory) { Vault = vaultPath, Profile = set.Profile };
         exit = CliApp.ExitSuccess;
 
         if (set.File is not { } file)
@@ -404,21 +411,26 @@ internal static class RunCommand
         }
 
         var lines = file.Lines
-            .Select(fileLine => fileLine.Reference is EnvReference env ? $"{fileLine.Name} ← {env.Key}" : Literal(fileLine))
+            .Select(fileLine => fileLine.Reference is EnvReference env ? $"{fileLine.Name} ← {env.Key}" : Written(fileLine))
             .ToList();
-
-        if (lines.Count > ApproverProtocol.MaximumEnvListLength || lines.Any(fileLine => fileLine.Length > ApproverProtocol.MaximumFileLineLength))
-        {
-            exit = Fail(context, $"{set.Label} is too long for the prompt to show whole; run without --session");
-            return false;
-        }
 
         request = new EnvRequest(envs[0].Project, command, context.WorkingDirectory)
         {
+            Vault = vaultPath,
             Profile = envs[0].Profile,
             Keys = [.. envs.Select(env => env.Key).Distinct(StringComparer.Ordinal)],
             FileLines = lines,
         };
+
+        // Measured with a session of the length every owner issues, so a request the framer would
+        // refuse is never sent and mistaken for an owner that did not answer.
+        if (lines.Count > ApproverProtocol.MaximumEnvListLength
+            || lines.Any(fileLine => fileLine.Length > ApproverProtocol.MaximumFileLineLength)
+            || ApproverProtocol.Encode(request with { Session = VaultOwner.NewSession() }).Length > MessageFramer.MaximumPayloadBytes)
+        {
+            exit = Fail(context, $"{OneLine(set.Label)} is too long for the prompt to show whole; run without --session");
+            return false;
+        }
 
         return true;
     }
@@ -616,7 +628,10 @@ internal static class RunCommand
         return place.Length > KpReferences.Scheme.Length ? place : KpReferences.Scheme + "/";
     }
 
-    private static string Literal(ReferenceLine line) => OneLine($"{line.Name}={line.Literal}");
+    /// <summary>A literal line as the child gets it.</summary>
+    private static string Written(ReferenceLine line) => $"{line.Name}={line.Literal}";
+
+    private static string Literal(ReferenceLine line) => OneLine(Written(line));
 
     /// <summary>→ where the writer is Unicode, else <c>-&gt;</c>: a legacy console code page writes a control character for it.</summary>
     private static string Arrow(TextWriter writer) => writer.Encoding.CodePage is 65001 or 1200 or 1201 ? "→" : "->";

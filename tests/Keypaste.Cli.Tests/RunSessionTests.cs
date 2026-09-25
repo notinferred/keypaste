@@ -207,6 +207,34 @@ public sealed class RunSessionTests : IDisposable
     }
 
     [Fact]
+    public async Task RunSession_ALiteralThePromptWouldShorten_IsRefusedUnasked()
+    {
+        var file = WriteFile($"API_TOKEN=kp://dev/dev/TOKEN\nNODE_OPTIONS=\"{new string(' ', 1100)}--require ./x.js\"\n");
+        await using var owner = Owner.Start(this, ApprovalAnswer.Approved);
+
+        _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("run", "--session", "--env-file", file, "--vault", _harness.VaultPath, "--", "deploy"));
+
+        Assert.Contains("line 2: the value of NODE_OPTIONS is too long", _harness.Err, StringComparison.Ordinal);
+        Assert.Null(owner.Channel.Last);
+        Assert.Empty(_harness.ProcessLauncher.Started);
+    }
+
+    [Fact]
+    public async Task RunSession_AFileTooLargeForOneFrame_IsRefusedAsTooLong_NotAsAnOlderOwner()
+    {
+        var literals = string.Concat(Enumerable.Range(0, 200).Select(i => $"LITERAL_{i}={new string('x', 400)}\n"));
+        var file = WriteFile($"API_TOKEN=kp://dev/dev/TOKEN\n{literals}");
+        await using var owner = Owner.Start(this, ApprovalAnswer.Approved);
+
+        _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("run", "--session", "--env-file", file, "--vault", _harness.VaultPath, "--", "deploy"));
+
+        Assert.Contains("is too long for the prompt to show whole; run without --session", _harness.Err, StringComparison.Ordinal);
+        Assert.DoesNotContain("older", _harness.Err, StringComparison.Ordinal);
+        Assert.Null(owner.Channel.Last);
+        Assert.Empty(_harness.ProcessLauncher.Started);
+    }
+
+    [Fact]
     public async Task RunSession_EntryReferences_AreRefused()
     {
         var file = WriteFile("API_TOKEN=kp://dev/dev/TOKEN\nGH=kp:///work/github\n");

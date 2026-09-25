@@ -502,6 +502,8 @@ public sealed class RunCommandTests
         Assert.Equal(
             [
                 $"keypaste run: resolving {file} → project acme-api, vault entries profile mixed",
+                "keypaste run: literal HTTPS_PROXY=http://proxy.internal:3128",
+                "keypaste run: literal NO_PROXY=localhost",
                 $"  resolving {file}  profile mixed",
                 "  ✓ A                   kp://acme-api/dev",
                 "  ✓ B                   kp://acme-api/dev",
@@ -513,6 +515,40 @@ public sealed class RunCommandTests
             ],
             harness.Err.ReplaceLineEndings("\n").Split('\n', StringSplitOptions.RemoveEmptyEntries));
         Assert.DoesNotContain("dev-db", harness.Err, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Run_OnATerminal_ListsEveryLiteralBeforeThePasswordIsAskedFor()
+    {
+        using var harness = Profiled();
+        harness.ConsoleStyle.Terminal = true;
+        var file = Write(harness, "refs.env", "DB=kp://acme-api/dev/DATABASE_URL\nHTTPS_PROXY=http://proxy.internal:3128\n");
+        string? shownFirst = null;
+        harness.Prompt.OnPrompt = _ => shownFirst ??= harness.Err;
+
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run("run", "--env-file", file, "--vault", harness.VaultPath, "--", "node"));
+
+        Assert.Contains("keypaste run: literal HTTPS_PROXY=http://proxy.internal:3128", shownFirst, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("NODE_OPTIONS=\"{0}--require ./x.js\"")]
+    [InlineData("NODE_OPTIONS=\"--max-old-space-size=4096\\n--require ./x.js\"")]
+    [InlineData("NODE_OPTIONS=\"--max-old-space-size=4096 \"")]
+    public void Run_ALiteralThatCannotBeShownAsWritten_IsRefusedUnasked(string literal)
+    {
+        using var harness = Profiled();
+        harness.WorkingDirectory = EnvVerbTests.MapProject(harness, "acme-api");
+        Write(harness, Core.EnvReferenceFile.FileName, $"DB=kp://acme-api/dev/DATABASE_URL\n{string.Format(literal, new string(' ', 1100))}\n");
+
+        harness.AssertExit(CliApp.ExitUsageError, harness.Run("run", "--vault", harness.VaultPath, "--", "node"));
+
+        Assert.Equal(
+            "keypaste run: .env.keypaste line 2: the value of NODE_OPTIONS is too long or holds characters that cannot be shown on one line",
+            harness.Err.Trim());
+        Assert.Empty(harness.Prompt.PromptsSeen);
+        Assert.Empty(harness.ProcessLauncher.Started);
     }
 
     [Fact]
