@@ -138,6 +138,32 @@ public static class EnvReferenceFile
         };
     }
 
+    /// <summary>Writes a reference file as UTF-8, replacing one only when told to.</summary>
+    /// <param name="path">The file.</param>
+    /// <param name="text">What <see cref="Format"/> made.</param>
+    /// <param name="replace">Whether a file already there may be replaced.</param>
+    /// <param name="error">Why nothing was written, otherwise empty.</param>
+    /// <returns>Whether the file was written.</returns>
+    /// <remarks>The caller refuses a destination that is a vault: this writes references, never a vault's bytes.</remarks>
+    public static bool TryWrite(string path, string text, bool replace, out string error)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        ArgumentNullException.ThrowIfNull(text);
+
+        try
+        {
+            using var file = new FileStream(path, replace ? FileMode.Create : FileMode.CreateNew, FileAccess.Write);
+            file.Write(Encoding.UTF8.GetBytes(text));
+            error = string.Empty;
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            error = File.Exists(path) && !replace ? $"{path} already exists" : ex.Message;
+            return false;
+        }
+    }
+
     private static string Quoted(string reference) =>
         reference.Any(c => c == '#' || char.IsWhiteSpace(c)) ? $"\"{reference}\"" : reference;
 }

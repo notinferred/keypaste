@@ -209,13 +209,11 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
             return $"{EnvProfileNames.GroupPath(Name, SelectedProfile)} {names}";
         }
 
-        try
+        var text = EnvReferenceFile.Format(Name, SelectedProfile, [.. variables.Select(variable => variable.Key)]);
+
+        if (!EnvReferenceFile.TryWrite(target, text, replace, out var writeError))
         {
-            File.WriteAllText(target, EnvReferenceFile.Format(Name, SelectedProfile, [.. variables.Select(variable => variable.Key)]));
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            return $"{target} could not be written: {ex.Message}";
+            return $"{target} could not be written: {writeError}";
         }
 
         return $"Wrote {(variables.Count == 1 ? "1 reference" : $"{variables.Count} references")} to {target}. It holds no value and is safe to commit.";
@@ -475,6 +473,9 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     {
         _revealed = null;
         Variables = [];
+        Profiles = [];
+        ProfileProblems = [];
+        Matrix = null;
         Removing = null;
         Replacing = null;
         NewValue.Dispose();
