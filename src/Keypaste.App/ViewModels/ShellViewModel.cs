@@ -3,6 +3,7 @@ using Keypaste.App.Clipboard;
 using Keypaste.App.Navigation;
 using Keypaste.App.Session;
 using Keypaste.Core;
+using Keypaste.Core.Sharing;
 
 namespace Keypaste.App.ViewModels;
 
@@ -461,6 +462,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             DestinationKind.Entries => Entries(),
             DestinationKind.EnvSets => new EnvSetsViewModel(_session, Clipboard, _picker, toast: ShowToast),
             DestinationKind.Trash => new TrashViewModel(_session),
+            DestinationKind.Sharing => Sharing(),
             _ => null,
         };
 
@@ -480,6 +482,31 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     }
 
     private AgentActivityViewModel Activity() => new(Authority, Home, _clock, _post, toast: ShowToast, clipboard: Clipboard);
+
+    /// <summary>How share links reach their server; the shell makes one when none is given.</summary>
+    /// <remarks>Redirects are never followed, so an envelope reaches only the origin the link names.</remarks>
+    internal HttpMessageHandler? ShareTransport { get; init; }
+
+    private SocketsHttpHandler? _ownShareTransport;
+
+    private SharingViewModel Sharing()
+    {
+        var resolved = ShareEndpoint.TryResolve(null, Environment.GetEnvironmentVariable(ShareEndpoint.EnvironmentVariable), out var endpoint, out _);
+        var transport = ShareTransport ?? (_ownShareTransport ??= new SocketsHttpHandler
+        {
+            AllowAutoRedirect = false,
+            UseCookies = false,
+            AutomaticDecompression = System.Net.DecompressionMethods.None,
+            ConnectTimeout = TimeSpan.FromSeconds(10),
+        });
+        var auditPath = Core.Audit.KeypasteHome.AuditPath(Home);
+        var service = new ShareService(
+            new ShareClient(transport, endpoint ?? ShareEndpoint.Default),
+            _clock,
+            () => Core.Audit.AuditLog.TryOpen(auditPath, _clock, out var log, out _) ? log : null);
+
+        return new SharingViewModel(_session, Clipboard, service, ShowToast, resolved ? null : $"Sharing is off: {ShareEndpoint.EnvironmentVariable} may only name a local development server.");
+    }
 
     private void OpenProject(string? project)
     {
@@ -508,11 +535,15 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         IReadOnlyList<string> names;
         Dictionary<string, int> perGroup = new(StringComparer.Ordinal);
         int total;
+        int liveShares;
 
         try
         {
-            var entries = vault.ReadEntries().Where(entry => !Core.ReservedGroups.IsReserved(entry.GroupPath)).ToList();
+            // keypaste's own records, share links among them, are not secrets the Secrets list shows.
+            var entries = vault.ReadEntries().Where(entry => !ReservedGroups.IsReserved(entry.GroupPath)).ToList();
             total = entries.Count;
+            var now = _clock.GetUtcNow();
+            liveShares = new ShareStore(vault).List().Count(share => share.Expires > now);
 
             foreach (var entry in entries)
             {
@@ -532,6 +563,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         Projects = [.. names.Select(name => new ProjectRow(name, perGroup.GetValueOrDefault(EnvConvention.GroupPath(name))))];
         SetCount(DestinationKind.Entries, total);
         SetCount(DestinationKind.EnvSets, names.Count);
+        SetCount(DestinationKind.Sharing, liveShares);
     }
 
     private void SetCount(DestinationKind kind, int count, bool live = false)
@@ -684,6 +716,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         Projects = [];
         (Content as IDisposable)?.Dispose();
         Content = null;
+        _ownShareTransport?.Dispose();
 
         // A secret on the clipboard is derived from an open vault, so it does not survive the lock
         // either. Disposing clears it, conditionally — a clipboard the user has changed since is

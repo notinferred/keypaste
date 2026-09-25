@@ -20,6 +20,9 @@ internal enum DestinationKind
 
     /// <summary>The recycle bin, and the way back out of it.</summary>
     Trash = 5,
+
+    /// <summary>End-to-end encrypted share links made from this vault.</summary>
+    Sharing = 6,
 }
 
 /// <summary>Where a destination sits in the sidebar.</summary>
@@ -69,6 +72,7 @@ internal static class Destinations
         new(DestinationKind.AgentActivity, "Agents", "bot", OwnsHeader: true),
         new(DestinationKind.Log, "Activity", "activity", OwnsHeader: true),
         new(DestinationKind.EnvSets, "Env profiles", "layers", OwnsHeader: true),
+        new(DestinationKind.Sharing, "Sharing", "link", OwnsHeader: true),
         new(DestinationKind.Settings, "Settings", "settings", DestinationPlacement.Footer),
         new(DestinationKind.Trash, "Trash", "trash-2", DestinationPlacement.Footer),
     ];

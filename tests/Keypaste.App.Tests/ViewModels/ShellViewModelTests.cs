@@ -43,7 +43,7 @@ public sealed class ShellViewModelTests : IDisposable
     {
         using var shell = Shell();
 
-        Assert.Equal(["Secrets", "Agents", "Activity", "Env profiles"], shell.MainNav.Select(item => item.Title));
+        Assert.Equal(["Secrets", "Agents", "Activity", "Env profiles", "Sharing"], shell.MainNav.Select(item => item.Title));
         Assert.Equal(["Settings", "Trash"], shell.FooterNav.Select(item => item.Title));
         Assert.Equal(Enumerable.Range(1, Destinations.All.Count), Destinations.All.Select(d => d.Shortcut));
     }
@@ -112,6 +112,28 @@ public sealed class ShellViewModelTests : IDisposable
 
         Assert.False(shell.McpRunning);
         Assert.Equal("stopped", shell.McpState);
+    }
+
+    [Fact]
+    public async Task A_link_made_on_sharing_is_toasted_by_the_shell_and_counted_in_the_sidebar()
+    {
+        using var server = new FakeShareServer { Now = _clock.GetUtcNow() };
+        using var shell = new ShellViewModel(_session, _fixture.Home, authority: null, clipboard: new Clipboard.FakeClipboard(), clock: _clock)
+        {
+            ShareTransport = server,
+        };
+
+        shell.Current = Destinations.Of(DestinationKind.Sharing);
+        var sharing = Assert.IsType<SharingViewModel>(shell.Content);
+        Assert.False(shell.ShowsHeader);
+        sharing.SelectedWhat = "env/billing/STRIPE_KEY";
+
+        await sharing.CreateCommand.ExecuteAsync();
+
+        Assert.Equal("Link copied. Expires in 24h, 1 view.", shell.Toast);
+        shell.Current = Destinations.Of(DestinationKind.Entries);
+        Assert.Equal("1", shell.MainNav.Single(item => item.Destination.Kind == DestinationKind.Sharing).Count);
+        Assert.Equal("4", shell.MainNav.Single(item => item.Destination.Kind == DestinationKind.Entries).Count);
     }
 
     private ShellViewModel Shell() => new(_session, _fixture.Home, authority: null, clock: _clock);

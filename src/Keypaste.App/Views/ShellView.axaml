@@ -35,6 +35,10 @@
       <views:AgentActivityView />
     </DataTemplate>
 
+    <DataTemplate DataType="vm:SharingViewModel">
+      <views:SharingView />
+    </DataTemplate>
+
   </UserControl.DataTemplates>
 
   <UserControl.Styles>
