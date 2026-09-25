@@ -858,8 +858,8 @@ validate_packages() {
     workflow="$(jqr ".components.\"$c\".workflow" "$def")"
     [ -f "$root/$workflow" ] || continue
     code="$(package_code "$root" "$workflow")"
-    for kind in msi appimage; do
-      case "$kind" in msi) ext=".msi" ;; appimage) ext=".AppImage" ;; esac
+    for kind in msi appimage app-bundle; do
+      case "$kind" in msi) ext=".msi" ;; appimage) ext=".AppImage" ;; app-bundle) ext=".app.zip" ;; esac
       case "$code" in *"$ext"*) ;; *) continue ;; esac
       declared="$(count_of "$def" "[.components.\"$c\".targets[]?.packages[]? | select(.kind == \"$kind\")]")"
       [ "${declared:-0}" -ge 1 ] \
@@ -1298,7 +1298,7 @@ cp site/public/index.html "$FAKE/site/public/"
 cp .github/workflows/release.yml .github/workflows/app.yml "$FAKE/.github/workflows/"
 mkdir -p "$FAKE/scripts"
 cp scripts/require-changelog-section.sh scripts/build-linux-appimage.sh scripts/build-windows-installer.sh scripts/sign-windows.sh \
-  scripts/verify-windows-signature.sh scripts/rehearse-windows-signing.sh "$FAKE/scripts/"
+  scripts/build-macos-app.sh scripts/verify-windows-signature.sh scripts/rehearse-windows-signing.sh "$FAKE/scripts/"
 DLIB_PROJECT="$(jqr '.signing.dlib.project' "$DEFINITION")"
 mkdir -p "$FAKE/$(dirname "$DLIB_PROJECT")"
 cp "$DLIB_PROJECT" "$FAKE/$DLIB_PROJECT"
@@ -1321,6 +1321,10 @@ expect_repo_refusal "installer-undeclared" "builds an msi package and app declar
 
 expect_repo_refusal "appimage-undeclared" "builds an appimage package and app declares none" \
   "$(mutate appimage-undeclared '(.components.app.targets[] | select(.rid == "linux-x64")) |= del(.packages)')" \
+  "$FAKE"
+
+expect_repo_refusal "app-bundle-undeclared" "builds an app-bundle package and app declares none" \
+  "$(mutate app-bundle-undeclared '(.components.app.targets[] | select(.rid == "osx-arm64")) |= del(.packages)')" \
   "$FAKE"
 
 expect_repo_refusal "installer-tool-unpinned" "and the definition pins WixToolset.Sdk/6.0.2" \
@@ -1377,6 +1381,11 @@ sed_inplace 's/| \.packages\[\] | select(\.kind == "appimage")/| .appimage | sel
 expect_repo_refusal "appimage-name-not-read-from-the-definition" "builds an appimage package without reading its name from the definition" \
   "$FAKE/release-targets.json" "$FAKE"
 cp scripts/build-linux-appimage.sh "$FAKE/scripts/build-linux-appimage.sh"
+
+sed_inplace 's/| \.packages\[\] | select(\.kind == "app-bundle")/| .bundle | select(.kind == "app-bundle")/' "$FAKE/scripts/build-macos-app.sh"
+expect_repo_refusal "app-bundle-name-not-read-from-the-definition" "builds an app-bundle package without reading its name from the definition" \
+  "$FAKE/release-targets.json" "$FAKE"
+cp scripts/build-macos-app.sh "$FAKE/scripts/build-macos-app.sh"
 
 printf 'readonly TOOL_SHA256=%s\n' "$(jqr '.components.app.targets[] | select(.rid == "linux-x64") | .packages[0].tool_sha256' "$DEFINITION")" \
   >> "$FAKE/scripts/build-linux-appimage.sh"
