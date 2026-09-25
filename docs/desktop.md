@@ -236,4 +236,4 @@ Use a disposable vault and set an idle timeout long enough to exclude it as the 
 
 Switching windows must leave the app unlocked. On macOS, `Cmd+H` hides the app and must also leave it unlocked; `Cmd+M` minimizes it.
 
-Record the OS name, version and build; session type and desktop environment; app build or tag; and each result with the selected platform task. F.2b3 covers the focused Windows/Linux release; macOS observation is needed if that desktop target is selected from BACKLOG. If a window manager reports no minimize event, record that result and update `MinimizeLock.IsSupported` to omit the unsupported checkbox. Untested targets remain unobserved.
+Record the OS name, version and build; session type and desktop environment; app build or tag; and each result with the selected platform task. F.2b3b covers the focused Windows/Linux release; macOS observation is needed if that desktop target is selected from BACKLOG. If a window manager reports no minimize event, record that result and update `MinimizeLock.IsSupported` to omit the unsupported checkbox. Untested targets remain unobserved.

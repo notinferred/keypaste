@@ -6,6 +6,7 @@
 
 | id | date | decision | supersedes |
 |---|---|---|---|
+| D-0342 | 2026-09-24 | F.2b3b, R.1a and R.1 accept an act whoever or whatever makes it, including the observer's own automation, provided it is made on the real desktop and from the artifact or package the row's Build names; an act not made still leaves the row open | Those rows requiring a person to make each act and refusing runner, event-reader and `Keypaste.AppDriver` observations |
 | D-0341 | 2026-09-24 | `keypaste run --session` gets a set only from the process holding the vault, through the endpoint's `env` message under that owner's current session and gate, after a prompt naming the project, variable names, command and directory; it never opens the vault or reads a password, even as a fallback | `keypaste run` always unlocking on its own |
 | D-0340 | 2026-09-24 | The app launches a project only through `EnvLaunch` into the platform's terminal (`%ComSpec% /s /k` on Windows; the first of `x-terminal-emulator`, `gnome-terminal`, `konsole`, `xterm` on Linux, the command as `$1` of a fixed `sh -c` script; none on macOS), after a confirmation that is the session resolver's, and never captures what the child prints | Env Sets only copying `keypaste run` |
 | D-0339 | 2026-09-24 | A project's directory and command live on the machine in `~/.keypaste/projects.json`, keyed by full vault path and project, with no field for a value and never in the vault; an unreadable file is never replaced | — |
