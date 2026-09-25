@@ -94,7 +94,7 @@ public sealed class ImportSource : IDisposable
 
             var destination = unit.IsRootEntries
                 ? intoGroup
-                : unit.Project is not null && reason is null ? unit.SourceGroup : intoGroup + "/" + unit.SourceGroup;
+                : unit.Project is not null && reason is null ? unit.SourceGroup : Unreserved(intoGroup, unit.SourceGroup, groups, rows, ref reason);
 
             // A project that moves takes its profiles with it; a profile that moves goes alone.
             if (reason is not null && unit.Project is { } moved && string.Equals(unit.SourceGroup, EnvConvention.GroupPath(moved), StringComparison.Ordinal))
@@ -102,16 +102,62 @@ public sealed class ImportSource : IDisposable
                 rerouted.TryAdd(moved, reason);
             }
 
-            if (!titles.TryGetValue(destination, out var there))
+            foreach (var (relative, list) in unit.Groups)
             {
-                titles[destination] = there = [];
+                At(titles, Below(destination, relative)).AddRange(list);
             }
 
-            there.AddRange(unit.Titles);
             rows.Add(new ImportRow(index, unit.SourceGroup, unit.EntryCount, destination, true, unit.IsRootEntries) { Rerouted = reason });
         }
 
         return new ImportPlan(rows, intoGroup);
+    }
+
+    /// <summary>
+    /// <paramref name="sourceGroup"/> under <paramref name="into"/>, with any segment spelled like the
+    /// recycle bin renamed, since a group of that name is refused anywhere in a vault.
+    /// </summary>
+    private static string Unreserved(string into, string sourceGroup, HashSet<string> groups, List<ImportRow> rows, ref string? reason)
+    {
+        var path = into;
+
+        foreach (var segment in sourceGroup.Split('/'))
+        {
+            var name = segment;
+
+            if (string.Equals(segment, KeePassInterop.RecycleBinName, StringComparison.Ordinal))
+            {
+                var renamed = $"{KeePassInterop.RecycleBinName} (imported)";
+                name = renamed;
+
+                for (var suffix = 2; Taken(path + "/" + name); suffix++)
+                {
+                    name = $"{renamed} ({suffix})";
+                }
+
+                reason ??= $"{KeePassInterop.RecycleBinName} is the recycle bin's name";
+            }
+
+            path = path + "/" + name;
+        }
+
+        return path;
+
+        bool Taken(string candidate) =>
+            groups.Contains(candidate) || rows.Any(row => string.Equals(row.Destination, candidate, StringComparison.Ordinal));
+    }
+
+    private static string Below(string destination, string relative) =>
+        relative.Length == 0 ? destination : destination + "/" + relative;
+
+    private static List<string> At(Dictionary<string, List<string>> titles, string path)
+    {
+        if (!titles.TryGetValue(path, out var there))
+        {
+            titles[path] = there = [];
+        }
+
+        return there;
     }
 
     private static Dictionary<string, List<string>> Titles(Vault target) =>
@@ -161,36 +207,43 @@ public sealed class ImportSource : IDisposable
                 continue;
             }
 
-            if (!titles.TryGetValue(destination, out var there))
-            {
-                there = [];
-                titles[destination] = there;
-            }
-
             if (IsEnv(destination))
             {
+                var there = At(titles, destination);
+
                 if (RefuseEnvSet(unit, destination, there) is { } env)
                 {
                     problems.Add(new ImportProblem(row.Index, env, Blocks: true));
                 }
+
+                there.AddRange(unit.Titles);
+                continue;
             }
-            else
+
+            var duplicates = 0;
+            var inSubgroups = false;
+
+            foreach (var (relative, list) in unit.Groups)
             {
-                var duplicates = unit.Titles.Count(title => there.Contains(title, StringComparer.Ordinal))
-                    + unit.Titles.Count - unit.Titles.Distinct(StringComparer.Ordinal).Count();
+                var at = At(titles, Below(destination, relative));
+                var repeated = list.Count(title => at.Contains(title, StringComparer.Ordinal))
+                    + list.Count - list.Distinct(StringComparer.Ordinal).Count();
 
-                if (duplicates > 0)
-                {
-                    problems.Add(new ImportProblem(
-                        row.Index,
-                        duplicates == 1
-                            ? $"1 title in {destination} names another entry too; both are kept"
-                            : $"{duplicates} titles in {destination} name another entry too; all are kept",
-                        Blocks: false));
-                }
+                duplicates += repeated;
+                inSubgroups |= repeated > 0 && relative.Length > 0;
+                at.AddRange(list);
             }
 
-            there.AddRange(unit.Titles);
+            if (duplicates > 0)
+            {
+                var where = inSubgroups ? $"{destination} and its subgroups" : destination;
+                problems.Add(new ImportProblem(
+                    row.Index,
+                    duplicates == 1
+                        ? $"1 title in {where} names another entry too; both are kept"
+                        : $"{duplicates} titles in {where} name another entry too; all are kept",
+                    Blocks: false));
+            }
         }
 
         return problems;
@@ -278,13 +331,35 @@ public sealed class ImportSource : IDisposable
 
     private void Add(ImportNode node, ImportScope scope, string sourceGroup, bool isRoot = false, string? project = null)
     {
-        var count = scope == ImportScope.WholeGroup ? Count(node, sourceGroup) : node.Titles.Count;
+        List<(string Relative, IReadOnlyList<string> Titles)> groups = [(string.Empty, node.Titles)];
+
+        if (scope == ImportScope.WholeGroup)
+        {
+            Collect(node, sourceGroup, string.Empty, groups);
+        }
+
         _units.Add(new Unit(
-            node.Id, scope, sourceGroup, node.Titles, count, scope == ImportScope.WholeGroup && node.Children.Count > 0, isRoot, project));
+            node.Id,
+            scope,
+            sourceGroup,
+            node.Titles,
+            groups,
+            groups.Sum(group => group.Titles.Count),
+            scope == ImportScope.WholeGroup && node.Children.Count > 0,
+            isRoot,
+            project));
     }
 
-    private int Count(ImportNode node, string path) =>
-        node.Titles.Count + Live(node, path).Sum(child => Count(child, path + "/" + child.Name));
+    /// <summary>Every live subgroup's titles, by its path below the unit's group.</summary>
+    private void Collect(ImportNode node, string path, string relative, List<(string Relative, IReadOnlyList<string> Titles)> groups)
+    {
+        foreach (var child in Live(node, path))
+        {
+            var below = relative.Length == 0 ? child.Name : relative + "/" + child.Name;
+            groups.Add((below, child.Titles));
+            Collect(child, path + "/" + child.Name, below, groups);
+        }
+    }
 
     /// <summary>A group's children, noting any recycle bin among them as skipped.</summary>
     private List<ImportNode> Live(ImportNode node, string path)
@@ -435,6 +510,7 @@ public sealed class ImportSource : IDisposable
         ImportScope Scope,
         string SourceGroup,
         IReadOnlyList<string> Titles,
+        IReadOnlyList<(string Relative, IReadOnlyList<string> Titles)> Groups,
         int EntryCount,
         bool HasSubgroups,
         bool IsRootEntries,

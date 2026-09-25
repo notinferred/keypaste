@@ -21,7 +21,7 @@ public sealed record KdbxProbe(string Path, string FileName, string Version, str
 /// <param name="IsRootEntries">Whether the row is the entries directly in the source's root group.</param>
 public sealed record ImportRow(int Index, string SourceGroup, int EntryCount, string Destination, bool Include, bool IsRootEntries)
 {
-    /// <summary>Why a default plan put an env set under the import group instead of at its own path, or null.</summary>
+    /// <summary>Why a default plan put an env set under the import group instead of at its own path, or renamed a group, or null.</summary>
     public string? Rerouted { get; init; }
 }
 

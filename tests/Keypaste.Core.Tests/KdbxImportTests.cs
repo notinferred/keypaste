@@ -227,6 +227,50 @@ public sealed class KdbxImportTests : IDisposable
     }
 
     [Fact]
+    public void DuplicateTitlesInMergedSubgroups_AreCountedBeforeTheImport()
+    {
+        var source = Source("src.kdbx", vault => vault.AddEntry(new VaultEntry { Title = "gmail", GroupPath = "Work/Email", Password = "theirs" }));
+        using var target = Target();
+        target.AddEntry(new VaultEntry { Title = "gmail", GroupPath = "x/Work/Email", Password = "mine" });
+
+        using var opened = KdbxImport.Open(source, SourcePassword, null);
+        var plan = opened.DefaultPlan(target, "x");
+
+        var problem = Assert.Single(opened.Check(target, plan));
+        Assert.False(problem.Blocks);
+        Assert.Equal("1 title in x/Work and its subgroups names another entry too; both are kept", problem.Message);
+
+        var result = opened.ApplyTo(target, plan);
+
+        Assert.Equal(1, result.DuplicateTitles);
+    }
+
+    [Fact]
+    public void APlainGroupNamedLikeTheRecycleBin_LandsUnderAnotherName()
+    {
+        var source = Source("bins.kdbx", vault =>
+        {
+            vault.AddEntry(new VaultEntry { Title = "kept", GroupPath = KeePassInterop.RecycleBinName, Password = "k" });
+            vault.AddEntry(new VaultEntry { Title = "gone", GroupPath = "Other", Password = "g" });
+            vault.RemoveEntry(new EntryName("Other", "gone"));
+        });
+        using var target = Target();
+
+        using var opened = KdbxImport.Open(source, SourcePassword, null);
+        var plan = opened.DefaultPlan(target, "into");
+
+        var row = Assert.Single(plan.Rows, row => row.SourceGroup == KeePassInterop.RecycleBinName);
+        Assert.Equal("into/Recycle Bin (imported)", row.Destination);
+        Assert.Equal("Recycle Bin is the recycle bin's name", row.Rerouted);
+        Assert.DoesNotContain(opened.Check(target, plan), problem => problem.Blocks);
+
+        opened.ApplyTo(target, plan);
+
+        Assert.NotNull(target.Find(new EntryName("into/Recycle Bin (imported)", "kept")));
+        Assert.DoesNotContain(target.Search(string.Empty), match => match.Name.Title == "gone");
+    }
+
+    [Fact]
     public void DefaultPlan_MapsEnvProjects_AndAvoidsCollisions()
     {
         var source = Source("acme.kdbx", vault =>
