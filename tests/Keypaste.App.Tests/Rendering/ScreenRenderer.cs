@@ -1,10 +1,12 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.VisualTree;
 using Keypaste.App.Controls;
 using Keypaste.App.Navigation;
 using Keypaste.App.Session;
@@ -12,7 +14,9 @@ using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
+using Keypaste.Core.Activity;
 using Keypaste.Core.Approval;
+using Keypaste.Core.Audit;
 using Xunit;
 
 namespace Keypaste.App.Tests.Rendering;
@@ -46,7 +50,107 @@ public sealed class ScreenRenderer
         DrawShell(demo, output!);
         DrawApproval(output!);
         DrawComponents(output!);
+        DrawSecrets(demo, output!);
     });
+
+    /// <summary>The Secrets screen in its states: a login, a variable with profiles, its menu, the new-entry form, history, and the default window.</summary>
+    private static void DrawSecrets(DemoVault demo, string output)
+    {
+        using (var vault = Vault.Open(demo.Path, _master))
+        {
+            vault.UpdateEntry(new VaultEntry { Title = "github", Username = "maya@acme.dev", Password = "demo-gh-rotated-9Qk", Url = "https://github.com", Notes = "Recovery codes are in the safe.", GroupPath = "Work" });
+
+            foreach (var key in new[] { "DATABASE_URL", "STRIPE_SECRET_KEY", "OPENAI_API_KEY" })
+            {
+                vault.AddEntry(new VaultEntry { Title = key, Password = "demo-staging-" + key.ToLowerInvariant(), GroupPath = "env/acme-api/staging" });
+                vault.AddEntry(new VaultEntry { Title = key, Password = "demo-prod-" + key.ToLowerInvariant(), GroupPath = "env/acme-api/prod" });
+            }
+
+            vault.Save();
+        }
+
+        // A live authority and this vault's audit lines, so the rows' dots and the Agent access card
+        // are read the way the app reads them.
+        var clock = new ManualClock();
+#pragma warning disable CA2000 // The authority owns and disposes its session.
+        using var authority = new AppAuthority(new AppVaultSession(clock, home: demo.Home), null, () => new Session.NobodyToAsk());
+#pragma warning restore CA2000
+
+        using (var master = TempVault.Secret(_master))
+        {
+            Assert.Equal(UnlockOutcome.Opened, authority.Session.TryUnlock(demo.Path, master.Value));
+        }
+
+        var vaultKey = authority.Session.Identity!.Key;
+        Granted(demo.Home, clock, new EntryName("env/acme-api", "DATABASE_URL"), "claude-code", vaultKey, TimeSpan.FromMinutes(4));
+        Granted(demo.Home, clock, new EntryName("env/acme-api", "DATABASE_URL"), "cursor", vaultKey, TimeSpan.FromMinutes(52));
+        Granted(demo.Home, clock, new EntryName("env/acme-api", "OPENAI_API_KEY"), "cursor", vaultKey, TimeSpan.FromMinutes(70));
+        Granted(demo.Home, clock, new EntryName("env/acme-api", "REDIS_URL"), "claude-code", vaultKey, TimeSpan.FromHours(3));
+        Granted(demo.Home, clock, new EntryName("Work", "github"), "claude-code", vaultKey, TimeSpan.FromDays(2));
+
+        using var shell = new ShellViewModel(authority.Session, demo.Home, authority, clipboard: new FakeClipboard(), clock: clock);
+        var window = new MainWindow { Width = _width, Height = _height };
+        window.FindControl<ContentControl>("Root")!.Content = new ShellView { DataContext = shell };
+        window.Show();
+
+        shell.Current = Destinations.Of(DestinationKind.Entries);
+        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
+
+        entries.Selected = entries.Rows.First(row => row.Title == "github");
+        Save(window, output, "10-secrets-login");
+
+        entries.SelectedGroup = entries.Groups.First(group => group.Path == "env/acme-api");
+        entries.Selected = entries.Rows.First(row => row.Title == "DATABASE_URL" && row.GroupPath == "env/acme-api");
+        Save(window, output, "11-secrets-variable");
+
+        WindowInput.Drain();
+        window.GetVisualDescendants().OfType<ToggleButton>().Single(toggle => toggle.Name == "EntryMenu").IsChecked = true;
+        Save(window, output, "12-secrets-menu");
+        window.GetVisualDescendants().OfType<ToggleButton>().Single(toggle => toggle.Name == "EntryMenu").IsChecked = false;
+
+        entries.SelectedGroup = entries.Groups[0];
+        entries.BeginAddCommand.Execute(null);
+        Save(window, output, "13-secrets-new");
+        entries.CancelAddCommand.Execute(null);
+
+        entries.Selected = entries.Rows.First(row => row.Title == "github");
+        WindowInput.Drain();
+        entries.Detail!.History.ToggleCommand.Execute(null);
+        WindowInput.Drain();
+        entries.Detail.History.Selected = entries.Detail.History.Rows[0];
+        Save(window, output, "14-secrets-history");
+        entries.Detail.History.ToggleCommand.Execute(null);
+
+        window.Width = 1000;
+        window.Height = 680;
+        entries.Selected = entries.Rows.First(row => row.Title == "DATABASE_URL" && row.GroupPath == "env/acme-api");
+        Save(window, output, "15-secrets-1000");
+
+        window.Width = 960;
+        window.Height = 520;
+        entries.Selected = entries.Rows.First(row => row.Title == "github");
+        Save(window, output, "16-secrets-960");
+
+        window.Width = _width;
+        window.Height = _height;
+        entries.Detail!.RotateCommand.Execute(null);
+        Save(window, output, "17-secrets-rotate");
+        entries.Detail.CancelRotateCommand.Execute(null);
+
+        entries.DeleteCommand.Execute(null);
+        Save(window, output, "18-secrets-delete");
+        entries.CancelDeleteCommand.Execute(null);
+
+        entries.OrganizeCommand.Execute(null);
+        Save(window, output, "19-secrets-organize");
+        entries.CancelOrganizeCommand.Execute(null);
+
+        entries.Detail.EditCommand.Execute(null);
+        Save(window, output, "20-secrets-edit");
+        entries.Detail.CancelCommand.Execute(null);
+
+        window.Close();
+    }
 
     private static void DrawUnlock(DemoVault demo, string output)
     {
@@ -114,6 +218,30 @@ public sealed class ScreenRenderer
         window.Show();
         Save(window, output, "91-approval");
         window.Close();
+    }
+
+    /// <summary>Appends a granted credential line written <paramref name="ago"/> before now, as a bridge wrote it then.</summary>
+    private static void Granted(string home, ManualClock clock, EntryName entry, string client, string vaultKey, TimeSpan ago)
+    {
+        var then = new ManualClock(clock.GetUtcNow() - ago);
+        Assert.True(AuditLog.TryOpen(KeypasteHome.AuditPath(home), then, out var log, out var error), error);
+
+        using (log)
+        {
+            Assert.True(log.TryAppend(
+                new AuditRecord
+                {
+                    Tool = "request_credential",
+                    Client = new AuditClient(client, null, null),
+                    Args = AuditArgs.ForCredentialRequest(EntryActivity.KeyOf(entry), "password", 60, "demo"),
+                    Decision = AuditDecision.Granted,
+                    Method = AuditMethod.Prompt,
+                    Reason = "a person approved this request",
+                    Exposure = ["**"],
+                    Vault = vaultKey,
+                },
+                out var failure), failure);
+        }
     }
 
     /// <summary>The shared classes from Theme/*.axaml side by side, for checking them against the design.</summary>

@@ -68,13 +68,16 @@ public sealed class EntriesViewOrganizeTests : IDisposable
         using var context = New();
         var window = Shown(context);
 
-        // Hidden until asked for, which is what the three panels share with the add form. A
-        // collapsed Border keeps its children in the tree, so this is effective visibility.
+        // The form is the open entry's, so it is in the pane once an entry is. Hidden until asked
+        // for, which is what the panels share with the add form. A collapsed Border keeps its
+        // children in the tree, so this is effective visibility.
+        context.Entries.Selected = context.Entries.Rows.Single(row => row.Title == "production");
+        window.UpdateLayout();
+
         var title = Named<TextBox>(window, "OrganizeTitle");
         Assert.NotNull(title);
         Assert.False(title!.IsEffectivelyVisible);
 
-        context.Entries.Selected = context.Entries.Rows.Single(row => row.Title == "production");
         context.Entries.OrganizeCommand.Execute(null);
         window.UpdateLayout();
 

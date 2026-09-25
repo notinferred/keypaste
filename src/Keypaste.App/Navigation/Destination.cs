@@ -65,7 +65,7 @@ internal static class Destinations
     /// <summary>Every destination the app has.</summary>
     internal static IReadOnlyList<Destination> All { get; } =
     [
-        new(DestinationKind.Entries, "Secrets", "vault"),
+        new(DestinationKind.Entries, "Secrets", "vault", OwnsHeader: true),
         new(DestinationKind.AgentActivity, "Agents", "bot"),
         new(DestinationKind.Log, "Activity", "activity"),
         new(DestinationKind.EnvSets, "Env profiles", "layers"),

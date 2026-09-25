@@ -51,6 +51,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     private string _draftTitle = string.Empty;
     private string _draftGroupName = string.Empty;
     private GroupNode? _moveTarget;
+    private string _filterHint = "Filter secrets";
     private IReadOnlyList<GroupNode> _moveTargets = [];
 
     internal EntriesViewModel(AppVaultSession session, ClipboardCountdown clipboard, EntryActivitySource? activity = null)
@@ -116,8 +117,31 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
                 BeginRenameGroupCommand.RaiseCanExecuteChanged();
                 Raise(nameof(CreateGroupPrompt));
                 Raise(nameof(RenameGroupPrompt));
+                RaiseHeader();
             }
         }
+    }
+
+    /// <summary>The vault's file name, which the pane's location line starts from.</summary>
+    internal string VaultName => _session.VaultPath is { } path ? System.IO.Path.GetFileName(path) : string.Empty;
+
+    /// <summary>What the list header names: the env project or group showing, or the vault when it is all of it.</summary>
+    internal string ListTitle =>
+        SelectedGroup is { IsEverything: false } group
+            ? EnvPlace.OfGroup(group.Path) is { } env ? env.Project : EntryNameSanitizer.SanitizePath(group.Path).Text
+            : VaultName;
+
+    /// <summary>The profile badge beside <see cref="ListTitle"/> when the group showing is an env profile, else null.</summary>
+    internal string? ListProfile =>
+        SelectedGroup is { IsEverything: false } group ? EnvPlace.OfGroup(group.Path)?.Profile : null;
+
+    internal bool HasListProfile => ListProfile is not null;
+
+    /// <summary>The filter box's placeholder, counting the entries it would search.</summary>
+    internal string FilterHint
+    {
+        get => _filterHint;
+        private set => Set(ref _filterHint, value);
     }
 
     /// <summary>What matches the search and the selected group.</summary>
@@ -244,12 +268,17 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
             if (Set(ref _detail, value))
             {
+                Raise(nameof(ShowsPlaceholder));
+
                 // Disposed on the way out, not left to a collection: it holds a username, a URL and
                 // a notes field read from an open vault, and the lock has to mean something.
                 previous?.Dispose();
             }
         }
     }
+
+    /// <summary>Whether the pane's place says to choose an entry: nothing is open and nothing is being made.</summary>
+    internal bool ShowsPlaceholder => _detail is null && !_isAdding;
 
     /// <summary>A calm sentence when something did not work, or null.</summary>
     internal string? Error
@@ -300,6 +329,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         {
             if (Set(ref _isAdding, value))
             {
+                Raise(nameof(ShowsPlaceholder));
                 BeginAddCommand.RaiseCanExecuteChanged();
                 CancelAddCommand.RaiseCanExecuteChanged();
                 ConfirmAddCommand.RaiseCanExecuteChanged();
@@ -553,7 +583,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
         _all = [.. vault.ReadEntries()
             .Where(entry => !ReservedGroups.IsReserved(entry.GroupPath))
-            .Select(entry => new EntryRow(entry.Title, entry.GroupPath))];
+            .Select(entry => new EntryRow(entry.Title, entry.GroupPath) { Kind = EntryKinds.Of(entry) })];
         Groups = GroupNode.Flatten(vault.ReadGroupPaths());
         MoveTargets = Groups;
         Raise(nameof(TotalCount));
@@ -567,6 +597,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
             : Groups.FirstOrDefault(node => string.Equals(node.Path, wantedGroup, StringComparison.Ordinal));
 
         Raise(nameof(SelectedGroup));
+        RaiseHeader();
 
         // The vault changed underneath, so an answer about the old one is not an answer about this.
         _matchedQuery = null;
@@ -578,6 +609,13 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     }
 
     private void OnActivity(object? sender, EventArgs e) => ApplyActivity();
+
+    private void RaiseHeader()
+    {
+        Raise(nameof(ListTitle));
+        Raise(nameof(ListProfile));
+        Raise(nameof(HasListProfile));
+    }
 
     /// <summary>Gives every row and the open pane the latest picture of what agents did, never a value.</summary>
     private void ApplyActivity()
@@ -692,6 +730,9 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
         Match(query);
 
+        var scope = _all.Count(row => group is null || group.Contains(row.GroupPath));
+        FilterHint = scope == 1 ? "Filter 1 secret" : string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Filter {scope} secrets");
+
         List<EntryRow> rows =
         [
             .. _all
@@ -765,6 +806,12 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
         if (moved)
         {
+            // The add form stands in the pane's place, so choosing an entry to look at closes it.
+            if (name is not null && IsAdding)
+            {
+                CancelAdd();
+            }
+
             Detail = name is null ? null : Build(name);
 
             if (Detail is not null && _activity?.Current is { } picture)

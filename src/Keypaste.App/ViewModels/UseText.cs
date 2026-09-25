@@ -1,4 +1,5 @@
 using System.Globalization;
+using Keypaste.Core;
 using Keypaste.Core.Activity;
 
 namespace Keypaste.App.ViewModels;
@@ -92,5 +93,29 @@ internal static class UseText
         }
 
         return access.Waiting ? "a request is waiting" : "None active";
+    }
+
+    /// <summary>How many lines the Agent access card lists under its summary.</summary>
+    internal const int MaximumLines = 5;
+
+    /// <summary>The Agent access card's lines under its summary: each grant in force, then each client that received the entry.</summary>
+    /// <param name="access">What agents did with the entry.</param>
+    /// <param name="now">The time to measure from.</param>
+    /// <returns>Names, kinds and times, never a value; none when the summary already says all there is.</returns>
+    internal static IReadOnlyList<string> Lines(EntryAgentAccess access, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(access);
+
+        if (access.Grants.Count + access.Clients.Count <= 1)
+        {
+            return [];
+        }
+
+        var grants = access.Grants.Select(grant =>
+            $"{EntryNameSanitizer.Sanitize(grant.Client).Text} · {grant.Kind} grant, {Left(grant.SecondsLeft)} left");
+        var clients = access.Clients.Select(client =>
+            string.Create(CultureInfo.InvariantCulture, $"{EntryNameSanitizer.Sanitize(client.Client).Text} · {Ago(client.LastAt, now)} · {client.Releases}×"));
+
+        return [.. grants.Concat(clients).Take(MaximumLines)];
     }
 }
