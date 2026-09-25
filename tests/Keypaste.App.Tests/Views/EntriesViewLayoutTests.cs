@@ -23,7 +23,7 @@ public sealed class EntriesViewLayoutTests
     private const double _searchMinimum = 160d;
 
     /// <summary>Room for a short title beside its group, the least that still reads as a list.</summary>
-    private const double _listMinimum = 140d;
+    private const double _listMinimum = 100d;
 
     public static TheoryData<double, double, bool> Sizes => new()
     {

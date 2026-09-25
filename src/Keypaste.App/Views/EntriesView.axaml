@@ -20,7 +20,7 @@
       <!-- The dividers' columns are Auto so their margins separate the panes rather than overlap them. -->
       <ColumnDefinition Width="Auto" />
       <!-- The main window's MinWidth is what keeps this column's minimum beside the tree and pane. -->
-      <ColumnDefinition Width="*" MinWidth="140" />
+      <ColumnDefinition Width="*" MinWidth="100" />
       <ColumnDefinition Width="Auto" />
       <ColumnDefinition Width="Auto" />
     </Grid.ColumnDefinitions>
