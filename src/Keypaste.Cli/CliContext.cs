@@ -54,6 +54,9 @@ internal sealed class CliContext
     /// <summary>What time it is, for the commands that take a relative span.</summary>
     internal TimeProvider Clock { get; init; } = TimeProvider.System;
 
+    /// <summary>The directory the command was started in, which <c>projects.json</c> maps to a project.</summary>
+    internal string WorkingDirectory { get; init; } = System.Environment.CurrentDirectory;
+
     /// <summary>Builds the context the real program uses.</summary>
     /// <remarks>
     /// Prompts are wired to <paramref name="stderr"/>, not <paramref name="stdout"/>. That is the

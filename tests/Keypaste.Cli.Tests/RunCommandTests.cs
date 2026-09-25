@@ -347,4 +347,271 @@ public sealed class RunCommandTests
         Assert.Single(harness.ProcessLauncher.Started);
         Assert.True(zeroedWhenTheChildStarted, "the master password was still live when the child started");
     }
+
+    // ---- profiles and reference files -------------------------------------------------
+
+    [Fact]
+    public void Run_WithProfile_InjectsThatProfile()
+    {
+        using var harness = Profiled();
+
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run("run", "-p", "staging", "acme-api", "--vault", harness.VaultPath, "--", "node"));
+
+        Assert.Equal("staging-db", harness.ProcessLauncher.Environment["DATABASE_URL"]);
+        Assert.False(harness.ProcessLauncher.Environment.ContainsKey("STRIPE_KEY"));
+        Assert.Empty(harness.Err);
+
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(CliApp.ExitNotFound, harness.Run("run", "--profile", "qa", "acme-api", "--vault", harness.VaultPath, "--", "node"));
+        Assert.Contains("'acme-api' has no 'qa' profile", harness.Err, StringComparison.Ordinal);
+
+        harness.AssertExit(CliApp.ExitUsageError, harness.Run("run", "-p", "QA", "acme-api", "--vault", harness.VaultPath, "--", "node"));
+        Assert.Single(harness.ProcessLauncher.Started);
+    }
+
+    [Fact]
+    public void Run_InfersTheProjectFromProjectsJson()
+    {
+        using var harness = Profiled();
+        harness.WorkingDirectory = EnvVerbTests.MapProject(harness, "acme-api");
+
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run("run", "--vault", harness.VaultPath, "--", "node"));
+        Assert.Equal("dev-db", harness.ProcessLauncher.Environment["DATABASE_URL"]);
+
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run("run", "-p", "staging", "--vault", harness.VaultPath, "--", "node"));
+        Assert.Equal("staging-db", harness.ProcessLauncher.Environment["DATABASE_URL"]);
+        Assert.DoesNotContain("resolving", harness.Err, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Run_EnvFile_ResolvesReferences()
+    {
+        using var harness = Profiled();
+        var file = Write(harness, "refs.env", "DB=kp://acme-api/staging/DATABASE_URL\nSTRIPE_SECRET_KEY=kp://acme-api/dev/STRIPE_KEY\nGH=kp:///work/github#username\n");
+
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run("run", "--env-file", file, "--vault", harness.VaultPath, "--", "node"));
+
+        var environment = harness.ProcessLauncher.Environment;
+        Assert.Equal("staging-db", environment["DB"]);
+        Assert.Equal("sk_dev", environment["STRIPE_SECRET_KEY"]);
+        Assert.Equal("octocat", environment["GH"]);
+        Assert.False(environment.ContainsKey("DATABASE_URL"));
+    }
+
+    [Fact]
+    public void Run_ProfileFlag_RewritesTheFilesProfiles()
+    {
+        using var harness = Profiled();
+        var file = Write(harness, "refs.env", "DB=kp://acme-api/staging/DATABASE_URL\nGH=kp:///work/github#username\n");
+
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run("run", "--env-file", file, "-p", "dev", "--vault", harness.VaultPath, "--", "node"));
+
+        Assert.Equal("dev-db", harness.ProcessLauncher.Environment["DB"]);
+        Assert.Equal("octocat", harness.ProcessLauncher.Environment["GH"]);
+        Assert.Contains("profile dev", harness.Err, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Run_AutoDiscoveredFileWithEntryReferences_IsRefused()
+    {
+        using var harness = Profiled();
+        harness.WorkingDirectory = EnvVerbTests.MapProject(harness, "acme-api");
+        Write(harness, Core.EnvReferenceFile.FileName, "DB=kp://acme-api/dev/DATABASE_URL\nGH=kp:///work/github\n");
+
+        harness.AssertExit(CliApp.ExitUsageError, harness.Run("run", "--vault", harness.VaultPath, "--", "node"));
+
+        Assert.Contains(
+            "keypaste run: .env.keypaste names vault entries, not this directory's project acme-api; pass --env-file .env.keypaste to use it",
+            harness.Err,
+            StringComparison.Ordinal);
+        Assert.Empty(harness.Prompt.PromptsSeen);
+        Assert.Empty(harness.ProcessLauncher.Started);
+    }
+
+    [Fact]
+    public void Run_AutoDiscoveredFileForAnotherProject_IsRefused()
+    {
+        using var harness = Profiled();
+        harness.WorkingDirectory = EnvVerbTests.MapProject(harness, "acme-api");
+        Write(harness, Core.EnvReferenceFile.FileName, "DB=kp://billing/dev/DATABASE_URL\nAWS_ENDPOINT_URL=http://attacker.invalid\n");
+
+        harness.AssertExit(CliApp.ExitUsageError, harness.Run("run", "--vault", harness.VaultPath, "--", "node"));
+        Assert.Contains(".env.keypaste names project 'billing', not this directory's project acme-api", harness.Err, StringComparison.Ordinal);
+
+        Write(harness, Core.EnvReferenceFile.FileName, "A=kp://acme-api/dev/DATABASE_URL\nB=kp://billing/dev/DATABASE_URL\n");
+        harness.AssertExit(CliApp.ExitUsageError, harness.Run("run", "--vault", harness.VaultPath, "--", "node"));
+        Assert.Contains(".env.keypaste names several projects (acme-api, billing)", harness.Err, StringComparison.Ordinal);
+
+        Assert.Empty(harness.Prompt.PromptsSeen);
+        Assert.Empty(harness.ProcessLauncher.Started);
+    }
+
+    [Fact]
+    public void Run_FileWithoutAProjectMapping_IsNotAutoUsed()
+    {
+        using var harness = Profiled();
+        harness.Environment[Core.Audit.KeypasteHome.EnvironmentVariable] = Path.Combine(harness.Directory, "home");
+        harness.WorkingDirectory = harness.Directory;
+        Write(harness, Core.EnvReferenceFile.FileName, "DB=kp://acme-api/staging/DATABASE_URL\n");
+
+        harness.AssertExit(CliApp.ExitUsageError, harness.Run("run", "-p", "staging", "--vault", harness.VaultPath, "--", "env"));
+
+        Assert.Equal(
+            "keypaste run: this directory is not mapped to a project; pass --env-file .env.keypaste or name a project",
+            harness.Err.Trim());
+        Assert.Empty(harness.Prompt.PromptsSeen);
+        Assert.Empty(harness.ProcessLauncher.Started);
+    }
+
+    [Fact]
+    public void Run_ReferenceMode_AlwaysSaysWhichFileProjectAndProfile()
+    {
+        using var harness = Profiled();
+        harness.WorkingDirectory = EnvVerbTests.MapProject(harness, "acme-api");
+        Write(harness, Core.EnvReferenceFile.FileName, "DB=kp://acme-api/staging/DATABASE_URL\nNODE_OPTIONS=--max-old-space-size=4096\n");
+
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run("run", "--vault", harness.VaultPath, "--", "node"));
+
+        var said = harness.Err.ReplaceLineEndings("\n");
+        Assert.StartsWith("keypaste run: resolving .env.keypaste → project acme-api profile staging\n", said, StringComparison.Ordinal);
+        Assert.Contains("keypaste run: literal NODE_OPTIONS=--max-old-space-size=4096\n", said, StringComparison.Ordinal);
+        Assert.Equal("staging-db", harness.ProcessLauncher.Environment["DB"]);
+        Assert.Equal("--max-old-space-size=4096", harness.ProcessLauncher.Environment["NODE_OPTIONS"]);
+    }
+
+    [Fact]
+    public void Run_Summary_ListsEveryLiteral()
+    {
+        using var harness = Profiled();
+        harness.ConsoleStyle.Terminal = true;
+        var file = Write(
+            harness,
+            "refs.env",
+            "A=kp://acme-api/dev/DATABASE_URL\nB=kp://acme-api/dev/STRIPE_KEY\nHTTPS_PROXY=http://proxy.internal:3128\n" +
+            "C=kp://acme-api/dev/DATABASE_URL\nD=kp:///work/github#username\nE=kp://acme-api/staging/DATABASE_URL\nNO_PROXY=localhost\n");
+
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run("run", "--env-file", file, "--vault", harness.VaultPath, "--", "node"));
+
+        Assert.Equal(
+            [
+                $"keypaste run: resolving {file} → project acme-api, vault entries profile mixed",
+                "keypaste run: literal HTTPS_PROXY=http://proxy.internal:3128",
+                "keypaste run: literal NO_PROXY=localhost",
+                $"  resolving {file}  profile mixed",
+                "  ✓ A                   kp://acme-api/dev",
+                "  ✓ B                   kp://acme-api/dev",
+                "  = HTTPS_PROXY=http://proxy.internal:3128",
+                "  ✓ C                   kp://acme-api/dev",
+                "  = NO_PROXY=localhost",
+                "  + 2 more",
+                "  7 injected · nothing written to disk",
+            ],
+            harness.Err.ReplaceLineEndings("\n").Split('\n', StringSplitOptions.RemoveEmptyEntries));
+        Assert.DoesNotContain("dev-db", harness.Err, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Run_OnATerminal_ListsEveryLiteralBeforeThePasswordIsAskedFor()
+    {
+        using var harness = Profiled();
+        harness.ConsoleStyle.Terminal = true;
+        var file = Write(harness, "refs.env", "DB=kp://acme-api/dev/DATABASE_URL\nHTTPS_PROXY=http://proxy.internal:3128\n");
+        string? shownFirst = null;
+        harness.Prompt.OnPrompt = _ => shownFirst ??= harness.Err;
+
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run("run", "--env-file", file, "--vault", harness.VaultPath, "--", "node"));
+
+        Assert.Contains("keypaste run: literal HTTPS_PROXY=http://proxy.internal:3128", shownFirst, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("NODE_OPTIONS=\"{0}--require ./x.js\"")]
+    [InlineData("NODE_OPTIONS=\"--max-old-space-size=4096\\n--require ./x.js\"")]
+    [InlineData("NODE_OPTIONS=\"--max-old-space-size=4096 \"")]
+    public void Run_ALiteralThatCannotBeShownAsWritten_IsRefusedUnasked(string literal)
+    {
+        using var harness = Profiled();
+        harness.WorkingDirectory = EnvVerbTests.MapProject(harness, "acme-api");
+        Write(harness, Core.EnvReferenceFile.FileName, $"DB=kp://acme-api/dev/DATABASE_URL\n{string.Format(literal, new string(' ', 1100))}\n");
+
+        harness.AssertExit(CliApp.ExitUsageError, harness.Run("run", "--vault", harness.VaultPath, "--", "node"));
+
+        Assert.Equal(
+            "keypaste run: .env.keypaste line 2: the value of NODE_OPTIONS is too long or holds characters that cannot be shown on one line",
+            harness.Err.Trim());
+        Assert.Empty(harness.Prompt.PromptsSeen);
+        Assert.Empty(harness.ProcessLauncher.Started);
+    }
+
+    [Fact]
+    public void Run_EnvFileAndProject_IsAUsageError()
+    {
+        using var harness = Profiled();
+        var file = Write(harness, "refs.env", "DB=kp://acme-api/dev/DATABASE_URL\n");
+
+        harness.AssertExit(CliApp.ExitUsageError, harness.Run("run", "acme-api", "--env-file", file, "--vault", harness.VaultPath, "--", "node"));
+
+        Assert.Contains("takes no project", harness.Err, StringComparison.Ordinal);
+        Assert.Empty(harness.Prompt.PromptsSeen);
+    }
+
+    [Fact]
+    public void Run_PrintsTheSummary_OnlyOnATerminal()
+    {
+        using var harness = Profiled();
+
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run("run", "acme-api", "--vault", harness.VaultPath, "--", "node"));
+        Assert.Empty(harness.Err);
+
+        harness.ConsoleStyle.Terminal = true;
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run("run", "acme-api", "--vault", harness.VaultPath, "--", "node"));
+
+        Assert.Equal(
+            [
+                "  resolving acme-api  profile dev",
+                "  ✓ DATABASE_URL        kp://acme-api/dev",
+                "  ✓ STRIPE_KEY          kp://acme-api/dev",
+                "  2 injected · nothing written to disk",
+            ],
+            harness.Err.ReplaceLineEndings("\n").Split('\n', StringSplitOptions.RemoveEmptyEntries));
+    }
+
+    /// <summary>acme-api: dev holds DATABASE_URL=dev-db and STRIPE_KEY=sk_dev, staging DATABASE_URL=staging-db; work/github's username is octocat.</summary>
+    private static CliHarness Profiled()
+    {
+        var harness = new CliHarness();
+        harness.SeedVault(Master);
+        harness.WorkingDirectory = harness.Directory;
+        harness.Environment[Core.Audit.KeypasteHome.EnvironmentVariable] = Path.Combine(harness.Directory, "home");
+
+        using (var vault = Core.Vault.Open(harness.VaultPath, Master))
+        {
+            var store = new Core.EnvStore(vault);
+            store.TrySet("acme-api", "DATABASE_URL", "dev-db", out _);
+            store.TrySet("acme-api", "STRIPE_KEY", "sk_dev", out _);
+            store.TrySet("acme-api", "staging", "DATABASE_URL", "staging-db", out _);
+            vault.AddEntry(new Core.VaultEntry { GroupPath = "work", Title = "github", Username = "octocat", Password = "gh-password" });
+            vault.Save();
+        }
+
+        harness.Prompt.PromptsSeen.Clear();
+        return harness;
+    }
+
+    private static string Write(CliHarness harness, string name, string text)
+    {
+        var path = Path.Combine(harness.WorkingDirectory, name);
+        File.WriteAllText(path, text);
+        return path;
+    }
 }

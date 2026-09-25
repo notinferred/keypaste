@@ -26,6 +26,7 @@ internal static class EnvPullCommand
         new("yes", TakesValue: false),
         new("delete-source", TakesValue: false),
         new("keep", TakesValue: false),
+        EnvCommand.ProfileOption,
     ];
 
     internal static int Execute(string[] args, CliContext context)
@@ -59,6 +60,11 @@ internal static class EnvPullCommand
             return Fail(context, projectError);
         }
 
+        if (!EnvCommand.TryProfile(line, out var profile, out var profileError))
+        {
+            return Fail(context, profileError);
+        }
+
         var assumeYes = line.HasFlag("yes");
 
         // Same rule as `rm`: a piped run has to ask for the write explicitly rather than have a
@@ -88,7 +94,7 @@ internal static class EnvPullCommand
         }
 
         var exit = VaultSession.Open(vaultPath, line, context, vault =>
-            Import(vault, project, document, assumeYes, context));
+            Import(vault, project, profile, document, assumeYes, context));
 
         if (exit != CliApp.ExitSuccess)
         {
@@ -205,12 +211,13 @@ internal static class EnvPullCommand
     private static int Import(
         Vault vault,
         string project,
+        string profile,
         DotEnvDocument document,
         bool assumeYes,
         CliContext context)
     {
         var store = new EnvStore(vault);
-        var plan = EnvImport.Plan(store, project, document);
+        var plan = EnvImport.Plan(store, project, profile, document);
 
         if (plan.Refusal is { } collision)
         {
@@ -221,7 +228,7 @@ internal static class EnvPullCommand
         var updated = plan.Updated;
         var unchanged = plan.Unchanged;
 
-        var groupPath = EnvConvention.GroupPath(project);
+        var groupPath = EnvProfileNames.GroupPath(project, profile);
         context.Stderr.WriteLine(
             $"{groupPath}: {created.Count} new, {updated.Count} updated, {unchanged} unchanged");
         WriteNames(context, "new", created);
@@ -439,7 +446,7 @@ internal static class EnvPullCommand
 
     internal static void WriteUsage(TextWriter writer)
     {
-        writer.WriteLine("usage: keypaste env pull <project> [file] [--yes] [--delete-source | --keep]");
+        writer.WriteLine("usage: keypaste env pull <project> [file] [-p <profile>] [--yes] [--delete-source | --keep]");
         writer.WriteLine();
         writer.WriteLine($"imports a .env file, defaulting to ./{DefaultFileName}, then offers to delete it.");
         writer.WriteLine("if any line is malformed, every problem is reported and nothing is imported.");

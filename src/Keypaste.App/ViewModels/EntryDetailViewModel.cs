@@ -59,6 +59,9 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         _notes = entry.Notes;
         PasswordLength = entry.Password.Length;
 
+        Reference = KpReferences.ForEntry(Name);
+        Profiles = ProfilesOf(session, Reference);
+
         NewPassword = new SecretField(clipboard);
         _restored = restored;
         History = new EntryHistoryViewModel(session, clipboard, this, Restored);
@@ -88,6 +91,14 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     /// (docs/STEPS.md F.1e). Every vault access below goes through this instead.
     /// </remarks>
     internal EntryName Name => new(_groupPath, _title);
+
+    /// <summary>The <c>kp://</c> reference that names this entry, or null for one no reference resolves.</summary>
+    /// <remarks>A variable keypaste resolves gets its env form, <c>kp://&lt;project&gt;/&lt;profile&gt;/&lt;KEY&gt;</c>; any other entry its entry form.</remarks>
+    internal string? Reference { get; private set; }
+
+    /// <summary>For a variable, its key in every profile of its project, as the Profiles card shows it; null for any other entry.</summary>
+    /// <remarks>A cell's profile is protected when <see cref="EnvProfileNames.IsProtected"/> says so, which the card shows as approval required.</remarks>
+    internal EnvMatrixRow? Profiles { get; private set; }
 
     /// <summary>The entry's path, for the header and for the CLI hint.</summary>
     /// <remarks>A label, not an identity: joining is lossy, so nothing here looks an entry up by
@@ -320,9 +331,13 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         DraftUrl = string.Empty;
         DraftNotes = string.Empty;
         PasswordLength = 0;
+        Reference = null;
+        Profiles = null;
         NewPassword.Dispose();
         History.Dispose();
 
+        Raise(nameof(Reference));
+        Raise(nameof(Profiles));
         Raise(nameof(Title));
         Raise(nameof(GroupPath));
         Raise(nameof(Path));
@@ -346,6 +361,14 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
 
         _restored(name);
     }
+
+    private static EnvMatrixRow? ProfilesOf(AppVaultSession session, string? reference) =>
+        reference is not null
+        && KpReferences.TryParse(reference, out var parsed, out _)
+        && parsed is EnvReference env
+        && session.Unlocked is { } vault
+            ? EnvMatrix.Build(vault, env.Project, session.Clock).Row(env.Key)
+            : null;
 
     private async Task CopyPasswordAsync()
     {

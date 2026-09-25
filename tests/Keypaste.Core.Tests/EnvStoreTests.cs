@@ -68,7 +68,7 @@ public sealed class EnvStoreTests : IDisposable
     /// </summary>
     /// <remarks>
     /// This covers the fields <see cref="VaultEntry"/> models, which is a property of
-    /// <see cref="EnvStore.TrySet"/>, not of the update primitive underneath it — a
+    /// <see cref="EnvStore.TrySet(string, string, string, out string)"/>, not of the update primitive underneath it — a
     /// remove-and-re-add implementation of <see cref="Vault.UpdateEntry"/> passes this test.
     /// What survives only because the entry is edited in place is asserted by
     /// <see cref="Set_OnAnExistingKey_KeepsThePreviousValueAsHistory"/>, which does fail against
@@ -120,7 +120,7 @@ public sealed class EnvStoreTests : IDisposable
 
     /// <summary>
     /// Writing a value identical to the one already stored still costs a history item, because
-    /// <see cref="EnvStore.TrySet"/> compares nothing — it is told to set, so it sets.
+    /// <see cref="EnvStore.TrySet(string, string, string, out string)"/> compares nothing — it is told to set, so it sets.
     /// </summary>
     /// <remarks>
     /// This is why <c>keypaste env pull</c> classifies before it writes and skips the unchanged
@@ -228,7 +228,7 @@ public sealed class EnvStoreTests : IDisposable
 
     /// <summary>
     /// A project holding two entries with one title: KDBX permits it and KeePassXC will make it.
-    /// <see cref="EnvStore.Read"/> already refuses to answer "what is the value of that variable";
+    /// <see cref="EnvStore.Read(string)"/> already refuses to answer "what is the value of that variable";
     /// removal must refuse for the same reason rather than delete whichever came first.
     /// </summary>
     [Fact]
@@ -433,6 +433,124 @@ public sealed class EnvStoreTests : IDisposable
 
         Assert.True(store.ProjectExists("billing"));
         Assert.Empty(store.Read("billing"));
+    }
+
+    [Fact]
+    public void TheProjectGroup_IsTheDevProfile()
+    {
+        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        var store = new EnvStore(vault);
+
+        Assert.Equal(EnvSetOutcome.Created, store.TrySet("acme-api", "dev", "DATABASE_URL", "dev-db", out _));
+
+        Assert.Equal("dev-db", vault.Find(new EntryName("env/acme-api", "DATABASE_URL"))?.Password);
+        Assert.Equal(store.Read("acme-api"), store.Read("acme-api", "dev"));
+        Assert.True(store.ProfileExists("acme-api", "dev"));
+    }
+
+    [Fact]
+    public void SetWithAProfile_CreatesItsSubgroup()
+    {
+        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        var store = new EnvStore(vault);
+        store.TrySet("acme-api", "DATABASE_URL", "dev-db", out _);
+
+        Assert.False(store.ProfileExists("acme-api", "staging"));
+        Assert.Equal(EnvSetOutcome.Created, store.TrySet("acme-api", "staging", "DATABASE_URL", "staging-db", out _));
+
+        Assert.True(store.ProfileExists("acme-api", "staging"));
+        Assert.Equal("staging-db", vault.Find(new EntryName("env/acme-api/staging", "DATABASE_URL"))?.Password);
+        Assert.Equal([new EnvVariable("DATABASE_URL", "staging-db")], store.Read("acme-api", "staging"));
+        Assert.Equal([new EnvVariable("DATABASE_URL", "dev-db")], store.Read("acme-api"));
+
+        Assert.Equal(DeletionOutcome.NothingMatched, store.Remove("acme-api", "qa", "DATABASE_URL"));
+        Assert.NotEqual(DeletionOutcome.NothingMatched, store.Remove("acme-api", "staging", "DATABASE_URL"));
+        Assert.Equal([new EnvVariable("DATABASE_URL", "dev-db")], store.Read("acme-api"));
+        Assert.Equal(EnvSetOutcome.Rejected, store.TrySet("acme-api", "Staging", "DATABASE_URL", "x", out var error));
+        Assert.Contains("profile", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Profiles_DevFirst_ProtectedLast()
+    {
+        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        var store = new EnvStore(vault);
+        store.TrySet("acme-api", "A", "v", out _);
+
+        foreach (var profile in new[] { "prod", "staging", "production-eu", "alpha" })
+        {
+            store.TrySet("acme-api", profile, "A", "v", out _);
+        }
+
+        Assert.Equal(
+            [
+                new EnvProfileInfo("dev", false),
+                new EnvProfileInfo("alpha", false),
+                new EnvProfileInfo("staging", false),
+                new EnvProfileInfo("prod", true),
+                new EnvProfileInfo("production-eu", true),
+            ],
+            store.Profiles("acme-api"));
+        Assert.Empty(store.Profiles("absent"));
+        Assert.Equal(["acme-api"], store.Projects());
+    }
+
+    [Fact]
+    public void ASubgroupNamedDev_IsReportedAndNeverRead()
+    {
+        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        var store = new EnvStore(vault);
+        store.TrySet("acme-api", "A", "flat", out _);
+        vault.AddEntry(new VaultEntry { Title = "B", Password = "nested", GroupPath = "env/acme-api/dev" });
+
+        Assert.Equal([new EnvVariable("A", "flat")], store.Read("acme-api", "dev"));
+        Assert.Equal(["dev"], store.Profiles("acme-api").Select(profile => profile.Name));
+        Assert.Equal(
+            ["'env/acme-api/dev' is ignored: the dev profile is the project group itself; move its entries up"],
+            store.ProfileProblems("acme-api"));
+    }
+
+    [Fact]
+    public void AnInvalidSubgroup_IsReportedAndNeverRead()
+    {
+        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        var store = new EnvStore(vault);
+        store.TrySet("acme-api", "A", "flat", out _);
+        vault.AddEntry(new VaultEntry { Title = "B", Password = "shouted", GroupPath = "env/acme-api/Prod" });
+
+        Assert.Empty(store.Read("acme-api", "Prod"));
+        Assert.False(store.ProfileExists("acme-api", "Prod"));
+        Assert.Equal(["dev"], store.Profiles("acme-api").Select(profile => profile.Name));
+
+        var problem = Assert.Single(store.ProfileProblems("acme-api"));
+        Assert.StartsWith("'env/acme-api/Prod' is ignored: ", problem, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CaseCollision_IsCheckedWithinTheProfile()
+    {
+        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        var store = new EnvStore(vault);
+        store.TrySet("acme-api", "TOKEN", "dev", out _);
+
+        Assert.Equal(EnvSetOutcome.Created, store.TrySet("acme-api", "staging", "Token", "staging", out _));
+        Assert.Equal(EnvSetOutcome.Rejected, store.TrySet("acme-api", "staging", "TOKEN", "staging", out var error));
+        Assert.Contains("only in case", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AVaultWithoutProfiles_ReadsExactlyAsBefore()
+    {
+        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        var store = new EnvStore(vault);
+        store.TrySet("billing", "B", "2", out _);
+        store.TrySet("billing", "A", "1", out _);
+
+        Assert.Equal(["billing"], store.Projects());
+        Assert.Equal([new EnvProfileInfo("dev", false)], store.Profiles("billing"));
+        Assert.Empty(store.ProfileProblems("billing"));
+        Assert.Equal([new EnvVariable("A", "1"), new EnvVariable("B", "2")], store.Read("billing"));
+        Assert.Equal(store.Read("billing"), store.Read("billing", "dev"));
     }
 
     private string NewVaultPath()

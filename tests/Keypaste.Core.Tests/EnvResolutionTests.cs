@@ -169,6 +169,97 @@ public sealed class EnvResolutionTests : IDisposable
         Assert.Equal(at, updated.Expires);
     }
 
+    [Fact]
+    public void AProfile_ResolvesOnlyItsGroup()
+    {
+        using var vault = Saved(v =>
+        {
+            Add(v, "acme", "DATABASE_URL", "dev-db");
+            Add(v, "acme", "staging", "DATABASE_URL", "staging-db");
+            Add(v, "acme", "prod", "DATABASE_URL", "prod-db");
+        });
+
+        var resolved = EnvResolution.Resolve(vault, "acme", "staging", _clock);
+
+        Assert.Equal(EnvOutcome.Resolved, resolved.Outcome);
+        Assert.Equal("staging", resolved.Profile);
+        Assert.Equal([new EnvVariable("DATABASE_URL", "staging-db")], resolved.Variables);
+        Assert.Equal("staging", resolved.Preview.Profile);
+    }
+
+    [Fact]
+    public void TheDevSet_ExcludesProfileSubgroups()
+    {
+        using var vault = Saved(v =>
+        {
+            Add(v, "acme", "DATABASE_URL", "dev-db");
+            Add(v, "acme", "staging", "ONLY_STAGING", "staging-only");
+        });
+
+        var resolved = EnvResolution.Resolve(vault, "acme", _clock);
+
+        Assert.Equal(EnvOutcome.Resolved, resolved.Outcome);
+        Assert.Equal("dev", resolved.Profile);
+        Assert.Equal([new EnvVariable("DATABASE_URL", "dev-db")], resolved.Variables);
+    }
+
+    [Fact]
+    public void AMissingProfile_IsNoProfile()
+    {
+        using var vault = Saved(v => Add(v, "acme", "DATABASE_URL", "dev-db"));
+
+        var resolved = EnvResolution.Resolve(vault, "acme", "qa", _clock);
+
+        Assert.Equal(EnvOutcome.NoProfile, resolved.Outcome);
+        Assert.Equal("qa", resolved.Profile);
+        Assert.Equal("'acme' has no 'qa' profile", resolved.Refusal);
+    }
+
+    [Fact]
+    public void AMissingProject_IsNoProject()
+    {
+        using var vault = Saved(v => Add(v, "acme", "DATABASE_URL", "dev-db"));
+
+        var resolved = EnvResolution.Resolve(vault, "other", "staging", _clock);
+
+        Assert.Equal(EnvOutcome.NoProject, resolved.Outcome);
+        Assert.Equal("staging", resolved.Profile);
+    }
+
+    [Fact]
+    public void UnusableNamesTheProfileGroup()
+    {
+        using var vault = Saved(v =>
+        {
+            Add(v, "acme", "staging", "OLD", "old-staging-value");
+            v.SetExpiryUnchecked(new EntryName("env/acme/staging", "OLD"), _now.AddDays(-1));
+        });
+
+        var resolved = EnvResolution.Resolve(vault, "acme", "staging", _clock);
+
+        Assert.Equal(EnvOutcome.Unusable, resolved.Outcome);
+        Assert.StartsWith("'env/acme/staging' cannot be used: OLD expired", resolved.Refusal, StringComparison.Ordinal);
+        AssertNoValue(resolved, "old-staging-value");
+    }
+
+    [Fact]
+    public void AKeySubset_ComesOutInTheOrderAsked_AndAMissingKeyRefusesTheWhole()
+    {
+        using var vault = Saved(v =>
+        {
+            Add(v, "acme", "A", "a-value");
+            Add(v, "acme", "B", "b-value");
+        });
+
+        var subset = EnvResolution.Resolve(vault, "acme", "dev", ["B", "A"], _clock);
+        Assert.Equal([new EnvVariable("B", "b-value"), new EnvVariable("A", "a-value")], subset.Variables);
+
+        var missing = EnvResolution.Resolve(vault, "acme", "dev", ["A", "C"], _clock);
+        Assert.Equal(EnvOutcome.Unusable, missing.Outcome);
+        Assert.Equal(new EnvProblem("C", "is not in this profile's set"), Assert.Single(missing.Problems));
+        Assert.Empty(missing.Variables);
+    }
+
     private Vault Saved(Action<Vault> build, string? path = null)
     {
         path ??= Path.Combine(_directory, Guid.NewGuid().ToString("N") + ".kdbx");
@@ -184,6 +275,9 @@ public sealed class EnvResolutionTests : IDisposable
 
     private static void Add(Vault vault, string project, string key, string value) =>
         Assert.NotEqual(EnvSetOutcome.Rejected, new EnvStore(vault).TrySet(project, key, value, out _));
+
+    private static void Add(Vault vault, string project, string profile, string key, string value) =>
+        Assert.NotEqual(EnvSetOutcome.Rejected, new EnvStore(vault).TrySet(project, profile, key, value, out _));
 
     private static void AssertNoValue(EnvResolved resolved, params string[] values)
     {

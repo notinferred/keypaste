@@ -2,7 +2,7 @@ using Keypaste.Core;
 
 namespace Keypaste.Cli.Commands;
 
-/// <summary>Sets one variable: <c>keypaste env set &lt;project&gt; &lt;KEY&gt;[=value]</c>.</summary>
+/// <summary>Sets one variable: <c>keypaste env set &lt;project&gt; &lt;KEY&gt;[=value] [-p &lt;profile&gt;]</c>.</summary>
 /// <remarks>
 /// <para>
 /// With a bare <c>KEY</c> the value is read the way every other secret is — hidden, or one line of
@@ -21,6 +21,7 @@ internal static class EnvSetCommand
     [
         new("vault", TakesValue: true),
         new("keyfile", TakesValue: true),
+        EnvCommand.ProfileOption,
         .. GenerateOption.Specs,
     ];
 
@@ -34,7 +35,7 @@ internal static class EnvSetCommand
 
         if (line.WantsHelp)
         {
-            context.Stdout.WriteLine("usage: keypaste env set <project> <KEY>[=value]");
+            context.Stdout.WriteLine("usage: keypaste env set <project> <KEY>[=value] [-p <profile>]");
             context.Stdout.WriteLine($"       {GenerateOption.Usage}");
             return CliApp.ExitSuccess;
         }
@@ -42,6 +43,12 @@ internal static class EnvSetCommand
         if (!GenerateOption.TryRead(line, out var recipe, out var recipeError))
         {
             context.Stderr.WriteLine($"keypaste env set: {recipeError}");
+            return CliApp.ExitUsageError;
+        }
+
+        if (!EnvCommand.TryProfile(line, out var profile, out var profileError))
+        {
+            context.Stderr.WriteLine($"keypaste env set: {profileError}");
             return CliApp.ExitUsageError;
         }
 
@@ -107,7 +114,7 @@ internal static class EnvSetCommand
             }
 
             var store = new EnvStore(vault);
-            var outcome = store.TrySet(project, key, value, out var rejection);
+            var outcome = store.TrySet(project, profile, key, value, out var rejection);
 
             if (outcome == EnvSetOutcome.Rejected)
             {
@@ -117,7 +124,7 @@ internal static class EnvSetCommand
 
             vault.Save();
 
-            var entryPath = EnvConvention.EntryPath(project, key);
+            var entryPath = EnvCommand.EntryPath(project, profile, key);
             var generated = recipe is { } used
                 ? $" ({used.Describe("value")} generated)"
                 : string.Empty;

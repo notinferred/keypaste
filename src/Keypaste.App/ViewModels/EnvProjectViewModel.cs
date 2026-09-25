@@ -29,6 +29,10 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     private readonly Action<string?> _announce;
 
     private IReadOnlyList<EnvVariableRow> _variables = [];
+    private IReadOnlyList<EnvProfileInfo> _profiles = [];
+    private IReadOnlyList<string> _profileProblems = [];
+    private EnvMatrix? _matrix;
+    private string _selectedProfile = EnvProfileNames.Default;
     private EnvVariableRow? _revealed;
     private EnvVariableRow? _removing;
     private EnvVariableRow? _replacing;
@@ -115,12 +119,105 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     /// <summary>What the card says under its name.</summary>
     internal string Summary => Count == 1 ? "1 variable" : $"{Count} variables";
 
-    /// <summary>The command that injects this project, for the copy helper and the card.</summary>
+    /// <summary>The command that injects the selected profile, for the copy helper and the card.</summary>
     /// <remarks>
-    /// The trailing space is deliberate: it is a line somebody finishes typing, not one they run.
-    /// The prompt for 4.2 spells it exactly this way, and <c>docs/demo.md</c> shows the same shape.
+    /// It names the project as well as the profile, so it runs from any directory and not only the
+    /// one <c>projects.json</c> maps; the command is the mapped one, or <c>npm start</c> to edit.
     /// </remarks>
-    internal string RunCommand => $"keypaste run {Name} -- ";
+    internal string RunCommand => $"keypaste run -p {SelectedProfile} {Name} -- {Launch.Mapping?.Command ?? "npm start"}";
+
+    /// <summary>The project's profiles: <c>dev</c> first, protected ones last.</summary>
+    internal IReadOnlyList<EnvProfileInfo> Profiles
+    {
+        get => _profiles;
+        private set => Set(ref _profiles, value);
+    }
+
+    /// <summary>The subgroups that are never read, in keypaste's words.</summary>
+    internal IReadOnlyList<string> ProfileProblems
+    {
+        get => _profileProblems;
+        private set => Set(ref _profileProblems, value);
+    }
+
+    /// <summary>Every key against every profile. Holds no value.</summary>
+    internal EnvMatrix? Matrix
+    {
+        get => _matrix;
+        private set => Set(ref _matrix, value);
+    }
+
+    /// <summary>The profile the table shows and every add, replace, remove, import and launch goes to.</summary>
+    /// <remarks>A profile that does not exist yet may be chosen: the first variable added to it creates it, as <c>env set -p</c> does.</remarks>
+    internal string SelectedProfile
+    {
+        get => _selectedProfile;
+        set
+        {
+            if (!EnvProfileNames.IsValid(value, out var invalid))
+            {
+                _report(invalid);
+                return;
+            }
+
+            if (Set(ref _selectedProfile, value))
+            {
+                Import.Profile = value;
+                Launch.Profile = value;
+                _revealed = null;
+                Raise(nameof(RevealedKey));
+                Removing = null;
+                CancelReplace();
+                Reload();
+            }
+        }
+    }
+
+    /// <summary>The <c>.env.keypaste</c> the selected profile exports: references only, safe to commit.</summary>
+    internal string ReferencePreview => EnvReferenceFile.Format(Name, SelectedProfile, [.. Variables.Select(row => row.Key)]);
+
+    /// <summary>Writes <see cref="ReferencePreview"/> to a file, never a value.</summary>
+    /// <param name="path">The file.</param>
+    /// <param name="replace">Whether an existing file may be replaced.</param>
+    /// <returns>What happened, in a sentence the screen shows.</returns>
+    internal string ExportReferences(string path, bool replace = false)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+
+        if (_session.Unlocked is not { } vault)
+        {
+            return "The vault is locked.";
+        }
+
+        var target = Path.GetFullPath(path);
+
+        if ((_session.VaultPath is { } vaultPath && PathIdentity.SameFile(vaultPath, target))
+            || (File.Exists(target) && KdbxHeader.IsVaultFile(target)))
+        {
+            return $"{target} is a vault, so nothing was written. Choose another file.";
+        }
+
+        if (File.Exists(target) && !replace)
+        {
+            return $"{target} already exists, so nothing was written. Replace it to overwrite it.";
+        }
+
+        var variables = new EnvStore(vault).Read(Name, SelectedProfile);
+
+        if (!EnvNameRules.TryCheck(variables, out var names))
+        {
+            return $"{EnvProfileNames.GroupPath(Name, SelectedProfile)} {names}";
+        }
+
+        var text = EnvReferenceFile.Format(Name, SelectedProfile, [.. variables.Select(variable => variable.Key)]);
+
+        if (!EnvReferenceFile.TryWrite(target, text, replace, out var writeError))
+        {
+            return $"{target} could not be written: {writeError}";
+        }
+
+        return $"Wrote {(variables.Count == 1 ? "1 reference" : $"{variables.Count} references")} to {target}. It holds no value and is safe to commit.";
+    }
 
     /// <summary>Which variable is revealed right now, by name. Never its value.</summary>
     /// <remarks>
@@ -275,6 +372,9 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         if (_session.Unlocked is not { } vault)
         {
             Variables = [];
+            Profiles = [];
+            ProfileProblems = [];
+            Matrix = null;
 
             // A half-entered value is as much a secret as a stored one, and the screen is about to
             // be disposed anyway. Clearing here means the lock holds on whichever path runs.
@@ -282,15 +382,21 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
             ReplacementValue.Clear();
             IsAdding = false;
             Replacing = null;
+            RaiseProfileText();
             return;
         }
+
+        var store = new EnvStore(vault);
+        Profiles = store.Profiles(Name);
+        ProfileProblems = store.ProfileProblems(Name);
+        Matrix = EnvMatrix.Build(vault, Name, _session.Clock);
 
         try
         {
             Variables =
             [
-                .. new EnvStore(vault)
-                    .Read(Name)
+                .. store
+                    .Read(Name, SelectedProfile)
                     .Select(variable => new EnvVariableRow(
                         this,
                         variable.Key,
@@ -305,6 +411,14 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
             Variables = [];
             _report(e.Message);
         }
+
+        RaiseProfileText();
+    }
+
+    private void RaiseProfileText()
+    {
+        Raise(nameof(ReferencePreview));
+        Raise(nameof(RunCommand));
     }
 
     /// <summary>Hands a row its value, and takes it away from whichever row had it.</summary>
@@ -337,7 +451,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
             return null;
         }
 
-        foreach (var variable in new EnvStore(vault).Read(Name))
+        foreach (var variable in new EnvStore(vault).Read(Name, SelectedProfile))
         {
             if (string.Equals(variable.Key, key, StringComparison.Ordinal))
             {
@@ -359,6 +473,9 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     {
         _revealed = null;
         Variables = [];
+        Profiles = [];
+        ProfileProblems = [];
+        Matrix = null;
         Removing = null;
         Replacing = null;
         NewValue.Dispose();
@@ -434,7 +551,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
 
             var store = new EnvStore(vault);
 
-            if (store.TrySet(Name, key, value, out var rejection) == EnvSetOutcome.Rejected)
+            if (store.TrySet(Name, SelectedProfile, key, value, out var rejection) == EnvSetOutcome.Rejected)
             {
                 _report(rejection);
                 return;
@@ -464,7 +581,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     /// Writes a new value over an existing variable, keeping the old one in history.
     /// </summary>
     /// <remarks>
-    /// Straight through <see cref="EnvStore.TrySet"/>, whose update branch goes to
+    /// Straight through <see cref="EnvStore.TrySet(string, string, string, out string)"/>, whose update branch goes to
     /// <c>Vault.UpdateEntry</c> and therefore to <c>CreateBackup</c> — which is what keeps the
     /// replaced value in KeePass history (D-0014) without this screen knowing anything about it.
     /// </remarks>
@@ -487,7 +604,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         {
             var store = new EnvStore(vault);
 
-            switch (store.TrySet(Name, row.Key, value, out var rejection))
+            switch (store.TrySet(Name, SelectedProfile, row.Key, value, out var rejection))
             {
                 case EnvSetOutcome.Rejected:
                     _report(rejection);
@@ -541,7 +658,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
 
         try
         {
-            outcome = new EnvStore(vault).Remove(Name, row.Key);
+            outcome = new EnvStore(vault).Remove(Name, SelectedProfile, row.Key);
 
             if (outcome == DeletionOutcome.NothingMatched)
             {
