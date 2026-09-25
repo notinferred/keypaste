@@ -52,6 +52,9 @@ internal static class RunCommand
         new("keyfile", TakesValue: true),
         new(SessionOption, TakesValue: false),
         new(ApproverOption, TakesValue: true),
+        new("token", TakesValue: true),
+        new("bundle", TakesValue: true),
+        new("profile", TakesValue: true, 'p'),
     ];
 
     internal static int Execute(string[] args, CliContext context)
@@ -79,6 +82,11 @@ internal static class RunCommand
         if (split.Command.Count == 0)
         {
             return Fail(context, "no command given after --");
+        }
+
+        if (line.Value("token") is not null || line.Value("bundle") is not null)
+        {
+            return RunWithToken.Execute(line, split.Command, context);
         }
 
         if (line.Operands.Count != 1)

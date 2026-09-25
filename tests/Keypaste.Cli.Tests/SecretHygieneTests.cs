@@ -247,6 +247,50 @@ public sealed class SecretHygieneTests
         Assert.Empty(stdout.ToString());
     }
 
+    /// <summary>
+    /// The token verbs, swept as the theory above sweeps the rest. A theory of its own because each
+    /// of them needs a token to act on and a keypaste home of the harness's own: <c>create</c> and
+    /// <c>revoke</c> take the vault's claim and <c>bundle</c> writes an audit line, and neither may
+    /// touch the home of whoever runs the suite. <c>create</c>'s stdout is the token and nothing else.
+    /// </summary>
+    [Theory]
+    [InlineData("token", "create", "second", "--scope", "read:hygiene/dev/*")]
+    [InlineData("token", "create", "second", "--scope", "read:hygiene/dev/*", "--json")]
+    [InlineData("token", "ls")]
+    [InlineData("token", "ls", "--json")]
+    [InlineData("token", "revoke", "sweep")]
+    [InlineData("token", "bundle", "sweep", "-o", "sweep.kpb")]
+    public void NoTokenVerb_LeaksAFieldValue_ToStdoutOrStderr(params string[] verb)
+    {
+        using var harness = new CliHarness();
+        Seed(harness);
+        harness.Environment[Core.Audit.KeypasteHome.EnvironmentVariable] = harness.Directory;
+
+        harness.Prompt.Enqueue(Master);
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("token", "create", "sweep", "--scope", "read:hygiene/dev/*", "--vault", harness.VaultPath));
+        var token = harness.Out.Trim();
+        harness.Environment[Commands.RunWithToken.EnvironmentVariable] = token;
+        harness.Stdout.GetStringBuilder().Clear();
+        harness.Stderr.GetStringBuilder().Clear();
+
+        harness.Prompt.Enqueue(Master);
+        var args = verb.Select(arg => arg.EndsWith(".kpb", StringComparison.Ordinal) ? Path.Combine(harness.Directory, arg) : arg)
+            .Concat(["--vault", harness.VaultPath])
+            .ToArray();
+        Assert.Equal(CliApp.ExitSuccess, harness.Run(args));
+
+        foreach (var sentinel in new[] { SentinelPassword, SentinelUsername, SentinelNotes, SentinelUrl, token })
+        {
+            Assert.DoesNotContain(sentinel, harness.Out, StringComparison.Ordinal);
+            Assert.DoesNotContain(sentinel, harness.Err, StringComparison.Ordinal);
+        }
+
+        if (verb[1] == "create" && !verb.Contains("--json"))
+        {
+            Assert.True(Core.Tokens.TokenSecret.TryParse(harness.Out.Trim(), out _, out _));
+        }
+    }
+
     private static void Seed(CliHarness harness)
     {
         harness.Prompt.Interactive = false;
