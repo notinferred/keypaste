@@ -40,6 +40,15 @@ public sealed class ClientPoliciesTests : IDisposable
         Assert.False(Parse(text, out _, out _));
 
     [Fact]
+    public void APolicyHoldingTerminalEscapes_IsNamedWithoutThem()
+    {
+        Assert.False(Parse("[[client]]\nlabel = \"x\"\npolicy = \"\u001b]52;c;ZWNobyBwd25lZA==\u0007\u001b[2J\"\n", out _, out var problem));
+
+        Assert.Contains("is not a policy", problem, StringComparison.Ordinal);
+        Assert.DoesNotContain(problem, char.IsControl);
+    }
+
+    [Fact]
     public void MoreThanTheMostRows_IsMalformed()
     {
         var text = new StringBuilder();

@@ -193,7 +193,7 @@ public sealed class ClientPolicies
 
             if (!TryParseWire(policy.Value.Text, out var parsed))
             {
-                problem = At(policy.Line, $"'{policy.Value.Text}' is not a policy; use session, ask or inject-only");
+                problem = At(policy.Line, $"'{Safe(policy.Value.Text)}' is not a policy; use session, ask or inject-only");
                 return false;
             }
 
@@ -294,6 +294,10 @@ public sealed class ClientPolicies
             return false;
         }
     }
+
+    /// <summary>Makes text from the file safe to put in a message that a terminal will render.</summary>
+    private static string Safe(string text) =>
+        EntryNameSanitizer.Sanitize(text, MaximumLabelLength).Text;
 
     /// <summary>Whether a label may head a row.</summary>
     /// <param name="label">The label.</param>
