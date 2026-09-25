@@ -54,15 +54,16 @@ public sealed class ShareClient(HttpMessageHandler handler, Uri endpoint)
     /// <summary>The largest response body read.</summary>
     internal const int MaximumResponseBytes = 64 * 1024;
 
-    internal static readonly TimeSpan Timeout = TimeSpan.FromSeconds(15);
-
     private readonly HttpMessageHandler _handler = handler ?? throw new ArgumentNullException(nameof(handler));
 
     /// <summary>The origin this client speaks to.</summary>
     public Uri Endpoint { get; } = endpoint ?? throw new ArgumentNullException(nameof(endpoint));
 
+    /// <summary>How long one exchange may take, from sending the request to reading the last body byte.</summary>
+    internal TimeSpan Timeout { get; init; } = TimeSpan.FromSeconds(15);
+
     /// <summary>A client for another endpoint over the same transport.</summary>
-    public ShareClient WithEndpoint(Uri other) => new(_handler, other);
+    public ShareClient WithEndpoint(Uri other) => new(_handler, other) { Timeout = Timeout };
 
     /// <summary>Uploads an envelope.</summary>
     /// <param name="envelope">The sealed envelope.</param>
@@ -194,11 +195,16 @@ public sealed class ShareClient(HttpMessageHandler handler, Uri endpoint)
 
     private async Task<(HttpStatusCode Status, byte[] Body, ShareFailure Failure)> SendAsync(HttpRequestMessage request, CancellationToken ct)
     {
-        using var client = new HttpClient(_handler, disposeHandler: false) { Timeout = Timeout };
+        using var client = new HttpClient(_handler, disposeHandler: false) { Timeout = System.Threading.Timeout.InfiniteTimeSpan };
+
+        // HttpClient.Timeout stops at the headers under ResponseHeadersRead; this one also bounds the body.
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        deadline.CancelAfter(Timeout);
+        var token = deadline.Token;
 
         try
         {
-            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token).ConfigureAwait(false);
 
             if ((int)response.StatusCode is >= 300 and < 400)
             {
@@ -210,13 +216,13 @@ public sealed class ShareClient(HttpMessageHandler handler, Uri endpoint)
                 return (response.StatusCode, [], ShareFailure.Protocol);
             }
 
-            var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+            var stream = await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false);
             await using (stream.ConfigureAwait(false))
             {
                 var body = new byte[MaximumResponseBytes + 1];
                 var read = 0;
                 int last;
-                while (read < body.Length && (last = await stream.ReadAsync(body.AsMemory(read), ct).ConfigureAwait(false)) > 0)
+                while (read < body.Length && (last = await stream.ReadAsync(body.AsMemory(read), token).ConfigureAwait(false)) > 0)
                 {
                     read += last;
                 }
@@ -227,7 +233,7 @@ public sealed class ShareClient(HttpMessageHandler handler, Uri endpoint)
             }
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException
-                                       || (ex is TaskCanceledException && !ct.IsCancellationRequested))
+                                       || (ex is OperationCanceledException && !ct.IsCancellationRequested))
         {
             return (default, [], ShareFailure.Network);
         }

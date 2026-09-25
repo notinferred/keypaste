@@ -144,6 +144,19 @@ public sealed class ShareClientTests : IDisposable
     }
 
     [Fact]
+    public async Task ABodyThatNeverEnds_IsNetwork_WithinTheTimeout()
+    {
+        _server.Answer = _ => new HttpResponseMessage(HttpStatusCode.Created) { Content = new StreamContent(new StallingStream()) };
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var failure = await new ShareClient(_server, ShareEndpoint.Default) { Timeout = TimeSpan.FromMilliseconds(200) }
+            .RevokeAsync(Id, "token", CancellationToken.None)
+            .WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+
+        Assert.Equal(ShareFailure.Network, failure);
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(10), $"took {stopwatch.Elapsed}");
+    }
+
+    [Fact]
     public async Task Status_ReadsViewsLeft_AndNotFoundMeansGone()
     {
         const string token = "revoke-token";
@@ -182,5 +195,40 @@ public sealed class ShareClientTests : IDisposable
         Assert.Equal(ShareFailure.Refused, (await Client.StatusAsync("../../x", CancellationToken.None)).Failure);
         Assert.Equal(ShareFailure.Refused, await Client.RevokeAsync("../../x", "t", CancellationToken.None));
         Assert.Empty(_server.Requests);
+    }
+
+    /// <summary>A response body whose first byte never arrives.</summary>
+    private sealed class StallingStream : Stream
+    {
+        public override bool CanRead => true;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+        {
+            await Task.Delay(System.Threading.Timeout.Infinite, cancellationToken).ConfigureAwait(false);
+            return 0;
+        }
+
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+            ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override void Flush()
+        {
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 }

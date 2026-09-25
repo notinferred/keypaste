@@ -223,8 +223,11 @@ function openStore(env, url, ctx) {
 }
 
 function postgresStore(env, ctx) {
-  const sql = postgres(env.SHARE_DB.connectionString, { fetch_types: false });
+  return sqlStore(postgres(env.SHARE_DB.connectionString, { fetch_types: false }), ctx);
+}
 
+// Exported so the tests can run the SQL paths against a stand-in for the driver.
+export function sqlStore(sql, ctx) {
   return {
     async create({ id, envelope, views, ttl, revokeSha256, passphrase }) {
       const [row] = await sql`
@@ -247,7 +250,14 @@ function postgresStore(env, ctx) {
         where id = ${id} and views_left > 0 and expires_at > now()
         returning envelope, views_left
       `;
-      if (row && row.views_left === 0) await sql`delete from public.share where id = ${id} and views_left = 0`;
+      // The view is spent once the update commits; if this cleanup fails, the sweep deletes the row.
+      if (row && row.views_left === 0) {
+        try {
+          await sql`delete from public.share where id = ${id} and views_left = 0`;
+        } catch (error) {
+          console.error("share cleanup failed:", error?.name, error?.code, error?.message);
+        }
+      }
       return row ?? null;
     },
     async revoke(id, revokeSha256) {

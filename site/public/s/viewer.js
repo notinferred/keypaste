@@ -3,6 +3,7 @@ import { checkPassphrase, deriveKey, openEnvelope, parseLink } from "./share-cry
 const GONE = "This link has already been opened, has expired or was revoked.";
 const ALTERED = "This link could not be decrypted. It may have been altered.";
 const UNREACHABLE = "keypaste.com could not be reached. No view was used; try again in a moment.";
+const UNREACHABLE_OPEN = "keypaste.com could not be reached; the link may have used a view. Try again in a moment.";
 
 const $ = (id) => document.getElementById(id);
 
@@ -81,7 +82,7 @@ async function reveal(event) {
     try {
       opened = await api(`/api/share/${link.id}/open`, "POST");
     } catch {
-      fail(UNREACHABLE);
+      fail(UNREACHABLE_OPEN);
       return;
     }
 

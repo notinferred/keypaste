@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 import worker from "../src/worker.js";
-import { memory } from "../src/share.js";
+import { memory, sqlStore } from "../src/share.js";
 
 const vector = JSON.parse(await readFile(new URL("./share-vector.json", import.meta.url), "utf8"));
 const LOCAL = "http://127.0.0.1:8787";
@@ -242,6 +242,22 @@ test("the sweep deletes expired shares", async () => {
   await pending;
 
   assert.equal(memory.has(id), false);
+});
+
+test("the last view returns its envelope even when the cleanup delete fails", async (t) => {
+  const id = "AAAAAAAAAAAAAAAAAAAAAA";
+  const envelope = vector.cases[0].envelope;
+  const sql = async (strings) => {
+    if (strings[0].trim().startsWith("update")) return [{ envelope, views_left: 0 }];
+    throw Object.assign(new Error("connection terminated"), { code: "CONNECTION_ENDED" });
+  };
+  const logged = t.mock.method(console, "error", () => {});
+
+  const row = await sqlStore(sql, ctx).open(id);
+
+  assert.deepEqual(row, { envelope, views_left: 0 });
+  assert.equal(logged.mock.callCount(), 1);
+  assert.doesNotMatch(logged.mock.calls[0].arguments.join(" "), new RegExp(id));
 });
 
 test("every share response carried no-store and the API headers", () => {
