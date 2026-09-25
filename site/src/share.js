@@ -1,8 +1,8 @@
 // Share links (D-0355): the server keeps an envelope it cannot open, a view count, an expiry and the
 // SHA-256 of a revoke token. The key is in the link's fragment, which no browser sends here.
 //
-// Until SHARE_ENABLED is "1", which is set only after the founder ratifies sharing and provisions its
-// database, the API answers 503 and the viewer 404; merging this into main deploys it switched off.
+// With SHARE_ENABLED other than "1" the API answers 503 and the viewer 404, so one variable in
+// wrangler.jsonc switches sharing off without forgetting a live share.
 //
 // Unknown, spent, expired and revoked shares, and a wrong revoke token, all answer the one 404, so
 // a caller cannot tell a share that never existed from one somebody opened. That 404 alone carries

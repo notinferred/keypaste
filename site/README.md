@@ -6,11 +6,11 @@ Database permissions were last verified on 2026-07-28 (D-0037). Page deployment 
 
 ## Database connection
 
-The database password lives in an account-level Hyperdrive configuration. `wrangler.jsonc` contains its ID; no database password or Wrangler secret belongs in the repository or Worker.
+The database passwords live in account-level Hyperdrive configurations. `wrangler.jsonc` contains their IDs; no database password or Wrangler secret belongs in the repository or Worker.
 
-The recorded connection uses `keypaste_signup_writer` with `INSERT` on `public.signup` and no `SELECT`. This restricts access to stored subscribers, but a compromised handler can still read newly submitted addresses. `schema.sql` owns intended grants; verify effective permissions after role or connection changes.
+Since 2026-09-25 both tables are in one PlanetScale Postgres database on `aws-us-east-1-3.pg.psdb.cloud` (D-0364). `HYPERDRIVE` (`keypaste-signup`, `efcf6358…`) connects as `keypaste_signup_writer`, which has `INSERT` on `public.signup` and no `SELECT`: a compromised handler can still read newly submitted addresses, but not the stored list. `SHARE_DB` (`keypaste-share`, `59f7f117…`) connects as `keypaste_share`, which can read and write `public.share` and nothing else. Both configs are uncached and use `verify-full` against the uploaded ISRG Root X1 (`f8411755…`). `schema.sql` owns the intended grants; verify effective permissions after any role or connection change.
 
-The existing SQL-created role requires SQL administration and a branch-routing suffix in the connection username. New setups should use a managed role with verified grants. See [PlanetScale role management](https://planetscale.com/docs/postgres/connecting/roles).
+Both roles were created with SQL (`CREATE ROLE … LOGIN NOINHERIT`), not as PlanetScale managed roles, so they do not appear in the dashboard's role list. Rotating one is `ALTER ROLE … PASSWORD` with an admin connection followed by `wrangler hyperdrive update` with the new password, re-checking the CA and SSL mode afterwards. The connection username carries the branch suffix, `<role>.qhhxudm5mg87`.
 
 ## Setup
 
@@ -56,7 +56,9 @@ Verify the CA reference, `verify-full` mode and a successful restricted-role que
 
 ## Recorded database verification
 
-On 2026-07-28, configuration `9ef85ab258e846fbb2c0d3457b744282` used `keypaste_signup_writer.jb6eu3wgh2u3`, with `NOINHERIT`, no memberships, no superuser or `bypassrls`, and only the required insert access. Select, count, returning, update, delete and other-table reads failed with 42501. Valid submissions returned 303 to `/thanks/` and inserted a row; duplicates and honeypots inserted nothing. Invalid input, origin and content type returned 400.
+On 2026-09-25, against the new database, each role was checked by connecting as it: `keypaste_signup_writer` inserted into `signup` inside a rolled-back transaction and was refused (42501) reading `signup` and touching `share`; `keypaste_share` inserted, updated, read and deleted a `share` row and was refused (42501) reading or inserting `signup`. Neither role has memberships. Both Hyperdrive configs report `verify-full` with CA `f8411755…`. `REVOKE CONNECT ON DATABASE postgres FROM PUBLIC` was not applied to this database, because PlanetScale's own roles (`pscale_exporter`, `pscale_pgbouncer`, `pscale_replication`) may rely on it; the table grants are what restrict the Worker's roles.
+
+The rest of this section records the previous database, which is gone along with its Hyperdrive config `9ef85ab2…`. On 2026-07-28, configuration `9ef85ab258e846fbb2c0d3457b744282` used `keypaste_signup_writer.jb6eu3wgh2u3`, with `NOINHERIT`, no memberships, no superuser or `bypassrls`, and only the required insert access. Select, count, returning, update, delete and other-table reads failed with 42501. Valid submissions returned 303 to `/thanks/` and inserted a row; duplicates and honeypots inserted nothing. Invalid input, origin and content type returned 400.
 
 The original integration role inherited `postgres` and `pscale_superuser`. It was replaced before the signup table existed; prior submissions returned 503. Integration-created roles require the same permission review as manually configured roles.
 
@@ -124,15 +126,9 @@ Use a dedicated test address for checks that write rows. Verify valid submission
 
 Unknown, spent, expired and revoked shares and a wrong revoke token all answer the same 404, and only that 404 carries `x-keypaste-share: gone`, the one answer on which keypaste forgets a share and its revoke token. A foreign `Origin` answers 403, a malformed request 400, an oversized one 413 and a rate-limited one 429.
 
-**Until the Worker variable `SHARE_ENABLED` is `"1"`, the API routes answer 503 and the viewer 404.** Merging this code deploys it switched off; the founder sets the variable only after sharing is ratified and its database is provisioned. With the variable set and no `SHARE_DB` binding, the routes also answer 503. Switching sharing off never makes a client forget a live share, so it can still be revoked once sharing is back on.
+Sharing is on: `SHARE_ENABLED` is `"1"` in `wrangler.jsonc`'s `vars`, which every deploy sets (D-0364). Any other value makes the API routes answer 503 and the viewer 404, and so does a missing `SHARE_DB` binding. Switching sharing off never makes a client forget a live share, so it can still be revoked once sharing is back on.
 
-Provisioning, run from `site/` after `npm ci`:
-
-1. Create a managed role for shares with no inherited roles, separate from the signup role: `pscale role create <database> <branch> keypaste-share --inherited-roles ''`.
-2. Substitute its generated username for `<SHARE_ROLE>` in the share section of `schema.sql` and apply that section with an admin connection.
-3. Create an uncached Hyperdrive config for it: `npx wrangler hyperdrive create keypaste-share --caching-disabled --connection-string="postgresql://pscale_<id>.<branch-id>:PASSWORD@…/postgres" --ca-certificate-id <CA_CERT_ID> --sslmode verify-full`.
-4. Add `{ "binding": "SHARE_DB", "id": "<returned id>" }` to `hyperdrive` in `wrangler.jsonc`. A placeholder id would fail the deploy, so the binding is added only once the config exists.
-5. After ratification, set `SHARE_ENABLED` to `1` in the Worker's variables.
+The share database was provisioned on 2026-09-25: the `share` table and its index from `schema.sql`, the `keypaste_share` role with only the grants listed there, and the uncached `keypaste-share` Hyperdrive config bound as `SHARE_DB`. Before the deploy, a link made by `keypaste share` through a local `wrangler dev` on that database opened once in headless Edge and was refused on its second open.
 
 A cron trigger every 30 minutes deletes expired and spent rows.
 

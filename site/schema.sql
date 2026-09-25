@@ -53,6 +53,11 @@ CREATE TABLE IF NOT EXISTS public.signup (
 -- these grants use. Getting this backwards is the most likely reason a correct-looking
 -- `wrangler hyperdrive update` fails to authenticate.
 
+-- The database provisioned on 2026-09-25 (D-0364) has no pscale CLI behind it, so its role was
+-- created with SQL instead, NOINHERIT and with no memberships; <ROLE> is keypaste_signup_writer:
+--
+--     CREATE ROLE keypaste_signup_writer LOGIN NOINHERIT NOCREATEDB NOCREATEROLE NOBYPASSRLS PASSWORD '…';
+
 GRANT CONNECT ON DATABASE postgres   TO "<ROLE>";
 GRANT USAGE   ON SCHEMA  public      TO "<ROLE>";
 GRANT INSERT  ON TABLE  public.signup TO "<ROLE>";
@@ -63,7 +68,9 @@ GRANT INSERT  ON TABLE  public.signup TO "<ROLE>";
 -- be useful, which is the exact privilege being withheld here.
 
 -- PlanetScale grants CONNECT on a new database to PUBLIC, meaning every current and future role.
--- Close that, now that the one role that needs it has been granted it explicitly.
+-- Close that, now that the one role that needs it has been granted it explicitly. Not applied to the
+-- 2026-09-25 database: PlanetScale's own roles (pscale_exporter, pscale_pgbouncer, ...) may connect
+-- through that grant, and the table grants already confine the Worker's roles.
 REVOKE CONNECT ON DATABASE postgres FROM PUBLIC;
 
 
@@ -84,10 +91,10 @@ CREATE TABLE IF NOT EXISTS public.share (
 );
 CREATE INDEX IF NOT EXISTS share_expires_at ON public.share (expires_at);
 
--- A separate managed role (keypaste-share, no inherited roles) and a separate Hyperdrive config
--- created with --caching-disabled, bound as SHARE_DB. The signup role gains nothing. Substitute the
--- share role's generated username for <SHARE_ROLE>, as for <ROLE> above; it needs CONNECT too,
--- because the statement above revoked it from PUBLIC.
+-- A separate role and a separate Hyperdrive config created with --caching-disabled, bound as
+-- SHARE_DB. The signup role gains nothing. On the 2026-09-25 database <SHARE_ROLE> is keypaste_share,
+-- created like keypaste_signup_writer above; it is granted CONNECT explicitly so it keeps working
+-- wherever the statement above has revoked it from PUBLIC.
 GRANT CONNECT ON DATABASE postgres TO "<SHARE_ROLE>";
 GRANT USAGE ON SCHEMA public TO "<SHARE_ROLE>";
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.share TO "<SHARE_ROLE>";

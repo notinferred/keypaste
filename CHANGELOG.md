@@ -16,7 +16,7 @@ A project holds profiles: `env/<project>` is dev and `env/<project>/<profile>` a
 
 `keypaste token create` makes a scoped, inject-only token for CI, such as `read:acme-api/staging/*`, printed once and expiring after 30 days by default. `keypaste run --token` injects what its scope covers through the process holding the vault, which audits it, and `token bundle` seals the sets into a file for `run --bundle`. A protected profile needs `--allow-prod` and still asks you live. The Agents screen creates, lists and revokes the same tokens.
 
-`keypaste share` encrypts one field, or an entry's username, password and URL together (`--field login`), on this machine and uploads only ciphertext. The link holds the key, opens 1 to 10 times, expires after 5 minutes to 7 days, can require a passphrase and can be revoked; `share ls` lists your links. keypaste.com does not serve links yet.
+`keypaste share` encrypts one field, or an entry's username, password and URL together (`--field login`), on this machine and uploads only ciphertext. The link holds the key, opens 1 to 10 times, expires after 5 minutes to 7 days, can require a passphrase and can be revoked; `share ls` lists your links. keypaste.com serves them from 2026-09-25.
 
 `keypaste import <file.kdbx>` copies another KeePass file into the vault with its fields, attachments and history, leaving its recycle bin behind and never writing the file. `--dry-run` shows the plan and `--in-place` keeps editing the file itself. The desktop has the same as its Import .kdbx dialog.
 

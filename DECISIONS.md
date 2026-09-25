@@ -6,6 +6,7 @@
 
 | id | date | decision | supersedes |
 |---|---|---|---|
+| D-0364 | 2026-09-25 | keypaste.com's tables move to a new PlanetScale database with SQL-created roles `keypaste_signup_writer` (INSERT on `signup`) and `keypaste_share` (the `share` table only), each behind its own uncached `verify-full` Hyperdrive config, and `SHARE_ENABLED` is set in `wrangler.jsonc`, so share links are served | the deleted signup Hyperdrive config `9ef85ab2…` |
 | D-0363 | 2026-09-25 | Agent Activity's history reads a missing audit log as a session with no records yet and only an unreadable log as unavailable | D-0331 |
 | D-0362 | 2026-09-25 | A share passphrase has at least 20 characters, and the CLI and desktop point to six generated words, because the status answer's passphrase check lets whoever holds a link test guesses offline without spending a view; the check stays so a mistyped passphrase costs no view | — |
 | D-0361 | 2026-09-25 | Audit lines gain `vault` (the vault's identity key), `entries` and a 256-character `command` head with its SHA-256; last-used and in-use signals come from that vault's granted lines, the owner's release ledger and its live grants, and a bridge's client name, version and label on attach are display and counting only | — |
