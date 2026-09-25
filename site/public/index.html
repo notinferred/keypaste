@@ -157,7 +157,7 @@
     <div class="hero-body">
       <p class="eyebrow">open source · reads and writes KDBX · no account, no server</p>
       <h1>A password manager your agents have to ask.</h1>
-      <p class="lead">keypaste keeps your logins and your projects' environment variables in one ordinary KDBX file on your disk. When an AI agent needs a credential, it asks for one field; you read who is asking and why, and you choose: deny, once, or for an hour.</p>
+      <p class="lead">keypaste keeps your logins and your projects' environment variables in one ordinary KDBX file on your disk. When an AI agent needs a credential, it asks for one field; you read who is asking and why, and you approve or deny that request (the next release adds allowing it once or for an hour).</p>
 
       <div class="actions">
         <a class="button primary" href="#install">Install the CLI</a>
@@ -171,7 +171,7 @@
 
       <figure>
         <div class="terminal">
-          <div class="terminal-bar"><span class="lights" aria-hidden="true"><span></span><span></span><span></span></span>keypaste agent<span class="live"><span class="dot waiting" aria-hidden="true"></span>waiting for you</span></div>
+          <div class="terminal-bar"><span class="lights" aria-hidden="true"><span></span><span></span><span></span></span>keypaste agent<span class="live"><span class="dot waiting" aria-hidden="true"></span>next release · in source</span></div>
 <pre>
 ────────────────────────────────────────────────────────────
 keypaste: an agent is asking for a credential.
@@ -188,7 +188,7 @@ keypaste: an agent is asking for a credential.
 [d] deny  [o] once  [h] 1 hour  45s ›
 </pre>
         </div>
-        <figcaption>The agent approval flow in one screen. An agent asked; you were shown its requester label, the requested field and its stated reason; one field goes back, with a time limit on reusing that approval. Expiry does not erase the client's copies or revoke the credential. <a href="#demo">Watch it end to end</a>, about sixty seconds.</figcaption>
+        <figcaption>The approval as the next release draws it, in source today; the v0.3.0 download asks <code>Approve? [y/N]</code> and allows up to 300 seconds. An agent asked; you were shown its requester label, the requested field and its stated reason; one field goes back, with a time limit on reusing that approval. Expiry does not erase the client's copies or revoke the credential. <a href="#demo">Watch it end to end</a>, about sixty seconds.</figcaption>
       </figure>
     </div>
   </div>
@@ -233,6 +233,7 @@ keypaste run dev -- npm start</pre>
       <figure class="demo">
         <img src="/demo/keypaste-demo.gif" width="1040" height="583" loading="lazy"
              alt="An agent asks keypaste for one credential; a person approves it; the audit log records it.">
+        <figcaption>Recorded with the published v0.3.0, which asks <code>Approve? [y/N]</code> and allows up to 300 seconds.</figcaption>
       </figure>
     </div>
   </section>
@@ -255,7 +256,7 @@ keypaste run dev -- npm start</pre>
         </div>
       </div>
 
-      <p class="status"><b>Published: CLI/MCP v0.3.0.</b> Local vaults, environment injection and terminal approval are available on four native targets. The binaries are unsigned and there is no public desktop download. The desktop source creates and edits vaults and restores entry history, but it unlocks separately from the terminal approver. Locking the app does not stop that approver; its env screen currently copies a run command.</p>
+      <p class="status"><b>Published: CLI/MCP v0.3.0.</b> Local vaults, environment injection and terminal approval are available on four native targets. The binaries are unsigned and there is no public desktop download. In source, the desktop and <code>keypaste agent</code> share one owner per vault, <code>keypaste lock</code> locks whichever holds it, and the Env profiles screen launches a project's command or a terminal from the unlocked session; none of this is published.</p>
     </div>
   </section>
 
@@ -362,7 +363,7 @@ keypaste run dev -- npm start    # injected into the child process, nothing on d
   <section id="desktop">
     <div class="wrap prose">
       <div class="section-head"><span class="num">07</span><h2>The desktop app</h2></div>
-      <p class="intro">The next release focuses on daily vault use and recovery, one unlock session, native MCP approvals and launching a project with its env set. Locking will stop new session-backed secret releases and launches. Values already delivered to an agent or child process remain outside that control. Sharing, hosted services, teams and complete KeePassXC parity are outside this release.</p>
+      <p class="intro">The next release focuses on daily vault use and recovery, one unlock session, native MCP approvals that allow a request once or for an hour, and launching a project with its env set. Locking will stop new session-backed secret releases and launches. Values already delivered to an agent or child process remain outside that control. One-time share links come with the CLI; keypaste.com serves them once sharing is switched on. Hosted sync, accounts, teams and complete KeePassXC parity stay out.</p>
 
       <p><strong>Tell me when the app ships.</strong> The CLI/MCP is available above. The intended desktop app uses one unlock session for credentials, native approvals and project launches; it has no public download yet. You can register interest in one installation announcement. Confirmation mail is not implemented, so signups remain unconfirmed and no messages are sent. Any future message requires confirmation first.</p>
 

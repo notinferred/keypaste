@@ -4,19 +4,19 @@
 
 # Launch material
 
-This is reusable draft copy for the published CLI/MCP `v0.3.0`, reviewed against the repository's release record on 2026-09-19. It is not an instruction to publish or contact anyone. There is no mandatory campaign, posting schedule or announcement gate. The founder chooses whether and where to use it; any later use must describe the version actually available.
+This is reusable draft copy for the next CLI/MCP release, reviewed against the source on 2026-09-25; its transcript matches the current source, which `v0.3.0` predates (`v0.3.0` prompts `Approve? [y/N]` with a `for N seconds` line). An announcement of `v0.3.0` itself must use the `v0.3.0` [demo](docs/demo.md) recording instead, and when the version that ships this prompt is tagged, re-date this draft to it. It is not an instruction to publish or contact anyone. There is no mandatory campaign, posting schedule or announcement gate. The founder chooses whether and where to use it; any later use must describe the version actually available.
 
 [PRODUCT](docs/PRODUCT.md) defines the focused local desktop product. [STEPS](docs/STEPS.md) owns delivery, and [RELEASE](docs/RELEASE.md) distinguishes source, packages and public downloads. A future desktop announcement must wait for that desktop release and its installation evidence.
 
-## Current release draft
+## Next release draft
 
 keypaste stores passwords and project environment variables in a local KDBX file and lets an AI client request one credential at a time over MCP.
 
-The public release is CLI/MCP `v0.3.0`, with downloads for Windows x64, macOS ARM64 and Linux x64/ARM64. It works without an account or service. `keypaste run dev -- npm start` reads an env set and passes it to a child process without writing a plaintext env file.
+The current public release is CLI/MCP `v0.3.0`, with downloads for Windows x64, macOS ARM64 and Linux x64/ARM64. It works without an account or service. `keypaste run dev -- npm start` reads an env set and passes it to a child process without writing a plaintext env file.
 
-For agent access, your MCP client starts `keypaste-mcp`. You start and unlock a separate `keypaste agent` in a terminal, which shows credential requests. Approval releases one field and permits bounded reuse on that connection; silence for 45 seconds denies access. User-written policy can authorize a matching request without a prompt. The bridge records calls in a local hash-chained audit log and refuses release when the required record cannot be written.
+For agent access, your MCP client starts `keypaste-mcp`. You start and unlock a separate `keypaste agent` in a terminal, which shows credential requests. You answer Deny, Allow once, which releases one field and keeps nothing, or Allow for 1 hour, which lets that connection reuse the approval for the hour; silence for 45 seconds denies access. User-written policy can authorize a matching request without a prompt. The bridge records calls in a local hash-chained audit log and refuses release when the required record cannot be written.
 
-The binaries are unsigned and un-notarized. There is no public desktop download. The desktop source can create and edit vaults and restore entry history, but its session is separate from the terminal approver. Locking the desktop does not stop that approver. The app's env screen copies a command; launching projects from the shared unlock session and native approvals remain planned.
+The binaries are unsigned and un-notarized. There is no public desktop download. In source, the desktop and `keypaste agent` share one owner per vault, the unlocked app answers agents in its own prompt window, and the Env profiles screen launches a project's command or a terminal from that session; none of this is published yet.
 
 The intended product is a familiar local password manager with one unlock session for vault use, native MCP approval and project launches. Existing processes retain credentials they already received; neither locking the vault nor expiring an approval erases those copies.
 

@@ -6,7 +6,7 @@
   </picture>
 </h1>
 
-<p align="center">keypaste keeps your logins and your projects' secrets in one KeePass-compatible vault, and gives an AI agent a secret only when you allow it: once, or for 1 hour.</p>
+<p align="center">keypaste keeps your logins and your projects' secrets in one KeePass-compatible vault, and gives an AI agent a secret only when you allow it.</p>
 
 <p align="center">
   <img src="docs/screenshots/secrets.png" width="880" alt="The keypaste desktop app on its Secrets screen: a github login open with its username, masked password, URL, notes and kp:// reference, and the list of logins and env variables beside it.">
@@ -29,7 +29,7 @@ The published `v0.3.0` CLI stores logins and environment variables in a local KD
 **For developers and their agents**
 
 - MCP approval: an agent asks for one field of one entry and gives its reason. You answer Deny, Allow once or Allow for 1 hour, and every request lands in a hash-chained audit log.
-- Inject-only runs: `keypaste run` puts values in a command's environment and nothing on disk. With `--allow-run`, an agent can run a command you approve with secrets it never sees.
+- Inject-only runs: `keypaste run` puts values in a command's environment and nothing on disk. With `--allow-run`, an agent can run a command you approve and gets back its output with each value replaced, though a command it can edit can still reveal a value ([T-35](THREATS.md#t-35--a-run-keeps-values-out-of-the-result-not-out-of-the-agents-reach)). The `run` tool awaits the founder's amendment of [PRODUCT §2](docs/PRODUCT.md), which still rules out shell execution over MCP.
 - Env profiles: one set of keys per project, with a value for dev, staging and prod. Prod always needs a live answer.
 - `.env.keypaste`: `KEY=kp://project/profile/KEY` references and no values, safe to commit.
 - Scoped tokens for CI, such as `read:acme-api/staging/*`: inject-only, and expiring after 30 days by default.
@@ -51,6 +51,8 @@ The published `v0.3.0` CLI stores logins and environment variables in a local KD
 ## The approval, in the terminal
 
 ![An agent asks keypaste for one credential; a person approves it; the audit log records it.](docs/demo/keypaste-demo.gif)
+
+<sub>Recorded with the published v0.3.0, which asks <code>Approve? [y/N]</code> and allows up to 300 seconds. In source, for the next release, the prompt is:</sub>
 
 ```
 ────────────────────────────────────────────────────────────
@@ -223,7 +225,7 @@ keypaste add github --generate --words 6
 keypaste env set billing STRIPE_KEY --generate --words 8 --separator _
 ```
 
-`keypaste generate --words 6` prints a passphrase and stores nothing. Generation details go to stderr, so a redirect captures only the passphrase. It opens no vault and asks for nothing. This does not implement encrypted sharing or receiving.
+`keypaste generate --words 6` prints a passphrase and stores nothing. Generation details go to stderr, so a redirect captures only the passphrase. It opens no vault and asks for nothing.
 
 | exit code | meaning |
 | --- | --- |

@@ -20,7 +20,7 @@ A project holds profiles: `env/<project>` is dev and `env/<project>/<profile>` a
 
 `keypaste import <file.kdbx>` copies another KeePass file into the vault with its fields, attachments and history, leaving its recycle bin behind and never writing the file. `--dry-run` shows the plan and `--in-place` keeps editing the file itself. The desktop has the same as its Import .kdbx dialog.
 
-`keypaste-mcp --allow-run` offers agents a `run` tool. After you approve the exact command, directory, variable names and reason, or under a grant of at most 15 minutes for that command line, it runs the command with the values in its environment and returns its output with each value replaced. Nothing adds `--allow-run` for you.
+`keypaste-mcp --allow-run` offers agents a `run` tool. After you approve the exact command, directory, variable names and reason, or under a grant of at most 15 minutes for that command line, it runs the command with the values in its environment and returns its output with each value replaced; a command the agent can edit can still reveal a value (T-35). Nothing adds `--allow-run` for you, and the tool awaits the founder's PRODUCT §2 amendment.
 
 `~/.keypaste/clients.toml` narrows one MCP client at a time: Ask every time, Session grants up to 1 hour, or Inject only. Set it with `keypaste mcp policy` or on the desktop's Agents screen.
 
