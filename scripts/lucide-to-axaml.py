@@ -21,10 +21,10 @@ ICONS = """
 activity alert-triangle arrow-right bot bug check chevron-down chevron-right chevrons-up-down
 circle-check circle-dot clipboard-check clock copy credit-card database download ellipsis
 external-link eye eye-off file-code file-down file-input file-key file-lock-2 file-up filter
-fingerprint folder folder-git-2 folder-open globe history hourglass import info key key-round
-key-square layers link lock lock-open log-out moon more-horizontal plug plus refresh-cw rotate-cw
-search server settings share-2 shield shield-check sticky-note sun terminal ticket trash-2 unlock
-upload usb user vault wand-2 x
+fingerprint folder folder-git-2 folder-input folder-open folder-pen folder-plus globe history
+hourglass import info key key-round key-square layers link lock lock-open log-out moon
+more-horizontal panel-left pencil plug plus refresh-cw rotate-cw search server settings share-2
+shield shield-check sticky-note sun terminal ticket trash-2 unlock upload usb user vault wand-2 x
 """.split()
 
 # Names the design uses that this Lucide release publishes under another name.

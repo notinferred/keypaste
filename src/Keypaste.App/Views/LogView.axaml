@@ -14,18 +14,17 @@
       </Grid.ColumnDefinitions>
       <StackPanel Spacing="20">
 
-        <Grid ColumnDefinitions="*,Auto">
-          <StackPanel Grid.Column="0" Spacing="6" VerticalAlignment="Bottom">
+        <!-- The actions go on a line of their own under the subtitle when the two do not fit side by side. -->
+        <ctl:HeaderRow Spacing="16">
+          <StackPanel Spacing="6" VerticalAlignment="Bottom">
             <TextBlock Classes="h1" Text="Activity" />
             <!-- Not the handoff's "stored inside the vault, signed": the log is plaintext machine state, hash-chained. -->
             <TextBlock Classes="subtitle"
                        Text="Every agent request, grant, token run and share. Kept on this machine, hash-chained, append-only." />
           </StackPanel>
 
-          <StackPanel Grid.Column="1"
-                      Orientation="Horizontal"
+          <StackPanel Orientation="Horizontal"
                       Spacing="8"
-                      Margin="16,0,0,0"
                       VerticalAlignment="Bottom">
             <Button Classes="ghost sm"
                     Name="VerifyChain"
@@ -48,7 +47,7 @@
               </StackPanel>
             </Border>
           </StackPanel>
-        </Grid>
+        </ctl:HeaderRow>
 
         <!-- One sentence about a file that is unreadable, unchecked or edited. A log never written to is the empty state below. -->
         <Border Classes="card filled"

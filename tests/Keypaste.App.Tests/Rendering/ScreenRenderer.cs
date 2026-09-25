@@ -52,6 +52,7 @@ public sealed class ScreenRenderer
         DrawApproval(output!);
         DrawComponents(output!);
         DrawSecrets(demo, output!);
+        DrawLight(demo, output!);
         DrawLockAndImport(demo, output!);
         DrawPrompts(output!);
         DrawTrashWithRows(demo, output!);
@@ -827,7 +828,46 @@ public sealed class ScreenRenderer
         shares.Answer = null;
     }
 
-    private static void DrawApproval(string output)
+    /// <summary>Secrets, Agents and the approval window in the light theme.</summary>
+    private static void DrawLight(DemoVault demo, string output)
+    {
+        Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+
+        try
+        {
+            var clock = new ManualClock();
+#pragma warning disable CA2000 // The authority owns and disposes its session.
+            using var authority = new AppAuthority(new AppVaultSession(clock, home: demo.Home), null, () => new Session.NobodyToAsk());
+#pragma warning restore CA2000
+
+            using (var master = TempVault.Secret(_master))
+            {
+                Assert.Equal(UnlockOutcome.Opened, authority.Session.TryUnlock(demo.Path, master.Value));
+            }
+
+            using var shell = new ShellViewModel(authority.Session, demo.Home, authority, clipboard: new FakeClipboard(), clock: clock);
+            var window = new MainWindow { Width = _width, Height = _height };
+            window.FindControl<ContentControl>("Root")!.Content = new ShellView { DataContext = shell };
+            window.Show();
+
+            shell.Current = Destinations.Of(DestinationKind.Entries);
+            var entries = Assert.IsType<EntriesViewModel>(shell.Content);
+            entries.Selected = entries.Rows.First(row => row.Title == "github");
+            Save(window, output, "60-light-secrets");
+
+            shell.Current = Destinations.Of(DestinationKind.AgentActivity);
+            Save(window, output, "61-light-agents");
+            window.Close();
+
+            DrawApproval(output, "62-light-approval");
+        }
+        finally
+        {
+            Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
+        }
+    }
+
+    private static void DrawApproval(string output, string name = "91-approval")
     {
         var prompt = ApprovalPrompt.For(
             "claude-code",
@@ -840,7 +880,7 @@ public sealed class ScreenRenderer
         model.Tick(TimeSpan.FromSeconds(28));
         var window = new ApprovalWindow(model);
         window.Show();
-        Save(window, output, "91-approval");
+        Save(window, output, name);
         window.Close();
     }
 

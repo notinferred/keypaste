@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Layout;
 
 namespace Keypaste.App.Controls;
 
@@ -8,7 +9,8 @@ namespace Keypaste.App.Controls;
 /// title, still at the right, when the two do not fit side by side.
 /// </summary>
 /// <remarks>
-/// The first child is the title and the second the actions; any others are ignored. The design's
+/// The first child is the title and the second the actions; any others are ignored. Beside the
+/// title the actions keep their own vertical alignment. The design's
 /// header wraps its actions below a long key instead of squeezing the key to a few characters: a
 /// wrapping flex row whose gap is <see cref="Spacing"/> both ways.
 /// </remarks>
@@ -65,7 +67,13 @@ internal sealed class HeaderRow : Panel
         if (title.DesiredSize.Width <= beside)
         {
             title.Arrange(new Rect(0, 0, beside, finalSize.Height));
-            actions.Arrange(new Rect(finalSize.Width - actions.DesiredSize.Width, 0, actions.DesiredSize.Width, actions.DesiredSize.Height));
+            var top = actions.VerticalAlignment switch
+            {
+                VerticalAlignment.Bottom => finalSize.Height - actions.DesiredSize.Height,
+                VerticalAlignment.Center => (finalSize.Height - actions.DesiredSize.Height) / 2,
+                _ => 0,
+            };
+            actions.Arrange(new Rect(finalSize.Width - actions.DesiredSize.Width, top, actions.DesiredSize.Width, actions.DesiredSize.Height));
         }
         else
         {

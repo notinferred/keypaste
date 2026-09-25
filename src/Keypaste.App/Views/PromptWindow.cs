@@ -12,7 +12,7 @@ namespace Keypaste.App.Views;
 internal abstract class PromptWindow : Window
 {
     /// <summary>The transparent band around the card that its shadow is drawn in.</summary>
-    private const double ShadowMargin = 24;
+    private const double _shadowMargin = 24;
 
     protected PromptWindow()
     {
@@ -23,7 +23,7 @@ internal abstract class PromptWindow : Window
             if (ActualTransparencyLevel == WindowTransparencyLevel.None)
             {
                 Classes.Add("opaque");
-                Width -= 2 * ShadowMargin;
+                Width -= 2 * _shadowMargin;
             }
 
             // Focus starts on Deny, so a keystroke meant for another window can only refuse.

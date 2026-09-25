@@ -373,7 +373,7 @@
                                                                  FontFamily="{DynamicResource KpMono}"
                                                                  FontSize="12.5"
                                                                  VerticalAlignment="Center"
-                                                                 RenderOptions.TextRenderingMode="Antialias"
+                                                                 TextOptions.TextRenderingMode="Antialias"
                                                                  Foreground="{DynamicResource KpTextSecondary}"
                                                                  RevealBackground="{DynamicResource KpBgHover}" />
                                             </DataTemplate>

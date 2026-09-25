@@ -65,7 +65,7 @@ internal sealed class EntryRevisionRow : ObservableObject, IRevealSource
     /// </remarks>
     internal string Title { get; }
 
-    /// <summary>When this revision was current, rendered as the Log screen renders a time.</summary>
+    /// <summary>When this revision was current, rendered as the Activity screen renders a time.</summary>
     internal string When =>
         ModifiedUtc.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
 

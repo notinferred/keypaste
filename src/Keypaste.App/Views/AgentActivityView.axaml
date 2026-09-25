@@ -88,11 +88,12 @@
 
               <StackPanel Spacing="10" IsVisible="{Binding HasPreview}">
                 <Border Classes="terminal">
-                  <ScrollViewer HorizontalScrollBarVisibility="Auto" Padding="14,12">
+                  <ScrollViewer HorizontalScrollBarVisibility="Auto">
                     <SelectableTextBlock Text="{Binding Preview}"
+                                         Margin="14,12"
                                          FontFamily="{DynamicResource KpMono}"
                                          FontSize="12"
-                                         Foreground="{DynamicResource KpTextSecondary}" />
+                                         Foreground="{DynamicResource KpGrey3}" />
                   </ScrollViewer>
                 </Border>
                 <TextBlock Classes="caption" Text="{Binding PreviewNote}" MaxWidth="640" HorizontalAlignment="Left" />
@@ -393,11 +394,13 @@
           </StackPanel>
           <TextBlock Classes="caption" Text="{Binding HistoryMessage}" IsVisible="{Binding HasHistoryMessage}" />
           <Border Classes="terminal" IsVisible="{Binding HasHistory}">
-            <ScrollViewer HorizontalScrollBarVisibility="Auto" MaxHeight="360" Padding="14,12">
+            <!-- The inset is the text's margin: a ScrollViewer's own Padding is left out of its measured height. -->
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" MaxHeight="360">
               <SelectableTextBlock Text="{Binding History}"
+                                   Margin="14,12"
                                    FontFamily="{DynamicResource KpMono}"
                                    FontSize="12"
-                                   Foreground="{DynamicResource KpTextSecondary}" />
+                                   Foreground="{DynamicResource KpGrey3}" />
             </ScrollViewer>
           </Border>
         </StackPanel>

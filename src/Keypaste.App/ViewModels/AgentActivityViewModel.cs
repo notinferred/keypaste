@@ -18,7 +18,7 @@ namespace Keypaste.App.ViewModels;
 /// </para>
 /// <para>
 /// <b>History is read from the audit file <c>keypaste-mcp</c> wrote</b>, kept to the records naming
-/// this session and rendered by <see cref="AuditText"/> as the Log screen renders the whole file
+/// this session and rendered by <see cref="AuditText"/> as the Activity screen reads the whole file
 /// (D-0331). A log that is missing or unreadable is said to be unavailable, never shown as a
 /// session in which nothing happened.
 /// </para>
@@ -412,7 +412,7 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
             AuditReadKind.Missing => $"History unavailable: there is no audit log at {_auditPath}.",
             AuditReadKind.Unreadable => $"History unavailable: the audit log couldn't be read: {history.Error}",
             AuditReadKind.Unchecked => "History unavailable: the audit log couldn't be checked, so nothing from it is shown here.",
-            AuditReadKind.Broken => "This log has been edited since keypaste wrote it. Verify chain on the Log screen says where.",
+            AuditReadKind.Broken => "This log has been edited since keypaste wrote it. Verify chain on the Activity screen says where.",
             _ => string.Empty,
         });
     }
