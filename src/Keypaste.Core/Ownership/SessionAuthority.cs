@@ -184,18 +184,19 @@ public sealed class SessionAuthority : IApproverHandler
         {
             return Refused(
                 request.Project,
+                request.Profile,
                 refusal.Method == AuditMethod.VaultLocked ? EnvOutcome.Locked : EnvOutcome.NoSession,
                 refusal.Reason);
         }
 
         if (_environments is not { } environments)
         {
-            return Refused(request.Project, EnvOutcome.NoSession, "the keypaste process holding this vault does not release env sets");
+            return Refused(request.Project, request.Profile, EnvOutcome.NoSession, "the keypaste process holding this vault does not release env sets");
         }
 
         if (EnvReleasePrompt.Problem(request.Project, request.Command, request.Directory) is { } problem)
         {
-            return Refused(request.Project, EnvOutcome.Invalid, problem);
+            return Refused(request.Project, request.Profile, EnvOutcome.Invalid, problem);
         }
 
         // Every run is a new connection, so the cooldown names the request and not the connection:
@@ -235,8 +236,8 @@ public sealed class SessionAuthority : IApproverHandler
 
     private SessionLifetime? Live() => _lifetime() is { IsLive: true } lifetime ? lifetime : null;
 
-    private static EnvReply Refused(string project, EnvOutcome outcome, string reason) =>
-        new(EnvResolved.Refused(project, outcome), reason);
+    private static EnvReply Refused(string project, string profile, EnvOutcome outcome, string reason) =>
+        new(EnvResolved.Refused(project, outcome, profile: profile), reason);
 
     private static string Declined(ApprovalAnswer answer) => answer switch
     {

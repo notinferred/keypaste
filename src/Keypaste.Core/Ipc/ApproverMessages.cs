@@ -19,6 +19,17 @@ public enum ApproverMessageKind
 
     /// <summary>A project's env set for <c>keypaste run --session</c>, subject to a human saying yes.</summary>
     Env = 4,
+
+    /// <summary>The grants the owner's current session holds, as a list shows them.</summary>
+    Grants = 5,
+    /// <summary>Ends grants of the owner's current session.</summary>
+    RevokeGrants = 6,
+    /// <summary>Asks the owner to lock now.</summary>
+    Lock = 7,
+    /// <summary>An env request naming a profile other than the default, or a subset of keys.</summary>
+    EnvProfile = 8,
+    /// <summary>An env request authorized by a scoped token instead of a prompt.</summary>
+    TokenEnv = 9,
 }
 
 /// <summary>Asks the owner of a vault to attach this connection to its current session.</summary>
@@ -217,6 +228,15 @@ public sealed record EnvRequest(string Project, IReadOnlyList<string> Command, s
 
     /// <summary>The session this connection attached to.</summary>
     public string Session { get; init; } = string.Empty;
+
+    /// <summary>The profile asked for; the default profile travels as the original <c>env</c> kind.</summary>
+    public string Profile { get; init; } = EnvProfileNames.Default;
+
+    /// <summary>The keys the runner will inject, or null for the whole set.</summary>
+    public IReadOnlyList<string>? Keys { get; init; }
+
+    /// <summary>What a reference file makes of the set, as the runner claims it: <c>NAME ← KEY</c> and literal <c>NAME=value</c> lines; null outside reference-file mode.</summary>
+    public IReadOnlyList<string>? FileLines { get; init; }
 }
 
 /// <summary>The owner's answer to an <see cref="EnvRequest"/>: the whole set, or why none of it.</summary>

@@ -1,20 +1,21 @@
 namespace Keypaste.Core.Approval;
 
 /// <summary>
-/// What came back from asking a human. Exactly one value releases a credential.
+/// What came back from asking a human. Two values release a credential.
 /// </summary>
 /// <remarks>
-/// Seven of the eight mean deny, and they are distinct only so the audit line and the refusal an
+/// Seven of the nine mean deny, and they are distinct only so the audit line and the refusal an
 /// agent reads can say <em>why</em> — never so any of them can be treated as a maybe. docs/PRODUCT.md law
 /// 3.2 makes deny the default and law 3.7 makes every error path a denial, so the safe way to read
-/// this enum is: anything that is not <see cref="Approved"/> is a no.
+/// this enum is: two values release, <see cref="Approved"/> and <see cref="ApprovedOnce"/>; anything
+/// else is a no. <see cref="ApprovalAnswers.Releases"/> reads it that way.
 /// </remarks>
 public enum ApprovalAnswer
 {
     /// <summary>Nobody was asked, because nothing could ask them. The default, and a denial.</summary>
     NoChannel = 0,
 
-    /// <summary>A human said yes to this specific request. The only value that releases anything.</summary>
+    /// <summary>A human allowed this request and its reuse for the timed grant the prompt offered.</summary>
     Approved = 1,
 
     /// <summary>A human said no.</summary>
@@ -40,4 +41,7 @@ public enum ApprovalAnswer
 
     /// <summary>Asking went wrong. Fail closed (docs/PRODUCT.md law 3.7).</summary>
     Failed = 7,
+
+    /// <summary>A human allowed this one request and nothing after it.</summary>
+    ApprovedOnce = 8,
 }

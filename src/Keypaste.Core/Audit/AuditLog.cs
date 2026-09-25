@@ -649,6 +649,9 @@ public sealed class AuditLog : IDisposable
         AuditMethod.Undeliverable => "undeliverable",
         AuditMethod.NoSession => "no-session",
         AuditMethod.VaultChanged => "vault-changed",
+        AuditMethod.Token => "token",
+        AuditMethod.ShareCreated => "share-created",
+        AuditMethod.ShareRevoked => "share-revoked",
         _ => "unknown",
     };
 

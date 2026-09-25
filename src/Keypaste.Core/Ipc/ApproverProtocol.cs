@@ -41,6 +41,11 @@ public static class ApproverProtocol
     internal const string CredentialKind = "credential";
     internal const string AttachKind = "attach";
     internal const string EnvKind = "env";
+    internal const string GrantsKind = "grants";
+    internal const string RevokeGrantsKind = "revoke-grants";
+    internal const string LockKind = "lock";
+    internal const string EnvProfileKind = "env-profile";
+    internal const string TokenEnvKind = "token-env";
 
     /// <summary>Stands in for a reply whose own envelope will not fit a frame.</summary>
     /// <remarks>
@@ -478,6 +483,11 @@ public static class ApproverProtocol
                 CredentialKind => ApproverMessageKind.Credential,
                 AttachKind => ApproverMessageKind.Attach,
                 EnvKind => ApproverMessageKind.Env,
+                GrantsKind => ApproverMessageKind.Grants,
+                RevokeGrantsKind => ApproverMessageKind.RevokeGrants,
+                LockKind => ApproverMessageKind.Lock,
+                EnvProfileKind => ApproverMessageKind.EnvProfile,
+                TokenEnvKind => ApproverMessageKind.TokenEnv,
                 _ => ApproverMessageKind.Unknown,
             };
         }

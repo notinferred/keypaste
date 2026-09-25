@@ -1,4 +1,6 @@
 using Keypaste.Core;
+using Keypaste.Core.Audit;
+using Keypaste.Core.Ownership;
 
 namespace Keypaste.Cli;
 
@@ -87,6 +89,33 @@ internal static class VaultSession
         {
             context.Stderr.WriteLine($"keypaste: {ex.Message}");
             return CliApp.ExitInternalError;
+        }
+    }
+
+    /// <summary>
+    /// Takes the vault's claim, then opens it and runs <paramref name="body"/>, for a verb that saves.
+    /// </summary>
+    /// <remarks>
+    /// The claim is taken before the password is read, as <c>keypaste agent</c> takes it, so a
+    /// command never saves under a running owner and leaves that owner's copy changed on disk (D-0317).
+    /// </remarks>
+    /// <param name="path">The vault, already resolved by <see cref="VaultLocator.TryResolve"/>.</param>
+    /// <param name="line">The parsed command line, for <c>--keyfile</c>.</param>
+    /// <param name="context">Where prompts and errors go.</param>
+    /// <param name="body">What to do with the open vault.</param>
+    internal static int OpenHeld(string path, CommandLine line, CliContext context, Func<Vault, int> body)
+    {
+        var home = KeypasteHome.Resolve(context.Environment.Get(KeypasteHome.EnvironmentVariable));
+
+        if (!VaultClaim.TryAcquire(home, path, OwnerKind.CommandLine, out var claim, out var refusal))
+        {
+            context.Stderr.WriteLine($"keypaste: {refusal}");
+            return CliApp.ExitInternalError;
+        }
+
+        using (claim)
+        {
+            return Open(path, line, context, body);
         }
     }
 

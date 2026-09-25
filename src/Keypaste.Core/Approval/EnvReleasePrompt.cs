@@ -45,6 +45,18 @@ public sealed record EnvReleasePrompt
     /// <summary>Whether <see cref="Directory"/> had anything scrubbed out of it.</summary>
     public required bool DirectoryWasAltered { get; init; }
 
+    /// <summary>The profile the set belongs to, sanitized.</summary>
+    public string Profile { get; init; } = EnvProfileNames.Default;
+
+    /// <summary>How long a timed grant would last if the person chooses one; zero offers only "allow once".</summary>
+    public int GrantSeconds { get; init; }
+
+    /// <summary>Who is asking when it is not a person's own <c>keypaste run --session</c>, such as a scoped token; null otherwise. A prompt with a requester never offers a timed grant.</summary>
+    public string? Requester { get; init; }
+
+    /// <summary>The reference file's variable names and literals, each sanitized; empty outside reference-file mode.</summary>
+    public IReadOnlyList<string> FileLines { get; init; } = [];
+
     /// <summary>Why a request cannot be asked about, or null when it can.</summary>
     /// <param name="project">The project named.</param>
     /// <param name="command">The command, one argument per item.</param>
@@ -93,6 +105,7 @@ public sealed record EnvReleasePrompt
         return new EnvReleasePrompt
         {
             Project = EntryNameSanitizer.Sanitize(preview.Project).Text,
+            Profile = EntryNameSanitizer.Sanitize(preview.Profile).Text,
             Keys = preview.Keys,
             Command = shownCommand.Text,
             CommandWasAltered = shownCommand.WasAltered,

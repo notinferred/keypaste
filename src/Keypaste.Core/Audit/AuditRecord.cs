@@ -111,6 +111,15 @@ public enum AuditMethod
     /// owner has not been saved yet. The reason says which.
     /// </remarks>
     VaultChanged = 18,
+
+    /// <summary>Released or refused under a scoped token rather than a prompt or a rule.</summary>
+    Token = 19,
+
+    /// <summary>A share link was created.</summary>
+    ShareCreated = 20,
+
+    /// <summary>A share link was revoked.</summary>
+    ShareRevoked = 21,
 }
 
 /// <summary>Who asked.</summary>
