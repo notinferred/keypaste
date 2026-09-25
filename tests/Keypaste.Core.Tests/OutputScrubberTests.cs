@@ -88,6 +88,18 @@ public sealed partial class OutputScrubberTests
         Assert.Equal("before [keypaste:SECRET] after", scrubbed);
     }
 
+    [Theory]
+    [InlineData("abc\r\ndef\r\nghi", "abc\ndef\nghi")]
+    [InlineData("abc\r\ndef\r\nghi", "abc\r\r\ndef\r\r\nghi")]
+    [InlineData("abc\ndef\nghi", "abc\r\ndef\r\nghi")]
+    [InlineData("-----BEGIN KEY-----\r\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASC\r\nAw==", "-----BEGIN KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASC\nAw==")]
+    public void AMultiLineValue_IsReplacedWholeWhateverLineBreaksItIsPrintedWith(string value, string printed)
+    {
+        var scrubber = For(("K", value));
+
+        Assert.Equal("<[keypaste:K]>", Scrub(scrubber, $"<{printed}>"));
+    }
+
     [Fact]
     public void AJsonDumpEscapingSlashes_IsReplaced()
     {

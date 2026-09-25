@@ -26,7 +26,7 @@ public sealed record ScrubbedText(string Text, int Replacements, bool Truncated)
 /// from several encoders with <c>\u</c> hex in either case and <c>/</c> as it is or as <c>\/</c>, C-style
 /// backslash escapes with neither, either or both quotes escaped, POSIX single quotes, bash double quotes, percent-encoding in either case with <c>%20</c>
 /// or <c>+</c>, a URI's userinfo password, and each line of 8 or more characters of a multi-line value,
-/// all again with <c>\n</c> as <c>\r\n</c>. Anything else — base64, a reversed or split value, a
+/// all again with line breaks as <c>\n</c>, <c>\r\n</c> and <c>\r\r\n</c>. Anything else — base64, a reversed or split value, a
 /// substring, a file, the network — is not caught; the person's approval of the exact command is the
 /// control (THREATS.md T-35).
 /// </para>
@@ -276,7 +276,10 @@ public sealed class OutputScrubber
 
         if (text.Contains('\n', StringComparison.Ordinal))
         {
-            yield return text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace("\n", "\r\n", StringComparison.Ordinal);
+            var lf = text.Replace("\r\n", "\n", StringComparison.Ordinal);
+            yield return lf;
+            yield return lf.Replace("\n", "\r\n", StringComparison.Ordinal);
+            yield return lf.Replace("\n", "\r\r\n", StringComparison.Ordinal);
         }
     }
 
