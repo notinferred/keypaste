@@ -42,7 +42,7 @@ Instrument Sans 400/500/600 for the interface and Fragment Mono 400 for anything
 
 [Typography.axaml](../src/Keypaste.App/Theme/Typography.axaml) holds these as text classes.
 
-The wordmark is "keypaste", always lowercase, Instrument Sans 600 at −0.045em. It is live text, not outlines; outline it before production print use.
+The wordmark is "keypaste", always lowercase, Instrument Sans 600 at −0.045em. The README lockups draw it as outlines of Instrument Sans SemiBold, because an SVG shown as an image cannot load a web font; elsewhere it is live text, outlined before production print use.
 
 ## Shape and motion
 
