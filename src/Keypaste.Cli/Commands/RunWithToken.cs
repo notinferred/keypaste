@@ -227,7 +227,7 @@ internal static class RunWithToken
 
         if (reply is null)
         {
-            context.Stderr.WriteLine($"keypaste run: {Shown(refusal)}, so nothing was started");
+            context.Stderr.WriteLine($"keypaste run: {refusal}, so nothing was started");
             return CliApp.ExitInternalError;
         }
 
@@ -257,6 +257,7 @@ internal static class RunWithToken
         }
     }
 
+    /// <summary>Asks the owner for the token's set; the refusal is ready to print, with the owner's words already made safe.</summary>
     private static async Task<(EnvReply? Reply, string Refusal)> AskAsync(
         string pipe,
         string vaultPath,
@@ -269,14 +270,14 @@ internal static class RunWithToken
 
         if (client is null)
         {
-            return (null, $"nothing holds {vaultPath} unlocked; unlock it in the keypaste app or start `keypaste agent`");
+            return (null, $"nothing holds {RunCommand.OneLine(vaultPath)} unlocked; unlock it in the keypaste app or start `keypaste agent`");
         }
 
         var attached = await client.AttachAsync(new AttachRequest(vaultPath), bound.Token);
 
         if (attached is not { Attached: true, Session: { } session })
         {
-            return (null, attached?.Reason ?? "the keypaste process holding the vault did not answer");
+            return (null, attached?.Reason is { } reason ? Shown(reason) : "the keypaste process holding the vault did not answer");
         }
 
         if (EnvProfileNames.IsProtected(request.Profile))

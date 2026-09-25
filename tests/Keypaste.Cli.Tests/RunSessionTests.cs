@@ -86,8 +86,10 @@ public sealed class RunSessionTests : IDisposable
 
         Assert.Empty(_harness.ProcessLauncher.Started);
         Assert.Empty(_harness.Prompt.PromptsSeen);
-        Assert.Contains("nothing holds", _harness.Err, StringComparison.Ordinal);
-        Assert.Contains("keypaste agent", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains(
+            $"nothing holds {_harness.VaultPath} unlocked; unlock it in the keypaste app or start `keypaste agent`, so nothing was started",
+            _harness.Err,
+            StringComparison.Ordinal);
     }
 
     [Fact]

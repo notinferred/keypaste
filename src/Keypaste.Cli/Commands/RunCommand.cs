@@ -366,7 +366,7 @@ internal static class RunCommand
         {
             context.Stderr.WriteLine(refusal is null
                 ? $"keypaste run: the keypaste process holding {vaultPath} is older and cannot release profiles; update it, so nothing was started"
-                : $"keypaste run: {Shown(refusal)}, so nothing was started");
+                : $"keypaste run: {refusal}, so nothing was started");
             return CliApp.ExitInternalError;
         }
 
@@ -451,7 +451,7 @@ internal static class RunCommand
         return true;
     }
 
-    /// <returns>The reply, or null with the reason; a null reason means an owner that did not answer a profile request at all.</returns>
+    /// <returns>The reply, or null with the reason ready to print; a null reason means an owner that did not answer a profile request at all.</returns>
     private static async Task<(EnvReply? Reply, string? Refusal)> AskAsync(
         string pipe,
         string vaultPath,
@@ -464,14 +464,14 @@ internal static class RunCommand
 
         if (client is null)
         {
-            return (null, $"nothing holds {vaultPath} unlocked; unlock it in the keypaste app or start `keypaste agent`");
+            return (null, $"nothing holds {OneLine(vaultPath)} unlocked; unlock it in the keypaste app or start `keypaste agent`");
         }
 
         var attached = await client.AttachAsync(new AttachRequest(vaultPath), bound.Token);
 
         if (attached is not { Attached: true, Session: { } session })
         {
-            return (null, attached?.Reason ?? "the keypaste process holding the vault did not answer");
+            return (null, attached?.Reason is { } reason ? Shown(reason) : "the keypaste process holding the vault did not answer");
         }
 
         var profiled = !string.Equals(request.Profile, EnvProfileNames.Default, StringComparison.Ordinal)
@@ -656,7 +656,7 @@ internal static class RunCommand
     private static string Shown(string text) => EntryNameSanitizer.SanitizeProse(text, 512).Text;
 
     /// <summary>A path or a file's literal as written, on one line, with nothing that draws anything else.</summary>
-    private static string OneLine(string text) =>
+    internal static string OneLine(string text) =>
         DisplayTextSanitizer.Sanitize(text.Replace('\n', '\0').Replace('\t', '\0'), 1024).Text;
 
     private static int Fail(CliContext context, string message)
