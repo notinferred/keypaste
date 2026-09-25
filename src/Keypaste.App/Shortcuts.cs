@@ -89,6 +89,12 @@ internal sealed class Shortcuts : IDisposable
             return;
         }
 
+        // The import dialog is modal: nothing may move focus or the page out from under it.
+        if (shell.HasImport)
+        {
+            return;
+        }
+
         if (e.Key == Key.K)
         {
             shell.FocusSearch();

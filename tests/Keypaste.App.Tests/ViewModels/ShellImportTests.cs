@@ -1,5 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
+using Avalonia.Controls;
+using Avalonia.Headless;
+using Avalonia.Input;
 using Keypaste.App.Session;
 using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
@@ -187,6 +190,28 @@ public sealed class ShellImportTests : IDisposable
         sink.Clear();
         Assert.Equal(0, shell.Import.PasswordLength);
     }
+
+    [Fact]
+    public Task Search_and_page_chords_do_nothing_behind_the_import_dialog() => HeadlessSession.On(() =>
+    {
+        using var shell = NewShell();
+        var window = new Window { Content = new TextBox() };
+        using var shortcuts = new Shortcuts(window, _session, () => null, () => shell);
+        window.Show();
+        var searched = 0;
+        shell.SearchFocusRequested += (_, _) => searched++;
+        var before = shell.Current;
+        var command = OperatingSystem.IsMacOS() ? RawInputModifiers.Meta : RawInputModifiers.Control;
+
+        shell.OpenImport(_source);
+        window.KeyPressQwerty(PhysicalKey.K, command);
+        window.KeyPressQwerty(PhysicalKey.Digit3, command);
+
+        Assert.Equal(0, searched);
+        Assert.Same(before, shell.Current);
+        Assert.True(shell.HasImport);
+        window.Close();
+    });
 
     private ShellViewModel NewShell() =>
         new(_session, _vault.Home, null, clipboard: new FakeClipboard(), clock: new ManualClock(), picker: _picker,
