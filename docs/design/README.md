@@ -126,7 +126,7 @@ State: `view`, `sel` (selected secret), `reveal`, `approval`, `importOpen`, `loc
   - Allow once → toast "Allowed once. Injected into pid 48213".
   - Allow 1h → adds or refreshes a 60-minute grant, then shows a toast.
   - Real app: Enter = primary; the dialog times out as a Deny after 30s.
-- Selecting a secret resets `reveal` to false. Copy shows a toast and **clears the clipboard after 30s**.
+- Selecting a secret resets `reveal` to false. Copy shows a toast and **clears the clipboard after the product's clipboard window (20 s)**.
 - Lock hides everything and pauses agents; unlocking (password or hardware key) restores the app.
 - The profile toggle rewrites the `.env.keypaste` preview and the run command.
 

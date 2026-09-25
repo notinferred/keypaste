@@ -645,7 +645,7 @@ public sealed class ScreenRenderer
         DrawActivityStates(shell, window, demo.Home, output);
 
         shell.Current = Destinations.Of(DestinationKind.Entries);
-        shell.ShowToast("Copied the username. The clipboard clears in 30s.");
+        shell.ShowToast("Copied the username");
         Save(window, output, "90-toast");
 
         window.Close();

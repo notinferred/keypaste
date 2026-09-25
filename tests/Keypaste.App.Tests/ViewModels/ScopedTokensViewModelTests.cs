@@ -172,10 +172,11 @@ public sealed class ScopedTokensViewModelTests : IDisposable
         Assert.DoesNotContain(token[13..], Shown(screen), StringComparison.Ordinal);
         Assert.DoesNotContain(token[13..], string.Join('\n', said), StringComparison.Ordinal);
 
-        screen.CopyMintedCommand.Execute(null);
+        await screen.CopyMintedCommand.ExecuteAsync();
         await countdown.SettledAsync();
         Assert.Equal(token, clipboard.Content);
         Assert.True(clipboard.ContentWasSetAsASecret);
+        Assert.Equal("Copied ci-staging", said[^1]);
 
         screen.DoneMintedCommand.Execute(null);
 

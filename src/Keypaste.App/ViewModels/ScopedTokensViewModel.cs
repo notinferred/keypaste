@@ -56,7 +56,7 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
         OpenFormCommand = new RelayCommand(() => IsFormOpen = true, () => CanOpenForm);
         CancelFormCommand = new RelayCommand(CloseForm);
         CreateCommand = new RelayCommand(CreateFromForm);
-        CopyMintedCommand = new RelayCommand(CopyMinted, () => _minted is not null && _clipboard is not null);
+        CopyMintedCommand = new AsyncRelayCommand(CopyMintedAsync, () => _minted is not null && _clipboard is not null);
         DoneMintedCommand = new RelayCommand(() => SetMinted(null));
         RevokeCommand = new RelayCommand<ScopedTokenRow>(RevokeRow, row => row is not null);
         AskRevokeCommand = new RelayCommand<ScopedTokenRow>(row => Confirm(row?.Id), row => row is not null);
@@ -159,7 +159,7 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
     internal RelayCommand CreateCommand { get; }
 
     /// <summary>Copies the minted token; the clipboard clears itself as a copied password does.</summary>
-    internal RelayCommand CopyMintedCommand { get; }
+    internal AsyncRelayCommand CopyMintedCommand { get; }
 
     /// <summary>Forgets the minted token.</summary>
     internal RelayCommand DoneMintedCommand { get; }
@@ -298,12 +298,17 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
         _toast($"Created {name}");
     }
 
-    private void CopyMinted()
+    /// <remarks>Says nothing about when the clipboard clears: the clipboard's own countdown shows that, and a failed copy.</remarks>
+    private async Task CopyMintedAsync()
     {
-        if (_minted?.Reveal() is { } token && _clipboard is not null)
+        if (_minted is { } minted && minted.Reveal() is { } token && _clipboard is not null)
         {
-            _ = _clipboard.CopyAsync(token, _minted.Name);
-            _toast($"Copied {_minted.Name}. Clipboard clears in 30s");
+            await _clipboard.CopyAsync(token, minted.Name).ConfigureAwait(true);
+
+            if (_clipboard.Failure is null)
+            {
+                _toast($"Copied {minted.Name}");
+            }
         }
     }
 
