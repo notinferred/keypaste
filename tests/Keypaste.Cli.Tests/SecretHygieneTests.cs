@@ -31,6 +31,8 @@ public sealed class SecretHygieneTests
     [InlineData("env", "ls")]
     [InlineData("env", "ls", "hygiene")]
     [InlineData("env", "rm", "hygiene", "API_KEY", "--yes")]
+    [InlineData("share", "ls", "--offline")]
+    [InlineData("share", "ls", "--offline", "--json")]
     public void NoVerb_LeaksAFieldValue_ToStdoutOrStderr(params string[] verb)
     {
         using var harness = new CliHarness();
@@ -245,6 +247,43 @@ public sealed class SecretHygieneTests
         context.Stderr.Write("probe");
         Assert.Contains("probe", stderr.ToString(), StringComparison.Ordinal);
         Assert.Empty(stdout.ToString());
+    }
+
+    /// <summary>
+    /// <c>share</c> is handed the fields it encrypts and makes the key that opens them. Neither may
+    /// reach the terminal, with one exception the person asked for: the link itself, alone on stdout,
+    /// under <c>--print</c>.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Share_NeverPrintsAFieldValueOrTheKey_ExceptTheLinkUnderPrint(bool print)
+    {
+        using var harness = new CliHarness();
+        using var server = new FakeShareServer();
+        Seed(harness);
+        harness.Environment[Core.Audit.KeypasteHome.EnvironmentVariable] = Path.Combine(harness.Directory, "home");
+        string? copied = null;
+        harness.ClearStrategy.DuringWait = () => copied = harness.Clipboard.Content;
+
+        harness.Prompt.Enqueue(Master);
+        string[] args = ["share", "secrets/target", "--field", "login", "--vault", harness.VaultPath];
+        var exit = Commands.ShareCommand.Execute(print ? [.. args, "--print"] : args, harness.NewContext(), server);
+
+        Assert.Equal(CliApp.ExitSuccess, exit);
+        var link = print ? harness.Out.Trim() : copied;
+        Assert.True(Core.Sharing.ShareLink.TryParse(link!, out _, out var key));
+        Assert.Equal(print ? link + Environment.NewLine : string.Empty, harness.Out);
+        Assert.DoesNotContain(key, harness.Err, StringComparison.Ordinal);
+
+        foreach (var sentinel in new[] { SentinelPassword, SentinelUsername, SentinelNotes, SentinelUrl })
+        {
+            Assert.DoesNotContain(sentinel, harness.Out, StringComparison.Ordinal);
+            Assert.DoesNotContain(sentinel, harness.Err, StringComparison.Ordinal);
+            Assert.DoesNotContain(sentinel, server.Transcript, StringComparison.Ordinal);
+        }
+
+        Assert.DoesNotContain(key, server.Transcript, StringComparison.Ordinal);
     }
 
     private static void Seed(CliHarness harness)
