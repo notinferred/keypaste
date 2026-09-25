@@ -14,7 +14,7 @@ internal enum ShareStatusTone
     /// <summary>Opened at least once and still opening.</summary>
     Accent = 1,
 
-    /// <summary>Not opened yet.</summary>
+    /// <summary>Still opening and not opened yet.</summary>
     Ok = 2,
 }
 
@@ -22,7 +22,7 @@ internal enum ShareStatusTone
 /// One share link in the Sharing screen's list: names and limits, never a key or a value.
 /// <c>Opens</c> is whether the link may still open, so revoking it means something.
 /// </summary>
-internal sealed record SharingRow(string Id, string What, string Recipient, string Rule, string Status, ShareStatusTone StatusTone, bool Opens)
+internal sealed record SharingRow(string Id, string What, string Recipient, string Rule, string Status, ShareStatusTone StatusTone, bool Opens, bool Checked = true)
 {
     /// <summary>The second line: who it went to and its limits.</summary>
     internal string Detail => $"{Recipient} · {Rule}";
@@ -104,7 +104,7 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
             RevokeCommand.Execute(null);
         });
         RefreshCommand = new AsyncRelayCommand(() => LoadAsync(online: true));
-        RetryCommand = new RelayCommand(() => Unavailable = null);
+        RetryCommand = new AsyncRelayCommand(RetryAsync);
 
         _ = LoadAsync(online: false);
     }
@@ -129,12 +129,16 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
             if (Set(ref _rows, value))
             {
                 Raise(nameof(IsEmpty));
+                Raise(nameof(HasUnchecked));
             }
         }
     }
 
     /// <summary>Whether the vault remembers no link.</summary>
     internal bool IsEmpty => _rows.Count == 0;
+
+    /// <summary>Whether a link's status has not been asked for yet, since opening the screen asks nothing.</summary>
+    internal bool HasUnchecked => _rows.Any(row => !row.Checked);
 
     /// <summary>The entries that can be shared, by path; keypaste's own records are not among them.</summary>
     internal IReadOnlyList<string> Candidates
@@ -254,8 +258,8 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
     /// <summary>Asks the share server how many views each link has left.</summary>
     internal AsyncRelayCommand RefreshCommand { get; }
 
-    /// <summary>Lets the form ask the share server again after it said it was unavailable.</summary>
-    internal RelayCommand RetryCommand { get; }
+    /// <summary>Makes the link again after the share server said it was unavailable.</summary>
+    internal AsyncRelayCommand RetryCommand { get; }
 
     /// <summary>Nothing read out of the vault outlives this.</summary>
     public void Dispose()
@@ -327,6 +331,12 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
         await LoadAsync(online: true).ConfigureAwait(true);
     }
 
+    private Task RetryAsync()
+    {
+        Unavailable = null;
+        return CreateAsync();
+    }
+
     private async Task RevokeAsync()
     {
         Error = null;
@@ -393,17 +403,15 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
     private static SharingRow Row((ShareInfo Info, string Status, int? ViewsLeft) listed, bool online)
     {
         var (info, status, left) = listed;
-        var tone = left is not { } views ? ShareStatusTone.Muted
-            : views == info.Views ? ShareStatusTone.Ok
-            : ShareStatusTone.Accent;
 
         // The server answers the same for a link opened to its last view and one revoked elsewhere.
-        var (text, opens) = status switch
+        var (text, tone, opens) = (status, left) switch
         {
-            "gone" => ("Opened or revoked", false),
-            "expired" => ("Expired", false),
-            "unknown" => (online ? "Status unknown" : "Not checked", true),
-            _ => (status, true),
+            ("gone", _) => ("Opened or revoked", ShareStatusTone.Muted, false),
+            ("expired", _) => ("Expired", ShareStatusTone.Muted, false),
+            (_, { } views) when views >= info.Views => ("Not opened yet", ShareStatusTone.Ok, true),
+            (_, { } views) => ($"{info.Views - views} of {info.Views} views used", ShareStatusTone.Accent, true),
+            _ => (online ? "Status unknown" : "Not checked", ShareStatusTone.Muted, true),
         };
 
         return new SharingRow(
@@ -413,7 +421,8 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
             info.Rule,
             text,
             tone,
-            opens);
+            opens,
+            Checked: online || !opens);
     }
 
     private static TimeSpan TtlOf(string ttl) => ttl switch

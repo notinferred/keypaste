@@ -140,9 +140,18 @@ public sealed class ScreenRenderer
         return server;
     }
 
-    /// <summary>The Sharing screen with statuses checked and the form filled, then as it is once the server answers that it takes no shares.</summary>
+    /// <summary>The Sharing screen as it opens, with statuses not yet asked for; then checked with the form filled; then once the server answers that it takes no shares.</summary>
     private static void DrawSharing(Window window, string output, SharingViewModel sharing, FakeShareServer shares, string name)
     {
+        var opened = DateTime.UtcNow;
+        while (sharing.IsEmpty && DateTime.UtcNow - opened < TimeSpan.FromSeconds(5))
+        {
+            WindowInput.Drain();
+            Thread.Sleep(1);
+        }
+
+        Save(window, output, name + "-unchecked");
+
         Wait(sharing.RefreshCommand.ExecuteAsync());
         sharing.SelectedWhat = "env/acme-api/STRIPE_SECRET_KEY";
         sharing.Recipient = "sam@acme.dev";

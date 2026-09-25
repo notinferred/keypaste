@@ -108,8 +108,9 @@ public sealed class SharingViewModelTests : IDisposable
         Assert.Equal(id, row.Id);
         Assert.Equal("env/acme-api/STRIPE_KEY", row.What);
         Assert.Equal("sam@acme.dev · 3 views · 24h", row.Detail);
-        Assert.Equal("3 views left", row.Status);
+        Assert.Equal("Not opened yet", row.Status);
         Assert.Equal(ShareStatusTone.Ok, row.StatusTone);
+        Assert.False(screen.HasUnchecked);
         Assert.Equal("Revoke", row.RevokeLabel);
         Assert.DoesNotContain(key, row.ToString(), StringComparison.Ordinal);
         Assert.DoesNotContain(_toasts, toast => toast.Contains(key, StringComparison.Ordinal));
@@ -175,10 +176,13 @@ public sealed class SharingViewModelTests : IDisposable
         Assert.Empty(_toasts);
         Assert.Empty(screen.Rows);
 
-        screen.RetryCommand.Execute(null);
+        _server.Answer = null;
+        await screen.RetryCommand.ExecuteAsync();
 
         Assert.False(screen.IsUnavailable);
         Assert.True(screen.CreateCommand.CanExecute(null));
+        Assert.NotNull(_clipboard.Content);
+        Assert.Single(screen.Rows);
     }
 
     [Fact]
@@ -292,6 +296,24 @@ public sealed class SharingViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task Refresh_APartlyUsedLink_SaysHowManyViewsWereUsed()
+    {
+        using var screen = Screen();
+        screen.SelectedWhat = "env/acme-api/STRIPE_KEY";
+        screen.Views = 3;
+        await screen.CreateCommand.ExecuteAsync();
+        var id = Assert.Single(screen.Rows).Id;
+        _server.Shares[id] = _server.Shares[id] with { ViewsLeft = 2 };
+
+        await screen.RefreshCommand.ExecuteAsync();
+
+        var row = Assert.Single(screen.Rows);
+        Assert.Equal("1 of 3 views used", row.Status);
+        Assert.Equal(ShareStatusTone.Accent, row.StatusTone);
+        Assert.Equal("Revoke", row.RevokeLabel);
+    }
+
+    [Fact]
     public async Task Opening_TheScreen_AsksTheServerNothing()
     {
         using (var first = Screen())
@@ -307,6 +329,7 @@ public sealed class SharingViewModelTests : IDisposable
         Assert.Equal(asked, _server.Requests.Count);
         Assert.Equal("Not checked", screen.Rows[0].Status);
         Assert.Equal(ShareStatusTone.Muted, screen.Rows[0].StatusTone);
+        Assert.True(screen.HasUnchecked);
     }
 
     [Fact]

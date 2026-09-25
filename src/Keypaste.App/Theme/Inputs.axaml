@@ -7,7 +7,8 @@
       TextBox.mono         Fragment Mono for keys, values and paths
       Border.segmented     the track around a segmented control; put RadioButton.segment (or
                            ToggleButton.segment) inside a horizontal StackPanel in it
-      ListBox.segmented    the same look for a bound list of choices
+      ListBox.segmented    the same look for a bound list of choices; its items are styled in
+                           Lists.axaml, after the generic ListBoxItem rules they must override
   -->
 
   <Style Selector="TextBox">
@@ -115,27 +116,6 @@
       </ItemsPanelTemplate>
     </Setter>
   </Style>
-  <Style Selector="ListBox.segmented > ListBoxItem">
-    <Setter Property="FontSize" Value="12" />
-    <Setter Property="FontWeight" Value="Medium" />
-    <Setter Property="Padding" Value="12,5" />
-    <Setter Property="MinHeight" Value="0" />
-    <Setter Property="Margin" Value="0" />
-    <Setter Property="CornerRadius" Value="5" />
-    <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
-  </Style>
-  <Style Selector="ListBox.segmented > ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="BoxShadow" Value="none" />
-  </Style>
-  <Style Selector="ListBox.segmented > ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="Transparent" />
-    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
-  </Style>
-  <Style Selector="ListBox.segmented > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
-    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
-  </Style>
-
   <Style Selector="ProgressBar.thin">
     <Setter Property="MinHeight" Value="3" />
     <Setter Property="Height" Value="3" />

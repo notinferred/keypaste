@@ -39,18 +39,12 @@
       <Setter Property="Padding" Value="0,5" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
     </Style>
-    <Style Selector="ListBox.choice > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter,
-                     ListBox.choice > ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter,
-                     ListBox.choice > ListBoxItem:selected:focus /template/ ContentPresenter#PART_ContentPresenter,
-                     ListBox.choice > ListBoxItem:selected:pressed /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
-      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
-      <Setter Property="BoxShadow" Value="none" />
-    </Style>
 
     <!-- The design's 16px check: amber with an ink tick when on, a hairline square when off. -->
     <Style Selector="CheckBox.passphrase">
       <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="0" />
       <Setter Property="Template">
         <ControlTemplate>
           <StackPanel Orientation="Horizontal" Spacing="10" Background="Transparent">
@@ -102,210 +96,225 @@
       <Setter Property="Background" Value="{DynamicResource KpAccent}" />
     </Style>
 
-    <Style Selector="Button.revoke">
-      <Setter Property="Padding" Value="0" />
-      <Setter Property="MinHeight" Value="0" />
+    <!-- A 24px target that takes a text line's height in the row. Revoke is the danger tint; Remove only forgets, so it stays quiet. -->
+    <Style Selector="Button.row-action">
+      <Setter Property="MinHeight" Value="24" />
+      <Setter Property="Height" Value="24" />
+      <Setter Property="Padding" Value="8,0" />
+      <Setter Property="Margin" Value="0,-4" />
       <Setter Property="FontSize" Value="12" />
       <Setter Property="Cursor" Value="Hand" />
       <Setter Property="HorizontalAlignment" Value="Right" />
     </Style>
-    <Style Selector="Button.revoke /template/ ContentPresenter#PART_ContentPresenter">
+    <Style Selector="Button.row-action.quiet /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
     </Style>
-    <Style Selector="Button.revoke:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="Foreground" Value="{DynamicResource KpDanger}" />
+    <Style Selector="Button.row-action.quiet:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
     </Style>
   </UserControl.Styles>
 
   <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-    <Grid Margin="32,28" MaxWidth="1080" HorizontalAlignment="Left"
-          ColumnDefinitions="*,24,*">
+    <!-- The design's max-width 1080, left-aligned: the star column fills up to it. -->
+    <Grid Margin="32,28">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" MaxWidth="1080" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <Grid ColumnDefinitions="*,24,*">
 
-      <!-- The links this vault made: what, to whom and on what terms, and whether each still opens. -->
-      <StackPanel Grid.Column="0" Spacing="16" MinWidth="296">
-        <Grid ColumnDefinitions="*,Auto">
-          <StackPanel Grid.Column="0" Spacing="6">
-            <TextBlock Classes="h1" Text="Sharing" />
-            <TextBlock Classes="subtitle"
-                       Text="End-to-end encrypted links. The key lives in the URL fragment, so our relay never sees it." />
-          </StackPanel>
-          <Button Grid.Column="1"
-                  x:Name="CheckStatus"
-                  Classes="ghost sm"
-                  VerticalAlignment="Top"
-                  Margin="12,0,0,0"
-                  IsVisible="{Binding !IsEmpty}"
-                  ToolTip.Tip="Ask the share server how many views each link has left"
-                  Command="{Binding RefreshCommand}">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <ctl:KpIcon Icon="refresh-cw" Size="13" />
-              <TextBlock Text="Check status" />
-            </StackPanel>
-          </Button>
-        </Grid>
-
-        <Border Classes="card" IsVisible="{Binding IsEmpty}" Padding="16,14">
-          <TextBlock Classes="caption"
-                     Text="No links yet. A link you create appears here with its limits, and Check status asks how many views it has left." />
-        </Border>
-
-        <Border x:Name="Shares"
-                CornerRadius="{DynamicResource KpRadiusCard}"
-                BorderBrush="{DynamicResource KpBorderSubtle}"
-                BorderThickness="1"
-                ClipToBounds="True"
-                IsVisible="{Binding !IsEmpty}">
-          <ItemsControl ItemsSource="{Binding Rows}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:SharingRow">
-                <Border Padding="16,14"
-                        BorderBrush="{DynamicResource KpBorderSubtle}"
-                        BorderThickness="0,0,0,1">
-                  <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="4">
-                    <TextBlock Grid.Row="0" Grid.Column="0"
-                               Classes="mono lg"
-                               Text="{Binding What}"
-                               TextTrimming="CharacterEllipsis"
-                               ToolTip.Tip="{Binding What}" />
-                    <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="6"
-                                HorizontalAlignment="Right">
-                      <Border Classes="dot" Classes.ok="{Binding IsOk}" Classes.amber="{Binding IsAccent}" />
-                      <TextBlock Classes="status" Classes.ok="{Binding IsOk}" Classes.amber="{Binding IsAccent}"
-                                 Text="{Binding Status}" />
-                    </StackPanel>
-                    <TextBlock Grid.Row="1" Grid.Column="0"
-                               FontSize="12"
-                               Foreground="{DynamicResource KpTextMuted}"
-                               Text="{Binding Detail}"
-                               TextTrimming="CharacterEllipsis" />
-                    <Button Grid.Row="1" Grid.Column="1"
-                            Classes="revoke"
-                            Content="{Binding RevokeLabel}"
-                            Command="{Binding $parent[ItemsControl].((vm:SharingViewModel)DataContext).RevokeRowCommand}"
-                            CommandParameter="{Binding}" />
-                  </Grid>
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </Border>
-      </StackPanel>
-
-      <!-- The form. The link it makes goes to the clipboard and nowhere else on screen. -->
-      <Border Grid.Column="2"
-              MinWidth="296"
-              VerticalAlignment="Top"
-              Padding="20"
-              CornerRadius="{DynamicResource KpRadiusDialog}"
-              Background="{DynamicResource KpBgPanel}"
-              BorderBrush="{DynamicResource KpBorderSubtle}"
-              BorderThickness="1">
-        <StackPanel Spacing="14">
-          <TextBlock Text="New share link" FontSize="15" FontWeight="SemiBold" LetterSpacing="-0.15" />
-
-          <Grid ColumnDefinitions="*,10,112" RowDefinitions="Auto,6,Auto">
-            <TextBlock Grid.Row="0" Grid.Column="0" Classes="label" Text="What" />
-            <Panel Grid.Row="2" Grid.Column="0">
-              <AutoCompleteBox x:Name="What"
-                               Classes="what"
-                               ItemsSource="{Binding Candidates}"
-                               SelectedItem="{Binding SelectedWhat}"
-                               FilterMode="Contains"
-                               MinimumPrefixLength="0"
-                               MaxDropDownHeight="260"
-                               PlaceholderText="Search entries" />
-              <ctl:KpIcon Icon="chevron-down" Size="13" IsHitTestVisible="False"
-                          HorizontalAlignment="Right" Margin="0,0,10,0"
-                          Foreground="{DynamicResource KpTextMuted}" />
-            </Panel>
-            <TextBlock Grid.Row="0" Grid.Column="2" Classes="label" Text="Field" />
-            <ComboBox Grid.Row="2" Grid.Column="2"
-                      x:Name="ShareField"
-                      Classes="form"
-                      HorizontalAlignment="Stretch"
-                      ItemsSource="{Binding FieldOptions}"
-                      SelectedItem="{Binding Field}" />
-          </Grid>
-
-          <StackPanel Spacing="6">
-            <TextBlock Classes="label" Text="Recipient" />
-            <TextBox x:Name="Recipient"
-                     Classes="form"
-                     Text="{Binding Recipient}"
-                     MaxLength="128"
-                     PlaceholderText="For your list only; never sent" />
-          </StackPanel>
-
-          <Grid ColumnDefinitions="*,10,*">
+        <!-- The links this vault made: what, to whom and on what terms, and whether each still opens. -->
+        <StackPanel Grid.Column="0" Spacing="16" MinWidth="296">
+          <Grid ColumnDefinitions="*,Auto">
             <StackPanel Grid.Column="0" Spacing="6">
-              <TextBlock Classes="label" Text="Expires" />
-              <ListBox x:Name="Expires"
-                       Classes="segmented choice"
-                       ItemsSource="{Binding TtlChoices}"
-                       SelectedItem="{Binding Ttl}" />
+              <TextBlock Classes="h1" Text="Sharing" />
+              <TextBlock Classes="subtitle"
+                         Text="End-to-end encrypted links. The key lives in the URL fragment, so our relay never sees it." />
             </StackPanel>
-            <StackPanel Grid.Column="2" Spacing="6">
-              <TextBlock Classes="label" Text="Views" />
-              <ListBox x:Name="Views"
-                       Classes="segmented choice"
-                       ItemsSource="{Binding ViewChoices}"
-                       SelectedItem="{Binding Views}" />
-            </StackPanel>
-          </Grid>
-
-          <CheckBox x:Name="RequirePassphrase"
-                    Classes="passphrase"
-                    IsChecked="{Binding RequirePassphrase}"
-                    Content="Require a passphrase, sent separately" />
-
-          <StackPanel Spacing="6" IsVisible="{Binding RequirePassphrase}">
-            <ctl:MaskedInput x:Name="SharePassphrase"
-                             MinHeight="34"
-                             Height="34"
-                             FontSize="14"
-                             AllowsPaste="True"
-                             Sink="{Binding Passphrase}"
-                             MaskedLength="{Binding Passphrase.MaskedLength}"
-                             Placeholder="Passphrase, at least 8 characters" />
-            <TextBlock Classes="caption"
-                       Text="Not stored. Send it another way than the link." />
-          </StackPanel>
-
-          <Button x:Name="CreateLink"
-                  Classes="primary lg"
-                  HorizontalAlignment="Stretch"
-                  HorizontalContentAlignment="Center"
-                  Command="{Binding CreateCommand}">
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <ctl:KpIcon Icon="link" Size="14" />
-              <TextBlock Text="Create and copy link" />
-            </StackPanel>
-          </Button>
-
-          <Grid ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding IsUnavailable}">
-            <Border Grid.Column="0" Classes="dot" Margin="0,0,8,0" />
-            <TextBlock Grid.Column="1"
-                       x:Name="Unavailable"
-                       Classes="caption"
-                       Text="{Binding Unavailable}" />
-            <Button Grid.Column="2"
-                    Classes="link"
+            <Button Grid.Column="1"
+                    x:Name="CheckStatus"
+                    Classes="ghost sm"
+                    VerticalAlignment="Top"
                     Margin="12,0,0,0"
-                    VerticalAlignment="Center"
-                    IsVisible="{Binding CanRetry}"
-                    Content="Try again"
-                    Command="{Binding RetryCommand}" />
+                    IsVisible="{Binding !IsEmpty}"
+                    ToolTip.Tip="Ask the share server how many views each link has left"
+                    Command="{Binding RefreshCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <ctl:KpIcon Icon="refresh-cw" Size="13" />
+                <TextBlock Text="Check status" />
+              </StackPanel>
+            </Button>
           </Grid>
 
-          <TextBlock x:Name="ShareError"
-                     Classes="caption danger"
-                     IsVisible="{Binding HasError}"
-                     Text="{Binding Error}" />
-        </StackPanel>
-      </Border>
+          <Border Classes="card" IsVisible="{Binding IsEmpty}" Padding="16,14">
+            <TextBlock Classes="caption"
+                       Text="No links yet. A link you create appears here with its limits, and Check status asks how many views it has left." />
+          </Border>
 
+          <Border x:Name="Shares"
+                  CornerRadius="{DynamicResource KpRadiusCard}"
+                  BorderBrush="{DynamicResource KpBorderSubtle}"
+                  BorderThickness="1"
+                  ClipToBounds="True"
+                  IsVisible="{Binding !IsEmpty}">
+            <ItemsControl ItemsSource="{Binding Rows}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:SharingRow">
+                  <Border Padding="16,14"
+                          BorderBrush="{DynamicResource KpBorderSubtle}"
+                          BorderThickness="0,0,0,1">
+                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="4">
+                      <TextBlock Grid.Row="0" Grid.Column="0"
+                                 Classes="mono lg"
+                                 Text="{Binding What}"
+                                 TextTrimming="CharacterEllipsis"
+                                 ToolTip.Tip="{Binding What}" />
+                      <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="6"
+                                  HorizontalAlignment="Right">
+                        <Border Classes="dot" Classes.ok="{Binding IsOk}" Classes.amber="{Binding IsAccent}" />
+                        <TextBlock Classes="status" Classes.ok="{Binding IsOk}" Classes.amber="{Binding IsAccent}"
+                                   Text="{Binding Status}" />
+                      </StackPanel>
+                      <TextBlock Grid.Row="1" Grid.Column="0"
+                                 FontSize="12"
+                                 Foreground="{DynamicResource KpTextMuted}"
+                                 Text="{Binding Detail}"
+                                 TextTrimming="CharacterEllipsis" />
+                      <Button Grid.Row="1" Grid.Column="1"
+                              Classes="row-action"
+                              Classes.danger="{Binding Opens}"
+                              Classes.quiet="{Binding !Opens}"
+                              Content="{Binding RevokeLabel}"
+                              Command="{Binding $parent[ItemsControl].((vm:SharingViewModel)DataContext).RevokeRowCommand}"
+                              CommandParameter="{Binding}" />
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </Border>
+
+          <TextBlock Classes="caption"
+                     IsVisible="{Binding HasUnchecked}"
+                     Text="Opening this screen asks the share server nothing. Check status asks how many views each link has left." />
+        </StackPanel>
+
+        <!-- The form. The link it makes goes to the clipboard and nowhere else on screen. -->
+        <Border Grid.Column="2"
+                MinWidth="296"
+                VerticalAlignment="Top"
+                Padding="20"
+                CornerRadius="{DynamicResource KpRadiusDialog}"
+                Background="{DynamicResource KpBgPanel}"
+                BorderBrush="{DynamicResource KpBorderSubtle}"
+                BorderThickness="1">
+          <StackPanel Spacing="14">
+            <TextBlock Text="New share link" FontSize="15" FontWeight="SemiBold" LetterSpacing="-0.15" />
+
+            <Grid ColumnDefinitions="*,10,112" RowDefinitions="Auto,6,Auto">
+              <TextBlock Grid.Row="0" Grid.Column="0" Classes="label" Text="What" />
+              <Panel Grid.Row="2" Grid.Column="0">
+                <AutoCompleteBox x:Name="What"
+                                 Classes="what"
+                                 ItemsSource="{Binding Candidates}"
+                                 SelectedItem="{Binding SelectedWhat}"
+                                 FilterMode="Contains"
+                                 MinimumPrefixLength="0"
+                                 MaxDropDownHeight="260"
+                                 PlaceholderText="Search entries" />
+                <ctl:KpIcon Icon="chevron-down" Size="13" IsHitTestVisible="False"
+                            HorizontalAlignment="Right" Margin="0,0,10,0"
+                            Foreground="{DynamicResource KpTextMuted}" />
+              </Panel>
+              <TextBlock Grid.Row="0" Grid.Column="2" Classes="label" Text="Field" />
+              <ComboBox Grid.Row="2" Grid.Column="2"
+                        x:Name="ShareField"
+                        Classes="form"
+                        HorizontalAlignment="Stretch"
+                        ItemsSource="{Binding FieldOptions}"
+                        SelectedItem="{Binding Field}" />
+            </Grid>
+
+            <StackPanel Spacing="6">
+              <TextBlock Classes="label" Text="Recipient" />
+              <TextBox x:Name="Recipient"
+                       Classes="form"
+                       Text="{Binding Recipient}"
+                       MaxLength="128"
+                       PlaceholderText="For your list only; never sent" />
+            </StackPanel>
+
+            <Grid ColumnDefinitions="*,10,*">
+              <StackPanel Grid.Column="0" Spacing="6">
+                <TextBlock Classes="label" Text="Expires" />
+                <ListBox x:Name="Expires"
+                         Classes="segmented choice"
+                         ItemsSource="{Binding TtlChoices}"
+                         SelectedItem="{Binding Ttl}" />
+              </StackPanel>
+              <StackPanel Grid.Column="2" Spacing="6">
+                <TextBlock Classes="label" Text="Views" />
+                <ListBox x:Name="Views"
+                         Classes="segmented choice"
+                         ItemsSource="{Binding ViewChoices}"
+                         SelectedItem="{Binding Views}" />
+              </StackPanel>
+            </Grid>
+
+            <CheckBox x:Name="RequirePassphrase"
+                      Classes="passphrase"
+                      IsChecked="{Binding RequirePassphrase}"
+                      Content="Require a passphrase, sent separately" />
+
+            <StackPanel Spacing="6" IsVisible="{Binding RequirePassphrase}">
+              <ctl:MaskedInput x:Name="SharePassphrase"
+                               MinHeight="34"
+                               Height="34"
+                               FontSize="14"
+                               AllowsPaste="True"
+                               Sink="{Binding Passphrase}"
+                               MaskedLength="{Binding Passphrase.MaskedLength}"
+                               Placeholder="Passphrase, at least 8 characters" />
+              <TextBlock Classes="caption"
+                         Text="Not stored. Send it another way than the link." />
+            </StackPanel>
+
+            <Button x:Name="CreateLink"
+                    Classes="primary lg"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    Command="{Binding CreateCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <ctl:KpIcon Icon="link" Size="14" />
+                <TextBlock Text="Create and copy link" />
+              </StackPanel>
+            </Button>
+
+            <Grid ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding IsUnavailable}">
+              <Border Grid.Column="0" Classes="dot" Margin="0,0,8,0" />
+              <TextBlock Grid.Column="1"
+                         x:Name="Unavailable"
+                         Classes="caption"
+                         Text="{Binding Unavailable}" />
+              <Button Grid.Column="2"
+                      Classes="link"
+                      Margin="12,0,0,0"
+                      VerticalAlignment="Center"
+                      IsVisible="{Binding CanRetry}"
+                      Content="Try again"
+                      Command="{Binding RetryCommand}" />
+            </Grid>
+
+            <TextBlock x:Name="ShareError"
+                       Classes="caption danger"
+                       IsVisible="{Binding HasError}"
+                       Text="{Binding Error}" />
+          </StackPanel>
+        </Border>
+
+      </Grid>
     </Grid>
   </ScrollViewer>
 </UserControl>
