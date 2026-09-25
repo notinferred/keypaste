@@ -1,4 +1,5 @@
 using Keypaste.Cli.Commands;
+using Keypaste.Cli.Styling;
 using Keypaste.Core;
 
 namespace Keypaste.Cli;
@@ -60,7 +61,7 @@ internal static class CliApp
 
         if (args.Length == 0)
         {
-            WriteUsage(context.Stderr);
+            WriteUsage(context.Stderr, context.ConsoleStyle);
             return ExitUsageError;
         }
 
@@ -107,6 +108,18 @@ internal static class CliApp
             case "log":
                 return LogCommand.Execute(args, context);
 
+            case "set":
+                return SetCommand.Execute(args, context);
+
+            case "grants":
+                return GrantsCommand.Execute(args, context);
+
+            case "lock":
+                return LockCommand.Execute(args, context);
+
+            case "mcp":
+                return McpCommand.Execute(args, context);
+
             case "hello":
                 context.Stdout.WriteLine(CoreInfo.Hello());
                 return ExitSuccess;
@@ -119,41 +132,83 @@ internal static class CliApp
             case "help":
             case "--help":
             case "-h":
-                WriteUsage(context.Stdout);
+                WriteUsage(context.Stdout, context.ConsoleStyle);
                 return ExitSuccess;
 
             default:
                 context.Stderr.WriteLine($"keypaste: unknown command '{command}'");
-                WriteUsage(context.Stderr);
+                WriteUsage(context.Stderr, context.ConsoleStyle);
                 return ExitUsageError;
         }
     }
 
-    internal static void WriteUsage(TextWriter writer)
+    /// <summary>The verbs, grouped as a person looks for them, in the order they are printed.</summary>
+    private static readonly (string Heading, (string Verb, string Summary)[] Verbs)[] _groups =
+    [
+        ("SECRETS",
+        [
+            ("get", "copy a secret to the clipboard, or print it with --reveal"),
+            ("set", "create or update a secret"),
+            ("run", "run a command with secrets in its environment"),
+            ("env", "import, export and diff .env profiles"),
+        ]),
+        ("AGENTS",
+        [
+            ("mcp", "approve agents' requests here, or connect MCP clients"),
+            ("grants", "list or revoke time-boxed access"),
+            ("token", "create scoped, inject-only tokens"),
+            ("log", "show the hash-chained activity log"),
+        ]),
+        ("VAULT",
+        [
+            ("import", "copy in a .kdbx, or keep editing it in place"),
+            ("share", "create an encrypted, expiring link"),
+            ("lock", "lock now and pause all agents"),
+            ("init", "create a new vault"),
+            ("add", "add an entry"),
+            ("ls", "list groups and entries"),
+            ("rm", "remove an entry"),
+            ("generate", "print a password or passphrase; it is not stored"),
+            ("access", "change the master password or keyfile"),
+            ("policy", "show the standing rules that skip the prompt"),
+        ]),
+    ];
+
+    /// <summary>The top-level help: verbs amber and headings grey on a terminal, plain anywhere else.</summary>
+    internal static void WriteUsage(TextWriter writer, IConsoleStyle style)
     {
-        writer.WriteLine("usage: keypaste <command> [options]");
+        ArgumentNullException.ThrowIfNull(writer);
+        ArgumentNullException.ThrowIfNull(style);
+
+        string Muted(string text) => style.Paint(writer, Tone.Muted, text);
+
+        writer.WriteLine($"keypaste {CoreInfo.Version}{Muted($" {style.Glyph(writer, Mark.Dot)} secrets for developers and their agents")}");
         writer.WriteLine();
-        writer.WriteLine("commands:");
-        writer.WriteLine("  init <vault.kdbx>   create a new vault");
-        writer.WriteLine("  add <entry>         add an entry");
-        writer.WriteLine("  get <entry>         copy a password to the clipboard, or --show it");
-        writer.WriteLine("  generate --words N  print a passphrase; it is not stored");
-        writer.WriteLine("  ls                  list groups and entries");
-        writer.WriteLine("  rm <entry>          remove an entry");
-        writer.WriteLine("  access              change the master password or keyfile");
-        writer.WriteLine("  env <subcommand>    manage a project's environment variables");
-        writer.WriteLine("  run <project> --    run a command with those variables injected");
-        writer.WriteLine("  agent               unlock the vault and approve AI agents' requests");
-        writer.WriteLine("  setup               point the AI clients on this machine at your vault");
-        writer.WriteLine("  policy ls           show the standing rules that skip the approval prompt");
-        writer.WriteLine("  log                 show what agents asked for, and what happened");
-        writer.WriteLine("  version             print the core version");
+        writer.WriteLine(Muted("USAGE"));
+        writer.WriteLine("  keypaste <command> [flags]");
+
+        foreach (var (heading, verbs) in _groups)
+        {
+            writer.WriteLine();
+            writer.WriteLine(Muted(heading));
+
+            foreach (var (verb, summary) in verbs)
+            {
+                writer.WriteLine($"  {style.Paint(writer, Tone.Accent, verb)}{new string(' ', 10 - verb.Length)}{summary}");
+            }
+        }
+
         writer.WriteLine();
-        writer.WriteLine("the vault:");
-        writer.WriteLine($"  --vault <path>      which vault to use, or set {VaultLocator.EnvironmentVariable}");
-        writer.WriteLine($"  --keyfile <path>    the keyfile it needs too, or set {VaultLocator.KeyfileEnvironmentVariable}");
+        writer.WriteLine(Muted("FLAGS"));
+        writer.WriteLine($"  --vault <path>    which vault to use, or set {VaultLocator.EnvironmentVariable}");
+        writer.WriteLine($"  --keyfile <path>  the keyfile it needs too, or set {VaultLocator.KeyfileEnvironmentVariable}");
+        writer.WriteLine("  --json            machine-readable output from ls, env ls, log, grants,");
+        writer.WriteLine("                    token ls and share ls");
+        writer.WriteLine("  -h, --help        help for any command");
         writer.WriteLine();
-        writer.WriteLine("exit codes:");
+        writer.WriteLine("  agent is mcp serve, setup is mcp setup, version prints the version.");
+        writer.WriteLine();
+        writer.WriteLine(Muted("EXIT CODES"));
         writer.WriteLine("  0 ok  1 usage  2 error  3 not found  4 wrong password  5 audit log tampered");
         writer.WriteLine("  once a `run` command starts, its exit code is keypaste's own.");
         writer.WriteLine();

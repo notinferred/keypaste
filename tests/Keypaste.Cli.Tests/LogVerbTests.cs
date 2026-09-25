@@ -425,4 +425,56 @@ public sealed class LogVerbTests : IDisposable
         Assert.Contains("--denied", _cli.Out, StringComparison.Ordinal);
         Assert.Contains("A broken chain exits 5", _cli.Out, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Log_Json_FollowsTheFilters()
+    {
+        Seed();
+
+        _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("log", "--denied", "--json"));
+
+        Assert.Single(_cli.Out.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries));
+        using var document = System.Text.Json.JsonDocument.Parse(_cli.Out);
+        var record = Assert.Single(document.RootElement.EnumerateArray());
+        Assert.Equal(2, record.GetProperty("line").GetInt32());
+        Assert.StartsWith("2026-07-26T14:00:00", record.GetProperty("time").GetString(), StringComparison.Ordinal);
+        Assert.Equal("request_credential", record.GetProperty("tool").GetString());
+        Assert.Equal("claude-desktop", record.GetProperty("label").GetString());
+        Assert.Equal("env/dev/DB_URL", record.GetProperty("entry").GetString());
+        Assert.Equal("password", record.GetProperty("field").GetString());
+        Assert.Equal("denied", record.GetProperty("decision").GetString());
+        Assert.Equal("nobody was asked", record.GetProperty("reason").GetString());
+        Assert.True(record.TryGetProperty("method", out _));
+        Assert.True(record.TryGetProperty("session", out _));
+
+        _cli.Stdout.GetStringBuilder().Clear();
+        _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("log", "--client", "nobody-like-this", "--json"));
+        Assert.Equal("[]" + Environment.NewLine, _cli.Out);
+    }
+
+    [Fact]
+    public void Log_Json_WithNoLogYet_IsAnEmptyArray()
+    {
+        _cli.Environment[KeypasteHome.EnvironmentVariable] = Path.Combine(_cli.Directory, ".keypaste");
+
+        _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("log", "--json"));
+
+        Assert.Equal("[]" + Environment.NewLine, _cli.Out);
+    }
+
+    /// <summary>The table the verify-demo pages paste: its header row and its two-space gutter.</summary>
+    [Fact]
+    public void Log_Table_IsUnchanged()
+    {
+        Write(
+            new DateTimeOffset(2026, 7, 27, 9, 57, 42, TimeSpan.Zero),
+            Record("claude-code", "env/demo/STRIPE_KEY", AuditDecision.Granted, AuditMethod.Prompt));
+
+        _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("log"));
+
+        var lines = _cli.Out.Split(Environment.NewLine);
+        Assert.Contains("  time (UTC)           client       entry                decision  method", lines);
+        Assert.Contains("  2026-07-27 09:57:42  claude-code  env/demo/STRIPE_KEY  granted   prompt", lines);
+        Assert.DoesNotContain("\u001b", _cli.Out, StringComparison.Ordinal);
+    }
 }

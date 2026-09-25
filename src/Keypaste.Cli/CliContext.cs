@@ -48,7 +48,7 @@ internal sealed class CliContext
     /// </remarks>
     internal required IProcessRunner ProcessRunner { get; init; }
 
-    /// <summary>How a warning that must not be missed reaches the terminal.</summary>
+    /// <summary>How output is coloured and marked on a terminal, and left plain everywhere else.</summary>
     internal required IConsoleStyle ConsoleStyle { get; init; }
 
     /// <summary>What time it is, for the commands that take a relative span.</summary>
@@ -75,7 +75,7 @@ internal sealed class CliContext
             Environment = environment,
             ProcessLauncher = new SystemProcessLauncher(),
             ProcessRunner = processRunner,
-            ConsoleStyle = new SystemConsoleStyle(environment),
+            ConsoleStyle = new SystemConsoleStyle(environment, stdout, stderr),
         };
     }
 }

@@ -69,6 +69,13 @@ internal static class AddCommand
             return CliApp.ExitUsageError;
         }
 
+        if (ReservedGroups.IsReserved(groupPath))
+        {
+            var shown = EntryNameSanitizer.SanitizePath(groupPath + "/" + title).Text;
+            context.Stderr.WriteLine($"keypaste add: {shown} is keypaste's own group; it cannot be written here");
+            return CliApp.ExitUsageError;
+        }
+
         if (!VaultLocator.TryResolve(line, context.Environment, out var path, out var locateError))
         {
             context.Stderr.WriteLine($"keypaste add: {locateError}");

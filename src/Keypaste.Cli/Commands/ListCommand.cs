@@ -1,3 +1,4 @@
+using Keypaste.Cli.Output;
 using Keypaste.Core;
 
 namespace Keypaste.Cli.Commands;
@@ -32,7 +33,8 @@ namespace Keypaste.Cli.Commands;
 /// which reports what can be recovered and where each entry came from — rather than mixed back in
 /// with the live ones, where it would read as a credential somebody still uses. KeePassXC shows
 /// the bin as an ordinary group, so the two disagree about that group and about nothing else; a
-/// row this listing does print is still exactly what the vault holds (V.3a).
+/// row this listing does print is still exactly what the vault holds (V.3a). keypaste's own groups
+/// (<see cref="ReservedGroups"/>) are left out on the same terms: they hold its records, not secrets.
 /// </para>
 /// </remarks>
 internal static class ListCommand
@@ -56,6 +58,7 @@ internal static class ListCommand
         new("vault", TakesValue: true),
         new("keyfile", TakesValue: true),
         new("flat", TakesValue: false),
+        new(CliJson.Option, TakesValue: false),
     ];
 
     internal static int Execute(string[] args, CliContext context)
@@ -68,7 +71,7 @@ internal static class ListCommand
 
         if (line.WantsHelp)
         {
-            context.Stdout.WriteLine("usage: keypaste ls [--flat]");
+            context.Stdout.WriteLine("usage: keypaste ls [--flat | --json]");
             return CliApp.ExitSuccess;
         }
 
@@ -85,18 +88,28 @@ internal static class ListCommand
         }
 
         var flat = line.HasFlag("flat");
+        var json = line.HasFlag(CliJson.Option);
 
         return VaultSession.Open(path, line, context, vault =>
         {
             // Groups and entries are collected separately because a group holding no entries is
             // invisible in an entry listing, and KeePassXC lists it.
+            var groups = vault.ReadGroupPaths().Where(group => !ReservedGroups.IsReserved(group)).ToList();
+            var entries = vault.ReadEntries().Where(entry => !ReservedGroups.IsReserved(entry.GroupPath)).ToList();
+
+            if (json)
+            {
+                WriteJson(groups, entries, context);
+                return CliApp.ExitSuccess;
+            }
+
             List<string> paths = [];
-            foreach (var group in vault.ReadGroupPaths())
+            foreach (var group in groups)
             {
                 paths.Add(group + "/");
             }
 
-            foreach (var entry in vault.ReadEntries())
+            foreach (var entry in entries)
             {
                 paths.Add(entry.Path);
             }
@@ -131,6 +144,28 @@ internal static class ListCommand
             }
 
             return CliApp.ExitSuccess;
+        });
+    }
+
+    /// <summary>The listing as one JSON array, in the text listing's order.</summary>
+    /// <remarks>Raw names, not scrubbed ones: a parser needs what the vault holds, and the encoder escapes every control and non-ASCII character.</remarks>
+    private static void WriteJson(List<string> groups, List<VaultEntry> entries, CliContext context)
+    {
+        var items = groups
+            .Select(group => (Key: group + "/", Entry: (VaultEntry?)null, Path: group))
+            .Concat(entries.Select(entry => (Key: entry.Path, Entry: (VaultEntry?)entry, entry.Path)))
+            .OrderBy(item => item.Key, StringComparer.Ordinal);
+
+        CliJson.WriteArray(context.Stdout, items, (json, item) =>
+        {
+            json.WriteString("type", item.Entry is null ? "group" : "entry");
+            json.WriteString("path", item.Path);
+
+            if (item.Entry is { } entry)
+            {
+                json.WriteString("group", entry.GroupPath);
+                json.WriteString("title", entry.Title);
+            }
         });
     }
 

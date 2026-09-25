@@ -4,11 +4,10 @@ internal enum Tone { Muted = 0, Accent = 1, Ok = 2, Danger = 3 }
 
 internal enum Mark { Done = 0, Prompt = 1, Dot = 2 }
 
-/// <summary>Output that must not be missed.</summary>
+/// <summary>How keypaste colours and marks what it prints: amber for what needs the person, green for done, red for refused, grey for the rest.</summary>
 /// <remarks>
-/// The only place keypaste uses colour. It takes the writer rather than returning a decorated
-/// string so that the two platforms can reach the terminal differently — which they must — without
-/// any caller learning about it.
+/// The only place keypaste decides colour. Every member takes the writer, because only the stream
+/// that reaches a terminal is ever coloured, and a caller must not have to know which that is.
 /// </remarks>
 internal interface IConsoleStyle
 {

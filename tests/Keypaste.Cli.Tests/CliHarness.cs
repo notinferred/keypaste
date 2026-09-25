@@ -5,6 +5,7 @@ using Keypaste.Cli.Clipboard;
 using Keypaste.Cli.Prompting;
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
+using Keypaste.Core.Audit;
 using Keypaste.Core.Launch;
 using Keypaste.Core.Processes;
 
@@ -19,6 +20,9 @@ internal sealed class CliHarness : IDisposable
     {
         Directory = System.IO.Directory.CreateTempSubdirectory("keypaste-cli-tests-").FullName;
         VaultPath = Path.Combine(Directory, "vault.kdbx");
+
+        // A verb that claims the vault writes under keypaste's home, which must never be the real one.
+        Environment[KeypasteHome.EnvironmentVariable] = Path.Combine(Directory, ".keypaste");
     }
 
     internal string Directory { get; }
