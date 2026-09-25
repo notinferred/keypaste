@@ -1,4 +1,5 @@
 using System.Globalization;
+using Keypaste.Core;
 using Keypaste.Core.Activity;
 
 namespace Keypaste.App.ViewModels;
@@ -68,9 +69,8 @@ internal static class UseText
 
     /// <summary>The Agent access card's one line.</summary>
     /// <param name="access">What the card shows.</param>
-    /// <param name="now">The time to measure from.</param>
-    /// <returns>"claude-code · grant, 42m left", "cursor · 1h ago", "ci-staging · token" or "None active".</returns>
-    internal static string Summary(EntryAgentAccess? access, DateTimeOffset now)
+    /// <returns>"claude-code · grant, 42m left", "cursor", "ci-staging · token" or "None active": who, never when, which the card's Last used line says.</returns>
+    internal static string Summary(EntryAgentAccess? access)
     {
         if (access is null)
         {
@@ -85,12 +85,33 @@ internal static class UseText
 
         if (access.Clients.Count > 0)
         {
-            var latest = access.Clients[0];
-            return latest.Client.EndsWith(" · token", StringComparison.Ordinal)
-                ? latest.Client
-                : $"{latest.Client} · {Ago(latest.LastAt, now)}";
+            return access.Clients[0].Client;
         }
 
         return access.Waiting ? "a request is waiting" : "None active";
+    }
+
+    /// <summary>How many lines the Agent access card lists under its summary.</summary>
+    internal const int MaximumLines = 5;
+
+    /// <summary>The Agent access card's lines under its summary: each grant in force, then each client that received the entry.</summary>
+    /// <param name="access">What agents did with the entry.</param>
+    /// <param name="now">The time to measure from.</param>
+    /// <returns>Names, kinds and times, never a value; none when the summary already says all there is.</returns>
+    internal static IReadOnlyList<string> Lines(EntryAgentAccess access, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(access);
+
+        if (access.Grants.Count + access.Clients.Count <= 1)
+        {
+            return [];
+        }
+
+        var grants = access.Grants.Select(grant =>
+            $"{EntryNameSanitizer.Sanitize(grant.Client).Text} · {grant.Kind} grant, {Left(grant.SecondsLeft)} left");
+        var clients = access.Clients.Select(client =>
+            string.Create(CultureInfo.InvariantCulture, $"{EntryNameSanitizer.Sanitize(client.Client).Text} · {Ago(client.LastAt, now)} · {client.Releases}×"));
+
+        return [.. grants.Concat(clients).Take(MaximumLines)];
     }
 }

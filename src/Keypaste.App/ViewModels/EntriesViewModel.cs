@@ -44,6 +44,8 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     private string? _notice;
     private RecycledEntryId? _undo;
     private string _newEntryPath = string.Empty;
+    private string _newUsername = string.Empty;
+    private string _newUrl = string.Empty;
     private bool _generatePassword = true;
     private bool _isOrganizing;
     private bool _isCreatingGroup;
@@ -51,6 +53,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     private string _draftTitle = string.Empty;
     private string _draftGroupName = string.Empty;
     private GroupNode? _moveTarget;
+    private string _filterHint = "Filter secrets";
     private IReadOnlyList<GroupNode> _moveTargets = [];
 
     internal EntriesViewModel(AppVaultSession session, ClipboardCountdown clipboard, EntryActivitySource? activity = null)
@@ -116,16 +119,61 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
                 BeginRenameGroupCommand.RaiseCanExecuteChanged();
                 Raise(nameof(CreateGroupPrompt));
                 Raise(nameof(RenameGroupPrompt));
+                RaiseHeader();
             }
         }
+    }
+
+    /// <summary>The vault's file name, which the pane's location line starts from.</summary>
+    internal string VaultName => _session.VaultPath is { } path ? System.IO.Path.GetFileName(path) : string.Empty;
+
+    /// <summary>What the list header names: the env project or group showing, or the vault when it is all of it.</summary>
+    internal string ListTitle =>
+        SelectedGroup is { IsEverything: false } group
+            ? EnvPlace.OfGroup(group.Path) is { } env ? env.Project : EntryNameSanitizer.SanitizePath(group.Path).Text
+            : VaultName;
+
+    /// <summary>The profile badge beside <see cref="ListTitle"/> when the group showing is an env profile, else null.</summary>
+    internal string? ListProfile =>
+        SelectedGroup is { IsEverything: false } group ? EnvPlace.OfGroup(group.Path)?.Profile : null;
+
+    internal bool HasListProfile => ListProfile is not null;
+
+    /// <summary>The filter box's placeholder, counting the entries it would search.</summary>
+    internal string FilterHint
+    {
+        get => _filterHint;
+        private set => Set(ref _filterHint, value);
     }
 
     /// <summary>What matches the search and the selected group.</summary>
     internal IReadOnlyList<EntryRow> Rows
     {
         get => _rows;
-        private set => Set(ref _rows, value);
+        private set
+        {
+            if (Set(ref _rows, value))
+            {
+                Raise(nameof(ShowsListEmpty));
+                Raise(nameof(ListEmptyNote));
+                Raise(nameof(ListEmptyOffersNew));
+            }
+        }
     }
+
+    /// <summary>Whether the list has nothing to show, so it says why instead of standing blank.</summary>
+    internal bool ShowsListEmpty => _rows.Count == 0 && _session.Unlocked is not null;
+
+    /// <summary>Why the list is empty: nothing matched the filter, or there is nothing where it is looking.</summary>
+    internal string ListEmptyNote =>
+        Search.Trim() is { Length: > 0 } query
+            ? $"No secrets match “{DisplayTextSanitizer.Sanitize(query, 64).Text}”."
+            : SelectedGroup is { IsEverything: false }
+                ? $"No secrets in {ListTitle}."
+                : "No secrets in this vault yet.";
+
+    /// <summary>Whether the empty list offers New, which it does when a filter is not the reason.</summary>
+    internal bool ListEmptyOffersNew => Search.Trim().Length == 0;
 
     /// <summary>The search box.</summary>
     /// <remarks>
@@ -173,16 +221,25 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     /// The getter looks the row up in the current list, so an equal row selected again is the same
     /// value and the list highlights it the moment it comes back.
     /// </para>
+    /// <para>
+    /// While the add form stands in the pane's place no row is selected, so the list does not
+    /// highlight an entry the pane is not showing; choosing one closes the form.
+    /// </para>
     /// </remarks>
     internal EntryRow? Selected
     {
-        get => _selection is { } name
+        get => _selection is { } name && !_isAdding
             ? Rows.FirstOrDefault(row => row.Name == name)
             : null;
         set
         {
             if (value is { } row)
             {
+                if (IsAdding)
+                {
+                    CancelAdd();
+                }
+
                 Select(row.Name);
             }
         }
@@ -244,12 +301,17 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
             if (Set(ref _detail, value))
             {
+                Raise(nameof(ShowsPlaceholder));
+
                 // Disposed on the way out, not left to a collection: it holds a username, a URL and
                 // a notes field read from an open vault, and the lock has to mean something.
                 previous?.Dispose();
             }
         }
     }
+
+    /// <summary>Whether the pane's place says to choose an entry: nothing is open and nothing is being made.</summary>
+    internal bool ShowsPlaceholder => _detail is null && !_isAdding;
 
     /// <summary>A calm sentence when something did not work, or null.</summary>
     internal string? Error
@@ -300,6 +362,10 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         {
             if (Set(ref _isAdding, value))
             {
+                Raise(nameof(ShowsPlaceholder));
+                Raise(nameof(Selected));
+                DeleteCommand.RaiseCanExecuteChanged();
+                OrganizeCommand.RaiseCanExecuteChanged();
                 BeginAddCommand.RaiseCanExecuteChanged();
                 CancelAddCommand.RaiseCanExecuteChanged();
                 ConfirmAddCommand.RaiseCanExecuteChanged();
@@ -311,7 +377,31 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     internal string NewEntryPath
     {
         get => _newEntryPath;
-        set => Set(ref _newEntryPath, value);
+        set
+        {
+            if (Set(ref _newEntryPath, value))
+            {
+                Raise(nameof(NewEntryIsLogin));
+            }
+        }
+    }
+
+    /// <summary>Whether the new entry can have a username and a URL: anything but a key under env, which has profiles instead.</summary>
+    internal bool NewEntryIsLogin =>
+        !_newEntryPath.TrimStart().StartsWith(EnvConvention.RootGroup + "/", StringComparison.Ordinal);
+
+    /// <summary>The new entry's username, when it is a login.</summary>
+    internal string NewUsername
+    {
+        get => _newUsername;
+        set => Set(ref _newUsername, value);
+    }
+
+    /// <summary>The new entry's URL, when it is a login.</summary>
+    internal string NewUrl
+    {
+        get => _newUrl;
+        set => Set(ref _newUrl, value);
     }
 
     /// <summary>
@@ -553,20 +643,20 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
         _all = [.. vault.ReadEntries()
             .Where(entry => !ReservedGroups.IsReserved(entry.GroupPath))
-            .Select(entry => new EntryRow(entry.Title, entry.GroupPath))];
+            .Select(entry => new EntryRow(entry.Title, entry.GroupPath) { Kind = EntryKinds.Of(entry) })];
         Groups = GroupNode.Flatten(vault.ReadGroupPaths());
         MoveTargets = Groups;
         Raise(nameof(TotalCount));
 
         // The tree is rebuilt from the vault, so the node the sidebar had is not in the new list.
         // Re-pointing at the one with the same path keeps the filter and the highlight where they
-        // were; a group that is gone leaves the selection at everything. Assigned to the field
+        // were; a first visit, or a group that is gone, highlights everything. Assigned to the field
         // rather than the property, because Filter runs below either way.
-        _selectedGroup = wantedGroup is null
-            ? null
-            : Groups.FirstOrDefault(node => string.Equals(node.Path, wantedGroup, StringComparison.Ordinal));
+        _selectedGroup = Groups.FirstOrDefault(node => string.Equals(node.Path, wantedGroup ?? string.Empty, StringComparison.Ordinal))
+            ?? Groups.FirstOrDefault(node => node.IsEverything);
 
         Raise(nameof(SelectedGroup));
+        RaiseHeader();
 
         // The vault changed underneath, so an answer about the old one is not an answer about this.
         _matchedQuery = null;
@@ -578,6 +668,13 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     }
 
     private void OnActivity(object? sender, EventArgs e) => ApplyActivity();
+
+    private void RaiseHeader()
+    {
+        Raise(nameof(ListTitle));
+        Raise(nameof(ListProfile));
+        Raise(nameof(HasListProfile));
+    }
 
     /// <summary>Gives every row and the open pane the latest picture of what agents did, never a value.</summary>
     private void ApplyActivity()
@@ -613,6 +710,8 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         _pinned = null;
         _draftTitle = string.Empty;
         _draftGroupName = string.Empty;
+        _newUsername = string.Empty;
+        _newUrl = string.Empty;
         _moveTarget = null;
         MoveTargets = [];
         IsOrganizing = false;
@@ -622,6 +721,8 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         Raise(nameof(Search));
         Raise(nameof(DraftTitle));
         Raise(nameof(DraftGroupName));
+        Raise(nameof(NewUsername));
+        Raise(nameof(NewUrl));
         Raise(nameof(MoveTarget));
     }
 
@@ -692,10 +793,13 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
         Match(query);
 
+        var scope = _all.Count(row => Shows(group, row.GroupPath));
+        FilterHint = scope == 1 ? "Filter 1 secret" : string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Filter {scope} secrets");
+
         List<EntryRow> rows =
         [
             .. _all
-                .Where(row => group is null || group.Contains(row.GroupPath))
+                .Where(row => Shows(group, row.GroupPath))
                 .Where(row => query.Length == 0 || _matches.ContainsKey(row.Name))
                 .Select(row => query.Length == 0
                     ? row
@@ -714,6 +818,18 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
         Rows = rows;
     }
+
+    /// <summary>Whether an entry in <paramref name="groupPath"/> is listed while <paramref name="group"/> is selected.</summary>
+    /// <remarks>
+    /// A folder lists its children's entries too, except an env project: its own group is its
+    /// default profile, as the header's badge and the sidebar's count say, and each profile below
+    /// it is a row of the tree to select.
+    /// </remarks>
+    private static bool Shows(GroupNode? group, string groupPath) =>
+        group is null
+        || (EnvPlace.OfGroup(group.Path) is null
+            ? group.Contains(groupPath)
+            : string.Equals(group.Path, groupPath, StringComparison.Ordinal));
 
     /// <summary>Asks core which entries the query is in, unless it already answered this one.</summary>
     private void Match(string query)
@@ -765,6 +881,12 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
         if (moved)
         {
+            // The add form stands in the pane's place, so choosing an entry to look at closes it.
+            if (name is not null && IsAdding)
+            {
+                CancelAdd();
+            }
+
             Detail = name is null ? null : Build(name);
 
             if (Detail is not null && _activity?.Current is { } picture)
@@ -785,6 +907,8 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     {
         Offer(null, null);
         NewEntryPath = SelectedGroup is { IsEverything: false } group ? group.Path + "/" : string.Empty;
+        NewUsername = string.Empty;
+        NewUrl = string.Empty;
         NewPassword.Clear();
         IsAdding = true;
         Error = null;
@@ -794,6 +918,8 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     {
         IsAdding = false;
         NewEntryPath = string.Empty;
+        NewUsername = string.Empty;
+        NewUrl = string.Empty;
         NewPassword.Clear();
         Error = null;
     }
@@ -879,6 +1005,8 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
             {
                 Title = sanitized.Text,
                 Password = password,
+                Username = NewEntryIsLogin ? NewUsername.Trim() : string.Empty,
+                Url = NewEntryIsLogin ? NewUrl.Trim() : string.Empty,
                 GroupPath = EntryNameSanitizer.SanitizePath(groupPath).Text,
             });
 
@@ -897,6 +1025,8 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
         IsAdding = false;
         NewEntryPath = string.Empty;
+        NewUsername = string.Empty;
+        NewUrl = string.Empty;
         NewPassword.Clear();
         Error = null;
 
@@ -1125,7 +1255,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
         // A filter the entry has just left would hide what somebody is still looking at, so the
         // filter follows the entry rather than the other way round.
-        if (SelectedGroup is { IsEverything: false } group && !group.Contains(moved.GroupPath))
+        if (SelectedGroup is { IsEverything: false } group && !Shows(group, moved.GroupPath))
         {
             SelectedGroup = Groups.FirstOrDefault(
                 node => string.Equals(node.Path, moved.GroupPath, StringComparison.Ordinal))

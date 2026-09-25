@@ -129,6 +129,21 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
     internal string Where { get; } =
         GroupPath.Length == 0 ? "—" : EntryNameSanitizer.SanitizePath(GroupPath).Text;
 
+    /// <summary>What sort of entry this is, read from which fields are filled in.</summary>
+    internal EntryKind Kind { get; init; }
+
+    /// <summary>The icon the row draws for its kind.</summary>
+    internal string Icon => EntryKinds.Icon(Kind);
+
+    /// <summary>The row's second line: its kind, then where it lives.</summary>
+    /// <remarks>A variable says its project and profile rather than the <c>env/…</c> group path they are stored under.</remarks>
+    internal string Summary =>
+        EnvPlace.Of(GroupPath, Title) is { } place
+            ? $"{EntryKinds.Label(Kind)} · {EntryNameSanitizer.Sanitize(place.Project).Text} · {place.Profile}"
+            : GroupPath.Length == 0
+                ? EntryKinds.Label(Kind)
+                : $"{EntryKinds.Label(Kind)} · {Where}";
+
     /// <summary>
     /// Which fields a person cannot see on this row the query was found in, worded for the list.
     /// </summary>

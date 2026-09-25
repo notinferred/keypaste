@@ -37,9 +37,12 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     private bool _isConfirmingRotate;
     private string _created = string.Empty;
     private string _rotated = string.Empty;
+    private string? _uuid;
     private EntryAgentAccess? _agentAccess;
     private string _agentAccessSummary = "None active";
     private string _lastUsedText = "never";
+    private EntryKind _kind;
+    private IReadOnlyList<string> _agentLines = [];
 
     internal EntryDetailViewModel(
         AppVaultSession session,
@@ -65,9 +68,12 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         _url = entry.Url;
         _notes = entry.Notes;
         PasswordLength = entry.Password.Length;
+        _kind = EntryKinds.Of(entry);
+        VaultName = session.VaultPath is { } vaultPath ? System.IO.Path.GetFileName(vaultPath) : string.Empty;
 
         Reference = KpReferences.ForEntry(Name);
         Profiles = ProfilesOf(session, Reference);
+        ProfileStates = Profiles is { } row ? [.. row.Cells.Select(ProfileState.Of)] : [];
 
         NewPassword = new SecretField(clipboard);
         _restored = restored;
@@ -75,6 +81,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
 
         CopyPasswordCommand = new AsyncRelayCommand(CopyPasswordAsync, () => PasswordLength > 0);
         CopyUsernameCommand = new AsyncRelayCommand(CopyUsernameAsync, () => Username.Length > 0);
+        CopyReferenceCommand = new AsyncRelayCommand(CopyReferenceAsync, () => Reference is not null);
         EditCommand = new RelayCommand(BeginEdit, () => !IsEditing);
         CancelCommand = new RelayCommand(CancelEdit, () => IsEditing);
         SaveCommand = new RelayCommand(SaveEdit, () => IsEditing);
@@ -107,9 +114,12 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         }
     }
 
-    /// <summary>What the confirm row asks.</summary>
-    internal string RotatePrompt { get; } =
-        $"Replace the value with a new {PasswordGenerator.DefaultLength}-character password? The old one stays in history.";
+    /// <summary>What the confirm row asks. A variable's names the profile whose apps get the new value.</summary>
+    internal string RotatePrompt =>
+        EnvPlace.Of(_groupPath, _title) is { } place
+            ? $"Replace {DisplayTitle} in {place.Project} · {place.Profile} with a new random {PasswordGenerator.DefaultLength}-character value? "
+                + $"Every app that injects this key in {place.Profile} gets it on its next run, so a connection string or URL here stops working. The old value stays in history."
+            : $"Replace the value with a new {PasswordGenerator.DefaultLength}-character password? The old one stays in history.";
 
     /// <summary>When the entry was created, as the metadata row shows it.</summary>
     internal string Created
@@ -132,19 +142,30 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         private set => Set(ref _agentAccess, value);
     }
 
-    /// <summary>The Agent access card's one line.</summary>
+    /// <summary>The Agent access card's one line, when <see cref="AgentLines"/> does not list the same agents.</summary>
     internal string AgentAccessSummary
     {
         get => _agentAccessSummary;
         private set => Set(ref _agentAccessSummary, value);
     }
 
+    internal bool ShowsAgentAccessSummary => _agentLines.Count == 0;
+
     /// <summary>When an agent last received it: "in use", "4m ago" or "never".</summary>
     internal string LastUsedText
     {
         get => _lastUsedText;
-        private set => Set(ref _lastUsedText, value);
+        private set
+        {
+            if (Set(ref _lastUsedText, value))
+            {
+                Raise(nameof(HasBeenUsed));
+            }
+        }
     }
+
+    /// <summary>Whether an agent ever received it, which is when the card says when.</summary>
+    internal bool HasBeenUsed => _lastUsedText != "never";
 
     /// <summary>Takes the latest picture of what agents did, never a value.</summary>
     /// <param name="activity">The picture.</param>
@@ -160,9 +181,98 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         var now = _session.Clock.GetUtcNow();
         var access = activity.Access(Name);
         AgentAccess = access;
-        AgentAccessSummary = UseText.Summary(access, now);
+        AgentAccessSummary = UseText.Summary(access);
         LastUsedText = UseText.LastUsed(access.Use, now);
+        AgentLines = UseText.Lines(access, now);
     }
+
+    /// <summary>The Agent access card's detail: each grant in force, then each client that received this entry.</summary>
+    internal IReadOnlyList<string> AgentLines
+    {
+        get => _agentLines;
+        private set
+        {
+            if (Set(ref _agentLines, value))
+            {
+                Raise(nameof(ShowsAgentAccessSummary));
+            }
+        }
+    }
+
+    /// <summary>What sort of entry this is.</summary>
+    internal EntryKind Kind
+    {
+        get => _kind;
+        private set
+        {
+            if (Set(ref _kind, value))
+            {
+                Raise(nameof(KindLabel));
+                Raise(nameof(Location));
+                Raise(nameof(IsVariable));
+                Raise(nameof(ValueLabel));
+                Raise(nameof(ShowsUsername));
+                Raise(nameof(ShowsUrl));
+                Raise(nameof(ReplacementPlaceholder));
+                Raise(nameof(ReplacementCaption));
+            }
+        }
+    }
+
+    /// <summary>The edit form's secret field, named for what it replaces.</summary>
+    internal string ReplacementPlaceholder => IsVariable ? "New value" : "New password";
+
+    internal string ReplacementCaption => IsVariable
+        ? "Leave this empty to keep the current value. A replacement keeps the old one in this entry's history."
+        : "Leave this empty to keep the current password. A replacement keeps the old one in this entry's history.";
+
+    internal string KindLabel => EntryKinds.Label(_kind);
+
+    /// <summary>Whether this entry is a key of an env project, which has profiles rather than a username and a URL.</summary>
+    internal bool IsVariable => _kind == EntryKind.Variable;
+
+    /// <summary>The secret field's label: a variable holds a value, anything else a password.</summary>
+    internal string ValueLabel => IsVariable ? "Value" : "Password";
+
+    /// <summary>The vault's file name.</summary>
+    internal string VaultName { get; }
+
+    /// <summary>The header's second line: the kind, then the vault file and each group down to this entry.</summary>
+    internal string Location
+    {
+        get
+        {
+            var trail = _groupPath.Length == 0
+                ? VaultName
+                : string.Join(" › ", _groupPath.Split('/').Select(group => EntryNameSanitizer.Sanitize(group).Text).Prepend(VaultName));
+
+            return trail.Length == 0 ? KindLabel : $"{KindLabel} · {trail}";
+        }
+    }
+
+    /// <summary>Where the value lives in the KDBX file: the entry's UUID, abbreviated, and its field.</summary>
+    /// <remarks>The path is on the location line already; the UUID is what KeePassXC shows nowhere else.</remarks>
+    internal string KdbxEntry => _uuid is { Length: > 8 } uuid
+        ? $"uuid {uuid[..4].ToLowerInvariant()}…{uuid[^4..].ToLowerInvariant()} · field Password"
+        : $"{DisplayPath} · field Password";
+
+    /// <summary>A login always shows its username; anything else only when it has one.</summary>
+    internal bool ShowsUsername => !IsVariable || Username.Length > 0;
+
+    /// <summary>A login always shows its URL; anything else only when it has one.</summary>
+    internal bool ShowsUrl => !IsVariable || Url.Length > 0;
+
+    internal bool ShowsNotes => Notes.Length > 0;
+
+    internal bool HasReference => Reference is not null;
+
+    /// <summary>The Profiles card's rows, one per profile of the variable's project; empty for any other entry.</summary>
+    internal IReadOnlyList<ProfileState> ProfileStates { get; private set; }
+
+    internal bool HasProfiles => ProfileStates.Count > 0;
+
+    /// <summary>Copies <see cref="Reference"/>, which names the entry and holds no value.</summary>
+    internal AsyncRelayCommand CopyReferenceCommand { get; }
 
     /// <summary>Where a failure goes. Owned by the entries screen, which draws the banner.</summary>
     internal Action<string?> Report { get; }
@@ -240,6 +350,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
             if (Set(ref _username, value))
             {
                 Raise(nameof(DisplayUsername));
+                Raise(nameof(ShowsUsername));
                 CopyUsernameCommand.RaiseCanExecuteChanged();
             }
         }
@@ -253,6 +364,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
             if (Set(ref _url, value))
             {
                 Raise(nameof(DisplayUrl));
+                Raise(nameof(ShowsUrl));
             }
         }
     }
@@ -265,6 +377,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
             if (Set(ref _notes, value))
             {
                 Raise(nameof(DisplayNotes));
+                Raise(nameof(ShowsNotes));
             }
         }
     }
@@ -367,6 +480,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         Url = entry.Url;
         Notes = entry.Notes;
         PasswordLength = entry.Password.Length;
+        Kind = EntryKinds.Of(entry);
         Raise(nameof(PasswordLength));
         Raise(nameof(MaskedLength));
         Raise(nameof(PasswordMask));
@@ -422,13 +536,21 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         DraftUrl = string.Empty;
         DraftNotes = string.Empty;
         PasswordLength = 0;
+        _uuid = null;
         Reference = null;
         Profiles = null;
+        ProfileStates = [];
+        AgentLines = [];
         NewPassword.Dispose();
         History.Dispose();
 
         Raise(nameof(Reference));
+        Raise(nameof(HasReference));
         Raise(nameof(Profiles));
+        Raise(nameof(ProfileStates));
+        Raise(nameof(HasProfiles));
+        Raise(nameof(Location));
+        Raise(nameof(KdbxEntry));
         Raise(nameof(Title));
         Raise(nameof(GroupPath));
         Raise(nameof(Path));
@@ -490,6 +612,14 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     private async Task CopyUsernameAsync() =>
         await _clipboard.CopyPlainAsync(Username, "Username").ConfigureAwait(true);
 
+    private async Task CopyReferenceAsync()
+    {
+        if (Reference is { } reference)
+        {
+            await _clipboard.CopyPlainAsync(reference, "Reference").ConfigureAwait(true);
+        }
+    }
+
     private void ReadTimes()
     {
         if (_session.Unlocked is not { } vault)
@@ -502,6 +632,8 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
             var now = _session.Clock.GetUtcNow();
             Created = UseText.Dated(vault.ReadTimes(Name)?.Created, now);
             Rotated = UseText.Dated(EntryRotation.LastRotated(vault, Name), now);
+            _uuid = vault.EntryUuid(Name);
+            Raise(nameof(KdbxEntry));
         }
         catch (VaultException e)
         {

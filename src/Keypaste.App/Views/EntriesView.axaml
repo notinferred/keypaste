@@ -8,595 +8,1037 @@
 
   <UserControl.Resources>
     <views:DepthToIndent x:Key="Indent" />
-    <views:HistoryToPaneWidth x:Key="PaneWidth" />
   </UserControl.Resources>
 
-  <!-- The columns move when a revision is being compared: the group tree steps aside so the detail
-       pane can show a revision's fields beside the current ones. Both outer columns are Auto, so
-       what moves them is the pane's width and the tree's visibility. -->
-  <Grid RowDefinitions="Auto,*">
+  <UserControl.Styles>
+
+    <!-- A row's kind icon is muted until its row is selected. -->
+    <Style Selector="ListBoxItem ctl|KpIcon.kind">
+      <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+    </Style>
+    <Style Selector="ListBoxItem:selected ctl|KpIcon.kind">
+      <Setter Property="Foreground" Value="{DynamicResource KpAccent}" />
+    </Style>
+
+    <!-- The group tree: 30px rows, quieter than the sidebar's destinations. -->
+    <Style Selector="ListBox.groups > ListBoxItem">
+      <Setter Property="MinHeight" Value="30" />
+      <Setter Property="Height" Value="30" />
+      <Setter Property="Padding" Value="8,0" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
+    </Style>
+    <Style Selector="ListBox.groups > ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
+    </Style>
+    <Style Selector="ListBox.groups > ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter,
+                     ListBox.groups > ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter,
+                     ListBox.groups > ListBoxItem:selected:focus /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+      <Setter Property="BoxShadow" Value="none" />
+    </Style>
+
+    <Style Selector="ToggleButton.tree">
+      <Setter Property="Width" Value="26" />
+      <Setter Property="Height" Value="26" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="ToggleButton.tree /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+    </Style>
+    <Style Selector="ToggleButton.tree:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+    </Style>
+    <Style Selector="ToggleButton.tree:checked /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
+    </Style>
+
+    <!-- The ⋯ button, which stays #2A2C30 whether its menu is open or not. -->
+    <Style Selector="ToggleButton.more">
+      <Setter Property="Width" Value="30" />
+      <Setter Property="Height" Value="30" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="ToggleButton.more /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+    </Style>
+    <Style Selector="ToggleButton.more:pointerover /template/ ContentPresenter#PART_ContentPresenter,
+                     ToggleButton.more:checked /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource KpBgActiveHover}" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+    </Style>
+
+    <!-- The header's Copy and Rotate: 30px, 12px sides. -->
+    <Style Selector="Button.action">
+      <Setter Property="Height" Value="30" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="12,0" />
+    </Style>
+
+    <!-- The small button inside a value field: Reveal. -->
+    <Style Selector="Button.in-field">
+      <Setter Property="Height" Value="30" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="10,0" />
+      <Setter Property="CornerRadius" Value="5" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+
+    <Style Selector="Button.menu-item">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="Height" Value="30" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="10,0" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="FontSize" Value="12.5" />
+      <Setter Property="FontWeight" Value="Normal" />
+    </Style>
+    <Style Selector="Button.menu-item.danger /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.menu-item.danger:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource KpDangerTint}" />
+    </Style>
+
+    <!-- A value in a field-shaped box: the design's Value field, 40px on the app ink. -->
+    <Style Selector="Border.value">
+      <Setter Property="MinHeight" Value="40" />
+      <Setter Property="Padding" Value="12,4,4,4" />
+      <Setter Property="Background" Value="{DynamicResource KpBgApp}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource KpBorderDefault}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusField}" />
+    </Style>
+
+    <Style Selector="Border.meta">
+      <Setter Property="Padding" Value="0,10" />
+      <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
+      <Setter Property="BorderThickness" Value="0,0,0,1" />
+    </Style>
+
+    <Style Selector="Border.menu">
+      <Setter Property="Background" Value="{DynamicResource KpBgCard}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource KpBorderStrong}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusCard}" />
+      <Setter Property="BoxShadow" Value="{StaticResource KpShadowPopover}" />
+      <Setter Property="Padding" Value="4" />
+    </Style>
+
+    <Style Selector="Border.form">
+      <Setter Property="Background" Value="{DynamicResource KpBgPanel}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusCard}" />
+      <Setter Property="Padding" Value="14" />
+    </Style>
+
+    <!-- The destructive confirmation, the one place KpDanger appears on this screen. -->
+    <Style Selector="Border.form.danger">
+      <Setter Property="Background" Value="{DynamicResource KpDangerTint}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource KpDanger}" />
+    </Style>
+
+    <Style Selector="ToggleButton.tree:disabled /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextDisabled}" />
+    </Style>
+
+    <Style Selector="Border.note">
+      <Setter Property="Background" Value="{DynamicResource KpAccentTint}" />
+      <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusField}" />
+      <Setter Property="Padding" Value="12,8" />
+    </Style>
+
+  </UserControl.Styles>
+
+  <!-- Four columns: the group tree, which folds away, the list, and the entry's pane. The tree also
+       steps aside while a revision is being compared, so the pane has room for two sets of fields. -->
+  <Grid>
     <Grid.ColumnDefinitions>
       <ColumnDefinition Width="Auto" />
-      <!-- The dividers' columns are Auto so their margins separate the panes rather than overlap them. -->
+      <ColumnDefinition Width="34*" MinWidth="240" />
       <ColumnDefinition Width="Auto" />
-      <!-- The main window's MinWidth is what keeps this column's minimum beside the tree and pane. -->
-      <ColumnDefinition Width="*" MinWidth="100" />
-      <ColumnDefinition Width="Auto" />
-      <ColumnDefinition Width="Auto" />
+      <ColumnDefinition Width="66*" />
     </Grid.ColumnDefinitions>
 
     <!-- The group tree. A flat, indented ListBox rather than a TreeView: arrow keys, Home/End and
          type-ahead work for free, and a vault three groups deep does not need expand state. -->
-    <TextBlock Grid.Row="0" Grid.Column="0"
-               Text="Groups"
-               Width="180"
-               FontSize="11"
-               Margin="0,0,0,8"
-               IsVisible="{Binding !Detail.History.IsOpen}"
-               Foreground="{DynamicResource KpTextMuted}" />
+    <Panel Grid.Column="0" IsVisible="{Binding !Detail.History.IsOpen}">
+      <DockPanel Width="188" IsVisible="{Binding #GroupsToggle.IsChecked}">
 
-    <Grid Grid.Row="1" Grid.Column="0"
-          Width="180"
-          RowDefinitions="*,Auto"
-          IsVisible="{Binding !Detail.History.IsOpen}">
+        <Rectangle DockPanel.Dock="Right"
+                   x:Name="TreeDivider"
+                   Width="1"
+                   Fill="{DynamicResource KpBorderSubtle}" />
 
-      <ListBox Grid.Row="0"
-               Name="Groups"
-               ItemsSource="{Binding Groups}"
-               SelectedItem="{Binding SelectedGroup}"
-               Background="Transparent"
-               BorderThickness="0">
-        <ListBox.ItemTemplate>
-          <DataTemplate x:DataType="vm:GroupNode">
-            <TextBlock Text="{Binding Label}"
-                       Margin="{Binding Depth, Converter={StaticResource Indent}}"
-                       TextTrimming="CharacterEllipsis" />
-          </DataTemplate>
-        </ListBox.ItemTemplate>
-      </ListBox>
+        <!-- A group is a thing on the tree, so its controls are where the tree is. New makes a child
+             of whatever is selected, or a top-level group under "All entries"; Rename is unavailable
+             there, because the root is not a group somebody named. -->
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto" Margin="18,20,8,8">
+          <TextBlock Grid.Column="0" Classes="th" Text="GROUPS" VerticalAlignment="Center" />
+          <Button Grid.Column="1"
+                  x:Name="NewGroup"
+                  Classes="icon ghost sm"
+                  ToolTip.Tip="New group"
+                  AutomationProperties.Name="New group"
+                  Command="{Binding BeginCreateGroupCommand}">
+            <ctl:KpIcon Icon="folder-plus" Size="14" />
+          </Button>
+          <Button Grid.Column="2"
+                  x:Name="RenameGroup"
+                  Classes="icon ghost sm"
+                  ToolTip.Tip="Rename group"
+                  AutomationProperties.Name="Rename group"
+                  Command="{Binding BeginRenameGroupCommand}">
+            <ctl:KpIcon Icon="folder-pen" Size="14" />
+          </Button>
+        </Grid>
 
-      <!-- A group is a thing on the tree, so its controls are where the tree is. New makes a child
-           of whatever is selected, or a top-level group under "All entries"; Rename is unavailable
-           there, because the root is not a group somebody named. -->
-      <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
-        <Button x:Name="NewGroup" Content="New group" FontSize="11"
-                Command="{Binding BeginCreateGroupCommand}" />
-        <Button x:Name="RenameGroup" Content="Rename" FontSize="11"
-                Command="{Binding BeginRenameGroupCommand}" />
+        <ListBox Name="Groups"
+                 Classes="groups"
+                 Margin="8,0,8,12"
+                 ItemsSource="{Binding Groups}"
+                 SelectedItem="{Binding SelectedGroup}">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:GroupNode">
+              <StackPanel Orientation="Horizontal"
+                          Spacing="8"
+                          Margin="{Binding Depth, Converter={StaticResource Indent}}">
+                <ctl:KpIcon Icon="folder" Size="14" Foreground="{DynamicResource KpTextMuted}" />
+                <TextBlock Text="{Binding Label}"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" />
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+
+      </DockPanel>
+    </Panel>
+
+    <!-- The list. Titles, kinds and groups, and nothing from inside an entry: see EntryRow. -->
+    <DockPanel Grid.Column="1">
+
+      <Border DockPanel.Dock="Top"
+              Padding="16,16,16,12"
+              BorderBrush="{DynamicResource KpBorderSubtle}"
+              BorderThickness="0,0,0,1">
+        <StackPanel Spacing="12">
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <ToggleButton Grid.Column="0"
+                          x:Name="GroupsToggle"
+                          Classes="tree"
+                          IsChecked="True"
+                          IsEnabled="{Binding !Detail.History.IsOpen, FallbackValue=True}"
+                          Margin="-4,0,6,0"
+                          ToolTip.Tip="Show or hide groups"
+                          AutomationProperties.Name="Groups">
+              <ctl:KpIcon Icon="panel-left" Size="15" />
+            </ToggleButton>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+              <TextBlock Classes="mono lg"
+                         Text="{Binding ListTitle}"
+                         TextTrimming="CharacterEllipsis"
+                         VerticalAlignment="Center" />
+              <Border Classes="chip" IsVisible="{Binding HasListProfile}">
+                <TextBlock Text="{Binding ListProfile}" />
+              </Border>
+            </StackPanel>
+            <Button Grid.Column="2"
+                    x:Name="AddEntry"
+                    Classes="primary sm"
+                    Height="28"
+                    Padding="10,0"
+                    Command="{Binding BeginAddCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <ctl:KpIcon Icon="plus" Size="13" />
+                <TextBlock Text="New" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+          </Grid>
+          <TextBox Name="Search"
+                   Classes="search"
+                   Height="30"
+                   MinHeight="30"
+                   Text="{Binding Search}"
+                   PlaceholderText="{Binding FilterHint}">
+            <TextBox.InnerLeftContent>
+              <ctl:KpIcon Icon="filter" Size="13" Margin="2,0,0,0" Foreground="{DynamicResource KpTextMuted}" />
+            </TextBox.InnerLeftContent>
+          </TextBox>
+        </StackPanel>
+      </Border>
+
+      <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="8,8,8,0">
+
+        <!-- What the last deletion did, and the way back for the one still on screen. Every other
+             recovery is on Trash, which is where this one goes once the screen moves on. -->
+        <Border Classes="note" IsVisible="{Binding HasNotice}">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Grid.Column="0"
+                       Text="{Binding Notice}"
+                       TextWrapping="Wrap"
+                       VerticalAlignment="Center"
+                       FontSize="12"
+                       Classes="secondary" />
+            <Button Grid.Column="1"
+                    Classes="link"
+                    Content="Restore"
+                    Margin="10,0,0,0"
+                    IsVisible="{Binding CanUndoDelete}"
+                    Command="{Binding UndoDeleteCommand}" />
+          </Grid>
+        </Border>
+
+        <!-- Calm, not a dialog. KpDanger is reserved for the destructive confirmation. -->
+        <Border Classes="note" IsVisible="{Binding HasError}">
+          <TextBlock Text="{Binding Error}" TextWrapping="Wrap" FontSize="12" Classes="secondary" />
+        </Border>
+
+        <Border Classes="form" IsVisible="{Binding IsCreatingGroup}">
+          <StackPanel Spacing="10">
+            <TextBlock Classes="caption" Text="{Binding CreateGroupPrompt}" />
+            <TextBox x:Name="NewGroupName" Text="{Binding DraftGroupName}" PlaceholderText="servers" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button x:Name="CreateGroup" Classes="primary sm" Content="Create" Command="{Binding ConfirmCreateGroupCommand}" />
+              <Button Classes="ghost sm" Content="Cancel" Command="{Binding CancelGroupCommand}" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="form" IsVisible="{Binding IsRenamingGroup}">
+          <StackPanel Spacing="10">
+            <TextBlock Classes="caption" Text="{Binding RenameGroupPrompt}" />
+            <TextBox x:Name="RenameGroupName" Text="{Binding DraftGroupName}" />
+            <TextBlock Classes="caption" Text="{Binding AccessNote}" />
+            <!-- The specific case of the line above: renaming a project is also how the name
+                 `keypaste run` takes changes. -->
+            <TextBlock x:Name="ProjectRenameNote"
+                       Classes="caption"
+                       IsVisible="{Binding ShowsProjectRenameNote}"
+                       Text="{Binding ProjectRenameNote}" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button x:Name="RenameGroupSave" Classes="primary sm" Content="Rename" Command="{Binding ConfirmRenameGroupCommand}" />
+              <Button Classes="ghost sm" Content="Cancel" Command="{Binding CancelGroupCommand}" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
       </StackPanel>
 
-    </Grid>
-
-    <Rectangle Grid.Row="0" Grid.RowSpan="2" Grid.Column="1"
-               x:Name="TreeDivider"
-               Width="1" Fill="{DynamicResource KpBorderSubtle}" Margin="12,0"
-               IsVisible="{Binding !Detail.History.IsOpen}" />
-
-    <!-- The toolbar spans the list and the entry's pane, since the list's column alone is narrower
-         than its buttons once an entry is open (F.22). -->
-    <Grid Grid.Row="0" Grid.Column="2" Grid.ColumnSpan="3" ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,0,0,8">
-      <TextBox Grid.Column="0"
-               Name="Search"
-               Text="{Binding Search}"
-               PlaceholderText="Search entries"
-               BorderThickness="1" />
-      <Button Grid.Column="1" x:Name="AddEntry" Content="Add" Margin="8,0,0,0" Command="{Binding BeginAddCommand}" />
-      <Button Grid.Column="2" x:Name="Organize" Content="Organize" Margin="8,0,0,0"
-              Command="{Binding OrganizeCommand}" />
-      <Button Grid.Column="3" x:Name="DeleteEntry" Content="Delete" Margin="8,0,0,0" Command="{Binding DeleteCommand}" />
-    </Grid>
-
-    <!-- The list. Titles and groups, and nothing from inside an entry: see EntryRow. -->
-    <Grid Grid.Row="1" Grid.Column="2" RowDefinitions="Auto,Auto,Auto,*">
-
-      <!-- What the last deletion did, and the way back for the one still on screen. Every other
-           recovery is on Trash, which is where this one goes once the screen moves on. -->
-      <Border Grid.Row="0"
-              IsVisible="{Binding HasNotice}"
-              Background="{DynamicResource KpAccentQuiet}"
-              CornerRadius="{DynamicResource KpRadiusSm}"
-              Padding="12,8"
-              Margin="0,0,0,8">
-        <Grid ColumnDefinitions="*,Auto">
-          <TextBlock Grid.Column="0"
-                     Text="{Binding Notice}"
-                     TextWrapping="Wrap"
-                     VerticalAlignment="Center"
-                     FontSize="12"
-                     Foreground="{DynamicResource KpTextSecondary}" />
-          <Button Grid.Column="1"
-                  Content="Restore"
-                  Margin="8,0,0,0"
-                  IsVisible="{Binding CanUndoDelete}"
-                  Command="{Binding UndoDeleteCommand}" />
-        </Grid>
-      </Border>
-
-      <!-- Calm, not a dialog. KpDanger is reserved for the destructive confirmation. -->
-      <Border Grid.Row="1"
-              IsVisible="{Binding HasError}"
-              Background="{DynamicResource KpAccentQuiet}"
-              CornerRadius="{DynamicResource KpRadiusSm}"
-              Padding="12,8"
-              Margin="0,0,0,8">
-        <TextBlock Text="{Binding Error}"
-                   TextWrapping="Wrap"
-                   FontSize="12"
-                   Foreground="{DynamicResource KpTextSecondary}" />
-      </Border>
-
-      <!-- The one place KpDanger appears on this screen. What the deletion costs depends on the
-           vault: DeletePrompt reads its recycle-bin setting and says which case this is. -->
-      <Border Grid.Row="2"
-              IsVisible="{Binding IsConfirmingDelete}"
-              BorderBrush="{DynamicResource KpDanger}"
-              BorderThickness="1"
-              CornerRadius="{DynamicResource KpRadiusSm}"
-              Padding="12"
-              Margin="0,0,0,8">
-        <StackPanel Spacing="8">
-          <TextBlock Text="{Binding DeletePrompt}"
-                     TextWrapping="Wrap"
-                     Foreground="{DynamicResource KpTextPrimary}" />
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button Content="Delete" Command="{Binding ConfirmDeleteCommand}"
-                    Foreground="{DynamicResource KpDanger}" />
-            <Button Content="Keep it" Command="{Binding CancelDeleteCommand}" />
+      <Panel>
+      <!-- An empty list says why, so a filter with no match does not read as a failed load. -->
+      <StackPanel Spacing="12"
+                  Margin="24,0"
+                  HorizontalAlignment="Center"
+                  VerticalAlignment="Center"
+                  IsVisible="{Binding ShowsListEmpty}">
+        <TextBlock x:Name="ListEmpty"
+                   Classes="subtitle"
+                   TextAlignment="Center"
+                   Text="{Binding ListEmptyNote}" />
+        <Button Classes="sm"
+                HorizontalAlignment="Center"
+                IsVisible="{Binding ListEmptyOffersNew}"
+                Command="{Binding BeginAddCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <ctl:KpIcon Icon="plus" Size="13" />
+            <TextBlock Text="New secret" VerticalAlignment="Center" />
           </StackPanel>
-        </StackPanel>
-      </Border>
+        </Button>
+      </StackPanel>
 
-      <Border Grid.Row="2"
-              IsVisible="{Binding IsAdding}"
-              Background="{DynamicResource KpSurface2}"
-              CornerRadius="{DynamicResource KpRadiusSm}"
-              Padding="12"
-              Margin="0,0,0,8">
-        <StackPanel Spacing="8">
-          <TextBox Text="{Binding NewEntryPath}" PlaceholderText="servers/production" />
-          <CheckBox Content="Generate a password" IsChecked="{Binding GeneratePassword}" />
-          <StackPanel Spacing="4" IsVisible="{Binding GeneratePassword}">
-            <StackPanel Orientation="Horizontal" Spacing="12">
-              <RadioButton GroupName="NewEntrySecretKind" Content="Characters" IsChecked="{Binding Generator.UseCharacters}" />
-              <RadioButton GroupName="NewEntrySecretKind" Content="Words" IsChecked="{Binding Generator.UseWords}" />
-              <NumericUpDown Width="104"
-                             IsVisible="{Binding Generator.UseWords}"
-                             Minimum="{Binding Generator.MinimumWords}"
-                             Maximum="{Binding Generator.MaximumWords}"
-                             Increment="1"
-                             FormatString="0"
-                             Value="{Binding Generator.WordCount}" />
-              <TextBox Width="44"
-                       MaxLength="1"
-                       IsVisible="{Binding Generator.UseWords}"
-                       Text="{Binding Generator.Separator}" />
-            </StackPanel>
-            <TextBlock FontSize="11"
-                       TextWrapping="Wrap"
-                       Foreground="{DynamicResource KpTextMuted}"
-                       Text="{Binding Generator.Strength}" />
-            <TextBlock FontSize="11"
-                       TextWrapping="Wrap"
-                       IsVisible="{Binding Generator.UseWords}"
-                       Foreground="{DynamicResource KpTextMuted}"
-                       Text="{Binding Generator.Provenance}" />
-            <TextBlock FontSize="11"
-                       TextWrapping="Wrap"
-                       IsVisible="{Binding Generator.Error, Converter={x:Static ObjectConverters.IsNotNull}}"
-                       Foreground="{DynamicResource KpTextSecondary}"
-                       Text="{Binding Generator.Error}" />
-          </StackPanel>
-          <ctl:MaskedInput x:Name="NewEntryPassword"
-                           IsVisible="{Binding !GeneratePassword}"
-                           AllowsPaste="True"
-                           Sink="{Binding NewPassword}"
-                           MaskedLength="{Binding NewPassword.MaskedLength}"
-                           Placeholder="Existing password" />
-          <TextBlock FontSize="11"
-                     TextWrapping="Wrap"
-                     IsVisible="{Binding !GeneratePassword}"
-                     Foreground="{DynamicResource KpTextMuted}"
-                     Text="Type it or press Ctrl/Cmd+V to paste. Leave it empty for an entry with no password." />
-          <TextBlock FontSize="11"
-                     TextWrapping="Wrap"
-                     IsVisible="{Binding NewPassword.Note.Length}"
-                     Foreground="{DynamicResource KpTextMuted}"
-                     Text="{Binding NewPassword.Note}" />
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button Content="Create" Command="{Binding ConfirmAddCommand}" />
-            <Button Content="Cancel" Command="{Binding CancelAddCommand}" />
-          </StackPanel>
-        </StackPanel>
-      </Border>
-
-      <!-- Renaming and moving on one form, behind one Save. The two are a single core write
-           (Vault.Relocate), and splitting them into two submits would let a rename commit in the
-           open vault while the move beside it was refused, for the next save to write out. -->
-      <Border Grid.Row="2"
-              IsVisible="{Binding IsOrganizing}"
-              Background="{DynamicResource KpSurface2}"
-              CornerRadius="{DynamicResource KpRadiusSm}"
-              Padding="12"
-              Margin="0,0,0,8">
-        <StackPanel Spacing="8">
-          <TextBlock Text="{Binding OrganizePrompt}"
-                     FontSize="11"
-                     FontFamily="{DynamicResource KpMono}"
-                     TextTrimming="CharacterEllipsis"
-                     Foreground="{DynamicResource KpTextMuted}" />
-          <TextBlock Text="Name" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
-          <TextBox x:Name="OrganizeTitle" Text="{Binding DraftTitle}" />
-          <TextBlock Text="Group" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
-          <ComboBox x:Name="OrganizeGroup"
-                    HorizontalAlignment="Stretch"
-                    ItemsSource="{Binding MoveTargets}"
-                    SelectedItem="{Binding MoveTarget}">
-            <ComboBox.ItemTemplate>
-              <DataTemplate x:DataType="vm:GroupNode">
-                <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
-              </DataTemplate>
-            </ComboBox.ItemTemplate>
-          </ComboBox>
-          <TextBlock FontSize="11" TextWrapping="Wrap"
-                     Foreground="{DynamicResource KpTextMuted}"
-                     Text="{Binding AccessNote}" />
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button x:Name="OrganizeSave" Content="Save" Command="{Binding ConfirmOrganizeCommand}" />
-            <Button Content="Cancel" Command="{Binding CancelOrganizeCommand}" />
-          </StackPanel>
-        </StackPanel>
-      </Border>
-
-      <Border Grid.Row="2"
-              IsVisible="{Binding IsCreatingGroup}"
-              Background="{DynamicResource KpSurface2}"
-              CornerRadius="{DynamicResource KpRadiusSm}"
-              Padding="12"
-              Margin="0,0,0,8">
-        <StackPanel Spacing="8">
-          <TextBlock Text="{Binding CreateGroupPrompt}"
-                     FontSize="11"
-                     TextWrapping="Wrap"
-                     Foreground="{DynamicResource KpTextMuted}" />
-          <TextBox x:Name="NewGroupName" Text="{Binding DraftGroupName}" PlaceholderText="servers" />
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button x:Name="CreateGroup" Content="Create" Command="{Binding ConfirmCreateGroupCommand}" />
-            <Button Content="Cancel" Command="{Binding CancelGroupCommand}" />
-          </StackPanel>
-        </StackPanel>
-      </Border>
-
-      <Border Grid.Row="2"
-              IsVisible="{Binding IsRenamingGroup}"
-              Background="{DynamicResource KpSurface2}"
-              CornerRadius="{DynamicResource KpRadiusSm}"
-              Padding="12"
-              Margin="0,0,0,8">
-        <StackPanel Spacing="8">
-          <TextBlock Text="{Binding RenameGroupPrompt}"
-                     FontSize="11"
-                     TextWrapping="Wrap"
-                     Foreground="{DynamicResource KpTextMuted}" />
-          <TextBox x:Name="RenameGroupName" Text="{Binding DraftGroupName}" />
-          <TextBlock FontSize="11" TextWrapping="Wrap"
-                     Foreground="{DynamicResource KpTextMuted}"
-                     Text="{Binding AccessNote}" />
-          <!-- The specific case of the line above: renaming a project is also how the name
-               `keypaste run` takes changes. -->
-          <TextBlock x:Name="ProjectRenameNote"
-                     FontSize="11" TextWrapping="Wrap"
-                     IsVisible="{Binding ShowsProjectRenameNote}"
-                     Foreground="{DynamicResource KpTextMuted}"
-                     Text="{Binding ProjectRenameNote}" />
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button x:Name="RenameGroupSave" Content="Rename" Command="{Binding ConfirmRenameGroupCommand}" />
-            <Button Content="Cancel" Command="{Binding CancelGroupCommand}" />
-          </StackPanel>
-        </StackPanel>
-      </Border>
-
-      <ListBox Grid.Row="3"
-               Name="Rows"
+      <ListBox Name="Rows"
+               Classes="rows"
+               Padding="6"
                ItemsSource="{Binding Rows}"
-               SelectedItem="{Binding Selected}"
-               Background="Transparent"
-               BorderThickness="0">
+               SelectedItem="{Binding Selected}">
         <ListBox.ItemTemplate>
           <DataTemplate x:DataType="vm:EntryRow">
-            <Grid ColumnDefinitions="*,Auto,Auto,Auto">
-              <TextBlock Grid.Column="0" Text="{Binding DisplayTitle}" TextTrimming="CharacterEllipsis" />
+            <Grid ColumnDefinitions="18,10,*,Auto" RowDefinitions="Auto,4,Auto">
+              <ctl:KpIcon Grid.Row="0" Grid.Column="0" Classes="kind" Icon="{Binding Icon}" Size="15" />
+              <TextBlock Grid.Row="0" Grid.Column="2"
+                         Classes="mono lg"
+                         Text="{Binding DisplayTitle}"
+                         TextTrimming="CharacterEllipsis"
+                         VerticalAlignment="Center" />
               <!-- When an agent last received it: amber in use, green recent, grey idle. A time, never a value. -->
-              <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="5" Margin="12,0,0,0"
+              <StackPanel Grid.Row="0" Grid.Column="3"
+                          Orientation="Horizontal"
+                          Spacing="6"
+                          Margin="10,0,0,0"
                           IsVisible="{Binding LastUsedText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                <Border Classes="dot" Classes.warn="{Binding IsInUse}" Classes.ok="{Binding IsRecent}" Classes.idle="{Binding IsIdle}"
-                        VerticalAlignment="Center" />
-                <TextBlock Text="{Binding LastUsedText}" FontSize="11" FontFamily="{DynamicResource KpMono}"
-                           Foreground="{DynamicResource KpTextMuted}" />
+                <TextBlock Classes="mono sm muted" Text="{Binding LastUsedText}" VerticalAlignment="Center" />
+                <Border Classes="dot" Classes.warn="{Binding IsInUse}" Classes.ok="{Binding IsRecent}" Classes.idle="{Binding IsIdle}" />
               </StackPanel>
-              <!-- Why the row is in a result whose reason is nowhere else on it. A field name from
-                   a fixed vocabulary; the value that matched is never drawn. -->
-              <TextBlock Grid.Column="1"
-                         Text="{Binding Why}"
-                         FontSize="11"
-                         Margin="12,0,0,0"
-                         IsVisible="{Binding Why.Length}"
-                         Foreground="{DynamicResource KpAccent}" />
-              <TextBlock Grid.Column="2"
-                         Text="{Binding Where}"
-                         FontSize="11"
-                         Margin="12,0,0,0"
-                         Foreground="{DynamicResource KpTextMuted}" />
+              <!-- Its kind and group, and why it is in a result whose reason is nowhere else on it:
+                   a field name from a fixed vocabulary, never the value that matched. -->
+              <StackPanel Grid.Row="2" Grid.Column="2" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="6">
+                <TextBlock Text="{Binding Summary}"
+                           FontSize="11.5"
+                           Classes="muted"
+                           TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{Binding Why}"
+                           FontSize="11.5"
+                           Classes="amber"
+                           IsVisible="{Binding Why.Length}" />
+              </StackPanel>
             </Grid>
           </DataTemplate>
         </ListBox.ItemTemplate>
       </ListBox>
+      </Panel>
 
-    </Grid>
+    </DockPanel>
 
-    <Rectangle Grid.Row="1" Grid.Column="3"
+    <Rectangle Grid.Column="2"
                x:Name="PaneDivider"
-               Width="1" Fill="{DynamicResource KpBorderSubtle}" Margin="12,0" />
+               Width="1"
+               Fill="{DynamicResource KpBorderSubtle}" />
 
-    <!-- The detail pane. Username, URL and notes for the one entry somebody chose; the password is
-         dots until its cell is held, and no binding here carries it (D-0300). -->
-    <ContentControl Grid.Row="1" Grid.Column="4"
+    <TextBlock Grid.Column="3"
+               Classes="subtitle"
+               Text="Choose a secret to see it here."
+               HorizontalAlignment="Center"
+               VerticalAlignment="Center"
+               IsVisible="{Binding ShowsPlaceholder}" />
+
+    <!-- A new entry is made in the pane's place, where there is room for its generator. -->
+    <ScrollViewer Grid.Column="3"
+                  HorizontalScrollBarVisibility="Disabled"
+                  IsVisible="{Binding IsAdding}">
+      <Grid Margin="32,28">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" MaxWidth="756" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <StackPanel Spacing="24">
+
+          <StackPanel Spacing="6">
+            <TextBlock Classes="h1" Text="New secret" />
+            <TextBlock Classes="subtitle" Text="{Binding VaultName, StringFormat='Saved into {0}.'}" />
+          </StackPanel>
+
+          <StackPanel Spacing="8">
+            <TextBlock Classes="label" Text="Group and title" />
+            <TextBox Classes="mono" MinHeight="40" Text="{Binding NewEntryPath}" PlaceholderText="servers/production" />
+            <TextBlock Classes="caption" Text="Groups are separated by /. The last part is the entry's title." />
+          </StackPanel>
+
+          <!-- A login's other fields, so it is whole in one step. A key under env has profiles instead. -->
+          <StackPanel Spacing="8" IsVisible="{Binding NewEntryIsLogin}">
+            <TextBlock Classes="label" Text="Username" />
+            <TextBox x:Name="NewEntryUsername" Classes="mono" MinHeight="40" Text="{Binding NewUsername}" PlaceholderText="Optional" />
+          </StackPanel>
+
+          <StackPanel Spacing="8" IsVisible="{Binding NewEntryIsLogin}">
+            <TextBlock Classes="label" Text="URL" />
+            <TextBox x:Name="NewEntryUrl" Classes="mono" MinHeight="40" Text="{Binding NewUrl}" PlaceholderText="https://" />
+          </StackPanel>
+
+          <StackPanel Spacing="10">
+            <TextBlock Classes="label" Text="Password" />
+            <CheckBox Content="Generate a password" IsChecked="{Binding GeneratePassword}" />
+            <StackPanel Spacing="10" IsVisible="{Binding GeneratePassword}">
+              <Border Classes="segmented inset">
+                <StackPanel Orientation="Horizontal">
+                  <RadioButton Classes="segment" GroupName="NewEntrySecretKind" Content="Characters" IsChecked="{Binding Generator.UseCharacters}" />
+                  <RadioButton Classes="segment" GroupName="NewEntrySecretKind" Content="Words" IsChecked="{Binding Generator.UseWords}" />
+                </StackPanel>
+              </Border>
+              <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Generator.UseWords}">
+                <NumericUpDown Width="104"
+                               Minimum="{Binding Generator.MinimumWords}"
+                               Maximum="{Binding Generator.MaximumWords}"
+                               Increment="1"
+                               FormatString="0"
+                               Value="{Binding Generator.WordCount}" />
+                <TextBox Width="44"
+                         MaxLength="1"
+                         Classes="mono"
+                         ToolTip.Tip="Separator"
+                         Text="{Binding Generator.Separator}" />
+              </StackPanel>
+              <TextBlock Classes="mono muted" FontSize="12" Text="{Binding Generator.Strength}" />
+              <TextBlock Classes="caption"
+                         IsVisible="{Binding Generator.UseWords}"
+                         Text="{Binding Generator.Provenance}" />
+              <TextBlock Classes="caption secondary"
+                         IsVisible="{Binding Generator.Error, Converter={x:Static ObjectConverters.IsNotNull}}"
+                         Text="{Binding Generator.Error}" />
+            </StackPanel>
+            <ctl:MaskedInput x:Name="NewEntryPassword"
+                             IsVisible="{Binding !GeneratePassword}"
+                             AllowsPaste="True"
+                             Sink="{Binding NewPassword}"
+                             MaskedLength="{Binding NewPassword.MaskedLength}"
+                             Placeholder="Existing password" />
+            <TextBlock Classes="caption"
+                       IsVisible="{Binding !GeneratePassword}"
+                       Text="Type it or press Ctrl/Cmd+V to paste. Leave it empty for an entry with no password." />
+            <TextBlock Classes="caption"
+                       IsVisible="{Binding NewPassword.Note.Length}"
+                       Text="{Binding NewPassword.Note}" />
+          </StackPanel>
+
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Classes="primary" Content="Create" Command="{Binding ConfirmAddCommand}" />
+            <Button Classes="ghost" Content="Cancel" Command="{Binding CancelAddCommand}" />
+          </StackPanel>
+
+        </StackPanel>
+      </Grid>
+    </ScrollViewer>
+
+    <!-- The entry's pane. Username, URL and notes for the one entry somebody chose; the password is
+         dots until it is held, and no binding here carries it (D-0300). -->
+    <ContentControl Grid.Column="3"
                     x:Name="EntryPane"
-                    Width="{Binding Detail.History.IsOpen, Converter={StaticResource PaneWidth}}"
+                    IsVisible="{Binding !IsAdding}"
                     Content="{Binding Detail}">
       <ContentControl.DataTemplates>
         <DataTemplate DataType="vm:EntryDetailViewModel">
-          <ScrollViewer>
-            <StackPanel Spacing="12">
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+            <Grid Margin="32,28">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" MaxWidth="756" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <StackPanel Spacing="24">
 
-              <StackPanel Spacing="2">
-                <TextBlock x:Name="EntryTitle" Text="{Binding DisplayTitle}" FontSize="16"
-                           TextTrimming="CharacterEllipsis"
-                           Foreground="{DynamicResource KpTextPrimary}" />
-                <TextBlock Text="{Binding DisplayPath}" FontSize="11"
-                           FontFamily="{DynamicResource KpMono}"
-                           TextTrimming="CharacterEllipsis"
-                           Foreground="{DynamicResource KpTextMuted}" />
-              </StackPanel>
+                <!-- The header, drawn above everything after it so its menu can lie over them. -->
+                <StackPanel ZIndex="1">
+                  <ctl:HeaderRow Spacing="16">
+                    <StackPanel Spacing="6">
+                      <TextBlock x:Name="EntryTitle"
+                                 Classes="mono xl"
+                                 Text="{Binding DisplayTitle}"
+                                 TextWrapping="Wrap" />
+                      <TextBlock Text="{Binding Location}"
+                                 FontSize="13"
+                                 Classes="muted"
+                                 TextWrapping="Wrap" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
+                      <Button x:Name="CopyPassword" Classes="action" Command="{Binding CopyPasswordCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <ctl:KpIcon Icon="copy" Size="13" />
+                          <TextBlock Text="Copy" VerticalAlignment="Center" />
+                        </StackPanel>
+                      </Button>
+                      <Button x:Name="RotateFromPane" Classes="action" Command="{Binding RotateCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <ctl:KpIcon Icon="refresh-cw" Size="13" />
+                          <TextBlock Text="Rotate" VerticalAlignment="Center" />
+                        </StackPanel>
+                      </Button>
+                      <ToggleButton x:Name="EntryMenu"
+                                    Classes="more"
+                                    ToolTip.Tip="More"
+                                    AutomationProperties.Name="More actions">
+                        <ctl:KpIcon Icon="ellipsis" Size="14" />
+                      </ToggleButton>
+                    </StackPanel>
+                  </ctl:HeaderRow>
 
-              <StackPanel Spacing="4" IsVisible="{Binding !IsEditing}">
-                <TextBlock Text="Password" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
-                <Grid ColumnDefinitions="*,Auto">
-                  <ctl:RevealedValue Grid.Column="0"
-                                     x:Name="CurrentPassword"
-                                     Source="{Binding}"
-                                     MaskedLength="{Binding MaskedLength}"
-                                     AutomationProperties.Name="Hold to reveal the password"
-                                     FontFamily="{DynamicResource KpMono}"
-                                     FontSize="13"
-                                     VerticalAlignment="Center"
-                                     Foreground="{DynamicResource KpTextSecondary}" />
-                  <Button Grid.Column="1" x:Name="CopyPassword" Content="Copy"
-                          Command="{Binding CopyPasswordCommand}" />
-                </Grid>
-              </StackPanel>
-
-              <StackPanel Spacing="4" IsVisible="{Binding !IsEditing}">
-                <TextBlock Text="Username" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
-                <Grid ColumnDefinitions="*,Auto">
-                  <TextBlock Grid.Column="0" Text="{Binding DisplayUsername}"
-                             TextTrimming="CharacterEllipsis"
-                             VerticalAlignment="Center"
-                             Foreground="{DynamicResource KpTextPrimary}" />
-                  <Button Grid.Column="1" Content="Copy" Command="{Binding CopyUsernameCommand}" />
-                </Grid>
-              </StackPanel>
-
-              <StackPanel Spacing="4" IsVisible="{Binding !IsEditing}">
-                <TextBlock Text="URL" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBlock Text="{Binding DisplayUrl}" TextWrapping="Wrap"
-                           Foreground="{DynamicResource KpTextPrimary}" />
-              </StackPanel>
-
-              <StackPanel Spacing="4" IsVisible="{Binding !IsEditing}">
-                <TextBlock Text="Notes" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBlock Text="{Binding DisplayNotes}" TextWrapping="Wrap"
-                           Foreground="{DynamicResource KpTextPrimary}" />
-              </StackPanel>
-
-              <StackPanel Orientation="Horizontal" Spacing="8"
-                          IsVisible="{Binding !IsEditing}">
-                <Button Content="Edit" Command="{Binding EditCommand}" />
-                <Button x:Name="RotateFromPane" Content="Rotate" Command="{Binding RotateCommand}" />
-                <Button x:Name="OrganizeFromPane" Content="Rename or move"
-                        Command="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).OrganizeCommand}" />
-              </StackPanel>
-
-              <!-- Rotate asks first: the old value stays in history and the new one is never shown here. -->
-              <StackPanel Spacing="6" IsVisible="{Binding IsConfirmingRotate}">
-                <TextBlock Text="{Binding RotatePrompt}" TextWrapping="Wrap" FontSize="12"
-                           Foreground="{DynamicResource KpTextPrimary}" />
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Button x:Name="ConfirmRotate" Content="Rotate" Command="{Binding ConfirmRotateCommand}" />
-                  <Button Content="Cancel" Command="{Binding CancelRotateCommand}" />
+                  <!-- The ⋯ menu. A canvas takes no room, so the open menu lies over the fields below
+                       rather than pushing them down. -->
+                  <Canvas Height="0">
+                    <Border x:Name="EntryMenuPanel"
+                            Classes="menu"
+                            Canvas.Right="0"
+                            Canvas.Top="6"
+                            MinWidth="200"
+                            IsVisible="{Binding #EntryMenu.IsChecked}">
+                      <StackPanel Spacing="2">
+                        <Button Classes="ghost menu-item" Command="{Binding EditCommand}">
+                          <StackPanel Orientation="Horizontal" Spacing="10">
+                            <ctl:KpIcon Icon="pencil" Size="14" />
+                            <TextBlock Text="Edit fields" VerticalAlignment="Center" />
+                          </StackPanel>
+                        </Button>
+                        <Button x:Name="OrganizeFromPane"
+                                Classes="ghost menu-item"
+                                Command="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).OrganizeCommand}">
+                          <StackPanel Orientation="Horizontal" Spacing="10">
+                            <ctl:KpIcon Icon="folder-input" Size="14" />
+                            <TextBlock Text="Rename or move" VerticalAlignment="Center" />
+                          </StackPanel>
+                        </Button>
+                        <!-- History is read when this asks for it, never on selection: one reading
+                             materialises every superseded password (EntryHistoryViewModel). -->
+                        <Button x:Name="HistoryToggle" Classes="ghost menu-item" Command="{Binding History.ToggleCommand}">
+                          <StackPanel Orientation="Horizontal" Spacing="10">
+                            <ctl:KpIcon Icon="history" Size="14" />
+                            <TextBlock Text="{Binding History.ToggleLabel}" VerticalAlignment="Center" />
+                          </StackPanel>
+                        </Button>
+                        <Border Classes="divider" Margin="6,2" />
+                        <Button x:Name="DeleteEntry"
+                                Classes="ghost menu-item danger"
+                                Foreground="{DynamicResource KpDanger}"
+                                Command="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).DeleteCommand}">
+                          <StackPanel Orientation="Horizontal" Spacing="10">
+                            <ctl:KpIcon Icon="trash-2" Size="14" Foreground="{DynamicResource KpDanger}" />
+                            <TextBlock Text="Delete" VerticalAlignment="Center" Foreground="{DynamicResource KpDanger}" />
+                          </StackPanel>
+                        </Button>
+                      </StackPanel>
+                    </Border>
+                  </Canvas>
                 </StackPanel>
-              </StackPanel>
 
-              <!-- Agent access: who received this entry and what grant covers it now, never a value. -->
-              <Border Theme="{StaticResource KpCard}" IsVisible="{Binding !IsEditing}">
-                <StackPanel Spacing="4">
-                  <TextBlock Text="Agent access" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
-                  <TextBlock x:Name="AgentAccessSummary" Text="{Binding AgentAccessSummary}" TextWrapping="Wrap"
-                             Foreground="{DynamicResource KpTextPrimary}" />
-                  <TextBlock Text="{Binding LastUsedText, StringFormat='last used {0}'}" FontSize="11"
-                             FontFamily="{DynamicResource KpMono}" Foreground="{DynamicResource KpTextMuted}" />
-                </StackPanel>
-              </Border>
-
-              <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto" IsVisible="{Binding !IsEditing}">
-                <TextBlock Grid.Row="0" Grid.Column="0" Text="Created" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBlock Grid.Row="0" Grid.Column="1" x:Name="CreatedText" Text="{Binding Created}" FontSize="11"
-                           FontFamily="{DynamicResource KpMono}" Foreground="{DynamicResource KpTextSecondary}" />
-                <TextBlock Grid.Row="1" Grid.Column="0" Text="Rotated" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBlock Grid.Row="1" Grid.Column="1" x:Name="RotatedText" Text="{Binding Rotated}" FontSize="11"
-                           FontFamily="{DynamicResource KpMono}" Foreground="{DynamicResource KpTextSecondary}" />
-              </Grid>
-
-              <!-- History. Read when the toggle asks for it, never on selection: one reading
-                   materialises every superseded password (EntryHistoryViewModel). -->
-              <StackPanel Spacing="8" IsVisible="{Binding !IsEditing}">
-
-                <Button x:Name="HistoryToggle"
-                        Content="{Binding History.ToggleLabel}"
-                        Command="{Binding History.ToggleCommand}"
-                        HorizontalAlignment="Left" />
-
-                <StackPanel Spacing="8" IsVisible="{Binding History.IsOpen}">
-
-                  <TextBlock x:Name="HistoryEmpty"
-                             IsVisible="{Binding History.ShowsEmptyNote}"
-                             Text="{Binding History.EmptyNote}"
-                             TextWrapping="Wrap"
-                             FontSize="11"
-                             Foreground="{DynamicResource KpTextMuted}" />
-
-                  <ListBox x:Name="Revisions"
-                           MaxHeight="160"
-                           ItemsSource="{Binding History.Rows}"
-                           SelectedItem="{Binding History.Selected}"
-                           Background="Transparent"
-                           BorderThickness="0">
-                    <ListBox.ItemTemplate>
-                      <DataTemplate x:DataType="vm:EntryRevisionRow">
-                        <Grid ColumnDefinitions="Auto,*">
-                          <TextBlock Grid.Column="0"
-                                     Text="{Binding When}"
-                                     FontFamily="{DynamicResource KpMono}"
-                                     FontSize="12"
-                                     Foreground="{DynamicResource KpTextPrimary}" />
-                          <TextBlock Grid.Column="1"
-                                     Text="{Binding DisplayTitle}"
-                                     FontSize="12"
-                                     Margin="12,0,0,0"
-                                     TextTrimming="CharacterEllipsis"
-                                     Foreground="{DynamicResource KpTextMuted}" />
-                        </Grid>
-                      </DataTemplate>
-                    </ListBox.ItemTemplate>
-                  </ListBox>
-
-                  <!-- The chosen revision beside the entry as it is now. Its password can be read
-                       only while it is held, and copied as the current one is. -->
-                  <Grid IsVisible="{Binding History.HasSelection}"
-                        ColumnDefinitions="*,12,*"
-                        RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
-
-                    <TextBlock Grid.Row="0" Grid.Column="0"
-                               Text="{Binding History.Selected.When}"
-                               FontFamily="{DynamicResource KpMono}"
-                               FontSize="12"
-                               TextTrimming="CharacterEllipsis"
-                               Foreground="{DynamicResource KpTextPrimary}" />
-                    <TextBlock Grid.Row="0" Grid.Column="2"
-                               Text="Now"
-                               FontSize="12"
-                               Foreground="{DynamicResource KpTextPrimary}" />
-
-                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
-                               Text="Password" FontSize="11" Margin="0,8,0,0"
-                               Foreground="{DynamicResource KpTextMuted}" />
-                    <Grid Grid.Row="2" Grid.Column="0" ColumnDefinitions="*,Auto">
-                      <ctl:RevealedValue Grid.Column="0"
-                                         x:Name="RevisionPassword"
-                                         Source="{Binding History.Selected}"
-                                         MaskedLength="{Binding History.Selected.MaskedLength}"
-                                         AutomationProperties.Name="{Binding History.Selected.RevealLabel}"
-                                         FontFamily="{DynamicResource KpMono}"
-                                         FontSize="12"
-                                         VerticalAlignment="Center"
-                                         Foreground="{DynamicResource KpTextSecondary}" />
-                      <Button Grid.Column="1" x:Name="CopyRevisionPassword" Content="Copy"
-                              Command="{Binding History.Selected.CopyPasswordCommand}" />
-                    </Grid>
-                    <TextBlock Grid.Row="2" Grid.Column="2"
-                               Text="{Binding PasswordMask}"
-                               FontFamily="{DynamicResource KpMono}"
-                               Foreground="{DynamicResource KpTextSecondary}" />
-
-                    <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3"
-                               Text="Username" FontSize="11" Margin="0,8,0,0"
-                               Foreground="{DynamicResource KpTextMuted}" />
-                    <TextBlock Grid.Row="4" Grid.Column="0"
-                               Text="{Binding History.Selected.DisplayUsername}"
-                               TextTrimming="CharacterEllipsis"
-                               Foreground="{DynamicResource KpTextPrimary}" />
-                    <TextBlock Grid.Row="4" Grid.Column="2"
-                               Text="{Binding DisplayUsername}"
-                               TextTrimming="CharacterEllipsis"
-                               Foreground="{DynamicResource KpTextPrimary}" />
-
-                    <TextBlock Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="3"
-                               Text="URL" FontSize="11" Margin="0,8,0,0"
-                               Foreground="{DynamicResource KpTextMuted}" />
-                    <TextBlock Grid.Row="6" Grid.Column="0"
-                               Text="{Binding History.Selected.DisplayUrl}"
-                               TextWrapping="Wrap"
-                               Foreground="{DynamicResource KpTextPrimary}" />
-                    <TextBlock Grid.Row="6" Grid.Column="2"
-                               Text="{Binding DisplayUrl}"
-                               TextWrapping="Wrap"
-                               Foreground="{DynamicResource KpTextPrimary}" />
-
-                    <TextBlock Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="3"
-                               Text="Notes" FontSize="11" Margin="0,8,0,0"
-                               Foreground="{DynamicResource KpTextMuted}" />
-                    <TextBlock Grid.Row="8" Grid.Column="0"
-                               Text="{Binding History.Selected.DisplayNotes}"
-                               TextWrapping="Wrap"
-                               Foreground="{DynamicResource KpTextPrimary}" />
-                    <TextBlock Grid.Row="8" Grid.Column="2"
-                               Text="{Binding DisplayNotes}"
-                               TextWrapping="Wrap"
-                               Foreground="{DynamicResource KpTextPrimary}" />
-
-                  </Grid>
-
-                  <StackPanel Spacing="4" IsVisible="{Binding History.HasSelection}">
-                    <Button x:Name="RestoreRevision"
-                            Content="Restore this"
-                            Command="{Binding History.RestoreCommand}"
-                            HorizontalAlignment="Left" />
-                    <TextBlock FontSize="11"
-                               TextWrapping="Wrap"
-                               Foreground="{DynamicResource KpTextMuted}"
-                               Text="Restoring makes these the entry's values. The ones it replaces are kept here." />
+                <!-- Rotate asks first: the old value stays in history and the new one is never shown here. -->
+                <Border Classes="note" IsVisible="{Binding IsConfirmingRotate}">
+                  <StackPanel Spacing="10">
+                    <TextBlock Text="{Binding RotatePrompt}" TextWrapping="Wrap" FontSize="12.5" Classes="primary" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Button x:Name="ConfirmRotate" Classes="primary sm" Content="Rotate" Command="{Binding ConfirmRotateCommand}" />
+                      <Button Classes="ghost sm" Content="Cancel" Command="{Binding CancelRotateCommand}" />
+                    </StackPanel>
                   </StackPanel>
+                </Border>
 
+                <!-- The screen's forms about this entry: deleting it, and renaming or moving it. -->
+                <StackPanel Spacing="12"
+                            x:DataType="vm:EntriesViewModel"
+                            DataContext="{Binding $parent[views:EntriesView].DataContext}"
+                            IsVisible="{Binding IsConfirmingDelete}">
+                  <!-- What the deletion costs depends on the vault: DeletePrompt reads its recycle-bin
+                       setting and says which case this is. -->
+                  <Border Classes="form danger">
+                    <StackPanel Spacing="10">
+                      <TextBlock Text="{Binding DeletePrompt}" TextWrapping="Wrap" FontSize="12.5" Classes="primary" />
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Classes="danger sm" Content="Delete" Command="{Binding ConfirmDeleteCommand}" />
+                        <Button Classes="ghost sm" Content="Keep it" Command="{Binding CancelDeleteCommand}" />
+                      </StackPanel>
+                    </StackPanel>
+                  </Border>
                 </StackPanel>
 
-              </StackPanel>
+                <!-- Renaming and moving on one form, behind one Save. The two are a single core write
+                     (Vault.Relocate), and splitting them into two submits would let a rename commit in
+                     the open vault while the move beside it was refused, for the next save to write out. -->
+                <Border Classes="form"
+                        x:DataType="vm:EntriesViewModel"
+                        DataContext="{Binding $parent[views:EntriesView].DataContext}"
+                        IsVisible="{Binding IsOrganizing}">
+                  <StackPanel Spacing="10">
+                    <TextBlock Classes="section" Text="Rename or move" />
+                    <TextBlock Text="{Binding OrganizePrompt}"
+                               Classes="mono sm muted"
+                               TextTrimming="CharacterEllipsis" />
+                    <StackPanel Spacing="6">
+                      <TextBlock Classes="label" Text="Name" />
+                      <TextBox x:Name="OrganizeTitle" Classes="mono" Text="{Binding DraftTitle}" />
+                    </StackPanel>
+                    <StackPanel Spacing="6">
+                      <TextBlock Classes="label" Text="Group" />
+                      <ComboBox x:Name="OrganizeGroup"
+                                HorizontalAlignment="Stretch"
+                                ItemsSource="{Binding MoveTargets}"
+                                SelectedItem="{Binding MoveTarget}">
+                        <ComboBox.ItemTemplate>
+                          <DataTemplate x:DataType="vm:GroupNode">
+                            <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                          </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                      </ComboBox>
+                    </StackPanel>
+                    <TextBlock Classes="caption" Text="{Binding AccessNote}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Button x:Name="OrganizeSave" Classes="primary sm" Content="Save" Command="{Binding ConfirmOrganizeCommand}" />
+                      <Button Classes="ghost sm" Content="Cancel" Command="{Binding CancelOrganizeCommand}" />
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
 
-              <StackPanel Spacing="8" IsVisible="{Binding IsEditing}">
-                <TextBlock Text="Username" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBox Text="{Binding DraftUsername}" />
-                <TextBlock Text="URL" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBox Text="{Binding DraftUrl}" />
-                <TextBlock Text="Notes" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBox Text="{Binding DraftNotes}" AcceptsReturn="True" MinHeight="80" />
-                <TextBlock Text="Password" FontSize="11" Foreground="{DynamicResource KpTextMuted}" />
-                <ctl:MaskedInput x:Name="ReplacementPassword"
-                                 AllowsPaste="True"
-                                 Sink="{Binding NewPassword}"
-                                 MaskedLength="{Binding NewPassword.MaskedLength}"
-                                 Placeholder="New password" />
-                <TextBlock FontSize="11" TextWrapping="Wrap"
-                           Foreground="{DynamicResource KpTextMuted}"
-                           Text="Leave this empty to keep the current password. A replacement keeps the old one in this entry's history." />
-                <TextBlock FontSize="11" TextWrapping="Wrap"
-                           IsVisible="{Binding NewPassword.Note.Length}"
-                           Foreground="{DynamicResource KpTextMuted}"
-                           Text="{Binding NewPassword.Note}" />
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Button Content="Save" Command="{Binding SaveCommand}" />
-                  <Button Content="Cancel" Command="{Binding CancelCommand}" />
+                <!-- History, once somebody asked for it: under the header, where the menu that opened it is. -->
+                <Border Classes="form">
+                  <Border.IsVisible>
+                    <MultiBinding Converter="{x:Static BoolConverters.And}">
+                      <Binding Path="!IsEditing" />
+                      <Binding Path="History.IsOpen" />
+                    </MultiBinding>
+                  </Border.IsVisible>
+                  <StackPanel Spacing="12">
+
+                    <Grid ColumnDefinitions="*,Auto">
+                      <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                        <ctl:KpIcon Icon="history" Size="14" Foreground="{DynamicResource KpTextMuted}" />
+                        <TextBlock Classes="section" Text="History" VerticalAlignment="Center" />
+                      </StackPanel>
+                      <Button Grid.Column="1" Classes="link" Content="{Binding History.ToggleLabel}" Command="{Binding History.ToggleCommand}" />
+                    </Grid>
+
+                    <TextBlock x:Name="HistoryEmpty"
+                               Classes="caption"
+                               IsVisible="{Binding History.ShowsEmptyNote}"
+                               Text="{Binding History.EmptyNote}" />
+
+                    <ListBox x:Name="Revisions"
+                             MaxHeight="180"
+                             ItemsSource="{Binding History.Rows}"
+                             SelectedItem="{Binding History.Selected}">
+                      <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:EntryRevisionRow">
+                          <Grid ColumnDefinitions="Auto,*">
+                            <TextBlock Grid.Column="0" Classes="mono" FontSize="12" Text="{Binding When}" />
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding DisplayTitle}"
+                                       FontSize="12"
+                                       Margin="12,0,0,0"
+                                       Classes="muted"
+                                       TextTrimming="CharacterEllipsis" />
+                          </Grid>
+                        </DataTemplate>
+                      </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <!-- The chosen revision above the entry as it is now, field by field. Its password
+                         can be read only while it is held, and copied as the current one is. -->
+                    <Grid IsVisible="{Binding History.HasSelection}"
+                          ColumnDefinitions="Auto,12,*"
+                          RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+
+                      <TextBlock Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3"
+                                 Classes="caption"
+                                 Text="{Binding History.Selected.When, StringFormat='Then is the revision saved {0}. Now is the entry as it is.'}"
+                                 TextWrapping="Wrap" />
+
+                      <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="Password" Margin="0,12,0,6" />
+                      <TextBlock Grid.Row="2" Grid.Column="0" Classes="caption" Text="Then" VerticalAlignment="Center" />
+                      <Grid Grid.Row="2" Grid.Column="2" ColumnDefinitions="*,Auto,Auto">
+                        <ctl:RevealedValue Grid.Column="0"
+                                           x:Name="RevisionPassword"
+                                           Source="{Binding History.Selected}"
+                                           MaskedLength="{Binding History.Selected.MaskedLength}"
+                                           AutomationProperties.Name="{Binding History.Selected.RevealLabel}"
+                                           FontFamily="{DynamicResource KpMono}"
+                                           FontSize="12"
+                                           HorizontalAlignment="Left"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource KpTextSecondary}" />
+                        <ctl:RevealButton Grid.Column="1"
+                                          x:Name="RevealRevisionPassword"
+                                          Classes="ghost in-field"
+                                          Margin="0,0,6,0"
+                                          Target="{Binding #RevisionPassword}"
+                                          ToolTip.Tip="Hold to reveal">
+                          <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ctl:KpIcon Icon="eye" Size="14" />
+                            <TextBlock Text="Reveal" VerticalAlignment="Center" />
+                          </StackPanel>
+                        </ctl:RevealButton>
+                        <Button Grid.Column="2" x:Name="CopyRevisionPassword" Classes="sm" Content="Copy"
+                                Command="{Binding History.Selected.CopyPasswordCommand}" />
+                      </Grid>
+                      <TextBlock Grid.Row="3" Grid.Column="0" Classes="caption" Text="Now" Margin="0,4,0,0" />
+                      <TextBlock Grid.Row="3" Grid.Column="2" Classes="mono secondary" Text="{Binding PasswordMask}" Margin="0,4,0,0" />
+
+                      <TextBlock Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="Username" Margin="0,12,0,6" />
+                      <TextBlock Grid.Row="5" Grid.Column="0" Classes="caption" Text="Then" />
+                      <Panel Grid.Row="5" Grid.Column="2">
+                        <TextBlock Classes="mono" Text="{Binding History.Selected.DisplayUsername}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Classes="caption" Text="(empty)" IsVisible="{Binding History.Selected.DisplayUsername, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                      </Panel>
+                      <TextBlock Grid.Row="6" Grid.Column="0" Classes="caption" Text="Now" Margin="0,4,0,0" />
+                      <Panel Grid.Row="6" Grid.Column="2" Margin="0,4,0,0">
+                        <TextBlock Classes="mono" Text="{Binding DisplayUsername}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Classes="caption" Text="(empty)" IsVisible="{Binding DisplayUsername, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                      </Panel>
+
+                      <TextBlock Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="URL" Margin="0,12,0,6" />
+                      <TextBlock Grid.Row="8" Grid.Column="0" Classes="caption" Text="Then" />
+                      <Panel Grid.Row="8" Grid.Column="2">
+                        <TextBlock Classes="mono" Text="{Binding History.Selected.DisplayUrl}" TextWrapping="Wrap" />
+                        <TextBlock Classes="caption" Text="(empty)" IsVisible="{Binding History.Selected.DisplayUrl, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                      </Panel>
+                      <TextBlock Grid.Row="9" Grid.Column="0" Classes="caption" Text="Now" Margin="0,4,0,0" />
+                      <Panel Grid.Row="9" Grid.Column="2" Margin="0,4,0,0">
+                        <TextBlock Classes="mono" Text="{Binding DisplayUrl}" TextWrapping="Wrap" />
+                        <TextBlock Classes="caption" Text="(empty)" IsVisible="{Binding DisplayUrl, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                      </Panel>
+
+                      <TextBlock Grid.Row="10" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="Notes" Margin="0,12,0,6" />
+                      <TextBlock Grid.Row="11" Grid.Column="0" Classes="caption" Text="Then" />
+                      <Panel Grid.Row="11" Grid.Column="2">
+                        <TextBlock FontSize="13" Text="{Binding History.Selected.DisplayNotes}" TextWrapping="Wrap" />
+                        <TextBlock Classes="caption" Text="(empty)" IsVisible="{Binding History.Selected.DisplayNotes, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                      </Panel>
+                      <TextBlock Grid.Row="12" Grid.Column="0" Classes="caption" Text="Now" Margin="0,4,0,0" />
+                      <Panel Grid.Row="12" Grid.Column="2" Margin="0,4,0,0">
+                        <TextBlock FontSize="13" Text="{Binding DisplayNotes}" TextWrapping="Wrap" />
+                        <TextBlock Classes="caption" Text="(empty)" IsVisible="{Binding DisplayNotes, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                      </Panel>
+                    </Grid>
+
+                    <StackPanel Spacing="6" IsVisible="{Binding History.HasSelection}">
+                      <Button x:Name="RestoreRevision"
+                              Classes="sm"
+                              Content="Restore this"
+                              Command="{Binding History.RestoreCommand}"
+                              HorizontalAlignment="Left" />
+                      <TextBlock Classes="caption"
+                                 Text="Restoring makes these the entry's values. The ones it replaces are kept here." />
+                    </StackPanel>
+
+                  </StackPanel>
+                </Border>
+
+                <!-- The fields. A login leads with its username; a variable with its value. -->
+                <StackPanel Spacing="8">
+                  <StackPanel.IsVisible>
+                    <MultiBinding Converter="{x:Static BoolConverters.And}">
+                      <Binding Path="!IsEditing" />
+                      <Binding Path="ShowsUsername" />
+                    </MultiBinding>
+                  </StackPanel.IsVisible>
+                  <TextBlock Classes="label" Text="Username" />
+                  <Border Classes="value">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <TextBlock Grid.Column="0"
+                                 Classes="mono lg"
+                                 Text="{Binding DisplayUsername}"
+                                 TextTrimming="CharacterEllipsis"
+                                 VerticalAlignment="Center" />
+                      <Button Grid.Column="1"
+                              Classes="ghost in-field"
+                              Command="{Binding CopyUsernameCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <ctl:KpIcon Icon="copy" Size="13" />
+                          <TextBlock Text="Copy" VerticalAlignment="Center" />
+                        </StackPanel>
+                      </Button>
+                    </Grid>
+                  </Border>
                 </StackPanel>
-              </StackPanel>
 
-            </StackPanel>
+                <StackPanel Spacing="8" IsVisible="{Binding !IsEditing}">
+                  <TextBlock Classes="label" Text="{Binding ValueLabel}" />
+                  <Border Classes="value">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <!-- Not a TextBlock: its automation peer publishes its text as the element's name.
+                           RevealedValue draws the characters itself, only while Reveal is held. -->
+                      <ctl:RevealedValue Grid.Column="0"
+                                         x:Name="CurrentPassword"
+                                         Source="{Binding}"
+                                         MaskedLength="{Binding MaskedLength}"
+                                         AutomationProperties.Name="Hold to reveal the password"
+                                         FontFamily="{DynamicResource KpMono}"
+                                         FontSize="13"
+                                         HorizontalAlignment="Left"
+                                         VerticalAlignment="Center"
+                                         ClipToBounds="True"
+                                         Foreground="{DynamicResource KpTextPrimary}" />
+                      <ctl:RevealButton Grid.Column="1"
+                                        Classes="ghost in-field"
+                                        Target="{Binding #CurrentPassword}"
+                                        ToolTip.Tip="Hold to reveal">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <ctl:KpIcon Icon="eye" Size="14" />
+                          <TextBlock Text="Reveal" VerticalAlignment="Center" />
+                        </StackPanel>
+                      </ctl:RevealButton>
+                    </Grid>
+                  </Border>
+                </StackPanel>
+
+                <StackPanel Spacing="8">
+                  <StackPanel.IsVisible>
+                    <MultiBinding Converter="{x:Static BoolConverters.And}">
+                      <Binding Path="!IsEditing" />
+                      <Binding Path="ShowsUrl" />
+                    </MultiBinding>
+                  </StackPanel.IsVisible>
+                  <TextBlock Classes="label" Text="URL" />
+                  <Border Classes="value">
+                    <TextBlock Classes="mono lg"
+                               Text="{Binding DisplayUrl}"
+                               TextTrimming="CharacterEllipsis"
+                               VerticalAlignment="Center" />
+                  </Border>
+                </StackPanel>
+
+                <StackPanel Spacing="8">
+                  <StackPanel.IsVisible>
+                    <MultiBinding Converter="{x:Static BoolConverters.And}">
+                      <Binding Path="!IsEditing" />
+                      <Binding Path="ShowsNotes" />
+                    </MultiBinding>
+                  </StackPanel.IsVisible>
+                  <TextBlock Classes="label" Text="Notes" />
+                  <Border Classes="value" Padding="12,10">
+                    <TextBlock Text="{Binding DisplayNotes}"
+                               TextWrapping="Wrap"
+                               FontSize="13"
+                               LineHeight="19.5"
+                               Classes="secondary" />
+                  </Border>
+                </StackPanel>
+
+                <StackPanel Spacing="8">
+                  <StackPanel.IsVisible>
+                    <MultiBinding Converter="{x:Static BoolConverters.And}">
+                      <Binding Path="!IsEditing" />
+                      <Binding Path="HasReference" />
+                    </MultiBinding>
+                  </StackPanel.IsVisible>
+                  <TextBlock Classes="label" Text="Reference" />
+                  <Border Classes="field" Height="36" Padding="12,0,4,0">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <TextBlock Grid.Column="0"
+                                 Classes="mono secondary"
+                                 Text="{Binding Reference}"
+                                 TextTrimming="CharacterEllipsis"
+                                 VerticalAlignment="Center" />
+                      <Button Grid.Column="1"
+                              Classes="icon ghost sm"
+                              ToolTip.Tip="Copy the reference"
+                              AutomationProperties.Name="Copy the reference"
+                              Command="{Binding CopyReferenceCommand}">
+                        <ctl:KpIcon Icon="copy" Size="13" Foreground="{DynamicResource KpTextMuted}" />
+                      </Button>
+                    </Grid>
+                  </Border>
+                  <TextBlock Classes="caption"
+                             Text="Use this in .env.keypaste or MCP tool calls. It resolves at runtime and the value never enters the agent's context." />
+                </StackPanel>
+
+                <!-- Agent access: who received this entry and what grant covers it now, never a value.
+                     Profiles: the variable's key in every profile of its project. -->
+                <ctl:AutoFitGrid MinItemWidth="220" Spacing="12" IsVisible="{Binding !IsEditing}">
+                  <Border Classes="card">
+                    <StackPanel Spacing="10">
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ctl:KpIcon Icon="bot" Size="14" Foreground="{DynamicResource KpTextMuted}" />
+                        <TextBlock Classes="label" Text="Agent access" VerticalAlignment="Center" />
+                      </StackPanel>
+                      <TextBlock x:Name="AgentAccessSummary"
+                                 Classes="mono"
+                                 FontSize="12.5"
+                                 IsVisible="{Binding ShowsAgentAccessSummary}"
+                                 Text="{Binding AgentAccessSummary}"
+                                 TextWrapping="Wrap" />
+                      <ItemsControl ItemsSource="{Binding AgentLines}"
+                                    IsVisible="{Binding AgentLines.Count}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="x:String">
+                            <TextBlock Classes="mono" FontSize="12.5" Text="{Binding}" TextTrimming="CharacterEllipsis" Margin="0,2" />
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                      <TextBlock Classes="caption"
+                                 IsVisible="{Binding HasBeenUsed}"
+                                 Text="{Binding LastUsedText, StringFormat='Last used {0}'}" />
+                    </StackPanel>
+                  </Border>
+                  <Border Classes="card" IsVisible="{Binding HasProfiles}">
+                    <StackPanel Spacing="8">
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <ctl:KpIcon Icon="layers" Size="14" Foreground="{DynamicResource KpTextMuted}" />
+                        <TextBlock Classes="label" Text="Profiles" VerticalAlignment="Center" />
+                      </StackPanel>
+                      <ItemsControl ItemsSource="{Binding ProfileStates}">
+                        <ItemsControl.ItemsPanel>
+                          <ItemsPanelTemplate>
+                            <StackPanel Spacing="8" />
+                          </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:ProfileState">
+                            <Grid ColumnDefinitions="*,Auto" ToolTip.Tip="{Binding Problem}">
+                              <TextBlock Grid.Column="0" Classes="mono" FontSize="12" Text="{Binding Profile}" />
+                              <TextBlock Grid.Column="1"
+                                         Classes="mono"
+                                         FontSize="12"
+                                         Classes.ok="{Binding IsOk}"
+                                         Classes.amber="{Binding IsAmber}"
+                                         Classes.danger="{Binding IsDanger}"
+                                         Text="{Binding State}" />
+                            </Grid>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </Border>
+                </ctl:AutoFitGrid>
+
+                <Border BorderBrush="{DynamicResource KpBorderSubtle}"
+                        BorderThickness="0,1,0,0"
+                        IsVisible="{Binding !IsEditing}">
+                  <StackPanel>
+                    <Border Classes="meta">
+                      <Grid ColumnDefinitions="140,*">
+                        <TextBlock Grid.Column="0" FontSize="12.5" Classes="muted" Text="Created" />
+                        <TextBlock Grid.Column="1" x:Name="CreatedText" FontSize="12.5" Classes="primary" Text="{Binding Created}" />
+                      </Grid>
+                    </Border>
+                    <Border Classes="meta">
+                      <Grid ColumnDefinitions="140,*">
+                        <TextBlock Grid.Column="0" FontSize="12.5" Classes="muted" Text="Rotated" />
+                        <TextBlock Grid.Column="1" x:Name="RotatedText" FontSize="12.5" Classes="primary" Text="{Binding Rotated}" />
+                      </Grid>
+                    </Border>
+                    <Border Classes="meta">
+                      <Grid ColumnDefinitions="140,*">
+                        <TextBlock Grid.Column="0" FontSize="12.5" Classes="muted" Text="KDBX entry" />
+                        <TextBlock Grid.Column="1" Classes="mono" FontSize="12" Text="{Binding KdbxEntry}" TextTrimming="CharacterEllipsis" />
+                      </Grid>
+                    </Border>
+                  </StackPanel>
+                </Border>
+
+                <Border Classes="form" IsVisible="{Binding IsEditing}">
+                  <StackPanel Spacing="10">
+                    <TextBlock Classes="section" Text="Edit fields" />
+                    <StackPanel Spacing="6" IsVisible="{Binding ShowsUsername}">
+                      <TextBlock Classes="label" Text="Username" />
+                      <TextBox Classes="mono" Text="{Binding DraftUsername}" />
+                    </StackPanel>
+                    <StackPanel Spacing="6" IsVisible="{Binding ShowsUrl}">
+                      <TextBlock Classes="label" Text="URL" />
+                      <TextBox Classes="mono" Text="{Binding DraftUrl}" />
+                    </StackPanel>
+                    <StackPanel Spacing="6">
+                      <TextBlock Classes="label" Text="Notes" />
+                      <TextBox Text="{Binding DraftNotes}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" VerticalContentAlignment="Top" />
+                    </StackPanel>
+                    <StackPanel Spacing="6">
+                      <TextBlock Classes="label" Text="{Binding ValueLabel}" />
+                      <ctl:MaskedInput x:Name="ReplacementPassword"
+                                       AllowsPaste="True"
+                                       Sink="{Binding NewPassword}"
+                                       MaskedLength="{Binding NewPassword.MaskedLength}"
+                                       Placeholder="{Binding ReplacementPlaceholder}" />
+                      <TextBlock Classes="caption" Text="{Binding ReplacementCaption}" TextWrapping="Wrap" />
+                      <TextBlock Classes="caption"
+                                 IsVisible="{Binding NewPassword.Note.Length}"
+                                 Text="{Binding NewPassword.Note}" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Button Classes="primary sm" Content="Save" Command="{Binding SaveCommand}" />
+                      <Button Classes="ghost sm" Content="Cancel" Command="{Binding CancelCommand}" />
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+
+              </StackPanel>
+            </Grid>
           </ScrollViewer>
         </DataTemplate>
       </ContentControl.DataTemplates>

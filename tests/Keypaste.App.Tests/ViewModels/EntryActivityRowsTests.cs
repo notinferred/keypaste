@@ -67,7 +67,13 @@ public sealed class EntryActivityRowsTests
         var access = screen.Entries.Detail!.AgentAccess!;
 
         Assert.Equal(["claude-code", "cursor"], access.Clients.Select(client => client.Client));
-        Assert.Equal("claude-code · 5m ago", screen.Entries.Detail.AgentAccessSummary);
+
+        // Two clients are listed one per line, so the summary that would name the first again steps
+        // aside, and the time is said once, on the Last used line.
+        Assert.Equal("claude-code", screen.Entries.Detail.AgentAccessSummary);
+        Assert.False(screen.Entries.Detail.ShowsAgentAccessSummary);
+        Assert.Equal(["claude-code · 5m ago · 1×", "cursor · 15m ago · 1×"], screen.Entries.Detail.AgentLines);
+        Assert.Equal("5m ago", screen.Entries.Detail.LastUsedText);
     }
 
     private sealed class Screen(EntryActivitySource activity, ClipboardCountdown countdown, EntriesViewModel entries) : IDisposable
