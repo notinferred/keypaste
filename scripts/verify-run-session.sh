@@ -147,7 +147,8 @@ printf '%s\n%s\n' "$MASTER" "$MASTER" | "$CLI" init "$VAULT" >/dev/null || die "
 for pair in "DEPLOY_KEY=$DEPLOY" "DB_URL=$DATABASE"; do
   printf '%s\n' "$MASTER" | "$CLI" env set ci "$pair" --vault "$VAULT" >/dev/null || die "could not store the ci set"
 done
-printf '%s\n%s\n' "$MASTER" "$DEPLOY" | "$CLI" add env/broken/BAD-NAME --vault "$VAULT" >/dev/null \
+# KeePassXC can write a name keypaste refuses to create; the driver's raw-add stands in for it.
+printf '%s\n' "$DEPLOY" | KEYPASTE_DRIVER_PASSWORD="$MASTER" "$DRV" raw-add "$VAULT" env/broken BAD-NAME >/dev/null \
   || die "could not store an entry whose name cannot be exported"
 
 # ------------------------------------------------------------------- nothing holds the vault

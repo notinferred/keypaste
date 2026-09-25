@@ -100,7 +100,15 @@ public sealed class HostileNameRenderingTests : IDisposable
     public void EnvLsProject_DoesNotRenderAVariableNameThatCanMisrepresentItself()
     {
         const string project = "demo";
-        _cli.SeedVault(_master, ($"env/{project}/{Spoofed("KEY")}", "value"));
+        _cli.SeedVault(_master);
+
+        // KeePassXC writes a name keypaste refuses to create.
+        using (var vault = Vault.Open(_cli.VaultPath, _master))
+        {
+            vault.AddEntry(new VaultEntry { GroupPath = $"env/{project}", Title = Spoofed("KEY"), Password = "value" });
+            vault.Save();
+        }
+
         _cli.Prompt.Enqueue(_master);
 
         _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("env", "ls", project, "--vault", _cli.VaultPath));

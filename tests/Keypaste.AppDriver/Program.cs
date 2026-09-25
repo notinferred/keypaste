@@ -3,6 +3,7 @@ using Keypaste.App;
 using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
+using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
@@ -94,6 +95,7 @@ internal static class Program
                 ["backup-restore", var vault, var backup] => await driver.RestoreBackupAsync(vault, backup).ConfigureAwait(true),
                 ["export", var vault, var destination] => await driver.ExportAsync(vault, destination).ConfigureAwait(true),
                 ["access", var vault, .. var change] => await driver.ChangeAccessAsync(vault, change).ConfigureAwait(true),
+                ["raw-add", var vault, var group, var title] => RawAdd(vault, group, title),
                 ["hold", var vault, .. var options] => await HoldAsync(driver, vault, options).ConfigureAwait(true),
                 _ => Usage(),
             };
@@ -140,6 +142,19 @@ internal static class Program
 
         using var screen = new PromptScreen();
         return await driver.HoldAsync(vault, screen.Open, locked, screen).ConfigureAwait(true);
+    }
+
+    // KeePassXC can store a name keypaste refuses to create, so this writes below the product's rules.
+    private static int RawAdd(string vault, string group, string title)
+    {
+        var password = Environment.GetEnvironmentVariable("KEYPASTE_DRIVER_PASSWORD") ?? string.Empty;
+        var value = Console.In.ReadLine() ?? string.Empty;
+
+        using var v = Vault.Open(vault, password);
+        v.AddEntry(new VaultEntry { GroupPath = group, Title = title, Password = value });
+        v.Save();
+        Console.WriteLine("added");
+        return 0;
     }
 
     private static int Usage()
