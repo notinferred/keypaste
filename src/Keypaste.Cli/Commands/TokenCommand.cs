@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Keypaste.Cli.Output;
 using Keypaste.Cli.Styling;
@@ -176,15 +177,7 @@ internal static class TokenCommand
 
             if (line.HasFlag(CliJson.Option))
             {
-                CliJson.WriteArray(context.Stdout, [info], (json, created) =>
-                {
-                    json.WriteString("name", created.Name);
-                    json.WriteString("token", token);
-                    json.WriteString("prefix", created.Prefix);
-                    WriteScopes(json, created);
-                    json.WriteString("expires", Timestamp(created.Expires));
-                });
-
+                WriteCreated(context.Stdout, info, token);
                 return CliApp.ExitSuccess;
             }
 
@@ -197,6 +190,25 @@ internal static class TokenCommand
             context.Stderr.WriteLine($"  scope {Scopes(info)} {dot} expires {Day(info.Expires)}");
             return CliApp.ExitSuccess;
         });
+    }
+
+    /// <summary>The one <c>--json</c> that is an object, not an array: a script reads <c>.token</c> from it.</summary>
+    private static void WriteCreated(TextWriter writer, TokenInfo info, string token)
+    {
+        using var buffer = new MemoryStream();
+
+        using (var json = new Utf8JsonWriter(buffer))
+        {
+            json.WriteStartObject();
+            json.WriteString("name", info.Name);
+            json.WriteString("token", token);
+            json.WriteString("prefix", info.Prefix);
+            WriteScopes(json, info);
+            json.WriteString("expires", Timestamp(info.Expires));
+            json.WriteEndObject();
+        }
+
+        writer.WriteLine(Encoding.UTF8.GetString(buffer.ToArray()));
     }
 
     private static int List(CommandLine line, CliContext context)
@@ -493,15 +505,21 @@ internal static class TokenCommand
             return false;
         }
 
-        lifetime = text[^1] switch
+        var unit = text[^1] switch
         {
-            'm' => TimeSpan.FromMinutes(amount),
-            'h' => TimeSpan.FromHours(amount),
-            'd' => TimeSpan.FromDays(amount),
+            'm' => TimeSpan.FromMinutes(1),
+            'h' => TimeSpan.FromHours(1),
+            'd' => TimeSpan.FromDays(1),
             _ => TimeSpan.Zero,
         };
 
-        return lifetime >= TokenStore.MinimumLifetime && lifetime <= TokenStore.MaximumLifetime;
+        if (unit == TimeSpan.Zero || amount > TokenStore.MaximumLifetime / unit)
+        {
+            return false;
+        }
+
+        lifetime = unit * amount;
+        return lifetime >= TokenStore.MinimumLifetime;
     }
 
     private static string Remaining(TokenInfo info, DateTimeOffset now, CliContext context)

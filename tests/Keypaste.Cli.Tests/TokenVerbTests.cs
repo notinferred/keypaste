@@ -55,6 +55,10 @@ public sealed class TokenVerbTests : IDisposable
             ["--scope", "write:acme-api/staging/*"],
             ["--scope", "read:acme-api/staging/*", "--ttl", "400d"],
             ["--scope", "read:acme-api/staging/*", "--ttl", "5s"],
+            ["--scope", "read:acme-api/staging/*", "--ttl", "99999999d"],
+            ["--scope", "read:acme-api/staging/*", "--ttl", "2147483647h"],
+            ["--scope", "read:acme-api/staging/*", "--expires", "2147483647m"],
+            ["--scope", "read:acme-api/staging/*", "--ttl", "0m"],
             ["--scope", "read:acme-api/staging/*", "--ttl", "1d", "--expires", "1d"],
             ["--scope", "read:acme-api/prod/*"],
         ];
@@ -76,7 +80,9 @@ public sealed class TokenVerbTests : IDisposable
             "token", "create", "ci-staging", "--scope", "read:acme-api/staging/*", "--expires", "7d", "--json", "--vault", _harness.VaultPath));
 
         using var json = JsonDocument.Parse(_harness.Out);
-        var created = Assert.Single(json.RootElement.EnumerateArray().ToList());
+        var created = json.RootElement;
+        Assert.Equal(JsonValueKind.Object, created.ValueKind);
+        Assert.Equal(["name", "token", "prefix", "scopes", "expires"], created.EnumerateObject().Select(property => property.Name));
         var token = created.GetProperty("token").GetString()!;
 
         Assert.True(TokenSecret.TryParse(token, out var id, out _));
@@ -189,6 +195,39 @@ public sealed class TokenVerbTests : IDisposable
         Assert.Contains("bundled 2 variable(s)", line, StringComparison.Ordinal);
         Assert.DoesNotContain(token[13..], line, StringComparison.Ordinal);
         Assert.Single(Directory.GetFiles(_harness.Directory, "*.kpb*"));
+    }
+
+    [Fact]
+    public void AnEntryExpirySetElsewhere_BoundsTheBundleAndTheListing()
+    {
+        var token = Mint(_harness, "ci-staging", "read:acme-api/staging/*");
+        var expires = _harness.Clock.Now.AddDays(1);
+
+        using (var vault = Vault.Open(_harness.VaultPath, Master))
+        {
+            var entry = Assert.Single(vault.ReadEntries(), entry => entry.GroupPath == ReservedGroups.Tokens);
+            vault.SetExpiryUnchecked(EntryName.Of(entry), expires);
+            vault.Save();
+        }
+
+        Clear();
+        _harness.AssertExit(0, Bundle(token));
+
+        var file = File.ReadAllBytes(BundlePath);
+        Assert.Contains("expires 2026-07-27", _harness.Err, StringComparison.Ordinal);
+        Assert.True(TokenBundle.TryOpen(file, token, expires.AddSeconds(-1), out _, out var error), error);
+        Assert.False(TokenBundle.TryOpen(file, token, expires, out _, out error));
+        Assert.Contains("expired", error, StringComparison.Ordinal);
+
+        Clear();
+        _harness.Clock.Now = expires;
+        _harness.Prompt.Enqueue(Master);
+        _harness.AssertExit(0, _harness.Run("token", "ls", "--json", "--vault", _harness.VaultPath));
+
+        using var json = JsonDocument.Parse(_harness.Out);
+        var row = Assert.Single(json.RootElement.EnumerateArray().ToList());
+        Assert.Equal("2026-07-27T15:00:00Z", row.GetProperty("expires").GetString());
+        Assert.True(row.GetProperty("expired").GetBoolean());
     }
 
     [Fact]

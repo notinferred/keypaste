@@ -116,6 +116,22 @@ public sealed class ScopedTokensViewModelTests : IDisposable
     }
 
     [Fact]
+    public void Revoke_RemovesTheRowsToken_NotOneNamedLikeItsId()
+    {
+        using var screen = new ScopedTokensViewModel(_session);
+        var (_, meantToken, _) = screen.Create("meant", "read:acme-api/staging/*", TimeSpan.FromDays(30), false);
+        var meant = Assert.Single(screen.Rows);
+        var (_, decoyToken, _) = screen.Create(meant.Id, "read:acme-api/staging/*", TimeSpan.FromDays(30), false);
+
+        Assert.Null(screen.Revoke(meant));
+
+        Assert.Equal(meant.Id, Assert.Single(screen.Rows).Name);
+        var store = new TokenStore(_session.Unlocked!);
+        Assert.Equal(TokenCheck.Unknown, store.Verify(meantToken!, _clock.GetUtcNow(), out _));
+        Assert.Equal(TokenCheck.Valid, store.Verify(decoyToken!, _clock.GetUtcNow(), out _));
+    }
+
+    [Fact]
     public void EntriesView_DoesNotListReservedGroups()
     {
         using var screen = new ScopedTokensViewModel(_session);

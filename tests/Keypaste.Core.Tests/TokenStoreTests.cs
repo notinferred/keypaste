@@ -117,6 +117,22 @@ public sealed class TokenStoreTests : IDisposable
     }
 
     [Fact]
+    public void AnEntryExpirySetElsewhere_ShortensTheTokensExpiry_NeverLengthensIt()
+    {
+        var shortened = Create("shortened", "read:a/dev/*", out var token);
+        var lengthened = Create("lengthened", "read:a/dev/*", out _, TimeSpan.FromDays(1));
+        _vault.SetExpiryUnchecked(new EntryName(ReservedGroups.Tokens, shortened.Id), _now.AddHours(1));
+        _vault.SetExpiryUnchecked(new EntryName(ReservedGroups.Tokens, lengthened.Id), _now.AddDays(60));
+        _vault.Save();
+
+        var store = new TokenStore(_vault);
+
+        Assert.Equal([_now.AddDays(1), _now.AddHours(1)], store.List().Select(info => info.Expires));
+        Assert.Equal(TokenCheck.Valid, store.Verify(token, _now, out var verified));
+        Assert.Equal(_now.AddHours(1), verified!.Expires);
+    }
+
+    [Fact]
     public void Verify_ChangedOnDisk_IsNotUnknown()
     {
         Create("ci", "read:a/dev/*", out var token);
@@ -204,6 +220,23 @@ public sealed class TokenStoreTests : IDisposable
 
         Assert.Empty(new TokenStore(_vault).List());
         Assert.Empty(_vault.ReadRecycled());
+    }
+
+    [Fact]
+    public void RevokeId_NeverTakesTheIdAsAName()
+    {
+        var meant = Create("meant", "read:a/dev/*", out var meantToken);
+        Create(meant.Id, "read:a/dev/*", out var decoyToken);
+        _vault.Save();
+
+        Assert.True(new TokenStore(_vault).RevokeId(meant.Id));
+        _vault.Save();
+
+        var store = new TokenStore(_vault);
+        Assert.Equal([meant.Id], store.List().Select(info => info.Name));
+        Assert.Equal(TokenCheck.Unknown, store.Verify(meantToken, _now, out _));
+        Assert.Equal(TokenCheck.Valid, store.Verify(decoyToken, _now, out _));
+        Assert.False(store.RevokeId("meant"));
     }
 
     [Fact]

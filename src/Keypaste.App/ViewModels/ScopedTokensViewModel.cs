@@ -93,7 +93,7 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
 
         if (!TrySave(vault, out var saveError))
         {
-            store.Revoke(info.Id);
+            store.RevokeId(info.Id);
             return (false, null, saveError);
         }
 
@@ -113,7 +113,7 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
             return "The vault is locked.";
         }
 
-        if (!new TokenStore(vault).Revoke(row.Id))
+        if (!new TokenStore(vault).RevokeId(row.Id))
         {
             Refresh();
             return "That token is no longer in the vault.";

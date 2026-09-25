@@ -198,10 +198,25 @@ public sealed class TokenStore(Vault vault)
 
         var entries = Entries(_vault.ReadEntries()).ToList();
         var named = entries.Where(entry => string.Equals(entry.Username, nameOrId, StringComparison.Ordinal)).ToList();
-        var doomed = named.Count > 0
-            ? named
-            : entries.Where(entry => string.Equals(entry.Title, nameOrId, StringComparison.Ordinal)).ToList();
 
+        return Delete(named.Count > 0 ? named : WithId(entries, nameOrId));
+    }
+
+    /// <summary>Deletes the token with this id from the open vault for good, which the caller saves.</summary>
+    /// <param name="id">The token's id, never taken as a name.</param>
+    /// <returns>Whether a token was deleted.</returns>
+    public bool RevokeId(string id)
+    {
+        ArgumentNullException.ThrowIfNull(id);
+
+        return Delete(WithId(Entries(_vault.ReadEntries()), id));
+    }
+
+    private static List<VaultEntry> WithId(IEnumerable<VaultEntry> entries, string id) =>
+        [.. entries.Where(entry => string.Equals(entry.Title, id, StringComparison.Ordinal))];
+
+    private bool Delete(List<VaultEntry> doomed)
+    {
         foreach (var entry in doomed)
         {
             if (_vault.RemoveEntry(EntryName.Of(entry), out var recycled) == DeletionOutcome.Recycled)
@@ -259,9 +274,7 @@ public sealed class TokenStore(Vault vault)
 
             info = recorded;
 
-            return recorded.IsExpired(now) || (entry.Expires is { } expires && now >= expires)
-                ? TokenCheck.Expired
-                : TokenCheck.Valid;
+            return recorded.IsExpired(now) ? TokenCheck.Expired : TokenCheck.Valid;
         }
         finally
         {
@@ -348,6 +361,12 @@ public sealed class TokenStore(Vault vault)
                 }
 
                 scopes.Add(scope);
+            }
+
+            // An expiry set on the entry in KeePassXC can only shorten the token's life.
+            if (entry.Expires is { } entryExpires && entryExpires < expires)
+            {
+                expires = entryExpires;
             }
 
             info = new TokenInfo(entry.Title, name, scopes, created, expires, allowProd.GetBoolean());
