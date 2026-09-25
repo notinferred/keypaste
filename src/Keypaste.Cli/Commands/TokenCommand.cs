@@ -341,6 +341,11 @@ internal static class TokenCommand
 
         var destination = Path.GetFullPath(output);
 
+        if (!VaultOverwriteGuard.TryRefuse("keypaste token bundle", path, destination, "a bundle", context, out var refused))
+        {
+            return refused;
+        }
+
         if (File.Exists(destination) && !line.HasFlag("force"))
         {
             context.Stderr.WriteLine($"keypaste token bundle: '{output}' already exists; --force replaces it");
@@ -391,11 +396,12 @@ internal static class TokenCommand
                 sets.Add(new BundledSet(project, profile, resolved.Variables));
             }
 
-            return Write(destination, output, token, info, sets, now, context);
+            return Write(path, destination, output, token, info, sets, now, context);
         });
     }
 
     private static int Write(
+        string vaultPath,
         string destination,
         string output,
         string token,
@@ -424,6 +430,12 @@ internal static class TokenCommand
         {
             context.Stderr.WriteLine("keypaste token bundle: the sets are too large for one bundle; nothing was written");
             return CliApp.ExitInternalError;
+        }
+
+        // Checked again after the vault was open: a vault may have been put at the destination meanwhile.
+        if (!VaultOverwriteGuard.TryRefuse("keypaste token bundle", vaultPath, destination, "a bundle", context, out var refused))
+        {
+            return refused;
         }
 
         var count = sets.Sum(set => set.Variables.Count);

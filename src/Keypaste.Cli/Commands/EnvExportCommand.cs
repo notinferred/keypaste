@@ -212,46 +212,8 @@ internal static class EnvExportCommand
         return null;
     }
 
-    /// <summary>Refuses a destination that is the vault this export reads from.</summary>
-    /// <remarks>
-    /// <para>
-    /// It takes no <c>force</c> parameter, and that is the point: there is no argument in scope for
-    /// a later edit to thread an override through, so a bypass cannot be added without a diff that
-    /// says out loud what it is doing. <c>--force</c> is for a stale <c>.env</c>; there is no
-    /// version of "yes, replace my vault with a plaintext file" worth offering.
-    /// </para>
-    /// <para>
-    /// Two rules, because one of them cannot see everything. <see cref="PathIdentity.SameFile"/>
-    /// resolves links, including one in an ancestor directory, and it is the rule that produces the
-    /// message naming the vault. It cannot see through a hard link or a bind mount, so a
-    /// destination that is already a KDBX file is refused as well — which also declines to write a
-    /// <c>.env</c> over some <em>other</em> vault, an accident with the same cost.
-    /// </para>
-    /// </remarks>
-    private static bool TryRefuseTheVault(string vaultPath, string targetPath, CliContext context, out int exit)
-    {
-        exit = CliApp.ExitSuccess;
-
-        if (PathIdentity.SameFile(vaultPath, targetPath))
-        {
-            context.Stderr.WriteLine(string.Equals(targetPath, vaultPath, StringComparison.Ordinal)
-                ? $"keypaste env export: '{targetPath}' is the vault this export reads from"
-                : $"keypaste env export: '{targetPath}' is the vault at '{vaultPath}'");
-        }
-        else if (File.Exists(targetPath) && KdbxHeader.IsVaultFile(targetPath))
-        {
-            context.Stderr.WriteLine($"keypaste env export: '{targetPath}' is a KeePass vault");
-        }
-        else
-        {
-            return true;
-        }
-
-        context.Stderr.WriteLine("Writing it would leave you with a .env and no vault.");
-        context.Stderr.WriteLine("Nothing was written. --force does not lift this; name another file.");
-        exit = CliApp.ExitUsageError;
-        return false;
-    }
+    private static bool TryRefuseTheVault(string vaultPath, string targetPath, CliContext context, out int exit) =>
+        VaultOverwriteGuard.TryRefuse("keypaste env export", vaultPath, targetPath, "a .env", context, out exit);
 
     /// <summary>Checks the destination is writable, and refuses to clobber anything by default.</summary>
     private static bool TryClearTheWay(string targetPath, bool force, CliContext context, out int exit)

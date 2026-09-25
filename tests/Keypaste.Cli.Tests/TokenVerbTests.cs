@@ -266,6 +266,30 @@ public sealed class TokenVerbTests : IDisposable
     }
 
     [Fact]
+    public void Bundle_NeverReplacesAVault_EvenWithForce()
+    {
+        var token = Mint(_harness, "ci-staging", "read:acme-api/staging/*");
+        var other = Path.Combine(_harness.Directory, "other.kdbx");
+        File.Copy(_harness.VaultPath, other);
+        var vaultBytes = File.ReadAllBytes(_harness.VaultPath);
+        var otherBytes = File.ReadAllBytes(other);
+        _harness.Environment[RunWithToken.EnvironmentVariable] = token;
+
+        foreach (var destination in new[] { _harness.VaultPath, other })
+        {
+            Clear();
+            _harness.Prompt.Enqueue(Master);
+            _harness.AssertExit(CliApp.ExitUsageError, _harness.Run(
+                "token", "bundle", "ci-staging", "-o", destination, "--force", "--vault", _harness.VaultPath));
+            Assert.Contains("--force does not lift this", _harness.Err, StringComparison.Ordinal);
+        }
+
+        Assert.Equal(vaultBytes, File.ReadAllBytes(_harness.VaultPath));
+        Assert.Equal(otherBytes, File.ReadAllBytes(other));
+        Assert.False(File.Exists(KeypasteHome.AuditPath(_harness.Directory)));
+    }
+
+    [Fact]
     public void Bundle_RefusesAProtectedScope()
     {
         var token = Mint(_harness, "ci-staging", "read:acme-api/staging/*,read:acme-api/prod/*", "--allow-prod");
