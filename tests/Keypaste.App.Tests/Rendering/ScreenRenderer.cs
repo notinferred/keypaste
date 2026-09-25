@@ -149,6 +149,21 @@ public sealed class ScreenRenderer
         Save(window, output, "20-secrets-edit");
         entries.Detail.CancelCommand.Execute(null);
 
+        // A variable's edit form and rotate prompt, which are worded for a value in a profile, and a
+        // filter that matches nothing.
+        entries.Selected = entries.Rows.First(row => row.Title == "DATABASE_URL" && row.GroupPath == "env/acme-api");
+        entries.Detail!.EditCommand.Execute(null);
+        Save(window, output, "21-secrets-variable-edit");
+        entries.Detail.CancelCommand.Execute(null);
+
+        entries.Detail.RotateCommand.Execute(null);
+        Save(window, output, "22-secrets-variable-rotate");
+        entries.Detail.CancelRotateCommand.Execute(null);
+
+        entries.Search = "no-such-secret";
+        Save(window, output, "23-secrets-no-match");
+        entries.Search = string.Empty;
+
         window.Close();
     }
 

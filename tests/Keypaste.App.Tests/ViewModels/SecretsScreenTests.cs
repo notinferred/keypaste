@@ -115,7 +115,85 @@ public sealed class SecretsScreenTests : IDisposable
         Assert.True(detail.ShowsUrl);
         Assert.False(detail.HasProfiles);
         Assert.Equal("Login · acme.kdbx › Work", detail.Location);
-        Assert.Equal("Work/github · field Password", detail.KdbxEntry);
+        Assert.Matches("^uuid [0-9a-f]{4}…[0-9a-f]{4} · field Password$", detail.KdbxEntry);
+        Assert.Equal("Password", detail.ValueLabel);
+        Assert.Equal("New password", detail.ReplacementPlaceholder);
+        Assert.Contains("20-character password", detail.RotatePrompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_env_project_group_lists_its_own_profile_as_its_badge_says()
+    {
+        using var context = new Context(_vaultPath);
+
+        context.Entries.SelectedGroup = context.Entries.Groups.Single(group => group.Path == "env/acme-api");
+
+        Assert.Equal("acme-api", context.Entries.ListTitle);
+        Assert.Equal("dev", context.Entries.ListProfile);
+        Assert.Equal("Filter 1 secret", context.Entries.FilterHint);
+        Assert.Equal(["env/acme-api"], context.Entries.Rows.Select(row => row.GroupPath));
+    }
+
+    [Fact]
+    public void The_list_starts_on_everything_and_highlights_it()
+    {
+        using var context = new Context(_vaultPath);
+
+        Assert.NotNull(context.Entries.SelectedGroup);
+        Assert.True(context.Entries.SelectedGroup!.IsEverything);
+    }
+
+    [Fact]
+    public void An_empty_list_says_why()
+    {
+        using var context = new Context(_vaultPath);
+        Assert.False(context.Entries.ShowsListEmpty);
+
+        context.Entries.Search = "nothing-is-called-this";
+
+        Assert.True(context.Entries.ShowsListEmpty);
+        Assert.Equal("No secrets match “nothing-is-called-this”.", context.Entries.ListEmptyNote);
+        Assert.False(context.Entries.ListEmptyOffersNew);
+    }
+
+    [Fact]
+    public void A_variable_is_edited_and_rotated_as_a_value_in_its_profile()
+    {
+        using var context = new Context(_vaultPath);
+
+        context.Entries.Selected = context.Entries.Rows.Single(row => row.GroupPath == "env/acme-api/prod");
+        var detail = context.Entries.Detail!;
+
+        Assert.Equal("New value", detail.ReplacementPlaceholder);
+        Assert.Contains("current value", detail.ReplacementCaption, StringComparison.Ordinal);
+        Assert.Contains("DATABASE_URL in acme-api · prod", detail.RotatePrompt, StringComparison.Ordinal);
+        Assert.Contains("injects this key in prod", detail.RotatePrompt, StringComparison.Ordinal);
+        Assert.DoesNotContain(_value, detail.RotatePrompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_new_login_is_made_whole_in_one_step_and_a_new_key_under_env_has_no_username()
+    {
+        using var context = new Context(_vaultPath);
+
+        context.Entries.Selected = context.Entries.Rows.Single(row => row.Title == "github");
+        context.Entries.BeginAddCommand.Execute(null);
+        Assert.Null(context.Entries.Selected);
+
+        context.Entries.NewEntryPath = "Work/gitlab";
+        Assert.True(context.Entries.NewEntryIsLogin);
+        context.Entries.NewUsername = "me";
+        context.Entries.NewUrl = "https://gitlab.com";
+        context.Entries.ConfirmAddCommand.Execute(null);
+
+        var added = context.Session.Unlocked!.Find(new EntryName("Work", "gitlab"))!;
+        Assert.Equal("me", added.Username);
+        Assert.Equal("https://gitlab.com", added.Url);
+
+        context.Entries.BeginAddCommand.Execute(null);
+        context.Entries.NewEntryPath = "env/acme-api/API_KEY";
+        Assert.False(context.Entries.NewEntryIsLogin);
+        Assert.Empty(context.Entries.NewUsername);
     }
 
     /// <summary>A reference names the entry and holds no value, so it is copied as plain text.</summary>

@@ -107,9 +107,16 @@ public sealed class Vault : IDisposable
     }
 
     /// <summary>The KDBX UUID of the entry called <paramref name="name"/>, as hex, or
-    /// <see langword="null"/> if none has that name. A test seam; keypaste addresses entries by
-    /// name.</summary>
-    internal string? EntryUuid(EntryName name) => _interop.EntryUuid(name);
+    /// <see langword="null"/> if none has that name.</summary>
+    /// <remarks>For showing where an entry sits in the file, as KeePassXC knows it. keypaste
+    /// addresses entries by name, never by this.</remarks>
+    public string? EntryUuid(EntryName name)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+
+        return _interop.EntryUuid(name);
+    }
 
     /// <summary>How many deleted-object tombstones the vault carries.</summary>
     /// <remarks>

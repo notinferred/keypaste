@@ -37,6 +37,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     private bool _isConfirmingRotate;
     private string _created = string.Empty;
     private string _rotated = string.Empty;
+    private string? _uuid;
     private EntryAgentAccess? _agentAccess;
     private string _agentAccessSummary = "None active";
     private string _lastUsedText = "never";
@@ -113,9 +114,12 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         }
     }
 
-    /// <summary>What the confirm row asks.</summary>
-    internal string RotatePrompt { get; } =
-        $"Replace the value with a new {PasswordGenerator.DefaultLength}-character password? The old one stays in history.";
+    /// <summary>What the confirm row asks. A variable's names the profile whose apps get the new value.</summary>
+    internal string RotatePrompt =>
+        EnvPlace.Of(_groupPath, _title) is { } place
+            ? $"Replace {DisplayTitle} in {place.Project} · {place.Profile} with a new random {PasswordGenerator.DefaultLength}-character value? "
+                + $"Every app that injects this key in {place.Profile} gets it on its next run, so a connection string or URL here stops working. The old value stays in history."
+            : $"Replace the value with a new {PasswordGenerator.DefaultLength}-character password? The old one stays in history.";
 
     /// <summary>When the entry was created, as the metadata row shows it.</summary>
     internal string Created
@@ -138,19 +142,30 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         private set => Set(ref _agentAccess, value);
     }
 
-    /// <summary>The Agent access card's one line.</summary>
+    /// <summary>The Agent access card's one line, when <see cref="AgentLines"/> does not list the same agents.</summary>
     internal string AgentAccessSummary
     {
         get => _agentAccessSummary;
         private set => Set(ref _agentAccessSummary, value);
     }
 
+    internal bool ShowsAgentAccessSummary => _agentLines.Count == 0;
+
     /// <summary>When an agent last received it: "in use", "4m ago" or "never".</summary>
     internal string LastUsedText
     {
         get => _lastUsedText;
-        private set => Set(ref _lastUsedText, value);
+        private set
+        {
+            if (Set(ref _lastUsedText, value))
+            {
+                Raise(nameof(HasBeenUsed));
+            }
+        }
     }
+
+    /// <summary>Whether an agent ever received it, which is when the card says when.</summary>
+    internal bool HasBeenUsed => _lastUsedText != "never";
 
     /// <summary>Takes the latest picture of what agents did, never a value.</summary>
     /// <param name="activity">The picture.</param>
@@ -166,7 +181,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         var now = _session.Clock.GetUtcNow();
         var access = activity.Access(Name);
         AgentAccess = access;
-        AgentAccessSummary = UseText.Summary(access, now);
+        AgentAccessSummary = UseText.Summary(access);
         LastUsedText = UseText.LastUsed(access.Use, now);
         AgentLines = UseText.Lines(access, now);
     }
@@ -175,7 +190,13 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     internal IReadOnlyList<string> AgentLines
     {
         get => _agentLines;
-        private set => Set(ref _agentLines, value);
+        private set
+        {
+            if (Set(ref _agentLines, value))
+            {
+                Raise(nameof(ShowsAgentAccessSummary));
+            }
+        }
     }
 
     /// <summary>What sort of entry this is.</summary>
@@ -192,9 +213,18 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
                 Raise(nameof(ValueLabel));
                 Raise(nameof(ShowsUsername));
                 Raise(nameof(ShowsUrl));
+                Raise(nameof(ReplacementPlaceholder));
+                Raise(nameof(ReplacementCaption));
             }
         }
     }
+
+    /// <summary>The edit form's secret field, named for what it replaces.</summary>
+    internal string ReplacementPlaceholder => IsVariable ? "New value" : "New password";
+
+    internal string ReplacementCaption => IsVariable
+        ? "Leave this empty to keep the current value. A replacement keeps the old one in this entry's history."
+        : "Leave this empty to keep the current password. A replacement keeps the old one in this entry's history.";
 
     internal string KindLabel => EntryKinds.Label(_kind);
 
@@ -220,8 +250,11 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         }
     }
 
-    /// <summary>Where the value lives in the KDBX file, as KeePassXC would find it.</summary>
-    internal string KdbxEntry => $"{DisplayPath} · field Password";
+    /// <summary>Where the value lives in the KDBX file: the entry's UUID, abbreviated, and its field.</summary>
+    /// <remarks>The path is on the location line already; the UUID is what KeePassXC shows nowhere else.</remarks>
+    internal string KdbxEntry => _uuid is { Length: > 8 } uuid
+        ? $"uuid {uuid[..4].ToLowerInvariant()}…{uuid[^4..].ToLowerInvariant()} · field Password"
+        : $"{DisplayPath} · field Password";
 
     /// <summary>A login always shows its username; anything else only when it has one.</summary>
     internal bool ShowsUsername => !IsVariable || Username.Length > 0;
@@ -503,6 +536,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         DraftUrl = string.Empty;
         DraftNotes = string.Empty;
         PasswordLength = 0;
+        _uuid = null;
         Reference = null;
         Profiles = null;
         ProfileStates = [];
@@ -598,6 +632,8 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
             var now = _session.Clock.GetUtcNow();
             Created = UseText.Dated(vault.ReadTimes(Name)?.Created, now);
             Rotated = UseText.Dated(EntryRotation.LastRotated(vault, Name), now);
+            _uuid = vault.EntryUuid(Name);
+            Raise(nameof(KdbxEntry));
         }
         catch (VaultException e)
         {

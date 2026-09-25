@@ -145,6 +145,17 @@
       <Setter Property="Padding" Value="14" />
     </Style>
 
+    <!-- The destructive confirmation, the one place KpDanger appears on this screen. -->
+    <Style Selector="Border.form.danger">
+      <Setter Property="Background" Value="{DynamicResource KpDangerTint}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource KpDanger}" />
+    </Style>
+
+    <Style Selector="ToggleButton.tree:disabled /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextDisabled}" />
+    </Style>
+
     <Style Selector="Border.note">
       <Setter Property="Background" Value="{DynamicResource KpAccentTint}" />
       <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusField}" />
@@ -231,6 +242,7 @@
                           x:Name="GroupsToggle"
                           Classes="tree"
                           IsChecked="True"
+                          IsEnabled="{Binding !Detail.History.IsOpen, FallbackValue=True}"
                           Margin="-4,0,6,0"
                           ToolTip.Tip="Show or hide groups"
                           AutomationProperties.Name="Groups">
@@ -327,6 +339,28 @@
 
       </StackPanel>
 
+      <Panel>
+      <!-- An empty list says why, so a filter with no match does not read as a failed load. -->
+      <StackPanel Spacing="12"
+                  Margin="24,0"
+                  HorizontalAlignment="Center"
+                  VerticalAlignment="Center"
+                  IsVisible="{Binding ShowsListEmpty}">
+        <TextBlock x:Name="ListEmpty"
+                   Classes="subtitle"
+                   TextAlignment="Center"
+                   Text="{Binding ListEmptyNote}" />
+        <Button Classes="sm"
+                HorizontalAlignment="Center"
+                IsVisible="{Binding ListEmptyOffersNew}"
+                Command="{Binding BeginAddCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <ctl:KpIcon Icon="plus" Size="13" />
+            <TextBlock Text="New secret" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+      </StackPanel>
+
       <ListBox Name="Rows"
                Classes="rows"
                Padding="6"
@@ -366,6 +400,7 @@
           </DataTemplate>
         </ListBox.ItemTemplate>
       </ListBox>
+      </Panel>
 
     </DockPanel>
 
@@ -393,14 +428,25 @@
         <StackPanel Spacing="24">
 
           <StackPanel Spacing="6">
-            <TextBlock Classes="mono xl" Text="New secret" />
-            <TextBlock FontSize="13" Classes="muted" TextWrapping="Wrap" Text="{Binding VaultName, StringFormat='Saved into {0}.'}" />
+            <TextBlock Classes="h1" Text="New secret" />
+            <TextBlock Classes="subtitle" Text="{Binding VaultName, StringFormat='Saved into {0}.'}" />
           </StackPanel>
 
           <StackPanel Spacing="8">
             <TextBlock Classes="label" Text="Group and title" />
             <TextBox Classes="mono" MinHeight="40" Text="{Binding NewEntryPath}" PlaceholderText="servers/production" />
             <TextBlock Classes="caption" Text="Groups are separated by /. The last part is the entry's title." />
+          </StackPanel>
+
+          <!-- A login's other fields, so it is whole in one step. A key under env has profiles instead. -->
+          <StackPanel Spacing="8" IsVisible="{Binding NewEntryIsLogin}">
+            <TextBlock Classes="label" Text="Username" />
+            <TextBox x:Name="NewEntryUsername" Classes="mono" MinHeight="40" Text="{Binding NewUsername}" PlaceholderText="Optional" />
+          </StackPanel>
+
+          <StackPanel Spacing="8" IsVisible="{Binding NewEntryIsLogin}">
+            <TextBlock Classes="label" Text="URL" />
+            <TextBox x:Name="NewEntryUrl" Classes="mono" MinHeight="40" Text="{Binding NewUrl}" PlaceholderText="https://" />
           </StackPanel>
 
           <StackPanel Spacing="10">
@@ -571,9 +617,9 @@
                             x:DataType="vm:EntriesViewModel"
                             DataContext="{Binding $parent[views:EntriesView].DataContext}"
                             IsVisible="{Binding IsConfirmingDelete}">
-                  <!-- The one place KpDanger appears on this screen. What the deletion costs depends on
-                       the vault: DeletePrompt reads its recycle-bin setting and says which case this is. -->
-                  <Border Classes="form" BorderBrush="{DynamicResource KpDanger}" Background="{DynamicResource KpDangerTint}">
+                  <!-- What the deletion costs depends on the vault: DeletePrompt reads its recycle-bin
+                       setting and says which case this is. -->
+                  <Border Classes="form danger">
                     <StackPanel Spacing="10">
                       <TextBlock Text="{Binding DeletePrompt}" TextWrapping="Wrap" FontSize="12.5" Classes="primary" />
                       <StackPanel Orientation="Horizontal" Spacing="8">
@@ -676,7 +722,7 @@
 
                       <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="Password" Margin="0,12,0,6" />
                       <TextBlock Grid.Row="2" Grid.Column="0" Classes="caption" Text="Then" VerticalAlignment="Center" />
-                      <Grid Grid.Row="2" Grid.Column="2" ColumnDefinitions="*,Auto">
+                      <Grid Grid.Row="2" Grid.Column="2" ColumnDefinitions="*,Auto,Auto">
                         <ctl:RevealedValue Grid.Column="0"
                                            x:Name="RevisionPassword"
                                            Source="{Binding History.Selected}"
@@ -687,7 +733,18 @@
                                            HorizontalAlignment="Left"
                                            VerticalAlignment="Center"
                                            Foreground="{DynamicResource KpTextSecondary}" />
-                        <Button Grid.Column="1" x:Name="CopyRevisionPassword" Classes="sm" Content="Copy"
+                        <ctl:RevealButton Grid.Column="1"
+                                          x:Name="RevealRevisionPassword"
+                                          Classes="ghost in-field"
+                                          Margin="0,0,6,0"
+                                          Target="{Binding #RevisionPassword}"
+                                          ToolTip.Tip="Hold to reveal">
+                          <StackPanel Orientation="Horizontal" Spacing="6">
+                            <ctl:KpIcon Icon="eye" Size="14" />
+                            <TextBlock Text="Reveal" VerticalAlignment="Center" />
+                          </StackPanel>
+                        </ctl:RevealButton>
+                        <Button Grid.Column="2" x:Name="CopyRevisionPassword" Classes="sm" Content="Copy"
                                 Command="{Binding History.Selected.CopyPasswordCommand}" />
                       </Grid>
                       <TextBlock Grid.Row="3" Grid.Column="0" Classes="caption" Text="Now" Margin="0,4,0,0" />
@@ -695,21 +752,39 @@
 
                       <TextBlock Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="Username" Margin="0,12,0,6" />
                       <TextBlock Grid.Row="5" Grid.Column="0" Classes="caption" Text="Then" />
-                      <TextBlock Grid.Row="5" Grid.Column="2" Classes="mono" Text="{Binding History.Selected.DisplayUsername}" TextTrimming="CharacterEllipsis" />
+                      <Panel Grid.Row="5" Grid.Column="2">
+                        <TextBlock Classes="mono" Text="{Binding History.Selected.DisplayUsername}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Classes="caption" Text="(empty)" IsVisible="{Binding History.Selected.DisplayUsername, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                      </Panel>
                       <TextBlock Grid.Row="6" Grid.Column="0" Classes="caption" Text="Now" Margin="0,4,0,0" />
-                      <TextBlock Grid.Row="6" Grid.Column="2" Classes="mono" Text="{Binding DisplayUsername}" TextTrimming="CharacterEllipsis" Margin="0,4,0,0" />
+                      <Panel Grid.Row="6" Grid.Column="2" Margin="0,4,0,0">
+                        <TextBlock Classes="mono" Text="{Binding DisplayUsername}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Classes="caption" Text="(empty)" IsVisible="{Binding DisplayUsername, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                      </Panel>
 
                       <TextBlock Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="URL" Margin="0,12,0,6" />
                       <TextBlock Grid.Row="8" Grid.Column="0" Classes="caption" Text="Then" />
-                      <TextBlock Grid.Row="8" Grid.Column="2" Classes="mono" Text="{Binding History.Selected.DisplayUrl}" TextWrapping="Wrap" />
+                      <Panel Grid.Row="8" Grid.Column="2">
+                        <TextBlock Classes="mono" Text="{Binding History.Selected.DisplayUrl}" TextWrapping="Wrap" />
+                        <TextBlock Classes="caption" Text="(empty)" IsVisible="{Binding History.Selected.DisplayUrl, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                      </Panel>
                       <TextBlock Grid.Row="9" Grid.Column="0" Classes="caption" Text="Now" Margin="0,4,0,0" />
-                      <TextBlock Grid.Row="9" Grid.Column="2" Classes="mono" Text="{Binding DisplayUrl}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                      <Panel Grid.Row="9" Grid.Column="2" Margin="0,4,0,0">
+                        <TextBlock Classes="mono" Text="{Binding DisplayUrl}" TextWrapping="Wrap" />
+                        <TextBlock Classes="caption" Text="(empty)" IsVisible="{Binding DisplayUrl, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                      </Panel>
 
                       <TextBlock Grid.Row="10" Grid.Column="0" Grid.ColumnSpan="3" Classes="label" Text="Notes" Margin="0,12,0,6" />
                       <TextBlock Grid.Row="11" Grid.Column="0" Classes="caption" Text="Then" />
-                      <TextBlock Grid.Row="11" Grid.Column="2" FontSize="13" Text="{Binding History.Selected.DisplayNotes}" TextWrapping="Wrap" />
+                      <Panel Grid.Row="11" Grid.Column="2">
+                        <TextBlock FontSize="13" Text="{Binding History.Selected.DisplayNotes}" TextWrapping="Wrap" />
+                        <TextBlock Classes="caption" Text="(empty)" IsVisible="{Binding History.Selected.DisplayNotes, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                      </Panel>
                       <TextBlock Grid.Row="12" Grid.Column="0" Classes="caption" Text="Now" Margin="0,4,0,0" />
-                      <TextBlock Grid.Row="12" Grid.Column="2" FontSize="13" Text="{Binding DisplayNotes}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                      <Panel Grid.Row="12" Grid.Column="2" Margin="0,4,0,0">
+                        <TextBlock FontSize="13" Text="{Binding DisplayNotes}" TextWrapping="Wrap" />
+                        <TextBlock Classes="caption" Text="(empty)" IsVisible="{Binding DisplayNotes, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                      </Panel>
                     </Grid>
 
                     <StackPanel Spacing="6" IsVisible="{Binding History.HasSelection}">
@@ -855,17 +930,21 @@
                       </StackPanel>
                       <TextBlock x:Name="AgentAccessSummary"
                                  Classes="mono"
+                                 FontSize="12.5"
+                                 IsVisible="{Binding ShowsAgentAccessSummary}"
                                  Text="{Binding AgentAccessSummary}"
                                  TextWrapping="Wrap" />
                       <ItemsControl ItemsSource="{Binding AgentLines}"
                                     IsVisible="{Binding AgentLines.Count}">
                         <ItemsControl.ItemTemplate>
                           <DataTemplate x:DataType="x:String">
-                            <TextBlock Classes="mono sm secondary" Text="{Binding}" TextTrimming="CharacterEllipsis" Margin="0,2" />
+                            <TextBlock Classes="mono" FontSize="12.5" Text="{Binding}" TextTrimming="CharacterEllipsis" Margin="0,2" />
                           </DataTemplate>
                         </ItemsControl.ItemTemplate>
                       </ItemsControl>
-                      <TextBlock Classes="caption" Text="{Binding LastUsedText, StringFormat='Last used {0}'}" />
+                      <TextBlock Classes="caption"
+                                 IsVisible="{Binding HasBeenUsed}"
+                                 Text="{Binding LastUsedText, StringFormat='Last used {0}'}" />
                     </StackPanel>
                   </Border>
                   <Border Classes="card" IsVisible="{Binding HasProfiles}">
@@ -927,11 +1006,11 @@
                 <Border Classes="form" IsVisible="{Binding IsEditing}">
                   <StackPanel Spacing="10">
                     <TextBlock Classes="section" Text="Edit fields" />
-                    <StackPanel Spacing="6">
+                    <StackPanel Spacing="6" IsVisible="{Binding ShowsUsername}">
                       <TextBlock Classes="label" Text="Username" />
                       <TextBox Classes="mono" Text="{Binding DraftUsername}" />
                     </StackPanel>
-                    <StackPanel Spacing="6">
+                    <StackPanel Spacing="6" IsVisible="{Binding ShowsUrl}">
                       <TextBlock Classes="label" Text="URL" />
                       <TextBox Classes="mono" Text="{Binding DraftUrl}" />
                     </StackPanel>
@@ -945,9 +1024,8 @@
                                        AllowsPaste="True"
                                        Sink="{Binding NewPassword}"
                                        MaskedLength="{Binding NewPassword.MaskedLength}"
-                                       Placeholder="New password" />
-                      <TextBlock Classes="caption"
-                                 Text="Leave this empty to keep the current password. A replacement keeps the old one in this entry's history." />
+                                       Placeholder="{Binding ReplacementPlaceholder}" />
+                      <TextBlock Classes="caption" Text="{Binding ReplacementCaption}" TextWrapping="Wrap" />
                       <TextBlock Classes="caption"
                                  IsVisible="{Binding NewPassword.Note.Length}"
                                  Text="{Binding NewPassword.Note}" />
