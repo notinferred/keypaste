@@ -143,24 +143,31 @@ function page(status, heading, body) {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>keypaste — ${heading}</title>
-<meta name="color-scheme" content="light dark">
+<meta name="robots" content="noindex">
+<meta name="color-scheme" content="dark light">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/brand.css">
 <style>
-  body { margin: 0; background: #fbfbfa; color: #1a1a19;
-         font: 17px/1.65 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  main { max-width: 32rem; margin: 0 auto; padding: 5rem 1.5rem; }
-  h1 { font-size: 1.25rem; font-weight: 600; margin: 0 0 1rem; }
-  a { color: #3d5a80; }
-  @media (prefers-color-scheme: dark) {
-    body { background: #141414; color: #ececea; }
-    a { color: #8fb0d9; }
-  }
+  main { max-width: 34rem; margin: 0 auto; padding: 48px 16px 64px; }
+  .lockup { margin-bottom: 32px; }
+  .card { padding: 28px; border: 1px solid var(--border-subtle); border-radius: 14px; background: var(--bg-panel); }
+  h1 { margin: 0 0 12px; font-size: 24px; font-weight: 600; letter-spacing: -0.03em; }
+  p { margin: 0 0 16px; color: var(--text-secondary); font-size: 15px; }
 </style>
 </head>
-<body><main>
-  <h1>${heading}</h1>
-  <p>${body}</p>
-  <p><a href="/">Back to keypaste.com</a></p>
-</main></body>
+<body>
+<main>
+  <a class="lockup" href="/" aria-label="keypaste home">
+    <svg width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><rect class="mark-stem" x="10" y="8" width="10" height="48"/><polygon class="mark-arm" points="40,24 54,24 38,40 54,56 40,56 24,40"/></svg>
+    <span>keypaste</span>
+  </a>
+  <section class="card">
+    <h1>${heading}</h1>
+    <p>${body}</p>
+    <a class="button primary" href="/">Back to keypaste.com</a>
+  </section>
+</main>
+</body>
 </html>
 `;
   return new Response(html, { status, headers: { "content-type": "text/html; charset=utf-8" } });
