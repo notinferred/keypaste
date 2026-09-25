@@ -39,7 +39,7 @@ public sealed class DesktopEnvApprovalTests
             Assert.Equal("deploy --to \"staging area\"", Text(window, "CommandText"));
             Assert.EndsWith("work", Text(window, "DirectoryText"), StringComparison.Ordinal);
 
-            app.Arm();
+            await app.ArmAsync();
             Click(window, "Approve");
             var answered = await reply.WaitAsync(_wait, Token);
 
@@ -68,7 +68,7 @@ public sealed class DesktopEnvApprovalTests
             await using var app = await PromptedApp.StartAsync();
             var reply = app.AskEnv();
             var window = await app.PromptAsync();
-            app.Arm();
+            await app.ArmAsync();
 
             switch (how)
             {
@@ -113,7 +113,7 @@ public sealed class DesktopEnvApprovalTests
             await Task.Delay(200, Token);
             Assert.False(reply.IsCompleted, "a click before the prompt was armed answered it");
 
-            app.Arm();
+            await app.ArmAsync();
             Click(window, "Approve");
             Assert.Equal(EnvOutcome.Resolved, (await reply.WaitAsync(_wait, Token))?.Set.Outcome);
         });
@@ -129,7 +129,7 @@ public sealed class DesktopEnvApprovalTests
             Assert.Equal("Allow this command for 15 minutes", window.FindControl<Button>("Approve")!.Content);
             Assert.Contains("exactly this command", Text(window, "TimedCaptionText"), StringComparison.Ordinal);
 
-            app.Arm();
+            await app.ArmAsync();
             Click(window, "Approve");
             Assert.Equal(EnvOutcome.Resolved, (await reply.WaitAsync(_wait, Token))?.Set.Outcome);
             await PromptedApp.WithdrawnAsync(window);
@@ -150,7 +150,7 @@ public sealed class DesktopEnvApprovalTests
             var reply = app.AskEnv();
             var window = await app.PromptAsync();
 
-            app.Arm();
+            await app.ArmAsync();
             Click(window, "AllowOnce");
             Assert.Equal(EnvOutcome.Resolved, (await reply.WaitAsync(_wait, Token))?.Set.Outcome);
             await PromptedApp.WithdrawnAsync(window);

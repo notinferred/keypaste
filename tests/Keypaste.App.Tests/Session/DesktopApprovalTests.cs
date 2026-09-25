@@ -45,7 +45,7 @@ public sealed class DesktopApprovalTests
             Assert.Equal("password", Text(window, "FieldText"));
             Assert.Equal("once, or for 1 hour", Text(window, "LifetimeText"));
 
-            app.Arm();
+            await app.ArmAsync();
             Click(window, "Approve");
             var answered = await reply.WaitAsync(_wait, Token);
 
@@ -76,7 +76,7 @@ public sealed class DesktopApprovalTests
             await using var app = await PromptedApp.StartAsync();
             var reply = app.Ask();
             var window = await app.PromptAsync();
-            app.Arm();
+            await app.ArmAsync();
 
             switch (how)
             {
@@ -162,7 +162,7 @@ public sealed class DesktopApprovalTests
             await Task.Delay(200, Token);
             Assert.False(reply.IsCompleted, "a click before the prompt was armed answered it");
 
-            app.Arm();
+            await app.ArmAsync();
             Click(window, "Approve");
 
             Assert.Equal(AuditDecision.Granted, (await reply.WaitAsync(_wait, Token))!.Decision);
@@ -175,7 +175,7 @@ public sealed class DesktopApprovalTests
             await using var app = await PromptedApp.StartAsync();
             var reply = app.Ask();
             var window = await app.PromptAsync();
-            app.Arm();
+            await app.ArmAsync();
 
             // Focus starts on Deny, so a keystroke meant for another window can only refuse.
             Assert.True(window.FindControl<Button>("Deny")!.IsFocused);
@@ -239,7 +239,7 @@ public sealed class DesktopApprovalTests
             await using var app = await PromptedApp.StartAsync();
             var reply = app.Ask();
             var window = await app.PromptAsync();
-            app.Arm();
+            await app.ArmAsync();
             Click(window, "AllowOnce");
 
             var answered = await reply.WaitAsync(_wait, Token);
@@ -264,7 +264,7 @@ public sealed class DesktopApprovalTests
             await using var app = await PromptedApp.StartAsync();
             var reply = app.Ask();
             var window = await app.PromptAsync();
-            app.Arm();
+            await app.ArmAsync();
             Click(window, "Approve");
 
             Assert.Equal(3600, (await reply.WaitAsync(_wait, Token))!.TtlSeconds);
@@ -296,8 +296,7 @@ public sealed class DesktopApprovalTests
             await Task.Delay(200, Token);
             Assert.False(reply.IsCompleted, "a click before the prompt was armed answered it");
 
-            app.Arm();
-            await PromptedApp.UntilAsync(() => window.FindControl<Button>(button)!.IsEffectivelyEnabled);
+            await app.ArmAsync();
             Click(window, button);
 
             Assert.Equal(AuditDecision.Granted, (await reply.WaitAsync(_wait, Token))!.Decision);
@@ -315,7 +314,7 @@ public sealed class DesktopApprovalTests
             Assert.True(window.FindControl<Button>("AllowOnce")!.IsVisible);
             Assert.Equal("once only: protected profile", Text(window, "LifetimeText"));
 
-            app.Arm();
+            await app.ArmAsync();
             Click(window, "AllowOnce");
             var answered = await reply.WaitAsync(_wait, Token);
 
@@ -474,11 +473,12 @@ public sealed class DesktopApprovalTests
             return window;
         }
 
-        /// <summary>Lets the arming delay pass, as a person reading the prompt does.</summary>
-        internal void Arm()
+        /// <summary>Lets the arming delay pass, as a person reading the prompt does, and waits for the prompt to arm.</summary>
+        /// <remarks>The delay's continuation runs on the thread pool, so the arming is posted some time after the clock moves.</remarks>
+        internal async Task ArmAsync()
         {
             Clock.Advance(PromptViewModel.ArmingDelay);
-            WindowInput.Drain();
+            await Until(() => Windows[^1].FindControl<Button>("AllowOnce")!.IsEffectivelyEnabled);
         }
 
         internal static async Task WithdrawnAsync(Window window) => await Until(() => !window.IsVisible);

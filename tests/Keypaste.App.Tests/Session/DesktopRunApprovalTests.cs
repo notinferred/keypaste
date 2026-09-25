@@ -59,7 +59,7 @@ public sealed class DesktopRunApprovalTests
             var reply = app.AskRun();
             var window = await app.PromptAsync();
 
-            app.Arm();
+            await app.ArmAsync();
             Click(window, "AllowOnce");
             var answered = await reply.WaitAsync(_wait, Token);
 
@@ -77,7 +77,7 @@ public sealed class DesktopRunApprovalTests
             var reply = app.AskRun();
             var window = await app.PromptAsync();
 
-            app.Arm();
+            await app.ArmAsync();
             Click(window, "Approve");
             Assert.Equal(EnvOutcome.Resolved, (await reply.WaitAsync(_wait, Token))?.Set.Outcome);
             await PromptedApp.WithdrawnAsync(window);
@@ -107,7 +107,7 @@ public sealed class DesktopRunApprovalTests
             await Task.Delay(200, Token);
             Assert.False(reply.IsCompleted, "a click before the prompt was armed answered it");
 
-            app.Arm();
+            await app.ArmAsync();
             Click(window, "AllowOnce");
             Assert.Equal(EnvOutcome.Resolved, (await reply.WaitAsync(_wait, Token))?.Set.Outcome);
         });
@@ -170,7 +170,7 @@ public sealed class DesktopRunApprovalTests
             await using var app = await PromptedApp.StartAsync();
             var reply = app.AskRun();
             var window = await app.PromptAsync();
-            app.Arm();
+            await app.ArmAsync();
 
             Key(window, PhysicalKey.Enter);
 
