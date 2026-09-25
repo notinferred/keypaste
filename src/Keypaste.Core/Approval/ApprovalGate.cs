@@ -156,6 +156,10 @@ public sealed class ApprovalGate : IDisposable
     {
         using var withdraw = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
+        // The window opens before the person is asked, so time spent putting the prompt up counts
+        // against it rather than starting a fresh window once the prompt is showing.
+        var window = Task.Delay(Limits.Window, _clock, withdraw.Token);
+
         Task<ApprovalAnswer> asking;
 
         try
@@ -167,14 +171,14 @@ public sealed class ApprovalGate : IDisposable
         }
         catch (OperationCanceledException)
         {
+            await withdraw.CancelAsync().ConfigureAwait(false);
             return ApprovalAnswer.Cancelled;
         }
         catch (Exception)
         {
+            await withdraw.CancelAsync().ConfigureAwait(false);
             return ApprovalAnswer.Failed;
         }
-
-        var window = Task.Delay(Limits.Window, _clock, withdraw.Token);
 
         var first = await Task.WhenAny(asking, window).ConfigureAwait(false);
 

@@ -66,6 +66,26 @@ public sealed class ApprovalGateTests
     }
 
     /// <summary>
+    /// The window is open before the person is asked, so a whole window spent putting the prompt up
+    /// closes it. Opened afterwards, it began again once the prompt was showing, and a test that
+    /// moved its clock as soon as the person was asked could never see it close (app run
+    /// 36084643134).
+    /// </summary>
+    [Fact]
+    public async Task TheWindowIsOpenBeforeThePersonIsAsked()
+    {
+        var clock = new ManualClock();
+        var channel = new SlowToShowChannel(clock, TimeSpan.FromSeconds(ApprovalLimits.DefaultWindowSeconds));
+        using var gate = new ApprovalGate(channel, clock, ApprovalLimits.Default);
+
+        var answer = await gate.AskAsync("k", Prompt(), TestContext.Current.CancellationToken)
+            .AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        Assert.Equal(ApprovalAnswer.TimedOut, answer);
+    }
+
+    /// <summary>
     /// The single most important test in this file, and the one a "simplification" would break: a
     /// channel that answers yes after the deadline must not release anything. The human's window is
     /// the human's window, whatever the channel decided to do about the token it was handed.
@@ -389,6 +409,19 @@ public sealed class ApprovalGateTests
             await _released.Task.ConfigureAwait(false);
 
             return answer;
+        }
+    }
+
+    /// <summary>A channel whose prompt takes <paramref name="showing"/> to appear and is then never answered.</summary>
+    private sealed class SlowToShowChannel(ManualClock clock, TimeSpan showing) : IApprovalChannel
+    {
+        public ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken)
+        {
+            clock.Advance(showing);
+
+            var answer = new TaskCompletionSource<ApprovalAnswer>(TaskCreationOptions.RunContinuationsAsynchronously);
+            cancellationToken.Register(() => answer.TrySetResult(ApprovalAnswer.Denied));
+            return new ValueTask<ApprovalAnswer>(answer.Task);
         }
     }
 
