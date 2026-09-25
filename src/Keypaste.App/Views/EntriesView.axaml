@@ -916,7 +916,7 @@
                     </Grid>
                   </Border>
                   <TextBlock Classes="caption"
-                             Text="Use this in .env.keypaste or MCP tool calls. It resolves at runtime and the value never enters the agent's context." />
+                             Text="Use this in .env.keypaste with keypaste run, or in an agent&apos;s run tool when the bridge allows it. keypaste puts the value into the command&apos;s environment, not into the file." />
                 </StackPanel>
 
                 <!-- Agent access: who received this entry and what grant covers it now, never a value.

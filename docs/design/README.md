@@ -48,7 +48,7 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
 **App shell**: full window; grid rows `40px / 1fr`.
 - **Titlebar** (`#18191C`, bottom border `#26282C`): columns `232px | 1fr | auto`.
   - Window controls: three 12px circles `#3A3D43`, gap 8.
-  - Search, centered, `min(440px,100%)` × 28, radius 6, bg `#111214`, border `#26282C`, 12.5px muted. Placeholder "Search secrets, agents, projects". ⌘K keycap is mono 10.5 on `#24262A`, radius 4.
+  - Search, centered, `min(440px,100%)` × 28, radius 6, bg `#111214`, border `#26282C`, 12.5px muted. Placeholder "Search secrets". ⌘K keycap is mono 10.5 on `#24262A`, radius 4.
   - Right side: status "● acme.kdbx · saved" (mono 11, green dot 6px) and a "lock" button (26h, `#24262A`, radius 6).
 - **Sidebar**, 232px (`#18191C`, right border), padding 16/10, gap 20:
   - Lockup: 22px mark + 19px wordmark.
@@ -65,7 +65,7 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
 - Detail (padding 28/32, gap 24, max-width 820):
   - Key (mono 22) and path "Kind · acme.kdbx › acme › api › dev". Actions: Copy, Rotate, ⋯ (30h, `#2A2C30`).
   - **Value** field (40h, bg `#111214`, border `#2C2E33`): shows 24 masked • characters, with a Reveal/Hide toggle.
-  - **Reference** (36h, `#18191C`): `kp://acme/api/dev/KEY`, plus the helper line "Use this in .env.keypaste or MCP tool calls…".
+  - **Reference** (36h, `#18191C`): `kp://acme/api/dev/KEY`, plus the helper line "Use this in .env.keypaste with keypaste run, or in an agent's run tool when the bridge allows it…".
   - Two cards: Agent access, and Profiles (dev set / staging set / prod "approval required" in amber).
   - Metadata rows (140px label column): Created, Rotated, KDBX entry.
 
