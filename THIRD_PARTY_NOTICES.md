@@ -1,6 +1,6 @@
 # Third-party notices
 
-keypaste is distributed under AGPL-3.0-only and incorporates KeePassLib, the EFF long word list, the Instrument Sans and Fragment Mono typefaces and Lucide icons.
+keypaste is distributed under AGPL-3.0-only and incorporates KeePassLib, the EFF long word list, the Instrument Sans and Fragment Mono typefaces and Lucide icons. Its desktop app also links Yubico's .NET SDK, and its tests carry one KeePassXC test database.
 
 ## KeePassLib
 
@@ -37,3 +37,13 @@ The Regular face is embedded unmodified in the desktop app for keys, values, pat
 Copyright (c) Lucide Contributors 2022; portions copyright (c) Cole Bemis 2013-2022 as part of Feather (MIT). Licensed under the ISC License; the full text is in `third_party/lucide/LICENSE`, and [UPSTREAM.md](third_party/lucide/UPSTREAM.md) records the release.
 
 The icons are vendored as SVG at `third_party/lucide/icons/`. [lucide-to-axaml.py](scripts/lucide-to-axaml.py) converts the ones the desktop app uses into path geometry in `src/Keypaste.App/Theme/Icons.axaml`, which the app strokes at its own width; the shapes are not otherwise modified.
+
+## Yubico .NET SDK
+
+Copyright (c) Yubico AB. Licensed under the Apache License, Version 2.0; the full text is at <https://www.apache.org/licenses/LICENSE-2.0> and in each package as `LICENSE.txt`.
+
+The desktop app references `Yubico.YubiKey` 1.18.0 from NuGet, with its `Yubico.Core` and `Yubico.NativeShims` packages, to ask a YubiKey for HMAC-SHA1 challenge-response ([Directory.Packages.props](Directory.Packages.props), D-0366). They are not vendored or modified, and the CLI and the MCP bridge do not contain them. `Yubico.NativeShims` is a native library that statically contains OpenSSL's libcrypto, which is also Apache-2.0. Apache-2.0 code may be combined into a GPLv3 work, and so into this AGPL-3.0-only distribution; the SDK remains under Apache-2.0.
+
+## KeePassXC test database
+
+`tests/Keypaste.Core.Tests/HardwareKeys/KeePassXcChallengeResponseTests.cs` embeds KeePassXC's `tests/data/YubiKeyProtectedPasswords.kdbx`, copyright the KeePassXC Team, licensed under GNU GPL version 2 or 3 as KeePassXC is. It is test data that proves keypaste opens a database KeePassXC protected with a YubiKey; no shipped binary contains it. keypaste takes the GPLv3 option, which AGPL-3.0 §13 permits combining.

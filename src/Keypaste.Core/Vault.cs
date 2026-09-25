@@ -1,3 +1,4 @@
+using Keypaste.Core.HardwareKeys;
 using Keypaste.Core.Import;
 using Keypaste.Core.Internal;
 
@@ -164,12 +165,13 @@ public sealed class Vault : IDisposable
     /// the stronger version of the same fixture: there, KeePassXC makes them.
     /// </para>
     /// </remarks>
-    internal static Vault CreateWith(string path, ReadOnlySpan<char> masterPassword, string? keyfilePath)
+    internal static Vault CreateWith(
+        string path, ReadOnlySpan<char> masterPassword, string? keyfilePath, HardwareKey? hardwareKey = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
 
         return new Vault(
-            WithUtf8Password(masterPassword, utf8 => KeePassInterop.Create(path, utf8, keyfilePath)),
+            WithUtf8Password(masterPassword, utf8 => KeePassInterop.Create(path, utf8, keyfilePath, hardwareKey)),
             path,
             stamp: false);
     }
@@ -190,7 +192,24 @@ public sealed class Vault : IDisposable
     /// an unreadable one reaching here is an <see cref="InvalidMasterPasswordException"/> like any
     /// other factor that does not open the vault.
     /// </param>
-    public static Vault Open(string path, ReadOnlySpan<char> masterPassword, string? keyfilePath)
+    public static Vault Open(string path, ReadOnlySpan<char> masterPassword, string? keyfilePath) =>
+        Open(path, masterPassword, keyfilePath, hardwareKey: null);
+
+    /// <summary>Opens an existing vault that may also need a hardware key.</summary>
+    /// <param name="path">The vault file.</param>
+    /// <param name="masterPassword">
+    /// The master password. Empty is no password when a keyfile or hardware key is given, as it is
+    /// in KeePassXC.
+    /// </param>
+    /// <param name="keyfilePath">The keyfile, or <see langword="null"/> for a vault that has none.</param>
+    /// <param name="hardwareKey">
+    /// The hardware key's slot, or <see langword="null"/> for a vault that needs none. It is asked
+    /// now, and again on every save of the returned vault, which keeps using it; the caller disposes
+    /// it after the vault.
+    /// </param>
+    /// <exception cref="InvalidMasterPasswordException">The factors do not open the vault, which is also what a wrong hardware key or slot gives.</exception>
+    /// <exception cref="HardwareKeyException">The hardware key did not answer, so nothing was opened.</exception>
+    public static Vault Open(string path, ReadOnlySpan<char> masterPassword, string? keyfilePath, HardwareKey? hardwareKey)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
 
@@ -200,7 +219,7 @@ public sealed class Vault : IDisposable
         }
 
         return new Vault(
-            WithUtf8Password(masterPassword, utf8 => KeePassInterop.Open(path, utf8, keyfilePath)),
+            WithUtf8Password(masterPassword, utf8 => KeePassInterop.Open(path, utf8, keyfilePath, hardwareKey)),
             path,
             stamp: true);
     }
@@ -437,6 +456,16 @@ public sealed class Vault : IDisposable
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
             return _interop.KeyfilePath;
+        }
+    }
+
+    /// <summary>The hardware key this vault opens with and asks on every save, or <see langword="null"/> when it has none.</summary>
+    public HardwareKey? HardwareKey
+    {
+        get
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return _interop.HardwareKey;
         }
     }
 
@@ -881,7 +910,7 @@ public sealed class Vault : IDisposable
         Commit(null, null, KeePassInterop.SaveAttempts, backUp: true, applyFloor: false);
     }
 
-    /// <summary>Changes what unlocks this vault: its master password, its keyfile, or both.</summary>
+    /// <summary>Changes what unlocks this vault: its master password, its keyfile, its hardware key, or several.</summary>
     /// <param name="change">What to change.</param>
     /// <param name="newPassword">The new master password; read only when <see cref="VaultAccessChange.SetPassword"/> is set.</param>
     /// <param name="confirmation">The same password, typed again.</param>
@@ -893,7 +922,8 @@ public sealed class Vault : IDisposable
     /// <para>
     /// <b>A password is never taken away.</b> A vault that has one keeps one, and a vault a keyfile
     /// alone protects may change its keyfile but loses it only for a password. Only a keyfile that
-    /// already exists is attached, and never one keyed by its hash (D-0287, D-0288).
+    /// already exists is attached, and never one keyed by its hash (D-0287, D-0288). A hardware key
+    /// is attached only while a key with that slot is connected, and is asked once, by the save.
     /// </para>
     /// <para>
     /// The save always keeps the file it replaces, like <see cref="SaveOverwriting"/>, but refuses a
@@ -945,6 +975,13 @@ public sealed class Vault : IDisposable
             _ => _interop.KeyfilePath,
         };
 
+        var hardwareKeyAfter = change.HardwareKeyChange switch
+        {
+            AccessHardwareKeyChange.Attach => change.HardwareKey,
+            AccessHardwareKeyChange.Remove => null,
+            _ => _interop.HardwareKey,
+        };
+
         // Nothing released under the old factors is reused under the new ones (D-0318), and nothing
         // is read from this vault while its file is being replaced.
         bool wasPending;
@@ -956,9 +993,10 @@ public sealed class Vault : IDisposable
 
         Edited?.Invoke(this, VaultEdit.Everything);
 
+        var keepKeyfile = change.Keyfile == AccessKeyfileChange.Keep;
         var pending = change.SetPassword
-            ? WithUtf8Password(newPassword, utf8 => _interop.ChangeKey(utf8, keyfileAfter, change.Keyfile == AccessKeyfileChange.Keep))
-            : _interop.ChangeKey(null, keyfileAfter, change.Keyfile == AccessKeyfileChange.Keep);
+            ? WithUtf8Password(newPassword, utf8 => _interop.ChangeKey(utf8, keyfileAfter, keepKeyfile, hardwareKeyAfter))
+            : _interop.ChangeKey(null, keyfileAfter, keepKeyfile, hardwareKeyAfter);
 
         _lastKept = null;
         try
@@ -1005,7 +1043,7 @@ public sealed class Vault : IDisposable
     private VaultAccessResult? RefuseAccessChange(
         VaultAccessChange change, string? keyfilePath, ReadOnlySpan<char> newPassword, ReadOnlySpan<char> confirmation)
     {
-        if (!change.SetPassword && change.Keyfile == AccessKeyfileChange.Keep)
+        if (!change.SetPassword && change.Keyfile == AccessKeyfileChange.Keep && change.HardwareKeyChange == AccessHardwareKeyChange.Keep)
         {
             return Refused(VaultAccessOutcome.NothingToChange);
         }
@@ -1015,7 +1053,17 @@ public sealed class Vault : IDisposable
             return Refused(VaultAccessOutcome.NoKeyfileToRemove);
         }
 
-        if (change.Keyfile == AccessKeyfileChange.Remove && !change.SetPassword && !_interop.KeyHasPassword)
+        if (change.HardwareKeyChange == AccessHardwareKeyChange.Remove && _interop.HardwareKey is null)
+        {
+            return Refused(VaultAccessOutcome.NoHardwareKeyToRemove);
+        }
+
+        var passwordAfter = change.SetPassword || _interop.KeyHasPassword;
+        var keyfileAfter = change.Keyfile == AccessKeyfileChange.Attach
+            || (change.Keyfile == AccessKeyfileChange.Keep && _interop.KeyfilePath is not null);
+
+        if ((change.Keyfile == AccessKeyfileChange.Remove || change.HardwareKeyChange == AccessHardwareKeyChange.Remove)
+            && !passwordAfter && !keyfileAfter)
         {
             return Refused(VaultAccessOutcome.WouldLeaveNoPassword);
         }
@@ -1023,6 +1071,17 @@ public sealed class Vault : IDisposable
         if (change.Keyfile == AccessKeyfileChange.Attach && RefuseAttaching(Path, keyfilePath) is { } refusedKeyfile)
         {
             return refusedKeyfile;
+        }
+
+        if (change.HardwareKeyChange == AccessHardwareKeyChange.Attach)
+        {
+            var attached = change.HardwareKey
+                ?? throw new ArgumentException("A hardware key to attach is required.", nameof(change));
+
+            if (!attached.IsConnected())
+            {
+                return Refused(VaultAccessOutcome.HardwareKeyNotFound);
+            }
         }
 
         if (change.SetPassword && newPassword.IsEmpty)

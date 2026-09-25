@@ -46,6 +46,27 @@ public sealed class RecentVaultsTests : IDisposable
         Assert.Equal(when, only.OpenedAt);
     }
 
+    [Fact]
+    public void The_hardware_key_slot_a_vault_opened_with_round_trips_and_nothing_else_about_it_is_kept()
+    {
+        var vault = Path.Combine(_directory, "personal.kdbx");
+
+        RecentVaults.Save(RecentFile, RecentVaults.Remember([], vault, DateTimeOffset.UtcNow, hardwareKeySlot: 2));
+
+        Assert.Equal(2, Assert.Single(RecentVaults.Load(RecentFile)).HardwareKeySlot);
+        Assert.Contains("hardware_key_slot = 2", File.ReadAllText(RecentFile), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_slot_that_is_not_one_or_two_is_forgotten_and_the_vault_kept()
+    {
+        var vault = RecentVaults.Portable(Path.Combine(_directory, "personal.kdbx"));
+        File.WriteAllText(RecentFile, $"[[vault]]\npath = \"{vault}\"\nhardware_key_slot = 3\n");
+
+        var only = Assert.Single(RecentVaults.Load(RecentFile));
+        Assert.Null(only.HardwareKeySlot);
+    }
+
     /// <summary>
     /// The reason paths are written with forward slashes: the parser refuses a backslash, and that
     /// refusal is a property of the policy file worth keeping.

@@ -46,6 +46,27 @@
     <PackageVersion Include="Avalonia.Fonts.Inter" Version="12.1.0" />
   </ItemGroup>
 
+  <!-- Hardware-key unlocking in the desktop app (P.1), justified in DECISIONS.md D-0366 as
+       docs/PRODUCT.md law 3.9 requires, because a YubiKey's response is key material.
+
+       Yubico's own .NET SDK (Apache-2.0) is the one maintained driver for YubiKey OTP HMAC-SHA1
+       challenge-response over USB HID on Windows, macOS and Linux; the alternative is three
+       platforms of hand-written HID feature-report code that nobody here can test without devices.
+       It brings twenty-three transitive packages into the process that holds the unlocked vault:
+       Yubico.Core, Yubico.NativeShims (a native smart-card shim), CommunityToolkit.Diagnostics,
+       System.Formats.Cbor and Microsoft.Extensions' configuration, logging, options and dependency
+       injection. What it is trusted with: sending a 64-byte challenge
+       to one slot and returning 20 bytes. It never sees the vault, the password or the derived key.
+       Its logging is replaced with a null logger before first use, because by default it reads
+       appsettings.json from the working directory and writes to the console.
+
+       The CLI does not reference it: its NativeAOT publish would statically link the shim and
+       OpenSSL and, on Linux, require libpcsclite at start-up for every user. Keypaste.Core still has
+       no PackageReference. -->
+  <ItemGroup Label="Desktop hardware keys">
+    <PackageVersion Include="Yubico.YubiKey" Version="1.18.0" />
+  </ItemGroup>
+
   <!-- Avalonia.Headless only, not Avalonia.Headless.XUnit: a spike proved HeadlessUnitTestSession
        drives xunit.v3 directly under this repository's Microsoft.Testing.Platform runner, so the
        integration package buys an attribute and costs a dependency. One session per process — a

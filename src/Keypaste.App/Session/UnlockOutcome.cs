@@ -36,4 +36,7 @@ internal enum UnlockOutcome
 
     /// <summary>Another keypaste process holds this vault, so it was not opened.</summary>
     HeldElsewhere = 6,
+
+    /// <summary>The hardware key gave no response; <see cref="AppVaultSession.LastHardwareKeyFailure"/> says why.</summary>
+    HardwareKeyFailed = 7,
 }

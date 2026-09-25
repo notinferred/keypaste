@@ -89,8 +89,9 @@ internal sealed class Shortcuts : IDisposable
             return;
         }
 
-        // The import dialog is modal: nothing may move focus or the page out from under it.
-        if (shell.HasImport)
+        // The import dialog is modal: nothing may move focus or the page out from under it. So is a
+        // save waiting for the YubiKey, which Lock cancels.
+        if (shell.HasImport || shell.IsWaitingForTouch)
         {
             return;
         }

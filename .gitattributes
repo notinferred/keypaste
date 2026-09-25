@@ -15,6 +15,7 @@ third_party/KeePassLib/**            -text
 third_party/KeePassLib/KeePassLib.csproj   text eol=lf
 third_party/KeePassLib/UPSTREAM.md         text eol=lf
 third_party/KeePassLib/packages.lock.json  text eol=lf
+third_party/KeePassLib/Keys/IChallengeResponseUserKey.cs  text eol=lf
 
 # The vendored word list is pinned by SHA-256 in Keypaste.Core.WordList, so it has to be checked
 # out as the bytes EFF published; normalising a line ending would break the pin on Windows. The

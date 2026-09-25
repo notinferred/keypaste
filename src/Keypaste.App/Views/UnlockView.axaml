@@ -235,6 +235,37 @@
                 </Button>
               </StackPanel>
             </Panel>
+
+            <!-- The design's "Touch YubiKey to unlock": a second factor beside the password, which
+                 the key answers when it is touched. -->
+            <Panel HorizontalAlignment="Center" IsEnabled="{Binding CanTypePassword}" IsVisible="{Binding OffersHardwareKey}">
+              <Button x:Name="UseHardwareKey"
+                      Classes="quiet"
+                      IsVisible="{Binding !UsesHardwareKey}"
+                      Command="{Binding UseHardwareKeyCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <ctl:KpIcon Icon="usb" Size="14" />
+                  <TextBlock Text="Unlock with a YubiKey too" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
+              <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding UsesHardwareKey}">
+                <ctl:KpIcon Icon="usb" Size="14" Foreground="{DynamicResource KpAccent}" />
+                <TextBlock Classes="mono secondary"
+                           FontSize="12"
+                           Text="{Binding HardwareKeyLabel}"
+                           VerticalAlignment="Center" />
+                <Button x:Name="SwitchSlot"
+                        Classes="quiet"
+                        Content="{Binding OtherSlotLabel}"
+                        Command="{Binding SwitchSlotCommand}" />
+                <Button Classes="icon ghost sm"
+                        Width="22" Height="22"
+                        ToolTip.Tip="Unlock without a YubiKey"
+                        Command="{Binding ClearHardwareKeyCommand}">
+                  <ctl:KpIcon Icon="x" Size="12" />
+                </Button>
+              </StackPanel>
+            </Panel>
           </StackPanel>
 
           <StackPanel Spacing="10" IsVisible="{Binding !HasSelection}">
@@ -383,6 +414,11 @@
               </StackPanel>
             </Panel>
 
+            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" IsVisible="{Binding UsesHardwareKey}">
+              <ctl:KpIcon Icon="usb" Size="14" Foreground="{DynamicResource KpTextMuted}" />
+              <TextBlock Classes="caption" Text="The check asks the YubiKey the unlock screen chose." VerticalAlignment="Center" />
+            </StackPanel>
+
             <Button Classes="primary wide"
                     Content="Check this backup"
                     IsVisible="{Binding IsChoosing}"
@@ -411,6 +447,18 @@
                        Text="{Binding Message}"
                        IsVisible="{Binding HasNote}" />
           </StackPanel>
+        </StackPanel>
+
+        <!-- Waiting is an amber dot with its halo (BRAND). -->
+        <StackPanel x:Name="TouchPrompt"
+                    Orientation="Horizontal"
+                    Spacing="10"
+                    HorizontalAlignment="Center"
+                    IsVisible="{Binding IsWaitingForTouch}">
+          <Border Classes="dot waiting" />
+          <TextBlock Text="Touch your YubiKey" FontSize="13" VerticalAlignment="Center"
+                     Foreground="{DynamicResource KpTextPrimary}" />
+          <Button Classes="quiet" Content="Cancel" Command="{Binding CancelTouchCommand}" />
         </StackPanel>
 
         <TextBlock Classes="lock-note"

@@ -424,8 +424,16 @@ namespace KeePassLib.Serialization
 
 				Debug.Assert(m_pwDatabase != null);
 				Debug.Assert(m_pwDatabase.MasterKey != null);
+#if KEYPASTE_CHALLENGE_RESPONSE
+				// KeePassXC challenges with the KDF seed and hashes the answer into the
+				// KDF input from KDBX 4; before it, with the master seed, into the final key.
+				bool bFinalKeyChallenge = (m_uFileVersion < FileVersion32_4);
+				ProtectedBinary pbinUser = m_pwDatabase.MasterKey.GenerateKey32Ex(
+					m_pwDatabase.KdfParameters, m_slLogger, !bFinalKeyChallenge);
+#else
 				ProtectedBinary pbinUser = m_pwDatabase.MasterKey.GenerateKey32Ex(
 					m_pwDatabase.KdfParameters, m_slLogger);
+#endif
 				Debug.Assert(pbinUser != null);
 				if(pbinUser == null)
 					throw new SecurityException(KLRes.InvalidCompositeKey);
@@ -435,6 +443,27 @@ namespace KeePassLib.Serialization
 				Array.Copy(pUserKey32, 0, pbCmp, 32, 32);
 				MemUtil.ZeroByteArray(pUserKey32);
 
+#if KEYPASTE_CHALLENGE_RESPONSE
+				byte[] pbResponse32 = (bFinalKeyChallenge ?
+					m_pwDatabase.MasterKey.ChallengeResponse(m_pbMasterSeed) : null);
+				if(pbResponse32 != null)
+				{
+					byte[] pbFinal = new byte[32 + 32 + 32];
+					try
+					{
+						Array.Copy(m_pbMasterSeed, 0, pbFinal, 0, 32);
+						Array.Copy(pbResponse32, 0, pbFinal, 32, 32);
+						Array.Copy(pbCmp, 32, pbFinal, 64, 32);
+						pbCipherKey = CryptoUtil.ResizeKey(pbFinal, 0, pbFinal.Length, cbCipherKey);
+					}
+					finally
+					{
+						MemUtil.ZeroByteArray(pbFinal);
+						MemUtil.ZeroByteArray(pbResponse32);
+					}
+				}
+				else
+#endif
 				pbCipherKey = CryptoUtil.ResizeKey(pbCmp, 0, 64, cbCipherKey);
 
 				pbCmp[64] = 1;

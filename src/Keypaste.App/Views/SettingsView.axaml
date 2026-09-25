@@ -149,7 +149,7 @@
             <Border Classes="settings-row">
               <StackPanel Spacing="12">
                 <StackPanel Spacing="4">
-                  <TextBlock Classes="row-label" Text="Master password and keyfile" />
+                  <TextBlock Classes="row-label" Text="Master password, keyfile and YubiKey" />
                   <TextBlock Name="AccessFactors" Classes="caption" Text="{Binding Factors}"
                              Foreground="{DynamicResource KpTextSecondary}" />
                 </StackPanel>
@@ -194,6 +194,24 @@
                                IsChecked="{Binding RemoveKeyfile}" />
                 </StackPanel>
 
+                <StackPanel Spacing="2" IsEnabled="{Binding IsEditing}" IsVisible="{Binding OffersHardwareKey}">
+                  <TextBlock Classes="label" Text="YubiKey" Margin="0,0,0,4" />
+                  <RadioButton GroupName="HardwareKey" Content="Keep the YubiKey as it is" IsChecked="{Binding KeepHardwareKey}" />
+                  <RadioButton x:Name="AttachHardwareKey"
+                               GroupName="HardwareKey"
+                               Content="{Binding AttachHardwareKeyLabel}"
+                               IsChecked="{Binding AttachHardwareKey}" />
+                  <StackPanel Orientation="Horizontal" Spacing="16" Margin="28,4,0,4" IsVisible="{Binding AttachHardwareKey}">
+                    <RadioButton GroupName="HardwareKeySlot" Content="Slot 1" IsChecked="{Binding NewSlotOne}" />
+                    <RadioButton GroupName="HardwareKeySlot" Content="Slot 2" IsChecked="{Binding NewSlotTwo}" />
+                  </StackPanel>
+                  <TextBlock Classes="caption" Margin="28,0,0,4" IsVisible="{Binding AttachHardwareKey}"
+                             Text="Plug in a YubiKey whose slot is programmed for HMAC-SHA1 challenge-response, as KeePassXC uses it. It is asked once, when the change is saved." />
+                  <RadioButton GroupName="HardwareKey" Content="Stop using the YubiKey"
+                               IsVisible="{Binding HasHardwareKey}"
+                               IsChecked="{Binding RemoveHardwareKey}" />
+                </StackPanel>
+
                 <Button Content="Change…" Command="{Binding ReviewCommand}" HorizontalAlignment="Left"
                         IsVisible="{Binding IsEditing}" />
 
@@ -211,6 +229,10 @@
                     <TextBlock Classes="caption" Text="{Binding KeyfileWarning}"
                                IsVisible="{Binding HasKeyfileWarning}"
                                Foreground="{DynamicResource KpTextSecondary}" />
+                    <TextBlock Name="HardwareKeyWarning"
+                               Classes="caption" Text="{Binding HardwareKeyWarning}"
+                               IsVisible="{Binding HasHardwareKeyWarning}"
+                               Foreground="{DynamicResource KpTextPrimary}" />
                     <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
                       <Button Classes="danger" Content="Change access" Command="{Binding ConfirmCommand}" />
                       <Button Classes="ghost" Content="Leave access as it is" Command="{Binding CancelCommand}" />
@@ -290,7 +312,7 @@
             <Border Classes="settings-row">
               <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
                 <TextBlock Grid.Column="0" Classes="caption"
-                           Text="keypaste remembers the paths of vaults you have opened on this machine, and where the keyfile each one opened with is. It holds no entry names, no secrets and no key material." />
+                           Text="keypaste remembers the paths of vaults you have opened on this machine, where the keyfile each one opened with is, and which YubiKey slot. It holds no entry names, no secrets and no key material." />
                 <Button Grid.Column="1" Classes="ghost" Content="Forget them all" Command="{Binding ForgetAllCommand}"
                         VerticalAlignment="Top" />
               </Grid>

@@ -67,6 +67,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     private readonly Vault? _watched;
     private readonly Action<string, string?>? _openInPlace;
     private KdbxImportViewModel? _import;
+    private bool _waitingForTouch;
     private bool _disposed;
 
     internal ShellViewModel(
@@ -109,6 +110,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         OpenProjectCommand = new RelayCommand<string>(OpenProject);
         OpenAgentsCommand = new RelayCommand(() => Current = Destinations.Of(DestinationKind.AgentActivity));
         ImportCommand = new AsyncRelayCommand(PickImportAsync, () => _picker is not null && _import is null);
+        CancelTouchCommand = new RelayCommand(_session.CancelHardwareKeyWait, () => _waitingForTouch);
 
         MainNav = [.. Destinations.Main.Select(d => new NavItem(d))];
         FooterNav = [.. Destinations.Footer.Select(d => new NavItem(d))];
@@ -116,6 +118,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         _current = Destinations.All[0];
         _session.LockingSoon += OnLockingSoon;
         _session.Edited += OnEdited;
+        _session.WaitingForTouch += OnWaitingForTouch;
         _watched = _session.Unlocked;
 
         if (authority is not null && _session.Identity is { } identity)
@@ -157,6 +160,22 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     internal bool HasNotice => _notice is not null;
 
     internal RelayCommand DismissNoticeCommand { get; }
+
+    /// <summary>Whether a save is waiting for the vault's YubiKey to be touched.</summary>
+    internal bool IsWaitingForTouch
+    {
+        get => _waitingForTouch;
+        private set
+        {
+            if (Set(ref _waitingForTouch, value))
+            {
+                CancelTouchCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    /// <summary>Stops waiting for the YubiKey, so the save fails and writes nothing.</summary>
+    internal RelayCommand CancelTouchCommand { get; }
 
     /// <summary>The auto-clearing clipboard, and the toast that counts it down.</summary>
     internal ClipboardCountdown Clipboard { get; }
@@ -762,6 +781,14 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         }
     }
 
+    private void OnWaitingForTouch(object? sender, bool waiting) => Post(() =>
+    {
+        if (!_disposed)
+        {
+            IsWaitingForTouch = waiting;
+        }
+    });
+
     private void OnLockingSoon(object? sender, TimeSpan remaining) =>
         Countdown = $"Locking in {Math.Max(1, (int)remaining.TotalSeconds)} seconds.";
 
@@ -775,6 +802,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         _disposed = true;
         _session.LockingSoon -= OnLockingSoon;
         _session.Edited -= OnEdited;
+        _session.WaitingForTouch -= OnWaitingForTouch;
 
         if (_watched is not null)
         {

@@ -1,4 +1,19 @@
+using Keypaste.Core.HardwareKeys;
+
 namespace Keypaste.Core;
+
+/// <summary>What an access change does to a vault's hardware key.</summary>
+public enum AccessHardwareKeyChange
+{
+    /// <summary>The hardware key the vault opened with, or none, stays as it is.</summary>
+    Keep = 0,
+
+    /// <summary>A hardware key's slot is added, or replaces the current one.</summary>
+    Attach = 1,
+
+    /// <summary>The current hardware key stops being needed.</summary>
+    Remove = 2,
+}
 
 /// <summary>What an access change does to a vault's keyfile.</summary>
 public enum AccessKeyfileChange
@@ -17,7 +32,14 @@ public enum AccessKeyfileChange
 /// <param name="SetPassword">Whether the master password is set to a new one.</param>
 /// <param name="Keyfile">What happens to the keyfile.</param>
 /// <param name="KeyfilePath">The keyfile to attach; required for <see cref="AccessKeyfileChange.Attach"/> alone.</param>
-public sealed record VaultAccessChange(bool SetPassword, AccessKeyfileChange Keyfile, string? KeyfilePath = null);
+public sealed record VaultAccessChange(bool SetPassword, AccessKeyfileChange Keyfile, string? KeyfilePath = null)
+{
+    /// <summary>What happens to the hardware key.</summary>
+    public AccessHardwareKeyChange HardwareKeyChange { get; init; }
+
+    /// <summary>The hardware key to attach; required for <see cref="AccessHardwareKeyChange.Attach"/> alone. The caller owns it.</summary>
+    public HardwareKey? HardwareKey { get; init; }
+}
 
 /// <summary>What happened when a vault's access was asked to change.</summary>
 /// <remarks>
@@ -38,7 +60,7 @@ public enum VaultAccessOutcome
     /// <summary>The confirmation did not match the new password.</summary>
     PasswordsDoNotMatch = 3,
 
-    /// <summary>The keyfile to remove is all that unlocks the vault, and no password was set in its place.</summary>
+    /// <summary>The keyfile or hardware key to remove would leave neither a password nor a keyfile, and no password was set in its place.</summary>
     WouldLeaveNoPassword = 4,
 
     /// <summary>A keyfile was to be removed from a vault that has none.</summary>
@@ -52,6 +74,12 @@ public enum VaultAccessOutcome
 
     /// <summary>The file to attach is this vault or lies in its backup directory.</summary>
     KeyfileIsThisVault = 8,
+
+    /// <summary>A hardware key was to be removed from a vault that has none.</summary>
+    NoHardwareKeyToRemove = 9,
+
+    /// <summary>No connected hardware key has the slot to attach programmed.</summary>
+    HardwareKeyNotFound = 10,
 }
 
 /// <summary>The result of <see cref="Vault.ChangeAccess(VaultAccessChange, ReadOnlySpan{char}, ReadOnlySpan{char})"/>.</summary>
