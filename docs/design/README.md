@@ -65,7 +65,7 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
 - Detail (padding 28/32, gap 24, max-width 820):
   - Key (mono 22) and path "Kind · acme.kdbx › acme › api › dev". Actions: Copy, Rotate, ⋯ (30h, `#2A2C30`).
   - **Value** field (40h, bg `#111214`, border `#2C2E33`): shows 24 masked • characters, with a Reveal/Hide toggle.
-  - **Reference** (36h, `#18191C`): `kp://acme/api/dev/KEY`, plus the helper line "Use this in .env.keypaste with keypaste run, or in an agent's run tool when the bridge allows it…".
+  - **Reference** (36h, `#18191C`): `kp://acme-api/dev/KEY`, plus the helper line "Use this in .env.keypaste with keypaste run, or in an agent's run tool when the bridge allows it…".
   - Two cards: Agent access, and Profiles (dev set / staging set / prod "approval required" in amber).
   - Metadata rows (140px label column): Created, Rotated, KDBX entry.
 
