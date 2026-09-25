@@ -107,6 +107,27 @@ public sealed class KdbxImportViewModelTests : IDisposable
         Assert.NotNull(reopened.Find(new EntryName(string.Empty, "example")));
     }
 
+    /// <summary>The copies are in the open vault once applied, so a failed save must not leave a Confirm that copies them again.</summary>
+    [Fact]
+    public async Task ASaveThatFailsAfterTheCopy_ClosesTheDialog_SoNothingIsCopiedTwice()
+    {
+        using var import = NewImport();
+        await Unlock(import);
+
+        using (var other = Vault.Open(_vault.Path_, TempVault.Password))
+        {
+            other.AddEntry(new VaultEntry { GroupPath = "elsewhere", Title = "x", Password = "x" });
+            other.Save();
+        }
+
+        import.ConfirmCommand.Execute(null);
+
+        Assert.False(import.CanConfirm);
+        Assert.False(import.IsDecrypted);
+        Assert.Contains(_announced, line => line.Contains("Lock and unlock", StringComparison.Ordinal));
+        Assert.Single(_session.Unlocked!.Search(string.Empty), match => match.Name == new EntryName("foreign/Banking", "Checking"));
+    }
+
     [Fact]
     public void KeepEditingInPlace_OpensTheFile()
     {

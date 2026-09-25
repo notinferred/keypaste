@@ -415,23 +415,37 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
         }
 
         var plan = Plan();
+        ImportResult? applied = null;
 
         try
         {
-            var result = source.ApplyTo(vault, plan);
+            applied = source.ApplyTo(vault, plan);
             vault.Save();
-            _announce($"Imported {Entries(result.Entries)} from {FileName}");
+            _announce($"Imported {Entries(applied.Entries)} from {FileName}");
         }
         catch (VaultChangedOnDiskException)
         {
-            Message = "Something else changed this vault since you opened it. Lock and unlock to see it, then import again.";
-            return;
+            const string changed = "Something else changed this vault since you opened it. Lock and unlock to see it, then import again.";
+
+            if (applied is null)
+            {
+                Message = changed;
+                return;
+            }
+
+            _announce(changed);
         }
-        catch (VaultException ex)
+        catch (VaultException ex) when (applied is null)
         {
             Message = DisplayTextSanitizer.Sanitize(ex.Message).Text;
             Check();
             return;
+        }
+        catch (VaultException ex)
+        {
+            // The copies are already in the open vault, so the dialog closes rather than offer a
+            // second Confirm that would copy them again.
+            _announce($"Copied {Entries(applied!.Entries)} from {FileName}, but they are not saved: {DisplayTextSanitizer.Sanitize(ex.Message).Text}");
         }
 
         Dispose();
