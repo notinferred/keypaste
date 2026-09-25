@@ -31,6 +31,18 @@ internal enum AuditReadKind
 /// </remarks>
 internal sealed record AuditHistory(AuditReadKind Kind, IReadOnlyList<string> Lines, IReadOnlyList<string> Verdict, string Error)
 {
+    /// <summary>The records the table holds, in file order, as the core's reader parsed and sanitized them.</summary>
+    internal IReadOnlyList<AuditEntry> Entries { get; init; } = [];
+
+    /// <summary>How many records the whole file holds.</summary>
+    internal int Total { get; init; }
+
+    /// <summary>How many lines of the file were not records this version understands.</summary>
+    internal int Unreadable { get; init; }
+
+    /// <summary>The physical line numbers the hash chain does not vouch for.</summary>
+    internal IReadOnlySet<int> Unverified { get; init; } = new HashSet<int>();
+
     /// <summary>Reads the log at <paramref name="path"/>, keeping the records <paramref name="keep"/> accepts.</summary>
     /// <param name="path">The log.</param>
     /// <param name="keep">Which records the table holds, or null for all of them.</param>
@@ -67,6 +79,12 @@ internal sealed record AuditHistory(AuditReadKind Kind, IReadOnlyList<string> Li
 
         var kind = report.Verdict == AuditChainVerdict.Broken ? AuditReadKind.Broken : AuditReadKind.Intact;
 
-        return new AuditHistory(kind, lines, AuditText.Verdict(report), string.Empty);
+        return new AuditHistory(kind, lines, AuditText.Verdict(report), string.Empty)
+        {
+            Entries = kept,
+            Total = entries.Count,
+            Unreadable = unreadable,
+            Unverified = unverified,
+        };
     }
 }

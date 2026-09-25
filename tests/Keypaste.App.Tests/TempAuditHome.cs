@@ -46,6 +46,21 @@ internal sealed class TempAuditHome : IDisposable
         }
     }
 
+    /// <summary>Appends the records given, in order, through the real writer.</summary>
+    internal void Write(params AuditRecord[] records)
+    {
+        ArgumentNullException.ThrowIfNull(records);
+        Assert.True(AuditLog.TryOpen(LogPath, new ManualClock(), out var log, out var error), error);
+
+        using (log)
+        {
+            foreach (var record in records)
+            {
+                Assert.True(log.TryAppend(record, out var failure), failure);
+            }
+        }
+    }
+
     /// <summary>
     /// Changes the first record's text without touching its hash — a careless edit, which is the
     /// thing the chain exists to detect.

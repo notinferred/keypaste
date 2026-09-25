@@ -146,11 +146,11 @@ Unreadable settings files cause the app to use defaults without overwriting the 
 
 The app writes forward slashes in `recent.toml`, including `C:/Users/…` on Windows. Its shared parser rejects backslashes so authorization patterns cannot render differently from their meaning.
 
-## The Log screen
+## The Activity screen
 
-The Log screen reads `~/.keypaste/audit.jsonl` through the same renderer as `keypaste log` ([D-0032](decisions-archive.md)). The reader and `keypaste log` need no unlocked vault; the current desktop exposes this screen only after unlock. Verify chain checks the audit hash chain.
+The Activity screen reads `~/.keypaste/audit.jsonl` through the same reader and chain check as `keypaste log` and shows it as a table, newest first, filtered to All, Agents (agent and token requests), You (what a person answered or did) or Denied. Its count, filter and notes lines are the ones `keypaste log` prints ([D-0032](decisions-archive.md)), and a row the hash chain does not vouch for is marked `?`. The reader and `keypaste log` need no unlocked vault; the current desktop exposes this screen only after unlock. Verify chain shows the chain's verdict.
 
-A missing log is normal before the MCP bridge has initialized one. Requests and bridge events populate it; opening the desktop Log screen does not require a prior credential release.
+A missing log is normal before the MCP bridge has initialized one. Requests and bridge events populate it; opening the desktop Activity screen does not require a prior credential release.
 
 <a id="what-you-should-know-about-the-master-password"></a>
 
@@ -177,7 +177,7 @@ CI builds and packages on three operating systems; desktop tests read secret sur
 9. With no `app.toml` the app starts dark; System follows the OS, and both light and dark read as calm. Choose Light, quit and relaunch: the first frame is light, with no flash of the dark one on the way.
 10. Set `idle_timeout_seconds = 137` in `app.toml` and relaunch. Settings must display it, locking must occur at 137 seconds, and the file must remain unchanged.
 11. Set a long idle timeout to isolate minimize locking. Enable "Lock when the window is minimized", minimize and restore: expect the unlock screen. Disable it, minimize and restore: expect an unlocked vault and a running idle countdown. Enable it again, quit and relaunch without opening Settings; minimizing must lock. A password copied before locking must no longer paste. Recorded runner results do not replace a person's check on a real macOS or Linux desktop.
-12. The Log screen matches `keypaste log` for the same `~/.keypaste/audit.jsonl`.
+12. The Activity screen lists the same records as `keypaste log` for the same `~/.keypaste/audit.jsonl`.
 13. Agent Activity names this app's process and session while the vault is unlocked. With `keypaste agent` holding the vault first, the unlock is refused and the unlock screen names the agent. In source, a credential request from a `keypaste-mcp` configured for the vault opens the prompt window over other windows: Allow once and Allow for 1 hour do nothing for their first second, Enter and Escape refuse, and locking the app while it is up takes it down. While it is up Agent Activity lists it with its seconds left; after Allow for 1 hour it lists the grant, Revoke removes it, and the same request prompts again. After Allow once nothing is listed and the same request prompts again.
 14. Entries lists titles and groups. Filter by a group and search for part of a title or group path; case changes still match. Selecting an entry shows a username, a URL and notes, and a row of dots where the password is.
 15. Copy a password and check the countdown and progress bar. It must paste before the timeout and be absent afterward.

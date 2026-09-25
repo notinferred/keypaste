@@ -13,6 +13,7 @@ using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
+using Keypaste.Core.Audit;
 using Xunit;
 
 namespace Keypaste.App.Tests.Rendering;
@@ -94,11 +95,35 @@ public sealed class ScreenRenderer
             Save(window, output, $"{destination.Shortcut:00}-{Slug(destination.Title)}");
         }
 
+        DrawActivityStates(shell, window, demo.Home, output);
+
         shell.Current = Destinations.Of(DestinationKind.Entries);
         shell.ShowToast("Copied the username. The clipboard clears in 30s.");
         Save(window, output, "90-toast");
 
         window.Close();
+    }
+
+    /// <summary>The Activity screen filtered to refusals, with the chain's verdict open, and after a careless edit.</summary>
+    /// <remarks>Last, because the edit leaves the demo log broken.</remarks>
+    private static void DrawActivityStates(ShellViewModel shell, Window window, string home, string output)
+    {
+        shell.Current = Destinations.Of(DestinationKind.Log);
+        var log = (LogViewModel)shell.Content!;
+
+        log.Filter = log.Filters.Single(option => option.Filter == LogFilter.Denied);
+        Save(window, output, "03-activity-denied");
+
+        log.Filter = log.Filters[0];
+        log.VerifyCommand.Execute(null);
+        Save(window, output, "03-activity-verify");
+
+        var path = KeypasteHome.AuditPath(home);
+        var lines = File.ReadAllText(path).Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        lines[3] = lines[3].Replace("the person denied it", "the person okayed it", StringComparison.Ordinal);
+        File.WriteAllText(path, string.Join('\n', lines) + '\n');
+        log.Refresh();
+        Save(window, output, "03-activity-broken");
     }
 
     private static void DrawApproval(string output)
@@ -243,11 +268,85 @@ public sealed class ScreenRenderer
             }
 
             vault.Save();
+            WriteActivity(_directory);
         }
 
         internal string Path { get; }
 
         internal string Home => _directory;
+
+        /// <summary>A morning of audit records, written through the real writer so the chain verifies.</summary>
+        private static void WriteActivity(string home)
+        {
+            var clock = new ManualClock(new DateTimeOffset(2026, 7, 28, 7, 40, 12, TimeSpan.Zero));
+            Assert.True(AuditLog.TryOpen(KeypasteHome.AuditPath(home), clock, out var log, out var error), error);
+
+            using (log)
+            {
+                void Write(TimeSpan after, AuditRecord record)
+                {
+                    clock.Advance(after);
+                    Assert.True(log.TryAppend(record, out var failure), failure);
+                }
+
+                var claude = new AuditClient("claude-code", "1.0.43", null);
+                var cursor = new AuditClient("cursor", "1.2.4", null);
+
+                static AuditRecord Credential(AuditClient client, string entry, string field, AuditDecision decision, AuditMethod method, string reason, int? seconds = null) => new()
+                {
+                    Tool = "request_credential",
+                    Client = client,
+                    Args = AuditArgs.ForCredentialRequest(entry, field, 3600, "Run the database migration for the api service."),
+                    Decision = decision,
+                    Method = method,
+                    Reason = reason,
+                    GrantedSeconds = seconds,
+                };
+
+                Write(TimeSpan.Zero, new AuditRecord
+                {
+                    Tool = "list_entry_names",
+                    Client = claude,
+                    Decision = AuditDecision.Granted,
+                    Method = AuditMethod.Exposure,
+                    Reason = "every name listed lies inside the exposure",
+                });
+                Write(TimeSpan.FromSeconds(41), Credential(claude, "env/acme-api/DATABASE_URL", "password", AuditDecision.Granted, AuditMethod.Prompt, "approved for 1 hour", 3600));
+                Write(TimeSpan.FromMinutes(17), new AuditRecord
+                {
+                    Tool = "run",
+                    Client = claude,
+                    Args = AuditArgs.ForRun(null, "Run the migration."),
+                    Decision = AuditDecision.Granted,
+                    Method = AuditMethod.GrantCache,
+                    Reason = "served from a grant given 17 minutes ago",
+                    Entries = ["env/acme-api/DATABASE_URL", "env/acme-api/STRIPE_SECRET_KEY"],
+                    Command = "npm run migrate",
+                });
+                Write(TimeSpan.FromMinutes(4), Credential(cursor, "Work/aws-console", "password", AuditDecision.Denied, AuditMethod.Prompt, "the person denied it"));
+                Write(TimeSpan.FromMinutes(18), new AuditRecord
+                {
+                    Tool = "run",
+                    Client = new AuditClient("keypaste run --token", "1.0.0", null),
+                    Args = new AuditArgs { Entry = "env/acme-api" },
+                    Decision = AuditDecision.Granted,
+                    Method = AuditMethod.Token,
+                    Reason = Core.Tokens.TokenAuditReason.Format("t7d2e", "ci-github-actions", "6 variable(s)"),
+                    Entries = ["env/acme-api/DATABASE_URL", "env/acme-api/STRIPE_SECRET_KEY", "env/acme-api/OPENAI_API_KEY", "env/acme-api/REDIS_URL", "env/acme-api/JWT_SIGNING_KEY", "env/acme-api/SENTRY_DSN"],
+                });
+                Write(TimeSpan.FromMinutes(11), new AuditRecord
+                {
+                    Tool = "share",
+                    Client = new AuditClient("keypaste share", "1.0.0", null),
+                    Args = new AuditArgs { Entry = "env/acme-api/STRIPE_SECRET_KEY", Field = "password" },
+                    Decision = AuditDecision.Granted,
+                    Method = AuditMethod.ShareCreated,
+                    Reason = "share 3a11: 1 view, expires 2026-07-29T08:31:00Z, to maya@acme.dev, passphrase",
+                });
+                Write(TimeSpan.FromMinutes(14), Credential(cursor, "env/acme-web/VERCEL_TOKEN", "password", AuditDecision.Denied, AuditMethod.TimedOut, "nobody answered within 60 seconds"));
+                Write(TimeSpan.FromMinutes(20), Credential(claude, "Work/github", "username", AuditDecision.Granted, AuditMethod.Policy, "rule 'github-username' in policy.toml"));
+            }
+        }
 
         public void Dispose()
         {

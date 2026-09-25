@@ -2,168 +2,232 @@ using Keypaste.Core.Audit;
 
 namespace Keypaste.App.ViewModels;
 
+/// <summary>Which records the Activity table holds.</summary>
+internal enum LogFilter
+{
+    All,
+
+    /// <summary>What agents and tokens asked for.</summary>
+    Agents,
+
+    /// <summary>What the person answered or did: approvals, refusals they gave, shares, bundles.</summary>
+    You,
+
+    /// <summary>Every refusal, whoever or whatever refused.</summary>
+    Denied,
+}
+
+/// <summary>A filter, and the words the heading states it in (D-0032).</summary>
+internal sealed record LogFilterOption(LogFilter Filter, string Words);
+
 /// <summary>
-/// The activity view: every call an AI agent made through the bridge, as <c>keypaste log</c> says it.
+/// The Activity screen: the audit log as a table, newest first, with the chain's verdict on request.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>It needs no unlocked vault.</b> The audit log is machine state rather than vault state — it is
-/// plaintext by design, because it is the record that has to survive the vault being locked — and
-/// <c>keypaste log</c> reads it without a master password. Asking for one here would be theatre, in
-/// exactly the way <c>LogCommand</c> already argues, and it would make the one screen a person opens
-/// when something looks wrong the one screen they cannot open.
+/// <b>It needs no unlocked vault.</b> The audit log is machine state, plaintext by design, and <c>keypaste log</c>
+/// reads it without a master password.
 /// </para>
 /// <para>
-/// <b>The lines are <see cref="AuditText"/>'s, verbatim.</b> Heading, table and notes arrive already
-/// rendered from the core and go into a monospace block untouched. Re-drawing that table as a
-/// <c>DataGrid</c> would write the same sentence twice, which docs/PRODUCT.md law 4.3 forbids and D-0032
-/// decided for this exact pair of front ends: <c>keypaste log</c> and this view must say the same
-/// thing about the same file. <c>LogViewModelTests</c> is what actually holds that.
+/// <b>The records are the core's.</b> <see cref="AuditHistory"/> reads them through <see cref="AuditReader"/> and
+/// checks the chain with <see cref="AuditChainVerifier"/>, as <c>keypaste log</c> does; the sentences about the file
+/// as a whole — the count, the filter, the notes and the verdict — are <see cref="AuditText"/>'s (D-0032).
 /// </para>
 /// <para>
-/// <b>The chain is checked on every load, and the verdict is shown on request.</b> Checking is not
-/// the optional part: the table has to mark the rows the chain cannot vouch for, or a record
-/// somebody inserted reads exactly like one keypaste wrote. What is optional is the several
-/// paragraphs about what a passing check does and does not prove, which belong to the person who
-/// asked for them rather than to everyone who opened a window.
-/// </para>
-/// <para>
-/// <b>No Avalonia type appears here.</b> That is what lets its tests be ordinary facts rather than
-/// dispatches onto the assembly's one headless session.
+/// <b>The chain is checked on every load.</b> A row the chain cannot vouch for is marked, or a record somebody
+/// inserted would read exactly like one keypaste wrote. The verdict's paragraphs wait to be asked for.
 /// </para>
 /// </remarks>
 internal sealed class LogViewModel : ObservableObject
 {
-    /// <summary>
-    /// What an empty machine is told.
-    /// </summary>
-    /// <remarks>
-    /// <c>internal</c> rather than <c>private</c> because the naming rule in <c>.editorconfig</c>
-    /// applies <c>_camelCase</c> to every private field, constants included. An absent log is not a
-    /// failure — it is what a machine looks like before any agent has asked for anything — so this
-    /// is a sentence rather than an error.
-    /// </remarks>
+    /// <summary>What an empty machine is told.</summary>
     internal const string NothingYet = "Nothing has asked keypaste for a credential on this machine yet.";
 
     private readonly string _path;
+    private readonly TimeProvider _clock;
 
-    private IReadOnlyList<string> _lines = [];
-    private IReadOnlyList<string> _verdict = [];
+    private AuditHistory _history = new(AuditReadKind.Missing, [], [], string.Empty);
+    private IReadOnlyList<LogRow> _all = [];
+    private IReadOnlyList<LogRow> _rows = [];
+    private IReadOnlyList<string> _notes = [];
+    private string _summary = string.Empty;
     private string _message = string.Empty;
     private bool _verdictShown;
+    private LogFilterOption _filter;
 
-    internal LogViewModel(string? home)
+    internal LogViewModel(string? home, TimeProvider? clock = null)
     {
         _path = KeypasteHome.AuditPath(home);
+        _clock = clock ?? TimeProvider.System;
+        _filter = Filters[0];
 
         RefreshCommand = new RelayCommand(Refresh);
-        VerifyCommand = new RelayCommand(ShowVerdict, () => _verdict.Count > 0);
+        VerifyCommand = new RelayCommand(ToggleVerdict, () => _history.Verdict.Count > 0);
 
         Refresh();
     }
 
-    /// <summary>The log being shown, whether or not it exists.</summary>
-    internal string Path => _path;
+    internal IReadOnlyList<LogFilterOption> Filters { get; } =
+    [
+        new(LogFilter.All, string.Empty),
+        new(LogFilter.Agents, "agent and token requests only"),
+        new(LogFilter.You, "your answers and actions only"),
+        new(LogFilter.Denied, "refused calls only"),
+    ];
 
-    /// <summary>
-    /// The rendering, exactly as the core produced it: heading, then table, then notes.
-    /// </summary>
-    /// <remarks>
-    /// Nothing is inserted between the three, because everything in this list has to be something
-    /// <see cref="AuditText"/> said. Spacing is the view's business.
-    /// </remarks>
-    internal IReadOnlyList<string> Lines => _lines;
+    internal LogFilterOption Filter
+    {
+        get => _filter;
+        set
+        {
+            if (value is null || !Set(ref _filter, value))
+            {
+                return;
+            }
 
-    /// <summary>The same, as one block for a selectable text control to hold.</summary>
-    internal string Text => string.Join(Environment.NewLine, _lines);
+            Apply();
+            Raise(nameof(ShowAll));
+            Raise(nameof(ShowAgents));
+            Raise(nameof(ShowYou));
+            Raise(nameof(ShowDenied));
+        }
+    }
 
-    internal bool HasLines => _lines.Count > 0;
+    /// <summary>The segments' checked states; checking one chooses it, and the unchecking that follows is ignored.</summary>
+    internal bool ShowAll
+    {
+        get => _filter.Filter == LogFilter.All;
+        set => Choose(value, LogFilter.All);
+    }
+
+    /// <inheritdoc cref="ShowAll"/>
+    internal bool ShowAgents
+    {
+        get => _filter.Filter == LogFilter.Agents;
+        set => Choose(value, LogFilter.Agents);
+    }
+
+    /// <inheritdoc cref="ShowAll"/>
+    internal bool ShowYou
+    {
+        get => _filter.Filter == LogFilter.You;
+        set => Choose(value, LogFilter.You);
+    }
+
+    /// <inheritdoc cref="ShowAll"/>
+    internal bool ShowDenied
+    {
+        get => _filter.Filter == LogFilter.Denied;
+        set => Choose(value, LogFilter.Denied);
+    }
+
+    /// <summary>The records the filter keeps, newest first.</summary>
+    internal IReadOnlyList<LogRow> Rows => _rows;
+
+    internal bool HasRows => _rows.Count > 0;
+
+    /// <summary>Whether the table is drawn at all: the file was read and checked.</summary>
+    internal bool HasTable => _history.Kind is AuditReadKind.Intact or AuditReadKind.Broken;
+
+    internal bool FilterEmpty => HasTable && _rows.Count == 0;
+
+    /// <summary>What the table is and is not showing, in the core's words: count, filter and file.</summary>
+    internal string Summary => _summary;
+
+    /// <summary>The core's notes on the rows shown: unverified rows, unread reasons, lines that are not records.</summary>
+    internal string Notes => string.Join(Environment.NewLine, _notes);
+
+    internal bool HasNotes => _notes.Count > 0;
 
     /// <summary>What the hash chain says about the whole file.</summary>
-    internal IReadOnlyList<string> VerdictLines => _verdict;
+    internal IReadOnlyList<string> VerdictLines => _history.Verdict;
 
-    /// <inheritdoc cref="Text"/>
-    internal string VerdictText => string.Join(Environment.NewLine, _verdict);
+    internal string VerdictText => string.Join(Environment.NewLine, _history.Verdict);
 
     /// <summary>Whether the verdict has been asked for.</summary>
     internal bool VerdictShown => _verdictShown;
 
-    /// <summary>
-    /// One calm sentence about the file as a whole, or nothing.
-    /// </summary>
-    /// <remarks>
-    /// It carries the three things that are true of the file rather than of a row: that there is no
-    /// log yet, that this one could not be read or checked, and that the chain is broken. The last
-    /// is said on load rather than left behind the button, because a table drawn from an edited file
-    /// must not look like a table drawn from one that was not — the same reason <c>keypaste log</c>
-    /// alarms on stderr before it prints.
-    /// </remarks>
+    internal string VerifyLabel => _verdictShown ? "Hide verdict" : "Verify chain";
+
+    /// <summary>One calm sentence about the file as a whole, or nothing: no log yet, unreadable, unchecked, or broken.</summary>
     internal string Message => _message;
 
     internal bool HasMessage => _message.Length > 0;
+
+    /// <summary>Whether the message is the chain being broken, which the screen marks as a warning.</summary>
+    internal bool IsBroken => _history.Kind == AuditReadKind.Broken;
 
     internal RelayCommand RefreshCommand { get; }
 
     internal RelayCommand VerifyCommand { get; }
 
-    /// <summary>Re-reads the log from disk and re-checks it.</summary>
-    /// <remarks>
-    /// The verdict is folded back out of sight, because it described the file as it was a moment
-    /// ago and this is a different read of it.
-    /// </remarks>
+    /// <summary>Re-reads the log from disk and re-checks it; the verdict folds away, because it described the last read.</summary>
     internal void Refresh()
     {
-        _lines = [];
-        _verdict = [];
-        _message = string.Empty;
+        _history = AuditHistory.Read(_path);
         _verdictShown = false;
-
-        Load();
-
-        Raise(nameof(Lines));
-        Raise(nameof(Text));
-        Raise(nameof(HasLines));
-        Raise(nameof(VerdictLines));
-        Raise(nameof(VerdictText));
-        Raise(nameof(VerdictShown));
-        Raise(nameof(Message));
-        Raise(nameof(HasMessage));
-        VerifyCommand.RaiseCanExecuteChanged();
-    }
-
-    /// <summary>Reads and renders, in the order <c>LogCommand</c> does it.</summary>
-    private void Load()
-    {
-        var history = AuditHistory.Read(_path);
-
-        _lines = history.Lines;
-        _verdict = history.Verdict;
-        _message = history.Kind switch
+        _message = _history.Kind switch
         {
             AuditReadKind.Missing => NothingYet,
-            AuditReadKind.Unreadable => $"That log couldn't be read: {history.Error}",
+            AuditReadKind.Unreadable => $"That log couldn't be read: {_history.Error}",
             AuditReadKind.Unchecked => "That log couldn't be checked, so nothing from it is shown here.",
             AuditReadKind.Broken => "This log has been edited since keypaste wrote it. Verify chain says where.",
             _ => string.Empty,
         };
+
+        _all = [.. _history.Entries.Reverse().Select(entry => LogRow.From(entry, !_history.Unverified.Contains(entry.Line), _clock))];
+
+        Raise(nameof(HasTable));
+        Raise(nameof(VerdictLines));
+        Raise(nameof(VerdictText));
+        Raise(nameof(VerdictShown));
+        Raise(nameof(VerifyLabel));
+        Raise(nameof(Message));
+        Raise(nameof(HasMessage));
+        Raise(nameof(IsBroken));
+        VerifyCommand.RaiseCanExecuteChanged();
+
+        Apply();
     }
 
-    /// <summary>
-    /// Reveals what the check on the current read found.
-    /// </summary>
-    /// <remarks>
-    /// It does not check again. The chain was verified when the file was read, and re-running it
-    /// against a file that may have grown since would produce a verdict about records the table
-    /// above is not showing.
-    /// </remarks>
-    private void ShowVerdict()
+    private void Apply()
     {
-        if (_verdictShown)
+        Func<LogRow, bool> keep = _filter.Filter switch
         {
-            return;
-        }
+            LogFilter.Agents => row => !row.ByYou,
+            LogFilter.You => row => row.AnsweredOrDoneByYou,
+            LogFilter.Denied => row => row.Denied,
+            _ => _ => true,
+        };
 
-        _verdictShown = true;
+        _rows = [.. _all.Where(keep)];
+
+        var shown = _rows.Select(row => row.Source).Reverse().ToList();
+        IReadOnlyList<string> words = _filter.Words.Length == 0 ? [] : [_filter.Words];
+
+        _summary = HasTable ? AuditText.Heading(_path, shown.Count, _history.Total, words) : string.Empty;
+        _notes = HasTable ? AuditText.Notes(shown, _history.Unreadable, _history.Unverified) : [];
+
+        Raise(nameof(Rows));
+        Raise(nameof(HasRows));
+        Raise(nameof(FilterEmpty));
+        Raise(nameof(Summary));
+        Raise(nameof(Notes));
+        Raise(nameof(HasNotes));
+    }
+
+    private void Choose(bool chosen, LogFilter filter)
+    {
+        if (chosen)
+        {
+            Filter = Filters.Single(option => option.Filter == filter);
+        }
+    }
+
+    private void ToggleVerdict()
+    {
+        _verdictShown = !_verdictShown;
         Raise(nameof(VerdictShown));
+        Raise(nameof(VerifyLabel));
     }
 }
