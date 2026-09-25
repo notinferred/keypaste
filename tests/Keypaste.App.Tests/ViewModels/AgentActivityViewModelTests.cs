@@ -146,7 +146,8 @@ public sealed class AgentActivityViewModelTests
         using var model = app.Model();
 
         Assert.False(model.HasHistoryMessage);
-        Assert.Contains($"1 record of 2 in {model.AuditPath}, session {app.Session}", model.History, StringComparison.Ordinal);
+        Assert.Equal($"1 record of 2 in {AuditHistory.ShortPath(model.AuditPath)}, this session", model.HistoryHeading);
+        Assert.DoesNotContain(app.Session, model.HistoryHeading + model.History, StringComparison.Ordinal);
         Assert.Contains("example", model.History, StringComparison.Ordinal);
         Assert.DoesNotContain("FROM_BEFORE", model.History, StringComparison.Ordinal);
     }
@@ -162,7 +163,20 @@ public sealed class AgentActivityViewModelTests
 
         app.Clock.Advance(TimeSpan.FromSeconds(1));
 
-        Assert.Contains("2 records of 2", model.History, StringComparison.Ordinal);
+        Assert.Contains("2 records of 2", model.HistoryHeading, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_session_with_no_records_says_so_instead_of_an_empty_table()
+    {
+        await using var app = await App.StartAsync();
+        app.Audit("env/other/FROM_BEFORE", "an-earlier-session");
+
+        using var model = app.Model();
+
+        Assert.False(model.HasHistory);
+        Assert.Equal("The audit log has no records from this session yet.", model.HistoryMessage);
+        Assert.Empty(model.HistoryHeading);
     }
 
     [Fact]

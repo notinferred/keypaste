@@ -50,6 +50,7 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
     private string _unavailable = string.Empty;
     private IReadOnlyList<ActivityRow> _waiting = [];
     private IReadOnlyList<ActivityRow> _grants = [];
+    private string _historyHeading = string.Empty;
     private string _history = string.Empty;
     private string _historyMessage = string.Empty;
     private (string? Session, long Length, DateTime Written)? _historyRead;
@@ -191,7 +192,10 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
     /// <summary>The audit log history is read from.</summary>
     internal string AuditPath => _auditPath;
 
-    /// <summary>This session's records, exactly as <see cref="AuditText"/> rendered them.</summary>
+    /// <summary>How many of the log's records are this session's, as <see cref="AuditText"/> states it.</summary>
+    internal string HistoryHeading => _historyHeading;
+
+    /// <summary>This session's records and their notes, exactly as <see cref="AuditText"/> rendered them.</summary>
     internal string History => _history;
 
     internal bool HasHistory => _history.Length > 0;
@@ -405,7 +409,13 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
         var history = AuditHistory.Read(
             _auditPath,
             entry => string.Equals(entry.Session, session, StringComparison.Ordinal),
-            [$"session {session}"]);
+            ["this session"]);
+
+        if (history.Kind == AuditReadKind.Intact && history.Entries.Count == 0)
+        {
+            Show([], "The audit log has no records from this session yet.");
+            return;
+        }
 
         Show(history.Lines, history.Kind switch
         {
@@ -419,8 +429,10 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
 
     private void Show(IReadOnlyList<string> lines, string message)
     {
-        _history = string.Join(Environment.NewLine, lines);
+        _historyHeading = lines.Count > 0 ? lines[0] : string.Empty;
+        _history = string.Join(Environment.NewLine, lines.Skip(1));
         _historyMessage = message;
+        Raise(nameof(HistoryHeading));
         Raise(nameof(History));
         Raise(nameof(HasHistory));
         Raise(nameof(HistoryMessage));

@@ -146,7 +146,7 @@ internal sealed class LogViewModel : ObservableObject
     internal string LogPath => _path;
 
     /// <summary>The log file with the home folder written as <c>~</c>, for the footer.</summary>
-    internal string ShortPath => Shorten(_path);
+    internal string ShortPath => AuditHistory.ShortPath(_path);
 
     /// <summary>Whether a row shown is one the hash chain does not vouch for, which the legend then explains.</summary>
     internal bool HasUnverifiedNote => _unverifiedShown;
@@ -247,15 +247,6 @@ internal sealed class LogViewModel : ObservableObject
         { } day when day.Year == today.Year => day.ToString("dddd, MMMM d", CultureInfo.InvariantCulture),
         { } day => day.ToString("MMMM d, yyyy", CultureInfo.InvariantCulture),
     };
-
-    private static string Shorten(string path)
-    {
-        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-
-        return home.Length > 0 && path.StartsWith(home + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
-            ? "~" + path[home.Length..]
-            : path;
-    }
 
     private void Apply()
     {

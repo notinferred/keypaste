@@ -392,7 +392,8 @@
             <ctl:KpIcon Icon="history" Size="15" Foreground="{DynamicResource KpTextMuted}" />
             <TextBlock Classes="section" Text="This session" />
           </StackPanel>
-          <TextBlock Classes="caption" Text="{Binding HistoryMessage}" IsVisible="{Binding HasHistoryMessage}" />
+          <TextBlock Classes="caption" Text="{Binding HistoryMessage}" IsVisible="{Binding HasHistoryMessage}" TextWrapping="Wrap" />
+          <TextBlock Classes="caption" Text="{Binding HistoryHeading}" IsVisible="{Binding HasHistory}" TextWrapping="Wrap" />
           <Border Classes="terminal" IsVisible="{Binding HasHistory}">
             <!-- The inset is the text's margin: a ScrollViewer's own Padding is left out of its measured height. -->
             <ScrollViewer HorizontalScrollBarVisibility="Auto" MaxHeight="360">

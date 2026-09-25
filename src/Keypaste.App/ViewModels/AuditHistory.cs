@@ -46,6 +46,18 @@ internal sealed record AuditHistory(AuditReadKind Kind, IReadOnlyList<string> Li
     /// <summary>What the chain check found, for a screen that states the verdict in its own layout.</summary>
     internal AuditChainReport? Report { get; init; }
 
+    /// <summary>A path with the home folder written as <c>~</c>, as every screen shows the log's.</summary>
+    /// <param name="path">The path.</param>
+    /// <returns>The shorter form, or <paramref name="path"/> when it is not under the home folder.</returns>
+    internal static string ShortPath(string path)
+    {
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+        return home.Length > 0 && path.StartsWith(home + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+            ? "~" + path[home.Length..]
+            : path;
+    }
+
     /// <summary>Reads the log at <paramref name="path"/>, keeping the records <paramref name="keep"/> accepts.</summary>
     /// <param name="path">The log.</param>
     /// <param name="keep">Which records the table holds, or null for all of them.</param>
@@ -75,7 +87,7 @@ internal sealed record AuditHistory(AuditReadKind Kind, IReadOnlyList<string> Li
 
         IReadOnlyList<string> lines =
         [
-            AuditText.Heading(path, kept.Count, entries.Count, filters ?? []),
+            AuditText.Heading(ShortPath(path), kept.Count, entries.Count, filters ?? []),
             .. AuditText.Table(kept, unverified),
             .. AuditText.Notes(kept, unreadable, unverified),
         ];
