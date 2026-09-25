@@ -1,9 +1,9 @@
-// The only server-side code keypaste.com runs: one form POST, one INSERT.
+// keypaste.com's server-side code: the signup form's one INSERT, and share links in share.js.
 //
-// Static assets win by default, so this Worker is reached for /subscribe (declared in
-// wrangler.jsonc under assets.run_worker_first) and for nothing else that exists on disk.
+// Static assets win by default, so this Worker is reached for /subscribe, /api/* and /s/* (declared
+// in wrangler.jsonc under assets.run_worker_first) and for nothing else that exists on disk.
 //
-// The page it serves has no JavaScript, so this endpoint is reached by a plain form navigation and
+// The signup page it serves has no JavaScript, so this endpoint is reached by a plain form navigation and
 // answers with a redirect. Success goes to a static /thanks/ page rather than HTML built here, so
 // the site's markup stays in one language and cannot rot in two places.
 //
@@ -12,6 +12,7 @@
 // The role behind it can INSERT into one table and cannot SELECT from it, so nothing reachable from
 // here can read the list back. See DECISIONS.md D-0036 and site/README.md.
 import postgres from "postgres";
+import { handleShare, isShareRoute, sweepShares } from "./share.js";
 
 const ORIGINS = new Set(["https://keypaste.com", "https://www.keypaste.com"]);
 const MAX_BODY = 1024;
@@ -19,6 +20,10 @@ const MAX_BODY = 1024;
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    if (isShareRoute(url.pathname)) {
+      return handleShare(request, env, ctx);
+    }
 
     if (url.pathname !== "/subscribe") {
       return new Response("Not found\n", { status: 404 });
@@ -41,6 +46,10 @@ export default {
           "GitHub works just as well.",
       );
     }
+  },
+
+  async scheduled(controller, env, ctx) {
+    ctx.waitUntil(sweepShares(env, ctx));
   },
 };
 
