@@ -29,6 +29,8 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
     private readonly Action<string?> _announce;
     private readonly Action _imported;
 
+    private string _planned = EnvProfileNames.Default;
+
     private DotEnvDocument? _document;
     private IReadOnlyList<EnvImportKey> _previewed = [];
     private IReadOnlyList<string> _rows = [];
@@ -60,6 +62,9 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
         ConfirmCommand = new RelayCommand(Confirm, () => IsPreviewing);
         CancelCommand = new RelayCommand(Clear, () => IsPreviewing);
     }
+
+    /// <summary>The profile a file is previewed for; the preview's own profile is what Import writes to.</summary>
+    internal string Profile { get; set; } = EnvProfileNames.Default;
 
     /// <summary>Whether a file is read and waiting on Import.</summary>
     internal bool IsPreviewing => _document is not null;
@@ -160,7 +165,7 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
 
         try
         {
-            plan = EnvImport.Plan(new EnvStore(vault), _project, document);
+            plan = EnvImport.Plan(new EnvStore(vault), _project, Profile, document);
         }
         catch (VaultException e)
         {
@@ -175,6 +180,7 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
         }
 
         _document = document;
+        _planned = plan.Profile;
         _previewed = plan.Keys;
         Source = path;
         Rows = [.. plan.Keys.Select(key => $"{EntryNameSanitizer.Sanitize(key.Key).Text}  {Describe(key.Change)}")];
@@ -199,7 +205,7 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
         try
         {
             var store = new EnvStore(vault);
-            var plan = EnvImport.Plan(store, _project, document);
+            var plan = EnvImport.Plan(store, _project, _planned, document);
 
             // The preview is what the person agreed to. A project that changed since is shown again.
             if (plan.Refusal is not null || !plan.Keys.SequenceEqual(_previewed))
@@ -211,7 +217,7 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
 
             if (!plan.WritesAnything)
             {
-                _announce($"{EnvConvention.GroupPath(_project)} already matches the file; nothing was written.");
+                _announce($"{EnvProfileNames.GroupPath(_project, _planned)} already matches the file; nothing was written.");
                 Clear();
                 return;
             }
@@ -227,7 +233,7 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
             vault.Save();
 
             var written = plan.Created.Count + plan.Updated.Count;
-            _announce($"Imported {(written == 1 ? "1 variable" : $"{written} variables")} into {EnvConvention.GroupPath(_project)}. {Source} is still there.");
+            _announce($"Imported {(written == 1 ? "1 variable" : $"{written} variables")} into {EnvProfileNames.GroupPath(_project, _planned)}. {Source} is still there.");
         }
         catch (VaultChangedOnDiskException)
         {
