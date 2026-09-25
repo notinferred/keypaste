@@ -7,18 +7,17 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark light">
 <title>keypaste — a shared secret</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/brand.css">
 <link rel="stylesheet" href="/s/viewer.css">
 <script type="module" src="/s/viewer.js"></script>
 </head>
 <body>
 <main>
-  <header class="brand">
-    <svg class="mark" viewBox="0 0 64 64" width="22" height="22" aria-hidden="true">
-      <rect class="mark-bar" x="10" y="8" width="10" height="48"></rect>
-      <polygon class="mark-arrow" points="40,24 54,24 38,40 54,56 40,56 24,40"></polygon>
-    </svg>
+  <a class="lockup" href="/" aria-label="keypaste home">
+    <svg width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><rect class="mark-stem" x="10" y="8" width="10" height="48"/><polygon class="mark-arm" points="40,24 54,24 38,40 54,56 40,56 24,40"/></svg>
     <span>keypaste</span>
-  </header>
+  </a>
 
   <section class="card" aria-labelledby="heading">
     <h1 id="heading">Someone shared a secret with you</h1>
@@ -32,7 +31,7 @@
         <p class="hint">The person who sent this link will have sent the passphrase separately.</p>
       </div>
       <p class="spend">Revealing it uses one view.</p>
-      <button type="submit" class="reveal" id="reveal">Reveal</button>
+      <button type="submit" class="button primary reveal" id="reveal">Reveal</button>
       <p class="error" id="error" role="alert" hidden></p>
     </form>
 

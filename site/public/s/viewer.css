@@ -1,110 +1,18 @@
-@font-face {
-  font-family: "Instrument Sans";
-  src: url("/fonts/InstrumentSans-Regular.ttf") format("truetype");
-  font-weight: 400;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Instrument Sans";
-  src: url("/fonts/InstrumentSans-Medium.ttf") format("truetype");
-  font-weight: 500;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Instrument Sans";
-  src: url("/fonts/InstrumentSans-SemiBold.ttf") format("truetype");
-  font-weight: 600;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Fragment Mono";
-  src: url("/fonts/FragmentMono-Regular.ttf") format("truetype");
-  font-weight: 400;
-  font-display: swap;
-}
-
-:root {
-  --bg-app: #111214;
-  --bg-card: #1d1e22;
-  --bg-field: #18191c;
-  --border: #2c2e33;
-  --border-strong: #3a3d43;
-  --text-primary: #f2f2f0;
-  --text-secondary: #c9cacd;
-  --text-muted: #8e9096;
-  --accent: #f2b544;
-  --accent-hover: #f7c566;
-  --accent-press: #d99d2e;
-  --accent-text: #f2b544;
-  --on-accent: #111214;
-  --danger: oklch(0.74 0.14 25);
-  --focus-ring: 0 0 0 2px #111214, 0 0 0 4px #f2b544;
-  --font-sans: "Instrument Sans", system-ui, sans-serif;
-  --font-mono: "Fragment Mono", ui-monospace, "SF Mono", Menlo, monospace;
-  color-scheme: dark;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    --bg-app: #f7f7f5;
-    --bg-card: #ffffff;
-    --bg-field: #f7f7f5;
-    --border: #dcdcd7;
-    --border-strong: #c4c4be;
-    --text-primary: #111214;
-    --text-secondary: #3a3c40;
-    --text-muted: #6b6d72;
-    --accent-text: #8a5a00;
-    --danger: oklch(0.55 0.17 25);
-    --focus-ring: 0 0 0 2px #ffffff, 0 0 0 4px #f2b544;
-    color-scheme: light;
-  }
-}
-
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  background: var(--bg-app);
-  color: var(--text-primary);
-  font: 400 15px/1.5 var(--font-sans);
-  letter-spacing: -0.005em;
-}
-
 main {
   max-width: 34rem;
   margin: 0 auto;
-  padding: 3rem 16px 4rem;
+  padding: 48px 16px 64px;
 }
 
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 1.5rem;
-  font-weight: 600;
-  font-size: 16px;
-  letter-spacing: -0.03em;
-}
-
-.mark-bar {
-  fill: var(--text-primary);
-}
-
-.mark-arrow {
-  fill: var(--accent);
+main > .lockup {
+  margin-bottom: 32px;
 }
 
 .card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 14px;
   padding: 24px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--bg-panel);
 }
 
 h1 {
@@ -119,14 +27,18 @@ p {
   margin: 0;
 }
 
-.notice,
-.meta {
+[hidden] {
+  display: none !important;
+}
+
+.notice {
   color: var(--text-secondary);
+  font-size: 14px;
 }
 
 .meta {
-  font-family: var(--font-mono);
-  font-size: 13px;
+  color: var(--text-muted);
+  font: 400 12px/1.5 var(--font-mono);
 }
 
 form,
@@ -134,10 +46,6 @@ form,
   display: grid;
   gap: 16px;
   margin-top: 16px;
-}
-
-[hidden] {
-  display: none !important;
 }
 
 .field {
@@ -148,61 +56,39 @@ form,
 label,
 .name {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 input {
   width: 100%;
-  padding: 10px 12px;
+  height: 40px;
+  padding: 0 12px;
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
-  background: var(--bg-field);
+  border-radius: 6px;
+  background: var(--bg-app);
   color: var(--text-primary);
   font: 400 14px var(--font-mono);
   caret-color: var(--accent);
 }
 
-input:focus {
+input:focus,
+input:focus-visible {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(242, 181, 68, 0.15);
+  border-radius: 6px;
+  box-shadow: 0 0 0 3px var(--accent-tint);
 }
 
 .hint,
-.spend,
-.foot {
+.spend {
   color: var(--text-muted);
   font-size: 13px;
 }
 
-button {
-  font: 600 14px var(--font-sans);
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-button:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-
 .reveal {
   justify-self: start;
-  padding: 10px 22px;
-  border: 0;
-  background: var(--accent);
-  color: var(--on-accent);
-}
-
-.reveal:hover {
-  background: var(--accent-hover);
-}
-
-.reveal:active {
-  background: var(--accent-press);
+  padding: 0 22px;
 }
 
 .reveal:disabled {
@@ -211,12 +97,14 @@ button:focus-visible {
 }
 
 .error {
-  color: var(--danger);
+  color: var(--status-danger);
+  font-size: 14px;
 }
 
 .title {
   font-size: 16px;
   font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
 #fields {
@@ -227,7 +115,7 @@ button:focus-visible {
 .secret {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 6px 12px;
+  gap: 6px 8px;
   align-items: center;
 }
 
@@ -238,29 +126,32 @@ button:focus-visible {
 .value {
   min-width: 0;
   padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-field);
-  font: 400 14px var(--font-mono);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  background: var(--bg-app);
+  font: 400 14px/1.5 var(--font-mono);
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
 
 .copy {
-  padding: 9px 14px;
+  height: 40px;
+  padding: 0 14px;
   border: 1px solid var(--border-strong);
+  border-radius: 7px;
   background: transparent;
   color: var(--text-primary);
+  font: 600 14px var(--font-sans);
+  cursor: pointer;
+  transition: background-color 120ms var(--ease-out);
 }
 
 .copy:hover {
-  border-color: var(--accent);
+  background: var(--bg-hover);
 }
 
 .foot {
-  margin-top: 1.25rem;
-}
-
-.foot a {
-  color: var(--accent-text);
+  margin-top: 20px;
+  color: var(--text-muted);
+  font-size: 13px;
 }

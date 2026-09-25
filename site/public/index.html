@@ -5,135 +5,173 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>keypaste — a local password manager for projects and AI</title>
 <meta name="description" content="A local KeePass-compatible password manager with project environments and approved AI access. CLI/MCP downloads are available; the shared desktop unlock session is planned.">
-<meta name="color-scheme" content="light dark">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔑</text></svg>">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#111214" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f7f7f5" media="(prefers-color-scheme: light)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/fonts/InstrumentSans-SemiBold.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/InstrumentSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/brand.css">
 <style>
-  :root {
-    --bg: #fbfbfa;
-    --fg: #1a1a19;
-    --muted: #6b6b66;
-    --rule: #e4e4e0;
-    --accent: #3d5a80;
-    --card: #ffffff;
-    --code: #f4f4f1;
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
+  @media (min-width: 720px) { .wrap { padding: 0 32px; } }
+
+  .hero { position: relative; isolation: isolate; }
+  .hero::before {
+    content: ""; position: absolute; inset: 0; z-index: -1;
+    background-image: linear-gradient(var(--grid-line) 1px, transparent 1px),
+                      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 16px 16px;
+    -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent);
+    mask-image: linear-gradient(to bottom, #000 55%, transparent);
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #141414;
-      --fg: #ececea;
-      --muted: #9a9a94;
-      --rule: #2a2a28;
-      --accent: #8fb0d9;
-      --card: #1b1b1a;
-      --code: #1b1b1a;
-    }
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--fg);
-    font: 17px/1.65 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Inter, sans-serif;
-    -webkit-font-smoothing: antialiased;
-  }
-  main { max-width: 46rem; margin: 0 auto; padding: 5rem 1.5rem 4rem; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 72px; }
+  .top nav { display: flex; gap: 20px; font: 400 12px/1 var(--font-mono); }
+  .top nav a { color: var(--text-muted); }
+  .top nav a:hover { color: var(--text-primary); text-decoration: none; }
+  @media (max-width: 420px) { .top nav a.optional { display: none; } }
+
+  .hero-body { max-width: 760px; padding: 64px 0 88px; }
+  .eyebrow { margin: 0 0 20px; color: var(--text-muted); font: 400 12px/1.5 var(--font-mono); }
   h1 {
-    font-size: 1.5rem; font-weight: 600; letter-spacing: -0.02em;
-    margin: 0 0 2.5rem;
+    margin: 0 0 20px; font-size: clamp(38px, 6.6vw, 54px); font-weight: 600;
+    letter-spacing: -0.045em; line-height: 1.04; text-wrap: balance;
   }
-  h1 span { color: var(--muted); font-weight: 400; }
-  h2 {
-    font-size: 1.05rem; font-weight: 600; letter-spacing: -0.01em;
-    margin: 3.5rem 0 1rem;
+  .lead { margin: 0 0 28px; max-width: 640px; color: var(--text-secondary); font-size: 20px; line-height: 1.45; text-wrap: pretty; }
+  @media (max-width: 560px) { .lead { font-size: 18px; } }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+  .release {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 24px 0 0;
+    color: var(--text-muted); font: 400 12px/1.5 var(--font-mono);
   }
-  .pitch {
-    font-size: 1.375rem; line-height: 1.45; letter-spacing: -0.015em;
-    margin: 0 0 1.5rem; text-wrap: balance;
+  .release b { color: var(--text-secondary); font-weight: 400; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--status-ok); }
+  .dot.waiting { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-tint); }
+
+  figure { margin: 0; }
+  .hero figure { margin-top: 56px; }
+  figcaption, .caption { color: var(--text-muted); font-size: 14px; line-height: 1.55; text-wrap: pretty; }
+  figcaption { margin-top: 14px; max-width: 680px; }
+  .terminal-bar .live { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; color: var(--accent); }
+
+  section { padding: 72px 0; border-top: 1px solid var(--border-subtle); }
+  .section-head { display: flex; align-items: baseline; gap: 14px; margin: 0 0 16px; }
+  .section-head .num { color: var(--text-muted); font: 400 12px/1 var(--font-mono); }
+  h2 { margin: 0; font-size: 30px; font-weight: 600; letter-spacing: -0.035em; line-height: 1.15; }
+  @media (max-width: 560px) { h2 { font-size: 26px; } section { padding: 56px 0; } }
+  .intro { margin: 0 0 32px; max-width: 680px; color: var(--text-secondary); font-size: 16px; text-wrap: pretty; }
+  .prose > * { max-width: 760px; }
+  .prose > p { margin: 0 0 16px; color: var(--text-secondary); font-size: 15px; text-wrap: pretty; }
+  .prose > p.caption { color: var(--text-muted); font-size: 14px; }
+  .prose > .terminal { margin: 0 0 16px; }
+  .prose strong, .prose b { color: var(--text-primary); font-weight: 600; }
+  p code, td code, li code {
+    padding: 1px 5px; border: 1px solid var(--border-subtle); border-radius: 4px;
+    background: var(--bg-panel); color: var(--text-primary); font-size: 0.86em; white-space: nowrap;
   }
-  .pitch strong { font-weight: 600; }
-  .sub { color: var(--muted); margin: 0 0 2.5rem; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 12px; }
+  .card {
+    display: flex; flex-direction: column; padding: 24px;
+    border: 1px solid var(--border-subtle); border-radius: 10px; background: var(--bg-panel);
+  }
+  .card h3 { margin: 16px 0 8px; font-size: 20px; font-weight: 600; letter-spacing: -0.03em; line-height: 1.3; }
+  .card p { margin: 0 0 16px; color: var(--text-secondary); font-size: 15px; text-wrap: pretty; }
+  .card p.caption { margin: 16px 0 0; color: var(--text-muted); font-size: 13px; }
+  .card .terminal { margin-top: auto; }
+  .card .terminal pre { padding: 12px 14px; font-size: 12px; }
+  .icon-tile {
+    display: grid; place-items: center; width: 36px; height: 36px;
+    border: 1px solid var(--border-default); border-radius: 7px; background: var(--bg-card);
+  }
+  .icon {
+    width: 18px; height: 18px; fill: none; stroke: var(--text-muted);
+    stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;
+  }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 12px; }
+  .tile { padding: 20px; border: 1px solid var(--border-subtle); border-radius: 10px; }
+  .tile h3 { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; font-size: 16px; font-weight: 600; letter-spacing: -0.02em; }
+  .tile p { margin: 0; color: var(--text-secondary); font-size: 14px; text-wrap: pretty; }
   .status {
-    border: 1px solid var(--rule); background: var(--card);
-    border-radius: 10px; padding: 1rem 1.25rem; margin: 2.5rem 0 0;
-    font-size: 0.95rem; color: var(--muted);
+    margin: 12px 0 0; padding: 16px 20px; border: 1px solid var(--border-default); border-radius: 10px;
+    background: var(--bg-panel); color: var(--text-secondary); font-size: 14px; text-wrap: pretty;
   }
-  .status b { color: var(--fg); font-weight: 600; }
-  ul.bullets { list-style: none; padding: 0; margin: 0; }
-  ul.bullets li { padding: 1rem 0; border-top: 1px solid var(--rule); }
-  ul.bullets li:last-child { border-bottom: 1px solid var(--rule); }
-  ul.bullets b { display: block; font-weight: 600; margin-bottom: 0.15rem; }
-  ul.bullets span { color: var(--muted); font-size: 0.95rem; }
-  pre {
-    background: var(--code); border: 1px solid var(--rule); border-radius: 10px;
-    padding: 1rem 1.15rem; margin: 0 0 1rem; overflow-x: auto;
-    font-size: 0.8125rem; line-height: 1.55;
-    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  .status b { color: var(--text-primary); font-weight: 600; }
+
+  .demo img { display: block; width: 100%; height: auto; border: 1px solid var(--border-subtle); border-radius: 10px; }
+
+  .table-wrap { overflow-x: auto; margin: 0 0 16px; border: 1px solid var(--border-default); border-radius: 10px; }
+  table { width: 100%; min-width: 600px; border-collapse: collapse; font-size: 14px; }
+  th {
+    padding: 10px 16px; background: var(--bg-panel); color: var(--text-muted); text-align: left;
+    font: 500 11px/1.4 var(--font-sans); letter-spacing: 0.04em; white-space: nowrap;
   }
-  p code, td code {
-    background: var(--code); border-radius: 4px; padding: 0.1em 0.35em;
-    font-size: 0.875em;
-    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  td { padding: 14px 16px; border-top: 1px solid var(--border-subtle); color: var(--text-secondary); vertical-align: top; }
+  td:first-child, td:last-child { font-family: var(--font-mono); font-size: 13px; color: var(--text-primary); white-space: nowrap; }
+  td b { color: var(--text-primary); font-weight: 600; }
+  @media (max-width: 560px) {
+    table { min-width: 0; }
+    thead { display: none; }
+    tr, td { display: block; }
+    tr + tr { border-top: 1px solid var(--border-subtle); }
+    td { padding: 0 16px 12px; border-top: 0; }
+    td:first-child { padding-top: 16px; }
+    td:last-child { padding-bottom: 16px; color: var(--text-muted); }
+    td:first-child::before { content: "If you have "; color: var(--text-muted); }
+    td:last-child::before { content: "Fixed in "; }
   }
-  .caption { color: var(--muted); font-size: 0.9rem; margin: 0 0 1rem; }
-  .scroll { overflow-x: auto; margin: 0 0 1rem; }
-  table { border-collapse: collapse; font-size: 0.875rem; min-width: 38rem; }
-  th, td {
-    text-align: left; vertical-align: top; padding: 0.6rem 0.9rem 0.6rem 0;
-    border-bottom: 1px solid var(--rule);
-  }
-  thead th { font-weight: 600; border-bottom: 1px solid var(--fg); white-space: nowrap; }
-  tbody th { font-weight: 400; color: var(--muted); }
-  td:first-of-type { font-weight: 550; }
-  form.signup { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 0 0 0.75rem; }
+
+  form.signup { display: flex; flex-wrap: wrap; gap: 8px; max-width: 520px; margin: 8px 0 12px; }
   form.signup label.field { flex: 1 1 16rem; }
   form.signup input[type="email"] {
-    width: 100%; padding: 0.7rem 0.85rem; font: inherit; font-size: 0.95rem;
-    color: var(--fg); background: var(--card);
-    border: 1px solid var(--rule); border-radius: 8px;
+    width: 100%; height: 40px; padding: 0 12px;
+    border: 1px solid var(--border-strong); border-radius: 6px; background: var(--bg-panel);
+    color: var(--text-primary); font: 400 14px var(--font-sans); caret-color: var(--accent);
   }
-  form.signup input[type="email"]:focus-visible {
-    outline: 2px solid var(--accent); outline-offset: 1px;
-  }
-  form.signup button {
-    padding: 0.7rem 1.15rem; font: inherit; font-size: 0.95rem; font-weight: 550;
-    color: var(--bg); background: var(--accent);
-    border: 0; border-radius: 8px; cursor: pointer;
-  }
-  form.signup button:hover { opacity: 0.9; }
+  form.signup input[type="email"]::placeholder { color: var(--text-muted); }
+  form.signup input[type="email"]:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-tint); }
   /* Offscreen rather than hidden: a bot skips type="hidden" and fills this in. */
   .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
-  .cta {
-    display: inline-block; padding: 0.7rem 1.15rem;
-    background: var(--accent); color: var(--bg);
-    border-radius: 8px; text-decoration: none; font-weight: 550;
-    font-size: 0.95rem;
-  }
-  .cta:hover { opacity: 0.9; }
-  footer {
-    margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid var(--rule);
-    color: var(--muted); font-size: 0.875rem;
-  }
-  footer p { margin: 0.4rem 0; }
-  a { color: var(--accent); }
-  @media (max-width: 480px) {
-    main { padding-top: 3rem; }
-    .pitch { font-size: 1.2rem; }
-    pre { font-size: 0.75rem; }
-  }
+
+  footer { padding: 40px 0 64px; border-top: 1px solid var(--border-subtle); color: var(--text-muted); font-size: 13px; }
+  footer .lockup { font-size: 16px; gap: 8px; margin-bottom: 16px; }
+  footer p { margin: 0 0 6px; max-width: 760px; }
 </style>
 </head>
 <body>
-<main>
-  <h1>keypaste <span>&mdash; passwords, projects and agent approvals.</span></h1>
+<header class="hero">
+  <div class="wrap">
+    <div class="top">
+      <a class="lockup" href="/" aria-label="keypaste home">
+        <svg width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><rect class="mark-stem" x="10" y="8" width="10" height="48"/><polygon class="mark-arm" points="40,24 54,24 38,40 54,56 40,56 24,40"/></svg>
+        <span>keypaste</span>
+      </a>
+      <nav aria-label="Sections">
+        <a class="optional" href="#agents">agents</a>
+        <a href="#install">install</a>
+        <a href="https://github.com/notinferred/keypaste">source</a>
+      </nav>
+    </div>
 
-  <p class="pitch"><strong>A local password manager for your credentials, your projects and your AI tools.</strong> keypaste stores credentials in an ordinary KDBX file. Its CLI injects project environments and lets an agent request one credential under your approval or a rule you wrote, with a local audit record.</p>
+    <div class="hero-body">
+      <p class="eyebrow">open source · reads and writes KDBX · no account, no server</p>
+      <h1>A password manager your agents have to ask.</h1>
+      <p class="lead">keypaste keeps your logins and your projects' environment variables in one ordinary KDBX file on your disk. When an AI agent needs a credential, it asks for one field; you read who is asking and why, and you choose: deny, once, or for an hour.</p>
 
-  <p class="sub">The planned desktop experience brings vault use, native approval prompts and project launches into one unlock session. Today the published tool is the CLI/MCP, and approvals use a separate terminal process. Local use needs no account or server.</p>
+      <div class="actions">
+        <a class="button primary" href="#install">Install the CLI</a>
+        <a class="button" href="https://github.com/notinferred/keypaste">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
+          Read the source
+        </a>
+      </div>
 
-  <img src="/demo/keypaste-demo.gif" width="1040" height="583"
-       alt="An agent asks keypaste for one credential; a person approves it; the audit log records it."
-       style="max-width:100%;height:auto;border-radius:8px">
+      <p class="release"><span class="dot" aria-hidden="true"></span><b>CLI/MCP v0.3.0 published</b><span>· macOS, Linux, Windows · unsigned</span><span>· desktop app not yet released</span></p>
 
+      <figure>
+        <div class="terminal">
+          <div class="terminal-bar"><span class="lights" aria-hidden="true"><span></span><span></span><span></span></span>keypaste agent<span class="live"><span class="dot waiting" aria-hidden="true"></span>waiting for you</span></div>
 <pre>
 ────────────────────────────────────────────────────────────
 keypaste: an agent is asking for a credential.
@@ -149,23 +187,85 @@ keypaste: an agent is asking for a credential.
 
 [d] deny  [o] once  [h] 1 hour  45s ›
 </pre>
+        </div>
+        <figcaption>The agent approval flow in one screen. An agent asked; you were shown its requester label, the requested field and its stated reason; one field goes back, with a time limit on reusing that approval. Expiry does not erase the client's copies or revoke the credential. <a href="#demo">Watch it end to end</a>, about sixty seconds.</figcaption>
+      </figure>
+    </div>
+  </div>
+</header>
 
-  <p class="caption">The agent approval flow in one screen. An agent asked; you were shown its requester label, the requested field and its stated reason; one field goes back, with a time limit on reusing that approval. Expiry does not erase the client's copies or revoke the credential. <a href="https://github.com/notinferred/keypaste/blob/main/docs/demo.md">Watch it end to end</a> — about sixty seconds.</p>
+<main>
+  <section id="vault">
+    <div class="wrap">
+      <div class="section-head"><span class="num">01</span><h2>One vault, two jobs</h2></div>
+      <p class="intro">The same file holds the passwords you type and the secrets your code runs with. Nothing about it is special to keypaste: KeePassXC opens it too.</p>
 
-  
+      <div class="cards">
+        <article class="card">
+          <span class="icon-tile"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5"/></svg></span>
+          <h3>Your passwords</h3>
+          <p>Logins with a username, password and URL, filed in groups, in the KDBX format KeePassXC opens. <code>get</code> copies a password to the clipboard and clears it after twenty seconds; it prints the value only when you pass <code>--show</code>.</p>
+          <div class="terminal">
+<pre>keypaste add github --username me --url https://github.com
+keypaste get github</pre>
+          </div>
+          <p class="caption">The desktop app, for browsing, editing and restoring entry history, runs from source and has no public download yet.</p>
+        </article>
 
-  <ul class="bullets">
-    <li><b>Local-first, offline</b> <span>Your vault is a file on your disk. Local use needs no account, service or network. Existing file-sync tools can transport the encrypted file; keypaste has no merge or managed-sync workflow.</span></li>
-    <li><b>Standard KDBX, not a new format</b> <span>CI checks KDBX read/write compatibility against real keepassxc-cli on Linux, macOS and Windows on qualifying pushes to main and every pull request. Your file remains portable; this does not claim complete KeePassXC feature coverage.</span></li>
-    <li><b>Open source, AGPL</b> <span>Auditable by anyone, forever. A tool that handles secrets shouldn't ask to be trusted on faith.</span></li>
-  </ul>
+        <article class="card">
+          <span class="icon-tile"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg></span>
+          <h3>Your projects and their agents</h3>
+          <p>A project's variables are entries under <code>env/&lt;project&gt;</code>. <code>keypaste run</code> injects them into one child process, and an agent asking over MCP gets one field, only after you approve it or a rule you wrote covers it. Every request is logged locally, granted or refused.</p>
+          <div class="terminal">
+<pre>keypaste env pull dev
+keypaste run dev -- npm start</pre>
+          </div>
+          <p class="caption">keypaste does not revoke a credential at its provider, and a value an agent already received stays with that agent.</p>
+        </article>
+      </div>
+    </div>
+  </section>
 
-  <p class="status"><b>Published: CLI/MCP v0.3.0.</b> Local vaults, environment injection and terminal approval are available on four native targets. The binaries are unsigned and there is no public desktop download. The desktop source creates and edits vaults and restores entry history, but it unlocks separately from the terminal approver. Locking the app does not stop that approver; its env screen currently copies a run command.</p>
+  <section id="demo">
+    <div class="wrap">
+      <div class="section-head"><span class="num">02</span><h2>Sixty seconds, end to end</h2></div>
+      <p class="intro">An agent asks for one credential, a person approves it, the deploy runs and the audit log records it. <a href="https://github.com/notinferred/keypaste/blob/main/docs/demo.md">The demo script</a> has every step.</p>
+      <figure class="demo">
+        <img src="/demo/keypaste-demo.gif" width="1040" height="583" loading="lazy"
+             alt="An agent asks keypaste for one credential; a person approves it; the audit log records it.">
+      </figure>
+    </div>
+  </section>
 
-  <h2>Install</h2>
+  <section id="what">
+    <div class="wrap">
+      <div class="section-head"><span class="num">03</span><h2>What it is, and what it is not yet</h2></div>
+      <div class="tiles">
+        <div class="tile">
+          <h3><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v1"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><rect width="8" height="5" x="2" y="13" rx="1"/><path d="M8 13v-2a2 2 0 1 0-4 0v2"/></svg>Local-first, offline</h3>
+          <p>Your vault is a file on your disk. Local use needs no account, service or network. Existing file-sync tools can transport the encrypted file; keypaste has no merge or managed-sync workflow.</p>
+        </div>
+        <div class="tile">
+          <h3><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>Standard KDBX, not a new format</h3>
+          <p>CI checks KDBX read/write compatibility against real keepassxc-cli on Linux, macOS and Windows on qualifying pushes to main and every pull request. Your file remains portable; this does not claim complete KeePassXC feature coverage.</p>
+        </div>
+        <div class="tile">
+          <h3><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>Open source, AGPL</h3>
+          <p>Auditable by anyone. A tool that handles secrets should not ask to be trusted on faith.</p>
+        </div>
+      </div>
 
-  <p class="caption">Five lines, and the third one is the reason the other four are worth typing: it checks the archive against a hash published beside it and stops if they disagree. Each binary is a single native file, so nothing needs .NET on your machine. macOS on Apple Silicon:</p>
+      <p class="status"><b>Published: CLI/MCP v0.3.0.</b> Local vaults, environment injection and terminal approval are available on four native targets. The binaries are unsigned and there is no public desktop download. The desktop source creates and edits vaults and restores entry history, but it unlocks separately from the terminal approver. Locking the app does not stop that approver; its env screen currently copies a run command.</p>
+    </div>
+  </section>
 
+  <section id="install">
+    <div class="wrap prose">
+      <div class="section-head"><span class="num">04</span><h2>Install</h2></div>
+      <p class="intro">Five lines, and the third one is the reason the other four are worth typing: it checks the archive against a hash published beside it and stops if they disagree. Each binary is a single native file, so nothing needs .NET on your machine.</p>
+
+      <div class="terminal">
+        <div class="terminal-bar"><span class="lights" aria-hidden="true"><span></span><span></span><span></span></span>macOS · Apple Silicon</div>
 <!-- install:macos -->
 <pre>curl -fLO https://dl.keypaste.com/v0.3.0/keypaste-0.3.0-osx-arm64.tar.gz
 curl -fLO https://dl.keypaste.com/v0.3.0/keypaste-0.3.0-osx-arm64.tar.gz.sha256
@@ -173,12 +273,12 @@ shasum -a 256 -c keypaste-0.3.0-osx-arm64.tar.gz.sha256
 tar -xzf keypaste-0.3.0-osx-arm64.tar.gz
 mkdir -p ~/.local/bin &amp;&amp; mv keypaste keypaste-mcp ~/.local/bin/</pre>
 <!-- /install:macos -->
+      </div>
 
-  <p class="caption"><b>macOS 13 or later</b> — that floor is what .NET 10 supports rather than a version
-     this project has measured, so no run backs this floor.</p>
+      <p class="caption"><b>macOS 13 or later.</b> That floor is what .NET 10 supports rather than a version this project has measured, so no run backs this floor.</p>
 
-  <p class="caption">Linux x64 — substitute <code>linux-arm64</code> for arm64:</p>
-
+      <div class="terminal">
+        <div class="terminal-bar"><span class="lights" aria-hidden="true"><span></span><span></span><span></span></span>Linux · x64 and arm64</div>
 <!-- install:linux -->
 <pre>curl -fLO https://dl.keypaste.com/v0.3.0/keypaste-0.3.0-linux-x64.tar.gz
 curl -fLO https://dl.keypaste.com/v0.3.0/keypaste-0.3.0-linux-x64.tar.gz.sha256
@@ -186,94 +286,118 @@ sha256sum -c keypaste-0.3.0-linux-x64.tar.gz.sha256
 tar -xzf keypaste-0.3.0-linux-x64.tar.gz
 mkdir -p ~/.local/bin &amp;&amp; mv keypaste keypaste-mcp ~/.local/bin/</pre>
 <!-- /install:linux -->
+      </div>
 
-  <p class="caption"><b>glibc 2.35 or later</b> — Debian 12, Ubuntu 22.04 and newer. The release workflow runs
-     the x64 binary on a clean Debian 12 and requires Alpine to refuse it; the equivalent container check is not implemented for arm64.</p>
+      <p class="caption">For arm64, substitute <code>linux-arm64</code> in all three filenames. <b>glibc 2.35 or later:</b> Debian 12, Ubuntu 22.04 and newer. The release workflow runs the x64 binary on a clean Debian 12 and requires Alpine to refuse it; the equivalent container check is not implemented for arm64.</p>
 
-  <p class="caption">Windows, Intel Macs, Alpine and building from source are in the <a href="https://github.com/notinferred/keypaste#install">README</a>. There is deliberately no <code>curl | sh</code>: it asks you to run code you have not read, from an origin that is not the repository. And the checksum proves the bytes arrived intact, not who made them — it is served from the same origin as the archive, so anyone who can replace one can replace both. The binaries are unsigned. Source-build instructions and the v0.3.0 build-attestation procedure are in the README.</p>
+      <p>Windows, Intel Macs, Alpine and building from source are in the <a href="https://github.com/notinferred/keypaste#install">README</a>. There is deliberately no <code>curl | sh</code>: it asks you to run code you have not read, from an origin that is not the repository. The checksum proves the bytes arrived intact, not who made them: it is served from the same origin as the archive, so anyone who can replace one can replace both. The binaries are unsigned. Source-build instructions and the v0.3.0 build-attestation procedure are in the README.</p>
 
-  <p class="caption">Then a vault, and a project with no <code>.env</code> in it:</p>
+      <p>Then a vault, and a project with no <code>.env</code> in it:</p>
 
+      <div class="terminal">
+        <div class="terminal-bar"><span class="lights" aria-hidden="true"><span></span><span></span><span></span></span>~/project</div>
 <pre>keypaste init ~/vault.kdbx
 export KEYPASTE_VAULT=~/vault.kdbx
 
 keypaste env pull dev            # imports ./.env, then offers to delete it
 keypaste run dev -- npm start    # injected into the child process, nothing on disk</pre>
+      </div>
+    </div>
+  </section>
 
-    <h2>Running an older version?</h2>
+  <section id="agents">
+    <div class="wrap prose">
+      <div class="section-head"><span class="num">05</span><h2>Connect an MCP client</h2></div>
+      <p class="intro">The current CLI workflow uses two processes. <code>keypaste-mcp</code> is started by your MCP client and forwards requests without opening the vault. <code>keypaste agent</code> is started by you, holds the vault, and asks you the question at the top of this page.</p>
 
-  <p class="caption">Published versions are never rewritten here, so the old archives are still served and still broken. Replacing the binary is the fix. Full detail in the <a href="https://github.com/notinferred/keypaste/blob/main/CHANGELOG.md">changelog</a>.</p>
-
-  <div class="scroll">
-  <table>
-    <thead><tr><th>If you have</th><th>What it does</th><th>Fixed in</th></tr></thead>
-    <tbody>
-      <tr>
-        <td>0.1.0</td>
-        <td>Can destroy your vault: <b>env export can delete your vault</b>, writing a project's variables over it in plaintext and taking every other entry and its history. Also: env rm and env set can act on the wrong entry; get can return the wrong password; env pull can delete an edit it never imported; and moving the clock back can revive an expired approval.</td>
-        <td>0.2.0</td>
-      </tr>
-      <tr>
-        <td>0.2.0</td>
-        <td>Can lose an edit: <b>saving while another program saves the same vault can undo its change</b>, with the lost edit in no history and nowhere else. Two saves within about two seconds was enough &mdash; which is what a password manager and an agent sharing a vault do. Two more that lose nothing are listed in the changelog.</td>
-        <td>0.3.0</td>
-      </tr>
-    </tbody>
-  </table>
-  </div>
-
-  <h2>Connecting it to Claude</h2>
-
-  <p class="caption">The current CLI workflow uses two processes. <code>keypaste-mcp</code> is started by your MCP client and forwards requests without opening the vault. <code>keypaste agent</code> is started by you, holds the vault, and asks you the question at the top of this page.</p>
-
+      <div class="terminal">
 <pre>keypaste agent --vault ~/vault.kdbx</pre>
+      </div>
 
-  <p class="caption">The downloads above are <strong>v0.3.0</strong>, which includes
-     <code>setup</code>: it finds installed clients and configures each through its own
-     <code>mcp add</code>, and a client without one gets its block printed to paste. Only
-     <code>v0.1.0</code> lacks it &mdash; on that release use the
-     <a href="https://github.com/notinferred/keypaste/blob/main/docs/mcp-setup.md#claude-code">manual client instructions</a>
-     instead.</p>
+      <p>The downloads above are <strong>v0.3.0</strong>, which includes <code>setup</code>: it finds installed clients and configures each through its own <code>mcp add</code>, and a client without one gets its block printed to paste. Only <code>v0.1.0</code> lacks it; on that release use the <a href="https://github.com/notinferred/keypaste/blob/main/docs/mcp-setup.md#claude-code">manual client instructions</a> instead.</p>
 
+      <div class="terminal">
 <pre>keypaste setup --vault ~/vault.kdbx</pre>
+      </div>
 
-  <p class="caption"><strong>Nothing keypaste writes into a client's configuration holds a master password, and nothing ever will.</strong> MCP tool calls are logged locally, granted or refused. The bridge excludes the returned field value, but request names and reasons remain and may contain sensitive text:</p>
+      <p><strong>Nothing keypaste writes into a client's configuration holds a master password, and nothing ever will.</strong> MCP tool calls are logged locally, granted or refused. The bridge excludes the returned field value, but request names and reasons remain and may contain sensitive text:</p>
 
+      <div class="terminal">
+        <div class="terminal-bar"><span class="lights" aria-hidden="true"><span></span><span></span><span></span></span>keypaste log</div>
 <pre>
   time (UTC)           client       entry                decision  method
   2026-07-26 14:03:09  claude-code  -                    granted   exposure
   2026-07-26 14:03:11  claude-code  env/demo/STRIPE_KEY  granted   prompt
   2026-07-26 14:07:44  claude-code  env/demo/STRIPE_KEY  denied    out-of-scope
 </pre>
+      </div>
+    </div>
+  </section>
 
-  <h2>The planned desktop experience</h2>
+  <section id="upgrade">
+    <div class="wrap prose">
+      <div class="section-head"><span class="num">06</span><h2>Running an older version?</h2></div>
+      <p class="intro">Published versions are never rewritten here, so the old archives are still served and still broken. Replacing the binary is the fix. Full detail is in the <a href="https://github.com/notinferred/keypaste/blob/main/CHANGELOG.md">changelog</a>.</p>
 
-  <p class="caption">The next release focuses on daily vault use and recovery, one unlock session, native MCP approvals and launching a project with its env set. Locking will stop new session-backed secret releases and launches. Values already delivered to an agent or child process remain outside that control. Sharing, hosted services, teams and complete KeePassXC parity are outside this release.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>IF YOU HAVE</th><th>WHAT IT DOES</th><th>FIXED IN</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>0.1.0</td>
+              <td>Can destroy your vault: <b>env export can delete your vault</b>, writing a project's variables over it in plaintext and taking every other entry and its history. Also: env rm and env set can act on the wrong entry; get can return the wrong password; env pull can delete an edit it never imported; and moving the clock back can revive an expired approval.</td>
+              <td>0.2.0</td>
+            </tr>
+            <tr>
+              <td>0.2.0</td>
+              <td>Can lose an edit: <b>saving while another program saves the same vault can undo its change</b>, with the lost edit in no history and nowhere else. Two saves within about two seconds was enough, which is what a password manager and an agent sharing a vault do. Two more that lose nothing are listed in the changelog.</td>
+              <td>0.3.0</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
 
-  <h2>Tell me when the app ships</h2>
+  <section id="desktop">
+    <div class="wrap prose">
+      <div class="section-head"><span class="num">07</span><h2>The desktop app</h2></div>
+      <p class="intro">The next release focuses on daily vault use and recovery, one unlock session, native MCP approvals and launching a project with its env set. Locking will stop new session-backed secret releases and launches. Values already delivered to an agent or child process remain outside that control. Sharing, hosted services, teams and complete KeePassXC parity are outside this release.</p>
 
-  <p class="caption">The CLI/MCP is available above. The intended desktop app uses one unlock session for credentials, native approvals and project launches; it has no public download yet. You can register interest in one installation announcement. Confirmation mail is not implemented, so signups remain unconfirmed and no messages are sent. Any future message requires confirmation first.</p>
+      <p><strong>Tell me when the app ships.</strong> The CLI/MCP is available above. The intended desktop app uses one unlock session for credentials, native approvals and project launches; it has no public download yet. You can register interest in one installation announcement. Confirmation mail is not implemented, so signups remain unconfirmed and no messages are sent. Any future message requires confirmation first.</p>
 
-  <form class="signup" method="post" action="/subscribe">
-    <label class="field">
-      <input type="email" name="email" required autocomplete="email" inputmode="email"
-             spellcheck="false" maxlength="254" placeholder="you@example.com"
-             aria-label="Your email address">
-    </label>
-    <span class="hp" aria-hidden="true"><label for="website">Leave this empty</label> <input id="website" type="text" name="website" tabindex="-1" autocomplete="off"></span>
-    <button type="submit">Notify me</button>
-  </form>
+      <form class="signup" method="post" action="/subscribe">
+        <label class="field">
+          <input type="email" name="email" required autocomplete="email" inputmode="email"
+                 spellcheck="false" maxlength="254" placeholder="you@example.com"
+                 aria-label="Your email address">
+        </label>
+        <span class="hp" aria-hidden="true"><label for="website">Leave this empty</label> <input id="website" type="text" name="website" tabindex="-1" autocomplete="off"></span>
+        <button class="button primary" type="submit">Notify me</button>
+      </form>
+    </div>
+  </section>
 
-  <p style="margin-top:2rem"><a class="cta" href="https://github.com/notinferred/keypaste">Read the source on GitHub →</a></p>
-
-  <h2>Found something wrong?</h2>
-
-  <p class="caption">Bugs, missing features and "this made no sense to me" all go to the <a href="https://github.com/notinferred/keypaste/issues">issue tracker</a>, and are read by the person who wrote it. Anything that looks like a security problem goes to <a href="mailto:security@keypaste.com">security@keypaste.com</a> instead of the tracker &mdash; <a href="https://github.com/notinferred/keypaste/blob/main/SECURITY.md">SECURITY.md</a> says what happens next and how fast.</p>
-
-  <footer>
-    <p>Security reports: <a href="mailto:security@keypaste.com">security@keypaste.com</a> &middot; Everything else: <a href="https://github.com/notinferred/keypaste/issues">the issue tracker</a></p>
-    <p>This page sets no cookies, loads no third-party scripts, and runs no JavaScript at all. If you enter your email it is stored for a possible desktop installation announcement. Addresses remain unconfirmed and no mail is currently sent; confirmation is required before any future message.</p>
-  </footer>
+  <section id="contact">
+    <div class="wrap prose">
+      <div class="section-head"><span class="num">08</span><h2>Found something wrong?</h2></div>
+      <p class="intro">Bugs, missing features and "this made no sense to me" all go to the <a href="https://github.com/notinferred/keypaste/issues">issue tracker</a>, and are read by the person who wrote it. Anything that looks like a security problem goes to <a href="mailto:security@keypaste.com">security@keypaste.com</a> instead of the tracker; <a href="https://github.com/notinferred/keypaste/blob/main/SECURITY.md">SECURITY.md</a> says what happens next and how fast.</p>
+      <div class="actions">
+        <a class="button" href="https://github.com/notinferred/keypaste">Read the source on GitHub</a>
+      </div>
+    </div>
+  </section>
 </main>
+
+<footer>
+  <div class="wrap">
+    <a class="lockup" href="/" aria-label="keypaste home">
+      <svg width="18" height="18" viewBox="0 0 64 64" aria-hidden="true"><rect class="mark-stem" x="10" y="8" width="10" height="48"/><polygon class="mark-arm" points="40,24 54,24 38,40 54,56 40,56 24,40"/></svg>
+      <span>keypaste</span>
+    </a>
+    <p>Security reports: <a href="mailto:security@keypaste.com">security@keypaste.com</a> · Everything else: <a href="https://github.com/notinferred/keypaste/issues">the issue tracker</a></p>
+    <p>This page sets no cookies, loads no third-party scripts, and runs no JavaScript at all. If you enter your email it is stored for a possible desktop installation announcement. Addresses remain unconfirmed and no mail is currently sent; confirmation is required before any future message.</p>
+  </div>
+</footer>
 </body>
 </html>

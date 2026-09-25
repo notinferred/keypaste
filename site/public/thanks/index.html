@@ -6,56 +6,44 @@
 <title>keypaste — you're on the list</title>
 <meta name="description" content="Your address is on the keypaste launch list.">
 <meta name="robots" content="noindex">
-<meta name="color-scheme" content="light dark">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔑</text></svg>">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#111214" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f7f7f5" media="(prefers-color-scheme: light)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/brand.css">
 <style>
-  :root {
-    --bg: #fbfbfa;
-    --fg: #1a1a19;
-    --muted: #6b6b66;
-    --rule: #e4e4e0;
-    --accent: #3d5a80;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #141414;
-      --fg: #ececea;
-      --muted: #9a9a94;
-      --rule: #2a2a28;
-      --accent: #8fb0d9;
-    }
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--fg);
-    font: 17px/1.65 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Inter, sans-serif;
-    -webkit-font-smoothing: antialiased;
-  }
-  main { max-width: 34rem; margin: 0 auto; padding: 6rem 1.5rem 4rem; }
-  h1 { font-size: 1.375rem; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 1.25rem; }
-  p { margin: 0 0 1.25rem; }
-  .muted { color: var(--muted); font-size: 0.95rem; }
-  a { color: var(--accent); }
-  footer {
-    margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--rule);
-    color: var(--muted); font-size: 0.875rem;
-  }
+  main { max-width: 34rem; margin: 0 auto; padding: 48px 16px 64px; }
+  .lockup { margin-bottom: 32px; }
+  .card { padding: 28px; border: 1px solid var(--border-subtle); border-radius: 14px; background: var(--bg-panel); }
+  h1 { margin: 0 0 12px; font-size: 30px; font-weight: 600; letter-spacing: -0.035em; line-height: 1.15; }
+  p { margin: 0 0 16px; color: var(--text-secondary); font-size: 15px; text-wrap: pretty; }
+  p.muted { color: var(--text-muted); font-size: 14px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+  footer { margin-top: 24px; color: var(--text-muted); font-size: 13px; }
 </style>
 </head>
 <body>
 <main>
-  <h1>You're on the list.</h1>
+  <a class="lockup" href="/" aria-label="keypaste home">
+    <svg width="24" height="24" viewBox="0 0 64 64" aria-hidden="true"><rect class="mark-stem" x="10" y="8" width="10" height="48"/><polygon class="mark-arm" points="40,24 54,24 38,40 54,56 40,56 24,40"/></svg>
+    <span>keypaste</span>
+  </a>
 
-  <p>One message, when the desktop app is ready to install. Not a newsletter, and nothing in between.</p>
+  <section class="card">
+    <h1>You're on the list.</h1>
 
-  <p class="muted">Before that first message goes out you will get one asking you to confirm — anyone can type anyone's address into a public form, and the difference between a mailing list and a nuisance is that somebody said yes to it. If you did not sign up, ignore that mail and nothing further happens.</p>
+    <p>One message, when the desktop app is ready to install. Not a newsletter, and nothing in between.</p>
 
-  <p><a href="/">Back to keypaste.com</a> &middot; <a href="https://github.com/notinferred/keypaste">the repository</a></p>
+    <p class="muted">Before that first message goes out you will get one asking you to confirm. Anyone can type anyone's address into a public form, and the difference between a mailing list and a nuisance is that somebody said yes to it. If you did not sign up, ignore that mail and nothing further happens.</p>
+
+    <div class="actions">
+      <a class="button primary" href="/">Back to keypaste.com</a>
+      <a class="button" href="https://github.com/notinferred/keypaste">The repository</a>
+    </div>
+  </section>
 
   <footer>
-    <p>Your address is stored on a database the maintainer runs, and is used for nothing else.</p>
+    <p class="muted">Your address is stored on a database the maintainer runs, and is used for nothing else.</p>
   </footer>
 </main>
 </body>
