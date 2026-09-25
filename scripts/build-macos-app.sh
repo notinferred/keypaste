@@ -4,7 +4,7 @@
 # The payload goes to Contents/MacOS, where the apphost finds its runtime and the app finds the keypaste-mcp it
 # gives clients; the icon and licences go to Contents/Resources. Nothing is signed or notarized while the app's
 # signing policy is none. ditto zips the bundle, keeping its modes in a format notarytool also accepts, and the
-# bundle is then checked as unzipped from that archive, including a launch through LaunchServices.
+# bundle is then checked as unzipped from that archive, including a --selftest started through LaunchServices.
 #
 # Build logs go to stderr; the path of the archive is the only line on stdout.
 #
@@ -47,8 +47,12 @@ mv "$app/Contents/MacOS/LICENSE" "$app/Contents/MacOS/THIRD_PARTY_NOTICES.md" "$
 cp "$ROOT/packaging/macos/keypaste.icns" "$app/Contents/Resources/"
 sed "s/{version}/$bundle_version/g" "$ROOT/packaging/macos/Info.plist" > "$app/Contents/Info.plist"
 plutil -lint "$app/Contents/Info.plist" >&2
-chmod -R go-w "$app"
-chmod 755 "$app/Contents/MacOS/keypaste-app" "$app/Contents/MacOS/keypaste-mcp"
+# The runtime pack's files arrive 0744, and only a Mach-O executable needs an exec bit.
+find "$app" -type d -exec chmod 755 {} +
+find "$app" -type f -exec chmod 644 {} +
+while IFS= read -r -d '' path; do
+  case "$(file -b "$path")" in *Mach-O*executable*) chmod 755 "$path" ;; esac
+done < <(find "$app/Contents/MacOS" -type f -print0)
 
 mkdir -p "$out"
 rm -f "$out/$name"
@@ -65,13 +69,13 @@ executable="$contents/MacOS/$(plist CFBundleExecutable)"
 
 reported="$("$executable" --version | tr -d '[:space:]')"
 [ "$reported" = "$binary_version" ] || die "the bundle's binary reports $reported, not $binary_version"
-"$executable" --selftest >&2
 case "$("$contents/MacOS/keypaste-mcp" --help 2>&1)" in "usage: keypaste-mcp"*) ;; *) die "the bundle's keypaste-mcp does not answer --help" ;; esac
 
-# LaunchServices, not a shell, is what reads Info.plist to start an app from Finder or `open`.
+# LaunchServices, not a shell, reads Info.plist and starts the app from Finder or `open`; its exit code is not open's.
 : > "$work/launched"
-open -W -n -g --stdout "$work/launched" --stderr "$work/launched.err" "$unzipped/keypaste.app" --args --version
-launched="$(tr -d '[:space:]' < "$work/launched")"
-[ "$launched" = "$binary_version" ] || die "LaunchServices started the bundle and it reported '$launched', not $binary_version: $(cat "$work/launched.err")"
+open -W -n -g --stdout "$work/launched" --stderr "$work/launched.err" "$unzipped/keypaste.app" --args --selftest
+grep -q '^keypaste-app: selftest ok ' "$work/launched" \
+  || die "the bundle started through LaunchServices did not pass --selftest: $(cat "$work/launched" "$work/launched.err")"
+cat "$work/launched" >&2
 
 echo "$out/$name"
