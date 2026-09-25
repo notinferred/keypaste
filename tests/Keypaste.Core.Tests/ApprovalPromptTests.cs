@@ -44,6 +44,8 @@ public sealed class ApprovalPromptTests
     /// put either. They are set from the sanitizer's own result rather than from anything the agent
     /// sends, so a reason cannot choose their value — it can only cause its own to be true by
     /// containing something that had to be scrubbed, which is precisely the fact being reported.
+    /// <c>OnceOnly</c> is an enum the approver sets from the entry's profile and the client's policy
+    /// file, never from the request's text: it says why no timed grant is offered, and nothing else.
     /// </remarks>
     [Fact]
     public void ThePromptHasNoMember_AReasonCouldUseToChangeTheDefaultOrTheDeadline()
@@ -60,6 +62,7 @@ public sealed class ApprovalPromptTests
                 "EntryWasAltered",
                 "Field",
                 "Label",
+                "OnceOnly",
                 "Reason",
                 "ReasonWasAltered",
                 "ReasonWasTruncated",
@@ -195,14 +198,13 @@ public sealed class ApprovalPromptTests
     }
 
     /// <summary>
-    /// The human is shown the TTL that will actually apply, not the one the agent asked for.
-    /// Showing a requested hour when five minutes will be granted would make the prompt a worse
-    /// source of truth than the audit log.
+    /// A standing rule's release lasts what the agent asked for, never past the operator's ceiling.
+    /// A person's timed grant is not bounded this way: they chose its length on screen.
     /// </summary>
     [Fact]
-    public void TheTtlShownIsTheOneThatWillApply()
+    public void ARulesReleaseIsBoundedByTheRequestAndTheCeiling()
     {
-        var limits = ApprovalLimits.Default;
+        var limits = ApprovalLimits.Default with { MaximumTtlSeconds = 300 };
 
         Assert.Equal(300, limits.EffectiveTtlSeconds(3600));
         Assert.Equal(60, limits.EffectiveTtlSeconds(60));

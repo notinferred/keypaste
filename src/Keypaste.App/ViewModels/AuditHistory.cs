@@ -31,6 +31,33 @@ internal enum AuditReadKind
 /// </remarks>
 internal sealed record AuditHistory(AuditReadKind Kind, IReadOnlyList<string> Lines, IReadOnlyList<string> Verdict, string Error)
 {
+    /// <summary>The records the table holds, in file order, as the core's reader parsed and sanitized them.</summary>
+    internal IReadOnlyList<AuditEntry> Entries { get; init; } = [];
+
+    /// <summary>How many records the whole file holds.</summary>
+    internal int Total { get; init; }
+
+    /// <summary>How many lines of the file were not records this version understands.</summary>
+    internal int Unreadable { get; init; }
+
+    /// <summary>The physical line numbers the hash chain does not vouch for.</summary>
+    internal IReadOnlySet<int> Unverified { get; init; } = new HashSet<int>();
+
+    /// <summary>What the chain check found, for a screen that states the verdict in its own layout.</summary>
+    internal AuditChainReport? Report { get; init; }
+
+    /// <summary>A path with the home folder written as <c>~</c>, as every screen shows the log's.</summary>
+    /// <param name="path">The path.</param>
+    /// <returns>The shorter form, or <paramref name="path"/> when it is not under the home folder.</returns>
+    internal static string ShortPath(string path)
+    {
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+        return home.Length > 0 && path.StartsWith(home + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+            ? "~" + path[home.Length..]
+            : path;
+    }
+
     /// <summary>Reads the log at <paramref name="path"/>, keeping the records <paramref name="keep"/> accepts.</summary>
     /// <param name="path">The log.</param>
     /// <param name="keep">Which records the table holds, or null for all of them.</param>
@@ -60,13 +87,20 @@ internal sealed record AuditHistory(AuditReadKind Kind, IReadOnlyList<string> Li
 
         IReadOnlyList<string> lines =
         [
-            AuditText.Heading(path, kept.Count, entries.Count, filters ?? []),
+            AuditText.Heading(ShortPath(path), kept.Count, entries.Count, filters ?? []),
             .. AuditText.Table(kept, unverified),
             .. AuditText.Notes(kept, unreadable, unverified),
         ];
 
         var kind = report.Verdict == AuditChainVerdict.Broken ? AuditReadKind.Broken : AuditReadKind.Intact;
 
-        return new AuditHistory(kind, lines, AuditText.Verdict(report), string.Empty);
+        return new AuditHistory(kind, lines, AuditText.Verdict(report), string.Empty)
+        {
+            Entries = kept,
+            Total = entries.Count,
+            Unreadable = unreadable,
+            Unverified = unverified,
+            Report = report,
+        };
     }
 }

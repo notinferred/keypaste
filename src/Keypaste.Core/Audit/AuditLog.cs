@@ -268,6 +268,12 @@ public sealed class AuditLog : IDisposable
                     bytes = Compose(record, timestamp, sequence, tail.Previous, withReasonExcerpt: false);
                 }
 
+                // A run's command head goes next: its argv is still committed to by command_sha256.
+                if (bytes.Length > MaximumRecordBytes && record.Command is not null)
+                {
+                    bytes = Compose(record with { Command = null }, timestamp, sequence, tail.Previous, withReasonExcerpt: false);
+                }
+
                 if (bytes.Length > MaximumRecordBytes)
                 {
                     error = $"the record is {bytes.Length} bytes, over the {MaximumRecordBytes}-byte limit";
@@ -577,6 +583,11 @@ public sealed class AuditLog : IDisposable
             writer.WriteString("method", Wire(record.Method));
             writer.WriteString("reason", record.Reason);
 
+            if (record.Decision == AuditDecision.Granted && record.GrantedSeconds is { } granted)
+            {
+                writer.WriteNumber("granted_seconds", granted);
+            }
+
             writer.WriteStartArray("exposure");
             foreach (var glob in record.Exposure)
             {
@@ -586,6 +597,21 @@ public sealed class AuditLog : IDisposable
             writer.WriteEndArray();
 
             WriteOptional(writer, "session", record.Session);
+            WriteOptional(writer, "vault", record.Vault);
+
+            if (record.Entries is { } entries)
+            {
+                writer.WriteStartArray("entries");
+                foreach (var entry in entries)
+                {
+                    writer.WriteStringValue(entry);
+                }
+
+                writer.WriteEndArray();
+            }
+
+            WriteOptional(writer, "command", record.Command);
+            WriteOptional(writer, "command_sha256", record.CommandSha256);
 
             // Last, so the bytes the hash covers include the link. The other order would let a
             // line's link be re-pointed without disturbing its hash.
@@ -628,7 +654,7 @@ public sealed class AuditLog : IDisposable
     /// law 3.3 requires say something untrue. It does not throw, because an audit write must not
     /// be the thing that takes the server down.
     /// </remarks>
-    private static string Wire(AuditMethod method) => method switch
+    internal static string Wire(AuditMethod method) => method switch
     {
         AuditMethod.VaultLocked => "vault-locked",
         AuditMethod.NotImplemented => "not-implemented",
@@ -649,6 +675,10 @@ public sealed class AuditLog : IDisposable
         AuditMethod.Undeliverable => "undeliverable",
         AuditMethod.NoSession => "no-session",
         AuditMethod.VaultChanged => "vault-changed",
+        AuditMethod.Token => "token",
+        AuditMethod.ShareCreated => "share-created",
+        AuditMethod.ShareRevoked => "share-revoked",
+        AuditMethod.InjectOnly => "inject-only",
         _ => "unknown",
     };
 

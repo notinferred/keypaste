@@ -1,6 +1,8 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Input;
+using Avalonia.Media;
 using Avalonia.VisualTree;
 using Keypaste.App.Session;
 using Keypaste.App.Tests.Controls;
@@ -17,7 +19,7 @@ namespace Keypaste.App.Tests.Session;
 /// <summary>
 /// A <c>keypaste run --session</c> request over the app's real endpoint raises the app's own prompt
 /// window, drawn by Skia and clicked through hit-testing, naming the project, its variable names,
-/// the command and the directory; only a press of Approve releases the set (V-E.1c).
+/// the command and the directory; only a press of Allow once or the timed allow releases the set (V-E.1c).
 /// </summary>
 public sealed class DesktopEnvApprovalTests
 {
@@ -34,11 +36,12 @@ public sealed class DesktopEnvApprovalTests
             var window = Assert.IsType<EnvApprovalWindow>(await app.PromptAsync());
 
             Assert.Equal("ci", Text(window, "ProjectText"));
-            Assert.Equal("DEPLOY_KEY", Text(window, "KeysText"));
+            Assert.Equal("dev", Text(window, "ProfileText"));
+            Assert.Equal(["DEPLOY_KEY"], KeyNameBlocks(window).Select(block => block.Text));
             Assert.Equal("deploy --to \"staging area\"", Text(window, "CommandText"));
             Assert.EndsWith("work", Text(window, "DirectoryText"), StringComparison.Ordinal);
 
-            app.Arm();
+            await app.ArmAsync();
             Click(window, "Approve");
             var answered = await reply.WaitAsync(_wait, Token);
 
@@ -48,6 +51,34 @@ public sealed class DesktopEnvApprovalTests
             await PromptedApp.WithdrawnAsync(window);
             AutomationSurface.AssertNothingExposes(window, Sentinel);
         });
+
+    [Fact]
+    public Task A_long_variable_name_wraps_whole_rather_than_ending_in_an_ellipsis() =>
+        HeadlessSession.On(() =>
+        {
+            var longKey = "STRIPE_RESTRICTED_KEY_FOR_WEBHOOK_SIGNING_IN_PRODUCTION_" + new string('A', 30);
+            var preview = new EnvPreview("acme-api", ["DATABASE_URL", longKey]);
+            var window = new EnvApprovalWindow(new EnvApprovalViewModel(EnvReleasePrompt.For(preview, ["npm", "test"], "work")));
+            window.Show();
+
+            try
+            {
+                window.CaptureRenderedFrame();
+                var drawn = Assert.Single(KeyNameBlocks(window), block => block.Text == longKey);
+
+                Assert.True(longKey.Length >= 80);
+                Assert.Equal(TextTrimming.None, drawn.TextTrimming);
+                Assert.Equal(TextWrapping.Wrap, drawn.TextWrapping);
+                Assert.True(drawn.TextLayout.TextLines.Count > 1);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+
+    internal static IReadOnlyList<TextBlock> KeyNameBlocks(Window window) =>
+        [.. window.FindControl<ItemsControl>("KeysList")!.GetVisualDescendants().OfType<TextBlock>().Where(block => block.Classes.Contains("key"))];
 
     public static TheoryData<string, EnvOutcome> Refusals => new()
     {
@@ -61,13 +92,13 @@ public sealed class DesktopEnvApprovalTests
 
     [Theory]
     [MemberData(nameof(Refusals))]
-    public Task Every_way_but_Approve_releases_nothing_and_takes_the_prompt_down(string how, EnvOutcome outcome) =>
+    public Task Every_way_but_an_allow_releases_nothing_and_takes_the_prompt_down(string how, EnvOutcome outcome) =>
         HeadlessSession.On(async () =>
         {
             await using var app = await PromptedApp.StartAsync();
             var reply = app.AskEnv();
             var window = await app.PromptAsync();
-            app.Arm();
+            await app.ArmAsync();
 
             switch (how)
             {
@@ -112,9 +143,54 @@ public sealed class DesktopEnvApprovalTests
             await Task.Delay(200, Token);
             Assert.False(reply.IsCompleted, "a click before the prompt was armed answered it");
 
-            app.Arm();
+            await app.ArmAsync();
             Click(window, "Approve");
             Assert.Equal(EnvOutcome.Resolved, (await reply.WaitAsync(_wait, Token))?.Set.Outcome);
+        });
+
+    [Fact]
+    public Task EnvAllowForTheHour_TheSameRunIsNotAskedAgain() =>
+        HeadlessSession.On(async () =>
+        {
+            await using var app = await PromptedApp.StartAsync();
+            var reply = app.AskEnv();
+            var window = await app.PromptAsync();
+
+            Assert.Equal("Allow this command for 15 minutes", window.FindControl<Button>("Approve")!.Content);
+            Assert.Contains("exactly this command", Text(window, "TimedCaptionText"), StringComparison.Ordinal);
+
+            await app.ArmAsync();
+            Click(window, "Approve");
+            Assert.Equal(EnvOutcome.Resolved, (await reply.WaitAsync(_wait, Token))?.Set.Outcome);
+            await PromptedApp.WithdrawnAsync(window);
+
+            var again = await app.AskEnv().WaitAsync(_wait, Token);
+
+            Assert.Equal(EnvOutcome.Resolved, again?.Set.Outcome);
+            Assert.Equal(Sentinel, Assert.Single(again!.Set.Variables).Value);
+            Assert.Single(app.Windows);
+            Assert.Single(app.Authority.Activity.EnvGrants);
+        });
+
+    [Fact]
+    public Task EnvAllowOnce_AsksAgain() =>
+        HeadlessSession.On(async () =>
+        {
+            await using var app = await PromptedApp.StartAsync();
+            var reply = app.AskEnv();
+            var window = await app.PromptAsync();
+
+            await app.ArmAsync();
+            Click(window, "AllowOnce");
+            Assert.Equal(EnvOutcome.Resolved, (await reply.WaitAsync(_wait, Token))?.Set.Outcome);
+            await PromptedApp.WithdrawnAsync(window);
+
+            var again = app.AskEnv();
+            var second = await app.PromptAsync(count: 2);
+            Click(second, "Deny");
+
+            Assert.Equal(EnvOutcome.Declined, (await again.WaitAsync(_wait, Token))?.Set.Outcome);
+            Assert.Empty(app.Authority.Activity.EnvGrants);
         });
 
     /// <summary>A command, directory and names the runner sent cannot move the window or its buttons, however long they are.</summary>
@@ -135,9 +211,26 @@ public sealed class DesktopEnvApprovalTests
             hostile.Close();
         });
 
-    private static (EnvApprovalWindow Window, string Layout) Layout(EnvPreview preview, IReadOnlyList<string> command, string directory)
+    /// <summary>A requester the runner names is one trimmed line, however long it says it is.</summary>
+    [Fact]
+    public Task A_long_requester_leaves_the_window_and_buttons_where_they_were() =>
+        HeadlessSession.On(() =>
+        {
+            var preview = new EnvPreview("ci", ["DEPLOY_KEY"]);
+            var (ordinary, ordinaryLayout) = Layout(preview, ["deploy"], "/work", "claude-code");
+            var (hostile, hostileLayout) = Layout(preview, ["deploy"], "/work", string.Join(' ', Enumerable.Repeat("claude-code", 60)));
+
+            Assert.Equal(ordinaryLayout, hostileLayout);
+
+            ordinary.Close();
+            hostile.Close();
+        });
+
+    private static (EnvApprovalWindow Window, string Layout) Layout(
+        EnvPreview preview, IReadOnlyList<string> command, string directory, string? requester = null)
     {
-        var window = new EnvApprovalWindow(new EnvApprovalViewModel(EnvReleasePrompt.For(preview, command, directory)));
+        var prompt = EnvReleasePrompt.For(preview, command, directory) with { Requester = requester };
+        var window = new EnvApprovalWindow(new EnvApprovalViewModel(prompt));
         window.Show();
         WindowInput.Drain();
         DrawnFrame.Capture(window);
@@ -152,5 +245,5 @@ public sealed class DesktopEnvApprovalTests
 
     /// <summary>The window's own buttons; a scrolling box adds its scroll bar's, which move nothing that matters.</summary>
     private static List<Button> Buttons(Window window) =>
-        [.. window.GetVisualDescendants().OfType<Button>().Where(button => button.Name is "Deny" or "Approve")];
+        [.. window.GetVisualDescendants().OfType<Button>().Where(button => button.Name is "Deny" or "AllowOnce" or "Approve")];
 }

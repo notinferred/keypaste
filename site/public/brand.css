@@ -1,0 +1,287 @@
+@font-face {
+  font-family: "Instrument Sans";
+  src: url("/fonts/InstrumentSans-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Instrument Sans";
+  src: url("/fonts/InstrumentSans-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Instrument Sans";
+  src: url("/fonts/InstrumentSans-SemiBold.woff2") format("woff2");
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Fragment Mono";
+  src: url("/fonts/FragmentMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+
+:root {
+  --bg-app: #111214;
+  --bg-panel: #18191c;
+  --bg-card: #1d1e22;
+  --bg-hover: #24262a;
+  --bg-active: #2a2c30;
+  --border-subtle: #26282c;
+  --border-default: #2c2e33;
+  --border-strong: #3a3d43;
+  --text-primary: #f2f2f0;
+  --text-secondary: #c9cacd;
+  --text-muted: #8e9096;
+  --accent: #f2b544;
+  --accent-hover: #f7c566;
+  --accent-press: #d99d2e;
+  --accent-tint: rgba(242, 181, 68, 0.12);
+  --accent-text: #f2b544;
+  --on-accent: #111214;
+  --status-ok: oklch(0.8 0.13 155);
+  --status-danger: oklch(0.74 0.14 25);
+  --grid-line: #18191c;
+  --mark-stem: #f2f2f0;
+  --mark-arm: #f2b544;
+  --focus-ring: 0 0 0 2px #111214, 0 0 0 4px #f2b544;
+
+  --terminal-bg: #0c0d0e;
+  --terminal-border: #26282c;
+  --terminal-divider: #1d1e22;
+  --terminal-text: #f2f2f0;
+  --terminal-muted: #8e9096;
+
+  --font-sans: "Instrument Sans", system-ui, sans-serif;
+  --font-mono: "Fragment Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg-app: #f7f7f5;
+    --bg-panel: #ffffff;
+    --bg-card: #ffffff;
+    --bg-hover: #efefec;
+    --bg-active: #e6e6e2;
+    --border-subtle: #e8e8e4;
+    --border-default: #dcdcd7;
+    --border-strong: #c4c4be;
+    --text-primary: #111214;
+    --text-secondary: #3a3c40;
+    --text-muted: #6b6d72;
+    --accent-text: #8a5a00;
+    --status-ok: oklch(0.55 0.13 155);
+    --status-danger: oklch(0.55 0.17 25);
+    --grid-line: #ebebe7;
+    --mark-stem: #111214;
+    --mark-arm: #d99d2e;
+    --focus-ring: 0 0 0 2px #ffffff, 0 0 0 4px #f2b544;
+    color-scheme: light;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font: 400 16px/1.55 var(--font-sans);
+  letter-spacing: -0.005em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: var(--accent-text);
+  text-decoration: none;
+  transition: color 120ms var(--ease-out);
+}
+
+a:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (prefers-color-scheme: light) {
+  a:hover {
+    color: var(--accent-press);
+  }
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+a:not(.button):focus-visible {
+  border-radius: 4px;
+}
+
+code,
+kbd,
+pre,
+.mono {
+  font-family: var(--font-mono);
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
+  letter-spacing: 0;
+}
+
+.lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-primary);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.045em;
+  line-height: 1;
+}
+
+.lockup:hover {
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.lockup svg {
+  flex: none;
+}
+
+.mark-stem {
+  fill: var(--mark-stem);
+}
+
+.mark-arm {
+  fill: var(--mark-arm);
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 18px;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-primary);
+  font: 600 14px/1 var(--font-sans);
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  transition: background-color 120ms var(--ease-out), border-color 120ms var(--ease-out);
+}
+
+.button:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.button.primary:hover {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
+}
+
+.button.primary:active {
+  border-color: var(--accent-press);
+  background: var(--accent-press);
+}
+
+.button svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.terminal {
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--terminal-border);
+  border-radius: 10px;
+  background: var(--terminal-bg);
+  color: var(--terminal-text);
+}
+
+.terminal-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--terminal-divider);
+  color: var(--terminal-muted);
+  font: 400 11px/1 var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.terminal-bar .lights {
+  display: flex;
+  gap: 6px;
+  margin-right: 8px;
+}
+
+.terminal-bar .lights span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #2a2c30;
+}
+
+.terminal pre {
+  margin: 0;
+  padding: 16px 18px;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.75;
+  white-space: pre;
+  scrollbar-color: #3a3d43 transparent;
+}
+
+.terminal pre::selection,
+.terminal pre ::selection {
+  background: rgba(242, 181, 68, 0.3);
+}
+
+@media (max-width: 560px) {
+  .terminal pre {
+    padding: 14px;
+    font-size: 11.5px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}

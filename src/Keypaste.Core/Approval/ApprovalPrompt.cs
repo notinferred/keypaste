@@ -75,18 +75,30 @@ public sealed record ApprovalPrompt
     public required bool ReasonWasAltered { get; init; }
 
     /// <summary>
-    /// How long a grant would live, in seconds — the number that will actually apply, not the one
-    /// the agent asked for. Showing a requested hour when policy will grant five minutes would be
-    /// lying to the human in the one place they are being asked to trust the display.
+    /// How long the timed grant the person may choose instead of "allow once" lasts, in seconds; zero
+    /// offers only "allow once". The approver's ceiling, never the number the agent asked for.
     /// </summary>
     public required int TtlSeconds { get; init; }
+
+    /// <summary>Why <see cref="TtlSeconds"/> is zero, when it is.</summary>
+    public OnceOnly OnceOnly { get; init; }
+
+    /// <summary>An entry as every prompt, grant and audit line shows it.</summary>
+    /// <param name="entry">The entry.</param>
+    /// <returns>Group separators kept, everything else scrubbed.</returns>
+    public static string Shown(EntryName entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+
+        return Display(entry).Text;
+    }
 
     /// <summary>Builds the prompt for one request, sanitizing everything untrusted on the way in.</summary>
     /// <param name="client">The client's asserted name, or null when it did not give one.</param>
     /// <param name="entry">The entry the request resolved to.</param>
     /// <param name="field">The requested field, already validated against <see cref="CredentialFields"/>.</param>
     /// <param name="reason">The agent's stated reason, verbatim.</param>
-    /// <param name="effectiveTtlSeconds">The TTL that will actually apply.</param>
+    /// <param name="effectiveTtlSeconds">The timed grant offered, or zero for "allow once" only.</param>
     /// <param name="clientLabel">The bridge's <c>--client-label</c>, or null.</param>
     /// <returns>A prompt safe for any channel to render.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="entry"/>, <paramref name="field"/> or <paramref name="reason"/> is null.</exception>

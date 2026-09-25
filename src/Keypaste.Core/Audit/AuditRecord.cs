@@ -111,6 +111,18 @@ public enum AuditMethod
     /// owner has not been saved yet. The reason says which.
     /// </remarks>
     VaultChanged = 18,
+
+    /// <summary>Released or refused under a scoped token rather than a prompt or a rule.</summary>
+    Token = 19,
+
+    /// <summary>A share link was created.</summary>
+    ShareCreated = 20,
+
+    /// <summary>A share link was revoked.</summary>
+    ShareRevoked = 21,
+
+    /// <summary>The client's policy is inject only, so a request for a value was refused before anything was resolved (D-0360).</summary>
+    InjectOnly = 22,
 }
 
 /// <summary>Who asked.</summary>
@@ -170,6 +182,24 @@ public sealed record AuditArgs
     /// a reason that changed after approval becomes visible (THREATS.md T-12).
     /// </remarks>
     public string? ReasonSha256 { get; init; }
+
+    /// <summary>Reduces a run request to what the log keeps: the set's group, when it named one, and the reason.</summary>
+    /// <param name="group">The env group of a set, or null for references, whose entries the line lists instead.</param>
+    /// <param name="reason">The agent's stated reason, verbatim.</param>
+    /// <returns>The arguments, holding no value.</returns>
+    public static AuditArgs ForRun(string? group, string reason)
+    {
+        ArgumentNullException.ThrowIfNull(reason);
+
+        return new AuditArgs
+        {
+            Entry = group is null ? null : EntryNameSanitizer.SanitizePath(group, maximumLength: EntryLength).Text,
+            EntryKind = group is null ? null : EntryAddressKind.Path,
+            ReasonExcerpt = EntryNameSanitizer.SanitizeProse(reason, ReasonExcerptLength).Text,
+            ReasonLength = reason.Length,
+            ReasonSha256 = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(reason))),
+        };
+    }
 
     /// <summary>Reduces a credential request to what the log keeps.</summary>
     /// <remarks>
@@ -246,4 +276,42 @@ public sealed record AuditRecord
 
     /// <summary>The unlocked session that answered, or null when the request reached none.</summary>
     public string? Session { get; init; }
+
+    /// <summary>How long what was released stays granted, in seconds: zero for a person's "allow once".</summary>
+    /// <remarks>Written only on a <see cref="AuditDecision.Granted"/> line, and absent from lines written before it existed.</remarks>
+    public int? GrantedSeconds { get; init; }
+
+    /// <summary>The vault the request named, as <c>VaultIdentity.Key</c>, or null when none was configured.</summary>
+    /// <remarks>Absent from lines written before it existed, which a reader counts for no vault in particular.</remarks>
+    public string? Vault { get; init; }
+
+    /// <summary>Each entry a release named or a run asked about, as <c>ApprovalPrompt.Shown</c> writes it, or null.</summary>
+    public IReadOnlyList<string>? Entries { get; init; }
+
+    /// <summary>The command a run started or asked to, one line, at most <see cref="CommandLength"/> characters, or null.</summary>
+    /// <remarks>Its full argv is <see cref="CommandSha256"/>, so a tail past the cut is still committed to.</remarks>
+    public string? Command { get; init; }
+
+    /// <summary>Lowercase hex SHA-256 of the run's canonical argv, program first, or null.</summary>
+    public string? CommandSha256 { get; init; }
+
+    /// <summary>The longest command head a line keeps.</summary>
+    public const int CommandLength = 256;
+
+    /// <summary>The hash a run line commits its whole command to: every item, NUL-terminated, in UTF-8.</summary>
+    /// <param name="argv">The program's absolute path, then the command's arguments.</param>
+    /// <returns>Lowercase hex SHA-256.</returns>
+    public static string HashOf(IEnumerable<string> argv)
+    {
+        ArgumentNullException.ThrowIfNull(argv);
+
+        var joined = new StringBuilder();
+
+        foreach (var item in argv)
+        {
+            joined.Append(item).Append('\0');
+        }
+
+        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(joined.ToString())));
+    }
 }

@@ -7,21 +7,36 @@
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "directory": "./public",
+    // The share viewer is served through the Worker so it answers 404 until SHARE_ENABLED is set.
+    "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",
     // Assets win by default, so the Worker would already see /subscribe - nothing is served from
     // that path. Stated anyway: relying on "there happens to be no file there" is not a routing
     // rule, and this removes the question of how the asset router answers a POST.
-    "run_worker_first": ["/subscribe"]
+    "run_worker_first": ["/subscribe", "/api/*", "/s/*"]
   },
-  "hyperdrive": [
-    {
-      // Created by hand with `wrangler hyperdrive create` - see site/README.md. The id is an
-      // account-scoped handle, not a secret, and is useless without access to the account. The
-      // database password lives in that config and appears nowhere in this repository.
-      "binding": "HYPERDRIVE",
-      "id": "9ef85ab258e846fbb2c0d3457b744282"
-    }
+  // Deletes spent and expired shares.
+  "triggers": {
+    "crons": ["*/30 * * * *"]
+  },
+  // Capacity, not secrecy: a missing binding means no limit. Keyed by cf-connecting-ip in memory.
+  "ratelimits": [
+    { "name": "SHARE_CREATE_LIMIT", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } },
+    { "name": "SHARE_OPEN_LIMIT", "namespace_id": "1002", "simple": { "limit": 30, "period": 60 } }
   ],
+  // Each created by hand with `wrangler hyperdrive create` - see site/README.md. An id is an
+  // account-scoped handle, not a secret, and is useless without access to the account. The database
+  // passwords live in those configs and appear nowhere in this repository.
+  "hyperdrive": [
+    // keypaste_signup_writer: INSERT on public.signup only.
+    { "binding": "HYPERDRIVE", "id": "efcf6358d6164c19a23fed8e77576b1b" },
+    // keypaste_share: public.share only, uncached so a spent view is never served again.
+    { "binding": "SHARE_DB", "id": "59f7f117df404fcba407beeeab6cb67c" }
+  ],
+  // Share links are on (D-0364). "0" or removing it switches the API to 503 and the viewer to 404.
+  "vars": {
+    "SHARE_ENABLED": "1"
+  },
   "routes": [
     { "pattern": "keypaste.com", "custom_domain": true },
     { "pattern": "www.keypaste.com", "custom_domain": true }

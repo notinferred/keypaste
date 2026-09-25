@@ -165,7 +165,20 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
     internal bool IsChecking => _check is not null;
 
     /// <summary>The registration Connect ran, or whose block was shown, which the check starts.</summary>
-    internal McpServerRegistration? Registered => _registered;
+    internal McpServerRegistration? Registered
+    {
+        get => _registered;
+        private set
+        {
+            if (Set(ref _registered, value))
+            {
+                Raise(nameof(NeedsRegistration));
+            }
+        }
+    }
+
+    /// <summary>Whether Check waits for a Connect or a shown block to start from.</summary>
+    internal bool NeedsRegistration => _registered is null;
 
     internal AsyncRelayCommand PreviewConnectCommand { get; }
 
@@ -209,7 +222,7 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
         if (!plan.RunsCommands)
         {
             // Nothing will be written, so this block is already what the client would start.
-            _registered = registration;
+            Registered = registration;
             Show(plan, $"{_client.DisplayName} has no command of its own. Add this to its configuration file yourself; "
                 + "keypaste wrote nothing. docs/mcp-setup.md says which file.");
             return;
@@ -270,7 +283,7 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
             _ => $"{plan.Client.DisplayName} refused" + (result.ClientSaid is { } said ? $": {said}" : "."),
         };
 
-        _registered = result.Status == McpSetupStatus.Done && !removing ? registration : null;
+        Registered = result.Status == McpSetupStatus.Done && !removing ? registration : null;
         CheckCommand.RaiseCanExecuteChanged();
     }
 

@@ -1,3 +1,4 @@
+using Keypaste.Core.Import;
 using Keypaste.Core.Internal;
 
 namespace Keypaste.Core;
@@ -13,6 +14,7 @@ public sealed class Vault : IDisposable
     private readonly KeePassInterop _interop;
     private readonly Lock _state = new();
     private byte[]? _stamp;
+    private DateTimeOffset? _savedAt;
     private bool _pending;
     private bool _disposed;
     private bool _backedUp;
@@ -24,6 +26,7 @@ public sealed class Vault : IDisposable
         _interop = interop;
         Path = path;
         _stamp = stamp ? SourceSnapshot.Digest(path) : null;
+        _savedAt = _stamp is null ? null : WrittenAt(path);
     }
 
     /// <summary>The path of the file backing this vault.</summary>
@@ -58,10 +61,62 @@ public sealed class Vault : IDisposable
     /// </remarks>
     public event EventHandler<VaultEdit>? Edited;
 
+    /// <summary>Raised after a save has written the file, outside the state lock.</summary>
+    public event EventHandler? Saved;
+
+    /// <summary>Whether the file holds what this vault holds, and when it was last written.</summary>
+    /// <returns>
+    /// <see cref="VaultSaveStatus.Unsaved"/> while a change is not saved or nothing was ever read from
+    /// the file; <see cref="VaultSaveStatus.Unreadable"/> when the file cannot be read;
+    /// <see cref="VaultSaveStatus.ChangedOnDisk"/> when something else wrote it; otherwise
+    /// <see cref="VaultSaveStatus.Saved"/>.
+    /// </returns>
+    /// <remarks>Hashes the whole file, as <see cref="ReadSaved(out IReadOnlyList{VaultEntry}?)"/> does, so a caller polls it sparingly.</remarks>
+    public VaultSaveState SaveState()
+    {
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            if (_pending || _stamp is not { } stamp)
+            {
+                return new VaultSaveState(VaultSaveStatus.Unsaved, _savedAt);
+            }
+
+            if (SourceSnapshot.Digest(Path) is not { } current)
+            {
+                return new VaultSaveState(VaultSaveStatus.Unreadable, _savedAt);
+            }
+
+            return new VaultSaveState(
+                CryptographicOperations.FixedTimeEquals(stamp, current) ? VaultSaveStatus.Saved : VaultSaveStatus.ChangedOnDisk,
+                _savedAt);
+        }
+    }
+
+    /// <summary>When the entry with this name was created and last modified.</summary>
+    /// <param name="name">The entry.</param>
+    /// <returns>Its times, or null when no entry answers to that name.</returns>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    public EntryTimes? ReadTimes(EntryName name)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+
+        return _interop.ReadTimes(name);
+    }
+
     /// <summary>The KDBX UUID of the entry called <paramref name="name"/>, as hex, or
-    /// <see langword="null"/> if none has that name. A test seam; keypaste addresses entries by
-    /// name.</summary>
-    internal string? EntryUuid(EntryName name) => _interop.EntryUuid(name);
+    /// <see langword="null"/> if none has that name.</summary>
+    /// <remarks>For showing where an entry sits in the file, as KeePassXC knows it. keypaste
+    /// addresses entries by name, never by this.</remarks>
+    public string? EntryUuid(EntryName name)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+
+        return _interop.EntryUuid(name);
+    }
 
     /// <summary>How many deleted-object tombstones the vault carries.</summary>
     /// <remarks>
@@ -657,6 +712,36 @@ public sealed class Vault : IDisposable
         return outcome;
     }
 
+    /// <summary>Copies groups of another vault into this one, all or none. Call <see cref="Save"/> to persist it.</summary>
+    /// <param name="source">The vault copied from; <see cref="ImportSource.ApplyTo"/> has checked every destination.</param>
+    /// <param name="pieces">What to copy, and where.</param>
+    /// <returns>What was copied.</returns>
+    internal ImportResult Import(ImportSource source, IReadOnlyList<ImportPiece> pieces)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(pieces);
+
+        var groupsBefore = 0;
+        VaultEdit edit = VaultEdit.Of();
+        var copied = Change(
+            () =>
+            {
+                groupsBefore = _interop.ReadGroupPaths().Count;
+                return _interop.ImportFrom(source.Interop, pieces);
+            },
+            names => edit = VaultEdit.Of(names));
+
+        var shared = _interop.Search(string.Empty)
+            .CountBy(match => match.Name)
+            .Where(pair => pair.Value > 1)
+            .Select(pair => pair.Key)
+            .ToHashSet();
+
+        return new ImportResult(
+            copied.Count, _interop.ReadGroupPaths().Count - groupsBefore, copied.Count(shared.Contains), edit);
+    }
+
     /// <summary>Writes a protected custom string onto an entry. A test seam; nothing else uses it.</summary>
     /// <remarks>
     /// Internal for the reason <see cref="AddGroupUnchecked"/> is: it exists so a fixture can hold
@@ -1197,6 +1282,7 @@ public sealed class Vault : IDisposable
             lock (_state)
             {
                 _stamp = stamp;
+                _savedAt = WrittenAt(Path);
                 _pending = false;
             }
 
@@ -1205,6 +1291,20 @@ public sealed class Vault : IDisposable
         finally
         {
             clock.Publish(succeeded);
+        }
+
+        Saved?.Invoke(this, EventArgs.Empty);
+    }
+
+    private static DateTimeOffset? WrittenAt(string path)
+    {
+        try
+        {
+            return File.Exists(path) ? new DateTimeOffset(File.GetLastWriteTimeUtc(path), TimeSpan.Zero) : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
         }
     }
 

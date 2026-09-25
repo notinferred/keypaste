@@ -1,5 +1,7 @@
 using Keypaste.Core;
 using Keypaste.Core.Approval;
+using Keypaste.Core.Audit;
+using Keypaste.Core.Clients;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Policy;
@@ -34,6 +36,7 @@ internal sealed class SessionHost : IDisposable
     private readonly AppVaultSession _session;
     private readonly string? _approverOverride;
     private readonly Func<IApprovalChannel> _approvals;
+    private readonly Action? _requestLock;
     private readonly Lock _gate = new();
     private Hosted? _hosted;
     private bool _disposed;
@@ -41,7 +44,12 @@ internal sealed class SessionHost : IDisposable
     /// <param name="session">The session whose vault is served.</param>
     /// <param name="approverOverride">The value of <c>KEYPASTE_APPROVER</c>, or null.</param>
     /// <param name="approvals">Where a person is asked, per unlock.</param>
-    internal SessionHost(AppVaultSession session, string? approverOverride, Func<IApprovalChannel> approvals)
+    /// <param name="requestLock">What <c>keypaste lock</c> runs, or null to refuse it.</param>
+    internal SessionHost(
+        AppVaultSession session,
+        string? approverOverride,
+        Func<IApprovalChannel> approvals,
+        Action? requestLock = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(approvals);
@@ -49,6 +57,7 @@ internal sealed class SessionHost : IDisposable
         _session = session;
         _approverOverride = approverOverride;
         _approvals = approvals;
+        _requestLock = requestLock;
         _session.Opened += OnOpened;
         _session.Locked += OnLocked;
 
@@ -96,6 +105,40 @@ internal sealed class SessionHost : IDisposable
         }
     }
 
+    /// <summary>The bridges attached to the live session that said who their client is.</summary>
+    internal IReadOnlyList<ConnectedClient> Clients
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _hosted?.Clients ?? [];
+            }
+        }
+    }
+
+    /// <summary>What the live session has released, newest first.</summary>
+    internal IReadOnlyList<ReleaseSeen> Released
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _hosted?.Released ?? [];
+            }
+        }
+    }
+
+    /// <summary>Ends every grant given to a bridge started with this label.</summary>
+    /// <param name="label">The raw label.</param>
+    internal void RevokeClient(string label)
+    {
+        lock (_gate)
+        {
+            _hosted?.RevokeClient(label);
+        }
+    }
+
     /// <summary>Ends one grant in the authority, so the next matching request is asked again.</summary>
     /// <param name="key">The grant, as <see cref="Activity"/> listed it.</param>
     internal void Revoke(GrantKey key)
@@ -106,12 +149,54 @@ internal sealed class SessionHost : IDisposable
         }
     }
 
+    /// <summary>Ends one timed grant a person gave a repeated <c>keypaste run --session</c>.</summary>
+    /// <param name="key">The grant, as <see cref="ApproverActivity.EnvGrants"/> listed it.</param>
+    internal void RevokeEnvGrant(string key)
+    {
+        lock (_gate)
+        {
+            _hosted?.RevokeEnvGrant(key);
+        }
+    }
+
     /// <summary>Ends every grant in the authority.</summary>
     internal void RevokeAll()
     {
         lock (_gate)
         {
             _hosted?.RevokeAll();
+        }
+    }
+
+    /// <summary>The grants in force, as <c>keypaste grants</c> lists them: names and ids, never a value.</summary>
+    internal IReadOnlyList<GrantSummary> Grants() => GrantSummary.Of(Activity);
+
+    /// <summary>Ends the grant with this id, as <c>keypaste grants revoke</c> names it.</summary>
+    /// <param name="id">The grant's id, from <see cref="Grants"/>.</param>
+    /// <returns>Whether a grant with that id was in force.</returns>
+    internal bool Revoke(string id)
+    {
+        ArgumentNullException.ThrowIfNull(id);
+
+        lock (_gate)
+        {
+            var activity = _hosted?.Activity ?? ApproverActivity.None;
+
+            if (activity.Grants.FirstOrDefault(
+                    inForce => string.Equals(GrantId.Of(inForce.Key), id, StringComparison.OrdinalIgnoreCase)) is { } grant)
+            {
+                _hosted!.Revoke(grant.Key);
+                return true;
+            }
+
+            if (activity.EnvGrants.FirstOrDefault(
+                    inForce => string.Equals(GrantId.OfEnv(inForce.Key), id, StringComparison.OrdinalIgnoreCase)) is { } envGrant)
+            {
+                _hosted!.RevokeEnvGrant(envGrant.Key);
+                return true;
+            }
+
+            return false;
         }
     }
 
@@ -147,7 +232,7 @@ internal sealed class SessionHost : IDisposable
                 return;
             }
 
-            var hosted = Hosted.TryStart(pipe, vault, _session, lifetime, _approvals(), out var failure);
+            var hosted = Hosted.TryStart(pipe, vault, _session, lifetime, _approvals(), _requestLock, out var failure);
             _hosted = hosted;
             Endpoint = hosted is null ? null : pipe;
             Failure = failure;
@@ -195,6 +280,8 @@ internal sealed class SessionHost : IDisposable
         private readonly ApprovalGate _approvals;
         private readonly AppVaultSession _session;
         private readonly GrantCache _grants;
+        private readonly EnvGrantCache _envGrants;
+        private readonly Lazy<AuditLog?> _audit;
         private readonly CancellationTokenSource _stop = new();
         private readonly Task _run;
 
@@ -203,13 +290,17 @@ internal sealed class SessionHost : IDisposable
             SessionAuthority authority,
             ApprovalGate approvals,
             AppVaultSession session,
-            GrantCache grants)
+            GrantCache grants,
+            EnvGrantCache envGrants,
+            Lazy<AuditLog?> audit)
         {
             _listener = listener;
             _authority = authority;
             _approvals = approvals;
             _session = session;
             _grants = grants;
+            _envGrants = envGrants;
+            _audit = audit;
 
             // An edit in the app withdraws the grants naming what it touched before it is saved (D-0318).
             _session.Edited += OnEdited;
@@ -221,7 +312,15 @@ internal sealed class SessionHost : IDisposable
 
         internal ApproverActivity Activity => _run.IsCompleted ? ApproverActivity.None : _authority.Activity;
 
+        internal IReadOnlyList<ConnectedClient> Clients => _run.IsCompleted ? [] : _authority.Clients;
+
+        internal IReadOnlyList<ReleaseSeen> Released => _authority.Released;
+
+        internal void RevokeClient(string label) => _authority.RevokeClient(label);
+
         internal void Revoke(GrantKey key) => _authority.Revoke(key);
+
+        internal void RevokeEnvGrant(string key) => _authority.RevokeEnvGrant(key);
 
         internal void RevokeAll() => _authority.RevokeAll();
 
@@ -231,11 +330,13 @@ internal sealed class SessionHost : IDisposable
             AppVaultSession session,
             SessionLifetime lifetime,
             IApprovalChannel channel,
+            Action? requestLock,
             out string? failure)
         {
             // Owned by the lifetime, which zeroes it when a lock ends it (D-0313).
 #pragma warning disable CA2000
             var grants = lifetime.Own(new GrantCache(session.Clock));
+            var envGrants = lifetime.Own(new EnvGrantCache(session.Clock));
 #pragma warning restore CA2000
             var approvals = new ApprovalGate(channel, session.Clock, ApprovalLimits.Default);
 
@@ -244,19 +345,27 @@ internal sealed class SessionHost : IDisposable
                 new VaultEntryNameLister(() => session.UnlockedFor(lifetime)),
                 approvals,
                 grants,
-                PolicyGate.None);
+                PolicyGate.None,
+                requiresLiveApproval: EnvProfileNames.RequiresLiveApproval,
+                clients: new ClientPolicySource(KeypasteHome.ClientsPath(session.Home)));
+
+            // Opened when a token first arrives, so an unlock creates no log; one that cannot be opened refuses every token.
+            var audit = new Lazy<AuditLog?>(() =>
+                AuditLog.TryOpen(KeypasteHome.AuditPath(session.Home), TimeProvider.System, out var opened, out _) ? opened : null);
 
             var authority = new SessionAuthority(
                 vault,
                 () => session.Lifetime,
                 handler,
-                new SessionEnvironments(approvals, session.UnlockedFor, session.Clock));
+                new SessionEnvironments(approvals, session.UnlockedFor, session.Clock, envGrants, Audit: () => audit.Value),
+                requestLock,
+                session.Clock);
 
             try
             {
                 var listener = new ApproverListener(pipe, authority);
                 failure = null;
-                return new Hosted(listener, authority, approvals, session, grants);
+                return new Hosted(listener, authority, approvals, session, grants, envGrants, audit);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
@@ -266,7 +375,11 @@ internal sealed class SessionHost : IDisposable
             }
         }
 
-        private void OnEdited(object? sender, VaultEdit edit) => _grants.RevokeEntries(edit);
+        private void OnEdited(object? sender, VaultEdit edit)
+        {
+            _grants.RevokeEntries(edit);
+            _envGrants.RevokeEntries(edit);
+        }
 
         public void Dispose()
         {
@@ -284,6 +397,10 @@ internal sealed class SessionHost : IDisposable
 
             _listener.Dispose();
             _approvals.Dispose();
+            if (_audit.IsValueCreated)
+            {
+                _audit.Value?.Dispose();
+            }
             _stop.Dispose();
         }
     }

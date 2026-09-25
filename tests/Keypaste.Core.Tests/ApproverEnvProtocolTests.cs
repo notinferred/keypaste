@@ -92,4 +92,99 @@ public sealed class ApproverEnvProtocolTests
         Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out EnvRequest? request));
         Assert.Null(request);
     }
+
+    [Fact]
+    public void ADevWholeSetRequest_IsTheOldBytes()
+    {
+        var request = new EnvRequest("billing", ["npm", "start"], "/d") { Vault = "/v", Session = "s" };
+
+        Assert.Equal(
+            """{"v":2,"kind":"env","vault":"/v","session":"s","project":"billing","command":["npm","start"],"directory":"/d"}""",
+            Encoding.UTF8.GetString(ApproverProtocol.Encode(request)));
+        Assert.Equal(ApproverMessageKind.Env, ApproverProtocol.KindOf(ApproverProtocol.Encode(request with { Profile = "dev" })));
+    }
+
+    [Fact]
+    public void AProfileRequest_IsEnvProfile()
+    {
+        var sent = new EnvRequest("billing", ["npm"], "/d") { Vault = "/v", Session = "s", Profile = "staging" };
+        var frame = ApproverProtocol.Encode(sent);
+
+        Assert.Equal(ApproverMessageKind.EnvProfile, ApproverProtocol.KindOf(frame));
+        Assert.True(ApproverProtocol.TryDecode(frame, out EnvRequest? request));
+        Assert.Equal("staging", request.Profile);
+        Assert.Null(request.Keys);
+        Assert.Null(request.FileLines);
+        Assert.Equal("billing", request.Project);
+    }
+
+    [Fact]
+    public void AKeysSubset_IsEnvProfile()
+    {
+        var sent = new EnvRequest("billing", ["npm"], "/d")
+        {
+            Vault = "/v",
+            Session = "s",
+            Keys = ["B", "A"],
+            FileLines = ["DB ← B", "PROXY=http://p"],
+        };
+        var frame = ApproverProtocol.Encode(sent);
+
+        Assert.Equal(ApproverMessageKind.EnvProfile, ApproverProtocol.KindOf(frame));
+        Assert.True(ApproverProtocol.TryDecode(frame, out EnvRequest? request));
+        Assert.Equal("dev", request.Profile);
+        Assert.Equal(["B", "A"], request.Keys);
+        Assert.Equal(["DB ← B", "PROXY=http://p"], request.FileLines);
+    }
+
+    [Fact]
+    public void AnEnvFrame_DecodesAsDev()
+    {
+        var frame = """{"v":2,"kind":"env","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d","profile":"prod","keys":["A"]}""";
+
+        Assert.True(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out EnvRequest? request));
+        Assert.Equal("dev", request.Profile);
+        Assert.Null(request.Keys);
+        Assert.Null(request.FileLines);
+    }
+
+    [Theory]
+    [InlineData("""{"v":2,"kind":"env-profile","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d"}""")]
+    [InlineData("""{"v":2,"kind":"env-profile","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d","profile":"Prod"}""")]
+    [InlineData("""{"v":2,"kind":"env-profile","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d","profile":1}""")]
+    [InlineData("""{"v":2,"kind":"env-profile","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d","profile":"dev","keys":["BAD-KEY"]}""")]
+    [InlineData("""{"v":2,"kind":"env-profile","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d","profile":"dev","keys":"A"}""")]
+    [InlineData("""{"v":2,"kind":"env-profile","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d","profile":"dev","file_lines":[1]}""")]
+    public void AnEnvProfileFrameWithABadProfileOrKey_IsRejected(string frame)
+    {
+        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out EnvRequest? request));
+        Assert.Null(request);
+    }
+
+    [Fact]
+    public void An_env_profile_frame_past_its_bounds_is_rejected()
+    {
+        var sent = new EnvRequest("p", ["npm"], "/d") { Keys = [.. Enumerable.Repeat("A", ApproverProtocol.MaximumEnvListLength + 1)] };
+        var longLine = new EnvRequest("p", ["npm"], "/d") { FileLines = [new string('x', ApproverProtocol.MaximumFileLineLength + 1)] };
+
+        Assert.False(ApproverProtocol.TryDecode(ApproverProtocol.Encode(sent), out EnvRequest? _));
+        Assert.False(ApproverProtocol.TryDecode(ApproverProtocol.Encode(longLine), out EnvRequest? _));
+    }
+
+    [Fact]
+    public void TheReplyCarriesTheProfile()
+    {
+        var released = new EnvReply(EnvResolved.Refused("billing", EnvOutcome.Declined, profile: "staging"), "no");
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(released), out EnvReply? refused));
+        Assert.Equal("staging", refused.Set.Profile);
+
+        var frame = """{"v":2,"kind":"env","project":"p","outcome":0,"reason":"","problems":[],"variables":[{"key":"A","value":"v"}]}""";
+        Assert.True(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out EnvReply? old));
+        Assert.Equal("dev", old.Set.Profile);
+
+        var huge = new EnvReply(EnvResolved.Refused("billing", EnvOutcome.Unusable, [new EnvProblem("A", new string('x', MessageFramer.MaximumPayloadBytes))], "prod"), string.Empty);
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(huge), out EnvReply? tooLarge));
+        Assert.Equal(EnvOutcome.TooLarge, tooLarge.Set.Outcome);
+        Assert.Equal("prod", tooLarge.Set.Profile);
+    }
 }

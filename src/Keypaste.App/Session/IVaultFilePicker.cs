@@ -44,4 +44,10 @@ internal interface IVaultFilePicker
 
     /// <summary>Asks which directory a project runs in. Null when the person cancelled.</summary>
     Task<string?> PickFolderAsync();
+
+    /// <summary>Asks where a <c>.env.keypaste</c> of references should go. Null when the person cancelled.</summary>
+    /// <param name="suggestedName">The file name the dialog starts with.</param>
+    /// <param name="directory">Where the dialog opens, when the project has a mapped directory.</param>
+    /// <remarks>The dialog asks before replacing a file; what it writes holds references and never a value.</remarks>
+    Task<string?> PickReferenceFileAsync(string suggestedName, string? directory) => Task.FromResult<string?>(null);
 }

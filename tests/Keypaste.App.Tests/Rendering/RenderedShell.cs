@@ -60,6 +60,9 @@ internal sealed class RenderedShell : IDisposable
             vault.Save();
         }
 
+        // The unlock screen this vault was opened from remembers it, so the lock screen offers it again.
+        Core.Recent.RecentVaults.Save(Core.Audit.KeypasteHome.RecentPath(_directory), [new Core.Recent.RecentVault(path, DateTimeOffset.UtcNow)]);
+
         Session = new AppVaultSession(new ManualClock());
 
         using (var master = TempVault.Secret(Master))
@@ -134,6 +137,10 @@ internal sealed class RenderedShell : IDisposable
             case "ReplacementEnvValue":
                 var replacing = OpenProject();
                 replacing.BeginReplace(replacing.Variables.Single(row => row.Key == "STRIPE_KEY"));
+                break;
+
+            case "SharePassphrase":
+                Show<SharingViewModel>(DestinationKind.Sharing).RequirePassphrase = true;
                 break;
 
             default:

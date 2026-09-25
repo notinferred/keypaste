@@ -1,0 +1,607 @@
+using System.Collections.ObjectModel;
+using System.Globalization;
+using Keypaste.App.Session;
+using Keypaste.Core;
+using Keypaste.Core.Import;
+
+namespace Keypaste.App.ViewModels;
+
+/// <summary>
+/// The KDBX import dialog: another KeePass file, unlocked, and where each of its groups lands in the
+/// open vault; or, with <see cref="KeepEditingInPlace"/>, that file opened as the vault instead.
+/// </summary>
+/// <remarks>
+/// <para>
+/// The file goes through the same <see cref="KdbxImport"/> as <c>keypaste import</c>, so both front
+/// ends copy the same file the same way. It is opened read-only and its key is held only by the
+/// <see cref="ImportSource"/>, which goes on cancel, on confirm and on lock.
+/// </para>
+/// <para>
+/// Nothing here names a value: rows carry group paths, titles' counts and problems, and the password
+/// typed for the file stays in a buffer that is cleared once it has been tried.
+/// </para>
+/// </remarks>
+internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisposable
+{
+    private readonly AppVaultSession _session;
+    private readonly KdbxProbe? _probe;
+    private readonly Action<string, string?> _openInPlace;
+    private readonly Action<string> _announce;
+    private readonly Func<Task<string?>>? _pickKeyfile;
+    private readonly Func<Task>? _chooseAnother;
+    private readonly string _fileName;
+    private readonly SecretBuffer _password = new();
+
+    private ImportSource? _source;
+    private string? _keyfilePath;
+    private string _into = string.Empty;
+    private string _message = string.Empty;
+    private bool _keepInPlace;
+    private bool _busy;
+    private bool _blocked;
+    private bool _disposed;
+
+    /// <summary>Reads the file's header and waits for its password.</summary>
+    /// <param name="session">The session whose vault an import copies into.</param>
+    /// <param name="path">The file to import.</param>
+    /// <param name="openInPlace">
+    /// Opens a file as the vault, as the unlock screen's open-another-vault flow does: the session
+    /// locks the vault it has and asks for this one's password.
+    /// </param>
+    /// <param name="announce">Says what an import did, once it is saved.</param>
+    /// <param name="pickKeyfile">Asks which keyfile opens the file; null where nothing can ask.</param>
+    /// <param name="chooseAnother">Asks for another file when this one cannot be read; null where nothing can ask.</param>
+    internal KdbxImportViewModel(
+        AppVaultSession session,
+        string path,
+        Action<string, string?> openInPlace,
+        Action<string> announce,
+        Func<Task<string?>>? pickKeyfile = null,
+        Func<Task>? chooseAnother = null)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(path);
+        ArgumentNullException.ThrowIfNull(openInPlace);
+        ArgumentNullException.ThrowIfNull(announce);
+
+        _session = session;
+        _openInPlace = openInPlace;
+        _announce = announce;
+        _pickKeyfile = pickKeyfile;
+        _chooseAnother = chooseAnother;
+        _fileName = System.IO.Path.GetFileName(path);
+
+        if (KdbxImport.TryProbe(path, out var probe, out var error))
+        {
+            _probe = probe;
+            _keyfilePath = probe.SiblingKeyfile;
+        }
+        else
+        {
+            _message = WhyUnreadable(path, error);
+        }
+
+        UnlockCommand = new AsyncRelayCommand(UnlockAsync, () => !_busy && _probe is not null && _source is null);
+        ConfirmCommand = new RelayCommand(Confirm, () => CanConfirm);
+        CancelCommand = new RelayCommand(Dispose);
+        ChooseKeyfileCommand = new AsyncRelayCommand(ChooseKeyfileAsync, () => !_busy && _source is null && _pickKeyfile is not null);
+        ClearKeyfileCommand = new RelayCommand(() => KeyfilePath = null, () => !_busy && _source is null && _keyfilePath is not null);
+        ChooseAnotherCommand = new AsyncRelayCommand(() => _chooseAnother!(), () => _chooseAnother is not null && !_disposed);
+
+        _session.Locked += OnLocked;
+    }
+
+    /// <summary>Raised once, when the dialog is done: cancelled, confirmed or dropped by a lock.</summary>
+    internal event EventHandler? Closed;
+
+    /// <summary>Whether the file's header was read, so there is something to unlock or open.</summary>
+    internal bool IsReadable => _probe is not null;
+
+    /// <summary>Whether the header could not be read: the card says so and only another file or Cancel is offered.</summary>
+    internal bool IsUnreadable => _probe is null;
+
+    /// <summary>Asks for another file in place of one that cannot be read.</summary>
+    internal AsyncRelayCommand ChooseAnotherCommand { get; }
+
+    internal bool CanChooseAnother => IsUnreadable && _chooseAnother is not null;
+
+    /// <summary>The file card's second line: the header before unlock, and what unlocked it after.</summary>
+    internal string CardDetail => _source is null
+        ? $"{Version} · {Kdf} · {Cipher}"
+        : $"{Version} · {Kdf} · {Entries(EntryCount)} · {KeyFactors}";
+
+    /// <summary>Whether a message shows below the dialog's body rather than under the password field or on the card.</summary>
+    internal bool HasTrailingMessage => HasMessage && !NeedsUnlock && IsReadable;
+
+    /// <summary>Whether the password and keyfile are still wanted before rows can show.</summary>
+    internal bool NeedsUnlock => !_disposed && _probe is not null && _source is null && !_keepInPlace;
+
+    /// <summary>Whether the confirm button shows: the file was read and nothing more is needed to unlock it.</summary>
+    internal bool ShowsConfirm => IsReadable && !NeedsUnlock;
+
+    /// <summary>Whether the group mapping shows: the file is unlocked and is being copied.</summary>
+    internal bool ShowsRows => _source is not null && !_keepInPlace;
+
+    /// <summary>The unlock button's words, which say when Argon2 is running.</summary>
+    internal string UnlockText => _busy ? "Unlocking…" : "Unlock";
+
+    /// <summary>What the file holds that no import copies, such as its recycle bin.</summary>
+    internal string SkippedText => _source is { Skipped.Count: > 0 } source
+        ? "Not copied: " + string.Join(", ", source.Skipped.Select(skip => $"{Show(skip.SourceGroup)} ({Entries(skip.EntryCount)})"))
+        : string.Empty;
+
+    internal bool HasSkipped => SkippedText.Length > 0;
+
+    /// <summary>What keeping the file in place does to the vault that is open now.</summary>
+    /// <remarks>
+    /// The file's key is not carried over from this dialog: the unlock screen asks for it, so after a
+    /// decrypt here the note says it will be asked for again.
+    /// </remarks>
+    internal string InPlaceNote => (_session.VaultPath, _source) switch
+    {
+        ({ } open, null) => $"{Show(System.IO.Path.GetFileName(open))} locks and {FileName} opens as the vault, asking for its password. Nothing is copied.",
+        ({ } open, _) => $"{Show(System.IO.Path.GetFileName(open))} locks and {FileName} opens as the vault; you type its password once more there. Nothing is copied.",
+        _ => $"{FileName} opens as the vault. Nothing is copied.",
+    };
+
+    internal bool HasMessage => _message.Length > 0;
+
+    /// <summary>The keyfile's name; the full path is a tooltip.</summary>
+    internal string KeyfileName => _keyfilePath is null ? string.Empty : Show(System.IO.Path.GetFileName(_keyfilePath));
+
+    internal bool HasKeyfile => _keyfilePath is not null;
+
+    /// <summary>Asks for the file's keyfile.</summary>
+    internal AsyncRelayCommand ChooseKeyfileCommand { get; }
+
+    /// <summary>Stops using a keyfile, including one found beside the file.</summary>
+    internal RelayCommand ClearKeyfileCommand { get; }
+
+    internal string FileName => Show(_probe?.FileName ?? _fileName);
+
+    internal string Version => _probe?.Version ?? string.Empty;
+
+    internal string Kdf => _probe?.Kdf ?? string.Empty;
+
+    internal string Cipher => _probe?.Cipher ?? string.Empty;
+
+    /// <summary>What unlocked the file, as the card words it: <c>key file + password</c>.</summary>
+    internal string KeyFactors => _source is null
+        ? string.Empty
+        : string.Join(" + ", _source.KeyFactors.Reverse());
+
+    /// <summary>How many entries a whole import copies.</summary>
+    internal int EntryCount => _source?.EntryCount ?? 0;
+
+    internal bool IsDecrypted => _source is not null;
+
+    /// <summary>Whether the file was read but not yet unlocked.</summary>
+    internal bool IsLocked => _probe is not null && _source is null;
+
+    /// <summary>The unlocked file, while there is one. A test seam for when its key goes.</summary>
+    internal ImportSource? Source => _source;
+
+    /// <summary>The file card's one line.</summary>
+    internal string CardText => _source is null
+        ? $"{FileName} · {Version} · {Kdf} · Locked"
+        : $"{FileName} · {Version} · {Kdf} · {Entries(EntryCount)} · {KeyFactors} · Decrypted";
+
+    /// <summary>How many characters of the file's password have been typed, which is all a screen may know.</summary>
+    internal int PasswordLength => _disposed ? 0 : _password.Length;
+
+    /// <summary>The file's keyfile, prefilled from one found beside it.</summary>
+    internal string? KeyfilePath
+    {
+        get => _keyfilePath;
+        set
+        {
+            if (Set(ref _keyfilePath, string.IsNullOrEmpty(value) ? null : value))
+            {
+                Raise(nameof(KeyfileName));
+                Raise(nameof(HasKeyfile));
+                ClearKeyfileCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    internal AsyncRelayCommand UnlockCommand { get; }
+
+    /// <summary>One row per group of the file, once it is unlocked.</summary>
+    internal ObservableCollection<ImportRowViewModel> Rows { get; } = [];
+
+    /// <summary>The group everything is copied under; changing it lays every row out again.</summary>
+    internal string Into
+    {
+        get => _into;
+        set
+        {
+            if (Set(ref _into, value ?? string.Empty) && _source is not null)
+            {
+                Lay(_into);
+            }
+        }
+    }
+
+    /// <summary>Whether confirming opens the file as the vault instead of copying it in.</summary>
+    internal bool KeepEditingInPlace
+    {
+        get => _keepInPlace;
+        set
+        {
+            if (Set(ref _keepInPlace, value))
+            {
+                Refresh();
+            }
+        }
+    }
+
+    /// <summary>What is wrong with the file or the import as a whole, or empty.</summary>
+    internal string Message
+    {
+        get => _message;
+        private set
+        {
+            if (Set(ref _message, value))
+            {
+                Raise(nameof(HasMessage));
+                Raise(nameof(HasTrailingMessage));
+            }
+        }
+    }
+
+    internal bool Busy
+    {
+        get => _busy;
+        private set
+        {
+            if (Set(ref _busy, value))
+            {
+                Raise(nameof(UnlockText));
+                UnlockCommand.RaiseCanExecuteChanged();
+                ChooseKeyfileCommand.RaiseCanExecuteChanged();
+                ClearKeyfileCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    /// <summary><c>Import 142 entries</c>, or <c>Open acme.kdbx</c> when keeping the file in place.</summary>
+    internal string ConfirmText => _keepInPlace
+        ? $"Open {FileName}"
+        : $"Import {Entries(Rows.Where(row => row.Include).Sum(row => row.Count))}";
+
+    /// <summary>False while any included row is blocked, or before there is anything to confirm.</summary>
+    internal bool CanConfirm => !_disposed && _probe is not null
+        && (_keepInPlace || (_source is not null && _session.IsUnlocked && !_blocked && Rows.Any(row => row.Include)));
+
+    internal RelayCommand ConfirmCommand { get; }
+
+    internal RelayCommand CancelCommand { get; }
+
+    internal void TypePassword(char c)
+    {
+        if (!_disposed)
+        {
+            _password.Append(c);
+            Raise(nameof(PasswordLength));
+        }
+    }
+
+    internal void BackspacePassword()
+    {
+        if (!_disposed)
+        {
+            _password.Backspace();
+            Raise(nameof(PasswordLength));
+        }
+    }
+
+    internal void ClearPassword()
+    {
+        if (!_disposed)
+        {
+            _password.Clear();
+            Raise(nameof(PasswordLength));
+        }
+    }
+
+    void ISecretSink.Type(char value) => TypePassword(value);
+
+    void ISecretSink.Backspace() => BackspacePassword();
+
+    void ISecretSink.Clear() => ClearPassword();
+
+    // A master password is typed, never pasted, as on the unlock screen.
+    Task ISecretSink.Paste() => Task.CompletedTask;
+
+    /// <summary>Unlocks the file off the UI thread and lays out its rows.</summary>
+    /// <remarks>Internal so a test can await what <see cref="UnlockCommand"/> starts.</remarks>
+    internal async Task UnlockAsync()
+    {
+        if (_disposed || _probe is not { } probe || _source is not null)
+        {
+            return;
+        }
+
+        Busy = true;
+        Message = string.Empty;
+        var keyfile = _keyfilePath;
+
+        try
+        {
+            var opened = await Task.Run(() => KdbxImport.Open(probe.Path, _password.Value, keyfile)).ConfigureAwait(true);
+
+            if (_disposed || !_session.IsUnlocked)
+            {
+                opened.Dispose();
+                return;
+            }
+
+            _source = opened;
+            Lay(null);
+        }
+        catch (InvalidMasterPasswordException)
+        {
+            Message = keyfile is null
+                ? $"That password does not open {FileName}."
+                : $"That password and key file do not open {FileName}.";
+        }
+        catch (VaultException ex)
+        {
+            Message = DisplayTextSanitizer.Sanitize(ex.Message).Text;
+        }
+        finally
+        {
+            ClearPassword();
+            Busy = false;
+        }
+    }
+
+    /// <summary>Closes the file and forgets its password and rows.</summary>
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _session.Locked -= OnLocked;
+        _source?.Dispose();
+        _source = null;
+        _password.Dispose();
+        Rows.Clear();
+        Refresh();
+        Closed?.Invoke(this, EventArgs.Empty);
+    }
+
+    private async Task ChooseKeyfileAsync()
+    {
+        if (_pickKeyfile is null || await _pickKeyfile().ConfigureAwait(true) is not { } picked || _disposed)
+        {
+            return;
+        }
+
+        var full = System.IO.Path.GetFullPath(picked);
+        var inspection = VaultKeyfile.Inspect(full);
+
+        if (!inspection.Accepted)
+        {
+            Message = UnlockViewModel.ExplainKeyfile(inspection.Outcome);
+            return;
+        }
+
+        Message = string.Empty;
+        KeyfilePath = full;
+    }
+
+    private void Confirm()
+    {
+        if (!CanConfirm || _probe is not { } probe)
+        {
+            return;
+        }
+
+        if (_keepInPlace)
+        {
+            var keyfile = _keyfilePath;
+            Dispose();
+            _openInPlace(probe.Path, keyfile);
+            return;
+        }
+
+        if (_source is not { } source || _session.Unlocked is not { } vault)
+        {
+            return;
+        }
+
+        var plan = Plan();
+        ImportResult? applied = null;
+
+        try
+        {
+            applied = source.ApplyTo(vault, plan);
+            vault.Save();
+            _announce($"Imported {Entries(applied.Entries)} from {FileName}");
+        }
+        catch (VaultChangedOnDiskException)
+        {
+            const string changed = "Something else changed this vault since you opened it. Lock and unlock to see it, then import again.";
+
+            if (applied is null)
+            {
+                Message = changed;
+                return;
+            }
+
+            _announce(changed);
+        }
+        catch (VaultException ex) when (applied is null)
+        {
+            Message = DisplayTextSanitizer.Sanitize(ex.Message).Text;
+            Check();
+            return;
+        }
+        catch (VaultException ex)
+        {
+            // The copies are already in the open vault, so the dialog closes rather than offer a
+            // second Confirm that would copy them again.
+            _announce($"Copied {Entries(applied!.Entries)} from {FileName}, but they are not saved: {DisplayTextSanitizer.Sanitize(ex.Message).Text}");
+        }
+
+        Dispose();
+    }
+
+    /// <summary>Lays every row out as the default plan puts it, under <paramref name="into"/> or the file's name.</summary>
+    private void Lay(string? into)
+    {
+        if (_source is null || _session.Unlocked is not { } vault)
+        {
+            return;
+        }
+
+        var plan = _source.DefaultPlan(vault, into);
+        _into = plan.Into;
+        Raise(nameof(Into));
+
+        Rows.Clear();
+        foreach (var row in plan.Rows)
+        {
+            Rows.Add(new ImportRowViewModel(row, Check));
+        }
+
+        Check();
+    }
+
+    private ImportPlan Plan() => new([.. Rows.Select(row => row.Row)], _into);
+
+    /// <summary>Checks the rows as they stand and says what blocks.</summary>
+    private void Check()
+    {
+        if (_source is not null && _session.Unlocked is { } vault)
+        {
+            var problems = _source.Check(vault, Plan());
+
+            foreach (var row in Rows)
+            {
+                var own = problems.Where(problem => problem.Index == row.Row.Index).ToList();
+                var blocks = own.Any(problem => problem.Blocks);
+                var text = string.Join("; ", own.Select(problem => DisplayTextSanitizer.Sanitize(problem.Message).Text));
+                row.Show(blocks ? $"{text}. Type another destination or untick {row.SourceGroup}." : text, blocks);
+            }
+
+            _blocked = problems.Any(problem => problem.Blocks);
+            Message = string.Join(" ", problems.Where(problem => problem.Index < 0)
+                .Select(problem => DisplayTextSanitizer.Sanitize(problem.Message).Text));
+        }
+
+        Refresh();
+    }
+
+    private void Refresh()
+    {
+        Raise(nameof(NeedsUnlock));
+        Raise(nameof(ShowsConfirm));
+        Raise(nameof(HasTrailingMessage));
+        Raise(nameof(InPlaceNote));
+        Raise(nameof(ShowsRows));
+        Raise(nameof(CardDetail));
+        Raise(nameof(SkippedText));
+        Raise(nameof(HasSkipped));
+        Raise(nameof(IsDecrypted));
+        Raise(nameof(IsLocked));
+        Raise(nameof(EntryCount));
+        Raise(nameof(KeyFactors));
+        Raise(nameof(CardText));
+        Raise(nameof(ConfirmText));
+        Raise(nameof(CanConfirm));
+        UnlockCommand.RaiseCanExecuteChanged();
+        ConfirmCommand.RaiseCanExecuteChanged();
+        ChooseKeyfileCommand.RaiseCanExecuteChanged();
+        ClearKeyfileCommand.RaiseCanExecuteChanged();
+        ChooseAnotherCommand.RaiseCanExecuteChanged();
+    }
+
+    /// <summary>The probe's refusal about this file, without the directory it names.</summary>
+    private static string WhyUnreadable(string path, string error)
+    {
+        var quoted = $"'{System.IO.Path.GetFullPath(path)}' ";
+        var why = error.StartsWith(quoted, StringComparison.Ordinal) ? "This file " + error[quoted.Length..] : error;
+        return DisplayTextSanitizer.Sanitize(why).Text;
+    }
+
+    private void OnLocked(object? sender, VaultLockReason reason) => Dispose();
+
+    private static string Show(string? name) => name is null ? string.Empty : EntryNameSanitizer.SanitizePath(name).Text;
+
+    private static string Entries(int count) =>
+        count == 1 ? "1 entry" : string.Create(CultureInfo.InvariantCulture, $"{count} entries");
+}
+
+/// <summary>One group of the file being imported: where it lands, whether it is copied, and what is wrong.</summary>
+internal sealed class ImportRowViewModel : ObservableObject
+{
+    private readonly Action _changed;
+    private ImportRow _row;
+    private string _problem = string.Empty;
+    private bool _blocks;
+
+    internal ImportRowViewModel(ImportRow row, Action changed)
+    {
+        _row = row;
+        _changed = changed;
+    }
+
+    /// <summary>The row as the plan will copy it.</summary>
+    internal ImportRow Row => _row;
+
+    /// <summary>The group in the file, or <c>(top level)</c> for the entries in its root.</summary>
+    internal string SourceGroup => _row.IsRootEntries ? "(top level)" : EntryNameSanitizer.SanitizePath(_row.SourceGroup).Text;
+
+    internal int Count => _row.EntryCount;
+
+    internal string CountText => Count.ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>The group path it lands at in the open vault.</summary>
+    internal string Destination
+    {
+        get => _row.Destination;
+        set => Change(_row with { Destination = value ?? string.Empty });
+    }
+
+    internal bool Include
+    {
+        get => _row.Include;
+        set => Change(_row with { Include = value });
+    }
+
+    /// <summary>Why this row cannot be copied as it stands, or a note about it; empty when there is nothing to say.</summary>
+    internal string Problem => _problem;
+
+    /// <summary>Whether <see cref="Problem"/> stops the import.</summary>
+    internal bool Blocks => _blocks;
+
+    internal bool HasProblem => _problem.Length > 0;
+
+    internal void Show(string problem, bool blocks)
+    {
+        if (Set(ref _problem, problem, nameof(Problem)))
+        {
+            Raise(nameof(HasProblem));
+        }
+
+        Set(ref _blocks, blocks, nameof(Blocks));
+    }
+
+    private void Change(ImportRow row)
+    {
+        if (row == _row)
+        {
+            return;
+        }
+
+        _row = row;
+        Raise(nameof(Destination));
+        Raise(nameof(Include));
+        _changed();
+    }
+}

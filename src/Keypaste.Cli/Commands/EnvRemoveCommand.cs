@@ -2,7 +2,7 @@ using Keypaste.Core;
 
 namespace Keypaste.Cli.Commands;
 
-/// <summary>Removes one variable: <c>keypaste env rm &lt;project&gt; &lt;KEY&gt;</c>.</summary>
+/// <summary>Removes one variable: <c>keypaste env rm &lt;project&gt; &lt;KEY&gt; [-p &lt;profile&gt;]</c>.</summary>
 /// <remarks>
 /// The variable is addressed by its group and its title, never by the two joined, so this verb
 /// cannot reach an entry outside the project's group however it is called.
@@ -14,6 +14,7 @@ internal static class EnvRemoveCommand
         new("vault", TakesValue: true),
         new("keyfile", TakesValue: true),
         new("yes", TakesValue: false),
+        EnvCommand.ProfileOption,
     ];
 
     internal static int Execute(string[] args, CliContext context)
@@ -26,8 +27,14 @@ internal static class EnvRemoveCommand
 
         if (line.WantsHelp)
         {
-            context.Stdout.WriteLine("usage: keypaste env rm <project> <KEY> [--yes]");
+            context.Stdout.WriteLine("usage: keypaste env rm <project> <KEY> [-p <profile>] [--yes]");
             return CliApp.ExitSuccess;
+        }
+
+        if (!EnvCommand.TryProfile(line, out var profile, out var profileError))
+        {
+            context.Stderr.WriteLine($"keypaste env rm: {profileError}");
+            return CliApp.ExitUsageError;
         }
 
         if (line.Operands.Count != 2)
@@ -64,12 +71,20 @@ internal static class EnvRemoveCommand
                 return CliApp.ExitNotFound;
             }
 
-            var name = new EntryName(EnvConvention.GroupPath(project), key);
-            var entryPath = EnvConvention.EntryPath(project, key);
+            if (!store.ProfileExists(project, profile))
+            {
+                context.Stderr.WriteLine($"keypaste env rm: '{project}' has no '{profile}' profile");
+                return CliApp.ExitNotFound;
+            }
+
+            var name = new EntryName(EnvProfileNames.GroupPath(project, profile), key);
+            var entryPath = EnvCommand.EntryPath(project, profile, key);
 
             if (vault.Find(name) is null)
             {
-                context.Stderr.WriteLine($"keypaste env rm: '{project}' has no variable '{key}'");
+                context.Stderr.WriteLine(string.Equals(profile, EnvProfileNames.Default, StringComparison.Ordinal)
+                    ? $"keypaste env rm: '{project}' has no variable '{key}'"
+                    : $"keypaste env rm: '{project}' has no variable '{key}' in its '{profile}' profile");
                 return CliApp.ExitNotFound;
             }
 
@@ -87,7 +102,7 @@ internal static class EnvRemoveCommand
 
             // Nothing removed means nothing to save. Something wrote to the file between the
             // check above and here, and the honest answer is that this run did not do it.
-            var outcome = store.Remove(project, key);
+            var outcome = store.Remove(project, profile, key);
             if (outcome == DeletionOutcome.NothingMatched)
             {
                 context.Stderr.WriteLine(

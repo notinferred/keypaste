@@ -3,7 +3,8 @@ namespace Keypaste.Cli;
 /// <summary>Declares one option a verb accepts.</summary>
 /// <param name="Name">The long name, without the leading dashes.</param>
 /// <param name="TakesValue">Whether the option consumes a following value.</param>
-internal readonly record struct OptionSpec(string Name, bool TakesValue);
+/// <param name="Short">The one-letter alias, written <c>-x</c>, or <c>'\0'</c> for none.</param>
+internal readonly record struct OptionSpec(string Name, bool TakesValue, char Short = '\0');
 
 /// <summary>
 /// A hand-rolled parser for one verb's arguments.
@@ -12,8 +13,8 @@ internal readonly record struct OptionSpec(string Name, bool TakesValue);
 /// Hand-rolled because <c>System.CommandLine</c> is a NuGet package and <c>src/</c> carries no
 /// dependencies (DECISIONS.md D-0004). It handles exactly what keypaste's five verbs need —
 /// long options with or without values, <c>--</c>, and positional operands — and deliberately
-/// does not grow into a framework. Short options other than <c>-h</c> are not supported, so
-/// there is no bundling to get wrong.
+/// does not grow into a framework. Short options are declared per verb, never bundled: <c>-x</c>
+/// is its long option's alias, and an undeclared one stays an operand.
 /// </remarks>
 internal sealed class CommandLine
 {
@@ -77,6 +78,11 @@ internal sealed class CommandLine
             {
                 options["help"] = null;
                 continue;
+            }
+
+            if (token.Length == 2 && token[0] == '-' && token[1] != '-' && FindShort(spec, token[1]) is { } alias)
+            {
+                token = "--" + alias.Name;
             }
 
             if (!token.StartsWith("--", StringComparison.Ordinal))
@@ -145,6 +151,19 @@ internal sealed class CommandLine
         foreach (var candidate in spec)
         {
             if (string.Equals(candidate.Name, name, StringComparison.Ordinal))
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private static OptionSpec? FindShort(IReadOnlyList<OptionSpec> spec, char letter)
+    {
+        foreach (var candidate in spec)
+        {
+            if (candidate.Short != '\0' && candidate.Short == letter)
             {
                 return candidate;
             }

@@ -369,6 +369,14 @@ public sealed class LogVerbTests : IDisposable
 
         _cli.AssertExit(CliApp.ExitTamperDetected, _cli.Run("log", "verify"));
         Assert.Contains("keypaste never writes one there", _cli.Out, StringComparison.Ordinal);
+
+        _cli.Stdout.GetStringBuilder().Clear();
+        _cli.AssertExit(CliApp.ExitTamperDetected, _cli.Run("log", "--json"));
+        using var document = System.Text.Json.JsonDocument.Parse(_cli.Out);
+        var records = document.RootElement.EnumerateArray().ToList();
+        var forged = Assert.Single(records, record => record.GetProperty("entry").GetString() == "env/prod/PAYROLL_DB");
+        Assert.False(forged.GetProperty("verified").GetBoolean());
+        Assert.True(records[0].GetProperty("verified").GetBoolean());
     }
 
     /// <summary>
@@ -424,5 +432,99 @@ public sealed class LogVerbTests : IDisposable
         Assert.Contains("keypaste log verify", _cli.Out, StringComparison.Ordinal);
         Assert.Contains("--denied", _cli.Out, StringComparison.Ordinal);
         Assert.Contains("A broken chain exits 5", _cli.Out, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Log_Json_FollowsTheFilters()
+    {
+        Seed();
+
+        _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("log", "--denied", "--json"));
+
+        Assert.Single(_cli.Out.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries));
+        using var document = System.Text.Json.JsonDocument.Parse(_cli.Out);
+        var record = Assert.Single(document.RootElement.EnumerateArray());
+        Assert.Equal(2, record.GetProperty("line").GetInt32());
+        Assert.StartsWith("2026-07-26T14:00:00", record.GetProperty("time").GetString(), StringComparison.Ordinal);
+        Assert.Equal("request_credential", record.GetProperty("tool").GetString());
+        Assert.Equal("claude-desktop", record.GetProperty("label").GetString());
+        Assert.Equal("env/dev/DB_URL", record.GetProperty("entry").GetString());
+        Assert.Equal("password", record.GetProperty("field").GetString());
+        Assert.Equal("denied", record.GetProperty("decision").GetString());
+        Assert.Equal("nobody was asked", record.GetProperty("reason").GetString());
+        Assert.True(record.TryGetProperty("method", out _));
+        Assert.True(record.TryGetProperty("session", out _));
+        Assert.True(record.GetProperty("verified").GetBoolean());
+
+        _cli.Stdout.GetStringBuilder().Clear();
+        _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("log", "--client", "nobody-like-this", "--json"));
+        Assert.Equal("[]" + Environment.NewLine, _cli.Out);
+    }
+
+    [Fact]
+    public void Log_Json_CarriesEntriesCommandAndVault()
+    {
+        Write(
+            new DateTimeOffset(2026, 7, 26, 14, 0, 0, TimeSpan.Zero),
+            Record("claude-code", "env/acme", AuditDecision.Granted, AuditMethod.Prompt) with
+            {
+                Tool = "run",
+                Vault = "0123456789abcdef",
+                Entries = ["env/acme/DATABASE_URL", "env/acme/TOKEN"],
+                Command = "npm run migrate",
+            },
+            Record("claude-desktop", "env/dev/DB_URL", AuditDecision.Denied, AuditMethod.OutOfScope));
+
+        _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("log", "--json"));
+
+        using var document = System.Text.Json.JsonDocument.Parse(_cli.Out);
+        var records = document.RootElement.EnumerateArray().ToList();
+        Assert.Equal("0123456789abcdef", records[0].GetProperty("vault").GetString());
+        Assert.Equal(["env/acme/DATABASE_URL", "env/acme/TOKEN"], records[0].GetProperty("entries").EnumerateArray().Select(entry => entry.GetString()));
+        Assert.Equal("npm run migrate", records[0].GetProperty("command").GetString());
+        Assert.Equal(string.Empty, records[1].GetProperty("vault").GetString());
+        Assert.Equal(0, records[1].GetProperty("entries").GetArrayLength());
+    }
+
+    [Fact]
+    public void Log_Json_SaysHowLongAPersonsGrantLasts()
+    {
+        Write(
+            new DateTimeOffset(2026, 7, 26, 14, 0, 0, TimeSpan.Zero),
+            Record("claude-code", "env/dev/STRIPE_KEY", AuditDecision.Granted, AuditMethod.Prompt) with { GrantedSeconds = 3600 },
+            Record("claude-desktop", "env/dev/DB_URL", AuditDecision.Denied, AuditMethod.OutOfScope));
+
+        _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("log", "--json"));
+
+        using var document = System.Text.Json.JsonDocument.Parse(_cli.Out);
+        var records = document.RootElement.EnumerateArray().ToList();
+        Assert.Equal(3600, records[0].GetProperty("granted_seconds").GetInt32());
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, records[1].GetProperty("granted_seconds").ValueKind);
+    }
+
+    [Fact]
+    public void Log_Json_WithNoLogYet_IsAnEmptyArray()
+    {
+        _cli.Environment[KeypasteHome.EnvironmentVariable] = Path.Combine(_cli.Directory, ".keypaste");
+
+        _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("log", "--json"));
+
+        Assert.Equal("[]" + Environment.NewLine, _cli.Out);
+    }
+
+    /// <summary>The table the verify-demo pages paste: its header row and its two-space gutter.</summary>
+    [Fact]
+    public void Log_Table_IsUnchanged()
+    {
+        Write(
+            new DateTimeOffset(2026, 7, 27, 9, 57, 42, TimeSpan.Zero),
+            Record("claude-code", "env/demo/STRIPE_KEY", AuditDecision.Granted, AuditMethod.Prompt));
+
+        _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("log"));
+
+        var lines = _cli.Out.Split(Environment.NewLine);
+        Assert.Contains("  time (UTC)           client       entry                decision  method", lines);
+        Assert.Contains("  2026-07-27 09:57:42  claude-code  env/demo/STRIPE_KEY  granted   prompt", lines);
+        Assert.DoesNotContain("\u001b", _cli.Out, StringComparison.Ordinal);
     }
 }

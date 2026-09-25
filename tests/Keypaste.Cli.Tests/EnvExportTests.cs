@@ -603,6 +603,103 @@ public sealed class EnvExportTests
         Assert.Single(harness.ConsoleStyle.Alarms);
     }
 
+    [Fact]
+    public void References_ByDefault_ToStdout()
+    {
+        using var harness = SeededWithTwo();
+
+        harness.Prompt.Enqueue(Master);
+        var exit = harness.Run("env", "export", "billing", "--vault", harness.VaultPath);
+
+        harness.AssertExit(CliApp.ExitSuccess, exit);
+        Assert.Equal(
+            EnvReferenceFile.Header() + "API_KEY=kp://billing/dev/API_KEY\nPORT=kp://billing/dev/PORT\n",
+            harness.Out);
+        Assert.Equal("  ✓ wrote 2 references · 0 values · safe to commit", harness.Err.TrimEnd());
+        Assert.Empty(harness.ConsoleStyle.Alarms);
+        Assert.DoesNotContain("sk_live_secret", harness.Out + harness.Err, StringComparison.Ordinal);
+        Assert.DoesNotContain("8080", harness.Out + harness.Err, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void References_ToAFile_RefusesOverwriteWithoutForce()
+    {
+        using var harness = SeededWithTwo();
+        var target = Target(harness, EnvReferenceFile.FileName);
+        File.WriteAllText(target, "keep me\n");
+
+        var refused = harness.Run("env", "export", "billing", target, "--vault", harness.VaultPath);
+
+        harness.AssertExit(CliApp.ExitUsageError, refused);
+        Assert.Contains("pass --force", harness.Err, StringComparison.Ordinal);
+        Assert.Empty(harness.Prompt.PromptsSeen);
+        Assert.Equal("keep me\n", File.ReadAllText(target));
+
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run("env", "export", "billing", target, "--force", "--vault", harness.VaultPath));
+
+        var written = File.ReadAllText(target);
+        Assert.Contains("API_KEY=kp://billing/dev/API_KEY", written, StringComparison.Ordinal);
+        Assert.DoesNotContain("sk_live_secret", written, StringComparison.Ordinal);
+        Assert.Empty(harness.Out);
+
+        Assert.Equal(CliApp.ExitUsageError, harness.Run("env", "export", "billing", harness.VaultPath, "--force", "--vault", harness.VaultPath));
+    }
+
+    [Fact]
+    public void References_ToAFile_NameThatFileInTheirHeader()
+    {
+        using var harness = SeededWithTwo();
+        var target = Target(harness, "refs.env");
+
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run("env", "export", "billing", target, "--vault", harness.VaultPath));
+
+        var written = File.ReadAllText(target);
+        Assert.Contains("# `keypaste run --env-file refs.env -- <command>` resolves them.", written, StringComparison.Ordinal);
+        Assert.DoesNotContain(EnvReferenceFile.FileName, written, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Dotenv_StillWritesPlaintext_WithTheAlarm()
+    {
+        using var harness = SeededWithTwo();
+
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run("env", "export", "billing", "--dotenv", "--stdout", "--vault", harness.VaultPath));
+
+        Assert.Contains("API_KEY=sk_live_secret", harness.Out, StringComparison.Ordinal);
+        Assert.Single(harness.ConsoleStyle.Alarms);
+        Assert.DoesNotContain("kp://", harness.Out, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Dotenv_WithProfile()
+    {
+        using var harness = SeededWithTwo();
+        using (var vault = Vault.Open(harness.VaultPath, Master))
+        {
+            new EnvStore(vault).TrySet("billing", "staging", "API_KEY", "sk_staging_secret", out _);
+            vault.Save();
+        }
+
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run("env", "export", "billing", "-p", "staging", "--dotenv", "--stdout", "--vault", harness.VaultPath));
+
+        Assert.Contains("API_KEY=sk_staging_secret", harness.Out, StringComparison.Ordinal);
+        Assert.DoesNotContain("sk_live_secret", harness.Out, StringComparison.Ordinal);
+        Assert.Contains("env/billing/staging has 1 value", harness.Err, StringComparison.Ordinal);
+
+        harness.Stdout.GetStringBuilder().Clear();
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run("env", "export", "billing", "-p", "staging", "--vault", harness.VaultPath));
+        Assert.EndsWith("API_KEY=kp://billing/staging/API_KEY\n", harness.Out, StringComparison.Ordinal);
+
+        harness.Prompt.Enqueue(Master);
+        harness.AssertExit(CliApp.ExitNotFound, harness.Run("env", "export", "billing", "-p", "qa", "--vault", harness.VaultPath));
+        Assert.Contains("'billing' has no 'qa' profile", harness.Err, StringComparison.Ordinal);
+    }
+
     /// <summary>
     /// Creates a link, or skips. Windows needs Developer Mode or an elevated shell, and a machine
     /// that cannot make one must say so rather than pass a test it never ran.

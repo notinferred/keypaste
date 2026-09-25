@@ -130,7 +130,7 @@ public sealed class StartupSettingsTests
         using (var session = Compose(fixture, new ManualClock()))
         {
             Assert.Equal(TimeSpan.FromSeconds(AppSettings.Default.IdleTimeoutSeconds), session.IdleTimeout);
-            Assert.Equal(ThemeVariant.Default, Current.RequestedThemeVariant);
+            Assert.Equal(ThemeVariant.Dark, Current.RequestedThemeVariant);
         }
 
         Assert.Equal(original, File.ReadAllBytes(path));

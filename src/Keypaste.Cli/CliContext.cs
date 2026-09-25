@@ -48,11 +48,14 @@ internal sealed class CliContext
     /// </remarks>
     internal required IProcessRunner ProcessRunner { get; init; }
 
-    /// <summary>How a warning that must not be missed reaches the terminal.</summary>
+    /// <summary>How output is coloured and marked on a terminal, and left plain everywhere else.</summary>
     internal required IConsoleStyle ConsoleStyle { get; init; }
 
     /// <summary>What time it is, for the commands that take a relative span.</summary>
     internal TimeProvider Clock { get; init; } = TimeProvider.System;
+
+    /// <summary>The directory the command was started in, which <c>projects.json</c> maps to a project.</summary>
+    internal string WorkingDirectory { get; init; } = System.Environment.CurrentDirectory;
 
     /// <summary>Builds the context the real program uses.</summary>
     /// <remarks>
@@ -75,7 +78,7 @@ internal sealed class CliContext
             Environment = environment,
             ProcessLauncher = new SystemProcessLauncher(),
             ProcessRunner = processRunner,
-            ConsoleStyle = new SystemConsoleStyle(environment),
+            ConsoleStyle = new SystemConsoleStyle(environment, stdout, stderr),
         };
     }
 }

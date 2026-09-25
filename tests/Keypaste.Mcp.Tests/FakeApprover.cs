@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
 
@@ -32,6 +33,7 @@ internal sealed class FakeApprover : IAsyncDisposable
     private ApproverListener? _listener;
     private Task? _running;
     private int _attaches;
+    private int _runs;
     private bool _disposed;
 
     internal FakeApprover()
@@ -69,6 +71,18 @@ internal sealed class FakeApprover : IAsyncDisposable
 
     /// <summary>Every request that reached the approver, in the order it arrived.</summary>
     internal ConcurrentBag<CredentialRequest> Received { get; } = [];
+
+    /// <summary>Every attach that reached the approver, with the identity its bridge sent.</summary>
+    internal ConcurrentQueue<AttachRequest> Attached { get; } = [];
+
+    /// <summary>How the approver answers a run; null answers as an owner from before runs existed.</summary>
+    internal Func<RunRequest, RunReply>? RunAnswer { get; set; }
+
+    /// <summary>Set to end the connection without answering the next run, after running this action.</summary>
+    internal Action? DropRunOnce { get; set; }
+
+    /// <summary>How many runs reached the approver.</summary>
+    internal int Runs => Volatile.Read(ref _runs);
 
     /// <summary>Set to make the approver park on a request, so a timeout or a race is reachable.</summary>
     internal TaskCompletionSource Held { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -127,6 +141,50 @@ internal sealed class FakeApprover : IAsyncDisposable
         return Start();
     }
 
+    /// <summary>A run reply as an owner would send it, built through the wire so no internal constructor is needed.</summary>
+    internal static RunReply RunReplyOf(EnvOutcome outcome, AuditMethod method, IReadOnlyList<(string Key, string Value)> variables)
+    {
+        using var buffer = new MemoryStream();
+
+        using (var writer = new System.Text.Json.Utf8JsonWriter(buffer))
+        {
+            writer.WriteStartObject();
+            writer.WriteNumber("v", ApproverProtocol.Version);
+            writer.WriteString("kind", "run");
+            writer.WriteString("project", "acme-api");
+            writer.WriteString("profile", "dev");
+            writer.WriteNumber("outcome", (int)outcome);
+            writer.WriteString("reason", "the fake approver answered");
+            writer.WriteNumber("method", (int)method);
+            writer.WriteNumber("granted_seconds", 0);
+            writer.WriteStartArray("entries");
+            writer.WriteEndArray();
+            writer.WriteString("session", "fake-session");
+            writer.WriteStartArray("problems");
+            writer.WriteEndArray();
+
+            if (outcome == EnvOutcome.Resolved)
+            {
+                writer.WriteStartArray("variables");
+                foreach (var (key, value) in variables)
+                {
+                    writer.WriteStartObject();
+                    writer.WriteString("key", key);
+                    writer.WriteString("value", value);
+                    writer.WriteEndObject();
+                }
+
+                writer.WriteEndArray();
+            }
+
+            writer.WriteEndObject();
+        }
+
+        return ApproverProtocol.TryDecode(buffer.ToArray(), out RunReply? reply)
+            ? reply
+            : throw new InvalidOperationException("the fake run reply did not decode");
+    }
+
     internal static CredentialReply Denial(AuditMethod method, string reason) => new()
     {
         Decision = AuditDecision.Denied,
@@ -168,6 +226,7 @@ internal sealed class FakeApprover : IAsyncDisposable
         public ValueTask<AttachReply> AttachAsync(AttachRequest request, string connectionId, CancellationToken cancellationToken)
         {
             Interlocked.Increment(ref approver._attaches);
+            approver.Attached.Enqueue(request);
             return ValueTask.FromResult(approver.AttachRefusal ?? AttachReply.To(approver.Session));
         }
 
@@ -199,6 +258,21 @@ internal sealed class FakeApprover : IAsyncDisposable
 
         public ValueTask<EnvReply> ReleaseEnvAsync(EnvRequest request, string connectionId, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
+
+        public ValueTask<RunReply> ReleaseRunAsync(RunRequest request, string connectionId, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref approver._runs);
+
+            if (approver.DropRunOnce is { } drop)
+            {
+                approver.DropRunOnce = null;
+                drop();
+                throw new IOException("the fake approver dropped this run unanswered");
+            }
+
+            return ValueTask.FromResult(approver.RunAnswer?.Invoke(request)
+                ?? RunReplyOf(EnvOutcome.NoSession, AuditMethod.NoSession, []));
+        }
 
         public void Disconnected(string connectionId)
         {

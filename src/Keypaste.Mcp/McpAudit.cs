@@ -1,5 +1,6 @@
 using Keypaste.Core;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Ipc;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
@@ -49,6 +50,22 @@ internal static class McpAudit
             Clean(declared?.Name),
             Clean(declared?.Version),
             Clean(options.ClientLabel));
+    }
+
+    /// <summary>What this bridge tells the owner about its client when it attaches: display and counting only (THREATS.md T-3).</summary>
+    /// <param name="declared">What the client said in its handshake, or null before it has.</param>
+    /// <param name="options">The server's configuration, for the raw label.</param>
+    /// <returns>The identity, or null when there is nothing to say.</returns>
+    internal static AttachClient? AttachIdentity(Implementation? declared, ServerOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        var name = Clean(declared?.Name);
+        var version = Clean(declared?.Version);
+
+        return name is null && version is null && options.ClientLabel is null
+            ? null
+            : new AttachClient(name, version, options.ClientLabel);
     }
 
     /// <summary>How long a tool call waits for a handshake that is already in flight.</summary>
@@ -159,6 +176,7 @@ internal static class McpAudit
     /// <param name="reason">keypaste's own explanation. Trusted text.</param>
     /// <param name="exposure">What this server was configured to expose.</param>
     /// <param name="args">What was asked for.</param>
+    /// <param name="vault">The configured vault's identity key, or null.</param>
     /// <returns>The record to append.</returns>
     internal static AuditRecord Denial(
         string tool,
@@ -166,8 +184,9 @@ internal static class McpAudit
         AuditMethod method,
         string reason,
         EntryExposure exposure,
-        AuditArgs? args = null) =>
-        Line(tool, client, AuditDecision.Denied, method, reason, exposure, args);
+        AuditArgs? args = null,
+        string? vault = null) =>
+        Line(tool, client, AuditDecision.Denied, method, reason, exposure, args, vault);
 
     /// <summary>Builds the line for a call, whatever the answer was.</summary>
     /// <param name="tool">Which tool was called.</param>
@@ -177,6 +196,7 @@ internal static class McpAudit
     /// <param name="reason">keypaste's own explanation. Trusted text.</param>
     /// <param name="exposure">What this server was configured to expose.</param>
     /// <param name="args">What was asked for.</param>
+    /// <param name="vault">The configured vault's identity key, or null.</param>
     /// <returns>The record to append.</returns>
     /// <remarks>
     /// A grant and a denial go through the same builder and the same fields. Two shapes would be
@@ -190,7 +210,8 @@ internal static class McpAudit
         AuditMethod method,
         string reason,
         EntryExposure exposure,
-        AuditArgs? args = null)
+        AuditArgs? args = null,
+        string? vault = null)
     {
         ArgumentNullException.ThrowIfNull(exposure);
 
@@ -203,6 +224,7 @@ internal static class McpAudit
             Method = method,
             Reason = reason,
             Exposure = exposure.Globs,
+            Vault = vault,
         };
     }
 

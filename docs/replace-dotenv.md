@@ -74,13 +74,30 @@ See [SECURITY.md](../SECURITY.md) for the deletion and exposure limits.
 keypaste run dev -- npm start
 ```
 
-This command asks for the vault password on each invocation. In source, `keypaste run --session dev -- npm start` uses the unlocked desktop app or `keypaste agent` instead: it asks for no password, the app or agent shows the project, the variable names, the command and this directory, and the command starts only when you approve it there ([approvals](approvals.md#runs-that-ask-for-a-projects-variables)). A refusal, a lock or nothing holding the vault ends the run with a reason and starts nothing; it never falls back to asking for the password. The desktop's Env Sets screen can also import the `.env` and, once you save the project's directory and command, open a terminal running it with the set after you confirm it ([desktop](desktop.md#what-the-screens-show)).
+This command asks for the vault password on each invocation. In source, `keypaste run --session dev -- npm start` uses the unlocked desktop app or `keypaste agent` instead: it asks for no password, the app or agent shows the project, the variable names, the command and this directory, and the command starts only when you allow it there ([approvals](approvals.md#runs-that-ask-for-a-projects-variables)). A refusal, a lock or nothing holding the vault ends the run with a reason and starts nothing; it never falls back to asking for the password. The desktop's Env profiles screen can also import the `.env` and, once you save the project's directory and command, open a terminal running it with the set after you confirm it ([desktop](desktop.md#what-the-screens-show)).
 
 keypaste places variables in the child environment without writing a plaintext env file. CI points temporary directories at an empty folder and checks that the injection fixture leaves it empty. The child can still write or forward values; review its logging and behavior.
 
 Once delivered, environment values are copies held by the child and possibly its descendants. Locking a vault cannot remove those copies. The focused product will require an unlocked session for new launches and stop new releases when locked; it will not promise to revoke values already supplied.
 
 The `--` separates the project from its command. Without it, `keypaste run dev npm start` could name `npm` as the project. All arguments after `--` belong to the command. The child receives keypaste's stdin, stdout and stderr, preserving terminal prompts and output. keypaste closes the vault before starting the child, so a long-running server does not keep the vault unlocked. Ctrl+C, `docker stop` and `timeout` reach the child; keypaste waits for it to exit. After startup, keypaste returns the child's exit code. Missing commands return 127 and non-executable commands return 126. keypaste's own failures print a line beginning `keypaste run:`.
+
+## Profiles and references
+
+A project holds one set per profile. `dev` is the project group itself, `env/<project>`, so everything above is the dev profile; any other profile is a subgroup such as `env/<project>/staging`, named with lowercase letters, digits and `-`. Every env verb and `run` take `-p <profile>`:
+
+```sh
+keypaste env set acme-api DATABASE_URL -p staging
+keypaste env ls acme-api --profiles
+keypaste env diff acme-api dev staging
+keypaste run -p staging acme-api -- npm start
+```
+
+`env diff` names a key one profile lacks, a key a profile holds but cannot release (an expired entry, a name that cannot be exported) and a value two profiles share; it never prints a value. Profiles named `prod`, `production`, `prod-*` or `production-*`, in any case, are protected: a `--session` run of one is asked about live every time, allow once only.
+
+`keypaste env export acme-api -p staging > .env.keypaste` writes one reference per variable, such as `DATABASE_URL=kp://acme-api/staging/DATABASE_URL`, and no value, so the file can be committed. `kp:///<group>/<title>#username` names a field of any vault entry. `keypaste run --env-file .env.keypaste -- npm start` resolves every reference or starts nothing, and `-p` moves each `kp://<project>/…` reference to that profile.
+
+Once the desktop app has saved a directory for the project, `keypaste run -- npm start` there uses the project `projects.json` maps it to, and uses `./.env.keypaste` only when that file names nothing but that project's variables and literal values. A file naming vault entries or another project needs `--env-file`. A found or named reference file is always announced with its project and profile, and every literal is listed before the vault is opened, because a cloned repository's file can put values such as `HTTPS_PROXY` beside your secrets. A literal that cannot be shown whole on one line, because it is very long or holds line breaks, tabs, trailing spaces or invisible characters, is refused.
 
 <a id="minute-4--the-rest-of-the-repo"></a>
 
@@ -95,7 +112,7 @@ keypaste env pull dev
 keypaste run dev -- npm run dev
 ```
 
-One vault can hold `env/app-dev`, `env/app-prod` and `env/other-app`. Use separate vaults and master passwords when environments need different access boundaries.
+Commit a `.env.keypaste` from `keypaste env export` if you want the variable names and their profile in the repository; it holds no value. One vault can hold several projects, each with its profiles. Use separate vaults and master passwords when environments need different access boundaries.
 
 ## CI
 
@@ -121,11 +138,11 @@ steps:
 
 keypaste consumes exactly one line of stdin for the master password and leaves the rest for the child command.
 
-With non-terminal stdin, confirming verbs (`rm`, `env rm`, `env pull`, `env export`) require `--yes`. Prefer `keypaste run` in CI to avoid writing plaintext into a runner workspace that may be archived.
+With non-terminal stdin, confirming verbs (`rm`, `env rm`, `env pull`, `env export --dotenv`) require `--yes`. Prefer `keypaste run` in CI to avoid writing plaintext into a runner workspace that may be archived.
 
 ## The escape hatch
 
-Export when a tool requires a `.env` file or when moving credentials to another system:
+Export values with `--dotenv` when a tool requires a `.env` file or when moving credentials to another system; `-p` picks the profile:
 
 ```sh
 keypaste env export dev --dotenv --stdout

@@ -45,6 +45,18 @@ public sealed record EnvReleasePrompt
     /// <summary>Whether <see cref="Directory"/> had anything scrubbed out of it.</summary>
     public required bool DirectoryWasAltered { get; init; }
 
+    /// <summary>The profile the set belongs to, sanitized.</summary>
+    public string Profile { get; init; } = EnvProfileNames.Default;
+
+    /// <summary>How long a timed grant would last if the person chooses one; zero offers only "allow once".</summary>
+    public int GrantSeconds { get; init; }
+
+    /// <summary>Who is asking when it is not a person's own <c>keypaste run --session</c>, such as a scoped token; null otherwise. A prompt with a requester never offers a timed grant.</summary>
+    public string? Requester { get; init; }
+
+    /// <summary>The reference file's variable names and literals, each sanitized; empty outside reference-file mode.</summary>
+    public IReadOnlyList<string> FileLines { get; init; } = [];
+
     /// <summary>Why a request cannot be asked about, or null when it can.</summary>
     /// <param name="project">The project named.</param>
     /// <param name="command">The command, one argument per item.</param>
@@ -66,7 +78,7 @@ public sealed record EnvReleasePrompt
             return "the request names no command";
         }
 
-        if (Joined(command).Length > MaximumCommandLength)
+        if (CommandLine(command).Length > MaximumCommandLength)
         {
             return $"the command is longer than the {MaximumCommandLength} characters a prompt shows whole";
         }
@@ -87,12 +99,13 @@ public sealed record EnvReleasePrompt
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(directory);
 
-        var shownCommand = OneLine(Joined(command), MaximumCommandLength);
+        var shownCommand = OneLine(CommandLine(command), MaximumCommandLength);
         var shownDirectory = OneLine(directory, MaximumDirectoryLength);
 
         return new EnvReleasePrompt
         {
             Project = EntryNameSanitizer.Sanitize(preview.Project).Text,
+            Profile = EntryNameSanitizer.Sanitize(preview.Profile).Text,
             Keys = preview.Keys,
             Command = shownCommand.Text,
             CommandWasAltered = shownCommand.WasAltered,
@@ -110,8 +123,12 @@ public sealed record EnvReleasePrompt
     }
 
     /// <summary>The command as one line, quoting an argument that is empty or holds a space or a quote.</summary>
-    private static string Joined(IReadOnlyList<string> command)
+    /// <param name="command">The command, one argument per item.</param>
+    /// <returns>The line a prompt shows.</returns>
+    public static string CommandLine(IReadOnlyList<string> command)
     {
+        ArgumentNullException.ThrowIfNull(command);
+
         var line = new StringBuilder();
 
         foreach (var argument in command)

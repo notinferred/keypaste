@@ -44,3 +44,6 @@ secrets.json
 # which is how this rule gets broken by accident rather than by decision.
 keypastebusinessnotes.md
 *businessnotes*.md
+
+# `wrangler dev` settings for the share routes (SHARE_ENABLED, SHARE_DEV_MEMORY); local only.
+site/.dev.vars

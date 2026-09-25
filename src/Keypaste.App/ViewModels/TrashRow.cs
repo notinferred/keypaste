@@ -63,9 +63,9 @@ internal sealed class TrashRow
         var path => EntryNameSanitizer.SanitizePath(path).Text,
     };
 
-    /// <summary>When it was deleted, rendered as the Log screen renders a time.</summary>
+    /// <summary>When it was deleted, on this machine's clock as Settings dates a backup.</summary>
     internal string When =>
-        DeletedUtc.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+        DateTime.SpecifyKind(DeletedUtc, DateTimeKind.Utc).ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.CurrentCulture);
 
     /// <summary>What the row says under its name.</summary>
     internal string Summary => CameFromALiveGroup

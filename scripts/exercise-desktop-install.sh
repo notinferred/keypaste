@@ -318,7 +318,7 @@ env_run() {
 
 approval() {
   local pipe="keypaste-install-check-$$-$RANDOM" agent_pid response audit="$OUT/audit.jsonl"
-  printf '%s\ny\n' "$MASTER" | "$KP" agent --vault "$VAULT_NATIVE" --approver "$pipe" --approval-timeout 55 \
+  printf '%s\nh\n' "$MASTER" | "$KP" agent --vault "$VAULT_NATIVE" --approver "$pipe" --approval-timeout 55 \
     > /dev/null 2> "$OUT/agent-stderr.txt" &
   agent_pid=$!
   for _ in $(seq 1 150); do

@@ -159,11 +159,19 @@ internal sealed class McpHarness : IAsyncDisposable
                 : new ListEntryNamesTool(new ApproverEntryNameSource(_approver, options), options, _audit));
         serverOptions.ToolCollection.Add(new RequestCredentialTool(options, _approver, _audit));
 
+        if (options.AllowRun)
+        {
+            serverOptions.ToolCollection.Add(new RunTool(options, _approver, _audit));
+            serverOptions.ServerInstructions += ToolText.RunInstructions;
+        }
+
         _transcript = new TeeStream(channels.ServerWrites);
         _owned.Add(_transcript);
 
         _transport = new StreamServerTransport(channels.ServerReads, _transcript, "keypaste");
         _server = McpServer.Create(_transport, serverOptions, loggerFactory: null, serviceProvider: null);
+        var server = _server;
+        _approver.Identity = () => McpAudit.AttachIdentity(server.ClientInfo, options);
         _serving = _server.RunAsync();
 
         return channels;

@@ -55,7 +55,16 @@ internal static class GenerateOption
     /// flags with <c>--words</c> is an error for the same reason: the two describe different kinds
     /// of secret, and silently honouring one of them is a guess.
     /// </remarks>
-    internal static bool TryRead(CommandLine line, out SecretRecipe? recipe, out string error)
+    internal static bool TryRead(CommandLine line, out SecretRecipe? recipe, out string error) =>
+        TryRead(line, implied: false, out recipe, out error);
+
+    /// <summary>Reads the generator flags, as though <c>--generate</c> were given when <paramref name="implied"/>.</summary>
+    /// <param name="line">The parsed command line.</param>
+    /// <param name="implied">Whether the verb always generates, as <c>rotate</c> does.</param>
+    /// <param name="recipe">What to generate, or null when nothing is.</param>
+    /// <param name="error">A message naming the problem, or empty.</param>
+    /// <returns><see langword="false"/> on a usage mistake.</returns>
+    internal static bool TryRead(CommandLine line, bool implied, out SecretRecipe? recipe, out string error)
     {
         recipe = null;
 
@@ -68,7 +77,7 @@ internal static class GenerateOption
             || line.HasFlag("no-lookalikes");
         var shapedAsWords = wordsText is not null || separatorText is not null;
 
-        if (!line.HasFlag("generate"))
+        if (!implied && !line.HasFlag("generate"))
         {
             if (shapedAsCharacters || shapedAsWords)
             {

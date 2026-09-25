@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
+using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 
 namespace Keypaste.Core.Ipc;
@@ -41,6 +42,12 @@ public static class ApproverProtocol
     internal const string CredentialKind = "credential";
     internal const string AttachKind = "attach";
     internal const string EnvKind = "env";
+    internal const string GrantsKind = "grants";
+    internal const string RevokeGrantsKind = "revoke-grants";
+    internal const string LockKind = "lock";
+    internal const string EnvProfileKind = "env-profile";
+    internal const string TokenEnvKind = "token-env";
+    internal const string RunKind = "run";
 
     /// <summary>Stands in for a reply whose own envelope will not fit a frame.</summary>
     /// <remarks>
@@ -107,6 +114,13 @@ public static class ApproverProtocol
             writer.WriteNumber("v", Version);
             writer.WriteString("kind", AttachKind);
             writer.WriteString("vault", request.Vault);
+
+            if (request.Client is { } client)
+            {
+                WriteOptional(writer, "client_name", client.Name);
+                WriteOptional(writer, "client_version", client.Version);
+                WriteOptional(writer, "client_label", client.Label);
+            }
         });
     }
 
@@ -340,6 +354,29 @@ public static class ApproverProtocol
         return WriteCredential(reply).Length <= MessageFramer.MaximumPayloadBytes;
     }
 
+    /// <summary>Whether <see cref="Encode(EnvReply)"/> would send this reply as it is.</summary>
+    /// <param name="reply">The reply the owner is about to record and return.</param>
+    /// <returns><see langword="true"/> when it fits one frame.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
+    /// <remarks>Asked before a release is audited or recorded, so neither claims values the runner never received.</remarks>
+    internal static bool Fits(EnvReply reply)
+    {
+        ArgumentNullException.ThrowIfNull(reply);
+
+        return WriteEnv(reply).Length <= MessageFramer.MaximumPayloadBytes;
+    }
+
+    /// <summary>Whether <see cref="Encode(RunReply)"/> would send this reply as it is.</summary>
+    /// <param name="reply">The reply the owner is about to record and return.</param>
+    /// <returns><see langword="true"/> when it fits one frame.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
+    internal static bool Fits(RunReply reply)
+    {
+        ArgumentNullException.ThrowIfNull(reply);
+
+        return WriteRun(reply).Length <= MessageFramer.MaximumPayloadBytes;
+    }
+
     private static CredentialReply Bounded(CredentialReply reply, string? entry) =>
         reply.Decision == AuditDecision.Granted
             ? new CredentialReply
@@ -373,23 +410,53 @@ public static class ApproverProtocol
             WriteOptional(writer, "value", reply.Value);
         });
 
+    /// <summary>The most keys or file lines one env request names.</summary>
+    public const int MaximumEnvListLength = 1024;
+
+    /// <summary>The longest file line one env request carries.</summary>
+    public const int MaximumFileLineLength = 512;
+
     /// <summary>Encodes a request for a project's env set.</summary>
     /// <param name="request">What to ask for.</param>
     /// <returns>The frame's bytes, without a delimiter.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    /// <remarks>
+    /// The whole default profile travels as the original <c>env</c> kind, byte for byte; anything
+    /// else is <c>env-profile</c>, which an owner from before profiles does not answer, so a runner
+    /// asking an older owner for a profile gets nothing rather than the default set.
+    /// </remarks>
     public static byte[] Encode(EnvRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        var profiled = !string.Equals(request.Profile, EnvProfileNames.Default, StringComparison.Ordinal)
+            || request.Keys is not null
+            || request.FileLines is not null;
+
         return Write(writer =>
         {
             writer.WriteNumber("v", Version);
-            writer.WriteString("kind", EnvKind);
+            writer.WriteString("kind", profiled ? EnvProfileKind : EnvKind);
             writer.WriteString("vault", request.Vault);
             writer.WriteString("session", request.Session);
             writer.WriteString("project", request.Project);
             WriteStrings(writer, "command", request.Command);
             writer.WriteString("directory", request.Directory);
+
+            if (profiled)
+            {
+                writer.WriteString("profile", request.Profile);
+
+                if (request.Keys is { } keys)
+                {
+                    WriteStrings(writer, "keys", keys);
+                }
+
+                if (request.FileLines is { } lines)
+                {
+                    WriteStrings(writer, "file_lines", lines);
+                }
+            }
         });
     }
 
@@ -412,7 +479,7 @@ public static class ApproverProtocol
             return frame;
         }
 
-        var tooLarge = EnvResolved.Refused(reply.Set.Project, EnvOutcome.TooLarge);
+        var tooLarge = EnvResolved.Refused(reply.Set.Project, EnvOutcome.TooLarge, profile: reply.Set.Profile);
         var refusal = WriteEnv(new EnvReply(tooLarge, tooLarge.Refusal));
 
         return refusal.Length <= MessageFramer.MaximumPayloadBytes
@@ -426,6 +493,7 @@ public static class ApproverProtocol
             writer.WriteNumber("v", Version);
             writer.WriteString("kind", EnvKind);
             writer.WriteString("project", reply.Set.Project);
+            writer.WriteString("profile", reply.Set.Profile);
             writer.WriteNumber("outcome", (int)reply.Set.Outcome);
             writer.WriteString("reason", reply.Reason);
 
@@ -478,6 +546,12 @@ public static class ApproverProtocol
                 CredentialKind => ApproverMessageKind.Credential,
                 AttachKind => ApproverMessageKind.Attach,
                 EnvKind => ApproverMessageKind.Env,
+                GrantsKind => ApproverMessageKind.Grants,
+                RevokeGrantsKind => ApproverMessageKind.RevokeGrants,
+                LockKind => ApproverMessageKind.Lock,
+                EnvProfileKind => ApproverMessageKind.EnvProfile,
+                TokenEnvKind => ApproverMessageKind.TokenEnv,
+                RunKind => ApproverMessageKind.Run,
                 _ => ApproverMessageKind.Unknown,
             };
         }
@@ -694,7 +768,21 @@ public static class ApproverProtocol
                 return false;
             }
 
-            request = new AttachRequest(vault);
+            // Optional so an older bridge still attaches; bounded so an identity cannot outgrow a card.
+            var name = Optional(root, "client_name");
+            var version = Optional(root, "client_version");
+            var label = Optional(root, "client_label");
+
+            if (new[] { name, version, label }.Any(field => field?.Length > AttachClient.MaximumLength))
+            {
+                return false;
+            }
+
+            request = new AttachRequest(vault)
+            {
+                Client = name is null && version is null && label is null ? null : new AttachClient(name, version, label),
+            };
+
             return true;
         }
     }
@@ -745,6 +833,11 @@ public static class ApproverProtocol
     /// <param name="frame">The frame's bytes.</param>
     /// <param name="request">The decoded request.</param>
     /// <returns><see langword="true"/> when the frame was a well-formed env request.</returns>
+    /// <remarks>
+    /// An <c>env</c> frame is the whole default profile. An <c>env-profile</c> frame must name a
+    /// profile keypaste resolves, and any keys and file lines it carries are bounded here, before
+    /// anything is resolved or shown.
+    /// </remarks>
     public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out EnvRequest? request)
     {
         request = null;
@@ -757,8 +850,9 @@ public static class ApproverProtocol
         using (document)
         {
             var root = document.RootElement;
+            var profiled = IsKind(root, EnvProfileKind);
 
-            if (!IsKind(root, EnvKind)
+            if (!(profiled || IsKind(root, EnvKind))
                 || !TryString(root, "vault", out var vault)
                 || !TryString(root, "session", out var session)
                 || !TryString(root, "project", out var project)
@@ -769,8 +863,34 @@ public static class ApproverProtocol
             }
 
             request = new EnvRequest(project, command, directory) { Vault = vault, Session = session };
+
+            if (!profiled)
+            {
+                return true;
+            }
+
+            if (!TryString(root, "profile", out var profile)
+                || !EnvProfileNames.IsValid(profile, out _)
+                || !TryOptionalStrings(root, "keys", out var keys)
+                || !TryOptionalStrings(root, "file_lines", out var lines)
+                || keys?.Count > MaximumEnvListLength
+                || keys?.Any(key => !EnvConvention.IsValidKey(key, out _)) == true
+                || lines?.Count > MaximumEnvListLength
+                || lines?.Any(line => line.Length > MaximumFileLineLength) == true)
+            {
+                request = null;
+                return false;
+            }
+
+            request = request with { Profile = profile, Keys = keys, FileLines = lines };
             return true;
         }
+    }
+
+    private static bool TryOptionalStrings(JsonElement root, string name, out IReadOnlyList<string>? values)
+    {
+        values = null;
+        return !root.TryGetProperty(name, out _) || TryStrings(root, name, out values);
     }
 
     /// <summary>Decodes the answer to an env request.</summary>
@@ -804,6 +924,18 @@ public static class ApproverProtocol
                 return false;
             }
 
+            var profile = EnvProfileNames.Default;
+
+            if (root.TryGetProperty("profile", out _))
+            {
+                if (!TryString(root, "profile", out var named))
+                {
+                    return false;
+                }
+
+                profile = named;
+            }
+
             var outcome = (EnvOutcome)number;
 
             if (outcome == EnvOutcome.Resolved)
@@ -814,7 +946,7 @@ public static class ApproverProtocol
                 }
 
                 reply = new EnvReply(
-                    EnvResolved.Released(project, [.. variables.Select(pair => new EnvVariable(pair.Key, pair.Value))]),
+                    EnvResolved.Released(project, [.. variables.Select(pair => new EnvVariable(pair.Key, pair.Value))], profile),
                     reason);
                 return true;
             }
@@ -825,8 +957,724 @@ public static class ApproverProtocol
             }
 
             reply = new EnvReply(
-                EnvResolved.Refused(project, outcome, [.. problems.Select(pair => new EnvProblem(pair.Key, pair.Value))]),
+                EnvResolved.Refused(project, outcome, [.. problems.Select(pair => new EnvProblem(pair.Key, pair.Value))], profile),
                 reason);
+            return true;
+        }
+    }
+
+    /// <summary>The most grants one reply lists, and the most ids one revoke names.</summary>
+    public const int MaximumGrantRows = 256;
+
+    /// <summary>Encodes a request for the grants in force.</summary>
+    /// <param name="request">The attachment it is made under.</param>
+    /// <returns>The frame's bytes, without a delimiter.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    public static byte[] Encode(GrantsRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return WriteAttached(GrantsKind, request.Vault, request.Session, _ => { });
+    }
+
+    /// <summary>Encodes the grants in force, bounded to what one frame can carry.</summary>
+    /// <param name="reply">The grants, or why none were listed.</param>
+    /// <returns>The frame's bytes. Never over <see cref="MessageFramer.MaximumPayloadBytes"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
+    /// <remarks>
+    /// Rows are dropped whole from the end, past <see cref="MaximumGrantRows"/> or past the frame, and
+    /// <c>complete</c> is then false, as a names reply is bounded.
+    /// </remarks>
+    public static byte[] Encode(GrantsReply reply)
+    {
+        ArgumentNullException.ThrowIfNull(reply);
+
+        var budget = MessageFramer.MaximumPayloadBytes - WriteGrants(reply, 0, false).Length;
+        var buffer = new ArrayBufferWriter<byte>(256);
+        using var measure = new Utf8JsonWriter(buffer);
+        var used = 0;
+        var kept = 0;
+
+        foreach (var grant in reply.Grants.Take(MaximumGrantRows))
+        {
+            buffer.Clear();
+            measure.Reset(buffer);
+            WriteGrant(measure, grant);
+            measure.Flush();
+
+            var cost = buffer.WrittenCount + (kept == 0 ? 0 : 1);
+
+            if (used + cost > budget)
+            {
+                break;
+            }
+
+            used += cost;
+            kept++;
+        }
+
+        var frame = WriteGrants(reply, kept, reply.Complete && kept == reply.Grants.Count);
+
+        return frame.Length <= MessageFramer.MaximumPayloadBytes
+            ? frame
+            : WriteGrants(new GrantsReply(reply.Answered, [], false, Undersized), 0, false);
+    }
+
+    private static byte[] WriteGrants(GrantsReply reply, int count, bool complete) =>
+        Write(writer =>
+        {
+            writer.WriteNumber("v", Version);
+            writer.WriteString("kind", GrantsKind);
+            writer.WriteBoolean("answered", reply.Answered);
+            writer.WriteBoolean("complete", complete);
+            writer.WriteString("reason", reply.Reason);
+            writer.WriteStartArray("grants");
+
+            for (var i = 0; i < count; i++)
+            {
+                WriteGrant(writer, reply.Grants[i]);
+            }
+
+            writer.WriteEndArray();
+        });
+
+    private static void WriteGrant(Utf8JsonWriter writer, GrantSummary grant)
+    {
+        writer.WriteStartObject();
+        writer.WriteString("id", grant.Id);
+        writer.WriteString("kind", grant.Kind);
+        writer.WriteString("client", grant.Client);
+        writer.WriteString("scope", grant.Scope);
+        writer.WriteString("field", grant.Field);
+        writer.WriteNumber("seconds_left", grant.SecondsLeft);
+        writer.WriteEndObject();
+    }
+
+    /// <summary>Encodes a request to end grants.</summary>
+    /// <param name="request">Which grants, and the attachment it is made under.</param>
+    /// <returns>The frame's bytes, without a delimiter.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    public static byte[] Encode(RevokeGrantsRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return WriteAttached(RevokeGrantsKind, request.Vault, request.Session, writer =>
+        {
+            WriteStrings(writer, "ids", request.Ids);
+
+            if (request.Client is null)
+            {
+                writer.WriteNull("client");
+            }
+            else
+            {
+                writer.WriteString("client", request.Client);
+            }
+
+            writer.WriteBoolean("all", request.All);
+        });
+    }
+
+    /// <summary>Encodes how many grants were ended.</summary>
+    /// <param name="reply">The count, or why none.</param>
+    /// <returns>The frame's bytes, without a delimiter.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
+    public static byte[] Encode(RevokeGrantsReply reply)
+    {
+        ArgumentNullException.ThrowIfNull(reply);
+
+        return Write(writer =>
+        {
+            writer.WriteNumber("v", Version);
+            writer.WriteString("kind", RevokeGrantsKind);
+            writer.WriteNumber("revoked", reply.Revoked);
+            writer.WriteString("reason", reply.Reason);
+        });
+    }
+
+    /// <summary>Encodes a request to lock now.</summary>
+    /// <param name="request">The attachment it is made under.</param>
+    /// <returns>The frame's bytes, without a delimiter.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    public static byte[] Encode(LockRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return WriteAttached(LockKind, request.Vault, request.Session, _ => { });
+    }
+
+    /// <summary>Encodes whether the owner is locking.</summary>
+    /// <param name="reply">The answer.</param>
+    /// <returns>The frame's bytes, without a delimiter.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
+    public static byte[] Encode(LockReply reply)
+    {
+        ArgumentNullException.ThrowIfNull(reply);
+
+        return Write(writer =>
+        {
+            writer.WriteNumber("v", Version);
+            writer.WriteString("kind", LockKind);
+            writer.WriteBoolean("locking", reply.Locking);
+            writer.WriteString("reason", reply.Reason);
+        });
+    }
+
+    /// <summary>Decodes a request for the grants in force.</summary>
+    /// <param name="frame">The frame's bytes.</param>
+    /// <param name="request">The decoded request.</param>
+    /// <returns><see langword="true"/> when the frame was a well-formed grants request.</returns>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out GrantsRequest? request)
+    {
+        request = TryAttached(frame, GrantsKind, out var vault, out var session, out _)
+            ? new GrantsRequest { Vault = vault, Session = session }
+            : null;
+
+        return request is not null;
+    }
+
+    /// <summary>Decodes the grants in force.</summary>
+    /// <param name="frame">The frame's bytes.</param>
+    /// <param name="reply">The decoded reply.</param>
+    /// <returns><see langword="true"/> when the frame was a well-formed grants reply of at most <see cref="MaximumGrantRows"/> rows.</returns>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out GrantsReply? reply)
+    {
+        reply = null;
+
+        if (!TryParse(frame, out var document))
+        {
+            return false;
+        }
+
+        using (document)
+        {
+            var root = document.RootElement;
+
+            if (!IsKind(root, GrantsKind)
+                || !TryBoolean(root, "answered", out var answered)
+                || !TryString(root, "reason", out var reason)
+                || !root.TryGetProperty("grants", out var rows)
+                || rows.ValueKind != JsonValueKind.Array
+                || rows.GetArrayLength() > MaximumGrantRows)
+            {
+                return false;
+            }
+
+            var grants = new List<GrantSummary>(rows.GetArrayLength());
+
+            foreach (var row in rows.EnumerateArray())
+            {
+                if (row.ValueKind != JsonValueKind.Object
+                    || !TryString(row, "id", out var id)
+                    || !TryString(row, "kind", out var kind)
+                    || !TryString(row, "client", out var client)
+                    || !TryString(row, "scope", out var scope)
+                    || !TryString(row, "field", out var field)
+                    || !TryInteger(row, "seconds_left", out var seconds)
+                    || seconds < 0)
+                {
+                    return false;
+                }
+
+                grants.Add(new GrantSummary(id, kind, client, scope, field, seconds));
+            }
+
+            reply = new GrantsReply(answered, grants, TrueOnly(root, "complete"), reason);
+            return true;
+        }
+    }
+
+    /// <summary>Decodes a request to end grants.</summary>
+    /// <param name="frame">The frame's bytes.</param>
+    /// <param name="request">The decoded request.</param>
+    /// <returns><see langword="true"/> when the frame was well formed: at most <see cref="MaximumGrantRows"/> ids, each one a <see cref="GrantId"/>.</returns>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out RevokeGrantsRequest? request)
+    {
+        request = null;
+
+        if (!TryAttached(frame, RevokeGrantsKind, out var vault, out var session, out var root)
+            || !TryStrings(root, "ids", out var ids)
+            || ids.Count > MaximumGrantRows
+            || !ids.All(GrantId.IsId)
+            || !root.TryGetProperty("client", out var clientElement)
+            || clientElement.ValueKind is not (JsonValueKind.String or JsonValueKind.Null)
+            || !TryBoolean(root, "all", out var all))
+        {
+            return false;
+        }
+
+        request = new RevokeGrantsRequest(ids, clientElement.GetString(), all) { Vault = vault, Session = session };
+        return true;
+    }
+
+    /// <summary>Decodes how many grants were ended.</summary>
+    /// <param name="frame">The frame's bytes.</param>
+    /// <param name="reply">The decoded reply.</param>
+    /// <returns><see langword="true"/> when the frame was a well-formed revoke reply.</returns>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out RevokeGrantsReply? reply)
+    {
+        reply = null;
+
+        if (!TryParse(frame, out var document))
+        {
+            return false;
+        }
+
+        using (document)
+        {
+            var root = document.RootElement;
+
+            if (!IsKind(root, RevokeGrantsKind)
+                || !TryInteger(root, "revoked", out var revoked)
+                || revoked < 0
+                || !TryString(root, "reason", out var reason))
+            {
+                return false;
+            }
+
+            reply = new RevokeGrantsReply(revoked, reason);
+            return true;
+        }
+    }
+
+    /// <summary>Decodes a request to lock now.</summary>
+    /// <param name="frame">The frame's bytes.</param>
+    /// <param name="request">The decoded request.</param>
+    /// <returns><see langword="true"/> when the frame was a well-formed lock request.</returns>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out LockRequest? request)
+    {
+        request = TryAttached(frame, LockKind, out var vault, out var session, out _)
+            ? new LockRequest { Vault = vault, Session = session }
+            : null;
+
+        return request is not null;
+    }
+
+    /// <summary>Decodes whether the owner is locking.</summary>
+    /// <param name="frame">The frame's bytes.</param>
+    /// <param name="reply">The decoded reply.</param>
+    /// <returns><see langword="true"/> when the frame was a well-formed lock reply.</returns>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out LockReply? reply)
+    {
+        reply = null;
+
+        if (!TryParse(frame, out var document))
+        {
+            return false;
+        }
+
+        using (document)
+        {
+            var root = document.RootElement;
+
+            if (!IsKind(root, LockKind)
+                || !TryBoolean(root, "locking", out var locking)
+                || !TryString(root, "reason", out var reason))
+            {
+                return false;
+            }
+
+            reply = new LockReply(locking, reason);
+            return true;
+        }
+    }
+
+    private static byte[] WriteAttached(string kind, string vault, string session, Action<Utf8JsonWriter> body) =>
+        Write(writer =>
+        {
+            writer.WriteNumber("v", Version);
+            writer.WriteString("kind", kind);
+            writer.WriteString("vault", vault);
+            writer.WriteString("session", session);
+            body(writer);
+        });
+
+    /// <summary>Reads a request's kind, vault and session, and hands back a copy of its root for the rest.</summary>
+    private static bool TryAttached(
+        ReadOnlySpan<byte> frame,
+        string kind,
+        [NotNullWhen(true)] out string? vault,
+        [NotNullWhen(true)] out string? session,
+        out JsonElement root)
+    {
+        vault = null;
+        session = null;
+        root = default;
+
+        if (!TryParse(frame, out var document))
+        {
+            return false;
+        }
+
+        using (document)
+        {
+            var parsed = document.RootElement;
+
+            if (!IsKind(parsed, kind)
+                || !TryString(parsed, "vault", out vault)
+                || !TryString(parsed, "session", out session))
+            {
+                vault = null;
+                session = null;
+                return false;
+            }
+
+            root = parsed.Clone();
+            return true;
+        }
+    }
+
+    private static bool TryBoolean(JsonElement root, string name, out bool value)
+    {
+        value = false;
+
+        if (!root.TryGetProperty(name, out var element) || element.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+        {
+            return false;
+        }
+
+        value = element.GetBoolean();
+        return true;
+    }
+
+    /// <summary>Encodes a request for a set authorized by a scoped token.</summary>
+    /// <param name="request">What to ask for.</param>
+    /// <returns>The frame's bytes, without a delimiter.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    /// <remarks>The reply is an ordinary env reply.</remarks>
+    public static byte[] Encode(TokenEnvRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return Write(writer =>
+        {
+            writer.WriteNumber("v", Version);
+            writer.WriteString("kind", TokenEnvKind);
+            writer.WriteString("vault", request.Vault);
+            writer.WriteString("session", request.Session);
+            writer.WriteString("token", request.Token);
+            writer.WriteString("project", request.Project);
+            writer.WriteString("profile", request.Profile);
+            WriteStrings(writer, "command", request.Command);
+            writer.WriteString("directory", request.Directory);
+        });
+    }
+
+    /// <summary>Decodes a request for a set authorized by a scoped token.</summary>
+    /// <param name="frame">The frame's bytes.</param>
+    /// <param name="request">The decoded request.</param>
+    /// <returns><see langword="true"/> when the frame was a well-formed token env request.</returns>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out TokenEnvRequest? request)
+    {
+        request = null;
+
+        if (!TryParse(frame, out var document))
+        {
+            return false;
+        }
+
+        using (document)
+        {
+            var root = document.RootElement;
+
+            if (!IsKind(root, TokenEnvKind)
+                || !TryString(root, "vault", out var vault)
+                || !TryString(root, "session", out var session)
+                || !TryString(root, "token", out var token)
+                || !TryString(root, "project", out var project)
+                || !TryString(root, "profile", out var profile)
+                || !TryStrings(root, "command", out var command)
+                || !TryString(root, "directory", out var directory))
+            {
+                return false;
+            }
+
+            request = new TokenEnvRequest(token, project, profile, command, directory) { Vault = vault, Session = session };
+            return true;
+        }
+    }
+
+    /// <summary>The most globs a run request carries.</summary>
+    public const int MaximumExposureGlobs = 64;
+
+    /// <summary>Encodes an agent's run request.</summary>
+    /// <param name="request">What to ask for.</param>
+    /// <returns>The frame's bytes, without a delimiter.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="request"/> is null.</exception>
+    public static byte[] Encode(RunRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return Write(writer =>
+        {
+            writer.WriteNumber("v", Version);
+            writer.WriteString("kind", RunKind);
+            writer.WriteString("vault", request.Vault);
+            writer.WriteString("session", request.Session);
+            writer.WriteString("program", request.Program);
+            WriteStrings(writer, "command", request.Command);
+            writer.WriteString("directory", request.Directory);
+            WriteOptional(writer, "project", request.Project);
+            writer.WriteString("profile", request.Profile);
+
+            if (request.Keys is { } keys)
+            {
+                WriteStrings(writer, "keys", keys);
+            }
+
+            if (request.References is { } references)
+            {
+                writer.WriteStartArray("references");
+                foreach (var reference in references)
+                {
+                    writer.WriteStartObject();
+                    writer.WriteString("name", reference.Name);
+                    writer.WriteString("ref", reference.Reference);
+                    writer.WriteEndObject();
+                }
+
+                writer.WriteEndArray();
+            }
+
+            writer.WriteString("reason", request.Reason);
+            WriteStrings(writer, "exposure", request.Exposure);
+            WriteOptional(writer, "client_name", request.ClientName);
+            WriteOptional(writer, "client_version", request.ClientVersion);
+            WriteOptional(writer, "client_label", request.ClientLabel);
+        });
+    }
+
+    /// <summary>Decodes an agent's run request, bounded before anything is resolved or shown.</summary>
+    /// <param name="frame">The frame's bytes.</param>
+    /// <param name="request">The decoded request.</param>
+    /// <returns><see langword="true"/> when the frame was a well-formed run request within every bound.</returns>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out RunRequest? request)
+    {
+        request = null;
+
+        if (!TryParse(frame, out var document))
+        {
+            return false;
+        }
+
+        using (document)
+        {
+            var root = document.RootElement;
+
+            if (!IsKind(root, RunKind)
+                || !TryString(root, "vault", out var vault)
+                || !TryString(root, "session", out var session)
+                || !TryString(root, "program", out var program)
+                || program.Length > EnvReleasePrompt.MaximumDirectoryLength
+                || !TryStrings(root, "command", out var command)
+                || command.Count is 0 or > RunRequestRules.MaximumArguments
+                || command.Any(item => item.Length > RunRequestRules.MaximumArgumentLength)
+                || !TryString(root, "directory", out var directory)
+                || directory.Length > EnvReleasePrompt.MaximumDirectoryLength
+                || !TryString(root, "profile", out var profile)
+                || !TryOptionalStrings(root, "keys", out var keys)
+                || keys?.Count > RunRequestRules.MaximumVariables
+                || !TryReferences(root, out var references)
+                || !TryString(root, "reason", out var reason)
+                || reason.Length > CredentialRequestRules.MaximumReasonLength
+                || !TryStrings(root, "exposure", out var exposure)
+                || exposure.Count > MaximumExposureGlobs)
+            {
+                return false;
+            }
+
+            request = new RunRequest
+            {
+                Program = program,
+                Command = command,
+                Directory = directory,
+                Project = Optional(root, "project"),
+                Profile = profile,
+                Keys = keys,
+                References = references,
+                Reason = reason,
+                Exposure = exposure,
+                ClientName = Optional(root, "client_name"),
+                ClientVersion = Optional(root, "client_version"),
+                ClientLabel = Optional(root, "client_label"),
+                Vault = vault,
+                Session = session,
+            };
+
+            return true;
+        }
+    }
+
+    private static bool TryReferences(JsonElement root, out IReadOnlyList<RunReference>? references)
+    {
+        references = null;
+
+        if (!root.TryGetProperty("references", out var element))
+        {
+            return true;
+        }
+
+        if (element.ValueKind != JsonValueKind.Array || element.GetArrayLength() > RunRequestRules.MaximumVariables)
+        {
+            return false;
+        }
+
+        var decoded = new List<RunReference>(element.GetArrayLength());
+
+        foreach (var item in element.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.Object
+                || !TryString(item, "name", out var name)
+                || !TryString(item, "ref", out var reference)
+                || reference.Length > KpReferences.MaximumLength)
+            {
+                return false;
+            }
+
+            decoded.Add(new RunReference(name, reference));
+        }
+
+        references = decoded;
+        return true;
+    }
+
+    /// <summary>Encodes the answer to a run request, bounded to one frame.</summary>
+    /// <param name="reply">The variables, or why none.</param>
+    /// <returns>The frame's bytes. Never over <see cref="MessageFramer.MaximumPayloadBytes"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="reply"/> is null.</exception>
+    /// <remarks>
+    /// A set that will not fit is refused whole, never trimmed, and recorded as undeliverable under
+    /// the authority it had, as a credential that will not fit is.
+    /// </remarks>
+    public static byte[] Encode(RunReply reply)
+    {
+        ArgumentNullException.ThrowIfNull(reply);
+
+        var frame = WriteRun(reply);
+
+        if (frame.Length <= MessageFramer.MaximumPayloadBytes)
+        {
+            return frame;
+        }
+
+        var tooLarge = EnvResolved.Refused(reply.Set.Project, EnvOutcome.TooLarge, profile: reply.Set.Profile);
+        var refusal = WriteRun(new RunReply(tooLarge, AuditMethod.Undeliverable, UndeliverableReason(reply.Method))
+        {
+            Entries = reply.Entries,
+            Session = reply.Session,
+        });
+
+        return refusal.Length <= MessageFramer.MaximumPayloadBytes
+            ? refusal
+            : WriteRun(new RunReply(EnvResolved.Refused(string.Empty, EnvOutcome.TooLarge), AuditMethod.Undeliverable, Oversized));
+    }
+
+    private static byte[] WriteRun(RunReply reply) =>
+        Write(writer =>
+        {
+            writer.WriteNumber("v", Version);
+            writer.WriteString("kind", RunKind);
+            writer.WriteString("project", reply.Set.Project);
+            writer.WriteString("profile", reply.Set.Profile);
+            writer.WriteNumber("outcome", (int)reply.Set.Outcome);
+            writer.WriteString("reason", reply.Reason);
+            writer.WriteNumber("method", (int)reply.Method);
+            writer.WriteNumber("granted_seconds", reply.GrantedSeconds);
+            WriteStrings(writer, "entries", reply.Entries);
+            WriteOptional(writer, "session", reply.Session);
+
+            writer.WriteStartArray("problems");
+            foreach (var problem in reply.Set.Problems)
+            {
+                writer.WriteStartObject();
+                writer.WriteString("key", problem.Key);
+                writer.WriteString("reason", problem.Reason);
+                writer.WriteEndObject();
+            }
+
+            writer.WriteEndArray();
+
+            if (reply.Set.Outcome == EnvOutcome.Resolved)
+            {
+                writer.WriteStartArray("variables");
+                foreach (var variable in reply.Set.Variables)
+                {
+                    writer.WriteStartObject();
+                    writer.WriteString("key", variable.Key);
+                    writer.WriteString("value", variable.Value);
+                    writer.WriteEndObject();
+                }
+
+                writer.WriteEndArray();
+            }
+        });
+
+    /// <summary>Decodes the answer to a run request.</summary>
+    /// <param name="frame">The frame's bytes.</param>
+    /// <param name="reply">The decoded reply.</param>
+    /// <returns><see langword="true"/> when the frame was a well-formed run reply.</returns>
+    /// <remarks>
+    /// Values are accepted only on a released set, and an undefined method is refused rather than
+    /// guessed at, so a reply that says no never delivers a value alongside.
+    /// </remarks>
+    public static bool TryDecode(ReadOnlySpan<byte> frame, [NotNullWhen(true)] out RunReply? reply)
+    {
+        reply = null;
+
+        if (!TryParse(frame, out var document))
+        {
+            return false;
+        }
+
+        using (document)
+        {
+            var root = document.RootElement;
+
+            if (!IsKind(root, RunKind)
+                || !TryString(root, "project", out var project)
+                || !TryString(root, "profile", out var profile)
+                || !TryInteger(root, "outcome", out var number)
+                || !Enum.IsDefined((EnvOutcome)number)
+                || !TryString(root, "reason", out var reason)
+                || !TryInteger(root, "method", out var method)
+                || !Enum.IsDefined((AuditMethod)method)
+                || !TryInteger(root, "granted_seconds", out var granted)
+                || granted < 0
+                || !TryStrings(root, "entries", out var entries)
+                || !TryPairs(root, "problems", "reason", out var problems))
+            {
+                return false;
+            }
+
+            var outcome = (EnvOutcome)number;
+            EnvResolved set;
+
+            if (outcome == EnvOutcome.Resolved)
+            {
+                if (problems.Count > 0 || !TryPairs(root, "variables", "value", out var variables))
+                {
+                    return false;
+                }
+
+                set = EnvResolved.Released(project, [.. variables.Select(pair => new EnvVariable(pair.Key, pair.Value))], profile);
+            }
+            else
+            {
+                if (root.TryGetProperty("variables", out _))
+                {
+                    return false;
+                }
+
+                set = EnvResolved.Refused(project, outcome, [.. problems.Select(pair => new EnvProblem(pair.Key, pair.Value))], profile);
+            }
+
+            reply = new RunReply(set, (AuditMethod)method, reason)
+            {
+                GrantedSeconds = granted,
+                Entries = entries,
+                Session = Optional(root, "session"),
+            };
+
             return true;
         }
     }

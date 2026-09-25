@@ -199,6 +199,119 @@ public sealed class SessionEnvResolverTests : IDisposable
         Assert.Equal(EnvOutcome.Locked, (await Resolver().ResolveAsync("dev", null, Cancel)).Outcome);
     }
 
+    [Fact]
+    public async Task AKeysSubset_PreviewsAndReleasesOnlyThose()
+    {
+        AddToStaging(("A", "a1"), ("B", "b1"), ("C", "c1"));
+        EnvPreview? asked = null;
+
+        var resolved = await Resolver().ResolveAsync(
+            "dev",
+            "staging",
+            ["C", "A"],
+            (preview, _) =>
+            {
+                asked = preview;
+                return ValueTask.FromResult(true);
+            },
+            Cancel);
+
+        Assert.Equal(["C", "A"], asked?.Keys);
+        Assert.Equal("staging", asked?.Profile);
+        Assert.Equal([new EnvVariable("C", "c1"), new EnvVariable("A", "a1")], resolved.Variables);
+        Assert.Equal("staging", resolved.Profile);
+    }
+
+    [Fact]
+    public async Task ARequestedKeyMissing_RefusesTheWhole()
+    {
+        AddToStaging(("A", "a1"));
+        var asked = false;
+
+        var resolved = await Resolver().ResolveAsync(
+            "dev",
+            "staging",
+            ["A", "MISSING"],
+            (_, _) =>
+            {
+                asked = true;
+                return ValueTask.FromResult(true);
+            },
+            Cancel);
+
+        Assert.Equal(EnvOutcome.Unusable, resolved.Outcome);
+        Assert.Equal("MISSING", Assert.Single(resolved.Problems).Key);
+        Assert.Empty(resolved.Variables);
+        Assert.False(asked);
+    }
+
+    [Fact]
+    public async Task AKeysSubset_IgnoresAnUnusableUnrequestedKey()
+    {
+        AddToStaging(("A", "a1"), ("OLD", "old"));
+        _vault.AddEntry(new VaultEntry { GroupPath = "env/dev/staging", Title = "BAD-NAME", Password = "x" });
+        _vault.SetExpiryUnchecked(new EntryName("env/dev/staging", "OLD"), DateTimeOffset.UtcNow.AddDays(-1));
+        _vault.Save();
+
+        var subset = await Resolver().ResolveAsync("dev", "staging", ["A"], null, Cancel);
+        var whole = await Resolver().ResolveAsync("dev", "staging", null, null, Cancel);
+
+        Assert.Equal([new EnvVariable("A", "a1")], subset.Variables);
+        Assert.Equal(EnvOutcome.Unusable, whole.Outcome);
+        Assert.Equal(["BAD-NAME", "OLD"], whole.Problems.Select(problem => problem.Key));
+    }
+
+    [Fact]
+    public async Task EveryRefusal_CarriesTheRequestedProfile()
+    {
+        AddToStaging(("A", "a1"));
+
+        var declined = await Resolver().ResolveAsync("dev", "staging", null, (_, _) => ValueTask.FromResult(false), Cancel);
+
+        var changed = await Resolver().ResolveAsync(
+            "dev",
+            "staging",
+            null,
+            (_, _) =>
+            {
+                new EnvStore(_vault).TrySet("dev", "staging", "EXTRA", "x", out _);
+                _vault.Save();
+                return ValueTask.FromResult(true);
+            },
+            Cancel);
+
+        var lifetime = _lifetime!;
+        var lockedWhileAsked = await Resolver().ResolveAsync(
+            "dev",
+            "staging",
+            null,
+            (_, _) =>
+            {
+                lifetime.End();
+                return ValueTask.FromResult(true);
+            },
+            Cancel);
+
+        var locked = await Resolver().ResolveAsync("dev", "staging", null, null, Cancel);
+        var missing = await Resolver().ResolveAsync("dev", "qa", null, null, Cancel);
+
+        Assert.Equal(
+            [EnvOutcome.Declined, EnvOutcome.ChangedWhileAsked, EnvOutcome.Locked, EnvOutcome.Locked],
+            new[] { declined, changed, lockedWhileAsked, locked }.Select(resolved => resolved.Outcome));
+        Assert.All(new[] { declined, changed, lockedWhileAsked, locked }, resolved => Assert.Equal("staging", resolved.Profile));
+        Assert.Equal("qa", missing.Profile);
+    }
+
+    private void AddToStaging(params (string Key, string Value)[] variables)
+    {
+        foreach (var (key, value) in variables)
+        {
+            Assert.NotEqual(EnvSetOutcome.Rejected, new EnvStore(_vault).TrySet("dev", "staging", key, value, out _));
+        }
+
+        _vault.Save();
+    }
+
     private SessionEnvResolver Resolver() => new(
         () => _lifetime,
         lifetime => ReferenceEquals(lifetime, _lifetime) && lifetime.IsLive ? _vault : null,

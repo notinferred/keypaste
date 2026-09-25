@@ -12,7 +12,7 @@ Enter the master password and review requests in that terminal. Without the appr
 
 The MCP client starts the bridge, while you start the approver. This keeps software-triggered requests from opening a master-password prompt.
 
-These are the current CLI/MCP instructions. Locking the desktop does not stop a terminal approver holding another vault. In source, the bridge reaches whichever keypaste process holds the vault its `--vault` names: a desktop that has it unlocked answers listings and asks about each credential request in its own prompt window ([approvals](approvals.md#approving-in-the-desktop-app)), and `keypaste agent` on a vault the desktop holds is refused naming the app. A bridge with no `--vault` is refused, and `keypaste setup` always writes one. In source the app can also connect a client itself ([below](#from-the-desktop-app)). [STEPS](STEPS.md) covers the rest of the focused target: launching env projects through the app's session.
+These instructions describe the CLI and MCP bridge in source, for the next release; the published `v0.3.0` asks `Approve? [y/N]` and keeps an approval for up to 300 seconds. Locking the desktop does not stop a terminal approver holding another vault. In source, the bridge reaches whichever keypaste process holds the vault its `--vault` names: a desktop that has it unlocked answers listings and asks about each credential request in its own prompt window ([approvals](approvals.md#approving-in-the-desktop-app)), and `keypaste agent` on a vault the desktop holds is refused naming the app. A bridge with no `--vault` is refused, and `keypaste setup` always writes one. In source the app can also connect a client itself ([below](#from-the-desktop-app)). [STEPS](STEPS.md) covers the rest of the focused target: launching env projects through the app's session.
 
 ## Before you start
 
@@ -51,11 +51,11 @@ exposure       env/** (the default; nothing else in the vault can even be named)
 
 ## From the desktop app
 
-In source, Agent Activity has a Connect a client section for the vault the app has unlocked. Choose the client, the label the audit log and the prompt will call it (its id unless you change it) and any exposure beyond the default `env/**`, then press Preview connect. The app shows exactly what it will run: for Claude Code and Codex, the client's own removal of any earlier keypaste entry and then its `mcp add`, with the `keypaste-mcp` path, `--vault`, `--client-label` and each `--expose`. Nothing is written until you press Run it, and Cancel or changing a field drops the preview. For Cursor and Claude Desktop the app shows the block to paste and writes nothing, as `setup` does.
+In source, the Agents screen has a Connect a client section for the vault the app has unlocked. Choose the client, the label the audit log and the prompt will call it (its id unless you change it) and any exposure beyond the default `env/**`, then press Preview connect. The app shows exactly what it will run: for Claude Code and Codex, the client's own removal of any earlier keypaste entry and then its `mcp add`, with the `keypaste-mcp` path, `--vault`, `--client-label` and each `--expose`. Nothing is written until you press Run it, and Cancel or changing a field drops the preview. For Cursor and Claude Desktop the app shows the block to paste and writes nothing, as `setup` does.
 
 The app registers the `keypaste-mcp` beside it, or the first one on `PATH`. The internal desktop packages carry one. An AppImage is mounted somewhere new each time it starts, so from an AppImage the client is told to start the image file itself with `mcp`: moving or deleting the `.AppImage` breaks the registration until you connect again.
 
-Check the connection starts that registered command as the client would, lists the names its exposure allows and asks for one of them, the only one or the one you pick, with a reason saying it is a connection check. The request opens the app's prompt window like any other, and Approve or Deny each end the check. A released password is discarded unread, and the audit record appears in the session's history below. Preview remove and Run it take keypaste out of the client and leave its other servers alone.
+Check the connection starts that registered command as the client would, lists the names its exposure allows and asks for one of them, the only one or the one you pick, with a reason saying it is a connection check. The request opens the app's prompt window like any other, and Allow once, Allow for 1 hour or Deny each end the check. A released password is discarded unread, and the audit record appears in the session's history below. Preview remove and Run it take keypaste out of the client and leave its other servers alone.
 
 No master password, keyfile or session identifier is written into a client's configuration.
 
@@ -143,13 +143,27 @@ Each exposure glob authorizes disclosure of matching entry names. Review additio
 
 Patterns match the group path and the entry title as two separate things, so `*` stays inside one path segment and `**` spans any number of them. A title containing a slash is matched as a title, so it can never impersonate a deeper group.
 
-## The two tools
+## The tools
 
 `list_entry_names` takes no arguments and returns only exposed group paths and entry names. It cannot return usernames, passwords, URLs or notes, or widen exposure.
 
-`request_credential` takes `entry`, `field`, `reason` and `ttl_seconds`. It forwards the request to `keypaste agent` for approval or a matching policy rule and returns one field. `--max-ttl` caps approval reuse, not the lifetime of the returned credential. Without an approver it refuses and names the startup command. [The demo](demo.md) shows this flow.
+`request_credential` takes `entry`, `field`, `reason` and `ttl_seconds`. It forwards the request to `keypaste agent` for approval or a matching policy rule and returns one field. The person chooses whether an approval is reused; `--max-ttl` sets how long, not the lifetime of the returned credential. Without an approver it refuses and names the startup command. [The demo](demo.md) shows this flow.
 
 Anyone who can edit the vault can influence its entry names. keypaste removes control characters, invisible Unicode and structural punctuation, then labels the listing as data. Sanitization cannot eliminate prompt injection; [THREATS.md](../THREATS.md) T-1 describes the residual risk.
+
+## Running a command with secrets (`--allow-run`)
+
+Add `--allow-run` to the bridge's arguments and it offers a third tool, `run`. Nothing adds it for you: `keypaste setup` and the desktop's Connect leave it out, so an existing configuration never gains command execution on upgrade.
+
+`run` takes `command` (the program and its arguments, one per item, never through a shell), `directory` (an existing absolute path), either `project` with an optional `profile` and `keys` or `env` mapping variable names to `kp://` references, a `reason` and an optional `timeout_seconds` (default 120, at most 600). The person holding the vault is shown the exact program, command line, resolved directory, each variable with the entry it comes from and the agent's reason, and answers Deny, Allow once or allow for up to 15 minutes; the timed choice covers only that command line in that directory on that connection. `PATH`, `KEYPASTE_*` and literal values cannot be set, and a program is searched for only in absolute `PATH` entries.
+
+The bridge writes the audit line, then starts the command with the values in its environment and stdin closed, and returns its exit code and the last 16384 characters of each stream with every literal or escaped occurrence of a value replaced by `[keypaste:NAME]`. When the client asked for progress, the bridge reports every 10 seconds while a person decides and while the command runs; a client that times tool calls out sooner should raise its limit. If the client cancels, the command is stopped with what it started (on macOS, only what is still found under it).
+
+The scrubbing is a safety net, not a boundary: a command can still print a value in another form, write it to a file, send it over the network, and any process of the same user can read its environment while it runs. Approve only commands whose behaviour you know; [THREATS.md](../THREATS.md) T-35 lists the limits.
+
+## Seeing and ending access
+
+In source, `keypaste mcp serve` is `keypaste agent` and `keypaste mcp setup` is `keypaste setup`. From another terminal, `keypaste grants --vault <path>` lists the grants the process holding that vault has given, one row per agent, entry and field with an id and the time left, and never a value; `--json` prints the same rows as one JSON array. `keypaste grants revoke <id>` ends one grant, `keypaste grants revoke <agent>` ends every grant that agent holds, and `--all` ends them all. `keypaste lock --vault <path>` asks the desktop app or `keypaste agent` holding the vault to lock now: every grant ends and `keypaste agent` stops. None of these asks for a password; they reach the holder over the same per-user endpoint as `keypaste run --session`, and nothing holding the vault is not an error.
 
 ## The audit log
 
@@ -167,7 +181,8 @@ jq -c . < ~/.keypaste/audit.jsonl
          "reason_excerpt":"deploy the billing service to staging","reason_len":37,
          "reason_sha256":"..."},
  "decision":"granted","method":"prompt",
- "reason":"a person approved this request for 300 seconds",
+ "reason":"a person approved this request for 1 hour",
+ "granted_seconds":3600,
  "exposure":["env/**"],
  "prev":"0000...0000","hash":"0c806dbd...14b3c7"}
 ```
@@ -189,8 +204,13 @@ jq -c . < ~/.keypaste/audit.jsonl
 | `timed-out` / `busy` / `cooldown` | Nobody answered in time; the connection was already carrying another call, so this one was refused rather than queued behind it; or the same request was refused a moment ago. |
 | `cancelled` | The client stopped waiting before anybody answered. Nobody decided anything. |
 | `vault-locked` / `invalid-request` / `failed` | No vault open; the arguments were wrong; something went wrong. |
+| `inject-only` | The client's policy in `clients.toml` is inject only, so a request for a value was refused before anything was read ([policy.md](policy.md)). |
 | `not-initialized` | The client called a tool before finishing the MCP handshake. Denied, with the fix named; nothing was decided. |
 | `not-implemented` | Written by the early implementation of roadmap step 2.1, before approval existed; this is a step ID, not a released version. Nothing writes it now, and it is listed because the log is append-only: old records keep the word they were written with. |
+
+Current source also writes `vault`, the identity key of the vault that answered, and `entries`, the entries a release or run used; a `run` line carries the first 256 characters of the command line as `command` and the SHA-256 of the whole resolved argument list as `command_sha256`, and its `method` is `prompt` or `grant-cache` like a credential's.
+
+A granted line carries `granted_seconds`: how long the release may be reused, which is the hour a person chose, `0` for "allow once", or a standing rule's lifetime. Lines written before it existed have none.
 
 The returned value is excluded from the log. `field` records the requested field. Current source logs the sanitized resolved entry path when available, including for opaque handles, otherwise the sanitized request argument. Published `v0.1.0` records the request argument. Keep secret values out of entry names and reason excerpts.
 
@@ -287,7 +307,7 @@ Will it see my desktop edits immediately? No. The current terminal approver hold
 
 The master-password prompt belongs in the process you start. An MCP client can trigger bridge startup, its stdin and stdout carry the protocol, and desktop clients provide no terminal. A configuration password would be plaintext, while client-mediated input would expose it to the requester. [D-0023](decisions-archive.md) records this design.
 
-Do I have to approve every single call? No. A repeat request for the same field of the same entry, from the same connection, inside the lifetime you approved, is served without asking again. Change that with `--max-ttl` on the agent. A [policy rule](policy.md) can authorize matching releases without an initial prompt.
+Do I have to approve every single call? No. In source, after Allow for 1 hour (`h` at the terminal), a repeat request for the same field of the same entry, from the same connection, is served without asking again until the hour is up; Allow once (`o`) keeps nothing. Shorten the hour with `--max-ttl` on the agent. `v0.3.0` asks `[y/N]` and keeps an approval for up to 300 seconds. A [policy rule](policy.md) can authorize matching releases without an initial prompt.
 
 Does anything leave my machine? The keypaste bridge uses local stdio and local IPC; it does not send vault data to a hosted service. Your MCP client receives the tool result and may send it to a remote model and retain it in transcripts or session files. The local bridge does not make the rest of that client workflow local. See [the demo's limits](demo.md#the-honest-limits).
 

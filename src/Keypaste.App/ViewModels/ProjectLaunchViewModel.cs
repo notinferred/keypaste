@@ -110,6 +110,14 @@ internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
 
     internal bool IsMapped => _mapping is not null;
 
+    /// <summary>The profile Run and Open terminal start with; the project card sets it.</summary>
+    internal string Profile { get; set; } = EnvProfileNames.Default;
+
+    /// <summary>The project and, for any profile but the default, the profile, as the confirmation names them.</summary>
+    private string Source => string.Equals(Profile, EnvProfileNames.Default, StringComparison.Ordinal)
+        ? Shown(_project)
+        : $"{Shown(_project)} ({Shown(Profile)})";
+
     /// <summary>Whether this platform has a terminal the app can open.</summary>
     internal bool IsSupported => _launching.Terminal.IsSupported;
 
@@ -247,7 +255,7 @@ internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
         try
         {
             resolved = await _session.Environments
-                .ResolveAsync(_project, (preview, token) => AskAsync(preview, target!, run, token), _withdrawn.Token)
+                .ResolveAsync(_project, Profile, keys: null, (preview, token) => AskAsync(preview, target!, run, token), _withdrawn.Token)
                 .ConfigureAwait(true);
         }
         finally
@@ -282,8 +290,8 @@ internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
         using var withdrawn = token.Register(() => answer.TrySetCanceled(token));
 
         ConfirmTitle = run
-            ? $"Run this in a terminal with {Count(preview.Keys.Count)} from {Shown(_project)}?"
-            : $"Open a terminal with {Count(preview.Keys.Count)} from {Shown(_project)}?";
+            ? $"Run this in a terminal with {Count(preview.Keys.Count)} from {Source}?"
+            : $"Open a terminal with {Count(preview.Keys.Count)} from {Source}?";
         ConfirmStarts = run ? Shown(_mapping?.Command ?? string.Empty) : Shown(target.FileName);
         ConfirmDirectory = Shown(target.WorkingDirectory ?? string.Empty);
         ConfirmKeys = preview.Keys.Count == 0 ? "(none)" : string.Join(", ", preview.Keys.Select(key => EntryNameSanitizer.Sanitize(key).Text));
@@ -318,7 +326,7 @@ internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
         EnvOutcome.Declined => "Nothing was started.",
         EnvOutcome.Locked => "The vault was locked, so nothing was started.",
         EnvOutcome.Unusable => Shown(
-            $"{EnvConvention.GroupPath(resolved.Project)} cannot be used, so nothing was started: " +
+            $"{EnvProfileNames.GroupPath(resolved.Project, resolved.Profile)} cannot be used, so nothing was started: " +
             string.Join("; ", resolved.Problems.Select(problem => $"{EnvResolved.Display(problem.Key)} {problem.Reason}")) +
             ". Fix or remove them, then try again."),
         _ => Shown($"Nothing was started: {resolved.Refusal}."),

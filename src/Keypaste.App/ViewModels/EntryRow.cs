@@ -1,4 +1,6 @@
+using System.ComponentModel;
 using Keypaste.Core;
+using Keypaste.Core.Activity;
 
 namespace Keypaste.App.ViewModels;
 
@@ -35,8 +37,75 @@ namespace Keypaste.App.ViewModels;
 /// of a filtered list as well as an unfiltered one.
 /// </para>
 /// </remarks>
-internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fields = MatchedFields.None)
+internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fields = MatchedFields.None) : INotifyPropertyChanged
 {
+    private EntryUseState _use;
+    private string _lastUsedText = string.Empty;
+
+    /// <inheritdoc/>
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    /// <summary>Whether agents use this entry now, recently, or not: the row's dot.</summary>
+    internal EntryUseState Use
+    {
+        get => _use;
+        private set
+        {
+            if (_use != value)
+            {
+                _use = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Use)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsInUse)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsRecent)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsIdle)));
+            }
+        }
+    }
+
+    internal bool IsInUse => _use == EntryUseState.InUse;
+
+    internal bool IsRecent => _use == EntryUseState.Recent;
+
+    internal bool IsIdle => _use == EntryUseState.Idle;
+
+    /// <summary>"in use", "4m ago", "3h ago", "2d ago" or "never"; empty until activity is read.</summary>
+    internal string LastUsedText
+    {
+        get => _lastUsedText;
+        private set
+        {
+            if (!string.Equals(_lastUsedText, value, StringComparison.Ordinal))
+            {
+                _lastUsedText = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LastUsedText)));
+            }
+        }
+    }
+
+    /// <summary>Takes this entry's use from the latest picture, without rebuilding the list.</summary>
+    /// <param name="activity">The picture.</param>
+    /// <param name="now">The time to measure from.</param>
+    internal void Apply(EntryActivity activity, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(activity);
+
+        var use = activity.Use(Name);
+        Use = use.State;
+        LastUsedText = UseText.LastUsed(use, now);
+    }
+
+    /// <summary>Rows are the same row when they name the same entry for the same reason; their use is not identity.</summary>
+    /// <param name="other">The other row.</param>
+    /// <returns>Whether they are equal.</returns>
+    public bool Equals(EntryRow? other) =>
+        other is not null
+        && string.Equals(Title, other.Title, StringComparison.Ordinal)
+        && string.Equals(GroupPath, other.GroupPath, StringComparison.Ordinal)
+        && Fields == other.Fields;
+
+    /// <inheritdoc/>
+    public override int GetHashCode() => HashCode.Combine(Title, GroupPath, Fields);
+
     /// <summary>The row's identity, which is what core reads and writes through.</summary>
     /// <remarks>
     /// Carries the title the vault holds and is never sanitized. <see cref="Path"/> is the two
@@ -59,6 +128,21 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
     /// <summary>The group, for a list that is not grouped by one. Display only, so scrubbed.</summary>
     internal string Where { get; } =
         GroupPath.Length == 0 ? "—" : EntryNameSanitizer.SanitizePath(GroupPath).Text;
+
+    /// <summary>What sort of entry this is, read from which fields are filled in.</summary>
+    internal EntryKind Kind { get; init; }
+
+    /// <summary>The icon the row draws for its kind.</summary>
+    internal string Icon => EntryKinds.Icon(Kind);
+
+    /// <summary>The row's second line: its kind, then where it lives.</summary>
+    /// <remarks>A variable says its project and profile rather than the <c>env/…</c> group path they are stored under.</remarks>
+    internal string Summary =>
+        EnvPlace.Of(GroupPath, Title) is { } place
+            ? $"{EntryKinds.Label(Kind)} · {EntryNameSanitizer.Sanitize(place.Project).Text} · {place.Profile}"
+            : GroupPath.Length == 0
+                ? EntryKinds.Label(Kind)
+                : $"{EntryKinds.Label(Kind)} · {Where}";
 
     /// <summary>
     /// Which fields a person cannot see on this row the query was found in, worded for the list.

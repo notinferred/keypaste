@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Keypaste.App.Session;
 using Keypaste.App.Views;
 using Keypaste.Core.Approval;
@@ -47,12 +48,12 @@ internal sealed class PromptScreen : IDisposable
     /// <summary>The channel launch composes for each unlock, watched by this screen.</summary>
     internal IApprovalChannel Open()
     {
-        var channel = new WindowApprovalChannel(TimeProvider.System);
+        var channel = new WindowApprovalChannel(TimeProvider.System, ApprovalLimits.Default.Window);
         channel.Shown += OnShown;
         return channel;
     }
 
-    /// <summary>Answers the prompt on screen: <c>approve</c>, <c>deny</c> or <c>close</c>.</summary>
+    /// <summary>Answers the prompt on screen: <c>approve</c> (the timed allow), <c>once</c>, <c>deny</c> or <c>close</c>.</summary>
     internal Task AnswerAsync(string answer) =>
         Dispatcher.UIThread.InvokeAsync(
             async () =>
@@ -61,22 +62,22 @@ internal sealed class PromptScreen : IDisposable
 
                 switch (answer)
                 {
-                    case "approve":
-                        var approve = Button(window, "Approve");
+                    case "approve" or "once":
+                        var allow = Button(window, answer == "once" ? "AllowOnce" : "Approve");
                         var armedBy = DateTime.UtcNow + _armingWait;
 
-                        // A person reads the prompt before pressing Approve, which is armed a moment after it appears.
-                        while (!approve.IsEffectivelyEnabled)
+                        // A person reads the prompt before allowing it, which is armed a moment after it appears.
+                        while (!allow.IsEffectivelyEnabled)
                         {
                             if (DateTime.UtcNow > armedBy)
                             {
-                                throw new DriverException("Approve never became pressable");
+                                throw new DriverException($"{allow.Name} never became pressable");
                             }
 
                             await Task.Delay(50).ConfigureAwait(true);
                         }
 
-                        Click(window, approve);
+                        Click(window, allow);
                         break;
 
                     case "deny":
@@ -94,11 +95,18 @@ internal sealed class PromptScreen : IDisposable
         _open = window;
         window.CaptureRenderedFrame();
 
-        Console.Out.WriteLine(window is EnvApprovalWindow
-            ? $"env-prompt project={Text(window, "ProjectText")} command={Text(window, "CommandText")} " +
-                $"directory={Text(window, "DirectoryText")} keys={Text(window, "KeysText")?.ReplaceLineEndings(",")}"
-            : $"prompt client={Text(window, "ClientText")} label={Text(window, "LabelText")} " +
-                $"entry={Text(window, "EntryText")} field={Text(window, "FieldText")} for={Text(window, "LifetimeText")}");
+        Console.Out.WriteLine(window switch
+        {
+            EnvApprovalWindow =>
+                $"env-prompt project={Text(window, "ProjectText")} command={Text(window, "CommandText")} " +
+                $"directory={Text(window, "DirectoryText")} keys={string.Join(',', KeyNames(window))}",
+            RunApprovalWindow =>
+                $"run-prompt title={Text(window, "TitleText")} program={Text(window, "ProgramText")} " +
+                $"command={Text(window, "CommandText")} directory={Text(window, "DirectoryText")}",
+            _ =>
+                $"prompt client={Text(window, "ClientText")} label={Text(window, "LabelText")} " +
+                $"entry={Text(window, "EntryText")} field={Text(window, "FieldText")} for={Text(window, "LifetimeText")}",
+        });
 
         window.Closed += (_, _) =>
         {
@@ -112,6 +120,10 @@ internal sealed class PromptScreen : IDisposable
     }
 
     private static string? Text(Window window, string name) => window.FindControl<TextBlock>(name)?.Text;
+
+    private static IEnumerable<string?> KeyNames(Window window) =>
+        window.FindControl<ItemsControl>("KeysList")?.GetVisualDescendants().OfType<TextBlock>()
+            .Where(block => block.Classes.Contains("key")).Select(block => block.Text) ?? [];
 
     private static Button Button(Window window, string name) =>
         window.FindControl<Button>(name) ?? throw new DriverException($"the prompt has no {name} button");

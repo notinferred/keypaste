@@ -137,8 +137,8 @@ FIRST="$(session_of)"
 # ------------------------------------------------------------- Approve releases, and says so
 raise_prompt approve
 grep '^prompt client' "$HOLD_OUT" | tail -1 \
-  | grep -qF "label=$LABEL entry=$ENTRY field=password for=60 seconds" \
-  || die "the prompt does not show the label, entry, field and lifetime"
+  | grep -qF "label=$LABEL entry=$ENTRY field=password for=once, or for 1 hour" \
+  || die "the prompt does not show the label, entry, field and what the person can allow"
 echo approve >&"$HOLD_IN"
 answered 30
 withdrawn

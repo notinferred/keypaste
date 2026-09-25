@@ -19,7 +19,7 @@ max_ttl_seconds = 300
 max_per_hour    = 20
 ```
 
-`keypaste agent` reads the file but never writes it. There is no command to edit authorization rules that an agent could persuade someone to run. In source, the desktop app does not read it: every release from a vault the app holds needs a press of Approve in [its prompt](approvals.md#approving-in-the-desktop-app).
+`keypaste agent` reads the file but never writes it. There is no command to edit authorization rules that an agent could persuade someone to run. In source, the desktop app does not read it: every credential released from a vault the app holds needs a press of Allow once or Allow for 1 hour in [its prompt](approvals.md#approving-in-the-desktop-app); a scoped token's run is the exception ([T-32](../THREATS.md#t-32--a-scoped-token-is-a-bearer-credential)).
 
 <a id="read-this-part-before-you-write-a-rule"></a>
 
@@ -144,6 +144,24 @@ keypaste: released env/dev/STRIPE_KEY to allow#1 for 300s without asking
 ```
 
 <a id="the-honest-limits"></a>
+
+## Narrowing one client
+
+`policy.toml` adds releases; `~/.keypaste/clients.toml` only takes them away, one client at a time, keyed by the same `--client-label`. Each client has one of three policies:
+
+| Policy | What it does |
+|---|---|
+| `session` | Session grants up to 1 hour: a person may give a timed grant and, in `keypaste agent`, a rule here may apply. The default. |
+| `ask` | Ask every time: no timed grant is offered or used and no rule here applies. |
+| `inject-only` | `request_credential` is refused before anything is read; `run` under `--allow-run` is still asked about. |
+
+```sh
+keypaste mcp policy                       # list them; --json prints the rows
+keypaste mcp policy '*' ask               # every client without a row of its own
+keypaste mcp policy claude-code session
+```
+
+The desktop's Agents screen sets the same file. Unlike this file's `"*"`, the `*` row there also covers a bridge started with no label, because it can only narrow; put the strict policy on `*`, since a label is whatever the client's configuration says and an agent that can edit that configuration can change it ([THREATS.md](../THREATS.md) T-36). The holder of the vault reads the file at every request, so a change applies to the next one. A file it cannot read or parse refuses every agent request until it is fixed or deleted. No policy covers `keypaste run --session` from an agent's own shell.
 
 ## Limits
 

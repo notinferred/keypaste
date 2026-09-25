@@ -71,6 +71,7 @@ internal sealed class TrashViewModel : ObservableObject, IDisposable
             if (Set(ref _rows, value))
             {
                 Raise(nameof(IsEmpty));
+                Raise(nameof(AwaitsSelection));
             }
         }
     }
@@ -90,6 +91,7 @@ internal sealed class TrashViewModel : ObservableObject, IDisposable
             // leave the button pointing at an entry nobody agreed to erase.
             IsConfirmingPurge = false;
             Raise(nameof(PurgePrompt));
+            Raise(nameof(AwaitsSelection));
             RestoreCommand.RaiseCanExecuteChanged();
             PurgeCommand.RaiseCanExecuteChanged();
         }
@@ -97,6 +99,9 @@ internal sealed class TrashViewModel : ObservableObject, IDisposable
 
     /// <summary>Whether there is nothing to recover.</summary>
     internal bool IsEmpty => _rows.Count == 0;
+
+    /// <summary>Whether the bin holds entries but none is picked, so Restore and Delete wait on one.</summary>
+    internal bool AwaitsSelection => _rows.Count > 0 && _selected is null;
 
     /// <summary>Whether this vault recycles a deleted entry at all.</summary>
     internal bool RecyclesDeletedEntries => _session.Unlocked?.RecyclesDeletedEntries == true;

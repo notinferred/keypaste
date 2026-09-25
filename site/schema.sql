@@ -53,6 +53,11 @@ CREATE TABLE IF NOT EXISTS public.signup (
 -- these grants use. Getting this backwards is the most likely reason a correct-looking
 -- `wrangler hyperdrive update` fails to authenticate.
 
+-- The database provisioned on 2026-09-25 (D-0364) has no pscale CLI behind it, so its role was
+-- created with SQL instead, NOINHERIT and with no memberships; <ROLE> is keypaste_signup_writer:
+--
+--     CREATE ROLE keypaste_signup_writer LOGIN NOINHERIT NOCREATEDB NOCREATEROLE NOBYPASSRLS PASSWORD '…';
+
 GRANT CONNECT ON DATABASE postgres   TO "<ROLE>";
 GRANT USAGE   ON SCHEMA  public      TO "<ROLE>";
 GRANT INSERT  ON TABLE  public.signup TO "<ROLE>";
@@ -63,5 +68,33 @@ GRANT INSERT  ON TABLE  public.signup TO "<ROLE>";
 -- be useful, which is the exact privilege being withheld here.
 
 -- PlanetScale grants CONNECT on a new database to PUBLIC, meaning every current and future role.
--- Close that, now that the one role that needs it has been granted it explicitly.
+-- Close that, now that the one role that needs it has been granted it explicitly. Not applied to the
+-- 2026-09-25 database: PlanetScale's own roles (pscale_exporter, pscale_pgbouncer, ...) may connect
+-- through that grant, and the table grants already confine the Worker's roles.
 REVOKE CONNECT ON DATABASE postgres FROM PUBLIC;
+
+
+-- ---------------------------------------------------------------- share links (D-0355)
+--
+-- One row per share link: an envelope the server cannot open, the views left, the expiry and the
+-- SHA-256 of the revoke token. The link's key never reaches the server. A row is deleted when its
+-- last view is spent, when it is revoked, and by the Worker's cron sweep once it expires.
+
+CREATE TABLE IF NOT EXISTS public.share (
+  id            text        PRIMARY KEY,                          -- 22-char base64url, server-generated
+  envelope      text        NOT NULL CHECK (length(envelope) <= 16384),
+  views_left    integer     NOT NULL CHECK (views_left BETWEEN 0 AND 10),
+  expires_at    timestamptz NOT NULL,
+  revoke_sha256 text        NOT NULL CHECK (revoke_sha256 ~ '^[0-9a-f]{64}$'),
+  passphrase    boolean     NOT NULL,
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS share_expires_at ON public.share (expires_at);
+
+-- A separate role and a separate Hyperdrive config created with --caching-disabled, bound as
+-- SHARE_DB. The signup role gains nothing. On the 2026-09-25 database <SHARE_ROLE> is keypaste_share,
+-- created like keypaste_signup_writer above; it is granted CONNECT explicitly so it keeps working
+-- wherever the statement above has revoked it from PUBLIC.
+GRANT CONNECT ON DATABASE postgres TO "<SHARE_ROLE>";
+GRANT USAGE ON SCHEMA public TO "<SHARE_ROLE>";
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.share TO "<SHARE_ROLE>";

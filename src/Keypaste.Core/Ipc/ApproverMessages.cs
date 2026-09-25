@@ -1,3 +1,4 @@
+using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 
 namespace Keypaste.Core.Ipc;
@@ -19,11 +20,38 @@ public enum ApproverMessageKind
 
     /// <summary>A project's env set for <c>keypaste run --session</c>, subject to a human saying yes.</summary>
     Env = 4,
+
+    /// <summary>The grants the owner's current session holds, as a list shows them.</summary>
+    Grants = 5,
+    /// <summary>Ends grants of the owner's current session.</summary>
+    RevokeGrants = 6,
+    /// <summary>Asks the owner to lock now.</summary>
+    Lock = 7,
+    /// <summary>An env request naming a profile other than the default, or a subset of keys.</summary>
+    EnvProfile = 8,
+    /// <summary>An env request authorized by a scoped token instead of a prompt.</summary>
+    TokenEnv = 9,
+    /// <summary>An agent's command to start with approved secrets in its environment.</summary>
+    Run = 10,
+}
+
+/// <summary>Who a bridge says its client is, for display and counting only (THREATS.md T-3).</summary>
+/// <param name="Name">What the client called itself, or null.</param>
+/// <param name="Version">What version it claimed, or null.</param>
+/// <param name="Label">The bridge's raw <c>--client-label</c>, or null.</param>
+public sealed record AttachClient(string? Name, string? Version, string? Label)
+{
+    /// <summary>The longest identity field an attach frame carries.</summary>
+    public const int MaximumLength = 64;
 }
 
 /// <summary>Asks the owner of a vault to attach this connection to its current session.</summary>
 /// <param name="Vault">The vault the bridge was configured with, as an absolute path.</param>
-public sealed record AttachRequest(string Vault);
+public sealed record AttachRequest(string Vault)
+{
+    /// <summary>The bridge's client, or null for a runner, <c>grants</c> or <c>lock</c>, which are not counted.</summary>
+    public AttachClient? Client { get; init; }
+}
 
 /// <summary>The session a connection is now attached to, or why it is not attached.</summary>
 /// <param name="Session">The session's identifier, or null when the connection was not attached.</param>
@@ -217,6 +245,15 @@ public sealed record EnvRequest(string Project, IReadOnlyList<string> Command, s
 
     /// <summary>The session this connection attached to.</summary>
     public string Session { get; init; } = string.Empty;
+
+    /// <summary>The profile asked for; the default profile travels as the original <c>env</c> kind.</summary>
+    public string Profile { get; init; } = EnvProfileNames.Default;
+
+    /// <summary>The keys the runner will inject, or null for the whole set.</summary>
+    public IReadOnlyList<string>? Keys { get; init; }
+
+    /// <summary>What a reference file makes of the set, as the runner claims it: <c>NAME ← KEY</c> and literal <c>NAME=value</c> lines; null outside reference-file mode.</summary>
+    public IReadOnlyList<string>? FileLines { get; init; }
 }
 
 /// <summary>The owner's answer to an <see cref="EnvRequest"/>: the whole set, or why none of it.</summary>
@@ -227,4 +264,215 @@ public sealed record EnvReply(EnvResolved Set, string Reason)
     /// <summary>A description with every value left out.</summary>
     /// <returns>The outcome, and never a value.</returns>
     public override string ToString() => $"EnvReply {{ Outcome = {Set.Outcome}, Variables = {Set.Variables.Count} }}";
+}
+
+/// <summary>One grant in force, as <c>keypaste grants</c> lists it. It has no member for a value.</summary>
+/// <param name="Id">The id a revoke names it by, from <see cref="GrantId"/>.</param>
+/// <param name="Kind"><c>credential</c> for an agent's field, <c>env</c> for a <c>keypaste run --session</c> set, <c>run</c> for an agent's run.</param>
+/// <param name="Client">Who it was granted to, as the prompt showed it.</param>
+/// <param name="Scope">What it releases: the entry, or the project and profile.</param>
+/// <param name="Field">Which field, or <c>set</c> for an env set.</param>
+/// <param name="SecondsLeft">How long it has left, rounded up so a live grant never reads as over.</param>
+public sealed record GrantSummary(string Id, string Kind, string Client, string Scope, string Field, int SecondsLeft)
+{
+    /// <summary>A credential grant's row.</summary>
+    /// <param name="grant">The grant, as the owner's cache lists it.</param>
+    /// <returns>Its id, client, entry, field and remaining seconds.</returns>
+    public static GrantSummary From(GrantInForce grant)
+    {
+        ArgumentNullException.ThrowIfNull(grant);
+
+        return new GrantSummary(
+            GrantId.Of(grant.Key),
+            "credential",
+            grant.Approved.Client,
+            grant.Approved.Entry,
+            grant.Key.Field,
+            SecondsOf(grant.Remaining));
+    }
+
+    /// <summary>A timed grant's row for a repeated <c>keypaste run --session</c> or an agent's run.</summary>
+    /// <param name="grant">The grant, as the owner's env grants list it.</param>
+    /// <returns>Its id, the project and profile, and remaining seconds.</returns>
+    public static GrantSummary From(EnvGrantInForce grant)
+    {
+        ArgumentNullException.ThrowIfNull(grant);
+
+        return new GrantSummary(
+            GrantId.OfEnv(grant.Key),
+            grant.Client is null ? "env" : "run",
+            grant.Client ?? EnvClient,
+            $"{grant.Project} · {grant.Profile}",
+            "set",
+            SecondsOf(grant.Remaining));
+    }
+
+    /// <summary>Every grant an activity holds, agents' and runs' alike, soonest to end first.</summary>
+    /// <param name="activity">What the owner's current session holds.</param>
+    /// <returns>One row per grant.</returns>
+    public static IReadOnlyList<GrantSummary> Of(ApproverActivity activity)
+    {
+        ArgumentNullException.ThrowIfNull(activity);
+
+        return [.. activity.Grants.Select(From).Concat(activity.EnvGrants.Select(From)).OrderBy(grant => grant.SecondsLeft)];
+    }
+
+    /// <summary>Who an env grant is listed as given to.</summary>
+    public const string EnvClient = "keypaste run";
+
+    private static int SecondsOf(TimeSpan remaining) => (int)Math.Ceiling(Math.Max(0, remaining.TotalSeconds));
+}
+
+/// <summary>Asks the owner which grants its current session holds.</summary>
+public sealed record GrantsRequest
+{
+    /// <summary>The vault this connection attached to.</summary>
+    public string Vault { get; init; } = string.Empty;
+
+    /// <summary>The session this connection attached to.</summary>
+    public string Session { get; init; } = string.Empty;
+}
+
+/// <summary>The grants in force, or why none were listed.</summary>
+/// <param name="Answered">Whether the owner admitted the request at all.</param>
+/// <param name="Grants">The grants, soonest to end first.</param>
+/// <param name="Complete">Whether these are all of them; a reply that would not fit one frame drops rows and says so.</param>
+/// <param name="Reason">keypaste's own words for a refusal, or empty.</param>
+public sealed record GrantsReply(bool Answered, IReadOnlyList<GrantSummary> Grants, bool Complete, string Reason);
+
+/// <summary>Asks the owner to end grants of its current session.</summary>
+/// <param name="Ids">The ids to end.</param>
+/// <param name="Client">Ends every grant given to this client, or null.</param>
+/// <param name="All">Ends every grant.</param>
+public sealed record RevokeGrantsRequest(IReadOnlyList<string> Ids, string? Client, bool All)
+{
+    /// <summary>The vault this connection attached to.</summary>
+    public string Vault { get; init; } = string.Empty;
+
+    /// <summary>The session this connection attached to.</summary>
+    public string Session { get; init; } = string.Empty;
+}
+
+/// <summary>How many grants were ended, or why none were.</summary>
+/// <param name="Revoked">How many grants ended.</param>
+/// <param name="Reason">keypaste's own words for a refusal, or empty.</param>
+public sealed record RevokeGrantsReply(int Revoked, string Reason);
+
+/// <summary>Asks the owner to lock now.</summary>
+public sealed record LockRequest
+{
+    /// <summary>The vault this connection attached to.</summary>
+    public string Vault { get; init; } = string.Empty;
+
+    /// <summary>The session this connection attached to.</summary>
+    public string Session { get; init; } = string.Empty;
+}
+
+/// <summary>Whether the owner is locking.</summary>
+/// <param name="Locking">Whether the lock was started; it completes after this reply leaves.</param>
+/// <param name="Reason">keypaste's own words for a refusal, or empty.</param>
+public sealed record LockReply(bool Locking, string Reason);
+
+/// <summary>
+/// Asks the owner to release a set to a runner holding a scoped token, which the owner verifies
+/// in place of asking a person.
+/// </summary>
+/// <remarks>
+/// <see cref="ToString"/> leaves the token out, so no interpolated request can print it.
+/// </remarks>
+/// <param name="Token">The token, verified only by the owner.</param>
+/// <param name="Project">The project whose set is asked for.</param>
+/// <param name="Profile">The profile asked for.</param>
+/// <param name="Command">The command the runner will start, one argument per item.</param>
+/// <param name="Directory">The directory it will start in.</param>
+public sealed record TokenEnvRequest(string Token, string Project, string Profile, IReadOnlyList<string> Command, string Directory)
+{
+    /// <summary>The vault this connection attached to.</summary>
+    public string Vault { get; init; } = string.Empty;
+
+    /// <summary>The session this connection attached to.</summary>
+    public string Session { get; init; } = string.Empty;
+
+    /// <summary>A description with the token left out.</summary>
+    /// <returns>The set asked for, never the token.</returns>
+    public override string ToString() => $"TokenEnvRequest {{ Project = {Project}, Profile = {Profile}, Token = <redacted> }}";
+}
+
+/// <summary>One variable of an agent's run named by a <c>kp://</c> reference.</summary>
+/// <param name="Name">The variable name the command sees.</param>
+/// <param name="Reference">The reference, as the agent wrote it.</param>
+public sealed record RunReference(string Name, string Reference);
+
+/// <summary>
+/// Asks the owner to release approved secrets for a command an agent's bridge will start with them in
+/// its environment.
+/// </summary>
+/// <remarks>
+/// The owner runs nothing. The program, command and directory are the bridge's claim, as a runner's
+/// are (THREATS.md T-30): they are what the person is shown and what the bridge starts.
+/// </remarks>
+public sealed record RunRequest
+{
+    /// <summary>The program's absolute path, as the bridge resolved it and will start it.</summary>
+    public required string Program { get; init; }
+
+    /// <summary>The command as the agent named it: its first item named the program.</summary>
+    public required IReadOnlyList<string> Command { get; init; }
+
+    /// <summary>The directory, every link resolved.</summary>
+    public required string Directory { get; init; }
+
+    /// <summary>The env project whose set is asked for, or null in reference mode.</summary>
+    public string? Project { get; init; }
+
+    /// <summary>The project's profile.</summary>
+    public string Profile { get; init; } = EnvProfileNames.Default;
+
+    /// <summary>Only these keys of the set, or null for the whole set.</summary>
+    public IReadOnlyList<string>? Keys { get; init; }
+
+    /// <summary>Each variable and its reference, or null in set mode.</summary>
+    public IReadOnlyList<RunReference>? References { get; init; }
+
+    /// <summary>The agent's stated reason, verbatim and untrusted (THREATS.md T-2).</summary>
+    public required string Reason { get; init; }
+
+    /// <summary>The globs the bridge was configured with.</summary>
+    public required IReadOnlyList<string> Exposure { get; init; }
+
+    /// <summary>What the client called itself. Unauthenticated.</summary>
+    public string? ClientName { get; init; }
+
+    /// <summary>What version the client claimed. Unauthenticated.</summary>
+    public string? ClientVersion { get; init; }
+
+    /// <summary>The bridge's <c>--client-label</c>, raw, as <see cref="CredentialRequest.ClientLabel"/> is.</summary>
+    public string? ClientLabel { get; init; }
+
+    /// <summary>The vault this connection attached to.</summary>
+    public string Vault { get; init; } = string.Empty;
+
+    /// <summary>The session this connection attached to.</summary>
+    public string Session { get; init; } = string.Empty;
+}
+
+/// <summary>The owner's answer to a <see cref="RunRequest"/>: the variables, or why none.</summary>
+/// <param name="Set">The variables, with values only when its outcome is <see cref="EnvOutcome.Resolved"/>.</param>
+/// <param name="Method">How it was decided, for the bridge's audit line.</param>
+/// <param name="Reason">keypaste's own words.</param>
+public sealed record RunReply(EnvResolved Set, AuditMethod Method, string Reason)
+{
+    /// <summary>How long the grant that served or was given lasts, in seconds; zero for "allow once".</summary>
+    public int GrantedSeconds { get; init; }
+
+    /// <summary>Each entry released or asked about, as <see cref="ApprovalPrompt.Shown"/> writes it.</summary>
+    public IReadOnlyList<string> Entries { get; init; } = [];
+
+    /// <summary>The session that answered, or null when none did.</summary>
+    public string? Session { get; init; }
+
+    /// <summary>A description with every value left out.</summary>
+    /// <returns>The outcome and method, never a value.</returns>
+    public override string ToString() =>
+        $"RunReply {{ Outcome = {Set.Outcome}, Method = {Method}, Variables = {Set.Variables.Count} }}";
 }

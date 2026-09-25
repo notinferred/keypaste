@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Launch;
 using ModelContextProtocol.Protocol;
 
 namespace Keypaste.Mcp.Tools;
@@ -66,13 +67,85 @@ internal static class ToolResults
                 // and the word written to the log cannot disagree about whether a person was
                 // involved. Telling a model a human approved something no human saw is exactly the
                 // claim keypaste asks to be trusted on.
-                Text = (method == AuditMethod.Policy
-                    ? ToolText.ReleasedByPolicy(field, ttlSeconds)
-                    : ToolText.Released(field, ttlSeconds)) + value,
+                Text = (method switch
+                {
+                    AuditMethod.Policy => ToolText.ReleasedByPolicy(field, ttlSeconds),
+                    AuditMethod.Prompt when ttlSeconds == 0 => ToolText.ReleasedOnce(field),
+                    _ => ToolText.Released(field, ttlSeconds),
+                }) + value,
             },
         ],
         StructuredContent = Structured(field, value, ttlSeconds),
     };
+
+    /// <summary>A run's result: how it ended and its scrubbed output. It carries no value.</summary>
+    /// <param name="names">The variables injected.</param>
+    /// <param name="method">How the release was decided.</param>
+    /// <param name="grantedSeconds">How long the grant lasts or has left.</param>
+    /// <param name="exitCode">The exit code, or null when it was stopped.</param>
+    /// <param name="timeoutSeconds">The run's timeout.</param>
+    /// <param name="stdout">Standard output, scrubbed.</param>
+    /// <param name="stderr">Standard error, scrubbed.</param>
+    /// <returns>A success result, even for a non-zero exit: the tool worked and the command did not.</returns>
+    internal static CallToolResult Ran(
+        IReadOnlyList<string> names,
+        AuditMethod method,
+        int grantedSeconds,
+        int? exitCode,
+        int timeoutSeconds,
+        ScrubbedText stdout,
+        ScrubbedText stderr)
+    {
+        var replacements = stdout.Replacements + stderr.Replacements;
+        var header = ToolText.Ran(names, method, grantedSeconds, exitCode, timeoutSeconds, replacements);
+
+        using var buffer = new MemoryStream(1024);
+
+        using (var writer = new Utf8JsonWriter(buffer))
+        {
+            writer.WriteStartObject();
+
+            if (exitCode is { } code)
+            {
+                writer.WriteNumber("exit_code", code);
+            }
+            else
+            {
+                writer.WriteNull("exit_code");
+            }
+
+            writer.WriteBoolean("timed_out", exitCode is null);
+            writer.WriteStartArray("injected");
+            foreach (var name in names)
+            {
+                writer.WriteStringValue(name);
+            }
+
+            writer.WriteEndArray();
+            writer.WriteNumber("granted_seconds", grantedSeconds);
+            writer.WriteString("stdout", stdout.Text);
+            writer.WriteString("stderr", stderr.Text);
+            writer.WriteBoolean("stdout_truncated", stdout.Truncated);
+            writer.WriteBoolean("stderr_truncated", stderr.Truncated);
+            writer.WriteNumber("replacements", replacements);
+            writer.WriteEndObject();
+        }
+
+        using var parsed = JsonDocument.Parse(buffer.ToArray());
+
+        return new CallToolResult
+        {
+            IsError = false,
+            Content =
+            [
+                new TextContentBlock
+                {
+                    Text = $"{header}\n--- stdout ---\n{stdout.Text}\n--- stderr ---\n{stderr.Text}",
+                },
+            ],
+            StructuredContent = parsed.RootElement.Clone(),
+        };
+    }
 
     private static JsonElement Structured(string field, string value, int ttlSeconds)
     {

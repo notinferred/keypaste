@@ -19,6 +19,9 @@
     <Property Id="ARPCOMMENTS" Value="Internal candidate $(var.FullVersion); unsigned; not for distribution" />
     <Property Id="ARPNOMODIFY" Value="1" />
 
+    <Icon Id="keypaste.ico" SourceFile="$(var.AppIcon)" />
+    <Property Id="ARPPRODUCTICON" Value="keypaste.ico" />
+
     <StandardDirectory Id="LocalAppDataFolder">
       <Directory Id="ProgramsFolder" Name="Programs">
         <Directory Id="INSTALLFOLDER" Name="keypaste" />
@@ -33,7 +36,7 @@
     </Component>
 
     <Component Id="StartMenuShortcut" Directory="ProgramMenuFolder">
-      <Shortcut Id="KeypasteShortcut" Name="keypaste" Target="[INSTALLFOLDER]keypaste-app.exe" WorkingDirectory="INSTALLFOLDER" />
+      <Shortcut Id="KeypasteShortcut" Name="keypaste" Target="[INSTALLFOLDER]keypaste-app.exe" WorkingDirectory="INSTALLFOLDER" Icon="keypaste.ico" />
       <RegistryValue Root="HKCU" Key="Software\keypaste\Installer" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
     </Component>
 

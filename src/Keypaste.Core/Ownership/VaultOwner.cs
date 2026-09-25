@@ -10,6 +10,9 @@ public enum OwnerKind
 
     /// <summary>A terminal <c>keypaste agent</c>.</summary>
     TerminalAgent = 1,
+
+    /// <summary>A keypaste command that saves the vault, held only while it runs.</summary>
+    CommandLine = 2,
 }
 
 /// <summary>The process holding a vault, as another process is told about it.</summary>
@@ -38,6 +41,7 @@ public sealed record VaultOwner(OwnerKind Kind, int ProcessId, string VaultPath)
     {
         OwnerKind.DesktopApp => "the keypaste desktop app",
         OwnerKind.TerminalAgent => "keypaste agent",
+        OwnerKind.CommandLine => "a keypaste command",
         _ => "a keypaste process",
     };
 }

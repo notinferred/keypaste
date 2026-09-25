@@ -177,7 +177,7 @@ public sealed class PolicyVerbTests : IDisposable
     {
         _cli.Run("help");
 
-        Assert.Contains("policy ls", _cli.Out, StringComparison.Ordinal);
+        Assert.Contains("  policy    show the standing rules that skip the prompt", _cli.Out, StringComparison.Ordinal);
     }
 
     private int Run(string? policy)

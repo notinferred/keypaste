@@ -103,6 +103,25 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
     private ApproverClient? _client;
     private bool _disposed;
 
+    /// <summary>Who this bridge's client says it is, sent on every attach so the owner can count it; null sends nothing.</summary>
+    /// <remarks>Display only (THREATS.md T-3): read when attaching, because the handshake that names the client comes after this connection is built.</remarks>
+    internal Func<AttachClient?>? Identity { get; set; }
+
+    /// <summary>Asks the owner to release the secrets an agent's run would inject.</summary>
+    /// <param name="request">The run. Its vault and session are filled in here.</param>
+    /// <param name="cancellationToken">Cancelled when the client gives up on the call.</param>
+    /// <returns>The owner's answer, and what became of the exchange.</returns>
+    /// <remarks>
+    /// Never sent twice. A run whose reply was lost may already have been approved, or released, and
+    /// sending it again on a fresh connection would put a second prompt in front of a person who
+    /// already answered; it is reported as a failed exchange instead.
+    /// </remarks>
+    internal ValueTask<Exchange<RunReply>> RunAsync(RunRequest request, CancellationToken cancellationToken) =>
+        ExchangeAsync(
+            (client, session, token) => client.ReleaseRunAsync(request with { Vault = vaultPath, Session = session }, token),
+            cancellationToken,
+            retry: false);
+
     /// <summary>Asks the owner to decide one credential request.</summary>
     /// <param name="request">What the agent asked for. Its vault and session are filled in here.</param>
     /// <param name="cancellationToken">Cancelled when the client gives up on the call.</param>
@@ -127,7 +146,8 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
 
     private async ValueTask<Exchange<T>> ExchangeAsync<T>(
         Func<ApproverClient, string, CancellationToken, ValueTask<T?>> exchange,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool retry = true)
         where T : class
     {
         if (pipeName is null || vaultPath.Length == 0)
@@ -178,7 +198,7 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
             // send the request again. The connection is finished either way, but re-sending would put a
             // request nobody is waiting for in front of a person, on a fresh connection whose id scopes a
             // different grant and cooldown.
-            if (cancellationToken.IsCancellationRequested)
+            if (cancellationToken.IsCancellationRequested || !retry)
             {
                 await DropAsync().ConfigureAwait(false);
 
@@ -219,7 +239,7 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
                 return (null, null, ApproverOutcome.Unreachable);
             }
 
-            var attached = await client.AttachAsync(new AttachRequest(vaultPath), cancellationToken).ConfigureAwait(false);
+            var attached = await client.AttachAsync(new AttachRequest(vaultPath) { Client = Identity?.Invoke() }, cancellationToken).ConfigureAwait(false);
 
             if (attached is not null)
             {

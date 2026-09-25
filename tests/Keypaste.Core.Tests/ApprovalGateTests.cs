@@ -66,6 +66,26 @@ public sealed class ApprovalGateTests
     }
 
     /// <summary>
+    /// The window is open before the person is asked, so a whole window spent putting the prompt up
+    /// closes it. Opened afterwards, it began again once the prompt was showing, and a test that
+    /// moved its clock as soon as the person was asked could never see it close (app run
+    /// 36084643134).
+    /// </summary>
+    [Fact]
+    public async Task TheWindowIsOpenBeforeThePersonIsAsked()
+    {
+        var clock = new ManualClock();
+        var channel = new SlowToShowChannel(clock, TimeSpan.FromSeconds(ApprovalLimits.DefaultWindowSeconds));
+        using var gate = new ApprovalGate(channel, clock, ApprovalLimits.Default);
+
+        var answer = await gate.AskAsync("k", Prompt(), TestContext.Current.CancellationToken)
+            .AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        Assert.Equal(ApprovalAnswer.TimedOut, answer);
+    }
+
+    /// <summary>
     /// The single most important test in this file, and the one a "simplification" would break: a
     /// channel that answers yes after the deadline must not release anything. The human's window is
     /// the human's window, whatever the channel decided to do about the token it was handed.
@@ -339,6 +359,80 @@ public sealed class ApprovalGateTests
         Assert.Null(owned.Waiting);
     }
 
+    [Fact]
+    public async Task ApprovedOnce_IsReturnedAsGiven()
+    {
+        var (gate, _) = Build(new ScriptedChannel(ApprovalAnswer.ApprovedOnce));
+        using var owned = gate;
+
+        var answer = await owned.AskAsync("k", Prompt(), TestContext.Current.CancellationToken);
+
+        Assert.Equal(ApprovalAnswer.ApprovedOnce, answer);
+        Assert.True(answer.Releases());
+    }
+
+    /// <summary>"Allow once" after the window closed is as late as any other yes.</summary>
+    [Fact]
+    public async Task ApprovedOnce_AfterTheWindow_IsTimedOut()
+    {
+        var channel = new ScriptedChannel(ApprovalAnswer.ApprovedOnce) { Park = true, IgnoreWithdrawal = true };
+        var (gate, clock) = Build(channel);
+        using var owned = gate;
+
+        var asking = owned.AskAsync("k", Prompt(), TestContext.Current.CancellationToken).AsTask();
+        await channel.Entered.WaitAsync(TestContext.Current.CancellationToken);
+
+        clock.Advance(TimeSpan.FromSeconds(ApprovalLimits.DefaultWindowSeconds));
+        channel.Release();
+
+        Assert.Equal(ApprovalAnswer.TimedOut, await asking);
+    }
+
+    [Fact]
+    public async Task ApprovedOnce_ForAWithdrawnRequest_IsCancelled()
+    {
+        var channel = new ScriptedChannel(ApprovalAnswer.ApprovedOnce) { Park = true };
+        var (gate, _) = Build(channel);
+        using var owned = gate;
+        using var caller = new CancellationTokenSource();
+
+        var asking = owned.AskAsync("k", Prompt(), caller.Token).AsTask();
+        await channel.Entered.WaitAsync(TestContext.Current.CancellationToken);
+        await caller.CancelAsync();
+
+        Assert.Equal(ApprovalAnswer.Cancelled, await asking);
+        Assert.True(channel.WasWithdrawn);
+    }
+
+    [Fact]
+    public async Task ApprovedOnce_StartsNoCooldown()
+    {
+        var channel = new ScriptedChannel(ApprovalAnswer.ApprovedOnce);
+        var (gate, _) = Build(channel);
+        using var owned = gate;
+
+        await owned.AskAsync("same", Prompt(), TestContext.Current.CancellationToken);
+
+        Assert.False(owned.IsInCooldown("same"));
+        Assert.Equal(ApprovalAnswer.ApprovedOnce, await owned.AskAsync("same", Prompt(), TestContext.Current.CancellationToken));
+        Assert.Equal(2, channel.Asked);
+    }
+
+    [Theory]
+    [InlineData(ApprovalAnswer.NoChannel)]
+    [InlineData(ApprovalAnswer.Denied)]
+    [InlineData(ApprovalAnswer.TimedOut)]
+    [InlineData(ApprovalAnswer.Cancelled)]
+    [InlineData(ApprovalAnswer.Busy)]
+    [InlineData(ApprovalAnswer.Cooldown)]
+    [InlineData(ApprovalAnswer.Failed)]
+    public void OnlyTheTwoAllowAnswers_Release(ApprovalAnswer answer)
+    {
+        Assert.False(answer.Releases());
+        Assert.True(ApprovalAnswer.Approved.Releases());
+        Assert.True(ApprovalAnswer.ApprovedOnce.Releases());
+    }
+
     /// <summary>A channel that answers what it was told to, when it is told to.</summary>
     /// <remarks>
     /// Both completion sources are built with
@@ -389,6 +483,19 @@ public sealed class ApprovalGateTests
             await _released.Task.ConfigureAwait(false);
 
             return answer;
+        }
+    }
+
+    /// <summary>A channel whose prompt takes <paramref name="showing"/> to appear and is then never answered.</summary>
+    private sealed class SlowToShowChannel(ManualClock clock, TimeSpan showing) : IApprovalChannel
+    {
+        public ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken)
+        {
+            clock.Advance(showing);
+
+            var answer = new TaskCompletionSource<ApprovalAnswer>(TaskCreationOptions.RunContinuationsAsynchronously);
+            cancellationToken.Register(() => answer.TrySetResult(ApprovalAnswer.Denied));
+            return new ValueTask<ApprovalAnswer>(answer.Task);
         }
     }
 

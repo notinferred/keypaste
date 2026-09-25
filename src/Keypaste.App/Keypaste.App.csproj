@@ -35,7 +35,12 @@
     -->
 
     <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <ApplicationIcon>Assets/keypaste.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets/**" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="../Keypaste.Core/Keypaste.Core.csproj" />

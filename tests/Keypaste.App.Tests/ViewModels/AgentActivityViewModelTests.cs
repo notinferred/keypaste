@@ -32,8 +32,12 @@ public sealed class AgentActivityViewModelTests
         Assert.Equal("example · password", waiting.What);
         Assert.Equal("claude-code · label ci-probe", waiting.Who);
         Assert.Equal("answered for you in 45 s", waiting.Left);
+        Assert.Equal("45s left", waiting.LeftText);
+        Assert.True(model.HasWaiting);
         Assert.Empty(model.Grants);
         Assert.True(model.IsAvailable);
+        var serving = Assert.IsType<AuthorityStatus.Serving>(app.Authority.Status);
+        Assert.Equal($"Answering agents from this app · process {serving.Owner.ProcessId} · session {serving.Session}", model.Serving);
 
         app.Clock.Advance(TimeSpan.FromSeconds(5));
 
@@ -61,13 +65,13 @@ public sealed class AgentActivityViewModelTests
         var grant = Assert.Single(model.Grants);
         Assert.Equal("example · password", grant.What);
         Assert.Equal("claude-code · label ci-probe", grant.Who);
-        Assert.Equal("ends in 60 s", grant.Left);
+        Assert.Equal("ends in 3600 s", grant.Left);
         Assert.NotNull(grant.Grant);
         Assert.True(model.RevokeAllCommand.CanExecute(null));
 
         app.Clock.Advance(TimeSpan.FromSeconds(10));
 
-        Assert.Equal("ends in 50 s", Assert.Single(model.Grants).Left);
+        Assert.Equal("ends in 3590 s", Assert.Single(model.Grants).Left);
         Assert.DoesNotContain(reply.Value!, Everything(model), StringComparison.Ordinal);
     }
 
@@ -104,6 +108,35 @@ public sealed class AgentActivityViewModelTests
     }
 
     [Fact]
+    public async Task RevokeById_EndsThatGrant()
+    {
+        await using var app = await App.StartAsync();
+        app.Person.Answer = ApprovalAnswer.Approved;
+
+        await using var second = await app.ConnectAsync();
+        await app.RequestAsync();
+        await app.RequestAsync(second);
+
+        using var model = app.Model();
+
+        Assert.Equal(2, model.Grants.Count);
+        var listed = app.Authority.Grants();
+        Assert.Equal(model.Grants.Select(row => row.Id).Order(StringComparer.Ordinal), listed.Select(grant => grant.Id).Order(StringComparer.Ordinal));
+        Assert.All(model.Grants, row => Assert.Equal(GrantId.Of(row.Grant!.Value), row.Id));
+        Assert.All(listed, grant => Assert.Equal(new GrantSummary(grant.Id, "credential", "claude-code", "example", "password", 3600), grant));
+
+        var ended = model.Grants[0];
+        model.RevokeCommand.Execute(ended);
+
+        var kept = Assert.Single(model.Grants);
+        Assert.NotEqual(ended.Id, kept.Id);
+        Assert.Equal(kept.Id, Assert.Single(app.Authority.Grants()).Id);
+        Assert.False(app.Authority.Revoke(ended.Id!));
+        Assert.True(app.Authority.Revoke(kept.Id!.ToUpperInvariant()));
+        Assert.Empty(app.Authority.Grants());
+    }
+
+    [Fact]
     public async Task History_is_the_audit_records_naming_this_session()
     {
         await using var app = await App.StartAsync();
@@ -113,7 +146,8 @@ public sealed class AgentActivityViewModelTests
         using var model = app.Model();
 
         Assert.False(model.HasHistoryMessage);
-        Assert.Contains($"1 record of 2 in {model.AuditPath}, session {app.Session}", model.History, StringComparison.Ordinal);
+        Assert.Equal($"1 record of 2 in {AuditHistory.ShortPath(model.AuditPath)}, this session", model.HistoryHeading);
+        Assert.DoesNotContain(app.Session, model.HistoryHeading + model.History, StringComparison.Ordinal);
         Assert.Contains("example", model.History, StringComparison.Ordinal);
         Assert.DoesNotContain("FROM_BEFORE", model.History, StringComparison.Ordinal);
     }
@@ -129,18 +163,32 @@ public sealed class AgentActivityViewModelTests
 
         app.Clock.Advance(TimeSpan.FromSeconds(1));
 
-        Assert.Contains("2 records of 2", model.History, StringComparison.Ordinal);
+        Assert.Contains("2 records of 2", model.HistoryHeading, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task A_missing_log_is_unavailable_rather_than_a_session_with_no_history()
+    public async Task A_session_with_no_records_says_so_instead_of_an_empty_table()
+    {
+        await using var app = await App.StartAsync();
+        app.Audit("env/other/FROM_BEFORE", "an-earlier-session");
+
+        using var model = app.Model();
+
+        Assert.False(model.HasHistory);
+        Assert.Equal("The audit log has no records from this session yet.", model.HistoryMessage);
+        Assert.Empty(model.HistoryHeading);
+    }
+
+    [Fact]
+    public async Task A_missing_log_reads_as_a_session_with_no_records_yet()
     {
         await using var app = await App.StartAsync();
 
         using var model = app.Model();
 
         Assert.False(model.HasHistory);
-        Assert.Equal($"History unavailable: there is no audit log at {model.AuditPath}.", model.HistoryMessage);
+        Assert.Equal("The audit log has no records from this session yet.", model.HistoryMessage);
+        Assert.DoesNotContain(model.AuditPath, model.HistoryMessage, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -204,6 +252,44 @@ public sealed class AgentActivityViewModelTests
         Assert.Same(before, Assert.Single(model.Grants));
     }
 
+    [Fact]
+    public void A_runs_timed_grant_is_listed_by_the_id_keypaste_grants_revokes_it_by()
+    {
+        var row = ActivityRow.EnvGranted(3, new EnvGrantInForce("key", "acme-api", "staging", "npm start", TimeSpan.FromSeconds(899.5)));
+
+        Assert.Equal(3, row.Number);
+        Assert.Equal(GrantId.OfEnv("key"), row.Id);
+        Assert.Null(row.Grant);
+        Assert.Equal("keypaste run · label none configured", row.Who);
+        Assert.Equal("acme-api · staging · npm start · set", row.What);
+        Assert.Equal("ends in 900 s", row.Left);
+    }
+
+    [Fact]
+    public async Task A_grant_row_says_its_time_left_as_the_table_shows_it_and_a_revoke_says_so()
+    {
+        await using var app = await App.StartAsync();
+        app.Person.Answer = ApprovalAnswer.Approved;
+        await app.RequestAsync();
+
+        List<string> said = [];
+        using var model = new AgentActivityViewModel(app.Authority, app.Fixture.Home, app.Clock, toast: said.Add);
+
+        var grant = Assert.Single(model.Grants);
+        Assert.Equal(("claude-code", "example · password", "1h left", 1d), (grant.Client, grant.Detail, grant.LeftText, grant.Fraction));
+
+        app.Clock.Advance(TimeSpan.FromSeconds(181));
+
+        grant = Assert.Single(model.Grants);
+        Assert.Equal("57m left", grant.LeftText);
+        Assert.Equal(3419d / 3600, grant.Fraction, 3);
+
+        model.RevokeCommand.Execute(grant);
+
+        Assert.Empty(model.Grants);
+        Assert.Equal(["Revoked claude-code's grant"], said);
+    }
+
     private static string Everything(AgentActivityViewModel model) =>
         string.Join(
             '\n',
@@ -262,8 +348,18 @@ public sealed class AgentActivityViewModelTests
 
         internal AgentActivityViewModel Model() => new(Authority, Fixture.Home, Clock);
 
-        internal Task<CredentialReply?> RequestAsync() =>
-            _client.RequestAsync(
+        /// <summary>A second connection attached to the same session, as a second agent would be.</summary>
+        internal async Task<ApproverClient> ConnectAsync()
+        {
+            var serving = Assert.IsType<AuthorityStatus.Serving>(Authority.Status);
+            var client = await ApproverClient.TryConnectAsync(serving.Endpoint, _connect, Token);
+            Assert.NotNull(client);
+            Assert.True((await client.AttachAsync(new AttachRequest(Fixture.Path_), Token))!.Attached);
+            return client;
+        }
+
+        internal Task<CredentialReply?> RequestAsync(ApproverClient? on = null) =>
+            (on ?? _client).RequestAsync(
                 new CredentialRequest
                 {
                     Entry = "example",

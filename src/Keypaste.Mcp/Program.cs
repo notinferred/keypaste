@@ -1,6 +1,7 @@
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Launch;
 using Keypaste.Mcp.Tools;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
@@ -8,7 +9,7 @@ using ModelContextProtocol.Server;
 namespace Keypaste.Mcp;
 
 /// <summary>
-/// The MCP bridge: two tools, over stdio, denying everything.
+/// The MCP bridge: two tools, or three with <c>--allow-run</c>, over stdio, denying everything.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -85,19 +86,28 @@ internal static class Program
         var serverOptions = new McpServerOptions
         {
             ServerInfo = new Implementation { Name = "keypaste", Version = CoreInfo.Version },
-            ServerInstructions = ToolText.ServerInstructions,
+            ServerInstructions = options.AllowRun ? ToolText.ServerInstructions + ToolText.RunInstructions : ToolText.ServerInstructions,
             Capabilities = new ServerCapabilities { Tools = new ToolsCapability() },
             ToolCollection = [],
         };
 
         // Registered explicitly rather than by scanning the assembly: two tools is the whole
-        // surface, and a bridge that could grow a third by accident is not one to build.
+        // surface, and run a third only when the person started this bridge with --allow-run, so
+        // no existing configuration gains command execution on upgrade (D-0358).
         serverOptions.ToolCollection.Add(
             new ListEntryNamesTool(new ApproverEntryNameSource(approver, options), options, audit));
         serverOptions.ToolCollection.Add(new RequestCredentialTool(options, approver, audit));
 
+        if (options.AllowRun)
+        {
+            // Every child of this process is a run's, so orphans a run leaves behind can be found.
+            CapturedLaunch.AdoptOrphans();
+            serverOptions.ToolCollection.Add(new RunTool(options, approver, audit));
+        }
+
         await using var transport = new StdioServerTransport(serverOptions, loggerFactory: null);
         await using var server = McpServer.Create(transport, serverOptions, loggerFactory: null, serviceProvider: null);
+        approver.Identity = () => McpAudit.AttachIdentity(server.ClientInfo, options);
 
         await server.RunAsync().ConfigureAwait(false);
     }

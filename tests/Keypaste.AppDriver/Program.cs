@@ -3,6 +3,7 @@ using Keypaste.App;
 using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
+using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
@@ -40,7 +41,7 @@ namespace Keypaste.AppDriver;
 /// <c>scripts/verify-current-state.sh</c> can change it between two real requests (U.3). With
 /// neither, a request is put to the person in the app's own prompt window, as launch does, drawn on
 /// a headless display: <c>prompt</c> prints what the window shows and <c>prompt withdrawn</c> when it
-/// comes down, and the lines <c>approve</c>, <c>deny</c> and <c>close</c> click its buttons through
+/// comes down, and the lines <c>approve</c> (the timed allow), <c>once</c>, <c>deny</c> and <c>close</c> click its buttons through
 /// the display's hit-testing or close it, so <c>scripts/verify-desktop-approval.sh</c> can answer a
 /// real request as a person would (4.4).
 /// </para>
@@ -62,7 +63,7 @@ internal static class Program
         "       hold <vault> [--locked] [--held-prompt | --approving-prompt]\n" +
         "            (then per line of standard input: lock, unlock, edit <entry-path>, delete <entry-path>,\n" +
         "             relocate <entry-path> <destination-group-path> <new-title>, and with the app's own\n" +
-        "             prompt: approve, deny, close; connect <client> [label=<l>] [expose=<g,g>],\n" +
+        "             prompt: approve, once, deny, close; connect <client> [label=<l>] [expose=<g,g>],\n" +
         "             connect-remove <client>, confirm, cancel, check, pick <n>)\n" +
         "KEYPASTE_HOME must be set. KEYPASTE_DRIVER_PASSWORD is the password typed (empty for none),\n" +
         "KEYPASTE_DRIVER_KEYFILE the keyfile chosen, KEYPASTE_DRIVER_NEW_PASSWORD a new password or entry password.";
@@ -94,6 +95,7 @@ internal static class Program
                 ["backup-restore", var vault, var backup] => await driver.RestoreBackupAsync(vault, backup).ConfigureAwait(true),
                 ["export", var vault, var destination] => await driver.ExportAsync(vault, destination).ConfigureAwait(true),
                 ["access", var vault, .. var change] => await driver.ChangeAccessAsync(vault, change).ConfigureAwait(true),
+                ["raw-add", var vault, var group, var title] => RawAdd(vault, group, title),
                 ["hold", var vault, .. var options] => await HoldAsync(driver, vault, options).ConfigureAwait(true),
                 _ => Usage(),
             };
@@ -140,6 +142,19 @@ internal static class Program
 
         using var screen = new PromptScreen();
         return await driver.HoldAsync(vault, screen.Open, locked, screen).ConfigureAwait(true);
+    }
+
+    // KeePassXC can store a name keypaste refuses to create, so this writes below the product's rules.
+    private static int RawAdd(string vault, string group, string title)
+    {
+        var password = Environment.GetEnvironmentVariable("KEYPASTE_DRIVER_PASSWORD") ?? string.Empty;
+        var value = Console.In.ReadLine() ?? string.Empty;
+
+        using var v = Vault.Open(vault, password);
+        v.AddEntry(new VaultEntry { GroupPath = group, Title = title, Password = value });
+        v.Save();
+        Console.WriteLine("added");
+        return 0;
     }
 
     private static int Usage()
@@ -535,7 +550,7 @@ internal sealed class Driver(string home)
                     connect.Pick(which);
                     break;
 
-                case [("approve" or "deny" or "close") and var answer]:
+                case [("approve" or "once" or "deny" or "close") and var answer]:
                     await (screen ?? throw new DriverException("hold answers a prompt only with the app's own"))
                         .AnswerAsync(answer).ConfigureAwait(true);
                     break;
@@ -576,6 +591,11 @@ internal sealed class Driver(string home)
         if (model.HasHistoryMessage)
         {
             Console.Out.WriteLine($"history-message {model.HistoryMessage}");
+        }
+
+        if (model.HasHistory)
+        {
+            Console.Out.WriteLine($"history-heading {model.HistoryHeading}");
         }
 
         foreach (var line in model.History.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries))

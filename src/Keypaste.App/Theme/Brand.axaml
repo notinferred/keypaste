@@ -1,0 +1,46 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:ctl="using:Keypaste.App.Controls">
+
+  <!-- The mark on its 64-unit grid: stem rect(10,8,10,48), arm polygon(40,24 54,24 38,40 54,56
+       40,56 24,40). The 4-unit gap between them is never closed. Use ctl:BrandMark to draw it;
+       the geometries are here for a Path that needs them. -->
+  <StreamGeometry x:Key="KpMarkStemGeometry">M10,8 H20 V56 H10 Z</StreamGeometry>
+  <StreamGeometry x:Key="KpMarkArmGeometry">M40,24 L54,24 L38,40 L54,56 L40,56 L24,40 Z</StreamGeometry>
+
+  <ControlTheme x:Key="{x:Type ctl:BrandMark}" TargetType="ctl:BrandMark">
+    <Setter Property="StemBrush" Value="{DynamicResource KpMarkStem}" />
+    <Setter Property="ArmBrush" Value="{DynamicResource KpMarkArm}" />
+    <Setter Property="Width" Value="22" />
+    <Setter Property="Height" Value="22" />
+
+    <!-- One-colour use: the arm takes the stem's colour. -->
+    <Style Selector="^.mono">
+      <Setter Property="ArmBrush" Value="{DynamicResource KpMarkStem}" />
+    </Style>
+  </ControlTheme>
+
+  <!-- The lockup: mark plus wordmark. The wordmark is always lowercase, Instrument Sans 600 at
+       -0.045em, which BrandLockup keeps in step with FontSize. -->
+  <ControlTheme x:Key="{x:Type ctl:BrandLockup}" TargetType="ctl:BrandLockup">
+    <Setter Property="FontSize" Value="19" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <ctl:BrandMark Width="{TemplateBinding MarkSize}"
+                         Height="{TemplateBinding MarkSize}"
+                         VerticalAlignment="Center" />
+          <TextBlock Text="keypaste"
+                     VerticalAlignment="Center"
+                     FontFamily="{DynamicResource KpSans}"
+                     FontWeight="{TemplateBinding FontWeight}"
+                     FontSize="{TemplateBinding FontSize}"
+                     LetterSpacing="{TemplateBinding LetterSpacing}" />
+        </StackPanel>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+
+</ResourceDictionary>

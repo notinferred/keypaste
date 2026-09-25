@@ -397,6 +397,7 @@ public sealed class EnvVerbTests
     [InlineData("env", "rm", "--help")]
     [InlineData("env", "pull", "--help")]
     [InlineData("env", "export", "--help")]
+    [InlineData("env", "diff", "--help")]
     public void Help_GoesToStdout_AndExitsZero(params string[] args)
     {
         using var harness = new CliHarness();
@@ -420,6 +421,192 @@ public sealed class EnvVerbTests
 
         Assert.All(harness.Out, c => Assert.True(c < 128, $"non-ASCII character '{c}' in env usage"));
     }
+
+    [Fact]
+    public void Profiles_SetLsRmAndPull_WorkOnTheNamedProfileOnly()
+    {
+        using var harness = new CliHarness();
+        SeedVault(harness);
+
+        harness.Prompt.Enqueue(Master);
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("env", "set", "acme-api", "DATABASE_URL=dev-db", "--vault", harness.VaultPath));
+        harness.Prompt.Enqueue(Master);
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("env", "set", "acme-api", "DATABASE_URL=staging-db", "-p", "staging", "--vault", harness.VaultPath));
+        Assert.Contains("Set env/acme-api/staging/DATABASE_URL", harness.Err, StringComparison.Ordinal);
+
+        var file = Path.Combine(harness.Directory, "staging.env");
+        File.WriteAllText(file, "PULLED=pulled-value\n");
+        harness.Prompt.Enqueue(Master);
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("env", "pull", "acme-api", file, "-p", "staging", "--yes", "--keep", "--vault", harness.VaultPath));
+        Assert.Contains("into env/acme-api/staging", harness.Err, StringComparison.Ordinal);
+
+        Assert.Equal(["DATABASE_URL", "PULLED"], Ls(harness, "acme-api", "-p", "staging"));
+        Assert.Equal(["DATABASE_URL"], Ls(harness, "acme-api"));
+
+        harness.Prompt.Enqueue(Master);
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("env", "rm", "acme-api", "DATABASE_URL", "-p", "staging", "--yes", "--vault", harness.VaultPath));
+
+        using (var vault = Vault.Open(harness.VaultPath, Master))
+        {
+            Assert.Equal("dev-db", vault.Find(new EntryName("env/acme-api", "DATABASE_URL"))?.Password);
+            Assert.Null(vault.Find(new EntryName("env/acme-api/staging", "DATABASE_URL")));
+            Assert.Equal("pulled-value", vault.Find(new EntryName("env/acme-api/staging", "PULLED"))?.Password);
+        }
+
+        harness.Prompt.Enqueue(Master);
+        Assert.Equal(CliApp.ExitNotFound, harness.Run("env", "rm", "acme-api", "PULLED", "-p", "qa", "--yes", "--vault", harness.VaultPath));
+        Assert.Contains("'acme-api' has no 'qa' profile", harness.Err, StringComparison.Ordinal);
+
+        Assert.Equal(CliApp.ExitUsageError, harness.Run("env", "set", "acme-api", "X=y", "-p", "Staging", "--vault", harness.VaultPath));
+        Assert.Contains("is not a profile name", harness.Err, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EnvLs_Json()
+    {
+        using var harness = new CliHarness();
+        SeedProfiles(harness);
+        using (var vault = Vault.Open(harness.VaultPath, Master))
+        {
+            vault.AddEntry(new VaultEntry { Title = "BAD-NAME", Password = "x", GroupPath = "env/acme-api/staging" });
+            vault.Save();
+        }
+
+        harness.Prompt.Enqueue(Master);
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("env", "ls", "--json", "--vault", harness.VaultPath));
+        Assert.Equal("""[{"project":"acme-api","profiles":["dev","staging","prod"]}]""", harness.Out.Trim());
+
+        harness.Stdout.GetStringBuilder().Clear();
+        harness.Prompt.Enqueue(Master);
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("env", "ls", "acme-api", "-p", "staging", "--json", "--vault", harness.VaultPath));
+        Assert.Equal(
+            """[{"key":"BAD-NAME","profile":"staging","usable":false},{"key":"DATABASE_URL","profile":"staging","usable":true}]""",
+            harness.Out.Trim());
+        Assert.DoesNotContain("staging-db", harness.Out + harness.Err, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EnvLs_Profiles()
+    {
+        using var harness = new CliHarness();
+        SeedProfiles(harness);
+        Author(harness, ("env/acme-api/dev", "LOST", "x"));
+
+        harness.Prompt.Enqueue(Master);
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("env", "ls", "acme-api", "--profiles", "--vault", harness.VaultPath));
+        Assert.Equal(["dev", "staging", "prod"], Lines(harness.Out));
+        Assert.Contains("'env/acme-api/dev' is ignored", harness.Err, StringComparison.Ordinal);
+
+        harness.Stderr.GetStringBuilder().Clear();
+        harness.Prompt.Enqueue(Master);
+        Assert.Equal(CliApp.ExitNotFound, harness.Run("env", "ls", "acme-api", "-p", "qa", "--vault", harness.VaultPath));
+        Assert.Equal("keypaste env ls: 'acme-api' has no 'qa' profile", harness.Err.Trim());
+    }
+
+    [Fact]
+    public void EnvDiff_Output()
+    {
+        using var harness = new CliHarness();
+        SeedProfiles(harness);
+
+        harness.Stdout.GetStringBuilder().Clear();
+        harness.Prompt.Enqueue(Master);
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("env", "diff", "acme-api", "dev", "prod", "--vault", harness.VaultPath));
+        Assert.Equal(
+            [
+                "  - DATABASE_URL      missing in prod",
+                "  - JWT_SIGNING_KEY   missing in dev",
+                "  - SENTRY_DSN        missing in dev",
+                "  = STRIPE_KEY        same value in dev and prod",
+            ],
+            Lines(harness.Out));
+
+        harness.Stdout.GetStringBuilder().Clear();
+        harness.Prompt.Enqueue(Master);
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("env", "diff", "acme-api", "--vault", harness.VaultPath));
+        Assert.Equal(
+            [
+                "  dev · staging",
+                "  - STRIPE_KEY        missing in staging",
+                "  dev · prod",
+                "  - DATABASE_URL      missing in prod",
+                "  - JWT_SIGNING_KEY   missing in dev",
+                "  - SENTRY_DSN        missing in dev",
+                "  = STRIPE_KEY        same value in dev and prod",
+            ],
+            Lines(harness.Out));
+
+        harness.Stdout.GetStringBuilder().Clear();
+        harness.Prompt.Enqueue(Master);
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("env", "diff", "acme-api", "staging", "staging", "--vault", harness.VaultPath));
+        Assert.Equal(["  ✓ staging and staging have the same keys"], Lines(harness.Out));
+        Assert.DoesNotContain("-db", harness.Out + harness.Err, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EnvDiff_InfersTheProject()
+    {
+        using var harness = new CliHarness();
+        SeedProfiles(harness);
+        var project = MapProject(harness, "acme-api");
+        harness.WorkingDirectory = Path.Combine(project, "src");
+        Directory.CreateDirectory(harness.WorkingDirectory);
+
+        harness.Stdout.GetStringBuilder().Clear();
+        harness.Prompt.Enqueue(Master);
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("env", "diff", "staging", "prod", "--vault", harness.VaultPath));
+        Assert.Contains("  - SENTRY_DSN        missing in staging", Lines(harness.Out));
+
+        harness.WorkingDirectory = harness.Directory;
+        Assert.Equal(CliApp.ExitUsageError, harness.Run("env", "diff", "--vault", harness.VaultPath));
+        Assert.Contains("this directory is not mapped to a project; name a project", harness.Err, StringComparison.Ordinal);
+    }
+
+    /// <summary>Maps a fresh directory to a project in <c>projects.json</c> under a home inside the harness.</summary>
+    /// <returns>The mapped directory.</returns>
+    internal static string MapProject(CliHarness harness, string project)
+    {
+        var home = Path.Combine(harness.Directory, "home");
+        var directory = Path.Combine(harness.Directory, "work", project);
+        Directory.CreateDirectory(directory);
+
+        harness.Environment[Core.Audit.KeypasteHome.EnvironmentVariable] = home;
+        Assert.True(Core.Projects.ProjectMappings.Save(
+            Core.Audit.KeypasteHome.ProjectsPath(home),
+            [new Core.Projects.ProjectMapping(Path.GetFullPath(harness.VaultPath), project, directory, "npm start")]));
+
+        return directory;
+    }
+
+    /// <summary>
+    /// acme-api's dev holds DATABASE_URL and STRIPE_KEY, staging DATABASE_URL, prod JWT_SIGNING_KEY,
+    /// SENTRY_DSN and the same STRIPE_KEY as dev.
+    /// </summary>
+    private static void SeedProfiles(CliHarness harness)
+    {
+        SeedVault(harness);
+
+        using var vault = Vault.Open(harness.VaultPath, Master);
+        var store = new EnvStore(vault);
+        store.TrySet("acme-api", "DATABASE_URL", "dev-db", out _);
+        store.TrySet("acme-api", "STRIPE_KEY", "shared-stripe", out _);
+        store.TrySet("acme-api", "staging", "DATABASE_URL", "staging-db", out _);
+        store.TrySet("acme-api", "prod", "JWT_SIGNING_KEY", "prod-jwt", out _);
+        store.TrySet("acme-api", "prod", "SENTRY_DSN", "prod-sentry", out _);
+        store.TrySet("acme-api", "prod", "STRIPE_KEY", "shared-stripe", out _);
+        vault.Save();
+    }
+
+    private static List<string> Ls(CliHarness harness, params string[] args)
+    {
+        harness.Stdout.GetStringBuilder().Clear();
+        harness.Prompt.Enqueue(Master);
+        Assert.Equal(CliApp.ExitSuccess, harness.Run([.. new[] { "env", "ls" }, .. args, "--vault", harness.VaultPath]));
+        return Lines(harness.Out);
+    }
+
+    private static List<string> Lines(string text) =>
+        [.. text.ReplaceLineEndings("\n").Split('\n', StringSplitOptions.RemoveEmptyEntries)];
 
     /// <summary>
     /// Writes entries the CLI itself refuses to create, the way KeePassXC would. Takes the vault

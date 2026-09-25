@@ -1,0 +1,136 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- The design's MCP approval dialog, shared by the three prompt windows. The window is chromeless
+       and transparent, so the card and its shadow are all there is of it; where the platform cannot
+       draw transparency, PromptWindow marks the window opaque and the card fills it edge to edge. -->
+
+  <Style Selector="Border.prompt">
+    <Setter Property="Background" Value="{DynamicResource KpBgCard}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KpBorderStrong}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusDialog}" />
+    <Setter Property="Padding" Value="20" />
+    <Setter Property="Margin" Value="24" />
+    <Setter Property="BoxShadow" Value="0 24 64 0 #8C000000" />
+  </Style>
+  <Style Selector=".opaque Border.prompt">
+    <Setter Property="Margin" Value="0" />
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="BoxShadow" Value="none" />
+  </Style>
+
+  <!-- The header is one fixed row of single lines, whatever the agent calls itself or wherever it
+       runs: a title and a subtitle, or a third line where a window sets its height for one. -->
+  <Style Selector="Grid.prompt-head">
+    <Setter Property="Height" Value="40" />
+  </Style>
+  <Style Selector="Grid.prompt-head TextBlock">
+    <Setter Property="TextWrapping" Value="NoWrap" />
+    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    <Setter Property="MaxLines" Value="1" />
+  </Style>
+
+  <Style Selector="Border.prompt-tile">
+    <Setter Property="Width" Value="36" />
+    <Setter Property="Height" Value="36" />
+    <Setter Property="CornerRadius" Value="9" />
+    <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="TextBlock.prompt-title">
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="LetterSpacing" Value="-0.16" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+  </Style>
+
+  <Style Selector="TextBlock.prompt-sub">
+    <Setter Property="FontSize" Value="12.5" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+  </Style>
+
+  <Style Selector="TextBlock.prompt-countdown">
+    <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource KpAccentText}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <!-- The tool call: what was asked, machine-readable, on the app ink. -->
+  <Style Selector="Border.prompt-call">
+    <Setter Property="Background" Value="{DynamicResource KpBgApp}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusButton}" />
+  </Style>
+  <Style Selector="Border.prompt-call TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
+    <Setter Property="FontSize" Value="11.5" />
+    <Setter Property="LineHeight" Value="18.4" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+  </Style>
+  <Style Selector="Border.prompt-call TextBlock.value">
+    <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
+  </Style>
+
+  <!-- The secrets list: one bordered row per name, its tag on the right. -->
+  <Style Selector="Border.prompt-list">
+    <Setter Property="BorderBrush" Value="{DynamicResource KpBorderDefault}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusButton}" />
+    <Setter Property="ClipToBounds" Value="True" />
+  </Style>
+  <Style Selector="Border.prompt-list TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
+    <Setter Property="FontSize" Value="12.5" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+  </Style>
+  <Style Selector="Border.prompt-list TextBlock.tag">
+    <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+  </Style>
+  <Style Selector="Border.prompt-row">
+    <Setter Property="BorderBrush" Value="{DynamicResource KpBorderDefault}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="Padding" Value="12,0" />
+  </Style>
+  <!-- A divider sits between rows, never after the last, so a short list ends in padding. -->
+  <Style Selector="ContentPresenter:nth-last-child(1) > Border.prompt-row">
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+
+  <!-- The agent's reason: its words, in a box of their own that scrolls. -->
+  <Style Selector="Border.prompt-reason">
+    <Setter Property="BorderBrush" Value="{DynamicResource KpBorderDefault}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusButton}" />
+  </Style>
+
+  <Style Selector="TextBlock.prompt-note">
+    <Setter Property="FontSize" Value="12.5" />
+    <Setter Property="LineHeight" Value="18.75" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+  </Style>
+
+  <Style Selector="TextBlock.prompt-scrubbed">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="Foreground" Value="{DynamicResource KpAccentText}" />
+  </Style>
+
+  <Style Selector="Button.prompt">
+    <Setter Property="Height" Value="34" />
+    <Setter Property="MinHeight" Value="34" />
+    <Setter Property="Padding" Value="12,0" />
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+  <Style Selector="Button.prompt.primary">
+    <Setter Property="Padding" Value="14,0" />
+  </Style>
+  <!-- While arming, Allow once keeps its fill and shape; only its label fades. -->
+  <Style Selector="Button.prompt:not(.primary):not(.ghost):disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextDisabled}" />
+  </Style>
+
+</Styles>

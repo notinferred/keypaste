@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fragment+Mono"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lucide-static@latest/font/lucide.css"><style>body{margin:0;background:#111214;color:#F2F2F0;font-family:'Instrument Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased}a{color:#F2B544;text-decoration:none}a:hover{color:#F7C566}*{box-sizing:border-box}::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:#2A2C30;border-radius:5px;border:2px solid #111214}</style></helmet>
+<div data-screen-label="Desktop app" style="height:100vh;min-height:640px;display:grid;grid-template-rows:40px minmax(0,1fr);background:#111214;color:#F2F2F0;overflow:hidden;position:relative">
+<div style="display:grid;grid-template-columns:232px minmax(0,1fr) auto;align-items:center;border-bottom:1px solid #26282C;background:#18191C">
+<div style="display:flex;gap:8px;padding:0 16px"><span style="width:12px;height:12px;border-radius:50%;background:#3A3D43"></span><span style="width:12px;height:12px;border-radius:50%;background:#3A3D43"></span><span style="width:12px;height:12px;border-radius:50%;background:#3A3D43"></span></div>
+<div style="justify-self:center;width:min(440px,100%);height:28px;padding:0 10px;display:flex;align-items:center;gap:8px;border-radius:6px;background:#111214;border:1px solid #26282C;font-size:12.5px;color:#8E9096;min-width:0;overflow:hidden"><i class="icon-search" style="font-size:13px;flex:none"></i><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Search secrets, agents, projects</span><span style="flex:none;margin-left:auto;font-family:'Fragment Mono',monospace;font-size:10.5px;padding:1px 6px;border-radius:4px;background:#24262A">⌘K</span></div>
+<div style="display:flex;align-items:center;gap:6px;padding:0 12px;font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096"><span style="display:flex;align-items:center;gap:6px;padding:0 8px;white-space:nowrap"><span style="width:6px;height:6px;border-radius:50%;background:oklch(0.80 0.13 155)"></span>acme.kdbx · saved</span><span onClick="{{ doLock }}" style="white-space:nowrap;flex:none;height:26px;padding:0 10px;display:flex;align-items:center;gap:6px;border-radius:6px;background:#24262A;color:#C9CACD;cursor:pointer" style-hover="background:#2A2C30"><i class="icon-lock" style="font-size:12px"></i>lock</span></div>
+</div>
+<div style="display:grid;grid-template-columns:232px minmax(0,1fr);min-height:0">
+<aside style="display:flex;flex-direction:column;gap:20px;padding:16px 10px;background:#18191C;border-right:1px solid #26282C;min-height:0;overflow:auto">
+<div style="display:flex;align-items:center;gap:8px;padding:0 8px"><svg width="22" height="22" viewBox="0 0 64 64"><rect x="10" y="8" width="10" height="48" fill="#F2F2F0"></rect><polygon points="40,24 54,24 38,40 54,56 40,56 24,40" fill="#F2B544"></polygon></svg><span style="font-size:19px;font-weight:600;letter-spacing:-0.045em">keypaste</span></div>
+<nav style="display:grid;gap:2px">
+<sc-for list="{{ nav }}" as="item" hint-placeholder-count="5">
+<div onClick="{{ item.onClick }}" style="height:34px;padding:0 10px;display:flex;align-items:center;gap:10px;border-radius:7px;font-size:13.5px;font-weight:500;cursor:pointer;background:{{ item.bg }};color:{{ item.fg }}" style-hover="background:#24262A"><i class="icon-{{ item.icon }}" style="font-size:16px;color:{{ item.ic }}"></i>{{ item.label }}<span style="margin-left:auto;font-family:'Fragment Mono',monospace;font-size:11px;color:{{ item.cc }}">{{ item.count }}</span></div>
+</sc-for>
+</nav>
+<div style="display:grid;gap:2px">
+<div style="padding:0 10px 6px;font-size:11px;font-weight:500;color:#8E9096;letter-spacing:.04em">PROJECTS</div>
+<sc-for list="{{ projects }}" as="p" hint-placeholder-count="4">
+<div style="height:30px;padding:0 10px;display:flex;align-items:center;gap:10px;border-radius:7px;font-family:'Fragment Mono',monospace;font-size:12px;color:#C9CACD;cursor:pointer" style-hover="background:#24262A"><i class="icon-{{ p.icon }}" style="font-size:14px;color:#8E9096"></i>{{ p.name }}<span style="margin-left:auto;font-size:11px;color:#8E9096">{{ p.n }}</span></div>
+</sc-for>
+</div>
+<div style="margin-top:auto;display:grid;gap:8px">
+<div onClick="{{ openImport }}" style="height:32px;padding:0 10px;display:flex;align-items:center;gap:10px;border-radius:7px;font-size:13px;color:#C9CACD;cursor:pointer;border:1px dashed #3A3D43" style-hover="background:#24262A"><i class="icon-file-input" style="font-size:15px;color:#8E9096"></i>Import .kdbx</div>
+<div onClick="{{ simulate }}" style="padding:10px;border-radius:8px;background:#111214;border:1px solid #26282C;display:grid;gap:4px;cursor:pointer" style-hover="border-color:#3A3D43">
+<div style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:500"><i class="icon-plug" style="font-size:14px;color:#F2B544"></i>MCP server<span style="margin-left:auto;display:flex;align-items:center;gap:5px;font-size:11px;color:oklch(0.80 0.13 155)"><span style="width:6px;height:6px;border-radius:50%;background:currentColor"></span>running</span></div>
+<div style="font-family:'Fragment Mono',monospace;font-size:10.5px;color:#8E9096">stdio · 3 clients · click to simulate a request</div>
+</div>
+</div>
+</aside>
+<main style="min-width:0;min-height:0;overflow:auto">
+<sc-if value="{{ isVault }}" hint-placeholder-val="{{ true }}">
+<div data-screen-label="Secrets" style="height:100%;display:grid;grid-template-columns:minmax(240px,34%) minmax(0,1fr)">
+<div style="border-right:1px solid #26282C;display:flex;flex-direction:column;min-height:0">
+<div style="padding:16px 16px 12px;display:grid;gap:12px;border-bottom:1px solid #26282C">
+<div style="display:flex;align-items:center;gap:8px"><span style="font-family:'Fragment Mono',monospace;font-size:13px">acme/api</span><span style="height:20px;padding:0 7px;display:flex;align-items:center;border-radius:4px;background:#24262A;font-family:'Fragment Mono',monospace;font-size:11px;color:#C9CACD">dev</span><span style="white-space:nowrap;flex:none;margin-left:auto;height:28px;padding:0 10px;display:flex;align-items:center;gap:6px;border-radius:7px;background:#F2B544;color:#111214;font-size:12.5px;font-weight:600;cursor:pointer" style-hover="background:#F7C566"><i class="icon-plus" style="font-size:13px"></i>New</span></div>
+<div style="height:30px;padding:0 10px;display:flex;align-items:center;gap:8px;border-radius:6px;background:#111214;border:1px solid #26282C;font-size:12.5px;color:#8E9096"><i class="icon-filter" style="font-size:13px"></i>Filter 7 secrets</div>
+</div>
+<div style="overflow:auto;padding:6px">
+<sc-for list="{{ secrets }}" as="x" hint-placeholder-count="7">
+<div onClick="{{ x.onClick }}" style="height:52px;padding:0 10px;display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:4px 10px;align-content:center;align-items:center;border-radius:7px;cursor:pointer;background:{{ x.bg }};box-shadow:{{ x.bar }}" style-hover="background:#1D1E22"><i class="icon-{{ x.icon }}" style="font-size:15px;color:{{ x.ic }}"></i><span style="font-family:'Fragment Mono',monospace;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ x.key }}</span><span style="display:flex;align-items:center;gap:6px;font-family:'Fragment Mono',monospace;font-size:11px;color:#8E9096">{{ x.used }}<span style="width:6px;height:6px;border-radius:50%;background:{{ x.dot }}"></span></span><span></span><span style="font-size:11.5px;color:#8E9096">{{ x.kind }}</span></div>
+</sc-for>
+</div>
+</div>
+<div style="overflow:auto;padding:28px 32px;display:grid;grid-template-columns:minmax(0,1fr);gap:24px;align-content:start;max-width:820px;min-width:0">
+<div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap">
+<div style="display:grid;gap:6px;min-width:0"><span style="font-family:'Fragment Mono',monospace;font-size:22px;letter-spacing:-0.01em;overflow-wrap:anywhere">{{ cur.key }}</span><span style="font-size:13px;color:#8E9096;overflow-wrap:anywhere">{{ cur.kind }} · acme.kdbx › acme › api › dev</span></div>
+<div style="margin-left:auto;display:flex;gap:6px;font-size:12.5px;font-weight:500">
+<span onClick="{{ copyVal }}" style="white-space:nowrap;flex:none;height:30px;padding:0 12px;display:flex;align-items:center;gap:6px;border-radius:7px;background:#2A2C30;cursor:pointer" style-hover="background:#33363B"><i class="icon-copy" style="font-size:13px"></i>Copy</span>
+<span style="white-space:nowrap;flex:none;height:30px;padding:0 12px;display:flex;align-items:center;gap:6px;border-radius:7px;background:#2A2C30;cursor:pointer" style-hover="background:#33363B"><i class="icon-refresh-cw" style="font-size:13px"></i>Rotate</span>
+<span style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:7px;background:#2A2C30"><i class="icon-ellipsis" style="font-size:14px"></i></span>
+</div>
+</div>
+<div style="display:grid;gap:8px"><span style="font-size:12px;font-weight:500;color:#C9CACD">Value</span>
+<div style="min-height:40px;padding:4px 4px 4px 12px;display:flex;align-items:center;gap:8px;border-radius:6px;background:#111214;border:1px solid #2C2E33;font-family:'Fragment Mono',monospace;font-size:13px"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ valueText }}</span><span onClick="{{ toggleReveal }}" style="white-space:nowrap;flex:none;height:30px;padding:0 10px;display:flex;align-items:center;gap:6px;border-radius:5px;font-family:'Instrument Sans',sans-serif;font-size:12px;font-weight:500;color:#C9CACD;cursor:pointer" style-hover="background:#24262A"><i class="icon-{{ revealIcon }}" style="font-size:14px"></i>{{ revealLabel }}</span></div>
+</div>
+<div style="display:grid;gap:8px"><span style="font-size:12px;font-weight:500;color:#C9CACD">Reference</span>
+<div style="height:36px;padding:0 12px;display:flex;align-items:center;gap:8px;border-radius:6px;background:#18191C;border:1px solid #26282C;font-family:'Fragment Mono',monospace;font-size:12.5px;color:#C9CACD;min-width:0"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ ref }}</span><i class="icon-copy" style="flex:none;margin-left:auto;font-size:13px;color:#8E9096"></i></div>
+<span style="font-size:12px;color:#8E9096">Use this in .env.keypaste with keypaste run, or in an agent's run tool when the bridge allows it. keypaste puts the value into the command's environment, not into the file.</span>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+<div style="padding:16px;border-radius:10px;border:1px solid #26282C;display:grid;gap:10px;align-content:start"><span style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:500;color:#C9CACD"><i class="icon-bot" style="font-size:14px;color:#8E9096"></i>Agent access</span><span style="font-family:'Fragment Mono',monospace;font-size:12.5px">{{ cur.agents }}</span><span style="font-size:12px;color:#8E9096">Last used {{ cur.used }}</span></div>
+<div style="padding:16px;border-radius:10px;border:1px solid #26282C;display:grid;gap:8px;align-content:start;font-family:'Fragment Mono',monospace;font-size:12px"><span style="display:flex;align-items:center;gap:8px;font-family:'Instrument Sans',sans-serif;font-size:12px;font-weight:500;color:#C9CACD"><i class="icon-layers" style="font-size:14px;color:#8E9096"></i>Profiles</span><span style="display:flex;justify-content:space-between"><span>dev</span><span style="color:oklch(0.80 0.13 155)">set</span></span><span style="display:flex;justify-content:space-between"><span>staging</span><span style="color:oklch(0.80 0.13 155)">set</span></span><span style="display:flex;justify-content:space-between"><span>prod</span><span style="color:#F2B544">approval required</span></span></div>
+</div>
+<div style="display:grid;gap:0;border-top:1px solid #26282C;font-size:12.5px">
+<div style="display:grid;grid-template-columns:140px 1fr;padding:10px 0;border-bottom:1px solid #26282C"><span style="color:#8E9096">Created</span><span>2026-03-14 · you</span></div>
+<div style="display:grid;grid-template-columns:140px 1fr;padding:10px 0;border-bottom:1px solid #26282C"><span style="color:#8E9096">Rotated</span><span>2026-09-02 · 22 days ago</span></div>
+<div style="display:grid;grid-template-columns:140px 1fr;padding:10px 0;border-bottom:1px solid #26282C"><span style="color:#8E9096">KDBX entry</span><span style="font-family:'Fragment Mono',monospace;font-size:12px">uuid 9f3c…41ab · field Password</span></div>
+</div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ isAgents }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Agents" style="padding:28px 32px;display:grid;gap:28px;max-width:1080px">
+<div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap"><div style="display:grid;gap:6px"><h1 style="margin:0;font-size:24px;font-weight:600;letter-spacing:-0.03em">Agents</h1><span style="font-size:13px;color:#8E9096">MCP clients and tokens that can ask for secrets. Every request goes through you or a grant.</span></div><span style="white-space:nowrap;flex:none;margin-left:auto;height:30px;padding:0 12px;display:flex;align-items:center;gap:6px;border-radius:7px;background:#2A2C30;font-size:12.5px;font-weight:500;cursor:pointer" style-hover="background:#33363B"><i class="icon-plus" style="font-size:13px"></i>Connect client</span></div>
+<div style="display:grid;gap:10px">
+<div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><i class="icon-hourglass" style="font-size:15px;color:#F2B544"></i>Active grants</div>
+<sc-if value="{{ hasGrants }}" hint-placeholder-val="{{ true }}">
+<div style="border-radius:10px;border:1px solid #26282C;overflow:hidden">
+<sc-for list="{{ grants }}" as="g" hint-placeholder-count="2">
+<div style="padding:14px 16px;display:grid;grid-template-columns:minmax(0,1fr) 150px auto;gap:16px;align-items:center;border-bottom:1px solid #26282C">
+<div style="display:grid;gap:4px;min-width:0"><span style="font-size:13.5px;font-weight:600">{{ g.agent }}</span><span style="font-family:'Fragment Mono',monospace;font-size:12px;color:#C9CACD;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ g.secrets }} · {{ g.scope }}</span></div>
+<div style="display:grid;gap:6px"><span style="font-family:'Fragment Mono',monospace;font-size:11px;color:#F2B544">{{ g.left }}</span><span style="height:3px;border-radius:2px;background:#2A2C30;overflow:hidden"><span style="display:block;height:100%;width:{{ g.pct }};background:#F2B544"></span></span></div>
+<span onClick="{{ g.revoke }}" style="white-space:nowrap;flex:none;height:28px;padding:0 10px;display:flex;align-items:center;border-radius:7px;background:rgba(240,120,110,.12);color:oklch(0.74 0.14 25);font-size:12px;font-weight:500;cursor:pointer" style-hover="background:rgba(240,120,110,.2)">Revoke</span>
+</div>
+</sc-for>
+</div>
+</sc-if>
+</div>
+<div style="display:grid;gap:10px">
+<div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><i class="icon-plug" style="font-size:15px;color:#8E9096"></i>MCP clients</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">
+<sc-for list="{{ agents }}" as="a" hint-placeholder-count="3">
+<div style="padding:16px;border-radius:10px;background:#18191C;border:1px solid #26282C;display:grid;gap:14px">
+<div style="display:flex;align-items:center;gap:10px"><span style="width:32px;height:32px;border-radius:8px;background:#2A2C30;display:flex;align-items:center;justify-content:center;font-family:'Fragment Mono',monospace;font-size:12px">{{ a.init }}</span><div style="display:grid;gap:2px"><span style="font-size:14px;font-weight:600">{{ a.name }}</span><span style="font-size:12px;color:#8E9096">{{ a.client }}</span></div><span style="margin-left:auto;display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:500;color:{{ a.c }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor"></span>{{ a.status }}</span></div>
+<div style="display:grid;gap:6px"><span style="font-size:11px;font-weight:500;color:#8E9096;letter-spacing:.04em">POLICY</span><div style="height:32px;padding:0 10px;display:flex;align-items:center;border-radius:6px;background:#111214;border:1px solid #2C2E33;font-size:12.5px;min-width:0"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ a.policy }}</span><i class="icon-chevron-down" style="flex:none;margin-left:auto;font-size:13px;color:#8E9096"></i></div></div>
+</div>
+</sc-for>
+</div>
+</div>
+<div style="display:grid;gap:10px">
+<div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><i class="icon-ticket" style="font-size:15px;color:#8E9096"></i>Scoped tokens<span style="margin-left:auto;font-size:12px;font-weight:500;color:#F2B544;cursor:pointer">New token</span></div>
+<div style="border-radius:10px;border:1px solid #26282C;overflow:hidden;font-size:12.5px">
+<div style="display:grid;grid-template-columns:1.1fr 1fr 1.5fr .8fr .6fr;gap:12px;padding:9px 16px;background:#18191C;font-size:11px;font-weight:500;color:#8E9096;letter-spacing:.04em"><span>NAME</span><span>TOKEN</span><span>SCOPE</span><span>MODE</span><span>EXPIRES</span></div>
+<sc-for list="{{ tokens }}" as="k" hint-placeholder-count="2">
+<div style="display:grid;grid-template-columns:1.1fr 1fr 1.5fr .8fr .6fr;gap:12px;padding:12px 16px;border-top:1px solid #26282C;align-items:center"><span style="font-weight:500">{{ k.name }}</span><span style="font-family:'Fragment Mono',monospace;font-size:12px;color:#C9CACD">{{ k.tok }}</span><span style="font-family:'Fragment Mono',monospace;font-size:12px;color:#C9CACD;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ k.scope }}</span><span style="justify-self:start;height:22px;padding:0 8px;display:flex;align-items:center;border-radius:4px;border:1px solid #2C2E33;font-family:'Fragment Mono',monospace;font-size:11px">{{ k.mode }}</span><span style="color:#8E9096">{{ k.exp }}</span></div>
+</sc-for>
+</div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ isActivity }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Activity" style="padding:28px 32px;display:grid;gap:20px;max-width:1080px">
+<div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap"><div style="display:grid;gap:6px"><h1 style="margin:0;font-size:24px;font-weight:600;letter-spacing:-0.03em">Activity</h1><span style="font-size:13px;color:#8E9096">Every request, grant, injection and share. Stored inside the vault, signed, append-only.</span></div>
+<div style="margin-left:auto;display:inline-flex;padding:2px;border-radius:7px;background:#18191C;border:1px solid #26282C;font-size:12px;font-weight:500">
+<sc-for list="{{ filters }}" as="f" hint-placeholder-count="4"><span onClick="{{ f.onClick }}" style="padding:5px 12px;border-radius:5px;cursor:pointer;background:{{ f.bg }};color:{{ f.fg }}">{{ f.label }}</span></sc-for>
+</div></div>
+<div style="border-radius:10px;border:1px solid #26282C;overflow-x:auto;font-size:12.5px">
+<div style="min-width:680px;display:grid;grid-template-columns:64px 110px 100px minmax(0,1.6fr) minmax(0,1fr) 100px;gap:12px;padding:9px 16px;background:#18191C;font-size:11px;font-weight:500;color:#8E9096;letter-spacing:.04em"><span>TIME</span><span>ACTOR</span><span>ACTION</span><span>SECRETS</span><span>WHERE</span><span>RESULT</span></div>
+<sc-for list="{{ activity }}" as="r" hint-placeholder-count="6">
+<div style="min-width:680px;display:grid;grid-template-columns:64px 110px 100px minmax(0,1.6fr) minmax(0,1fr) 100px;gap:12px;padding:11px 16px;border-top:1px solid #26282C;align-items:center" style-hover="background:#18191C"><span style="font-family:'Fragment Mono',monospace;font-size:11.5px;color:#8E9096">{{ r.t }}</span><span style="font-weight:500">{{ r.actor }}</span><span style="color:#C9CACD">{{ r.action }}</span><span style="font-family:'Fragment Mono',monospace;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.what }}</span><span style="font-family:'Fragment Mono',monospace;font-size:12px;color:#8E9096;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.where }}</span><span style="display:flex;align-items:center;gap:6px;font-weight:500;color:{{ r.c }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor"></span>{{ r.res }}</span></div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ isEnv }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Env profiles" style="padding:28px 32px;display:grid;gap:24px;max-width:1080px">
+<div style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap"><div style="display:grid;gap:6px"><h1 style="margin:0;font-size:24px;font-weight:600;letter-spacing:-0.03em">Env profiles</h1><span style="font-size:13px;color:#8E9096"><span style="font-family:'Fragment Mono',monospace">acme/api</span> · one set of keys, a value per environment</span></div>
+<div style="margin-left:auto;display:flex;gap:6px;font-size:12.5px;font-weight:500"><span onClick="{{ importEnv }}" style="white-space:nowrap;flex:none;height:30px;padding:0 12px;display:flex;align-items:center;gap:6px;border-radius:7px;background:#2A2C30;cursor:pointer" style-hover="background:#33363B"><i class="icon-file-up" style="font-size:13px"></i>Import .env</span><span onClick="{{ exportEnv }}" style="white-space:nowrap;flex:none;height:30px;padding:0 12px;display:flex;align-items:center;gap:6px;border-radius:7px;background:#2A2C30;cursor:pointer" style-hover="background:#33363B"><i class="icon-file-down" style="font-size:13px"></i>Export .env.keypaste</span></div></div>
+<div style="border-radius:10px;border:1px solid #26282C;overflow:hidden;font-size:12.5px">
+<div style="display:grid;grid-template-columns:minmax(0,1.6fr) repeat(3,minmax(0,1fr));gap:12px;padding:9px 16px;background:#18191C;font-size:11px;font-weight:500;color:#8E9096;letter-spacing:.04em"><span>KEY</span><span>DEV</span><span>STAGING</span><span style="display:flex;align-items:center;gap:6px">PROD<i class="icon-shield-check" style="font-size:12px;color:#F2B544"></i></span></div>
+<sc-for list="{{ envRows }}" as="e" hint-placeholder-count="6">
+<div style="display:grid;grid-template-columns:minmax(0,1.6fr) repeat(3,minmax(0,1fr));gap:12px;padding:11px 16px;border-top:1px solid #26282C;align-items:center;font-family:'Fragment Mono',monospace;font-size:12.5px"><span>{{ e.key }}</span><span style="color:{{ e.d.c }}">{{ e.d.t }}</span><span style="color:{{ e.s.c }}">{{ e.s.t }}</span><span style="color:{{ e.p.c }}">{{ e.p.t }}</span></div>
+</sc-for>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px">
+<div style="border-radius:10px;background:#0C0D0E;border:1px solid #26282C;overflow:hidden">
+<div style="height:36px;padding:0 6px 0 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #1D1E22;font-family:'Fragment Mono',monospace;font-size:11.5px;color:#8E9096"><i class="icon-file-code" style="font-size:13px"></i>.env.keypaste<span style="margin-left:auto;display:inline-flex;padding:2px;border-radius:6px;background:#18191C;font-family:'Instrument Sans',sans-serif;font-size:11.5px;font-weight:500"><sc-for list="{{ profiles }}" as="p" hint-placeholder-count="3"><span onClick="{{ p.onClick }}" style="padding:3px 9px;border-radius:4px;cursor:pointer;background:{{ p.bg }};color:{{ p.fg }}">{{ p.name }}</span></sc-for></span></div>
+<div style="padding:12px 14px;display:grid;gap:2px;font-family:'Fragment Mono',monospace;font-size:12px;line-height:1.7;color:#C9CACD;overflow:auto"><sc-for list="{{ envFile }}" as="line" hint-placeholder-count="6"><span style="white-space:nowrap">{{ line }}</span></sc-for></div>
+</div>
+<div style="padding:18px;border-radius:10px;border:1px solid #26282C;display:grid;gap:12px;align-content:start">
+<span style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><i class="icon-terminal" style="font-size:15px;color:#8E9096"></i>Run with this profile</span>
+<div style="padding:10px 12px;border-radius:6px;background:#0C0D0E;border:1px solid #26282C;font-family:'Fragment Mono',monospace;font-size:12.5px;display:flex;align-items:center;gap:8px"><span style="color:#F2B544">›</span>{{ runCmd }}<i class="icon-copy" style="margin-left:auto;font-size:13px;color:#8E9096"></i></div>
+<span style="font-size:12.5px;line-height:1.5;color:#8E9096">Values go only into the command's environment and are never written to disk. The command, anything it starts and other programs running as you can read them.</span>
+<span style="font-size:12.5px;line-height:1.5;color:#8E9096">Through an agent or a token, a prod profile is asked about live every time and never kept in a grant.</span>
+</div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ isSharing }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Sharing" style="padding:28px 32px;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px;max-width:1080px;align-items:start">
+<div style="display:grid;gap:16px">
+<div style="display:grid;gap:6px"><h1 style="margin:0;font-size:24px;font-weight:600;letter-spacing:-0.03em">Sharing</h1><span style="font-size:13px;color:#8E9096">End-to-end encrypted links. The key lives in the URL fragment, so our relay never sees it.</span></div>
+<div style="border-radius:10px;border:1px solid #26282C;overflow:hidden">
+<sc-for list="{{ shares }}" as="h" hint-placeholder-count="3">
+<div style="padding:14px 16px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;border-bottom:1px solid #26282C;align-items:center"><span style="font-family:'Fragment Mono',monospace;font-size:13px">{{ h.what }}</span><span style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:{{ h.c }}"><span style="width:6px;height:6px;border-radius:50%;background:currentColor"></span>{{ h.status }}</span><span style="font-size:12px;color:#8E9096">{{ h.to }} · {{ h.rule }}</span></div>
+</sc-for>
+</div>
+</div>
+<div style="padding:20px;border-radius:14px;background:#18191C;border:1px solid #26282C;display:grid;gap:14px">
+<span style="font-size:15px;font-weight:600;letter-spacing:-0.01em">New share link</span>
+<div style="display:grid;gap:6px"><span style="font-size:12px;font-weight:500;color:#C9CACD">What</span><div style="height:34px;padding:0 10px;display:flex;align-items:center;border-radius:6px;background:#111214;border:1px solid #2C2E33;font-family:'Fragment Mono',monospace;font-size:12.5px">STRIPE_SECRET_KEY<i class="icon-chevron-down" style="margin-left:auto;font-size:13px;color:#8E9096"></i></div></div>
+<div style="display:grid;gap:6px"><span style="font-size:12px;font-weight:500;color:#C9CACD">Recipient</span><div style="height:34px;padding:0 10px;display:flex;align-items:center;border-radius:6px;background:#111214;border:1px solid #2C2E33;font-size:13px">sam@acme.dev</div></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+<div style="display:grid;gap:6px"><span style="font-size:12px;font-weight:500;color:#C9CACD">Expires</span><div style="display:inline-flex;padding:2px;border-radius:7px;background:#111214;border:1px solid #26282C;font-size:12px;font-weight:500"><span style="flex:1;text-align:center;padding:5px 0;border-radius:5px;color:#8E9096">1h</span><span style="flex:1;text-align:center;padding:5px 0;border-radius:5px;background:#2A2C30">24h</span><span style="flex:1;text-align:center;padding:5px 0;border-radius:5px;color:#8E9096">7d</span></div></div>
+<div style="display:grid;gap:6px"><span style="font-size:12px;font-weight:500;color:#C9CACD">Views</span><div style="display:inline-flex;padding:2px;border-radius:7px;background:#111214;border:1px solid #26282C;font-size:12px;font-weight:500"><span style="flex:1;text-align:center;padding:5px 0;border-radius:5px;background:#2A2C30">1</span><span style="flex:1;text-align:center;padding:5px 0;border-radius:5px;color:#8E9096">3</span><span style="flex:1;text-align:center;padding:5px 0;border-radius:5px;color:#8E9096">10</span></div></div>
+</div>
+<div style="display:flex;align-items:center;gap:10px;font-size:13px"><span style="width:16px;height:16px;border-radius:4px;background:#F2B544;color:#111214;display:flex;align-items:center;justify-content:center"><i class="icon-check" style="font-size:12px"></i></span>Require a passphrase, sent separately</div>
+<span onClick="{{ createShare }}" style="height:34px;display:flex;align-items:center;justify-content:center;gap:8px;border-radius:7px;background:#F2B544;color:#111214;font-size:13px;font-weight:600;cursor:pointer" style-hover="background:#F7C566"><i class="icon-link" style="font-size:14px"></i>Create and copy link</span>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ approval }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;background:rgba(8,9,10,.6);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:24px;z-index:10">
+<div data-screen-label="MCP approval" style="width:min(460px,100%);border-radius:14px;background:#1D1E22;border:1px solid #3A3D43;box-shadow:0 24px 64px rgba(0,0,0,.55);padding:20px;display:grid;gap:16px">
+<div style="display:flex;align-items:center;gap:12px"><span style="width:36px;height:36px;border-radius:9px;background:#2A2C30;display:flex;align-items:center;justify-content:center"><i class="icon-bot" style="font-size:18px"></i></span><div style="display:grid;gap:2px"><span style="font-size:16px;font-weight:600;letter-spacing:-0.01em">claude-code wants 2 secrets</span><span style="font-size:12.5px;color:#8E9096">via MCP · ~/acme/api · profile dev</span></div><span style="margin-left:auto;display:flex;align-items:center;gap:6px;font-family:'Fragment Mono',monospace;font-size:11px;color:#F2B544"><span style="width:6px;height:6px;border-radius:50%;background:#F2B544;box-shadow:0 0 0 3px rgba(242,181,68,.2)"></span>0:28</span></div>
+<div style="padding:10px 12px;border-radius:7px;background:#111214;font-family:'Fragment Mono',monospace;font-size:11.5px;color:#8E9096;line-height:1.6">tool: keypaste.run<br><span style="color:#C9CACD">npm run migrate</span></div>
+<div style="border-radius:7px;border:1px solid #2C2E33;font-family:'Fragment Mono',monospace;font-size:12.5px"><div style="display:flex;justify-content:space-between;padding:9px 12px;border-bottom:1px solid #2C2E33"><span>DATABASE_URL</span><span style="color:#8E9096">inject only</span></div><div style="display:flex;justify-content:space-between;padding:9px 12px"><span>STRIPE_SECRET_KEY</span><span style="color:#8E9096">inject only</span></div></div>
+<div style="font-size:12.5px;line-height:1.5;color:#8E9096">keypaste will add these to the command's environment. The agent sees the names, never the values.</div>
+<div style="display:flex;gap:8px;font-size:13px;font-weight:500"><span onClick="{{ deny }}" style="white-space:nowrap;flex:none;height:34px;padding:0 12px;display:flex;align-items:center;border-radius:7px;color:#C9CACD;cursor:pointer" style-hover="background:#24262A">Deny</span><span onClick="{{ once }}" style="white-space:nowrap;flex:none;height:34px;padding:0 12px;display:flex;align-items:center;border-radius:7px;background:#2A2C30;cursor:pointer" style-hover="background:#33363B">Allow once</span><span onClick="{{ hour }}" style="white-space:nowrap;flex:none;margin-left:auto;height:34px;padding:0 14px;display:flex;align-items:center;gap:8px;border-radius:7px;background:#F2B544;color:#111214;font-weight:600;cursor:pointer" style-hover="background:#F7C566">Allow for 1 hour<span style="font-family:'Fragment Mono',monospace;font-size:11px;opacity:.7">⏎</span></span></div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ importOpen }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;background:rgba(8,9,10,.6);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:24px;z-index:10">
+<div data-screen-label="KDBX import" style="width:min(520px,100%);border-radius:14px;background:#1D1E22;border:1px solid #3A3D43;box-shadow:0 24px 64px rgba(0,0,0,.55);padding:20px;display:grid;gap:16px">
+<div style="display:flex;align-items:center;gap:10px"><i class="icon-file-input" style="font-size:18px;color:#F2B544"></i><span style="font-size:16px;font-weight:600;letter-spacing:-0.01em">Import a KDBX vault</span><span onClick="{{ closeImport }}" style="margin-left:auto;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:6px;color:#8E9096;cursor:pointer" style-hover="background:#2A2C30"><i class="icon-x" style="font-size:15px"></i></span></div>
+<div style="padding:14px;border-radius:10px;border:1px dashed #3A3D43;display:flex;align-items:center;gap:12px"><i class="icon-file-lock-2" style="font-size:22px;color:#8E9096"></i><div style="display:grid;gap:2px"><span style="font-family:'Fragment Mono',monospace;font-size:13px">acme.kdbx</span><span style="font-size:12px;color:#8E9096">KDBX 4.1 · Argon2id · 142 entries · key file + password</span></div><span style="margin-left:auto;font-size:12px;color:oklch(0.80 0.13 155);display:flex;align-items:center;gap:5px"><i class="icon-lock-open" style="font-size:13px"></i>Decrypted</span></div>
+<div style="display:grid;gap:8px"><span style="font-size:12px;font-weight:500;color:#C9CACD">Map groups to projects</span>
+<div style="border-radius:7px;border:1px solid #2C2E33;font-family:'Fragment Mono',monospace;font-size:12px">
+<div style="display:grid;grid-template-columns:1fr 20px 1fr;gap:8px;padding:9px 12px;border-bottom:1px solid #2C2E33;align-items:center"><span style="color:#C9CACD">Work/Acme/API</span><i class="icon-arrow-right" style="font-size:12px;color:#8E9096"></i><span>acme/api</span></div>
+<div style="display:grid;grid-template-columns:1fr 20px 1fr;gap:8px;padding:9px 12px;border-bottom:1px solid #2C2E33;align-items:center"><span style="color:#C9CACD">Work/Acme/Web</span><i class="icon-arrow-right" style="font-size:12px;color:#8E9096"></i><span>acme/web</span></div>
+<div style="display:grid;grid-template-columns:1fr 20px 1fr;gap:8px;padding:9px 12px;align-items:center"><span style="color:#C9CACD">SSH</span><i class="icon-arrow-right" style="font-size:12px;color:#8E9096"></i><span>infra</span></div>
+</div></div>
+<div style="display:flex;align-items:center;gap:10px;font-size:13px"><span style="width:32px;height:18px;border-radius:9px;background:#F2B544;position:relative;flex:none"><span style="position:absolute;top:2px;left:16px;width:14px;height:14px;border-radius:50%;background:#111214"></span></span>Keep editing this file in place, so KeePassXC and other KDBX apps stay in sync</div>
+<div style="display:flex;gap:8px;font-size:13px;font-weight:500"><span onClick="{{ closeImport }}" style="white-space:nowrap;flex:none;margin-left:auto;height:34px;padding:0 12px;display:flex;align-items:center;border-radius:7px;color:#C9CACD;cursor:pointer" style-hover="background:#24262A">Cancel</span><span onClick="{{ doImport }}" style="white-space:nowrap;flex:none;height:34px;padding:0 14px;display:flex;align-items:center;border-radius:7px;background:#F2B544;color:#111214;font-weight:600;cursor:pointer" style-hover="background:#F7C566">Import 142 entries</span></div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ locked }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Unlock" style="position:absolute;inset:0;z-index:20;background:#111214;background-image:linear-gradient(#18191C 1px,transparent 1px),linear-gradient(90deg,#18191C 1px,transparent 1px);background-size:16px 16px;display:flex;align-items:center;justify-content:center;padding:24px">
+<div style="width:min(360px,100%);display:grid;gap:18px;justify-items:center;text-align:center">
+<svg width="56" height="56" viewBox="0 0 64 64"><rect x="10" y="8" width="10" height="48" fill="#F2F2F0"></rect><polygon points="40,24 54,24 38,40 54,56 40,56 24,40" fill="#F2B544"></polygon></svg>
+<div style="display:grid;gap:6px"><span style="font-size:22px;font-weight:600;letter-spacing:-0.03em">acme.kdbx is locked</span><span style="font-size:13px;color:#8E9096">Agents are paused until you unlock.</span></div>
+<div style="width:100%;height:40px;padding:0 12px;display:flex;align-items:center;border-radius:7px;background:#18191C;border:1px solid #F2B544;box-shadow:0 0 0 3px rgba(242,181,68,.15);font-family:'Fragment Mono',monospace;font-size:14px;letter-spacing:.14em">••••••••••<span style="width:1.5px;height:18px;background:#F2B544;margin-left:2px"></span></div>
+<span onClick="{{ doUnlock }}" style="width:100%;height:38px;display:flex;align-items:center;justify-content:center;gap:8px;border-radius:7px;background:#F2B544;color:#111214;font-size:13.5px;font-weight:600;cursor:pointer" style-hover="background:#F7C566">Unlock</span>
+<span onClick="{{ doUnlock }}" style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:#C9CACD;cursor:pointer"><i class="icon-usb" style="font-size:14px;color:#8E9096"></i>Touch YubiKey 5C to unlock</span>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ toastOn }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;right:20px;bottom:20px;z-index:30;display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;background:#24262A;border:1px solid #3A3D43;box-shadow:0 8px 24px rgba(0,0,0,.35);font-size:13px"><i class="icon-circle-check" style="font-size:15px;color:oklch(0.80 0.13 155)"></i>{{ toast }}</div>
+</sc-if>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const G='oklch(0.80 0.13 155)',R='oklch(0.74 0.14 25)',B='oklch(0.78 0.10 245)',A='#F2B544',M='#8E9096';
+const SECRETS=[
+ {key:'DATABASE_URL',icon:'database',kind:'Connection string',used:'4m ago',dot:A,value:'postgres://api:demo-7Hq2x@db.internal:5432/acme',agents:'claude-code · grant, 42m left'},
+ {key:'STRIPE_SECRET_KEY',icon:'credit-card',kind:'API key',used:'in use',dot:A,value:'sk_live_demo_51NfQ2kLx9vT4bY',agents:'claude-code · grant, 42m left'},
+ {key:'OPENAI_API_KEY',icon:'key-round',kind:'API key',used:'1h ago',dot:G,value:'sk-proj-demo-a91Kd0Lm2Q',agents:'cursor · allow once, unused'},
+ {key:'REDIS_URL',icon:'server',kind:'Connection string',used:'3h ago',dot:'#55575C',value:'redis://default:demo@cache.internal:6379',agents:'None active'},
+ {key:'JWT_SIGNING_KEY',icon:'key-round',kind:'Signing key',used:'2d ago',dot:'#55575C',value:'demo-hs256-f3a9c1e07b2d44',agents:'None active'},
+ {key:'SENTRY_DSN',icon:'bug',kind:'URL',used:'5d ago',dot:'#55575C',value:'https://demo@o0.ingest.sentry.io/1',agents:'ci-github-actions · token'},
+ {key:'deploy@acme-prod',icon:'key-square',kind:'SSH key · ed25519',used:'1d ago',dot:'#55575C',value:'SHA256:demoQ3k1v9x0bW7yYt2',agents:'None active'}];
+const AGENTS=[
+ {name:'claude-code',client:'Claude Code · MCP stdio',policy:'Session grants up to 1h',status:'Connected',c:G,init:'cc'},
+ {name:'cursor',client:'Cursor · MCP stdio',policy:'Ask every time',status:'Connected',c:G,init:'cu'},
+ {name:'local-evals',client:'python · scoped token',policy:'Inject only',status:'Idle',c:M,init:'le'}];
+const TOKENS=[
+ {name:'ci-github-actions',tok:'kpt_ci_7d2e…b90f',scope:'read:acme/api/staging/*',mode:'inject-only',exp:'29 days'},
+ {name:'local-evals',tok:'kpt_lc_3a11…e04c',scope:'read:acme/api/dev/OPENAI_API_KEY',mode:'inject-only',exp:'6 days'}];
+const ACT=[
+ {t:'14:32:08',actor:'claude-code',kind:'agent',action:'Injected',what:'DATABASE_URL, STRIPE_SECRET_KEY',where:'acme/api · dev',res:'Granted',c:G},
+ {t:'14:31:51',actor:'claude-code',kind:'agent',action:'Requested',what:'2 secrets',where:'acme/api · dev',res:'Approved 1h',c:G},
+ {t:'14:02:17',actor:'cursor',kind:'agent',action:'Requested',what:'AWS_SECRET_ACCESS_KEY',where:'infra · prod',res:'Denied',c:R},
+ {t:'13:40:00',actor:'ci-github-actions',kind:'agent',action:'Injected',what:'6 secrets',where:'acme/api · staging',res:'Token',c:B},
+ {t:'12:15:33',actor:'you',kind:'you',action:'Shared',what:'STRIPE_SECRET_KEY',where:'maya@acme.dev',res:'Link · 24h',c:M},
+ {t:'11:58:02',actor:'claude-code',kind:'agent',action:'Grant expired',what:'REDIS_URL',where:'acme/api · dev',res:'Expired',c:M},
+ {t:'09:12:45',actor:'you',kind:'you',action:'Unlocked',what:'acme.kdbx',where:'YubiKey 5C',res:'OK',c:G}];
+const ENV=[['DATABASE_URL',1,1,1],['STRIPE_SECRET_KEY',1,1,1],['OPENAI_API_KEY',1,2,0],['REDIS_URL',1,1,1],['JWT_SIGNING_KEY',1,1,1],['SENTRY_DSN',0,1,1]];
+const SHARES=[
+ {what:'STRIPE_SECRET_KEY',to:'maya@acme.dev',rule:'1 view · 24h · passphrase',status:'Opened 12:20',c:G},
+ {what:'acme/api · staging (6)',to:'Anyone with the passphrase',rule:'3 views · 7 days',status:'1 of 3 views',c:A},
+ {what:'deploy@acme-prod',to:'jordan@acme.dev',rule:'1 view · 1h',status:'Expired',c:M}];
+class Component extends DCLogic {
+  state={view:'vault',sel:'DATABASE_URL',reveal:false,approval:false,importOpen:false,locked:false,profile:'dev',filter:'all',toast:null,
+    grants:[{id:1,agent:'claude-code',secrets:'DATABASE_URL, STRIPE_SECRET_KEY',scope:'acme/api/dev',left:'42m left',pct:'70%'},{id:2,agent:'cursor',secrets:'OPENAI_API_KEY',scope:'acme/web/dev',left:'Once, unused',pct:'100%'}]};
+  componentDidMount(){this.t=setTimeout(()=>this.setState({approval:true}),1600);}
+  componentWillUnmount(){clearTimeout(this.t);clearTimeout(this.tt);}
+  toast(msg){clearTimeout(this.tt);this.setState({toast:msg});this.tt=setTimeout(()=>this.setState({toast:null}),2800);}
+  renderVals(){
+    const s=this.state,set=o=>()=>this.setState(o);
+    const nav=[['vault','vault','Secrets','142'],['agents','bot','Agents',String(s.grants.length)],['activity','activity','Activity',''],['env','layers','Env profiles','3'],['sharing','link','Sharing','2']].map(([id,icon,label,count])=>{const on=s.view===id;return{icon,label,count,onClick:set({view:id}),bg:on?'#2A2C30':'transparent',fg:on?'#F2F2F0':'#C9CACD',ic:on?A:M,cc:id==='agents'&&s.grants.length?A:M};});
+    const cur=SECRETS.find(x=>x.key===s.sel)||SECRETS[0];
+    const secrets=SECRETS.map(x=>{const on=x.key===s.sel;return{...x,onClick:()=>this.setState({sel:x.key,reveal:false}),bg:on?'rgba(242,181,68,.10)':'transparent',bar:on?'inset 2px 0 0 #F2B544':'none',ic:on?A:M};});
+    const cell=v=>v===1?{t:'••••••',c:'#C9CACD'}:v===2?{t:'differs',c:A}:{t:'missing',c:R};
+    const envRows=ENV.map(([k,d,st,p])=>({key:k,d:cell(d),s:cell(st),p:cell(p)}));
+    const profiles=['dev','staging','prod'].map(p=>({name:p,onClick:set({profile:p}),bg:s.profile===p?'#2A2C30':'transparent',fg:s.profile===p?'#F2F2F0':M}));
+    const filters=[['all','All'],['agent','Agents'],['you','You'],['denied','Denied']].map(([id,l])=>({label:l,onClick:set({filter:id}),bg:s.filter===id?'#2A2C30':'transparent',fg:s.filter===id?'#F2F2F0':M}));
+    const activity=ACT.filter(a=>s.filter==='all'||(s.filter==='denied'?a.res==='Denied':a.kind===s.filter));
+    const decide=(msg,grant)=>()=>{this.setState(st=>({approval:false,grants:grant?[{id:Date.now(),agent:'claude-code',secrets:'DATABASE_URL, STRIPE_SECRET_KEY',scope:'acme/api/dev',left:'60m left',pct:'100%'},...st.grants.filter(g=>g.id!==1)]:st.grants}));this.toast(msg);};
+    return {
+      nav,cur,secrets,envRows,profiles,filters,activity,agents:AGENTS,tokens:TOKENS,shares:SHARES,
+      projects:[{name:'acme/api',icon:'folder-git-2',n:'24'},{name:'acme/web',icon:'folder-git-2',n:'18'},{name:'infra',icon:'server',n:'31'},{name:'personal',icon:'user',n:'69'}],
+      grants:s.grants.map(g=>({...g,revoke:()=>{this.setState(st=>({grants:st.grants.filter(x=>x.id!==g.id)}));this.toast(`Revoked ${g.agent}'s grant`);}})),
+      hasGrants:s.grants.length>0,
+      isVault:s.view==='vault',isAgents:s.view==='agents',isActivity:s.view==='activity',isEnv:s.view==='env',isSharing:s.view==='sharing',
+      valueText:s.reveal?cur.value:'••••••••••••••••••••••••',revealIcon:s.reveal?'eye-off':'eye',revealLabel:s.reveal?'Hide':'Reveal',
+      toggleReveal:set({reveal:!s.reveal}),
+      copyVal:()=>this.toast(`Copied ${cur.key}. Clipboard clears in 30s`),
+      ref:`kp://acme-api/dev/${cur.key}`,
+      profile:s.profile,runCmd:`keypaste run -p ${s.profile} -- npm start`,
+      envFile:ENV.map(([k])=>`${k}=kp://acme-api/${s.profile}/${k}`),
+      exportEnv:()=>this.toast(`Exported .env.keypaste for ${s.profile}. References only, no values`),
+      importEnv:()=>this.toast('Imported 6 keys from .env into acme/api/dev'),
+      createShare:()=>this.toast('Share link copied. Expires in 24h, 1 view'),
+      approval:s.approval,simulate:set({approval:true}),
+      deny:decide('Denied claude-code',false),once:decide('Allowed once. Injected into pid 48213',false),hour:decide('Granted claude-code for 1 hour',true),
+      importOpen:s.importOpen,openImport:set({importOpen:true}),closeImport:set({importOpen:false}),
+      doImport:()=>{this.setState({importOpen:false});this.toast('Imported 142 entries from acme.kdbx');},
+      locked:s.locked,doLock:set({locked:true,approval:false}),doUnlock:()=>{this.setState({locked:false});this.toast('Unlocked with YubiKey 5C');},
+      toastOn:!!s.toast,toast:s.toast
+    };
+  }
+}
+</script>
+</body>
+</html>

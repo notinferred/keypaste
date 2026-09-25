@@ -290,7 +290,7 @@ public static class AuditText
         {
             if (finding.IsBreak)
             {
-                yield return $"  line {finding.Line}{Named(finding)}: {Fault(finding.Fault)}";
+                yield return $"  line {finding.Line}{Named(finding)}: {Describe(finding.Fault)}";
             }
         }
     }
@@ -346,7 +346,10 @@ public static class AuditText
             ? string.Empty
             : string.Create(CultureInfo.InvariantCulture, $" (seq {finding.Sequence}, {finding.Timestamp})");
 
-    private static string Fault(AuditChainFault fault) => fault switch
+    /// <summary>What a break in the chain means, in one sentence.</summary>
+    /// <param name="fault">The break.</param>
+    /// <returns>The sentence.</returns>
+    public static string Describe(AuditChainFault fault) => fault switch
     {
         AuditChainFault.Altered => "its own bytes have changed since it was written.",
         AuditChainFault.Unlinked => "it does not follow the record before it. One was removed or inserted.",

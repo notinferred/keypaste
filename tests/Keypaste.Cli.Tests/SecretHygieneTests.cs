@@ -31,6 +31,22 @@ public sealed class SecretHygieneTests
     [InlineData("env", "ls")]
     [InlineData("env", "ls", "hygiene")]
     [InlineData("env", "rm", "hygiene", "API_KEY", "--yes")]
+    [InlineData("env", "ls", "--json")]
+    [InlineData("env", "ls", "hygiene", "--json")]
+    [InlineData("env", "ls", "hygiene", "--profiles")]
+    [InlineData("env", "export", "hygiene")]
+    [InlineData("env", "diff", "hygiene")]
+    [InlineData("ls", "--json")]
+    [InlineData("set", "secrets/target")]
+    [InlineData("set", "secrets/target", "--generate")]
+    [InlineData("set", "secrets/new", "--generate", "--words", "4")]
+    [InlineData("share", "ls", "--offline")]
+    [InlineData("share", "ls", "--offline", "--json")]
+    [InlineData("rotate", "secrets/target")]
+    [InlineData("rotate", "secrets/target", "--words", "6")]
+    [InlineData("rotate", "secrets/absent")]
+    [InlineData("mcp", "policy")]
+    [InlineData("mcp", "policy", "--json")]
     public void NoVerb_LeaksAFieldValue_ToStdoutOrStderr(params string[] verb)
     {
         using var harness = new CliHarness();
@@ -247,6 +263,87 @@ public sealed class SecretHygieneTests
         Assert.Empty(stdout.ToString());
     }
 
+    /// <summary>
+    /// The token verbs, swept as the theory above sweeps the rest. A theory of its own because each
+    /// of them needs a token to act on and a keypaste home of the harness's own: <c>create</c> and
+    /// <c>revoke</c> take the vault's claim and <c>bundle</c> writes an audit line, and neither may
+    /// touch the home of whoever runs the suite. <c>create</c>'s stdout is the token and nothing else.
+    /// </summary>
+    [Theory]
+    [InlineData("token", "create", "second", "--scope", "read:hygiene/dev/*")]
+    [InlineData("token", "create", "second", "--scope", "read:hygiene/dev/*", "--json")]
+    [InlineData("token", "ls")]
+    [InlineData("token", "ls", "--json")]
+    [InlineData("token", "revoke", "sweep")]
+    [InlineData("token", "bundle", "sweep", "-o", "sweep.kpb")]
+    public void NoTokenVerb_LeaksAFieldValue_ToStdoutOrStderr(params string[] verb)
+    {
+        using var harness = new CliHarness();
+        Seed(harness);
+        harness.Environment[Core.Audit.KeypasteHome.EnvironmentVariable] = harness.Directory;
+
+        harness.Prompt.Enqueue(Master);
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("token", "create", "sweep", "--scope", "read:hygiene/dev/*", "--vault", harness.VaultPath));
+        var token = harness.Out.Trim();
+        harness.Environment[Commands.RunWithToken.EnvironmentVariable] = token;
+        harness.Stdout.GetStringBuilder().Clear();
+        harness.Stderr.GetStringBuilder().Clear();
+
+        harness.Prompt.Enqueue(Master);
+        var args = verb.Select(arg => arg.EndsWith(".kpb", StringComparison.Ordinal) ? Path.Combine(harness.Directory, arg) : arg)
+            .Concat(["--vault", harness.VaultPath])
+            .ToArray();
+        Assert.Equal(CliApp.ExitSuccess, harness.Run(args));
+
+        foreach (var sentinel in new[] { SentinelPassword, SentinelUsername, SentinelNotes, SentinelUrl, token })
+        {
+            Assert.DoesNotContain(sentinel, harness.Out, StringComparison.Ordinal);
+            Assert.DoesNotContain(sentinel, harness.Err, StringComparison.Ordinal);
+        }
+
+        if (verb[1] == "create" && !verb.Contains("--json"))
+        {
+            Assert.True(Core.Tokens.TokenSecret.TryParse(harness.Out.Trim(), out _, out _));
+        }
+    }
+
+    /// <summary>
+    /// <c>share</c> is handed the fields it encrypts and makes the key that opens them. Neither may
+    /// reach the terminal, with one exception the person asked for: the link itself, alone on stdout,
+    /// under <c>--print</c>.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Share_NeverPrintsAFieldValueOrTheKey_ExceptTheLinkUnderPrint(bool print)
+    {
+        using var harness = new CliHarness();
+        using var server = new FakeShareServer();
+        Seed(harness);
+        harness.Environment[Core.Audit.KeypasteHome.EnvironmentVariable] = Path.Combine(harness.Directory, "home");
+        string? copied = null;
+        harness.ClearStrategy.DuringWait = () => copied = harness.Clipboard.Content;
+
+        harness.Prompt.Enqueue(Master);
+        string[] args = ["share", "secrets/target", "--field", "login", "--vault", harness.VaultPath];
+        var exit = Commands.ShareCommand.Execute(print ? [.. args, "--print"] : args, harness.NewContext(), server);
+
+        Assert.Equal(CliApp.ExitSuccess, exit);
+        var link = print ? harness.Out.Trim() : copied;
+        Assert.True(Core.Sharing.ShareLink.TryParse(link!, out _, out var key));
+        Assert.Equal(print ? link + Environment.NewLine : string.Empty, harness.Out);
+        Assert.DoesNotContain(key, harness.Err, StringComparison.Ordinal);
+
+        foreach (var sentinel in new[] { SentinelPassword, SentinelUsername, SentinelNotes, SentinelUrl })
+        {
+            Assert.DoesNotContain(sentinel, harness.Out, StringComparison.Ordinal);
+            Assert.DoesNotContain(sentinel, harness.Err, StringComparison.Ordinal);
+            Assert.DoesNotContain(sentinel, server.Transcript, StringComparison.Ordinal);
+        }
+
+        Assert.DoesNotContain(key, server.Transcript, StringComparison.Ordinal);
+    }
+
     private static void Seed(CliHarness harness)
     {
         harness.Prompt.Interactive = false;
@@ -268,5 +365,104 @@ public sealed class SecretHygieneTests
 
         harness.Stdout.GetStringBuilder().Clear();
         harness.Stderr.GetStringBuilder().Clear();
+    }
+
+    [Fact]
+    public void EnvExportReferences_NeverContainsAValue()
+    {
+        using var harness = new CliHarness();
+        Seed(harness);
+        var path = Path.Combine(harness.Directory, ".env.keypaste");
+
+        harness.Prompt.Enqueue(Master);
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("env", "export", "hygiene", "--vault", harness.VaultPath));
+        harness.Prompt.Enqueue(Master);
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("env", "export", "hygiene", path, "--vault", harness.VaultPath));
+
+        Assert.Contains("kp://hygiene/dev/API_KEY", harness.Out + File.ReadAllText(path), StringComparison.Ordinal);
+        Assert.DoesNotContain(SentinelPassword, harness.Out + harness.Err + File.ReadAllText(path), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EnvDiff_NeverPrintsAValue()
+    {
+        using var harness = new CliHarness();
+        Seed(harness);
+
+        using (var vault = Vault.Open(harness.VaultPath, Master))
+        {
+            var store = new EnvStore(vault);
+            store.TrySet("hygiene", "prod", "API_KEY", SentinelPassword, out _);
+            store.TrySet("hygiene", "prod", "OTHER", SentinelNotes, out _);
+            vault.SetExpiryUnchecked(new EntryName("env/hygiene/prod", "OTHER"), new DateTimeOffset(2020, 1, 1, 0, 0, 0, TimeSpan.Zero));
+            vault.Save();
+        }
+
+        harness.Prompt.Enqueue(Master);
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("env", "diff", "hygiene", "--vault", harness.VaultPath));
+
+        Assert.Contains("same value in dev and prod", harness.Out, StringComparison.Ordinal);
+        Assert.Contains("OTHER", harness.Out, StringComparison.Ordinal);
+        foreach (var sentinel in new[] { SentinelPassword, SentinelNotes })
+        {
+            Assert.DoesNotContain(sentinel, harness.Out + harness.Err, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void RunReferenceFailure_NeverPrintsAValue()
+    {
+        using var harness = new CliHarness();
+        Seed(harness);
+        harness.ConsoleStyle.Terminal = true;
+
+        using (var vault = Vault.Open(harness.VaultPath, Master))
+        {
+            vault.AddEntry(new VaultEntry { GroupPath = "env/hygiene", Title = "BAD-NAME", Password = SentinelNotes });
+            vault.Save();
+        }
+
+        var file = Path.Combine(harness.Directory, "refs.env");
+        File.WriteAllText(file, "API=kp://hygiene/dev/API_KEY\nNOPE=kp://hygiene/dev/ABSENT\nUSER=kp:///secrets/target#username\n");
+
+        harness.Prompt.Enqueue(Master);
+        Assert.Equal(CliApp.ExitInternalError, harness.Run("run", "--env-file", file, "--vault", harness.VaultPath, "--", "node"));
+
+        Assert.Contains("NOPE", harness.Err, StringComparison.Ordinal);
+        Assert.DoesNotContain("BAD-NAME", harness.Err, StringComparison.Ordinal);
+        Assert.Empty(harness.ProcessLauncher.Started);
+        foreach (var sentinel in new[] { SentinelPassword, SentinelUsername, SentinelNotes })
+        {
+            Assert.DoesNotContain(sentinel, harness.Out + harness.Err, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>
+    /// <c>import</c> reads every value of another vault and prints its plan, its refusals and its
+    /// count; the swept vault is the source, copied whole and previewed, into a second one.
+    /// </summary>
+    [Fact]
+    public void Import_NeverEchoesAValue_FromTheVaultItCopies()
+    {
+        using var harness = new CliHarness();
+        Seed(harness);
+        harness.Environment[Core.Audit.KeypasteHome.EnvironmentVariable] = Path.Combine(harness.Directory, "home");
+
+        var target = Path.Combine(harness.Directory, "target.kdbx");
+        harness.Prompt.Enqueue(Master, Master);
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("init", target));
+
+        foreach (var shape in new[] { new[] { "--dry-run" }, [], ["--into", ".keypaste"] })
+        {
+            harness.Prompt.Enqueue(Master, Master);
+            harness.Run(["import", harness.VaultPath, "--vault", target, .. shape]);
+        }
+
+        Assert.Contains("copied into vault", harness.Err, StringComparison.Ordinal);
+        foreach (var sentinel in new[] { SentinelPassword, SentinelUsername, SentinelNotes, SentinelUrl, Master })
+        {
+            Assert.DoesNotContain(sentinel, harness.Out, StringComparison.Ordinal);
+            Assert.DoesNotContain(sentinel, harness.Err, StringComparison.Ordinal);
+        }
     }
 }

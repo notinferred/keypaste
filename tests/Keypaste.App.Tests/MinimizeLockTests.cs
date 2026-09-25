@@ -170,12 +170,12 @@ public sealed class MinimizeLockTests
     });
 
     /// <summary>
-    /// The checkbox is offered exactly where a minimize can be observed, and both answers come from
+    /// The switch is offered exactly where a minimize can be observed, and both answers come from
     /// one place — an inactive security setting is the defect this task repairs, and a second
     /// opinion about where it works would rebuild it.
     /// </summary>
     [Fact]
-    public Task The_checkbox_is_offered_exactly_where_minimizing_is_observed() => Started(fixture =>
+    public Task The_switch_is_offered_exactly_where_minimizing_is_observed() => Started(fixture =>
     {
         using var app = new Armed(fixture, new ManualClock());
         var screen = Screen(app, fixture);
@@ -184,11 +184,11 @@ public sealed class MinimizeLockTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
-        var checkbox = window.GetVisualDescendants().OfType<CheckBox>()
+        var toggle = window.GetVisualDescendants().OfType<ToggleSwitch>()
             .Single(box => Equals(box.Content, "Lock when the window is minimized"));
 
         Assert.Equal(MinimizeLock.IsSupported, screen.MinimizeLockSupported);
-        Assert.Equal(MinimizeLock.IsSupported, checkbox.IsEffectivelyVisible);
+        Assert.Equal(MinimizeLock.IsSupported, toggle.IsEffectivelyVisible);
 
         window.Close();
     });

@@ -348,6 +348,32 @@ public sealed class ApproverListenerTests
         Assert.Throws<ArgumentNullException>(() => new ApproverListener("x", null!));
     }
 
+    /// <summary>
+    /// A handler written before grants and lock existed answers them with its interface's refusals:
+    /// it lists nothing, ends nothing and does not lock.
+    /// </summary>
+    [Fact]
+    public async Task AFakeHandlerWithoutTheNewMethods_RefusesThem()
+    {
+        await using var host = Host.Start(new RecordingHandler());
+        await using var client = await ConnectAsync(host.PipeName);
+
+        var grants = await client.GrantsAsync(new GrantsRequest { Vault = "/v.kdbx", Session = "test-session" }, Token);
+        var revoked = await client.RevokeGrantsAsync(new RevokeGrantsRequest([], null, All: true), Token);
+        var locked = await client.LockAsync(new LockRequest(), Token);
+
+        Assert.NotNull(grants);
+        Assert.False(grants.Answered);
+        Assert.Empty(grants.Grants);
+        Assert.Contains("does not list grants", grants.Reason, StringComparison.Ordinal);
+        Assert.NotNull(revoked);
+        Assert.Equal(0, revoked.Revoked);
+        Assert.Contains("does not revoke grants", revoked.Reason, StringComparison.Ordinal);
+        Assert.NotNull(locked);
+        Assert.False(locked.Locking);
+        Assert.Contains("does not lock", locked.Reason, StringComparison.Ordinal);
+    }
+
     /// <summary>A listener running on its own pipe, torn down with the test.</summary>
     private sealed class Host : IAsyncDisposable
     {

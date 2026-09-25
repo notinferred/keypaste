@@ -37,7 +37,6 @@ Complete KeePassXC parity is withdrawn as an objective. Individual capabilities 
 | Project env diff, JSON export and a clean inherited environment | Names-only comparison, explicit output formats and `run --no-inherit` may solve specific tool needs. Avoid silently skipping unusable values. |
 | Shell/direnv integration or stopping launched programs on lock | Ordinary environments are copied into processes. Any convenience must state descendant exposure and cannot promise to revoke delivered credentials. |
 | Secret rotation reminders and deliberate history removal | Reminders do not rotate a provider credential; purging a leaked value is explicit and cannot erase existing copies or backups. |
-| Applying the adopted brand | [BRAND](BRAND.md) records unapplied marks and palette; apply them when relevant interface work is selected, without a separate release gate. |
 | An idle warning that counts down | The header's warning is set once, 30 seconds before the lock, so its number stays at 29 while the lock approaches ([F.2b3a](steps/F.2b3a.md)). Update it each second or drop the number; any key or click must still cancel it. |
 | Saying where a new project is kept | A new project writes nothing to the vault until its first variable, and its card leads with this machine's directory and command, which a person read as where the project is saved ([F.2b3a](steps/F.2b3a.md)). |
 | Command palette and additional generator recipes | Add when they improve an observed frequent task; existing CLI recipe controls are not proof of desktop controls. |

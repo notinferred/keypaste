@@ -27,14 +27,23 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     private readonly AppVaultSession _session;
     private readonly Action<string?> _report;
     private readonly Action<string?> _announce;
+    private readonly IVaultFilePicker? _picker;
 
     private IReadOnlyList<EnvVariableRow> _variables = [];
+    private IReadOnlyList<EnvProfileColumn> _columns = [];
+    private IReadOnlyList<EnvKeyRow> _rows = [];
+    private IReadOnlyList<EnvProfileInfo> _profiles = [];
+    private IReadOnlyList<string> _profileProblems = [];
+    private EnvMatrix? _matrix;
+    private string _selectedProfile = EnvProfileNames.Default;
     private EnvVariableRow? _revealed;
     private EnvVariableRow? _removing;
     private EnvVariableRow? _replacing;
     private bool _isAdding;
     private bool _generateValue = true;
     private string _newKey = string.Empty;
+    private bool _isAddingProfile;
+    private string _newProfile = string.Empty;
 
     internal EnvProjectViewModel(
         AppVaultSession session,
@@ -53,6 +62,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         _session = session;
         _report = report;
         _announce = announce ?? (_ => { });
+        _picker = picker;
         Clipboard = clipboard;
         Name = name;
 
@@ -67,9 +77,14 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         ReplacementValue = new SecretField(clipboard);
         ConfirmReplaceCommand = new RelayCommand(ConfirmReplace, () => Replacing is not null);
         CancelReplaceCommand = new RelayCommand(CancelReplace, () => Replacing is not null);
+        ExportReferencesCommand = new AsyncRelayCommand(ExportReferencesAsync, () => _picker is not null);
+        BeginAddProfileCommand = new RelayCommand(BeginAddProfile, () => !IsAddingProfile);
+        ConfirmAddProfileCommand = new RelayCommand(ConfirmAddProfile, () => IsAddingProfile);
+        CancelAddProfileCommand = new RelayCommand(() => IsAddingProfile = false, () => IsAddingProfile);
 
         Import = new EnvImportViewModel(session, name, picker, report, _announce, imported ?? Reload);
         Launch = new ProjectLaunchViewModel(session, name, picker, launching ?? ProjectLaunching.ForThisMachine(), report, _announce);
+        Launch.PropertyChanged += OnLaunchChanged;
 
         Reload();
     }
@@ -115,12 +130,174 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     /// <summary>What the card says under its name.</summary>
     internal string Summary => Count == 1 ? "1 variable" : $"{Count} variables";
 
-    /// <summary>The command that injects this project, for the copy helper and the card.</summary>
+    /// <summary>The command that injects the selected profile, for the copy helper and the card.</summary>
     /// <remarks>
-    /// The trailing space is deliberate: it is a line somebody finishes typing, not one they run.
-    /// The prompt for 4.2 spells it exactly this way, and <c>docs/demo.md</c> shows the same shape.
+    /// It names the project as well as the profile, so it runs from any directory and not only the
+    /// one <c>projects.json</c> maps; the command is the mapped one, or <c>npm start</c> to edit.
     /// </remarks>
-    internal string RunCommand => $"keypaste run {Name} -- ";
+    internal string RunCommand => $"keypaste run -p {SelectedProfile} {Name} -- {Launch.Mapping?.Command ?? "npm start"}";
+
+    /// <summary>The project's profiles: <c>dev</c> first, protected ones last.</summary>
+    internal IReadOnlyList<EnvProfileInfo> Profiles
+    {
+        get => _profiles;
+        private set => Set(ref _profiles, value);
+    }
+
+    /// <summary>
+    /// The matrix columns and the preview's toggle: <see cref="Profiles"/>, plus the selected
+    /// profile while it has no key yet, placed before any protected one.
+    /// </summary>
+    internal IReadOnlyList<EnvProfileColumn> Columns
+    {
+        get => _columns;
+        private set => Set(ref _columns, value);
+    }
+
+    /// <summary>Every key against <see cref="Columns"/>. Holds no value.</summary>
+    internal IReadOnlyList<EnvKeyRow> Rows
+    {
+        get => _rows;
+        private set
+        {
+            if (Set(ref _rows, value))
+            {
+                Raise(nameof(HasRows));
+            }
+        }
+    }
+
+    internal bool HasRows => _rows.Count > 0;
+
+    /// <summary>Whether the selected profile is protected, so every release of it is asked live (D-0348).</summary>
+    internal bool SelectedIsProtected => EnvProfileNames.IsProtected(SelectedProfile);
+
+    /// <summary>Whether the new-profile form is open.</summary>
+    internal bool IsAddingProfile
+    {
+        get => _isAddingProfile;
+        private set
+        {
+            if (Set(ref _isAddingProfile, value))
+            {
+                BeginAddProfileCommand.RaiseCanExecuteChanged();
+                ConfirmAddProfileCommand.RaiseCanExecuteChanged();
+                CancelAddProfileCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    /// <summary>The name of the profile being started.</summary>
+    internal string NewProfile
+    {
+        get => _newProfile;
+        set => Set(ref _newProfile, value);
+    }
+
+    internal RelayCommand BeginAddProfileCommand { get; }
+
+    /// <summary>Selects the new profile and opens the add form, since its first key is what creates it.</summary>
+    internal RelayCommand ConfirmAddProfileCommand { get; }
+
+    internal RelayCommand CancelAddProfileCommand { get; }
+
+    /// <summary>Asks where to save <see cref="ReferencePreview"/> and writes it there.</summary>
+    internal AsyncRelayCommand ExportReferencesCommand { get; }
+
+    /// <summary>The subgroups that are never read, in keypaste's words.</summary>
+    internal IReadOnlyList<string> ProfileProblems
+    {
+        get => _profileProblems;
+        private set => Set(ref _profileProblems, value);
+    }
+
+    /// <summary>Every key against every profile. Holds no value.</summary>
+    internal EnvMatrix? Matrix
+    {
+        get => _matrix;
+        private set => Set(ref _matrix, value);
+    }
+
+    /// <summary>The profile the table shows and every add, replace, remove, import and launch goes to.</summary>
+    /// <remarks>A profile that does not exist yet may be chosen: the first variable added to it creates it, as <c>env set -p</c> does.</remarks>
+    internal string SelectedProfile
+    {
+        get => _selectedProfile;
+        set
+        {
+            if (!EnvProfileNames.IsValid(value, out var invalid))
+            {
+                _report(invalid);
+                return;
+            }
+
+            if (Set(ref _selectedProfile, value))
+            {
+                Raise(nameof(SelectedIsProtected));
+                Import.Profile = value;
+                Launch.Profile = value;
+                _revealed = null;
+                Raise(nameof(RevealedKey));
+                Removing = null;
+                CancelReplace();
+                Reload();
+            }
+        }
+    }
+
+    /// <summary>The <c>.env.keypaste</c> the selected profile exports: references only, safe to commit.</summary>
+    internal string ReferencePreview => EnvReferenceFile.Format(Name, SelectedProfile, [.. Variables.Select(row => row.Key)]);
+
+    /// <summary>The preview a line at a time, as the terminal panel draws it.</summary>
+    internal IReadOnlyList<EnvPreviewLine> ReferenceLines =>
+        [.. ReferencePreview.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(line => new EnvPreviewLine(line))];
+
+    /// <summary>Writes <see cref="ReferencePreview"/> to a file, never a value.</summary>
+    /// <param name="path">The file.</param>
+    /// <param name="replace">Whether an existing file may be replaced.</param>
+    /// <returns>What happened, in a sentence the screen shows.</returns>
+    internal string ExportReferences(string path, bool replace = false) => Export(path, replace, out _);
+
+    private string Export(string path, bool replace, out bool written)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        written = false;
+
+        if (_session.Unlocked is not { } vault)
+        {
+            return "The vault is locked.";
+        }
+
+        var target = Path.GetFullPath(path);
+
+        if ((_session.VaultPath is { } vaultPath && PathIdentity.SameFile(vaultPath, target))
+            || (File.Exists(target) && KdbxHeader.IsVaultFile(target)))
+        {
+            return $"{target} is a vault, so nothing was written. Choose another file.";
+        }
+
+        if (File.Exists(target) && !replace)
+        {
+            return $"{target} already exists, so nothing was written. Replace it to overwrite it.";
+        }
+
+        var variables = new EnvStore(vault).Read(Name, SelectedProfile);
+
+        if (!EnvNameRules.TryCheck(variables, out var names))
+        {
+            return $"{EnvProfileNames.GroupPath(Name, SelectedProfile)} {names}";
+        }
+
+        var text = EnvReferenceFile.Format(Name, SelectedProfile, [.. variables.Select(variable => variable.Key)], Path.GetFileName(target));
+
+        if (!EnvReferenceFile.TryWrite(target, text, replace, out var writeError))
+        {
+            return $"{target} could not be written: {writeError}";
+        }
+
+        written = true;
+        return $"Wrote {(variables.Count == 1 ? "1 reference" : $"{variables.Count} references")} to {target}. It holds no value and is safe to commit.";
+    }
 
     /// <summary>Which variable is revealed right now, by name. Never its value.</summary>
     /// <remarks>
@@ -275,6 +452,11 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         if (_session.Unlocked is not { } vault)
         {
             Variables = [];
+            Profiles = [];
+            ProfileProblems = [];
+            Matrix = null;
+            Columns = [];
+            Rows = [];
 
             // A half-entered value is as much a secret as a stored one, and the screen is about to
             // be disposed anyway. Clearing here means the lock holds on whichever path runs.
@@ -282,15 +464,21 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
             ReplacementValue.Clear();
             IsAdding = false;
             Replacing = null;
+            RaiseProfileText();
             return;
         }
+
+        var store = new EnvStore(vault);
+        Profiles = store.Profiles(Name);
+        ProfileProblems = store.ProfileProblems(Name);
+        Matrix = EnvMatrix.Build(vault, Name, _session.Clock);
 
         try
         {
             Variables =
             [
-                .. new EnvStore(vault)
-                    .Read(Name)
+                .. store
+                    .Read(Name, SelectedProfile)
                     .Select(variable => new EnvVariableRow(
                         this,
                         variable.Key,
@@ -305,6 +493,124 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
             Variables = [];
             _report(e.Message);
         }
+
+        Layout();
+        RaiseProfileText();
+    }
+
+    private void Layout()
+    {
+        var profiles = Profiles.ToList();
+
+        if (!profiles.Any(profile => string.Equals(profile.Name, SelectedProfile, StringComparison.Ordinal)))
+        {
+            var pending = new EnvProfileInfo(SelectedProfile, EnvProfileNames.IsProtected(SelectedProfile));
+            var firstProtected = profiles.FindIndex(profile => profile.IsProtected);
+            profiles.Insert(pending.IsProtected || firstProtected < 0 ? profiles.Count : firstProtected, pending);
+        }
+
+        Columns =
+        [
+            .. profiles.Select(profile => new EnvProfileColumn(
+                profile.Name,
+                profile.IsProtected,
+                string.Equals(profile.Name, SelectedProfile, StringComparison.Ordinal),
+                new RelayCommand(() => SelectedProfile = profile.Name))),
+        ];
+
+        var selected = Variables.ToDictionary(row => row.Key, StringComparer.Ordinal);
+        var keys = (Matrix?.Rows.Select(row => row.Key) ?? []).Union(selected.Keys, StringComparer.Ordinal).Order(StringComparer.Ordinal);
+
+        Rows =
+        [
+            .. keys.Select(key => new EnvKeyRow(key, [.. profiles.Select(profile => Cell(key, profile.Name))])),
+        ];
+
+        EnvProfileCell Cell(string key, string profile)
+        {
+            var known = Matrix?.Row(key)?.Cells.FirstOrDefault(cell => string.Equals(cell.Profile, profile, StringComparison.Ordinal));
+            var isSelected = string.Equals(profile, SelectedProfile, StringComparison.Ordinal);
+            var variable = isSelected ? selected.GetValueOrDefault(key) : null;
+            var state = known?.State ?? (variable is null ? EnvCellState.Missing : EnvCellState.Set);
+
+            return new EnvProfileCell(
+                profile,
+                state,
+                known?.Problem,
+                known?.SameValueAs ?? [],
+                variable,
+                new RelayCommand(() => Act(key, profile, state)));
+        }
+    }
+
+    private void Act(string key, string profile, EnvCellState state)
+    {
+        SelectedProfile = profile;
+
+        if (state == EnvCellState.Missing && string.Equals(SelectedProfile, profile, StringComparison.Ordinal))
+        {
+            BeginAdd();
+            NewKey = key;
+        }
+    }
+
+    private void BeginAddProfile()
+    {
+        NewProfile = string.Empty;
+        IsAddingProfile = true;
+        _report(null);
+    }
+
+    private void ConfirmAddProfile()
+    {
+        var profile = NewProfile.Trim();
+
+        if (!EnvProfileNames.IsValid(profile, out var invalid))
+        {
+            _report(invalid);
+            return;
+        }
+
+        IsAddingProfile = false;
+        NewProfile = string.Empty;
+        SelectedProfile = profile;
+        BeginAdd();
+    }
+
+    private async Task ExportReferencesAsync()
+    {
+        if (_picker is null || await _picker.PickReferenceFileAsync(EnvReferenceFile.FileName, Launch.Mapping?.Directory).ConfigureAwait(true) is not { } path)
+        {
+            return;
+        }
+
+        // The save dialog has already asked before replacing a file, so its answer is the person's.
+        var message = Export(path, replace: true, out var written);
+
+        if (written)
+        {
+            _report(null);
+            _announce(message);
+        }
+        else
+        {
+            _report(message);
+        }
+    }
+
+    private void OnLaunchChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ProjectLaunchViewModel.Mapping))
+        {
+            Raise(nameof(RunCommand));
+        }
+    }
+
+    private void RaiseProfileText()
+    {
+        Raise(nameof(ReferencePreview));
+        Raise(nameof(ReferenceLines));
+        Raise(nameof(RunCommand));
     }
 
     /// <summary>Hands a row its value, and takes it away from whichever row had it.</summary>
@@ -337,7 +643,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
             return null;
         }
 
-        foreach (var variable in new EnvStore(vault).Read(Name))
+        foreach (var variable in new EnvStore(vault).Read(Name, SelectedProfile))
         {
             if (string.Equals(variable.Key, key, StringComparison.Ordinal))
             {
@@ -359,8 +665,14 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     {
         _revealed = null;
         Variables = [];
+        Profiles = [];
+        ProfileProblems = [];
+        Matrix = null;
+        Columns = [];
+        Rows = [];
         Removing = null;
         Replacing = null;
+        Launch.PropertyChanged -= OnLaunchChanged;
         NewValue.Dispose();
         ReplacementValue.Dispose();
         Import.Dispose();
@@ -434,7 +746,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
 
             var store = new EnvStore(vault);
 
-            if (store.TrySet(Name, key, value, out var rejection) == EnvSetOutcome.Rejected)
+            if (store.TrySet(Name, SelectedProfile, key, value, out var rejection) == EnvSetOutcome.Rejected)
             {
                 _report(rejection);
                 return;
@@ -464,7 +776,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     /// Writes a new value over an existing variable, keeping the old one in history.
     /// </summary>
     /// <remarks>
-    /// Straight through <see cref="EnvStore.TrySet"/>, whose update branch goes to
+    /// Straight through <see cref="EnvStore.TrySet(string, string, string, out string)"/>, whose update branch goes to
     /// <c>Vault.UpdateEntry</c> and therefore to <c>CreateBackup</c> — which is what keeps the
     /// replaced value in KeePass history (D-0014) without this screen knowing anything about it.
     /// </remarks>
@@ -487,7 +799,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         {
             var store = new EnvStore(vault);
 
-            switch (store.TrySet(Name, row.Key, value, out var rejection))
+            switch (store.TrySet(Name, SelectedProfile, row.Key, value, out var rejection))
             {
                 case EnvSetOutcome.Rejected:
                     _report(rejection);
@@ -520,6 +832,12 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         // back out of the vault to recompute lengths it already knows.
         row.Resize(value.Length);
 
+        if (_session.Unlocked is { } current)
+        {
+            Matrix = EnvMatrix.Build(current, Name, _session.Clock);
+            Layout();
+        }
+
         Replacing = null;
         ReplacementValue.Clear();
     }
@@ -541,7 +859,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
 
         try
         {
-            outcome = new EnvStore(vault).Remove(Name, row.Key);
+            outcome = new EnvStore(vault).Remove(Name, SelectedProfile, row.Key);
 
             if (outcome == DeletionOutcome.NothingMatched)
             {

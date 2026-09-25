@@ -50,6 +50,59 @@ public interface IApproverHandler
     /// <returns>The whole set, or why none of it was released.</returns>
     ValueTask<EnvReply> ReleaseEnvAsync(EnvRequest request, string connectionId, CancellationToken cancellationToken);
 
+    /// <summary>Lists the grants the current session holds, names only.</summary>
+    /// <param name="request">The attachment it is made under.</param>
+    /// <param name="connectionId">Who is asking.</param>
+    /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
+    /// <returns>The grants, or why none were listed. A handler that does not hold grants refuses.</returns>
+    ValueTask<GrantsReply> GrantsAsync(GrantsRequest request, string connectionId, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(new GrantsReply(false, [], true, "this keypaste process does not list grants"));
+
+    /// <summary>Ends grants of the current session.</summary>
+    /// <param name="request">Which grants, and the attachment it is made under.</param>
+    /// <param name="connectionId">Who is asking.</param>
+    /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
+    /// <returns>How many ended. A handler that does not hold grants refuses.</returns>
+    ValueTask<RevokeGrantsReply> RevokeGrantsAsync(RevokeGrantsRequest request, string connectionId, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(new RevokeGrantsReply(0, "this keypaste process does not revoke grants"));
+
+    /// <summary>Locks now.</summary>
+    /// <param name="request">The attachment it is made under.</param>
+    /// <param name="connectionId">Who is asking.</param>
+    /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
+    /// <returns>Whether the lock started. A handler that cannot lock refuses.</returns>
+    ValueTask<LockReply> LockAsync(LockRequest request, string connectionId, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(new LockReply(false, "this keypaste process does not lock on request"));
+
+    /// <summary>Decides one request for a set authorized by a scoped token rather than a prompt.</summary>
+    /// <param name="request">The token, the set and the command the runner will start with it.</param>
+    /// <param name="connectionId">Who is asking.</param>
+    /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
+    /// <returns>The set, or why none of it was released. A handler that does not verify tokens refuses.</returns>
+    ValueTask<EnvReply> ReleaseTokenEnvAsync(TokenEnvRequest request, string connectionId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return ValueTask.FromResult(new EnvReply(
+            EnvResolved.Refused(request.Project, EnvOutcome.NoSession, profile: request.Profile),
+            "this keypaste process does not accept tokens"));
+    }
+
+    /// <summary>Decides one agent's request to run a command with approved secrets, asking a human before any of it leaves.</summary>
+    /// <param name="request">The program, command, directory, variables and reason.</param>
+    /// <param name="connectionId">Who is asking, and what a timed grant is scoped to.</param>
+    /// <param name="cancellationToken">Cancelled when the connection goes away.</param>
+    /// <returns>The variables, or why none. A handler that does not serve runs refuses.</returns>
+    ValueTask<RunReply> ReleaseRunAsync(RunRequest request, string connectionId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return ValueTask.FromResult(new RunReply(
+            EnvResolved.Refused(request.Project ?? string.Empty, EnvOutcome.NoSession, profile: request.Profile),
+            Audit.AuditMethod.NoSession,
+            "this keypaste process does not run commands for agents"));
+    }
+
     /// <summary>Tells the handler a connection has gone, so its grants can go with it.</summary>
     /// <param name="connectionId">The connection that ended.</param>
     void Disconnected(string connectionId);

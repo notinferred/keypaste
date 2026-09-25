@@ -61,6 +61,24 @@ public sealed class EnvPullTests
         Assert.DoesNotContain("sk_live_secret", harness.Err, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Pull_OfAReferenceFile_IsRefused_AndTheVaultKeepsItsValues()
+    {
+        using var harness = Seeded();
+        harness.Prompt.Enqueue(Master, "real-key");
+        harness.Run("env", "set", "billing", "API_KEY", "--vault", harness.VaultPath);
+        harness.Stderr.GetStringBuilder().Clear();
+        var path = WriteEnvFile(harness, EnvReferenceFile.Format("billing", "dev", ["API_KEY"]), EnvReferenceFile.FileName);
+
+        harness.Prompt.Enqueue(Master);
+        var exit = harness.Run("env", "pull", "billing", path, "--yes", "--keep", "--vault", harness.VaultPath);
+
+        Assert.NotEqual(CliApp.ExitSuccess, exit);
+        Assert.Contains(EnvReferenceFile.FileName, harness.Err, StringComparison.Ordinal);
+        Assert.Equal([new EnvVariable("API_KEY", "real-key")], Stored(harness, "billing"));
+        Assert.True(File.Exists(path));
+    }
+
     /// <summary>
     /// The fail-closed test. A partial import whose original was then deleted is unrecoverable,
     /// so one bad line has to leave the vault exactly as it was.

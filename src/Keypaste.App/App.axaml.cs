@@ -7,6 +7,7 @@ using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
+using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
 
@@ -32,6 +33,7 @@ internal sealed partial class App : Application, IDisposable
     private UnlockViewModel? _unlock;
     private ShellViewModel? _shell;
     private IClassicDesktopStyleApplicationLifetime? _desktop;
+    private (string Path, string? Keyfile)? _openNext;
     private bool _shuttingDown;
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
@@ -65,7 +67,8 @@ internal sealed partial class App : Application, IDisposable
         _authority = new AppAuthority(
             _session,
             Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable),
-            () => new WindowApprovalChannel(TimeProvider.System));
+            () => new WindowApprovalChannel(TimeProvider.System, ApprovalLimits.Default.Window),
+            AppAuthority.RequestLock(_session, action => Dispatcher.UIThread.Post(action)));
 
         _window = new MainWindow();
         _activity = Observe(_window, _session, TimeProvider.System, () => _shell?.ClearCountdown());
@@ -228,14 +231,22 @@ internal sealed partial class App : Application, IDisposable
         Dispatcher.UIThread.Post(() =>
             ShowUnlock(
                 Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable),
-                reason == VaultLockReason.AccessChanged ? AccessChangedMessage : null));
+                reason == VaultLockReason.AccessChanged ? AccessChangedMessage : null,
+                reason));
+    }
+
+    /// <summary>Keeps an imported file in place: locks the open vault and puts that file on the unlock screen.</summary>
+    private void OpenInPlace(string path, string? keyfile)
+    {
+        _openNext = (path, keyfile);
+        _session?.Lock(VaultLockReason.Manual);
     }
 
     /// <summary>What the unlock screen says when an access change could not carry on with the vault open.</summary>
     internal const string AccessChangedMessage =
         "The vault's password or keyfile was changed, and it locked rather than open again. Unlock it with the new ones.";
 
-    private void ShowUnlock(string? home, string? message = null)
+    private void ShowUnlock(string? home, string? message = null, VaultLockReason? reason = null)
     {
         if (_session is null || _window is null)
         {
@@ -247,11 +258,20 @@ internal sealed partial class App : Application, IDisposable
         _shell?.Dispose();
         _shell = null;
 
+        var next = _openNext;
+        _openNext = null;
+
         _unlock?.Dispose();
         _unlock = new UnlockViewModel(
             _session, home, new StorageProviderPicker(_window), OnUnlocked,
             action => Dispatcher.UIThread.Post(action),
-            message);
+            message,
+            next is null ? reason : null);
+
+        if (next is { } file)
+        {
+            _unlock.Offer(file.Path, file.Keyfile);
+        }
 
         _window.FindControl<ContentControl>("Root")!.Content =
             new UnlockView { DataContext = _unlock };
@@ -275,7 +295,8 @@ internal sealed partial class App : Application, IDisposable
             action => Dispatcher.UIThread.Post(action),
             _preferences,
             _unlock?.Notice,
-            new StorageProviderPicker(_window));
+            new StorageProviderPicker(_window),
+            OpenInPlace);
 
         _window.FindControl<ContentControl>("Root")!.Content =
             new ShellView { DataContext = _shell };

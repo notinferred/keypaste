@@ -230,6 +230,30 @@ public sealed class ApproverListener : IDisposable
                 return ApproverProtocol.Encode(
                     await _handler.ReleaseEnvAsync(env, connectionId, cancellationToken).ConfigureAwait(false));
 
+            case ApproverMessageKind.EnvProfile when ApproverProtocol.TryDecode(frame, out EnvRequest? envProfile):
+                return ApproverProtocol.Encode(
+                    await _handler.ReleaseEnvAsync(envProfile, connectionId, cancellationToken).ConfigureAwait(false));
+
+            case ApproverMessageKind.Grants when ApproverProtocol.TryDecode(frame, out GrantsRequest? grants):
+                return ApproverProtocol.Encode(
+                    await _handler.GrantsAsync(grants, connectionId, cancellationToken).ConfigureAwait(false));
+
+            case ApproverMessageKind.RevokeGrants when ApproverProtocol.TryDecode(frame, out RevokeGrantsRequest? revoke):
+                return ApproverProtocol.Encode(
+                    await _handler.RevokeGrantsAsync(revoke, connectionId, cancellationToken).ConfigureAwait(false));
+
+            case ApproverMessageKind.Lock when ApproverProtocol.TryDecode(frame, out LockRequest? lockNow):
+                return ApproverProtocol.Encode(
+                    await _handler.LockAsync(lockNow, connectionId, cancellationToken).ConfigureAwait(false));
+
+            case ApproverMessageKind.TokenEnv when ApproverProtocol.TryDecode(frame, out TokenEnvRequest? tokenEnv):
+                return ApproverProtocol.Encode(
+                    await _handler.ReleaseTokenEnvAsync(tokenEnv, connectionId, cancellationToken).ConfigureAwait(false));
+
+            case ApproverMessageKind.Run when ApproverProtocol.TryDecode(frame, out RunRequest? run):
+                return ApproverProtocol.Encode(
+                    await _handler.ReleaseRunAsync(run, connectionId, cancellationToken).ConfigureAwait(false));
+
             default:
                 return null;
         }

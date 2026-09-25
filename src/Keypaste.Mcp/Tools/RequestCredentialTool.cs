@@ -132,7 +132,7 @@ internal sealed class RequestCredentialTool(
             verdict.Reason,
             options.Exposure,
             args);
-        var record = line with { Session = verdict.Session };
+        var record = line with { Session = verdict.Session, GrantedSeconds = verdict.Released?.TtlSeconds, Vault = options.VaultKey };
 
         // No cancellation token reaches this, and there is none to forward: appending is synchronous
         // and takes none. That is what makes "every call is logged" true even for the calls nobody

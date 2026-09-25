@@ -4,6 +4,7 @@ using Keypaste.Cli.Approval;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Clients;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Policy;
@@ -31,14 +32,16 @@ namespace Keypaste.Cli.Commands;
 /// opened (D-0309).
 /// </para>
 /// <para>
-/// <b>It writes no audit lines.</b> <c>keypaste-mcp</c> is the only process that appends to the
-/// log, so there is one writer, one key order and one schema (DECISIONS.md D-0020). What this
-/// process prints is for the person watching it, not the record.
+/// <b>It writes audit lines for scoped tokens and nothing else.</b> <c>keypaste-mcp</c> records what
+/// agents asked for (DECISIONS.md D-0020); a <c>keypaste run --token</c> is recorded here, by the
+/// owner that verified it, because the runner is the side that could skip it. A log that cannot be
+/// opened refuses every token and nothing else. What this process prints is for the person
+/// watching it, not the record.
 /// </para>
 /// <para>
 /// <b>The vault stays unlocked for as long as this runs.</b> There is no idle auto-lock — closing
 /// the terminal is the lock — and that is stated in docs/approvals.md rather than left for somebody
-/// to discover. Ctrl+C, SIGTERM and closing the terminal end the unlock's
+/// to discover. Ctrl+C, SIGTERM, closing the terminal and <c>keypaste lock</c> end the unlock's
 /// <see cref="SessionLifetime"/> before the listener stops, the same transition the desktop's locks
 /// take, so a request waiting at the prompt is withdrawn and denied and every grant is zeroed
 /// (D-0313).
@@ -128,7 +131,8 @@ internal static class AgentCommand
 
         using (claim)
         {
-            return VaultSession.Open(vaultPath, line, context, vault => Serve(vault, claim, pipeName, limits, policy, context));
+            var clients = new ClientPolicySource(KeypasteHome.ClientsPath(context.Environment.Get(KeypasteHome.EnvironmentVariable)));
+            return VaultSession.Open(vaultPath, line, context, vault => Serve(vault, claim, pipeName, limits, policy, clients, context));
         }
     }
 
@@ -138,13 +142,19 @@ internal static class AgentCommand
         string pipeName,
         ApprovalLimits limits,
         PolicyLoad policy,
+        ClientPolicySource clients,
         CliContext context)
     {
+        var console = new AgentConsole(context.Stderr, context.Prompt.IsInteractive, context.ConsoleStyle);
+        void Narrate(string line) => console.WriteLine($"keypaste: {line}");
+
         using var lifetime = new SessionLifetime();
         using var grants = new GrantCache(TimeProvider.System);
         lifetime.Own(grants);
+        using var envGrants = new EnvGrantCache(TimeProvider.System);
+        lifetime.Own(envGrants);
         using var gate = new ApprovalGate(
-            new TerminalApprovalChannel(context.Prompt, context.Stderr),
+            new TerminalApprovalChannel(context.Prompt, console, limits.Window, TimeProvider.System),
             TimeProvider.System,
             limits);
 
@@ -154,13 +164,26 @@ internal static class AgentCommand
             gate,
             grants,
             new PolicyGate(policy.Rules, TimeProvider.System),
-            line => context.Stderr.WriteLine($"keypaste: {line}"));
+            Narrate,
+            clients: clients);
 
+        using var audit = OpenAudit(context);
+
+        using var stop = new CancellationTokenSource();
+
+        // `keypaste lock` ends the lifetime and stops the listener, the same way a signal does.
         var authority = new SessionAuthority(
             claim.Vault,
             () => lifetime,
             handler,
-            new SessionEnvironments(gate, asked => ReferenceEquals(asked, lifetime) && asked.IsLive ? vault : null, TimeProvider.System));
+            new SessionEnvironments(
+                gate,
+                asked => ReferenceEquals(asked, lifetime) && asked.IsLive ? vault : null,
+                TimeProvider.System,
+                envGrants,
+                Narrate,
+                () => audit),
+            lockNow: () => Stop(lifetime, stop));
 
         ApproverListener? listener = null;
 
@@ -174,12 +197,10 @@ internal static class AgentCommand
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                context.Stderr.WriteLine($"keypaste: could not listen on '{pipeName}': {ex.Message}");
-                context.Stderr.WriteLine("keypaste: another keypaste process may be listening on that name.");
+                console.WriteLine($"keypaste: could not listen on '{pipeName}': {ex.Message}");
+                console.WriteLine("keypaste: another keypaste process may be listening on that name.");
                 return CliApp.ExitInternalError;
             }
-
-            using var stop = new CancellationTokenSource();
 
             // A signal ends the lifetime and then stops the listener, rather than ending the
             // process, so a waiting request is answered as locked, the vault is disposed and the
@@ -188,7 +209,7 @@ internal static class AgentCommand
 
             try
             {
-                Announce(claim.Vault.Path, pipeName, lifetime.Id, limits, policy, context);
+                Announce(claim.Vault.Path, pipeName, lifetime.Id, limits, policy, console);
 
                 // Blocking on the listener is the command. There is no synchronization context in
                 // a console app, so this is a wait rather than a deadlock waiting to happen.
@@ -207,8 +228,38 @@ internal static class AgentCommand
             listener?.Dispose();
         }
 
-        context.Stderr.WriteLine("keypaste: the agent has stopped. The vault is locked and every grant is gone.");
+        console.WriteLine("keypaste: the agent has stopped. The vault is locked and every grant is gone.");
         return CliApp.ExitSuccess;
+    }
+
+    /// <summary>Ends the lifetime, then stops the listener; a stop that arrives after the agent has gone does nothing.</summary>
+    private static void Stop(SessionLifetime lifetime, CancellationTokenSource stop)
+    {
+        lifetime.End();
+
+        try
+        {
+            stop.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Already stopped.
+        }
+    }
+
+    private static AuditLog? OpenAudit(CliContext context)
+    {
+        if (AuditLog.TryOpen(
+                KeypasteHome.AuditPath(context.Environment.Get(KeypasteHome.EnvironmentVariable)),
+                TimeProvider.System,
+                out var audit,
+                out var error))
+        {
+            return audit;
+        }
+
+        context.Stderr.WriteLine($"keypaste: tokens are refused: {error}");
+        return null;
     }
 
     private static List<PosixSignalRegistration> LockOnSignals(SessionLifetime lifetime, CancellationTokenSource stop)
@@ -222,8 +273,7 @@ internal static class AgentCommand
                 registrations.Add(PosixSignalRegistration.Create(signal, context =>
                 {
                     context.Cancel = true;
-                    lifetime.End();
-                    stop.Cancel();
+                    Stop(lifetime, stop);
                 }));
             }
             catch (PlatformNotSupportedException)
@@ -256,26 +306,26 @@ internal static class AgentCommand
         string session,
         ApprovalLimits limits,
         PolicyLoad policy,
-        CliContext context)
+        AgentConsole console)
     {
-        context.Stderr.WriteLine($"keypaste: watching {vaultPath}");
+        console.WriteLine($"keypaste: watching {vaultPath}");
 
         if (policy.Status == PolicyStatus.Rejected)
         {
-            context.Stderr.WriteLine($"keypaste: policy: {policy.Reason}");
-            context.Stderr.WriteLine(
+            console.WriteLine($"keypaste: policy: {policy.Reason}");
+            console.WriteLine(
                 "keypaste: policy: every request will be shown to you. Fix it and restart, or run `keypaste policy ls`.");
         }
         else if (policy.HasRules)
         {
-            context.Stderr.WriteLine($"keypaste: policy: {policy.Reason}. `keypaste policy ls` shows them.");
+            console.WriteLine($"keypaste: policy: {policy.Reason}. `keypaste policy ls` shows them.");
         }
         else
         {
-            context.Stderr.WriteLine($"keypaste: policy: {policy.Reason}.");
+            console.WriteLine($"keypaste: policy: {policy.Reason}.");
         }
 
-        context.Stderr.WriteLine(
+        console.WriteLine(
             string.Create(
                 CultureInfo.InvariantCulture,
                 $"keypaste: listening on {pipeName} for session {session}, {limits.Window.TotalSeconds:0} seconds to answer, grants last at most {limits.MaximumTtlSeconds} seconds"));
@@ -283,7 +333,7 @@ internal static class AgentCommand
         // The claim changes when a rule is in force, because with one it is no longer true. Saying
         // "nothing is released without you saying yes" while a standing rule releases things
         // silently is the kind of small untruth this product cannot afford to print.
-        context.Stderr.WriteLine(
+        console.WriteLine(
             policy.HasRules
                 ? "keypaste: nothing is released without you saying yes, unless a policy rule covers it. Press Ctrl+C to stop."
                 : "keypaste: nothing is released without you saying yes. Press Ctrl+C to stop.");
@@ -365,7 +415,7 @@ internal static class AgentCommand
         writer.WriteLine($"  --keyfile <path>           the keyfile it needs too, or set {VaultLocator.KeyfileEnvironmentVariable}");
         writer.WriteLine($"  --approver <name>          which pipe to listen on, or set {ApproverEndpoint.EnvironmentVariable}");
         writer.WriteLine($"  --approval-timeout <secs>  how long you have to answer, {ApprovalLimits.MinimumWindowSeconds}-{ApprovalLimits.MaximumWindowSeconds}, default {ApprovalLimits.DefaultWindowSeconds}");
-        writer.WriteLine($"  --max-ttl <secs>           the longest grant to issue, default {ApprovalLimits.DefaultMaximumTtlSeconds}");
+        writer.WriteLine($"  --max-ttl <secs>           how long an [h] grant lasts, default {ApprovalLimits.DefaultMaximumTtlSeconds}");
         writer.WriteLine($"  --policy <path>            standing rules, default ~/{KeypasteHome.DirectoryName}/{KeypasteHome.PolicyFileName}");
         writer.WriteLine();
         writer.WriteLine("A rule in the policy file releases a credential without asking. Anything wrong");

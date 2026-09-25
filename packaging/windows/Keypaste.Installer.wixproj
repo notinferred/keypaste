@@ -10,7 +10,7 @@
     <ProductVersion Condition="'$(ProductVersion)' == ''">$(VersionPrefix)</ProductVersion>
     <!-- Per-user files under LocalAppData cannot carry the HKCU key paths ICE38 wants, and ICE91 only warns that they do not follow ALLUSERS, which a perUser package never reads. -->
     <SuppressIces>ICE38;ICE91</SuppressIces>
-    <DefineConstants>PayloadDir=$(PayloadDir);FullVersion=$(FullVersion);ProductVersion=$(ProductVersion)</DefineConstants>
+    <DefineConstants>PayloadDir=$(PayloadDir);FullVersion=$(FullVersion);ProductVersion=$(ProductVersion);AppIcon=$(MSBuildThisFileDirectory)..\..\src\Keypaste.App\Assets\keypaste.ico</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

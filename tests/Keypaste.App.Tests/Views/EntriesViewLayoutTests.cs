@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Shapes;
 using Keypaste.App.Navigation;
 using Keypaste.App.Tests.Rendering;
@@ -14,7 +15,8 @@ namespace Keypaste.App.Tests.Views;
 /// </summary>
 /// <remarks>
 /// Observed on Linux in F.2b3b: in the default window the toolbar was wider than the list's column,
-/// so the search box shrank under Add and the entry's title met Delete. Bounds are read from the
+/// so the search box shrank under Add and the entry's title met Delete. Organize and Delete now live
+/// in the entry's ⋯ menu, so the header's Copy, Rotate and ⋯ are what the title must stay clear of. Bounds are read from the
 /// window's own layout after a frame is drawn, as <see cref="RenderedShell"/> lays out any screen.
 /// </remarks>
 public sealed class EntriesViewLayoutTests
@@ -25,17 +27,19 @@ public sealed class EntriesViewLayoutTests
     /// <summary>Room for a short title beside its group, the least that still reads as a list.</summary>
     private const double _listMinimum = 100d;
 
-    public static TheoryData<double, double, bool> Sizes => new()
+    public static TheoryData<double, double, bool, bool> Sizes => new()
     {
-        { 1000, 680, false },
-        { 960, 520, false },
-        { 1000, 680, true },
-        { 960, 520, true },
+        { 1000, 680, false, false },
+        { 960, 520, false, false },
+        { 1000, 680, false, true },
+        { 960, 520, false, true },
+        { 1000, 680, true, false },
+        { 960, 520, true, false },
     };
 
     [Theory]
     [MemberData(nameof(Sizes))]
-    public Task An_open_entry_leaves_the_toolbar_panes_and_dividers_whole_and_apart(double width, double height, bool comparing) =>
+    public Task An_open_entry_leaves_the_toolbar_panes_and_dividers_whole_and_apart(double width, double height, bool comparing, bool tree) =>
         HeadlessSession.On(() =>
         {
             using var shell = new RenderedShell("keypaste-entries-layout-");
@@ -44,6 +48,17 @@ public sealed class EntriesViewLayoutTests
             var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
             entries.Selected = entries.Rows.Single(row => row.Title == "github");
             RenderedShell.Drain();
+
+            // The tree starts folded at these sizes, and opening it must not crowd anything out.
+            var groups = shell.Named<ListBox>("Groups");
+            Assert.False(groups.IsEffectivelyVisible, $"the group tree starts open at {width}×{height}");
+
+            if (tree)
+            {
+                shell.Named<ToggleButton>("GroupsToggle").IsChecked = true;
+                RenderedShell.Drain();
+                Assert.True(groups.IsEffectivelyVisible);
+            }
 
             if (comparing)
             {
@@ -55,16 +70,17 @@ public sealed class EntriesViewLayoutTests
             }
 
             shell.Frame();
-            var at = comparing ? $"{width}×{height}, comparing" : $"{width}×{height}";
+            var at = $"{width}×{height}{(comparing ? ", comparing" : string.Empty)}{(tree ? ", tree open" : string.Empty)}";
 
             var search = Bounds(shell, shell.Named<TextBox>("Search"));
             var controls = new Dictionary<string, Rect>
             {
                 ["Search"] = search,
-                ["Add"] = Bounds(shell, shell.Named<Button>("AddEntry")),
-                ["Organize"] = Bounds(shell, shell.Named<Button>("Organize")),
-                ["Delete"] = Bounds(shell, shell.Named<Button>("DeleteEntry")),
+                ["New"] = Bounds(shell, shell.Named<Button>("AddEntry")),
                 ["the entry's title"] = Bounds(shell, shell.Named<TextBlock>("EntryTitle")),
+                ["Copy"] = Bounds(shell, shell.Named<Button>("CopyPassword")),
+                ["Rotate"] = Bounds(shell, shell.Named<Button>("RotateFromPane")),
+                ["the entry's menu"] = Bounds(shell, shell.Named<ToggleButton>("EntryMenu")),
             };
             var panes = new Dictionary<string, Rect>
             {
@@ -73,8 +89,7 @@ public sealed class EntriesViewLayoutTests
                 ["the entry's pane"] = Bounds(shell, shell.Named<ContentControl>("EntryPane")),
             };
 
-            // Comparing a revision steps the tree aside for the pane's second column.
-            if (!comparing)
+            if (tree)
             {
                 panes["the group tree"] = Bounds(shell, shell.Named<ListBox>("Groups"));
                 panes["the tree's divider"] = Bounds(shell, shell.Named<Rectangle>("TreeDivider"));

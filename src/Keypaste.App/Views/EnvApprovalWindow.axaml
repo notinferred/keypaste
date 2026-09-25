@@ -1,92 +1,117 @@
-<Window xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:vm="using:Keypaste.App.ViewModels"
-        x:Class="Keypaste.App.Views.EnvApprovalWindow"
-        x:DataType="vm:EnvApprovalViewModel"
-        Title="keypaste: a run is asking for a project's variables"
-        Width="560" Height="620"
-        MinWidth="560" MaxWidth="560" MinHeight="620" MaxHeight="620"
-        CanResize="False"
-        SizeToContent="Manual"
-        Topmost="True"
-        WindowStartupLocation="CenterScreen"
-        Background="{DynamicResource KpSurface0}">
+<views:PromptWindow xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:vm="using:Keypaste.App.ViewModels"
+                    xmlns:views="using:Keypaste.App.Views"
+                    xmlns:ctl="using:Keypaste.App.Controls"
+                    xmlns:sys="using:System"
+                    x:Class="Keypaste.App.Views.EnvApprovalWindow"
+                    x:DataType="vm:EnvApprovalViewModel"
+                    Icon="avares://keypaste-app/Assets/keypaste.ico"
+                    Title="keypaste: a run is asking for a project's variables"
+                    Width="508"
+                    SizeToContent="Height"
+                    CanResize="False"
+                    WindowDecorations="None"
+                    TransparencyLevelHint="Transparent"
+                    Background="Transparent"
+                    Topmost="True"
+                    WindowStartupLocation="CenterScreen">
 
-  <!-- Fixed rows, as in ApprovalWindow: the command, directory and names are what the runner sent,
-       so each sits in a box of its own that wraps and scrolls and none of them can move the question
-       or the buttons (THREATS.md T-2, T-30). Nothing is trimmed, so no part of a command is hidden
-       past an edge. No button is the default: Enter approves nothing, and Escape denies. -->
+  <Window.Styles>
+    <StyleInclude Source="avares://keypaste-app/Views/PromptStyles.axaml" />
+  </Window.Styles>
 
-  <Grid RowDefinitions="36,30,24,84,24,52,24,*,24,40,56" Margin="24">
+  <!-- Fixed heights, as in ApprovalWindow: the command, directory and names are what the runner
+       sent, so each sits in a box that wraps and scrolls and none of them can move the question or
+       the buttons (THREATS.md T-2, T-30). Only the header and the requester line are trimmed to one
+       line; no part of a command is hidden past an edge. No button is the default: Enter approves
+       nothing, and Escape denies. -->
 
-    <TextBlock Grid.Row="0"
-               Text="A run is asking for a project's variables"
-               FontSize="18"
-               Foreground="{DynamicResource KpTextPrimary}" />
+  <Border Classes="prompt">
+    <StackPanel Spacing="16">
 
-    <Grid Grid.Row="1" ColumnDefinitions="110,*">
-      <TextBlock Grid.Column="0" Text="Project" Foreground="{DynamicResource KpTextMuted}" />
-      <TextBlock Grid.Column="1" Name="ProjectText" Text="{Binding Project}" TextTrimming="CharacterEllipsis"
-                 FontFamily="{DynamicResource KpMono}"
-                 Foreground="{DynamicResource KpTextPrimary}" />
-    </Grid>
+      <Grid Classes="prompt-head" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+        <Border Grid.Column="0" Classes="prompt-tile">
+          <ctl:KpIcon Icon="terminal" Size="18" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
+        </Border>
+        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+          <TextBlock Name="TitleText" Classes="prompt-title" Text="{Binding Title}" />
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Name="ProjectText" Classes="prompt-sub" Text="{Binding Project}"
+                       MaxWidth="160" TextTrimming="CharacterEllipsis" />
+            <TextBlock Classes="prompt-sub" Text=" · profile " />
+            <TextBlock Name="ProfileText" Classes="prompt-sub" Text="{Binding Profile}"
+                       MaxWidth="100" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </StackPanel>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <Border Classes="dot waiting" />
+          <TextBlock Name="CountdownText" Classes="prompt-countdown" Text="{Binding Countdown}" />
+        </StackPanel>
+      </Grid>
 
-    <TextBlock Grid.Row="2" Text="Command it will start" Foreground="{DynamicResource KpTextMuted}" />
-    <Border Grid.Row="3" Theme="{StaticResource KpCard}">
-      <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="10">
-        <TextBlock Name="CommandText" Text="{Binding Command}" TextWrapping="Wrap"
-                   FontFamily="{DynamicResource KpMono}"
-                   Foreground="{DynamicResource KpTextPrimary}" />
-      </ScrollViewer>
-    </Border>
+      <TextBlock Name="RequesterText" Classes="prompt-sub" TextTrimming="CharacterEllipsis"
+                 Text="{Binding Requester, StringFormat='asked by {0}'}"
+                 IsVisible="{Binding Requester, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
-    <TextBlock Grid.Row="4" Text="In directory" Foreground="{DynamicResource KpTextMuted}" />
-    <Border Grid.Row="5" Theme="{StaticResource KpCard}">
-      <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="10">
-        <TextBlock Name="DirectoryText" Text="{Binding Directory}" TextWrapping="Wrap"
-                   FontFamily="{DynamicResource KpMono}"
-                   Foreground="{DynamicResource KpTextPrimary}" />
-      </ScrollViewer>
-    </Border>
+      <Border Classes="prompt-call" Height="58">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="12,10">
+          <StackPanel Spacing="2">
+            <TextBlock Name="ScrubbedText" Classes="prompt-scrubbed" Text="{Binding Scrubbed}"
+                       IsVisible="{Binding Scrubbed, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <Grid ColumnDefinitions="36,*" RowDefinitions="Auto,Auto">
+              <TextBlock Grid.Row="0" Grid.Column="0" Text="run" />
+              <TextBlock Grid.Row="0" Grid.Column="1" Name="CommandText" Classes="value" Text="{Binding Command}" TextWrapping="Wrap" />
+              <TextBlock Grid.Row="1" Grid.Column="0" Text="in" />
+              <TextBlock Grid.Row="1" Grid.Column="1" Name="DirectoryText" Text="{Binding Directory}" TextWrapping="Wrap" />
+            </Grid>
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
 
-    <TextBlock Grid.Row="6" Text="Variables it will receive (names only)" Foreground="{DynamicResource KpTextMuted}" />
-    <Border Grid.Row="7" Theme="{StaticResource KpCard}">
-      <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="10">
-        <TextBlock Name="KeysText" Text="{Binding Keys}" TextWrapping="Wrap"
-                   FontFamily="{DynamicResource KpMono}"
-                   Foreground="{DynamicResource KpTextSecondary}" />
-      </ScrollViewer>
-    </Border>
+      <!-- The names, one row each with its tag. A name wraps rather than ending in an ellipsis: two
+           long names that share a prefix must still read as two different variables. -->
+      <Border Classes="prompt-list" Height="110">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+          <StackPanel>
+            <ItemsControl Name="KeysList" ItemsSource="{Binding KeyNames}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="sys:String">
+                  <Border Classes="prompt-row" MinHeight="36" Padding="12,6">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                      <TextBlock Classes="key" Text="{Binding}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="1" Classes="tag" Text="inject only" VerticalAlignment="Center" />
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Name="NoKeysText" Text="(none)" Margin="12,8" IsVisible="{Binding HasNoKeys}" />
+            <TextBlock Name="FileLinesText" Classes="tag" Text="{Binding FileLines}" TextWrapping="Wrap" FontSize="11.5"
+                       Margin="12,8"
+                       IsVisible="{Binding FileLines, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
 
-    <TextBlock Grid.Row="8"
-               Name="ScrubbedText"
-               Text="{Binding Scrubbed}"
-               TextWrapping="Wrap"
-               FontSize="12"
-               Foreground="{DynamicResource KpTextSecondary}" />
+      <TextBlock Classes="prompt-note"
+                 Text="The command is what the run says it will start. Allow only a run you started: every value goes into its environment." />
 
-    <TextBlock Grid.Row="9"
-               Text="The command is what the run says it will start. Approve only a run you started: every value goes into its environment."
-               TextWrapping="Wrap"
-               FontSize="12"
-               Foreground="{DynamicResource KpTextMuted}" />
+      <StackPanel Spacing="10">
+        <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
+          <Button Grid.Column="0" Name="Deny" Classes="prompt ghost" Content="Deny"
+                  IsCancel="True" Command="{Binding DenyCommand}" />
+          <Button Grid.Column="1" Name="AllowOnce" Classes="prompt" Content="Allow once"
+                  Command="{Binding AllowOnceCommand}" />
+          <Button Grid.Column="2" Name="Approve" Classes="prompt primary" Content="{Binding TimedLabel}"
+                  HorizontalAlignment="Right"
+                  IsVisible="{Binding OffersTimed}" Command="{Binding ApproveCommand}" />
+        </Grid>
+        <TextBlock Name="TimedCaptionText" Classes="caption" Text="{Binding TimedCaption}"
+                   IsVisible="{Binding TimedCaption, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+      </StackPanel>
 
-    <StackPanel Grid.Row="10"
-                Orientation="Horizontal"
-                HorizontalAlignment="Right"
-                VerticalAlignment="Bottom"
-                Spacing="8">
-      <Button Name="Deny"
-              Content="Deny"
-              Width="110"
-              IsCancel="True"
-              Command="{Binding DenyCommand}" />
-      <Button Name="Approve"
-              Content="Approve"
-              Width="110"
-              Command="{Binding ApproveCommand}" />
     </StackPanel>
+  </Border>
 
-  </Grid>
-
-</Window>
+</views:PromptWindow>

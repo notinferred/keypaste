@@ -1,3 +1,6 @@
+using Keypaste.Core.Approval;
+using Keypaste.Core.Audit;
+using Keypaste.Core.Ipc;
 using Xunit;
 
 namespace Keypaste.Core.Tests;
@@ -205,4 +208,100 @@ public sealed class EntryExposureTests
     [Fact]
     public void TryCreate_RejectsNull() =>
         Assert.Throws<ArgumentNullException>(() => EntryExposure.TryCreate(null!, out _, out _));
+
+    /// <summary>keypaste's own records are never named or released, whatever a bridge or a rule was told.</summary>
+    [Theory]
+    [InlineData("**")]
+    [InlineData("**/*")]
+    [InlineData(".keypaste/**")]
+    [InlineData(".keypaste/tokens/*")]
+    [InlineData(".Keypaste/**")]
+    [InlineData("*/*/*")]
+    public void EveryGlob_IncludingDoubleStar_RefusesReservedEntries(string glob)
+    {
+        var exposure = Exposure(glob);
+
+        Assert.False(exposure.Allows(Name(ReservedGroups.Tokens, "7d2e91c0")));
+        Assert.False(exposure.Allows(Name(ReservedGroups.Shares, "link")));
+        Assert.False(exposure.Allows(Name(".Keypaste/tokens", "7d2e91c0")));
+        Assert.False(exposure.Allows(Name(ReservedGroups.Root, "loose")));
+    }
+
+    [Fact]
+    public void ANameThatOnlyStartsLikeTheReservedGroup_IsNotReserved()
+    {
+        Assert.True(Exposure("**").Allows(Name(".keypaste-notes", "x")));
+        Assert.True(Exposure("**").Allows(Name("env/.keypaste", "x")));
+    }
+
+    [Fact]
+    public void TheListerNeverNamesReservedEntries()
+    {
+        var directory = Directory.CreateTempSubdirectory("keypaste-reserved-").FullName;
+
+        try
+        {
+            using var vault = ReservedVault(directory);
+
+            Assert.True(new VaultEntryNameLister(() => vault).TryList(Exposure("**"), out var names, out _));
+
+            Assert.Contains(Name("env/dev", "KEY"), names);
+            Assert.DoesNotContain(names, name => ReservedGroups.IsReserved(name.GroupPath));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task AHandleToAReservedEntry_IsOutOfScope()
+    {
+        var directory = Directory.CreateTempSubdirectory("keypaste-reserved-").FullName;
+
+        try
+        {
+            using var vault = ReservedVault(directory);
+            using var fixture = new ApproverFixture();
+            fixture.Channel.Answer = ApprovalAnswer.Approved;
+
+            var handler = new ApproverHandler(
+                new VaultCredentialSource(() => vault),
+                new VaultEntryNameLister(() => vault),
+                fixture.Gate,
+                fixture.Grants,
+                fixture.Policy);
+
+            var reply = await handler.RequestAsync(
+                new CredentialRequest
+                {
+                    Entry = EntryHandle.For(Name(ReservedGroups.Tokens, "7d2e91c0")),
+                    Field = "password",
+                    Reason = "read the verifier",
+                    TtlSeconds = 60,
+                    Exposure = ["**"],
+                },
+                "connection",
+                TestContext.Current.CancellationToken);
+
+            Assert.Equal(AuditDecision.Denied, reply.Decision);
+            Assert.Equal(AuditMethod.OutOfScope, reply.Method);
+            Assert.Null(reply.Value);
+            Assert.Equal(0, fixture.Channel.Asked);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private static Vault ReservedVault(string directory)
+    {
+        var vault = Vault.Create(Path.Combine(directory, "vault.kdbx"), EnvStoreTests.MasterPassword);
+        vault.AddEntry(new VaultEntry { GroupPath = "env/dev", Title = "KEY", Password = "v" });
+        vault.AddEntry(new VaultEntry { GroupPath = ReservedGroups.Tokens, Title = "7d2e91c0", Password = "verifier" });
+        vault.AddEntry(new VaultEntry { GroupPath = ReservedGroups.Shares, Title = "link", Password = "revoke" });
+        vault.Save();
+        return vault;
+    }
 }

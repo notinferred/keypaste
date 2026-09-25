@@ -24,4 +24,7 @@ internal enum VaultLockReason
 
     /// <summary>The vault's access changed and it did not open again under the new factors.</summary>
     AccessChanged = 5,
+
+    /// <summary><c>keypaste lock</c> asked, over the vault's endpoint.</summary>
+    Requested = 6,
 }

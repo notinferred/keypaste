@@ -8,7 +8,7 @@
 # A real keypaste-mcp request waiting at the unlocked app is listed. After Approve its grant is listed and
 # the history shows the prompted grant from the audit file the bridge wrote. Revoke and Revoke all make the
 # same request ask again. A lock empties both lists, and the next session starts with nothing listed. A
-# missing and an unreadable audit log are each shown as unavailable.
+# missing audit log reads as a session with no records yet, and an unreadable one is shown as unavailable.
 #
 # NEGATIVE CONTROL: this fails if a waiting request or a grant is not listed, if a revoked grant still
 # answers, if history is missing the bridge's record or is shown for a log that cannot be read, or if a
@@ -157,7 +157,8 @@ FIRST="$(session_of)"
 activity
 omits '^unavailable ' "the authority as unreadable while it serves"
 omits '^(waiting|grant) ' "a request or grant before any agent asked"
-shows '^history-message History unavailable: there is no audit log at ' "a missing log as unavailable"
+shows '^history-message The audit log has no records from this session yet\.' "a missing log as a session with no records yet"
+omits '^history-message History unavailable' "a missing log as unavailable"
 
 # ------------------------------------------ the waiting request, then its grant and its audit record
 start_bridge first
@@ -176,7 +177,7 @@ last_audit --arg s "$FIRST" '.decision == "granted" and .method == "prompt" and 
 activity
 omits '^waiting ' "a request after it was answered"
 shows "$LISTED" "the grant Approve gave"
-shows "^history 1 record of [0-9]+ in .*, session $FIRST$" "history kept to this session"
+shows "^history-heading 1 record of [0-9]+ in .*, this session$" "history kept to this session"
 shows "^history .*DEPLOY_KEY.*granted.*prompt" "the prompted grant from the audit file"
 
 ask 4
@@ -210,7 +211,7 @@ reply 6
 refused 6
 activity
 shows "^history .*DEPLOY_KEY.*denied.*prompt" "the refusal from the audit file"
-shows "^history 4 records of [0-9]+ in .*, session $FIRST$" "every record of this session"
+shows "^history-heading 4 records of [0-9]+ in .*, this session$" "every record of this session"
 
 # ------------------------------------------------ a lock empties both lists; the next session has none
 start_bridge second
@@ -235,7 +236,8 @@ SECOND="$(session_of)"
 activity
 omits '^unavailable ' "the new session as unreadable"
 omits '^(waiting|grant) ' "a request or grant from before the lock"
-shows "^history 0 records of [0-9]+ in .*, session $SECOND$" "the new session's history"
+shows '^history-message The audit log has no records from this session yet\.' "the new session's history"
+omits '^history(-heading)? ' "a record from before the lock in the new session's history"
 
 # ----------------------------------------------------------------- an unreadable log is unavailable
 exec {MCP_IN}>&-
@@ -254,4 +256,4 @@ HOLD_PID=""
 
 echo "ok: Agent Activity listed a real keypaste-mcp request waiting at the app and the grant Approve gave,"
 echo "    showed this session's audit records, made revoked grants ask again, held nothing after a lock,"
-echo "    and said a missing or unreadable log was unavailable"
+echo "    read a missing log as no records yet and said an unreadable log was unavailable"

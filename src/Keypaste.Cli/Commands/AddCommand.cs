@@ -61,11 +61,18 @@ internal static class AddCommand
         }
 
         var title = slash < 0 ? target : target[(slash + 1)..];
-        var groupPath = slash < 0 ? groupFlag ?? string.Empty : target[..slash];
+        var groupPath = WrittenGroup.Normalize(slash < 0 ? groupFlag ?? string.Empty : target[..slash]);
 
         if (title.Length == 0)
         {
             context.Stderr.WriteLine("keypaste add: the entry name cannot be empty");
+            return CliApp.ExitUsageError;
+        }
+
+        if (ReservedGroups.IsReserved(groupPath))
+        {
+            var shown = EntryNameSanitizer.SanitizePath(groupPath + "/" + title).Text;
+            context.Stderr.WriteLine($"keypaste add: {shown} is keypaste's own group; it cannot be written here");
             return CliApp.ExitUsageError;
         }
 
@@ -86,6 +93,12 @@ internal static class AddCommand
             if (vault.Find(name) is not null)
             {
                 context.Stderr.WriteLine($"keypaste add: '{entryPath}' already exists");
+                return CliApp.ExitUsageError;
+            }
+
+            if (!EnvNameRules.TryCheckNewEntry(name, SetCommand.SiblingTitles(vault, groupPath), out var envError))
+            {
+                context.Stderr.WriteLine($"keypaste add: {EntryNameSanitizer.SanitizeProse(envError, 1024).Text}");
                 return CliApp.ExitUsageError;
             }
 
