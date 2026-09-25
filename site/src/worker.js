@@ -12,7 +12,7 @@
 // The role behind it can INSERT into one table and cannot SELECT from it, so nothing reachable from
 // here can read the list back. See DECISIONS.md D-0036 and site/README.md.
 import postgres from "postgres";
-import { handleShare, isShareRoute, sweepShares } from "./share.js";
+import { handleShare, isShareRoute, readCapped, sweepShares } from "./share.js";
 
 const ORIGINS = new Set(["https://keypaste.com", "https://www.keypaste.com"]);
 const MAX_BODY = 1024;
@@ -64,14 +64,11 @@ async function subscribe(request, env, ctx) {
     return refuse("That submission was not a form.");
   }
 
-  if (Number(request.headers.get("content-length") ?? 0) > MAX_BODY) {
+  const raw = await readCapped(request, MAX_BODY);
+  if (!raw) {
     return refuse("That submission was too large.");
   }
-
-  const body = await request.text();
-  if (body.length > MAX_BODY) {
-    return refuse("That submission was too large.");
-  }
+  const body = new TextDecoder().decode(raw);
 
   const form = new URLSearchParams(body);
 

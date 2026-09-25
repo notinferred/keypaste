@@ -38,6 +38,32 @@ const VIEWER_HEADERS = {
 // tests can age a share past its expiry.
 export const memory = new Map();
 
+// A body with no Content-Length is streamed and cut off at the cap, never buffered whole first.
+export async function readCapped(request, max) {
+  if (Number(request.headers.get("content-length") ?? 0) > max) return null;
+  if (!request.body) return new Uint8Array(0);
+  const reader = request.body.getReader();
+  const chunks = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > max) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return out;
+}
+
 export function isShareRoute(pathname) {
   return pathname === "/api/share" || pathname.startsWith("/api/share/") || pathname === "/s" || pathname.startsWith("/s/");
 }
@@ -119,10 +145,8 @@ async function create(request, store) {
   if (!(request.headers.get("content-type") ?? "").startsWith("application/json")) {
     return json(400, { error: "the body must be JSON" });
   }
-  if (Number(request.headers.get("content-length") ?? 0) > MAX_BODY) return json(413, { error: "too large" });
-
-  const bytes = await request.arrayBuffer();
-  if (bytes.byteLength > MAX_BODY) return json(413, { error: "too large" });
+  const bytes = await readCapped(request, MAX_BODY);
+  if (!bytes) return json(413, { error: "too large" });
 
   let body;
   try {

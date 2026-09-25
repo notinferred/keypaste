@@ -204,6 +204,30 @@ test("an oversized body is refused with 413", async () => {
   assert.equal(response.status, 413);
 });
 
+test("a streamed body with no Content-Length is cut off at the cap, not read whole", async () => {
+  let pulled = 0;
+  const chunk = new Uint8Array(4096).fill(0x78);
+  const endless = new ReadableStream({
+    pull(controller) {
+      pulled += chunk.byteLength;
+      controller.enqueue(chunk);
+    },
+  });
+
+  const request = new Request(LOCAL + "/api/share", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: endless,
+    duplex: "half",
+  });
+  assert.equal(request.headers.get("content-length"), null);
+
+  const response = await worker.fetch(request, enabled, ctx);
+
+  assert.equal(response.status, 413);
+  assert.ok(pulled < 64 * 1024, `read ${pulled} bytes of an endless body`);
+});
+
 test("a foreign Origin is refused with 403 and keypaste.com's own is accepted", async () => {
   const foreign = await create({}, { headers: { "content-type": "application/json", origin: "https://evil.example" } });
   assert.equal(foreign.status, 403);
