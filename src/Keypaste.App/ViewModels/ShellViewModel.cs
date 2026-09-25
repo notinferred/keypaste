@@ -665,8 +665,9 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             var clients = Core.Clients.McpClientCards.Count(Authority.Clients);
 
             McpRunning = true;
+            // The sidebar card is narrow: while something waits, the transport gives way to the client count.
             McpDetail = waiting > 0
-                ? string.Create(CultureInfo.InvariantCulture, $"{waiting} waiting for you · {Clients(clients)}")
+                ? string.Create(CultureInfo.InvariantCulture, $"{waiting} waiting · {ClientCount(clients)}")
                 : Clients(clients);
             SetCount(DestinationKind.AgentActivity, grants + waiting, live: true);
             return;
@@ -682,11 +683,13 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         SetCount(DestinationKind.AgentActivity, 0);
     }
 
-    private static string Clients(int count) => count switch
+    private static string Clients(int count) => "stdio · " + ClientCount(count);
+
+    private static string ClientCount(int count) => count switch
     {
-        0 => "stdio · no clients",
-        1 => "stdio · 1 client",
-        _ => string.Create(CultureInfo.InvariantCulture, $"stdio · {count} clients"),
+        0 => "no clients",
+        1 => "1 client",
+        _ => string.Create(CultureInfo.InvariantCulture, $"{count} clients"),
     };
 
     private void OnStatusTick()

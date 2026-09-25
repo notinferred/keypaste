@@ -96,6 +96,78 @@ public sealed class ShellStatusTests
         }
     }
 
+    [Fact]
+    public async Task TheMcpCard_KeepsTheClientCountWhileARequestWaits()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock();
+#pragma warning disable CA2000
+        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NeverAnswers());
+#pragma warning restore CA2000
+
+        using (var master = TempVault.Secret(TempVault.Password))
+        {
+            Assert.Equal(UnlockOutcome.Opened, authority.Session.TryUnlock(fixture.Path_, master.Value));
+        }
+
+        using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
+        var serving = Assert.IsType<AuthorityStatus.Serving>(authority.Status);
+        List<ApproverClient> clients = [];
+
+        foreach (var identity in new AttachClient[] { new("claude", "1", "cc"), new("cursor", "1", null) })
+        {
+            var client = await ApproverClient.TryConnectAsync(serving.Endpoint, _connect, Token);
+            Assert.NotNull(client);
+            Assert.True((await client.AttachAsync(new AttachRequest(fixture.Path_) { Client = identity }, Token))!.Attached);
+            clients.Add(client);
+        }
+
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(Token);
+        var waiting = clients[0].RequestAsync(
+            new CredentialRequest
+            {
+                Entry = "example",
+                Field = "password",
+                Reason = "run the tests",
+                TtlSeconds = 60,
+                Exposure = ["**"],
+                ClientName = "claude",
+                ClientLabel = "cc",
+                Vault = fixture.Path_,
+                Session = serving.Session,
+            },
+            stop.Token);
+
+        using (var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10)))
+        {
+            while (authority.Activity.Waiting.Count == 0)
+            {
+                await Task.Delay(20, deadline.Token);
+            }
+        }
+
+        clock.Advance(TimeSpan.FromSeconds(1));
+
+        Assert.Equal("1 waiting · 2 clients", shell.McpDetail);
+
+        await stop.CancelAsync();
+        await waiting;
+
+        foreach (var client in clients)
+        {
+            await client.DisposeAsync();
+        }
+    }
+
+    private sealed class NeverAnswers : IApprovalChannel
+    {
+        public async ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            return ApprovalAnswer.Denied;
+        }
+    }
+
     private sealed class NobodyAnswers : IApprovalChannel
     {
         public ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken) =>
