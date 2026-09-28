@@ -267,20 +267,29 @@ FAKE
   appmanifest="$(KEYPASTE_RELEASE_DEFINITION="$appdef" bash "$COMPLETION" --component app manifest-name "$v")"
   appbundle="$(KEYPASTE_RELEASE_DEFINITION="$appdef" bash "$COMPLETION" --component app bundle-name "$v")"
 
-  # stage_app [workflow] [ref]
+  # stage_app [workflow] [ref] [asset to leave unattested]
   stage_app() {
     local workflow="${1:-notinferred/keypaste/.github/workflows/release.yml}"
-    local ref="${2:-refs/tags/v$v}" n subjects
+    local ref="${2:-refs/tags/v$v}" skip="${3:-}" n subjects
     rm -rf "$work/appdist"; mkdir -p "$work/appdist"
     while IFS= read -r n; do printf 'the bytes of %s\n' "$n" > "$work/appdist/$n"; done <<< "$appnames"
     KEYPASTE_RELEASE_DEFINITION="$appdef" bash "$COMPLETION" --component app record "$v" "v$v" deadbeef "$work/appdist" > "$work/appdist/$appmanifest"
-    subjects="$(cd "$work/appdist" && for n in $appnames "$appmanifest"; do sha256sum "$n" | awk '{print $1}'; done | jq -R . | jq -s .)"
+    subjects="$(cd "$work/appdist" && for n in $appnames "$appmanifest"; do [ "$n" = "$skip" ] || sha256sum "$n" | awk '{print $1}'; done | jq -R . | jq -s .)"
     jq -n --arg r notinferred/keypaste --arg w "$workflow" --arg f "$ref" --argjson s "$subjects" \
       '{repo: $r, workflow: $w, ref: $f, subjects: $s}' > "$work/appdist/$appbundle"
   }
 
+  # The count comes from the definition, so declaring a package cannot leave this case behind.
+  local appcount
+  appcount="$(grep -c . <<< "$appnames")"
+  [ "$appcount" -gt 0 ] || die "the release definition names no app assets"
+
   stage_app
-  expect accept app-genuine-staged-directory "all 4 assets" \
+  expect accept app-genuine-staged-directory "all $appcount assets" \
+    -- env KEYPASTE_RELEASE_DEFINITION="$appdef" bash "$subject" --component app --dir "$v" "$work/appdist"
+
+  stage_app "" "" "$(sed -n 2p <<< "$appnames")"
+  expect refuse app-asset-left-out-of-the-bundle "is not attested" \
     -- env KEYPASTE_RELEASE_DEFINITION="$appdef" bash "$subject" --component app --dir "$v" "$work/appdist"
 
   stage_app notinferred/keypaste/.github/workflows/app.yml
@@ -306,8 +315,8 @@ FAKE
   echo "ok: $cases cases. A path with a backslash verifies. A changed byte, a rewritten manifest, another repository,"
   echo "    workflow or tag, an unattested or unpublished asset, a short manifest and a verifier that proves nothing"
   echo "    all refuse; the weakened copy does not. The desktop component verifies against its own manifest and"
-  echo "    bundle in the same prefix, and refuses one attested by the app workflow, at another tag, absent, or"
-  echo "    standing in for the other component's manifest."
+  echo "    bundle in the same prefix, and refuses a package left out of it, one attested by the app workflow,"
+  echo "    at another tag, absent, or standing in for the other component's manifest."
 }
 
 while [ $# -gt 0 ]; do

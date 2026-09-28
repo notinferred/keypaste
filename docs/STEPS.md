@@ -235,10 +235,6 @@ The Windows MSI, the Linux AppImage and the macOS app bundle are internal candid
 Package managers and agent marketplaces carry a version only after it is published. keypaste.com keeps its "no `curl | sh`" stance: the one-command routes are the package managers and the signed installers.
 
 - [ ] **F.20 — Diagnose the withdrawn prompt drawn on Linux.** Needs: 4.4. — app run 36040583862 at `f51fe5d`, attempt 1, `ubuntu-24.04`: `DesktopApprovalTests.A_request_withdrawn_before_its_prompt_is_drawn_never_draws_it` counted one prompt drawn where none was expected (`DesktopApprovalTests.cs:142`), its first failure in the recorded app runs. The hypothesis to test first: the test withdraws through `CancelAsync`, whose callback sets the request answered on the thread pool, and while the test awaits it the UI dispatcher may already run the show job `WindowApprovalChannel` posted, which checks `IsAnswered` only once. A branch probe repeating the case with the identical desktop test command records, in each failing iteration, whether the show job ran before the withdrawal and whether the product or only the test's arrangement lets a withdrawn prompt be drawn, per [diagnostics](diagnostics.md).
-- [ ] **F.24 — Expect every desktop package in the provenance self-test.** Needs: none. Priority: before `main` is pushed.
-  - On local `main` at `d2ced03`, `bash scripts/verify.sh` (2026-09-28) fails `verify-provenance.sh --selftest`. The case `app-genuine-staged-directory` expects "all 4 assets" (`verify-provenance.sh:283`), but since `2348d54` added the macOS `keypaste.app` zip to the app component, the staged directory holds 6.
-  - `ci.yml` and `release.yml` run the same self-test, so both fail once `main` is pushed.
-  - Verify: the self-test accepts the genuine staged directory at the definition's current asset count, and still refuses one missing an asset.
 - [ ] **G.5 — Carry the CLI on PATH in every desktop install.** Needs: none.
   - Every desktop payload gains the NativeAOT `keypaste`.
   - The MSI adds its folder to the per-user PATH and removes it on uninstall.
