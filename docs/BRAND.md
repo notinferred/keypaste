@@ -2,11 +2,11 @@
 
 Owns the marks, the palette, the type, the shape, the voice and the usage rules. Every surface (desktop app, CLI, site, README, store listing, installer) takes its visual values from here. The design handoff in [docs/design](design/README.md) holds the exact values for every screen and the high-fidelity prototypes they come from; where this page and a prototype disagree, the prototype's markup is the reference for that screen and this page for everything else. Where a value also has to exist as code, the file named below holds it.
 
-**Status:** adopted 2026-09-24 (direction 1b, the monogram). The desktop app's theme, icon, shell and screens, keypaste.com (through [brand.css](../site/public/brand.css)) and the README's lockup and screenshots are built from it, and the CLI follows the terminal rules below.
+**Status:** adopted 2026-09-24 (direction 1b, the monogram). The desktop app's theme, icon, shell and screens, keypaste.com (through [brand.css](../site/public/brand.css)) and the README's lockup and screenshots are built from it, and the CLI follows the terminal rules below. Amended 2026-09-28: the theme follows the system, titles use the sans face and the voice is calmer; the app adopts the amendment in N.7.
 
 ## Colour
 
-Dark first. Depth is lightness, not shadow.
+The app follows the system's light or dark setting, and both palettes are first-class. Depth is lightness, not shadow.
 
 | Role | Dark | Light |
 |---|---|---|
@@ -38,7 +38,7 @@ Instrument Sans 400/500/600 for the interface and Fragment Mono 400 for anything
 | Body | 13–14/400, line height 1.5 |
 | Label | 12/500 |
 | Table header | 11/500, +0.04em, muted, written in capitals |
-| Mono | 12–13; a secret's key in its detail pane 22 |
+| Mono | 12–13. An item's title is sans at heading size in its detail pane; a variable's key stays mono |
 
 [Typography.axaml](../src/Keypaste.App/Theme/Typography.axaml) holds these as text classes.
 
@@ -62,7 +62,7 @@ The CLI keeps to 80 columns. Amber means it needs you: the `›` prompt, command
 
 ## Voice
 
-Precise and plain, like good CLI help text. Name the actor and the object: "claude-code wants DATABASE_URL". Always give a duration: "Allow for 1 hour", never "Trust". Use sentence case, "you" for the person and the agent's real client name for the agent. No exclamation marks and no emoji. An error says what to do next.
+Plain and calm; precise where it protects you. Name the actor and the object: "claude-code wants DATABASE_URL". Always give a duration: "Allow for 1 hour", never "Trust". Use sentence case, "you" for the person and the agent's real client name for the agent. No exclamation marks and no emoji. An error says what to do next.
 
 ## The marks
 

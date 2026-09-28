@@ -1,9 +1,9 @@
 # Handoff: keypaste — desktop app, CLI, brand system
 
 ## Overview
-keypaste is an open-source, KDBX-compatible secrets manager for developers and AI agents. Core ideas:
+keypaste is an open-source, local password manager on a KDBX file, for people who keep their passwords in KeePass and write software ([PRODUCT](../PRODUCT.md)). This handoff describes the prototypes the current screens were built from; [ROADMAP](../../ROADMAP.md) has the simpler app that replaces parts of them. Core ideas:
 - **MCP server**: AI clients (claude-code, cursor, …) request secrets over MCP stdio. A human approves each request (deny / allow once / allow for 1h), or a time-boxed **grant** covers it.
-- **Inject-only**: agents see key *names*, never values. Values are injected into a child process env (`keypaste run -p dev -- cmd`).
+- **Inject first**: agents list key *names*; a value reaches an agent only through a request the person approves, and `keypaste run -p dev -- cmd` injects values into a child process instead.
 - **Env profiles**: one key set per project, with a value per profile (dev / staging / prod). Prod always needs a live approval.
 - **.env import/export**: export writes `.env.keypaste` containing **references only** (`KEY=kp://project/profile/KEY`), which is safe to commit.
 - **Sharing**: end-to-end encrypted, expiring, view-limited links; the key lives in the URL fragment.
@@ -63,7 +63,7 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
   - Line 2: kind (11.5 muted).
   - Hover bg `#1D1E22`. Selected: bg `rgba(242,181,68,.10)`, `box-shadow: inset 2px 0 0 #F2B544`, amber icon.
 - Detail (padding 28/32, gap 24, max-width 820):
-  - Key (mono 22) and path "Kind · acme.kdbx › acme › api › dev". Actions: Copy, Rotate, ⋯ (30h, `#2A2C30`).
+  - Title (sans 22/600; a variable's key in mono 22) and path "Kind · acme.kdbx › acme › api › dev". Actions: Copy, Rotate, ⋯ (30h, `#2A2C30`).
   - **Value** field (40h, bg `#111214`, border `#2C2E33`): shows 24 masked • characters, with a Reveal/Hide toggle.
   - **Reference** (36h, `#18191C`): `kp://acme-api/dev/KEY`, plus the helper line "Use this in .env.keypaste with keypaste run, or in an agent's run tool when the bridge allows it…".
   - Two cards: Agent access, and Profiles (dev set / staging set / prod "approval required" in amber).
@@ -79,7 +79,7 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
 **3. Activity**
 - Segmented filter: All / Agents / You / Denied.
 - Table columns `64 | 110 | 100 | 1.6fr | 1fr | 100`, min-width 680, scrolls horizontally: TIME (mono muted), ACTOR, ACTION, SECRETS (mono), WHERE (mono muted), RESULT (colored dot + label: Granted / Approved 1h = ok, Denied = danger, Token = info, Expired / Link = muted).
-- Subtitle: "Stored inside the vault, signed, append-only."
+- Subtitle: "Every agent request, grant, token run and share. Kept on this machine, hash-chained, append-only."
 
 **4. Env profiles**
 - Header actions: "Import .env", "Export .env.keypaste".

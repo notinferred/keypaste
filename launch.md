@@ -6,7 +6,7 @@
 
 This is reusable draft copy for the next CLI/MCP release, reviewed against the source on 2026-09-25; its transcript matches the current source, which `v0.3.0` predates (`v0.3.0` prompts `Approve? [y/N]` with a `for N seconds` line). An announcement of `v0.3.0` itself must use the `v0.3.0` [demo](docs/demo.md) recording instead, and when the version that ships this prompt is tagged, re-date this draft to it. It is not an instruction to publish or contact anyone. There is no mandatory campaign, posting schedule or announcement gate. The founder chooses whether and where to use it; any later use must describe the version actually available.
 
-[PRODUCT](docs/PRODUCT.md) defines the focused local desktop product. [STEPS](docs/STEPS.md) owns delivery, and [RELEASE](docs/RELEASE.md) distinguishes source, packages and public downloads. A future desktop announcement must wait for that desktop release and its installation evidence.
+[PRODUCT](docs/PRODUCT.md) defines the focused local desktop product. [ROADMAP](ROADMAP.md) owns what comes next, and [RELEASE](docs/RELEASE.md) distinguishes source, packages and public downloads. A future desktop announcement must wait for that desktop release and its installation evidence.
 
 ## Next release draft
 

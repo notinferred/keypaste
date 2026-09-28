@@ -2,7 +2,7 @@
 
 A person approves credential requests unless a live approval or a matching policy rule covers them. This guide describes the terminal workflow in source, for the next release, and, in source, [approving in the desktop app](#approving-in-the-desktop-app); notes give `v0.3.0`'s differences, and [policy rules](policy.md) allow matching requests without a prompt at `keypaste agent`.
 
-In source, one vault has one owner: while the app has a vault unlocked, `keypaste agent` on that vault is refused with a message naming the app, and the app asks about that vault's credential requests itself. The desktop and a terminal approver on another vault still unlock independently, and launching env projects through the app's session is unfinished; [STEPS](STEPS.md) owns the remaining work.
+In source, one vault has one owner: while the app has a vault unlocked, `keypaste agent` on that vault is refused with a message naming the app, and the app asks about that vault's credential requests itself. The desktop and a terminal approver on another vault still unlock independently, and the app launches a project's terminal through its own session; [ROADMAP](../ROADMAP.md) has the work ahead.
 
 <a id="the-short-version"></a>
 

@@ -1,26 +1,26 @@
 # Desktop UI direction
 
-[PRODUCT](PRODUCT.md) defines the local password manager; [STEPS](STEPS.md) owns the active work. This is interface guidance for that scope, not a separate feature roadmap.
+[PRODUCT](PRODUCT.md) defines the local password manager and [ROADMAP](../ROADMAP.md) the work ahead. This is interface guidance for that scope, not a separate roadmap.
 
 ## Everyday use
 
-Keep the lowercase keypaste wordmark, a clear vault identity and an obvious locked or unlocked state. Opening the app should lead to creating or opening a vault, then finding, adding, editing or copying a credential. Search, Add and the selected item's details must remain usable in a small window. Notes should have enough room to read and edit without forcing every item into a large editor.
+Keep the lowercase keypaste wordmark, a clear vault identity and an obvious locked or unlocked state. Opening the app should lead to creating or opening a vault, then finding, adding, editing or copying a credential. Search, Add and the selected item's details must remain usable in a small window. Notes should have enough room to read and edit without forcing every item into a large editor. The main screens keep to that everyday work in plain words; advanced controls and security recommendations stay in Settings (PRODUCT §5.8), and the look follows [BRAND](BRAND.md).
 
-Recovery belongs beside the action it reverses. Entry history and deletion recovery are implemented in source: a deletion states where the entry went and offers to put it back, and Trash holds what is still recoverable. Preserve familiar KeePass groups and ordinary KDBX data. Custom item templates, shared ownership, organization administration and browser integration are optional ideas in [BACKLOG](BACKLOG.md).
+Recovery belongs beside the action it reverses. Entry history and deletion recovery are implemented in source: a deletion states where the entry went and offers to put it back, and Trash holds what is still recoverable. Preserve familiar KeePass groups and ordinary KDBX data. Item templates (N.4) and browser fill (8.1, 8.3a) are planned in [ROADMAP](../ROADMAP.md); shared ownership and organization administration are optional ideas in [BACKLOG](BACKLOG.md).
 
 ## One session for credentials, agents and projects
 
-The target is one unlock session. An agent request should appear in the app with the requested entry and field, requester, agent-written reason and approval lifetime. Approval remains explicit unless a person configured a matching policy. Denial is the default. Agent traffic must not extend the person's idle session.
+One unlock session serves all three. An agent request should appear in the app with the requested entry and field, requester, agent-written reason and approval lifetime. Approval remains explicit unless a person configured a matching policy. Denial is the default. Agent traffic must not extend the person's idle session.
 
 Project actions should identify the env set and command before launch. The app should make clear that the child receives a snapshot, and that subsequent vault edits or locks cannot erase values already delivered. Lock must stop new session-backed launches and credential releases.
 
-These are target behaviors. Today the desktop and terminal approver unlock independently, approvals appear in the terminal, and Env profiles copies a `keypaste run` command. The Agents screen reports whether a terminal approver is running. [Desktop guidance](desktop.md) owns the current user instructions.
+In source, one process holds the vault, the app asks about each agent request in its own prompt window, and a project's terminal starts through the same session after a confirmation; the published `v0.3.0` predates all of it. [Desktop guidance](desktop.md) owns the current user instructions.
 
 ## Existing source and known gaps
 
 The app creates and opens vaults, adds generated or existing credentials, edits passwords, usernames, URLs and notes, generates passwords or passphrases, copies secrets, restores prior entry values, restores or erases a deleted entry, restores a whole-vault backup from the unlock screen and exports an encrypted copy from Settings. Env values can be added, replaced, copied and revealed while held. These source features do not establish public desktop availability.
 
-Custom-field editing and launching projects from the app are not implemented. The approval prompt window, the restore panel and the Settings backups section have not had a person's rendered layout review. The current interface uses fixed panes; narrower layouts and long text still need review. The earlier layout measurements predate the expanded history pane and are not current rendering evidence.
+Custom-field editing is not implemented (V.7b). The approval prompt window, the restore panel and the Settings backups section have not had a person's rendered layout review. The current interface uses fixed panes; narrower layouts and long text still need review. The earlier layout measurements predate the expanded history pane and are not current rendering evidence.
 
 Username, URL and notes display now preserves ordinary punctuation and line breaks while sanitizing control characters that could misrepresent text. Titles and group paths retain stricter name sanitization. Display limits, clipping and shortening must remain distinguishable from the actual stored or copied value.
 
@@ -39,6 +39,6 @@ Review the relevant interface changes on Windows and Linux at minimum and normal
 | Lock during editing, reveal, approval or launch | Drafts and displays clear; new session-backed secret delivery is refused |
 | Project launch and later vault changes | The env snapshot and limits of later locking are understandable |
 
-T1 covers daily vault use and recovery, T2 the shared session, T3 native MCP approval, T4 project environments and T5 installation and delivery. Backend compatibility, secret-display protections and installed-app verification remain required for the behaviors they establish.
+[ROADMAP](../ROADMAP.md) orders the tracks these scenarios serve. Backend compatibility, secret-display protections and installed-app verification remain required for the behaviors they establish.
 
 The organize forms and the search result's matched-field label were added in V.5b and have had no rendered layout review. Their logic is covered; how three mutually exclusive inline panels and a third column on every row look at the smallest window the app allows is not.
