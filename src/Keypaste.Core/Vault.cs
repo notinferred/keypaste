@@ -1,6 +1,7 @@
 using Keypaste.Core.HardwareKeys;
 using Keypaste.Core.Import;
 using Keypaste.Core.Internal;
+using Keypaste.Core.Recommendations;
 
 namespace Keypaste.Core;
 
@@ -345,6 +346,65 @@ public sealed class Vault : IDisposable
         }
 
         return Change(() => _interop.RemoveField(name, field) > 0, removed => removed ? VaultEdit.Of(name) : null);
+    }
+
+    /// <summary>Moves keys found in notes into protected fields. Call <see cref="Save"/> to persist it.</summary>
+    /// <param name="check">The check that found them, while it is still undisposed.</param>
+    /// <param name="findings">The findings to move, from <paramref name="check"/>.</param>
+    /// <returns>What was moved, or why nothing was.</returns>
+    /// <remarks>
+    /// <para>
+    /// Each entry changes as one edit with one history revision (D-0373): every value becomes a
+    /// protected field named by its key, and exactly its line leaves the notes. A field that already
+    /// holds the same value keeps its flag and is not written, and its line still leaves. The
+    /// previous notes stay in the entry's history.
+    /// </para>
+    /// <para>
+    /// The selection is all or nothing. It is refused, with nothing changed, when an entry has gone,
+    /// its notes changed since the check, a field holds a different value, or its notes set a field
+    /// twice.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentException">A finding came from another check.</exception>
+    /// <exception cref="VaultException">More than one entry answers to an entry's name. Nothing is changed.</exception>
+    public NoteKeyMove MoveNoteKeys(NoteKeyCheck check, IReadOnlyList<NoteKeyFinding> findings)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(check);
+        ArgumentNullException.ThrowIfNull(findings);
+
+        if (findings.Any(finding => !ReferenceEquals(finding.Check, check)))
+        {
+            throw new ArgumentException("Every finding must come from the check given.", nameof(findings));
+        }
+
+        return Change(
+            () =>
+            {
+                List<NoteKeyRefusal> refusals = [];
+                List<(EntryName Entry, List<FieldWrite> Writes, string Notes)> planned = [];
+
+                foreach (var entry in findings.GroupBy(finding => finding.Entry))
+                {
+                    if (PlanNoteMove(check, entry.Key, [.. entry], refusals) is { } plan)
+                    {
+                        planned.Add((entry.Key, plan.Writes, plan.Notes));
+                    }
+                }
+
+                if (refusals.Count > 0 || planned.Count == 0)
+                {
+                    return new NoteKeyMove(false, [], refusals);
+                }
+
+                foreach (var (entry, writes, notes) in planned)
+                {
+                    _interop.MoveToFields(entry, writes, notes);
+                }
+
+                return new NoteKeyMove(true, [.. planned.Select(plan => plan.Entry)], []);
+            },
+            move => move.Moved ? VaultEdit.Of(move.Entries) : null);
     }
 
     /// <summary>The one entry's own tags, never its group's.</summary>
@@ -1585,6 +1645,71 @@ public sealed class Vault : IDisposable
                 return true;
             },
             _ => touched ?? VaultEdit.Of());
+
+    /// <summary>Every live entry with notes, for <see cref="NoteKeyCheck"/>.</summary>
+    internal IReadOnlyList<EntryNotes> ReadNotes()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        lock (_state)
+        {
+            return _interop.ReadNotes();
+        }
+    }
+
+    /// <summary>What one entry's move writes, or null with its refusals added.</summary>
+    private (List<FieldWrite> Writes, string Notes)? PlanNoteMove(
+        NoteKeyCheck check,
+        EntryName name,
+        IReadOnlyList<NoteKeyFinding> findings,
+        List<NoteKeyRefusal> refusals)
+    {
+        if (_interop.ReadNotes(name) is not { } current || current.Uuid != findings[0].EntryUuid)
+        {
+            refusals.AddRange(findings.Select(finding => new NoteKeyRefusal(finding, NoteKeyRefusalReason.EntryGone)));
+            return null;
+        }
+
+        var parsed = NoteKeyCheck.Parse(current.Notes);
+        var repeated = NoteKeyCheck.Repeated(parsed);
+        List<ParsedNoteKey> moving = [];
+        List<FieldWrite> writes = [];
+        var before = refusals.Count;
+
+        foreach (var finding in findings)
+        {
+            var key = parsed.FirstOrDefault(key => key.Line == finding.Line && key.Field == finding.Field && key.Kind == finding.Kind);
+
+            if (!check.Matches(finding, current.Notes) || key is null)
+            {
+                refusals.Add(new NoteKeyRefusal(finding, NoteKeyRefusalReason.NotesChanged));
+                continue;
+            }
+
+            if (repeated.Contains(key.Field))
+            {
+                refusals.Add(new NoteKeyRefusal(finding, NoteKeyRefusalReason.KeyRepeated));
+                continue;
+            }
+
+            var existing = _interop.ReadCustomField(name, key.Field);
+
+            if (existing is not null && existing != key.Value)
+            {
+                refusals.Add(new NoteKeyRefusal(finding, NoteKeyRefusalReason.FieldHoldsOtherValue));
+                continue;
+            }
+
+            if (existing is null)
+            {
+                writes.Add(new FieldWrite(key.Field, key.Value, Protect: true));
+            }
+
+            moving.Add(key);
+        }
+
+        return refusals.Count > before ? null : (writes, NoteKeyCheck.Without(current.Notes, moving));
+    }
 
     /// <summary>A refused field name or tag, as a sentence.</summary>
     private static VaultException Refused(string error) =>

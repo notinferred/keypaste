@@ -216,10 +216,14 @@
                        SelectedItem="{Binding SelectedFooter}">
                 <ListBox.ItemTemplate>
                   <DataTemplate x:DataType="vm:NavItem">
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                      <ctl:KpIcon Icon="{Binding Icon}" Size="14" />
-                      <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
-                    </StackPanel>
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                      <ctl:KpIcon Grid.Column="0" Icon="{Binding Icon}" Size="14" Margin="0,0,10,0" />
+                      <TextBlock Grid.Column="1" Text="{Binding Title}" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="2"
+                                 Classes="mono sm muted"
+                                 Text="{Binding Count}"
+                                 VerticalAlignment="Center" />
+                    </Grid>
                   </DataTemplate>
                 </ListBox.ItemTemplate>
               </ListBox>

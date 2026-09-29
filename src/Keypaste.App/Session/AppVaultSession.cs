@@ -176,6 +176,10 @@ internal sealed class AppVaultSession : IDisposable
     /// </remarks>
     internal event EventHandler<VaultEdit>? Edited;
 
+    /// <summary>Raised after the open vault has been saved, forwarded from whichever vault is open.</summary>
+    /// <remarks>Subscribing here rather than to a vault keeps working after an access change replaces it.</remarks>
+    internal event EventHandler? Saved;
+
     /// <summary>keypaste's home, where the vault's claim is kept.</summary>
     internal string Home => _home;
 
@@ -531,9 +535,11 @@ internal sealed class AppVaultSession : IDisposable
                 if (previous is not null)
                 {
                     previous.Edited -= OnVaultEdited;
+                    previous.Saved -= OnVaultSaved;
                 }
 
                 opened.Edited += OnVaultEdited;
+                opened.Saved += OnVaultSaved;
                 _vault = opened;
                 previousKey = _hardwareKey;
                 _hardwareKey = hardwareKey;
@@ -755,8 +761,10 @@ internal sealed class AppVaultSession : IDisposable
             }
 
             _vault.Edited -= OnVaultEdited;
+            _vault.Saved -= OnVaultSaved;
             _vault.Dispose();
             reopened.Edited += OnVaultEdited;
+            reopened.Saved += OnVaultSaved;
             _vault = reopened;
             replaced = _hardwareKey;
             _hardwareKey = hardwareKey;
@@ -771,6 +779,8 @@ internal sealed class AppVaultSession : IDisposable
     }
 
     private void OnVaultEdited(object? sender, VaultEdit edit) => Edited?.Invoke(this, edit);
+
+    private void OnVaultSaved(object? sender, EventArgs e) => Saved?.Invoke(this, EventArgs.Empty);
 
     /// <summary>Records that a person did something.</summary>
     /// <remarks>
@@ -847,6 +857,7 @@ internal sealed class AppVaultSession : IDisposable
             if (vault is not null)
             {
                 vault.Edited -= OnVaultEdited;
+                vault.Saved -= OnVaultSaved;
             }
 
             _timer?.Dispose();

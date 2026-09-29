@@ -9,6 +9,7 @@ using KeePassLib.Serialization;
 using KeePassLib.Utility;
 using Keypaste.Core.HardwareKeys;
 using Keypaste.Core.Import;
+using Keypaste.Core.Recommendations;
 
 namespace Keypaste.Core.Internal;
 
@@ -674,6 +675,53 @@ internal sealed class KeePassInterop : IDisposable
         found.Entry.CreateBackup(_database);
         found.Entry.Strings.Remove(field);
         found.Entry.Touch(true);
+        return 1;
+    }
+
+    /// <summary>Every live entry with notes, by the traversal <see cref="Collect"/> uses.</summary>
+    internal IReadOnlyList<EntryNotes> ReadNotes()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        List<EntryNotes> found = [];
+        CollectNotes(_database.RootGroup, string.Empty, found, Bin());
+        return found;
+    }
+
+    /// <summary>The one entry's identifier and notes, or null when there is no such entry.</summary>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal EntryNotes? ReadNotes(EntryName name)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        return Locate(name) is { } found
+            ? new EntryNotes(name, found.Entry.Uuid.ToHexString(), ReadField(found.Entry, PwDefs.NotesField))
+            : null;
+    }
+
+    /// <summary>Writes protected fields and replaces the notes as one edit with one history revision.</summary>
+    /// <returns>0 when there is no such entry, otherwise 1.</returns>
+    /// <remarks>The caller has checked the names and the notes; the notes keep their protection flag.</remarks>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal int MoveToFields(EntryName name, IReadOnlyList<FieldWrite> writes, string notes)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (Locate(name) is not { } found)
+        {
+            return 0;
+        }
+
+        PwEntry entry = found.Entry;
+        entry.CreateBackup(_database);
+
+        foreach (FieldWrite write in writes)
+        {
+            entry.Strings.Set(write.Name, new ProtectedString(true, write.Value!));
+        }
+
+        entry.Strings.Set(PwDefs.NotesField, new ProtectedString(entry.Strings.Get(PwDefs.NotesField)?.IsProtected ?? false, notes));
+        entry.Touch(true);
         return 1;
     }
 
@@ -1970,6 +2018,25 @@ internal sealed class KeePassInterop : IDisposable
             }
 
             Collect(child, ChildPath(groupPath, child.Name), entries, bin);
+        }
+    }
+
+    private static void CollectNotes(PwGroup group, string groupPath, List<EntryNotes> found, PwGroup? bin)
+    {
+        foreach (PwEntry entry in group.Entries)
+        {
+            if (ReadField(entry, PwDefs.NotesField) is { Length: > 0 } notes)
+            {
+                found.Add(new EntryNotes(new EntryName(groupPath, ReadField(entry, PwDefs.TitleField)), entry.Uuid.ToHexString(), notes));
+            }
+        }
+
+        foreach (PwGroup child in group.Groups)
+        {
+            if (!ReferenceEquals(child, bin))
+            {
+                CollectNotes(child, ChildPath(groupPath, child.Name), found, bin);
+            }
         }
     }
 

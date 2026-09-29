@@ -64,7 +64,6 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     private StatusTone _vaultStatusTone;
     private string _vaultStatusDetail = string.Empty;
     private int _ticks;
-    private readonly Vault? _watched;
     private readonly Action<string, string?>? _openInPlace;
     private KdbxImportViewModel? _import;
     private bool _waitingForTouch;
@@ -119,21 +118,26 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         _session.LockingSoon += OnLockingSoon;
         _session.Edited += OnEdited;
         _session.WaitingForTouch += OnWaitingForTouch;
-        _watched = _session.Unlocked;
+        _session.Saved += OnSaved;
 
         if (authority is not null && _session.Identity is { } identity)
         {
             EntryActivity = new EntryActivitySource(authority, Core.Audit.KeypasteHome.AuditPath(home), identity.Key, _clock, post);
         }
 
-        if (_watched is not null)
+        Recommendations = new RecommendationsViewModel(session, home);
+        Recommendations.PropertyChanged += (_, e) =>
         {
-            _watched.Saved += OnSaved;
-        }
+            if (e.PropertyName == nameof(RecommendationsViewModel.NeedsReview))
+            {
+                SetCount(DestinationKind.Settings, Recommendations.NeedsReview);
+            }
+        };
 
         // Built here rather than left to the first navigation. Assigning Current to the destination
         // it already holds changes nothing, so Show never ran and the shell opened on a blank pane.
         Show(_current);
+        SetCount(DestinationKind.Settings, Recommendations.NeedsReview);
         ReadAuthority();
         ReadVaultStatus();
 
@@ -176,6 +180,9 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>Stops waiting for the YubiKey, so the save fails and writes nothing.</summary>
     internal RelayCommand CancelTouchCommand { get; }
+
+    /// <summary>Keys left in notes, checked on unlock and after each save, and listed only in Settings.</summary>
+    internal RecommendationsViewModel Recommendations { get; }
 
     /// <summary>The auto-clearing clipboard, and the toast that counts it down.</summary>
     internal ClipboardCountdown Clipboard { get; }
@@ -546,7 +553,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         {
             // The audit log is machine state, which is why `keypaste log` reads it without a vault.
             DestinationKind.Log => new LogViewModel(Home, _clock, Clipboard),
-            DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker),
+            DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker, Recommendations),
             DestinationKind.AgentActivity => Activity(),
             DestinationKind.Entries => Entries(),
             DestinationKind.EnvSets => new EnvSetsViewModel(_session, Clipboard, _picker, toast: ShowToast),
@@ -761,7 +768,14 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             : VaultPath;
     }
 
-    private void OnSaved(object? sender, EventArgs e) => Post(ReadVaultStatus);
+    private void OnSaved(object? sender, EventArgs e) => Post(() =>
+    {
+        if (!_disposed)
+        {
+            ReadVaultStatus();
+            Recommendations.Check();
+        }
+    });
 
     private void OnEdited(object? sender, VaultEdit edit) => Post(() =>
     {
@@ -803,11 +817,8 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         _session.LockingSoon -= OnLockingSoon;
         _session.Edited -= OnEdited;
         _session.WaitingForTouch -= OnWaitingForTouch;
-
-        if (_watched is not null)
-        {
-            _watched.Saved -= OnSaved;
-        }
+        _session.Saved -= OnSaved;
+        Recommendations.Dispose();
 
         _statusTimer?.Dispose();
         _toastTimer?.Dispose();

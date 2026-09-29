@@ -69,6 +69,92 @@
           <TextBlock Classes="subtitle" Text="Saved on this machine, and in force as soon as you change them." />
         </StackPanel>
 
+        <!-- Recommendations (C.2): keys left in notes, named by entry and key, never by value. No amber here. -->
+        <Panel IsVisible="{Binding HasRecommendations}">
+        <Border Name="RecommendationsCard"
+                Classes="card filled settings"
+                DataContext="{Binding Recommendations}"
+                x:DataType="vm:RecommendationsViewModel">
+          <StackPanel>
+            <Border Classes="settings-head">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <ctl:KpIcon Icon="clipboard-check" Size="16" Foreground="{DynamicResource KpTextMuted}" />
+                <TextBlock Classes="section" Text="Recommendations" />
+              </StackPanel>
+            </Border>
+            <Border Classes="settings-row">
+              <TextBlock Classes="caption"
+                         TextWrapping="Wrap"
+                         Text="Keys left in notes, checked on this machine when you unlock and after each save. Nothing changes until you choose." />
+            </Border>
+            <Border Classes="settings-row" IsVisible="{Binding IsEmpty}">
+              <TextBlock Name="RecommendationsEmpty" Classes="caption" Text="No keys found in notes." />
+            </Border>
+            <ItemsControl Name="RecommendationRows" ItemsSource="{Binding Rows}" IsVisible="{Binding !IsEmpty}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:RecommendationRow">
+                  <Border BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,1,0,0" Padding="20,12">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12"
+                          AutomationProperties.Name="{Binding Description}">
+                      <CheckBox Grid.Column="0"
+                                IsChecked="{Binding IsSelected}"
+                                IsEnabled="{Binding NeedsReview}"
+                                VerticalAlignment="Center"
+                                AutomationProperties.Name="{Binding Key, StringFormat='Select {0}'}" />
+                      <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <TextBlock Name="RecommendationTokenKind"
+                                     Text="{Binding TokenKind}"
+                                     IsVisible="{Binding IsToken}"
+                                     FontSize="13.5"
+                                     FontWeight="Medium"
+                                     Foreground="{DynamicResource KpTextPrimary}"
+                                     VerticalAlignment="Center" />
+                          <TextBlock Name="RecommendationKey"
+                                     Classes="mono"
+                                     FontSize="13"
+                                     Text="{Binding Key}"
+                                     Foreground="{DynamicResource KpTextPrimary}"
+                                     VerticalAlignment="Center" />
+                          <Border Classes="chip outline" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding StateLabel}" FontFamily="{DynamicResource KpSans}" />
+                          </Border>
+                        </StackPanel>
+                        <TextBlock Classes="caption" Text="{Binding Where}" TextTrimming="CharacterEllipsis" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <Button Classes="sm" Content="Move to a field" IsVisible="{Binding NeedsReview}" Command="{Binding MoveCommand}" />
+                        <Button Classes="sm ghost" Content="Dismiss" IsVisible="{Binding NeedsReview}" Command="{Binding DismissCommand}" />
+                        <Button Classes="sm ghost" Content="Review again" IsVisible="{Binding IsDismissed}" Command="{Binding ReviewAgainCommand}" />
+                      </StackPanel>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Border Classes="settings-row" IsVisible="{Binding !IsEmpty}">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
+                <TextBlock Grid.Column="0"
+                           Classes="caption"
+                           TextWrapping="Wrap"
+                           Text="Each value becomes a protected field named by its key, and its line leaves the notes, in one change to each entry. The notes as they were stay in the entry's history." />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
+                  <Button Name="SelectAllRecommendations" Classes="sm ghost" Content="Select all" Command="{Binding SelectAllCommand}" />
+                  <Button Name="MoveSelected" Classes="sm" Content="Move selected" Command="{Binding MoveSelectedCommand}" />
+                </StackPanel>
+              </Grid>
+            </Border>
+            <Border Classes="settings-row" IsVisible="{Binding HasMessage}">
+              <TextBlock Name="RecommendationsMessage"
+                         Classes="caption"
+                         TextWrapping="Wrap"
+                         Text="{Binding Message}"
+                         Foreground="{DynamicResource KpTextSecondary}" />
+            </Border>
+          </StackPanel>
+        </Border>
+        </Panel>
+
         <!-- Security -->
         <Border Classes="card filled settings">
           <StackPanel>

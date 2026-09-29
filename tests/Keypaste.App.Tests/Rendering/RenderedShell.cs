@@ -49,7 +49,7 @@ internal sealed class RenderedShell : IDisposable
     private ShellViewModel? _shell;
     private UnlockViewModel? _unlock;
 
-    internal RenderedShell(string directoryPrefix = "keypaste-drawn-")
+    internal RenderedShell(string directoryPrefix = "keypaste-drawn-", Action<Vault>? seed = null)
     {
         _directory = Directory.CreateTempSubdirectory(directoryPrefix).FullName;
         var path = Path.Combine(_directory, "vault.kdbx");
@@ -60,6 +60,7 @@ internal sealed class RenderedShell : IDisposable
             vault.SetFields(new EntryName(string.Empty, "github"), [new FieldWrite("API_TOKEN", FieldValue), new FieldWrite("Region", PlainFieldValue, Protect: false)]);
             vault.UpdateEntry(new VaultEntry { Title = "github", Username = "me", Password = Current });
             vault.AddEntry(new VaultEntry { Title = "STRIPE_KEY", Password = EnvValue, GroupPath = "env/billing" });
+            seed?.Invoke(vault);
             vault.Save();
         }
 

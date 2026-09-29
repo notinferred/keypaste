@@ -47,7 +47,8 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
         string? home,
         DesktopPreferences preferences,
         Action<AppTheme> applyTheme,
-        IVaultFilePicker? picker = null)
+        IVaultFilePicker? picker = null,
+        RecommendationsViewModel? recommendations = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(preferences);
@@ -71,7 +72,13 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
         ForgetAllCommand = new RelayCommand(ForgetAll);
         ExportCommand = new AsyncRelayCommand(ExportAsync, () => !_exporting && _picker is not null);
         Access = new VaultAccessViewModel(session, home, picker);
+        Recommendations = recommendations;
     }
+
+    /// <summary>Keys left in notes, owned by the shell for the unlock; null where no shell built this screen.</summary>
+    internal RecommendationsViewModel? Recommendations { get; }
+
+    internal bool HasRecommendations => Recommendations is not null;
 
     /// <summary>Changing the vault's master password and keyfile.</summary>
     internal VaultAccessViewModel Access { get; }

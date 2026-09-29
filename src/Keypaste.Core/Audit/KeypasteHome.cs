@@ -78,6 +78,14 @@ public static class KeypasteHome
     public static string ProjectsPath(string? fromEnvironment) =>
         Path.Combine(Resolve(fromEnvironment), ProjectsFileName);
 
+    /// <summary>The recommendations dismissed on this machine.</summary>
+    public const string RecommendationsFileName = "recommendations.json";
+
+    /// <summary>Resolves the dismissed recommendations. The file is not created.</summary>
+    /// <remarks>It names vaults, entries and keys by identifier and never holds a title or a value (D-0372).</remarks>
+    public static string RecommendationsPath(string? fromEnvironment) =>
+        Path.Combine(Resolve(fromEnvironment), RecommendationsFileName);
+
     /// <summary>The per-client policies, keyed by each bridge's <c>--client-label</c>.</summary>
     public const string ClientsFileName = "clients.toml";
 

@@ -32,6 +32,7 @@ A credential request runs: MCP client â†’ `Mcp/Tools/RequestCredentialTool.cs` â
 |---|---|
 | Open, save, entries, custom fields, history, recycle bin | `Vault.cs`, `VaultEntry.cs`, `EntryField.cs` and `FieldNameRules.cs` (which custom fields keypaste writes), `EntryName.cs`, `EntryHandle.cs`, `EntryRevision.cs`, `RecycledEntry.cs` |
 | Organize and search | `VaultOrganization.cs`, `VaultNameRules.cs`, `VaultSearch.cs` |
+| Recommendations: keys left in notes, the token prefixes it knows, and dismissals kept on this machine | `Recommendations/` (`NoteKeyCheck.cs`, `TokenPrefixes.cs`, `RecommendationDismissals.cs`); the move is `Vault.MoveNoteKeys` |
 | Creation, unlock factors and access changes | `VaultCreation.cs`, `VaultKeyfile.cs`, `VaultAccess.cs`, `VaultLocation.cs`; a hardware key's challenge-response factor in `HardwareKeys/` |
 | Backups, restore and export | `VaultBackups.cs` |
 | KDBX boundary, save retries and timing | `Internal/KeePassInterop.cs`, `Internal/SaveClock.cs`, `KdbxFormat.cs`, `ProcessTemporaryDirectory.cs`, `PathIdentity.cs` |

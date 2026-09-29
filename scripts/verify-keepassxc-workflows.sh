@@ -148,6 +148,21 @@ did() { local what=$1; shift; "$@" >"$dir/did.out" 2>&1 || die "$what failed: $(
 
 uuid() { printf '%-16.16s' "$1" | base64; }
 
+# The number of revisions KeePassXC holds for the entry with the UUID $2 in the vault $1.
+revisions() {
+  kx export "$1" -f xml | awk -v id="<UUID>$2</UUID>" '
+    /<History>/ { inhist = 1; if (mine) n = 0; next }
+    /<\/History>/ { inhist = 0; if (mine) { print n; found = 1; exit } next }
+    inhist { if (mine && /<Entry>/) n++; next }
+    /<UUID>/ { mine = index($0, id) > 0 }
+    END { if (!found) print 0 }'
+}
+
+# C.2's notes: two keys, a GitHub token on a line of its own, a PEM block and a sentence. The token
+# is assembled here so no literal token sits in the repository.
+gh_token="ghp_$(printf 'kp2c%.0s' 1 2 3 4 5 6 7 8 9)"
+kept_notes=$'-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASC\n-----END PRIVATE KEY-----\nRecovery codes are in the safe.'
+
 cat >"$dir/seed.xml" <<EOF
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <KeePassFile>
@@ -197,6 +212,24 @@ cat >"$dir/seed.xml" <<EOF
           <UUID>$(uuid occupied)</UUID>
           <String><Key>Title</Key><Value>occupied</Value></String>
           <String><Key>Password</Key><Value ProtectInMemory="True">o-1</Value></String>
+        </Entry>
+      </Group>
+      <Group>
+        <UUID>$(uuid review)</UUID><Name>review</Name>
+        <Entry>
+          <UUID>$(uuid stripe)</UUID>
+          <String><Key>Title</Key><Value>stripe</Value></String>
+          <String><Key>Password</Key><Value ProtectInMemory="True">s-1</Value></String>
+          <String><Key>Notes</Key><Value>STRIPE_SECRET_KEY=sk_test_1
+export OPENAI_API_KEY=sk-proj-2
+$gh_token
+$kept_notes</Value></String>
+        </Entry>
+        <Entry>
+          <UUID>$(uuid plain)</UUID>
+          <String><Key>Title</Key><Value>plain</Value></String>
+          <String><Key>Password</Key><Value ProtectInMemory="True">p-1</Value></String>
+          <String><Key>Notes</Key><Value>Recovery codes are in the safe.</Value></String>
         </Entry>
       </Group>
       <Group>
@@ -364,6 +397,44 @@ exercise() {
   refused "the app adding a field named otp" "$db" app field-add "$db" servers/database otp protected
   new_pw=
   [ "$(header "$db" | cut -c17-22)" = "000004" ] || die "the app's field and tag edits moved the vault off KDBX 4.0"
+  intact "$db" servers/database
+
+  step "[$kind] notes: the app flags keys left in notes, remembers a dismissal, refuses a clash and moves them into fields"
+  review() {
+    app notes-review "$db" >"$dir/review.out" 2>&1 || die "the app's notes review failed: $(cat "$dir/review.out")"
+    grep -qF -e sk_test_1 -e sk-proj-2 -e "$gh_token" "$dir/review.out" && die "the app's notes review printed a value"
+    grep -qx "count $1" "$dir/review.out" || die "the app does not count $1 keys to review: $(cat "$dir/review.out")"
+  }
+  review 3
+  for want in "key=STRIPE_SECRET_KEY kind=assignment" "key=OPENAI_API_KEY kind=assignment" "key=GITHUB_TOKEN kind=token"; do
+    grep -qxF "finding entry=review/stripe $want state=needs-review" "$dir/review.out" \
+      || die "the app does not flag $want on review/stripe: $(cat "$dir/review.out")"
+  done
+  [ "$(grep -c '^finding ' "$dir/review.out")" = 3 ] || die "the app flags other than three keys: $(cat "$dir/review.out")"
+  did "the app's dismissal" app notes-dismiss "$db" review/stripe OPENAI_API_KEY
+  review 2
+  grep -qxF "finding entry=review/stripe key=OPENAI_API_KEY kind=assignment state=dismissed" "$dir/review.out" \
+    || die "a later unlock forgot the dismissal: $(cat "$dir/review.out")"
+  did "the app's review again" app notes-restore "$db" review/stripe OPENAI_API_KEY
+  review 3
+  new_pw=kp-c2-other-value
+  did "keypaste set --field" kp_cli "$db" set review/stripe --field GITHUB_TOKEN
+  new_pw=
+  refused "the app moving a key onto a field holding another value" "$db" app notes-move "$db" review/stripe
+  did "keypaste field rm" kp_cli "$db" field rm review/stripe GITHUB_TOKEN
+  listed=$(revisions "$db" "$(uuid stripe)")
+  did "the app's move" app notes-move "$db" review/stripe
+  expect "$db" review/stripe STRIPE_SECRET_KEY sk_test_1
+  expect "$db" review/stripe OPENAI_API_KEY sk-proj-2
+  expect "$db" review/stripe GITHUB_TOKEN "$gh_token"
+  for field in STRIPE_SECRET_KEY OPENAI_API_KEY GITHUB_TOKEN; do
+    [ "$(protection "$field" "$db")" = protected ] || die "KeePassXC does not read $field as protected"
+  done
+  expect "$db" review/stripe Notes "$kept_notes"
+  expect "$db" review/plain Notes "Recovery codes are in the safe."
+  [ "$(revisions "$db" "$(uuid stripe)")" = $((listed + 1)) ] || die "the move did not add exactly one revision"
+  kx export "$db" -f xml | grep -qF 'STRIPE_SECRET_KEY=sk_test_1' || die "KeePassXC finds no revision holding the old notes"
+  review 0
   intact "$db" servers/database
 
   step "[$kind] organize: the app renames the group carrying CustomData and moves the entry out of it"

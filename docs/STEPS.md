@@ -6,7 +6,7 @@ This file holds open work only. Finishing a task removes it from here, adds its 
 
 ## Selection and evidence
 
-Only the next five tasks are detailed: C.2, N.1a, N.7, N.2 and N.5. Later rows name a bounded outcome and the dependencies their own implementation or verifier needs; expand a selected later task before building it. Tasks are not marked implemented from a document, reader, mock response or consuming screen. Name the producer, transport, consumer and user action exercised, and retain the source/version and limitations of the observation.
+Only the next five tasks are detailed: N.1a, N.7, N.2, N.5 and N.4. Later rows name a bounded outcome and the dependencies their own implementation or verifier needs; expand a selected later task before building it. Tasks are not marked implemented from a document, reader, mock response or consuming screen. Name the producer, transport, consumer and user action exercised, and retain the source/version and limitations of the observation.
 
 Needs are build dependencies. Ships after names publication gates. External signing identities are inputs, not a queue of enrollment code. A ready row does not authorize publication, account changes or messages. Preserve the secret-path tests, real KeePassXC compatibility, stale-write refusals and release integrity checks while changing product scope.
 
@@ -14,29 +14,6 @@ Needs are build dependencies. Ships after names publication gates. External sign
 
 Custom fields and tags are ordinary KeePass data: keypaste writes them as KeePassXC reads them, and every row keeps the permanent compatibility gates (PRODUCT §4.6). C.1a's tags include the project tags T4 builds on. The main screens show everyday password-manager work; advanced controls and security recommendations live in Settings (PRODUCT §5.8).
 
-- [ ] **C.2 — Flag keys left in notes for review.** Needs: V.7a, V.7b.
-  **Build:** a local check runs in the process holding the vault, on unlock and after each save. It reads the notes of every entry outside the recycle bin and keypaste's reserved group, and it finds two kinds of key:
-  - single-line `KEY=value` and `export KEY=value` assignments whose key is env-named;
-  - values that match a short, documented list of well-known token prefixes kept in core.
-
-  Each finding names its entry and its key, or the token kind, and never holds or shows the value. Findings appear only under Settings › Recommendations, with a quiet count on Settings. Each starts as needing review, and no main screen shows a banner.
-
-  Moving a finding, or all selected ones, does one edit with one revision: it writes the values as protected fields named by their keys and removes exactly those lines from the notes. The previous notes stay in history. The move is refused, with the reason, when a field already holds a different value or the notes changed since the check. A dismissed finding is remembered on this machine by entry and key, never by value.
-
-  The decision narrows D-0278: search still never reads notes, and the check's results leave only through this list. Traces to PRODUCT §§1, 2, 3.4 and 5.8.
-
-  **Verify (V-C.2):** the vault is one KeePassXC made. One entry's notes hold `STRIPE_SECRET_KEY=sk_test_1`, `export OPENAI_API_KEY=sk-proj-2`, a GitHub token on a line of its own, a PEM block and a sentence. Another entry's notes hold a sentence only.
-
-  After unlocking, with no further act:
-  - Settings › Recommendations lists the first entry's three findings as needing review, and not the second entry.
-  - The Settings row shows the count, and no first-level screen shows a banner.
-  - No value appears in the automation tree or a drawn frame.
-
-  Moving the findings leaves the entry with protected fields holding exactly those values, in one revision. Its notes hold only the PEM block and the sentence, and a revision holds the old notes. Real KeePassXC reads the fields and the trimmed notes.
-
-  A dismissed finding stays dismissed after a lock and unlock. Editing the notes between the check and the move refuses the move. A search for `sk_test_1` still finds nothing.
-
-  A parser tested only on strings does not pass.
 - [ ] **N.1a — Put the app in four places.** Needs: none.
   **Build:** the sidebar becomes Items, with the project rows beneath it, and Agents, with Trash and Settings in the footer, on Ctrl/Cmd+1–4. The other destinations move:
   - Activity becomes Agents › History, and the full log moves to Settings › Advanced.
@@ -70,9 +47,11 @@ Custom fields and tags are ordinary KeePass data: keypaste writes them as KeePas
 
   A view model asserting over a fixture URL without the launcher does not pass.
 - [ ] **N.4 — Create an item from a template.** Needs: V.7a.
-  - The templates are Login, API key, Database, Server and Secure note.
-  - Each has a title, a folder picker, tags and notes instead of a `/` path.
-  - Each opens in KeePassXC with the same fields, protection, tags and notes.
+  **Build:** New on Items starts from Login, API key, Database, Server or Secure note. Each asks for a title, a folder chosen from the vault's groups instead of a typed `/` path, tags and notes, and its own fields: a login's username, password and web address; an API key's env-named key, protected; a database's and a server's host, username and password; a secure note's notes alone. The item is created in one write with no history item, under V.7a's field-name rules and C.1a's tag rules. The keypaste-design skill applies. Traces to PRODUCT §§1 and 5.8.
+
+  **Verify (V-N.4):** in the app, on a vault KeePassXC made, a person creates one item from each template. Real KeePassXC reads each item's title, group, fields and their protection, tags and notes, and finds no revision. A title already taken in the folder, a refused field name and an empty title each write nothing. The form's automation tree carries no typed value.
+
+  A template shown only in a view model does not pass.
 - [ ] **N.1b — Give every advanced feature one home.** Needs: N.1a.
   - Scoped tokens, shared links, the log's hash check and diagnostics live in Settings › Advanced.
   - Per-app choices live under that app on Agents.

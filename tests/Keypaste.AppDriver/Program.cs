@@ -66,6 +66,10 @@ internal static class Program
         "       backup-restore <vault> <backup-file-name>\n" +
         "       export <vault> <destination>\n" +
         "       access <vault> [--password] [--attach <keyfile> | --remove-keyfile]\n" +
+        "       notes-review <vault>\n" +
+        "       notes-move <vault> <entry-path> [<key>...]\n" +
+        "       notes-dismiss <vault> <entry-path> <key>\n" +
+        "       notes-restore <vault> <entry-path> <key>\n" +
         "       hold <vault> [--locked] [--held-prompt | --approving-prompt]\n" +
         "            (then per line of standard input: lock, unlock, edit <entry-path>, delete <entry-path>,\n" +
         "             relocate <entry-path> <destination-group-path> <new-title>, and with the app's own\n" +
@@ -108,6 +112,10 @@ internal static class Program
                 ["backup-restore", var vault, var backup] => await driver.RestoreBackupAsync(vault, backup).ConfigureAwait(true),
                 ["export", var vault, var destination] => await driver.ExportAsync(vault, destination).ConfigureAwait(true),
                 ["access", var vault, .. var change] => await driver.ChangeAccessAsync(vault, change).ConfigureAwait(true),
+                ["notes-review", var vault] => await driver.ReviewNotesAsync(vault).ConfigureAwait(true),
+                ["notes-move", var vault, var entry, .. var keys] => await driver.MoveNoteKeysAsync(vault, entry, keys).ConfigureAwait(true),
+                ["notes-dismiss", var vault, var entry, var key] => await driver.DismissNoteKeyAsync(vault, entry, key).ConfigureAwait(true),
+                ["notes-restore", var vault, var entry, var key] => await driver.ReviewNoteKeyAgainAsync(vault, entry, key).ConfigureAwait(true),
                 ["raw-add", var vault, var group, var title] => RawAdd(vault, group, title),
                 ["hold", var vault, .. var options] => await HoldAsync(driver, vault, options).ConfigureAwait(true),
                 _ => Usage(),
@@ -461,6 +469,77 @@ internal sealed class Driver(string home)
         return settings.Message.StartsWith("An encrypted copy is at", StringComparison.Ordinal)
             ? Did(settings.Message)
             : Refused(settings.Message);
+    }
+
+    /// <summary>Lists Settings › Recommendations as the app checked it on unlock: entry, key, kind and state, never a value.</summary>
+    internal Task<int> ReviewNotesAsync(string vault) =>
+        WithRecommendationsAsync(vault, list =>
+        {
+            foreach (var row in list.Rows)
+            {
+                var kind = row.IsToken ? "token" : "assignment";
+                var state = row.IsDismissed ? "dismissed" : "needs-review";
+                Console.Out.WriteLine($"finding entry={row.Entry} key={row.Key} kind={kind} state={state}");
+            }
+
+            Console.Out.WriteLine(string.Create(CultureInfo.InvariantCulture, $"count {list.NeedsReview}"));
+            return 0;
+        });
+
+    /// <summary>Selects one entry's findings, or the named keys of it, and presses Move selected.</summary>
+    internal Task<int> MoveNoteKeysAsync(string vault, string entry, string[] keys) =>
+        WithRecommendationsAsync(vault, list =>
+        {
+            var rows = list.Rows.Where(row => row.Entry == entry && row.NeedsReview && (keys.Length == 0 || keys.Contains(row.Key))).ToList();
+
+            if (rows.Count == 0)
+            {
+                throw new DriverException($"no finding needing review on '{entry}'");
+            }
+
+            foreach (var row in rows)
+            {
+                row.IsSelected = true;
+            }
+
+            Press(list.MoveSelectedCommand, "Move selected");
+            return list.Message.StartsWith("Moved ", StringComparison.Ordinal) ? Did(list.Message) : Refused(list.Message);
+        });
+
+    /// <summary>Presses Dismiss on one finding.</summary>
+    internal Task<int> DismissNoteKeyAsync(string vault, string entry, string key) =>
+        WithRecommendationsAsync(vault, list =>
+        {
+            var row = list.Rows.SingleOrDefault(row => row.Entry == entry && row.Key == key && row.NeedsReview)
+                ?? throw new DriverException($"no finding for {key} on '{entry}'");
+
+            Press(row.DismissCommand, "Dismiss");
+            return list.Message.Length == 0 ? Did("dismissed") : Refused(list.Message);
+        });
+
+    /// <summary>Presses Review again on one dismissed finding.</summary>
+    internal Task<int> ReviewNoteKeyAgainAsync(string vault, string entry, string key) =>
+        WithRecommendationsAsync(vault, list =>
+        {
+            var row = list.Rows.SingleOrDefault(row => row.Entry == entry && row.Key == key && row.IsDismissed)
+                ?? throw new DriverException($"no dismissed finding for {key} on '{entry}'");
+
+            Press(row.ReviewAgainCommand, "Review again");
+            return list.Message.Length == 0 ? Did("restored") : Refused(list.Message);
+        });
+
+    private async Task<int> WithRecommendationsAsync(string vault, Func<RecommendationsViewModel, int> act)
+    {
+        using var session = new AppVaultSession(TimeProvider.System, home: home);
+        using var unlock = Screen(session);
+
+        if (await UnlockAsync(unlock, session, vault).ConfigureAwait(true) is { } refused)
+        {
+            return refused;
+        }
+
+        using var list = new RecommendationsViewModel(session, home);
+        return act(list);
     }
 
     internal async Task<int> ChangeAccessAsync(string vault, string[] change)

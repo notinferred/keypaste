@@ -83,6 +83,15 @@ public sealed class SecretHygieneTests
 
     internal const string SentinelUnselectedTitle = "SENTINEL-OTHER-TITLE-30bd19";
 
+    /// <summary>A key left in the unselected entry's notes, which Settings › Recommendations names (C.2).</summary>
+    internal const string SentinelNoteKey = "SENTINEL_NOTE_KEY";
+
+    /// <summary>That key's value, which the recommendation never holds.</summary>
+    internal const string SentinelNoteKeyValue = "SENTINEL-NOTE-KEY-VALUE-5e1f0a";
+
+    /// <summary>A GitHub token on a line of its own in the same notes.</summary>
+    internal const string SentinelNoteToken = "ghp_SENTINELNOTETOKEN8a3b6c";
+
     /// <summary>
     /// The password the sentinel entry used to have, kept in its KeePass history.
     /// </summary>
@@ -151,6 +160,8 @@ public sealed class SecretHygieneTests
         SentinelOtherEnvValue,
         SentinelFieldValue,
         SentinelPlainFieldValue,
+        SentinelNoteKeyValue,
+        SentinelNoteToken,
         Master,
     ];
 
@@ -181,6 +192,33 @@ public sealed class SecretHygieneTests
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Settings › Recommendations names the keys left in notes and holds none of their values,
+    /// before and after a lock (C.2).
+    /// </summary>
+    [Fact]
+    public void The_recommendations_list_holds_keys_and_no_value()
+    {
+        using var fixture = new SentinelVault();
+        using var session = Unlocked(fixture);
+        using var shell = new ShellViewModel(session, fixture.Home, authority: null);
+        var list = shell.Recommendations;
+
+        shell.Current = Destinations.Of(DestinationKind.Settings);
+        var surfaced = Surface(list).Concat(Surface(shell.Content)).ToList();
+
+        Assert.Contains(surfaced, text => text.Contains(SentinelNoteKey, StringComparison.Ordinal));
+        Assert.Contains(surfaced, text => text.Contains("GITHUB_TOKEN", StringComparison.Ordinal));
+        Assert.DoesNotContain(surfaced, text => text.Contains(SentinelNoteKeyValue, StringComparison.Ordinal));
+        Assert.DoesNotContain(surfaced, text => text.Contains(SentinelNoteToken, StringComparison.Ordinal));
+
+        session.Lock(VaultLockReason.Manual);
+        shell.Dispose();
+
+        Assert.Empty(list.Rows);
+        Assert.DoesNotContain(Surface(list), text => text.Contains(SentinelNoteKey, StringComparison.Ordinal));
     }
 
     /// <summary>
@@ -972,6 +1010,7 @@ public sealed class SecretHygieneTests
             {
                 Title = SentinelUnselectedTitle,
                 Password = SentinelUnselectedPassword,
+                Notes = SentinelNoteKey + "=" + SentinelNoteKeyValue + "\n" + SentinelNoteToken,
                 GroupPath = SentinelGroup,
             });
 
