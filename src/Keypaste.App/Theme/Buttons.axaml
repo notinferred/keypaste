@@ -55,6 +55,23 @@
   <Style Selector="Button.accent">
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
+  <!-- A primary that opens a menu, such as Items' "+": amber whether its menu is open or not. -->
+  <Style Selector="ToggleButton.primary">
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="ToggleButton.primary /template/ ContentPresenter#PART_ContentPresenter,
+                   ToggleButton.primary:checked /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentButtonBackground}" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentButtonForeground}" />
+  </Style>
+  <Style Selector="ToggleButton.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentButtonBackgroundPointerOver}" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentButtonForegroundPointerOver}" />
+  </Style>
+  <Style Selector="ToggleButton.primary:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentButtonBackgroundPressed}" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentButtonForegroundPressed}" />
+  </Style>
 
   <!-- ghost -->
   <Style Selector="Button.ghost /template/ ContentPresenter#PART_ContentPresenter">

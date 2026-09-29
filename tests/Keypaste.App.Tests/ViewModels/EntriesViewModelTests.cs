@@ -70,7 +70,7 @@ public sealed class EntriesViewModelTests : IDisposable
 
         var labels = context.Entries.Groups.Select(group => group.Label).ToArray();
 
-        Assert.Equal(["All entries", "env", "billing", "servers"], labels);
+        Assert.Equal(["All items", "env", "billing", "servers"], labels);
         Assert.Equal([0, 1, 2, 1], context.Entries.Groups.Select(group => group.Depth).ToArray());
     }
 

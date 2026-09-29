@@ -154,7 +154,9 @@ internal sealed class RenderedShell : IDisposable
                 break;
 
             case "SharePassphrase":
-                Show<SharingViewModel>(DestinationKind.Sharing).RequirePassphrase = true;
+                Shell.ShareCommand.Execute("github");
+                Drain();
+                Shell.Share!.RequirePassphrase = true;
                 break;
 
             default:

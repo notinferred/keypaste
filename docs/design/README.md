@@ -48,16 +48,17 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
 **App shell**: full window; grid rows `40px / 1fr`.
 - **Titlebar** (`#18191C`, bottom border `#26282C`): columns `232px | 1fr | auto`.
   - Window controls: three 12px circles `#3A3D43`, gap 8.
-  - Search, centered, `min(440px,100%)` × 28, radius 6, bg `#111214`, border `#26282C`, 12.5px muted. Placeholder "Search secrets". ⌘K keycap is mono 10.5 on `#24262A`, radius 4.
+  - Search, centered, `min(440px,100%)` × 28, radius 6, bg `#111214`, border `#26282C`, 12.5px muted. The app's only search (D-0374). Placeholder "Search all items", or "Search in this group" with the group as a chip (clearable) inside the field. ⌘K keycap is mono 10.5 on `#24262A`, radius 4.
   - Right side: status "● acme.kdbx · saved" (mono 11, green dot 6px) and a "lock" button (26h, `#24262A`, radius 6).
 - **Sidebar**, 232px (`#18191C`, right border), padding 16/10, gap 20:
   - Lockup: 22px mark + 19px wordmark.
-  - Nav rows: 34h, radius 7, 13.5/500. Icon 16px is muted, or amber when active; active bg `#2A2C30`. Count on the right is mono 11 (amber for an Agents count > 0). Items: Secrets, Agents, Activity, Env profiles, Sharing.
-  - "PROJECTS" label (11/500, +0.04em) and project rows: 30h, mono 12, with count.
-  - Bottom: "Import .kdbx" (32h, 1px dashed `#3A3D43`), then the MCP server card (bg `#111214`, border, radius 8, padding 10) reading "MCP server ● running" and "stdio · 3 clients".
+  - Four places (D-0374), one list read top to bottom: Items, each env project's row beneath it (indented, mono 12, with count), then Agents; Trash and Settings quieter at the foot. `Ctrl/Cmd+1`–`4` in that order.
+  - Nav rows: 34h, radius 7, 13.5/500. Icon 16px is muted, or amber when active; active bg `#2A2C30`. Count on the right is mono 11, muted. Agents also carries a 6px dot, green while the app is answering agents.
+  - No Import row and no MCP server card: import is in Items' "+" menu, and what the card said is the Agents row's tooltip.
+- **Back**: a screen under a place (a project's Env profiles, Agents › History, Settings › Advanced's activity log and share links) has a ghost "‹ <place>" button above its title.
 
-**1. Secrets**: columns `minmax(240px,34%) | 1fr`.
-- List header: project path (mono 13), profile badge "dev" (20h, `#24262A`, radius 4, mono 11), and an amber "New" button (28h). Below it a filter field (30h).
+**1. Items**: columns `minmax(240px,34%) | 1fr`.
+- List header: project path (mono 13), profile badge "dev" (20h, `#24262A`, radius 4, mono 11), and an amber "New" button (28h) that opens a menu: New item, New project, Import .env, Import .kdbx. No filter field: the titlebar search is the only one.
 - Rows: 52h, radius 7, grid `18px | 1fr | auto` over two lines.
   - Line 1: icon, key (mono 13, ellipsis), and "last used" (mono 11) with a 6px dot. The dot is amber for in use, green for recently granted, `#55575C` for idle.
   - Line 2: kind (11.5 muted).
@@ -76,7 +77,7 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
   - POLICY select with three options: "Ask every time", "Session grants up to 1h", "Inject only".
 - **Scoped tokens** table with columns NAME, TOKEN, SCOPE, MODE (outlined chip), EXPIRES. "New token" link.
 
-**3. Activity**
+**3. Activity log** (Settings › Advanced; Agents › History is the same table held to Agents, with no filter)
 - Segmented filter: All / Agents / You / Denied.
 - Table columns `64 | 110 | 100 | 1.6fr | 1fr | 100`, min-width 680, scrolls horizontally: TIME (mono muted), ACTOR, ACTION, SECRETS (mono), WHERE (mono muted), RESULT (colored dot + label: Granted / Approved 1h = ok, Denied = danger, Token = info, Expired / Link = muted).
 - Subtitle: "Every agent request, grant, token run and share. Kept on this machine, hash-chained, append-only."
@@ -88,8 +89,8 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
   - `.env.keypaste` preview (terminal style) with a dev/staging/prod segmented toggle that rewrites the references.
   - "Run with this profile" card showing the command `keypaste run -p <profile> -- npm start` plus explanatory copy.
 
-**5. Sharing**: left column is the share list (what, recipient · rule, status dot). Right column is the "New share link" form:
-- What (select) and Recipient.
+**5. Sharing**: Settings › Advanced › Share links is the share list (what, recipient · rule, status dot). The "New share link" form is the Share… dialog an item's ⋯ menu opens:
+- What (the item, fixed) and Recipient.
 - Expires segmented control: 1h / **24h** / 7d. Views: **1** / 3 / 10.
 - "Require a passphrase, sent separately" checkbox.
 - Primary button "Create and copy link".

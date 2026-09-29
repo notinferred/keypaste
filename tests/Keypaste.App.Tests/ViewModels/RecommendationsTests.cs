@@ -62,7 +62,6 @@ public sealed class RecommendationsTests : IDisposable
 
         var settings = Settings(shell);
         Assert.Equal("3", settings.Count);
-        Assert.False(settings.IsLive);
         Assert.Null(shell.Notice);
         Assert.Null(shell.Toast);
     }

@@ -46,50 +46,9 @@
       <Setter Property="Padding" Value="18,10,18,16" />
     </Style>
 
-    <!-- A project row and the footer of the sidebar are buttons drawn as rows. -->
-    <Style Selector="Button.sidebar-row">
-      <Setter Property="HorizontalAlignment" Value="Stretch" />
-      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-      <Setter Property="Height" Value="30" />
-      <Setter Property="Padding" Value="10,0" />
-      <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
-    </Style>
-    <Style Selector="Button.sidebar-row /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
-    </Style>
-    <Style Selector="Button.sidebar-row:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
-      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
-    </Style>
-    <!-- "Import .kdbx": a 32px row on a 1px dashed #3A3D43 outline, which Border cannot draw. -->
-    <Style Selector="Button.import">
-      <Setter Property="Height" Value="32" />
-      <Setter Property="Padding" Value="0" />
-      <Setter Property="VerticalContentAlignment" Value="Stretch" />
-    </Style>
-
-    <Style Selector="Button.mcp-card">
-      <Setter Property="HorizontalAlignment" Value="Stretch" />
-      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-      <Setter Property="Padding" Value="10" />
-      <Setter Property="CornerRadius" Value="8" />
-      <Setter Property="BorderThickness" Value="1" />
-    </Style>
-    <Style Selector="Button.mcp-card /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource KpBgApp}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
-    </Style>
-    <Style Selector="Button.mcp-card:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource KpBgApp}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource KpBorderStrong}" />
-    </Style>
-
-    <Style Selector="ctl|KpIcon.mcp">
-      <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
-    </Style>
-    <Style Selector="ctl|KpIcon.mcp.live">
-      <Setter Property="Foreground" Value="{DynamicResource KpAccent}" />
+    <!-- A sidebar row is announced by its place or project, the rows being view models rather than text. -->
+    <Style Selector="ListBox.nav > ListBoxItem">
+      <Setter Property="AutomationProperties.Name" Value="{ReflectionBinding Title}" />
     </Style>
 
     <Style Selector="Button.titlebar-lock">
@@ -109,14 +68,6 @@
       <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
       <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
     </Style>
-    <!-- A window near its minimum height gives the footer's second MCP line and the gap above the
-         projects to the project rows (ShellView.axaml.cs sets the class). -->
-    <Style Selector=".short TextBlock#McpDetail">
-      <Setter Property="IsVisible" Value="False" />
-    </Style>
-    <Style Selector=".short Grid#ProjectsSection">
-      <Setter Property="Margin" Value="0,8,0,0" />
-    </Style>
   </UserControl.Styles>
 
   <Panel>
@@ -132,6 +83,7 @@
               WindowDecorationProperties.ElementRole="TitleBar">
         <Grid ColumnDefinitions="232,*,Auto" Margin="{x:Static views:WindowChrome.CaptionInset}">
 
+          <!-- The app's only search. It searches Items, and says where: every item, or the group in view. -->
           <TextBox Grid.Column="1"
                    Name="ShellSearch"
                    Classes="search"
@@ -139,10 +91,29 @@
                    Margin="16,0"
                    VerticalAlignment="Center"
                    Text="{Binding Search}"
-                   PlaceholderText="Search secrets"
+                   PlaceholderText="{Binding SearchPlaceholder}"
+                   AutomationProperties.Name="Search"
                    WindowDecorationProperties.ElementRole="User">
             <TextBox.InnerLeftContent>
-              <ctl:KpIcon Icon="search" Size="13" Margin="2,0,0,0" Foreground="{DynamicResource KpTextMuted}" />
+              <StackPanel Orientation="Horizontal" Spacing="6" Margin="2,0,0,0">
+                <ctl:KpIcon Icon="search" Size="13" Foreground="{DynamicResource KpTextMuted}" VerticalAlignment="Center" />
+                <Border Name="SearchScope"
+                        Classes="chip"
+                        IsVisible="{Binding HasSearchScope}"
+                        VerticalAlignment="Center">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <TextBlock Text="{Binding SearchScope}" MaxWidth="140" TextTrimming="CharacterEllipsis" />
+                    <Button Name="ClearSearchScope"
+                            Classes="icon ghost sm"
+                            Width="16" Height="16" MinHeight="16" Padding="0"
+                            ToolTip.Tip="Search every item"
+                            AutomationProperties.Name="Search every item"
+                            Command="{Binding ClearScopeCommand}">
+                      <ctl:KpIcon Icon="x" Size="10" />
+                    </Button>
+                  </StackPanel>
+                </Border>
+              </StackPanel>
             </TextBox.InnerLeftContent>
             <TextBox.InnerRightContent>
               <Border Classes="keycap" Margin="0,0,5,0">
@@ -208,92 +179,20 @@
                              MarkSize="22"
                              FontSize="19" />
 
-            <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,12,0,0">
-
-              <ListBox Name="FooterNav"
-                       Classes="nav quiet"
-                       ItemsSource="{Binding FooterNav}"
-                       SelectedItem="{Binding SelectedFooter}">
-                <ListBox.ItemTemplate>
-                  <DataTemplate x:DataType="vm:NavItem">
-                    <Grid ColumnDefinitions="Auto,*,Auto">
-                      <ctl:KpIcon Grid.Column="0" Icon="{Binding Icon}" Size="14" Margin="0,0,10,0" />
-                      <TextBlock Grid.Column="1" Text="{Binding Title}" VerticalAlignment="Center" />
-                      <TextBlock Grid.Column="2"
-                                 Classes="mono sm muted"
-                                 Text="{Binding Count}"
-                                 VerticalAlignment="Center" />
-                    </Grid>
-                  </DataTemplate>
-                </ListBox.ItemTemplate>
-              </ListBox>
-
-              <Button Name="ImportKdbx"
-                      Classes="ghost sidebar-row import"
-                      IsVisible="{Binding ImportAvailable}"
-                      Command="{Binding ImportCommand}">
-                <Panel>
-                  <Rectangle RadiusX="7" RadiusY="7"
-                             Stroke="{DynamicResource KpBorderStrong}"
-                             StrokeThickness="1"
-                             StrokeDashArray="4,3" />
-                  <StackPanel Orientation="Horizontal" Spacing="10" Margin="10,0" VerticalAlignment="Center">
-                    <ctl:KpIcon Icon="file-input" Size="15" Foreground="{DynamicResource KpTextMuted}" />
-                    <TextBlock Text="Import .kdbx" FontSize="13" FontWeight="Normal" VerticalAlignment="Center" />
-                  </StackPanel>
-                </Panel>
-              </Button>
-
-              <Button Name="McpCard"
-                      Classes="mcp-card"
-                      Command="{Binding OpenAgentsCommand}">
-                <StackPanel Spacing="4">
-                  <Grid ColumnDefinitions="Auto,*,Auto">
-                    <ctl:KpIcon Grid.Column="0"
-                                Icon="plug"
-                                Size="14"
-                                Margin="0,0,8,0"
-                                Classes="mcp"
-                                Classes.live="{Binding McpRunning}" />
-                    <TextBlock Grid.Column="1"
-                               Text="MCP server"
-                               FontSize="12.5"
-                               FontWeight="Medium"
-                               Foreground="{DynamicResource KpTextPrimary}"
-                               VerticalAlignment="Center" />
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="5">
-                      <Border Classes="dot" Classes.ok="{Binding McpRunning}" />
-                      <TextBlock Text="{Binding McpState}"
-                                 FontSize="11"
-                                 Classes="muted"
-                                 Classes.ok="{Binding McpRunning}"
-                                 VerticalAlignment="Center" />
-                    </StackPanel>
-                  </Grid>
-                  <TextBlock Name="McpDetail"
-                             Classes="mono muted"
-                             FontSize="10.5"
-                             FontWeight="Normal"
-                             Text="{Binding McpDetail}"
-                             TextTrimming="CharacterEllipsis" />
-                </StackPanel>
-              </Button>
-
-            </StackPanel>
-
-            <ListBox Name="Nav"
-                     DockPanel.Dock="Top"
-                     Classes="nav"
-                     ItemsSource="{Binding MainNav}"
-                     SelectedItem="{Binding SelectedMain}">
+            <!-- Trash and Settings, quieter, at the bottom. -->
+            <ListBox Name="FooterNav"
+                     DockPanel.Dock="Bottom"
+                     Classes="nav quiet"
+                     Margin="0,12,0,0"
+                     ItemsSource="{Binding FooterNav}"
+                     SelectedItem="{Binding SelectedFooter}">
               <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:NavItem">
-                  <Grid ColumnDefinitions="Auto,*,Auto">
-                    <ctl:KpIcon Grid.Column="0" Icon="{Binding Icon}" Size="16" Margin="0,0,10,0" />
+                  <Grid ColumnDefinitions="Auto,*,Auto" AutomationProperties.Name="{Binding Title}">
+                    <ctl:KpIcon Grid.Column="0" Icon="{Binding Icon}" Size="14" Margin="0,0,10,0" />
                     <TextBlock Grid.Column="1" Text="{Binding Title}" VerticalAlignment="Center" />
                     <TextBlock Grid.Column="2"
                                Classes="mono sm muted"
-                               Classes.amber="{Binding IsLive}"
                                Text="{Binding Count}"
                                VerticalAlignment="Center" />
                   </Grid>
@@ -301,59 +200,86 @@
               </ListBox.ItemTemplate>
             </ListBox>
 
-            <!-- Only the project rows scroll, so a short window keeps the heading and its first rows in view. -->
-            <Grid Name="ProjectsSection" RowDefinitions="Auto,*" Margin="0,20,0,0" IsVisible="{Binding HasProjects}">
-              <TextBlock Classes="th" Text="PROJECTS" Margin="10,0,10,6" />
-              <ScrollViewer Grid.Row="1"
-                            HorizontalScrollBarVisibility="Disabled"
-                            VerticalScrollBarVisibility="Auto">
-                <ItemsControl ItemsSource="{Binding Projects}">
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:ProjectRow">
-                      <Button Classes="sidebar-row"
-                              Command="{Binding $parent[ItemsControl].((vm:ShellViewModel)DataContext).OpenProjectCommand}"
-                              CommandParameter="{Binding Name}"
-                              ToolTip.Tip="{Binding Name}">
-                        <Grid ColumnDefinitions="Auto,*,Auto">
-                          <ctl:KpIcon Grid.Column="0"
-                                      Icon="folder-git-2"
-                                      Size="14"
-                                      Margin="0,0,10,0"
-                                      Foreground="{DynamicResource KpTextMuted}" />
-                          <TextBlock Grid.Column="1"
-                                     Classes="mono"
-                                     FontSize="12"
-                                     FontWeight="Normal"
-                                     Text="{Binding Name}"
-                                     TextTrimming="CharacterEllipsis"
-                                     VerticalAlignment="Center" />
-                          <TextBlock Grid.Column="2"
-                                     Classes="mono sm muted"
-                                     FontWeight="Normal"
-                                     Text="{Binding Count}"
-                                     VerticalAlignment="Center" />
-                        </Grid>
-                      </Button>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-              </ScrollViewer>
-            </Grid>
+            <!-- Items, its project rows, then Agents: one list, so the arrow keys walk the sidebar as it
+                 reads and its automation tree names exactly the places and the projects (D-0374). -->
+            <ListBox Name="Nav"
+                     Classes="nav"
+                     ItemsSource="{Binding SidebarRows}"
+                     SelectedItem="{Binding SelectedSidebarRow}"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+              <ListBox.DataTemplates>
+                <DataTemplate DataType="vm:NavItem">
+                  <Grid ColumnDefinitions="Auto,*,Auto,Auto"
+                        AutomationProperties.Name="{Binding Title}"
+                        AutomationProperties.HelpText="{Binding Detail}"
+                        ToolTip.Tip="{Binding Detail}">
+                    <ctl:KpIcon Grid.Column="0" Icon="{Binding Icon}" Size="16" Margin="0,0,10,0" />
+                    <TextBlock Grid.Column="1" Text="{Binding Title}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="2"
+                               Classes="mono sm muted"
+                               Text="{Binding Count}"
+                               VerticalAlignment="Center" />
+                    <Border Grid.Column="3"
+                            Name="AgentsDot"
+                            Classes="dot"
+                            Classes.ok="{Binding DotLive}"
+                            Margin="8,0,0,0"
+                            IsVisible="{Binding HasDot}" />
+                  </Grid>
+                </DataTemplate>
+                <DataTemplate DataType="vm:ProjectRow">
+                  <Grid ColumnDefinitions="Auto,*,Auto"
+                        Margin="14,0,0,0"
+                        AutomationProperties.Name="{Binding Title}"
+                        ToolTip.Tip="{Binding Name}">
+                    <ctl:KpIcon Grid.Column="0" Icon="folder-git-2" Size="14" Margin="0,0,10,0" />
+                    <TextBlock Grid.Column="1"
+                               Classes="mono"
+                               FontSize="12"
+                               FontWeight="Normal"
+                               Text="{Binding Name}"
+                               TextTrimming="CharacterEllipsis"
+                               VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="2"
+                               Classes="mono sm muted"
+                               FontWeight="Normal"
+                               Text="{Binding Count}"
+                               VerticalAlignment="Center" />
+                  </Grid>
+                </DataTemplate>
+              </ListBox.DataTemplates>
+            </ListBox>
 
           </DockPanel>
         </Border>
 
-        <Grid Grid.Column="1" RowDefinitions="Auto,Auto,*">
+        <Grid Grid.Column="1" RowDefinitions="Auto,Auto,Auto,*">
+
+          <!-- A screen under a place, such as History under Agents, goes back up to it (D-0374). -->
+          <Button Grid.Row="0"
+                  Name="Back"
+                  ZIndex="1"
+                  Classes="ghost sm"
+                  IsVisible="{Binding HasBack}"
+                  HorizontalAlignment="Left"
+                  Margin="24,12,0,-16"
+                  AutomationProperties.Name="{Binding BackTitle, StringFormat='Back to {0}'}"
+                  Command="{Binding BackCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <ctl:KpIcon Icon="chevron-right" Size="13" RenderTransform="rotate(180deg)" />
+              <TextBlock Text="{Binding BackTitle}" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
 
           <!-- Until a screen draws its own title (Destination.OwnsHeader), the shell draws it. -->
-          <TextBlock Grid.Row="0"
+          <TextBlock Grid.Row="1"
                      Classes="h1"
                      Text="{Binding CurrentTitle}"
                      IsVisible="{Binding ShowsHeader}"
                      Margin="18,14,18,0" />
 
           <!-- Said once, after a restore landed here. Quiet: the restore worked, and this is what it did. -->
-          <Border Grid.Row="1"
+          <Border Grid.Row="2"
                   IsVisible="{Binding HasNotice}"
                   Classes="card"
                   Background="{DynamicResource KpAccentTint}"
@@ -377,13 +303,18 @@
             </Grid>
           </Border>
 
-          <Border Grid.Row="2" Classes="content" Classes.padded="{Binding ShowsHeader}">
+          <Border Grid.Row="3" Classes="content" Classes.padded="{Binding ShowsHeader}">
             <ContentControl Content="{Binding Content}" />
           </Border>
 
         </Grid>
       </Grid>
     </Grid>
+
+    <!-- Share…, from an item's ⋯ menu, modal over the whole window. -->
+    <Border Classes="backdrop" IsVisible="{Binding HasShare}" Padding="24">
+      <views:ShareDialogView DataContext="{Binding Share}" />
+    </Border>
 
     <!-- The KDBX import dialog, modal over the whole window. -->
     <Border Classes="backdrop" IsVisible="{Binding HasImport}" Padding="24">

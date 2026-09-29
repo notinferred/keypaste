@@ -53,7 +53,6 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     private string _draftTitle = string.Empty;
     private string _draftGroupName = string.Empty;
     private GroupNode? _moveTarget;
-    private string _filterHint = "Filter secrets";
     private IReadOnlyList<GroupNode> _moveTargets = [];
 
     internal EntriesViewModel(AppVaultSession session, ClipboardCountdown clipboard, EntryActivitySource? activity = null)
@@ -67,6 +66,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         NewPassword = new SecretField(clipboard);
 
         BeginAddCommand = new RelayCommand(BeginAdd, () => !IsAdding);
+        ClearScopeCommand = new RelayCommand(() => SelectedGroup = Groups.FirstOrDefault(group => group.IsEverything));
         CancelAddCommand = new RelayCommand(CancelAdd, () => IsAdding);
         ConfirmAddCommand = new RelayCommand(ConfirmAdd, () => IsAdding);
         DeleteCommand = new RelayCommand(
@@ -99,7 +99,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>The group tree, flattened, with "All entries" first.</summary>
+    /// <summary>The group tree, flattened, with "All items" first.</summary>
     internal IReadOnlyList<GroupNode> Groups
     {
         get => _groups;
@@ -139,12 +139,11 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
     internal bool HasListProfile => ListProfile is not null;
 
-    /// <summary>The filter box's placeholder, counting the entries it would search.</summary>
-    internal string FilterHint
-    {
-        get => _filterHint;
-        private set => Set(ref _filterHint, value);
-    }
+    /// <summary>The group the titlebar search is limited to, as the list header names it, or null for every item.</summary>
+    internal string? SearchScope => SelectedGroup is { IsEverything: false } ? ListTitle : null;
+
+    /// <summary>Shows every item again, which widens the titlebar search to all of them.</summary>
+    internal RelayCommand ClearScopeCommand { get; }
 
     /// <summary>What matches the search and the selected group.</summary>
     internal IReadOnlyList<EntryRow> Rows
@@ -157,6 +156,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
                 Raise(nameof(ShowsListEmpty));
                 Raise(nameof(ListEmptyNote));
                 Raise(nameof(ListEmptyOffersNew));
+                Raise(nameof(ListEmptyOffersImport));
             }
         }
     }
@@ -167,13 +167,19 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     /// <summary>Why the list is empty: nothing matched the filter, or there is nothing where it is looking.</summary>
     internal string ListEmptyNote =>
         Search.Trim() is { Length: > 0 } query
-            ? $"No secrets match “{DisplayTextSanitizer.Sanitize(query, 64).Text}”."
+            ? $"No items match “{DisplayTextSanitizer.Sanitize(query, 64).Text}”."
             : SelectedGroup is { IsEverything: false }
-                ? $"No secrets in {ListTitle}."
-                : "No secrets in this vault yet.";
+                ? $"No items in {ListTitle}."
+                : "No items in this vault yet.";
 
     /// <summary>Whether the empty list offers New, which it does when a filter is not the reason.</summary>
     internal bool ListEmptyOffersNew => Search.Trim().Length == 0;
+
+    /// <summary>
+    /// Whether the empty list also offers Import .kdbx: the vault holds no item at all, as a new one
+    /// does, so the first thing a KeePass user may want is to bring their database in.
+    /// </summary>
+    internal bool ListEmptyOffersImport => _all.Count == 0 && ListEmptyOffersNew && SelectedGroup is null or { IsEverything: true };
 
     /// <summary>The search box.</summary>
     /// <remarks>
@@ -674,6 +680,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         Raise(nameof(ListTitle));
         Raise(nameof(ListProfile));
         Raise(nameof(HasListProfile));
+        Raise(nameof(SearchScope));
     }
 
     /// <summary>Gives every row and the open pane the latest picture of what agents did, never a value.</summary>
@@ -792,9 +799,6 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         var query = Search.Trim();
 
         Match(query);
-
-        var scope = _all.Count(row => Shows(group, row.GroupPath));
-        FilterHint = scope == 1 ? "Filter 1 secret" : string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Filter {scope} secrets");
 
         List<EntryRow> rows =
         [

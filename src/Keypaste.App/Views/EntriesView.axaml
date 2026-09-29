@@ -200,7 +200,7 @@
                    Fill="{DynamicResource KpBorderSubtle}" />
 
         <!-- A group is a thing on the tree, so its controls are where the tree is. New makes a child
-             of whatever is selected, or a top-level group under "All entries"; Rename is unavailable
+             of whatever is selected, or a top-level group under "All items"; Rename is unavailable
              there, because the root is not a group somebody named. -->
         <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto" Margin="18,20,8,8">
           <TextBlock Grid.Column="0" Classes="th" Text="GROUPS" VerticalAlignment="Center" />
@@ -247,11 +247,13 @@
     <!-- The list. Titles, kinds and groups, and nothing from inside an entry: see EntryRow. -->
     <DockPanel Grid.Column="1">
 
+      <!-- Above the list, so the open "+" menu lies over the rows rather than under them. -->
       <Border DockPanel.Dock="Top"
+              ZIndex="1"
               Padding="16,16,16,12"
               BorderBrush="{DynamicResource KpBorderSubtle}"
               BorderThickness="0,0,0,1">
-        <StackPanel Spacing="12">
+        <StackPanel>
           <Grid ColumnDefinitions="Auto,*,Auto">
             <ToggleButton Grid.Column="0"
                           x:Name="GroupsToggle"
@@ -272,28 +274,62 @@
                 <TextBlock Text="{Binding ListProfile}" />
               </Border>
             </StackPanel>
-            <Button Grid.Column="2"
-                    x:Name="AddEntry"
-                    Classes="primary sm"
-                    Height="28"
-                    Padding="10,0"
-                    Command="{Binding BeginAddCommand}">
+            <ToggleButton Grid.Column="2"
+                          x:Name="AddEntry"
+                          Classes="primary sm"
+                          Height="28"
+                          Padding="10,0"
+                          ToolTip.Tip="New item, project or import"
+                          AutomationProperties.Name="New">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <ctl:KpIcon Icon="plus" Size="13" />
                 <TextBlock Text="New" VerticalAlignment="Center" />
               </StackPanel>
-            </Button>
+            </ToggleButton>
           </Grid>
-          <TextBox Name="Search"
-                   Classes="search"
-                   Height="30"
-                   MinHeight="30"
-                   Text="{Binding Search}"
-                   PlaceholderText="{Binding FilterHint}">
-            <TextBox.InnerLeftContent>
-              <ctl:KpIcon Icon="filter" Size="13" Margin="2,0,0,0" Foreground="{DynamicResource KpTextMuted}" />
-            </TextBox.InnerLeftContent>
-          </TextBox>
+
+          <!-- The "+" menu: everything that adds to the vault, in one place (D-0374). -->
+          <Canvas Height="0">
+            <Border x:Name="AddMenuPanel"
+                    Classes="menu"
+                    Canvas.Right="0"
+                    Canvas.Top="6"
+                    MinWidth="200"
+                    IsVisible="{Binding #AddEntry.IsChecked}">
+              <StackPanel Spacing="2">
+                <Button x:Name="NewItem" Classes="ghost menu-item" Command="{Binding BeginAddCommand}">
+                  <StackPanel Orientation="Horizontal" Spacing="10">
+                    <ctl:KpIcon Icon="key-round" Size="14" />
+                    <TextBlock Text="New item" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+                <Button x:Name="NewProject"
+                        Classes="ghost menu-item"
+                        Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).NewProjectCommand, FallbackValue={x:Null}}">
+                  <StackPanel Orientation="Horizontal" Spacing="10">
+                    <ctl:KpIcon Icon="folder-git-2" Size="14" />
+                    <TextBlock Text="New project" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+                <Button x:Name="ImportEnv"
+                        Classes="ghost menu-item"
+                        Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).ImportEnvCommand, FallbackValue={x:Null}}">
+                  <StackPanel Orientation="Horizontal" Spacing="10">
+                    <ctl:KpIcon Icon="file-code" Size="14" />
+                    <TextBlock Text="Import .env" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+                <Button x:Name="ImportKdbx"
+                        Classes="ghost menu-item"
+                        Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).ImportCommand, FallbackValue={x:Null}}">
+                  <StackPanel Orientation="Horizontal" Spacing="10">
+                    <ctl:KpIcon Icon="file-input" Size="14" />
+                    <TextBlock Text="Import .kdbx" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+              </StackPanel>
+            </Border>
+          </Canvas>
         </StackPanel>
       </Border>
 
@@ -365,15 +401,26 @@
                    Classes="subtitle"
                    TextAlignment="Center"
                    Text="{Binding ListEmptyNote}" />
-        <Button Classes="sm"
-                HorizontalAlignment="Center"
-                IsVisible="{Binding ListEmptyOffersNew}"
-                Command="{Binding BeginAddCommand}">
-          <StackPanel Orientation="Horizontal" Spacing="6">
-            <ctl:KpIcon Icon="plus" Size="13" />
-            <TextBlock Text="New secret" VerticalAlignment="Center" />
-          </StackPanel>
-        </Button>
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+          <Button Classes="sm"
+                  IsVisible="{Binding ListEmptyOffersNew}"
+                  Command="{Binding BeginAddCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <ctl:KpIcon Icon="plus" Size="13" />
+              <TextBlock Text="New item" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <!-- The first run: a new vault is empty, and a KeePass user's first act may be to bring theirs in. -->
+          <Button x:Name="ImportFromEmpty"
+                  Classes="sm"
+                  IsVisible="{Binding ListEmptyOffersImport}"
+                  Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).ImportCommand, FallbackValue={x:Null}}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <ctl:KpIcon Icon="file-input" Size="13" />
+              <TextBlock Text="Import .kdbx" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
       </StackPanel>
 
       <ListBox Name="Rows"
@@ -443,7 +490,7 @@
         <StackPanel Spacing="24">
 
           <StackPanel Spacing="6">
-            <TextBlock Classes="h1" Text="New secret" />
+            <TextBlock Classes="h1" Text="New item" />
             <TextBlock Classes="subtitle" Text="{Binding VaultName, StringFormat='Saved into {0}.'}" />
           </StackPanel>
 
@@ -595,6 +642,15 @@
                         </Button>
                         <!-- History is read when this asks for it, never on selection: one reading
                              materialises every superseded password (EntryHistoryViewModel). -->
+                        <Button x:Name="ShareEntry"
+                                Classes="ghost menu-item"
+                                Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).ShareCommand, FallbackValue={x:Null}}"
+                                CommandParameter="{Binding Path}">
+                          <StackPanel Orientation="Horizontal" Spacing="10">
+                            <ctl:KpIcon Icon="share-2" Size="14" />
+                            <TextBlock Text="Share…" VerticalAlignment="Center" />
+                          </StackPanel>
+                        </Button>
                         <Button x:Name="HistoryToggle" Classes="ghost menu-item" Command="{Binding History.ToggleCommand}">
                           <StackPanel Orientation="Horizontal" Spacing="10">
                             <ctl:KpIcon Icon="history" Size="14" />

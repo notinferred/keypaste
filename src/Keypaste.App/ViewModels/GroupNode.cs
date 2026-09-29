@@ -50,7 +50,7 @@ internal sealed class GroupNode
     /// <remarks>
     /// <see cref="Path"/> stays raw because it selects the group; only the label is drawn.
     /// </remarks>
-    internal string Label => IsEverything ? "All entries" : EntryNameSanitizer.Sanitize(Name).Text;
+    internal string Label => IsEverything ? "All items" : EntryNameSanitizer.Sanitize(Name).Text;
 
     /// <summary>
     /// Builds the tree, flattened depth-first into the order a list should draw it.
@@ -66,7 +66,7 @@ internal sealed class GroupNode
     {
         ArgumentNullException.ThrowIfNull(groupPaths);
 
-        var everything = new GroupNode("All entries", string.Empty, 0);
+        var everything = new GroupNode("All items", string.Empty, 0);
         var byPath = new Dictionary<string, GroupNode>(StringComparer.Ordinal);
 
         foreach (var path in groupPaths.Where(p => !ReservedGroups.IsReserved(p)).OrderBy(p => p, StringComparer.Ordinal))

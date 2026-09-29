@@ -77,12 +77,16 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
     /// <param name="service">The share server's client.</param>
     /// <param name="showToast">Says what a share or revocation did.</param>
     /// <param name="unavailable">Why no link can be made from here at all, such as an endpoint that did not resolve, or null.</param>
+    /// <param name="what">The entry an item's Share… opened this for, fixed for the dialog; null for Settings' list of links.</param>
+    /// <param name="cancel">What the dialog's Cancel does.</param>
     internal SharingViewModel(
         AppVaultSession session,
         ClipboardCountdown clipboard,
         ShareService service,
         Action<string>? showToast = null,
-        string? unavailable = null)
+        string? unavailable = null,
+        string? what = null,
+        Action? cancel = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(clipboard);
@@ -94,7 +98,9 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
         _showToast = showToast ?? (_ => { });
         _unavailable = unavailable;
         _misconfigured = unavailable is not null;
+        _selectedWhat = what;
         Passphrase = new SecretField(clipboard);
+        CancelCommand = new RelayCommand(() => cancel?.Invoke());
 
         CreateCommand = new AsyncRelayCommand(CreateAsync, () => _selectedWhat is not null && _unavailable is null);
         RevokeCommand = new AsyncRelayCommand(RevokeAsync, () => _selected is not null);
@@ -249,6 +255,12 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
     /// <summary>Uploads the share and copies its link.</summary>
     internal AsyncRelayCommand CreateCommand { get; }
 
+    /// <summary>Closes the Share… dialog without making a link.</summary>
+    internal RelayCommand CancelCommand { get; }
+
+    /// <summary>Raised once a link has been made and copied.</summary>
+    internal event EventHandler? Created;
+
     /// <summary>Revokes the selected link and forgets it.</summary>
     internal AsyncRelayCommand RevokeCommand { get; }
 
@@ -327,6 +339,12 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
         var info = outcome.Info!;
         _showToast($"Link copied. Expires in {ShareInfo.FormatTtl(info.Expires - info.Created)}, {(info.Views == 1 ? "1 view" : $"{info.Views} views")}.");
         Passphrase.Clear();
+
+        if (Created is { } created)
+        {
+            created(this, EventArgs.Empty);
+            return;
+        }
 
         await LoadAsync(online: true).ConfigureAwait(true);
     }

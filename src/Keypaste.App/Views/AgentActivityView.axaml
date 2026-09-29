@@ -25,13 +25,29 @@
             <Border Classes="dot ok" VerticalAlignment="Center" />
             <TextBlock Grid.Column="1" Classes="caption" Text="{Binding Serving}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
           </Grid>
-          <Button Grid.Column="1" VerticalAlignment="Bottom" Padding="12,0" Height="30"
-                  Command="{Binding ToggleConnectCommand}">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <ctl:KpIcon Icon="plus" Size="13" />
-              <TextBlock Text="Connect client" />
-            </StackPanel>
-          </Button>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+            <!-- Agents › History: what agents and tokens asked for (D-0374). -->
+            <Button Name="AgentHistory"
+                    Classes="ghost"
+                    Padding="12,0"
+                    Height="30"
+                    IsVisible="{Binding OffersHistory}"
+                    Command="{Binding OpenHistoryCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <ctl:KpIcon Icon="history" Size="13" />
+                <TextBlock Text="History" />
+              </StackPanel>
+            </Button>
+            <Button Name="ConnectClient"
+                    Padding="12,0"
+                    Height="30"
+                    Command="{Binding ToggleConnectCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <ctl:KpIcon Icon="plus" Size="13" />
+                <TextBlock Text="Connect client" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
         </Grid>
 
         <Border Classes="card" IsVisible="{Binding IsUnavailable}">

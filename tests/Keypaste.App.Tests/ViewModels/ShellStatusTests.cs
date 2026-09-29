@@ -59,7 +59,7 @@ public sealed class ShellStatusTests
     }
 
     [Fact]
-    public async Task TheMcpCard_CountsDistinctConnectedClients()
+    public async Task TheAgentsRow_CountsDistinctConnectedClients()
     {
         using var fixture = new TempVault();
         var clock = new ManualClock();
@@ -73,7 +73,7 @@ public sealed class ShellStatusTests
         }
 
         using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
-        Assert.Equal("stdio · no clients", shell.McpDetail);
+        Assert.Equal("Answering agents · no clients", shell.AgentsDetail);
 
         var endpoint = Assert.IsType<AuthorityStatus.Serving>(authority.Status).Endpoint;
         List<ApproverClient> clients = [];
@@ -88,7 +88,7 @@ public sealed class ShellStatusTests
 
         clock.Advance(TimeSpan.FromSeconds(1));
 
-        Assert.Equal("stdio · 2 clients", shell.McpDetail);
+        Assert.Equal("Answering agents · 2 clients", shell.AgentsDetail);
 
         foreach (var client in clients)
         {
@@ -97,7 +97,7 @@ public sealed class ShellStatusTests
     }
 
     [Fact]
-    public async Task TheMcpCard_KeepsTheClientCountWhileARequestWaits()
+    public async Task TheAgentsRow_KeepsTheClientCountWhileARequestWaits()
     {
         using var fixture = new TempVault();
         var clock = new ManualClock();
@@ -148,7 +148,7 @@ public sealed class ShellStatusTests
 
         clock.Advance(TimeSpan.FromSeconds(1));
 
-        Assert.Equal("1 waiting · 2 clients", shell.McpDetail);
+        Assert.Equal("Answering agents · 1 waiting · 2 clients", shell.AgentsDetail);
 
         await stop.CancelAsync();
         await waiting;

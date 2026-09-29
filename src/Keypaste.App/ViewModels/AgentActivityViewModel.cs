@@ -63,13 +63,16 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
         Action<Action>? post = null,
         ClientConnector? connector = null,
         Action<string>? toast = null,
-        ClipboardCountdown? clipboard = null)
+        ClipboardCountdown? clipboard = null,
+        Action? openHistory = null)
     {
         _authority = authority;
+        OpenHistoryCommand = new RelayCommand(() => openHistory?.Invoke(), () => openHistory is not null);
         _toast = toast ?? (_ => { });
         Connect = authority is null ? null : new ConnectClientViewModel(authority.Session, connector ?? ClientConnector.ForThisProcess());
         Tokens = authority is null ? null : new ScopedTokensViewModel(authority.Session, clipboard, _toast);
         ToggleConnectCommand = new RelayCommand(() => IsConnectOpen = !IsConnectOpen, () => Connect is not null);
+        OffersHistory = openHistory is not null;
         _auditPath = KeypasteHome.AuditPath(home);
         _clientsPath = KeypasteHome.ClientsPath(home);
         _clock = clock ?? TimeProvider.System;
@@ -131,6 +134,11 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
     }
 
     internal RelayCommand ToggleConnectCommand { get; }
+
+    /// <summary>Agents › History: what agents and tokens asked for, and what came of it.</summary>
+    internal RelayCommand OpenHistoryCommand { get; }
+
+    internal bool OffersHistory { get; }
 
     /// <summary>The vault's scoped tokens, minting one and revoking one.</summary>
     internal ScopedTokensViewModel? Tokens { get; }

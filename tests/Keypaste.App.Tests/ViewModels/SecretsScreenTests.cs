@@ -68,13 +68,13 @@ public sealed class SecretsScreenTests : IDisposable
 
         Assert.Equal("acme.kdbx", context.Entries.ListTitle);
         Assert.False(context.Entries.HasListProfile);
-        Assert.Equal("Filter 5 secrets", context.Entries.FilterHint);
+        Assert.Null(context.Entries.SearchScope);
 
         context.Entries.SelectedGroup = context.Entries.Groups.Single(group => group.Path == "env/acme-api/prod");
 
         Assert.Equal("acme-api", context.Entries.ListTitle);
         Assert.Equal("prod", context.Entries.ListProfile);
-        Assert.Equal("Filter 1 secret", context.Entries.FilterHint);
+        Assert.Equal("acme-api", context.Entries.SearchScope);
 
         context.Entries.SelectedGroup = context.Entries.Groups.Single(group => group.Path == "Work");
 
@@ -130,7 +130,7 @@ public sealed class SecretsScreenTests : IDisposable
 
         Assert.Equal("acme-api", context.Entries.ListTitle);
         Assert.Equal("dev", context.Entries.ListProfile);
-        Assert.Equal("Filter 1 secret", context.Entries.FilterHint);
+        Assert.Equal("acme-api", context.Entries.SearchScope);
         Assert.Equal(["env/acme-api"], context.Entries.Rows.Select(row => row.GroupPath));
     }
 
@@ -152,7 +152,7 @@ public sealed class SecretsScreenTests : IDisposable
         context.Entries.Search = "nothing-is-called-this";
 
         Assert.True(context.Entries.ShowsListEmpty);
-        Assert.Equal("No secrets match “nothing-is-called-this”.", context.Entries.ListEmptyNote);
+        Assert.Equal("No items match “nothing-is-called-this”.", context.Entries.ListEmptyNote);
         Assert.False(context.Entries.ListEmptyOffersNew);
     }
 

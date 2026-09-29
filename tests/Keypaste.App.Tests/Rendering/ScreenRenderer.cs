@@ -722,7 +722,7 @@ public sealed class ScreenRenderer
 
             if (shell.Content is SharingViewModel sharing)
             {
-                DrawSharing(window, output, sharing, shares, $"{destination.Shortcut:00}-{Slug(destination.Title)}");
+                DrawSharing(window, output, shell, sharing, shares, ScreenName(destination));
                 continue;
             }
 
@@ -736,7 +736,7 @@ public sealed class ScreenRenderer
                 env.OpenCommand.Execute("acme-api");
             }
 
-            Save(window, output, $"{destination.Shortcut:00}-{Slug(destination.Title)}");
+            Save(window, output, ScreenName(destination));
         }
 
         DrawActivityStates(shell, window, demo.Home, output);
@@ -759,18 +759,18 @@ public sealed class ScreenRenderer
         var log = (LogViewModel)shell.Content!;
 
         log.Filter = log.Filters.Single(option => option.Filter == LogFilter.Denied);
-        Save(window, output, "03-activity-denied");
+        Save(window, output, "04-settings-activity-log-denied");
 
         log.Filter = log.Filters.Single(option => option.Filter == LogFilter.You);
-        Save(window, output, "03-activity-you");
+        Save(window, output, "04-settings-activity-log-you");
 
         log.Filter = log.Filters[0];
         log.VerifyCommand.Execute(null);
-        Save(window, output, "03-activity-verify");
+        Save(window, output, "04-settings-activity-log-verify");
         log.VerifyCommand.Execute(null);
 
         window.Width = 960;
-        Save(window, output, "03-activity-narrow");
+        Save(window, output, "04-settings-activity-log-narrow");
         window.Width = _width;
 
         var path = KeypasteHome.AuditPath(home);
@@ -779,15 +779,15 @@ public sealed class ScreenRenderer
         lines[denied] = lines[denied].Replace("the person denied it", "the person okayed it", StringComparison.Ordinal);
         File.WriteAllText(path, string.Join('\n', lines) + '\n');
         log.Refresh();
-        Save(window, output, "03-activity-broken");
+        Save(window, output, "04-settings-activity-log-broken");
 
         log.VerifyCommand.Execute(null);
-        Save(window, output, "03-activity-broken-verify");
+        Save(window, output, "04-settings-activity-log-broken-verify");
 
         var fresh = Directory.CreateTempSubdirectory("keypaste-screens-empty-").FullName;
         try
         {
-            DrawLogAlone(new LogViewModel(fresh, new ManualClock()), output, "03-activity-empty");
+            DrawLogAlone(new LogViewModel(fresh, new ManualClock()), output, "04-settings-activity-log-empty");
 
             var clock = new ManualClock(new DateTimeOffset(2026, 7, 28, 8, 1, 53, TimeSpan.Zero));
             Assert.True(AuditLog.TryOpen(KeypasteHome.AuditPath(fresh), clock, out var agentsOnly, out var error), error);
@@ -807,7 +807,7 @@ public sealed class ScreenRenderer
 
             var agents = new LogViewModel(fresh, new ManualClock());
             agents.Filter = agents.Filters.Single(option => option.Filter == LogFilter.You);
-            DrawLogAlone(agents, output, "03-activity-you-empty");
+            DrawLogAlone(agents, output, "04-settings-activity-log-you-empty");
         }
         finally
         {
@@ -901,7 +901,8 @@ public sealed class ScreenRenderer
     }
 
     /// <summary>The Sharing screen as it opens, with statuses not yet asked for; then checked with the form filled; then once the server answers that it takes no shares.</summary>
-    private static void DrawSharing(Window window, string output, SharingViewModel sharing, FakeShareServer shares, string name)
+    /// <summary>Settings › Advanced's share links, then Share… from an item, filled in and then refused by the server.</summary>
+    private static void DrawSharing(Window window, string output, ShellViewModel shell, SharingViewModel sharing, FakeShareServer shares, string name)
     {
         var opened = DateTime.UtcNow;
         while (sharing.IsEmpty && DateTime.UtcNow - opened < TimeSpan.FromSeconds(5))
@@ -913,17 +914,28 @@ public sealed class ScreenRenderer
         Save(window, output, name + "-unchecked");
 
         Wait(sharing.RefreshCommand.ExecuteAsync());
-        sharing.SelectedWhat = "env/acme-api/STRIPE_SECRET_KEY";
-        sharing.Recipient = "sam@acme.dev";
-        sharing.RequirePassphrase = true;
         Save(window, output, name);
 
+        shell.Current = Destinations.Of(DestinationKind.Entries);
+        shell.ShareCommand.Execute("env/acme-api/STRIPE_SECRET_KEY");
+        var dialog = shell.Share!;
+        dialog.Recipient = "sam@acme.dev";
+        dialog.RequirePassphrase = true;
+        Save(window, output, "12-items-share");
+
         shares.Answer = _ => FakeShareServer.Json(System.Net.HttpStatusCode.NotFound, "{\"error\":\"not found\"}");
-        sharing.RequirePassphrase = false;
-        Wait(sharing.CreateCommand.ExecuteAsync());
-        Save(window, output, name + "-unavailable");
+        dialog.RequirePassphrase = false;
+        Wait(dialog.CreateCommand.ExecuteAsync());
+        Save(window, output, "12-items-share-unavailable");
         shares.Answer = null;
+        dialog.CancelCommand.Execute(null);
     }
+
+    /// <summary>A place is named by its digit; a screen under one by its place's digit and both names.</summary>
+    private static string ScreenName(Destination destination) =>
+        destination.IsPlace
+            ? $"{destination.Shortcut:00}-{Slug(destination.Title)}"
+            : $"{Destinations.PlaceOf(destination).Shortcut:00}-{Slug(Destinations.PlaceOf(destination).Title)}-{Slug(destination.Title)}";
 
     /// <summary>Secrets, Agents and the approval window in the light theme.</summary>
     private static void DrawLight(DemoVault demo, string output)

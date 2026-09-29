@@ -15,14 +15,18 @@ namespace Keypaste.App.Views;
 /// <remarks>
 /// Everything this screen does — searching, building the group tree, reading and writing the vault —
 /// belongs to <see cref="ViewModels.EntriesViewModel"/>, which names no Avalonia type and is
-/// therefore assertable with no application and no display. The one thing here is the pane's ⋯ menu,
-/// which opens with focus on its first item and closes on a choice, Escape or a press elsewhere: a
-/// matter of where the pointer and the keyboard went rather than of anything in the vault.
+/// therefore assertable with no application and no display. The one thing here is the screen's two
+/// menus, the list's "+" and the pane's ⋯, each of which opens with focus on its first item and closes
+/// on a choice, Escape or a press elsewhere: a matter of where the pointer and the keyboard went rather
+/// than of anything in the vault.
 /// </remarks>
 internal sealed partial class EntriesView : UserControl
 {
     /// <summary>How wide the screen must be for the group tree to start open: room for it, the list and a pane that shows a long password whole.</summary>
     internal const double TreeOpensAt = 960d;
+
+    /// <summary>Each menu's toggle, by name, and the panel it opens.</summary>
+    private static readonly (string Toggle, string Panel)[] _menus = [("EntryMenu", "EntryMenuPanel"), ("AddEntry", "AddMenuPanel")];
 
     private readonly ToggleButton _groups;
     private bool _placingTree;
@@ -56,36 +60,42 @@ internal sealed partial class EntriesView : UserControl
         _placingTree = false;
     }
 
-    /// <summary>A choice in the menu closes it.</summary>
+    /// <summary>A choice in a menu closes it.</summary>
     private void OnClick(object? sender, RoutedEventArgs e)
     {
         if (e.Source is Button { Classes: var classes } && classes.Contains("menu-item"))
         {
-            CloseMenu();
+            foreach (var (toggle, _) in OpenMenus())
+            {
+                toggle.IsChecked = false;
+            }
         }
     }
 
-    /// <summary>A press anywhere but the menu or its button closes it.</summary>
+    /// <summary>A press anywhere but a menu or its button closes it.</summary>
     private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (Menu() is not { IsChecked: true } toggle || e.Source is not Visual source)
+        if (e.Source is not Visual source)
         {
             return;
         }
 
-        var inside = source.GetSelfAndVisualAncestors().Any(visual =>
-            ReferenceEquals(visual, toggle) || visual is Control { Name: "EntryMenuPanel" });
-
-        if (!inside)
+        foreach (var (toggle, panel) in OpenMenus())
         {
-            toggle.IsChecked = false;
+            var inside = source.GetSelfAndVisualAncestors().Any(visual =>
+                ReferenceEquals(visual, toggle) || visual is Control control && control.Name == panel);
+
+            if (!inside)
+            {
+                toggle.IsChecked = false;
+            }
         }
     }
 
-    /// <summary>Escape closes the menu and gives focus back to its button.</summary>
+    /// <summary>Escape closes an open menu and gives focus back to its button.</summary>
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Escape || Menu() is not { IsChecked: true } toggle)
+        if (e.Key != Key.Escape || OpenMenus().FirstOrDefault() is not ({ } toggle, _))
         {
             return;
         }
@@ -98,7 +108,8 @@ internal sealed partial class EntriesView : UserControl
     /// <summary>An opened menu takes focus on its first item, visibly so when it was opened from the keyboard.</summary>
     private void OnMenuToggled(object? sender, RoutedEventArgs e)
     {
-        if (e.Source is not ToggleButton { Name: "EntryMenu", IsChecked: true } toggle)
+        if (e.Source is not ToggleButton { IsChecked: true } toggle
+            || _menus.FirstOrDefault(menu => menu.Toggle == toggle.Name).Panel is not { } name)
         {
             return;
         }
@@ -109,7 +120,7 @@ internal sealed partial class EntriesView : UserControl
             () =>
             {
                 if (toggle.IsChecked == true
-                    && this.GetVisualDescendants().OfType<Control>().FirstOrDefault(control => control.Name == "EntryMenuPanel") is { } panel
+                    && this.GetVisualDescendants().OfType<Control>().FirstOrDefault(control => control.Name == name) is { } panel
                     && panel.GetVisualDescendants().OfType<Button>().FirstOrDefault(button => button.IsEffectivelyEnabled) is { } first)
                 {
                     first.Focus(method);
@@ -118,14 +129,17 @@ internal sealed partial class EntriesView : UserControl
             DispatcherPriority.Loaded);
     }
 
-    private void CloseMenu()
+    /// <summary>Each menu that is open, with the name of its panel.</summary>
+    private IEnumerable<(ToggleButton Toggle, string Panel)> OpenMenus()
     {
-        if (Menu() is { } toggle)
+        var toggles = this.GetVisualDescendants().OfType<ToggleButton>().ToList();
+
+        foreach (var (name, panel) in _menus)
         {
-            toggle.IsChecked = false;
+            if (toggles.FirstOrDefault(toggle => toggle.Name == name) is { IsChecked: true } toggle)
+            {
+                yield return (toggle, panel);
+            }
         }
     }
-
-    private ToggleButton? Menu() =>
-        this.GetVisualDescendants().OfType<ToggleButton>().FirstOrDefault(toggle => toggle.Name == "EntryMenu");
 }

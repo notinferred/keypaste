@@ -6,7 +6,7 @@ This file holds open work only. Finishing a task removes it from here, adds its 
 
 ## Selection and evidence
 
-Only the next five tasks are detailed: N.1a, N.7, N.2, N.5 and N.4. Later rows name a bounded outcome and the dependencies their own implementation or verifier needs; expand a selected later task before building it. Tasks are not marked implemented from a document, reader, mock response or consuming screen. Name the producer, transport, consumer and user action exercised, and retain the source/version and limitations of the observation.
+Only the next five tasks are detailed: N.1a2, N.7, N.2, N.5 and N.4. Later rows name a bounded outcome and the dependencies their own implementation or verifier needs; expand a selected later task before building it. Tasks are not marked implemented from a document, reader, mock response or consuming screen. Name the producer, transport, consumer and user action exercised, and retain the source/version and limitations of the observation.
 
 Needs are build dependencies. Ships after names publication gates. External signing identities are inputs, not a queue of enrollment code. A ready row does not authorize publication, account changes or messages. Preserve the secret-path tests, real KeePassXC compatibility, stale-write refusals and release integrity checks while changing product scope.
 
@@ -28,7 +28,15 @@ Custom fields and tags are ordinary KeePass data: keypaste writes them as KeePas
   The sidebar's automation tree lists exactly the four places and the project rows. The MCP card and the second search box are absent. `EntriesViewLayoutTests` holds at 960 px, and each captured frame has one amber element.
 
   An act left unreachable, or a removed row still listed, leaves the row open.
-- [ ] **N.7 — Apply the amended brand.** Needs: none.
+
+  Split on 2026-09-29, estimated past two weeks (PRODUCT §6.3): N.1a1 built the four places and every clause of V-N.1a but the last ([record](steps/N.1a1.md)); N.1a2 builds that. N.1a closes with N.1a2.
+- [ ] **N.1a2 — Allow one amber element per frame.** Needs: N.1a1.
+  **Build:** a test-side detector counts the amber elements in a frame the app drew: connected regions of the accent's hue and saturation, on the topmost surface only, outside the marks, a selected row's inset bar and the focus ring. The screens N.1a1's journey passes through are brought to at most one, the view's primary action or live signal (BRAND rule 4): selected sidebar and list icons, thin progress bars and link buttons leave amber, a row's in-use dot turns blue, and Agents' Connect client is primary only while nothing is waiting. Traces to PRODUCT §§1 and 5.8.
+
+  **Verify (V-N.1a2):** differential tests show the detector counting two primaries as two, amber mono text as one in both themes, a tint or a selected row as none, and a dialog's primary over a backdrop as one. Every frame of N.1a1's journey then holds at most one amber element, and where the view has a primary action or live signal it is that element.
+
+  A rule asserted over styles or tokens rather than drawn frames does not pass.
+- [ ] **N.7 — Apply the amended brand.** Needs: N.1a2.
   **Build:** the app follows [BRAND](BRAND.md) as amended on 2026-09-28. With no theme chosen, `AppSettings.Default` and `App.axaml` follow the system's light or dark setting, as it changes; Light or Dark chosen in Settings still wins. Titles and headings, the item title in its pane among them, use Instrument Sans at BRAND's sizes, and keys, values, references, paths, commands and timestamps stay Fragment Mono. The copy on the main screens and in the prompts follows BRAND's voice without dropping what T-2's evidence relies on. The first line of `keypaste --help` carries PRODUCT §1's positioning within 80 columns. The keypaste-design skill applies. Traces to PRODUCT §§1 and 5.8.
 
   **Verify (V-N.7):** with no `app.toml`, a frame captured under a light platform setting has the light app background and one under a dark setting the dark background, and a choice in Settings overrides either. `ScreenRenderer` renders every screen in both palettes, and each frame has one amber element. The rendered item title and headings use Instrument Sans, and a key and a value Fragment Mono. `CliAppTests` pins the new help line, which fits 80 columns.
@@ -175,6 +183,7 @@ The Windows MSI, the Linux AppImage and the macOS app bundle are internal candid
 Package managers and agent marketplaces carry a version only after it is published. keypaste.com keeps its "no `curl | sh`" stance: the one-command routes are the package managers and the signed installers.
 
 - [ ] **F.20 — Diagnose the withdrawn prompt drawn on Linux.** Needs: 4.4. — app run 36040583862 at `f51fe5d`, attempt 1, `ubuntu-24.04`: `DesktopApprovalTests.A_request_withdrawn_before_its_prompt_is_drawn_never_draws_it` counted one prompt drawn where none was expected (`DesktopApprovalTests.cs:142`), its first failure in the recorded app runs. The hypothesis to test first: the test withdraws through `CancelAsync`, whose callback sets the request answered on the thread pool, and while the test awaits it the UI dispatcher may already run the show job `WindowApprovalChannel` posted, which checks `IsAnswered` only once. A branch probe repeating the case with the identical desktop test command records, in each failing iteration, whether the show job ran before the withdrawal and whether the product or only the test's arrangement lets a withdrawn prompt be drawn, per [diagnostics](diagnostics.md).
+- [ ] **F.25 — Point the install exercise at labels the app has.** Needs: none. — `scripts/exercise-desktop-install.sh` invokes "Add variable" on Env profiles and "Check again" on Agents, and neither label is in the app's views, so its variable and agent-status acts fail before they reach what they check. The exercise names controls the app has and records each act's result, per [diagnostics](diagnostics.md).
 - [ ] **G.5 — Carry the CLI on PATH in every desktop install.** Needs: none.
   - Every desktop payload gains the NativeAOT `keypaste`.
   - The MSI adds its folder to the per-user PATH and removes it on uninstall.

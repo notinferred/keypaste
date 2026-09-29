@@ -89,9 +89,9 @@ internal sealed class Shortcuts : IDisposable
             return;
         }
 
-        // The import dialog is modal: nothing may move focus or the page out from under it. So is a
-        // save waiting for the YubiKey, which Lock cancels.
-        if (shell.HasImport || shell.IsWaitingForTouch)
+        // The import and share dialogs are modal: nothing may move focus or the page out from under
+        // them. So is a save waiting for the YubiKey, which Lock cancels.
+        if (shell.HasImport || shell.HasShare || shell.IsWaitingForTouch)
         {
             return;
         }
@@ -109,11 +109,6 @@ internal sealed class Shortcuts : IDisposable
             Key.D2 or Key.NumPad2 => 2,
             Key.D3 or Key.NumPad3 => 3,
             Key.D4 or Key.NumPad4 => 4,
-            Key.D5 or Key.NumPad5 => 5,
-            Key.D6 or Key.NumPad6 => 6,
-            Key.D7 or Key.NumPad7 => 7,
-            Key.D8 or Key.NumPad8 => 8,
-            Key.D9 or Key.NumPad9 => 9,
             _ => 0,
         };
 

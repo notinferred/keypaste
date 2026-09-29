@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Shapes;
+using Avalonia.VisualTree;
 using Keypaste.App.Navigation;
 using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
@@ -72,11 +73,13 @@ public sealed class EntriesViewLayoutTests
             shell.Frame();
             var at = $"{width}×{height}{(comparing ? ", comparing" : string.Empty)}{(tree ? ", tree open" : string.Empty)}";
 
-            var search = Bounds(shell, shell.Named<TextBox>("Search"));
+            // The titlebar's is the only search (D-0374); the list has no filter box of its own.
+            Assert.DoesNotContain(shell.Window.GetVisualDescendants().OfType<TextBox>(), box => box.Name == "Search");
+            var search = Bounds(shell, shell.Named<TextBox>("ShellSearch"));
             var controls = new Dictionary<string, Rect>
             {
                 ["Search"] = search,
-                ["New"] = Bounds(shell, shell.Named<Button>("AddEntry")),
+                ["New"] = Bounds(shell, shell.Named<ToggleButton>("AddEntry")),
                 ["the entry's title"] = Bounds(shell, shell.Named<TextBlock>("EntryTitle")),
                 ["Copy"] = Bounds(shell, shell.Named<Button>("CopyPassword")),
                 ["Rotate"] = Bounds(shell, shell.Named<Button>("RotateFromPane")),

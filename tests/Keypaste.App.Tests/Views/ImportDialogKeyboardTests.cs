@@ -1,5 +1,6 @@
 using System.Text;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.VisualTree;
@@ -80,7 +81,7 @@ public sealed class ImportDialogKeyboardTests
     [Theory]
     [InlineData("cancel")]
     [InlineData("escape")]
-    public Task Closing_the_dialog_gives_the_keyboard_back_to_Import_kdbx(string how) => HeadlessSession.On(() =>
+    public Task Closing_the_dialog_gives_the_keyboard_back_to_the_new_menu(string how) => HeadlessSession.On(() =>
     {
         using var fixture = new TempVault();
         using var session = Open(fixture);
@@ -90,7 +91,7 @@ public sealed class ImportDialogKeyboardTests
         window.Show();
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
 
-        var button = window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "ImportKdbx");
+        var button = window.GetVisualDescendants().OfType<ToggleButton>().Single(button => button.Name == "AddEntry");
         button.Focus();
         Drain(shell.ImportCommand.ExecuteAsync());
         Assert.NotNull(shell.Import);

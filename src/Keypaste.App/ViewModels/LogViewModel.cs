@@ -61,12 +61,20 @@ internal sealed class LogViewModel : ObservableObject
     private bool _verdictShown;
     private LogFilterOption _filter;
 
-    internal LogViewModel(string? home, TimeProvider? clock = null, ClipboardCountdown? clipboard = null)
+    /// <param name="home">keypaste's home, whose <c>audit.jsonl</c> is read.</param>
+    /// <param name="clock">The clock times are shown against.</param>
+    /// <param name="clipboard">Where the chain's hash is copied.</param>
+    /// <param name="agentsOnly">
+    /// Agents › History: the agent and token records only, with no filter to widen it. The whole
+    /// log, with its filters, is Settings › Advanced's Activity log.
+    /// </param>
+    internal LogViewModel(string? home, TimeProvider? clock = null, ClipboardCountdown? clipboard = null, bool agentsOnly = false)
     {
         _path = KeypasteHome.AuditPath(home);
         _clock = clock ?? TimeProvider.System;
         _clipboard = clipboard;
-        _filter = Filters[0];
+        _filter = agentsOnly ? Filters[1] : Filters[0];
+        IsAgentHistory = agentsOnly;
 
         RefreshCommand = new RelayCommand(Refresh);
         VerifyCommand = new RelayCommand(ToggleVerdict, () => _verdict is not null);
@@ -74,6 +82,17 @@ internal sealed class LogViewModel : ObservableObject
 
         Refresh();
     }
+
+    /// <summary>Whether this is Agents › History rather than the whole activity log.</summary>
+    internal bool IsAgentHistory { get; }
+
+    internal bool ShowsFilters => !IsAgentHistory;
+
+    internal string Title => IsAgentHistory ? "History" : "Activity log";
+
+    internal string Subtitle => IsAgentHistory
+        ? "What agents and tokens asked for, and what came of it. Kept on this machine, hash-chained, append-only."
+        : "Every agent request, grant, token run and share. Kept on this machine, hash-chained, append-only.";
 
     internal IReadOnlyList<LogFilterOption> Filters { get; } =
     [

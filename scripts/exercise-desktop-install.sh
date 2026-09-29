@@ -300,8 +300,7 @@ first_session() {
   if wait_for_change "$before"; then fact vault_changed_by_edit true; else fact vault_changed_by_edit false; return 0; fi
 
   before="$(sha256_of "$VAULT")"
-  act env-shortcut drive key ctrl+2 \
-    && act open-project drive invoke Open \
+  act open-project drive select "$PROJECT" \
     && act begin-variable drive invoke 'Add variable' \
     && act variable-name drive set-only "$VARIABLE" \
     && act add-variable drive invoke Add \
@@ -329,7 +328,7 @@ approval() {
   act agent-listening grep 'listening on' "$OUT/agent-stderr.txt" || { kill "$agent_pid" 2>/dev/null || true; return 0; }
 
   launch second "$pipe" > /dev/null
-  if act second-window drive window 120 && unlock second-unlock && act activity-shortcut drive key ctrl+3 \
+  if act second-window drive window 120 && unlock second-unlock && act agents-shortcut drive key ctrl+2 \
     && act check-again drive invoke 'Check again' && act agent-activity drive find-prefix "$AGENT_STATUS"; then
     fact agent_activity "$(step "$OUT" agent-activity | cut -f2)"
   fi

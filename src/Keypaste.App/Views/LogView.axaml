@@ -17,10 +17,9 @@
         <!-- The actions go on a line of their own under the subtitle when the two do not fit side by side. -->
         <ctl:HeaderRow Spacing="16">
           <StackPanel Spacing="6" VerticalAlignment="Bottom">
-            <TextBlock Classes="h1" Text="Activity" />
+            <TextBlock Classes="h1" Text="{Binding Title}" />
             <!-- Not the handoff's "stored inside the vault, signed": the log is plaintext machine state, hash-chained. -->
-            <TextBlock Classes="subtitle"
-                       Text="Every agent request, grant, token run and share. Kept on this machine, hash-chained, append-only." />
+            <TextBlock Classes="subtitle" Text="{Binding Subtitle}" />
           </StackPanel>
 
           <StackPanel Orientation="Horizontal"
@@ -38,14 +37,16 @@
                     Command="{Binding RefreshCommand}">
               <ctl:KpIcon Icon="refresh-cw" Size="14" />
             </Button>
-            <Border Classes="segmented" Name="Filter" IsVisible="{Binding HasTable}">
-              <StackPanel Orientation="Horizontal">
-                <RadioButton Classes="segment" GroupName="LogFilter" Content="All" IsChecked="{Binding ShowAll}" />
-                <RadioButton Classes="segment" GroupName="LogFilter" Content="Agents" IsChecked="{Binding ShowAgents}" />
-                <RadioButton Classes="segment" GroupName="LogFilter" Content="You" IsChecked="{Binding ShowYou}" />
-                <RadioButton Classes="segment" GroupName="LogFilter" Content="Denied" IsChecked="{Binding ShowDenied}" />
-              </StackPanel>
-            </Border>
+            <Panel IsVisible="{Binding ShowsFilters}">
+              <Border Classes="segmented" Name="Filter" IsVisible="{Binding HasTable}">
+                <StackPanel Orientation="Horizontal">
+                  <RadioButton Classes="segment" GroupName="LogFilter" Content="All" IsChecked="{Binding ShowAll}" />
+                  <RadioButton Classes="segment" GroupName="LogFilter" Content="Agents" IsChecked="{Binding ShowAgents}" />
+                  <RadioButton Classes="segment" GroupName="LogFilter" Content="You" IsChecked="{Binding ShowYou}" />
+                  <RadioButton Classes="segment" GroupName="LogFilter" Content="Denied" IsChecked="{Binding ShowDenied}" />
+                </StackPanel>
+              </Border>
+            </Panel>
           </StackPanel>
         </ctl:HeaderRow>
 

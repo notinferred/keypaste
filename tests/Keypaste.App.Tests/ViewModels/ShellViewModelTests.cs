@@ -39,25 +39,85 @@ public sealed class ShellViewModelTests : IDisposable
     }
 
     [Fact]
-    public void The_sidebar_leads_with_secrets_and_keeps_settings_and_trash_at_the_bottom()
+    public void The_sidebar_lists_the_four_places_with_the_projects_beneath_items()
     {
         using var shell = Shell();
 
-        Assert.Equal(["Secrets", "Agents", "Activity", "Env profiles", "Sharing"], shell.MainNav.Select(item => item.Title));
-        Assert.Equal(["Settings", "Trash"], shell.FooterNav.Select(item => item.Title));
-        Assert.Equal(Enumerable.Range(1, Destinations.All.Count), Destinations.All.Select(d => d.Shortcut));
+        Assert.Equal(["Items", "Agents"], shell.MainNav.Select(item => item.Title));
+        Assert.Equal(["Trash", "Settings"], shell.FooterNav.Select(item => item.Title));
+        Assert.Equal([1, 2, 3, 4], Destinations.Places.Select(d => d.Shortcut));
+        Assert.All(Destinations.All.Where(d => !d.IsPlace), d => Assert.Equal(0, d.Shortcut));
+        Assert.Equal(
+            ["Items", "billing", "Agents"],
+            shell.SidebarRows.Select(row => row switch { NavItem item => item.Title, ProjectRow project => project.Name, _ => "?" }));
     }
 
     [Fact]
-    public void A_digit_reaches_the_row_in_that_position()
+    public void Each_digit_reaches_the_place_in_that_position_and_no_other_digit_does_anything()
     {
         using var shell = Shell();
 
-        Assert.True(shell.GoTo(4));
+        Assert.True(shell.GoTo(3));
+        Assert.IsType<TrashViewModel>(shell.Content);
+        Assert.Equal("Trash", shell.SelectedFooter?.Title);
 
-        Assert.IsType<EnvSetsViewModel>(shell.Content);
-        Assert.Null(shell.SelectedFooter);
-        Assert.Equal("Env profiles", shell.SelectedMain?.Title);
+        Assert.True(shell.GoTo(4));
+        Assert.IsType<SettingsViewModel>(shell.Content);
+
+        Assert.True(shell.GoTo(2));
+        Assert.IsType<AgentActivityViewModel>(shell.Content);
+        Assert.Equal("Agents", shell.SelectedMain?.Title);
+
+        Assert.False(shell.GoTo(5));
+        Assert.IsType<AgentActivityViewModel>(shell.Content);
+    }
+
+    [Fact]
+    public void A_screen_under_a_place_keeps_its_place_selected_and_goes_back_to_it()
+    {
+        using var shell = Shell();
+
+        shell.Current = Destinations.Of(DestinationKind.Log);
+        Assert.Equal("Settings", shell.SelectedFooter?.Title);
+        Assert.True(shell.HasBack);
+        Assert.Equal("Settings", shell.BackTitle);
+        Assert.False(Assert.IsType<LogViewModel>(shell.Content).IsAgentHistory);
+
+        shell.BackCommand.Execute(null);
+        Assert.IsType<SettingsViewModel>(shell.Content);
+        Assert.False(shell.HasBack);
+
+        shell.Current = Destinations.Of(DestinationKind.AgentHistory);
+        Assert.Equal("Agents", shell.SelectedMain?.Title);
+        var history = Assert.IsType<LogViewModel>(shell.Content);
+        Assert.True(history.IsAgentHistory);
+        Assert.Equal("History", history.Title);
+    }
+
+    [Fact]
+    public void Settings_advanced_opens_the_activity_log_and_the_share_links()
+    {
+        using var shell = Shell();
+        shell.GoTo(4);
+
+        Assert.IsType<SettingsViewModel>(shell.Content).OpenActivityLogCommand.Execute(null);
+        Assert.IsType<LogViewModel>(shell.Content);
+
+        shell.BackCommand.Execute(null);
+        Assert.IsType<SettingsViewModel>(shell.Content).OpenShareLinksCommand.Execute(null);
+        Assert.IsType<SharingViewModel>(shell.Content);
+        Assert.Equal("Share links", shell.CurrentTitle);
+    }
+
+    [Fact]
+    public void Agents_opens_its_history()
+    {
+        using var shell = Shell();
+        shell.GoTo(2);
+
+        Assert.IsType<AgentActivityViewModel>(shell.Content).OpenHistoryCommand.Execute(null);
+
+        Assert.True(Assert.IsType<LogViewModel>(shell.Content).IsAgentHistory);
     }
 
     [Fact]
@@ -70,26 +130,65 @@ public sealed class ShellViewModelTests : IDisposable
     }
 
     [Fact]
-    public void Opening_a_project_from_the_sidebar_opens_it_in_env_profiles()
+    public void Choosing_a_project_row_opens_it_and_selects_that_row_until_back()
     {
         using var shell = Shell();
 
-        shell.OpenProjectCommand.Execute("billing");
+        shell.SelectedSidebarRow = shell.SidebarRows.OfType<ProjectRow>().Single();
 
         var env = Assert.IsType<EnvSetsViewModel>(shell.Content);
         Assert.Equal("billing", env.OpenProject?.Name);
+        Assert.Equal(new ProjectRow("billing", 2), shell.SelectedSidebarRow);
+        Assert.Equal("Items", shell.BackTitle);
+
+        shell.BackCommand.Execute(null);
+
+        Assert.IsType<EntriesViewModel>(shell.Content);
+        Assert.Equal("Items", Assert.IsType<NavItem>(shell.SelectedSidebarRow).Title);
     }
 
     [Fact]
-    public void The_titlebar_search_moves_to_secrets_and_filters_them()
+    public void Items_plus_menu_starts_a_project_and_imports_into_the_one_in_view()
     {
         using var shell = Shell();
-        shell.GoTo(3);
+
+        shell.NewProjectCommand.Execute(null);
+        Assert.True(Assert.IsType<EnvSetsViewModel>(shell.Content).IsAdding);
+
+        shell.GoTo(1);
+        shell.ImportEnvCommand.Execute(null);
+        Assert.Equal("billing", Assert.IsType<EnvSetsViewModel>(shell.Content).OpenProject?.Name);
+    }
+
+    [Fact]
+    public void The_titlebar_search_moves_to_items_and_filters_them()
+    {
+        using var shell = Shell();
+        shell.GoTo(2);
 
         shell.Search = "github";
 
         var entries = Assert.IsType<EntriesViewModel>(shell.Content);
         Assert.Equal("github", entries.Search);
+    }
+
+    [Fact]
+    public void The_titlebar_search_says_its_scope_and_can_widen_it()
+    {
+        using var shell = Shell();
+        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
+        Assert.Null(shell.SearchScope);
+        Assert.Equal("Search all items", shell.SearchPlaceholder);
+
+        entries.SelectedGroup = entries.Groups.Single(group => group.Path == "Work");
+
+        Assert.Equal("Work", shell.SearchScope);
+        Assert.Equal("Search in this group", shell.SearchPlaceholder);
+
+        shell.ClearScopeCommand.Execute(null);
+
+        Assert.Null(shell.SearchScope);
+        Assert.True(entries.SelectedGroup?.IsEverything);
     }
 
     [Fact]
@@ -106,16 +205,20 @@ public sealed class ShellViewModelTests : IDisposable
     }
 
     [Fact]
-    public void Without_an_authority_the_mcp_card_says_it_is_stopped()
+    public void Without_an_authority_the_agents_row_has_a_dot_that_is_not_live()
     {
         using var shell = Shell();
+        var agents = shell.MainNav.Single(item => item.Destination.Kind == DestinationKind.AgentActivity);
 
-        Assert.False(shell.McpRunning);
-        Assert.Equal("stopped", shell.McpState);
+        Assert.False(shell.AgentsServing);
+        Assert.True(agents.HasDot);
+        Assert.False(agents.DotLive);
+        Assert.Equal("not serving agents", agents.Detail);
+        Assert.False(shell.MainNav.Single(item => item.Destination.Kind == DestinationKind.Entries).HasDot);
     }
 
     [Fact]
-    public async Task A_link_made_on_sharing_is_toasted_by_the_shell_and_counted_in_the_sidebar()
+    public async Task Share_from_an_item_is_a_dialog_that_toasts_closes_and_lists_the_link_under_settings()
     {
         using var server = new FakeShareServer { Now = _clock.GetUtcNow() };
         using var shell = new ShellViewModel(_session, _fixture.Home, authority: null, clipboard: new Clipboard.FakeClipboard(), clock: _clock)
@@ -123,17 +226,34 @@ public sealed class ShellViewModelTests : IDisposable
             ShareTransport = server,
         };
 
-        shell.Current = Destinations.Of(DestinationKind.Sharing);
-        var sharing = Assert.IsType<SharingViewModel>(shell.Content);
-        Assert.False(shell.ShowsHeader);
-        sharing.SelectedWhat = "env/billing/STRIPE_KEY";
+        shell.ShareCommand.Execute("env/billing/STRIPE_KEY");
+        Assert.True(shell.HasShare);
+        Assert.IsType<EntriesViewModel>(shell.Content);
+        var share = shell.Share!;
+        Assert.Equal("env/billing/STRIPE_KEY", share.SelectedWhat);
 
-        await sharing.CreateCommand.ExecuteAsync();
+        await share.CreateCommand.ExecuteAsync();
 
         Assert.Equal("Link copied. Expires in 24h, 1 view.", shell.Toast);
-        shell.Current = Destinations.Of(DestinationKind.Entries);
-        Assert.Equal("1", shell.MainNav.Single(item => item.Destination.Kind == DestinationKind.Sharing).Count);
-        Assert.Equal("4", shell.MainNav.Single(item => item.Destination.Kind == DestinationKind.Entries).Count);
+        Assert.False(shell.HasShare);
+
+        shell.Current = Destinations.Of(DestinationKind.Sharing);
+        var links = Assert.IsType<SharingViewModel>(shell.Content);
+        await links.RefreshCommand.ExecuteAsync();
+        Assert.Single(links.Rows);
+        Assert.False(shell.ShowsHeader);
+    }
+
+    [Fact]
+    public void Cancel_closes_the_share_dialog_without_a_link()
+    {
+        using var shell = Shell();
+
+        shell.ShareCommand.Execute("Work/github");
+        shell.Share!.CancelCommand.Execute(null);
+
+        Assert.False(shell.HasShare);
+        Assert.Null(shell.Share);
     }
 
     private ShellViewModel Shell() => new(_session, _fixture.Home, authority: null, clock: _clock);

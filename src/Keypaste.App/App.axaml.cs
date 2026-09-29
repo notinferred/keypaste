@@ -75,6 +75,13 @@ internal sealed partial class App : Application, IDisposable
         _activity = Observe(_window, _session, TimeProvider.System, () => _shell?.ClearCountdown());
         _shortcuts = Bind(_window, _session, () => _unlock, () => _shell);
         _minimize = Watch(_window, _preferences, _session, () => _unlock?.CancelPendingRestore());
+
+        // A Mac user looks for an import under File (D-0374); elsewhere it is on Items' "+".
+        if (OperatingSystem.IsMacOS())
+        {
+            NativeMenu.SetMenu(_window, AppMenu.Build(() => _shell));
+        }
+
         ShowUnlock(home);
 
         _desktop = desktop;
@@ -87,6 +94,12 @@ internal sealed partial class App : Application, IDisposable
 
     /// <summary>The authority <see cref="Launch"/> composed, or null before it or after quitting.</summary>
     internal AppAuthority? Authority => _authority;
+
+    /// <summary>How the app asks for a file; the platform's picker unless a test gives another.</summary>
+    internal Func<TopLevel, IVaultFilePicker> Pickers { get; init; } = window => new StorageProviderPicker(window);
+
+    /// <summary>How share links reach their server; the shell makes one unless a test gives another.</summary>
+    internal HttpMessageHandler? ShareTransport { get; init; }
 
     /// <summary>
     /// Turns the saved preferences into behaviour: the palette the app paints in and the timeout
@@ -265,7 +278,7 @@ internal sealed partial class App : Application, IDisposable
 
         _unlock?.Dispose();
         _unlock = new UnlockViewModel(
-            _session, home, new StorageProviderPicker(_window), OnUnlocked,
+            _session, home, Pickers(_window), OnUnlocked,
             action => Dispatcher.UIThread.Post(action),
             message,
             next is null ? reason : null);
@@ -297,8 +310,11 @@ internal sealed partial class App : Application, IDisposable
             action => Dispatcher.UIThread.Post(action),
             _preferences,
             _unlock?.Notice,
-            new StorageProviderPicker(_window),
-            OpenInPlace);
+            Pickers(_window),
+            OpenInPlace)
+        {
+            ShareTransport = ShareTransport,
+        };
 
         _window.FindControl<ContentControl>("Root")!.Content =
             new ShellView { DataContext = _shell };

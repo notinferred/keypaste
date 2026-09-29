@@ -58,8 +58,12 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     private string _search = string.Empty;
     private string? _toast;
     private IReadOnlyList<ProjectRow> _projects = [];
-    private bool _mcpRunning;
-    private string _mcpDetail = string.Empty;
+    private IReadOnlyList<object> _sidebarRows = [];
+    private string? _openProject;
+    private bool _rebuildingSidebar;
+    private bool _agentsServing;
+    private string _agentsDetail = string.Empty;
+    private SharingViewModel? _share;
     private string _vaultStatus = string.Empty;
     private StatusTone _vaultStatusTone;
     private string _vaultStatusDetail = string.Empty;
@@ -107,14 +111,20 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         DismissNoticeCommand = new RelayCommand(() => Notice = null);
         DismissToastCommand = new RelayCommand(() => Toast = null);
         OpenProjectCommand = new RelayCommand<string>(OpenProject);
-        OpenAgentsCommand = new RelayCommand(() => Current = Destinations.Of(DestinationKind.AgentActivity));
+        BackCommand = new RelayCommand(() => Current = Destinations.PlaceOf(Current), () => HasBack);
+        NewProjectCommand = new RelayCommand(NewProject);
+        ImportEnvCommand = new RelayCommand(ImportEnv);
+        ShareCommand = new RelayCommand<string>(OpenShare, path => path is not null && _share is null);
+        CloseShareCommand = new RelayCommand(CloseShare);
+        ClearScopeCommand = new RelayCommand(() => (Content as EntriesViewModel)?.ClearScopeCommand.Execute(null));
         ImportCommand = new AsyncRelayCommand(PickImportAsync, () => _picker is not null && _import is null);
         CancelTouchCommand = new RelayCommand(_session.CancelHardwareKeyWait, () => _waitingForTouch);
 
-        MainNav = [.. Destinations.Main.Select(d => new NavItem(d))];
+        MainNav = [.. Destinations.Main.Select(d => new NavItem(d) { HasDot = d.Kind == DestinationKind.AgentActivity })];
         FooterNav = [.. Destinations.Footer.Select(d => new NavItem(d))];
+        _sidebarRows = SidebarOf([]);
 
-        _current = Destinations.All[0];
+        _current = Destinations.Places[0];
         _session.LockingSoon += OnLockingSoon;
         _session.Edited += OnEdited;
         _session.WaitingForTouch += OnWaitingForTouch;
@@ -224,10 +234,59 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     /// <summary>The sidebar's quieter rows at the bottom: Settings and Trash.</summary>
     internal IReadOnlyList<NavItem> FooterNav { get; }
 
-    /// <summary>The main row for <see cref="Current"/>, or null while a footer row is current.</summary>
+    /// <summary>
+    /// The sidebar's main list, in reading order: Items, the project rows beneath it, then Agents (D-0374).
+    /// </summary>
+    /// <remarks>
+    /// One list rather than three, so the arrow keys walk the sidebar as a person reads it and its
+    /// automation tree names exactly the places and the projects.
+    /// </remarks>
+    internal IReadOnlyList<object> SidebarRows
+    {
+        get => _sidebarRows;
+        private set => Set(ref _sidebarRows, value);
+    }
+
+    /// <summary>
+    /// The sidebar row for where the shell is: the open project's row on its Env profiles, otherwise
+    /// the place the screen is, or is under. Choosing a row goes there.
+    /// </summary>
+    internal object? SelectedSidebarRow
+    {
+        get
+        {
+            if (_current.Kind == DestinationKind.EnvSets && _openProject is { } open
+                && _projects.FirstOrDefault(row => row.Name == open) is { } project)
+            {
+                return project;
+            }
+
+            return SelectedMain;
+        }
+        set
+        {
+            // Replacing the rows makes the list re-select, and write back, whichever row it had.
+            if (_rebuildingSidebar)
+            {
+                return;
+            }
+
+            switch (value)
+            {
+                case NavItem item:
+                    Current = item.Destination;
+                    break;
+                case ProjectRow project:
+                    OpenProject(project.Name);
+                    break;
+            }
+        }
+    }
+
+    /// <summary>The main row for the place <see cref="Current"/> is, or is under; null while it is a footer place.</summary>
     internal NavItem? SelectedMain
     {
-        get => MainNav.FirstOrDefault(item => item.Destination == _current);
+        get => MainNav.FirstOrDefault(item => item.Destination == Destinations.PlaceOf(_current));
         set
         {
             if (value is not null)
@@ -237,10 +296,10 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>The footer row for <see cref="Current"/>, or null while a main row is current.</summary>
+    /// <summary>The footer row for the place <see cref="Current"/> is, or is under; null while it is a main place.</summary>
     internal NavItem? SelectedFooter
     {
-        get => FooterNav.FirstOrDefault(item => item.Destination == _current);
+        get => FooterNav.FirstOrDefault(item => item.Destination == Destinations.PlaceOf(_current));
         set
         {
             if (value is not null)
@@ -256,10 +315,26 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         get => _projects;
         private set
         {
-            if (Set(ref _projects, value))
+            if (_projects.SequenceEqual(value))
             {
-                Raise(nameof(HasProjects));
+                return;
             }
+
+            _projects = value;
+            Raise();
+            Raise(nameof(HasProjects));
+            _rebuildingSidebar = true;
+
+            try
+            {
+                SidebarRows = SidebarOf(value);
+            }
+            finally
+            {
+                _rebuildingSidebar = false;
+            }
+
+            Raise(nameof(SelectedSidebarRow));
         }
     }
 
@@ -268,10 +343,41 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     /// <summary>Opens Env profiles on a project.</summary>
     internal RelayCommand<string> OpenProjectCommand { get; }
 
-    /// <summary>Whether the sidebar offers "Import .kdbx".</summary>
-#pragma warning disable CA1822
-    internal bool ImportAvailable => true;
-#pragma warning restore CA1822
+    /// <summary>Goes up from a screen under a place to the place.</summary>
+    internal RelayCommand BackCommand { get; }
+
+    /// <summary>Whether the shell shows a screen under a place, which offers Back.</summary>
+    internal bool HasBack => !_current.IsPlace;
+
+    /// <summary>What Back says: the place it returns to.</summary>
+    internal string BackTitle => Destinations.PlaceOf(_current).Title;
+
+    /// <summary>Items' "+" menu: New project, on Env profiles.</summary>
+    internal RelayCommand NewProjectCommand { get; }
+
+    /// <summary>Items' "+" menu: Import .env, into the project in view or the first one.</summary>
+    internal RelayCommand ImportEnvCommand { get; }
+
+    /// <summary>An item's ⋯ menu: Share…, as a dialog over the screen.</summary>
+    internal RelayCommand<string> ShareCommand { get; }
+
+    internal RelayCommand CloseShareCommand { get; }
+
+    /// <summary>The share dialog while it is open, or null.</summary>
+    internal SharingViewModel? Share
+    {
+        get => _share;
+        private set
+        {
+            if (Set(ref _share, value))
+            {
+                Raise(nameof(HasShare));
+                ShareCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    internal bool HasShare => _share is not null;
 
     /// <summary>Asks which KDBX file to import, then shows the import dialog over the shell.</summary>
     internal AsyncRelayCommand ImportCommand { get; }
@@ -383,32 +489,33 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     /// <summary>Locks now.</summary>
     internal RelayCommand LockCommand { get; }
 
-    /// <summary>Whether this app is answering agents for the vault, as its authority says.</summary>
-    internal bool McpRunning
+    /// <summary>Whether this app is answering agents for the vault, as its authority says; the Agents row's dot.</summary>
+    internal bool AgentsServing
     {
-        get => _mcpRunning;
+        get => _agentsServing;
         private set
         {
-            if (Set(ref _mcpRunning, value))
+            if (Set(ref _agentsServing, value))
             {
-                Raise(nameof(McpState));
+                MainNav.Single(item => item.Destination.Kind == DestinationKind.AgentActivity).DotLive = value;
             }
         }
     }
 
-    internal string McpState => _mcpRunning ? "running" : "stopped";
-
-    /// <summary>The MCP card's second line: what the authority knows, and nothing it does not.</summary>
-    internal string McpDetail
+    /// <summary>The Agents row's tooltip: what the authority knows, and nothing it does not.</summary>
+    internal string AgentsDetail
     {
-        get => _mcpDetail;
-        private set => Set(ref _mcpDetail, value);
+        get => _agentsDetail;
+        private set
+        {
+            if (Set(ref _agentsDetail, value))
+            {
+                MainNav.Single(item => item.Destination.Kind == DestinationKind.AgentActivity).Detail = value;
+            }
+        }
     }
 
-    /// <summary>Opens Agents, from the MCP card.</summary>
-    internal RelayCommand OpenAgentsCommand { get; }
-
-    /// <summary>The titlebar search. It filters Secrets, and moves there to do it.</summary>
+    /// <summary>The titlebar search, the app's only one. It filters Items, and moves there to do it.</summary>
     internal string Search
     {
         get => _search;
@@ -429,6 +536,17 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             }
         }
     }
+
+    /// <summary>The group the search is limited to, or null when it searches every item.</summary>
+    internal string? SearchScope => Content is EntriesViewModel entries ? entries.SearchScope : null;
+
+    internal bool HasSearchScope => SearchScope is not null;
+
+    /// <summary>What the search box says while empty: where it searches.</summary>
+    internal string SearchPlaceholder => SearchScope is null ? "Search all items" : "Search in this group";
+
+    /// <summary>Widens the search to every item.</summary>
+    internal RelayCommand ClearScopeCommand { get; }
 
     /// <summary>Raised when <c>Ctrl/Cmd+K</c> asks for the titlebar search.</summary>
     internal event EventHandler? SearchFocusRequested;
@@ -482,11 +600,20 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         {
             if (value is not null && Set(ref _current, value))
             {
+                if (value.Kind != DestinationKind.EnvSets)
+                {
+                    _openProject = null;
+                }
+
                 Raise(nameof(CurrentTitle));
                 Raise(nameof(ShowsHeader));
+                Raise(nameof(HasBack));
+                Raise(nameof(BackTitle));
+                BackCommand.RaiseCanExecuteChanged();
+                Show(value);
                 Raise(nameof(SelectedMain));
                 Raise(nameof(SelectedFooter));
-                Show(value);
+                Raise(nameof(SelectedSidebarRow));
             }
         }
     }
@@ -527,12 +654,12 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     /// <summary>Clears the countdown, because somebody is evidently still here.</summary>
     internal void ClearCountdown() => Countdown = string.Empty;
 
-    /// <summary>Moves to a destination by its shortcut digit.</summary>
-    /// <param name="digit">A destination's position in the sidebar, from 1.</param>
-    /// <returns><see langword="true"/> when a destination matched.</returns>
+    /// <summary>Moves to a place by its shortcut digit.</summary>
+    /// <param name="digit">A place's position in the sidebar, from 1.</param>
+    /// <returns><see langword="true"/> when a place matched.</returns>
     internal bool GoTo(int digit)
     {
-        foreach (var destination in Navigation.Destinations.All)
+        foreach (var destination in Navigation.Destinations.Places)
         {
             if (destination.Shortcut == digit)
             {
@@ -547,13 +674,19 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     /// <summary>Builds the current destination's content.</summary>
     private void Show(Destination destination)
     {
+        if (Content is EntriesViewModel previous)
+        {
+            previous.PropertyChanged -= OnEntriesChanged;
+        }
+
         (Content as IDisposable)?.Dispose();
 
         Content = destination.Kind switch
         {
             // The audit log is machine state, which is why `keypaste log` reads it without a vault.
             DestinationKind.Log => new LogViewModel(Home, _clock, Clipboard),
-            DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker, Recommendations),
+            DestinationKind.AgentHistory => new LogViewModel(Home, _clock, Clipboard, agentsOnly: true),
+            DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker, Recommendations, kind => Current = Destinations.Of(kind)),
             DestinationKind.AgentActivity => Activity(),
             DestinationKind.Entries => Entries(),
             DestinationKind.EnvSets => new EnvSetsViewModel(_session, Clipboard, _picker, toast: ShowToast),
@@ -562,6 +695,12 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             _ => null,
         };
 
+        if (Content is EntriesViewModel entries)
+        {
+            entries.PropertyChanged += OnEntriesChanged;
+        }
+
+        RaiseScope();
         Count();
     }
 
@@ -577,7 +716,23 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         return entries;
     }
 
-    private AgentActivityViewModel Activity() => new(Authority, Home, _clock, _post, toast: ShowToast, clipboard: Clipboard);
+    private AgentActivityViewModel Activity() =>
+        new(Authority, Home, _clock, _post, toast: ShowToast, clipboard: Clipboard, openHistory: () => Current = Destinations.Of(DestinationKind.AgentHistory));
+
+    private void OnEntriesChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(EntriesViewModel.SearchScope))
+        {
+            RaiseScope();
+        }
+    }
+
+    private void RaiseScope()
+    {
+        Raise(nameof(SearchScope));
+        Raise(nameof(HasSearchScope));
+        Raise(nameof(SearchPlaceholder));
+    }
 
     /// <summary>How share links reach their server; the shell makes one when none is given.</summary>
     /// <remarks>Redirects are never followed, so an envelope reaches only the origin the link names.</remarks>
@@ -585,7 +740,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
     private SocketsHttpHandler? _ownShareTransport;
 
-    private SharingViewModel Sharing()
+    private SharingViewModel Sharing(string? what = null, Action? cancel = null)
     {
         var resolved = ShareEndpoint.TryResolve(null, Environment.GetEnvironmentVariable(ShareEndpoint.EnvironmentVariable), out var endpoint, out _);
         var transport = ShareTransport ?? (_ownShareTransport ??= new SocketsHttpHandler
@@ -601,7 +756,67 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             _clock,
             () => Core.Audit.AuditLog.TryOpen(auditPath, _clock, out var log, out _) ? log : null);
 
-        return new SharingViewModel(_session, Clipboard, service, ShowToast, resolved ? null : $"Sharing is off: {ShareEndpoint.EnvironmentVariable} may only name a local development server.");
+        return new SharingViewModel(
+            _session,
+            Clipboard,
+            service,
+            ShowToast,
+            resolved ? null : $"Sharing is off: {ShareEndpoint.EnvironmentVariable} may only name a local development server.",
+            what,
+            cancel);
+    }
+
+    /// <summary>Opens the share dialog on one entry, over whatever screen is showing.</summary>
+    internal void OpenShare(string? path)
+    {
+        if (_disposed || path is null || _share is not null)
+        {
+            return;
+        }
+
+        var share = Sharing(path, CloseShare);
+        share.Created += (_, _) => CloseShare();
+        Share = share;
+    }
+
+    private void CloseShare()
+    {
+        var share = _share;
+        Share = null;
+        share?.Dispose();
+    }
+
+    /// <summary>New project, from Items' "+" menu: Env profiles, with its create form open.</summary>
+    private void NewProject()
+    {
+        Current = Destinations.Of(DestinationKind.EnvSets);
+
+        if (Content is EnvSetsViewModel env)
+        {
+            env.BeginAddCommand.Execute(null);
+        }
+    }
+
+    /// <summary>Import .env, from Items' "+" menu: into the project in view, else the first; with none, create one first.</summary>
+    private void ImportEnv()
+    {
+        var inView = (Content as EntriesViewModel)?.SelectedGroup is { IsEverything: false } group
+            ? EnvPlace.OfGroup(group.Path)?.Project
+            : null;
+        var project = inView ?? (_projects.Count > 0 ? _projects[0].Name : null);
+
+        if (project is null)
+        {
+            NewProject();
+            return;
+        }
+
+        OpenProject(project);
+
+        if ((Content as EnvSetsViewModel)?.OpenProject is { } open)
+        {
+            open.Import.ChooseCommand.Execute(null);
+        }
     }
 
     private void OpenProject(string? project)
@@ -611,13 +826,20 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             return;
         }
 
+        _openProject = project;
         Current = Destinations.Of(DestinationKind.EnvSets);
 
         if (Content is EnvSetsViewModel env)
         {
             env.OpenCommand.Execute(project);
         }
+
+        Raise(nameof(SelectedSidebarRow));
     }
+
+    /// <summary>The sidebar's main list: Items, then each project, then Agents.</summary>
+    private IReadOnlyList<object> SidebarOf(IReadOnlyList<ProjectRow> projects) =>
+        [MainNav[0], .. projects, .. MainNav.Skip(1)];
 
     /// <summary>Counts entries and env projects for the sidebar, reading names only.</summary>
     private void Count()
@@ -631,15 +853,12 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         IReadOnlyList<string> names;
         Dictionary<string, int> perGroup = new(StringComparer.Ordinal);
         int total;
-        int liveShares;
 
         try
         {
             // keypaste's own records, share links among them, are not secrets the Secrets list shows.
             var entries = vault.ReadEntries().Where(entry => !ReservedGroups.IsReserved(entry.GroupPath)).ToList();
             total = entries.Count;
-            var now = _clock.GetUtcNow();
-            liveShares = new ShareStore(vault).List().Count(share => share.Expires > now);
 
             foreach (var entry in entries)
             {
@@ -658,18 +877,15 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
         Projects = [.. names.Select(name => new ProjectRow(name, perGroup.GetValueOrDefault(EnvConvention.GroupPath(name))))];
         SetCount(DestinationKind.Entries, total);
-        SetCount(DestinationKind.EnvSets, names.Count);
-        SetCount(DestinationKind.Sharing, liveShares);
     }
 
-    private void SetCount(DestinationKind kind, int count, bool live = false)
+    private void SetCount(DestinationKind kind, int count)
     {
         foreach (var item in MainNav.Concat(FooterNav))
         {
             if (item.Destination.Kind == kind)
             {
                 item.Count = count > 0 ? count.ToString(CultureInfo.InvariantCulture) : string.Empty;
-                item.IsLive = live && count > 0;
             }
         }
     }
@@ -690,17 +906,16 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             var waiting = activity.Waiting.Count + activity.WaitingRuns.Count + activity.WaitingEnvs.Count;
             var clients = Core.Clients.McpClientCards.Count(Authority.Clients);
 
-            McpRunning = true;
-            // The sidebar card is narrow: while something waits, the transport gives way to the client count.
-            McpDetail = waiting > 0
-                ? string.Create(CultureInfo.InvariantCulture, $"{waiting} waiting · {ClientCount(clients)}")
-                : Clients(clients);
-            SetCount(DestinationKind.AgentActivity, grants + waiting, live: true);
+            AgentsServing = true;
+            AgentsDetail = waiting > 0
+                ? string.Create(CultureInfo.InvariantCulture, $"Answering agents · {waiting} waiting · {ClientCount(clients)}")
+                : "Answering agents · " + ClientCount(clients);
+            SetCount(DestinationKind.AgentActivity, grants + waiting);
             return;
         }
 
-        McpRunning = false;
-        McpDetail = status switch
+        AgentsServing = false;
+        AgentsDetail = status switch
         {
             AuthorityStatus.HeldBy => "another keypaste holds this vault",
             AuthorityStatus.NotServing => "agents cannot reach this vault",
@@ -708,8 +923,6 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         };
         SetCount(DestinationKind.AgentActivity, 0);
     }
-
-    private static string Clients(int count) => "stdio · " + ClientCount(count);
 
     private static string ClientCount(int count) => count switch
     {
@@ -819,6 +1032,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         _session.WaitingForTouch -= OnWaitingForTouch;
         _session.Saved -= OnSaved;
         Recommendations.Dispose();
+        CloseShare();
 
         _statusTimer?.Dispose();
         _toastTimer?.Dispose();

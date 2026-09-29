@@ -43,11 +43,10 @@ public sealed class ShellImportTests : IDisposable
     }
 
     [Fact]
-    public void The_sidebar_offers_import()
+    public void Items_offers_import()
     {
         using var shell = NewShell();
 
-        Assert.True(shell.ImportAvailable);
         Assert.True(shell.ImportCommand.CanExecute(null));
         Assert.False(shell.HasImport);
     }
