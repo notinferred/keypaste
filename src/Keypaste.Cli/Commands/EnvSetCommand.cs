@@ -85,7 +85,7 @@ internal static class EnvSetCommand
             return CliApp.ExitUsageError;
         }
 
-        return VaultSession.Open(path, line, context, vault =>
+        return VaultSession.OpenHeld(path, line, context, vault =>
         {
             string value;
             if (inlineValue is not null)

@@ -238,7 +238,7 @@ public sealed class SetVerbTests : IDisposable
         }
 
         Assert.Contains("keypaste: this vault is already unlocked in keypaste agent", _harness.Err, StringComparison.Ordinal);
-        Assert.Contains("Lock it there first.", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains("Run `keypaste lock` and try again.", _harness.Err, StringComparison.Ordinal);
         Assert.Empty(_harness.Prompt.PromptsSeen);
         Assert.Equal(before, File.ReadAllBytes(_harness.VaultPath));
     }

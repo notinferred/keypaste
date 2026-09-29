@@ -48,7 +48,7 @@ public sealed class VaultSessionTests : IDisposable
         Assert.False(ran);
         Assert.Empty(_harness.Prompt.PromptsSeen);
         Assert.Contains(
-            $"keypaste: this vault is already unlocked in the keypaste desktop app (process {Environment.ProcessId}). Lock it there first.",
+            $"keypaste: this vault is already unlocked in the keypaste desktop app (process {Environment.ProcessId}). Make the change there, or run `keypaste lock` and try again.",
             _harness.Err,
             StringComparison.Ordinal);
     }

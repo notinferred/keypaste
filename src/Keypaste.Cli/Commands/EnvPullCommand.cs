@@ -93,7 +93,7 @@ internal static class EnvPullCommand
             context.Stderr.WriteLine(advisory);
         }
 
-        var exit = VaultSession.Open(vaultPath, line, context, vault =>
+        var exit = VaultSession.OpenHeld(vaultPath, line, context, vault =>
             Import(vault, project, profile, document, assumeYes, context));
 
         if (exit != CliApp.ExitSuccess)

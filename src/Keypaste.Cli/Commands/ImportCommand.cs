@@ -3,7 +3,6 @@ using Keypaste.Cli.Styling;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Import;
-using Keypaste.Core.Ownership;
 using Keypaste.Core.Recent;
 
 namespace Keypaste.Cli.Commands;
@@ -14,13 +13,10 @@ namespace Keypaste.Cli.Commands;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The source is opened read-only and never saved. A copy takes the target's claim before either
-/// password is asked for, so a vault the app or an agent holds is refused before anybody types, and
-/// is saved only when no row is blocked.
-/// </para>
-/// <para>
-/// The claim is taken here rather than through <see cref="VaultSession.OpenHeld"/> because the
-/// source's password is asked for first, between the claim and the target's master password.
+/// The source is opened read-only and never saved. A copy takes the target's claim through
+/// <see cref="VaultSession.OpenHeld{T}"/> before either password is asked for, so a vault the app or
+/// an agent holds is refused before anybody types, and is saved only when no row is blocked. A dry
+/// run saves nothing and takes no claim.
 /// </para>
 /// </remarks>
 internal static class ImportCommand
@@ -109,28 +105,15 @@ internal static class ImportCommand
             : Copy(probe, keyfile, target, line, into, context);
     }
 
-    private static int Copy(KdbxProbe probe, string? keyfile, string target, CommandLine line, string? into, CliContext context)
-    {
-        var dryRun = line.HasFlag("dry-run");
-        VaultClaim? claim = null;
-
-        if (!dryRun)
-        {
-            var home = KeypasteHome.Resolve(context.Environment.Get(KeypasteHome.EnvironmentVariable));
-            if (!VaultClaim.TryAcquire(home, target, OwnerKind.CommandLine, out claim, out var refusal))
-            {
-                context.Stderr.WriteLine($"keypaste: {refusal}");
-                return CliApp.ExitInternalError;
-            }
-        }
-
-        using (claim)
-        {
-            return WithSource(probe, keyfile, context, opened => VaultSession.Open(target, line, context, vault => dryRun
-                ? Preview(opened, vault, into, context)
-                : Apply(opened, vault, into, context)));
-        }
-    }
+    private static int Copy(KdbxProbe probe, string? keyfile, string target, CommandLine line, string? into, CliContext context) =>
+        line.HasFlag("dry-run")
+            ? WithSource(probe, keyfile, context, opened => VaultSession.Open(target, line, context, vault => Preview(opened, vault, into, context)))
+            : VaultSession.OpenHeld<ImportSource>(
+                target,
+                line,
+                context,
+                next => WithSource(probe, keyfile, context, next),
+                (opened, vault) => Apply(opened, vault, into, context));
 
     private static int Preview(ImportSource source, Vault vault, string? into, CliContext context)
     {

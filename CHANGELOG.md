@@ -8,6 +8,8 @@ Upgrade the bridge and `keypaste agent` together: they must be the same version,
 
 keypaste has a new brand: an icon "k." and a wordmark "keypaste." in Hepta Slab with an amber dot, amber on ink, Instrument Sans and Fragment Mono ([BRAND](docs/BRAND.md)). The desktop app is rebuilt on it, with restyled screens, a new lock screen and restyled prompt windows, and keypaste.com and the README use it too.
 
+`keypaste add`, `rm`, `access`, `env set`, `env rm`, `env pull` and `import` are now refused while the desktop app or `keypaste agent` holds the vault, before asking for a password, as `set` and `rotate` already were. The message names what holds it and says to make the change there or run `keypaste lock`. Scripts that saved through the CLI while the app was unlocked now stop there ([N.10](docs/steps/N.10.md)).
+
 A secret the desktop copies now also asks macOS pasteboard managers such as Maccy, and KDE's Klipper, not to keep it, as it already asked Windows' Clipboard History; a copied run command is left for them to keep ([N.12](docs/steps/N.12.md)).
 
 Scoped tokens and Diagnostics moved to Settings › Advanced, beside the activity log and share links. A client's policy is now chosen from its card's ⋯ menu on Agents, and History shows its records without Verify chain, which is on the activity log ([N.1b](docs/steps/N.1b.md)).

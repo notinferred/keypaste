@@ -723,16 +723,35 @@ internal sealed class Driver(string home)
         return act(entries);
     }
 
+    private static void Post(SynchronizationContext? context, Action action)
+    {
+        if (context is null)
+        {
+            action();
+        }
+        else
+        {
+            context.Post(_ => action(), null);
+        }
+    }
+
     internal async Task<int> HoldAsync(string vault, Func<IApprovalChannel> prompt, bool startLocked, PromptScreen? screen)
     {
         // The authority owns the session from here, and disposing it is quitting.
 #pragma warning disable CA2000
+        var session = new AppVaultSession(TimeProvider.System, AppVaultSession.MaximumIdleTimeout, home);
+        var context = SynchronizationContext.Current;
         using var authority = new AppAuthority(
-            new AppVaultSession(TimeProvider.System, AppVaultSession.MaximumIdleTimeout, home),
+            session,
             Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable),
-            prompt);
+            prompt,
+            // `keypaste lock` locks it as launch composes the app, on the thread this hold runs on.
+            AppAuthority.RequestLock(session, action => Post(context, () =>
+            {
+                action();
+                Console.Out.WriteLine("locked");
+            })));
 #pragma warning restore CA2000
-        var session = authority.Session;
         using var connect = new ConnectScreen(this, authority);
 
         if (startLocked)

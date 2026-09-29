@@ -114,7 +114,7 @@ A keyfile is optional: Add a keyfile… attaches one you already have, such as a
 
 The refusals are the ones `keypaste init` makes, because both front ends ask the same code: a path something already occupies is refused and that file is left exactly as it was, an empty password is refused, and a confirmation that does not match is refused, as is a keyfile keypaste will not attach. Nothing is written until all of them have passed, so a refused attempt leaves the disk as it found it, and cancelling the picker writes nothing at all. The vault is remembered in `recent.toml` only once it exists and the app has opened it.
 
-A new vault opens on an empty Items list, which offers New item and Import .kdbx. Add entries there, or with `keypaste add` in a terminal against the same file.
+A new vault opens on an empty Items list, which offers New item and Import .kdbx. Add entries there. `keypaste add` and the other verbs that save are refused while the app holds the vault; lock the app first, or make the change in it.
 
 ## Locking
 
@@ -211,7 +211,7 @@ CI builds and packages on three operating systems; desktop tests read secret sur
 21a. Make a group with New group, then use Rename or move in an entry's ⋯ menu to put an entry into it and give it a new name in the same Save. Check `keypaste get <new path> --show` in a terminal, and that the old path is gone. Try the same Save again with a name the destination already holds: it is refused, says why, and the entry is where it was.
 21b. Rename a group holding an env project — `env/billing` to `env/invoicing`. The form says what it costs before you confirm. Afterwards `keypaste run invoicing -- printenv` sees the project and `keypaste run billing` does not.
 21c. Search for part of an entry's username, and then part of its URL. The row appears with the matched field named beside it and no value shown. Search for its password: nothing. Search for a word that is only in its notes: nothing.
-22. With the app open on a vault, run `keypaste env set` against the same file in a terminal. Come back and make any edit: the app refuses, says why, and the terminal's write is still there.
+22. With the app open on a vault, run `keypaste env set` against the same file in a terminal: it is refused, naming the app and its process and saying to make the change there or run `keypaste lock`, and the file is unchanged. Save the file from KeePassXC instead, come back and make any edit: the app refuses, says why, and KeePassXC's write is still there.
 23. Generate a password in the app, then read it back with `keypaste get --show`.
 24. Choose Words, set the count to eight, and check that the line beneath it names eight words and about 103 bits and that the list line names 7,776. Add the entry, then read it back with `keypaste get --show`: eight words separated by full stops. Set the separator to `-` and the form must refuse it, because four of the list's words are spelled with one.
 25. Untick Generate a password, type an existing one, and read it back with `keypaste get --show`. Repeat with `Ctrl/Cmd+V` from a value you copied elsewhere, and once with something ending in a newline copied out of a terminal: the stored value must have no trailing newline.

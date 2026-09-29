@@ -78,7 +78,7 @@ internal static class AccessCommand
             return exit;
         }
 
-        return VaultSession.Open(path, line, context, vault => Change(vault, change, context), namesHardwareKeys: true);
+        return VaultSession.OpenHeld(path, line, context, vault => Change(vault, change, context), namesHardwareKeys: true);
     }
 
     /// <summary>The refusals that need no password, made before anybody is asked for one.</summary>
@@ -160,9 +160,6 @@ internal static class AccessCommand
                 $"keypaste: the vault now needs '{change.KeyfilePath}'. Losing that file locks the vault; " +
                 "back it up somewhere other than beside the vault.");
         }
-
-        err.WriteLine(
-            "keypaste: a running `keypaste agent` still holds the earlier vault; restart it to use the new credentials.");
     }
 
     private static string Words(VaultAccessOutcome outcome, string? keyfile) => outcome switch

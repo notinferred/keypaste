@@ -98,24 +98,64 @@ internal static class VaultSession
     /// <remarks>
     /// The claim is taken before the password is read, as <c>keypaste agent</c> takes it, so a
     /// command never saves under a running owner and leaves that owner's copy changed on disk (D-0317).
+    /// Every verb that saves opens the vault here; <see cref="Open"/> is for verbs that never save
+    /// (D-0382), which <c>SavingVerbSourceRulesTests</c> holds.
     /// </remarks>
     /// <param name="path">The vault, already resolved by <see cref="VaultLocator.TryResolve"/>.</param>
     /// <param name="line">The parsed command line, for <c>--keyfile</c>.</param>
     /// <param name="context">Where prompts and errors go.</param>
     /// <param name="body">What to do with the open vault.</param>
-    internal static int OpenHeld(string path, CommandLine line, CliContext context, Func<Vault, int> body)
+    /// <param name="namesHardwareKeys">As for <see cref="Open"/>.</param>
+    internal static int OpenHeld(
+        string path, CommandLine line, CliContext context, Func<Vault, int> body, bool namesHardwareKeys = false) =>
+        Held(path, context, () => Open(path, line, context, body, namesHardwareKeys));
+
+    /// <summary>
+    /// Takes the vault's claim, runs <paramref name="first"/> for what the verb needs before the vault's
+    /// own password, then opens the vault and runs <paramref name="body"/> with both.
+    /// </summary>
+    /// <remarks>
+    /// <c>import</c> asks for its source's password between the claim and the target's, so a vault
+    /// something holds is refused before either is typed.
+    /// </remarks>
+    /// <param name="path">The vault, already resolved by <see cref="VaultLocator.TryResolve"/>.</param>
+    /// <param name="line">The parsed command line, for <c>--keyfile</c>.</param>
+    /// <param name="context">Where prompts and errors go.</param>
+    /// <param name="first">Obtains the value and hands it on, returning the exit code of what it was handed.</param>
+    /// <param name="body">What to do with the value and the open vault.</param>
+    internal static int OpenHeld<T>(
+        string path, CommandLine line, CliContext context, Func<Func<T, int>, int> first, Func<T, Vault, int> body) =>
+        Held(path, context, () => first(value => Open(path, line, context, vault => body(value, vault))));
+
+    /// <summary>
+    /// Why a verb that saves is refused a vault something holds, naming the holder and what to do next.
+    /// </summary>
+    /// <param name="refusal">The claim's own sentence, kept when nothing is known of the holder.</param>
+    /// <param name="holder">The process holding the vault, when it named itself.</param>
+    internal static string HeldRefusal(string refusal, VaultOwner? holder) => holder?.Kind switch
+    {
+        OwnerKind.DesktopApp =>
+            $"this vault is already unlocked in {holder.Describe()}. Make the change there, or run `keypaste lock` and try again.",
+        OwnerKind.TerminalAgent =>
+            $"this vault is already unlocked in {holder.Describe()}. Run `keypaste lock` and try again.",
+        OwnerKind.CommandLine =>
+            $"this vault is in use by {holder.Describe()}. Try again when it finishes.",
+        _ => refusal,
+    };
+
+    private static int Held(string path, CliContext context, Func<int> body)
     {
         var home = KeypasteHome.Resolve(context.Environment.Get(KeypasteHome.EnvironmentVariable));
 
-        if (!VaultClaim.TryAcquire(home, path, OwnerKind.CommandLine, out var claim, out var refusal))
+        if (!VaultClaim.TryAcquire(home, path, OwnerKind.CommandLine, out var claim, out var refusal, out var holder))
         {
-            context.Stderr.WriteLine($"keypaste: {refusal}");
+            context.Stderr.WriteLine($"keypaste: {HeldRefusal(refusal, holder)}");
             return CliApp.ExitInternalError;
         }
 
         using (claim)
         {
-            return Open(path, line, context, body);
+            return body();
         }
     }
 

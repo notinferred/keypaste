@@ -23,6 +23,7 @@ on:
       - 'scripts/verify-agent-activity.sh'
       - 'scripts/verify-connect-client.sh'
       - 'scripts/verify-run-session.sh'
+      - 'scripts/verify-held-saves.sh'
       - 'scripts/verify-clipboard-markers.sh'
       - 'src/Keypaste.Mcp/**'
       - 'scripts/install-keepassxc-windows.sh'

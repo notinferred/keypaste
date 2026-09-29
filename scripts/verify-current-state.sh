@@ -5,9 +5,11 @@
 #
 # One bridge keeps one connection, so a grant it was given can be reused. A password edited in the app
 # is the next value released and is asked about again; an entry moved out of the exposure is refused,
-# and moving it back asks again rather than serving the old grant. A save by the CLI between two
-# requests makes the second refuse as vault-changed, the listing too, the file keeps the CLI's bytes
-# even when the app then tries to save, and nothing is released until the app is unlocked again.
+# and moving it back asks again rather than serving the old grant. A save by another program between
+# two requests makes the second refuse as vault-changed, the listing too, the file keeps that program's
+# bytes even when the app then tries to save, and nothing is released until the app is unlocked again.
+# The other program is the CLI under another KEYPASTE_HOME, which does not see this home's claim (T-29):
+# under this home, a verb that saves is refused while the app holds the vault (N.10).
 # Deletes, group renames and access changes run over a real pipe in CurrentStateTests.
 #
 # NEGATIVE CONTROL: this fails if an old value is released after an edit, a grant outlives the change
@@ -45,9 +47,10 @@ MCP="$(resolve "${KEYPASTE_MCP_BIN:-artifacts/bin/Keypaste.Mcp/release/keypaste-
 DRV="$(resolve "${KEYPASTE_APP_DRIVER:-artifacts/bin/Keypaste.AppDriver/release/Keypaste.AppDriver}")"
 
 WORK="$(mktemp -d)"
-mkdir -p "$WORK/home"
+mkdir -p "$WORK/home" "$WORK/other-home"
 KEYPASTE_HOME="$(native "$WORK/home")"
 export KEYPASTE_HOME
+OTHER_HOME="$(native "$WORK/other-home")"
 VAULT="$(native "$WORK/vault.kdbx")"
 AUDIT="$(native "$WORK/audit.jsonl")"
 readonly HOLD_OUT="$WORK/hold.txt"
@@ -186,24 +189,24 @@ released 14 "$V2" prompt "the request after the entry moved back"
 asked 3 "the request after the entry moved back"
 
 # ------------------- another program saves: refused, the file kept, and nothing until a re-unlock
-printf '%s\n' "$MASTER" | "$CLI" env set ci "DEPLOY_KEY=$V3" --vault "$VAULT" >/dev/null \
-  || die "the CLI could not save the vault the app holds"
+printf '%s\n' "$MASTER" | KEYPASTE_HOME="$OTHER_HOME" "$CLI" env set ci "DEPLOY_KEY=$V3" --vault "$VAULT" >/dev/null \
+  || die "another program could not save the vault the app holds"
 EXTERNAL="$(digest)"
 
 request 15 "$ENTRY"
-denied 15 vault-changed "the request after the CLI saved"
+denied 15 vault-changed "the request after another program saved"
 tail -n 1 "$AUDIT" | jq -e --arg s "$FIRST" '.session == $s' >/dev/null || die "the refusal does not name session $FIRST"
 tail -n 1 "$AUDIT" | jq -e '.reason | contains("another program changed the vault file")' >/dev/null \
   || die "the refusal's audit line does not say the file changed"
 call 16 list_entry_names '{}'
-denied 16 vault-changed "the listing after the CLI saved" list_entry_names
+denied 16 vault-changed "the listing after another program saved" list_entry_names
 
 line="$(act "edit $ENTRY")"
-case "$line" in refused:*) ;; *) die "the app saved over the CLI's write: $line" ;; esac
-[ "$(digest)" = "$EXTERNAL" ] || die "the vault file no longer holds the CLI's bytes"
+case "$line" in refused:*) ;; *) die "the app saved over the other program's write: $line" ;; esac
+[ "$(digest)" = "$EXTERNAL" ] || die "the vault file no longer holds the other program's bytes"
 request 17 "$ENTRY"
 denied 17 vault-changed "the request after the app's refused save"
-asked 3 "the requests after the CLI saved"
+asked 3 "the requests after another program saved"
 
 act lock >/dev/null
 act unlock >/dev/null
@@ -221,4 +224,4 @@ wait_for '^shut down' "$HOLD_OUT"
 HOLD_PID=""
 
 echo "ok: an edit in the app was the next value released and was asked about again, a moved entry's grant"
-echo "    was gone, and a CLI save was refused as vault-changed with its bytes kept until the app unlocked again"
+echo "    was gone, and another program's save was refused as vault-changed with its bytes kept until the app unlocked again"

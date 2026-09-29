@@ -6,7 +6,7 @@ This file holds open work only. Finishing a task removes it from here, adds its 
 
 ## Selection and evidence
 
-Only the next five tasks are detailed: N.10, C.1b, C.1c, C.3 and C.4. Later rows name a bounded outcome and the dependencies their own implementation or verifier needs; expand a selected later task before building it. Tasks are not marked implemented from a document, reader, mock response or consuming screen. Name the producer, transport, consumer and user action exercised, and retain the source/version and limitations of the observation.
+Only the next five tasks are detailed: C.1b, C.1c, C.3, C.4 and C.5a. Later rows name a bounded outcome and the dependencies their own implementation or verifier needs; expand a selected later task before building it. Tasks are not marked implemented from a document, reader, mock response or consuming screen. Name the producer, transport, consumer and user action exercised, and retain the source/version and limitations of the observation.
 
 Needs are build dependencies. Ships after names publication gates. External signing identities are inputs, not a queue of enrollment code. A ready row does not authorize publication, account changes or messages. Preserve the secret-path tests, real KeePassXC compatibility, stale-write refusals and release integrity checks while changing product scope.
 
@@ -23,14 +23,8 @@ Custom fields and tags are ordinary KeePass data: keypaste writes them as KeePas
 
 ## T2 — One shared unlock session
 
-U.1–U.3 and 4.4b gave the app, `keypaste agent` and the bridge one owner and one lock (D-0309 to D-0321). One gap remains: seven CLI verbs still save without taking the owner's claim, so the app refuses agents as `vault-changed` until someone reloads.
+U.1–U.3 and 4.4b gave the app, `keypaste agent` and the bridge one owner and one lock (D-0309 to D-0321), and N.10 made every CLI verb that saves take the owner's claim (D-0382). What remains is approving a terminal edit in the unlocked app instead of refusing it.
 
-- [ ] **N.10 — Make every saving verb take the vault's claim.** Needs: none.
-  **Build:** `add`, `rm`, `access`, `env set`, `env rm`, `env pull` and `import`, the verbs that still save inside a `VaultSession.Open` body, open the vault through `OpenHeld`, as `set`, `rotate`, `field rm` and `env tag` already do; `import`'s own claim moves onto `OpenHeld`, and `import --dry-run` still reads without the claim. While the app or `keypaste agent` holds the vault, each is refused before its password is read, and the refusal names the holder, its process and the next step: for the app, make the change there or run `keypaste lock` and try again; for `keypaste agent`, run `keypaste lock` and try again. A rule test over `src/Keypaste.Cli` holds that `VaultSession.Open` is called only by verbs that never save. Traces to PRODUCT §2 and T2.
-
-  **Verify (V-N.10):** with the app, through `Keypaste.AppDriver hold`, and then `keypaste agent` holding a vault, each of the seven verbs is refused naming the holder's process and the next step: with stdin closed it reports the holder rather than a missing password, and with the right answers piped the vault's bytes and backup count are unchanged. The holder then answers an agent request instead of refusing it as `vault-changed`. With nothing holding the vault each verb saves as before. The rule test fails on a copy that adds a save through `Open`.
-
-  A refusal shown only against a claim the test takes itself does not pass.
 - [ ] **N.11 — Approve a terminal edit in the unlocked app.** Needs: N.10.
   - `set`, `add`, `rm` and the env writers send the change to the vault's owner, which asks in its prompt window and writes through its session.
   - No master password crosses the pipe, and `access` stays refused.
@@ -79,9 +73,11 @@ The `env/<project>` layout that v0.3.0 wrote stays readable indefinitely; no new
 Every release still needs a person's answer or a rule they wrote, and the bridge stays vault-free (PRODUCT §§2 and 3.2). The bridge, the in-app prompt (4.4), the Agents screen (4.3b) and connecting from the app (2.6a) are reused.
 
 - [ ] **C.5a — Release one env field to an agent.** Needs: V.7a.
-  - `request_credential`, `kp:///…#field`, policy `fields` and `share --field` take `password`, `username`, `url`, `notes` or an env-named custom field.
-  - No other custom field ever leaves.
-  - T-8 is updated.
+  **Build:** `CredentialFields` becomes the one rule for what leaves by name: `password`, `username`, `url`, `notes`, or a custom field `EnvConvention.IsEnvNamedField` accepts (`[A-Z][A-Z0-9_]{0,127}`, not starting `KPEX_`, `KPXC_` or `KP2A_`) that is no standard name in any case; no other custom field ever leaves. `request_credential`'s schema, the bridge and the owner (`CredentialRequestRules`) take it, and `VaultCredentialSource` reads that field from the saved file only after a person's Allow or a rule. `kp:///<group>/<title>#<field>` takes it for `keypaste run --env-file` and the bridge's `run` tool, `policy.toml`'s `fields` takes it and `keypaste policy ls` names it, and `keypaste share --field` or a reference seals that one field under its name. Each prompt names the requested field, a run's as `entry · field`, and a grant for one field serves none of the entry's others. Any other name, such as `Recovery codes`, `otp` or `KP2A_URL_1`, is refused by the bridge and again by the owner before anyone is asked or anything read: the agent reads `keypaste: DENIED. The "field" argument must be password, username, url, notes or a custom field named like an environment variable. This call was recorded in the audit log.`, and its audit line records `field: invalid` and `method: invalid-request`. A reference or share naming one starts or uploads nothing. T-8 states which custom fields can leave. Traces to PRODUCT §§2 and 3 and T3.
+
+  **Verify (V-C.5a):** on a vault KeePassXC made, `api/OpenAI` holds distinct sentinels in its password, a protected `OPENAI_API_KEY`, `Recovery codes`, `otp` and `KP2A_URL_1`. A shipped `keypaste-mcp --expose 'api/**'` over stdio asks the app, held by `Keypaste.AppDriver hold`: the drawn prompt reads `field=OPENAI_API_KEY`, Allow once returns exactly its sentinel, audited with that field, and once a second request is allowed for 1 hour a `password` request still draws a prompt. `Recovery codes`, `otp`, `KP2A_URL_1` and `URL` each get the denial above and no prompt. Through `keypaste agent` with stdin at EOF, a rule with `fields = ["OPENAI_API_KEY"]` releases it as `policy` while `password` reaches a prompt, a rule naming `Recovery codes` releases nothing unprompted, and the `run` tool under `--allow-run` naming `kp:///api/OpenAI#OPENAI_API_KEY` is asked about as `api/OpenAI · OPENAI_API_KEY`. That reference given to `keypaste run --env-file` puts that sentinel in the child, and `#Recovery%20codes` starts nothing. `keypaste share --field OPENAI_API_KEY` and its reference form, against the Worker on loopback, make links `share-crypto.js` opens to that one field; `--field "Recovery codes"` uploads nothing. No other sentinel reaches a result, the wire, a child, a payload or the log.
+
+  A custom field released only in core or an in-process bridge, with no shipped `keypaste-mcp` request answered on a vault KeePassXC made, does not pass.
 - [ ] **C.5b — Expose tagged projects to agents.** Needs: C.1b, C.5a.
   - The default exposure becomes `env/**` plus `tag:env:*`, and `--expose` and policy rules accept tag selectors.
   - An entry reached only through a tag exposes only its env fields.

@@ -250,7 +250,6 @@ public sealed class AccessCommandTests
         Assert.Contains("including the one this change just took", harness.Err, StringComparison.Ordinal);
         Assert.Contains("Losing that file locks the vault", harness.Err, StringComparison.Ordinal);
         Assert.Contains("somewhere other than beside the vault", harness.Err, StringComparison.Ordinal);
-        Assert.Contains("restart it to use the new credentials", harness.Err, StringComparison.Ordinal);
         Assert.DoesNotContain(_next, harness.Err, StringComparison.Ordinal);
         Assert.DoesNotContain(_master, harness.Err, StringComparison.Ordinal);
     }

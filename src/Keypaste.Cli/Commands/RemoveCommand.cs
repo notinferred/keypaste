@@ -50,7 +50,7 @@ internal static class RemoveCommand
             return CliApp.ExitUsageError;
         }
 
-        return VaultSession.Open(path, line, context, vault =>
+        return VaultSession.OpenHeld(path, line, context, vault =>
         {
             if (vault.Find(entryPath) is null)
             {

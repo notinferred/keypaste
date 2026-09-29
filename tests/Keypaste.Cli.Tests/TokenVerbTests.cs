@@ -352,7 +352,7 @@ public sealed class TokenVerbTests : IDisposable
 
         Assert.Empty(_harness.Prompt.PromptsSeen);
         Assert.Empty(_harness.Out);
-        Assert.Contains("Lock it there first", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains("Run `keypaste lock` and try again.", _harness.Err, StringComparison.Ordinal);
         Assert.Equal(before, File.ReadAllBytes(_harness.VaultPath));
     }
 

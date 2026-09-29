@@ -61,7 +61,7 @@ internal static class EnvRemoveCommand
             return CliApp.ExitUsageError;
         }
 
-        return VaultSession.Open(path, line, context, vault =>
+        return VaultSession.OpenHeld(path, line, context, vault =>
         {
             var store = new EnvStore(vault);
 

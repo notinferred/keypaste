@@ -100,7 +100,7 @@ public sealed class RotateVerbTests : IDisposable
             _harness.AssertExit(CliApp.ExitInternalError, Rotate("Banking/Chase"));
         }
 
-        Assert.Contains("Lock it there first.", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains("Run `keypaste lock` and try again.", _harness.Err, StringComparison.Ordinal);
         Assert.Empty(_harness.Prompt.PromptsSeen);
         Assert.Equal(before, File.ReadAllBytes(_harness.VaultPath));
     }
