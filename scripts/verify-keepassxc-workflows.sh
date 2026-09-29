@@ -9,8 +9,8 @@
 # association and a revision KeePassXC wrote — and KeePassXC then attaches a binary and a text file.
 # Each vault is AES-KDF and KDBX 4.0, as KeePassXC writes them.
 #
-# On each vault: open, edit, restore a revision, organize, delete and recover, restore a backup,
-# export, and change access. The app half runs through tests/Keypaste.AppDriver, which presses the
+# On each vault: open, edit, restore a revision, set and remove custom fields, organize, delete and
+# recover, restore a backup, export, and change access. The app half runs through tests/Keypaste.AppDriver, which presses the
 # commands the desktop's screens bind to. After every write KeePassXC opens the vault with its current
 # factors, reads the value the workflow wrote, finds every unmodelled marker, exports both attachments
 # byte for byte, and reports the cipher and KDF it chose. Every refusal leaves the vault byte-identical
@@ -300,6 +300,19 @@ exercise() {
   did "the app's revision restore" app revision-restore "$db" servers/database 0
   expect "$db" servers/database Password pw-3
   expect "$db" servers/database kp94-secret kp94-secret-value
+  intact "$db" servers/database
+
+  step "[$kind] fields: the CLI sets a protected and a plain field on the entry KeePassXC made, and removes one"
+  new_pw=kp7a-secret-value
+  did "keypaste set --field" kp_cli "$db" set servers/database --field kp7a-secret
+  new_pw=kp7a-plain-value
+  did "keypaste set --field --plain" kp_cli "$db" set servers/database --field kp7a-plain --plain
+  new_pw=
+  expect "$db" servers/database kp7a-secret kp7a-secret-value
+  expect "$db" servers/database kp7a-plain kp7a-plain-value
+  did "keypaste field rm" kp_cli "$db" field rm servers/database kp7a-plain
+  value "$db" servers/database kp7a-plain >/dev/null 2>&1 && die "KeePassXC still finds the field keypaste removed"
+  refused "the CLI writing a field named Password" "$db" kp_cli "$db" set servers/database --field Password
   intact "$db" servers/database
 
   step "[$kind] organize: the app renames the group carrying CustomData and moves the entry out of it"

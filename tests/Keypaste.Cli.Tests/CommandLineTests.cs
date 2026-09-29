@@ -42,6 +42,20 @@ public sealed class CommandLineTests
     }
 
     [Fact]
+    public void ARepeatingOption_KeepsEveryValueInOrder_AndOthersStillRefuseTwo()
+    {
+        OptionSpec[] spec = [new("field", TakesValue: true, Repeats: true), new("vault", TakesValue: true)];
+
+        Assert.True(CommandLine.TryParse(["set", "--field", "B", "e", "--field=A", "--field", "--C"], 1, spec, out var line, out _));
+        Assert.Equal(["B", "A", "--C"], line.Values("field"));
+        Assert.Equal(["e"], line.Operands);
+        Assert.Empty(line.Values("vault"));
+
+        Assert.False(CommandLine.TryParse(["set", "--field", "A", "--vault", "a", "--vault", "b"], 1, spec, out _, out var error));
+        Assert.Contains("more than once", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void EqualsForm_AndSpaceForm_AreEquivalent()
     {
         Assert.True(CommandLine.TryParse(["get", "--vault=a"], 1, _spec, out var inline, out _));

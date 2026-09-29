@@ -6,7 +6,7 @@ This file holds open work only. Finishing a task removes it from here, adds its 
 
 ## Selection and evidence
 
-Only the next five tasks are detailed: V.7a, C.1a, V.7b, C.2 and N.1a. Later rows name a bounded outcome and the dependencies their own implementation or verifier needs; expand a selected later task before building it. Tasks are not marked implemented from a document, reader, mock response or consuming screen. Name the producer, transport, consumer and user action exercised, and retain the source/version and limitations of the observation.
+Only the next five tasks are detailed: C.1a, V.7b, C.2, N.1a and N.7. Later rows name a bounded outcome and the dependencies their own implementation or verifier needs; expand a selected later task before building it. Tasks are not marked implemented from a document, reader, mock response or consuming screen. Name the producer, transport, consumer and user action exercised, and retain the source/version and limitations of the observation.
 
 Needs are build dependencies. Ships after names publication gates. External signing identities are inputs, not a queue of enrollment code. A ready row does not authorize publication, account changes or messages. Preserve the secret-path tests, real KeePassXC compatibility, stale-write refusals and release integrity checks while changing product scope.
 
@@ -14,18 +14,6 @@ Needs are build dependencies. Ships after names publication gates. External sign
 
 Custom fields and tags are ordinary KeePass data: keypaste writes them as KeePassXC reads them, and every row keeps the permanent compatibility gates (PRODUCT §4.6). C.1a's tags include the project tags T4 builds on. The main screens show everyday password-manager work; advanced controls and security recommendations live in Settings (PRODUCT §5.8).
 
-- [ ] **V.7a — Manage custom fields in core and the CLI.** Needs: none.
-  **Build:** core lists an entry's custom fields by name and protected flag, never by value, and reads one value when asked. It sets one or several fields of one entry as a single edit that makes one history revision and reports what it touched through `Edited` (D-0318), and it removes a field. A new field is written protected unless `--plain` asks otherwise; an existing field keeps its flag.
-
-  These names are refused: empty names, names with control characters or edge whitespace, standard field names in any case, and KeePassXC's own attributes (`otp`, `TOTP Seed`, `TOTP Settings`, `_EXEC_CMD`, `KP2A_URL*`, `KPEX_*`, `KPXC_*`). Fields with those names stay readable and untouched. `UpdateEntry` never writes custom fields, and the `Vault.AddProtectedFieldUnchecked` test seam is removed.
-
-  The CLI gains `get <entry> --field <name>`, `set <entry> --field <name>`, `field ls <entry> [--json]` and `field rm <entry> <name>`. A new `verify-keepassxc-fields.sh` joins the compatibility matrix and the workflows gate gains a field step; secret-path tests are mandatory. Traces to PRODUCT §§1, 2, 4.5 and 4.6.
-
-  **Verify (V-V.7a):** the vault is one KeePassXC made by importing XML. The shipped CLI sets a protected field and changes a plain one. Real KeePassXC reads both with `show -a`, and its XML export marks exactly the protected one. The entry keeps its other field, tag, attachment and `otp`, and the header still says KDBX 4.0.
-
-  After `keepassxc-cli merge` brings in a newer copy of the entry, `keypaste get --field` prints KeePassXC's value and history holds the old one. Setting three fields makes one revision. `--field otp`, `--field Password` and `--field password` are refused, and the file stays byte-identical. `field ls` and `ls` output contain none of the sentinel values.
-
-  A core-only test does not pass, and neither does a vault keypaste wrote standing in for KeePassXC's side.
 - [ ] **C.1a — Tag entries into projects and environments.** Needs: none.
   **Build:** core reads an entry's own tags and adds or removes one as an edit with a revision. It refuses a tag holding `,`, `;`, a tab, a control character or edge whitespace, and never reads or writes group tags.
 
@@ -94,11 +82,12 @@ Custom fields and tags are ordinary KeePass data: keypaste writes them as KeePas
   The sidebar's automation tree lists exactly the four places and the project rows. The MCP card and the second search box are absent. `EntriesViewLayoutTests` holds at 960 px, and each captured frame has one amber element.
 
   An act left unreachable, or a removed row still listed, leaves the row open.
-- [ ] **N.7 — Apply the amended brand.** Needs: none. This follows [BRAND](BRAND.md) as amended on 2026-09-28:
-  - The theme follows the system.
-  - Titles and headings use the sans face, and mono is kept for machine-readable text.
-  - The voice is plain and calm.
-  - The CLI help carries the v1.8 positioning line.
+- [ ] **N.7 — Apply the amended brand.** Needs: none.
+  **Build:** the app follows [BRAND](BRAND.md) as amended on 2026-09-28. With no theme chosen, `AppSettings.Default` and `App.axaml` follow the system's light or dark setting, as it changes; Light or Dark chosen in Settings still wins. Titles and headings, the item title in its pane among them, use Instrument Sans at BRAND's sizes, and keys, values, references, paths, commands and timestamps stay Fragment Mono. The copy on the main screens and in the prompts follows BRAND's voice without dropping what T-2's evidence relies on. The first line of `keypaste --help` carries PRODUCT §1's positioning within 80 columns. The keypaste-design skill applies. Traces to PRODUCT §§1 and 5.8.
+
+  **Verify (V-N.7):** with no `app.toml`, a frame captured under a light platform setting has the light app background and one under a dark setting the dark background, and a choice in Settings overrides either. `ScreenRenderer` renders every screen in both palettes, and each frame has one amber element. The rendered item title and headings use Instrument Sans, and a key and a value Fragment Mono. `CliAppTests` pins the new help line, which fits 80 columns.
+
+  A palette shown only in a token file does not pass.
 - [ ] **N.2 — Offer the person's KeePassXC database on first run.** Needs: none.
   - With no recent vault, the welcome offers three things: the databases KeePassXC last opened, opening another file, and creating a vault. The databases are read only from `LastActiveDatabase`, `LastOpenedDatabases` and `LastDatabases` in KeePassXC's local `keepassxc.ini`.
   - The lock screen stops mentioning agents.

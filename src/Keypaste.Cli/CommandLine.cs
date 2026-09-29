@@ -4,7 +4,8 @@ namespace Keypaste.Cli;
 /// <param name="Name">The long name, without the leading dashes.</param>
 /// <param name="TakesValue">Whether the option consumes a following value.</param>
 /// <param name="Short">The one-letter alias, written <c>-x</c>, or <c>'\0'</c> for none.</param>
-internal readonly record struct OptionSpec(string Name, bool TakesValue, char Short = '\0');
+/// <param name="Repeats">Whether the option may be given more than once, each value kept in order.</param>
+internal readonly record struct OptionSpec(string Name, bool TakesValue, char Short = '\0', bool Repeats = false);
 
 /// <summary>
 /// A hand-rolled parser for one verb's arguments.
@@ -19,11 +20,13 @@ internal readonly record struct OptionSpec(string Name, bool TakesValue, char Sh
 internal sealed class CommandLine
 {
     private readonly Dictionary<string, string?> _options;
+    private readonly Dictionary<string, List<string>> _values;
     private readonly List<string> _operands;
 
-    private CommandLine(Dictionary<string, string?> options, List<string> operands)
+    private CommandLine(Dictionary<string, string?> options, Dictionary<string, List<string>> values, List<string> operands)
     {
         _options = options;
+        _values = values;
         _operands = operands;
     }
 
@@ -39,6 +42,9 @@ internal sealed class CommandLine
     /// <summary>The value of an option, or <see langword="null"/> if it was not given.</summary>
     internal string? Value(string name) => _options.TryGetValue(name, out var value) ? value : null;
 
+    /// <summary>Every value an option was given, in order; empty if it was not given.</summary>
+    internal IReadOnlyList<string> Values(string name) => _values.TryGetValue(name, out var values) ? values : [];
+
     /// <summary>
     /// Parses <paramref name="args"/> from <paramref name="start"/> against <paramref name="spec"/>.
     /// </summary>
@@ -51,8 +57,9 @@ internal sealed class CommandLine
         out string error)
     {
         Dictionary<string, string?> options = new(StringComparer.Ordinal);
+        Dictionary<string, List<string>> values = new(StringComparer.Ordinal);
         List<string> operands = [];
-        line = new CommandLine(options, operands);
+        line = new CommandLine(options, values, operands);
         error = string.Empty;
 
         var operandsOnly = false;
@@ -108,7 +115,7 @@ internal sealed class CommandLine
                 return false;
             }
 
-            if (options.ContainsKey(name))
+            if (options.ContainsKey(name) && !declared.Value.Repeats)
             {
                 error = $"option '--{name}' given more than once";
                 return false;
@@ -126,21 +133,23 @@ internal sealed class CommandLine
                 continue;
             }
 
-            if (inlineValue is not null)
-            {
-                options[name] = inlineValue;
-                continue;
-            }
-
             // A value is consumed positionally even if it looks like an option, so that
             // --notes '--not-a-flag' and passwords beginning with dashes are expressible.
-            if (i + 1 >= args.Length)
+            if (inlineValue is null && i + 1 >= args.Length)
             {
                 error = $"option '--{name}' needs a value";
                 return false;
             }
 
-            options[name] = args[++i];
+            var value = inlineValue ?? args[++i];
+            options[name] = value;
+
+            if (!values.TryGetValue(name, out var given))
+            {
+                values[name] = given = [];
+            }
+
+            given.Add(value);
         }
 
         return true;

@@ -30,7 +30,7 @@ A credential request runs: MCP client â†’ `Mcp/Tools/RequestCredentialTool.cs` â
 
 | Concern | Files |
 |---|---|
-| Open, save, entries, history, recycle bin | `Vault.cs`, `VaultEntry.cs`, `EntryName.cs`, `EntryHandle.cs`, `EntryRevision.cs`, `RecycledEntry.cs` |
+| Open, save, entries, custom fields, history, recycle bin | `Vault.cs`, `VaultEntry.cs`, `EntryField.cs` and `FieldNameRules.cs` (which custom fields keypaste writes), `EntryName.cs`, `EntryHandle.cs`, `EntryRevision.cs`, `RecycledEntry.cs` |
 | Organize and search | `VaultOrganization.cs`, `VaultNameRules.cs`, `VaultSearch.cs` |
 | Creation, unlock factors and access changes | `VaultCreation.cs`, `VaultKeyfile.cs`, `VaultAccess.cs`, `VaultLocation.cs`; a hardware key's challenge-response factor in `HardwareKeys/` |
 | Backups, restore and export | `VaultBackups.cs` |

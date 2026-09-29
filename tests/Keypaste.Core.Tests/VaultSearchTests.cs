@@ -105,9 +105,6 @@ public sealed class VaultSearchTests : IDisposable
         Assert.Empty(vault.Search("recovery-code-in-the-notes"));
     }
 
-    /// <summary>
-    /// A field keypaste does not model, written by another client, is preserved and not searched.
-    /// </summary>
     [Fact]
     public void AProtectedCustomFieldIsNotMatched()
     {
@@ -115,7 +112,7 @@ public sealed class VaultSearchTests : IDisposable
 
         using (var vault = Seeded(path))
         {
-            vault.AddProtectedFieldUnchecked(new EntryName("servers", "PROD_DB"), "TOTP Seed", "custom-field-secret");
+            vault.SetFields(new EntryName("servers", "PROD_DB"), [new FieldWrite("Recovery code", "custom-field-secret")]);
             vault.Save();
         }
 

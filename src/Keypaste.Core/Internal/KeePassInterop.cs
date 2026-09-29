@@ -595,25 +595,86 @@ internal sealed class KeePassInterop : IDisposable
         return GroupOutcome.Renamed;
     }
 
-    /// <summary>
-    /// Writes a protected custom string onto an entry, which keypaste has no other way to make.
-    /// </summary>
-    /// <remarks>
-    /// A test seam, for the reason D-0255 gives about <see cref="AddGroupUnchecked"/>: a TOTP seed
-    /// or an API secret in a custom field is a shape KeePassXC writes every day, keypaste preserves
-    /// and keypaste must never search. Without a way to put one in a fixture, that last claim can
-    /// only be argued from the implementation.
-    /// </remarks>
-    internal void AddProtectedFieldUnchecked(EntryName name, string field, string value)
+    /// <summary>The custom fields of the one entry with this name, by name and flag, or null when there is no such entry.</summary>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal IReadOnlyList<EntryField>? ReadFields(EntryName name)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         if (Locate(name) is not { } found)
         {
-            throw new VaultException($"'{name.Title}' is not in this vault.");
+            return null;
         }
 
-        found.Entry.Strings.Set(field, new ProtectedString(true, value));
+        return
+        [
+            .. found.Entry.Strings
+                .Where(field => !PwDefs.IsStandardField(field.Key))
+                .OrderBy(field => field.Key, StringComparer.Ordinal)
+                .Select(field => new EntryField(field.Key, field.Value.IsProtected, !FieldNameRules.IsWritable(field.Key, out _))),
+        ];
+    }
+
+    /// <summary>One custom field's value, or null when there is no such entry or no such field.</summary>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal string? ReadCustomField(EntryName name, string field)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        return Locate(name) is { } found && !PwDefs.IsStandardField(field)
+            ? found.Entry.Strings.Get(field)?.ReadString()
+            : null;
+    }
+
+    /// <summary>Applies every write to one entry as one edit with one history revision.</summary>
+    /// <returns>0 when there is no such entry, otherwise 1.</returns>
+    /// <remarks>The caller has checked the names; a write that keeps a value names a field that exists.</remarks>
+    /// <exception cref="VaultException">More than one entry answers to that name, or a write keeps the value of a field the entry does not have. Nothing is changed.</exception>
+    internal int SetFields(EntryName name, IReadOnlyList<FieldWrite> writes)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (Locate(name) is not { } found)
+        {
+            return 0;
+        }
+
+        PwEntry entry = found.Entry;
+
+        if (writes.FirstOrDefault(write => write.Value is null && !entry.Strings.Exists(write.Name)) is { } missing)
+        {
+            throw new VaultException($"'{name.Title}' has no field '{missing.Name}'.");
+        }
+
+        entry.CreateBackup(_database);
+
+        foreach (FieldWrite write in writes)
+        {
+            ProtectedString? existing = entry.Strings.Get(write.Name);
+            bool protect = write.Protect ?? existing?.IsProtected ?? true;
+            entry.Strings.Set(write.Name, new ProtectedString(protect, write.Value ?? existing!.ReadString()));
+        }
+
+        entry.Touch(true);
+        return 1;
+    }
+
+    /// <summary>Removes one custom field as an edit with one history revision.</summary>
+    /// <returns>0 when there is no such entry or field, otherwise 1.</returns>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal int RemoveField(EntryName name, string field)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (Locate(name) is not { } found || !found.Entry.Strings.Exists(field))
+        {
+            return 0;
+        }
+
+        found.Entry.CreateBackup(_database);
+        found.Entry.Strings.Remove(field);
+        found.Entry.Touch(true);
+        return 1;
     }
 
     /// <summary>Sets an entry's expiry, which only KeePassXC writes, for a fixture to hold one.</summary>
@@ -2544,9 +2605,9 @@ internal sealed class KeePassInterop : IDisposable
     }
 
     /// <summary>
-    /// Writes a vault the way another KeePass application might: a chosen KDF and cipher, a custom
-    /// field, an attachment, a tag, a custom icon, history, a recycle bin and a <c>.keypaste</c>
-    /// group. A test seam; keypaste writes none of these itself.
+    /// Writes a vault the way another KeePass application might: a chosen KDF and cipher, custom
+    /// fields including KeePassXC's <c>otp</c>, an attachment, a tag, a custom icon, history, a
+    /// recycle bin and a <c>.keypaste</c> group. A test seam; keypaste writes none of these itself.
     /// </summary>
     /// <param name="path">Where to write it.</param>
     /// <param name="utf8Password">Its password; the caller zeroes it.</param>
@@ -2591,6 +2652,7 @@ internal sealed class KeePassInterop : IDisposable
             checking.Strings.Set(PwDefs.PasswordField, new ProtectedString(true, "v2"));
             checking.Strings.Set(PwDefs.UserNameField, new ProtectedString(false, "holder"));
             checking.Strings.Set("PIN", new ProtectedString(true, "4321"));
+            checking.Strings.Set("otp", new ProtectedString(true, "otpauth://totp/Bank?secret=JBSWY3DPEHPK3PXP"));
             checking.Binaries.Set("statement.txt", new ProtectedBinary(false, Encoding.UTF8.GetBytes("statement bytes")));
             checking.Tags.Add("finance");
             checking.CustomIconUuid = icon.Uuid;

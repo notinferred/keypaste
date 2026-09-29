@@ -1,9 +1,10 @@
 using System.Globalization;
 using Keypaste.Cli.Clipboard;
+using Keypaste.Core;
 
 namespace Keypaste.Cli.Commands;
 
-/// <summary>Retrieves a password: <c>keypaste get &lt;entry&gt;</c>.</summary>
+/// <summary>Retrieves a password, or one custom field: <c>keypaste get &lt;entry&gt; [--field &lt;name&gt;]</c>.</summary>
 /// <remarks>
 /// Without <c>--reveal</c> (or its older spelling <c>--show</c>) the secret goes to the clipboard and never to stdout. That is the whole
 /// point of the verb: a password on stdout ends up in shell history, scrollback, and CI logs.
@@ -22,6 +23,7 @@ internal static class GetCommand
     [
         new("vault", TakesValue: true),
         new("keyfile", TakesValue: true),
+        new("field", TakesValue: true),
         new("show", TakesValue: false),
         new("reveal", TakesValue: false),
         new("timeout", TakesValue: true),
@@ -37,7 +39,7 @@ internal static class GetCommand
 
         if (line.WantsHelp)
         {
-            context.Stdout.WriteLine("usage: keypaste get <entry> [--reveal | --show] [--timeout <seconds>]");
+            context.Stdout.WriteLine("usage: keypaste get <entry> [--field <name>] [--reveal | --show] [--timeout <seconds>]");
             return CliApp.ExitSuccess;
         }
 
@@ -50,6 +52,19 @@ internal static class GetCommand
         if (line.Operands.Count != 1)
         {
             context.Stderr.WriteLine("keypaste get: expected exactly one entry name");
+            return CliApp.ExitUsageError;
+        }
+
+        var field = line.Value("field");
+        if (field is { Length: 0 })
+        {
+            context.Stderr.WriteLine("keypaste get: the field name cannot be empty");
+            return CliApp.ExitUsageError;
+        }
+
+        if (field is not null && FieldNameRules.IsStandard(field))
+        {
+            context.Stderr.WriteLine($"keypaste get: '{field}' is one of the entry's standard fields; without --field, get reads the password");
             return CliApp.ExitUsageError;
         }
 
@@ -81,24 +96,31 @@ internal static class GetCommand
                 return CliApp.ExitNotFound;
             }
 
+            var secret = field is null ? entry.Password : vault.ReadField(EntryName.Of(entry), field);
+            if (secret is null)
+            {
+                context.Stderr.WriteLine($"keypaste get: '{entryPath}' has no field '{field}'");
+                return CliApp.ExitNotFound;
+            }
+
             if (show)
             {
-                context.Stdout.WriteLine(entry.Password);
+                context.Stdout.WriteLine(secret);
                 return CliApp.ExitSuccess;
             }
 
-            return Copy(context, entry.Password, timeout);
+            return Copy(context, secret, timeout);
         });
     }
 
-    private static int Copy(CliContext context, string password, int timeoutSeconds)
+    private static int Copy(CliContext context, string secret, int timeoutSeconds)
     {
-        var status = context.Clipboard.TrySet(password, out var error);
+        var status = context.Clipboard.TrySet(secret, out var error);
         if (status != ClipboardStatus.Ok)
         {
             // Never fall back to printing the secret. A user who wants it on stdout says so.
             context.Stderr.WriteLine(status == ClipboardStatus.NoDisplay
-                ? $"keypaste get: {error}. Use --show to print the password instead."
+                ? $"keypaste get: {error}. Use --show to print it instead."
                 : $"keypaste get: could not use the clipboard: {error}. Use --show instead.");
             return CliApp.ExitInternalError;
         }

@@ -252,6 +252,101 @@ public sealed class Vault : IDisposable
         return Change(() => _interop.UpdateEntry(entry) > 0, updated => updated ? VaultEdit.Of(EntryName.Of(entry)) : null);
     }
 
+    /// <summary>The custom fields of the one entry with this name, by name and protection, never by value.</summary>
+    /// <param name="name">The entry.</param>
+    /// <returns>Its custom fields in ordinal order of name, or null when no entry answers to that name.</returns>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    public IReadOnlyList<EntryField>? Fields(EntryName name)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+
+        return _interop.ReadFields(name);
+    }
+
+    /// <summary>One custom field's value.</summary>
+    /// <param name="name">The entry.</param>
+    /// <param name="field">The field's name, matched exactly.</param>
+    /// <returns>The value, or null when there is no such entry or no such field.</returns>
+    /// <remarks>Any custom field is readable, including one keypaste will not write (<see cref="EntryField.IsReadOnly"/>).</remarks>
+    /// <exception cref="ArgumentException"><paramref name="field"/> is a standard field, which <see cref="Find(EntryName)"/> reads.</exception>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    public string? ReadField(EntryName name, string field)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(field);
+
+        if (FieldNameRules.IsStandard(field))
+        {
+            throw new ArgumentException($"'{field}' is a standard field, not a custom one.", nameof(field));
+        }
+
+        return _interop.ReadCustomField(name, field);
+    }
+
+    /// <summary>Sets one or several custom fields of one entry as a single edit. Call <see cref="Save"/> to persist it.</summary>
+    /// <param name="name">The entry.</param>
+    /// <param name="writes">The fields to write, each named once.</param>
+    /// <returns><see langword="true"/> if the entry was found and written.</returns>
+    /// <remarks>
+    /// The whole set makes one history revision, as KeePassXC's own edit does, and the edit names the
+    /// entry (D-0318). A new field is protected unless its write says otherwise; an existing one keeps
+    /// its flag unless its write names one. Standard fields and the entry's other data are untouched.
+    /// </remarks>
+    /// <exception cref="VaultException">
+    /// A name is not writable (<see cref="FieldNameRules.IsWritable"/>), two writes share a name, a
+    /// write keeps the value of a field the entry does not have, or more than one entry answers to
+    /// that name. Nothing is changed.
+    /// </exception>
+    public bool SetFields(EntryName name, IReadOnlyList<FieldWrite> writes)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(writes);
+
+        if (writes.Count == 0)
+        {
+            throw new VaultException("No field was named.");
+        }
+
+        HashSet<string> named = new(StringComparer.Ordinal);
+
+        foreach (FieldWrite write in writes)
+        {
+            if (!FieldNameRules.IsWritable(write.Name, out string error))
+            {
+                throw FieldRefused(error);
+            }
+
+            if (!named.Add(write.Name))
+            {
+                throw new VaultException($"'{write.Name}' is named twice.");
+            }
+        }
+
+        return Change(() => _interop.SetFields(name, writes) > 0, written => written ? VaultEdit.Of(name) : null);
+    }
+
+    /// <summary>Removes one custom field as an edit with one history revision. Call <see cref="Save"/> to persist it.</summary>
+    /// <param name="name">The entry.</param>
+    /// <param name="field">The field's name, matched exactly.</param>
+    /// <returns><see langword="true"/> if the field was there and was removed.</returns>
+    /// <exception cref="VaultException">The name is not writable, or more than one entry answers to that name. Nothing is changed.</exception>
+    public bool RemoveField(EntryName name, string field)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(field);
+
+        if (!FieldNameRules.IsWritable(field, out string error))
+        {
+            throw FieldRefused(error);
+        }
+
+        return Change(() => _interop.RemoveField(name, field) > 0, removed => removed ? VaultEdit.Of(name) : null);
+    }
+
     /// <summary>The earlier states KeePass history keeps for the one entry with this name, newest
     /// first.</summary>
     /// <remarks>
@@ -770,15 +865,6 @@ public sealed class Vault : IDisposable
         return new ImportResult(
             copied.Count, _interop.ReadGroupPaths().Count - groupsBefore, copied.Count(shared.Contains), edit);
     }
-
-    /// <summary>Writes a protected custom string onto an entry. A test seam; nothing else uses it.</summary>
-    /// <remarks>
-    /// Internal for the reason <see cref="AddGroupUnchecked"/> is: it exists so a fixture can hold
-    /// the custom fields KeePassXC writes, which keypaste preserves and <see cref="Search"/> must
-    /// never read.
-    /// </remarks>
-    internal void AddProtectedFieldUnchecked(EntryName name, string field, string value) =>
-        Change(() => _interop.AddProtectedFieldUnchecked(name, field, value), VaultEdit.Of(name));
 
     /// <summary>Sets an entry's expiry. A test seam; KeePassXC is what writes expiry.</summary>
     internal void SetExpiryUnchecked(EntryName name, DateTimeOffset? expires) =>
@@ -1445,6 +1531,10 @@ public sealed class Vault : IDisposable
                 return true;
             },
             _ => touched ?? VaultEdit.Of());
+
+    /// <summary>A refused field name, as a sentence.</summary>
+    private static VaultException FieldRefused(string error) =>
+        new(string.Concat(char.ToUpperInvariant(error[0]).ToString(), error.AsSpan(1), "."));
 
     /// <summary>Whether a group path is <paramref name="groupPath"/> or lies inside it.</summary>
     private static bool IsBeneath(string candidate, string groupPath) =>

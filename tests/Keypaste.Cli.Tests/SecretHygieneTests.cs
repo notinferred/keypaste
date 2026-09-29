@@ -14,6 +14,11 @@ public sealed class SecretHygieneTests
     internal const string SentinelUsername = "SENTINEL-USER-4a17";
     internal const string SentinelNotes = "SENTINEL-NOTES-c08e";
     internal const string SentinelUrl = "https://example.invalid/SENTINEL-URL-2d55";
+    internal const string SentinelField = "SENTINEL-FIELD-5e02";
+    internal const string SentinelPlainField = "SENTINEL-PLAIN-FIELD-a7d9";
+
+    private static readonly string[] _everySentinel =
+        [SentinelPassword, SentinelUsername, SentinelNotes, SentinelUrl, SentinelField, SentinelPlainField];
 
     /// <summary>Where <c>env set hygiene GENERATED</c> lands, for reading back with <c>get</c>.</summary>
     internal const string EnvPath = "env/hygiene/GENERATED";
@@ -37,6 +42,11 @@ public sealed class SecretHygieneTests
     [InlineData("env", "export", "hygiene")]
     [InlineData("env", "diff", "hygiene")]
     [InlineData("ls", "--json")]
+    [InlineData("field", "ls", "secrets/target")]
+    [InlineData("field", "ls", "secrets/target", "--json")]
+    [InlineData("field", "rm", "secrets/target", "Region")]
+    [InlineData("get", "secrets/target", "--field", "API Secret")]
+    [InlineData("set", "secrets/target", "--field", "API Secret")]
     [InlineData("set", "secrets/target")]
     [InlineData("set", "secrets/target", "--generate")]
     [InlineData("set", "secrets/new", "--generate", "--words", "4")]
@@ -56,7 +66,7 @@ public sealed class SecretHygieneTests
         var args = verb.Concat(["--vault", harness.VaultPath]).ToArray();
         harness.Run(args);
 
-        foreach (var sentinel in new[] { SentinelPassword, SentinelUsername, SentinelNotes, SentinelUrl })
+        foreach (var sentinel in _everySentinel)
         {
             Assert.DoesNotContain(sentinel, harness.Out, StringComparison.Ordinal);
             Assert.DoesNotContain(sentinel, harness.Err, StringComparison.Ordinal);
@@ -120,7 +130,7 @@ public sealed class SecretHygieneTests
         harness.Prompt.Enqueue(Master);
         harness.Run("env", "pull", "hygiene", path, "--yes", "--keep", "--vault", harness.VaultPath);
 
-        foreach (var sentinel in new[] { SentinelPassword, SentinelUsername, SentinelNotes, SentinelUrl })
+        foreach (var sentinel in _everySentinel)
         {
             Assert.DoesNotContain(sentinel, harness.Out, StringComparison.Ordinal);
             Assert.DoesNotContain(sentinel, harness.Err, StringComparison.Ordinal);
@@ -334,7 +344,7 @@ public sealed class SecretHygieneTests
         Assert.Equal(print ? link + Environment.NewLine : string.Empty, harness.Out);
         Assert.DoesNotContain(key, harness.Err, StringComparison.Ordinal);
 
-        foreach (var sentinel in new[] { SentinelPassword, SentinelUsername, SentinelNotes, SentinelUrl })
+        foreach (var sentinel in _everySentinel)
         {
             Assert.DoesNotContain(sentinel, harness.Out, StringComparison.Ordinal);
             Assert.DoesNotContain(sentinel, harness.Err, StringComparison.Ordinal);
@@ -362,6 +372,12 @@ public sealed class SecretHygieneTests
         // against a real secret rather than an empty project.
         harness.Prompt.Enqueue(Master, SentinelPassword);
         harness.Run("env", "set", "hygiene", "API_KEY", "--vault", harness.VaultPath);
+
+        // Custom fields, one protected and one plain, so the sweep covers what `field ls` names.
+        harness.Prompt.Enqueue(Master, SentinelField);
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("set", "secrets/target", "--field", "API Secret", "--vault", harness.VaultPath));
+        harness.Prompt.Enqueue(Master, SentinelPlainField);
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("set", "secrets/target", "--field", "Region", "--plain", "--vault", harness.VaultPath));
 
         harness.Stdout.GetStringBuilder().Clear();
         harness.Stderr.GetStringBuilder().Clear();

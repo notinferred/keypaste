@@ -132,7 +132,7 @@ public sealed class CliAppTests
             .Select(line => line.Split(' ', StringSplitOptions.RemoveEmptyEntries)[0])
             .ToList();
 
-        Assert.Equal(19, verbs.Count);
+        Assert.Equal(20, verbs.Count);
 
         foreach (var verb in verbs)
         {
@@ -154,7 +154,8 @@ public sealed class CliAppTests
             "",
             "SECRETS",
             "  get       copy a secret to the clipboard, or print it with --reveal",
-            "  set       create or update a secret",
+            "  set       create or update a secret, or its custom fields",
+            "  field     list or remove an entry's custom fields",
             "  rotate    replace a secret with a new generated one",
             "  run       run a command with secrets in its environment",
             "  env       import, export and diff .env profiles",
@@ -180,8 +181,8 @@ public sealed class CliAppTests
             "FLAGS",
             $"  --vault <path>    which vault to use, or set {VaultLocator.EnvironmentVariable}",
             $"  --keyfile <path>  the keyfile it needs too, or set {VaultLocator.KeyfileEnvironmentVariable}",
-            "  --json            machine-readable output from ls, env ls, log, grants,",
-            "                    token ls, share ls and mcp policy",
+            "  --json            machine-readable output from ls, field ls, env ls, log,",
+            "                    grants, token ls, share ls and mcp policy",
             "  -h, --help        help for any command",
             "",
             "  agent is mcp serve, setup is mcp setup, version prints the version.",

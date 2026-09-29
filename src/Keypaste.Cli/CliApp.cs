@@ -117,6 +117,9 @@ internal static class CliApp
             case "set":
                 return SetCommand.Execute(args, context);
 
+            case "field":
+                return FieldCommand.Execute(args, context);
+
             case "grants":
                 return GrantsCommand.Execute(args, context);
 
@@ -160,7 +163,8 @@ internal static class CliApp
         ("SECRETS",
         [
             ("get", "copy a secret to the clipboard, or print it with --reveal"),
-            ("set", "create or update a secret"),
+            ("set", "create or update a secret, or its custom fields"),
+            ("field", "list or remove an entry's custom fields"),
             ("rotate", "replace a secret with a new generated one"),
             ("run", "run a command with secrets in its environment"),
             ("env", "import, export and diff .env profiles"),
@@ -215,8 +219,8 @@ internal static class CliApp
         writer.WriteLine(Muted("FLAGS"));
         writer.WriteLine($"  --vault <path>    which vault to use, or set {VaultLocator.EnvironmentVariable}");
         writer.WriteLine($"  --keyfile <path>  the keyfile it needs too, or set {VaultLocator.KeyfileEnvironmentVariable}");
-        writer.WriteLine("  --json            machine-readable output from ls, env ls, log, grants,");
-        writer.WriteLine("                    token ls, share ls and mcp policy");
+        writer.WriteLine("  --json            machine-readable output from ls, field ls, env ls, log,");
+        writer.WriteLine("                    grants, token ls, share ls and mcp policy");
         writer.WriteLine("  -h, --help        help for any command");
         writer.WriteLine();
         writer.WriteLine("  agent is mcp serve, setup is mcp setup, version prints the version.");
