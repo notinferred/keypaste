@@ -50,6 +50,11 @@
     <Setter Property="VerticalContentAlignment" Value="Center" />
   </Style>
 
+  <!-- Items' table: one line a row, as KeePassXC's entry table draws them. -->
+  <Style Selector="ListBox.rows.table > ListBoxItem">
+    <Setter Property="MinHeight" Value="36" />
+  </Style>
+
   <Style Selector="ListBox.nav > ListBoxItem">
     <Setter Property="MinHeight" Value="34" />
     <Setter Property="Height" Value="34" />
@@ -76,6 +81,22 @@
   </Style>
   <Style Selector="ListBox.nav > ListBoxItem:selected ctl|KpIcon">
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+  </Style>
+  <!-- The group tree under Items is denser than the places, and its heading is a label, not a row. -->
+  <Style Selector="ListBox.nav > ListBoxItem.group">
+    <Setter Property="Height" Value="28" />
+    <Setter Property="MinHeight" Value="28" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="Normal" />
+  </Style>
+  <Style Selector="ListBox.nav > ListBoxItem.heading">
+    <Setter Property="Height" Value="30" />
+    <Setter Property="MinHeight" Value="30" />
+    <Setter Property="VerticalContentAlignment" Value="Bottom" />
+    <Setter Property="Padding" Value="10,0,10,4" />
+  </Style>
+  <Style Selector="ListBox.nav > ListBoxItem.heading /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
   </Style>
   <!-- The footer rows (Settings, Trash) are quieter than the destinations above them. -->
   <Style Selector="ListBox.nav.quiet > ListBoxItem">

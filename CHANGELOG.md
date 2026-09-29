@@ -8,6 +8,8 @@ Upgrade the bridge and `keypaste agent` together: they must be the same version,
 
 keypaste has a new brand: an icon "k." and a wordmark "keypaste." in Hepta Slab with an amber dot, amber on ink, Instrument Sans and Fragment Mono ([BRAND](docs/BRAND.md)). The desktop app is rebuilt on it, with restyled screens, a new lock screen and restyled prompt windows, and keypaste.com and the README use it too.
 
+Items is laid out as KeePassXC's main window: the vault's groups fold under Items in the sidebar, with your projects under their own heading; the list is a table of titles, kinds and groups above the chosen item's preview, whose fields read one line each; and a new item, an edit or a comparison of two revisions takes the whole view ([N.14](docs/steps/N.14.md)).
+
 Screen readers now announce the desktop's icon-and-text buttons by their labels, the three Copy buttons by what they copy, and item rows by their titles, instead of by control type names ([F.25](docs/steps/F.25.md)).
 
 The desktop follows your system's light or dark setting unless Settings chooses one. Item titles are set in Instrument Sans, status text is darker and readable on the light palette, and every screen in both palettes keeps amber for its one main action or live signal. The icon and wordmark replace the monogram in the app, its icons, keypaste.com and the README, and `keypaste --help` opens with what keypaste is ([N.7](docs/steps/N.7.md)).

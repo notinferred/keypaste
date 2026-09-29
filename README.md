@@ -9,7 +9,7 @@
 <p align="center">keypaste keeps your logins and your projects' secrets in one KeePass-compatible vault, and gives an AI agent a secret only when you allow it.</p>
 
 <p align="center">
-  <img src="docs/screenshots/secrets.png" width="880" alt="The keypaste desktop app on Items: a github login open with its username, masked password, URL, notes, custom fields and tags, beside the list of logins and env variables and the sidebar's four places.">
+  <img src="docs/screenshots/secrets.png" width="880" alt="The keypaste desktop app on Items, laid out as KeePassXC: the vault's groups and projects in the sidebar, a table of logins and env variables, and the chosen github login's username, masked password, URL, notes and custom fields previewed below it.">
 </p>
 
 <p align="center"><sub>The desktop app, built from source. It has no public release yet.</sub></p>

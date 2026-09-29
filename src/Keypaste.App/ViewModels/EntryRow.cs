@@ -142,14 +142,14 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
     /// <summary>The icon the row draws for its kind.</summary>
     internal string Icon => EntryKinds.Icon(Kind);
 
-    /// <summary>The row's second line: its kind, then where it lives.</summary>
-    /// <remarks>A variable says its project and profile rather than the <c>env/…</c> group path they are stored under.</remarks>
-    internal string Summary =>
+    /// <summary>The kind column: login, variable, note and so on.</summary>
+    internal string KindLabel => EntryKinds.Label(Kind);
+
+    /// <summary>The group column: a variable's project and profile, or the group, or a dash at the root.</summary>
+    internal string Place =>
         EnvPlace.Of(GroupPath, Title) is { } place
-            ? $"{EntryKinds.Label(Kind)} · {EntryNameSanitizer.Sanitize(place.Project).Text} · {place.Profile}"
-            : GroupPath.Length == 0
-                ? EntryKinds.Label(Kind)
-                : $"{EntryKinds.Label(Kind)} · {Where}";
+            ? $"{EntryNameSanitizer.Sanitize(place.Project).Text} · {place.Profile}"
+            : Where;
 
     /// <summary>
     /// Which fields a person cannot see on this row the query was found in, worded for the list.

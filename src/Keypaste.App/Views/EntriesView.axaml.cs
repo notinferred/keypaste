@@ -6,6 +6,7 @@ using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using Keypaste.App.ViewModels;
 
 namespace Keypaste.App.Views;
 
@@ -15,29 +16,29 @@ namespace Keypaste.App.Views;
 /// <remarks>
 /// Everything this screen does — searching, building the group tree, reading and writing the vault —
 /// belongs to <see cref="ViewModels.EntriesViewModel"/>, which names no Avalonia type and is
-/// therefore assertable with no application and no display. The one thing here is the screen's two
+/// therefore assertable with no application and no display. What is here is layout: the screen's two
 /// menus, the list's "+" and the pane's ⋯, each of which opens with focus on its first item and closes
-/// on a choice, Escape or a press elsewhere: a matter of where the pointer and the keyboard went rather
-/// than of anything in the vault.
+/// on a choice, Escape or a press elsewhere; and the list's row, which folds away while the item takes
+/// the whole view and comes back at the height it was dragged to.
 /// </remarks>
 internal sealed partial class EntriesView : UserControl
 {
-    /// <summary>How wide the screen must be for the group tree to start open: room for it, the list and a pane that shows a long password whole.</summary>
-    internal const double TreeOpensAt = 960d;
+    /// <summary>The list's least height beside the preview (D-0344).</summary>
+    internal const double ListMinHeight = 100d;
 
     /// <summary>Each menu's toggle, by name, and the panel it opens.</summary>
     private static readonly (string Toggle, string Panel)[] _menus = [("EntryMenu", "EntryMenuPanel"), ("AddEntry", "AddMenuPanel")];
 
-    private readonly ToggleButton _groups;
-    private bool _placingTree;
-    private bool _treeChosen;
+    private readonly RowDefinition _listRow;
+    private GridLength _listHeight;
+    private EntriesViewModel? _entries;
 
     public EntriesView()
     {
         AvaloniaXamlLoader.Load(this);
 
-        _groups = this.FindControl<ToggleButton>("GroupsToggle")!;
-        _groups.IsCheckedChanged += (_, _) => _treeChosen |= !_placingTree;
+        _listRow = this.FindControl<Grid>("Split")!.RowDefinitions[0];
+        _listHeight = _listRow.Height;
 
         AddHandler(Button.ClickEvent, OnClick, RoutingStrategies.Bubble);
         AddHandler(PointerPressedEvent, OnPointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
@@ -45,19 +46,50 @@ internal sealed partial class EntriesView : UserControl
         AddHandler(ToggleButton.IsCheckedChangedEvent, OnMenuToggled, RoutingStrategies.Bubble);
     }
 
-    /// <summary>The tree starts open on a wide screen and folded on a narrow one, until somebody chooses.</summary>
-    protected override void OnSizeChanged(SizeChangedEventArgs e)
+    protected override void OnDataContextChanged(EventArgs e)
     {
-        base.OnSizeChanged(e);
+        base.OnDataContextChanged(e);
 
-        if (_treeChosen)
+        if (_entries is not null)
         {
+            _entries.PropertyChanged -= OnEntriesChanged;
+        }
+
+        _entries = DataContext as EntriesViewModel;
+
+        if (_entries is not null)
+        {
+            _entries.PropertyChanged += OnEntriesChanged;
+        }
+
+        PlaceList();
+    }
+
+    private void OnEntriesChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(EntriesViewModel.ShowsList))
+        {
+            PlaceList();
+        }
+    }
+
+    /// <summary>A star row keeps its share of the height with nothing in it, so the list's row goes to zero while the item takes the whole view.</summary>
+    private void PlaceList()
+    {
+        if (_entries is null || _entries.ShowsList)
+        {
+            _listRow.MinHeight = ListMinHeight;
+            _listRow.Height = _listHeight;
             return;
         }
 
-        _placingTree = true;
-        _groups.IsChecked = e.NewSize.Width >= TreeOpensAt;
-        _placingTree = false;
+        if (_listRow.Height.Value > 0)
+        {
+            _listHeight = _listRow.Height;
+        }
+
+        _listRow.MinHeight = 0;
+        _listRow.Height = new GridLength(0);
     }
 
     /// <summary>A choice in a menu closes it.</summary>

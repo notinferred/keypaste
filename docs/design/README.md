@@ -52,18 +52,16 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
   - Right side: status "● acme.kdbx · saved" (mono 11, green dot 6px) and a "lock" button (26h, `#24262A`, radius 6).
 - **Sidebar**, 232px (`#18191C`, right border), padding 16/10, gap 20:
   - The wordmark alone, 104px wide (BRAND: never beside the icon).
-  - Four places (D-0374), one list read top to bottom: Items, each env project's row beneath it (indented, mono 12, with count), then Agents; Trash and Settings quieter at the foot. `Ctrl/Cmd+1`–`4` in that order.
+  - Four places (D-0374), one list read top to bottom: Items, with a chevron that folds the vault's group tree beneath it (D-0376: rows 28h, 13/400, folder icon 14px, 14px indent a level, a 16px chevron on a group with groups inside it); a PROJECTS heading (table-heading style, not selectable) over each env project's row (indented, mono 12, with count); then Agents; Trash and Settings quieter at the foot. `Ctrl/Cmd+1`–`4` in that order; Left and Right fold the chosen row.
   - Nav rows: 34h, radius 7, 13.5/500. Icon 16px is muted, or the text colour when active; active bg `#2A2C30`. Count on the right is mono 11, muted. Agents also carries a 6px dot, green while the app is answering agents.
   - No Import row and no MCP server card: import is in Items' "+" menu, and what the card said is the Agents row's tooltip.
 - **Back**: a screen under a place (a project's Env profiles, Agents › History, Settings › Advanced's activity log and share links) has a ghost "‹ <place>" button above its title.
 
-**1. Items**: columns `minmax(240px,34%) | 1fr`.
-- List header: project path (mono 13), profile badge "dev" (20h, `#24262A`, radius 4, mono 11), and a "New" button (28h), amber unless a form in the view shows its own primary, that opens a menu: New item, New project, Import .env, Import .kdbx. No filter field: the titlebar search is the only one.
-- Rows: 52h, radius 7, grid `18px | 1fr | auto` over two lines.
-  - Line 1: icon, key (mono 13, ellipsis), and "last used" (mono 11) with a 6px dot. The dot is blue for in use, green for recently granted, `#55575C` for idle.
-  - Line 2: kind (11.5 muted).
+**1. Items**, as KeePassXC's main window (D-0376): the list header, then the table over the chosen item's preview, split 2:3 by a draggable 1px line (the table at least 100px tall, the preview 140px). A new item, an edit or a comparison of two revisions takes the whole area below the header.
+- List header: the group or project path (mono 13), profile badge "dev" (20h, `#24262A`, radius 4, mono 11), Rename group (a 14px folder-pen icon) while a group is chosen, and a "New" button (28h), amber unless a form in the view shows its own primary, that opens a menu: New item, New group, New project, Import .env, Import .kdbx. No filter field: the titlebar search is the only one.
+- Table: column heads TITLE, KIND, GROUP, LAST USED (table-heading style), then rows 36h, radius 7, grid `28px | 1fr | 112px | 1fr | 112px`: kind icon, title (sans 13.5/500, a variable's key mono 13) with the matched field ("username", "URL") after it in a search, kind (12.5 muted), group or "project · profile" (mono 12 muted), and "last used" (mono 11) with a 6px dot. The dot is blue for in use, green for recently granted, `#55575C` for idle. No field value is ever a column.
   - Hover bg `#1D1E22`. Selected: bg `rgba(242,181,68,.10)`, `box-shadow: inset 2px 0 0 #F2B544`, icon in the text colour.
-- Detail (padding 28/32, gap 24, max-width 820):
+- Preview (padding 28/32, gap 24, max-width 820); username, password or value, URL and notes are one row each, the label in a 96px column to the left of its value:
   - Title (sans 22/600; a variable's key in mono 22) and path "Kind · acme.kdbx › acme › api › dev". Actions: Copy, Rotate, ⋯ (30h, `#2A2C30`).
   - **Value** field (40h, bg `#111214`, border `#2C2E33`): shows 24 masked • characters, with a Reveal/Hide toggle.
   - **Reference** (36h, `#18191C`): `kp://acme-api/dev/KEY`, plus the helper line "Use this in .env.keypaste with keypaste run, or in an agent's run tool when the bridge allows it…".

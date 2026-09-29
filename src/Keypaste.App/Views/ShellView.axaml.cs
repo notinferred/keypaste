@@ -1,5 +1,7 @@
 using System.ComponentModel;
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -12,7 +14,53 @@ internal sealed partial class ShellView : UserControl
     private ShellViewModel? _shell;
     private Control? _focusBeforeImport;
 
-    public ShellView() => AvaloniaXamlLoader.Load(this);
+    public ShellView()
+    {
+        AvaloniaXamlLoader.Load(this);
+
+        var nav = this.FindControl<ListBox>("Nav")!;
+        nav.ContainerPrepared += OnSidebarRowPrepared;
+        nav.AddHandler(KeyDownEvent, OnSidebarKeyDown, RoutingStrategies.Tunnel);
+    }
+
+    /// <summary>A heading names the rows under it and cannot be chosen; a group's row is a denser tree row.</summary>
+    private static void OnSidebarRowPrepared(object? sender, ContainerPreparedEventArgs e)
+    {
+        var heading = e.Container.DataContext is SidebarHeading;
+        e.Container.IsEnabled = !heading;
+        e.Container.Focusable = !heading;
+        e.Container.Classes.Set("heading", heading);
+        e.Container.Classes.Set("group", e.Container.DataContext is GroupRow);
+    }
+
+    /// <summary>
+    /// Right unfolds the chosen row and Left folds it, as in KeePassXC's group tree. Folding replaces the
+    /// rows, so the keyboard is handed back to the chosen one, or the next key would go nowhere.
+    /// </summary>
+    private void OnSidebarKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (_shell is null || sender is not ListBox nav || e.Key is not (Key.Left or Key.Right) || e.KeyModifiers != KeyModifiers.None)
+        {
+            return;
+        }
+
+        var row = _shell.SelectedSidebarRow;
+
+        if (row is NavItem { IsExpandable: true } or GroupRow { HasChildren: true })
+        {
+            _shell.Fold(row, open: e.Key == Key.Right);
+            e.Handled = true;
+            Dispatcher.UIThread.Post(
+                () =>
+                {
+                    if (_shell?.SelectedSidebarRow is { } chosen && nav.ContainerFromItem(chosen) is Control container)
+                    {
+                        container.Focus(NavigationMethod.Directional);
+                    }
+                },
+                DispatcherPriority.Loaded);
+        }
+    }
 
     protected override void OnDataContextChanged(EventArgs e)
     {

@@ -7,6 +7,10 @@
              x:DataType="vm:ShellViewModel"
              Background="{DynamicResource KpBgApp}">
 
+  <UserControl.Resources>
+    <views:DepthToIndent x:Key="Indent" />
+  </UserControl.Resources>
+
   <!-- Implicit templates, matched by the type of whatever Content holds. Adding a destination
        means a line in Destinations.All, a view model in ShellViewModel.Show and a template here. -->
   <UserControl.DataTemplates>
@@ -201,8 +205,9 @@
               </ListBox.ItemTemplate>
             </ListBox>
 
-            <!-- Items, its project rows, then Agents: one list, so the arrow keys walk the sidebar as it
-                 reads and its automation tree names exactly the places and the projects (D-0374). -->
+            <!-- Items with the vault's group tree under it, the projects, then Agents: one list, so the
+                 arrow keys walk the sidebar as it reads, and Left and Right fold a row as in KeePassXC's
+                 tree (D-0376). -->
             <ListBox Name="Nav"
                      Classes="nav"
                      ItemsSource="{Binding SidebarRows}"
@@ -210,7 +215,7 @@
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
               <ListBox.DataTemplates>
                 <DataTemplate DataType="vm:NavItem">
-                  <Grid ColumnDefinitions="Auto,*,Auto,Auto"
+                  <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto"
                         AutomationProperties.Name="{Binding Title}"
                         AutomationProperties.HelpText="{Binding Detail}"
                         ToolTip.Tip="{Binding Detail}">
@@ -226,7 +231,39 @@
                             Classes.ok="{Binding DotLive}"
                             Margin="8,0,0,0"
                             IsVisible="{Binding HasDot}" />
+                    <Button Grid.Column="4"
+                            Classes="icon ghost fold"
+                            Margin="4,0,-6,0"
+                            IsVisible="{Binding IsExpandable}"
+                            Command="{Binding $parent[ListBox].((vm:ShellViewModel)DataContext).FoldCommand}"
+                            CommandParameter="{Binding}"
+                            ToolTip.Tip="Show or hide the groups"
+                            AutomationProperties.Name="Show or hide the groups">
+                      <ctl:KpIcon Icon="{Binding Chevron}" Size="12" />
+                    </Button>
                   </Grid>
+                </DataTemplate>
+                <DataTemplate DataType="vm:GroupRow">
+                  <Grid ColumnDefinitions="16,Auto,*"
+                        Margin="{Binding Depth, Converter={StaticResource Indent}}"
+                        AutomationProperties.Name="{Binding Title}">
+                    <Button Grid.Column="0"
+                            Classes="icon ghost fold"
+                            IsVisible="{Binding HasChildren}"
+                            Command="{Binding $parent[ListBox].((vm:ShellViewModel)DataContext).FoldCommand}"
+                            CommandParameter="{Binding}"
+                            AutomationProperties.Name="{Binding Title, StringFormat='Show or hide the groups in {0}'}">
+                      <ctl:KpIcon Icon="{Binding Chevron}" Size="12" />
+                    </Button>
+                    <ctl:KpIcon Grid.Column="1" Icon="folder" Size="14" Margin="4,0,8,0" />
+                    <TextBlock Grid.Column="2"
+                               Text="{Binding Title}"
+                               TextTrimming="CharacterEllipsis"
+                               VerticalAlignment="Center" />
+                  </Grid>
+                </DataTemplate>
+                <DataTemplate DataType="vm:SidebarHeading">
+                  <TextBlock Classes="th" Text="{Binding Label}" AutomationProperties.Name="{Binding Title}" />
                 </DataTemplate>
                 <DataTemplate DataType="vm:ProjectRow">
                   <Grid ColumnDefinitions="Auto,*,Auto"

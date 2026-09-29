@@ -98,8 +98,9 @@ public sealed class FourPlacesJourneyTests
             var shell = Assert.IsType<ShellViewModel>(Assert.IsType<ShellView>(root.Content).DataContext);
             DrawnFrame.Capture(main);
 
-            // The sidebar lists exactly the four places and the project, and there is one search.
-            Assert.Equal(["Items", "billing", "Agents"], Names(Named<ListBox>(main, "Nav")));
+            // The sidebar lists the four places, the vault's group tree under Items and the project
+            // under its heading (D-0376), and there is one search.
+            Assert.Equal(["Items", "Work", "env", "Projects", "billing", "Agents"], Names(Named<ListBox>(main, "Nav")));
             Assert.Equal(["Trash", "Settings"], Names(Named<ListBox>(main, "FooterNav")));
             Assert.DoesNotContain(main.GetVisualDescendants().OfType<Control>(), control => control.Name is "Search" or "McpCard");
             Assert.Equal(["ShellSearch"], main.GetVisualDescendants().OfType<TextBox>().Where(box => box.Classes.Contains("search")).Select(box => box.Name));
@@ -111,7 +112,7 @@ public sealed class FourPlacesJourneyTests
             var items = Assert.IsType<EntriesViewModel>(shell.Content);
             Press(main, Row(main, "Rows", row => row is EntryRow { Title: "github" }));
             Assert.Equal("github", items.Selected?.Title);
-            Press(main, Row(main, "Groups", row => row is GroupNode { Path: "Work" }));
+            Press(main, Row(main, "Nav", row => row is GroupRow { Path: "Work" }));
             Assert.Equal("Work", Named<Border>(main, "SearchScope").GetVisualDescendants().OfType<TextBlock>().First().Text);
             Assert.True(Named<Border>(main, "SearchScope").IsEffectivelyVisible);
             AmberElements.AssertOne(main, Named<ToggleButton>(main, "AddEntry"), "Items, an item open and the search scoped");

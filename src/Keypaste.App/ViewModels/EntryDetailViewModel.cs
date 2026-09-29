@@ -104,6 +104,18 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
             {
                 Raise(nameof(HasOwnPrimary));
             }
+
+            if (e.PropertyName == nameof(IsEditing))
+            {
+                Raise(nameof(TakesWholeView));
+            }
+        };
+        History.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(EntryHistoryViewModel.IsOpen))
+            {
+                Raise(nameof(TakesWholeView));
+            }
         };
         EditCommand = new RelayCommand(BeginEdit, () => !IsEditing);
         CancelCommand = new RelayCommand(CancelEdit, () => IsEditing);
@@ -217,6 +229,9 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
 
     /// <summary>Whether a form in the pane shows its own primary button: an edit, a rotate, or adding or replacing a field.</summary>
     internal bool HasOwnPrimary => IsEditing || IsConfirmingRotate || IsAddingField || IsReplacingField;
+
+    /// <summary>Whether the item takes the whole of Items, as KeePassXC's editor does: while it is edited or two revisions are compared.</summary>
+    internal bool TakesWholeView => IsEditing || History.IsOpen;
 
     internal string ReplaceFieldPrompt => $"New value for {_replacingField?.DisplayName}";
 

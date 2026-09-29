@@ -72,6 +72,11 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
             {
                 Raise(nameof(AddIsPrimary));
             }
+
+            if (e.PropertyName is nameof(IsAdding) or nameof(Detail))
+            {
+                Raise(nameof(ShowsList));
+            }
         };
         ClearScopeCommand = new RelayCommand(() => SelectedGroup = Groups.FirstOrDefault(group => group.IsEverything));
         CancelAddCommand = new RelayCommand(CancelAdd, () => IsAdding);
@@ -124,12 +129,16 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
                 Filter();
                 CloseGroupForms();
                 BeginRenameGroupCommand.RaiseCanExecuteChanged();
+                Raise(nameof(CanRenameGroup));
                 Raise(nameof(CreateGroupPrompt));
                 Raise(nameof(RenameGroupPrompt));
                 RaiseHeader();
             }
         }
     }
+
+    /// <summary>Whether a group is showing, which Rename beside its name then renames.</summary>
+    internal bool CanRenameGroup => SelectedGroup is { IsEverything: false };
 
     /// <summary>The vault's file name, which the pane's location line starts from.</summary>
     internal string VaultName => _session.VaultPath is { } path ? System.IO.Path.GetFileName(path) : string.Empty;
@@ -311,6 +320,12 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     internal bool AddIsPrimary =>
         !IsAdding && !IsOrganizing && !IsCreatingGroup && !IsRenamingGroup && _detail is not { HasOwnPrimary: true };
 
+    /// <summary>
+    /// Whether the list shows above the item's preview. A new item, an edit and a comparison of two
+    /// revisions take the whole view instead, as KeePassXC's editor does (D-0376).
+    /// </summary>
+    internal bool ShowsList => !IsAdding && _detail is not { TakesWholeView: true };
+
     /// <summary>The selected entry's fields, or null when nothing is selected.</summary>
     internal EntryDetailViewModel? Detail
     {
@@ -467,6 +482,11 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         if (e.PropertyName == nameof(EntryDetailViewModel.HasOwnPrimary))
         {
             Raise(nameof(AddIsPrimary));
+        }
+
+        if (e.PropertyName == nameof(EntryDetailViewModel.TakesWholeView))
+        {
+            Raise(nameof(ShowsList));
         }
     }
 

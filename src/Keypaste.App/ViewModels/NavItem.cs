@@ -8,6 +8,7 @@ internal sealed class NavItem(Destination destination) : ObservableObject
     private string _count = string.Empty;
     private bool _dotLive;
     private string? _detail;
+    private bool _expanded = true;
 
     internal Destination Destination { get; } = destination;
 
@@ -31,6 +32,25 @@ internal sealed class NavItem(Destination destination) : ObservableObject
         get => _dotLive;
         set => Set(ref _dotLive, value);
     }
+
+    /// <summary>Whether the row folds the rows under it: Items does, over the group tree.</summary>
+    internal bool IsExpandable { get; init; }
+
+    /// <summary>Whether the rows under it are showing.</summary>
+    internal bool IsExpanded
+    {
+        get => _expanded;
+        set
+        {
+            if (Set(ref _expanded, value))
+            {
+                Raise(nameof(Chevron));
+            }
+        }
+    }
+
+    /// <summary>The fold's chevron: down while open, right while closed.</summary>
+    internal string Chevron => _expanded ? "chevron-down" : "chevron-right";
 
     /// <summary>The row's tooltip and automation help text, or null.</summary>
     internal string? Detail

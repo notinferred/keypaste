@@ -57,7 +57,11 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     private string _countdown = string.Empty;
     private string _search = string.Empty;
     private string? _toast;
+    private static readonly SidebarHeading _projectsHeading = new("Projects");
+
+    private readonly HashSet<string> _expanded = new(StringComparer.Ordinal);
     private IReadOnlyList<ProjectRow> _projects = [];
+    private IReadOnlyList<GroupNode> _groups = [];
     private IReadOnlyList<object> _sidebarRows = [];
     private string? _openProject;
     private bool _rebuildingSidebar;
@@ -120,9 +124,10 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         ImportCommand = new AsyncRelayCommand(PickImportAsync, () => _picker is not null && _import is null);
         CancelTouchCommand = new RelayCommand(_session.CancelHardwareKeyWait, () => _waitingForTouch);
 
-        MainNav = [.. Destinations.Main.Select(d => new NavItem(d) { HasDot = d.Kind == DestinationKind.AgentActivity })];
+        FoldCommand = new RelayCommand<object>(row => Fold(row, open: null));
+        MainNav = [.. Destinations.Main.Select(d => new NavItem(d) { HasDot = d.Kind == DestinationKind.AgentActivity, IsExpandable = d.Kind == DestinationKind.Entries })];
         FooterNav = [.. Destinations.Footer.Select(d => new NavItem(d))];
-        _sidebarRows = SidebarOf([]);
+        _sidebarRows = SidebarOf();
 
         _current = Destinations.Places[0];
         _session.LockingSoon += OnLockingSoon;
@@ -235,11 +240,12 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     internal IReadOnlyList<NavItem> FooterNav { get; }
 
     /// <summary>
-    /// The sidebar's main list, in reading order: Items, the project rows beneath it, then Agents (D-0374).
+    /// The sidebar's main list, in reading order: Items with the vault's group tree folded under it,
+    /// the projects under their heading, then Agents (D-0376).
     /// </summary>
     /// <remarks>
-    /// One list rather than three, so the arrow keys walk the sidebar as a person reads it and its
-    /// automation tree names exactly the places and the projects.
+    /// One list rather than several, so the arrow keys walk the sidebar as a person reads it; Left and
+    /// Right fold and unfold a row, as they do in KeePassXC's tree.
     /// </remarks>
     internal IReadOnlyList<object> SidebarRows
     {
@@ -248,8 +254,8 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// The sidebar row for where the shell is: the open project's row on its Env profiles, otherwise
-    /// the place the screen is, or is under. Choosing a row goes there.
+    /// The sidebar row for where the shell is: the open project's row on its Env profiles, the group
+    /// Items shows, otherwise the place the screen is, or is under. Choosing a row goes there.
     /// </summary>
     internal object? SelectedSidebarRow
     {
@@ -259,6 +265,12 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
                 && _projects.FirstOrDefault(row => row.Name == open) is { } project)
             {
                 return project;
+            }
+
+            if (_current.Kind == DestinationKind.Entries && (Content as EntriesViewModel)?.SelectedGroup is { IsEverything: false } group
+                && _sidebarRows.OfType<GroupRow>().FirstOrDefault(row => row.Path == group.Path) is { } shown)
+            {
+                return shown;
             }
 
             return SelectedMain;
@@ -273,8 +285,14 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
             switch (value)
             {
+                case NavItem { Destination.Kind: DestinationKind.Entries }:
+                    ShowGroup(string.Empty);
+                    break;
                 case NavItem item:
                     Current = item.Destination;
+                    break;
+                case GroupRow group:
+                    ShowGroup(group.Path);
                     break;
                 case ProjectRow project:
                     OpenProject(project.Name);
@@ -323,19 +341,47 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             _projects = value;
             Raise();
             Raise(nameof(HasProjects));
-            _rebuildingSidebar = true;
-
-            try
-            {
-                SidebarRows = SidebarOf(value);
-            }
-            finally
-            {
-                _rebuildingSidebar = false;
-            }
-
-            Raise(nameof(SelectedSidebarRow));
+            RebuildSidebar();
         }
+    }
+
+    /// <summary>Folds or unfolds a row of the tree: Items, or a group with groups inside it.</summary>
+    internal RelayCommand<object> FoldCommand { get; }
+
+    /// <summary>
+    /// Opens or closes a row of the tree, or flips it when <paramref name="open"/> is null. Folding away
+    /// the group Items shows shows the folded row instead, as KeePassXC selects the parent it folds.
+    /// </summary>
+    internal void Fold(object? row, bool? open)
+    {
+        switch (row)
+        {
+            case NavItem { IsExpandable: true } items:
+                items.IsExpanded = open ?? !items.IsExpanded;
+
+                if (!items.IsExpanded)
+                {
+                    ShowGroupIfInside(string.Empty);
+                }
+
+                break;
+            case GroupRow { HasChildren: true } group:
+                if (open ?? !_expanded.Contains(group.Path))
+                {
+                    _expanded.Add(group.Path);
+                }
+                else
+                {
+                    _expanded.Remove(group.Path);
+                    ShowGroupIfInside(group.Path);
+                }
+
+                break;
+            default:
+                return;
+        }
+
+        RebuildSidebar();
     }
 
     internal bool HasProjects => _projects.Count > 0;
@@ -725,6 +771,11 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         {
             RaiseScope();
         }
+
+        if (e.PropertyName == nameof(EntriesViewModel.SelectedGroup))
+        {
+            Raise(nameof(SelectedSidebarRow));
+        }
     }
 
     private void RaiseScope()
@@ -837,20 +888,106 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         Raise(nameof(SelectedSidebarRow));
     }
 
-    /// <summary>The sidebar's main list: Items, then each project, then Agents.</summary>
-    private IReadOnlyList<object> SidebarOf(IReadOnlyList<ProjectRow> projects) =>
-        [MainNav[0], .. projects, .. MainNav.Skip(1)];
+    /// <summary>Items showing <paramref name="path"/>, or every item when it is empty.</summary>
+    private void ShowGroup(string path)
+    {
+        Current = Destinations.Of(DestinationKind.Entries);
+
+        if (Content is EntriesViewModel entries && entries.Groups.FirstOrDefault(node => node.Path == path) is { } node)
+        {
+            entries.SelectedGroup = node;
+        }
+
+        Raise(nameof(SelectedSidebarRow));
+    }
+
+    /// <summary>Shows <paramref name="path"/> when the group Items shows is folded away inside it.</summary>
+    private void ShowGroupIfInside(string path)
+    {
+        if (Content is EntriesViewModel { SelectedGroup: { IsEverything: false } shown }
+            && (path.Length == 0 || shown.Path.StartsWith(path + "/", StringComparison.Ordinal)))
+        {
+            ShowGroup(path);
+        }
+    }
+
+    /// <summary>
+    /// The sidebar's main list: Items, the groups whose parents are all open when Items is, the
+    /// projects under their heading, then Agents.
+    /// </summary>
+    private List<object> SidebarOf()
+    {
+        var items = MainNav[0];
+        List<object> rows = [items];
+
+        if (items.IsExpanded)
+        {
+            foreach (var node in _groups.Where(node => !node.IsEverything && ParentsOpen(node.Path)))
+            {
+                rows.Add(new GroupRow(node.Path, node.Label, node.Depth, node.Children.Count > 0, _expanded.Contains(node.Path)));
+            }
+        }
+
+        if (_projects.Count > 0)
+        {
+            rows.Add(_projectsHeading);
+            rows.AddRange(_projects);
+        }
+
+        rows.AddRange(MainNav.Skip(1));
+        return rows;
+    }
+
+    private bool ParentsOpen(string path)
+    {
+        for (var slash = path.IndexOf('/', StringComparison.Ordinal); slash > 0; slash = path.IndexOf('/', slash + 1))
+        {
+            if (!_expanded.Contains(path[..slash]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>Replaces the sidebar's rows when they differ, keeping the list from writing back the row it had.</summary>
+    private void RebuildSidebar()
+    {
+        var rows = SidebarOf();
+
+        if (rows.SequenceEqual(_sidebarRows))
+        {
+            return;
+        }
+
+        _rebuildingSidebar = true;
+
+        try
+        {
+            SidebarRows = rows;
+        }
+        finally
+        {
+            _rebuildingSidebar = false;
+        }
+
+        Raise(nameof(SelectedSidebarRow));
+    }
 
     /// <summary>Counts entries and env projects for the sidebar, reading names only.</summary>
     private void Count()
     {
         if (_disposed || _session.Unlocked is not { } vault)
         {
+            _groups = [];
             Projects = [];
+            RebuildSidebar();
             return;
         }
 
         IReadOnlyList<string> names;
+        IReadOnlyList<GroupNode> groups;
         Dictionary<string, int> perGroup = new(StringComparer.Ordinal);
         int total;
 
@@ -869,13 +1006,16 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             }
 
             names = new EnvStore(vault).Projects();
+            groups = GroupNode.Flatten(vault.ReadGroupPaths());
         }
         catch (ObjectDisposedException)
         {
             return;
         }
 
+        _groups = groups;
         Projects = [.. names.Select(name => new ProjectRow(name, perGroup.GetValueOrDefault(EnvConvention.GroupPath(name))))];
+        RebuildSidebar();
         SetCount(DestinationKind.Entries, total);
     }
 

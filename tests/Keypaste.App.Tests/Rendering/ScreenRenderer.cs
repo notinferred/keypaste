@@ -1054,7 +1054,7 @@ public sealed class ScreenRenderer
                 new Border { Classes = { "field" }, Width = 300, Child = Text("kp://acme-api/dev/STRIPE_SECRET_KEY", "mono secondary") }),
             Row(
                 new Border { Classes = { "dialog" }, Width = 360, Child = new StackPanel { Spacing = 8, Children = { Text("claude-code wants 2 secrets", "dialog-title"), Text("via MCP · ~/acme/api · profile dev", "subtitle") } } },
-                new Border { Classes = { "toast" }, Child = Row(new KpIcon { Icon = "circle-check", Size = 15, Foreground = (IBrush)Application.Current.FindResource("KpOk")! }, Text("Granted claude-code for 1 hour", "")) }),
+                new Border { Classes = { "toast" }, Child = Row(new KpIcon { Icon = "circle-check", Size = 15, Foreground = (IBrush)Application.Current.FindResource(Application.Current.ActualThemeVariant, "KpOk")! }, Text("Granted claude-code for 1 hour", "")) }),
             icons,
         ]);
 

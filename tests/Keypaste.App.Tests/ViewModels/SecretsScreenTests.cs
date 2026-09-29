@@ -46,19 +46,20 @@ public sealed class SecretsScreenTests : IDisposable
     }
 
     [Theory]
-    [InlineData("Work", "github", "Login · Work")]
-    [InlineData("Home", "wifi", "Password · Home")]
-    [InlineData("Home", "recovery", "Secure note · Home")]
-    [InlineData("env/acme-api", "DATABASE_URL", "Env variable · acme-api · dev")]
-    [InlineData("env/acme-api/prod", "DATABASE_URL", "Env variable · acme-api · prod")]
-    public void A_row_says_its_kind_and_where_it_lives(string group, string title, string summary)
+    [InlineData("Work", "github", "Login", "Work")]
+    [InlineData("Home", "wifi", "Password", "Home")]
+    [InlineData("Home", "recovery", "Secure note", "Home")]
+    [InlineData("env/acme-api", "DATABASE_URL", "Env variable", "acme-api · dev")]
+    [InlineData("env/acme-api/prod", "DATABASE_URL", "Env variable", "acme-api · prod")]
+    public void A_row_says_its_kind_and_where_it_lives(string group, string title, string kind, string place)
     {
         using var context = new Context(_vaultPath);
 
         var row = context.Entries.Rows.Single(row => row.GroupPath == group && row.Title == title);
 
-        Assert.Equal(summary, row.Summary);
-        Assert.DoesNotContain(_value, row.Summary, StringComparison.Ordinal);
+        Assert.Equal(kind, row.KindLabel);
+        Assert.Equal(place, row.Place);
+        Assert.DoesNotContain(_value, row.Place, StringComparison.Ordinal);
     }
 
     [Fact]

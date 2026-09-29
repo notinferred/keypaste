@@ -39,7 +39,7 @@ public sealed class ShellViewModelTests : IDisposable
     }
 
     [Fact]
-    public void The_sidebar_lists_the_four_places_with_the_projects_beneath_items()
+    public void The_sidebar_lists_the_four_places_with_the_group_tree_and_the_projects_beneath_items()
     {
         using var shell = Shell();
 
@@ -47,10 +47,48 @@ public sealed class ShellViewModelTests : IDisposable
         Assert.Equal(["Trash", "Settings"], shell.FooterNav.Select(item => item.Title));
         Assert.Equal([1, 2, 3, 4], Destinations.Places.Select(d => d.Shortcut));
         Assert.All(Destinations.All.Where(d => !d.IsPlace), d => Assert.Equal(0, d.Shortcut));
-        Assert.Equal(
-            ["Items", "billing", "Agents"],
-            shell.SidebarRows.Select(row => row switch { NavItem item => item.Title, ProjectRow project => project.Name, _ => "?" }));
+        Assert.Equal(["Items", "Work", "env", "Projects", "billing", "Agents"], Titles(shell));
     }
+
+    [Fact]
+    public void A_group_in_the_tree_folds_and_choosing_it_shows_its_items()
+    {
+        using var shell = Shell();
+        var env = shell.SidebarRows.OfType<GroupRow>().Single(row => row.Path == "env");
+
+        Assert.True(env.HasChildren);
+        Assert.False(env.IsExpanded);
+
+        shell.FoldCommand.Execute(env);
+        Assert.Equal(["Items", "Work", "env", "billing", "Projects", "billing", "Agents"], Titles(shell));
+
+        shell.SelectedSidebarRow = shell.SidebarRows.OfType<GroupRow>().Single(row => row.Path == "env/billing");
+        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
+        Assert.Equal("env/billing", entries.SelectedGroup?.Path);
+        Assert.Equal(["DATABASE_URL", "STRIPE_KEY"], entries.Rows.Select(row => row.Title).Order());
+        Assert.Equal("env/billing", Assert.IsType<GroupRow>(shell.SelectedSidebarRow).Path);
+
+        // Folding away the group Items shows shows the folded group instead, as KeePassXC does.
+        shell.Fold(shell.SidebarRows.OfType<GroupRow>().Single(row => row.Path == "env"), open: false);
+        Assert.Equal("env", entries.SelectedGroup?.Path);
+        Assert.Equal("env", Assert.IsType<GroupRow>(shell.SelectedSidebarRow).Path);
+
+        // Items folds the whole tree and shows every item.
+        shell.Fold(shell.MainNav[0], open: false);
+        Assert.Equal(["Items", "Projects", "billing", "Agents"], Titles(shell));
+        Assert.True(entries.SelectedGroup?.IsEverything);
+        Assert.Same(shell.MainNav[0], shell.SelectedSidebarRow);
+    }
+
+    private static IEnumerable<string> Titles(ShellViewModel shell) =>
+        shell.SidebarRows.Select(row => row switch
+        {
+            NavItem item => item.Title,
+            GroupRow group => group.Title,
+            SidebarHeading heading => heading.Title,
+            ProjectRow project => project.Name,
+            _ => "?",
+        });
 
     [Fact]
     public void Each_digit_reaches_the_place_in_that_position_and_no_other_digit_does_anything()
