@@ -20,6 +20,17 @@ Completed 2026-09-29 on `main` above `856b407`, source only. [PRODUCT](../PRODUC
 
   The founder picked direction A. It is built at SemiBold, the weight the sheet recommended.
 - **No new rows.** Work this step found goes into this step, not onto new rows. A split of N.7 into N.7a and N.7b, and a row for the light palette's status contrast, were drafted and withdrawn. The contrast fix is below.
+- **A lighter cut of the marks, later the same day.** The founder asked for a logo and wordmark in the new font that fit the new styling better. A second concept canvas, also a private artifact, set the marks above beside three directions, each in the sidebar, on the lock screen, as the app icon from 128 down to 16px, in a browser tab, in keypaste.com's header and in the README:
+  - A · Quiet, lighter and tighter;
+  - B · Keycap, A's wordmark with the app icon drawn as a keycap;
+  - C · Caret, an amber text caret in place of the dot.
+
+  The founder picked A. It was first recorded as a step of its own, N.15, in `1968915`. Under the founder's rule above, it belongs here: that record was withdrawn in its favour, and the ID N.15 is retired. Its account follows.
+
+  - **What changed.** The wordmark is Hepta Slab at weight 500, where it was 600, tracked −1.5%. The icon is weight 580 tracked −1%. Each mark's square dot is sized from its weight's stem, 1.45 stems in the wordmark and 1.3 in the icon, and set close after the last letter, where it had been the font's own period. They are applied to the desktop's sidebar and lock screen, the app icon on three platforms, the favicon, keypaste.com's header, footer, share viewer and thanks page, and the README and its screenshots.
+  - **How.** [outline-brand-marks.py](../../scripts/outline-brand-marks.py) now outlines each mark at its own weight, unites the tracked letters into one outline, since the app and the icon rasterizer fill even-odd, and draws the dot as geometry. It also rewrites the wordmark inline in `site/public/index.html`, `s/index.html`, `thanks/index.html` and `site/src/worker.js`, and stops if one no longer carries it. [render-app-icon.py](../../scripts/render-app-icon.py) redrew the `.ico`, the PNG, the Linux SVG and the `.icns`.
+  - **Evidence.** Two runs of the outline script left every file byte-identical. Pillow decoded the `.ico` at nine sizes from 16 to 256 px and the `.icns` at 128 to 1024 px. `ScreenRenderer`, `BrandMarksTests` and `AmberElementsTests` passed 12 of 12 in both palettes. Four README screenshots were matched to the frames they came from and replaced; `approval-prompt.png` carries no mark. `bash scripts/verify.sh` passed workflows, scripts, backend, integration and desktop, the desktop suite 835 of 838 with the renderer's 3 skipped.
+  - **Limits.** Headless rendering only: the icons were not seen in a real taskbar, Dock or launcher. The prototypes in `docs/design/design/` still draw the monogram.
 
 ## What changed for users
 

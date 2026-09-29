@@ -12,7 +12,7 @@ A secret the desktop copies now also asks macOS pasteboard managers such as Macc
 
 Scoped tokens and Diagnostics moved to Settings › Advanced, beside the activity log and share links. A client's policy is now chosen from its card's ⋯ menu on Agents, and History shows its records without Verify chain, which is on the activity log ([N.1b](docs/steps/N.1b.md)).
 
-The wordmark and the icon are a lighter cut: the wordmark in Hepta Slab at weight 500 and the icon at 580, each with a square dot sized from its letters, in the app, its icons, keypaste.com and the README ([N.15](docs/steps/N.15.md)).
+The wordmark and the icon are a lighter cut: the wordmark in Hepta Slab at weight 500 and the icon at 580, each with a square dot sized from its letters, in the app, its icons, keypaste.com and the README ([N.7](docs/steps/N.7.md)).
 
 New item now starts from a template, Login, API key, Database, Server or Secure note, picks its folder from your vault's groups instead of a typed path, and takes tags and notes; an API key is kept as a protected field named as a project reads it, and a database's or server's host as a plain `Host` field. The item is written whole, with no history item ([N.4](docs/steps/N.4.md)).
 
