@@ -13,6 +13,7 @@ using Keypaste.App.Views;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Recent;
 
 namespace Keypaste.App;
 
@@ -103,6 +104,9 @@ internal sealed partial class App : Application, IDisposable
 
     /// <summary>How the app asks for a file; the platform's picker unless a test gives another.</summary>
     internal Func<TopLevel, IVaultFilePicker> Pickers { get; init; } = window => new StorageProviderPicker(window);
+
+    /// <summary>KeePassXC's local settings, whose databases the first run offers; where KeePassXC keeps them unless a test gives another.</summary>
+    internal string? KeePassXcConfig { get; init; } = KeePassXcDatabases.LocalConfigPath();
 
     /// <summary>How share links reach their server; the shell makes one unless a test gives another.</summary>
     internal HttpMessageHandler? ShareTransport { get; init; }
@@ -287,7 +291,8 @@ internal sealed partial class App : Application, IDisposable
             _session, home, Pickers(_window), OnUnlocked,
             action => Dispatcher.UIThread.Post(action),
             message,
-            next is null ? reason : null);
+            next is null ? reason : null,
+            KeePassXcConfig);
 
         if (next is { } file)
         {

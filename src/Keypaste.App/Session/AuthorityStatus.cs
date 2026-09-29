@@ -16,13 +16,16 @@ internal abstract record AuthorityStatus
     /// <param name="Owner">That process, as its claim names it.</param>
     internal sealed record HeldBy(VaultOwner Owner) : AuthorityStatus
     {
-        /// <summary>The owner as the app says it, on the unlock screen and in Agent Activity.</summary>
-        internal string Sentence
+        /// <summary>The owner as Agent Activity says it.</summary>
+        internal string Sentence => $"{Holder[..^1]}, and agents reach it there.";
+
+        /// <summary>The owner as the unlock screen says it, which speaks of no agent (N.2).</summary>
+        internal string Holder
         {
             get
             {
                 var owner = Owner.Describe();
-                return $"{char.ToUpperInvariant(owner[0])}{owner[1..]} holds this vault, and agents reach it there.";
+                return $"{char.ToUpperInvariant(owner[0])}{owner[1..]} holds this vault.";
             }
         }
     }

@@ -97,11 +97,11 @@ public sealed class AppAuthorityTests
 
             Assert.Equal(0, unlocked);
             Assert.Contains(agent, model.Message, StringComparison.Ordinal);
-            Assert.Equal($"Keypaste agent (process {Environment.ProcessId}) holds this vault, and agents reach it there.", model.Owner);
+            Assert.Equal($"Keypaste agent (process {Environment.ProcessId}) holds this vault.", model.Owner);
 
             var held = Assert.IsType<AuthorityStatus.HeldBy>(authority.Status);
             Assert.Equal(OwnerKind.TerminalAgent, held.Owner.Kind);
-            Assert.Equal(model.Owner, AgentActivityViewModel.Describe(held));
+            Assert.Equal($"Keypaste agent (process {Environment.ProcessId}) holds this vault, and agents reach it there.", AgentActivityViewModel.Describe(held));
 
             Type(model, "x");
             Assert.False(model.HasMessage);

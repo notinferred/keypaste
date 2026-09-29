@@ -272,7 +272,9 @@ The desktop records up to ten successfully opened vault paths for its unlock scr
 
 Anyone able to read `~/.keypaste` can discover those paths, a keyfile's location included, just as they can read the audit file; T-27 says what that location is worth. Showing only the vault filename in the app reduces path exposure in screenshots but does not protect the stored path.
 
-Evidence: `RecentVaultsTests` checks persistence, capacity, removal and the keyfile path's round trip. `Keypaste.App.Tests.SecretHygieneTests.The_recent_list_holds_the_path_and_no_field_value` checks stored records for field leakage.
+With no recent vault, the desktop also reads KeePassXC's local `keepassxc.ini`, and only its `LastActiveDatabase`, `LastOpenedDatabases` and `LastDatabases`, to offer the databases KeePassXC last opened (D-0377). It never writes KeePassXC's files and records none of those paths until one is opened, when it joins `recent.toml` as any opened vault does. The read tells keypaste nothing a process running as the user could not read itself; what it adds is those paths on the first screen, where the file names, and the full paths in their tooltips, can be captured in a screenshot.
+
+Evidence: `RecentVaultsTests` checks persistence, capacity, removal and the keyfile path's round trip. `Keypaste.App.Tests.SecretHygieneTests.The_recent_list_holds_the_path_and_no_field_value` checks stored records for field leakage. `KeePassXcDatabasesTests` checks that only the three keys of the `[General]` section are read and the file is left as it was, and `verify-keepassxc-first-run.sh` that KeePassXC's files are byte-identical after the app lists and opens what real KeePassXC wrote.
 
 ## T-25 — A value on screen, because somebody asked to see it
 

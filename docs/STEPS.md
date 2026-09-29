@@ -6,7 +6,7 @@ This file holds open work only. Finishing a task removes it from here, adds its 
 
 ## Selection and evidence
 
-Only the next five tasks are detailed: N.2, N.5, N.4, N.1b and N.12. Later rows name a bounded outcome and the dependencies their own implementation or verifier needs; expand a selected later task before building it. Tasks are not marked implemented from a document, reader, mock response or consuming screen. Name the producer, transport, consumer and user action exercised, and retain the source/version and limitations of the observation.
+Only the next five tasks are detailed: N.5, N.4, N.1b, N.12 and N.10. Later rows name a bounded outcome and the dependencies their own implementation or verifier needs; expand a selected later task before building it. Tasks are not marked implemented from a document, reader, mock response or consuming screen. Name the producer, transport, consumer and user action exercised, and retain the source/version and limitations of the observation.
 
 Needs are build dependencies. Ships after names publication gates. External signing identities are inputs, not a queue of enrollment code. A ready row does not authorize publication, account changes or messages. Preserve the secret-path tests, real KeePassXC compatibility, stale-write refusals and release integrity checks while changing product scope.
 
@@ -14,12 +14,6 @@ Needs are build dependencies. Ships after names publication gates. External sign
 
 Custom fields and tags are ordinary KeePass data: keypaste writes them as KeePassXC reads them, and every row keeps the permanent compatibility gates (PRODUCT §4.6). C.1a's tags include the project tags T4 builds on. The main screens show everyday password-manager work; advanced controls and security recommendations live in Settings (PRODUCT §5.8).
 
-- [ ] **N.2 — Offer the person's KeePassXC database on first run.** Needs: none.
-  **Build:** with no recent vault, the welcome offers three things: the databases KeePassXC last opened, opening another file, and creating a vault. Core reads only `LastActiveDatabase`, `LastOpenedDatabases` and `LastDatabases` from KeePassXC's local `keepassxc.ini` (`%LOCALAPPDATA%\KeePassXC\keepassxc.ini` on Windows, and where KeePassXC 2.7 keeps it on macOS and Linux), lists each existing file once, and treats a missing, unreadable or malformed file as no databases. Choosing one goes to the ordinary unlock with that path, and nothing is written to KeePassXC's files. The lock screen stops mentioning agents, and the YubiKey control moves under More options unless the vault's recent entry records a slot. T-24 gains the read. Traces to PRODUCT §§1 and 5.8.
-
-  **Verify (V-N.2):** real KeePassXC opens two databases and closes; with an empty `~/.keypaste`, the welcome lists exactly those two, the last active first, and unlocking one opens it. A listed path that has since been deleted is not offered, and an ini with a malformed line lists the rest. KeePassXC's files are byte-identical afterwards. The lock screen's automation tree names no agent, and its YubiKey control is under More options for a vault without a slot.
-
-  A reader shown only on a hand-written ini does not pass.
 - [ ] **N.5 — Make the item pane read like a password manager.** Needs: V.7b.
   **Build:** the item pane shows a web address as a link that opens in the default browser, for `http` and `https` only, with its own Copy; any other scheme is shown as text and never opened. The `kp://` reference and the KDBX identifier move under the pane's "…" menu. The Agent access card appears only when agents can see the item, by the served session's exposure or a standing rule, or have received a field of it. The keypaste-design skill applies. Traces to PRODUCT §§1 and 5.8.
 
@@ -56,9 +50,11 @@ Custom fields and tags are ordinary KeePass data: keypaste writes them as KeePas
 U.1–U.3 and 4.4b gave the app, `keypaste agent` and the bridge one owner and one lock (D-0309 to D-0321). One gap remains: six CLI verbs still save without taking the owner's claim, so the app refuses agents as `vault-changed` until someone reloads.
 
 - [ ] **N.10 — Make every saving verb take the vault's claim.** Needs: none.
-  - `add`, `rm`, `access`, `env set`, `env rm` and `env pull` open the vault through `OpenHeld`, as `set` and `rotate` already do.
-  - While the app or `keypaste agent` holds the vault, they are refused before the password is read. The refusal names the holder and the next step: make the change in the app, or run `keypaste lock`.
-  - A rule test holds that nothing saves through `Open`.
+  **Build:** `add`, `rm`, `access`, `env set`, `env rm`, `env pull` and `import`, the verbs that still save through `VaultSession.Open`, open the vault through `OpenHeld`, as `set`, `rotate`, `field rm` and `env tag` already do; `import --dry-run` still reads without the claim. While the app or `keypaste agent` holds the vault, each is refused before its password is read, and the refusal names the holder and the next step: make the change in the app, or run `keypaste lock` and try again. A rule test over `src/Keypaste.Cli` holds that `VaultSession.Open` is called only by verbs that never save. Traces to PRODUCT §2 and T2.
+
+  **Verify (V-N.10):** with the app, through `Keypaste.AppDriver hold`, and then `keypaste agent` holding a vault, each of the seven verbs is refused naming the holder and the next step, with no password prompt on stderr and the vault's bytes and backup count unchanged, and the holder then answers an agent request instead of refusing it as `vault-changed`. With nothing holding the vault each verb saves as before. The rule test fails on a copy that adds a save through `Open`.
+
+  A refusal shown only against a claim the test takes itself does not pass.
 - [ ] **N.11 — Approve a terminal edit in the unlocked app.** Needs: N.10.
   - `set`, `add`, `rm` and the env writers send the change to the vault's owner, which asks in its prompt window and writes through its session.
   - No master password crosses the pipe, and `access` stays refused.

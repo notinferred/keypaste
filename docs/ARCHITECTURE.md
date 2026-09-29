@@ -54,7 +54,7 @@ A credential request runs: MCP client â†’ `Mcp/Tools/RequestCredentialTool.cs` â
 | Who holds a vault, which session a request belongs to, and env sets released under that session (`SessionEnvResolver.cs`, and to a runner through `SessionEnvironments.cs`) | `Ownership/` |
 | Standing rules in `policy.toml` | `Policy/` |
 | Audit log and `~/.keypaste` paths | `Audit/`, `Audit/KeypasteHome.cs` |
-| `recent.toml` and `app.toml` | `Recent/`, `Settings/` |
+| `recent.toml`, `app.toml`, and the databases KeePassXC last opened (read from its `keepassxc.ini`) | `Recent/`, `Settings/` |
 | Connecting MCP clients: the catalogue, setup plans, finding the bridge and the connection check; per-client policy in `clients.toml` and the connected-client cards | `Clients/` |
 | Last used and in use per entry, from audit lines, the owner's release ledger and live grants | `Activity/` |
 | Running another program and capturing what it printed | `Processes/` |

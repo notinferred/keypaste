@@ -178,7 +178,7 @@
                        Text="{Binding Subtitle}"
                        IsVisible="{Binding HasSelection}" />
             <TextBlock Classes="lock-subtitle"
-                       Text="Choose a .kdbx file, drag one here, or create a new vault."
+                       Text="{Binding WelcomeSubtitle}"
                        IsVisible="{Binding !HasSelection}" />
             <StackPanel Orientation="Horizontal"
                         Spacing="6"
@@ -241,9 +241,22 @@
               </StackPanel>
             </Panel>
 
+            <!-- A vault whose recent entry records no slot keeps the YubiKey under More options (N.2). -->
+            <Button Classes="quiet"
+                    HorizontalAlignment="Center"
+                    IsEnabled="{Binding CanTypePassword}"
+                    IsVisible="{Binding OffersMoreOptions}"
+                    Command="{Binding ShowMoreOptionsCommand}"
+                    AutomationProperties.Name="More options">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <ctl:KpIcon Icon="chevron-down" Size="14" />
+                <TextBlock Text="More options" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+
             <!-- The design's "Touch YubiKey to unlock": a second factor beside the password, which
                  the key answers when it is touched. -->
-            <Panel HorizontalAlignment="Center" IsEnabled="{Binding CanTypePassword}" IsVisible="{Binding OffersHardwareKey}">
+            <Panel HorizontalAlignment="Center" IsEnabled="{Binding CanTypePassword}" IsVisible="{Binding ShowsHardwareKey}">
               <Button x:Name="UseHardwareKey"
                       Classes="quiet"
                       IsVisible="{Binding !UsesHardwareKey}"
@@ -276,7 +289,35 @@
           </StackPanel>
 
           <StackPanel Spacing="10" IsVisible="{Binding !HasSelection}">
-            <Button Classes="primary wide" Command="{Binding BrowseCommand}" AutomationProperties.Name="Open a vault…">
+            <!-- With no recent vault, the databases KeePassXC last opened come first (N.2). -->
+            <StackPanel Spacing="6" IsVisible="{Binding OffersKeePassXc}">
+              <TextBlock Classes="th" Text="KEEPASSXC LAST OPENED" Margin="10,0" />
+              <ListBox x:Name="KeePassXcList"
+                       Classes="recent"
+                       ItemsSource="{Binding KeePassXc}"
+                       SelectedItem="{Binding SelectedKeePassXc}"
+                       MaxHeight="180">
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:KeePassXcDatabaseItem">
+                    <Grid ColumnDefinitions="Auto,*" ToolTip.Tip="{Binding Path}">
+                      <ctl:KpIcon Grid.Column="0" Icon="file-lock-2" Size="14" Margin="0,0,10,0" />
+                      <TextBlock Grid.Column="1"
+                                 Classes="mono"
+                                 Text="{Binding Name}"
+                                 TextTrimming="CharacterEllipsis"
+                                 VerticalAlignment="Center" />
+                    </Grid>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+            </StackPanel>
+            <Button Classes="wide" IsVisible="{Binding OffersKeePassXc}" Command="{Binding BrowseCommand}" AutomationProperties.Name="Open another file…">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <ctl:KpIcon Icon="folder-open" Size="15" />
+                <TextBlock Text="Open another file…" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+            <Button Classes="primary wide" IsVisible="{Binding OffersOpenFirst}" Command="{Binding BrowseCommand}" AutomationProperties.Name="Open a vault…">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <ctl:KpIcon Icon="folder-open" Size="15" />
                 <TextBlock Text="Open a vault…" VerticalAlignment="Center" />

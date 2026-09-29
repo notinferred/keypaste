@@ -14,6 +14,7 @@ on:
       - 'tests/Keypaste.FakeMcpClient/**'
       - 'tests/Keypaste.EnvReporter/**'
       - 'scripts/verify-keepassxc-workflows.sh'
+      - 'scripts/verify-keepassxc-first-run.sh'
       - 'scripts/verify-session-authority.sh'
       - 'scripts/verify-lock-boundary.sh'
       - 'scripts/verify-current-state.sh'
@@ -161,6 +162,60 @@ jobs:
       - name: Verify every workflow on KeePassXC-made vaults through the CLI and the app
         shell: bash
         run: bash scripts/verify-keepassxc-workflows.sh artifacts/compat/workflows
+
+  # The first run offers the databases real KeePassXC last opened, found where KeePassXC keeps them (N.2).
+  first-run:
+    name: keepassxc first run (${{ matrix.os }})
+    needs: gate
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      KP_COMPAT_PASSWORD: ci-master-pw
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      - name: Install KeePassXC (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends keepassxc
+
+      - name: Install KeePassXC (macOS)
+        if: runner.os == 'macOS'
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+          HOMEBREW_NO_INSTALL_CLEANUP: '1'
+        run: brew install --cask keepassxc
+
+      - name: Install KeePassXC (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "KPXC_CLI=$(bash scripts/install-keepassxc-windows.sh)" >> "$GITHUB_ENV"
+
+      - name: Restore and build the app driver
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet restore tests/Keypaste.AppDriver/Keypaste.AppDriver.csproj --locked-mode
+          dotnet build tests/Keypaste.AppDriver/Keypaste.AppDriver.csproj --no-restore -c Release
+
+      - name: Verify the first run offers the databases KeePassXC last opened
+        shell: bash
+        run: bash scripts/verify-keepassxc-first-run.sh artifacts/compat/first-run
 
   package:
     name: publish + selftest (${{ matrix.os }})

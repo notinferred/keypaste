@@ -24,6 +24,18 @@ internal sealed class RecentVaultItem(string path, bool exists)
     /// and reads as data loss.
     /// </remarks>
     internal bool Exists { get; } = exists;
+
+    public override string ToString() => Name;
+}
+
+/// <summary>A database KeePassXC last opened, as the first run offers it: its name, with the path in a tooltip.</summary>
+internal sealed class KeePassXcDatabaseItem(string path)
+{
+    internal string Path { get; } = path;
+
+    internal string Name { get; } = System.IO.Path.GetFileName(path);
+
+    public override string ToString() => Name;
 }
 
 /// <summary>
@@ -42,6 +54,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     private readonly Action _unlocked;
     private readonly IVaultFilePicker _picker;
     private readonly Action<Action> _post;
+    private readonly string? _keePassXcConfig;
 
     private SecretBuffer _master = new();
     private SecretBuffer _new = new();
@@ -50,6 +63,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     private string? _selectedPath;
     private string? _keyfilePath;
     private int? _hardwareKeySlot;
+    private bool _moreOptions;
     private bool _waitingForTouch;
     private string? _newVaultPath;
     private string _message = string.Empty;
@@ -70,7 +84,8 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         Action unlocked,
         Action<Action>? post = null,
         string? message = null,
-        VaultLockReason? lockedBy = null)
+        VaultLockReason? lockedBy = null,
+        string? keePassXcConfig = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(picker);
@@ -81,6 +96,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         _picker = picker;
         _unlocked = unlocked;
         _post = post ?? (action => action());
+        _keePassXcConfig = keePassXcConfig;
 
         UnlockCommand = new AsyncRelayCommand(UnlockAsync, () => CanUnlock);
         BrowseCommand = new AsyncRelayCommand(BrowseAsync, () => !_busy && IsOpening);
@@ -91,6 +107,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         CloseRestoreCommand = new RelayCommand(CloseRestore, () => _restore is { Busy: false });
         ChooseKeyfileCommand = new AsyncRelayCommand(ChooseKeyfileAsync, () => !_busy);
         ClearKeyfileCommand = new RelayCommand(() => KeyfilePath = null, () => !_busy && _keyfilePath is not null);
+        ShowMoreOptionsCommand = new RelayCommand(() => MoreOptions = true, () => !_moreOptions);
         UseHardwareKeyCommand = new RelayCommand(() => HardwareKeySlot = 2, () => !_busy && OffersHardwareKey && _hardwareKeySlot is null);
         SwitchSlotCommand = new RelayCommand(() => HardwareKeySlot = _hardwareKeySlot == 1 ? 2 : 1, () => !_busy && _hardwareKeySlot is not null);
         ClearHardwareKeyCommand = new RelayCommand(() => HardwareKeySlot = null, () => !_busy && _hardwareKeySlot is not null);
@@ -127,7 +144,35 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     /// <summary>The line under the heading while a vault is selected.</summary>
     internal string Subtitle => IsHandOff
         ? "Enter its master password to keep editing it in place."
-        : "Agents are paused until you unlock.";
+        : "Enter its master password to open it.";
+
+    /// <summary>The line under the heading with no vault selected.</summary>
+    internal string WelcomeSubtitle => OffersKeePassXc
+        ? "Open a vault KeePassXC opened, another file, or a new vault."
+        : "Choose a .kdbx file, drag one here, or create a new vault.";
+
+    /// <summary>The databases KeePassXC last opened, offered while no vault is selected (D-0377).</summary>
+    internal IReadOnlyList<KeePassXcDatabaseItem> KeePassXc { get; private set; } = [];
+
+    /// <summary>Whether the welcome lists KeePassXC's databases.</summary>
+    internal bool OffersKeePassXc => _selectedPath is null && KeePassXc.Count > 0;
+
+    /// <summary>Whether "Open a vault…" is the welcome's primary action, which it is while KeePassXC offers nothing.</summary>
+    internal bool OffersOpenFirst => _selectedPath is null && KeePassXc.Count == 0;
+
+    /// <summary>Choosing a database KeePassXC opened goes to the ordinary unlock with its path.</summary>
+    internal KeePassXcDatabaseItem? SelectedKeePassXc
+    {
+        get => null;
+        set
+        {
+            if (value is not null)
+            {
+                Offer(value.Path);
+                Raise(nameof(SelectedKeePassXc));
+            }
+        }
+    }
 
     /// <summary>What the heading of the create form says.</summary>
     internal string CreateHeading => $"Create {NewVaultName}";
@@ -243,6 +288,33 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     /// <summary>Whether this build reaches hardware keys, so the screen offers one.</summary>
     internal bool OffersHardwareKey => _session.HardwareKeys is not null;
 
+    /// <summary>Shows the controls a vault needs only sometimes, the YubiKey's.</summary>
+    internal RelayCommand ShowMoreOptionsCommand { get; }
+
+    /// <summary>Whether More options has been opened for the selected vault.</summary>
+    internal bool MoreOptions
+    {
+        get => _moreOptions;
+        private set
+        {
+            if (Set(ref _moreOptions, value))
+            {
+                Raise(nameof(ShowsHardwareKey));
+                Raise(nameof(OffersMoreOptions));
+                ShowMoreOptionsCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Whether the YubiKey controls show: straight away for a vault whose recent entry records a slot,
+    /// otherwise under More options.
+    /// </summary>
+    internal bool ShowsHardwareKey => OffersHardwareKey && (_moreOptions || _hardwareKeySlot is not null);
+
+    /// <summary>Whether More options is offered, which it is while it hides something.</summary>
+    internal bool OffersMoreOptions => OffersHardwareKey && !ShowsHardwareKey;
+
     /// <summary>Asks for the YubiKey as well, in slot 2 until another is chosen.</summary>
     internal RelayCommand UseHardwareKeyCommand { get; }
 
@@ -267,6 +339,8 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
             if (Set(ref _hardwareKeySlot, value))
             {
                 Raise(nameof(UsesHardwareKey));
+                Raise(nameof(ShowsHardwareKey));
+                Raise(nameof(OffersMoreOptions));
                 Raise(nameof(HardwareKeyLabel));
                 Raise(nameof(OtherSlotLabel));
                 UnlockCommand.RaiseCanExecuteChanged();
@@ -336,6 +410,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
             {
                 Message = string.Empty;
                 Owner = string.Empty;
+                MoreOptions = false;
                 KeyfilePath = RememberedKeyfile(value);
                 HardwareKeySlot = OffersHardwareKey ? Remembered(value)?.HardwareKeySlot : null;
                 Look();
@@ -345,6 +420,9 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
                 Raise(nameof(IsHandOff));
                 Raise(nameof(Subtitle));
                 Raise(nameof(ShowsRecent));
+                Raise(nameof(OffersKeePassXc));
+                Raise(nameof(OffersOpenFirst));
+                Raise(nameof(WelcomeSubtitle));
                 RaiseMessage();
             }
         }
@@ -980,7 +1058,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     }
 
     private void ShowOwner() =>
-        Owner = _session.HeldBy is { } holder ? new AuthorityStatus.HeldBy(holder).Sentence : string.Empty;
+        Owner = _session.HeldBy is { } holder ? new AuthorityStatus.HeldBy(holder).Holder : string.Empty;
 
     /// <summary>The lock note for <paramref name="reason"/>, or empty where the screen already says why.</summary>
     internal static string DescribeLock(VaultLockReason reason, DateTimeOffset at, TimeSpan idleTimeout)
@@ -1056,6 +1134,15 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
         // The most recent vault that still exists is pre-selected, so the common case is launch,
         // type, Enter — with no mouse and no arrow keys.
         SelectedPath = Recent.FirstOrDefault(item => item.Exists)?.Path;
+
+        if (_selectedPath is null)
+        {
+            KeePassXc = [.. KeePassXcDatabases.Read(_keePassXcConfig).Select(path => new KeePassXcDatabaseItem(path))];
+            Raise(nameof(KeePassXc));
+            Raise(nameof(OffersKeePassXc));
+            Raise(nameof(OffersOpenFirst));
+            Raise(nameof(WelcomeSubtitle));
+        }
     }
 
     private void Project()

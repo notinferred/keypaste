@@ -25,15 +25,15 @@ backend      Locked restore, format, Release build and backend tests.
 integration  Prepare the backend and exercise real CLI/MCP processes and the demo pages.
 desktop      The desktop solution AND the separate CLI/desktop consistency project.
 compat       Prepare the backend and the app driver, and verify creation, write-back, history, recovery, organization,
-             keyfiles, custom fields, project tags and every workflow on vaults KeePassXC made, through the CLI and the app, against
-             installed KeePassXC.
+             keyfiles, custom fields, project tags and every workflow on vaults KeePassXC made, through the CLI and the app, and
+             the first run's offer of the databases KeePassXC last opened, against installed KeePassXC.
              Never selected automatically; run it by name.
 
 --list prints the selection and commands without executing them. Backend/desktop accept
 --prepare-only and --test-only for CI or a build already prepared by this command.
 Use Git Bash on Windows. A full run needs dotnet, git, jq, GNU timeout and running Docker.
 macOS can supply GNU timeout as gtimeout from coreutils. compat also needs keepassxc-cli
-(or KPXC_CLI). Native AOT, packaging, other operating systems and live install checks stay in CI.
+(or KPXC_CLI) with KeePassXC's app beside it or on PATH (or KPXC_APP). Native AOT, packaging, other operating systems and live install checks stay in CI.
 USAGE
 }
 
@@ -266,6 +266,7 @@ profile_compat() {
   run bash scripts/verify-keepassxc-xml-attach.sh artifacts/compat/local-xml-attach
   prepare tests/Keypaste.AppDriver/Keypaste.AppDriver.csproj
   run bash scripts/verify-keepassxc-workflows.sh artifacts/compat/local-workflows
+  run bash scripts/verify-keepassxc-first-run.sh artifacts/compat/local-first-run
 }
 
 # Backend tests read workflows, scripts and the release definition, so those paths select backend too.

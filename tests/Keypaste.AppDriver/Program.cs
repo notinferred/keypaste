@@ -8,6 +8,7 @@ using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Recent;
 
 namespace Keypaste.AppDriver;
 
@@ -50,6 +51,8 @@ internal static class Program
 {
     private const string _usage =
         "usage: open <vault>\n" +
+        "       welcome [--keepassxc-config <ini>]\n" +
+        "       open-offered <n> [--keepassxc-config <ini>]\n" +
         "       create <vault>\n" +
         "       edit <vault> <entry-path> <notes> <url>\n" +
         "       field-add <vault> <entry-path> <name> <protected | plain>\n" +
@@ -95,6 +98,10 @@ internal static class Program
             return args switch
             {
                 ["open", var vault] => await driver.OpenAsync(vault).ConfigureAwait(true),
+                ["welcome"] => driver.Welcome(KeePassXcDatabases.LocalConfigPath()),
+                ["welcome", "--keepassxc-config", var ini] => driver.Welcome(ini),
+                ["open-offered", var row] => await driver.OpenOfferedAsync(row, KeePassXcDatabases.LocalConfigPath()).ConfigureAwait(true),
+                ["open-offered", var row, "--keepassxc-config", var ini] => await driver.OpenOfferedAsync(row, ini).ConfigureAwait(true),
                 ["create", var vault] => await driver.CreateAsync(vault).ConfigureAwait(true),
                 ["edit", var vault, var entry, var notes, var url] => await driver.EditAsync(vault, entry, notes, url).ConfigureAwait(true),
                 ["field-add", var vault, var entry, var name, "protected"] => await driver.AddFieldAsync(vault, entry, name, protect: true).ConfigureAwait(true),
@@ -199,6 +206,47 @@ internal sealed class Driver(string home)
         using var session = new AppVaultSession(TimeProvider.System, home: home);
         using var unlock = Screen(session);
         return await UnlockAsync(unlock, session, vault).ConfigureAwait(true) ?? Did("opened");
+    }
+
+    /// <summary>Prints the databases the first run offers from KeePassXC, one path a line, as the welcome lists them (N.2).</summary>
+    internal int Welcome(string? keePassXcConfig)
+    {
+        using var session = new AppVaultSession(TimeProvider.System, home: home);
+        using var unlock = new UnlockViewModel(session, home, _picker, () => { }, keePassXcConfig: keePassXcConfig);
+
+        if (unlock.HasSelection)
+        {
+            throw new DriverException("a recent vault is selected, so the welcome is not showing");
+        }
+
+        foreach (var item in unlock.KeePassXc)
+        {
+            Console.Out.WriteLine(item.Path);
+        }
+
+        return 0;
+    }
+
+    /// <summary>Chooses the welcome's <paramref name="row"/>th database from KeePassXC, counting from 1, and unlocks it.</summary>
+    internal async Task<int> OpenOfferedAsync(string row, string? keePassXcConfig)
+    {
+        using var session = new AppVaultSession(TimeProvider.System, home: home);
+        using var unlock = new UnlockViewModel(session, home, _picker, () => { }, keePassXcConfig: keePassXcConfig);
+
+        if (!int.TryParse(row, NumberStyles.None, CultureInfo.InvariantCulture, out var n) || n < 1 || n > unlock.KeePassXc.Count)
+        {
+            throw new DriverException($"the welcome offers {unlock.KeePassXc.Count} databases from KeePassXC, not a row {row}");
+        }
+
+        var chosen = unlock.KeePassXc[n - 1].Path;
+        unlock.SelectedKeePassXc = unlock.KeePassXc[n - 1];
+
+        if (unlock.SelectedPath != chosen)
+        {
+            return Refused(unlock.Message);
+        }
+
+        return await UnlockAsync(unlock, session, chosen).ConfigureAwait(true) ?? Did($"opened {chosen}");
     }
 
     internal async Task<int> CreateAsync(string vault)

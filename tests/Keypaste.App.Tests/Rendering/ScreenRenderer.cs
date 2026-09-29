@@ -108,6 +108,16 @@ public sealed class ScreenRenderer
                 window.Close();
             }
 
+            Core.Recent.RecentVaults.Save(
+                Core.Audit.KeypasteHome.RecentPath(home), [new Core.Recent.RecentVault(path, DateTimeOffset.UtcNow)]);
+
+            using (var unlock = new UnlockViewModel(session, home, new FakeVaultFilePicker(), () => { }))
+            {
+                var window = Show(new UnlockView { DataContext = unlock });
+                Save(window, output, "70b-lock-more-options");
+                window.Close();
+            }
+
             device.NeverTouched = false;
             using (var master = TempVault.Secret(_master))
             {
@@ -456,6 +466,15 @@ public sealed class ScreenRenderer
             using var welcome = new UnlockViewModel(session, empty, picker, () => { });
             var window = Show(new UnlockView { DataContext = welcome });
             Save(window, output, "81-lock-welcome");
+            window.Close();
+
+            var personal = Path.Combine(empty, "personal.kdbx");
+            File.WriteAllBytes(personal, [1]);
+            var ini = Path.Combine(empty, "keepassxc.ini");
+            File.WriteAllText(ini, $"[General]\nLastActiveDatabase={demo.Path.Replace('\\', '/')}\nLastDatabases={personal.Replace(@"\", @"\\", StringComparison.Ordinal)}\n");
+            using var fromKeePassXc = new UnlockViewModel(session, empty, picker, () => { }, keePassXcConfig: ini);
+            window = Show(new UnlockView { DataContext = fromKeePassXc });
+            Save(window, output, "81b-lock-welcome-keepassxc");
             window.Close();
         }
         finally
