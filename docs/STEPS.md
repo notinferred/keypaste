@@ -6,7 +6,7 @@ This file holds open work only. Finishing a task removes it from here, adds its 
 
 ## Selection and evidence
 
-Only the next five tasks are detailed: N.4, N.1b, N.12, N.10 and C.1b. Later rows name a bounded outcome and the dependencies their own implementation or verifier needs; expand a selected later task before building it. Tasks are not marked implemented from a document, reader, mock response or consuming screen. Name the producer, transport, consumer and user action exercised, and retain the source/version and limitations of the observation.
+Only the next five tasks are detailed: N.1b, N.12, N.10, C.1b and C.1c. Later rows name a bounded outcome and the dependencies their own implementation or verifier needs; expand a selected later task before building it. Tasks are not marked implemented from a document, reader, mock response or consuming screen. Name the producer, transport, consumer and user action exercised, and retain the source/version and limitations of the observation.
 
 Needs are build dependencies. Ships after names publication gates. External signing identities are inputs, not a queue of enrollment code. A ready row does not authorize publication, account changes or messages. Preserve the secret-path tests, real KeePassXC compatibility, stale-write refusals and release integrity checks while changing product scope.
 
@@ -14,12 +14,6 @@ Needs are build dependencies. Ships after names publication gates. External sign
 
 Custom fields and tags are ordinary KeePass data: keypaste writes them as KeePassXC reads them, and every row keeps the permanent compatibility gates (PRODUCT §4.6). C.1a's tags include the project tags T4 builds on. The main screens show everyday password-manager work; advanced controls and security recommendations live in Settings (PRODUCT §5.8).
 
-- [ ] **N.4 — Create an item from a template.** Needs: V.7a.
-  **Build:** New on Items starts from Login, API key, Database, Server or Secure note. Each asks for a title, a folder chosen from the vault's groups instead of a typed `/` path, tags and notes, and its own fields: a login's username, password and web address; an API key's env-named key, protected; a database's and a server's host, username and password; a secure note's notes alone. The item is created in one write with no history item, under V.7a's field-name rules and C.1a's tag rules. The keypaste-design skill applies. Traces to PRODUCT §§1 and 5.8.
-
-  **Verify (V-N.4):** in the app, on a vault KeePassXC made, a person creates one item from each template. Real KeePassXC reads each item's title, group, fields and their protection, tags and notes, and finds no revision. A title already taken in the folder, a refused field name and an empty title each write nothing. The form's automation tree carries no typed value.
-
-  A template shown only in a view model does not pass.
 - [ ] **N.1b — Give every advanced feature one home.** Needs: N.1a.
   **Build:** Settings › Advanced, which already lists the activity log and share links (N.1a1), gains Scoped tokens, moved from Agents with New token, its one-time copy and Revoke, and Diagnostics, moved from Settings' main list. The log's hash check, Verify chain and Copy hash, is offered on the activity log only; Agents › History shows the records without it. Each connected app's choice of Session grants up to 1h, Ask every time or Inject only moves from a dropdown on its card to that app's menu on Agents. Nothing is removed. The keypaste-design skill applies. Traces to PRODUCT §5.8.
 
@@ -66,11 +60,11 @@ The `env/<project>` layout that v0.3.0 wrote stays readable indefinitely; no new
 
   A resolver shown only over an in-memory vault, with no child started, does not pass.
 - [ ] **C.1c — Write keys onto entries.** Needs: C.1b.
-  - This covers `env set`, `env pull`, `env rm` and the app's add, edit and import.
-  - An existing key is updated where it lives.
-  - A new key goes on the entry the person names, or else on the environment's home entry `env/<project>/.env` (`.env.<environment>`).
-  - Values are written protected, with one revision per entry per operation.
-  - Before a tag changes, the person is shown every field or environment the change reaches.
+  **Build:** `env set`, `env pull`, `env rm` and the app's add, edit and import on Env profiles write a project's keys as fields of its entries (D-0367). An existing key is updated where it lives: on the tagged entry that holds it, or in place as a legacy `env/<project>` variable. A new key goes on the entry the person names (`--entry` in the CLI, a choice of the environment's tagged entries in the app), or else on the environment's home entry `env/<project>/.env` (`.env.<environment>` for another environment), created with its tag on first use. Values are written protected through `Vault.SetFields` and `RemoveField`, one revision per entry per operation. Before a tag changes, through `env tag`, `env untag` or the pane's chips, the person is shown every field and environment the change reaches, and nothing is written until they confirm. Traces to PRODUCT §2 and T4.
+
+  **Verify (V-C.1c):** on a vault KeePassXC made, `env set` of a tagged key changes it on its own entry, `env set` of a new key without `--entry` creates `env/<project>/.env` tagged `env:<project>` and holding it protected, and `env pull` of a `.env` touching keys on two entries makes one revision on each; real KeePassXC reads each value, its protection and the home entry's tag, and `keypaste run` then gives a child the new values. The app's add, edit and import write the same, `env rm` removes a field and keeps it in history, and a tag change through the CLI and through the app lists the fields and environments it reaches before anything is written, and writes nothing when declined.
+
+  A write shown only in core, with no front end and no KeePassXC read, does not pass.
 - [ ] **C.3 — Move a 0.3 project onto tagged fields.** Needs: C.1c.
   - It is opt-in: `env migrate <project>`, or its equivalent on the Projects screen.
   - Each legacy variable's value moves into a protected field of its environment's home entry, and the old entries are recycled, in one save, all or nothing.

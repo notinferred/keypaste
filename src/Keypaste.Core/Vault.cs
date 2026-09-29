@@ -235,6 +235,80 @@ public sealed class Vault : IDisposable
         Change(() => _interop.AddEntry(entry), VaultEdit.Of(EntryName.Of(entry)));
     }
 
+    /// <summary>
+    /// Creates an entry in an existing group with its custom fields and tags, in one change and with
+    /// no history item (D-0379). Call <see cref="Save"/> to persist it.
+    /// </summary>
+    /// <param name="entry">The entry's standard fields and the group it goes in, which must exist.</param>
+    /// <param name="fields">Its custom fields, each named once and holding a value; a field is protected unless its write says otherwise.</param>
+    /// <param name="tags">Its tags, each named once.</param>
+    /// <remarks>
+    /// Every check runs before anything is written: the title and field names by
+    /// <see cref="VaultNameRules"/> and <see cref="FieldNameRules"/>, the tags by <see cref="TagRules"/>,
+    /// and the group is neither keypaste's own nor the <c>env</c> layout, where no new variable is
+    /// written (D-0367). The entry's own name may not be taken in its group.
+    /// </remarks>
+    /// <exception cref="VaultException">Any of those is refused, or the group does not exist or names more than one. Nothing is changed.</exception>
+    public void CreateEntry(VaultEntry entry, IReadOnlyList<FieldWrite> fields, IReadOnlyList<string> tags)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(entry);
+        ArgumentNullException.ThrowIfNull(fields);
+        ArgumentNullException.ThrowIfNull(tags);
+
+        if (!VaultNameRules.IsValidTitle(entry.Title, out string error))
+        {
+            throw Refused(error);
+        }
+
+        if (ReservedGroups.IsReserved(entry.GroupPath))
+        {
+            throw new VaultException("keypaste keeps that group for itself. Choose another.");
+        }
+
+        if (IsBeneath(entry.GroupPath, EnvConvention.RootGroup))
+        {
+            throw new VaultException("The env group holds projects from before tags. Choose another group, and tag the item into a project instead.");
+        }
+
+        HashSet<string> named = new(StringComparer.Ordinal);
+
+        foreach (FieldWrite write in fields)
+        {
+            if (!FieldNameRules.IsWritable(write.Name, out error))
+            {
+                throw Refused(error);
+            }
+
+            if (!named.Add(write.Name))
+            {
+                throw new VaultException($"'{write.Name}' is named twice.");
+            }
+
+            if (write.Value is null)
+            {
+                throw new VaultException($"'{write.Name}' has no value.");
+            }
+        }
+
+        HashSet<string> tagged = new(StringComparer.Ordinal);
+
+        foreach (string tag in tags)
+        {
+            if (!TagRules.IsValid(tag, out error))
+            {
+                throw Refused(error);
+            }
+
+            if (!tagged.Add(tag))
+            {
+                throw new VaultException($"The tag '{tag}' is named twice.");
+            }
+        }
+
+        Change(() => _interop.CreateEntry(entry, fields, tags), VaultEdit.Of(EntryName.Of(entry)));
+    }
+
     /// <summary>Overwrites the fields of the entry at <paramref name="entry"/>'s
     /// <see cref="VaultEntry.Path"/>. Call <see cref="Save"/> to persist it.</summary>
     /// <remarks>

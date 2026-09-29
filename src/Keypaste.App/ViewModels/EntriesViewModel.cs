@@ -40,14 +40,10 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     private string? _matchedQuery;
     private Dictionary<EntryName, MatchedFields> _matches = [];
     private string? _error;
-    private bool _isAdding;
     private bool _isConfirmingDelete;
     private string? _notice;
     private RecycledEntryId? _undo;
-    private string _newEntryPath = string.Empty;
-    private string _newUsername = string.Empty;
-    private string _newUrl = string.Empty;
-    private bool _generatePassword = true;
+    private NewItemViewModel? _newItem;
     private bool _isOrganizing;
     private bool _isCreatingGroup;
     private bool _isRenamingGroup;
@@ -65,7 +61,6 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         _clipboard = clipboard;
         _activity = activity;
         _web = web;
-        NewPassword = new SecretField(clipboard);
 
         BeginAddCommand = new RelayCommand(BeginAdd, () => !IsAdding);
         PropertyChanged += (_, e) =>
@@ -252,7 +247,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     /// </remarks>
     internal EntryRow? Selected
     {
-        get => _selection is { } name && !_isAdding
+        get => _selection is { } name && !IsAdding
             ? Rows.FirstOrDefault(row => row.Name == name)
             : null;
         set
@@ -358,7 +353,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>Whether the pane's place says to choose an entry: nothing is open and nothing is being made.</summary>
-    internal bool ShowsPlaceholder => _detail is null && !_isAdding;
+    internal bool ShowsPlaceholder => _detail is null && !IsAdding;
 
     /// <summary>A calm sentence when something did not work, or null.</summary>
     internal string? Error
@@ -402,13 +397,20 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     internal int TotalCount => _all.Count;
 
     /// <summary>Whether the add form is showing.</summary>
-    internal bool IsAdding
+    internal bool IsAdding => _newItem is not null;
+
+    /// <summary>The New item form while it is open (N.4).</summary>
+    internal NewItemViewModel? NewItem
     {
-        get => _isAdding;
+        get => _newItem;
         private set
         {
-            if (Set(ref _isAdding, value))
+            var old = _newItem;
+
+            if (Set(ref _newItem, value))
             {
+                old?.Dispose();
+                Raise(nameof(IsAdding));
                 Raise(nameof(ShowsPlaceholder));
                 Raise(nameof(Selected));
                 DeleteCommand.RaiseCanExecuteChanged();
@@ -419,65 +421,6 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
             }
         }
     }
-
-    /// <summary>Where the new entry goes, as a path — <c>servers/production</c>.</summary>
-    internal string NewEntryPath
-    {
-        get => _newEntryPath;
-        set
-        {
-            if (Set(ref _newEntryPath, value))
-            {
-                Raise(nameof(NewEntryIsLogin));
-            }
-        }
-    }
-
-    /// <summary>Whether the new entry can have a username and a URL: anything but a key under env, which has profiles instead.</summary>
-    internal bool NewEntryIsLogin =>
-        !_newEntryPath.TrimStart().StartsWith(EnvConvention.RootGroup + "/", StringComparison.Ordinal);
-
-    /// <summary>The new entry's username, when it is a login.</summary>
-    internal string NewUsername
-    {
-        get => _newUsername;
-        set => Set(ref _newUsername, value);
-    }
-
-    /// <summary>The new entry's URL, when it is a login.</summary>
-    internal string NewUrl
-    {
-        get => _newUrl;
-        set => Set(ref _newUrl, value);
-    }
-
-    /// <summary>
-    /// Whether to generate the new entry's password, rather than take one already in hand.
-    /// </summary>
-    /// <remarks>
-    /// On by default, because a generated password is the better answer whenever there is a choice.
-    /// Turning it off shows <see cref="NewPassword"/>, which is how somebody stores the API key
-    /// they were handed rather than one keypaste invented (docs/PRODUCT.md §1.1).
-    /// </remarks>
-    internal bool GeneratePassword
-    {
-        get => _generatePassword;
-        set
-        {
-            if (Set(ref _generatePassword, value) && value)
-            {
-                // Turning generation back on hides the field. Anything typed into it would
-                // otherwise sit in the buffer, invisible, until something else read it.
-                NewPassword.Clear();
-            }
-        }
-    }
-
-    /// <summary>The password being entered for the new entry, when it is not being generated.</summary>
-    internal SecretField NewPassword { get; }
-
-    /// <summary>What to generate, while <see cref="GeneratePassword"/> is on.</summary>
-    internal GeneratorViewModel Generator { get; } = new();
 
     private void OnDetailChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
@@ -691,9 +634,8 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
             Forget();
 
             // A half-entered password is as much a secret as a stored one, and the screen is about
-            // to be disposed anyway. Clearing here means the lock holds on whichever path runs.
-            NewPassword.Clear();
-            IsAdding = false;
+            // to be disposed anyway. Closing the form here disposes it on whichever path runs.
+            NewItem = null;
             return;
         }
 
@@ -771,8 +713,6 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         _pinned = null;
         _draftTitle = string.Empty;
         _draftGroupName = string.Empty;
-        _newUsername = string.Empty;
-        _newUrl = string.Empty;
         _moveTarget = null;
         MoveTargets = [];
         IsOrganizing = false;
@@ -782,8 +722,6 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         Raise(nameof(Search));
         Raise(nameof(DraftTitle));
         Raise(nameof(DraftGroupName));
-        Raise(nameof(NewUsername));
-        Raise(nameof(NewUrl));
         Raise(nameof(MoveTarget));
     }
 
@@ -802,7 +740,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         Forget();
         Detail = null;
         Offer(null, null);
-        NewPassword.Dispose();
+        NewItem = null;
     }
 
     private EntryDetailViewModel? Build(EntryName name)
@@ -963,131 +901,32 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
     private void BeginAdd()
     {
-        Offer(null, null);
-        NewEntryPath = SelectedGroup is { IsEverything: false } group ? group.Path + "/" : string.Empty;
-        NewUsername = string.Empty;
-        NewUrl = string.Empty;
-        NewPassword.Clear();
-        IsAdding = true;
-        Error = null;
-    }
-
-    private void CancelAdd()
-    {
-        IsAdding = false;
-        NewEntryPath = string.Empty;
-        NewUsername = string.Empty;
-        NewUrl = string.Empty;
-        NewPassword.Clear();
-        Error = null;
-    }
-
-    private void ConfirmAdd()
-    {
         if (_session.Unlocked is not { } vault)
         {
             Error = "The vault is locked.";
             return;
         }
 
-        var target = NewEntryPath.Trim();
-        var slash = target.LastIndexOf('/');
-        var title = slash < 0 ? target : target[(slash + 1)..];
-        var groupPath = slash < 0 ? string.Empty : target[..slash];
-
-        if (title.Length == 0)
-        {
-            Error = "An entry needs a name.";
-            return;
-        }
-
-        // The same function `keypaste add` reaches for, rather than a regular expression written
-        // for this form. A validator that lives next to an error message is where a second
-        // implementation of a naming rule always appears.
-        var sanitized = EntryNameSanitizer.Sanitize(title);
-        if (sanitized.WasAltered)
-        {
-            // The rejected name is not echoed: it was rejected precisely because it does not
-            // render as what it is, so quoting it back would put the trickery on screen and read
-            // as identical to the suggestion beside it.
-            Error = $"That is not a name keypaste will create. Try '{sanitized.Text}'.";
-            return;
-        }
-
-        var name = new EntryName(groupPath, title);
-        var path = groupPath.Length == 0 ? title : groupPath + "/" + title;
-
-        try
-        {
-            // The identity, so this cannot claim an entry exists that nothing has.
-            if (vault.Find(name) is not null)
-            {
-                Error = $"'{EntryNameSanitizer.SanitizePath(path).Text}' already exists.";
-                return;
-            }
-
-            // The joined form, reached for its refusal alone: it throws when the path already
-            // names two, and a third would deepen a collision the detail pane then has to refuse.
-            _ = vault.Find(path);
-        }
-        catch (VaultException e)
-        {
-            Error = e.Message;
-            return;
-        }
-
-        var password = string.Empty;
-
-        try
-        {
-            if (GeneratePassword)
-            {
-                if (Generator.Recipe is not { } recipe)
-                {
-                    Error = Generator.Error;
-                    return;
-                }
-
-                using var buffer = new SecretBuffer();
-                PasswordGenerator.Append(recipe, buffer);
-                password = new string(buffer.Value);
-            }
-            else
-            {
-                // Empty is still allowed, and the field shows zero dots beside the unticked box:
-                // KDBX permits an entry with no password, and 4.2 created them that way.
-                password = NewPassword.Compose();
-            }
-
-            vault.AddEntry(new VaultEntry
-            {
-                Title = sanitized.Text,
-                Password = password,
-                Username = NewEntryIsLogin ? NewUsername.Trim() : string.Empty,
-                Url = NewEntryIsLogin ? NewUrl.Trim() : string.Empty,
-                GroupPath = EntryNameSanitizer.SanitizePath(groupPath).Text,
-            });
-
-            vault.Save();
-        }
-        catch (VaultChangedOnDiskException)
-        {
-            Error = "Something else changed this vault since you opened it. Lock and unlock to see it, then add this again.";
-            return;
-        }
-        catch (VaultException e)
-        {
-            Error = e.Message;
-            return;
-        }
-
-        IsAdding = false;
-        NewEntryPath = string.Empty;
-        NewUsername = string.Empty;
-        NewUrl = string.Empty;
-        NewPassword.Clear();
+        Offer(null, null);
         Error = null;
+        NewItem = new NewItemViewModel(_session, _clipboard, vault.ReadGroupPaths(), SelectedGroup is { IsEverything: false } group ? group.Path : null);
+    }
 
+    private void CancelAdd()
+    {
+        NewItem = null;
+        Error = null;
+    }
+
+    private void ConfirmAdd()
+    {
+        if (_newItem?.Create() is not { } name)
+        {
+            return;
+        }
+
+        NewItem = null;
+        Error = null;
         Reload();
         Selected = Rows.FirstOrDefault(row => row.Name == name);
     }
@@ -1355,7 +1194,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     private void CloseOtherForms()
     {
         Offer(null, null);
-        IsAdding = false;
+        NewItem = null;
         IsConfirmingDelete = false;
         IsOrganizing = false;
     }

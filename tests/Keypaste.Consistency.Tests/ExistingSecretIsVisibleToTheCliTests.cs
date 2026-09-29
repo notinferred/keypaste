@@ -1,6 +1,7 @@
 using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.App.Tests.Clipboard;
+using Keypaste.App.Tests.ViewModels;
 using Keypaste.App.ViewModels;
 using Keypaste.Cli;
 using Keypaste.Core;
@@ -39,15 +40,14 @@ public sealed class ExistingSecretIsVisibleToTheCliTests
         using var fixture = new VaultFixture(("seed", "seed-password"));
         using var screen = Entries(fixture);
 
-        screen.Model.BeginAddCommand.Execute(null);
-        screen.Model.NewEntryPath = "svc/api";
-        screen.Model.GeneratePassword = false;
-        Enter(screen.Model.NewPassword, _typed);
+        var form = NewItemForm.Open(screen.Model, "api");
+        form.GeneratePassword = false;
+        Enter(form.Password, _typed);
         screen.Model.ConfirmAddCommand.Execute(null);
 
         Assert.Null(screen.Model.Error);
 
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "svc/api", "--show"));
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "api", "--show"));
         Assert.Equal(_typed, fixture.Cli.Out.Trim());
     }
 
@@ -59,15 +59,14 @@ public sealed class ExistingSecretIsVisibleToTheCliTests
 
         screen.Clipboard.Plant(_pasted);
 
-        screen.Model.BeginAddCommand.Execute(null);
-        screen.Model.NewEntryPath = "svc/api";
-        screen.Model.GeneratePassword = false;
-        await screen.Model.NewPassword.Paste();
+        var form = NewItemForm.Open(screen.Model, "api");
+        form.GeneratePassword = false;
+        await form.Password.Paste();
         screen.Model.ConfirmAddCommand.Execute(null);
 
         Assert.Null(screen.Model.Error);
 
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "svc/api", "--show"));
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "api", "--show"));
         Assert.Equal(_pasted, fixture.Cli.Out.Trim());
     }
 

@@ -338,6 +338,53 @@ internal sealed class KeePassInterop : IDisposable
         group.AddEntry(pwEntry, true);
     }
 
+    /// <summary>
+    /// Creates an entry with its fields and tags in an existing group as one mutation, with no
+    /// history item. The caller has checked every name.
+    /// </summary>
+    /// <exception cref="VaultException">The group does not exist or names more than one, or the entry's name is taken. Nothing is changed.</exception>
+    internal void CreateEntry(VaultEntry entry, IReadOnlyList<FieldWrite> fields, IReadOnlyList<string> tags)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (LocateGroup(entry.GroupPath) is not { } destination)
+        {
+            throw new VaultException($"There is no group '{entry.GroupPath}'. Choose one the vault has.");
+        }
+
+        var projected = Projected(null, null, null, null);
+        projected.Add((entry.GroupPath, entry.Title, true));
+
+        switch (RefuseCollision(projected))
+        {
+            case OrganizeOutcome.DestinationOccupied:
+                throw new VaultException($"'{entry.Title}' is already in that group. Choose another title.");
+            case OrganizeOutcome.DestinationAmbiguous:
+                throw new VaultException($"'{ChildPath(entry.GroupPath, entry.Title)}' would name two entries. Choose another title.");
+        }
+
+        // Nothing above this line writes. The entry is whole before it joins the group, so a
+        // refusal can never leave half of one behind.
+        PwEntry pwEntry = new(true, true);
+        SetField(pwEntry, PwDefs.TitleField, entry.Title);
+        SetField(pwEntry, PwDefs.UserNameField, entry.Username);
+        SetField(pwEntry, PwDefs.PasswordField, entry.Password);
+        SetField(pwEntry, PwDefs.UrlField, entry.Url);
+        SetField(pwEntry, PwDefs.NotesField, entry.Notes);
+
+        foreach (FieldWrite write in fields)
+        {
+            pwEntry.Strings.Set(write.Name, new ProtectedString(write.Protect ?? true, write.Value!));
+        }
+
+        foreach (string tag in tags)
+        {
+            pwEntry.AddTag(tag);
+        }
+
+        destination.Group.AddEntry(pwEntry, true);
+    }
+
     /// <summary>Overwrites the fields of the one entry with this entry's name.</summary>
     /// <returns>The number of entries updated: 0 if nothing matched, otherwise 1.</returns>
     /// <remarks>

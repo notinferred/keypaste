@@ -21,6 +21,7 @@
   <ItemGroup>
     <Compile Include="../Keypaste.Cli.Tests/CliHarness.cs" Link="CliHarness.cs" />
     <Compile Include="../Keypaste.App.Tests/Clipboard/FakeClipboard.cs" Link="FakeClipboard.cs" />
+    <Compile Include="../Keypaste.App.Tests/ViewModels/NewItemForm.cs" Link="NewItemForm.cs" />
   </ItemGroup>
 
   <!--

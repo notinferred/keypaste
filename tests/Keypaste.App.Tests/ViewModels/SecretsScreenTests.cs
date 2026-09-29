@@ -173,28 +173,25 @@ public sealed class SecretsScreenTests : IDisposable
     }
 
     [Fact]
-    public void A_new_login_is_made_whole_in_one_step_and_a_new_key_under_env_has_no_username()
+    public void A_new_login_is_made_whole_in_one_step_and_the_env_layout_is_no_folder_to_make_one_in()
     {
         using var context = new Context(_vaultPath);
 
         context.Entries.Selected = context.Entries.Rows.Single(row => row.Title == "github");
-        context.Entries.BeginAddCommand.Execute(null);
+        var form = NewItemForm.Open(context.Entries, "Work/gitlab");
         Assert.Null(context.Entries.Selected);
 
-        context.Entries.NewEntryPath = "Work/gitlab";
-        Assert.True(context.Entries.NewEntryIsLogin);
-        context.Entries.NewUsername = "me";
-        context.Entries.NewUrl = "https://gitlab.com";
+        Assert.True(form.ShowsUsername && form.ShowsUrl);
+        form.Username = "me";
+        form.Url = "https://gitlab.com";
         context.Entries.ConfirmAddCommand.Execute(null);
 
         var added = context.Session.Unlocked!.Find(new EntryName("Work", "gitlab"))!;
         Assert.Equal("me", added.Username);
         Assert.Equal("https://gitlab.com", added.Url);
 
-        context.Entries.BeginAddCommand.Execute(null);
-        context.Entries.NewEntryPath = "env/acme-api/API_KEY";
-        Assert.False(context.Entries.NewEntryIsLogin);
-        Assert.Empty(context.Entries.NewUsername);
+        form = NewItemForm.Open(context.Entries);
+        Assert.DoesNotContain(form.Folders, folder => folder.Path == "env" || folder.Path.StartsWith("env/", StringComparison.Ordinal));
     }
 
     /// <summary>A reference names the entry and holds no value, so it is copied as plain text.</summary>

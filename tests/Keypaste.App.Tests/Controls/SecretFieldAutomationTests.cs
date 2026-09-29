@@ -7,6 +7,7 @@ using Keypaste.App.Clipboard;
 using Keypaste.App.Controls;
 using Keypaste.App.Session;
 using Keypaste.App.Tests.Clipboard;
+using Keypaste.App.Tests.ViewModels;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
@@ -51,6 +52,16 @@ public sealed class SecretFieldAutomationTests
             screen.BeginAdd();
 
             Assert.Equal(_alpha.Length, Differential(screen.Window, screen.NewEntryPassword).Length);
+        });
+
+    [Fact]
+    public Task The_new_api_key_value_surface_depends_on_the_length_and_not_the_characters() =>
+        HeadlessSession.On(() =>
+        {
+            using var screen = new EntriesScreen();
+            screen.BeginAddKey();
+
+            Assert.Equal(_alpha.Length, Differential(screen.Window, screen.NewItemKeyValue).Length);
         });
 
     [Fact]
@@ -150,6 +161,12 @@ public sealed class SecretFieldAutomationTests
         Type(entries.Window, entries.NewEntryPassword, _fixture);
         AutomationSurface.AssertNothingExposes(entries.Window, _fixture);
 
+        // An API key's value, the other secret New item takes (N.4).
+        using var key = new EntriesScreen();
+        key.BeginAddKey();
+        Type(key.Window, key.NewItemKeyValue, _fixture);
+        AutomationSurface.AssertNothingExposes(key.Window, _fixture);
+
         entries.BeginEdit();
         Type(entries.Window, entries.ReplacementPassword, _fixture);
         AutomationSurface.AssertNothingExposes(entries.Window, _fixture);
@@ -187,7 +204,7 @@ public sealed class SecretFieldAutomationTests
         await Paste(screen.Window, screen.NewEntryPassword);
 
         Assert.Equal(1, screen.Clipboard.ReadCount);
-        Assert.Equal(_fixture.Length, screen.Model.NewPassword.MaskedLength);
+        Assert.Equal(_fixture.Length, screen.Model.NewItem!.Password.MaskedLength);
         AutomationSurface.AssertNothingExposes(screen.Window, _fixture);
     });
 
@@ -360,6 +377,8 @@ public sealed class SecretFieldAutomationTests
 
         internal MaskedInput NewEntryPassword => Field("NewEntryPassword");
 
+        internal MaskedInput NewItemKeyValue => Field("NewItemKeyValue");
+
         internal MaskedInput ReplacementPassword => Field("ReplacementPassword");
 
         internal MaskedInput NewFieldValue => Field("NewFieldValue");
@@ -387,8 +406,15 @@ public sealed class SecretFieldAutomationTests
         /// <summary>Opens the add form with generation off, which is what shows the field.</summary>
         internal void BeginAdd()
         {
-            Model.BeginAddCommand.Execute(null);
-            Model.GeneratePassword = false;
+            var form = NewItemForm.Open(Model);
+            form.GeneratePassword = false;
+            Drain();
+        }
+
+        /// <summary>Opens New item on the API key template, which shows the key's value field.</summary>
+        internal void BeginAddKey()
+        {
+            NewItemForm.Open(Model).Template = ItemTemplate.ApiKey;
             Drain();
         }
 

@@ -979,7 +979,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         try
         {
             Fields = [.. (vault.Fields(Name) ?? []).Select(field => new EntryFieldRow(this, field))];
-            Tags = [.. (vault.Tags(Name) ?? []).Select(tag => new EntryTagChip(this, tag))];
+            Tags = [.. (vault.Tags(Name) ?? []).Select(tag => new EntryTagChip(tag, RemoveTag))];
         }
         catch (VaultException e)
         {

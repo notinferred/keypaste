@@ -56,15 +56,14 @@ public sealed class GeneratedPassphraseTests : IDisposable
     {
         using (var context = New())
         {
-            context.Entries.BeginAddCommand.Execute(null);
-            context.Entries.NewEntryPath = "servers/database";
-            context.Entries.Generator.UseWords = true;
+            var form = NewItemForm.Open(context.Entries, "database");
+            form.Generator.UseWords = true;
             context.Entries.ConfirmAddCommand.Execute(null);
 
             Assert.Null(context.Entries.Error);
         }
 
-        AssertIsAPassphrase(Reread("servers/database"), 6, PasswordGenerator.DefaultSeparator);
+        AssertIsAPassphrase(Reread("database"), 6, PasswordGenerator.DefaultSeparator);
     }
 
     [Fact]
@@ -91,16 +90,15 @@ public sealed class GeneratedPassphraseTests : IDisposable
     {
         using (var context = New())
         {
-            context.Entries.BeginAddCommand.Execute(null);
-            context.Entries.NewEntryPath = "servers/database";
-            context.Entries.Generator.UseWords = true;
-            context.Entries.Generator.Separator = "_";
+            var form = NewItemForm.Open(context.Entries, "database");
+            form.Generator.UseWords = true;
+            form.Generator.Separator = "_";
             context.Entries.ConfirmAddCommand.Execute(null);
 
             Assert.Null(context.Entries.Error);
         }
 
-        var stored = Reread("servers/database");
+        var stored = Reread("database");
 
         AssertIsAPassphrase(stored, 6, '_');
         Assert.DoesNotContain(PasswordGenerator.DefaultSeparator, stored);
@@ -119,8 +117,7 @@ public sealed class GeneratedPassphraseTests : IDisposable
     {
         using (var context = New())
         {
-            context.Entries.BeginAddCommand.Execute(null);
-            context.Entries.NewEntryPath = "servers/database";
+            var form = NewItemForm.Open(context.Entries, "database");
             context.Entries.ConfirmAddCommand.Execute(null);
 
             var project = Billing(context);
@@ -132,7 +129,7 @@ public sealed class GeneratedPassphraseTests : IDisposable
             Assert.Null(context.EnvSets.Error);
         }
 
-        Assert.Equal(PasswordGenerator.DefaultLength, Reread("servers/database").Length);
+        Assert.Equal(PasswordGenerator.DefaultLength, Reread("database").Length);
         Assert.Equal(PasswordGenerator.DefaultLength, Reread("env/billing/DATABASE_URL").Length);
     }
 
@@ -148,17 +145,17 @@ public sealed class GeneratedPassphraseTests : IDisposable
     {
         using (var context = New())
         {
-            context.Entries.BeginAddCommand.Execute(null);
-            context.Entries.NewEntryPath = "servers/database";
-            context.Entries.Generator.UseWords = true;
-            context.Entries.Generator.WordCount = 3;
+            var form = NewItemForm.Open(context.Entries, "database");
+            form.Generator.UseWords = true;
+            form.Generator.WordCount = 3;
             context.Entries.ConfirmAddCommand.Execute(null);
 
-            Assert.NotNull(context.Entries.Error);
+            Assert.NotNull(form.Error);
+            Assert.True(context.Entries.IsAdding);
         }
 
         using var reopened = Vault.Open(_vaultPath, Master);
-        Assert.Null(reopened.Find("servers/database"));
+        Assert.Null(reopened.Find("database"));
     }
 
     private static void AssertIsAPassphrase(string value, int words, char separator)

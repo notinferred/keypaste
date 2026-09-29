@@ -2,7 +2,7 @@ using Keypaste.Core;
 
 namespace Keypaste.App.ViewModels;
 
-/// <summary>One of an entry's own tags, as a chip the pane draws and can remove.</summary>
+/// <summary>One of an entry's own tags, or a new item's, as a chip the pane or the form draws and can remove.</summary>
 /// <remarks>
 /// A project tag (D-0370) reads as its project and environment, with a shield when the environment is
 /// protected; a tag that starts <c>env:</c> and breaks the grammar is drawn as written, flagged, with
@@ -10,10 +10,10 @@ namespace Keypaste.App.ViewModels;
 /// </remarks>
 internal sealed class EntryTagChip
 {
-    internal EntryTagChip(EntryDetailViewModel owner, string tag)
+    internal EntryTagChip(string tag, Action<EntryTagChip> remove)
     {
-        ArgumentNullException.ThrowIfNull(owner);
         ArgumentNullException.ThrowIfNull(tag);
+        ArgumentNullException.ThrowIfNull(remove);
 
         Tag = tag;
 
@@ -26,7 +26,7 @@ internal sealed class EntryTagChip
             ? $"{EntryNameSanitizer.Sanitize(tag).Text} puts this entry in no project: {read.Problem}"
             : IsProject ? EntryNameSanitizer.Sanitize(tag).Text : null;
 
-        RemoveCommand = new RelayCommand(() => owner.RemoveTag(this));
+        RemoveCommand = new RelayCommand(() => remove(this));
     }
 
     /// <summary>The tag as the entry holds it. Addresses the tag on removal.</summary>

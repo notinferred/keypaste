@@ -36,7 +36,7 @@ public sealed class DrawnMaskTests
     public static TheoryData<string> ShellFields =>
     [
         "CurrentPassword", "AccessNewPassword", "AccessConfirmPassword",
-        "NewEntryPassword", "ReplacementPassword", "NewEnvValue", "ReplacementEnvValue",
+        "NewEntryPassword", "NewItemKeyValue", "ReplacementPassword", "NewEnvValue", "ReplacementEnvValue",
         "NewFieldValue", "ReplacementFieldValue",
         "SharePassphrase",
     ];

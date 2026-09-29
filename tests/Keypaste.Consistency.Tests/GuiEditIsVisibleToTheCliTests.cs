@@ -1,5 +1,6 @@
 using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
+using Keypaste.App.Tests.ViewModels;
 using Keypaste.App.ViewModels;
 using Keypaste.Cli;
 using Keypaste.Core;
@@ -44,8 +45,7 @@ public sealed class GuiEditIsVisibleToTheCliTests
         using var fixture = new VaultFixture(("seed", "seed-password"));
         using var screen = Entries(fixture);
 
-        screen.Model.BeginAddCommand.Execute(null);
-        screen.Model.NewEntryPath = "servers/database";
+        var form = NewItemForm.Open(screen.Model, "database");
         screen.Model.ConfirmAddCommand.Execute(null);
 
         Assert.Null(screen.Model.Error);
@@ -69,19 +69,18 @@ public sealed class GuiEditIsVisibleToTheCliTests
         using var fixture = new VaultFixture(("seed", "seed-password"));
         using var screen = Entries(fixture);
 
-        screen.Model.BeginAddCommand.Execute(null);
-        screen.Model.NewEntryPath = "svc/api";
+        var form = NewItemForm.Open(screen.Model, "api");
         screen.Model.ConfirmAddCommand.Execute(null);
 
         Assert.Null(screen.Model.Error);
 
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "svc/api", "--show"));
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "api", "--show"));
 
         var value = fixture.Cli.Out.Trim();
         Assert.Equal(PasswordGenerator.DefaultLength, value.Length);
 
         // And it is the value the file holds, not merely a string of the right length.
-        Assert.Equal(fixture.Unlocked.Find("svc/api")?.Password, value);
+        Assert.Equal(fixture.Unlocked.Find("api")?.Password, value);
     }
 
     /// <summary>
@@ -100,14 +99,13 @@ public sealed class GuiEditIsVisibleToTheCliTests
         using var fixture = new VaultFixture(("seed", "seed-password"));
         using var screen = Entries(fixture);
 
-        screen.Model.BeginAddCommand.Execute(null);
-        screen.Model.NewEntryPath = "svc/api";
-        screen.Model.Generator.UseWords = true;
+        var form = NewItemForm.Open(screen.Model, "api");
+        form.Generator.UseWords = true;
         screen.Model.ConfirmAddCommand.Execute(null);
 
         Assert.Null(screen.Model.Error);
 
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "svc/api", "--show"));
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "api", "--show"));
 
         var value = fixture.Cli.Out.Trim();
         Assert.NotEmpty(value);
@@ -119,7 +117,7 @@ public sealed class GuiEditIsVisibleToTheCliTests
             $"'{piece}' is not a word from the vendored list"));
 
         // And it is the value the file holds, not merely a string of the right shape.
-        Assert.Equal(fixture.Unlocked.Find("svc/api")?.Password, value);
+        Assert.Equal(fixture.Unlocked.Find("api")?.Password, value);
     }
 
     [Fact]

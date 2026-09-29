@@ -402,7 +402,7 @@ public sealed class TrashTests : IDisposable
         Delete(context, "servers/production");
         Assert.True(context.Entries.CanUndoDelete);
 
-        context.Entries.BeginAddCommand.Execute(null);
+        var form = NewItemForm.Open(context.Entries);
 
         Assert.False(context.Entries.CanUndoDelete);
         Assert.Null(context.Entries.Notice);
@@ -430,8 +430,7 @@ public sealed class TrashTests : IDisposable
 
     private static void Add(Context context, string path)
     {
-        context.Entries.BeginAddCommand.Execute(null);
-        context.Entries.NewEntryPath = path;
+        var form = NewItemForm.Open(context.Entries, path);
         context.Entries.ConfirmAddCommand.Execute(null);
 
         Assert.Null(context.Entries.Error);

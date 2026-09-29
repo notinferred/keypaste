@@ -11,7 +11,7 @@
 # Each vault is AES-KDF and KDBX 4.0, as KeePassXC writes them.
 #
 # On each vault: open, edit, restore a revision, set and remove custom fields and tag and untag from
-# the CLI and from the app, organize, delete and recover, restore a backup, export, and change access. The app half runs through tests/Keypaste.AppDriver, which presses the
+# the CLI and from the app, organize, delete and recover, restore a backup, export, and change access. On a fourth, the app makes one item from each template (N.4). The app half runs through tests/Keypaste.AppDriver, which presses the
 # commands the desktop's screens bind to. After every write KeePassXC opens the vault with its current
 # factors, reads the value the workflow wrote, finds every unmodelled marker, exports both attachments
 # byte for byte, and reports the cipher and KDF it chose. Every refusal leaves the vault byte-identical
@@ -547,6 +547,62 @@ exercise keyfile "$pw" "$dir/keyfile.keyx"
 exercise keyfile-only "" "$dir/keyfile-only.keyx"
 
 # ---------------------------------------------------------------------------------------
+# New items from templates, through the app, on a vault KeePassXC made (N.4).
+# ---------------------------------------------------------------------------------------
+# The number of revisions KeePassXC holds for the entry at the path $2 in the vault $1.
+revisions_at() {
+  local id
+  id=$(value "$1" "$2" Uuid | tr -d '{}-' | xxd -r -p | base64) || die "KeePassXC cannot read the UUID of '$2'"
+  revisions "$1" "$id"
+}
+
+step "templates: the app makes one item from each template, and KeePassXC reads each whole, with no revision"
+db="$dir/templates.kdbx"
+cur_pw=$pw cur_kf= new_pw=
+kpxc_import "$db" "$pw" "" "$dir/seed.xml"
+new_pw=n4-login-pw
+did "the app's new login" app item-new "$db" login servers n4-login --username n4-user --url https://n4.example --notes "n4 login notes" --tag n4
+new_pw=sk-n4-api-key
+did "the app's new API key" app item-new "$db" apikey servers n4-openai --key N4_API_KEY --tag env:kp94
+new_pw=n4-db-pw
+did "the app's new database" app item-new "$db" database servers n4-db --host db.n4.example:5432 --username n4-dbuser
+new_pw=n4-server-pw
+did "the app's new server" app item-new "$db" server servers n4-server --host n4.example --username root
+new_pw=
+did "the app's new secure note" app item-new "$db" securenote servers n4-note --notes "n4 secure note"
+
+expect "$db" servers/n4-login UserName n4-user
+expect "$db" servers/n4-login Password n4-login-pw
+expect "$db" servers/n4-login URL https://n4.example
+expect "$db" servers/n4-login Notes "n4 login notes"
+expect "$db" servers/n4-openai N4_API_KEY sk-n4-api-key
+[ "$(protection N4_API_KEY "$db")" = protected ] || die "KeePassXC does not read the API key the app made as protected"
+expect "$db" servers/n4-db Host db.n4.example:5432
+expect "$db" servers/n4-db UserName n4-dbuser
+expect "$db" servers/n4-db Password n4-db-pw
+expect "$db" servers/n4-server Host n4.example
+expect "$db" servers/n4-server UserName root
+expect "$db" servers/n4-server Password n4-server-pw
+[ "$(protection Host "$db")" = plain ] || die "KeePassXC does not read the host the app wrote as a plain field"
+expect "$db" servers/n4-note Notes "n4 secure note"
+listed=$(value "$db" servers/n4-login Tags) || die "KeePassXC cannot read the login's tags"
+grep -qx 'n4' <<<"${listed//,/$'\n'}" || die "KeePassXC does not read the tag the app gave the login: ${listed}"
+listed=$(value "$db" servers/n4-openai Tags) || die "KeePassXC cannot read the API key's tags"
+grep -qx 'env:kp94' <<<"${listed//,/$'\n'}" || die "KeePassXC does not read the project tag the app gave the API key: ${listed}"
+for title in n4-login n4-openai n4-db n4-server n4-note; do
+  [ "$(revisions_at "$db" "servers/$title")" = 0 ] || die "KeePassXC finds a revision of servers/$title, which the app made in one write"
+done
+
+new_pw=refused-value
+refused "the app making an item whose title the folder already has" "$db" app item-new "$db" login servers n4-login
+refused "the app making an API key named otp" "$db" app item-new "$db" apikey servers n4-otp --key otp
+refused "the app making an API key whose name is not a variable's" "$db" app item-new "$db" apikey servers n4-spaced --key "api key"
+refused "the app making an item with no title" "$db" app item-new "$db" login servers ""
+new_pw=
+[ "$(header "$db" | cut -c17-22)" = "000004" ] || die "the app's new items moved the vault off KDBX 4.0"
+intact "$db" servers/database
+
+# ---------------------------------------------------------------------------------------
 # Creation, through both front ends, read by KeePassXC.
 # ---------------------------------------------------------------------------------------
 step "create: keypaste init makes a vault KeePassXC opens and reads"
@@ -563,5 +619,5 @@ cur_kf=
 kx db-info "$dir/created-app.kdbx" >/dev/null 2>&1 && die "KeePassXC opens the app's vault without its keyfile"
 refused "the app creating over an existing vault" "$dir/created-cli.kdbx" app create "$dir/created-cli.kdbx"
 
-printf '\nWORKFLOWS GATE PASSED: three KeePassXC vaults through the CLI and the app, creation, and every refusal byte-identical, on %s\n' \
+printf '\nWORKFLOWS GATE PASSED: three KeePassXC vaults through the CLI and the app, one item from each template on a fourth, creation, and every refusal byte-identical, on %s\n' \
   "$("$cli" --version | tr -d '\r')"

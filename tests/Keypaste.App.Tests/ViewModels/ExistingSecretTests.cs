@@ -67,16 +67,15 @@ public sealed class ExistingSecretTests : IDisposable
     {
         using (var context = New())
         {
-            context.Entries.BeginAddCommand.Execute(null);
-            context.Entries.NewEntryPath = "svc/api";
-            context.Entries.GeneratePassword = false;
-            Enter(context.Entries.NewPassword, _typed);
+            var form = NewItemForm.Open(context.Entries, "api");
+            form.GeneratePassword = false;
+            Enter(form.Password, _typed);
             context.Entries.ConfirmAddCommand.Execute(null);
 
             Assert.Null(context.Entries.Error);
         }
 
-        Assert.Equal(_typed, Reread("svc/api"));
+        Assert.Equal(_typed, Reread("api"));
     }
 
     [Fact]
@@ -86,17 +85,16 @@ public sealed class ExistingSecretTests : IDisposable
         {
             context.Clipboard.Plant(_pasted);
 
-            context.Entries.BeginAddCommand.Execute(null);
-            context.Entries.NewEntryPath = "svc/api";
-            context.Entries.GeneratePassword = false;
-            await context.Entries.NewPassword.Paste();
+            var form = NewItemForm.Open(context.Entries, "api");
+            form.GeneratePassword = false;
+            await form.Password.Paste();
             context.Entries.ConfirmAddCommand.Execute(null);
 
             Assert.Null(context.Entries.Error);
-            Assert.Empty(context.Entries.NewPassword.Note);
+            Assert.Empty(form.Password.Note);
         }
 
-        Assert.Equal(_pasted, Reread("svc/api"));
+        Assert.Equal(_pasted, Reread("api"));
     }
 
     /// <summary>
@@ -110,17 +108,16 @@ public sealed class ExistingSecretTests : IDisposable
         {
             context.Clipboard.Plant(_pasted);
 
-            context.Entries.BeginAddCommand.Execute(null);
-            context.Entries.NewEntryPath = "svc/api";
-            context.Entries.GeneratePassword = false;
-            Enter(context.Entries.NewPassword, _typed);
-            await context.Entries.NewPassword.Paste();
+            var form = NewItemForm.Open(context.Entries, "api");
+            form.GeneratePassword = false;
+            Enter(form.Password, _typed);
+            await form.Password.Paste();
             context.Entries.ConfirmAddCommand.Execute(null);
 
             Assert.Null(context.Entries.Error);
         }
 
-        Assert.Equal(_typed + _pasted, Reread("svc/api"));
+        Assert.Equal(_typed + _pasted, Reread("api"));
     }
 
     /// <summary>
@@ -133,12 +130,12 @@ public sealed class ExistingSecretTests : IDisposable
         using var context = New();
         context.Clipboard.Plant("before\u0007after");
 
-        context.Entries.BeginAddCommand.Execute(null);
-        context.Entries.GeneratePassword = false;
-        await context.Entries.NewPassword.Paste();
+        var form = NewItemForm.Open(context.Entries);
+        form.GeneratePassword = false;
+        await form.Password.Paste();
 
-        Assert.False(context.Entries.NewPassword.HasValue);
-        Assert.Contains("no keyboard can type", context.Entries.NewPassword.Note, StringComparison.Ordinal);
+        Assert.False(form.Password.HasValue);
+        Assert.Contains("no keyboard can type", form.Password.Note, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -147,12 +144,12 @@ public sealed class ExistingSecretTests : IDisposable
         using var context = New();
         context.Clipboard.Plant(string.Empty);
 
-        context.Entries.BeginAddCommand.Execute(null);
-        context.Entries.GeneratePassword = false;
-        await context.Entries.NewPassword.Paste();
+        var form = NewItemForm.Open(context.Entries);
+        form.GeneratePassword = false;
+        await form.Password.Paste();
 
-        Assert.False(context.Entries.NewPassword.HasValue);
-        Assert.Contains("nothing to paste", context.Entries.NewPassword.Note, StringComparison.Ordinal);
+        Assert.False(form.Password.HasValue);
+        Assert.Contains("nothing to paste", form.Password.Note, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -163,15 +160,14 @@ public sealed class ExistingSecretTests : IDisposable
     {
         using (var context = New())
         {
-            context.Entries.BeginAddCommand.Execute(null);
-            context.Entries.NewEntryPath = "svc/api";
-            context.Entries.GeneratePassword = false;
+            var form = NewItemForm.Open(context.Entries, "api");
+            form.GeneratePassword = false;
             context.Entries.ConfirmAddCommand.Execute(null);
 
             Assert.Null(context.Entries.Error);
         }
 
-        Assert.Equal(string.Empty, Reread("svc/api"));
+        Assert.Equal(string.Empty, Reread("api"));
     }
 
     [Fact]
@@ -217,14 +213,14 @@ public sealed class ExistingSecretTests : IDisposable
     {
         using var context = New();
 
-        context.Entries.BeginAddCommand.Execute(null);
-        context.Entries.GeneratePassword = false;
-        Enter(context.Entries.NewPassword, _typed);
+        var form = NewItemForm.Open(context.Entries);
+        form.GeneratePassword = false;
+        Enter(form.Password, _typed);
 
-        context.Entries.GeneratePassword = true;
+        form.GeneratePassword = true;
 
-        Assert.False(context.Entries.NewPassword.HasValue);
-        Assert.True(context.Entries.NewPassword.IsZeroed);
+        Assert.False(form.Password.HasValue);
+        Assert.True(form.Password.IsZeroed);
     }
 
     [Fact]
@@ -232,14 +228,13 @@ public sealed class ExistingSecretTests : IDisposable
     {
         using var context = New();
 
-        context.Entries.BeginAddCommand.Execute(null);
-        context.Entries.NewEntryPath = "svc/api";
-        context.Entries.GeneratePassword = false;
-        Enter(context.Entries.NewPassword, _typed);
+        var form = NewItemForm.Open(context.Entries, "api");
+        form.GeneratePassword = false;
+        Enter(form.Password, _typed);
         context.Entries.ConfirmAddCommand.Execute(null);
 
         Assert.Null(context.Entries.Error);
-        Assert.True(context.Entries.NewPassword.IsZeroed);
+        Assert.True(form.Password.IsZeroed);
     }
 
     [Fact]
@@ -247,12 +242,12 @@ public sealed class ExistingSecretTests : IDisposable
     {
         using var context = New();
 
-        context.Entries.BeginAddCommand.Execute(null);
-        context.Entries.GeneratePassword = false;
-        Enter(context.Entries.NewPassword, _typed);
+        var form = NewItemForm.Open(context.Entries);
+        form.GeneratePassword = false;
+        Enter(form.Password, _typed);
         context.Entries.CancelAddCommand.Execute(null);
 
-        Assert.True(context.Entries.NewPassword.IsZeroed);
+        Assert.True(form.Password.IsZeroed);
     }
 
     [Fact]
@@ -274,9 +269,9 @@ public sealed class ExistingSecretTests : IDisposable
         using var context = New();
         var detail = Github(context);
 
-        context.Entries.BeginAddCommand.Execute(null);
-        context.Entries.GeneratePassword = false;
-        Enter(context.Entries.NewPassword, _typed);
+        var form = NewItemForm.Open(context.Entries);
+        form.GeneratePassword = false;
+        Enter(form.Password, _typed);
 
         detail.EditCommand.Execute(null);
         Enter(detail.NewPassword, _pasted);
@@ -284,7 +279,7 @@ public sealed class ExistingSecretTests : IDisposable
         context.Session.Lock(VaultLockReason.Manual);
         context.Entries.Reload();
 
-        Assert.True(context.Entries.NewPassword.IsZeroed);
+        Assert.True(form.Password.IsZeroed);
         Assert.True(detail.NewPassword.IsZeroed);
     }
 

@@ -55,6 +55,7 @@ internal static class Program
         "       open-offered <n> [--keepassxc-config <ini>]\n" +
         "       create <vault>\n" +
         "       edit <vault> <entry-path> <notes> <url>\n" +
+        "       item-new <vault> <login|apikey|database|server|securenote> <folder> <title> [--username u] [--url u] [--host h] [--key NAME] [--notes n] [--tag t]...\n" +
         "       field-add <vault> <entry-path> <name> <protected | plain>\n" +
         "       field-set <vault> <entry-path> <name>\n" +
         "       field-protect <vault> <entry-path> <name>\n" +
@@ -104,6 +105,7 @@ internal static class Program
                 ["open-offered", var row, "--keepassxc-config", var ini] => await driver.OpenOfferedAsync(row, ini).ConfigureAwait(true),
                 ["create", var vault] => await driver.CreateAsync(vault).ConfigureAwait(true),
                 ["edit", var vault, var entry, var notes, var url] => await driver.EditAsync(vault, entry, notes, url).ConfigureAwait(true),
+                ["item-new", var vault, var template, var folder, var title, .. var options] => await driver.NewItemAsync(vault, template, folder, title, options).ConfigureAwait(true),
                 ["field-add", var vault, var entry, var name, "protected"] => await driver.AddFieldAsync(vault, entry, name, protect: true).ConfigureAwait(true),
                 ["field-add", var vault, var entry, var name, "plain"] => await driver.AddFieldAsync(vault, entry, name, protect: false).ConfigureAwait(true),
                 ["field-set", var vault, var entry, var name] => await driver.ReplaceFieldAsync(vault, entry, name).ConfigureAwait(true),
@@ -298,6 +300,55 @@ internal sealed class Driver(string home)
 
             Press(detail.SaveCommand, "Save");
             return detail.IsEditing || entries.Error is not null ? Refused(entries.Error) : Did($"saved {entry}");
+        });
+
+    /// <summary>
+    /// Makes an item from a template through New item (N.4): the template, the title, the folder
+    /// chosen from the picker, the template's plain fields, tags and notes from <paramref name="options"/>,
+    /// and the one secret, a password or a key's value, typed from <c>KEYPASTE_DRIVER_NEW_PASSWORD</c>.
+    /// </summary>
+    internal Task<int> NewItemAsync(string vault, string template, string folder, string title, string[] options) =>
+        WithEntriesAsync(vault, entries =>
+        {
+            Press(entries.BeginAddCommand, "New item");
+            var form = entries.NewItem!;
+            form.SelectedTemplate = form.Templates.SingleOrDefault(choice => string.Equals(choice.Template.ToString(), template, StringComparison.OrdinalIgnoreCase))
+                ?? throw new DriverException($"there is no template '{template}'");
+            form.Title = title;
+            form.Folder = form.Folders.SingleOrDefault(choice => choice.Path == folder)
+                ?? throw new DriverException($"the folder picker offers no '{folder}'");
+
+            for (var i = 0; i + 1 < options.Length; i += 2)
+            {
+                var value = options[i + 1];
+
+                switch (options[i])
+                {
+                    case "--username": form.Username = value; break;
+                    case "--url": form.Url = value; break;
+                    case "--host": form.Host = value; break;
+                    case "--key": form.KeyName = value; break;
+                    case "--notes": form.Notes = value; break;
+                    case "--tag":
+                        form.DraftTag = value;
+                        Press(form.AddTagCommand, "Add tag");
+                        break;
+                    default: throw new DriverException($"item-new takes no '{options[i]}'");
+                }
+            }
+
+            if (form.ShowsKey)
+            {
+                Type(form.KeyValue);
+            }
+            else if (form.ShowsPassword && _newPassword.Length > 0)
+            {
+                form.GeneratePassword = false;
+                Type(form.Password);
+            }
+
+            Press(entries.ConfirmAddCommand, "Create");
+            return entries.IsAdding ? Refused(form.Error) : Did($"created {folder}/{title}");
         });
 
     internal Task<int> AddFieldAsync(string vault, string entry, string name, bool protect) =>

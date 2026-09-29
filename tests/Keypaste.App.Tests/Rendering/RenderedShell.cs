@@ -8,6 +8,7 @@ using Keypaste.App.Controls;
 using Keypaste.App.Navigation;
 using Keypaste.App.Session;
 using Keypaste.App.Tests.Clipboard;
+using Keypaste.App.Tests.ViewModels;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
@@ -123,8 +124,12 @@ internal sealed class RenderedShell : IDisposable
 
             case "NewEntryPassword":
                 var adding = Show<EntriesViewModel>(DestinationKind.Entries);
-                adding.BeginAddCommand.Execute(null);
-                adding.GeneratePassword = false;
+                var form = NewItemForm.Open(adding);
+                form.GeneratePassword = false;
+                break;
+
+            case "NewItemKeyValue":
+                NewItemForm.Open(Show<EntriesViewModel>(DestinationKind.Entries)).Template = ItemTemplate.ApiKey;
                 break;
 
             case "ReplacementPassword":

@@ -7,6 +7,7 @@
              x:DataType="vm:EntriesViewModel">
 
   <UserControl.Resources>
+    <views:DepthToIndent x:Key="Indent" />
     <DataTemplate x:Key="FieldCopyGlyph"><ctl:KpIcon Icon="copy" Size="13" /></DataTemplate>
     <DataTemplate x:Key="FieldReplaceGlyph"><ctl:KpIcon Icon="rotate-cw" Size="13" /></DataTemplate>
     <DataTemplate x:Key="FieldProtectGlyph"><ctl:KpIcon Icon="shield" Size="13" /></DataTemplate>
@@ -452,7 +453,7 @@
                    VerticalAlignment="Center"
                    IsVisible="{Binding ShowsPlaceholder}" />
 
-      <!-- A new entry is made in the pane's place, where there is room for its generator. -->
+      <!-- A new item is made from a template in the pane's place, where there is room for its generator (N.4). -->
       <ScrollViewer HorizontalScrollBarVisibility="Disabled"
                     IsVisible="{Binding IsAdding}">
         <Grid Margin="32,28">
@@ -467,70 +468,183 @@
               <TextBlock Classes="subtitle" Text="{Binding VaultName, StringFormat='Saved into {0}.'}" />
             </StackPanel>
 
-            <StackPanel Spacing="8">
-              <TextBlock Classes="label" Text="Group and title" />
-              <TextBox Classes="mono" MinHeight="40" Text="{Binding NewEntryPath}" PlaceholderText="servers/production" />
-              <TextBlock Classes="caption" Text="Groups are separated by /. The last part is the entry's title." />
-            </StackPanel>
+            <StackPanel Spacing="24" DataContext="{Binding NewItem}" x:DataType="vm:NewItemViewModel">
 
-            <!-- A login's other fields, so it is whole in one step. A key under env has profiles instead. -->
-            <StackPanel Spacing="8" IsVisible="{Binding NewEntryIsLogin}">
-              <TextBlock Classes="label" Text="Username" />
-              <TextBox x:Name="NewEntryUsername" Classes="mono" MinHeight="40" Text="{Binding NewUsername}" PlaceholderText="Optional" />
-            </StackPanel>
+              <ListBox x:Name="NewItemTemplate"
+                       Classes="templates"
+                       ItemsSource="{Binding Templates}"
+                       SelectedItem="{Binding SelectedTemplate}">
+                <ListBox.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal" />
+                  </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:TemplateChoice">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <ctl:KpIcon Icon="{Binding Icon}" Size="14" />
+                      <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
 
-            <StackPanel Spacing="8" IsVisible="{Binding NewEntryIsLogin}">
-              <TextBlock Classes="label" Text="URL" />
-              <TextBox x:Name="NewEntryUrl" Classes="mono" MinHeight="40" Text="{Binding NewUrl}" PlaceholderText="https://" />
-            </StackPanel>
-
-            <StackPanel Spacing="10">
-              <TextBlock Classes="label" Text="Password" />
-              <CheckBox Content="Generate a password" IsChecked="{Binding GeneratePassword}" />
-              <StackPanel Spacing="10" IsVisible="{Binding GeneratePassword}">
-                <Border Classes="segmented inset">
-                  <StackPanel Orientation="Horizontal">
-                    <RadioButton Classes="segment" GroupName="NewEntrySecretKind" Content="Characters" IsChecked="{Binding Generator.UseCharacters}" />
-                    <RadioButton Classes="segment" GroupName="NewEntrySecretKind" Content="Words" IsChecked="{Binding Generator.UseWords}" />
-                  </StackPanel>
-                </Border>
-                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Generator.UseWords}">
-                  <NumericUpDown Width="104"
-                                 Minimum="{Binding Generator.MinimumWords}"
-                                 Maximum="{Binding Generator.MaximumWords}"
-                                 Increment="1"
-                                 FormatString="0"
-                                 Value="{Binding Generator.WordCount}" />
-                  <TextBox Width="44"
-                           MaxLength="1"
-                           Classes="mono"
-                           ToolTip.Tip="Separator"
-                           Text="{Binding Generator.Separator}" />
+              <Grid ColumnDefinitions="*,16,*">
+                <StackPanel Grid.Column="0" Spacing="8">
+                  <TextBlock Classes="label" Text="Title" />
+                  <TextBox x:Name="NewItemTitle" MinHeight="40" Text="{Binding Title}" PlaceholderText="github" />
                 </StackPanel>
-                <TextBlock Classes="mono muted" FontSize="12" Text="{Binding Generator.Strength}" />
-                <TextBlock Classes="caption"
-                           IsVisible="{Binding Generator.UseWords}"
-                           Text="{Binding Generator.Provenance}" />
-                <TextBlock Classes="caption secondary"
-                           IsVisible="{Binding Generator.Error, Converter={x:Static ObjectConverters.IsNotNull}}"
-                           Text="{Binding Generator.Error}" />
+                <StackPanel Grid.Column="2" Spacing="8">
+                  <TextBlock Classes="label" Text="Folder" />
+                  <ComboBox x:Name="NewItemFolder"
+                            MinHeight="40"
+                            HorizontalAlignment="Stretch"
+                            ItemsSource="{Binding Folders}"
+                            SelectedItem="{Binding Folder}">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate x:DataType="vm:FolderChoice">
+                        <TextBlock Text="{Binding Label}"
+                                   Margin="{Binding Depth, Converter={StaticResource Indent}}"
+                                   TextTrimming="CharacterEllipsis" />
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                </StackPanel>
+              </Grid>
+
+              <StackPanel Spacing="8" IsVisible="{Binding ShowsKey}">
+                <TextBlock Classes="label" Text="Key name" />
+                <TextBox x:Name="NewItemKeyName" Classes="mono" MinHeight="40" Text="{Binding KeyName}" PlaceholderText="OPENAI_API_KEY" />
+                <TextBlock Classes="caption" Text="The name a project reads it under. It is kept as a protected field, and a project tag puts it in that project's environment." />
               </StackPanel>
-              <ctl:MaskedInput x:Name="NewEntryPassword"
-                               IsVisible="{Binding !GeneratePassword}"
-                               AllowsPaste="True"
-                               Sink="{Binding NewPassword}"
-                               MaskedLength="{Binding NewPassword.MaskedLength}"
-                               Placeholder="Existing password" />
-              <TextBlock Classes="caption"
-                         IsVisible="{Binding !GeneratePassword}"
-                         Text="Type it or press Ctrl/Cmd+V to paste. Leave it empty for an entry with no password." />
-              <TextBlock Classes="caption"
-                         IsVisible="{Binding NewPassword.Note.Length}"
-                         Text="{Binding NewPassword.Note}" />
+
+              <StackPanel Spacing="8" IsVisible="{Binding ShowsKey}">
+                <TextBlock Classes="label" Text="Key value" />
+                <ctl:MaskedInput x:Name="NewItemKeyValue"
+                                 AllowsPaste="True"
+                                 Sink="{Binding KeyValue}"
+                                 MaskedLength="{Binding KeyValue.MaskedLength}"
+                                 Placeholder="Key value" />
+                <TextBlock Classes="caption"
+                           IsVisible="{Binding KeyValue.Note.Length}"
+                           Text="{Binding KeyValue.Note}" />
+              </StackPanel>
+
+              <StackPanel Spacing="8" IsVisible="{Binding ShowsHost}">
+                <TextBlock Classes="label" Text="Host" />
+                <TextBox x:Name="NewItemHost" Classes="mono" MinHeight="40" Text="{Binding Host}" PlaceholderText="db.example.com:5432" />
+              </StackPanel>
+
+              <StackPanel Spacing="8" IsVisible="{Binding ShowsUsername}">
+                <TextBlock Classes="label" Text="Username" />
+                <TextBox x:Name="NewEntryUsername" Classes="mono" MinHeight="40" Text="{Binding Username}" PlaceholderText="Optional" />
+              </StackPanel>
+
+              <StackPanel Spacing="10" IsVisible="{Binding ShowsPassword}">
+                <TextBlock Classes="label" Text="Password" />
+                <CheckBox Content="Generate a password" IsChecked="{Binding GeneratePassword}" />
+                <StackPanel Spacing="10" IsVisible="{Binding GeneratePassword}">
+                  <Border Classes="segmented inset">
+                    <StackPanel Orientation="Horizontal">
+                      <RadioButton Classes="segment" GroupName="NewEntrySecretKind" Content="Characters" IsChecked="{Binding Generator.UseCharacters}" />
+                      <RadioButton Classes="segment" GroupName="NewEntrySecretKind" Content="Words" IsChecked="{Binding Generator.UseWords}" />
+                    </StackPanel>
+                  </Border>
+                  <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Generator.UseWords}">
+                    <NumericUpDown Width="104"
+                                   Minimum="{Binding Generator.MinimumWords}"
+                                   Maximum="{Binding Generator.MaximumWords}"
+                                   Increment="1"
+                                   FormatString="0"
+                                   Value="{Binding Generator.WordCount}" />
+                    <TextBox Width="44"
+                             MaxLength="1"
+                             Classes="mono"
+                             ToolTip.Tip="Separator"
+                             Text="{Binding Generator.Separator}" />
+                  </StackPanel>
+                  <TextBlock Classes="mono muted" FontSize="12" Text="{Binding Generator.Strength}" />
+                  <TextBlock Classes="caption"
+                             IsVisible="{Binding Generator.UseWords}"
+                             Text="{Binding Generator.Provenance}" />
+                  <TextBlock Classes="caption secondary"
+                             IsVisible="{Binding Generator.Error, Converter={x:Static ObjectConverters.IsNotNull}}"
+                             Text="{Binding Generator.Error}" />
+                </StackPanel>
+                <ctl:MaskedInput x:Name="NewEntryPassword"
+                                 IsVisible="{Binding !GeneratePassword}"
+                                 AllowsPaste="True"
+                                 Sink="{Binding Password}"
+                                 MaskedLength="{Binding Password.MaskedLength}"
+                                 Placeholder="Existing password" />
+                <TextBlock Classes="caption"
+                           IsVisible="{Binding !GeneratePassword}"
+                           Text="Type it or press Ctrl/Cmd+V to paste. Leave it empty for an item with no password." />
+                <TextBlock Classes="caption"
+                           IsVisible="{Binding Password.Note.Length}"
+                           Text="{Binding Password.Note}" />
+              </StackPanel>
+
+              <StackPanel Spacing="8" IsVisible="{Binding ShowsUrl}">
+                <TextBlock Classes="label" Text="Web address" />
+                <TextBox x:Name="NewEntryUrl" Classes="mono" MinHeight="40" Text="{Binding Url}" PlaceholderText="https://" />
+              </StackPanel>
+
+              <StackPanel Spacing="8">
+                <TextBlock Classes="label" Text="Notes" />
+                <TextBox x:Name="NewItemNotes"
+                         MinHeight="80"
+                         AcceptsReturn="True"
+                         TextWrapping="Wrap"
+                         Text="{Binding Notes}" />
+              </StackPanel>
+
+              <StackPanel Spacing="8">
+                <TextBlock Classes="label" Text="Tags" />
+                <ItemsControl ItemsSource="{Binding Tags}" IsVisible="{Binding Tags.Count}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <WrapPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:EntryTagChip">
+                      <Border Classes="chip tag" Margin="0,0,6,6" ToolTip.Tip="{Binding Tip}">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                          <ctl:KpIcon Icon="shield-check" Size="11" Foreground="{DynamicResource KpTextSecondary}" IsVisible="{Binding IsProtected}" />
+                          <ctl:KpIcon Icon="alert-triangle" Size="11" Foreground="{DynamicResource KpTextSecondary}" IsVisible="{Binding IsMalformed}" />
+                          <TextBlock Text="{Binding Display}" />
+                          <Button Classes="chip-remove"
+                                  AutomationProperties.Name="{Binding RemoveLabel}"
+                                  ToolTip.Tip="{Binding RemoveLabel}"
+                                  Command="{Binding RemoveCommand}">
+                            <ctl:KpIcon Icon="x" Size="10" />
+                          </Button>
+                        </StackPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBox x:Name="NewItemTag"
+                           Classes="mono"
+                           Text="{Binding DraftTag}"
+                           PlaceholderText="env:project:prod"
+                           Width="220" />
+                  <Button Classes="ghost sm" Content="Add tag" Command="{Binding AddTagCommand}" />
+                </StackPanel>
+              </StackPanel>
+
+              <TextBlock x:Name="NewItemError"
+                         Classes="caption"
+                         Foreground="{DynamicResource KpDanger}"
+                         TextWrapping="Wrap"
+                         IsVisible="{Binding HasError}"
+                         Text="{Binding Error}" />
             </StackPanel>
 
             <StackPanel Orientation="Horizontal" Spacing="8">
-              <Button Classes="primary" Content="Create" Command="{Binding ConfirmAddCommand}" />
+              <Button x:Name="CreateItem" Classes="primary" Content="Create" Command="{Binding ConfirmAddCommand}" />
               <Button Classes="ghost" Content="Cancel" Command="{Binding CancelAddCommand}" />
             </StackPanel>
 

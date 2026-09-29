@@ -138,8 +138,7 @@ public sealed class EntriesViewModelTests : IDisposable
     {
         using var context = New();
 
-        context.Entries.BeginAddCommand.Execute(null);
-        context.Entries.NewEntryPath = "servers/database";
+        var form = NewItemForm.Open(context.Entries, "servers/database");
         context.Entries.ConfirmAddCommand.Execute(null);
 
         Assert.Null(context.Entries.Error);
@@ -157,9 +156,8 @@ public sealed class EntriesViewModelTests : IDisposable
     {
         using var context = New();
 
-        context.Entries.BeginAddCommand.Execute(null);
-        context.Entries.NewEntryPath = "blank";
-        context.Entries.GeneratePassword = false;
+        var form = NewItemForm.Open(context.Entries, "blank");
+        form.GeneratePassword = false;
         context.Entries.ConfirmAddCommand.Execute(null);
 
         using var reopened = Vault.Open(_vaultPath, Master);
@@ -171,11 +169,10 @@ public sealed class EntriesViewModelTests : IDisposable
     {
         using var context = New();
 
-        context.Entries.BeginAddCommand.Execute(null);
-        context.Entries.NewEntryPath = "github";
+        var form = NewItemForm.Open(context.Entries, "github");
         context.Entries.ConfirmAddCommand.Execute(null);
 
-        Assert.NotNull(context.Entries.Error);
+        Assert.NotNull(form.Error);
         Assert.Equal(4, context.Entries.TotalCount);
     }
 
@@ -184,11 +181,10 @@ public sealed class EntriesViewModelTests : IDisposable
     {
         using var context = New();
 
-        context.Entries.BeginAddCommand.Execute(null);
-        context.Entries.NewEntryPath = "   ";
+        var form = NewItemForm.Open(context.Entries, "   ");
         context.Entries.ConfirmAddCommand.Execute(null);
 
-        Assert.NotNull(context.Entries.Error);
+        Assert.Equal("An item needs a title.", form.Error);
         Assert.True(context.Entries.IsAdding);
     }
 

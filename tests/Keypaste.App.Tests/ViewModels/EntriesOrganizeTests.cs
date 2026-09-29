@@ -355,8 +355,7 @@ public sealed class EntriesOrganizeTests : IDisposable
 
             Assert.NotNull(entries.Error);
 
-            entries.BeginAddCommand.Execute(null);
-            entries.NewEntryPath = "unrelated";
+            var form = NewItemForm.Open(entries, "unrelated");
             entries.ConfirmAddCommand.Execute(null);
 
             Assert.Null(entries.Error);
