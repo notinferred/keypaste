@@ -129,6 +129,22 @@ public sealed class EntryActivityTests
     }
 
     [Fact]
+    public void AgentsCanSee_WhatAnExposureOrRuleCovers_OrWhatLeftTheVault()
+    {
+        Assert.True(EntryExposure.TryCreate(["env/**"], out var bridge, out _));
+
+        var nothing = Build();
+        var reached = EntryActivity.Build([], _vault, ApproverActivity.None, [], _now, [bridge]);
+        var released = Build(audit: [Line("personal/github", 300)]);
+
+        Assert.False(nothing.AgentsCanSee(_stripe));
+        Assert.False(nothing.AgentsCanSee(_github));
+        Assert.True(reached.AgentsCanSee(_stripe));
+        Assert.False(reached.AgentsCanSee(_github));
+        Assert.True(released.AgentsCanSee(_github));
+    }
+
+    [Fact]
     public void KeyOf_IsWhatPromptsAndAuditLinesWrite()
     {
         var name = new EntryName("env/acme-api/prod", "DATABASE_URL");

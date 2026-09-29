@@ -94,6 +94,12 @@ public sealed class EntriesViewLayoutTests
                 panes["the divider"] = Bounds(shell, shell.Named<GridSplitter>("PaneDivider"));
                 Assert.True(list.Height >= _listMinimum, $"the list is {list.Height:0} px tall at {at}");
                 Assert.True(list.Bottom <= pane.Top, $"the list {list} is not above the entry's preview {pane} at {at}");
+
+                // The web address's link and its own Copy fit the preview's width, apart (N.5).
+                var link = Bounds(shell, shell.Named<Button>("OpenUrl"));
+                var copy = Bounds(shell, shell.Named<Button>("CopyUrl"));
+                Assert.True(link.Right <= copy.Left, $"the web address {link} runs into its Copy {copy} at {at}");
+                Assert.True(pane.Left <= link.Left && copy.Right <= pane.Right, $"the web address row leaves the preview {pane} at {at}");
             }
 
             foreach (var (name, bounds) in controls)

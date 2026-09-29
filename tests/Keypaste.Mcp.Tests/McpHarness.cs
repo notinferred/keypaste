@@ -172,6 +172,7 @@ internal sealed class McpHarness : IAsyncDisposable
         _server = McpServer.Create(_transport, serverOptions, loggerFactory: null, serviceProvider: null);
         var server = _server;
         _approver.Identity = () => McpAudit.AttachIdentity(server.ClientInfo, options);
+        _approver.Exposure = options.Exposure.Globs;
         _serving = _server.RunAsync();
 
         return channels;

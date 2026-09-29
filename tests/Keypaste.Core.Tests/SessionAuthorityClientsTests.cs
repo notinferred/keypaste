@@ -44,6 +44,19 @@ public sealed class SessionAuthorityClientsTests : IDisposable
     }
 
     [Fact]
+    public async Task ABridgesAnnouncedExposure_IsKeptWithIt_AndNoneIsEmpty()
+    {
+        var authority = Authority();
+
+        await authority.AttachAsync(
+            new AttachRequest(VaultPath) { Client = new AttachClient("claude-code", null, "cc"), Exposure = ["env/**"] }, "conn-1", Token);
+        await Attach(authority, "conn-2", new AttachClient("codex", null, null));
+
+        Assert.Equal(["env/**"], authority.Clients.Single(client => client.ConnectionId == "conn-1").Exposure);
+        Assert.Empty(authority.Clients.Single(client => client.ConnectionId == "conn-2").Exposure);
+    }
+
+    [Fact]
     public async Task ARunnerWithout_IsNot()
     {
         var authority = Authority();

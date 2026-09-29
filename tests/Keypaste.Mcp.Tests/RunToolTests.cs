@@ -481,6 +481,7 @@ public sealed class RunToolTests : IDisposable
 
         var attached = Assert.Single(harness.Approver.Attached);
         Assert.Equal(new AttachClient(McpHarness.ClientName, McpHarness.ClientVersion, McpHarness.ClientLabel), attached.Client);
+        Assert.Equal(["env/**"], attached.Exposure);
     }
 
     [Fact]

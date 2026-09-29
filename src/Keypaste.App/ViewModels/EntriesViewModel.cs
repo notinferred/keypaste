@@ -30,6 +30,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     private IReadOnlyList<EntryRow> _all = [];
     private IReadOnlyList<EntryRow> _rows = [];
     private readonly EntryActivitySource? _activity;
+    private readonly IWebLauncher? _web;
     private IReadOnlyList<GroupNode> _groups = [];
     private GroupNode? _selectedGroup;
     private EntryName? _selection;
@@ -55,7 +56,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     private GroupNode? _moveTarget;
     private IReadOnlyList<GroupNode> _moveTargets = [];
 
-    internal EntriesViewModel(AppVaultSession session, ClipboardCountdown clipboard, EntryActivitySource? activity = null)
+    internal EntriesViewModel(AppVaultSession session, ClipboardCountdown clipboard, EntryActivitySource? activity = null, IWebLauncher? web = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(clipboard);
@@ -63,6 +64,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         _session = session;
         _clipboard = clipboard;
         _activity = activity;
+        _web = web;
         NewPassword = new SecretField(clipboard);
 
         BeginAddCommand = new RelayCommand(BeginAdd, () => !IsAdding);
@@ -825,7 +827,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         }
 
         Error = null;
-        return new EntryDetailViewModel(_session, _clipboard, entry, message => Error = message, Reselect);
+        return new EntryDetailViewModel(_session, _clipboard, entry, message => Error = message, Reselect, _web);
     }
 
     /// <summary>Reads the list again and lands on the entry a restore left behind.</summary>

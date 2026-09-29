@@ -64,9 +64,10 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
 - Preview (padding 28/32, gap 24, max-width 820); username, password or value, URL and notes are one row each, the label in a 96px column to the left of its value:
   - Title (sans 22/600; a variable's key in mono 22) and path "Kind · acme.kdbx › acme › api › dev". Actions: Copy, Rotate, ⋯ (30h, `#2A2C30`).
   - **Value** field (40h, bg `#111214`, border `#2C2E33`): shows 24 masked • characters, with a Reveal/Hide toggle.
-  - **Reference** (36h, `#18191C`): `kp://acme-api/dev/KEY`, plus the helper line "Use this in .env.keypaste with keypaste run, or in an agent's run tool when the bridge allows it…".
-  - Two cards: Agent access, and Profiles (dev set / staging set / prod "approval required" in secondary text).
-  - Metadata rows (140px label column): Created, Rotated, KDBX entry.
+  - **URL**: a web address is an underlined mono link with a 13px external-link icon, in primary text, never amber, with its own Copy; any other value is plain text with a caption saying keypaste opens only web addresses (N.5).
+  - Two cards: Agent access, shown only when agents can see the item, and Profiles (dev set / staging set / prod "approval required" in secondary text).
+  - Metadata rows (140px label column): Created, Rotated.
+  - The ⋯ menu ends, above Delete, with the reference (`kp://acme-api/dev/KEY`, mono 12, its helper as a tooltip), the KDBX entry identifier and Copy the reference (N.5).
 
 **2. Agents**: padding 28/32, max-width 1080.
 - **Active grants** table: agent (13.5/600), secrets · scope (mono 12), time left (mono 11 secondary) over a 3px muted progress bar, and "Revoke" (danger-tint button). Revoke removes the row and shows a toast.

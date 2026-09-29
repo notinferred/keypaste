@@ -107,6 +107,10 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
     /// <remarks>Display only (THREATS.md T-3): read when attaching, because the handshake that names the client comes after this connection is built.</remarks>
     internal Func<AttachClient?>? Identity { get; set; }
 
+    /// <summary>The globs this bridge answers with, sent on every attach so the owner can say what its agents can see; null sends nothing.</summary>
+    /// <remarks>Display only (THREATS.md T-3): every request still carries its own exposure, which is what is enforced.</remarks>
+    internal IReadOnlyList<string>? Exposure { get; set; }
+
     /// <summary>Asks the owner to release the secrets an agent's run would inject.</summary>
     /// <param name="request">The run. Its vault and session are filled in here.</param>
     /// <param name="cancellationToken">Cancelled when the client gives up on the call.</param>
@@ -239,7 +243,7 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
                 return (null, null, ApproverOutcome.Unreachable);
             }
 
-            var attached = await client.AttachAsync(new AttachRequest(vaultPath) { Client = Identity?.Invoke() }, cancellationToken).ConfigureAwait(false);
+            var attached = await client.AttachAsync(new AttachRequest(vaultPath) { Client = Identity?.Invoke(), Exposure = Exposure }, cancellationToken).ConfigureAwait(false);
 
             if (attached is not null)
             {

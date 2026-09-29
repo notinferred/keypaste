@@ -56,10 +56,12 @@ public sealed class EntryActivity
     private readonly HashSet<string> _waiting = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<GrantSummary>> _envGrants = new(StringComparer.Ordinal);
     private readonly ApproverActivity _live;
+    private readonly IReadOnlyList<EntryExposure> _reach;
 
-    private EntryActivity(ApproverActivity live, DateTimeOffset now)
+    private EntryActivity(ApproverActivity live, IReadOnlyList<EntryExposure> reach, DateTimeOffset now)
     {
         _live = live;
+        _reach = reach;
         _now = now;
     }
 
@@ -69,20 +71,22 @@ public sealed class EntryActivity
     /// <param name="live">What the owner holds now.</param>
     /// <param name="session">What the owner released this session.</param>
     /// <param name="now">The time the recent window is measured from.</param>
+    /// <param name="reach">What agents can name without having asked yet: the exposures attached bridges announced and the scopes of standing rules.</param>
     /// <returns>The picture.</returns>
     public static EntryActivity Build(
         IReadOnlyList<AuditEntry> audit,
         string vaultKey,
         ApproverActivity live,
         IReadOnlyList<ReleaseSeen> session,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        IReadOnlyList<EntryExposure>? reach = null)
     {
         ArgumentNullException.ThrowIfNull(audit);
         ArgumentNullException.ThrowIfNull(vaultKey);
         ArgumentNullException.ThrowIfNull(live);
         ArgumentNullException.ThrowIfNull(session);
 
-        var activity = new EntryActivity(live, now);
+        var activity = new EntryActivity(live, reach ?? [], now);
 
         foreach (var entry in audit)
         {
@@ -170,6 +174,25 @@ public sealed class EntryActivity
             : last is { } at && _now - at <= RecentWindow ? EntryUseState.Recent : EntryUseState.Idle;
 
         return new EntryUse(state, last);
+    }
+
+    /// <summary>
+    /// Whether agents can see an entry: an attached bridge's exposure or a standing rule covers it,
+    /// or it has been released, is covered by a grant or is waiting on a person (N.5).
+    /// </summary>
+    /// <param name="entry">The entry.</param>
+    /// <returns>Whether the Agent access card belongs on its pane.</returns>
+    public bool AgentsCanSee(EntryName entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+
+        if (_reach.Any(exposure => exposure.Allows(entry)))
+        {
+            return true;
+        }
+
+        var access = Access(entry);
+        return access.Clients.Count > 0 || access.Grants.Count > 0 || access.Waiting;
     }
 
     /// <summary>What the Agent access card shows for an entry.</summary>

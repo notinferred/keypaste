@@ -1,5 +1,7 @@
+using Keypaste.Core;
 using Keypaste.Core.Activity;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Policy;
 
 namespace Keypaste.App.Session;
 
@@ -22,6 +24,7 @@ internal sealed class EntryActivitySource : IDisposable
 
     private readonly AppAuthority _authority;
     private readonly string _auditPath;
+    private readonly string? _policyPath;
     private readonly string _vaultKey;
     private readonly TimeProvider _clock;
     private readonly Action<Action> _post;
@@ -36,7 +39,9 @@ internal sealed class EntryActivitySource : IDisposable
     /// <param name="vaultKey">The vault's identity key; other vaults' lines are ignored.</param>
     /// <param name="clock">What the interval and the windows are measured on.</param>
     /// <param name="post">Runs an action on the UI thread; null runs it where it is.</param>
-    internal EntryActivitySource(AppAuthority authority, string auditPath, string vaultKey, TimeProvider clock, Action<Action>? post = null)
+    /// <param name="policyPath">The standing rules, whose scopes say which entries agents can see; null reads none.</param>
+    internal EntryActivitySource(
+        AppAuthority authority, string auditPath, string vaultKey, TimeProvider clock, Action<Action>? post = null, string? policyPath = null)
     {
         ArgumentNullException.ThrowIfNull(authority);
         ArgumentNullException.ThrowIfNull(auditPath);
@@ -45,6 +50,7 @@ internal sealed class EntryActivitySource : IDisposable
 
         _authority = authority;
         _auditPath = auditPath;
+        _policyPath = policyPath;
         _vaultKey = vaultKey;
         _clock = clock;
         _post = post ?? (run => run());
@@ -86,11 +92,32 @@ internal sealed class EntryActivitySource : IDisposable
             }
 
             _read.RemoveAll(entry => entry.At is not { } at || now - at > Horizon);
-            picture = EntryActivity.Build(_read, _vaultKey, _authority.Activity, _authority.Released, now);
+            picture = EntryActivity.Build(_read, _vaultKey, _authority.Activity, _authority.Released, now, Reach());
             Current = picture;
         }
 
         Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>What agents can name here: each attached bridge's announced exposure, and each standing rule's scope.</summary>
+    private List<EntryExposure> Reach()
+    {
+        var reach = new List<EntryExposure>();
+
+        foreach (var client in _authority.Clients)
+        {
+            if (client.Exposure.Count > 0 && EntryExposure.TryCreate(client.Exposure, out var exposure, out _))
+            {
+                reach.Add(exposure);
+            }
+        }
+
+        if (_policyPath is not null)
+        {
+            reach.AddRange(PolicyLoader.Load(_policyPath).Rules.Rules.Select(rule => rule.Scope));
+        }
+
+        return reach;
     }
 
     public void Dispose()

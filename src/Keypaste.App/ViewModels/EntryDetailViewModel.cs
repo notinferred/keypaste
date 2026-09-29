@@ -29,6 +29,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     private readonly AppVaultSession _session;
     private readonly ClipboardCountdown _clipboard;
     private readonly Action<EntryName> _restored;
+    private readonly IWebLauncher? _web;
     private string _entryPath;
     private string _title;
     private string _groupPath;
@@ -45,6 +46,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     private string _rotated = string.Empty;
     private string? _uuid;
     private EntryAgentAccess? _agentAccess;
+    private bool _showsAgentAccess;
     private string _agentAccessSummary = "None active";
     private string _lastUsedText = "never";
     private EntryKind _kind;
@@ -63,7 +65,8 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         ClipboardCountdown clipboard,
         VaultEntry entry,
         Action<string?> report,
-        Action<EntryName> restored)
+        Action<EntryName> restored,
+        IWebLauncher? web = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(clipboard);
@@ -74,6 +77,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         _session = session;
         _clipboard = clipboard;
         _entryPath = entry.Path;
+        _web = web;
         Report = report;
 
         _title = entry.Title;
@@ -98,6 +102,8 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         CopyPasswordCommand = new AsyncRelayCommand(CopyPasswordAsync, () => PasswordLength > 0);
         CopyUsernameCommand = new AsyncRelayCommand(CopyUsernameAsync, () => Username.Length > 0);
         CopyReferenceCommand = new AsyncRelayCommand(CopyReferenceAsync, () => Reference is not null);
+        OpenUrlCommand = new AsyncRelayCommand(OpenUrlAsync, () => OpensUrl);
+        CopyUrlCommand = new AsyncRelayCommand(CopyUrlAsync, () => Url.Length > 0);
         PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is nameof(IsEditing) or nameof(IsConfirmingRotate) or nameof(IsAddingField) or nameof(IsReplacingField))
@@ -367,6 +373,17 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         private set => Set(ref _rotated, value);
     }
 
+    /// <summary>
+    /// Whether the Agent access card shows: an agent attached here or a standing rule can name this
+    /// entry, or it has left the vault or is being asked for (N.5). False until the first reading,
+    /// and always when nothing answers agents.
+    /// </summary>
+    internal bool ShowsAgentAccess
+    {
+        get => _showsAgentAccess;
+        private set => Set(ref _showsAgentAccess, value);
+    }
+
     /// <summary>What agents did with this entry, or null before the first reading.</summary>
     internal EntryAgentAccess? AgentAccess
     {
@@ -412,6 +429,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
 
         var now = _session.Clock.GetUtcNow();
         var access = activity.Access(Name);
+        ShowsAgentAccess = activity.AgentsCanSee(Name);
         AgentAccess = access;
         AgentAccessSummary = UseText.Summary(access);
         LastUsedText = UseText.LastUsed(access.Use, now);
@@ -493,6 +511,18 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
 
     /// <summary>A login always shows its URL; anything else only when it has one.</summary>
     internal bool ShowsUrl => !IsVariable || Url.Length > 0;
+
+    /// <summary>Whether the URL is a link that opens in the browser: http or https, or a bare address as https (D-0378).</summary>
+    internal bool OpensUrl => WebAddress.TryOpenable(Url, out _);
+
+    /// <summary>Whether the URL is shown as text, with a line saying why it opens nothing.</summary>
+    internal bool ShowsUrlNote => Url.Length > 0 && !OpensUrl;
+
+    /// <summary>Opens the URL in the default browser.</summary>
+    internal AsyncRelayCommand OpenUrlCommand { get; }
+
+    /// <summary>Copies the URL as it is stored, which is not a secret.</summary>
+    internal AsyncRelayCommand CopyUrlCommand { get; }
 
     internal bool ShowsNotes => Notes.Length > 0;
 
@@ -597,6 +627,10 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
             {
                 Raise(nameof(DisplayUrl));
                 Raise(nameof(ShowsUrl));
+                Raise(nameof(OpensUrl));
+                Raise(nameof(ShowsUrlNote));
+                OpenUrlCommand.RaiseCanExecuteChanged();
+                CopyUrlCommand.RaiseCanExecuteChanged();
             }
         }
     }
@@ -852,6 +886,22 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
 
     private async Task CopyUsernameAsync() =>
         await _clipboard.CopyPlainAsync(Username, "Username").ConfigureAwait(true);
+
+    private async Task OpenUrlAsync()
+    {
+        if (!WebAddress.TryOpenable(Url, out var address))
+        {
+            return;
+        }
+
+        if (_web is null || !await _web.OpenAsync(address).ConfigureAwait(true))
+        {
+            Report($"Your system didn't open {DisplayUrl}. Copy it and paste it into your browser.");
+        }
+    }
+
+    private async Task CopyUrlAsync() =>
+        await _clipboard.CopyPlainAsync(Url, "Web address").ConfigureAwait(true);
 
     private async Task CopyReferenceAsync()
     {

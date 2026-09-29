@@ -54,6 +54,36 @@ public sealed class EntryActivityRowsTests
         Assert.Equal(text, row.LastUsedText);
     }
 
+    /// <summary>The card belongs to an item agents can see: with nothing released and no rule it is absent, and a standing rule covering the item brings it (N.5).</summary>
+    [Fact]
+    public async Task TheAgentAccessCard_ShowsOnlyWhenAgentsCanSeeTheItem()
+    {
+        await using var app = await App.StartAsync();
+
+        using (var screen = app.Screen())
+        {
+            screen.Entries.Selected = screen.Entries.Rows.Single(entry => entry.Path == "example");
+            Assert.False(screen.Entries.Detail!.ShowsAgentAccess);
+        }
+
+        var policy = Path.Combine(app.Fixture.Home, "policy.toml");
+        File.WriteAllText(policy, """
+            [[allow]]
+            client          = "claude-code"
+            entries         = ["**"]
+            fields          = ["password"]
+            max_ttl_seconds = 300
+            max_per_hour    = 20
+            """);
+
+        using (var screen = app.Screen(policy))
+        {
+            screen.Entries.Selected = screen.Entries.Rows.Single(entry => entry.Path == "example");
+            Assert.True(screen.Entries.Detail!.ShowsAgentAccess);
+            Assert.Equal("None active", screen.Entries.Detail.AgentAccessSummary);
+        }
+    }
+
     [Fact]
     public async Task TheAgentAccessCard_ListsClientsNewestFirst()
     {
@@ -136,10 +166,11 @@ public sealed class EntryActivityRowsTests
             return new App(fixture, clock, person, authority, client, serving.Session);
         }
 
-        internal Screen Screen()
+        internal Screen Screen(string? policyPath = null)
         {
 #pragma warning disable CA2000
-            var activity = new EntryActivitySource(Authority, KeypasteHome.AuditPath(Fixture.Home), Authority.Session.Identity!.Key, Clock);
+            var activity = new EntryActivitySource(
+                Authority, KeypasteHome.AuditPath(Fixture.Home), Authority.Session.Identity!.Key, Clock, policyPath: policyPath);
             var countdown = new ClipboardCountdown(new FakeClipboard(), new ManualClock());
             return new Screen(activity, countdown, new EntriesViewModel(Authority.Session, countdown, activity));
 #pragma warning restore CA2000

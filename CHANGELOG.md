@@ -8,6 +8,8 @@ Upgrade the bridge and `keypaste agent` together: they must be the same version,
 
 keypaste has a new brand: an icon "k." and a wordmark "keypaste." in Hepta Slab with an amber dot, amber on ink, Instrument Sans and Fragment Mono ([BRAND](docs/BRAND.md)). The desktop app is rebuilt on it, with restyled screens, a new lock screen and restyled prompt windows, and keypaste.com and the README use it too.
 
+An item's URL is now a link that opens in your browser when it is a web address, with its own Copy; any other scheme, such as `javascript:` or `file:`, is shown as text and never opened. The item's `kp://` reference and KDBX identifier moved into its ⋯ menu, and the Agent access card shows only for items agents can see ([N.5](docs/steps/N.5.md)).
+
 The first time you open the desktop, it lists the databases KeePassXC last opened on this machine, the one it had in front first, beside Open another file… and Create a new vault…, and choosing one takes you to its unlock. keypaste reads KeePassXC's list of recent databases and never writes KeePassXC's files. The lock screen no longer talks about agents, and Unlock with a YubiKey too is under More options unless the vault last opened with a key ([N.2](docs/steps/N.2.md)).
 
 Items is laid out as KeePassXC's main window: the vault's groups fold under Items in the sidebar, with your projects under their own heading; the list is a table of titles, kinds and groups above the chosen item's preview, whose fields read one line each; and a new item, an edit or a comparison of two revisions takes the whole view ([N.14](docs/steps/N.14.md)).

@@ -119,7 +119,7 @@ public sealed class SessionAuthority : IApproverHandler
                         pair.Value.Client.Version,
                         pair.Value.Client.Label,
                         pair.Value.AttachedAt,
-                        pair.Value.LastRequestAt))
+                        pair.Value.LastRequestAt) { Exposure = pair.Value.Exposure })
                     .OrderByDescending(client => client.LastRequestAt)
                     .ThenBy(client => client.ConnectionId, StringComparer.Ordinal),
             ];
@@ -214,7 +214,11 @@ public sealed class SessionAuthority : IApproverHandler
         }
 
         var now = _clock.GetUtcNow();
-        _attached[connectionId] = new Attachment(request.Vault, lifetime.Id, request.Client, now) { LastRequestAt = now };
+        _attached[connectionId] = new Attachment(request.Vault, lifetime.Id, request.Client, now)
+        {
+            LastRequestAt = now,
+            Exposure = request.Exposure ?? [],
+        };
 
         return ValueTask.FromResult(AttachReply.To(lifetime.Id));
     }
@@ -1048,6 +1052,8 @@ public sealed class SessionAuthority : IApproverHandler
         internal AttachClient? Client { get; } = client;
 
         internal DateTimeOffset AttachedAt { get; } = attachedAt;
+
+        internal IReadOnlyList<string> Exposure { get; init; } = [];
 
         internal DateTimeOffset LastRequestAt
         {

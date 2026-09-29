@@ -47,6 +47,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
     private readonly AppVaultSession _session;
     private readonly IVaultFilePicker? _picker;
+    private readonly IWebLauncher? _web;
     private readonly TimeProvider _clock;
     private readonly Action<Action>? _post;
     private readonly ITimer? _statusTimer;
@@ -88,11 +89,13 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         DesktopPreferences? preferences = null,
         string? notice = null,
         IVaultFilePicker? picker = null,
-        Action<string, string?>? openInPlace = null)
+        Action<string, string?>? openInPlace = null,
+        IWebLauncher? web = null)
     {
         ArgumentNullException.ThrowIfNull(session);
 
         _session = session;
+        _web = web;
         _notice = notice;
         _picker = picker;
         _openInPlace = openInPlace;
@@ -137,7 +140,8 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
         if (authority is not null && _session.Identity is { } identity)
         {
-            EntryActivity = new EntryActivitySource(authority, Core.Audit.KeypasteHome.AuditPath(home), identity.Key, _clock, post);
+            EntryActivity = new EntryActivitySource(
+                authority, Core.Audit.KeypasteHome.AuditPath(home), identity.Key, _clock, post, Core.Audit.KeypasteHome.PolicyPath(home));
         }
 
         Recommendations = new RecommendationsViewModel(session, home);
@@ -752,7 +756,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
     private EntriesViewModel Entries()
     {
-        var entries = new EntriesViewModel(_session, Clipboard, EntryActivity);
+        var entries = new EntriesViewModel(_session, Clipboard, EntryActivity, _web);
 
         if (_search.Length > 0)
         {

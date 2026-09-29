@@ -633,6 +633,38 @@
                               <TextBlock Text="{Binding History.ToggleLabel}" VerticalAlignment="Center" />
                             </StackPanel>
                           </Button>
+                          <!-- What names the entry rather than what it holds, kept here out of the preview (N.5). -->
+                          <Border Classes="divider" Margin="6,2" />
+                          <StackPanel x:Name="EntryIdentity" Margin="10,4" Spacing="3">
+                            <TextBlock Classes="caption" Text="Reference" IsVisible="{Binding HasReference}" />
+                            <TextBlock x:Name="ReferenceText"
+                                       Classes="mono secondary"
+                                       FontSize="12"
+                                       MaxWidth="300"
+                                       HorizontalAlignment="Left"
+                                       IsVisible="{Binding HasReference}"
+                                       Text="{Binding Reference}"
+                                       TextTrimming="CharacterEllipsis"
+                                       ToolTip.Tip="Use this in .env.keypaste with keypaste run, or in an agent&apos;s run tool when the bridge allows it. keypaste puts the value into the command&apos;s environment, not into the file." />
+                            <TextBlock Classes="caption" Text="KDBX entry" Margin="0,4,0,0" />
+                            <TextBlock x:Name="KdbxEntryText"
+                                       Classes="mono secondary"
+                                       FontSize="12"
+                                       MaxWidth="300"
+                                       HorizontalAlignment="Left"
+                                       Text="{Binding KdbxEntry}"
+                                       TextTrimming="CharacterEllipsis" />
+                          </StackPanel>
+                          <Button x:Name="CopyReference"
+                                  Classes="ghost menu-item"
+                                  IsVisible="{Binding HasReference}"
+                                  Command="{Binding CopyReferenceCommand}"
+                                  AutomationProperties.Name="Copy the reference">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                              <ctl:KpIcon Icon="copy" Size="14" />
+                              <TextBlock Text="Copy the reference" VerticalAlignment="Center" />
+                            </StackPanel>
+                          </Button>
                           <Border Classes="divider" Margin="6,2" />
                           <Button x:Name="DeleteEntry"
                                   Classes="ghost menu-item danger"
@@ -917,13 +949,52 @@
                           <Binding Path="ShowsUrl" />
                         </MultiBinding>
                       </Grid.IsVisible>
-                      <TextBlock Grid.Column="0" Classes="label" Text="URL" VerticalAlignment="Center" />
-                      <Border Grid.Column="1" Classes="value">
-                        <TextBlock Classes="mono lg"
-                                   Text="{Binding DisplayUrl}"
-                                   TextTrimming="CharacterEllipsis"
-                                   VerticalAlignment="Center" />
-                      </Border>
+                      <TextBlock Grid.Column="0" Classes="label" Text="URL" VerticalAlignment="Top" Margin="0,11,0,0" />
+                      <!-- A web address opens in the browser; anything else is text and says why (N.5, D-0378). -->
+                      <StackPanel Grid.Column="1" Spacing="6">
+                        <Border Classes="value">
+                          <Grid ColumnDefinitions="*,Auto">
+                            <Button x:Name="OpenUrl"
+                                    Grid.Column="0"
+                                    Classes="link"
+                                    HorizontalAlignment="Left"
+                                    IsVisible="{Binding OpensUrl}"
+                                    Command="{Binding OpenUrlCommand}"
+                                    ToolTip.Tip="Open in your browser"
+                                    AutomationProperties.Name="Open the web address">
+                              <DockPanel>
+                                <ctl:KpIcon DockPanel.Dock="Right" Icon="external-link" Size="13" Margin="6,0,0,0" />
+                                <TextBlock Classes="mono lg"
+                                           Text="{Binding DisplayUrl}"
+                                           TextDecorations="Underline"
+                                           TextTrimming="CharacterEllipsis"
+                                           VerticalAlignment="Center" />
+                              </DockPanel>
+                            </Button>
+                            <TextBlock Grid.Column="0"
+                                       Classes="mono lg"
+                                       IsVisible="{Binding !OpensUrl}"
+                                       Text="{Binding DisplayUrl}"
+                                       TextTrimming="CharacterEllipsis"
+                                       VerticalAlignment="Center" />
+                            <Button x:Name="CopyUrl"
+                                    Grid.Column="1"
+                                    Classes="ghost in-field"
+                                    Command="{Binding CopyUrlCommand}"
+                                    AutomationProperties.Name="Copy the web address">
+                              <StackPanel Orientation="Horizontal" Spacing="6">
+                                <ctl:KpIcon Icon="copy" Size="13" />
+                                <TextBlock Text="Copy" VerticalAlignment="Center" />
+                              </StackPanel>
+                            </Button>
+                          </Grid>
+                        </Border>
+                        <TextBlock x:Name="UrlNote"
+                                   Classes="caption"
+                                   TextWrapping="Wrap"
+                                   IsVisible="{Binding ShowsUrlNote}"
+                                   Text="keypaste opens only web addresses starting http or https, so this one is text. Copy it to use it." />
+                      </StackPanel>
                     </Grid>
 
                     <Grid ColumnDefinitions="96,*">
@@ -1113,38 +1184,10 @@
                     </StackPanel>
                   </StackPanel>
 
-                  <StackPanel Spacing="8">
-                    <StackPanel.IsVisible>
-                      <MultiBinding Converter="{x:Static BoolConverters.And}">
-                        <Binding Path="!IsEditing" />
-                        <Binding Path="HasReference" />
-                      </MultiBinding>
-                    </StackPanel.IsVisible>
-                    <TextBlock Classes="label" Text="Reference" />
-                    <Border Classes="field" Height="36" Padding="12,0,4,0">
-                      <Grid ColumnDefinitions="*,Auto">
-                        <TextBlock Grid.Column="0"
-                                   Classes="mono secondary"
-                                   Text="{Binding Reference}"
-                                   TextTrimming="CharacterEllipsis"
-                                   VerticalAlignment="Center" />
-                        <Button Grid.Column="1"
-                                Classes="icon ghost sm"
-                                ToolTip.Tip="Copy the reference"
-                                AutomationProperties.Name="Copy the reference"
-                                Command="{Binding CopyReferenceCommand}">
-                          <ctl:KpIcon Icon="copy" Size="13" Foreground="{DynamicResource KpTextMuted}" />
-                        </Button>
-                      </Grid>
-                    </Border>
-                    <TextBlock Classes="caption"
-                               Text="Use this in .env.keypaste with keypaste run, or in an agent&apos;s run tool when the bridge allows it. keypaste puts the value into the command&apos;s environment, not into the file." />
-                  </StackPanel>
-
-                  <!-- Agent access: who received this entry and what grant covers it now, never a value.
-                       Profiles: the variable's key in every profile of its project. -->
+                  <!-- Agent access: who received this entry and what grant covers it now, never a value, shown
+                       only when agents can see the entry (N.5). Profiles: the variable's key in every profile of its project. -->
                   <ctl:AutoFitGrid MinItemWidth="220" Spacing="12" IsVisible="{Binding !IsEditing}">
-                    <Border Classes="card">
+                    <Border x:Name="AgentAccessCard" Classes="card" IsVisible="{Binding ShowsAgentAccess}">
                       <StackPanel Spacing="10">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                           <ctl:KpIcon Icon="bot" Size="14" Foreground="{DynamicResource KpTextMuted}" />
@@ -1214,12 +1257,6 @@
                         <Grid ColumnDefinitions="140,*">
                           <TextBlock Grid.Column="0" FontSize="12.5" Classes="muted" Text="Rotated" />
                           <TextBlock Grid.Column="1" x:Name="RotatedText" FontSize="12.5" Classes="primary" Text="{Binding Rotated}" />
-                        </Grid>
-                      </Border>
-                      <Border Classes="meta">
-                        <Grid ColumnDefinitions="140,*">
-                          <TextBlock Grid.Column="0" FontSize="12.5" Classes="muted" Text="KDBX entry" />
-                          <TextBlock Grid.Column="1" Classes="mono" FontSize="12" Text="{Binding KdbxEntry}" TextTrimming="CharacterEllipsis" />
                         </Grid>
                       </Border>
                     </StackPanel>

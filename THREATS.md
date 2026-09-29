@@ -62,6 +62,8 @@ Evidence: `AuditLogTests.AnOverlongReason_IsExcerptedButItsLengthAndHashAreExact
 
 An MCP client supplies its own name and version without authentication. Any local process spawning the binary can claim to be `claude-code`. keypaste sanitizes this identity for the audit log and approval prompt but never uses it to authorize a release.
 
+A bridge also announces its exposure when it attaches (N.5). The app uses it only to decide whether an entry's Agent access card shows. A process that announces a wider or narrower exposure changes which cards show and nothing else: every request carries its own exposure, which the owner re-checks before it asks anyone (T-4).
+
 Prompted grants belong to an approver-minted connection ID. Another process claiming the same name inherits no grant; a restarted connection loses its predecessor's grants (D-0026). Policy rules instead match the operator's `--client-label`, supplied in the MCP configuration. An unlabelled bridge matches no rule, including `client = "*"`. A connected client cannot choose that label, but a process spawning the bridge can choose it and the exposure. Client-scoped policy therefore provides no authentication against that process (T-14; docs/policy.md).
 
 Calls before `initialize` completes are denied as `not-initialized`, preserving handshake attribution in the prompt and log. This does not authenticate the supplied identity. `scripts/verify-demo.sh` and `scripts/verify-mcp-stdio.sh` wait for initialization before calling tools.

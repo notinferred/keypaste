@@ -727,6 +727,37 @@ public sealed class ApproverProtocolTests
         Assert.Null(refused.Session);
     }
 
+    /// <summary>A bridge's announced exposure travels with its attach, and an older bridge's attach without one still decodes (N.5).</summary>
+    [Fact]
+    public void AnAttachCarriesTheBridgesExposure_OrNone()
+    {
+        Assert.True(ApproverProtocol.TryDecode(
+            ApproverProtocol.Encode(new AttachRequest("/home/me/vault.kdbx") { Exposure = ["env/**", "work/*"] }), out AttachRequest? announced));
+        Assert.True(ApproverProtocol.TryDecode(
+            ApproverProtocol.Encode(new AttachRequest("/home/me/vault.kdbx")), out AttachRequest? silent));
+
+        Assert.Equal(["env/**", "work/*"], announced.Exposure);
+        Assert.Null(silent.Exposure);
+    }
+
+    [Theory]
+    [InlineData("{\"v\":2,\"kind\":\"attach\",\"vault\":\"/v.kdbx\",\"exposure\":\"env/**\"}")]
+    [InlineData("{\"v\":2,\"kind\":\"attach\",\"vault\":\"/v.kdbx\",\"exposure\":[1]}")]
+    public void AnAttachWithAMalformedExposure_IsRefused(string frame)
+    {
+        Assert.True(ApproverProtocol.TryDecode("{\"v\":2,\"kind\":\"attach\",\"vault\":\"/v.kdbx\",\"exposure\":[\"env/**\"]}"u8, out AttachRequest? _));
+        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out AttachRequest? _));
+    }
+
+    [Fact]
+    public void AnAttachWithTooManyGlobs_IsRefused()
+    {
+        var globs = Enumerable.Range(0, ApproverProtocol.MaximumExposureGlobs + 1).Select(i => $"g{i}/*").ToList();
+
+        Assert.False(ApproverProtocol.TryDecode(
+            ApproverProtocol.Encode(new AttachRequest("/v.kdbx") { Exposure = globs }), out AttachRequest? _));
+    }
+
     /// <summary>A reply that both attaches and refuses, or does neither, is not taken as an attachment.</summary>
     [Theory]
     [InlineData("""{"v":2,"kind":"attach","session":"0123abcd","method":17,"reason":"no"}""")]

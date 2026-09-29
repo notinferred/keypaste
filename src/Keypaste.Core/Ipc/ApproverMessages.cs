@@ -51,6 +51,13 @@ public sealed record AttachRequest(string Vault)
 {
     /// <summary>The bridge's client, or null for a runner, <c>grants</c> or <c>lock</c>, which are not counted.</summary>
     public AttachClient? Client { get; init; }
+
+    /// <summary>
+    /// The globs the bridge answers with, so the owner can say which entries its agents can see;
+    /// null from a runner or an older bridge.
+    /// </summary>
+    /// <remarks>Display only, like <see cref="Client"/> (THREATS.md T-3): each request carries its own exposure, and that is what is enforced.</remarks>
+    public IReadOnlyList<string>? Exposure { get; init; }
 }
 
 /// <summary>The session a connection is now attached to, or why it is not attached.</summary>

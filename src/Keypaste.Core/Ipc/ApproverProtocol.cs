@@ -121,6 +121,11 @@ public static class ApproverProtocol
                 WriteOptional(writer, "client_version", client.Version);
                 WriteOptional(writer, "client_label", client.Label);
             }
+
+            if (request.Exposure is { } exposure)
+            {
+                WriteStrings(writer, "exposure", exposure);
+            }
         });
     }
 
@@ -778,9 +783,18 @@ public static class ApproverProtocol
                 return false;
             }
 
+            IReadOnlyList<string>? exposure = null;
+
+            if (root.TryGetProperty("exposure", out _)
+                && (!TryStrings(root, "exposure", out exposure) || exposure.Count > MaximumExposureGlobs))
+            {
+                return false;
+            }
+
             request = new AttachRequest(vault)
             {
                 Client = name is null && version is null && label is null ? null : new AttachClient(name, version, label),
+                Exposure = exposure,
             };
 
             return true;

@@ -6,7 +6,7 @@ This file holds open work only. Finishing a task removes it from here, adds its 
 
 ## Selection and evidence
 
-Only the next five tasks are detailed: N.5, N.4, N.1b, N.12 and N.10. Later rows name a bounded outcome and the dependencies their own implementation or verifier needs; expand a selected later task before building it. Tasks are not marked implemented from a document, reader, mock response or consuming screen. Name the producer, transport, consumer and user action exercised, and retain the source/version and limitations of the observation.
+Only the next five tasks are detailed: N.4, N.1b, N.12, N.10 and C.1b. Later rows name a bounded outcome and the dependencies their own implementation or verifier needs; expand a selected later task before building it. Tasks are not marked implemented from a document, reader, mock response or consuming screen. Name the producer, transport, consumer and user action exercised, and retain the source/version and limitations of the observation.
 
 Needs are build dependencies. Ships after names publication gates. External signing identities are inputs, not a queue of enrollment code. A ready row does not authorize publication, account changes or messages. Preserve the secret-path tests, real KeePassXC compatibility, stale-write refusals and release integrity checks while changing product scope.
 
@@ -14,12 +14,6 @@ Needs are build dependencies. Ships after names publication gates. External sign
 
 Custom fields and tags are ordinary KeePass data: keypaste writes them as KeePassXC reads them, and every row keeps the permanent compatibility gates (PRODUCT §4.6). C.1a's tags include the project tags T4 builds on. The main screens show everyday password-manager work; advanced controls and security recommendations live in Settings (PRODUCT §5.8).
 
-- [ ] **N.5 — Make the item pane read like a password manager.** Needs: V.7b.
-  **Build:** the item pane shows a web address as a link that opens in the default browser, for `http` and `https` only, with its own Copy; any other scheme is shown as text and never opened. The `kp://` reference and the KDBX identifier move under the pane's "…" menu. The Agent access card appears only when agents can see the item, by the served session's exposure or a standing rule, or have received a field of it. The keypaste-design skill applies. Traces to PRODUCT §§1 and 5.8.
-
-  **Verify (V-N.5):** in the app, an entry with an `https` address opens it through the platform launcher and copies it; one with `javascript:` or `file:` opens nothing and says why. The reference and identifier are absent from the pane's automation tree until "…" is opened. With no session serving agents and no release in the audit log, the agent card is absent; after a release of the entry's password, it is present. `EntriesViewLayoutTests` holds at 960 px.
-
-  A view model asserting over a fixture URL without the launcher does not pass.
 - [ ] **N.4 — Create an item from a template.** Needs: V.7a.
   **Build:** New on Items starts from Login, API key, Database, Server or Secure note. Each asks for a title, a folder chosen from the vault's groups instead of a typed `/` path, tags and notes, and its own fields: a login's username, password and web address; an API key's env-named key, protected; a database's and a server's host, username and password; a secure note's notes alone. The item is created in one write with no history item, under V.7a's field-name rules and C.1a's tag rules. The keypaste-design skill applies. Traces to PRODUCT §§1 and 5.8.
 
@@ -66,11 +60,11 @@ A variable becomes an env-named custom field on an ordinary entry. The entry's o
 The `env/<project>` layout that v0.3.0 wrote stays readable indefinitely; no new variable is written in it. The syntax of `-p`, of `kp://<project>/<environment>/<KEY>` and of token scopes is kept.
 
 - [ ] **C.1b — Resolve projects from tagged fields.** Needs: V.7a, C.1a.
-  - A set is two things: the fields named `[A-Z][A-Z0-9_]{0,127}` of every entry carrying its tag, excluding names starting `KPEX_`, `KPXC_` or `KP2A_`; plus the untagged entries of its legacy group.
-  - `EnvResolution` resolves it whole or not at all. These refuse the set, naming each: a key held twice, names differing only in case, an expired member, or a value holding a KeePass placeholder.
-  - Every consumer uses the variables' source entries: `run` in each form, `env ls`, `env export`, `env diff`, the app's matrix, grants, activity and audit.
-  - Prompts name the source entries.
-  - An entry in a protected environment makes any release that includes it Allow once only.
+  **Build:** a project's environment is two things: the fields named `[A-Z][A-Z0-9_]{0,127}`, not starting `KPEX_`, `KPXC_` or `KP2A_`, of every entry whose own tag puts it there (`env:<project>` for `dev`, `env:<project>:<environment>` otherwise, D-0370); and the untagged entries of its legacy `env/<project>` group for that environment (D-0347). `EnvResolution` resolves the set whole or not at all, refusing it and naming each cause and its entries: a key held by two entries, two keys differing only in case, an expired member, and a value holding a KeePass placeholder such as `{PASSWORD}`. Every consumer reads the set with each variable's source entry: `run` in each form (`-p`, `--session`, `--token`, `--bundle` and `.env.keypaste` references), `env ls`, `env export`, `env diff`, the app's Env profiles matrix and Run, grants, Agents › History and the audit line's `entries`; prompts name the source entries. A release that includes a member of a protected environment offers Allow once only (D-0348, D-0371). Traces to PRODUCT §§1 and 2 and T4.
+
+  **Verify (V-C.1b):** on a vault KeePassXC made and tagged, holding one legacy `env/<project>` variable and fields on two tagged entries, `keypaste run <project> -- <reporter>` and `run --session` through the app each start a child whose environment holds exactly the tagged fields and the legacy variable; `env export` writes a reference for each and `env diff` compares the tagged environments' key names. Each refusal starts nothing and names the entries: one key on two entries, a legacy `Api_Key` beside a tagged `API_KEY`, an expired member, and `{PASSWORD}` in a value. The app's prompt for `run --session` names the source entries, one including an `env:<project>:prod` member offers Allow once only, and each release's audit line names its source entries.
+
+  A resolver shown only over an in-memory vault, with no child started, does not pass.
 - [ ] **C.1c — Write keys onto entries.** Needs: C.1b.
   - This covers `env set`, `env pull`, `env rm` and the app's add, edit and import.
   - An existing key is updated where it lives.

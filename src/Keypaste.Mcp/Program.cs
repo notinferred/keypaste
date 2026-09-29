@@ -108,6 +108,7 @@ internal static class Program
         await using var transport = new StdioServerTransport(serverOptions, loggerFactory: null);
         await using var server = McpServer.Create(transport, serverOptions, loggerFactory: null, serviceProvider: null);
         approver.Identity = () => McpAudit.AttachIdentity(server.ClientInfo, options);
+        approver.Exposure = options.Exposure.Globs;
 
         await server.RunAsync().ConfigureAwait(false);
     }

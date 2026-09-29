@@ -108,6 +108,9 @@ internal sealed partial class App : Application, IDisposable
     /// <summary>KeePassXC's local settings, whose databases the first run offers; where KeePassXC keeps them unless a test gives another.</summary>
     internal string? KeePassXcConfig { get; init; } = KeePassXcDatabases.LocalConfigPath();
 
+    /// <summary>How an item's web address reaches the browser; the platform's launcher unless a test gives another.</summary>
+    internal Func<TopLevel, IWebLauncher> WebLaunchers { get; init; } = window => new PlatformWebLauncher(window);
+
     /// <summary>How share links reach their server; the shell makes one unless a test gives another.</summary>
     internal HttpMessageHandler? ShareTransport { get; init; }
 
@@ -322,7 +325,8 @@ internal sealed partial class App : Application, IDisposable
             _preferences,
             _unlock?.Notice,
             Pickers(_window),
-            OpenInPlace)
+            OpenInPlace,
+            WebLaunchers(_window))
         {
             ShareTransport = ShareTransport,
         };
