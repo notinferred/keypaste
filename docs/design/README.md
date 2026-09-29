@@ -33,7 +33,7 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
 **Type**
 - UI: Instrument Sans 400/500/600. Mono: Fragment Mono 400 for anything machine-readable (keys, values, refs, paths, commands, tokens, timestamps).
 - Scale: display 54/600, −0.045em · h1 24–30/600, −0.03em to −0.035em · dialog title 15–16/600, −0.01em · body 13–14/400, line-height 1.5 · label 12/500 · table header 11/500, +0.04em, uppercase, muted · mono 12–13.
-- Wordmark: "keypaste", always lowercase, Instrument Sans 600, −0.045em.
+- Marks: the icon "k." and the wordmark "keypaste.", always lowercase, outlined from Hepta Slab; [BRAND](../BRAND.md) owns them.
 
 **Space / shape**
 - 4px base: 2, 4, 6, 8, 12, 16, 20, 24, 32, 40, 56.

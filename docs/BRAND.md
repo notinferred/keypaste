@@ -2,7 +2,7 @@
 
 Owns the marks, the palette, the type, the shape, the voice and the usage rules. Every surface (desktop app, CLI, site, README, store listing, installer) takes its visual values from here. The design handoff in [docs/design](design/README.md) holds the exact values for every screen and the high-fidelity prototypes they come from; where this page and a prototype disagree, the prototype's markup is the reference for that screen and this page for everything else. Where a value also has to exist as code, the file named below holds it.
 
-**Status:** adopted 2026-09-24. Amended 2026-09-28: the theme follows the system, titles use the sans face and the voice is calmer. Amended 2026-09-29 by the founder: the monogram and its lockup give way to an icon and a wordmark in Hepta Slab with an amber dot, never set together, and the status colours gain light-ground values. The desktop app's theme, icon, shell and screens, keypaste.com (through [brand.css](../site/public/brand.css)) and the README's wordmark and screenshots are built from it as amended ([N.7](steps/N.7.md)), and the CLI follows the terminal rules below.
+**Status:** adopted 2026-09-24. Amended 2026-09-28: the theme follows the system, titles use the sans face and the voice is calmer. Amended 2026-09-29 by the founder: the monogram and its lockup give way to an icon and a wordmark in Hepta Slab with an amber dot, never set together, and the status colours gain light-ground values; later that day the founder chose a lighter cut of both marks. The desktop app's theme, icon, shell and screens, keypaste.com (through [brand.css](../site/public/brand.css)) and the README's wordmark and screenshots are built from it as amended ([N.7](steps/N.7.md), [N.15](steps/N.15.md)), and the CLI follows the terminal rules below.
 
 ## Colour
 
@@ -42,7 +42,7 @@ Instrument Sans 400/500/600 for the interface and Fragment Mono 400 for anything
 
 [Typography.axaml](../src/Keypaste.App/Theme/Typography.axaml) holds these as text classes.
 
-The marks are set in Hepta Slab SemiBold (600) tracked −1%, and only as outlines: no surface loads the face, and the interface never uses it.
+The marks are set in Hepta Slab, and only as outlines: no surface loads the face, and the interface never uses it. The wordmark is weight 500 tracked −1.5%, so it sits beside Instrument Sans without outweighing it; the icon is 580 tracked −1%, so it holds its weight on a tile and at 16px.
 
 ## Shape and motion
 
@@ -66,7 +66,7 @@ Plain and calm; precise where it protects you. Name the actor and the object: "c
 
 ## The marks
 
-The icon is "k." and the wordmark "keypaste.": the letters in ink, `#F2F2F0` on dark and `#111214` on light, and the square dot amber. They are two marks, never set side by side: the app's sidebar carries the wordmark alone, its lock screen and every icon the "k." alone.
+The icon is "k." and the wordmark "keypaste.": the letters in ink, `#F2F2F0` on dark and `#111214` on light, and the square dot amber, sized from the letters' stem and set close after the last one. They are two marks, never set side by side: the app's sidebar carries the wordmark alone, its lock screen and every icon the "k." alone.
 
 | File in [`assets/brand/`](../assets/brand) | Use |
 |---|---|

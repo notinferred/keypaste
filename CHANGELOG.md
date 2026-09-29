@@ -8,6 +8,8 @@ Upgrade the bridge and `keypaste agent` together: they must be the same version,
 
 keypaste has a new brand: an icon "k." and a wordmark "keypaste." in Hepta Slab with an amber dot, amber on ink, Instrument Sans and Fragment Mono ([BRAND](docs/BRAND.md)). The desktop app is rebuilt on it, with restyled screens, a new lock screen and restyled prompt windows, and keypaste.com and the README use it too.
 
+The wordmark and the icon are a lighter cut: the wordmark in Hepta Slab at weight 500 and the icon at 580, each with a square dot sized from its letters, in the app, its icons, keypaste.com and the README ([N.15](docs/steps/N.15.md)).
+
 New item now starts from a template, Login, API key, Database, Server or Secure note, picks its folder from your vault's groups instead of a typed path, and takes tags and notes; an API key is kept as a protected field named as a project reads it, and a database's or server's host as a plain `Host` field. The item is written whole, with no history item ([N.4](docs/steps/N.4.md)).
 
 An item's URL is now a link that opens in your browser when it is a web address, with its own Copy; any other scheme, such as `javascript:` or `file:`, is shown as text and never opened. The item's `kp://` reference and KDBX identifier moved into its ⋯ menu, and the Agent access card shows only for items agents can see ([N.5](docs/steps/N.5.md)).
