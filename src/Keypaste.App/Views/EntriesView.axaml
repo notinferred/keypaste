@@ -21,7 +21,7 @@
       <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
     </Style>
     <Style Selector="ListBoxItem:selected ctl|KpIcon.kind">
-      <Setter Property="Foreground" Value="{DynamicResource KpAccent}" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
     </Style>
 
     <!-- The group tree: 30px rows, quieter than the sidebar's destinations. -->
@@ -437,14 +437,15 @@
                          Text="{Binding DisplayTitle}"
                          TextTrimming="CharacterEllipsis"
                          VerticalAlignment="Center" />
-              <!-- When an agent last received it: amber in use, green recent, grey idle. A time, never a value. -->
+              <!-- When an agent last received it: blue in use, green recent, grey idle. A time, never a value. Not amber:
+                   several rows can be in use at once, and a view has one amber element. -->
               <StackPanel Grid.Row="0" Grid.Column="3"
                           Orientation="Horizontal"
                           Spacing="6"
                           Margin="10,0,0,0"
                           IsVisible="{Binding LastUsedText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                 <TextBlock Classes="mono sm muted" Text="{Binding LastUsedText}" VerticalAlignment="Center" />
-                <Border Classes="dot" Classes.warn="{Binding IsInUse}" Classes.ok="{Binding IsRecent}" Classes.idle="{Binding IsIdle}" />
+                <Border Classes="dot" Classes.info="{Binding IsInUse}" Classes.ok="{Binding IsRecent}" Classes.idle="{Binding IsIdle}" />
               </StackPanel>
               <!-- Its kind and group, and why it is in a result whose reason is nowhere else on it:
                    a field name from a fixed vocabulary, never the value that matched. -->
@@ -455,7 +456,7 @@
                            TextTrimming="CharacterEllipsis" />
                 <TextBlock Text="{Binding Why}"
                            FontSize="11.5"
-                           Classes="amber"
+                           Classes="secondary"
                            IsVisible="{Binding Why.Length}" />
               </StackPanel>
             </Grid>

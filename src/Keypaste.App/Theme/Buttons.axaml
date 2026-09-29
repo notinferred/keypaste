@@ -127,17 +127,18 @@
     <Setter Property="FontSize" Value="12" />
     <Setter Property="Cursor" Value="Hand" />
   </Style>
+  <!-- A link is text, not a signal: the view's one amber element is its primary action or live signal. -->
   <Style Selector="Button.link /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="Transparent" />
-    <Setter Property="Foreground" Value="{DynamicResource KpAccentText}" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
   </Style>
   <Style Selector="Button.link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="Transparent" />
-    <Setter Property="Foreground" Value="{DynamicResource KpAccentHover}" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
   </Style>
   <Style Selector="Button.link:pressed /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="Transparent" />
-    <Setter Property="Foreground" Value="{DynamicResource KpAccentPress}" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
   </Style>
   <Style Selector="Button.link:disabled /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="Transparent" />

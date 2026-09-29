@@ -114,11 +114,13 @@ public sealed class FourPlacesJourneyTests
             Press(main, Row(main, "Groups", row => row is GroupNode { Path: "Work" }));
             Assert.Equal("Work", Named<Border>(main, "SearchScope").GetVisualDescendants().OfType<TextBlock>().First().Text);
             Assert.True(Named<Border>(main, "SearchScope").IsEffectivelyVisible);
+            AmberElements.AssertOne(main, Named<ToggleButton>(main, "AddEntry"), "Items, an item open and the search scoped");
 
             // A project's variables, from its row beneath Items; Back returns to Items.
             Press(main, Row(main, "Nav", row => row is ProjectRow { Name: "billing" }));
             var env = Assert.IsType<EnvSetsViewModel>(shell.Content);
             Assert.Equal(["STRIPE_KEY"], env.OpenProject!.Variables.Select(row => row.Key));
+            AmberElements.AssertOne(main, null, "a project's variables");
             var back = Named<Button>(main, "Back");
             Assert.Equal("Back to Items", AutomationProperties.GetName(back));
             Press(main, back);
@@ -132,6 +134,7 @@ public sealed class FourPlacesJourneyTests
             WindowInput.Type(main, _sourcePassword);
             Press(main, main.GetVisualDescendants().OfType<Button>().Single(button => button.IsEffectivelyVisible && ReferenceEquals(button.Command, shell.Import!.UnlockCommand)));
             await Until(() => shell.Import is { CanConfirm: true });
+            AmberElements.AssertOne(main, Named<Button>(main, "ImportConfirm"), "the import dialog");
             Press(main, Named<Button>(main, "ImportConfirm"));
             await Until(() => !shell.HasImport);
             Assert.Contains(app.Authority!.Session.Unlocked!.ReadEntries(), entry => entry.Title == "Checking");
@@ -143,6 +146,7 @@ public sealed class FourPlacesJourneyTests
             Press(main, Named<ToggleButton>(main, "EntryMenu"));
             Press(main, Named<Button>(main, "ShareEntry"));
             Assert.True(shell.HasShare);
+            AmberElements.AssertOne(main, Named<Button>(main, "CreateLink"), "the share dialog");
             Press(main, Named<Button>(main, "CreateLink"));
             await Until(() => !shell.HasShare);
             Assert.Single(server.Shares);
@@ -164,23 +168,28 @@ public sealed class FourPlacesJourneyTests
             Chord(main, PhysicalKey.Digit2);
             await Until(() => shell.MainNav[1].Count == "1", () => $"grants {app.Authority.Activity.Grants.Count}, row '{shell.MainNav[1].Count}'");
             Assert.True(shell.MainNav[1].DotLive);
+            AmberElements.AssertOne(main, Named<Button>(main, "ConnectClient"), "Agents, a grant in force");
             Press(main, main.GetVisualDescendants().OfType<Button>().First(button => button.IsEffectivelyVisible && button.Content as string == "Revoke"));
             Assert.Empty(app.Authority.Activity.Grants);
             Press(main, Named<Button>(main, "AgentHistory"));
             var history = Assert.IsType<LogViewModel>(shell.Content);
             Assert.True(history.IsAgentHistory);
+            AmberElements.AssertOne(main, null, "History");
             Assert.Contains(history.Rows, row => row.Actor == _label);
 
             // Settings › Advanced: the whole log and its check, then the share links, revoked.
             Chord(main, PhysicalKey.Digit4);
+            AmberElements.AssertOne(main, null, "Settings");
             Press(main, Named<Button>(main, "OpenActivityLog"));
             var log = Assert.IsType<LogViewModel>(shell.Content);
             Press(main, Named<Button>(main, "VerifyChain"));
             Assert.True(log.VerdictShown);
+            AmberElements.AssertOne(main, null, "the activity log, its verdict shown");
             Press(main, Named<Button>(main, "Back"));
             Press(main, Named<Button>(main, "OpenShareLinks"));
             var links = Assert.IsType<SharingViewModel>(shell.Content);
             await Until(() => links.Rows.Count == 1);
+            AmberElements.AssertOne(main, null, "share links");
             DrawnFrame.Capture(main);
             Press(main, main.GetVisualDescendants().OfType<Button>().First(button => button.IsEffectivelyVisible && button.Classes.Contains("row-action")));
             await Until(() => server.Shares.Count == 0);
@@ -188,6 +197,7 @@ public sealed class FourPlacesJourneyTests
             // Trash, then the lock, before the window closes.
             Chord(main, PhysicalKey.Digit3);
             Assert.IsType<TrashViewModel>(shell.Content);
+            AmberElements.AssertOne(main, null, "Trash");
             Chord(main, PhysicalKey.L);
             await Until(() => root.Content is UnlockView);
             main.Close();

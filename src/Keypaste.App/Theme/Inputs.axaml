@@ -212,12 +212,13 @@
       </ItemsPanelTemplate>
     </Setter>
   </Style>
+  <!-- Time running out, such as a grant's or the clipboard's, is quiet: the time in words beside it says it. -->
   <Style Selector="ProgressBar.thin">
     <Setter Property="MinHeight" Value="3" />
     <Setter Property="Height" Value="3" />
     <Setter Property="CornerRadius" Value="2" />
     <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
-    <Setter Property="Foreground" Value="{DynamicResource KpAccent}" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
   </Style>
 
 </Styles>

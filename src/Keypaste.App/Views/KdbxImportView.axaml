@@ -146,7 +146,7 @@
     <StackPanel Spacing="16">
 
       <Grid ColumnDefinitions="Auto,*,Auto">
-        <ctl:KpIcon Grid.Column="0" Icon="file-input" Size="18" Margin="0,0,10,0" Foreground="{DynamicResource KpAccent}" />
+        <ctl:KpIcon Grid.Column="0" Icon="file-input" Size="18" Margin="0,0,10,0" Foreground="{DynamicResource KpTextMuted}" />
         <TextBlock Grid.Column="1" Classes="dialog-title" Text="Import a KDBX vault" VerticalAlignment="Center" />
         <Button Grid.Column="2"
                 Classes="icon ghost sm"

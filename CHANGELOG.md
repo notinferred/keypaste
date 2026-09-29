@@ -8,6 +8,8 @@ Upgrade the bridge and `keypaste agent` together: they must be the same version,
 
 keypaste has a new brand: the k monogram, amber on ink, Instrument Sans and Fragment Mono ([BRAND](docs/BRAND.md)). The desktop app is rebuilt on it, with restyled screens, a new lock screen and restyled prompt windows, and keypaste.com and the README use it too.
 
+Amber now marks one thing on a screen, its main action or something live such as a waiting request: selected rows and icons, links, countdown bars and an entry's "in use" dot are drawn in the ordinary colours ([N.1a2](docs/steps/N.1a2.md)).
+
 The desktop has four places: Items, with each project's row beneath it, Agents, Trash and Settings, on `Ctrl/Cmd+1` to `4`. History moved under Agents, and the whole activity log and your share links under Settings › Advanced; Share… is in an item's ⋯ menu, New project, Import .env and Import .kdbx in Items' "+" (and Import under File on macOS), and the titlebar's search is the only one and says where it searches. The MCP server card is gone: the Agents row shows a count and a dot ([N.1a1](docs/steps/N.1a1.md)).
 
 The desktop now looks for keys left in entry notes, such as `STRIPE_SECRET_KEY=…` or a GitHub token on a line of its own, when you unlock and after each save. Settings › Recommendations lists each by entry and key, never the value, with a quiet count on Settings; Move to a field makes each value a protected field and takes its line out of the notes in one revision, and Dismiss remembers your choice on this machine ([C.2](docs/steps/C.2.md)).

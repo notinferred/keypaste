@@ -312,7 +312,7 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                               <DataTemplate x:DataType="vm:EnvProfileColumn">
-                                <Border Height="2" Margin="12,0,24,0" Background="{DynamicResource KpAccent}"
+                                <Border Height="2" Margin="12,0,24,0" Background="{DynamicResource KpTextPrimary}"
                                         IsVisible="{Binding IsSelected}" />
                               </DataTemplate>
                             </ItemsControl.ItemTemplate>

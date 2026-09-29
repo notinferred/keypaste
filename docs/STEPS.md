@@ -6,7 +6,7 @@ This file holds open work only. Finishing a task removes it from here, adds its 
 
 ## Selection and evidence
 
-Only the next five tasks are detailed: N.1a2, N.7, N.2, N.5 and N.4. Later rows name a bounded outcome and the dependencies their own implementation or verifier needs; expand a selected later task before building it. Tasks are not marked implemented from a document, reader, mock response or consuming screen. Name the producer, transport, consumer and user action exercised, and retain the source/version and limitations of the observation.
+Only the next five tasks are detailed: N.7, N.2, N.5, N.4 and N.1b. Later rows name a bounded outcome and the dependencies their own implementation or verifier needs; expand a selected later task before building it. Tasks are not marked implemented from a document, reader, mock response or consuming screen. Name the producer, transport, consumer and user action exercised, and retain the source/version and limitations of the observation.
 
 Needs are build dependencies. Ships after names publication gates. External signing identities are inputs, not a queue of enrollment code. A ready row does not authorize publication, account changes or messages. Preserve the secret-path tests, real KeePassXC compatibility, stale-write refusals and release integrity checks while changing product scope.
 
@@ -14,28 +14,6 @@ Needs are build dependencies. Ships after names publication gates. External sign
 
 Custom fields and tags are ordinary KeePass data: keypaste writes them as KeePassXC reads them, and every row keeps the permanent compatibility gates (PRODUCT §4.6). C.1a's tags include the project tags T4 builds on. The main screens show everyday password-manager work; advanced controls and security recommendations live in Settings (PRODUCT §5.8).
 
-- [ ] **N.1a — Put the app in four places.** Needs: none.
-  **Build:** the sidebar becomes Items, with the project rows beneath it, and Agents, with Trash and Settings in the footer, on Ctrl/Cmd+1–4. The other destinations move:
-  - Activity becomes Agents › History, and the full log moves to Settings › Advanced.
-  - Env profiles is reached from the project rows and from the Items "+" menu, which also holds New project and Import .env.
-  - Sharing becomes an item's Share… action, with its links listed in Settings › Advanced.
-  - Import .kdbx moves to "+", the first run and the macOS File menu.
-
-  The always-visible MCP server card goes, and the Agents row shows a count and a dot. The title-bar search becomes the only search and shows its scope. Traces to PRODUCT §§1 and 5.8.
-
-  **Verify (V-N.1a):** a driver works through the app's launch composition (D-0342). From the four places it reaches an item found by search, a project's variables, the agent history, revoking a grant, the full log and its check, creating and revoking a share link, and a KDBX import.
-
-  The sidebar's automation tree lists exactly the four places and the project rows. The MCP card and the second search box are absent. `EntriesViewLayoutTests` holds at 960 px, and each captured frame has one amber element.
-
-  An act left unreachable, or a removed row still listed, leaves the row open.
-
-  Split on 2026-09-29, estimated past two weeks (PRODUCT §6.3): N.1a1 built the four places and every clause of V-N.1a but the last ([record](steps/N.1a1.md)); N.1a2 builds that. N.1a closes with N.1a2.
-- [ ] **N.1a2 — Allow one amber element per frame.** Needs: N.1a1.
-  **Build:** a test-side detector counts the amber elements in a frame the app drew: connected regions of the accent's hue and saturation, on the topmost surface only, outside the marks, a selected row's inset bar and the focus ring. The screens N.1a1's journey passes through are brought to at most one, the view's primary action or live signal (BRAND rule 4): selected sidebar and list icons, thin progress bars and link buttons leave amber, a row's in-use dot turns blue, and Agents' Connect client is primary only while nothing is waiting. Traces to PRODUCT §§1 and 5.8.
-
-  **Verify (V-N.1a2):** differential tests show the detector counting two primaries as two, amber mono text as one in both themes, a tint or a selected row as none, and a dialog's primary over a backdrop as one. Every frame of N.1a1's journey then holds at most one amber element, and where the view has a primary action or live signal it is that element.
-
-  A rule asserted over styles or tokens rather than drawn frames does not pass.
 - [ ] **N.7 — Apply the amended brand.** Needs: N.1a2.
   **Build:** the app follows [BRAND](BRAND.md) as amended on 2026-09-28. With no theme chosen, `AppSettings.Default` and `App.axaml` follow the system's light or dark setting, as it changes; Light or Dark chosen in Settings still wins. Titles and headings, the item title in its pane among them, use Instrument Sans at BRAND's sizes, and keys, values, references, paths, commands and timestamps stay Fragment Mono. The copy on the main screens and in the prompts follows BRAND's voice without dropping what T-2's evidence relies on. The first line of `keypaste --help` carries PRODUCT §1's positioning within 80 columns. The keypaste-design skill applies. Traces to PRODUCT §§1 and 5.8.
 
@@ -61,9 +39,11 @@ Custom fields and tags are ordinary KeePass data: keypaste writes them as KeePas
 
   A template shown only in a view model does not pass.
 - [ ] **N.1b — Give every advanced feature one home.** Needs: N.1a.
-  - Scoped tokens, shared links, the log's hash check and diagnostics live in Settings › Advanced.
-  - Per-app choices live under that app on Agents.
-  - Nothing is removed, and none of it appears on a first-level screen.
+  **Build:** Settings › Advanced, which already lists the activity log and share links (N.1a1), gains Scoped tokens, moved from Agents with New token, its one-time copy and Revoke, and Diagnostics, moved from Settings' main list. The log's hash check, Verify chain and Copy hash, is offered on the activity log only; Agents › History shows the records without it. Each connected app's choice of Session grants up to 1h, Ask every time or Inject only moves from a dropdown on its card to that app's menu on Agents. Nothing is removed. The keypaste-design skill applies. Traces to PRODUCT §5.8.
+
+  **Verify (V-N.1b):** a driver through the app's launch composition (D-0342) reaches, from Settings › Advanced, minting and revoking a scoped token, the log's check and the diagnostics facts, and from an app's menu on Agents, changing its choice, which `clients.toml` then holds. By their automation trees, Agents' first level and Settings' main list carry none of them. Every frame of the drive passes N.1a2's amber check.
+
+  A control left reachable only from its old place, or removed, leaves the row open.
 - [ ] **N.12 — Mark copied secrets as concealed on macOS and Linux.** Needs: none.
   - Add the macOS pasteboard's concealed and transient types, and KDE's password-manager hint, as Windows already has.
   - T-19 is extended.

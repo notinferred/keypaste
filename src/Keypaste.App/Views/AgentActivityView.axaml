@@ -38,7 +38,9 @@
                 <TextBlock Text="History" />
               </StackPanel>
             </Button>
+            <!-- The screen's primary action, except while a request waits: then the waiting countdown is its signal. -->
             <Button Name="ConnectClient"
+                    Classes.primary="{Binding !HasWaiting}"
                     Padding="12,0"
                     Height="30"
                     Command="{Binding ToggleConnectCommand}">
@@ -151,7 +153,7 @@
         <!-- The prompt window asks; this is the second place a waiting request shows, in case that window was missed. -->
         <StackPanel Spacing="10" IsVisible="{Binding HasWaiting}">
           <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
-            <ctl:KpIcon Icon="clock" Size="15" Foreground="{DynamicResource KpAccent}" />
+            <ctl:KpIcon Icon="clock" Size="15" Foreground="{DynamicResource KpTextMuted}" />
             <TextBlock Grid.Column="1" Classes="section" Text="Waiting for you" VerticalAlignment="Center" />
             <TextBlock Grid.Column="2" Classes="caption" Text="Answer in the prompt window" HorizontalAlignment="Right" VerticalAlignment="Center" />
           </Grid>
@@ -176,7 +178,7 @@
 
         <StackPanel Spacing="10" IsVisible="{Binding IsAvailable}">
           <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
-            <ctl:KpIcon Icon="hourglass" Size="15" Foreground="{DynamicResource KpAccent}" />
+            <ctl:KpIcon Icon="hourglass" Size="15" Foreground="{DynamicResource KpTextMuted}" />
             <TextBlock Grid.Column="1" Classes="section" Text="Active grants" VerticalAlignment="Center" />
             <Button Grid.Column="2" Classes="danger sm" FontSize="12" Content="Revoke all" HorizontalAlignment="Right" VerticalAlignment="Center"
                     IsVisible="{Binding HasGrants}" Command="{Binding RevokeAllCommand}" />
@@ -194,7 +196,7 @@
                         <TextBlock Classes="mono secondary" FontSize="12" Text="{Binding Detail}" TextTrimming="CharacterEllipsis" />
                       </StackPanel>
                       <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
-                        <TextBlock Classes="mono sm amber" Text="{Binding LeftText}" />
+                        <TextBlock Classes="mono sm secondary" Text="{Binding LeftText}" />
                         <ProgressBar Classes="thin" MinWidth="0" Minimum="0" Maximum="1" Value="{Binding Fraction}" />
                       </StackPanel>
                       <Button Grid.Column="2" Classes="danger sm" FontSize="12" Content="Revoke" VerticalAlignment="Center"
