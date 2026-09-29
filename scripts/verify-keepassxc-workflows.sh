@@ -149,13 +149,16 @@ did() { local what=$1; shift; "$@" >"$dir/did.out" 2>&1 || die "$what failed: $(
 uuid() { printf '%-16.16s' "$1" | base64; }
 
 # The number of revisions KeePassXC holds for the entry with the UUID $2 in the vault $1.
+# The export goes to a file first: awk stops reading once it has counted, and under pipefail the
+# rest of a large export written into a closed pipe fails the gate (F.26).
 revisions() {
-  kx export "$1" -f xml | awk -v id="<UUID>$2</UUID>" '
+  kx export "$1" -f xml >"$dir/revisions.xml" || die "KeePassXC cannot export $1"
+  awk -v id="<UUID>$2</UUID>" '
     /<History>/ { inhist = 1; if (mine) n = 0; next }
     /<\/History>/ { inhist = 0; if (mine) { print n; found = 1; exit } next }
     inhist { if (mine && /<Entry>/) n++; next }
     /<UUID>/ { mine = index($0, id) > 0 }
-    END { if (!found) print 0 }'
+    END { if (!found) print 0 }' "$dir/revisions.xml"
 }
 
 # C.2's notes: two keys, a GitHub token on a line of its own, a PEM block and a sentence. The token
@@ -433,7 +436,8 @@ exercise() {
   expect "$db" review/stripe Notes "$kept_notes"
   expect "$db" review/plain Notes "Recovery codes are in the safe."
   [ "$(revisions "$db" "$(uuid stripe)")" = $((listed + 1)) ] || die "the move did not add exactly one revision"
-  kx export "$db" -f xml | grep -qF 'STRIPE_SECRET_KEY=sk_test_1' || die "KeePassXC finds no revision holding the old notes"
+  kx export "$db" -f xml >"$dir/history.xml" || die "KeePassXC cannot export $db"
+  grep -qF 'STRIPE_SECRET_KEY=sk_test_1' "$dir/history.xml" || die "KeePassXC finds no revision holding the old notes"
   review 0
   intact "$db" servers/database
 
