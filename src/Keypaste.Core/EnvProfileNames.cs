@@ -74,4 +74,15 @@ public static class EnvProfileNames
         var segments = entry.GroupPath[prefix.Length..].Split('/');
         return segments.Skip(1).Any(IsProtected);
     }
+
+    /// <summary>Whether releasing this entry must be asked about live every time, by its path or by any of its own tags.</summary>
+    /// <param name="entry">The entry.</param>
+    /// <param name="tags">The entry's own tags; a group's are never passed.</param>
+    /// <returns><see langword="true"/> when the path or a tag names a protected environment (<see cref="ProjectTag.Protects"/>).</returns>
+    public static bool RequiresLiveApproval(EntryName entry, IEnumerable<string> tags)
+    {
+        ArgumentNullException.ThrowIfNull(tags);
+
+        return RequiresLiveApproval(entry) || tags.Any(tag => ProjectTag.Read(tag).Protects);
+    }
 }

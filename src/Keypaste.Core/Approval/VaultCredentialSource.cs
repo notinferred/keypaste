@@ -30,6 +30,26 @@ public sealed class VaultCredentialSource(Func<Vault?> unlockedVault) : ICredent
         unlockedVault ?? throw new ArgumentNullException(nameof(unlockedVault));
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// The entry's path or any of its own tags, read from the open vault; a request it answers is
+    /// released only after a read of the saved file, which refuses a tag not yet saved. It fails
+    /// closed: with no vault, no single such entry or no way to read its tags, the answer is yes.
+    /// </remarks>
+    public bool RequiresLiveApproval(EntryName name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+
+        try
+        {
+            return _unlockedVault()?.Tags(name) is not { } tags || EnvProfileNames.RequiresLiveApproval(name, tags);
+        }
+        catch (Exception failure) when (failure is VaultException or ObjectDisposedException)
+        {
+            return true;
+        }
+    }
+
+    /// <inheritdoc/>
     public bool TryResolve(
         string entryArgument,
         [NotNullWhen(true)] out EntryName? name,

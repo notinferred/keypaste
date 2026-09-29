@@ -69,6 +69,24 @@ public static class EnvConvention
     public static bool IsValidProject(string project, out string error) =>
         VaultNameRules.IsValidName(project, "project name", out error);
 
+    /// <summary>
+    /// Whether a custom field is named as a project variable: <c>[A-Z][A-Z0-9_]{0,127}</c>, not
+    /// starting <c>KPEX_</c>, <c>KPXC_</c> or <c>KP2A_</c>, which KeePassXC and KeePass2Android keep.
+    /// </summary>
+    /// <param name="name">The field's name.</param>
+    /// <returns><see langword="true"/> if a tagged entry's field of this name is one of its project's variables.</returns>
+    public static bool IsEnvNamedField(string name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+
+        return name.Length is > 0 and <= 128
+            && char.IsAsciiLetterUpper(name[0])
+            && name.All(c => char.IsAsciiLetterUpper(c) || char.IsAsciiDigit(c) || c == '_')
+            && !name.StartsWith("KPEX_", StringComparison.Ordinal)
+            && !name.StartsWith("KPXC_", StringComparison.Ordinal)
+            && !name.StartsWith("KP2A_", StringComparison.Ordinal);
+    }
+
     /// <summary>Whether a variable name is one keypaste is willing to create.</summary>
     /// <param name="key">The variable name to check.</param>
     /// <param name="error">A message naming the problem, or empty when the name is valid.</param>

@@ -316,7 +316,7 @@ public sealed class Vault : IDisposable
         {
             if (!FieldNameRules.IsWritable(write.Name, out string error))
             {
-                throw FieldRefused(error);
+                throw Refused(error);
             }
 
             if (!named.Add(write.Name))
@@ -341,10 +341,64 @@ public sealed class Vault : IDisposable
 
         if (!FieldNameRules.IsWritable(field, out string error))
         {
-            throw FieldRefused(error);
+            throw Refused(error);
         }
 
         return Change(() => _interop.RemoveField(name, field) > 0, removed => removed ? VaultEdit.Of(name) : null);
+    }
+
+    /// <summary>The one entry's own tags, never its group's.</summary>
+    /// <param name="name">The entry.</param>
+    /// <returns>Its tags as KeePass normalizes them, or null when no entry answers to that name.</returns>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    public IReadOnlyList<string>? Tags(EntryName name)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+
+        return _interop.ReadTags(name);
+    }
+
+    /// <summary>Every entry outside the recycle bin that carries a tag of its own, with those tags.</summary>
+    /// <returns>Each such entry depth-first; two entries sharing a name are both listed.</returns>
+    public IReadOnlyList<EntryTags> ReadTags()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        return _interop.ReadTags();
+    }
+
+    /// <summary>Adds one tag to an entry as an edit with one history revision. Call <see cref="Save"/> to persist it.</summary>
+    /// <param name="name">The entry.</param>
+    /// <param name="tag">The tag, matched ordinally, so <c>Prod</c> and <c>prod</c> are two tags.</param>
+    /// <returns><see langword="true"/> if the entry was found and did not already carry the tag.</returns>
+    /// <exception cref="VaultException">The tag is refused (<see cref="TagRules.IsValid"/>), or more than one entry answers to that name. Nothing is changed.</exception>
+    public bool AddTag(EntryName name, string tag)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(tag);
+
+        if (!TagRules.IsValid(tag, out string error))
+        {
+            throw Refused(error);
+        }
+
+        return Change(() => _interop.AddTag(name, tag) > 0, added => added ? VaultEdit.Of(name) : null);
+    }
+
+    /// <summary>Removes tags from an entry as one edit with one history revision. Call <see cref="Save"/> to persist it.</summary>
+    /// <param name="name">The entry.</param>
+    /// <param name="tags">The tags, each matched ordinally; one the entry does not carry is skipped.</param>
+    /// <returns><see langword="true"/> if the entry was found and carried at least one of them.</returns>
+    /// <exception cref="VaultException">More than one entry answers to that name. Nothing is changed.</exception>
+    public bool RemoveTags(EntryName name, IReadOnlyList<string> tags)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(tags);
+
+        return Change(() => _interop.RemoveTags(name, tags) > 0, removed => removed ? VaultEdit.Of(name) : null);
     }
 
     /// <summary>The earlier states KeePass history keeps for the one entry with this name, newest
@@ -1532,8 +1586,8 @@ public sealed class Vault : IDisposable
             },
             _ => touched ?? VaultEdit.Of());
 
-    /// <summary>A refused field name, as a sentence.</summary>
-    private static VaultException FieldRefused(string error) =>
+    /// <summary>A refused field name or tag, as a sentence.</summary>
+    private static VaultException Refused(string error) =>
         new(string.Concat(char.ToUpperInvariant(error[0]).ToString(), error.AsSpan(1), "."));
 
     /// <summary>Whether a group path is <paramref name="groupPath"/> or lies inside it.</summary>

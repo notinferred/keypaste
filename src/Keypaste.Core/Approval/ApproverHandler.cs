@@ -59,9 +59,9 @@ public sealed class ApproverHandler
     /// <param name="policy">What a human said yes to in advance.</param>
     /// <param name="narrate">Optional: a line of running commentary for the operator's terminal.</param>
     /// <param name="requiresLiveApproval">
-    /// Which entries are asked about every time, with no grant and no policy release; null means
-    /// <see cref="EnvProfileNames.RequiresLiveApproval"/>, so a host that forgets it still asks live
-    /// about a protected profile.
+    /// Which entries are asked about every time, with no grant and no policy release; null means the
+    /// source's own answer (<see cref="ICredentialSource.RequiresLiveApproval"/>), so a host that
+    /// forgets it still asks live about a protected environment, by path or by tag.
     /// </param>
     /// <param name="clients">
     /// The per-client policies in <c>clients.toml</c>, or null to hold every client to
@@ -96,9 +96,15 @@ public sealed class ApproverHandler
         _grants = grants;
         _policy = policy;
         _narrate = narrate;
-        _requiresLiveApproval = requiresLiveApproval ?? EnvProfileNames.RequiresLiveApproval;
+        _requiresLiveApproval = requiresLiveApproval ?? source.RequiresLiveApproval;
         _clients = clients;
     }
+
+    /// <summary>Whether a release of this entry is asked about live every time, by the rule this handler applies.</summary>
+    /// <param name="name">The entry.</param>
+    /// <returns><see langword="true"/> when no grant, rule or token may release it unprompted.</returns>
+    /// <remarks>For the release paths beside this one, so a run naming the entry is held to the same rule (D-0371).</remarks>
+    public bool RequiresLiveApproval(EntryName name) => _requiresLiveApproval(name);
 
     /// <summary>The policy a bridge with this label is held to now.</summary>
     /// <param name="label">The bridge's raw <c>--client-label</c>, or null.</param>

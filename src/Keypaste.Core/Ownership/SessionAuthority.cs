@@ -513,7 +513,7 @@ public sealed class SessionAuthority : IApproverHandler
                 return false;
             }
 
-            var onceOnly = entries.Any(entry => EnvProfileNames.RequiresLiveApproval(entry.Name))
+            var onceOnly = entries.Any(entry => _inner.RequiresLiveApproval(entry.Name))
                 ? OnceOnly.ProtectedProfile
                 : policy == ClientPolicy.AskEveryTime ? OnceOnly.ClientPolicy : OnceOnly.None;
             var grantSeconds = onceOnly == OnceOnly.None ? EnvGrantCache.GrantSeconds(environments.Gate.Limits) : 0;

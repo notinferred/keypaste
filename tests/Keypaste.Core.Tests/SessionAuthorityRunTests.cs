@@ -265,6 +265,22 @@ public sealed class SessionAuthorityRunTests : IDisposable
     }
 
     [Fact]
+    public async Task AReferenceToAnEntryTaggedIntoAProtectedEnvironment_IsOnceOnly()
+    {
+        Assert.True(_vault.AddTag(new EntryName("personal", "github"), "env:acme-api:prod"));
+        _vault.Save();
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        await using var owner = Owner.Start(this, vaultSource: true);
+        await using var client = await AttachedAsync(owner);
+
+        var reply = await client.ReleaseRunAsync(References(("GH", "kp:///personal/github#username")), Token);
+
+        Assert.Equal([new EnvVariable("GH", _github)], reply!.Set.Variables);
+        Assert.Equal(OnceOnly.ProtectedProfile, _fixture.Channel.LastRunPrompt!.OnceOnly);
+        Assert.Empty(owner.Authority.Activity.EnvGrants);
+    }
+
+    [Fact]
     public async Task AnEntryOutsideTheExposure_IsRefusedUnasked()
     {
         _fixture.Channel.Answer = ApprovalAnswer.Approved;
@@ -622,12 +638,12 @@ public sealed class SessionAuthorityRunTests : IDisposable
 
         internal SessionAuthority Authority { get; }
 
-        internal static Owner Start(SessionAuthorityRunTests test, ApproverFixture? fixture = null, bool clients = false)
+        internal static Owner Start(SessionAuthorityRunTests test, ApproverFixture? fixture = null, bool clients = false, bool vaultSource = false)
         {
             var used = fixture ?? test._fixture;
             var handler = new ApproverHandler(
-                used.Source,
-                used.Source,
+                vaultSource ? new VaultCredentialSource(() => test._vault) : used.Source,
+                vaultSource ? new VaultEntryNameLister(() => test._vault) : used.Source,
                 used.Gate,
                 used.Grants,
                 used.Policy,

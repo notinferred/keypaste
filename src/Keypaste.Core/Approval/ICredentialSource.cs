@@ -54,4 +54,13 @@ public interface ICredentialSource
         string field,
         [NotNullWhen(true)] out ReleasedField? value,
         out CredentialFailure failure);
+
+    /// <summary>Whether a release of this entry is asked about live every time, with no grant and no rule (D-0348).</summary>
+    /// <param name="name">The entry, as returned by <see cref="TryResolve"/>.</param>
+    /// <returns><see langword="true"/> for an entry in a protected environment.</returns>
+    /// <remarks>
+    /// By default the entry's path decides. A source that can read the entry's own tags answers for
+    /// them too, so the protection follows a tag (D-0371).
+    /// </remarks>
+    bool RequiresLiveApproval(EntryName name) => EnvProfileNames.RequiresLiveApproval(name);
 }

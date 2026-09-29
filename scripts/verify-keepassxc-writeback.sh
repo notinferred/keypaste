@@ -144,8 +144,9 @@ printf '%s\n' "$keys"
 diff -u <(printf '%s\n' 'ADDED_BY_KPXC' "$key") <(printf '%s\n' "$keys") \
   || die "keypaste env ls disagrees with KeePassXC about the project's variables"
 
+# A project with an env/<project> group is listed as legacy, with its one dev profile beneath it.
 projects=$(kp_run env ls --vault "$db") || die "keypaste env ls (projects) failed"
-diff -u <(printf '%s\n' "$project") <(printf '%s\n' "$projects") \
+diff -u <(printf '%s\n' "$project  legacy" '  dev') <(printf '%s\n' "$projects") \
   || die "keypaste env ls does not report the project"
 
 # ---------------------------------------------------------------------------------------

@@ -8,6 +8,8 @@ Upgrade the bridge and `keypaste agent` together: they must be the same version,
 
 keypaste has a new brand: the k monogram, amber on ink, Instrument Sans and Fragment Mono ([BRAND](docs/BRAND.md)). The desktop app is rebuilt on it, with Secrets, Agents, Activity, Env profiles and Sharing screens, a new lock screen and restyled prompt windows, and keypaste.com and the README use it too.
 
+An entry's own KeePass tag now puts it in a project: `env:<project>` in its dev environment, `env:<project>:<environment>` in another. `keypaste env tag` and `env untag` write and remove the tag, naming the fields that join or leave, and `env ls` lists each project's environments, protected ones marked, and the entries tagged into each, marking a project that has an `env/` group as legacy. A tag naming a protected environment, such as `env:billing:prod`, makes every agent request for that entry ask and offer Allow once only. Tagged fields do not reach `run` yet ([C.1a](docs/steps/C.1a.md)).
+
 `keypaste set <entry> --field <name>` sets a custom field on an existing entry, protected unless `--plain`, and several `--field` make one revision. `get --field` copies or prints one, `field ls` names an entry's fields and their protection without a value, and `field rm` removes one, which stays in history. KeePassXC's own attributes such as `otp` are read and never written ([V.7a](docs/steps/V.7a.md)).
 
 Every approval prompt, in the desktop and in `keypaste agent`, offers Deny, Allow once, which keeps nothing, and Allow for 1 hour (`d`, `o` and `h` at the terminal), whatever lifetime the agent asked for. `--max-ttl` shortens the hour. An entry in a protected profile such as `prod` offers Allow once only.

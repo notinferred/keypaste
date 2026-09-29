@@ -42,6 +42,8 @@ public sealed class SecretHygieneTests
     [InlineData("env", "export", "hygiene")]
     [InlineData("env", "diff", "hygiene")]
     [InlineData("ls", "--json")]
+    [InlineData("env", "tag", "hygiene", "secrets/target", "-p", "prod")]
+    [InlineData("env", "untag", "hygiene", "secrets/target")]
     [InlineData("field", "ls", "secrets/target")]
     [InlineData("field", "ls", "secrets/target", "--json")]
     [InlineData("field", "rm", "secrets/target", "Region")]

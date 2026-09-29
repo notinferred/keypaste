@@ -9,8 +9,8 @@
 # association and a revision KeePassXC wrote — and KeePassXC then attaches a binary and a text file.
 # Each vault is AES-KDF and KDBX 4.0, as KeePassXC writes them.
 #
-# On each vault: open, edit, restore a revision, set and remove custom fields, organize, delete and
-# recover, restore a backup, export, and change access. The app half runs through tests/Keypaste.AppDriver, which presses the
+# On each vault: open, edit, restore a revision, set and remove custom fields, tag and untag, organize,
+# delete and recover, restore a backup, export, and change access. The app half runs through tests/Keypaste.AppDriver, which presses the
 # commands the desktop's screens bind to. After every write KeePassXC opens the vault with its current
 # factors, reads the value the workflow wrote, finds every unmodelled marker, exports both attachments
 # byte for byte, and reports the cipher and KDF it chose. Every refusal leaves the vault byte-identical
@@ -313,6 +313,16 @@ exercise() {
   did "keypaste field rm" kp_cli "$db" field rm servers/database kp7a-plain
   value "$db" servers/database kp7a-plain >/dev/null 2>&1 && die "KeePassXC still finds the field keypaste removed"
   refused "the CLI writing a field named Password" "$db" kp_cli "$db" set servers/database --field Password
+  intact "$db" servers/database
+
+  step "[$kind] tags: the CLI tags the entry KeePassXC made into a project and untags it"
+  did "keypaste env tag" kp_cli "$db" env tag kp94 servers/database -p prod
+  listed=$(value "$db" servers/database Tags) || die "KeePassXC cannot read the entry's tags"
+  grep -qx 'env:kp94:prod' <<<"${listed//,/$'\n'}" || die "KeePassXC does not read the tag keypaste added: ${listed}"
+  did "keypaste env untag" kp_cli "$db" env untag kp94 servers/database -p prod
+  listed=$(value "$db" servers/database Tags) || die "KeePassXC cannot read the entry's tags"
+  grep -qx 'env:kp94:prod' <<<"${listed//,/$'\n'}" && die "KeePassXC still reads the tag keypaste removed: ${listed}"
+  refused "the CLI writing a malformed project tag" "$db" kp_cli "$db" env tag kp94 servers/database -p Prod
   intact "$db" servers/database
 
   step "[$kind] organize: the app renames the group carrying CustomData and moves the entry out of it"

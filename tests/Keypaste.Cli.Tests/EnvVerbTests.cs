@@ -26,7 +26,7 @@ public sealed class EnvVerbTests
 
         harness.Prompt.Enqueue(Master);
         Assert.Equal(CliApp.ExitSuccess, harness.Run("env", "ls", "--vault", harness.VaultPath));
-        Assert.Equal("billing", harness.Out.ReplaceLineEndings("\n").Trim(), StringComparer.Ordinal);
+        Assert.Equal("billing  legacy\n  dev", harness.Out.ReplaceLineEndings("\n").Trim(), StringComparer.Ordinal);
 
         harness.Stdout.GetStringBuilder().Clear();
         harness.Prompt.Enqueue(Master);
@@ -369,6 +369,10 @@ public sealed class EnvVerbTests
     [InlineData("env", "set", "billing", "=novalue")]
     [InlineData("env", "rm", "billing")]
     [InlineData("env", "ls", "a", "b")]
+    [InlineData("env", "tag", "billing")]
+    [InlineData("env", "tag", "bill:ing", "api/Stripe")]
+    [InlineData("env", "tag", "billing", "api/Stripe", "-p", "Prod")]
+    [InlineData("env", "untag", "billing", "api/Stripe", "extra")]
     [InlineData("env", "pull")]
     [InlineData("env", "pull", "a", "b", "c")]
     [InlineData("env", "pull", "a", "--keep", "--delete-source")]
@@ -398,6 +402,8 @@ public sealed class EnvVerbTests
     [InlineData("env", "pull", "--help")]
     [InlineData("env", "export", "--help")]
     [InlineData("env", "diff", "--help")]
+    [InlineData("env", "tag", "--help")]
+    [InlineData("env", "untag", "--help")]
     public void Help_GoesToStdout_AndExitsZero(params string[] args)
     {
         using var harness = new CliHarness();
@@ -474,7 +480,9 @@ public sealed class EnvVerbTests
 
         harness.Prompt.Enqueue(Master);
         Assert.Equal(CliApp.ExitSuccess, harness.Run("env", "ls", "--json", "--vault", harness.VaultPath));
-        Assert.Equal("""[{"project":"acme-api","profiles":["dev","staging","prod"]}]""", harness.Out.Trim());
+        Assert.Equal(
+            """[{"project":"acme-api","legacy":true,"environments":[{"name":"dev","protected":false,"members":[]},{"name":"staging","protected":false,"members":[]},{"name":"prod","protected":true,"members":[]}]}]""",
+            harness.Out.Trim());
 
         harness.Stdout.GetStringBuilder().Clear();
         harness.Prompt.Enqueue(Master);

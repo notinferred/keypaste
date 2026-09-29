@@ -6,7 +6,7 @@ This file holds open work only. Finishing a task removes it from here, adds its 
 
 ## Selection and evidence
 
-Only the next five tasks are detailed: C.1a, V.7b, C.2, N.1a and N.7. Later rows name a bounded outcome and the dependencies their own implementation or verifier needs; expand a selected later task before building it. Tasks are not marked implemented from a document, reader, mock response or consuming screen. Name the producer, transport, consumer and user action exercised, and retain the source/version and limitations of the observation.
+Only the next five tasks are detailed: V.7b, C.2, N.1a, N.7 and N.2. Later rows name a bounded outcome and the dependencies their own implementation or verifier needs; expand a selected later task before building it. Tasks are not marked implemented from a document, reader, mock response or consuming screen. Name the producer, transport, consumer and user action exercised, and retain the source/version and limitations of the observation.
 
 Needs are build dependencies. Ships after names publication gates. External signing identities are inputs, not a queue of enrollment code. A ready row does not authorize publication, account changes or messages. Preserve the secret-path tests, real KeePassXC compatibility, stale-write refusals and release integrity checks while changing product scope.
 
@@ -14,27 +14,6 @@ Needs are build dependencies. Ships after names publication gates. External sign
 
 Custom fields and tags are ordinary KeePass data: keypaste writes them as KeePassXC reads them, and every row keeps the permanent compatibility gates (PRODUCT §4.6). C.1a's tags include the project tags T4 builds on. The main screens show everyday password-manager work; advanced controls and security recommendations live in Settings (PRODUCT §5.8).
 
-- [ ] **C.1a — Tag entries into projects and environments.** Needs: none.
-  **Build:** core reads an entry's own tags and adds or removes one as an edit with a revision. It refuses a tag holding `,`, `;`, a tab, a control character or edge whitespace, and never reads or writes group tags.
-
-  A project tag is `env:<project>` or `env:<project>:<environment>`, matched ordinally:
-  - the project follows the existing name rule, without `:`;
-  - the environment is `[a-z0-9][a-z0-9-]{0,31}`;
-  - `env:<project>` means `dev`.
-
-  A malformed `env:` tag is reported and grants no membership. It still protects its entry when its environment names a protected profile in any case. Projects are the tag projects together with the legacy `env/` groups, marked as legacy.
-
-  The live-approval check (`ApproverHandler.cs:99,212-215`, `SessionHost.cs:349`) reads the entry's tags as well as its path, so D-0348's protection follows a tag. The CLI gains `env tag <project> <entry> [-p <environment>]` and `env untag`, each naming the fields that join or leave the set. `env ls [<project>]` lists projects, environments with protected ones marked, and member entries, with `--json`.
-
-  The tags half of a new `verify-keepassxc-projects.sh` and a tag step in the workflows gate check it against real KeePassXC. The decision on the grammar supersedes D-0347 for new data. Traces to PRODUCT §§1, 2, 3.2 and 4.6.
-
-  **Verify (V-C.1a):** the vault is one KeePassXC made with the tags `env:billing`, `env:billing:prod`, `env:billing:Prod`, `finance` and one group tag. `keypaste env ls` names billing with `dev`, a protected `prod`, and exactly the member entries. It reports `env:billing:Prod` and ignores `finance` and the group tag.
-
-  After `keypaste env tag billing Stripe -p prod`, real KeePassXC's `show -a Tags` lists `env:billing:prod`, and the file stays KDBX 4.0.
-
-  The approval check runs through a real `keypaste-mcp` whose `--expose` covers the entries, and a real `keypaste agent`. A `request_credential` for that entry's password is offered Allow once only. So is one for an entry KeePassXC tagged `env:billing:Prod` through merge.
-
-  Protection shown only in a unit test does not pass, and neither do tags written by keypaste for both directions.
 - [ ] **V.7b — Edit custom fields and tags in the app.** Needs: V.7a, C.1a.
   **Build:** the item pane lists an entry's custom fields by name, with protected ones masked. It reveals one while held and copies through the one clearing countdown (D-0300). It adds a field (a name, a masked value and a protected switch), changes a value, switches protection and removes a field, each through core with history. KeePassXC's own attributes are shown read-only.
 
@@ -89,10 +68,11 @@ Custom fields and tags are ordinary KeePass data: keypaste writes them as KeePas
 
   A palette shown only in a token file does not pass.
 - [ ] **N.2 — Offer the person's KeePassXC database on first run.** Needs: none.
-  - With no recent vault, the welcome offers three things: the databases KeePassXC last opened, opening another file, and creating a vault. The databases are read only from `LastActiveDatabase`, `LastOpenedDatabases` and `LastDatabases` in KeePassXC's local `keepassxc.ini`.
-  - The lock screen stops mentioning agents.
-  - The YubiKey control moves under More options unless the vault needs one.
-  - T-24 gains the read.
+  **Build:** with no recent vault, the welcome offers three things: the databases KeePassXC last opened, opening another file, and creating a vault. Core reads only `LastActiveDatabase`, `LastOpenedDatabases` and `LastDatabases` from KeePassXC's local `keepassxc.ini` (`%LOCALAPPDATA%\KeePassXC\keepassxc.ini` on Windows, and where KeePassXC 2.7 keeps it on macOS and Linux), lists each existing file once, and treats a missing, unreadable or malformed file as no databases. Choosing one goes to the ordinary unlock with that path, and nothing is written to KeePassXC's files. The lock screen stops mentioning agents, and the YubiKey control moves under More options unless the vault's recent entry records a slot. T-24 gains the read. Traces to PRODUCT §§1 and 5.8.
+
+  **Verify (V-N.2):** real KeePassXC opens two databases and closes; with an empty `~/.keypaste`, the welcome lists exactly those two, the last active first, and unlocking one opens it. A listed path that has since been deleted is not offered, and an ini with a malformed line lists the rest. KeePassXC's files are byte-identical afterwards. The lock screen's automation tree names no agent, and its YubiKey control is under More options for a vault without a slot.
+
+  A reader shown only on a hand-written ini does not pass.
 - [ ] **N.5 — Make the item pane read like a password manager.** Needs: V.7b.
   - A web address opens (http and https only) and copies.
   - The `kp://` reference and the KDBX identifier move under "…".

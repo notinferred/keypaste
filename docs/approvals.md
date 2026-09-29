@@ -75,7 +75,7 @@ The reason is text written by the agent. keypaste removes control characters, li
 
 `o` releases it for this request only. `h` also lets the same client ask for the same field again for an hour without asking you. Both count only once the choice has been on screen for a second, and keys typed before it appeared are discarded, so a key meant for the last prompt cannot answer this one. Anything else, including Enter, is a no, and so is saying nothing for 45 seconds. The countdown shows the seconds left.
 
-An entry in a protected profile, a group named `prod`, `production`, `prod-…` or `production-…` below `env/<project>`, offers only `o`: it is asked about every time, no grant is kept and no policy rule releases it.
+An entry in a protected profile, a group named `prod`, `production`, `prod-…` or `production-…` below `env/<project>`, offers only `o`: it is asked about every time, no grant is kept and no policy rule releases it. In source, so does an entry whose own KeePass tag names one, such as `env:billing:prod`, and a tag keypaste cannot read as a project tag still counts when it names one in any case, such as `env:billing:Prod`.
 
 ## Repeat requests
 

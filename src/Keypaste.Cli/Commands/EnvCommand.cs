@@ -42,6 +42,12 @@ internal static class EnvCommand
             case "diff":
                 return EnvDiffCommand.Execute(args, context);
 
+            case "tag":
+                return EnvTagCommand.Execute(args, context, tagging: true);
+
+            case "untag":
+                return EnvTagCommand.Execute(args, context, tagging: false);
+
             // Handled here rather than left to the subcommand parsers: with no subcommand to
             // dispatch on, `keypaste env --help` would otherwise be reported as an unknown one.
             case "help":
@@ -116,16 +122,19 @@ internal static class EnvCommand
         writer.WriteLine("usage: keypaste env <command> [-p <profile>]");
         writer.WriteLine();
         writer.WriteLine("commands:");
-        writer.WriteLine("  ls [project]             list projects, or one profile's variable names");
+        writer.WriteLine("  ls [project]             list projects and tagged entries, or variables");
         writer.WriteLine("  set <project> <KEY>      set a variable, prompting for the value");
         writer.WriteLine("  rm <project> <KEY>       remove a variable");
         writer.WriteLine("  pull <project> [file]    import a .env file, then offer to delete it");
         writer.WriteLine("  export [project] [file]  write kp:// references, safe to commit; --dotenv for plain text");
         writer.WriteLine("  diff [project] [a b]     compare profiles by name, never by value");
+        writer.WriteLine("  tag <project> <entry>    put an entry in a project through its env: tag");
+        writer.WriteLine("  untag <project> <entry>  take it out again");
         writer.WriteLine();
         writer.WriteLine($"variables live in the '{EnvConvention.RootGroup}/<project>' group of the vault, which is");
         writer.WriteLine($"the {EnvProfileNames.Default} profile; -p <profile> uses the '{EnvConvention.RootGroup}/<project>/<profile>' group.");
-        writer.WriteLine("one entry per variable, and fully editable in KeePassXC.");
+        writer.WriteLine("one entry per variable, and fully editable in KeePassXC. An entry tagged");
+        writer.WriteLine("env:<project> or env:<project>:<profile> belongs to that project too.");
         writer.WriteLine("to read a value: keypaste get env/<project>/<KEY> --show");
     }
 }

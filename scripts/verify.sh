@@ -25,7 +25,7 @@ backend      Locked restore, format, Release build and backend tests.
 integration  Prepare the backend and exercise real CLI/MCP processes and the demo pages.
 desktop      The desktop solution AND the separate CLI/desktop consistency project.
 compat       Prepare the backend and the app driver, and verify creation, write-back, history, recovery, organization,
-             keyfiles, custom fields and every workflow on vaults KeePassXC made, through the CLI and the app, against
+             keyfiles, custom fields, project tags and every workflow on vaults KeePassXC made, through the CLI and the app, against
              installed KeePassXC.
              Never selected automatically; run it by name.
 
@@ -261,6 +261,7 @@ profile_compat() {
   run bash scripts/verify-keepassxc-organize.sh artifacts/compat/local-organize.kdbx
   run bash scripts/verify-keepassxc-import.sh artifacts/compat/local-import
   run bash scripts/verify-keepassxc-fields.sh artifacts/compat/local-fields
+  run bash scripts/verify-keepassxc-projects.sh artifacts/compat/local-projects
   run bash scripts/verify-keepassxc-keyfile.sh artifacts/compat/local-keyfile.kdbx
   run bash scripts/verify-keepassxc-xml-attach.sh artifacts/compat/local-xml-attach
   prepare tests/Keypaste.AppDriver/Keypaste.AppDriver.csproj

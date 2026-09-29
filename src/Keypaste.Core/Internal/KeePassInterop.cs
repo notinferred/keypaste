@@ -677,6 +677,67 @@ internal sealed class KeePassInterop : IDisposable
         return 1;
     }
 
+    /// <summary>The one entry's own tags, or null when there is no such entry.</summary>
+    /// <remarks>Never <c>GetTagsInherited</c>: a group's tags are not the entry's (C.1a).</remarks>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal IReadOnlyList<string>? ReadTags(EntryName name)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        return Locate(name) is { } found ? [.. found.Entry.Tags] : null;
+    }
+
+    /// <summary>Every live entry carrying a tag of its own, by the traversal <see cref="Collect"/> uses.</summary>
+    internal IReadOnlyList<EntryTags> ReadTags()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        List<EntryTags> tagged = [];
+        CollectTags(_database.RootGroup, string.Empty, tagged, Bin());
+        return tagged;
+    }
+
+    /// <summary>Adds one tag as an edit with one history revision.</summary>
+    /// <returns>0 when there is no such entry or it carries the tag already, otherwise 1.</returns>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal int AddTag(EntryName name, string tag)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (Locate(name) is not { } found || found.Entry.HasTag(tag))
+        {
+            return 0;
+        }
+
+        found.Entry.CreateBackup(_database);
+        found.Entry.AddTag(tag);
+        found.Entry.Touch(true);
+        return 1;
+    }
+
+    /// <summary>Removes every one of the tags the entry carries, as one edit with one history revision.</summary>
+    /// <returns>0 when there is no such entry or it carries none of them, otherwise 1.</returns>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    internal int RemoveTags(EntryName name, IReadOnlyList<string> tags)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (Locate(name) is not { } found || !tags.Any(found.Entry.HasTag))
+        {
+            return 0;
+        }
+
+        found.Entry.CreateBackup(_database);
+
+        foreach (string tag in tags)
+        {
+            found.Entry.RemoveTag(tag);
+        }
+
+        found.Entry.Touch(true);
+        return 1;
+    }
+
     /// <summary>Sets an entry's expiry, which only KeePassXC writes, for a fixture to hold one.</summary>
     internal void SetExpiryUnchecked(EntryName name, DateTimeOffset? expires)
     {
@@ -1909,6 +1970,25 @@ internal sealed class KeePassInterop : IDisposable
             }
 
             Collect(child, ChildPath(groupPath, child.Name), entries, bin);
+        }
+    }
+
+    private static void CollectTags(PwGroup group, string groupPath, List<EntryTags> tagged, PwGroup? bin)
+    {
+        foreach (PwEntry entry in group.Entries)
+        {
+            if (entry.Tags.Count > 0)
+            {
+                tagged.Add(new EntryTags(new EntryName(groupPath, ReadField(entry, PwDefs.TitleField)), [.. entry.Tags]));
+            }
+        }
+
+        foreach (PwGroup child in group.Groups)
+        {
+            if (!ReferenceEquals(child, bin))
+            {
+                CollectTags(child, ChildPath(groupPath, child.Name), tagged, bin);
+            }
         }
     }
 

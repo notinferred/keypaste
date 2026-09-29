@@ -26,6 +26,7 @@ public sealed class DesktopApprovalTests
     internal const string Sentinel = "SENTINEL-DESKTOP-APPROVAL-3f9a1c";
     internal const string EntryPath = "env/ci/DEPLOY_KEY";
     internal const string ProdEntryPath = "env/ci/prod/DEPLOY_KEY";
+    internal const string TaggedEntryPath = "services/Stripe";
     internal const string Label = "ci-probe";
 
     private static readonly TimeSpan _wait = TimeSpan.FromSeconds(10);
@@ -323,6 +324,25 @@ public sealed class DesktopApprovalTests
         });
 
     [Fact]
+    public Task An_entry_tagged_into_a_protected_environment_is_offered_once_only() =>
+        HeadlessSession.On(async () =>
+        {
+            await using var app = await PromptedApp.StartAsync();
+            var reply = app.Ask(entry: TaggedEntryPath, exposure: "services/**");
+            var window = await app.PromptAsync();
+
+            Assert.False(window.FindControl<Button>("Approve")!.IsVisible);
+            Assert.True(window.FindControl<Button>("AllowOnce")!.IsVisible);
+
+            await app.ArmAsync();
+            Click(window, "AllowOnce");
+            var answered = await reply.WaitAsync(_wait, Token);
+
+            Assert.Equal(AuditDecision.Granted, answered!.Decision);
+            Assert.Equal(0, answered.TtlSeconds);
+        });
+
+    [Fact]
     public Task Countdown_TicksFromTheWindow() =>
         HeadlessSession.On(async () =>
         {
@@ -419,6 +439,8 @@ public sealed class DesktopApprovalTests
             {
                 created.AddEntry(new VaultEntry { GroupPath = "env/ci", Title = "DEPLOY_KEY", Password = Sentinel });
                 created.AddEntry(new VaultEntry { GroupPath = "env/ci/prod", Title = "DEPLOY_KEY", Password = Sentinel });
+                created.AddEntry(new VaultEntry { GroupPath = "services", Title = "Stripe", Password = Sentinel });
+                created.AddTag(new EntryName("services", "Stripe"), "env:ci:prod");
                 created.Save();
             }
 
@@ -444,10 +466,10 @@ public sealed class DesktopApprovalTests
             return client;
         }
 
-        internal Task<CredentialReply?> Ask(CancellationToken? cancellationToken = null, string entry = EntryPath) =>
-            Ask(_client!, cancellationToken, entry);
+        internal Task<CredentialReply?> Ask(CancellationToken? cancellationToken = null, string entry = EntryPath, string exposure = "env/**") =>
+            Ask(_client!, cancellationToken, entry, exposure);
 
-        internal Task<CredentialReply?> Ask(ApproverClient client, CancellationToken? cancellationToken = null, string entry = EntryPath) =>
+        internal Task<CredentialReply?> Ask(ApproverClient client, CancellationToken? cancellationToken = null, string entry = EntryPath, string exposure = "env/**") =>
             client.RequestAsync(
                 new CredentialRequest
                 {
@@ -455,7 +477,7 @@ public sealed class DesktopApprovalTests
                     Field = "password",
                     Reason = "deploy the billing service",
                     TtlSeconds = 60,
-                    Exposure = ["env/**"],
+                    Exposure = [exposure],
                     ClientName = "claude-code",
                     ClientLabel = Label,
                     Vault = Vault,

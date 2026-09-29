@@ -346,7 +346,6 @@ internal sealed class SessionHost : IDisposable
                 approvals,
                 grants,
                 PolicyGate.None,
-                requiresLiveApproval: EnvProfileNames.RequiresLiveApproval,
                 clients: new ClientPolicySource(KeypasteHome.ClientsPath(session.Home)));
 
             // Opened when a token first arrives, so an unlock creates no log; one that cannot be opened refuses every token.
