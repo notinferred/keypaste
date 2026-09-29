@@ -85,7 +85,7 @@ Entry lists show titles and groups. Selecting an entry shows its username, URL a
 
 Copied secrets are cleared after twenty seconds if the clipboard still contains the copied value. Locking, quitting and Clear now also clear them. A pending clipboard write is cleared when it completes; quitting waits for that handoff. Forced termination, crashes, power loss and logout can leave a copied value behind.
 
-Both Windows front ends request exclusion from Clipboard History and Cloud Clipboard. First-party consumers honor those formats; third-party managers can ignore them, and RDP or Citrix can copy the value to another machine. Windows does not restrict which local process may read the clipboard. Keypaste sets no equivalent history-exclusion marking on macOS or Linux (O-0019). On X11 and Wayland, `xclip` or `wl-copy` can continue serving the value after Keypaste exits.
+Both Windows front ends request exclusion from Clipboard History and Cloud Clipboard. First-party consumers honor those formats; third-party managers can ignore them, and RDP or Citrix can copy the value to another machine. Windows does not restrict which local process may read the clipboard. The desktop also marks a copied secret concealed and transient for macOS pasteboard managers and as a secret for KDE's Klipper; managers may ignore these conventions, and none stops a process reading the clipboard. The CLI's copies on macOS and Linux carry no such marker. On X11 and Wayland, `xclip` or `wl-copy` can continue serving the value after Keypaste exits.
 
 ### Editing your vault from the app
 

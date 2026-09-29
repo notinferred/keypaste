@@ -23,6 +23,7 @@ on:
       - 'scripts/verify-agent-activity.sh'
       - 'scripts/verify-connect-client.sh'
       - 'scripts/verify-run-session.sh'
+      - 'scripts/verify-clipboard-markers.sh'
       - 'src/Keypaste.Mcp/**'
       - 'scripts/install-keepassxc-windows.sh'
       - 'src/Keypaste.Cli/**'
@@ -216,6 +217,51 @@ jobs:
       - name: Verify the first run offers the databases KeePassXC last opened
         shell: bash
         run: bash scripts/verify-keepassxc-first-run.sh artifacts/compat/first-run
+
+  # What the platform clipboard offers after the app copies a secret, after its clear and after a
+  # plain copy: the nspasteboard.org types on macOS, Klipper's hint on X11 (N.12). The readings go to
+  # the log, since nothing in this workflow uploads before the installer is signed.
+  clipboard-markers:
+    name: clipboard markers (${{ matrix.os }})
+    needs: gate
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      - name: Restore (locked) and build the observer
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet restore keypaste.app.slnx --locked-mode
+          dotnet build tests/Keypaste.MinimizeObserver -c Release --no-restore -warnaserror
+
+      - name: Start Xvfb
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y xvfb xclip libx11-6 libice6 libsm6 libfontconfig1
+          Xvfb :99 -screen 0 1280x800x24 > "$RUNNER_TEMP/xvfb.log" 2>&1 &
+          echo "DISPLAY=:99" >> "$GITHUB_ENV"
+          sleep 2
+
+      - name: Read the clipboard's markers
+        shell: bash
+        run: bash scripts/verify-clipboard-markers.sh "$PWD/artifacts/bin/Keypaste.MinimizeObserver/release/Keypaste.MinimizeObserver" clipboard-markers
 
   package:
     name: publish + selftest (${{ matrix.os }})

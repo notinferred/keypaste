@@ -8,6 +8,8 @@ Upgrade the bridge and `keypaste agent` together: they must be the same version,
 
 keypaste has a new brand: an icon "k." and a wordmark "keypaste." in Hepta Slab with an amber dot, amber on ink, Instrument Sans and Fragment Mono ([BRAND](docs/BRAND.md)). The desktop app is rebuilt on it, with restyled screens, a new lock screen and restyled prompt windows, and keypaste.com and the README use it too.
 
+A secret the desktop copies now also asks macOS pasteboard managers such as Maccy, and KDE's Klipper, not to keep it, as it already asked Windows' Clipboard History; a copied run command is left for them to keep ([N.12](docs/steps/N.12.md)).
+
 Scoped tokens and Diagnostics moved to Settings › Advanced, beside the activity log and share links. A client's policy is now chosen from its card's ⋯ menu on Agents, and History shows its records without Verify chain, which is on the activity log ([N.1b](docs/steps/N.1b.md)).
 
 The wordmark and the icon are a lighter cut: the wordmark in Hepta Slab at weight 500 and the icon at 580, each with a square dot sized from its letters, in the app, its icons, keypaste.com and the README ([N.15](docs/steps/N.15.md)).

@@ -248,7 +248,7 @@ public sealed class ClipboardCountdownTests
     }
 
     /// <summary>
-    /// A run command is copied plainly: no countdown, no clear, no exclusion formats.
+    /// A run command is copied plainly: no countdown, no clear, no secret markers.
     /// </summary>
     [Fact]
     public async Task A_run_command_is_copied_without_a_countdown()

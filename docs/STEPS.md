@@ -6,7 +6,7 @@ This file holds open work only. Finishing a task removes it from here, adds its 
 
 ## Selection and evidence
 
-Only the next five tasks are detailed: N.12, N.10, C.1b, C.1c and C.3. Later rows name a bounded outcome and the dependencies their own implementation or verifier needs; expand a selected later task before building it. Tasks are not marked implemented from a document, reader, mock response or consuming screen. Name the producer, transport, consumer and user action exercised, and retain the source/version and limitations of the observation.
+Only the next five tasks are detailed: N.10, C.1b, C.1c, C.3 and C.4. Later rows name a bounded outcome and the dependencies their own implementation or verifier needs; expand a selected later task before building it. Tasks are not marked implemented from a document, reader, mock response or consuming screen. Name the producer, transport, consumer and user action exercised, and retain the source/version and limitations of the observation.
 
 Needs are build dependencies. Ships after names publication gates. External signing identities are inputs, not a queue of enrollment code. A ready row does not authorize publication, account changes or messages. Preserve the secret-path tests, real KeePassXC compatibility, stale-write refusals and release integrity checks while changing product scope.
 
@@ -14,12 +14,6 @@ Needs are build dependencies. Ships after names publication gates. External sign
 
 Custom fields and tags are ordinary KeePass data: keypaste writes them as KeePassXC reads them, and every row keeps the permanent compatibility gates (PRODUCT §4.6). C.1a's tags include the project tags T4 builds on. The main screens show everyday password-manager work; advanced controls and security recommendations live in Settings (PRODUCT §5.8).
 
-- [ ] **N.12 — Mark copied secrets as concealed on macOS and Linux.** Needs: none.
-  **Build:** a secret the desktop copies carries, in the same clipboard item as the Windows formats, `org.nspasteboard.ConcealedType` and `org.nspasteboard.TransientType`, which macOS pasteboard managers honour, and `x-kde-passwordManagerHint` holding `secret`, which KDE's Klipper honours; no marker's content is the secret. A copy that is not a secret, such as a `keypaste run` command, carries none. T-19 and SECURITY say what each marker asks and that none stops a process reading the clipboard, and O-0019 is answered. The CLI's `pbcopy`, `wl-copy` and `xclip` writes are unchanged, and that limit is stated. Traces to PRODUCT §3.
-
-  **Verify (V-N.12):** `AvaloniaClipboard` hands the platform one item holding the text and every marker for a secret, and no marker for plain text. On a macOS runner, after the app's composition copies a secret, the general pasteboard's item lists both nspasteboard types beside the text, and none after the clear, and the bundled `keypaste.app` on a Mac gives the same read; on a Linux runner with an X11 clipboard, `xclip -selection clipboard -o -t TARGETS` lists `x-kde-passwordManagerHint`, whose content reads `secret`.
-
-  A marker shown only in the source, with no platform read of what the clipboard offered, does not pass.
 - [ ] **N.6 — Use plain words everywhere.** Needs: N.1a, N.3.
   - The app, the CLI help and the bridge's refusal texts replace stdio, exposure, grant, session and KDBX-entry wording with plain terms.
   - The approval prompts keep every element T-2's evidence relies on.
@@ -66,10 +60,11 @@ The `env/<project>` layout that v0.3.0 wrote stays readable indefinitely; no new
 
   A move shown only in core, with no child run before and after it and no KeePassXC read, does not pass.
 - [ ] **C.4 — Build the Projects screen on tags.** Needs: C.1c, C.3.
-  - Projects come from tags and legacy groups.
-  - An open project shows its variables by environment, with each value's source entry and any sharing marked.
-  - From it the person adds keys, adds or removes entries, imports a `.env`, exports `.env.keypaste`, runs through E.1b's launch and moves a legacy project to tags.
-  - Split it into C.4a and C.4b if it runs past two weeks.
+  **Build:** the sidebar's project rows, the page's picker and New project read `ProjectCatalog`, listing tag-only projects beside the `env/` groups, which are marked legacy. An open project shows each key by environment with its value's source entry. A value whose entry serves several environments or projects is marked with them, and Replace names each of them before writing. Each environment lists its entries. Add entry tags one and Remove untags it, both behind C.1c's confirmation and deleting nothing. Keys are added, replaced, removed and imported through C.1c's writes. Export .env.keypaste references the resolved set, and Run goes through E.1b's launch, its confirmation naming the source entries. A legacy project's page offers Move to tags, listing each variable by environment with the home-entry field it becomes and the entries that will be recycled, and only a confirmation runs C.3's move. The page names the malformed tags `env ls` warns of. Traces to PRODUCT §§1, 2 and 5.8 and T4.
+
+  **Verify (V-C.4):** the vault is one KeePassXC made, with a legacy project mapped in `projects.json`, a tag-only one with two `dev` entries (one also tagged `staging`) and an `env:<project>:Prod` tag. A driver through the app's launch composition (D-0342) finds in the automation tree both projects with only the legacy one marked, each value's source entry, the shared entry's two environments and the malformed tag. On the tag-only project it adds an entry to `staging`, removes the other from `dev`, replaces the shared value, adds a key with no entry chosen and imports a `.env`. On the legacy project it declines Move to tags, tries it over a file another program saved, then confirms. Each declined or refused act leaves the bytes unchanged. Real KeePassXC reads every tag, value and protection written, the moved project's home entries and its old entries in the recycle bin. `keypaste run` resolves the exported references; Run starts `Keypaste.EnvReporter` holding exactly `dev`'s fields, and the moved project's Run gives a child its earlier environment. Every frame passes N.1a2's amber check.
+
+  A page shown only through its view models, with no KeePassXC read of its writes, does not pass.
 - [ ] **E.1d — Run a project from the app on macOS.** Needs: G.5.
   - Terminal.app runs the bundle's `keypaste run --session` for the project.
   - The command is passed as arguments and never spliced into script text.

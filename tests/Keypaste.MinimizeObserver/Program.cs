@@ -27,13 +27,16 @@ namespace Keypaste.MinimizeObserver;
 /// </summary>
 /// <remarks>
 /// It never changes the window's state itself: <c>scripts/observe-minimize-lock.sh</c> minimizes it from
-/// outside the process and decides what the events mean. Exit 3 means the app could not be arranged.
+/// outside the process and decides what the events mean. The <c>markers</c> scenario instead lets
+/// <c>scripts/verify-clipboard-markers.sh</c> read the platform clipboard after a secret copy, its
+/// clear and a plain copy (N.12). Exit 3 means the app could not be arranged.
 /// </remarks>
 internal static class Program
 {
     private const string _password = "minimize-observer-disposable";
     private const string _marker = "minimize-observer-marker";
     private const int _longIdleSeconds = 8 * 60 * 60;
+    private const string _plainCopy = "keypaste run billing -- npm start";
 
     private static readonly Stopwatch _clock = Stopwatch.StartNew();
     private static readonly Lock _output = new();
@@ -46,7 +49,7 @@ internal static class Program
         if (!Options.TryParse(args, out var options))
         {
             Console.Error.WriteLine(
-                "usage: --scenario enabled|control|hide|disabled|persist-write|persist-read --quit-file <path> [--deadline-seconds <n>]   (with KEYPASTE_HOME set)");
+                "usage: --scenario enabled|control|hide|disabled|persist-write|persist-read|markers --quit-file <path> [--deadline-seconds <n>]   (with KEYPASTE_HOME set)");
             return 2;
         }
 
@@ -99,7 +102,7 @@ internal static class Program
         {
             "enabled" or "control" or "hide" => Written(_longIdleSeconds, lockWhenMinimized: true),
             "disabled" => Written(60, lockWhenMinimized: false),
-            "persist-write" => Written(_longIdleSeconds, lockWhenMinimized: false),
+            "persist-write" or "markers" => Written(_longIdleSeconds, lockWhenMinimized: false),
             _ => null,
         };
 
@@ -123,7 +126,7 @@ internal static class Program
             options = new Options(scenario ?? string.Empty, quit ?? string.Empty, deadline);
             return args.Length % 2 == 0
                 && quit is not null
-                && scenario is "enabled" or "control" or "hide" or "disabled" or "persist-write" or "persist-read";
+                && scenario is "enabled" or "control" or "hide" or "disabled" or "persist-write" or "persist-read" or "markers";
         }
 
         private static AppSettings Written(int idleSeconds, bool lockWhenMinimized) =>
@@ -256,6 +259,34 @@ internal static class Program
                 lockWhenMinimized = shell.Preferences.LockWhenMinimized,
                 ms = Ms,
             });
+
+            if (options.Scenario == "markers")
+            {
+                _ = MarkersAsync(shell);
+            }
+        }
+
+        /// <summary>
+        /// Reports the secret's clear, then copies a run command plainly once the script has read the
+        /// cleared clipboard, which it says by writing the quit file's <c>.plain</c> sibling.
+        /// </summary>
+        private async Task MarkersAsync(ShellViewModel shell)
+        {
+            while (shell.Clipboard.IsCounting)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(250)).ConfigureAwait(true);
+            }
+
+            Emit(new { @event = "cleared", failure = shell.Clipboard.Failure, ms = Ms });
+
+            while (!File.Exists(options.QuitFile + ".plain"))
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(250)).ConfigureAwait(true);
+            }
+
+            await shell.Clipboard.CopyPlainAsync(_plainCopy, "run command").ConfigureAwait(true);
+            await shell.Clipboard.SettledAsync().ConfigureAwait(true);
+            Emit(new { @event = "plain", ms = Ms });
         }
 
         private async Task<ShellViewModel?> UnlockAsync(MainWindow window, AppVaultSession session)
