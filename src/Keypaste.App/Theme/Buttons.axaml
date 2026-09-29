@@ -7,7 +7,9 @@
       ghost                         no fill until hovered: Deny, Cancel
       danger                        danger tint: Revoke, Delete
       icon                          a 30px square for an icon alone; add ghost for no fill
-      link                          text colour, no box: "New token"
+      link                          text colour, no box: "Choose…"
+      more                          the 30px ⋯ toggle that opens a menu
+      menu-item                     a row in a menu (Border.menu); add danger for Delete
       sm / lg                       28px / 34px tall instead of 30px
     Put a KpIcon and a TextBlock in a StackPanel (Orientation Horizontal, Spacing 6) for an icon
     button; the icon takes the button's foreground.
@@ -154,6 +156,41 @@
   <Style Selector="Button.link:disabled /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextDisabled}" />
+  </Style>
+
+  <!-- The ⋯ button, which stays #2A2C30 whether its menu is open or not. -->
+  <Style Selector="ToggleButton.more">
+    <Setter Property="Width" Value="30" />
+    <Setter Property="Height" Value="30" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="ToggleButton.more /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+  </Style>
+  <Style Selector="ToggleButton.more:pointerover /template/ ContentPresenter#PART_ContentPresenter,
+                   ToggleButton.more:checked /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource KpBgActiveHover}" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+  </Style>
+
+  <Style Selector="Button.menu-item">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="Height" Value="30" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Padding" Value="10,0" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="FontSize" Value="12.5" />
+    <Setter Property="FontWeight" Value="Normal" />
+  </Style>
+  <Style Selector="Button.menu-item.danger /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="Button.menu-item.danger:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource KpDangerTint}" />
   </Style>
 
 </Styles>

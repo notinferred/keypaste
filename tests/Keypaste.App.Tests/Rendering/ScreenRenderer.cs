@@ -213,10 +213,6 @@ public sealed class ScreenRenderer
 
         shell.Current = Destinations.Of(DestinationKind.AgentActivity);
         var agents = Assert.IsType<AgentActivityViewModel>(shell.Content);
-        var tokens = agents.Tokens!;
-        Assert.True(tokens.Create("ci-github-actions", "read:acme-api/staging/*", TimeSpan.FromDays(30), false).Ok);
-        Assert.True(tokens.Create("local-evals", "read:acme-api/dev/OPENAI_API_KEY", TimeSpan.FromDays(7), false).Ok);
-        agents.Refresh();
         Save(window, output!, "20-agents");
 
         window.Height = 1500;
@@ -229,22 +225,33 @@ public sealed class ScreenRenderer
         window.Height = 1500;
 
         agents.RevokeCommand.Execute(agents.Grants[0]);
+        agents.Clients.Single(card => card.Label == "claude-code").IsMenuOpen = true;
+        Save(window, output!, "27-agents-client-menu");
+
+        agents.Clients.Single(card => card.Label == "claude-code").IsMenuOpen = false;
+        agents.ToggleConnectCommand.Execute(null);
+        Save(window, output!, "24-agents-connect");
+
+        // Scoped tokens, under Settings › Advanced.
+        window.Height = _height;
+        shell.Current = Destinations.Of(DestinationKind.Tokens);
+        var tokens = Assert.IsType<ScopedTokensViewModel>(shell.Content);
+        Assert.True(tokens.Create("ci-github-actions", "read:acme-api/staging/*", TimeSpan.FromDays(30), false).Ok);
+        Assert.True(tokens.Create("local-evals", "read:acme-api/dev/OPENAI_API_KEY", TimeSpan.FromDays(7), false).Ok);
+        Save(window, output!, "22-settings-tokens");
+
         tokens.OpenFormCommand.Execute(null);
         tokens.Name = "deploy-preview";
         tokens.Scope = "read:acme-web/preview/*";
         tokens.Expiry = "7d";
-        Save(window, output!, "22-agents-new-token");
+        Save(window, output!, "22b-settings-tokens-new");
 
         tokens.CreateCommand.Execute(null);
-        Save(window, output!, "23-agents-token-minted");
+        Save(window, output!, "23-settings-tokens-minted");
 
         tokens.DoneMintedCommand.Execute(null);
         tokens.AskRevokeCommand.Execute(tokens.Rows[0]);
-        Save(window, output!, "26-agents-token-revoke");
-
-        tokens.CancelRevokeCommand.Execute(null);
-        agents.ToggleConnectCommand.Execute(null);
-        Save(window, output!, "24-agents-connect");
+        Save(window, output!, "26-settings-tokens-revoke");
 
         window.Close();
         authority.Session.Lock(VaultLockReason.Manual);
@@ -695,6 +702,9 @@ public sealed class ScreenRenderer
         shell.Current = Destinations.Of(DestinationKind.Settings);
         Save(window, output, "95-settings-whole");
         window.Height = _height;
+
+        shell.Current = Destinations.Of(DestinationKind.Diagnostics);
+        Save(window, output, "95b-settings-diagnostics");
 
         shell.Current = Destinations.Of(DestinationKind.Trash);
         var trash = (TrashViewModel)shell.Content!;

@@ -1,0 +1,42 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Keypaste.App.ViewModels"
+             x:Class="Keypaste.App.Views.DiagnosticsView"
+             x:DataType="vm:DiagnosticsViewModel">
+
+  <UserControl.Styles>
+    <Style Selector="TextBlock.fact">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+    </Style>
+    <Style Selector="SelectableTextBlock.fact-value">
+      <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
+    </Style>
+  </UserControl.Styles>
+
+  <ScrollViewer>
+    <StackPanel Margin="{DynamicResource KpScreenPadding}" Spacing="20" MaxWidth="760" HorizontalAlignment="Left">
+      <StackPanel Spacing="6">
+        <TextBlock Classes="h1" Text="Diagnostics" />
+        <TextBlock Classes="subtitle" Text="The vault, the folder and the version this app is using, for when something is not where you expected." />
+      </StackPanel>
+
+      <Border Classes="card filled" Padding="20,16">
+        <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="8">
+          <TextBlock Grid.Row="0" Grid.Column="0" Classes="fact" Text="Vault" />
+          <SelectableTextBlock Grid.Row="0" Grid.Column="1" Classes="fact-value" Text="{Binding VaultPath}" />
+          <TextBlock Grid.Row="1" Grid.Column="0" Classes="fact" Text="keypaste home" />
+          <SelectableTextBlock Grid.Row="1" Grid.Column="1" Classes="fact-value" Text="{Binding HomePath}" />
+          <TextBlock Grid.Row="2" Grid.Column="0" Classes="fact" Text="KEYPASTE_HOME" FontFamily="{DynamicResource KpMono}" />
+          <SelectableTextBlock Grid.Row="2" Grid.Column="1" Classes="fact-value" Text="{Binding HomeOverride}" />
+          <TextBlock Grid.Row="3" Grid.Column="0" Classes="fact" Text="Version" />
+          <SelectableTextBlock Grid.Row="3" Grid.Column="1" Classes="fact-value" Text="{Binding Version}" />
+        </Grid>
+      </Border>
+    </StackPanel>
+  </ScrollViewer>
+
+</UserControl>

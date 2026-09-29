@@ -742,6 +742,8 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             DestinationKind.EnvSets => new EnvSetsViewModel(_session, Clipboard, _picker, toast: ShowToast),
             DestinationKind.Trash => new TrashViewModel(_session),
             DestinationKind.Sharing => Sharing(),
+            DestinationKind.Tokens => new ScopedTokensViewModel(_session, Clipboard, ShowToast),
+            DestinationKind.Diagnostics => new DiagnosticsViewModel(_session, Home),
             _ => null,
         };
 
@@ -767,7 +769,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     }
 
     private AgentActivityViewModel Activity() =>
-        new(Authority, Home, _clock, _post, toast: ShowToast, clipboard: Clipboard, openHistory: () => Current = Destinations.Of(DestinationKind.AgentHistory));
+        new(Authority, Home, _clock, _post, toast: ShowToast, openHistory: () => Current = Destinations.Of(DestinationKind.AgentHistory));
 
     private void OnEntriesChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {

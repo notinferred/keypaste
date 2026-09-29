@@ -12,11 +12,13 @@ internal sealed class ClientCardRow : ObservableObject
 {
     private readonly Action<ClientCardRow, ClientPolicy>? _choose;
     private ClientPolicy _policy;
+    private bool _isMenuOpen;
 
     internal ClientCardRow(McpClientCard? card, ClientPolicy policy, DateTimeOffset now, Action<ClientCardRow, ClientPolicy>? choose)
     {
         _choose = choose;
         _policy = policy;
+        Choices = [.. Enum.GetValues<ClientPolicy>().Select(choice => new PolicyChoice(this, choice))];
 
         if (card is null)
         {
@@ -72,10 +74,6 @@ internal sealed class ClientCardRow : ObservableObject
 
     internal string Hint { get; }
 
-    /// <summary>The policy's words, as the select lists them: <see cref="ClientPolicies.Describe"/> up to its explanation.</summary>
-    internal static IReadOnlyList<string> PolicyOptions { get; } =
-        [.. Enum.GetValues<ClientPolicy>().Select(Words)];
-
     /// <summary>What the policy held means beyond its name, or empty.</summary>
     internal string Explanation => ClientPolicies.Describe(_policy) is var described && described.IndexOf(':', StringComparison.Ordinal) is var colon and >= 0
         ? described[(colon + 1)..].Trim() + "."
@@ -83,8 +81,24 @@ internal sealed class ClientCardRow : ObservableObject
 
     internal bool HasExplanation => Explanation.Length > 0;
 
-    /// <summary>The same words, for the card's own select.</summary>
-    internal IReadOnlyList<string> Options { get; } = PolicyOptions;
+    /// <summary>Each policy the card's ⋯ menu offers, the one it holds checked.</summary>
+    internal IReadOnlyList<PolicyChoice> Choices { get; }
+
+    /// <summary>Whether the card's ⋯ menu is open.</summary>
+    internal bool IsMenuOpen
+    {
+        get => _isMenuOpen;
+        set
+        {
+            if (Set(ref _isMenuOpen, value))
+            {
+                Raise(nameof(MenuLayer));
+            }
+        }
+    }
+
+    /// <summary>Lifts the card while its menu is open, so the menu draws over the cards after it.</summary>
+    internal int MenuLayer => _isMenuOpen ? 1 : 0;
 
     /// <summary>The policy it is held to; choosing another writes <c>clients.toml</c>.</summary>
     internal ClientPolicy Policy
@@ -99,19 +113,8 @@ internal sealed class ClientCardRow : ObservableObject
         }
     }
 
-    /// <summary>The policy's words, for a select bound to <see cref="PolicyOptions"/>.</summary>
-    internal string PolicyText
-    {
-        get => Words(_policy);
-        set
-        {
-            if (Enum.GetValues<ClientPolicy>().FirstOrDefault(policy => Words(policy) == value) is var chosen
-                && Words(chosen) == value)
-            {
-                Policy = chosen;
-            }
-        }
-    }
+    /// <summary>The words of the policy it is held to: <see cref="ClientPolicies.Describe"/> up to its explanation.</summary>
+    internal string PolicyText => Words(_policy);
 
     /// <summary>Shows the policy the file now holds.</summary>
     internal void Held(ClientPolicy policy)
@@ -124,7 +127,7 @@ internal sealed class ClientCardRow : ObservableObject
         }
     }
 
-    private static string Words(ClientPolicy policy) => ClientPolicies.Describe(policy).Split(':')[0];
+    internal static string Words(ClientPolicy policy) => ClientPolicies.Describe(policy).Split(':')[0];
 
     /// <summary>Two lower-case letters: the first of two words, or the first two of one (<c>cursor</c> is <c>cu</c>).</summary>
     private static string InitialsOf(string title)
@@ -135,7 +138,13 @@ internal sealed class ClientCardRow : ObservableObject
     }
 }
 
-/// <summary>A policy a person chose for one client card.</summary>
+/// <summary>A policy offered for, or chosen on, one client card.</summary>
 /// <param name="Row">The card.</param>
 /// <param name="Policy">The policy.</param>
-internal sealed record PolicyChoice(ClientCardRow Row, ClientPolicy Policy);
+internal sealed record PolicyChoice(ClientCardRow Row, ClientPolicy Policy)
+{
+    internal string Words => ClientCardRow.Words(Policy);
+
+    /// <summary>Whether the card is held to it, which its menu checks.</summary>
+    internal bool IsHeld => Row.Policy == Policy;
+}

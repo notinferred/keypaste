@@ -14,19 +14,12 @@ namespace Keypaste.App.ViewModels;
 internal sealed record IdleChoice(int Seconds, string Label);
 
 /// <summary>
-/// Settings, and the facts a person needs when something is not where they expected.
+/// Settings, with Advanced's way to the screens the everyday ones leave out.
 /// </summary>
 /// <remarks>
-/// <para>
 /// Every change is written immediately and applied immediately — there is no Save button and no way
 /// to leave the screen with a setting that looks changed but is not. Shortening the idle timeout
 /// re-arms the session on the spot rather than at the next lock.
-/// </para>
-/// <para>
-/// <b>The facts block is the cheapest support tool this project will ever build.</b> Nearly every
-/// "it can't find my vault" is answered by showing which paths are actually in use and whether an
-/// environment variable is overriding them.
-/// </para>
 /// </remarks>
 internal sealed class SettingsViewModel : ObservableObject, IDisposable
 {
@@ -77,6 +70,8 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
         Recommendations = recommendations;
         OpenActivityLogCommand = new RelayCommand(() => open?.Invoke(DestinationKind.Log), () => open is not null);
         OpenShareLinksCommand = new RelayCommand(() => open?.Invoke(DestinationKind.Sharing), () => open is not null);
+        OpenScopedTokensCommand = new RelayCommand(() => open?.Invoke(DestinationKind.Tokens), () => open is not null);
+        OpenDiagnosticsCommand = new RelayCommand(() => open?.Invoke(DestinationKind.Diagnostics), () => open is not null);
         ShareLinksNote = ShareLinksNoteOf(session);
     }
 
@@ -85,6 +80,12 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
 
     /// <summary>Settings › Advanced: the share links made from this vault.</summary>
     internal RelayCommand OpenShareLinksCommand { get; }
+
+    /// <summary>Settings › Advanced: the vault's scoped tokens, minting and revoking one.</summary>
+    internal RelayCommand OpenScopedTokensCommand { get; }
+
+    /// <summary>Settings › Advanced: the paths and version this app is using.</summary>
+    internal RelayCommand OpenDiagnosticsCommand { get; }
 
     /// <summary>How many of this vault's links may still open, from their recorded expiry only.</summary>
     internal string ShareLinksNote { get; }
@@ -250,20 +251,6 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
         "Copies beside the vault do not survive losing the disk or the folder. Export an encrypted copy " +
         "and keep it on another disk. It opens with this vault's master password.";
 #pragma warning restore CA1822
-
-    /// <summary>The vault that is open.</summary>
-    internal string VaultPath => _session.VaultPath ?? "none";
-
-    /// <summary>Where the machine-local files live.</summary>
-    internal string HomePath => KeypasteHome.Resolve(_home);
-
-    /// <summary>Whether <c>KEYPASTE_HOME</c> is overriding that.</summary>
-    internal string HomeOverride =>
-        string.IsNullOrEmpty(_home) ? "not set" : _home;
-
-    /// <summary>The app's version, for a bug report.</summary>
-    internal static string Version =>
-        typeof(SettingsViewModel).Assembly.GetName().Version?.ToString() ?? "unknown";
 
     /// <summary>Confirmation of the last thing that happened, or nothing.</summary>
     internal string Message

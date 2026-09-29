@@ -1,11 +1,9 @@
-using System.Reflection;
 using System.Text;
 using Avalonia.Automation;
 using Avalonia.Automation.Peers;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Controls.Primitives;
-using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.VisualTree;
 using Keypaste.App.Controls;
@@ -18,6 +16,7 @@ using Keypaste.Core.Audit;
 using Keypaste.Core.Internal;
 using Keypaste.Core.Ipc;
 using Xunit;
+using static Keypaste.App.Tests.Session.JourneyDriver;
 
 namespace Keypaste.App.Tests.Session;
 
@@ -48,13 +47,6 @@ public sealed class FourPlacesJourneyTests
     /// <summary>The bridge's client label, which History names the agent by.</summary>
     private const string _label = "four-places";
     private const string _sourcePassword = "foreign-source-password";
-
-    private static readonly TimeSpan _wait = TimeSpan.FromSeconds(15);
-
-    private static readonly RawInputModifiers _command =
-        OperatingSystem.IsMacOS() ? RawInputModifiers.Meta : RawInputModifiers.Control;
-
-    private static CancellationToken Token => TestContext.Current.CancellationToken;
 
     [Fact]
     public Task Every_act_is_reached_from_the_four_places() =>
@@ -160,7 +152,7 @@ public sealed class FourPlacesJourneyTests
             var prompt = lifetime.Windows.OfType<ApprovalWindow>().Single(window => window.IsVisible);
             await Until(() => prompt.FindControl<Button>("Approve")!.IsEffectivelyEnabled);
             DesktopApprovalTests.Click(prompt, "Approve");
-            var answered = await reply.WaitAsync(_wait, Token);
+            var answered = await reply.WaitAsync(Wait, Token);
             Assert.Equal(AuditDecision.Granted, answered!.Decision);
 
             Record(vault, session);
@@ -264,58 +256,12 @@ public sealed class FourPlacesJourneyTests
         }
     }
 
-    private static T Named<T>(Window window, string name)
-        where T : Control =>
-        window.GetVisualDescendants().OfType<T>().Single(control => control.Name == name && control.IsEffectivelyVisible);
-
-    private static ListBoxItem Row(Window window, string list, Func<object?, bool> which) =>
-        Named<ListBox>(window, list).GetVisualDescendants().OfType<ListBoxItem>().Single(item => which(item.DataContext));
-
-    private static void Press(Window window, Control control)
-    {
-        WindowInput.Reveal(window, control);
-        WindowInput.Press(window, control);
-        WindowInput.Release(window, control);
-        WindowInput.Drain();
-    }
-
-    private static void Chord(Window window, PhysicalKey key) => Key(window, key, _command);
-
-    private static void Key(Window window, PhysicalKey key, RawInputModifiers modifiers)
-    {
-        window.KeyPressQwerty(key, modifiers);
-        window.KeyReleaseQwerty(key, modifiers);
-        WindowInput.Drain();
-    }
-
-    private static void Attach(ClassicDesktopStyleApplicationLifetime lifetime)
-    {
-        var subscribe = typeof(ClassicDesktopStyleApplicationLifetime).GetMethod(
-            "SubscribeGlobalEvents",
-            BindingFlags.Instance | BindingFlags.NonPublic);
-
-        Assert.True(subscribe is not null, "Avalonia no longer has SubscribeGlobalEvents; attach the lifetime another way");
-        subscribe.Invoke(lifetime, null);
-    }
-
     private static async Task<ApproverClient> ConnectAsync(AppAuthority authority, string vault)
     {
         var endpoint = Assert.IsType<AuthorityStatus.Serving>(authority.Status).Endpoint;
-        var client = await ApproverClient.TryConnectAsync(endpoint, _wait, Token);
+        var client = await ApproverClient.TryConnectAsync(endpoint, Wait, Token);
         Assert.NotNull(client);
         Assert.True((await client.AttachAsync(new AttachRequest(vault) { Client = new AttachClient(_client, "1.0", _label) }, Token))!.Attached);
         return client;
-    }
-
-    private static async Task Until(Func<bool> condition, Func<string>? state = null)
-    {
-        var deadline = DateTime.UtcNow + _wait;
-
-        while (!condition())
-        {
-            Assert.True(DateTime.UtcNow < deadline, $"the app never reached that state{(state is null ? string.Empty : ": " + state())}");
-            WindowInput.Drain();
-            await Task.Delay(20, Token);
-        }
     }
 }

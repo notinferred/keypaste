@@ -1,5 +1,4 @@
 using System.Globalization;
-using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
@@ -18,7 +17,7 @@ namespace Keypaste.App.ViewModels;
 /// </para>
 /// <para>
 /// <b>History is read from the audit file <c>keypaste-mcp</c> wrote</b>, kept to the records naming
-/// this session and rendered by <see cref="AuditText"/> as the Activity screen reads the whole file
+/// this session and rendered by <see cref="AuditText"/> as the activity log reads the whole file
 /// (D-0331). A log that is missing or unreadable is said to be unavailable, never shown as a
 /// session in which nothing happened.
 /// </para>
@@ -63,25 +62,12 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
         Action<Action>? post = null,
         ClientConnector? connector = null,
         Action<string>? toast = null,
-        ClipboardCountdown? clipboard = null,
         Action? openHistory = null)
     {
         _authority = authority;
         OpenHistoryCommand = new RelayCommand(() => openHistory?.Invoke(), () => openHistory is not null);
         _toast = toast ?? (_ => { });
         Connect = authority is null ? null : new ConnectClientViewModel(authority.Session, connector ?? ClientConnector.ForThisProcess());
-        Tokens = authority is null ? null : new ScopedTokensViewModel(authority.Session, clipboard, _toast);
-
-        if (Tokens is not null)
-        {
-            Tokens.PropertyChanged += (_, e) =>
-            {
-                if (e.PropertyName is nameof(ScopedTokensViewModel.IsFormOpen) or nameof(ScopedTokensViewModel.HasMinted))
-                {
-                    Raise(nameof(ConnectIsPrimary));
-                }
-            };
-        }
         ToggleConnectCommand = new RelayCommand(() => IsConnectOpen = !IsConnectOpen, () => Connect is not null);
         OffersHistory = openHistory is not null;
         _auditPath = KeypasteHome.AuditPath(home);
@@ -109,10 +95,7 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
     /// <summary>The MCP clients of this vault, with the policy each is held to; the <c>*</c> card last.</summary>
     internal IReadOnlyList<ClientCardRow> Clients => _clients;
 
-    /// <summary>The words each policy is chosen by.</summary>
-    internal static IReadOnlyList<string> PolicyOptions => ClientCardRow.PolicyOptions;
-
-    /// <summary>Gives a client a policy, writing <c>clients.toml</c>.</summary>
+    /// <summary>Gives a client the policy chosen from its card's ⋯ menu, writing <c>clients.toml</c>.</summary>
     internal RelayCommand<PolicyChoice> SetPolicyCommand { get; }
 
     /// <summary>Replaces a clients file that cannot be read with an empty one.</summary>
@@ -152,10 +135,9 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
 
     /// <summary>
     /// Whether Connect client is the screen's primary action: not while a request waits, whose
-    /// countdown is the live signal, nor while a form here shows its own primary (D-0375).
+    /// countdown is the live signal, nor while the connect form shows its own primary (D-0375).
     /// </summary>
-    internal bool ConnectIsPrimary =>
-        Connect is not null && !HasWaiting && !_isConnectOpen && Tokens is not { IsFormOpen: true } and not { HasMinted: true };
+    internal bool ConnectIsPrimary => Connect is not null && !HasWaiting && !_isConnectOpen;
 
     /// <summary>Whether a form's own action may be primary: not while a request waits.</summary>
     internal bool FormsArePrimary => !HasWaiting;
@@ -166,9 +148,6 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
     internal RelayCommand OpenHistoryCommand { get; }
 
     internal bool OffersHistory { get; }
-
-    /// <summary>The vault's scoped tokens, minting one and revoking one.</summary>
-    internal ScopedTokensViewModel? Tokens { get; }
 
     /// <summary>One true sentence about what agents can do with this vault.</summary>
     internal string Status
@@ -448,7 +427,7 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
             entry => string.Equals(entry.Session, session, StringComparison.Ordinal),
             ["this session"]);
 
-        // No log yet is the first run before any agent asked, as the Activity screen reads it too.
+        // No log yet is the first run before any agent asked, as the activity log reads it too.
         if (history.Kind == AuditReadKind.Missing || (history.Kind == AuditReadKind.Intact && history.Entries.Count == 0))
         {
             Show([], "The audit log has no records from this session yet.");
@@ -459,7 +438,7 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
         {
             AuditReadKind.Unreadable => $"History unavailable: the audit log couldn't be read: {history.Error}",
             AuditReadKind.Unchecked => "History unavailable: the audit log couldn't be checked, so nothing from it is shown here.",
-            AuditReadKind.Broken => "This log has been edited since keypaste wrote it. Verify chain on the Activity screen says where.",
+            AuditReadKind.Broken => "This log has been edited since keypaste wrote it. The activity log in Settings › Advanced says where.",
             _ => string.Empty,
         });
     }
@@ -506,6 +485,5 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
         _disposed = true;
         _timer.Dispose();
         Connect?.Dispose();
-        Tokens?.Dispose();
     }
 }

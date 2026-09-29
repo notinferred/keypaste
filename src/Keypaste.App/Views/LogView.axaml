@@ -27,7 +27,7 @@
                       VerticalAlignment="Bottom">
             <Button Classes="ghost sm"
                     Name="VerifyChain"
-                    IsVisible="{Binding HasTable}"
+                    IsVisible="{Binding OffersVerify}"
                     Content="{Binding VerifyLabel}"
                     Command="{Binding VerifyCommand}" />
             <Button Classes="icon ghost sm"
@@ -338,7 +338,7 @@
               <TextBlock FontSize="12"
                          VerticalAlignment="Center"
                          Foreground="{DynamicResource KpTextSecondary}"
-                         Text="The hash chain does not vouch for rows marked like this. Verify chain says why." />
+                         Text="{Binding UnverifiedLegend}" />
             </StackPanel>
             <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasUnreadNote}">
               <ctl:KpIcon Icon="alert-triangle" Size="12" VerticalAlignment="Center" Foreground="{DynamicResource KpTextSecondary}" />

@@ -226,6 +226,11 @@
             </Grid>
           </Border>
           <ItemsControl Name="ClientCards" ItemsSource="{Binding Clients}">
+            <ItemsControl.Styles>
+              <Style Selector="ItemsControl#ClientCards > ContentPresenter" x:DataType="vm:ClientCardRow">
+                <Setter Property="ZIndex" Value="{Binding MenuLayer}" />
+              </Style>
+            </ItemsControl.Styles>
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>
                 <ctl:AutoFillPanel MinColumnWidth="240" Spacing="12" />
@@ -235,7 +240,7 @@
               <DataTemplate x:DataType="vm:ClientCardRow">
                 <Border Classes="card filled">
                   <StackPanel Spacing="14">
-                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                    <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="10">
                       <Border Classes="tile">
                         <TextBlock Text="{Binding Initials}" HorizontalAlignment="Center" VerticalAlignment="Center"
                                    FontFamily="{DynamicResource KpMono}" FontSize="12" Foreground="{DynamicResource KpTextPrimary}" />
@@ -252,15 +257,46 @@
                         <TextBlock Text="{Binding Status}" FontSize="11.5" FontWeight="Medium"
                                    Classes.ok="{Binding IsConnected}" Classes.muted="{Binding !IsConnected}" />
                       </StackPanel>
+                      <ToggleButton Grid.Column="3"
+                                    Name="ClientMenu"
+                                    Classes="more"
+                                    IsChecked="{Binding IsMenuOpen}"
+                                    IsEnabled="{Binding CanSetPolicy}"
+                                    ToolTip.Tip="Change the policy"
+                                    AutomationProperties.Name="{Binding Title, StringFormat='Policy for {0}'}">
+                        <ctl:KpIcon Icon="ellipsis" Size="14" />
+                      </ToggleButton>
                     </Grid>
-                    <StackPanel Spacing="6">
+
+                    <!-- A canvas takes no room, so the open menu lies over what is below it, the card's own policy included. -->
+                    <Canvas Height="0" Margin="0,-8,0,-6" ZIndex="1">
+                      <Border Name="ClientMenuPanel"
+                              Classes="menu"
+                              Canvas.Right="0"
+                              Canvas.Top="0"
+                              MinWidth="230"
+                              IsVisible="{Binding IsMenuOpen}">
+                        <ItemsControl ItemsSource="{Binding Choices}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:PolicyChoice">
+                              <Button Classes="ghost menu-item"
+                                      Command="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).SetPolicyCommand}"
+                                      CommandParameter="{Binding}"
+                                      AutomationProperties.Name="{Binding Words}">
+                                <Grid ColumnDefinitions="16,*" ColumnSpacing="8">
+                                  <ctl:KpIcon Icon="check" Size="14" IsVisible="{Binding IsHeld}" Foreground="{DynamicResource KpTextPrimary}" />
+                                  <TextBlock Grid.Column="1" Text="{Binding Words}" VerticalAlignment="Center" />
+                                </Grid>
+                              </Button>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </Border>
+                    </Canvas>
+                    <!-- The choice is made from the card's ⋯ menu; the card says which one holds. -->
+                    <StackPanel Spacing="4">
                       <TextBlock Classes="th" Text="POLICY" />
-                      <ComboBox ItemsSource="{Binding Options}"
-                                SelectedItem="{Binding PolicyText}"
-                                IsEnabled="{Binding CanSetPolicy}"
-                                HorizontalAlignment="Stretch"
-                                Height="32"
-                                AutomationProperties.Name="Policy" />
+                      <TextBlock Name="PolicyHeld" Text="{Binding PolicyText}" FontSize="13" Foreground="{DynamicResource KpTextPrimary}" />
                       <TextBlock Classes="caption" Text="{Binding Explanation}" FontSize="11.5" IsVisible="{Binding HasExplanation}" />
                       <TextBlock Classes="caption" Text="{Binding Hint}" FontSize="11.5"
                                  IsVisible="{Binding Hint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
@@ -273,140 +309,8 @@
           <TextBlock Classes="caption" Text="A client appears here once its bridge has asked for something." />
         </StackPanel>
 
-        <Panel IsVisible="{Binding Tokens, Converter={x:Static ObjectConverters.IsNotNull}}">
-          <StackPanel Spacing="10" DataContext="{Binding Tokens}" x:DataType="vm:ScopedTokensViewModel">
-            <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="8">
-              <ctl:KpIcon Icon="ticket" Size="15" Foreground="{DynamicResource KpTextMuted}" />
-              <TextBlock Grid.Column="1" Classes="section" Text="Scoped tokens" VerticalAlignment="Center" />
-              <Button Grid.Column="3" Classes="link" FontSize="12" Content="New token" Command="{Binding OpenFormCommand}"
-                      IsVisible="{Binding CanOpenForm}" />
-            </Grid>
-
-            <Border Classes="card filled" IsVisible="{Binding IsFormOpen}">
-              <StackPanel Spacing="14">
-                <Grid ColumnDefinitions="*,2*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="6">
-                  <TextBlock Classes="label" Text="Name" />
-                  <TextBlock Grid.Column="1" Classes="label" Text="Scope" />
-                  <TextBlock Grid.Column="2" Classes="label" Text="Expires" />
-                  <TextBox Grid.Row="1" Classes="mono" Text="{Binding Name}" PlaceholderText="ci-staging"
-                           AutomationProperties.Name="Token name" />
-                  <TextBox Grid.Row="1" Grid.Column="1" Classes="mono" Text="{Binding Scope}" PlaceholderText="read:acme-api/staging/*"
-                           AutomationProperties.Name="Token scope" />
-                  <Border Grid.Row="1" Grid.Column="2" Classes="segmented inset" VerticalAlignment="Center">
-                    <StackPanel Orientation="Horizontal">
-                      <RadioButton Classes="segment" GroupName="TokenExpiry" Content="7d"
-                                   IsChecked="{Binding Expiry, Mode=OneWay, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=7d}"
-                                   Command="{Binding SetExpiryCommand}" CommandParameter="7d" />
-                      <RadioButton Classes="segment" GroupName="TokenExpiry" Content="30d"
-                                   IsChecked="{Binding Expiry, Mode=OneWay, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=30d}"
-                                   Command="{Binding SetExpiryCommand}" CommandParameter="30d" />
-                      <RadioButton Classes="segment" GroupName="TokenExpiry" Content="90d"
-                                   IsChecked="{Binding Expiry, Mode=OneWay, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=90d}"
-                                   Command="{Binding SetExpiryCommand}" CommandParameter="90d" />
-                    </StackPanel>
-                  </Border>
-                </Grid>
-                <TextBlock Classes="caption"
-                           Text="read:project/profile/KEY, or * for the whole set; separate several with commas. A token only feeds keypaste run: it never prints a value." />
-                <TextBlock Classes="body danger" Text="{Binding FormError}" IsVisible="{Binding HasFormError}" />
-                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-                  <Button Classes="ghost" Content="Cancel" Command="{Binding CancelFormCommand}" />
-                  <Button Classes.primary="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).FormsArePrimary}" Content="Create token" Command="{Binding CreateCommand}" />
-                </StackPanel>
-              </StackPanel>
-            </Border>
-
-            <Border Classes="card" BorderBrush="{DynamicResource KpBorderStrong}" Background="{DynamicResource KpBgCard}"
-                    IsVisible="{Binding HasMinted}">
-              <StackPanel Spacing="12">
-                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-                  <ctl:KpIcon Icon="alert-triangle" Size="15" Foreground="{DynamicResource KpTextSecondary}" VerticalAlignment="Top" Margin="0,2,0,0" />
-                  <StackPanel Grid.Column="1" Spacing="4">
-                    <TextBlock Classes="body strong" Text="Copy this token now. It will not be shown again." />
-                    <TextBlock Classes="caption" Text="{Binding Minted.Note, FallbackValue=''}" />
-                  </StackPanel>
-                </Grid>
-                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-                  <Border Classes="field" Background="{DynamicResource KpBgApp}" BorderBrush="{DynamicResource KpBorderDefault}" MinHeight="40">
-                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                      <!-- Drawn, not a TextBlock: its peer contributes nothing to the automation tree. -->
-                      <ctl:RevealedValue Source="{Binding Minted}"
-                                         MaskedLength="24"
-                                         FontFamily="{DynamicResource KpMono}"
-                                         FontSize="14"
-                                         VerticalAlignment="Center"
-                                         ClipToBounds="True"
-                                         Cursor="Hand"
-                                         Foreground="{DynamicResource KpTextPrimary}" />
-                      <TextBlock Grid.Column="1" Classes="caption" Text="Hold to show" VerticalAlignment="Center" />
-                    </Grid>
-                  </Border>
-                  <Button Grid.Column="1" Classes.primary="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).FormsArePrimary}" Command="{Binding CopyMintedCommand}" VerticalAlignment="Center" AutomationProperties.Name="Copy token">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                      <ctl:KpIcon Icon="copy" Size="13" />
-                      <TextBlock Text="Copy" />
-                    </StackPanel>
-                  </Button>
-                  <Button Grid.Column="2" Content="Done" Command="{Binding DoneMintedCommand}" VerticalAlignment="Center" />
-                </Grid>
-              </StackPanel>
-            </Border>
-
-            <TextBlock Classes="body danger" Text="{Binding Message}" IsVisible="{Binding HasMessage}" />
-
-            <Border Classes="table">
-              <StackPanel>
-                <Border Classes="table-head">
-                  <Grid ColumnDefinitions="1.1*,1*,1.5*,0.8*,0.6*,72" ColumnSpacing="12">
-                    <TextBlock Classes="th" Text="NAME" />
-                    <TextBlock Grid.Column="1" Classes="th" Text="TOKEN" />
-                    <TextBlock Grid.Column="2" Classes="th" Text="SCOPE" />
-                    <TextBlock Grid.Column="3" Classes="th" Text="MODE" />
-                    <TextBlock Grid.Column="4" Classes="th" Text="EXPIRES" />
-                  </Grid>
-                </Border>
-                <Border Classes="table-row" Padding="16,12" IsVisible="{Binding HasNoRows}">
-                  <TextBlock Classes="caption" Text="No tokens yet. A token lets a script or CI job run with a scoped set, without you or the vault's password." />
-                </Border>
-                <ItemsControl ItemsSource="{Binding Rows}">
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:ScopedTokenRow">
-                      <Border Classes="table-row" Padding="16,12">
-                        <Panel>
-                          <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" IsVisible="{Binding IsConfirming}">
-                            <TextBlock Text="{Binding ConfirmText}" FontSize="12.5" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                            <Button Grid.Column="1" Classes="danger sm" FontSize="12" Content="Revoke" VerticalAlignment="Center"
-                                    Command="{Binding $parent[ItemsControl].((vm:ScopedTokensViewModel)DataContext).RevokeCommand}"
-                                    CommandParameter="{Binding}" />
-                            <Button Grid.Column="2" Classes="ghost sm" FontSize="12" Content="Cancel" VerticalAlignment="Center"
-                                    Command="{Binding $parent[ItemsControl].((vm:ScopedTokensViewModel)DataContext).CancelRevokeCommand}" />
-                          </Grid>
-                          <Grid ColumnDefinitions="1.1*,1*,1.5*,0.8*,0.6*,72" ColumnSpacing="12" IsVisible="{Binding !IsConfirming}">
-                            <TextBlock Text="{Binding Name}" FontSize="12.5" FontWeight="Medium" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="1" Classes="mono secondary" FontSize="12" Text="{Binding Prefix}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="2" Classes="mono secondary" FontSize="12" Text="{Binding Scope}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
-                                       ToolTip.Tip="{Binding Scope}" />
-                            <Border Grid.Column="3" Classes="chip outline">
-                              <TextBlock Text="{Binding Mode}" />
-                            </Border>
-                            <TextBlock Grid.Column="4" FontSize="12.5" Text="{Binding Expires}" VerticalAlignment="Center"
-                                       Classes.muted="{Binding !IsExpired}" Classes.danger="{Binding IsExpired}" />
-                            <Button Grid.Column="5" Classes="danger sm" FontSize="12" Content="Revoke" HorizontalAlignment="Right" VerticalAlignment="Center"
-                                    Command="{Binding $parent[ItemsControl].((vm:ScopedTokensViewModel)DataContext).AskRevokeCommand}"
-                                    CommandParameter="{Binding}" />
-                          </Grid>
-                        </Panel>
-                      </Border>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-              </StackPanel>
-            </Border>
-          </StackPanel>
-        </Panel>
-
-        <!-- This session's audit records as `keypaste log` renders them (D-0331); the Activity screen
-             has the whole file. -->
+        <!-- This session's audit records as `keypaste log` renders them (D-0331); the activity log in
+             Settings › Advanced has the whole file. -->
         <StackPanel Spacing="10">
           <StackPanel Orientation="Horizontal" Spacing="8">
             <ctl:KpIcon Icon="history" Size="15" Foreground="{DynamicResource KpTextMuted}" />

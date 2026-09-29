@@ -26,6 +26,12 @@ internal enum DestinationKind
 
     /// <summary>What agents and tokens asked for, under Agents.</summary>
     AgentHistory = 7,
+
+    /// <summary>The vault's scoped tokens, minting and revoking one, under Settings › Advanced.</summary>
+    Tokens = 8,
+
+    /// <summary>The paths and version this app uses, under Settings › Advanced.</summary>
+    Diagnostics = 9,
 }
 
 /// <summary>Where a place sits in the sidebar.</summary>
@@ -82,6 +88,8 @@ internal static class Destinations
         new(DestinationKind.AgentHistory, "History", "history", OwnsHeader: true, Parent: DestinationKind.AgentActivity),
         new(DestinationKind.Log, "Activity log", "activity", OwnsHeader: true, Parent: DestinationKind.Settings),
         new(DestinationKind.Sharing, "Share links", "link", OwnsHeader: true, Parent: DestinationKind.Settings),
+        new(DestinationKind.Tokens, "Scoped tokens", "ticket", OwnsHeader: true, Parent: DestinationKind.Settings),
+        new(DestinationKind.Diagnostics, "Diagnostics", "bug", OwnsHeader: true, Parent: DestinationKind.Settings),
     ];
 
     /// <summary>The four places, in the order the sidebar reads and the digits count.</summary>

@@ -105,7 +105,7 @@ Allow once releases that one field and keeps nothing. Allow for 1 hour also lets
 
 The app does not read `policy.toml`: every credential it releases needs a press of Allow once or Allow for 1 hour, or a grant one of them kept. A run under a scoped token is released without a prompt unless its profile is protected ([T-32](../THREATS.md#t-32--a-scoped-token-is-a-bearer-credential)).
 
-The Agents screen lists the request in front of you and the grants in force, each with the client, its label, the entry, the field and the seconds left, and counts them down. Revoke ends one grant and Revoke all ends every one, so the next request for them opens the prompt again; a revoke is not recorded in the audit log. Below the lists is this session's history: the audit records naming the app's current session, as `keypaste log` prints them. It says when the log is missing, cannot be read or has no records from this session yet rather than showing an empty history, and the Activity screen shows the whole file.
+The Agents screen lists the request in front of you and the grants in force, each with the client, its label, the entry, the field and the seconds left, and counts them down. Revoke ends one grant and Revoke all ends every one, so the next request for them opens the prompt again; a revoke is not recorded in the audit log. Below the lists is this session's history: the audit records naming the app's current session, as `keypaste log` prints them. It says when the log is missing, cannot be read or has no records from this session yet rather than showing an empty history, and the activity log in Settings › Advanced shows the whole file.
 
 ## Runs that ask for a project's variables
 

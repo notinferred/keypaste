@@ -77,8 +77,8 @@ internal sealed class LogViewModel : ObservableObject
         IsAgentHistory = agentsOnly;
 
         RefreshCommand = new RelayCommand(Refresh);
-        VerifyCommand = new RelayCommand(ToggleVerdict, () => _verdict is not null);
-        CopyHashCommand = new RelayCommand(() => _ = CopyHashAsync(), () => _clipboard is not null && _verdict is { HasHash: true });
+        VerifyCommand = new RelayCommand(ToggleVerdict, () => OffersChainCheck && _verdict is not null);
+        CopyHashCommand = new RelayCommand(() => _ = CopyHashAsync(), () => OffersChainCheck && _clipboard is not null && _verdict is { HasHash: true });
 
         Refresh();
     }
@@ -87,6 +87,23 @@ internal sealed class LogViewModel : ObservableObject
     internal bool IsAgentHistory { get; }
 
     internal bool ShowsFilters => !IsAgentHistory;
+
+    /// <summary>
+    /// Whether the hash check, Verify chain and Copy hash, is offered: on the activity log only.
+    /// History still marks a row the chain does not vouch for, and points at the log to say why.
+    /// </summary>
+    internal bool OffersChainCheck => !IsAgentHistory;
+
+    /// <summary>Whether Verify chain is drawn: a table was read, and this screen offers the check.</summary>
+    internal bool OffersVerify => OffersChainCheck && HasTable;
+
+    /// <summary>Where a person is sent to learn why a row or the file is not vouched for.</summary>
+    private string ChainSays(string what) => OffersChainCheck
+        ? $"Verify chain says {what}."
+        : $"The activity log in Settings › Advanced says {what}.";
+
+    /// <summary>The legend for a row the hash chain does not vouch for.</summary>
+    internal string UnverifiedLegend => $"The hash chain does not vouch for rows marked like this. {ChainSays("why")}";
 
     internal string Title => IsAgentHistory ? "History" : "Activity log";
 
@@ -177,8 +194,8 @@ internal sealed class LogViewModel : ObservableObject
     internal string UnreadableNote => _history.Unreadable switch
     {
         0 => string.Empty,
-        1 => "1 line of this log could not be read as a record. Verify chain says why.",
-        var n => string.Create(CultureInfo.InvariantCulture, $"{n} lines of this log could not be read as records. Verify chain says why."),
+        1 => $"1 line of this log could not be read as a record. {ChainSays("why")}",
+        var n => string.Create(CultureInfo.InvariantCulture, $"{n} lines of this log could not be read as records. {ChainSays("why")}"),
     };
 
     internal bool HasUnreadableNote => HasTable && _history.Unreadable > 0;
@@ -225,13 +242,14 @@ internal sealed class LogViewModel : ObservableObject
             AuditReadKind.Missing => NothingYet,
             AuditReadKind.Unreadable => $"That log couldn't be read: {_history.Error}",
             AuditReadKind.Unchecked => "That log couldn't be checked, so nothing from it is shown here.",
-            AuditReadKind.Broken => "This log has been edited since keypaste wrote it. Verify chain says where.",
+            AuditReadKind.Broken => $"This log has been edited since keypaste wrote it. {ChainSays("where")}",
             _ => string.Empty,
         };
 
         _all = [.. _history.Entries.Reverse().Select(entry => LogRow.From(entry, !_history.Unverified.Contains(entry.Line), _clock))];
 
         Raise(nameof(HasTable));
+        Raise(nameof(OffersVerify));
         Raise(nameof(Verdict));
         Raise(nameof(VerdictShown));
         Raise(nameof(VerifyLabel));

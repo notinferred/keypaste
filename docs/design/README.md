@@ -55,7 +55,7 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
   - Four places (D-0374), one list read top to bottom: Items, with a chevron that folds the vault's group tree beneath it (D-0376: rows 28h, 13/400, folder icon 14px, 14px indent a level, a 16px chevron on a group with groups inside it); a PROJECTS heading (table-heading style, not selectable) over each env project's row (indented, mono 12, with count); then Agents; Trash and Settings quieter at the foot. `Ctrl/Cmd+1`–`4` in that order; Left and Right fold the chosen row.
   - Nav rows: 34h, radius 7, 13.5/500. Icon 16px is muted, or the text colour when active; active bg `#2A2C30`. Count on the right is mono 11, muted. Agents also carries a 6px dot, green while the app is answering agents.
   - No Import row and no MCP server card: import is in Items' "+" menu, and what the card said is the Agents row's tooltip.
-- **Back**: a screen under a place (a project's Env profiles, Agents › History, Settings › Advanced's activity log and share links) has a ghost "‹ <place>" button above its title.
+- **Back**: a screen under a place (a project's Env profiles, Agents › History, and Settings › Advanced's activity log, share links, scoped tokens and diagnostics) has a ghost "‹ <place>" button above its title.
 
 **1. Items**, as KeePassXC's main window (D-0376): the list header, then the table over the chosen item's preview, split 2:3 by a draggable 1px line (the table at least 100px tall, the preview 140px). A new item, an edit or a comparison of two revisions takes the whole area below the header.
 - List header: the group or project path (mono 13), profile badge "dev" (20h, `#24262A`, radius 4, mono 11), Rename group (a 14px folder-pen icon) while a group is chosen, and a "New" button (28h), amber unless a form in the view shows its own primary, that opens a menu: New item, New group, New project, Import .env, Import .kdbx. No filter field: the titlebar search is the only one.
@@ -73,11 +73,10 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
 **2. Agents**: padding 28/32, max-width 1080.
 - **Active grants** table: agent (13.5/600), secrets · scope (mono 12), time left (mono 11 secondary) over a 3px muted progress bar, and "Revoke" (danger-tint button). Revoke removes the row and shows a toast.
 - **MCP clients** cards (auto-fill, min 240; `#18191C`; radius 10):
-  - 32px initials tile, name and client, status dot.
-  - POLICY select with three options: "Ask every time", "Session grants up to 1h", "Inject only".
-- **Scoped tokens** table with columns NAME, TOKEN, SCOPE, MODE (outlined chip), EXPIRES. "New token" link.
+  - 32px initials tile, name and client, status dot, and a 30px ⋯ toggle.
+  - POLICY, the policy held, as text. The ⋯ menu offers "Session grants up to 1h", "Ask every time" and "Inject only", the held one checked in the text colour; it is disabled for a client with no label.
 
-**3. Activity log** (Settings › Advanced; Agents › History is the same table held to Agents, with no filter)
+**3. Activity log** (Settings › Advanced; Agents › History is the same table held to Agents, with no filter and no Verify chain)
 - Segmented filter: All / Agents / You / Denied.
 - Table columns `64 | 110 | 100 | 1.6fr | 1fr | 100`, min-width 680, scrolls horizontally: TIME (mono muted), ACTOR, ACTION, SECRETS (mono), WHERE (mono muted), RESULT (colored dot + label: Granted / Approved 1h = ok, Denied = danger, Token = info, Expired / Link = muted).
 - Subtitle: "Every agent request, grant, token run and share. Kept on this machine, hash-chained, append-only."
@@ -88,6 +87,10 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
 - Below it, two panels:
   - `.env.keypaste` preview (terminal style) with a dev/staging/prod segmented toggle that rewrites the references.
   - "Run with this profile" card showing the command `keypaste run -p <profile> -- npm start` plus explanatory copy.
+
+**Scoped tokens** (Settings › Advanced): a table with columns NAME, TOKEN, SCOPE, MODE (outlined chip), EXPIRES. "New token" is the screen's primary, and the form's Create token, then the minted token's Copy, take its place while shown.
+
+**Diagnostics** (Settings › Advanced): the vault, keypaste's home, `KEYPASTE_HOME` and the version, labels muted 12, values mono 12.
 
 **5. Sharing**: Settings › Advanced › Share links is the share list (what, recipient · rule, status dot). The "New share link" form is the Share… dialog an item's ⋯ menu opens:
 - What (the item, fixed) and Recipient.

@@ -43,6 +43,14 @@
       <views:SharingView />
     </DataTemplate>
 
+    <DataTemplate DataType="vm:ScopedTokensViewModel">
+      <views:ScopedTokensView />
+    </DataTemplate>
+
+    <DataTemplate DataType="vm:DiagnosticsViewModel">
+      <views:DiagnosticsView />
+    </DataTemplate>
+
   </UserControl.DataTemplates>
 
   <UserControl.Styles>

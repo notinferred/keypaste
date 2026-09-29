@@ -197,4 +197,14 @@
     <Setter Property="Background" Value="{DynamicResource KpBorderSubtle}" />
   </Style>
 
+  <!-- A menu a ⋯ or + toggle opens, laid over what is below it. -->
+  <Style Selector="Border.menu">
+    <Setter Property="Background" Value="{DynamicResource KpBgCard}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KpBorderStrong}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusCard}" />
+    <Setter Property="BoxShadow" Value="{StaticResource KpShadowPopover}" />
+    <Setter Property="Padding" Value="4" />
+  </Style>
+
 </Styles>

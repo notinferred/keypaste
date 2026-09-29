@@ -32,7 +32,8 @@ public sealed class AgentClientsTests
         Assert.Equal(("claude-code", "cc", "Connected", "Claude Code · MCP stdio"), (connected.Title, connected.Initials, connected.Status, connected.Detail));
         Assert.Equal("Session grants up to 1h", connected.PolicyText);
         Assert.Equal(("cursor", "cu", "Idle"), (model.Clients[1].Title, model.Clients[1].Initials, model.Clients[1].Status));
-        Assert.Equal(3, AgentActivityViewModel.PolicyOptions.Count);
+        Assert.Equal(["Session grants up to 1h", "Ask every time", "Inject only"], connected.Choices.Select(choice => choice.Words));
+        Assert.Equal([ClientPolicy.SessionGrants], connected.Choices.Where(choice => choice.IsHeld).Select(choice => choice.Policy));
     }
 
     [Fact]
@@ -46,7 +47,7 @@ public sealed class AgentClientsTests
         using var model = app.Model();
         var card = model.Clients.Single(row => row.Label == "ci-probe");
 
-        card.PolicyText = ClientPolicies.Describe(ClientPolicy.AskEveryTime);
+        model.SetPolicyCommand.Execute(card.Choices.Single(choice => choice.Policy == ClientPolicy.AskEveryTime));
 
         Assert.True(ClientPolicies.TryLoad(app.ClientsPath, out var written, out _));
         Assert.Equal(ClientPolicy.AskEveryTime, written!.For("ci-probe"));
@@ -83,7 +84,7 @@ public sealed class AgentClientsTests
 
         Assert.False(card.CanSetPolicy);
 
-        card.PolicyText = ClientPolicies.Describe(ClientPolicy.AskEveryTime);
+        model.SetPolicyCommand.Execute(card.Choices.Single(choice => choice.Policy == ClientPolicy.AskEveryTime));
 
         Assert.False(File.Exists(app.ClientsPath));
     }

@@ -6,7 +6,7 @@ using Keypaste.Core.Tokens;
 
 namespace Keypaste.App.ViewModels;
 
-/// <summary>One scoped token as Agents › Scoped tokens lists it: never its secret or its verifier.</summary>
+/// <summary>One scoped token as Settings › Advanced › Scoped tokens lists it: never its secret or its verifier.</summary>
 /// <param name="Id">The token's id, which a revoke names.</param>
 /// <param name="Name">The name, scrubbed.</param>
 /// <param name="Prefix">The token's id as it is shown, <c>kpt_7d2e91c0…</c>.</param>
@@ -23,7 +23,7 @@ internal sealed record ScopedTokenRow(string Id, string Name, string Prefix, str
 }
 
 /// <summary>
-/// Agents › Scoped tokens: the tokens the session's vault holds, minting one and revoking one.
+/// Settings › Advanced › Scoped tokens: the tokens the session's vault holds, minting one and revoking one.
 /// </summary>
 /// <remarks>
 /// The desktop owns the vault while it is unlocked, so this is where tokens are made and revoked

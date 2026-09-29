@@ -148,6 +148,22 @@ public sealed class ShellViewModelTests : IDisposable
     }
 
     [Fact]
+    public void Settings_advanced_opens_the_scoped_tokens_and_diagnostics()
+    {
+        using var shell = Shell();
+        shell.GoTo(4);
+
+        Assert.IsType<SettingsViewModel>(shell.Content).OpenScopedTokensCommand.Execute(null);
+        Assert.IsType<ScopedTokensViewModel>(shell.Content);
+        Assert.Equal("Back to Settings", $"Back to {shell.BackTitle}");
+
+        shell.BackCommand.Execute(null);
+        Assert.IsType<SettingsViewModel>(shell.Content).OpenDiagnosticsCommand.Execute(null);
+        Assert.IsType<DiagnosticsViewModel>(shell.Content);
+        Assert.Equal("Diagnostics", shell.CurrentTitle);
+    }
+
+    [Fact]
     public void Agents_opens_its_history()
     {
         using var shell = Shell();

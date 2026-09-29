@@ -161,7 +161,7 @@ keypaste mcp policy '*' ask               # every client without a row of its ow
 keypaste mcp policy claude-code session
 ```
 
-The desktop's Agents screen sets the same file. Unlike this file's `"*"`, the `*` row there also covers a bridge started with no label, because it can only narrow; put the strict policy on `*`, since a label is whatever the client's configuration says and an agent that can edit that configuration can change it ([THREATS.md](../THREATS.md) T-36). The holder of the vault reads the file at every request, so a change applies to the next one. A file it cannot read or parse refuses every agent request until it is fixed or deleted. No policy covers `keypaste run --session` from an agent's own shell.
+On the desktop's Agents screen, each client card's ⋯ menu sets the same file. Unlike this file's `"*"`, the `*` row there also covers a bridge started with no label, because it can only narrow; put the strict policy on `*`, since a label is whatever the client's configuration says and an agent that can edit that configuration can change it ([THREATS.md](../THREATS.md) T-36). The holder of the vault reads the file at every request, so a change applies to the next one. A file it cannot read or parse refuses every agent request until it is fixed or deleted. No policy covers `keypaste run --session` from an agent's own shell.
 
 ## Limits
 
