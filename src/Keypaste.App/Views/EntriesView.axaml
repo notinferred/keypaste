@@ -276,7 +276,8 @@
             </StackPanel>
             <ToggleButton Grid.Column="2"
                           x:Name="AddEntry"
-                          Classes="primary sm"
+                          Classes="sm"
+                          Classes.primary="{Binding AddIsPrimary}"
                           Height="28"
                           Padding="10,0"
                           ToolTip.Tip="New item, project or import"
@@ -433,7 +434,9 @@
             <Grid ColumnDefinitions="18,10,*,Auto" RowDefinitions="Auto,4,Auto">
               <ctl:KpIcon Grid.Row="0" Grid.Column="0" Classes="kind" Icon="{Binding Icon}" Size="15" />
               <TextBlock Grid.Row="0" Grid.Column="2"
-                         Classes="mono lg"
+                         Classes.mono="{Binding IsVariable}"
+                         Classes.lg="{Binding IsVariable}"
+                         Classes.row-title="{Binding !IsVariable}"
                          Text="{Binding DisplayTitle}"
                          TextTrimming="CharacterEllipsis"
                          VerticalAlignment="Center" />
@@ -474,7 +477,7 @@
 
     <TextBlock Grid.Column="3"
                Classes="subtitle"
-               Text="Choose a secret to see it here."
+               Text="Choose an item to see it here."
                HorizontalAlignment="Center"
                VerticalAlignment="Center"
                IsVisible="{Binding ShowsPlaceholder}" />
@@ -587,7 +590,9 @@
                   <ctl:HeaderRow Spacing="16">
                     <StackPanel Spacing="6">
                       <TextBlock x:Name="EntryTitle"
-                                 Classes="mono xl"
+                                 Classes.mono="{Binding IsVariable}"
+                                 Classes.xl="{Binding IsVariable}"
+                                 Classes.title="{Binding !IsVariable}"
                                  Text="{Binding DisplayTitle}"
                                  TextWrapping="Wrap" />
                       <TextBlock Text="{Binding Location}"
@@ -1207,7 +1212,7 @@
                                          Classes="mono"
                                          FontSize="12"
                                          Classes.ok="{Binding IsOk}"
-                                         Classes.amber="{Binding IsAmber}"
+                                         Classes.secondary="{Binding IsAsked}"
                                          Classes.danger="{Binding IsDanger}"
                                          Text="{Binding State}" />
                             </Grid>

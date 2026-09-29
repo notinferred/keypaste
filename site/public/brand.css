@@ -47,8 +47,8 @@
   --status-ok: oklch(0.8 0.13 155);
   --status-danger: oklch(0.74 0.14 25);
   --grid-line: #18191c;
-  --mark-stem: #f2f2f0;
-  --mark-arm: #f2b544;
+  --mark-ink: #f2f2f0;
+  --mark-dot: #f2b544;
   --focus-ring: 0 0 0 2px #111214, 0 0 0 4px #f2b544;
 
   --terminal-bg: #0c0d0e;
@@ -78,11 +78,11 @@
     --text-secondary: #3a3c40;
     --text-muted: #6b6d72;
     --accent-text: #8a5a00;
-    --status-ok: oklch(0.55 0.13 155);
-    --status-danger: oklch(0.55 0.17 25);
+    --status-ok: oklch(0.5 0.13 155);
+    --status-danger: oklch(0.5 0.17 25);
     --grid-line: #ebebe7;
-    --mark-stem: #111214;
-    --mark-arm: #d99d2e;
+    --mark-ink: #111214;
+    --mark-dot: #d99d2e;
     --focus-ring: 0 0 0 2px #ffffff, 0 0 0 4px #f2b544;
     color-scheme: light;
   }
@@ -147,32 +147,21 @@ pre,
   letter-spacing: 0;
 }
 
-.lockup {
+.wordmark {
   display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--text-primary);
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.045em;
-  line-height: 1;
+  line-height: 0;
 }
 
-.lockup:hover {
-  color: var(--text-primary);
-  text-decoration: none;
-}
-
-.lockup svg {
+.wordmark svg {
   flex: none;
 }
 
-.mark-stem {
-  fill: var(--mark-stem);
+.mark-ink {
+  fill: var(--mark-ink);
 }
 
-.mark-arm {
-  fill: var(--mark-arm);
+.mark-dot {
+  fill: var(--mark-dot);
 }
 
 .button {

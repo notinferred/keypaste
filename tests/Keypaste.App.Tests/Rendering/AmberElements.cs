@@ -107,6 +107,13 @@ internal static class AmberElements
         Assert.True(bounds.Contains(found[0]), $"{at}: the amber element {found[0]} is not {expected.Name} at {bounds}");
     }
 
+    /// <summary>Asserts the frame holds at most one amber element, for a frame whose one is not named.</summary>
+    internal static void AssertAtMostOne(TopLevel window, string at)
+    {
+        var found = In(window);
+        Assert.True(found.Count <= 1, $"{at}: expected at most one amber element, found {Describe(window, found)}");
+    }
+
     internal static bool IsAmber(byte r, byte g, byte b)
     {
         int max = Math.Max(r, Math.Max(g, b));
@@ -140,7 +147,7 @@ internal static class AmberElements
         {
             switch (control)
             {
-                case BrandMark or BrandLockup:
+                case BrandOutline:
                     yield return Bounds(control, window, scaling, inflate: 1);
                     break;
 
@@ -263,7 +270,7 @@ internal static class AmberElements
         }));
     }
 
-    private static (byte[] Pixels, int Width, int Height) Read(Bitmap bitmap)
+    internal static (byte[] Pixels, int Width, int Height) Read(Bitmap bitmap)
     {
         var size = bitmap.PixelSize;
         using var copy = new WriteableBitmap(size, bitmap.Dpi, PixelFormat.Bgra8888, AlphaFormat.Premul);

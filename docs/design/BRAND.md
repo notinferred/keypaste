@@ -2,14 +2,14 @@
 
 keypaste is an open-source, local password manager on a KDBX file, for people who keep their passwords in KeePass and write software. It serves secrets over MCP with human approval, time-boxed grants and inject-only access; runs commands with env profiles (`keypaste run`); imports and exports `.env` files; and shares secrets through encrypted, expiring links. Surfaces: the desktop app and the CLI.
 
-Direction chosen: **1b, the monogram |<**, on a Swiss-precision grid.
+The interface is built on a Swiss-precision grid. The marks, chosen on 2026-09-29, are an icon "k." and a wordmark "keypaste." in Hepta Slab with an amber dot ([BRAND](../BRAND.md)).
 
 ## Index
 - `keypaste Brand System.dc.html`: logo, color, type, space, components, icons, voice
 - `keypaste Desktop.dc.html`: interactive desktop prototype (secrets, agents and grants, activity, env profiles, sharing, MCP approval, KDBX import, unlock)
 - `keypaste CLI.dc.html`: terminal output design
 - `styles.css` imports `tokens/typography.css`, `tokens/colors.css` and `tokens/spacing.css`
-- `assets/`: `keypaste-mark.svg`, `keypaste-mark-mono.svg` (currentColor), `keypaste-app-icon.svg`, `keypaste-favicon.svg`
+- `assets/`: `keypaste-glyph-{dark,light,mono}.svg`, `keypaste-wordmark-{dark,light,mono}.svg` (mono takes currentColor), `keypaste-app-icon.svg`, `keypaste-favicon.svg`
 
 ## Content fundamentals
 Plain and calm; precise where it protects you. Name the actor and the object ("claude-code wants DATABASE_URL"). Always give a duration ("Allow for 1 hour", never "Trust"). Use sentence case, "you" for the person, and the agent's real client name for the agent. No exclamation marks or emoji. Errors say what to do next. The wordmark is always lowercase.
@@ -27,4 +27,4 @@ Plain and calm; precise where it protects you. Name the actor and the object ("c
 Lucide (CDN icon font, `lucide-static`) at a 1.5px stroke: 16px in lists, 14px in fields, 20px in the sidebar. Icons are muted grey by default and turn amber only when their object is live. Unicode is used in the CLI (✓ › ┌ │ └). No emoji, no filled icons.
 
 ## Logo
-The lowercase k is built from a cursor stem (10×48u) and an insert-bracket arm (14u wide at 45°) on a 64u grid, with a 4u gap that is never closed. The arm is amber, or the same color as the stem in one-color use. Minimum sizes: 16px for the mark, 88px wide for the lockup. At 16px or smaller, use the favicon: amber tile, ink glyph. The wordmark is Instrument Sans Semibold at −4.5% tracking. It is live text, not outlines; outline it before any production print use.
+Two marks, never set side by side: the icon "k." and the wordmark "keypaste.", Hepta Slab SemiBold at −1% tracking, drawn only as outlines. The letters are ink and the square dot amber, or the ink's color in one-color use. Minimum sizes: 16px for the icon, 88px wide for the wordmark. At 32px or smaller, use the favicon: the dark tile with a larger "k.". The prototypes still draw the earlier monogram; BRAND and `assets/` are the reference for the marks.

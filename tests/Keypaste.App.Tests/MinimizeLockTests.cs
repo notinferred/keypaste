@@ -221,7 +221,7 @@ public sealed class MinimizeLockTests
         {
             // The application object is one per assembly; a test that left a theme behind would be
             // changing what another one renders in.
-            Current.RequestedThemeVariant = ThemeVariant.Default;
+            ((App)Current).ApplyTheme(Core.Settings.AppTheme.System);
         }
     });
 

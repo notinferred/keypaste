@@ -309,7 +309,7 @@ public sealed class SharingViewModelTests : IDisposable
 
         var row = Assert.Single(screen.Rows);
         Assert.Equal("1 of 3 views used", row.Status);
-        Assert.Equal(ShareStatusTone.Accent, row.StatusTone);
+        Assert.Equal(ShareStatusTone.Info, row.StatusTone);
         Assert.Equal("Revoke", row.RevokeLabel);
     }
 

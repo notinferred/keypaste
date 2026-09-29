@@ -66,6 +66,13 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         NewPassword = new SecretField(clipboard);
 
         BeginAddCommand = new RelayCommand(BeginAdd, () => !IsAdding);
+        PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(IsAdding) or nameof(IsOrganizing) or nameof(IsCreatingGroup) or nameof(IsRenamingGroup) or nameof(Detail))
+            {
+                Raise(nameof(AddIsPrimary));
+            }
+        };
         ClearScopeCommand = new RelayCommand(() => SelectedGroup = Groups.FirstOrDefault(group => group.IsEverything));
         CancelAddCommand = new RelayCommand(CancelAdd, () => IsAdding);
         ConfirmAddCommand = new RelayCommand(ConfirmAdd, () => IsAdding);
@@ -297,6 +304,13 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>
+    /// Whether "+ New" is the screen's primary action: not while a form here shows a primary of its own,
+    /// since a view has one amber element (D-0375).
+    /// </summary>
+    internal bool AddIsPrimary =>
+        !IsAdding && !IsOrganizing && !IsCreatingGroup && !IsRenamingGroup && _detail is not { HasOwnPrimary: true };
+
     /// <summary>The selected entry's fields, or null when nothing is selected.</summary>
     internal EntryDetailViewModel? Detail
     {
@@ -304,6 +318,16 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         private set
         {
             var previous = _detail;
+
+            if (previous is not null)
+            {
+                previous.PropertyChanged -= OnDetailChanged;
+            }
+
+            if (value is not null)
+            {
+                value.PropertyChanged += OnDetailChanged;
+            }
 
             if (Set(ref _detail, value))
             {
@@ -437,6 +461,14 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
     /// <summary>What to generate, while <see cref="GeneratePassword"/> is on.</summary>
     internal GeneratorViewModel Generator { get; } = new();
+
+    private void OnDetailChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(EntryDetailViewModel.HasOwnPrimary))
+        {
+            Raise(nameof(AddIsPrimary));
+        }
+    }
 
     /// <summary>Whether the organize form is showing for the selected entry.</summary>
     internal bool IsOrganizing

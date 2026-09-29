@@ -11,8 +11,8 @@ internal enum ShareStatusTone
     /// <summary>Gone, expired or not known.</summary>
     Muted = 0,
 
-    /// <summary>Opened at least once and still opening.</summary>
-    Accent = 1,
+    /// <summary>Opened at least once and still opening: blue, since several links can be partly used and amber is one per view.</summary>
+    Info = 1,
 
     /// <summary>Still opening and not opened yet.</summary>
     Ok = 2,
@@ -29,7 +29,7 @@ internal sealed record SharingRow(string Id, string What, string Recipient, stri
 
     internal bool IsOk => StatusTone == ShareStatusTone.Ok;
 
-    internal bool IsAccent => StatusTone == ShareStatusTone.Accent;
+    internal bool IsInfo => StatusTone == ShareStatusTone.Info;
 
     /// <summary>A link that may still open is revoked; one that cannot is only forgotten.</summary>
     internal string RevokeLabel => Opens ? "Revoke" : "Remove";
@@ -428,7 +428,7 @@ internal sealed class SharingViewModel : ObservableObject, IDisposable
             ("gone", _) => ("Opened or revoked", ShareStatusTone.Muted, false),
             ("expired", _) => ("Expired", ShareStatusTone.Muted, false),
             (_, { } views) when views >= info.Views => ("Not opened yet", ShareStatusTone.Ok, true),
-            (_, { } views) => ($"{info.Views - views} of {info.Views} views used", ShareStatusTone.Accent, true),
+            (_, { } views) => ($"{info.Views - views} of {info.Views} views used", ShareStatusTone.Info, true),
             _ => (online ? "Status unknown" : "Not checked", ShareStatusTone.Muted, true),
         };
 

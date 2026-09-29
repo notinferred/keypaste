@@ -2,6 +2,8 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Platform;
+using Avalonia.Styling;
 using Avalonia.Threading;
 using Keypaste.App.Clipboard;
 using Keypaste.App.HardwareKeys;
@@ -36,11 +38,15 @@ internal sealed partial class App : Application, IDisposable
     private IClassicDesktopStyleApplicationLifetime? _desktop;
     private (string Path, string? Keyfile)? _openNext;
     private bool _shuttingDown;
+    private Core.Settings.AppTheme _theme = Core.Settings.AppTheme.System;
+    private PlatformThemeVariant _platformTheme = PlatformThemeVariant.Dark;
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
     public override void OnFrameworkInitializationCompleted()
     {
+        FollowPlatformTheme();
+
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             Launch(desktop);
@@ -321,15 +327,50 @@ internal sealed partial class App : Application, IDisposable
     }
 
     /// <summary>
-    /// Applies a theme choice. <c>System</c> hands the decision back to the operating system.
+    /// Applies a theme choice. <c>System</c> paints in the operating system's light or dark setting,
+    /// and keeps doing so as it changes.
     /// </summary>
-    internal void ApplyTheme(Core.Settings.AppTheme theme) =>
+    /// <remarks>
+    /// System is the platform's current variant set explicitly, not <see cref="ThemeVariant.Default"/>:
+    /// once Light or Dark had been requested, Avalonia's Default left the app with no variant at all,
+    /// painting neither palette, until the platform next changed.
+    /// </remarks>
+    internal void ApplyTheme(Core.Settings.AppTheme theme)
+    {
+        _theme = theme;
         RequestedThemeVariant = theme switch
         {
-            Core.Settings.AppTheme.Light => Avalonia.Styling.ThemeVariant.Light,
-            Core.Settings.AppTheme.Dark => Avalonia.Styling.ThemeVariant.Dark,
-            _ => Avalonia.Styling.ThemeVariant.Default,
+            Core.Settings.AppTheme.Light => ThemeVariant.Light,
+            Core.Settings.AppTheme.Dark => ThemeVariant.Dark,
+            _ => VariantOf(_platformTheme),
         };
+    }
+
+    /// <summary>Tracks the operating system's light or dark setting, and follows it while System is chosen.</summary>
+    private void FollowPlatformTheme()
+    {
+        if (PlatformSettings is not { } settings)
+        {
+            return;
+        }
+
+        // What Avalonia has already resolved from the platform, when it has; its settings' own answer otherwise.
+        _platformTheme = ActualThemeVariant == ThemeVariant.Dark ? PlatformThemeVariant.Dark
+            : ActualThemeVariant == ThemeVariant.Light ? PlatformThemeVariant.Light
+            : settings.GetColorValues().ThemeVariant;
+        settings.ColorValuesChanged += (_, values) =>
+        {
+            _platformTheme = values.ThemeVariant;
+
+            if (_theme == Core.Settings.AppTheme.System)
+            {
+                RequestedThemeVariant = VariantOf(values.ThemeVariant);
+            }
+        };
+    }
+
+    private static ThemeVariant VariantOf(PlatformThemeVariant platform) =>
+        platform == PlatformThemeVariant.Dark ? ThemeVariant.Dark : ThemeVariant.Light;
 
     /// <summary>Drops the vault and the unlock screen's password buffer.</summary>
     /// <remarks>

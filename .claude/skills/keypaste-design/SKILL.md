@@ -19,7 +19,7 @@ The desktop app (Avalonia, `src/Keypaste.App`) already carries the brand; use it
 
 - `Theme/Tokens.axaml`: brushes such as `KpBgApp`, `KpBgPanel`, `KpBgCard`, `KpBorderSubtle`, `KpTextPrimary`, `KpTextMuted`, `KpAccent`, `KpOk`, `KpDanger`, `KpInfo`. A view never writes a hex colour.
 - `Theme/Typography.axaml`, `Buttons.axaml`, `Inputs.axaml`, `Lists.axaml`, `Surfaces.axaml`: classes for text, buttons, fields, rows and cards.
-- Icons: `<ctl:KpIcon Icon="lock" Size="16"/>`; add a Lucide icon with `python scripts/lucide-to-axaml.py <name>`. Marks: `<ctl:BrandMark/>` and `<ctl:BrandLockup/>`.
+- Icons: `<ctl:KpIcon Icon="lock" Size="16"/>`; add a Lucide icon with `python scripts/lucide-to-axaml.py <name>`. Marks: `<ctl:BrandMark/>` (the icon) and `<ctl:BrandWordmark/>`, never side by side.
 - `KEYPASTE_SCREENS_OUT=<dir> dotnet test tests/Keypaste.App.Tests -- --filter-class Keypaste.App.Tests.Rendering.ScreenRenderer` renders every screen with a demo vault; compare the PNGs with the prototype.
 
 keypaste.com takes its tokens from `site/public/brand.css`. CLI colour and help layout follow the terminal rules in BRAND.

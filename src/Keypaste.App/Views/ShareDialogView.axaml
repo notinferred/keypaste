@@ -28,7 +28,7 @@
       <Setter Property="HorizontalContentAlignment" Value="Center" />
     </Style>
 
-    <!-- The design's 16px check: amber with an ink tick when on, a hairline square when off. -->
+    <!-- A 16px check: the text colour with a tick in the ground's colour when on, a hairline square when off. -->
     <Style Selector="CheckBox.passphrase">
       <Setter Property="Cursor" Value="Hand" />
       <Setter Property="MinHeight" Value="0" />
@@ -56,14 +56,17 @@
       </Setter>
     </Style>
     <Style Selector="CheckBox.passphrase:checked /template/ Border#Box">
-      <Setter Property="Background" Value="{DynamicResource KpAccent}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource KpAccent}" />
+      <Setter Property="Background" Value="{DynamicResource KpTextPrimary}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource KpTextPrimary}" />
+    </Style>
+    <Style Selector="CheckBox.passphrase:checked /template/ ctl|KpIcon#Tick">
+      <Setter Property="Foreground" Value="{DynamicResource KpBgApp}" />
     </Style>
     <Style Selector="CheckBox.passphrase:checked /template/ ctl|KpIcon#Tick">
       <Setter Property="IsVisible" Value="True" />
     </Style>
     <Style Selector="CheckBox.passphrase:pointerover /template/ Border#Box">
-      <Setter Property="BorderBrush" Value="{DynamicResource KpAccentHover}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource KpTextSecondary}" />
     </Style>
     <Style Selector="CheckBox.passphrase:focus-visible /template/ Border#Box">
       <Setter Property="BoxShadow" Value="{StaticResource KpFieldGlow}" />

@@ -134,7 +134,7 @@
                   </StackPanel>
                   <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
                     <TextBlock Classes="mono muted" FontSize="12" Text="{Binding Where}" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Classes="amber" FontSize="11.5" Text="comes back at the root"
+                    <TextBlock Classes="secondary" FontSize="11.5" Text="comes back at the root"
                                IsVisible="{Binding !CameFromALiveGroup}" />
                   </StackPanel>
                   <TextBlock Grid.Column="2" Classes="mono muted" FontSize="11.5" Text="{Binding When}" VerticalAlignment="Center" />

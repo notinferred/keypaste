@@ -199,7 +199,7 @@ internal static class CliApp
 
         string Muted(string text) => style.Paint(writer, Tone.Muted, text);
 
-        writer.WriteLine($"keypaste {CoreInfo.Version}{Muted($" {style.Glyph(writer, Mark.Dot)} secrets for developers and their agents")}");
+        writer.WriteLine($"keypaste {CoreInfo.Version}{Muted($" {style.Glyph(writer, Mark.Dot)} a simple, local password manager on your KeePass file")}");
         writer.WriteLine();
         writer.WriteLine(Muted("USAGE"));
         writer.WriteLine("  keypaste <command> [flags]");

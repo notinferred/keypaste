@@ -1,82 +1,131 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
 using Avalonia.Media;
 
 namespace Keypaste.App.Controls;
 
 /// <summary>
-/// The keypaste mark: a cursor stem and an insert-bracket arm on a 64-unit grid.
+/// A keypaste mark drawn from its outlines: the ink, and the dot, which is never omitted.
 /// </summary>
 /// <remarks>
-/// The 4-unit gap between stem and arm is part of the mark and is never closed, which is why this
-/// draws the two shapes rather than one outline. Brushes come from <c>Theme/Brand.axaml</c>; the
-/// <c>mono</c> class draws both in the stem colour.
+/// The outlines are Hepta Slab SemiBold, written into <c>Theme/BrandOutlines.axaml</c> by
+/// <c>scripts/outline-brand-marks.py</c>, so no font is vendored. The mark keeps its proportions
+/// and centres in its bounds; a set Height gives its width, a set Width its height, and with neither
+/// it takes its default height. Geometry and brushes come from <c>Theme/Brand.axaml</c>; the
+/// <c>mono</c> class draws the dot in the ink.
 /// </remarks>
-internal sealed class BrandMark : Control
+internal abstract class BrandOutline : Control
 {
-    private const double _grid = 64;
+    internal static readonly StyledProperty<Geometry?> InkGeometryProperty =
+        AvaloniaProperty.Register<BrandOutline, Geometry?>(nameof(InkGeometry));
 
-    internal static readonly StyledProperty<IBrush?> StemBrushProperty =
-        AvaloniaProperty.Register<BrandMark, IBrush?>(nameof(StemBrush));
+    internal static readonly StyledProperty<Geometry?> DotGeometryProperty =
+        AvaloniaProperty.Register<BrandOutline, Geometry?>(nameof(DotGeometry));
 
-    internal static readonly StyledProperty<IBrush?> ArmBrushProperty =
-        AvaloniaProperty.Register<BrandMark, IBrush?>(nameof(ArmBrush));
+    internal static readonly StyledProperty<IBrush?> InkBrushProperty =
+        AvaloniaProperty.Register<BrandOutline, IBrush?>(nameof(InkBrush));
 
-    private static readonly Geometry _stem = Geometry.Parse("M10,8 H20 V56 H10 Z");
-    private static readonly Geometry _arm = Geometry.Parse("M40,24 L54,24 L38,40 L54,56 L40,56 L24,40 Z");
+    internal static readonly StyledProperty<IBrush?> DotBrushProperty =
+        AvaloniaProperty.Register<BrandOutline, IBrush?>(nameof(DotBrush));
 
-    static BrandMark() => AffectsRender<BrandMark>(StemBrushProperty, ArmBrushProperty);
-
-    internal IBrush? StemBrush
+    static BrandOutline()
     {
-        get => GetValue(StemBrushProperty);
-        set => SetValue(StemBrushProperty, value);
+        AffectsRender<BrandOutline>(InkGeometryProperty, DotGeometryProperty, InkBrushProperty, DotBrushProperty);
+        AffectsMeasure<BrandOutline>(InkGeometryProperty, DotGeometryProperty);
     }
 
-    internal IBrush? ArmBrush
+    internal Geometry? InkGeometry
     {
-        get => GetValue(ArmBrushProperty);
-        set => SetValue(ArmBrushProperty, value);
+        get => GetValue(InkGeometryProperty);
+        set => SetValue(InkGeometryProperty, value);
+    }
+
+    internal Geometry? DotGeometry
+    {
+        get => GetValue(DotGeometryProperty);
+        set => SetValue(DotGeometryProperty, value);
+    }
+
+    internal IBrush? InkBrush
+    {
+        get => GetValue(InkBrushProperty);
+        set => SetValue(InkBrushProperty, value);
+    }
+
+    internal IBrush? DotBrush
+    {
+        get => GetValue(DotBrushProperty);
+        set => SetValue(DotBrushProperty, value);
+    }
+
+    /// <summary>The height the mark takes when neither its Width nor its Height is set.</summary>
+    protected abstract double DefaultHeight { get; }
+
+    private Rect Box => (InkGeometry?.Bounds ?? default).Union(DotGeometry?.Bounds ?? default);
+
+    protected override Size MeasureOverride(Size availableSize)
+    {
+        var box = Box;
+
+        if (box.Width <= 0 || box.Height <= 0)
+        {
+            return default;
+        }
+
+        var aspect = box.Width / box.Height;
+
+        if (!double.IsNaN(Height))
+        {
+            return new Size(Height * aspect, Height);
+        }
+
+        if (!double.IsNaN(Width))
+        {
+            return new Size(Width, Width / aspect);
+        }
+
+        return new Size(DefaultHeight * aspect, DefaultHeight);
     }
 
     public override void Render(DrawingContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        var side = Math.Min(Bounds.Width, Bounds.Height);
-        var scale = side / _grid;
-        var matrix = Matrix.CreateScale(scale, scale)
-            * Matrix.CreateTranslation((Bounds.Width - side) / 2, (Bounds.Height - side) / 2);
+        var box = Box;
+
+        if (box.Width <= 0 || box.Height <= 0)
+        {
+            return;
+        }
+
+        var scale = Math.Min(Bounds.Width / box.Width, Bounds.Height / box.Height);
+        var matrix = Matrix.CreateTranslation(-box.X, -box.Y)
+            * Matrix.CreateScale(scale, scale)
+            * Matrix.CreateTranslation((Bounds.Width - (box.Width * scale)) / 2, (Bounds.Height - (box.Height * scale)) / 2);
 
         using (context.PushTransform(matrix))
         {
-            context.DrawGeometry(StemBrush, null, _stem);
-            context.DrawGeometry(ArmBrush, null, _arm);
+            if (InkGeometry is not null)
+            {
+                context.DrawGeometry(InkBrush, null, InkGeometry);
+            }
+
+            if (DotGeometry is not null)
+            {
+                context.DrawGeometry(DotBrush, null, DotGeometry);
+            }
         }
     }
 }
 
-/// <summary>The mark beside the wordmark, which is live text in Instrument Sans 600 at −0.045em.</summary>
-internal sealed class BrandLockup : TemplatedControl
+/// <summary>The icon: "k" with its dot. Never set beside the wordmark.</summary>
+internal sealed class BrandMark : BrandOutline
 {
-    internal static readonly StyledProperty<double> MarkSizeProperty =
-        AvaloniaProperty.Register<BrandLockup, double>(nameof(MarkSize), 22d);
+    protected override double DefaultHeight => 22;
+}
 
-    internal double MarkSize
-    {
-        get => GetValue(MarkSizeProperty);
-        set => SetValue(MarkSizeProperty, value);
-    }
-
-    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
-    {
-        ArgumentNullException.ThrowIfNull(change);
-        base.OnPropertyChanged(change);
-
-        if (change.Property == FontSizeProperty)
-        {
-            SetCurrentValue(LetterSpacingProperty, -0.045 * FontSize);
-        }
-    }
+/// <summary>The wordmark: "keypaste" with its dot. Never set beside the icon.</summary>
+internal sealed class BrandWordmark : BrandOutline
+{
+    protected override double DefaultHeight => 20;
 }

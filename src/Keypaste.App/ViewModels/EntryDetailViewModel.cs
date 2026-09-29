@@ -98,6 +98,13 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         CopyPasswordCommand = new AsyncRelayCommand(CopyPasswordAsync, () => PasswordLength > 0);
         CopyUsernameCommand = new AsyncRelayCommand(CopyUsernameAsync, () => Username.Length > 0);
         CopyReferenceCommand = new AsyncRelayCommand(CopyReferenceAsync, () => Reference is not null);
+        PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(IsEditing) or nameof(IsConfirmingRotate) or nameof(IsAddingField) or nameof(IsReplacingField))
+            {
+                Raise(nameof(HasOwnPrimary));
+            }
+        };
         EditCommand = new RelayCommand(BeginEdit, () => !IsEditing);
         CancelCommand = new RelayCommand(CancelEdit, () => IsEditing);
         SaveCommand = new RelayCommand(SaveEdit, () => IsEditing);
@@ -207,6 +214,9 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     }
 
     internal bool IsReplacingField => _replacingField is not null;
+
+    /// <summary>Whether a form in the pane shows its own primary button: an edit, a rotate, or adding or replacing a field.</summary>
+    internal bool HasOwnPrimary => IsEditing || IsConfirmingRotate || IsAddingField || IsReplacingField;
 
     internal string ReplaceFieldPrompt => $"New value for {_replacingField?.DisplayName}";
 

@@ -41,7 +41,18 @@ internal static class HeadlessSession
             .UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false });
 
     /// <summary>Runs <paramref name="body"/> on the session's UI thread.</summary>
-    internal static Task On(Action body) => Instance.Dispatch(body, CancellationToken.None);
+    /// <remarks>
+    /// Each dispatch gets the application afresh, so each starts on a dark system (<see cref="PlatformTheme"/>),
+    /// as the app's screens were drawn before its theme followed the system; a test that needs light says so.
+    /// </remarks>
+    internal static Task On(Action body) =>
+        Instance.Dispatch(
+            () =>
+            {
+                PlatformTheme.Set(Avalonia.Platform.PlatformThemeVariant.Dark);
+                body();
+            },
+            CancellationToken.None);
 
     /// <summary>Runs an asynchronous <paramref name="body"/> on the session's UI thread.</summary>
     /// <remarks>
@@ -63,6 +74,7 @@ internal static class HeadlessSession
             async () =>
             {
                 ArgumentNullException.ThrowIfNull(body);
+                PlatformTheme.Set(Avalonia.Platform.PlatformThemeVariant.Dark);
                 await body().ConfigureAwait(true);
                 return true;
             },

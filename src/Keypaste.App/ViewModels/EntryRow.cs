@@ -132,6 +132,9 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
     /// <summary>What sort of entry this is, read from which fields are filled in.</summary>
     internal EntryKind Kind { get; init; }
 
+    /// <summary>Whether the row is a variable, whose key is drawn in mono; any other title is sans.</summary>
+    internal bool IsVariable => Kind == EntryKind.Variable;
+
     /// <summary>The icon the row draws for its kind.</summary>
     internal string Icon => EntryKinds.Icon(Kind);
 

@@ -79,13 +79,14 @@ public sealed class StartupSettingsTests
     });
 
     [Fact]
-    public Task A_theme_of_System_hands_the_decision_back_to_the_operating_system() => Started(fixture =>
+    public Task A_theme_of_System_paints_what_the_operating_system_says() => Started(fixture =>
     {
         Save(fixture, AppSettings.Default with { Theme = AppTheme.System });
 
         using var session = Compose(fixture, new ManualClock());
 
-        Assert.Equal(ThemeVariant.Default, Current.RequestedThemeVariant);
+        // The headless platform reports dark (PlatformTheme); ThemeFollowsSystemTests switches it.
+        Assert.Equal(ThemeVariant.Dark, Current.ActualThemeVariant);
     });
 
     /// <summary>
@@ -130,7 +131,7 @@ public sealed class StartupSettingsTests
         using (var session = Compose(fixture, new ManualClock()))
         {
             Assert.Equal(TimeSpan.FromSeconds(AppSettings.Default.IdleTimeoutSeconds), session.IdleTimeout);
-            Assert.Equal(ThemeVariant.Dark, Current.RequestedThemeVariant);
+            Assert.Equal(ThemeVariant.Dark, Current.ActualThemeVariant);
         }
 
         Assert.Equal(original, File.ReadAllBytes(path));
@@ -174,7 +175,7 @@ public sealed class StartupSettingsTests
         }
         finally
         {
-            Current.RequestedThemeVariant = ThemeVariant.Default;
+            ((App)Current).ApplyTheme(AppTheme.System);
         }
     });
 }

@@ -7,7 +7,7 @@
       ghost                         no fill until hovered: Deny, Cancel
       danger                        danger tint: Revoke, Delete
       icon                          a 30px square for an icon alone; add ghost for no fill
-      link                          amber text, no box: "New token"
+      link                          text colour, no box: "New token"
       sm / lg                       28px / 34px tall instead of 30px
     Put a KpIcon and a TextBlock in a StackPanel (Orientation Horizontal, Spacing 6) for an icon
     button; the icon takes the button's foreground.

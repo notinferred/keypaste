@@ -298,19 +298,20 @@
                                       Background="Transparent"
                                       IsVisible="{Binding ReasonUnread}"
                                       ToolTip.Tip="Served from an earlier approval, under a reason that person never saw.">
-                                <ctl:KpIcon Icon="alert-triangle" Size="12" Foreground="{DynamicResource KpWarn}" />
+                                <ctl:KpIcon Icon="alert-triangle" Size="12" Foreground="{DynamicResource KpTextSecondary}" />
                               </Border>
                             </Grid>
 
                           </Grid>
                         </Border>
 
-                        <!-- A row the chain cannot vouch for is marked at its edge, so the TIME column stays aligned. -->
+                        <!-- A row the chain cannot vouch for is marked at its edge, so the TIME column stays aligned.
+                             Red, not amber: several rows can be marked, and the view's one amber element is the notice above. -->
                         <Border IsVisible="{Binding Unverified}"
                                 Width="2"
                                 Margin="0,1,0,0"
                                 HorizontalAlignment="Left"
-                                Background="{DynamicResource KpWarn}" />
+                                Background="{DynamicResource KpDanger}" />
                       </Panel>
 
                     </StackPanel>
@@ -332,14 +333,14 @@
         <StackPanel Spacing="6" Margin="0,-8,0,0" IsVisible="{Binding HasTable}">
           <StackPanel Name="Notes" Spacing="4" IsVisible="{Binding HasNotes}">
             <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasUnverifiedNote}">
-              <Border Width="2" Height="12" Margin="5,0" VerticalAlignment="Center" Background="{DynamicResource KpWarn}" />
+              <Border Width="2" Height="12" Margin="5,0" VerticalAlignment="Center" Background="{DynamicResource KpDanger}" />
               <TextBlock FontSize="12"
                          VerticalAlignment="Center"
                          Foreground="{DynamicResource KpTextSecondary}"
                          Text="The hash chain does not vouch for rows marked like this. Verify chain says why." />
             </StackPanel>
             <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasUnreadNote}">
-              <ctl:KpIcon Icon="alert-triangle" Size="12" VerticalAlignment="Center" Foreground="{DynamicResource KpWarn}" />
+              <ctl:KpIcon Icon="alert-triangle" Size="12" VerticalAlignment="Center" Foreground="{DynamicResource KpTextSecondary}" />
               <TextBlock FontSize="12"
                          VerticalAlignment="Center"
                          Foreground="{DynamicResource KpTextSecondary}"

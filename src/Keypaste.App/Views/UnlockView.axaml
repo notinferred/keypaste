@@ -155,7 +155,7 @@
       <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
     </Style>
     <Style Selector="ListBox.recent > ListBoxItem:selected ctl|KpIcon">
-      <Setter Property="Foreground" Value="{DynamicResource KpAccent}" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
     </Style>
   </UserControl.Styles>
 
@@ -167,7 +167,7 @@
                   VerticalAlignment="Center"
                   Spacing="18">
 
-        <ctl:BrandMark Width="56" Height="56" HorizontalAlignment="Center" />
+        <ctl:BrandMark Width="56" HorizontalAlignment="Center" />
 
         <!-- Opening an existing vault, or choosing one when there is none yet. -->
         <StackPanel Spacing="18" IsVisible="{Binding IsOpening}">
@@ -200,7 +200,9 @@
               <TextBlock Classes="lock-error" Text="{Binding Message}" IsVisible="{Binding IsError}" />
             </StackPanel>
 
-            <Button Classes="primary wide"
+            <!-- While a YubiKey waits for a touch, its waiting dot is the screen's one amber element. -->
+            <Button Classes="wide"
+                    Classes.primary="{Binding !IsWaitingForTouch}"
                     IsDefault="True"
                     Command="{Binding UnlockCommand}">
               <Panel>
@@ -219,7 +221,7 @@
                 </StackPanel>
               </Button>
               <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasKeyfile}">
-                <ctl:KpIcon Icon="file-key" Size="14" Foreground="{DynamicResource KpAccent}" />
+                <ctl:KpIcon Icon="file-key" Size="14" Foreground="{DynamicResource KpTextMuted}" />
                 <TextBlock Classes="mono secondary"
                            FontSize="12"
                            Text="{Binding KeyfileName}"
@@ -249,7 +251,7 @@
                 </StackPanel>
               </Button>
               <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding UsesHardwareKey}">
-                <ctl:KpIcon Icon="usb" Size="14" Foreground="{DynamicResource KpAccent}" />
+                <ctl:KpIcon Icon="usb" Size="14" Foreground="{DynamicResource KpTextMuted}" />
                 <TextBlock Classes="mono secondary"
                            FontSize="12"
                            Text="{Binding HardwareKeyLabel}"
@@ -321,7 +323,7 @@
                 </StackPanel>
               </Button>
               <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasKeyfile}">
-                <ctl:KpIcon Icon="file-key" Size="14" Foreground="{DynamicResource KpAccent}" />
+                <ctl:KpIcon Icon="file-key" Size="14" Foreground="{DynamicResource KpTextMuted}" />
                 <TextBlock Classes="mono secondary"
                            FontSize="12"
                            Text="{Binding KeyfileName}"
@@ -397,7 +399,7 @@
                 </StackPanel>
               </Button>
               <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasKeyfile}">
-                <ctl:KpIcon Icon="file-key" Size="14" Foreground="{DynamicResource KpAccent}" />
+                <ctl:KpIcon Icon="file-key" Size="14" Foreground="{DynamicResource KpTextMuted}" />
                 <TextBlock Classes="mono secondary"
                            FontSize="12"
                            Text="{Binding KeyfileName}"

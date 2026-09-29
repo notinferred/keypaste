@@ -27,8 +27,9 @@ namespace Keypaste.App.Tests.Rendering;
 /// <code>
 /// KEYPASTE_SCREENS_OUT=/tmp/screens dotnet test tests/Keypaste.App.Tests -- --filter-class Keypaste.App.Tests.Rendering.ScreenRenderer
 /// </code>
-/// (PowerShell: <c>$env:KEYPASTE_SCREENS_OUT="$env:TEMP\screens"</c> first.) It writes one file per
-/// sidebar destination, the unlock screen, the approval window and the shell with a toast. Add a
+/// (PowerShell: <c>$env:KEYPASTE_SCREENS_OUT="$env:TEMP\screens"</c> first.) It writes every screen
+/// twice, into <c>dark</c> and <c>light</c> folders, with the system set to each and no theme chosen,
+/// as the app starts (N.7), and fails a frame holding more than one amber element (D-0375). Add a
 /// screen by adding a <see cref="Save"/> call.
 /// </summary>
 public sealed class ScreenRenderer
@@ -38,25 +39,28 @@ public sealed class ScreenRenderer
     private const int _width = 1280;
     private const int _height = 800;
 
-    [Fact]
-    public Task Every_screen_is_drawn_to_a_file() => HeadlessSession.On(() =>
+    [Theory]
+    [InlineData("dark")]
+    [InlineData("light")]
+    public Task Every_screen_is_drawn_to_a_file(string palette) => HeadlessSession.On(() =>
     {
-        var output = Environment.GetEnvironmentVariable(_variable);
-        Assert.SkipWhen(string.IsNullOrEmpty(output), $"{_variable} is not set");
-        Directory.CreateDirectory(output!);
+        var root = Environment.GetEnvironmentVariable(_variable);
+        Assert.SkipWhen(string.IsNullOrEmpty(root), $"{_variable} is not set");
+        var output = Path.Combine(root!, palette);
+        Directory.CreateDirectory(output);
+        PlatformTheme.Set(palette == "light" ? Avalonia.Platform.PlatformThemeVariant.Light : Avalonia.Platform.PlatformThemeVariant.Dark);
 
         using var demo = new DemoVault();
-        DrawUnlock(demo, output!);
-        DrawShell(demo, output!);
-        DrawEnv(demo, output!);
-        DrawApproval(output!);
-        DrawComponents(output!);
-        DrawSecrets(demo, output!);
-        DrawLight(demo, output!);
-        DrawLockAndImport(demo, output!);
-        DrawPrompts(output!);
-        DrawTrashWithRows(demo, output!);
-        DrawHardwareKey(output!);
+        DrawUnlock(demo, output);
+        DrawShell(demo, output);
+        DrawEnv(demo, output);
+        DrawApproval(output);
+        DrawComponents(output);
+        DrawSecrets(demo, output);
+        DrawLockAndImport(demo, output);
+        DrawPrompts(output);
+        DrawTrashWithRows(demo, output);
+        DrawHardwareKey(output);
     });
 
     /// <summary>A vault that also needs a YubiKey: the unlock screen offering it, waiting for a touch, a save waiting for one, and adding one in Settings.</summary>
@@ -161,7 +165,7 @@ public sealed class ScreenRenderer
     {
         var output = Environment.GetEnvironmentVariable(_variable);
         Assert.SkipWhen(string.IsNullOrEmpty(output), $"{_variable} is not set");
-        Directory.CreateDirectory(output!);
+        Directory.CreateDirectory(output);
 
         using var demo = new DemoVault();
         var clock = new ManualClock();
@@ -846,10 +850,6 @@ public sealed class ScreenRenderer
 
         Hold(window, "REDIS_URL", () => Save(window, output, "42-env-held"));
 
-        Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
-        Save(window, output, "43-env-light");
-        Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
-
         window.Width = 960;
         Save(window, output, "44-env-narrow");
         Hold(window, "DATABASE_URL", () => Save(window, output, "45-env-narrow-held"));
@@ -936,45 +936,6 @@ public sealed class ScreenRenderer
         destination.IsPlace
             ? $"{destination.Shortcut:00}-{Slug(destination.Title)}"
             : $"{Destinations.PlaceOf(destination).Shortcut:00}-{Slug(Destinations.PlaceOf(destination).Title)}-{Slug(destination.Title)}";
-
-    /// <summary>Secrets, Agents and the approval window in the light theme.</summary>
-    private static void DrawLight(DemoVault demo, string output)
-    {
-        Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
-
-        try
-        {
-            var clock = new ManualClock();
-#pragma warning disable CA2000 // The authority owns and disposes its session.
-            using var authority = new AppAuthority(new AppVaultSession(clock, home: demo.Home), null, () => new Session.NobodyToAsk());
-#pragma warning restore CA2000
-
-            using (var master = TempVault.Secret(_master))
-            {
-                Assert.Equal(UnlockOutcome.Opened, authority.Session.TryUnlock(demo.Path, master.Value));
-            }
-
-            using var shell = new ShellViewModel(authority.Session, demo.Home, authority, clipboard: new FakeClipboard(), clock: clock);
-            var window = new MainWindow { Width = _width, Height = _height };
-            window.FindControl<ContentControl>("Root")!.Content = new ShellView { DataContext = shell };
-            window.Show();
-
-            shell.Current = Destinations.Of(DestinationKind.Entries);
-            var entries = Assert.IsType<EntriesViewModel>(shell.Content);
-            entries.Selected = entries.Rows.First(row => row.Title == "github");
-            Save(window, output, "60-light-secrets");
-
-            shell.Current = Destinations.Of(DestinationKind.AgentActivity);
-            Save(window, output, "61-light-agents");
-            window.Close();
-
-            DrawApproval(output, "62-light-approval");
-        }
-        finally
-        {
-            Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
-        }
-    }
 
     private static void DrawApproval(string output, string name = "91-approval")
     {
@@ -1078,7 +1039,7 @@ public sealed class ScreenRenderer
         var page = new StackPanel { Margin = new Thickness(32, 28), Spacing = 18 };
         page.Children.AddRange(
         [
-            Row(new BrandLockup { MarkSize = 22, FontSize = 19 }, new BrandMark { Width = 56, Height = 56 }, new BrandMark { Width = 22, Height = 22, Classes = { "mono" } }),
+            Row(new BrandWordmark { Width = 104 }, new BrandMark { Width = 56 }, new BrandMark { Width = 22, Classes = { "mono" } }),
             Row(Text("Agents", "h1"), Text("New share link", "dialog-title"), Text("Active grants", "section")),
             Row(Text("MCP clients and tokens that can ask for secrets.", "subtitle"), Text("Value", "label"), Text("TIME   ACTOR   RESULT", "th"), Text("kp://acme-api/dev/DATABASE_URL", "mono")),
             Row(Button("Connect client", ""), Button("Allow for 1 hour", "primary"), Button("Deny", "ghost"), Button("Revoke", "danger"), Button("New token", "link"), Button("Disabled", "primary", enabled: false), Button("Small", "sm"), Button("Large", "lg primary"), new Button { Classes = { "icon" }, Content = new KpIcon { Icon = "ellipsis", Size = 14 } }),
@@ -1100,20 +1061,31 @@ public sealed class ScreenRenderer
         var window = new Window { Width = _width, Height = 900, Content = new ScrollViewer { Content = page } };
         window.Show();
         focused.Focus();
-        Save(window, output, "92-components");
+        Save(window, output, "92-components", sheet: true);
         window.Close();
     }
 
-    private static void Save(TopLevel window, string output, string name)
+    /// <param name="window">The window to draw.</param>
+    /// <param name="output">The folder.</param>
+    /// <param name="name">The file's name.</param>
+    /// <param name="sheet">Whether the frame is a sheet of components side by side rather than one view, which the amber rule does not apply to.</param>
+    private static void Save(TopLevel window, string output, string name, bool sheet = false)
     {
         WindowInput.Drain();
 
         // Enough render ticks for every 120-200ms transition to finish, so no frame is mid-fade.
         AvaloniaHeadlessPlatform.ForceRenderTimerTick(30);
         WindowInput.Drain();
-        using var frame = window.CaptureRenderedFrame();
-        Assert.NotNull(frame);
-        frame.Save(Path.Combine(output, name + ".png"), PngBitmapEncoderOptions.Default);
+        using (var frame = window.CaptureRenderedFrame())
+        {
+            Assert.NotNull(frame);
+            frame.Save(Path.Combine(output, name + ".png"), PngBitmapEncoderOptions.Default);
+        }
+
+        if (!sheet)
+        {
+            AmberElements.AssertAtMostOne(window, $"{Path.GetFileName(output)}/{name}");
+        }
     }
 
     private static string Slug(string title) => title.ToLowerInvariant().Replace(' ', '-');

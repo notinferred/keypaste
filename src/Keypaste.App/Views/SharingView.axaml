@@ -14,11 +14,8 @@
     <Style Selector="TextBlock.status.ok">
       <Setter Property="Foreground" Value="{DynamicResource KpOk}" />
     </Style>
-    <Style Selector="TextBlock.status.amber">
-      <Setter Property="Foreground" Value="{DynamicResource KpAccentText}" />
-    </Style>
-    <Style Selector="Border.dot.amber">
-      <Setter Property="Background" Value="{DynamicResource KpAccent}" />
+    <Style Selector="TextBlock.status.info">
+      <Setter Property="Foreground" Value="{DynamicResource KpInfo}" />
     </Style>
 
     <!-- A 24px target that takes a text line's height in the row. Revoke is the danger tint; Remove only forgets, so it stays quiet. -->
@@ -98,8 +95,8 @@
                                  ToolTip.Tip="{Binding What}" />
                       <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="6"
                                   HorizontalAlignment="Right">
-                        <Border Classes="dot" Classes.ok="{Binding IsOk}" Classes.amber="{Binding IsAccent}" />
-                        <TextBlock Classes="status" Classes.ok="{Binding IsOk}" Classes.amber="{Binding IsAccent}"
+                        <Border Classes="dot" Classes.ok="{Binding IsOk}" Classes.info="{Binding IsInfo}" />
+                        <TextBlock Classes="status" Classes.ok="{Binding IsOk}" Classes.info="{Binding IsInfo}"
                                    Text="{Binding Status}" />
                       </StackPanel>
                       <TextBlock Grid.Row="1" Grid.Column="0"

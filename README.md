@@ -1,15 +1,15 @@
 <h1 align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/keypaste-lockup-dark.svg">
-    <source media="(prefers-color-scheme: light)" srcset="assets/brand/keypaste-lockup-light.svg">
-    <img alt="keypaste" src="assets/brand/keypaste-lockup-light.svg" width="240">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/keypaste-wordmark-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="assets/brand/keypaste-wordmark-light.svg">
+    <img alt="keypaste" src="assets/brand/keypaste-wordmark-light.svg" width="240">
   </picture>
 </h1>
 
 <p align="center">keypaste keeps your logins and your projects' secrets in one KeePass-compatible vault, and gives an AI agent a secret only when you allow it.</p>
 
 <p align="center">
-  <img src="docs/screenshots/secrets.png" width="880" alt="The keypaste desktop app on its Secrets screen: a github login open with its username, masked password, URL, notes and kp:// reference, and the list of logins and env variables beside it.">
+  <img src="docs/screenshots/secrets.png" width="880" alt="The keypaste desktop app on Items: a github login open with its username, masked password, URL, notes, custom fields and tags, beside the list of logins and env variables and the sidebar's four places.">
 </p>
 
 <p align="center"><sub>The desktop app, built from source. It has no public release yet.</sub></p>

@@ -18,7 +18,7 @@
         <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="16">
           <StackPanel Spacing="6">
             <TextBlock Classes="h1" Text="Agents" />
-            <TextBlock Classes="subtitle" Text="MCP clients and tokens that can ask for secrets. Every request goes through you or a grant." />
+            <TextBlock Classes="subtitle" Text="Apps and tokens that can ask for a secret. Each request waits for your answer, or uses one you gave for a set time." />
           </StackPanel>
           <Grid Grid.Row="1" Grid.ColumnSpan="2" ColumnDefinitions="Auto,*" ColumnSpacing="6" Margin="0,8,0,0"
                 IsVisible="{Binding IsServing}">
@@ -40,7 +40,7 @@
             </Button>
             <!-- The screen's primary action, except while a request waits: then the waiting countdown is its signal. -->
             <Button Name="ConnectClient"
-                    Classes.primary="{Binding !HasWaiting}"
+                    Classes.primary="{Binding ConnectIsPrimary}"
                     Padding="12,0"
                     Height="30"
                     Command="{Binding ToggleConnectCommand}">
@@ -100,7 +100,7 @@
                          Text="Exposure is which entry names the client may list: env/** unless you name others. Separate patterns with commas." />
 
               <StackPanel Orientation="Horizontal" Spacing="8">
-                <Button Classes="primary" Content="Preview connect" Command="{Binding PreviewConnectCommand}" />
+                <Button Classes.primary="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).FormsArePrimary}" Content="Preview connect" Command="{Binding PreviewConnectCommand}" />
                 <Button Content="Preview remove" Command="{Binding PreviewRemoveCommand}" />
               </StackPanel>
 
@@ -116,7 +116,7 @@
                 </Border>
                 <TextBlock Classes="caption" Text="{Binding PreviewNote}" MaxWidth="640" HorizontalAlignment="Left" />
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Button Classes="primary" Content="Run it" Command="{Binding ConfirmCommand}" />
+                  <Button Classes.primary="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).FormsArePrimary}" Content="Run it" Command="{Binding ConfirmCommand}" />
                   <Button Classes="ghost" Content="Cancel" Command="{Binding CancelCommand}" />
                 </StackPanel>
               </StackPanel>
@@ -309,16 +309,16 @@
                 <TextBlock Classes="body danger" Text="{Binding FormError}" IsVisible="{Binding HasFormError}" />
                 <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
                   <Button Classes="ghost" Content="Cancel" Command="{Binding CancelFormCommand}" />
-                  <Button Classes="primary" Content="Create token" Command="{Binding CreateCommand}" />
+                  <Button Classes.primary="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).FormsArePrimary}" Content="Create token" Command="{Binding CreateCommand}" />
                 </StackPanel>
               </StackPanel>
             </Border>
 
-            <Border Classes="card" BorderBrush="{DynamicResource KpAccent}" Background="{DynamicResource KpAccentTint}"
+            <Border Classes="card" BorderBrush="{DynamicResource KpBorderStrong}" Background="{DynamicResource KpBgCard}"
                     IsVisible="{Binding HasMinted}">
               <StackPanel Spacing="12">
                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-                  <ctl:KpIcon Icon="alert-triangle" Size="15" Foreground="{DynamicResource KpAccent}" VerticalAlignment="Top" Margin="0,2,0,0" />
+                  <ctl:KpIcon Icon="alert-triangle" Size="15" Foreground="{DynamicResource KpTextSecondary}" VerticalAlignment="Top" Margin="0,2,0,0" />
                   <StackPanel Grid.Column="1" Spacing="4">
                     <TextBlock Classes="body strong" Text="Copy this token now. It will not be shown again." />
                     <TextBlock Classes="caption" Text="{Binding Minted.Note, FallbackValue=''}" />
@@ -339,7 +339,7 @@
                       <TextBlock Grid.Column="1" Classes="caption" Text="Hold to show" VerticalAlignment="Center" />
                     </Grid>
                   </Border>
-                  <Button Grid.Column="1" Classes="primary" Command="{Binding CopyMintedCommand}" VerticalAlignment="Center">
+                  <Button Grid.Column="1" Classes.primary="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).FormsArePrimary}" Command="{Binding CopyMintedCommand}" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                       <ctl:KpIcon Icon="copy" Size="13" />
                       <TextBlock Text="Copy" />

@@ -21,7 +21,7 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
 **High fidelity.** Colors, type, spacing, radii and copy are final. Build pixel-accurate using the tokens in `tokens/`.
 
 ## Design tokens (see `tokens/*.css`)
-**Color, dark by default**
+**Color (the dark palette; the app follows the system, and BRAND gives the light one)**
 - Inks: `#111214` app bg · `#18191C` panel/sidebar/titlebar · `#1D1E22` card/dialog · `#24262A` hover · `#2A2C30` active/secondary button · `#33363B` secondary hover
 - Lines: `#26282C` subtle · `#2C2E33` field border · `#3A3D43` strong/dialog border
 - Text: `#F2F2F0` primary · `#C9CACD` secondary · `#8E9096` muted · `#55575C` disabled
@@ -51,27 +51,27 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
   - Search, centered, `min(440px,100%)` × 28, radius 6, bg `#111214`, border `#26282C`, 12.5px muted. The app's only search (D-0374). Placeholder "Search all items", or "Search in this group" with the group as a chip (clearable) inside the field. ⌘K keycap is mono 10.5 on `#24262A`, radius 4.
   - Right side: status "● acme.kdbx · saved" (mono 11, green dot 6px) and a "lock" button (26h, `#24262A`, radius 6).
 - **Sidebar**, 232px (`#18191C`, right border), padding 16/10, gap 20:
-  - Lockup: 22px mark + 19px wordmark.
+  - The wordmark alone, 104px wide (BRAND: never beside the icon).
   - Four places (D-0374), one list read top to bottom: Items, each env project's row beneath it (indented, mono 12, with count), then Agents; Trash and Settings quieter at the foot. `Ctrl/Cmd+1`–`4` in that order.
-  - Nav rows: 34h, radius 7, 13.5/500. Icon 16px is muted, or amber when active; active bg `#2A2C30`. Count on the right is mono 11, muted. Agents also carries a 6px dot, green while the app is answering agents.
+  - Nav rows: 34h, radius 7, 13.5/500. Icon 16px is muted, or the text colour when active; active bg `#2A2C30`. Count on the right is mono 11, muted. Agents also carries a 6px dot, green while the app is answering agents.
   - No Import row and no MCP server card: import is in Items' "+" menu, and what the card said is the Agents row's tooltip.
 - **Back**: a screen under a place (a project's Env profiles, Agents › History, Settings › Advanced's activity log and share links) has a ghost "‹ <place>" button above its title.
 
 **1. Items**: columns `minmax(240px,34%) | 1fr`.
-- List header: project path (mono 13), profile badge "dev" (20h, `#24262A`, radius 4, mono 11), and an amber "New" button (28h) that opens a menu: New item, New project, Import .env, Import .kdbx. No filter field: the titlebar search is the only one.
+- List header: project path (mono 13), profile badge "dev" (20h, `#24262A`, radius 4, mono 11), and a "New" button (28h), amber unless a form in the view shows its own primary, that opens a menu: New item, New project, Import .env, Import .kdbx. No filter field: the titlebar search is the only one.
 - Rows: 52h, radius 7, grid `18px | 1fr | auto` over two lines.
-  - Line 1: icon, key (mono 13, ellipsis), and "last used" (mono 11) with a 6px dot. The dot is amber for in use, green for recently granted, `#55575C` for idle.
+  - Line 1: icon, key (mono 13, ellipsis), and "last used" (mono 11) with a 6px dot. The dot is blue for in use, green for recently granted, `#55575C` for idle.
   - Line 2: kind (11.5 muted).
-  - Hover bg `#1D1E22`. Selected: bg `rgba(242,181,68,.10)`, `box-shadow: inset 2px 0 0 #F2B544`, amber icon.
+  - Hover bg `#1D1E22`. Selected: bg `rgba(242,181,68,.10)`, `box-shadow: inset 2px 0 0 #F2B544`, icon in the text colour.
 - Detail (padding 28/32, gap 24, max-width 820):
   - Title (sans 22/600; a variable's key in mono 22) and path "Kind · acme.kdbx › acme › api › dev". Actions: Copy, Rotate, ⋯ (30h, `#2A2C30`).
   - **Value** field (40h, bg `#111214`, border `#2C2E33`): shows 24 masked • characters, with a Reveal/Hide toggle.
   - **Reference** (36h, `#18191C`): `kp://acme-api/dev/KEY`, plus the helper line "Use this in .env.keypaste with keypaste run, or in an agent's run tool when the bridge allows it…".
-  - Two cards: Agent access, and Profiles (dev set / staging set / prod "approval required" in amber).
+  - Two cards: Agent access, and Profiles (dev set / staging set / prod "approval required" in secondary text).
   - Metadata rows (140px label column): Created, Rotated, KDBX entry.
 
 **2. Agents**: padding 28/32, max-width 1080.
-- **Active grants** table: agent (13.5/600), secrets · scope (mono 12), time left (mono 11 amber) over a 3px progress bar, and "Revoke" (danger-tint button). Revoke removes the row and shows a toast.
+- **Active grants** table: agent (13.5/600), secrets · scope (mono 12), time left (mono 11 secondary) over a 3px muted progress bar, and "Revoke" (danger-tint button). Revoke removes the row and shows a toast.
 - **MCP clients** cards (auto-fill, min 240; `#18191C`; radius 10):
   - 32px initials tile, name and client, status dot.
   - POLICY select with three options: "Ask every time", "Session grants up to 1h", "Inject only".
@@ -84,7 +84,7 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
 
 **4. Env profiles**
 - Header actions: "Import .env", "Export .env.keypaste".
-- Matrix with columns KEY | DEV | STAGING | PROD (shield icon on PROD). Cells: "••••••" (set), "differs" (amber), "missing" (danger).
+- Matrix with columns KEY | DEV | STAGING | PROD (shield icon on PROD). Cells: "••••••" (set), "differs" (secondary), "missing" (danger).
 - Below it, two panels:
   - `.env.keypaste` preview (terminal style) with a dev/staging/prod segmented toggle that rewrites the references.
   - "Run with this profile" card showing the command `keypaste run -p <profile> -- npm start` plus explanatory copy.
@@ -97,7 +97,7 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
 
 **Overlays**
 - **MCP approval dialog** (the key moment), 460 max, radius 14, `#1D1E22`, border `#3A3D43`:
-  - Bot tile, "claude-code wants 2 secrets" (16/600), "via MCP · ~/acme/api · profile dev", and an amber countdown "0:28" with a haloed dot.
+  - Bot tile, "claude-code wants 2 secrets" (16/600), "via MCP · ~/acme/api · profile dev", and a countdown "0:28" (mono 11 secondary) with a muted dot: the primary answer is the prompt's one amber element.
   - Tool call box (mono 11.5): "tool: keypaste.run / npm run migrate".
   - Secrets list with "inject only" tags.
   - Explainer text, then the buttons Deny (ghost) · Allow once (secondary) · **Allow for 1 hour ⏎** (primary, right-aligned).
@@ -108,7 +108,7 @@ To view them, open any `design/*.dc.html` in a browser (`support.js` must sit ne
   - Buttons: Cancel / "Import 142 entries".
 - **Lock screen**: full-window with a 16px hairline grid background.
   - 56px mark, "acme.kdbx is locked", "Agents are paused until you unlock."
-  - Focused password field with an amber caret, amber "Unlock" button, and "Touch YubiKey 5C to unlock".
+  - Focused password field with an amber caret, amber "Unlock" button, and "Touch YubiKey 5C to unlock"; while the key waits for a touch, its waiting dot is the amber element and Unlock is secondary.
 - **Toast**, bottom-right 20px: `#24262A`, border `#3A3D43`, radius 10, green check icon, auto-dismisses after 2.8s.
 
 ## CLI (`keypaste CLI.dc.html`)
@@ -132,11 +132,11 @@ State: `view`, `sel` (selected secret), `reveal`, `approval`, `importOpen`, `loc
 - The profile toggle rewrites the `.env.keypaste` preview and the run command.
 
 ## Assets
-- `assets/keypaste-mark.svg`: primary mark (paper stem `#F2F2F0` + amber arm).
-- `assets/keypaste-mark-mono.svg`: one-color, `currentColor`.
-- `assets/keypaste-app-icon.svg`: app icon; `#1D1E22` tile, rx 15/64.
-- `assets/keypaste-favicon.svg`: for 16px and below; amber tile with ink glyph.
-- Mark geometry on a 64u grid: stem `rect(10,8,10,48)`; arm `polygon(40,24 54,24 38,40 54,56 40,56 24,40)`; the 4u gap is never closed.
+- `assets/keypaste-glyph-dark.svg` / `-light.svg` / `-mono.svg`: the icon "k." (ink `#F2F2F0` or `#111214`, amber dot; mono takes `currentColor`).
+- `assets/keypaste-wordmark-dark.svg` / `-light.svg` / `-mono.svg`: the wordmark "keypaste.", never beside the icon.
+- `assets/keypaste-app-icon.svg`: app icon; the icon on a `#1D1E22` tile, rx 15/64.
+- `assets/keypaste-favicon.svg`: for 32px and below; the same tile, rx 12/64, with a larger "k.".
+- The marks are Hepta Slab SemiBold outlines written by `scripts/outline-brand-marks.py`; the prototypes still draw the earlier monogram.
 - Icons: **Lucide**, 1.5px stroke (the prototype uses the `lucide-static` icon font). Use `lucide-react` or equivalent. Sizes: 16px lists, 14px fields, 20px sidebar.
 - Fonts: Instrument Sans and Fragment Mono (Google Fonts, OFL). Self-host them in the app.
 

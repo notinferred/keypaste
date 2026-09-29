@@ -2,7 +2,7 @@
 
 Owns the marks, the palette, the type, the shape, the voice and the usage rules. Every surface (desktop app, CLI, site, README, store listing, installer) takes its visual values from here. The design handoff in [docs/design](design/README.md) holds the exact values for every screen and the high-fidelity prototypes they come from; where this page and a prototype disagree, the prototype's markup is the reference for that screen and this page for everything else. Where a value also has to exist as code, the file named below holds it.
 
-**Status:** adopted 2026-09-24 (direction 1b, the monogram). The desktop app's theme, icon, shell and screens, keypaste.com (through [brand.css](../site/public/brand.css)) and the README's lockup and screenshots are built from it, and the CLI follows the terminal rules below. Amended 2026-09-28: the theme follows the system, titles use the sans face and the voice is calmer; the app adopts the amendment in N.7.
+**Status:** adopted 2026-09-24. Amended 2026-09-28: the theme follows the system, titles use the sans face and the voice is calmer. Amended 2026-09-29 by the founder: the monogram and its lockup give way to an icon and a wordmark in Hepta Slab with an amber dot, never set together, and the status colours gain light-ground values. The desktop app's theme, icon, shell and screens, keypaste.com (through [brand.css](../site/public/brand.css)) and the README's wordmark and screenshots are built from it as amended ([N.7](steps/N.7.md)), and the CLI follows the terminal rules below.
 
 ## Colour
 
@@ -22,7 +22,7 @@ The app follows the system's light or dark setting, and both palettes are first-
 
 The single accent is amber `#F2B544` (hover `#F7C566`, press `#D99D2E`, tint 10–12%). It appears once per view, for the primary action or a live signal, and text on amber is always ink `#111214`. Amber used as text on a light ground is `#8A5A00`.
 
-Status colours: ok `oklch(0.80 0.13 155)`, danger `oklch(0.74 0.14 25)` with a 12% tint behind danger buttons, info `oklch(0.78 0.10 245)`. Warn is amber, and an idle dot is `#55575C`. The app draws them as `#72D699`, `#F7857D` and `#7FBEF3` because Avalonia has no oklch.
+Status colours: ok `oklch(0.80 0.13 155)`, danger `oklch(0.74 0.14 25)` with a 12% tint behind danger buttons, info `oklch(0.78 0.10 245)`. On the light palette the same hues sit at lightness 0.50, `oklch(0.50 0.13 155)`, `oklch(0.50 0.17 25)` and `oklch(0.50 0.10 245)`, so a status read as text keeps 4.5:1 on every light surface. Warn is amber, and an idle dot is `#55575C`. The app draws them as `#72D699`, `#F7857D` and `#7FBEF3`, and on light as `#007840`, `#B02A2D` and `#296898`, because Avalonia has no oklch.
 
 The app's values are in [Tokens.axaml](../src/Keypaste.App/Theme/Tokens.axaml); the CSS source is [docs/design/tokens](design/tokens/tokens/colors.css).
 
@@ -42,7 +42,7 @@ Instrument Sans 400/500/600 for the interface and Fragment Mono 400 for anything
 
 [Typography.axaml](../src/Keypaste.App/Theme/Typography.axaml) holds these as text classes.
 
-The wordmark is "keypaste", always lowercase, Instrument Sans 600 at −0.045em. The README lockups draw it as outlines of Instrument Sans SemiBold, because an SVG shown as an image cannot load a web font; elsewhere it is live text, outlined before production print use.
+The marks are set in Hepta Slab SemiBold (600) tracked −1%, and only as outlines: no surface loads the face, and the interface never uses it.
 
 ## Shape and motion
 
@@ -66,23 +66,23 @@ Plain and calm; precise where it protects you. Name the actor and the object: "c
 
 ## The marks
 
-The lowercase k is a cursor stem (`rect 10,8,10,48`) and an insert-bracket arm (`polygon 40,24 54,24 38,40 54,56 40,56 24,40`) on a 64-unit grid, with a 4-unit gap that is never closed. The arm is amber, or the stem's colour in one-colour use.
+The icon is "k." and the wordmark "keypaste.": the letters in ink, `#F2F2F0` on dark and `#111214` on light, and the square dot amber. They are two marks, never set side by side: the app's sidebar carries the wordmark alone, its lock screen and every icon the "k." alone.
 
 | File in [`assets/brand/`](../assets/brand) | Use |
 |---|---|
-| `keypaste-mark.svg` | The mark in colour, on a dark ground |
-| `keypaste-mark-mono.svg` | One-colour use; takes `currentColor` |
-| `keypaste-lockup-dark.svg` / `keypaste-lockup-light.svg` | Mark and wordmark on a dark or light ground; the README switches between them with `prefers-color-scheme` |
-| `keypaste-app-icon.svg` | App icon: `#1D1E22` tile, radius 15/64 |
-| `keypaste-favicon.svg` | 16px and below: amber tile, ink glyph |
+| `keypaste-glyph-dark.svg` / `keypaste-glyph-light.svg` | The icon on a dark or light ground |
+| `keypaste-wordmark-dark.svg` / `keypaste-wordmark-light.svg` | The wordmark on a dark or light ground; the README switches between them with `prefers-color-scheme` |
+| `keypaste-glyph-mono.svg` / `keypaste-wordmark-mono.svg` | One-colour use, the dot included; takes `currentColor` |
+| `keypaste-app-icon.svg` | App icon: the icon on a `#1D1E22` tile, radius 15/64, 46% of its height |
+| `keypaste-favicon.svg` | 32px and below: the same tile at radius 12/64 with a larger "k.", whose serifs stay apart at 16px |
 
-[render-app-icon.py](../scripts/render-app-icon.py) draws the desktop app's `.ico`, PNG and Linux icon from this geometry.
+[outline-brand-marks.py](../scripts/outline-brand-marks.py) outlines both marks from the recorded Hepta Slab file into these files, the site's favicon and the app's [BrandOutlines.axaml](../src/Keypaste.App/Theme/BrandOutlines.axaml); [render-app-icon.py](../scripts/render-app-icon.py) draws the desktop app's `.ico`, PNG, Linux icon and macOS `.icns` from the two tiles.
 
 ## Rules
 
 1. **Always lowercase.** The wordmark and the product name.
-2. **The gap between stem and arm is never closed.**
-3. **The mark's floor is 16px and the lockup's is 88px wide.** At 16px or smaller, use the favicon.
+2. **The icon and the wordmark are never set side by side, and the dot is never omitted.** It is amber, or the ink's colour in one-colour use.
+3. **The icon's floor is 16px and the wordmark's is 88px wide.** At 32px or smaller, use the favicon.
 4. **Amber appears once per view**, for the primary action or a live signal, and carries ink text.
 5. **Machine-readable text is mono**, everything else is Instrument Sans.
 6. **Depth is lightness.** Shadows belong to overlays only.

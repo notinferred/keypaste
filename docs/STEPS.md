@@ -6,7 +6,7 @@ This file holds open work only. Finishing a task removes it from here, adds its 
 
 ## Selection and evidence
 
-Only the next five tasks are detailed: N.7, N.2, N.5, N.4 and N.1b. Later rows name a bounded outcome and the dependencies their own implementation or verifier needs; expand a selected later task before building it. Tasks are not marked implemented from a document, reader, mock response or consuming screen. Name the producer, transport, consumer and user action exercised, and retain the source/version and limitations of the observation.
+Only the next five tasks are detailed: N.2, N.5, N.4, N.1b and N.12. Later rows name a bounded outcome and the dependencies their own implementation or verifier needs; expand a selected later task before building it. Tasks are not marked implemented from a document, reader, mock response or consuming screen. Name the producer, transport, consumer and user action exercised, and retain the source/version and limitations of the observation.
 
 Needs are build dependencies. Ships after names publication gates. External signing identities are inputs, not a queue of enrollment code. A ready row does not authorize publication, account changes or messages. Preserve the secret-path tests, real KeePassXC compatibility, stale-write refusals and release integrity checks while changing product scope.
 
@@ -14,12 +14,6 @@ Needs are build dependencies. Ships after names publication gates. External sign
 
 Custom fields and tags are ordinary KeePass data: keypaste writes them as KeePassXC reads them, and every row keeps the permanent compatibility gates (PRODUCT §4.6). C.1a's tags include the project tags T4 builds on. The main screens show everyday password-manager work; advanced controls and security recommendations live in Settings (PRODUCT §5.8).
 
-- [ ] **N.7 — Apply the amended brand.** Needs: N.1a2.
-  **Build:** the app follows [BRAND](BRAND.md) as amended on 2026-09-28. With no theme chosen, `AppSettings.Default` and `App.axaml` follow the system's light or dark setting, as it changes; Light or Dark chosen in Settings still wins. Titles and headings, the item title in its pane among them, use Instrument Sans at BRAND's sizes, and keys, values, references, paths, commands and timestamps stay Fragment Mono. The copy on the main screens and in the prompts follows BRAND's voice without dropping what T-2's evidence relies on. The first line of `keypaste --help` carries PRODUCT §1's positioning within 80 columns. The keypaste-design skill applies. Traces to PRODUCT §§1 and 5.8.
-
-  **Verify (V-N.7):** with no `app.toml`, a frame captured under a light platform setting has the light app background and one under a dark setting the dark background, and a choice in Settings overrides either. `ScreenRenderer` renders every screen in both palettes, and each frame has one amber element. The rendered item title and headings use Instrument Sans, and a key and a value Fragment Mono. `CliAppTests` pins the new help line, which fits 80 columns.
-
-  A palette shown only in a token file does not pass.
 - [ ] **N.2 — Offer the person's KeePassXC database on first run.** Needs: none.
   **Build:** with no recent vault, the welcome offers three things: the databases KeePassXC last opened, opening another file, and creating a vault. Core reads only `LastActiveDatabase`, `LastOpenedDatabases` and `LastDatabases` from KeePassXC's local `keepassxc.ini` (`%LOCALAPPDATA%\KeePassXC\keepassxc.ini` on Windows, and where KeePassXC 2.7 keeps it on macOS and Linux), lists each existing file once, and treats a missing, unreadable or malformed file as no databases. Choosing one goes to the ordinary unlock with that path, and nothing is written to KeePassXC's files. The lock screen stops mentioning agents, and the YubiKey control moves under More options unless the vault's recent entry records a slot. T-24 gains the read. Traces to PRODUCT §§1 and 5.8.
 
@@ -45,8 +39,11 @@ Custom fields and tags are ordinary KeePass data: keypaste writes them as KeePas
 
   A control left reachable only from its old place, or removed, leaves the row open.
 - [ ] **N.12 — Mark copied secrets as concealed on macOS and Linux.** Needs: none.
-  - Add the macOS pasteboard's concealed and transient types, and KDE's password-manager hint, as Windows already has.
-  - T-19 is extended.
+  **Build:** a secret the desktop copies carries, in the same clipboard item as the Windows formats, `org.nspasteboard.ConcealedType` and `org.nspasteboard.TransientType`, which macOS pasteboard managers honour, and `x-kde-passwordManagerHint` holding `secret`, which KDE's Klipper honours. A copy that is not a secret, such as a `keypaste run` command, carries none. T-19 and SECURITY say what each marker asks and that none stops a process reading the clipboard, and O-0019 is answered. The CLI's `pbcopy`, `wl-copy` and `xclip` writes are unchanged, and that limit is stated. Traces to PRODUCT §3.
+
+  **Verify (V-N.12):** `AvaloniaClipboard` hands the platform one item holding the text and every marker for a secret, and no marker for plain text. On the macOS runner, after the app copies a secret, the general pasteboard lists both nspasteboard types beside the text, and none after the clear; on a Linux runner with an X11 clipboard, `xclip -o -t TARGETS` lists `x-kde-passwordManagerHint`, whose content reads `secret`.
+
+  A marker shown only in the source, with no platform read of what the clipboard offered, does not pass.
 - [ ] **N.6 — Use plain words everywhere.** Needs: N.1a, N.3.
   - The app, the CLI help and the bridge's refusal texts replace stdio, exposure, grant, session and KDBX-entry wording with plain terms.
   - The approval prompts keep every element T-2's evidence relies on.

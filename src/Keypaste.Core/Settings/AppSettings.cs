@@ -98,7 +98,7 @@ public sealed record AppSettings
     public static AppSettings Default { get; } = new()
     {
         IdleTimeoutSeconds = 300,
-        Theme = AppTheme.Dark,
+        Theme = AppTheme.System,
         LockWhenMinimized = false,
     };
 

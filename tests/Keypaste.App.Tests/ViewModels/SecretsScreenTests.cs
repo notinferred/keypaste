@@ -98,7 +98,7 @@ public sealed class SecretsScreenTests : IDisposable
         Assert.Equal(
             [("dev", "set"), ("prod", "approval required")],
             detail.ProfileStates.Select(state => (state.Profile, state.State)));
-        Assert.True(detail.ProfileStates[1].IsAmber);
+        Assert.True(detail.ProfileStates[1].IsAsked);
     }
 
     [Fact]

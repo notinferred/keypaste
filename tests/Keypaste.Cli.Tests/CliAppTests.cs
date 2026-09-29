@@ -147,7 +147,7 @@ public sealed class CliAppTests
     private static string GroupedHelp => string.Join(
         Environment.NewLine,
         [
-            $"keypaste {CoreInfo.Version} · secrets for developers and their agents",
+            $"keypaste {CoreInfo.Version} · a simple, local password manager on your KeePass file",
             "",
             "USAGE",
             "  keypaste <command> [flags]",

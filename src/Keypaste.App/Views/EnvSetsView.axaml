@@ -220,7 +220,7 @@
         <Border Classes="banner" IsVisible="{Binding HasNotice}" Background="{DynamicResource KpAccentTint}">
           <Grid ColumnDefinitions="Auto,*">
             <ctl:KpIcon Icon="info" Size="14" Margin="0,1,10,0" VerticalAlignment="Top"
-                        Foreground="{DynamicResource KpAccent}" />
+                        Foreground="{DynamicResource KpTextSecondary}" />
             <TextBlock Grid.Column="1" Text="{Binding Notice}" TextWrapping="Wrap" FontSize="12.5"
                        Foreground="{DynamicResource KpTextSecondary}" />
           </Grid>
@@ -295,14 +295,14 @@
                                   <StackPanel Orientation="Horizontal" Spacing="6">
                                     <TextBlock Classes="th" Classes.selected="{Binding IsSelected}" Text="{Binding Header}" />
                                     <ctl:KpIcon Icon="shield-check" Size="12" IsVisible="{Binding IsProtected}"
-                                                Foreground="{DynamicResource KpAccent}" />
+                                                Foreground="{DynamicResource KpTextSecondary}" />
                                   </StackPanel>
                                 </Button>
                               </DataTemplate>
                             </ItemsControl.ItemTemplate>
                           </ItemsControl>
                           <!-- The selected profile, which holds, edits, the preview and the run command use, sits
-                               on an amber bar along the head's lower edge. -->
+                               on a bar in the text colour along the head's lower edge. -->
                           <ItemsControl Grid.Column="1" ItemsSource="{Binding Columns}" Margin="0,0,0,-9"
                                         VerticalAlignment="Bottom" IsHitTestVisible="False">
                             <ItemsControl.ItemsPanel>
@@ -355,7 +355,7 @@
                                                        Classes.danger="{Binding IsMissing}"
                                                        Classes.under="{Binding HasVariable}"
                                                        Text="{Binding Label}" />
-                                            <TextBlock Classes="mono amber"
+                                            <TextBlock Classes="mono secondary"
                                                        Text="{Binding Note}" IsVisible="{Binding HasNote}"
                                                        MaxWidth="{Binding $parent[Button].Bounds.Width}"
                                                        TextTrimming="CharacterEllipsis" />
@@ -430,7 +430,7 @@
                   <ItemsControl ItemsSource="{Binding ProfileProblems}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="x:String">
-                        <TextBlock Classes="caption amber" Text="{Binding}" />
+                        <TextBlock Classes="caption secondary" Text="{Binding}" />
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
@@ -624,8 +624,8 @@
                                  Text="This app opens terminals on Windows and Linux only. Copy the run command instead." />
 
                       <!-- The confirmation names the command, the directory and the variables' names, never a value. -->
-                      <Border Classes="card" IsVisible="{Binding Launch.IsConfirming}" BorderBrush="{DynamicResource KpAccent}"
-                              Background="{DynamicResource KpAccentTint}" Padding="14">
+                      <Border Classes="card" IsVisible="{Binding Launch.IsConfirming}" BorderBrush="{DynamicResource KpBorderStrong}"
+                              Background="{DynamicResource KpBgCard}" Padding="14">
                         <StackPanel Spacing="6">
                           <TextBlock Classes="body primary" Text="{Binding Launch.ConfirmTitle}" />
                           <TextBlock Classes="mono primary" Text="{Binding Launch.ConfirmStarts}" TextWrapping="Wrap" />

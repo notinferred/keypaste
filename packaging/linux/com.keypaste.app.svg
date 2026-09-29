@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 64 64">
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 64 64" role="img" aria-label="keypaste">
   <rect width="64" height="64" rx="15" fill="#1D1E22"/>
-  <rect x="16" y="14" width="7" height="36" fill="#F2F2F0"/>
-  <polygon points="38,26 48,26 36.5,38 48,50 38,50 26.5,38" fill="#F2B544"/>
+  <path fill="#F2F2F0" d="M23.22 42.9H26.07V46.72H15.27V42.9H18.68V21.1H15.27V17.28H23.22V36.58L31.44 30.3H26.45V26.48H39.68V30.3H37.05L31.16 34.65L37.55 42.9H39.92V46.72H29.15V42.9H32.11L27.81 37.12L23.22 40.52Z"/>
+  <path fill="#F2B544" d="M43.05 41.24H48.73V46.72H43.05Z"/>
 </svg>

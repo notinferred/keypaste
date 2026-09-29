@@ -97,6 +97,18 @@
     <Setter Property="LetterSpacing" Value="-0.22" />
   </Style>
 
+  <!-- An item's title is words, so sans: in its pane at heading size, in a list at row size (BRAND).
+       A variable's key is machine text and stays mono.lg / mono.xl. -->
+  <Style Selector=":is(TextBlock).title">
+    <Setter Property="FontSize" Value="22" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="LetterSpacing" Value="-0.66" />
+  </Style>
+  <Style Selector=":is(TextBlock).row-title">
+    <Setter Property="FontSize" Value="13.5" />
+    <Setter Property="FontWeight" Value="Medium" />
+  </Style>
+
   <Style Selector=":is(TextBlock).primary">
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
   </Style>

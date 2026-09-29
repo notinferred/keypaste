@@ -3,9 +3,10 @@
                     xmlns:sys="clr-namespace:System;assembly=System.Runtime">
 
   <!--
-    The design tokens from docs/design/tokens, dark first. The single accent is amber, used once per
+    The design tokens from docs/design/tokens, in two first-class palettes: the app follows the
+    system's light or dark setting unless Settings chooses one. The single accent is amber, used once per
     view for the primary action or a live signal, and text on amber is always ink. Status colours
-    share one oklch lightness and chroma; they are converted to sRGB here because Avalonia has no
+    share one oklch lightness and chroma in each palette; they are converted to sRGB here because Avalonia has no
     oklch. Depth is lightness, not shadow: shadows are for overlays only.
 
     Semantic brushes (KpBg*, KpBorder*, KpText*, KpAccent*, status) change with the theme and are
@@ -34,7 +35,10 @@
 
       <SolidColorBrush x:Key="KpAccentText" Color="#F2B544" />
       <SolidColorBrush x:Key="KpFocusGap" Color="#111214" />
-      <SolidColorBrush x:Key="KpMarkStem" Color="#F2F2F0" />
+      <SolidColorBrush x:Key="KpMarkInk" Color="#F2F2F0" />
+      <SolidColorBrush x:Key="KpOk" Color="#72D699" />
+      <SolidColorBrush x:Key="KpDanger" Color="#F7857D" />
+      <SolidColorBrush x:Key="KpInfo" Color="#7FBEF3" />
 
       <!-- Kept from the first palette so every view written against it still resolves. -->
       <SolidColorBrush x:Key="KpSurface0" Color="#111214" />
@@ -62,7 +66,11 @@
 
       <SolidColorBrush x:Key="KpAccentText" Color="#8A5A00" />
       <SolidColorBrush x:Key="KpFocusGap" Color="#FFFFFF" />
-      <SolidColorBrush x:Key="KpMarkStem" Color="#111214" />
+      <SolidColorBrush x:Key="KpMarkInk" Color="#111214" />
+      <!-- BRAND's status hues at oklch lightness 0.50, so a status read as text keeps 4.5:1 on every light surface. -->
+      <SolidColorBrush x:Key="KpOk" Color="#007840" />
+      <SolidColorBrush x:Key="KpDanger" Color="#B02A2D" />
+      <SolidColorBrush x:Key="KpInfo" Color="#296898" />
 
       <SolidColorBrush x:Key="KpSurface0" Color="#F7F7F5" />
       <SolidColorBrush x:Key="KpSurface1" Color="#FFFFFF" />
@@ -81,13 +89,10 @@
   <SolidColorBrush x:Key="KpAccentHalo" Color="#33F2B544" />
   <SolidColorBrush x:Key="KpOnAccent" Color="#111214" />
   <SolidColorBrush x:Key="KpFocusRing" Color="#F2B544" />
-  <SolidColorBrush x:Key="KpMarkArm" Color="#F2B544" />
+  <SolidColorBrush x:Key="KpMarkDot" Color="#F2B544" />
 
-  <SolidColorBrush x:Key="KpOk" Color="#72D699" />
-  <SolidColorBrush x:Key="KpDanger" Color="#F7857D" />
   <SolidColorBrush x:Key="KpDangerTint" Color="#1FF0786E" />
   <SolidColorBrush x:Key="KpDangerTintHover" Color="#33F0786E" />
-  <SolidColorBrush x:Key="KpInfo" Color="#7FBEF3" />
   <SolidColorBrush x:Key="KpWarn" Color="#F2B544" />
   <SolidColorBrush x:Key="KpIdle" Color="#55575C" />
 

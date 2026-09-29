@@ -40,11 +40,11 @@
         </ControlTemplate>
       </Setter>
       <Style Selector="^:checked /template/ Border#Track">
-        <Setter Property="Background" Value="{DynamicResource KpAccent}" />
+        <Setter Property="Background" Value="{DynamicResource KpTextPrimary}" />
       </Style>
       <Style Selector="^:checked /template/ Border#Knob">
         <Setter Property="Margin" Value="16,0,0,0" />
-        <Setter Property="Background" Value="{DynamicResource KpOnAccent}" />
+        <Setter Property="Background" Value="{DynamicResource KpBgApp}" />
       </Style>
       <Style Selector="^:focus-visible /template/ Border#Track">
         <Setter Property="BoxShadow" Value="{StaticResource KpFieldGlow}" />

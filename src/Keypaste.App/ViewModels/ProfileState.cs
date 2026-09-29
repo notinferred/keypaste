@@ -10,9 +10,10 @@ internal sealed record ProfileState(string Profile, string State, string? Proble
 {
     internal bool IsOk => State == "set";
 
-    internal bool IsAmber => State == "approval required";
+    /// <summary>Whether the key is set in a protected profile, which asks every time: said plainly, not in amber.</summary>
+    internal bool IsAsked => State == "approval required";
 
-    internal bool IsDanger => !IsOk && !IsAmber;
+    internal bool IsDanger => !IsOk && !IsAsked;
 
     /// <summary>A protected profile's key is always asked about live, which is what its line says once it is set.</summary>
     internal static ProfileState Of(EnvCell cell)

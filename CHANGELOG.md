@@ -6,7 +6,9 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 Upgrade the bridge and `keypaste agent` together: they must be the same version, and the bridge now needs `--vault`, so re-run `keypaste setup` for each client. Approval prompts answer `d`, `o` or `h` instead of `y` or `n`. `env export` now writes `kp://` references by default and values only with `--dotenv`. `rm` moves entries to the vault's recycle bin, which saves the vault as KDBX 4.1; KeePass 2.48 and KeePassXC 2.7 or later open it. The desktop entries below ship with the first public desktop release, which is published together with this version ([RELEASE](docs/RELEASE.md)). Each entry that names a step links its record, which holds the full account.
 
-keypaste has a new brand: the k monogram, amber on ink, Instrument Sans and Fragment Mono ([BRAND](docs/BRAND.md)). The desktop app is rebuilt on it, with restyled screens, a new lock screen and restyled prompt windows, and keypaste.com and the README use it too.
+keypaste has a new brand: an icon "k." and a wordmark "keypaste." in Hepta Slab with an amber dot, amber on ink, Instrument Sans and Fragment Mono ([BRAND](docs/BRAND.md)). The desktop app is rebuilt on it, with restyled screens, a new lock screen and restyled prompt windows, and keypaste.com and the README use it too.
+
+The desktop follows your system's light or dark setting unless Settings chooses one. Item titles are set in Instrument Sans, status text is darker and readable on the light palette, and every screen in both palettes keeps amber for its one main action or live signal. The icon and wordmark replace the monogram in the app, its icons, keypaste.com and the README, and `keypaste --help` opens with what keypaste is ([N.7](docs/steps/N.7.md)).
 
 Amber now marks one thing on a screen, its main action or something live such as a waiting request: selected rows and icons, links, countdown bars and an entry's "in use" dot are drawn in the ordinary colours ([N.1a2](docs/steps/N.1a2.md)).
 

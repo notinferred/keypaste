@@ -71,6 +71,17 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
         _toast = toast ?? (_ => { });
         Connect = authority is null ? null : new ConnectClientViewModel(authority.Session, connector ?? ClientConnector.ForThisProcess());
         Tokens = authority is null ? null : new ScopedTokensViewModel(authority.Session, clipboard, _toast);
+
+        if (Tokens is not null)
+        {
+            Tokens.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName is nameof(ScopedTokensViewModel.IsFormOpen) or nameof(ScopedTokensViewModel.HasMinted))
+                {
+                    Raise(nameof(ConnectIsPrimary));
+                }
+            };
+        }
         ToggleConnectCommand = new RelayCommand(() => IsConnectOpen = !IsConnectOpen, () => Connect is not null);
         OffersHistory = openHistory is not null;
         _auditPath = KeypasteHome.AuditPath(home);
@@ -130,8 +141,24 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
     internal bool IsConnectOpen
     {
         get => _isConnectOpen;
-        set => Set(ref _isConnectOpen, value && Connect is not null);
+        set
+        {
+            if (Set(ref _isConnectOpen, value && Connect is not null))
+            {
+                Raise(nameof(ConnectIsPrimary));
+            }
+        }
     }
+
+    /// <summary>
+    /// Whether Connect client is the screen's primary action: not while a request waits, whose
+    /// countdown is the live signal, nor while a form here shows its own primary (D-0375).
+    /// </summary>
+    internal bool ConnectIsPrimary =>
+        Connect is not null && !HasWaiting && !_isConnectOpen && Tokens is not { IsFormOpen: true } and not { HasMinted: true };
+
+    /// <summary>Whether a form's own action may be primary: not while a request waits.</summary>
+    internal bool FormsArePrimary => !HasWaiting;
 
     internal RelayCommand ToggleConnectCommand { get; }
 
@@ -284,6 +311,8 @@ internal sealed class AgentActivityViewModel : ObservableObject, IDisposable
         Raise(nameof(Waiting));
         Raise(nameof(NothingWaiting));
         Raise(nameof(HasWaiting));
+        Raise(nameof(ConnectIsPrimary));
+        Raise(nameof(FormsArePrimary));
         Raise(nameof(Grants));
         Raise(nameof(NoGrants));
         Raise(nameof(HasGrants));

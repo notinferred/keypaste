@@ -5,6 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.Media.TextFormatting;
 using Avalonia.Platform;
 using Avalonia.VisualTree;
 using Keypaste.App.Controls;
@@ -13,7 +14,7 @@ using Xunit;
 namespace Keypaste.App.Tests.Rendering;
 
 /// <summary>How a control draws text: what a reference rendering has to match.</summary>
-internal readonly record struct TextStyle(Typeface Typeface, double Size)
+internal readonly record struct TextStyle(Typeface Typeface, double Size, double LetterSpacing = 0)
 {
     /// <summary>The style <see cref="RevealedValue"/> draws its value and its dots in.</summary>
     internal static TextStyle Of(RevealedValue cell) => new(new Typeface(cell.FontFamily), cell.FontSize);
@@ -231,6 +232,8 @@ internal sealed class DrawnFrame
 
         internal static Reference Of(string text, TextStyle style, double scaling)
         {
+            // FormattedText has no letter spacing, so a tracked heading is laid out as a TextBlock lays it out.
+            using var tracked = style.LetterSpacing == 0 ? null : new TextLayout(text, style.Typeface, style.Size, Brushes.Black, letterSpacing: style.LetterSpacing);
             var layout = new FormattedText(
                 text,
                 CultureInfo.CurrentCulture,
@@ -240,14 +243,22 @@ internal sealed class DrawnFrame
                 Brushes.Black);
 
             var size = new PixelSize(
-                (int)Math.Ceiling(layout.WidthIncludingTrailingWhitespace * scaling) + 2,
-                (int)Math.Ceiling(layout.Height * scaling) + 2);
+                (int)Math.Ceiling((tracked?.WidthIncludingTrailingWhitespace ?? layout.WidthIncludingTrailingWhitespace) * scaling) + 2,
+                (int)Math.Ceiling((tracked?.Height ?? layout.Height) * scaling) + 2);
 
             using var target = new RenderTargetBitmap(size, new Vector(96 * scaling, 96 * scaling));
             using (var context = target.CreateDrawingContext())
             {
                 context.FillRectangle(Brushes.White, new Rect(0, 0, size.Width / scaling, size.Height / scaling));
-                context.DrawText(layout, new Point(1, 1));
+
+                if (tracked is null)
+                {
+                    context.DrawText(layout, new Point(1, 1));
+                }
+                else
+                {
+                    tracked.Draw(context, new Point(1, 1));
+                }
             }
 
             var (luminance, width, height) = ReadLuminance(target);

@@ -85,6 +85,40 @@
       <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="#C9CACD" />
       <SolidColorBrush x:Key="ToggleSwitchKnobFillOffPointerOver" Color="#F2F2F0" />
       <SolidColorBrush x:Key="ToggleSwitchContentForeground" Color="#F2F2F0" />
+      <!-- A checked box, a chosen radio and a switch that is on are drawn in the text colour, not amber: a view keeps amber for its primary action or a live signal (D-0375). -->
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillChecked" Color="#F2F2F0" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPointerOver" Color="#C9CACD" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPressed" Color="#C9CACD" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeChecked" Color="#F2F2F0" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPointerOver" Color="#C9CACD" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPressed" Color="#C9CACD" />
+      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundChecked" Color="#111214" />
+      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPointerOver" Color="#111214" />
+      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPressed" Color="#111214" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedStroke" Color="#F2F2F0" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedStrokePointerOver" Color="#C9CACD" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedStrokePressed" Color="#C9CACD" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedFill" Color="#F2F2F0" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedFillPointerOver" Color="#C9CACD" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedFillPressed" Color="#C9CACD" />
+      <SolidColorBrush x:Key="RadioButtonCheckGlyphFill" Color="#111214" />
+      <SolidColorBrush x:Key="RadioButtonCheckGlyphFillPointerOver" Color="#111214" />
+      <SolidColorBrush x:Key="RadioButtonCheckGlyphFillPressed" Color="#111214" />
+      <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#F2F2F0" />
+      <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#C9CACD" />
+      <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#C9CACD" />
+      <SolidColorBrush x:Key="ToggleSwitchStrokeOn" Color="#F2F2F0" />
+      <SolidColorBrush x:Key="ToggleSwitchStrokeOnPointerOver" Color="#C9CACD" />
+      <SolidColorBrush x:Key="ToggleSwitchStrokeOnPressed" Color="#C9CACD" />
+      <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#111214" />
+      <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#111214" />
+      <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#111214" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminate" Color="#F2F2F0" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminatePointerOver" Color="#C9CACD" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminatePressed" Color="#C9CACD" />
+      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundIndeterminate" Color="#111214" />
+      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundIndeterminatePointerOver" Color="#111214" />
+      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundIndeterminatePressed" Color="#111214" />
 
       <SolidColorBrush x:Key="ComboBoxBackground" Color="#111214" />
       <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#111214" />
@@ -202,6 +236,40 @@
       <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="#6B6D72" />
       <SolidColorBrush x:Key="ToggleSwitchKnobFillOffPointerOver" Color="#3A3C40" />
       <SolidColorBrush x:Key="ToggleSwitchContentForeground" Color="#111214" />
+      <!-- A checked box, a chosen radio and a switch that is on are drawn in the text colour, not amber: a view keeps amber for its primary action or a live signal (D-0375). -->
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillChecked" Color="#111214" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPointerOver" Color="#3A3C40" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPressed" Color="#3A3C40" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeChecked" Color="#111214" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPointerOver" Color="#3A3C40" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPressed" Color="#3A3C40" />
+      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundChecked" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPointerOver" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPressed" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedStroke" Color="#111214" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedStrokePointerOver" Color="#3A3C40" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedStrokePressed" Color="#3A3C40" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedFill" Color="#111214" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedFillPointerOver" Color="#3A3C40" />
+      <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedFillPressed" Color="#3A3C40" />
+      <SolidColorBrush x:Key="RadioButtonCheckGlyphFill" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="RadioButtonCheckGlyphFillPointerOver" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="RadioButtonCheckGlyphFillPressed" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#111214" />
+      <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#3A3C40" />
+      <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#3A3C40" />
+      <SolidColorBrush x:Key="ToggleSwitchStrokeOn" Color="#111214" />
+      <SolidColorBrush x:Key="ToggleSwitchStrokeOnPointerOver" Color="#3A3C40" />
+      <SolidColorBrush x:Key="ToggleSwitchStrokeOnPressed" Color="#3A3C40" />
+      <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminate" Color="#111214" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminatePointerOver" Color="#3A3C40" />
+      <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminatePressed" Color="#3A3C40" />
+      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundIndeterminate" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundIndeterminatePointerOver" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundIndeterminatePressed" Color="#FFFFFF" />
 
       <SolidColorBrush x:Key="ComboBoxBackground" Color="#FFFFFF" />
       <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#FFFFFF" />
@@ -289,41 +357,6 @@
   <Thickness x:Key="TextControlBorderThemeThickness">1</Thickness>
   <Thickness x:Key="TextControlBorderThemeThicknessFocused">1</Thickness>
   <Thickness x:Key="TextControlThemePadding">12,7,12,6</Thickness>
-
-  <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillChecked" Color="#F2B544" />
-  <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPointerOver" Color="#F7C566" />
-  <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPressed" Color="#D99D2E" />
-  <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminate" Color="#F2B544" />
-  <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminatePointerOver" Color="#F7C566" />
-  <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillIndeterminatePressed" Color="#D99D2E" />
-  <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPointerOver" Color="#F7C566" />
-  <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeCheckedPressed" Color="#D99D2E" />
-  <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundChecked" Color="#111214" />
-  <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPointerOver" Color="#111214" />
-  <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPressed" Color="#111214" />
-  <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundIndeterminate" Color="#111214" />
-  <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundIndeterminatePointerOver" Color="#111214" />
-  <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundIndeterminatePressed" Color="#111214" />
-
-  <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedFill" Color="#F2B544" />
-  <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedFillPointerOver" Color="#F7C566" />
-  <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedFillPressed" Color="#D99D2E" />
-  <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedStroke" Color="#F2B544" />
-  <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedStrokePointerOver" Color="#F7C566" />
-  <SolidColorBrush x:Key="RadioButtonOuterEllipseCheckedStrokePressed" Color="#D99D2E" />
-  <SolidColorBrush x:Key="RadioButtonCheckGlyphFill" Color="#111214" />
-  <SolidColorBrush x:Key="RadioButtonCheckGlyphFillPointerOver" Color="#111214" />
-  <SolidColorBrush x:Key="RadioButtonCheckGlyphFillPressed" Color="#111214" />
-
-  <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#F2B544" />
-  <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#F7C566" />
-  <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#D99D2E" />
-  <SolidColorBrush x:Key="ToggleSwitchStrokeOn" Color="#F2B544" />
-  <SolidColorBrush x:Key="ToggleSwitchStrokeOnPointerOver" Color="#F7C566" />
-  <SolidColorBrush x:Key="ToggleSwitchStrokeOnPressed" Color="#D99D2E" />
-  <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#111214" />
-  <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#111214" />
-  <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#111214" />
 
   <SolidColorBrush x:Key="ScrollBarBackground" Color="Transparent" />
   <SolidColorBrush x:Key="ScrollBarBackgroundPointerOver" Color="Transparent" />

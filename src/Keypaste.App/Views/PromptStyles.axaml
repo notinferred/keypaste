@@ -51,10 +51,15 @@
     <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
   </Style>
 
+  <!-- Time left is said, not signalled: the prompt's one amber element is its primary answer. -->
+  <Style Selector="Grid.prompt-head Border.dot.waiting">
+    <Setter Property="Background" Value="{DynamicResource KpTextMuted}" />
+    <Setter Property="BoxShadow" Value="0 0 0 0 Transparent" />
+  </Style>
   <Style Selector="TextBlock.prompt-countdown">
     <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
     <Setter Property="FontSize" Value="11" />
-    <Setter Property="Foreground" Value="{DynamicResource KpAccentText}" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
 
@@ -115,7 +120,7 @@
   <Style Selector="TextBlock.prompt-scrubbed">
     <Setter Property="FontSize" Value="12" />
     <Setter Property="TextWrapping" Value="Wrap" />
-    <Setter Property="Foreground" Value="{DynamicResource KpAccentText}" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
   </Style>
 
   <Style Selector="Button.prompt">
