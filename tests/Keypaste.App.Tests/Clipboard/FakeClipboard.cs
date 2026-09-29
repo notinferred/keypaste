@@ -18,7 +18,7 @@ internal sealed class FakeClipboard : IAppClipboard
     /// <summary>What is on it. A test reads this; production code has no equivalent.</summary>
     internal string? Content { get; private set; }
 
-    /// <summary>Whether it holds a secret set with the exclusion formats.</summary>
+    /// <summary>Whether it holds a secret set with the secret markers.</summary>
     internal bool ContentWasSetAsASecret { get; private set; }
 
     internal int ClearCount { get; private set; }
@@ -40,7 +40,7 @@ internal sealed class FakeClipboard : IAppClipboard
 
     /// <summary>Puts text on the clipboard the way some other program would have.</summary>
     /// <remarks>
-    /// Not <see cref="TrySetSecretAsync"/>, which records the exclusion formats keypaste sets on
+    /// Not <see cref="TrySetSecretAsync"/>, which records the secret markers keypaste sets on
     /// its own writes. A paste test wants the clipboard as somebody else left it.
     /// </remarks>
     internal void Plant(string text)

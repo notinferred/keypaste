@@ -30,7 +30,7 @@ internal sealed class HeldClipboard : IAppClipboard
     /// <summary>What is on it. A test reads this; production code has no equivalent.</summary>
     internal string? Content { get; private set; }
 
-    /// <summary>Whether it holds a secret set with the exclusion formats.</summary>
+    /// <summary>Whether it holds a secret set with the secret markers.</summary>
     internal bool ContentWasSetAsASecret { get; private set; }
 
     internal int ClearCount { get; private set; }

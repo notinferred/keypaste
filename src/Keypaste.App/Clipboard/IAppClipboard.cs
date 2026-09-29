@@ -20,9 +20,9 @@ namespace Keypaste.App.Clipboard;
 /// the <em>rule</em> — <see cref="Core.Clipboard.ClipboardClear.Should"/>, one function, two callers
 /// — and not the transport. A terminal has no window and shells out to <c>clip.exe</c>,
 /// <c>pbcopy</c> or <c>wl-copy</c>; this app has a window, so it can hand the windowing system a
-/// data object carrying the Windows exclusion formats, which a subprocess cannot express. That
-/// closes O-0008 for the app and leaves it open for the CLI, which is a real difference and is
-/// written down rather than smoothed over.
+/// data object carrying the secret markers, the Windows exclusion formats among them, which a
+/// subprocess cannot express. That closes O-0008 and answers O-0019 for the app and leaves both open
+/// for the CLI, which is a real difference and is written down rather than smoothed over.
 /// </para>
 /// <para>
 /// Asynchronous because the platform is. It exists as an interface so
@@ -41,8 +41,8 @@ internal interface IAppClipboard
     /// <param name="text">The text.</param>
     /// <returns>Whether it landed.</returns>
     /// <remarks>
-    /// Separate from <see cref="TrySetSecretAsync"/> so the exclusion formats are not applied to a
-    /// command line somebody wants in their shell history. Asking Windows to keep
+    /// Separate from <see cref="TrySetSecretAsync"/> so the secret markers are not applied to a
+    /// command line somebody wants in their clipboard history. Asking Windows to keep
     /// <c>keypaste run billing --</c> out of clipboard history would be a small hostility.
     /// </remarks>
     Task<bool> TrySetPlainAsync(string text);

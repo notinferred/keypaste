@@ -12,21 +12,23 @@ namespace Keypaste.App.Clipboard;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>The exclusion formats are the reason this is not a subprocess.</b> Windows Clipboard History
-/// and Cloud Clipboard keep a copy of everything copied, which clearing does not remove — O-0008.
-/// A clipboard owner can opt out by putting three well-known formats on the data object, and
-/// <c>clip.exe</c> has no way to express them, so <c>keypaste get</c> cannot. This can, and does.
+/// <b>The secret markers are the reason this is not a subprocess.</b> Windows Clipboard History and
+/// Cloud Clipboard keep a copy of everything copied, which clearing does not remove — O-0008. A
+/// clipboard owner can opt out by putting three well-known formats on the data object, and
+/// <c>clip.exe</c> has no way to express them, so <c>keypaste get</c> cannot. This can, and does,
+/// and on the same item asks macOS pasteboard managers and KDE's Klipper to keep no copy (O-0019).
 /// </para>
 /// <para>
-/// <b>All of it in one <c>SetDataObjectAsync</c>.</b> The history service acts on the notification
+/// <b>All of it in one <c>SetDataAsync</c>.</b> The history service acts on the notification
 /// raised when the clipboard closes, so a second pass to add the markers arrives after the copy has
 /// already been recorded. One call, or the opt-out is theatre.
 /// </para>
 /// <para>
 /// <b>What this closes and what it does not.</b> It closes first-party Clipboard History and Cloud
-/// Clipboard. It does not touch third-party clipboard managers, which decide independently and
-/// mostly ignore the formats, and it does not touch RDP or Citrix redirection, which hands the value
-/// to another machine's history. THREATS.md T-19 says so in those words.
+/// Clipboard, and asks the managers that honour the nspasteboard.org types or Klipper's hint to skip
+/// the value. Other managers decide independently, RDP or Citrix redirection hands the value to
+/// another machine's history, and no marker stops a process reading the clipboard. THREATS.md T-19
+/// says so in those words.
 /// </para>
 /// <para>
 /// <b>This file is the only place a clipboard string enters this process.</b>
@@ -41,18 +43,31 @@ namespace Keypaste.App.Clipboard;
 /// </remarks>
 internal sealed class AvaloniaClipboard(TopLevel topLevel) : IAppClipboard
 {
-    /// <summary>Asks clipboard monitors to skip this item.</summary>
+    /// <summary>The formats that ask clipboard monitors and managers to skip a secret, each with what it holds.</summary>
     /// <remarks>
-    /// The names are the registered Windows clipboard format names, spelled exactly. KeePassXC
+    /// <para>
+    /// The Windows names are the registered clipboard format names, spelled exactly. KeePassXC
     /// shipped one of these with a trailing space for three releases (O-0008), which is the kind of
-    /// defect no review catches in a string literal — <c>ClipboardFormatNamesTests</c> is why this
-    /// one will not last three releases.
+    /// defect no review catches in a string literal — <c>ClipboardSourceRulesTests</c> is why this
+    /// one will not last three releases. Four zero bytes are the documented "no" for
+    /// CanIncludeInClipboardHistory and CanUploadToCloudClipboard, a DWORD of zero; the
+    /// monitor-processing format is read for presence rather than content.
+    /// </para>
+    /// <para>
+    /// The two nspasteboard.org types are read for presence, so each holds nothing: KeePassXC puts
+    /// the secret itself in ConcealedType, which a manager that stores what it skips would keep.
+    /// Klipper reads <c>x-kde-passwordManagerHint</c> for the word <c>secret</c>. A platform that
+    /// does not know a name never asks for it, so each costs nothing elsewhere.
+    /// </para>
     /// </remarks>
-    internal static string[] ExclusionFormats { get; } =
+    internal static IReadOnlyList<(string Name, byte[] Content)> SecretMarkers =>
     [
-        "ExcludeClipboardContentFromMonitorProcessing",
-        "CanIncludeInClipboardHistory",
-        "CanUploadToCloudClipboard",
+        ("ExcludeClipboardContentFromMonitorProcessing", new byte[4]),
+        ("CanIncludeInClipboardHistory", new byte[4]),
+        ("CanUploadToCloudClipboard", new byte[4]),
+        ("org.nspasteboard.ConcealedType", []),
+        ("org.nspasteboard.TransientType", []),
+        ("x-kde-passwordManagerHint", "secret"u8.ToArray()),
     ];
 
     /// <inheritdoc/>
@@ -70,13 +85,9 @@ internal sealed class AvaloniaClipboard(TopLevel topLevel) : IAppClipboard
         using var transfer = new DataTransfer();
         var item = DataTransferItem.CreateText(secret);
 
-        foreach (var format in ExclusionFormats)
+        foreach (var (name, content) in SecretMarkers)
         {
-            // Four zero bytes: the documented "no" for CanIncludeInClipboardHistory and
-            // CanUploadToCloudClipboard is a DWORD of zero, and the monitor-processing format is
-            // read for presence rather than content. On platforms that do not know these names the
-            // format is simply never asked for, so this costs nothing off Windows.
-            item.Set(DataFormat.CreateBytesPlatformFormat(format), new byte[4]);
+            item.Set(DataFormat.CreateBytesPlatformFormat(name), content);
         }
 
         transfer.Add(item);

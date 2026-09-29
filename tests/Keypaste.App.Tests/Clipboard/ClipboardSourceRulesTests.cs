@@ -47,7 +47,8 @@ public sealed class ClipboardSourceRulesTests
     }
 
     /// <summary>
-    /// The Windows clipboard-exclusion format names are spelled exactly, with nothing around them.
+    /// The secret markers' format names, the Windows clipboard-exclusion names among them, are spelled
+    /// exactly, with nothing around them.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -57,23 +58,30 @@ public sealed class ClipboardSourceRulesTests
     /// <c>RegisterClipboardFormat</c> cannot be checked by review.
     /// </para>
     /// <para>
-    /// <b>What this does not prove:</b> that Windows honours them. That needs a real Windows session
-    /// with Clipboard History switched on, so it is on docs/desktop.md's manual checklist instead.
-    /// This holds the half that a typo breaks, which is the half that actually broke for somebody.
+    /// <b>What this does not prove:</b> that anything honours them. That needs a real Windows session
+    /// with Clipboard History switched on, or a pasteboard manager, so it is on docs/desktop.md's
+    /// manual checklist instead; <c>SecretMarkerTests</c> and <c>verify-clipboard-markers.sh</c> hold
+    /// what the app hands the platform and what the platform then offers. This holds the half that a
+    /// typo breaks, which is the half that actually broke for somebody.
     /// </para>
     /// </remarks>
     [Fact]
-    public void The_exclusion_format_names_carry_no_stray_whitespace()
+    public void The_secret_marker_names_carry_no_stray_whitespace()
     {
+        var names = AvaloniaClipboard.SecretMarkers.Select(marker => marker.Name).ToList();
+
         Assert.Equal(
             [
                 "ExcludeClipboardContentFromMonitorProcessing",
                 "CanIncludeInClipboardHistory",
                 "CanUploadToCloudClipboard",
+                "org.nspasteboard.ConcealedType",
+                "org.nspasteboard.TransientType",
+                "x-kde-passwordManagerHint",
             ],
-            AvaloniaClipboard.ExclusionFormats);
+            names);
 
-        foreach (var name in AvaloniaClipboard.ExclusionFormats)
+        foreach (var name in names)
         {
             Assert.Equal(name.Trim(), name);
             Assert.DoesNotContain(' ', name);
