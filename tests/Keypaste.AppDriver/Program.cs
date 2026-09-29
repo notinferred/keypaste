@@ -52,6 +52,12 @@ internal static class Program
         "usage: open <vault>\n" +
         "       create <vault>\n" +
         "       edit <vault> <entry-path> <notes> <url>\n" +
+        "       field-add <vault> <entry-path> <name> <protected | plain>\n" +
+        "       field-set <vault> <entry-path> <name>\n" +
+        "       field-protect <vault> <entry-path> <name>\n" +
+        "       field-rm <vault> <entry-path> <name>\n" +
+        "       tag-add <vault> <entry-path> <tag>\n" +
+        "       tag-rm <vault> <entry-path> <tag>\n" +
         "       group-rename <vault> <group-path> <new-name>\n" +
         "       relocate <vault> <entry-path> <destination-group-path> <new-title>\n" +
         "       delete <vault> <entry-path>\n" +
@@ -66,7 +72,7 @@ internal static class Program
         "             prompt: approve, once, deny, close; connect <client> [label=<l>] [expose=<g,g>],\n" +
         "             connect-remove <client>, confirm, cancel, check, pick <n>)\n" +
         "KEYPASTE_HOME must be set. KEYPASTE_DRIVER_PASSWORD is the password typed (empty for none),\n" +
-        "KEYPASTE_DRIVER_KEYFILE the keyfile chosen, KEYPASTE_DRIVER_NEW_PASSWORD a new password or entry password.";
+        "KEYPASTE_DRIVER_KEYFILE the keyfile chosen, KEYPASTE_DRIVER_NEW_PASSWORD a new password, entry password or field value.";
 
     private static async Task<int> Main(string[] args)
     {
@@ -87,6 +93,13 @@ internal static class Program
                 ["open", var vault] => await driver.OpenAsync(vault).ConfigureAwait(true),
                 ["create", var vault] => await driver.CreateAsync(vault).ConfigureAwait(true),
                 ["edit", var vault, var entry, var notes, var url] => await driver.EditAsync(vault, entry, notes, url).ConfigureAwait(true),
+                ["field-add", var vault, var entry, var name, "protected"] => await driver.AddFieldAsync(vault, entry, name, protect: true).ConfigureAwait(true),
+                ["field-add", var vault, var entry, var name, "plain"] => await driver.AddFieldAsync(vault, entry, name, protect: false).ConfigureAwait(true),
+                ["field-set", var vault, var entry, var name] => await driver.ReplaceFieldAsync(vault, entry, name).ConfigureAwait(true),
+                ["field-protect", var vault, var entry, var name] => await driver.ToggleProtectionAsync(vault, entry, name).ConfigureAwait(true),
+                ["field-rm", var vault, var entry, var name] => await driver.RemoveFieldAsync(vault, entry, name).ConfigureAwait(true),
+                ["tag-add", var vault, var entry, var tag] => await driver.AddTagAsync(vault, entry, tag).ConfigureAwait(true),
+                ["tag-rm", var vault, var entry, var tag] => await driver.RemoveTagAsync(vault, entry, tag).ConfigureAwait(true),
                 ["group-rename", var vault, var group, var name] => await driver.RenameGroupAsync(vault, group, name).ConfigureAwait(true),
                 ["relocate", var vault, var entry, var group, var title] => await driver.RelocateAsync(vault, entry, group, title).ConfigureAwait(true),
                 ["delete", var vault, var entry] => await driver.DeleteAsync(vault, entry).ConfigureAwait(true),
@@ -229,6 +242,72 @@ internal sealed class Driver(string home)
 
             Press(detail.SaveCommand, "Save");
             return detail.IsEditing || entries.Error is not null ? Refused(entries.Error) : Did($"saved {entry}");
+        });
+
+    internal Task<int> AddFieldAsync(string vault, string entry, string name, bool protect) =>
+        WithEntriesAsync(vault, entries =>
+        {
+            var detail = Select(entries, entry);
+
+            Press(detail.BeginAddFieldCommand, "Add field");
+            detail.DraftFieldName = name;
+            detail.NewFieldProtected = protect;
+            Type(detail.NewFieldValue);
+
+            Press(detail.ConfirmAddFieldCommand, "Add");
+            return detail.IsAddingField || entries.Error is not null ? Refused(entries.Error) : Did($"added {name} to {entry}");
+        });
+
+    internal Task<int> ReplaceFieldAsync(string vault, string entry, string name) =>
+        WithEntriesAsync(vault, entries =>
+        {
+            var detail = Select(entries, entry);
+
+            Press(Field(detail, name).ReplaceCommand, "Replace");
+            Type(detail.ReplacementFieldValue);
+
+            Press(detail.ConfirmReplaceFieldCommand, "Replace");
+            return detail.IsReplacingField || entries.Error is not null ? Refused(entries.Error) : Did($"replaced {name} on {entry}");
+        });
+
+    internal Task<int> ToggleProtectionAsync(string vault, string entry, string name) =>
+        WithEntriesAsync(vault, entries =>
+        {
+            var detail = Select(entries, entry);
+
+            Press(Field(detail, name).ToggleProtectionCommand, "Protection");
+            return entries.Error is not null ? Refused(entries.Error) : Did($"switched the protection of {name} on {entry}");
+        });
+
+    internal Task<int> RemoveFieldAsync(string vault, string entry, string name) =>
+        WithEntriesAsync(vault, entries =>
+        {
+            var detail = Select(entries, entry);
+
+            Press(Field(detail, name).RemoveCommand, "Remove");
+            Press(detail.ConfirmRemoveFieldCommand, "Remove");
+            return detail.IsRemovingField || entries.Error is not null ? Refused(entries.Error) : Did($"removed {name} from {entry}");
+        });
+
+    internal Task<int> AddTagAsync(string vault, string entry, string tag) =>
+        WithEntriesAsync(vault, entries =>
+        {
+            var detail = Select(entries, entry);
+
+            detail.DraftTag = tag;
+            Press(detail.AddTagCommand, "Add tag");
+            return entries.Error is not null ? Refused(entries.Error) : Did($"tagged {entry} {tag}");
+        });
+
+    internal Task<int> RemoveTagAsync(string vault, string entry, string tag) =>
+        WithEntriesAsync(vault, entries =>
+        {
+            var detail = Select(entries, entry);
+            var chip = detail.Tags.SingleOrDefault(chip => chip.Tag == tag)
+                ?? throw new DriverException($"'{entry}' has no chip for the tag '{tag}'");
+
+            Press(chip.RemoveCommand, "Remove tag");
+            return entries.Error is not null ? Refused(entries.Error) : Did($"untagged {entry} {tag}");
         });
 
     internal Task<int> RenameGroupAsync(string vault, string group, string name) =>
@@ -912,6 +991,19 @@ internal sealed class Driver(string home)
         entries.Selected = entries.Rows.SingleOrDefault(row => row.Path == path)
             ?? throw new DriverException($"no single '{path}' in the entry list");
         return entries.Detail ?? throw new DriverException($"'{path}' has no detail pane: {entries.Error}");
+    }
+
+    private static EntryFieldRow Field(EntryDetailViewModel detail, string name) =>
+        detail.Fields.SingleOrDefault(field => field.Name == name)
+            ?? throw new DriverException($"the pane lists no field '{name}'");
+
+    /// <summary>Types the new value into a masked field one keystroke at a time, as the control forwards them.</summary>
+    private void Type(SecretField field)
+    {
+        foreach (var c in _newPassword)
+        {
+            field.Type(c);
+        }
     }
 
     private static void Press(RelayCommand command, string button)

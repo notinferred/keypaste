@@ -1117,6 +1117,9 @@ public sealed class ScreenRenderer
 
             using var vault = Vault.Create(Path, _master);
             vault.AddEntry(new VaultEntry { Title = "github", Username = "maya@acme.dev", Password = "demo-gh-7Hq2x", Url = "https://github.com", GroupPath = "Work" });
+            vault.SetFields(new EntryName("Work", "github"), [new FieldWrite("GITHUB_TOKEN", "demo-ghp-4f2a9c"), new FieldWrite("Region", "eu-west-1", Protect: false)]);
+            vault.AddTag(new EntryName("Work", "github"), "env:acme-api:prod");
+            vault.AddTag(new EntryName("Work", "github"), "work");
             vault.AddEntry(new VaultEntry { Title = "aws-console", Username = "maya.ortiz", Password = "demo-aws-51Nf", Url = "https://console.aws.amazon.com", GroupPath = "Work" });
             vault.AddEntry(new VaultEntry { Title = "linear", Username = "maya@acme.dev", Password = "demo-lin-a91K", Url = "https://linear.app", GroupPath = "Work" });
             vault.AddEntry(new VaultEntry { Title = "gmail", Username = "maya.ortiz@gmail.com", Password = "demo-gm-3a11", Url = "https://mail.google.com", GroupPath = "Personal" });

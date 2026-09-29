@@ -6,7 +6,8 @@ using Keypaste.Core.Activity;
 namespace Keypaste.App.ViewModels;
 
 /// <summary>
-/// The one entry somebody selected: its fields, its copy buttons, and its inline edit.
+/// The one entry somebody selected: its fields, its copy buttons, its inline edit, and its custom
+/// fields and tags.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -16,6 +17,11 @@ namespace Keypaste.App.ViewModels;
 /// of the open vault at the moment Copy is pressed or its cell is held (D-0300), and handed straight
 /// to the clipboard or to the <see cref="Controls.RevealedValue"/> that draws it, so it is never in a
 /// view model and never in a binding.
+/// </para>
+/// <para>
+/// Custom fields are listed by name and protection only, and each value, plain or protected, is read
+/// the same way as the password (V.7b). Every change to a field or a tag is one core call and one
+/// save, so it is one revision in the entry's history.
 /// </para>
 /// </remarks>
 internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, IDisposable
@@ -43,6 +49,14 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     private string _lastUsedText = "never";
     private EntryKind _kind;
     private IReadOnlyList<string> _agentLines = [];
+    private IReadOnlyList<EntryFieldRow> _fields = [];
+    private IReadOnlyList<EntryTagChip> _tags = [];
+    private bool _isAddingField;
+    private string _draftFieldName = string.Empty;
+    private bool _newFieldProtected = true;
+    private EntryFieldRow? _replacingField;
+    private EntryFieldRow? _removingField;
+    private string _draftTag = string.Empty;
 
     internal EntryDetailViewModel(
         AppVaultSession session,
@@ -76,6 +90,8 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         ProfileStates = Profiles is { } row ? [.. row.Cells.Select(ProfileState.Of)] : [];
 
         NewPassword = new SecretField(clipboard);
+        NewFieldValue = new SecretField(clipboard);
+        ReplacementFieldValue = new SecretField(clipboard);
         _restored = restored;
         History = new EntryHistoryViewModel(session, clipboard, this, Restored);
 
@@ -88,9 +104,200 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         RotateCommand = new RelayCommand(() => IsConfirmingRotate = true, () => !IsConfirmingRotate && !IsEditing);
         ConfirmRotateCommand = new RelayCommand(ConfirmRotate, () => IsConfirmingRotate);
         CancelRotateCommand = new RelayCommand(() => IsConfirmingRotate = false, () => IsConfirmingRotate);
+        BeginAddFieldCommand = new RelayCommand(BeginAddField, () => !IsAddingField);
+        ConfirmAddFieldCommand = new RelayCommand(ConfirmAddField, () => IsAddingField && DraftFieldName.Trim().Length > 0);
+        CancelAddFieldCommand = new RelayCommand(CancelAddField, () => IsAddingField);
+        ConfirmReplaceFieldCommand = new RelayCommand(ConfirmReplaceField, () => ReplacingField is not null);
+        CancelReplaceFieldCommand = new RelayCommand(() => ReplacingField = null, () => ReplacingField is not null);
+        ConfirmRemoveFieldCommand = new RelayCommand(ConfirmRemoveField, () => RemovingField is not null);
+        CancelRemoveFieldCommand = new RelayCommand(() => RemovingField = null, () => RemovingField is not null);
+        AddTagCommand = new RelayCommand(AddTag, () => DraftTag.Trim().Length > 0);
 
         ReadTimes();
+        ReadFieldsAndTags();
     }
+
+    /// <summary>The countdown every copy on this pane goes through.</summary>
+    internal ClipboardCountdown Clipboard => _clipboard;
+
+    /// <summary>The entry's custom fields, by name, in ordinal order.</summary>
+    internal IReadOnlyList<EntryFieldRow> Fields
+    {
+        get => _fields;
+        private set
+        {
+            if (Set(ref _fields, value))
+            {
+                Raise(nameof(HasFields));
+            }
+        }
+    }
+
+    internal bool HasFields => _fields.Count > 0;
+
+    /// <summary>The entry's own tags, never its group's.</summary>
+    internal IReadOnlyList<EntryTagChip> Tags
+    {
+        get => _tags;
+        private set
+        {
+            if (Set(ref _tags, value))
+            {
+                Raise(nameof(HasTags));
+            }
+        }
+    }
+
+    internal bool HasTags => _tags.Count > 0;
+
+    /// <summary>A new field's value, while its form is open.</summary>
+    internal SecretField NewFieldValue { get; }
+
+    /// <summary>A replacement for one field's value, while its form is open.</summary>
+    internal SecretField ReplacementFieldValue { get; }
+
+    internal bool IsAddingField
+    {
+        get => _isAddingField;
+        private set
+        {
+            if (Set(ref _isAddingField, value))
+            {
+                BeginAddFieldCommand.RaiseCanExecuteChanged();
+                ConfirmAddFieldCommand.RaiseCanExecuteChanged();
+                CancelAddFieldCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    internal string DraftFieldName
+    {
+        get => _draftFieldName;
+        set
+        {
+            if (Set(ref _draftFieldName, value))
+            {
+                ConfirmAddFieldCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    /// <summary>Whether the new field is protected; on unless the person turns it off.</summary>
+    internal bool NewFieldProtected
+    {
+        get => _newFieldProtected;
+        set => Set(ref _newFieldProtected, value);
+    }
+
+    /// <summary>The field whose value the replace form is for, or null.</summary>
+    internal EntryFieldRow? ReplacingField
+    {
+        get => _replacingField;
+        private set
+        {
+            if (Set(ref _replacingField, value))
+            {
+                ReplacementFieldValue.Clear();
+                Raise(nameof(IsReplacingField));
+                Raise(nameof(ReplaceFieldPrompt));
+                ConfirmReplaceFieldCommand.RaiseCanExecuteChanged();
+                CancelReplaceFieldCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    internal bool IsReplacingField => _replacingField is not null;
+
+    internal string ReplaceFieldPrompt => $"New value for {_replacingField?.DisplayName}";
+
+    /// <summary>The field the remove confirmation is for, or null.</summary>
+    internal EntryFieldRow? RemovingField
+    {
+        get => _removingField;
+        private set
+        {
+            if (Set(ref _removingField, value))
+            {
+                Raise(nameof(IsRemovingField));
+                Raise(nameof(RemoveFieldPrompt));
+                ConfirmRemoveFieldCommand.RaiseCanExecuteChanged();
+                CancelRemoveFieldCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    internal bool IsRemovingField => _removingField is not null;
+
+    internal string RemoveFieldPrompt => $"Remove {_removingField?.DisplayName} from this entry? Its value stays in the entry's history.";
+
+    /// <summary>A tag being typed, added on Add tag.</summary>
+    internal string DraftTag
+    {
+        get => _draftTag;
+        set
+        {
+            if (Set(ref _draftTag, value))
+            {
+                AddTagCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    internal RelayCommand BeginAddFieldCommand { get; }
+
+    internal RelayCommand ConfirmAddFieldCommand { get; }
+
+    internal RelayCommand CancelAddFieldCommand { get; }
+
+    internal RelayCommand ConfirmReplaceFieldCommand { get; }
+
+    internal RelayCommand CancelReplaceFieldCommand { get; }
+
+    internal RelayCommand ConfirmRemoveFieldCommand { get; }
+
+    internal RelayCommand CancelRemoveFieldCommand { get; }
+
+    internal RelayCommand AddTagCommand { get; }
+
+    /// <summary>Reads one custom field out of the open vault, for a hold or a copy.</summary>
+    internal string? ReadField(string field)
+    {
+        try
+        {
+            return _session.Unlocked?.ReadField(Name, field);
+        }
+        catch (VaultException e)
+        {
+            Report(e.Message);
+            return null;
+        }
+    }
+
+    /// <summary>Opens the form that writes a new value over one field's.</summary>
+    internal void BeginReplaceField(EntryFieldRow row)
+    {
+        IsAddingField = false;
+        RemovingField = null;
+        ReplacingField = row;
+        Report(null);
+    }
+
+    /// <summary>Asks whether to remove one field.</summary>
+    internal void BeginRemoveField(EntryFieldRow row)
+    {
+        IsAddingField = false;
+        ReplacingField = null;
+        RemovingField = row;
+        Report(null);
+    }
+
+    /// <summary>Protects a plain field or stops protecting a protected one, keeping its value.</summary>
+    internal void ToggleProtection(EntryFieldRow row) =>
+        Write(vault => vault.SetFields(Name, [new FieldWrite(row.Name, Value: null, Protect: !row.IsProtected)]), null);
+
+    /// <summary>Removes one of the entry's tags.</summary>
+    internal void RemoveTag(EntryTagChip chip) =>
+        Write(vault => vault.RemoveTags(Name, [chip.Tag]), "That tag is no longer on this entry.");
 
     /// <summary>Replaces the password with a generated one, after asking.</summary>
     internal RelayCommand RotateCommand { get; }
@@ -485,6 +692,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         Raise(nameof(MaskedLength));
         Raise(nameof(PasswordMask));
         CopyPasswordCommand.RaiseCanExecuteChanged();
+        ReadFieldsAndTags();
     }
 
     /// <inheritdoc/>
@@ -541,7 +749,15 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         Profiles = null;
         ProfileStates = [];
         AgentLines = [];
+        Fields = [];
+        Tags = [];
+        ReplacingField = null;
+        RemovingField = null;
+        DraftFieldName = string.Empty;
+        DraftTag = string.Empty;
         NewPassword.Dispose();
+        NewFieldValue.Dispose();
+        ReplacementFieldValue.Dispose();
         History.Dispose();
 
         Raise(nameof(Reference));
@@ -676,6 +892,143 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         ReadTimes();
         History.Refresh();
         Report(null);
+    }
+
+    private void ReadFieldsAndTags()
+    {
+        if (_session.Unlocked is not { } vault)
+        {
+            return;
+        }
+
+        try
+        {
+            Fields = [.. (vault.Fields(Name) ?? []).Select(field => new EntryFieldRow(this, field))];
+            Tags = [.. (vault.Tags(Name) ?? []).Select(tag => new EntryTagChip(this, tag))];
+        }
+        catch (VaultException e)
+        {
+            Report(e.Message);
+        }
+    }
+
+    /// <summary>Makes one change to this entry through core and saves it, as one revision.</summary>
+    /// <param name="change">The change; false when it found nothing to change.</param>
+    /// <param name="unchanged">What to say when it found nothing, or null to say the entry is gone.</param>
+    /// <returns>Whether the change was saved.</returns>
+    private bool Write(Func<Vault, bool> change, string? unchanged)
+    {
+        if (_session.Unlocked is not { } vault)
+        {
+            Report("The vault is locked.");
+            return false;
+        }
+
+        try
+        {
+            if (!change(vault))
+            {
+                Report(unchanged ?? $"'{_entryPath}' is no longer in this vault.");
+                return false;
+            }
+
+            vault.Save();
+        }
+        catch (VaultChangedOnDiskException)
+        {
+            Report("Something else changed this vault since you opened it. Lock and unlock to see it, then make your change again.");
+            return false;
+        }
+        catch (VaultException e)
+        {
+            Report(e.Message);
+            return false;
+        }
+
+        ReadFieldsAndTags();
+
+        // The change is a revision now, and a list read before it would name the wrong one at every index (D-0229).
+        History.Refresh();
+        Report(null);
+        return true;
+    }
+
+    private void BeginAddField()
+    {
+        ReplacingField = null;
+        RemovingField = null;
+        DraftFieldName = string.Empty;
+        NewFieldValue.Clear();
+        NewFieldProtected = true;
+        IsAddingField = true;
+        Report(null);
+    }
+
+    private void CancelAddField()
+    {
+        IsAddingField = false;
+        NewFieldValue.Clear();
+        Report(null);
+    }
+
+    private void ConfirmAddField()
+    {
+        var name = DraftFieldName.Trim();
+
+        if (!FieldNameRules.IsWritable(name, out var error))
+        {
+            Report(string.Concat(char.ToUpperInvariant(error[0]).ToString(), error.AsSpan(1), "."));
+            return;
+        }
+
+        if (Fields.Any(field => string.Equals(field.Name, name, StringComparison.Ordinal)))
+        {
+            Report($"This entry already has {EntryNameSanitizer.Sanitize(name).Text}. Replace its value instead.");
+            return;
+        }
+
+        if (Write(vault => vault.SetFields(Name, [new FieldWrite(name, NewFieldValue.Compose(), NewFieldProtected)]), null))
+        {
+            IsAddingField = false;
+            NewFieldValue.Clear();
+            DraftFieldName = string.Empty;
+        }
+    }
+
+    private void ConfirmReplaceField()
+    {
+        if (ReplacingField is not { } row)
+        {
+            return;
+        }
+
+        if (Write(vault => vault.SetFields(Name, [new FieldWrite(row.Name, ReplacementFieldValue.Compose())]), null))
+        {
+            ReplacingField = null;
+        }
+    }
+
+    private void ConfirmRemoveField()
+    {
+        if (RemovingField is not { } row)
+        {
+            return;
+        }
+
+        if (Write(vault => vault.RemoveField(Name, row.Name), $"{row.DisplayName} is no longer on this entry."))
+        {
+            RemovingField = null;
+        }
+    }
+
+    private void AddTag()
+    {
+        var tag = DraftTag.Trim();
+
+        if (Write(vault => vault.AddTag(Name, tag), "This entry already has that tag."))
+        {
+            DraftTag = string.Empty;
+        }
     }
 
     private void BeginEdit()

@@ -6,7 +6,7 @@ This file holds open work only. Finishing a task removes it from here, adds its 
 
 ## Selection and evidence
 
-Only the next five tasks are detailed: V.7b, C.2, N.1a, N.7 and N.2. Later rows name a bounded outcome and the dependencies their own implementation or verifier needs; expand a selected later task before building it. Tasks are not marked implemented from a document, reader, mock response or consuming screen. Name the producer, transport, consumer and user action exercised, and retain the source/version and limitations of the observation.
+Only the next five tasks are detailed: C.2, N.1a, N.7, N.2 and N.5. Later rows name a bounded outcome and the dependencies their own implementation or verifier needs; expand a selected later task before building it. Tasks are not marked implemented from a document, reader, mock response or consuming screen. Name the producer, transport, consumer and user action exercised, and retain the source/version and limitations of the observation.
 
 Needs are build dependencies. Ships after names publication gates. External signing identities are inputs, not a queue of enrollment code. A ready row does not authorize publication, account changes or messages. Preserve the secret-path tests, real KeePassXC compatibility, stale-write refusals and release integrity checks while changing product scope.
 
@@ -14,16 +14,6 @@ Needs are build dependencies. Ships after names publication gates. External sign
 
 Custom fields and tags are ordinary KeePass data: keypaste writes them as KeePassXC reads them, and every row keeps the permanent compatibility gates (PRODUCT §4.6). C.1a's tags include the project tags T4 builds on. The main screens show everyday password-manager work; advanced controls and security recommendations live in Settings (PRODUCT §5.8).
 
-- [ ] **V.7b — Edit custom fields and tags in the app.** Needs: V.7a, C.1a.
-  **Build:** the item pane lists an entry's custom fields by name, with protected ones masked. It reveals one while held and copies through the one clearing countdown (D-0300). It adds a field (a name, a masked value and a protected switch), changes a value, switches protection and removes a field, each through core with history. KeePassXC's own attributes are shown read-only.
-
-  Tags appear as chips that can be added and removed, and a project tag shows its environment and a protected mark. T-22's automation sweep, D-0303's drawn-frame check and the workflows gate's AppDriver half cover the new commands, and the keypaste-design skill applies. Traces to PRODUCT §§1, 2, 4.6 and 5.2.
-
-  **Verify (V-V.7b):** in the app, on a vault KeePassXC made, a person adds a protected field, changes another, removes a third, and adds and removes a tag. Real KeePassXC reads the values, the protection and the tags, and still finds the attachment, custom data and `otp`. The file stays KDBX 4.0.
-
-  The automation surface carries no field value while typing, while a reveal is held or at rest. A drawn frame shows a value only while it is held.
-
-  A view-model-only check does not pass, and neither does KeePassXC reading what core wrote without the app.
 - [ ] **C.2 — Flag keys left in notes for review.** Needs: V.7a, V.7b.
   **Build:** a local check runs in the process holding the vault, on unlock and after each save. It reads the notes of every entry outside the recycle bin and keypaste's reserved group, and it finds two kinds of key:
   - single-line `KEY=value` and `export KEY=value` assignments whose key is env-named;
@@ -74,9 +64,11 @@ Custom fields and tags are ordinary KeePass data: keypaste writes them as KeePas
 
   A reader shown only on a hand-written ini does not pass.
 - [ ] **N.5 — Make the item pane read like a password manager.** Needs: V.7b.
-  - A web address opens (http and https only) and copies.
-  - The `kp://` reference and the KDBX identifier move under "…".
-  - The agent card appears only when agents can see the item or have received it.
+  **Build:** the item pane shows a web address as a link that opens in the default browser, for `http` and `https` only, with its own Copy; any other scheme is shown as text and never opened. The `kp://` reference and the KDBX identifier move under the pane's "…" menu. The Agent access card appears only when agents can see the item, by the served session's exposure or a standing rule, or have received a field of it. The keypaste-design skill applies. Traces to PRODUCT §§1 and 5.8.
+
+  **Verify (V-N.5):** in the app, an entry with an `https` address opens it through the platform launcher and copies it; one with `javascript:` or `file:` opens nothing and says why. The reference and identifier are absent from the pane's automation tree until "…" is opened. With no session serving agents and no release in the audit log, the agent card is absent; after a release of the entry's password, it is present. `EntriesViewLayoutTests` holds at 960 px.
+
+  A view model asserting over a fixture URL without the launcher does not pass.
 - [ ] **N.4 — Create an item from a template.** Needs: V.7a.
   - The templates are Login, API key, Database, Server and Secure note.
   - Each has a title, a folder picker, tags and notes instead of a `/` path.

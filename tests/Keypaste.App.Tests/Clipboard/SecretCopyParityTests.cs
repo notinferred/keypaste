@@ -38,8 +38,10 @@ public sealed class SecretCopyParityTests
     private const string _current = "SENTINEL-CURRENT-PASSWORD-5e1d7a";
     private const string _superseded = "SENTINEL-OLD-PASSWORD-4b8e21";
     private const string _envValue = "SENTINEL-ENV-VALUE-7d5e08";
+    private const string _fieldValue = "SENTINEL-FIELD-VALUE-3a9c51";
+    private const string _plainFieldValue = "SENTINEL-PLAIN-FIELD-6b2e40";
 
-    public static TheoryData<string> Surfaces => ["current", "env", "revision"];
+    public static TheoryData<string> Surfaces => ["current", "env", "revision", "field", "plain-field"];
 
     /// <summary>
     /// The preflight the rest depend on: the headless platform's clipboard holds what the adapter
@@ -152,6 +154,7 @@ public sealed class SecretCopyParityTests
             using (var vault = Vault.Create(path, _master))
             {
                 vault.AddEntry(new VaultEntry { Title = "github", Username = "me", Password = _superseded });
+                vault.SetFields(new EntryName(string.Empty, "github"), [new FieldWrite("API_TOKEN", _fieldValue), new FieldWrite("Region", _plainFieldValue, Protect: false)]);
                 vault.UpdateEntry(new VaultEntry { Title = "github", Username = "me", Password = _current });
                 vault.AddEntry(new VaultEntry { Title = "STRIPE_KEY", Password = _envValue, GroupPath = "env/billing" });
                 vault.Save();
@@ -192,6 +195,8 @@ public sealed class SecretCopyParityTests
                 "current" => (_current, Named(OpenEntry(), "CopyPassword")),
                 "revision" => (_superseded, Named(OpenRevision(), "CopyRevisionPassword")),
                 "env" => (_envValue, EnvCopy()),
+                "field" => (_fieldValue, FieldCopy("API_TOKEN")),
+                "plain-field" => (_plainFieldValue, FieldCopy("Region")),
                 _ => throw new ArgumentOutOfRangeException(nameof(surface)),
             };
 
@@ -266,6 +271,14 @@ public sealed class SecretCopyParityTests
 
             return Window.GetVisualDescendants().OfType<Button>()
                 .Single(button => button.DataContext is EnvVariableRow && Equals(button.Content, "Copy"));
+        }
+
+        private Button FieldCopy(string field)
+        {
+            OpenEntry();
+
+            return Window.GetVisualDescendants().OfType<Button>()
+                .Single(button => button.DataContext is EntryFieldRow row && row.Name == field && Equals(button.Content, "Copy"));
         }
 
         private Button Named(EntriesViewModel entries, string name)

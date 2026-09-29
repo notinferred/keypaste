@@ -64,6 +64,26 @@ public sealed class SecretFieldAutomationTests
         });
 
     [Fact]
+    public Task The_new_field_value_surface_depends_on_the_length_and_not_the_characters() =>
+        HeadlessSession.On(() =>
+        {
+            using var screen = new EntriesScreen();
+            screen.BeginAddField();
+
+            Assert.Equal(_alpha.Length, Differential(screen.Window, screen.NewFieldValue).Length);
+        });
+
+    [Fact]
+    public Task The_replacement_field_value_surface_depends_on_the_length_and_not_the_characters() =>
+        HeadlessSession.On(() =>
+        {
+            using var screen = new EntriesScreen();
+            screen.BeginReplaceField();
+
+            Assert.Equal(_alpha.Length, Differential(screen.Window, screen.ReplacementFieldValue).Length);
+        });
+
+    [Fact]
     public Task The_new_variable_value_surface_depends_on_the_length_and_not_the_characters() =>
         HeadlessSession.On(() =>
         {
@@ -99,6 +119,15 @@ public sealed class SecretFieldAutomationTests
         Type(entries.Window, entries.ReplacementPassword, _fixture);
         AssertShowsTheMask(entries.ReplacementPassword);
 
+        using var fields = new EntriesScreen();
+        fields.BeginAddField();
+        Type(fields.Window, fields.NewFieldValue, _fixture);
+        AssertShowsTheMask(fields.NewFieldValue);
+
+        fields.BeginReplaceField();
+        Type(fields.Window, fields.ReplacementFieldValue, _fixture);
+        AssertShowsTheMask(fields.ReplacementFieldValue);
+
         using var env = new EnvScreen();
         env.BeginAdd();
         Type(env.Window, env.NewEnvValue, _fixture);
@@ -124,6 +153,15 @@ public sealed class SecretFieldAutomationTests
         entries.BeginEdit();
         Type(entries.Window, entries.ReplacementPassword, _fixture);
         AutomationSurface.AssertNothingExposes(entries.Window, _fixture);
+
+        using var fields = new EntriesScreen();
+        fields.BeginAddField();
+        Type(fields.Window, fields.NewFieldValue, _fixture);
+        AutomationSurface.AssertNothingExposes(fields.Window, _fixture);
+
+        fields.BeginReplaceField();
+        Type(fields.Window, fields.ReplacementFieldValue, _fixture);
+        AutomationSurface.AssertNothingExposes(fields.Window, _fixture);
 
         using var env = new EnvScreen();
         env.BeginAdd();
@@ -254,6 +292,7 @@ public sealed class SecretFieldAutomationTests
             using (var vault = Vault.Create(path, _master))
             {
                 vault.AddEntry(new VaultEntry { Title = "github", Username = "me", Password = "gh" });
+                vault.SetFields(new EntryName(string.Empty, "github"), [new FieldWrite("API_TOKEN", "tok")]);
                 vault.AddEntry(new VaultEntry { Title = "STRIPE_KEY", Password = "sk", GroupPath = "env/billing" });
                 vault.Save();
             }
@@ -322,6 +361,28 @@ public sealed class SecretFieldAutomationTests
         internal MaskedInput NewEntryPassword => Field("NewEntryPassword");
 
         internal MaskedInput ReplacementPassword => Field("ReplacementPassword");
+
+        internal MaskedInput NewFieldValue => Field("NewFieldValue");
+
+        internal MaskedInput ReplacementFieldValue => Field("ReplacementFieldValue");
+
+        /// <summary>Selects an entry and opens its add-field form.</summary>
+        internal void BeginAddField()
+        {
+            Model.Selected = Model.Rows.Single(row => row.Title == "github");
+            Drain();
+            Model.Detail!.BeginAddFieldCommand.Execute(null);
+            Drain();
+        }
+
+        /// <summary>Selects an entry and opens the replace form of its one custom field.</summary>
+        internal void BeginReplaceField()
+        {
+            Model.Selected = Model.Rows.Single(row => row.Title == "github");
+            Drain();
+            Model.Detail!.BeginReplaceField(Model.Detail.Fields.Single());
+            Drain();
+        }
 
         /// <summary>Opens the add form with generation off, which is what shows the field.</summary>
         internal void BeginAdd()

@@ -5,12 +5,13 @@
 #
 # KeePassXC imports one KeePass XML document three times: behind a password, behind a password and
 # an XML keyfile, and behind the keyfile alone. The document carries what keypaste does not model —
-# meta, group and entry CustomData, an unprotected and a protected custom string, tags, an auto-type
-# association and a revision KeePassXC wrote — and KeePassXC then attaches a binary and a text file.
+# meta, group and entry CustomData, unprotected and protected custom strings, KeePassXC's own otp,
+# tags, an auto-type association and a revision KeePassXC wrote — and KeePassXC then attaches a binary
+# and a text file.
 # Each vault is AES-KDF and KDBX 4.0, as KeePassXC writes them.
 #
-# On each vault: open, edit, restore a revision, set and remove custom fields, tag and untag, organize,
-# delete and recover, restore a backup, export, and change access. The app half runs through tests/Keypaste.AppDriver, which presses the
+# On each vault: open, edit, restore a revision, set and remove custom fields and tag and untag from
+# the CLI and from the app, organize, delete and recover, restore a backup, export, and change access. The app half runs through tests/Keypaste.AppDriver, which presses the
 # commands the desktop's screens bind to. After every write KeePassXC opens the vault with its current
 # factors, reads the value the workflow wrote, finds every unmodelled marker, exports both attachments
 # byte for byte, and reports the cipher and KDF it chose. Every refusal leaves the vault byte-identical
@@ -90,7 +91,7 @@ expect() {
   [ "$got" = "$want" ] || die "KeePassXC reads $field '$got' of '$entry', not '$want'"
 }
 
-markers=(kp94-meta-value kp94-group-value kp94-entry-value kp94-plain-value kp94-secret-value kp94-window kp94-tag)
+markers=(kp94-meta-value kp94-group-value kp94-entry-value kp94-plain-value kp94-secret-value kp94-window kp94-tag KP7BOTPJBSWY3DPE)
 
 # Whether KeePassXC still sees everything keypaste does not model, on the entry at $2.
 check_intact() {
@@ -114,6 +115,17 @@ check_intact() {
 }
 
 intact() { local why; why=$(check_intact "$@") || die "$why"; }
+
+# "protected" or "plain" for the custom string called $1 on the entry, outside <History>, in the vault $2.
+protection() {
+  kx export "$2" -f xml | awk '/<History>/{past=1} !past{print} /<\/History>/{past=0}' >"$dir/protection.xml"
+  awk -v key="<Key>$1</Key>" '
+    !want && (p = index($0, key)) { want = 1; $0 = substr($0, p + length(key)) }
+    want && (v = index($0, "<Value")) {
+      tag = substr($0, v); tag = substr(tag, 1, index(tag, ">"))
+      print (index(tag, "ProtectInMemory=\"True\"") ? "protected" : "plain"); exit
+    }' "$dir/protection.xml"
+}
 
 # A refusal is exit 1 from the driver (3 is a driver that could not arrange the act) and any failure
 # from the CLI, and either way the vault's bytes and backup count are what they were.
@@ -158,6 +170,9 @@ cat >"$dir/seed.xml" <<EOF
           <String><Key>Password</Key><Value ProtectInMemory="True">pw-2</Value></String>
           <String><Key>kp94-plain</Key><Value>kp94-plain-value</Value></String>
           <String><Key>kp94-secret</Key><Value ProtectInMemory="True">kp94-secret-value</Value></String>
+          <String><Key>kp7b-change</Key><Value>kp7b-change-value</Value></String>
+          <String><Key>kp7b-remove</Key><Value ProtectInMemory="True">kp7b-remove-value</Value></String>
+          <String><Key>otp</Key><Value ProtectInMemory="True">otpauth://totp/kp94?secret=KP7BOTPJBSWY3DPE&amp;issuer=kp94</Value></String>
           <AutoType><Enabled>True</Enabled><DataTransferObfuscation>0</DataTransferObfuscation>
             <Association><Window>kp94-window</Window><KeystrokeSequence>{PASSWORD}{ENTER}</KeystrokeSequence></Association>
           </AutoType>
@@ -323,6 +338,32 @@ exercise() {
   listed=$(value "$db" servers/database Tags) || die "KeePassXC cannot read the entry's tags"
   grep -qx 'env:kp94:prod' <<<"${listed//,/$'\n'}" && die "KeePassXC still reads the tag keypaste removed: ${listed}"
   refused "the CLI writing a malformed project tag" "$db" kp_cli "$db" env tag kp94 servers/database -p Prod
+  intact "$db" servers/database
+
+  step "[$kind] fields and tags in the app: add a protected field, change, protect and remove others, and tag"
+  new_pw=kp7b-added-value
+  did "the app's field add" app field-add "$db" servers/database kp7b-added protected
+  new_pw=kp7b-changed-value
+  did "the app's field replace" app field-set "$db" servers/database kp7b-change
+  new_pw=
+  [ "$(protection kp7b-change "$db")" = plain ] || die "replacing a plain field's value in the app changed its protection"
+  did "the app's protection switch" app field-protect "$db" servers/database kp7b-change
+  did "the app's field remove" app field-rm "$db" servers/database kp7b-remove
+  expect "$db" servers/database kp7b-added kp7b-added-value
+  expect "$db" servers/database kp7b-change kp7b-changed-value
+  value "$db" servers/database kp7b-remove >/dev/null 2>&1 && die "KeePassXC still finds the field the app removed"
+  [ "$(protection kp7b-added "$db")" = protected ] || die "KeePassXC does not read the field the app added as protected"
+  [ "$(protection kp7b-change "$db")" = protected ] || die "KeePassXC does not read the field the app protected as protected"
+  did "the app's tag add" app tag-add "$db" servers/database env:kp94:prod
+  listed=$(value "$db" servers/database Tags) || die "KeePassXC cannot read the entry's tags"
+  grep -qx 'env:kp94:prod' <<<"${listed//,/$'\n'}" || die "KeePassXC does not read the tag the app added: ${listed}"
+  did "the app's tag remove" app tag-rm "$db" servers/database env:kp94:prod
+  listed=$(value "$db" servers/database Tags) || die "KeePassXC cannot read the entry's tags"
+  grep -qx 'env:kp94:prod' <<<"${listed//,/$'\n'}" && die "KeePassXC still reads the tag the app removed: ${listed}"
+  new_pw=refused-value
+  refused "the app adding a field named otp" "$db" app field-add "$db" servers/database otp protected
+  new_pw=
+  [ "$(header "$db" | cut -c17-22)" = "000004" ] || die "the app's field and tag edits moved the vault off KDBX 4.0"
   intact "$db" servers/database
 
   step "[$kind] organize: the app renames the group carrying CustomData and moves the entry out of it"

@@ -110,6 +110,12 @@ public sealed class SecretHygieneTests
 
     internal const string SentinelOtherProject = "SENTINEL-OTHER-PROJECT-6e0a44";
 
+    /// <summary>A protected custom field's value on the selected entry.</summary>
+    internal const string SentinelFieldValue = "SENTINEL-FIELD-VALUE-8f14c2";
+
+    /// <summary>A plain custom field's value on the selected entry, masked like a protected one (V.7b).</summary>
+    internal const string SentinelPlainFieldValue = "SENTINEL-PLAIN-FIELD-VALUE-d3a6e9";
+
     private static readonly string[] _everySentinel =
     [
         SentinelPassword,
@@ -126,6 +132,8 @@ public sealed class SecretHygieneTests
         SentinelEnvValue,
         SentinelOtherEnvValue,
         SentinelOtherProject,
+        SentinelFieldValue,
+        SentinelPlainFieldValue,
     ];
 
     /// <summary>The strings with no legitimate surface anywhere, in any state.</summary>
@@ -141,6 +149,8 @@ public sealed class SecretHygieneTests
         SentinelPassword,
         SentinelUnselectedPassword,
         SentinelOtherEnvValue,
+        SentinelFieldValue,
+        SentinelPlainFieldValue,
         Master,
     ];
 
@@ -415,7 +425,7 @@ public sealed class SecretHygieneTests
         var detail = entries.Detail!;
         detail.History.ToggleCommand.Execute(null);
 
-        var revision = Assert.Single(detail.History.Rows);
+        var revision = detail.History.Rows[0];
         Assert.Equal(SentinelSupersededPassword.Length, revision.MaskedLength);
         Assert.NotEmpty(revision.When);
         Assert.Empty(detail.History.RevealedWhen);
@@ -938,6 +948,11 @@ public sealed class SecretHygieneTests
                 Notes = SentinelNotes,
                 GroupPath = SentinelGroup,
             });
+
+            // Custom fields before the replacement, so the newest revision still holds the superseded password.
+            vault.SetFields(
+                new EntryName(SentinelGroup, SentinelTitle),
+                [new FieldWrite("API_TOKEN", SentinelFieldValue), new FieldWrite("Region", SentinelPlainFieldValue, Protect: false)]);
 
             // Replaced rather than created with its final password, so the entry has a history for
             // the pane to read and for every sweep here to run against.

@@ -8,6 +8,10 @@
 
   <UserControl.Resources>
     <views:DepthToIndent x:Key="Indent" />
+    <DataTemplate x:Key="FieldCopyGlyph"><ctl:KpIcon Icon="copy" Size="13" /></DataTemplate>
+    <DataTemplate x:Key="FieldReplaceGlyph"><ctl:KpIcon Icon="rotate-cw" Size="13" /></DataTemplate>
+    <DataTemplate x:Key="FieldProtectGlyph"><ctl:KpIcon Icon="shield" Size="13" /></DataTemplate>
+    <DataTemplate x:Key="FieldRemoveGlyph"><ctl:KpIcon Icon="trash-2" Size="13" /></DataTemplate>
   </UserControl.Resources>
 
   <UserControl.Styles>
@@ -154,6 +158,17 @@
     <Style Selector="ToggleButton.tree:disabled /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="Foreground" Value="{DynamicResource KpTextDisabled}" />
+    </Style>
+
+    <!-- A custom field's row buttons: 24px icons, as a variable's are on Env profiles. -->
+    <Style Selector="Button.row-action">
+      <Setter Property="Width" Value="24" />
+      <Setter Property="Height" Value="24" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
     </Style>
 
     <Style Selector="Border.note">
@@ -889,6 +904,174 @@
                                LineHeight="19.5"
                                Classes="secondary" />
                   </Border>
+                </StackPanel>
+
+                <!-- Custom fields: a name and a fixed mask each. A value, plain or protected, is read only while
+                     its cell is held or its Copy is pressed, as the password is (V.7b). -->
+                <StackPanel Spacing="8" IsVisible="{Binding !IsEditing}">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0" Classes="label" Text="Custom fields" VerticalAlignment="Center" />
+                    <Button Grid.Column="1"
+                            x:Name="AddField"
+                            Classes="ghost sm"
+                            Command="{Binding BeginAddFieldCommand}">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <ctl:KpIcon Icon="plus" Size="13" />
+                        <TextBlock Text="Add field" VerticalAlignment="Center" />
+                      </StackPanel>
+                    </Button>
+                  </Grid>
+                  <TextBlock Classes="caption" IsVisible="{Binding !HasFields}" Text="No custom fields." />
+                  <ItemsControl ItemsSource="{Binding Fields}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:EntryFieldRow">
+                        <Border Classes="value" Margin="0,0,0,6" Padding="12,6,4,8">
+                          <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                            <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                              <TextBlock Classes="mono" Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                              <TextBlock Classes="caption" Text="{Binding Kind}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <!-- Not a TextBlock, for the reason CurrentPassword is not one. It takes the row's width, so an
+                                 API key has room and a hold changes no size the automation surface reports (D-0232). -->
+                            <ctl:RevealedValue Grid.Row="1"
+                                               Grid.ColumnSpan="2"
+                                               Margin="0,4,0,0"
+                                               Width="{Binding $parent[Grid].Bounds.Width}"
+                                               x:Name="FieldValue"
+                                               Source="{Binding}"
+                                               MaskedLength="{Binding MaskedLength}"
+                                               AutomationProperties.Name="{Binding RevealLabel}"
+                                               FontFamily="{DynamicResource KpMono}"
+                                               FontSize="14"
+                                               HorizontalAlignment="Left"
+                                               VerticalAlignment="Center"
+                                               ClipToBounds="True"
+                                               Foreground="{DynamicResource KpTextPrimary}" />
+                            <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                              <ctl:RevealButton Classes="ghost row-action"
+                                                Target="{Binding #FieldValue}"
+                                                ToolTip.Tip="Hold to reveal"
+                                                AutomationProperties.Name="{Binding RevealLabel}">
+                                <ctl:KpIcon Icon="eye" Size="13" />
+                              </ctl:RevealButton>
+                              <Button Classes="ghost row-action" Content="Copy" ContentTemplate="{StaticResource FieldCopyGlyph}"
+                                      ToolTip.Tip="Copy the value; the clipboard clears itself"
+                                      Command="{Binding CopyValueCommand}" />
+                              <Button Classes="ghost row-action" Content="Replace" ContentTemplate="{StaticResource FieldReplaceGlyph}"
+                                      ToolTip.Tip="Replace the value"
+                                      IsVisible="{Binding IsWritable}"
+                                      Command="{Binding ReplaceCommand}" />
+                              <Button Classes="ghost row-action" Content="Protection" ContentTemplate="{StaticResource FieldProtectGlyph}"
+                                      ToolTip.Tip="{Binding ProtectionLabel}"
+                                      AutomationProperties.Name="{Binding ProtectionLabel}"
+                                      IsVisible="{Binding IsWritable}"
+                                      Command="{Binding ToggleProtectionCommand}" />
+                              <Button Classes="ghost row-action" Content="Remove" ContentTemplate="{StaticResource FieldRemoveGlyph}"
+                                      ToolTip.Tip="Remove this field"
+                                      IsVisible="{Binding IsWritable}"
+                                      Command="{Binding RemoveCommand}" />
+                            </StackPanel>
+                          </Grid>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+
+                  <Border Classes="form" IsVisible="{Binding IsAddingField}" ctl:ShowInView.OnShow="True">
+                    <StackPanel Spacing="10">
+                      <TextBlock Classes="section" Text="Add a field" />
+                      <TextBox x:Name="NewFieldName"
+                               Classes="mono"
+                               Text="{Binding DraftFieldName}"
+                               PlaceholderText="STRIPE_SECRET_KEY"
+                               Width="320"
+                               HorizontalAlignment="Left" />
+                      <ctl:MaskedInput x:Name="NewFieldValue"
+                                       AllowsPaste="True"
+                                       Width="420"
+                                       HorizontalAlignment="Left"
+                                       Sink="{Binding NewFieldValue}"
+                                       MaskedLength="{Binding NewFieldValue.MaskedLength}"
+                                       Placeholder="Field value" />
+                      <TextBlock Classes="caption" IsVisible="{Binding NewFieldValue.Note.Length}" Text="{Binding NewFieldValue.Note}" />
+                      <ToggleSwitch x:Name="NewFieldProtected"
+                                    IsChecked="{Binding NewFieldProtected}"
+                                    OnContent="Protected"
+                                    OffContent="Plain" />
+                      <TextBlock Classes="caption" Text="A protected field is masked in KeePassXC too. Type the value or press Ctrl/Cmd+V to paste." />
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Classes="primary" Content="Add" Command="{Binding ConfirmAddFieldCommand}" />
+                        <Button Classes="ghost" Content="Cancel" Command="{Binding CancelAddFieldCommand}" />
+                      </StackPanel>
+                    </StackPanel>
+                  </Border>
+
+                  <Border Classes="form" IsVisible="{Binding IsReplacingField}" ctl:ShowInView.OnShow="True">
+                    <StackPanel Spacing="10">
+                      <TextBlock Classes="section" Text="{Binding ReplaceFieldPrompt}" TextWrapping="Wrap" />
+                      <ctl:MaskedInput x:Name="ReplacementFieldValue"
+                                       AllowsPaste="True"
+                                       Width="420"
+                                       HorizontalAlignment="Left"
+                                       Sink="{Binding ReplacementFieldValue}"
+                                       MaskedLength="{Binding ReplacementFieldValue.MaskedLength}"
+                                       Placeholder="New field value" />
+                      <TextBlock Classes="caption" IsVisible="{Binding ReplacementFieldValue.Note.Length}" Text="{Binding ReplacementFieldValue.Note}" />
+                      <TextBlock Classes="caption" Text="The old value stays in the entry's history." />
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Classes="primary" Content="Replace" Command="{Binding ConfirmReplaceFieldCommand}" />
+                        <Button Classes="ghost" Content="Cancel" Command="{Binding CancelReplaceFieldCommand}" />
+                      </StackPanel>
+                    </StackPanel>
+                  </Border>
+
+                  <Border Classes="form danger" IsVisible="{Binding IsRemovingField}" ctl:ShowInView.OnShow="True">
+                    <StackPanel Spacing="10">
+                      <TextBlock Text="{Binding RemoveFieldPrompt}" TextWrapping="Wrap" />
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Classes="danger" Content="Remove" Command="{Binding ConfirmRemoveFieldCommand}" />
+                        <Button Classes="ghost" Content="Cancel" Command="{Binding CancelRemoveFieldCommand}" />
+                      </StackPanel>
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+
+                <!-- The entry's own tags. A project tag reads as its project and environment, with a shield
+                     when every agent request for the entry is asked about (D-0370, D-0371). -->
+                <StackPanel Spacing="8" IsVisible="{Binding !IsEditing}">
+                  <TextBlock Classes="label" Text="Tags" />
+                  <ItemsControl ItemsSource="{Binding Tags}" IsVisible="{Binding HasTags}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" />
+                      </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:EntryTagChip">
+                        <Border Classes="chip tag" Margin="0,0,6,6" ToolTip.Tip="{Binding Tip}">
+                          <StackPanel Orientation="Horizontal" Spacing="4">
+                            <ctl:KpIcon Icon="shield-check" Size="11" Foreground="{DynamicResource KpTextSecondary}" IsVisible="{Binding IsProtected}" />
+                            <ctl:KpIcon Icon="alert-triangle" Size="11" Foreground="{DynamicResource KpTextSecondary}" IsVisible="{Binding IsMalformed}" />
+                            <TextBlock Text="{Binding Display}" />
+                            <Button Classes="chip-remove"
+                                    AutomationProperties.Name="{Binding RemoveLabel}"
+                                    ToolTip.Tip="{Binding RemoveLabel}"
+                                    Command="{Binding RemoveCommand}">
+                              <ctl:KpIcon Icon="x" Size="10" />
+                            </Button>
+                          </StackPanel>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBox x:Name="NewTag"
+                             Classes="mono"
+                             Text="{Binding DraftTag}"
+                             PlaceholderText="env:project:prod"
+                             Width="220" />
+                    <Button Classes="ghost sm" Content="Add tag" Command="{Binding AddTagCommand}" />
+                  </StackPanel>
                 </StackPanel>
 
                 <StackPanel Spacing="8">

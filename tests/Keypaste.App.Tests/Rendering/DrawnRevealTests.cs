@@ -21,7 +21,7 @@ namespace Keypaste.App.Tests.Rendering;
 /// </remarks>
 public sealed class DrawnRevealTests
 {
-    public static TheoryData<string> Surfaces => ["current", "revision", "env"];
+    public static TheoryData<string> Surfaces => ["current", "revision", "env", "field", "plain-field"];
 
     [Theory]
     [MemberData(nameof(Surfaces))]

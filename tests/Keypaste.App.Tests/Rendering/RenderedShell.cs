@@ -38,6 +38,8 @@ internal sealed class RenderedShell : IDisposable
     internal const string Current = "SENTINEL-CURRENT-PASSWORD-5e1d7a";
     internal const string Superseded = "SENTINEL-OLD-PASSWORD-4b8e21";
     internal const string EnvValue = "SENTINEL-ENV-VALUE-7d5e08";
+    internal const string FieldValue = "SENTINEL-FIELD-VALUE-3a9c51";
+    internal const string PlainFieldValue = "SENTINEL-PLAIN-FIELD-6b2e40";
 
     private static readonly RawInputModifiers _command =
         OperatingSystem.IsMacOS() ? RawInputModifiers.Meta : RawInputModifiers.Control;
@@ -55,6 +57,7 @@ internal sealed class RenderedShell : IDisposable
         using (var vault = Vault.Create(path, Master))
         {
             vault.AddEntry(new VaultEntry { Title = "github", Username = "me", Password = Superseded });
+            vault.SetFields(new EntryName(string.Empty, "github"), [new FieldWrite("API_TOKEN", FieldValue), new FieldWrite("Region", PlainFieldValue, Protect: false)]);
             vault.UpdateEntry(new VaultEntry { Title = "github", Username = "me", Password = Current });
             vault.AddEntry(new VaultEntry { Title = "STRIPE_KEY", Password = EnvValue, GroupPath = "env/billing" });
             vault.Save();
@@ -81,7 +84,7 @@ internal sealed class RenderedShell : IDisposable
     }
 
     /// <summary>Every secret in the vault, for a frame that should hold none of them.</summary>
-    internal static IReadOnlyList<string> Secrets { get; } = [Current, Superseded, EnvValue];
+    internal static IReadOnlyList<string> Secrets { get; } = [Current, Superseded, EnvValue, FieldValue, PlainFieldValue];
 
     internal AppVaultSession Session { get; }
 
@@ -103,6 +106,8 @@ internal sealed class RenderedShell : IDisposable
         "current" => (OpenEntry("CurrentPassword"), Current),
         "revision" => (OpenRevision(), Superseded),
         "env" => (OpenEnv(), EnvValue),
+        "field" => (OpenCustomField("API_TOKEN"), FieldValue),
+        "plain-field" => (OpenCustomField("Region"), PlainFieldValue),
         _ => throw new ArgumentOutOfRangeException(nameof(surface)),
     };
 
@@ -126,6 +131,14 @@ internal sealed class RenderedShell : IDisposable
                 editing.Selected = editing.Rows.Single(row => row.Title == "github");
                 Drain();
                 editing.Detail!.EditCommand.Execute(null);
+                break;
+
+            case "NewFieldValue":
+                OpenPane().BeginAddFieldCommand.Execute(null);
+                break;
+
+            case "ReplacementFieldValue":
+                OpenPane().BeginReplaceField(OpenPane().Fields.Single(row => row.Name == "API_TOKEN"));
                 break;
 
             case "NewEnvValue":
@@ -201,6 +214,20 @@ internal sealed class RenderedShell : IDisposable
         Drain();
 
         return Named<RevealedValue>(cell);
+    }
+
+    private EntryDetailViewModel OpenPane()
+    {
+        OpenEntry("CurrentPassword");
+        return Assert.IsType<EntriesViewModel>(Shell.Content).Detail!;
+    }
+
+    private RevealedValue OpenCustomField(string name)
+    {
+        OpenPane();
+
+        return Window.GetVisualDescendants().OfType<RevealedValue>()
+            .Single(cell => cell.DataContext is EntryFieldRow row && row.Name == name);
     }
 
     private RevealedValue OpenRevision()

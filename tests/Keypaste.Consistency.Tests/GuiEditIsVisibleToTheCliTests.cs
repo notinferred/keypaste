@@ -376,6 +376,40 @@ public sealed class GuiEditIsVisibleToTheCliTests
         Assert.Equal("from-the-terminal", fixture.Cli.Out.Trim());
     }
 
+    /// <summary>
+    /// A custom field added in the entry pane is the value <c>keypaste get --field</c> returns, and a
+    /// tag it adds puts the entry in the project <c>keypaste env ls</c> lists (V.7b).
+    /// </summary>
+    [Fact]
+    public void A_field_and_a_tag_added_in_the_gui_are_what_the_cli_reads()
+    {
+        using var fixture = new VaultFixture(("github", "gh-password"));
+        using var screen = Entries(fixture);
+
+        screen.Model.Selected = screen.Model.Rows.Single(row => row.Title == "github");
+        var detail = screen.Model.Detail!;
+
+        detail.BeginAddFieldCommand.Execute(null);
+        detail.DraftFieldName = "API_TOKEN";
+
+        foreach (var c in "token-from-the-app")
+        {
+            detail.NewFieldValue.Type(c);
+        }
+
+        detail.ConfirmAddFieldCommand.Execute(null);
+        detail.DraftTag = "env:billing:prod";
+        detail.AddTagCommand.Execute(null);
+
+        Assert.Null(screen.Model.Error);
+
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "github", "--field", "API_TOKEN", "--show"));
+        Assert.Equal("token-from-the-app", fixture.Cli.Out.Trim());
+
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("env", "ls"));
+        Assert.Equal("billing\n  prod  protected\n    github", fixture.Cli.Out.ReplaceLineEndings("\n").Trim());
+    }
+
     private static Screen<EntriesViewModel> Entries(VaultFixture fixture)
     {
         Assert.Equal(UnlockOutcome.Opened, fixture.Unlock());
