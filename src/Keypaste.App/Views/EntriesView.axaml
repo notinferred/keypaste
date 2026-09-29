@@ -298,7 +298,7 @@
                     MinWidth="200"
                     IsVisible="{Binding #AddEntry.IsChecked}">
               <StackPanel Spacing="2">
-                <Button x:Name="NewItem" Classes="ghost menu-item" Command="{Binding BeginAddCommand}">
+                <Button x:Name="NewItem" Classes="ghost menu-item" Command="{Binding BeginAddCommand}" AutomationProperties.Name="New item">
                   <StackPanel Orientation="Horizontal" Spacing="10">
                     <ctl:KpIcon Icon="key-round" Size="14" />
                     <TextBlock Text="New item" VerticalAlignment="Center" />
@@ -306,7 +306,8 @@
                 </Button>
                 <Button x:Name="NewProject"
                         Classes="ghost menu-item"
-                        Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).NewProjectCommand, FallbackValue={x:Null}}">
+                        Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).NewProjectCommand, FallbackValue={x:Null}}"
+                        AutomationProperties.Name="New project">
                   <StackPanel Orientation="Horizontal" Spacing="10">
                     <ctl:KpIcon Icon="folder-git-2" Size="14" />
                     <TextBlock Text="New project" VerticalAlignment="Center" />
@@ -314,7 +315,8 @@
                 </Button>
                 <Button x:Name="ImportEnv"
                         Classes="ghost menu-item"
-                        Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).ImportEnvCommand, FallbackValue={x:Null}}">
+                        Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).ImportEnvCommand, FallbackValue={x:Null}}"
+                        AutomationProperties.Name="Import .env">
                   <StackPanel Orientation="Horizontal" Spacing="10">
                     <ctl:KpIcon Icon="file-code" Size="14" />
                     <TextBlock Text="Import .env" VerticalAlignment="Center" />
@@ -322,7 +324,8 @@
                 </Button>
                 <Button x:Name="ImportKdbx"
                         Classes="ghost menu-item"
-                        Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).ImportCommand, FallbackValue={x:Null}}">
+                        Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).ImportCommand, FallbackValue={x:Null}}"
+                        AutomationProperties.Name="Import .kdbx">
                   <StackPanel Orientation="Horizontal" Spacing="10">
                     <ctl:KpIcon Icon="file-input" Size="14" />
                     <TextBlock Text="Import .kdbx" VerticalAlignment="Center" />
@@ -405,7 +408,8 @@
         <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
           <Button Classes="sm"
                   IsVisible="{Binding ListEmptyOffersNew}"
-                  Command="{Binding BeginAddCommand}">
+                  Command="{Binding BeginAddCommand}"
+                  AutomationProperties.Name="New item">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <ctl:KpIcon Icon="plus" Size="13" />
               <TextBlock Text="New item" VerticalAlignment="Center" />
@@ -415,7 +419,8 @@
           <Button x:Name="ImportFromEmpty"
                   Classes="sm"
                   IsVisible="{Binding ListEmptyOffersImport}"
-                  Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).ImportCommand, FallbackValue={x:Null}}">
+                  Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).ImportCommand, FallbackValue={x:Null}}"
+                  AutomationProperties.Name="Import .kdbx">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <ctl:KpIcon Icon="file-input" Size="13" />
               <TextBlock Text="Import .kdbx" VerticalAlignment="Center" />
@@ -601,13 +606,13 @@
                                  TextWrapping="Wrap" />
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
-                      <Button x:Name="CopyPassword" Classes="action" Command="{Binding CopyPasswordCommand}">
+                      <Button x:Name="CopyPassword" Classes="action" Command="{Binding CopyPasswordCommand}" AutomationProperties.Name="Copy password">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                           <ctl:KpIcon Icon="copy" Size="13" />
                           <TextBlock Text="Copy" VerticalAlignment="Center" />
                         </StackPanel>
                       </Button>
-                      <Button x:Name="RotateFromPane" Classes="action" Command="{Binding RotateCommand}">
+                      <Button x:Name="RotateFromPane" Classes="action" Command="{Binding RotateCommand}" AutomationProperties.Name="Rotate">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                           <ctl:KpIcon Icon="refresh-cw" Size="13" />
                           <TextBlock Text="Rotate" VerticalAlignment="Center" />
@@ -632,7 +637,7 @@
                             MinWidth="200"
                             IsVisible="{Binding #EntryMenu.IsChecked}">
                       <StackPanel Spacing="2">
-                        <Button Classes="ghost menu-item" Command="{Binding EditCommand}">
+                        <Button Classes="ghost menu-item" Command="{Binding EditCommand}" AutomationProperties.Name="Edit fields">
                           <StackPanel Orientation="Horizontal" Spacing="10">
                             <ctl:KpIcon Icon="pencil" Size="14" />
                             <TextBlock Text="Edit fields" VerticalAlignment="Center" />
@@ -640,7 +645,8 @@
                         </Button>
                         <Button x:Name="OrganizeFromPane"
                                 Classes="ghost menu-item"
-                                Command="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).OrganizeCommand}">
+                                Command="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).OrganizeCommand}"
+                                AutomationProperties.Name="Rename or move">
                           <StackPanel Orientation="Horizontal" Spacing="10">
                             <ctl:KpIcon Icon="folder-input" Size="14" />
                             <TextBlock Text="Rename or move" VerticalAlignment="Center" />
@@ -651,13 +657,14 @@
                         <Button x:Name="ShareEntry"
                                 Classes="ghost menu-item"
                                 Command="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).ShareCommand, FallbackValue={x:Null}}"
-                                CommandParameter="{Binding Path}">
+                                CommandParameter="{Binding Path}"
+                                AutomationProperties.Name="Share…">
                           <StackPanel Orientation="Horizontal" Spacing="10">
                             <ctl:KpIcon Icon="share-2" Size="14" />
                             <TextBlock Text="Share…" VerticalAlignment="Center" />
                           </StackPanel>
                         </Button>
-                        <Button x:Name="HistoryToggle" Classes="ghost menu-item" Command="{Binding History.ToggleCommand}">
+                        <Button x:Name="HistoryToggle" Classes="ghost menu-item" Command="{Binding History.ToggleCommand}" AutomationProperties.Name="{Binding History.ToggleLabel}">
                           <StackPanel Orientation="Horizontal" Spacing="10">
                             <ctl:KpIcon Icon="history" Size="14" />
                             <TextBlock Text="{Binding History.ToggleLabel}" VerticalAlignment="Center" />
@@ -667,7 +674,8 @@
                         <Button x:Name="DeleteEntry"
                                 Classes="ghost menu-item danger"
                                 Foreground="{DynamicResource KpDanger}"
-                                Command="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).DeleteCommand}">
+                                Command="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).DeleteCommand}"
+                                AutomationProperties.Name="Delete">
                           <StackPanel Orientation="Horizontal" Spacing="10">
                             <ctl:KpIcon Icon="trash-2" Size="14" Foreground="{DynamicResource KpDanger}" />
                             <TextBlock Text="Delete" VerticalAlignment="Center" Foreground="{DynamicResource KpDanger}" />
@@ -815,7 +823,8 @@
                                           Classes="ghost in-field"
                                           Margin="0,0,6,0"
                                           Target="{Binding #RevisionPassword}"
-                                          ToolTip.Tip="Hold to reveal">
+                                          ToolTip.Tip="Hold to reveal"
+                                          AutomationProperties.Name="Reveal">
                           <StackPanel Orientation="Horizontal" Spacing="6">
                             <ctl:KpIcon Icon="eye" Size="14" />
                             <TextBlock Text="Reveal" VerticalAlignment="Center" />
@@ -895,7 +904,8 @@
                                  VerticalAlignment="Center" />
                       <Button Grid.Column="1"
                               Classes="ghost in-field"
-                              Command="{Binding CopyUsernameCommand}">
+                              Command="{Binding CopyUsernameCommand}"
+                              AutomationProperties.Name="Copy username">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                           <ctl:KpIcon Icon="copy" Size="13" />
                           <TextBlock Text="Copy" VerticalAlignment="Center" />
@@ -925,7 +935,8 @@
                       <ctl:RevealButton Grid.Column="1"
                                         Classes="ghost in-field"
                                         Target="{Binding #CurrentPassword}"
-                                        ToolTip.Tip="Hold to reveal">
+                                        ToolTip.Tip="Hold to reveal"
+                                        AutomationProperties.Name="Reveal">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                           <ctl:KpIcon Icon="eye" Size="14" />
                           <TextBlock Text="Reveal" VerticalAlignment="Center" />
@@ -976,7 +987,8 @@
                     <Button Grid.Column="1"
                             x:Name="AddField"
                             Classes="ghost sm"
-                            Command="{Binding BeginAddFieldCommand}">
+                            Command="{Binding BeginAddFieldCommand}"
+                            AutomationProperties.Name="Add field">
                       <StackPanel Orientation="Horizontal" Spacing="6">
                         <ctl:KpIcon Icon="plus" Size="13" />
                         <TextBlock Text="Add field" VerticalAlignment="Center" />

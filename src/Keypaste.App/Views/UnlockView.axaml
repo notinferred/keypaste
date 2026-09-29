@@ -204,7 +204,8 @@
             <Button Classes="wide"
                     Classes.primary="{Binding !IsWaitingForTouch}"
                     IsDefault="True"
-                    Command="{Binding UnlockCommand}">
+                    Command="{Binding UnlockCommand}"
+                    AutomationProperties.Name="Unlock">
               <Panel>
                 <TextBlock Text="Unlock" IsVisible="{Binding !Busy}" />
                 <TextBlock Text="Unlocking…" IsVisible="{Binding Busy}" />
@@ -214,7 +215,8 @@
             <Panel HorizontalAlignment="Center" IsEnabled="{Binding CanTypePassword}">
               <Button Classes="quiet"
                       IsVisible="{Binding !HasKeyfile}"
-                      Command="{Binding ChooseKeyfileCommand}">
+                      Command="{Binding ChooseKeyfileCommand}"
+                      AutomationProperties.Name="Unlock with a key file too">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <ctl:KpIcon Icon="file-key" Size="14" />
                   <TextBlock Text="Unlock with a key file too" VerticalAlignment="Center" />
@@ -232,7 +234,8 @@
                 <Button Classes="icon ghost sm"
                         Width="22" Height="22"
                         ToolTip.Tip="Unlock without a key file"
-                        Command="{Binding ClearKeyfileCommand}">
+                        Command="{Binding ClearKeyfileCommand}"
+                        AutomationProperties.Name="Unlock without a key file">
                   <ctl:KpIcon Icon="x" Size="12" />
                 </Button>
               </StackPanel>
@@ -244,7 +247,8 @@
               <Button x:Name="UseHardwareKey"
                       Classes="quiet"
                       IsVisible="{Binding !UsesHardwareKey}"
-                      Command="{Binding UseHardwareKeyCommand}">
+                      Command="{Binding UseHardwareKeyCommand}"
+                      AutomationProperties.Name="Unlock with a YubiKey too">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <ctl:KpIcon Icon="usb" Size="14" />
                   <TextBlock Text="Unlock with a YubiKey too" VerticalAlignment="Center" />
@@ -263,7 +267,8 @@
                 <Button Classes="icon ghost sm"
                         Width="22" Height="22"
                         ToolTip.Tip="Unlock without a YubiKey"
-                        Command="{Binding ClearHardwareKeyCommand}">
+                        Command="{Binding ClearHardwareKeyCommand}"
+                        AutomationProperties.Name="Unlock without a YubiKey">
                   <ctl:KpIcon Icon="x" Size="12" />
                 </Button>
               </StackPanel>
@@ -271,13 +276,13 @@
           </StackPanel>
 
           <StackPanel Spacing="10" IsVisible="{Binding !HasSelection}">
-            <Button Classes="primary wide" Command="{Binding BrowseCommand}">
+            <Button Classes="primary wide" Command="{Binding BrowseCommand}" AutomationProperties.Name="Open a vault…">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <ctl:KpIcon Icon="folder-open" Size="15" />
                 <TextBlock Text="Open a vault…" VerticalAlignment="Center" />
               </StackPanel>
             </Button>
-            <Button Classes="wide" Command="{Binding StartCreateCommand}">
+            <Button Classes="wide" Command="{Binding StartCreateCommand}" AutomationProperties.Name="Create a new vault…">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <ctl:KpIcon Icon="plus" Size="15" />
                 <TextBlock Text="Create a new vault…" VerticalAlignment="Center" />
@@ -316,7 +321,8 @@
             <Panel HorizontalAlignment="Center">
               <Button Classes="quiet"
                       IsVisible="{Binding !HasKeyfile}"
-                      Command="{Binding ChooseKeyfileCommand}">
+                      Command="{Binding ChooseKeyfileCommand}"
+                      AutomationProperties.Name="Add a key file">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <ctl:KpIcon Icon="file-key" Size="14" />
                   <TextBlock Text="Add a key file" VerticalAlignment="Center" />
@@ -334,7 +340,8 @@
                 <Button Classes="icon ghost sm"
                         Width="22" Height="22"
                         ToolTip.Tip="No key file"
-                        Command="{Binding ClearKeyfileCommand}">
+                        Command="{Binding ClearKeyfileCommand}"
+                        AutomationProperties.Name="No key file">
                   <ctl:KpIcon Icon="x" Size="12" />
                 </Button>
               </StackPanel>
@@ -392,7 +399,8 @@
             <Panel HorizontalAlignment="Center" IsEnabled="{Binding IsChoosing}">
               <Button Classes="quiet"
                       IsVisible="{Binding !HasKeyfile}"
-                      Command="{Binding ChooseKeyfileCommand}">
+                      Command="{Binding ChooseKeyfileCommand}"
+                      AutomationProperties.Name="That backup's key file">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <ctl:KpIcon Icon="file-key" Size="14" />
                   <TextBlock Text="That backup's key file" VerticalAlignment="Center" />
@@ -410,7 +418,8 @@
                 <Button Classes="icon ghost sm"
                         Width="22" Height="22"
                         ToolTip.Tip="No key file"
-                        Command="{Binding ClearKeyfileCommand}">
+                        Command="{Binding ClearKeyfileCommand}"
+                        AutomationProperties.Name="No key file">
                   <ctl:KpIcon Icon="x" Size="12" />
                 </Button>
               </StackPanel>
@@ -482,7 +491,8 @@
           <Button Classes="quiet"
                   Margin="8,0"
                   IsVisible="{Binding HasSelection}"
-                  Command="{Binding BrowseCommand}">
+                  Command="{Binding BrowseCommand}"
+                  AutomationProperties.Name="Open another vault">
             <StackPanel Orientation="Horizontal" Spacing="8">
               <ctl:KpIcon Icon="folder-open" Size="14" />
               <TextBlock Text="Open another vault" VerticalAlignment="Center" />
@@ -491,7 +501,8 @@
           <Button Classes="quiet"
                   Margin="8,0"
                   IsVisible="{Binding HasSelection}"
-                  Command="{Binding StartCreateCommand}">
+                  Command="{Binding StartCreateCommand}"
+                  AutomationProperties.Name="New vault">
             <StackPanel Orientation="Horizontal" Spacing="8">
               <ctl:KpIcon Icon="plus" Size="14" />
               <TextBlock Text="New vault" VerticalAlignment="Center" />
@@ -500,7 +511,8 @@
           <Button Classes="quiet"
                   Margin="8,0"
                   IsVisible="{Binding OffersRestore}"
-                  Command="{Binding StartRestoreCommand}">
+                  Command="{Binding StartRestoreCommand}"
+                  AutomationProperties.Name="Restore a backup">
             <StackPanel Orientation="Horizontal" Spacing="8">
               <ctl:KpIcon Icon="history" Size="14" />
               <TextBlock Text="Restore a backup" VerticalAlignment="Center" />

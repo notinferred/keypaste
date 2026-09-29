@@ -174,7 +174,8 @@
               Classes="primary lg"
               HorizontalAlignment="Stretch"
               HorizontalContentAlignment="Center"
-              Command="{Binding CreateCommand}">
+              Command="{Binding CreateCommand}"
+              AutomationProperties.Name="Create and copy link">
         <StackPanel Orientation="Horizontal" Spacing="8">
           <ctl:KpIcon Icon="link" Size="14" />
           <TextBlock Text="Create and copy link" />

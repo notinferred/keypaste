@@ -128,6 +128,12 @@ switch ($Action) {
     $button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
     Write-Output "invoked '$First'"
   }
+  'toggle' {
+    $button = Until 30 { Named $First ([System.Windows.Automation.ControlType]::Button) }
+    if (-not $button) { Fail "no toggle '$First'" }
+    $button.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle()
+    Write-Output "toggled '$First'"
+  }
   'set-after' {
     $label = Until 30 { Named $First ([System.Windows.Automation.ControlType]::Text) }
     if (-not $label) { Fail "no label '$First'" }
@@ -139,20 +145,13 @@ switch ($Action) {
     if ($value.Current.Value -ne $Second) { Fail "the field after '$First' reads '$($value.Current.Value)'" }
     Write-Output "set the field after '$First'"
   }
-  'set-only' {
-    $edits = Until 30 {
-      $window = Window
-      if ($window) {
-        $found = @($window.FindAll($Scope::Descendants,
-          (New-Object System.Windows.Automation.PropertyCondition($Auto::ControlTypeProperty, [System.Windows.Automation.ControlType]::Edit))))
-        if ($found.Count -gt 0) { return , $found }
-      }
-    }
-    if (-not $edits -or $edits.Count -ne 1) { Fail "expected one field, found $(@($edits).Count)" }
-    $value = $edits[0].GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
-    $value.SetValue($First)
-    if ($value.Current.Value -ne $First) { Fail "the field reads '$($value.Current.Value)'" }
-    Write-Output 'set the only field'
+  'set-named' {
+    $edit = Until 30 { Named $First ([System.Windows.Automation.ControlType]::Edit) }
+    if (-not $edit) { Fail "no field named '$First'" }
+    $value = $edit.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
+    $value.SetValue($Second)
+    if ($value.Current.Value -ne $Second) { Fail "the field named '$First' reads '$($value.Current.Value)'" }
+    Write-Output "set the field named '$First'"
   }
   default { Fail "no action named $Action" }
 }

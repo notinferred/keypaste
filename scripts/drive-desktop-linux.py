@@ -138,7 +138,7 @@ def act(action, args):
             raise Refused(f"the list holding '{args[0]}' refused the selection")
         return f"selected '{args[0]}'"
 
-    if action == "invoke":
+    if action in ("invoke", "toggle"):
         button = until(30, lambda: named(args[0], lambda e: has(e, "Action")))
         if button is None:
             raise Refused(f"no button '{args[0]}'")
@@ -161,14 +161,11 @@ def act(action, args):
             raise Refused(f"no field after '{args[0]}'")
         return set_text(edit, args[1], f"the field after '{args[0]}'")
 
-    if action == "set-only":
-        def probe():
-            found = [e for e in descendants(window()) if has(e, "EditableText")]
-            return found or None
-        edits = until(30, probe) or []
-        if len(edits) != 1:
-            raise Refused(f"expected one field, found {len(edits)}")
-        return set_text(edits[0], args[0], "the only field")
+    if action == "set-named":
+        edit = until(30, lambda: named(args[0], lambda e: has(e, "EditableText")))
+        if edit is None:
+            raise Refused(f"no field named '{args[0]}'")
+        return set_text(edit, args[1], f"the field named '{args[0]}'")
 
     raise Refused(f"no action named {action}")
 

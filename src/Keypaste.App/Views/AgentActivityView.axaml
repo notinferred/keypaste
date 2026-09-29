@@ -32,7 +32,8 @@
                     Padding="12,0"
                     Height="30"
                     IsVisible="{Binding OffersHistory}"
-                    Command="{Binding OpenHistoryCommand}">
+                    Command="{Binding OpenHistoryCommand}"
+                    AutomationProperties.Name="History">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <ctl:KpIcon Icon="history" Size="13" />
                 <TextBlock Text="History" />
@@ -43,7 +44,8 @@
                     Classes.primary="{Binding ConnectIsPrimary}"
                     Padding="12,0"
                     Height="30"
-                    Command="{Binding ToggleConnectCommand}">
+                    Command="{Binding ToggleConnectCommand}"
+                    AutomationProperties.Name="Connect client">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <ctl:KpIcon Icon="plus" Size="13" />
                 <TextBlock Text="Connect client" />
@@ -339,7 +341,7 @@
                       <TextBlock Grid.Column="1" Classes="caption" Text="Hold to show" VerticalAlignment="Center" />
                     </Grid>
                   </Border>
-                  <Button Grid.Column="1" Classes.primary="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).FormsArePrimary}" Command="{Binding CopyMintedCommand}" VerticalAlignment="Center">
+                  <Button Grid.Column="1" Classes.primary="{Binding $parent[UserControl].((vm:AgentActivityViewModel)DataContext).FormsArePrimary}" Command="{Binding CopyMintedCommand}" VerticalAlignment="Center" AutomationProperties.Name="Copy token">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                       <ctl:KpIcon Icon="copy" Size="13" />
                       <TextBlock Text="Copy" />

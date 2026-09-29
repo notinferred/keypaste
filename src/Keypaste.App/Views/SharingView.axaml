@@ -62,7 +62,8 @@
                     Margin="12,0,0,0"
                     IsVisible="{Binding !IsEmpty}"
                     ToolTip.Tip="Ask the share server how many views each link has left"
-                    Command="{Binding RefreshCommand}">
+                    Command="{Binding RefreshCommand}"
+                    AutomationProperties.Name="Check status">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <ctl:KpIcon Icon="refresh-cw" Size="13" />
                 <TextBlock Text="Check status" />

@@ -101,7 +101,8 @@
                       Name="CopyHash"
                       Margin="12,-4,-6,-4"
                       IsVisible="{Binding Verdict.HasHash}"
-                      Command="{Binding CopyHashCommand}">
+                      Command="{Binding CopyHashCommand}"
+                      AutomationProperties.Name="Copy latest hash">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <ctl:KpIcon Icon="copy" Size="13" />
                   <TextBlock Text="Copy latest hash" VerticalAlignment="Center" />

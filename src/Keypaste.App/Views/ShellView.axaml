@@ -152,6 +152,7 @@
             <Button Classes="titlebar-lock"
                     Command="{Binding LockCommand}"
                     ToolTip.Tip="Lock now"
+                    AutomationProperties.Name="Lock now"
                     WindowDecorationProperties.ElementRole="User">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <ctl:KpIcon Icon="lock" Size="12" />

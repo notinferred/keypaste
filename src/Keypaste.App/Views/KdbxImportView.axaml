@@ -151,7 +151,8 @@
         <Button Grid.Column="2"
                 Classes="icon ghost sm"
                 ToolTip.Tip="Cancel"
-                Command="{Binding CancelCommand}">
+                Command="{Binding CancelCommand}"
+                AutomationProperties.Name="Cancel">
           <ctl:KpIcon Icon="x" Size="15" />
         </Button>
       </Grid>
@@ -306,7 +307,7 @@
       </StackPanel>
 
       <StackPanel Spacing="6" IsVisible="{Binding IsReadable}">
-        <ToggleButton Theme="{StaticResource Switch}" IsChecked="{Binding KeepEditingInPlace}">
+        <ToggleButton Theme="{StaticResource Switch}" IsChecked="{Binding KeepEditingInPlace}" AutomationProperties.Name="Keep editing this file in place, so KeePassXC and other KDBX apps stay in sync">
           <TextBlock FontSize="13"
                      FontWeight="Normal"
                      TextWrapping="Wrap"

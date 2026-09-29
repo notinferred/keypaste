@@ -183,7 +183,8 @@
               <Button Classes="icon ghost sm" Width="22" Height="22" Margin="8,0,0,0"
                       ToolTip.Tip="New project"
                       Command="{Binding BeginAddCommand}"
-                      IsVisible="{Binding !IsAdding}">
+                      IsVisible="{Binding !IsAdding}"
+                      AutomationProperties.Name="New project">
                 <ctl:KpIcon Icon="plus" Size="13" />
               </Button>
             </StackPanel>
@@ -193,13 +194,13 @@
 
           <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Bottom"
                       IsVisible="{Binding HasOpenProject}">
-            <Button Command="{Binding OpenProject.Import.ChooseCommand}">
+            <Button Command="{Binding OpenProject.Import.ChooseCommand}" AutomationProperties.Name="Import .env">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <ctl:KpIcon Icon="file-up" Size="13" />
                 <TextBlock Text="Import .env" />
               </StackPanel>
             </Button>
-            <Button Command="{Binding OpenProject.ExportReferencesCommand}">
+            <Button Command="{Binding OpenProject.ExportReferencesCommand}" AutomationProperties.Name="Export .env.keypaste">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <ctl:KpIcon Icon="file-down" Size="13" />
                 <TextBlock Text="Export .env.keypaste" />
@@ -291,7 +292,8 @@
                             <ItemsControl.ItemTemplate>
                               <DataTemplate x:DataType="vm:EnvProfileColumn">
                                 <Button Classes="flat" Margin="12,0,0,0" Command="{Binding Select}"
-                                        ToolTip.Tip="{Binding Name, StringFormat='Edit, preview and run {0}'}">
+                                        ToolTip.Tip="{Binding Name, StringFormat='Edit, preview and run {0}'}"
+                                        AutomationProperties.Name="{Binding Name}">
                                   <StackPanel Orientation="Horizontal" Spacing="6">
                                     <TextBlock Classes="th" Classes.selected="{Binding IsSelected}" Text="{Binding Header}" />
                                     <ctl:KpIcon Icon="shield-check" Size="12" IsVisible="{Binding IsProtected}"
@@ -319,7 +321,8 @@
                           </ItemsControl>
                           <Button Grid.Column="2" Classes="flat" HorizontalAlignment="Right"
                                   Command="{Binding BeginAddProfileCommand}"
-                                  ToolTip.Tip="Add a profile, such as staging or prod">
+                                  ToolTip.Tip="Add a profile, such as staging or prod"
+                                  AutomationProperties.Name="Add profile">
                             <StackPanel Orientation="Horizontal" Spacing="4">
                               <ctl:KpIcon Icon="plus" Size="12" Foreground="{DynamicResource KpTextMuted}" />
                               <TextBlock Classes="th" Text="PROFILE" />
@@ -347,7 +350,8 @@
                                            value that differs. In the selected profile the hold target lies over it. -->
                                       <Panel Margin="12,0,0,0" VerticalAlignment="Center" ToolTip.Tip="{Binding Tip}">
                                         <Button Classes="flat cell" Command="{Binding Act}"
-                                                IsHitTestVisible="{Binding ShowsLabel}" Focusable="{Binding ShowsLabel}">
+                                                IsHitTestVisible="{Binding ShowsLabel}" Focusable="{Binding ShowsLabel}"
+                                                AutomationProperties.Name="{Binding Label}">
                                           <!-- A narrow cell drops the note below the mask rather than cutting it to a stub. -->
                                           <WrapPanel Orientation="Horizontal">
                                             <TextBlock Classes="mono" Margin="0,0,8,0"
@@ -413,7 +417,8 @@
                         <Grid ColumnDefinitions="*,Auto">
                           <TextBlock Classes="caption" VerticalAlignment="Center" IsVisible="{Binding !HasRows}"
                                      Text="{Binding SelectedProfile, StringFormat='No keys yet. Add the first one to {0}.'}" />
-                          <Button Grid.Column="1" Classes="ghost sm" Command="{Binding BeginAddCommand}">
+                          <Button Grid.Column="1" Classes="ghost sm" Command="{Binding BeginAddCommand}"
+                                  AutomationProperties.Name="{Binding SelectedProfile, StringFormat='Add a key to {0}'}">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                               <ctl:KpIcon Icon="plus" Size="13" />
                               <TextBlock Text="{Binding SelectedProfile, StringFormat='Add a key to {0}'}" />
@@ -453,7 +458,8 @@
                 <Border Classes="card filled" IsVisible="{Binding IsAdding}" ctl:ShowInView.OnShow="True">
                   <StackPanel Spacing="10">
                     <TextBlock Classes="section" Text="{Binding SelectedProfile, StringFormat='Add a key to {0}'}" />
-                    <TextBox Classes="mono" Text="{Binding NewKey}" PlaceholderText="STRIPE_KEY" Width="320" HorizontalAlignment="Left" />
+                    <TextBox Classes="mono" Text="{Binding NewKey}" PlaceholderText="STRIPE_KEY" Width="320" HorizontalAlignment="Left"
+                             AutomationProperties.Name="New key" />
                     <CheckBox Content="Generate a value" IsChecked="{Binding GenerateValue}" />
                     <StackPanel Spacing="6" IsVisible="{Binding GenerateValue}">
                       <StackPanel Orientation="Horizontal" Spacing="12">
@@ -587,7 +593,8 @@
                                      TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
                                      ToolTip.Tip="{Binding RunCommand}" />
                           <Button Grid.Column="2" Classes="ghost row-action" Margin="8,0,0,0"
-                                  ToolTip.Tip="Copy the command" Command="{Binding CopyRunCommandCommand}">
+                                  ToolTip.Tip="Copy the command" Command="{Binding CopyRunCommandCommand}"
+                                  AutomationProperties.Name="Copy the command">
                             <ctl:KpIcon Icon="copy" Size="13" />
                           </Button>
                         </Grid>
@@ -612,7 +619,7 @@
                         <Button Grid.Column="1" Content="Save" Margin="8,0,0,0" Command="{Binding Launch.SaveCommand}" />
                       </Grid>
                       <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Command="{Binding Launch.RunProjectCommand}">
+                        <Button Command="{Binding Launch.RunProjectCommand}" AutomationProperties.Name="Run in a terminal">
                           <StackPanel Orientation="Horizontal" Spacing="6">
                             <ctl:KpIcon Icon="terminal" Size="13" />
                             <TextBlock Text="Run in a terminal" />

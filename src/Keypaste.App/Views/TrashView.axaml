@@ -39,13 +39,13 @@
                   IsVisible="{Binding !IsEmpty}">
         <TextBlock Classes="caption" Text="Select an entry to restore or delete it" VerticalAlignment="Center"
                    Margin="0,0,4,0" IsVisible="{Binding AwaitsSelection}" />
-        <Button Name="RestoreButton" Command="{Binding RestoreCommand}">
+        <Button Name="RestoreButton" Command="{Binding RestoreCommand}" AutomationProperties.Name="Restore">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <ctl:KpIcon Icon="history" Size="14" />
             <TextBlock Text="Restore" />
           </StackPanel>
         </Button>
-        <Button Name="PurgeButton" Classes="danger" Command="{Binding PurgeCommand}">
+        <Button Name="PurgeButton" Classes="danger" Command="{Binding PurgeCommand}" AutomationProperties.Name="Delete for good">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <ctl:KpIcon Icon="trash-2" Size="14" />
             <TextBlock Text="Delete for good" />

@@ -271,7 +271,7 @@
                   <RadioButton GroupName="Keyfile" Content="Keep the keyfile as it is" IsChecked="{Binding KeepKeyfile}" />
                   <RadioButton GroupName="Keyfile" Content="{Binding AttachLabel}" IsChecked="{Binding AttachKeyfile}" />
                   <StackPanel Orientation="Horizontal" Spacing="10" Margin="28,4,0,4" IsVisible="{Binding AttachKeyfile}">
-                    <Button Classes="sm" Command="{Binding ChooseKeyfileCommand}">
+                    <Button Classes="sm" Command="{Binding ChooseKeyfileCommand}" AutomationProperties.Name="Choose keyfile…">
                       <StackPanel Orientation="Horizontal" Spacing="6">
                         <ctl:KpIcon Icon="file-key" Size="14" />
                         <TextBlock Text="Choose keyfile…" />
@@ -380,7 +380,7 @@
             <Border Classes="settings-row">
               <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
                 <TextBlock Grid.Column="0" Classes="caption" Text="{Binding ElsewhereAdvice}" />
-                <Button Grid.Column="1" Command="{Binding ExportCommand}" VerticalAlignment="Top">
+                <Button Grid.Column="1" Command="{Binding ExportCommand}" VerticalAlignment="Top" AutomationProperties.Name="Export an encrypted copy…">
                   <StackPanel Orientation="Horizontal" Spacing="6">
                     <ctl:KpIcon Icon="file-lock-2" Size="14" />
                     <TextBlock Text="Export an encrypted copy…" />

@@ -4,8 +4,8 @@
 #
 # The app carries no automation hook (D-0199). It is driven through the platform accessibility tree and real
 # keystrokes: UI Automation on Windows (drive-desktop-windows.ps1), AT-SPI and xdotool on Linux
-# (drive-desktop-linux.py). The vault is made by the CLI (D-0146). The app has no approval screen yet, so the
-# approval is a person's y at the terminal agent, with the app's Agent Activity screen reporting that agent.
+# (drive-desktop-linux.py). The vault is made by the CLI (D-0146). The approval is a person's answer at the
+# terminal agent, which holds the vault, so the app's unlock is refused and its unlock screen names that agent.
 #
 # Checks, in order: candidate, install, first-window, unlock, entry-list, edit, env-run, approval. A check
 # passes only on its evidence, is unreached when its action could not be done or an earlier check failed,
@@ -26,7 +26,7 @@ readonly ENTRY_GROUP='web'
 readonly ENTRY_TITLE='install-check'
 readonly PROJECT='install'
 readonly VARIABLE='APP_ADDED'
-readonly AGENT_STATUS='A keypaste agent is running'
+readonly AGENT_STATUS='Keypaste agent (process '
 readonly CR=$'\r'
 
 usage() {
@@ -293,7 +293,8 @@ first_session() {
   fact nonce "$NONCE"
   before="$(sha256_of "$VAULT")"
   act select-entry drive select "$ENTRY_TITLE" \
-    && act edit-entry drive invoke Edit \
+    && act entry-menu drive toggle 'More actions' \
+    && act edit-entry drive invoke 'Edit fields' \
     && act username drive set-after Username "$NONCE" \
     && act save-entry drive invoke Save \
     || return 0
@@ -301,8 +302,8 @@ first_session() {
 
   before="$(sha256_of "$VAULT")"
   act open-project drive select "$PROJECT" \
-    && act begin-variable drive invoke 'Add variable' \
-    && act variable-name drive set-only "$VARIABLE" \
+    && act begin-variable drive invoke 'Add a key to dev' \
+    && act variable-name drive set-named 'New key' "$VARIABLE" \
     && act add-variable drive invoke Add \
     || return 0
   if wait_for_change "$before"; then fact vault_changed_by_variable true; else fact vault_changed_by_variable false; fi
@@ -328,8 +329,8 @@ approval() {
   act agent-listening grep 'listening on' "$OUT/agent-stderr.txt" || { kill "$agent_pid" 2>/dev/null || true; return 0; }
 
   launch second "$pipe" > /dev/null
-  if act second-window drive window 120 && unlock second-unlock && act agents-shortcut drive key ctrl+2 \
-    && act check-again drive invoke 'Check again' && act agent-activity drive find-prefix "$AGENT_STATUS"; then
+  if act second-window drive window 120 && act second-unlock drive type "$MASTER" && act second-unlock-enter drive key Return \
+    && act agent-activity drive find-prefix "$AGENT_STATUS"; then
     fact agent_activity "$(step "$OUT" agent-activity | cut -f2)"
   fi
 
@@ -425,7 +426,7 @@ selftest() {
       '{"action":"entry-listed","status":"ok","detail":"found install-check"}' \
       '{"action":"save-entry","status":"ok","detail":"invoked Save"}' \
       '{"action":"add-variable","status":"ok","detail":"invoked Add"}' \
-      '{"action":"agent-activity","status":"ok","detail":"A keypaste agent is running. Approvals appear in that terminal."}' \
+      '{"action":"agent-activity","status":"ok","detail":"Keypaste agent (process 4242) holds this vault, and agents reach it there."}' \
       '{"action":"request","status":"ok","detail":"{}"}' > "$dir/driver.jsonl"
     printf '%s\n' \
       '{"fact":"installed_app","value":"C:/Users/runner/AppData/Local/Programs/keypaste/keypaste-app.exe"}' \
@@ -435,7 +436,7 @@ selftest() {
       '{"fact":"vault_changed_by_variable","value":"true"}' \
       '{"fact":"get_output","value":"generated"}' \
       '{"fact":"run_output","value":"generated"}' \
-      '{"fact":"agent_activity","value":"A keypaste agent is running."}' \
+      '{"fact":"agent_activity","value":"Keypaste agent (process 4242) holds this vault, and agents reach it there."}' \
       '{"fact":"mcp_error","value":"false"}' \
       '{"fact":"username_readback","value":"edited-in-app-1"}' \
       '{"fact":"audit_decision","value":"granted"}' \
@@ -484,7 +485,7 @@ selftest() {
   set_fact denied audit_decision denied
   set_fact denied mcp_error true
   passing no-agent-screen
-  refuse_action no-agent-screen agent-activity "nothing starting 'A keypaste agent is running' appeared"
+  refuse_action no-agent-screen agent-activity "nothing starting 'Keypaste agent (process ' appeared"
   passing unfinished
   jq -c 'select(.fact != "finished")' "$work/unfinished/facts.jsonl" > "$work/t" && mv "$work/t" "$work/unfinished/facts.jsonl"
 

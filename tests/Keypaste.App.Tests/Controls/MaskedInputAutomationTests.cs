@@ -299,6 +299,13 @@ public sealed class MaskedInputAutomationTests
     });
 
     /// <summary>A master password is typed, never pasted: the restore field ignores the gesture as the unlock field does.</summary>
+    private static readonly string[] _unlockScreenLabels =
+    [
+        "Unlock", "Unlock with a key file too", "Unlock without a key file", "Unlock with a YubiKey too",
+        "Unlock without a YubiKey", "Open a vault…", "Create a new vault…", "Add a key file", "No key file",
+        "That backup's key file", "Open another vault", "New vault", "Restore a backup",
+    ];
+
     [Fact]
     public Task The_backup_password_field_takes_no_paste() => HeadlessSession.On(() =>
     {
@@ -328,10 +335,12 @@ public sealed class MaskedInputAutomationTests
 
     /// <summary>
     /// <c>AutomationProperties.Name="{Binding …}"</c> compiles, renders identically and publishes
-    /// whatever it is bound to. Nothing on this screen sets one, and this is what keeps that true.
+    /// whatever it is bound to. The only names on this screen are these button labels, each a literal
+    /// in the view, so a screen reader does not announce a button by its content's type (F.25); a name
+    /// that is not one of them, or any other attached metadata, fails here.
     /// </summary>
     [Fact]
-    public Task No_automation_metadata_is_attached_on_the_unlock_screen() => HeadlessSession.On(() =>
+    public Task Only_literal_button_labels_are_attached_on_the_unlock_screen() => HeadlessSession.On(() =>
     {
         using var screen = new UnlockScreen();
 
@@ -339,7 +348,12 @@ public sealed class MaskedInputAutomationTests
 
         foreach (var element in screen.Window.GetVisualDescendants().OfType<Control>())
         {
-            Assert.Null(AutomationProperties.GetName(element));
+            if (AutomationProperties.GetName(element) is { } name)
+            {
+                Assert.IsAssignableFrom<Button>(element);
+                Assert.Contains(name, _unlockScreenLabels);
+            }
+
             Assert.Null(AutomationProperties.GetHelpText(element));
             Assert.Null(AutomationProperties.GetItemStatus(element));
             Assert.Null(AutomationProperties.GetItemType(element));

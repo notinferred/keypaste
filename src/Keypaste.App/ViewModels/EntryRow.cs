@@ -125,6 +125,10 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
     /// <summary>The title as the list draws it, scrubbed of anything that misrepresents it.</summary>
     internal string DisplayTitle { get; } = EntryNameSanitizer.Sanitize(Title).Text;
 
+    /// <summary>The row's name for a screen reader, which reads a list item by its content's text.</summary>
+    /// <returns>The scrubbed title, as the row draws it.</returns>
+    public override string ToString() => DisplayTitle;
+
     /// <summary>The group, for a list that is not grouped by one. Display only, so scrubbed.</summary>
     internal string Where { get; } =
         GroupPath.Length == 0 ? "—" : EntryNameSanitizer.SanitizePath(GroupPath).Text;
