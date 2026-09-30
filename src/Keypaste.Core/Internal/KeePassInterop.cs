@@ -403,9 +403,7 @@ internal sealed class KeePassInterop : IDisposable
 
         PwEntry pwEntry = found.Entry;
 
-        // Mutated rather than removed and re-added: re-adding mints a new UUID and discards
-        // timestamps, attachments and custom string fields keypaste does not model (law 4.6).
-        // CreateBackup trims the history list itself, so a separate MaintainBackups call is dead.
+        // Mutated in place: re-adding mints a new UUID and drops what keypaste does not model (law 4.6).
         pwEntry.CreateBackup(_database);
 
         SetField(pwEntry, PwDefs.TitleField, entry.Title);
@@ -414,7 +412,7 @@ internal sealed class KeePassInterop : IDisposable
         SetField(pwEntry, PwDefs.UrlField, entry.Url);
         SetField(pwEntry, PwDefs.NotesField, entry.Notes);
 
-        pwEntry.Touch(true);
+        MarkEdited(pwEntry);
         return 1;
     }
 
@@ -703,7 +701,7 @@ internal sealed class KeePassInterop : IDisposable
             entry.Strings.Set(write.Name, new ProtectedString(protect, write.Value ?? existing!.ReadString()));
         }
 
-        entry.Touch(true);
+        MarkEdited(entry);
         return 1;
     }
 
@@ -721,7 +719,7 @@ internal sealed class KeePassInterop : IDisposable
 
         found.Entry.CreateBackup(_database);
         found.Entry.Strings.Remove(field);
-        found.Entry.Touch(true);
+        MarkEdited(found.Entry);
         return 1;
     }
 
@@ -768,7 +766,7 @@ internal sealed class KeePassInterop : IDisposable
         }
 
         entry.Strings.Set(PwDefs.NotesField, new ProtectedString(entry.Strings.Get(PwDefs.NotesField)?.IsProtected ?? false, notes));
-        entry.Touch(true);
+        MarkEdited(entry);
         return 1;
     }
 
@@ -806,7 +804,7 @@ internal sealed class KeePassInterop : IDisposable
 
         found.Entry.CreateBackup(_database);
         found.Entry.AddTag(tag);
-        found.Entry.Touch(true);
+        MarkEdited(found.Entry);
         return 1;
     }
 
@@ -829,7 +827,7 @@ internal sealed class KeePassInterop : IDisposable
             found.Entry.RemoveTag(tag);
         }
 
-        found.Entry.Touch(true);
+        MarkEdited(found.Entry);
         return 1;
     }
 
@@ -917,17 +915,12 @@ internal sealed class KeePassInterop : IDisposable
             return collision;
         }
 
-        // Nothing above this line writes; nothing below it reads a decision. The two halves of the
-        // move stay adjacent so an entry can never be left belonging to no group.
+        // The two halves of the move stay adjacent so an entry never belongs to no group.
         if (moves)
         {
             found.Group.Entries.Remove(found.Entry);
 
-            // The three-argument overload stamps LocationChanged and leaves LastModificationTime
-            // and History alone: a move is not an edit of the entry's values. PreviousParentGroup
-            // is deliberately not written — that field raises the file to KDBX 4.1 (D-0247), and
-            // tidying a folder must not cost a reader what deleting does. One another tool wrote
-            // is left alone: it is somebody else's record, and the file is already 4.1 for it.
+            // A move stamps only LocationChanged, and writes no PreviousParentGroup, which raises the file to KDBX 4.1 (D-0247).
             destination.Group.AddEntry(found.Entry, true, true);
         }
 
@@ -935,17 +928,13 @@ internal sealed class KeePassInterop : IDisposable
         {
             SetField(found.Entry, PwDefs.TitleField, target.Title);
 
-            // The title is a field, so a merge that did not see it change would revert the rename.
-            // It takes no history revision: a rename overwrites no value, and KeePass evicts the
-            // oldest revision when the list fills.
-            found.Entry.Touch(true);
+            // Newer so a merge keeps the title; no revision, because a rename overwrites no value.
+            MarkEdited(found.Entry);
         }
 
         result = target;
 
-        // Computed from what actually varied rather than declared by the caller. A combined change
-        // is neither a rename nor a move on its own, and a result that had to pick one of them
-        // would be half wrong for the operation the app performs most.
+        // A combined change is neither a rename nor a move on its own.
         return (renames, moves) switch
         {
             (true, true) => OrganizeOutcome.RenamedAndMoved,
@@ -1468,30 +1457,22 @@ internal sealed class KeePassInterop : IDisposable
             return 0;
         }
 
-        // Resolved before anything mutates: RestoreFromBackup takes the item at its raw position and
-        // only then creates the backup that can evict it, so a position read later names another
-        // revision. An index refused here has also written nothing.
+        // Resolved before the restore's own backup can evict the item at this raw position.
         uint[] order = HistoryNewestFirst(found.Entry);
         ArgumentOutOfRangeException.ThrowIfNegative(index);
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, order.Length);
 
         PwEntry pwEntry = found.Entry;
 
-        // Read before the restore, which assigns every string back — the title included. A history
-        // item carries the title the entry had when the revision was taken, so without this a
-        // restore silently undoes a rename nobody asked about, and can land the entry on a name
-        // something else already answers to. A revision is values, never identity (D-0091), which
-        // is the same claim UpdateEntry makes about its own name argument.
+        // A revision is values, never identity, so the restore keeps the current title (D-0091).
         string title = ReadField(pwEntry, PwDefs.TitleField);
 
         pwEntry.RestoreFromBackup(order[index], _database);
 
         SetField(pwEntry, PwDefs.TitleField, title);
 
-        // Restoring assigns the old revision's timestamps back, so without this the entry would be
-        // older than the value it just replaced: a merge would revert it and history eviction, which
-        // drops the oldest, would take it first (DECISIONS.md D-0227).
-        pwEntry.Touch(true);
+        // The restore assigned the revision's old times back (D-0227).
+        MarkEdited(pwEntry);
         return 1;
     }
 
@@ -1550,6 +1531,23 @@ internal sealed class KeePassInterop : IDisposable
             .ThenByDescending(position => position)
             .Select(position => (uint)position)
             .ToArray();
+    }
+
+    // KeePassXC's merge keeps one version of an entry per whole second, so each edit takes a later second than every version it keeps (D-0387).
+    private static void MarkEdited(PwEntry entry)
+    {
+        long second = entry.History
+            .Select(revision => revision.LastModificationTime)
+            .Append(entry.LastModificationTime)
+            .Max().Ticks / TimeSpan.TicksPerSecond;
+
+        entry.Touch(true);
+
+        if (entry.LastModificationTime.Ticks / TimeSpan.TicksPerSecond <= second
+            && second < DateTime.MaxValue.Ticks / TimeSpan.TicksPerSecond)
+        {
+            entry.LastModificationTime = new DateTime((second + 1) * TimeSpan.TicksPerSecond, DateTimeKind.Utc);
+        }
     }
 
     /// <summary>How many times a save is attempted before the failure is reported.</summary>

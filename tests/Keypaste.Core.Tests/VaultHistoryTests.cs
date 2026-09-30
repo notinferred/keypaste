@@ -1,3 +1,11 @@
+using System.Text;
+using KeePassLib;
+using KeePassLib.Cryptography.Cipher;
+using KeePassLib.Cryptography.KeyDerivation;
+using KeePassLib.Keys;
+using KeePassLib.Security;
+using KeePassLib.Serialization;
+using Keypaste.Core.Recommendations;
 using Xunit;
 
 namespace Keypaste.Core.Tests;
@@ -50,7 +58,7 @@ public sealed class VaultHistoryTests : IDisposable
         Assert.All(revisions, revision =>
         {
             Assert.Equal(DateTimeKind.Utc, revision.ModifiedUtc.Kind);
-            Assert.True(revision.ModifiedUtc <= DateTime.UtcNow);
+            Assert.True(revision.ModifiedUtc <= DateTime.UtcNow.AddSeconds(revisions.Count));
             Assert.Equal("servers", revision.Fields.GroupPath, StringComparer.Ordinal);
             Assert.Equal("production", revision.Fields.Title, StringComparer.Ordinal);
         });
@@ -64,32 +72,76 @@ public sealed class VaultHistoryTests : IDisposable
     }
 
     /// <summary>
-    /// KDBX4 writes a timestamp to the second, so three updates a microsecond apart come back from
-    /// a reopened file with one time between them. Order is then the file's, newest last, and a
-    /// stable sort left to itself returns exactly the wrong end first.
+    /// KDBX4 writes a timestamp to the second, so revisions another application wrote a microsecond
+    /// apart, as keypaste did before F.27, come back from the file with one time between them. Order
+    /// is then the file's, newest last, and a stable sort left to itself returns exactly the wrong end
+    /// first.
     /// </summary>
     [Fact]
-    public void ReadHistory_AfterAReopenCollapsesTheTimesOntoOneSecond_StillOrdersNewestFirst()
+    public void ReadHistory_OfRevisionsSharingASecond_StillOrdersNewestFirst()
     {
-        IReadOnlyList<EntryRevision>? revisions = null;
+        var path = NewVaultPath();
+        WriteInOneSecond(path, DateTime.UtcNow);
 
-        for (var attempt = 0; attempt < 3 && !SharesATime(revisions); attempt++)
-        {
-            // Seeded just after a second boundary, so three updates and a save land before the next
-            // one: the tie is the condition under test, not an accident of when this ran.
-            while (DateTime.UtcNow.Millisecond > 50)
-            {
-                Thread.Yield();
-            }
+        using var vault = Vault.Open(path, MasterPassword);
+        var revisions = vault.ReadHistory(_production);
 
-            using var vault = Vault.Open(Seed(out _), MasterPassword);
-            revisions = vault.ReadHistory(_production);
-        }
-
-        Assert.True(SharesATime(revisions), "the three revisions did not land inside one second");
         Assert.NotNull(revisions);
+        Assert.Single(revisions.Select(revision => revision.ModifiedUtc).Distinct());
         Assert.Equal([0, 1, 2], revisions.Select(revision => revision.Index));
         Assert.Equal(["v2", "v1", "v0"], revisions.Select(revision => revision.Fields.Password));
+    }
+
+    /// <summary>
+    /// KeePassXC's merge keeps one version of an entry per second, so a version that shares its
+    /// second with another is lost at the next merge (F.27). Edits a microsecond apart are what an
+    /// unsaved session or two quick saves produce, and each still reaches the file in its own second.
+    /// </summary>
+    [Fact]
+    public void EditsInOneSecond_EachReachTheFileInASecondOfTheirOwn()
+    {
+        var path = Seed(out _);
+
+        using var vault = Vault.Open(path, MasterPassword);
+
+        Assert.Equal(["v3", "v2", "v1", "v0"], Versions(vault).Select(version => version.Password));
+        Assert.True(EachInASecondOfItsOwn(vault));
+    }
+
+    /// <summary>
+    /// Every edit is later than the version it replaces even when that version's time is ahead of this
+    /// machine's clock, as a merge from a device whose clock runs fast leaves it; otherwise the next
+    /// merge takes the older version as the newer. The check sees the shared second before the edit.
+    /// </summary>
+    [Theory]
+    [InlineData(nameof(Vault.UpdateEntry))]
+    [InlineData(nameof(Vault.SetFields))]
+    [InlineData(nameof(Vault.RemoveField))]
+    [InlineData(nameof(Vault.MoveNoteKeys))]
+    [InlineData(nameof(Vault.AddTag))]
+    [InlineData(nameof(Vault.RemoveTags))]
+    [InlineData(nameof(Vault.RenameEntry))]
+    [InlineData(nameof(Vault.RestoreRevision))]
+    public void AnEditOfAVersionStampedAhead_IsStampedAfterIt(string edit)
+    {
+        var path = NewVaultPath();
+        var ahead = DateTime.UtcNow.AddHours(1);
+        WriteInOneSecond(path, ahead);
+        EntryName edited;
+
+        using (var vault = Vault.Open(path, MasterPassword))
+        {
+            Assert.False(EachInASecondOfItsOwn(vault));
+
+            edited = Edit(vault, edit);
+            vault.Save();
+        }
+
+        using var reopened = Vault.Open(path, MasterPassword);
+        var versions = Versions(reopened, edited);
+
+        Assert.Equal(WholeSecond(ahead).AddSeconds(1), versions[0].ModifiedUtc);
+        Assert.All(versions.Skip(1), version => Assert.Equal(WholeSecond(ahead), version.ModifiedUtc));
     }
 
     /// <summary>
@@ -447,10 +499,98 @@ public sealed class VaultHistoryTests : IDisposable
             vault.ReadHistory(_production)!.Select(revision => revision.Fields.Password));
     }
 
-    private static bool SharesATime(IReadOnlyList<EntryRevision>? revisions)
+    /// <summary>Applies one edit to the entry <see cref="WriteInOneSecond"/> writes, and names the entry after it.</summary>
+    private static EntryName Edit(Vault vault, string edit)
     {
-        return revisions is { Count: 3 } && revisions[0].ModifiedUtc == revisions[2].ModifiedUtc;
+        EntryName? renamed = null;
+        using var check = new NoteKeyCheck();
+
+        bool applied = edit switch
+        {
+            nameof(Vault.UpdateEntry) => vault.UpdateEntry(new VaultEntry { Title = "production", Password = "v4", GroupPath = "servers" }),
+            nameof(Vault.SetFields) => vault.SetFields(_production, [new FieldWrite("TOKEN", "t4")]),
+            nameof(Vault.RemoveField) => vault.RemoveField(_production, "TOKEN"),
+            nameof(Vault.MoveNoteKeys) => vault.MoveNoteKeys(check, check.Scan(vault)).Moved,
+            nameof(Vault.AddTag) => vault.AddTag(_production, "added"),
+            nameof(Vault.RemoveTags) => vault.RemoveTags(_production, ["kept"]),
+            nameof(Vault.RenameEntry) => vault.RenameEntry(_production, "staging", out renamed) == OrganizeOutcome.Renamed,
+            nameof(Vault.RestoreRevision) => vault.RestoreRevision(_production, 0),
+            _ => throw new ArgumentOutOfRangeException(nameof(edit), edit, null),
+        };
+
+        Assert.True(applied, edit);
+        return renamed ?? _production;
     }
+
+    /// <summary>The entry and then its revisions, newest first, with the password and time of each.</summary>
+    private static List<Stamped> Versions(Vault vault, EntryName? name = null)
+    {
+        name ??= _production;
+        List<Stamped> versions = [new(vault.Find(name)!.Password, vault.ReadTimes(name)!.Modified.UtcDateTime)];
+        versions.AddRange(vault.ReadHistory(name)!.Select(revision => new Stamped(revision.Fields.Password, revision.ModifiedUtc)));
+        return versions;
+    }
+
+    private static bool EachInASecondOfItsOwn(Vault vault)
+    {
+        var seconds = Versions(vault).Select(version => WholeSecond(version.ModifiedUtc)).ToList();
+        return seconds.Zip(seconds.Skip(1)).All(pair => pair.First > pair.Second);
+    }
+
+    private static DateTime WholeSecond(DateTime time)
+    {
+        return new DateTime(time.Ticks - (time.Ticks % TimeSpan.TicksPerSecond), DateTimeKind.Utc);
+    }
+
+    /// <summary>
+    /// A vault the vendored library writes as another KeePass application would, whose entry holds
+    /// v3 and the revisions v0 to v2, all in the second of <paramref name="at"/>, each with a field,
+    /// a tag and a key in its notes for an edit to change.
+    /// </summary>
+    private static void WriteInOneSecond(string path, DateTime at)
+    {
+        CompositeKey key = new();
+        key.AddUserKey(new KcpPassword(Encoding.UTF8.GetBytes(MasterPassword), false));
+
+        PwDatabase database = new();
+        try
+        {
+            database.New(IOConnectionInfo.FromPath(path), key);
+            database.DataCipherUuid = new ChaCha20Engine().CipherUuid;
+            var kdf = new AesKdf();
+            var parameters = kdf.GetDefaultParameters();
+            parameters.SetUInt64(AesKdf.ParamRounds, 1000);
+            database.KdfParameters = parameters;
+
+            PwGroup servers = new(true, true, "servers", PwIcon.Folder);
+            database.RootGroup.AddGroup(servers, true);
+            PwEntry entry = new(true, true);
+            servers.AddEntry(entry, true);
+            entry.Strings.Set(PwDefs.TitleField, new ProtectedString(false, "production"));
+            entry.Strings.Set("TOKEN", new ProtectedString(true, "t0"));
+            entry.Strings.Set(PwDefs.NotesField, new ProtectedString(false, "NOTE_KEY=n0"));
+            entry.AddTag("kept");
+
+            for (var revision = 0; revision <= 3; revision++)
+            {
+                if (revision > 0)
+                {
+                    entry.CreateBackup(database);
+                }
+
+                entry.Strings.Set(PwDefs.PasswordField, new ProtectedString(true, $"v{revision}"));
+                entry.LastModificationTime = WholeSecond(at);
+            }
+
+            database.Save(null);
+        }
+        finally
+        {
+            database.Close();
+        }
+    }
+
+    private sealed record Stamped(string Password, DateTime ModifiedUtc);
 
     private string NewVaultPath()
     {

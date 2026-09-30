@@ -6,6 +6,7 @@
 
 | id | date | decision | supersedes |
 |---|---|---|---|
+| D-0387 | 2026-09-30 | Every edit keypaste makes to an entry stamps it in a later whole second than its previous time and every revision it keeps, running ahead of the clock by a second for each edit made faster than one a second, because KeePassXC's merge keeps one version of an entry per second ([F.27](docs/steps/F.27.md)) | D-0227's restore stamped with the clock alone |
 | D-0386 | 2026-09-30 | Open at login is the platform's per-user entry and nothing else records it: HKCU's Run value, a LaunchAgent in `~/Library/LaunchAgents` rather than SMAppService, which needs a signed bundle, or an XDG autostart entry, each starting the app with `--background`, which opens no window while it stays in the tray and takes no claim ([G.4a](docs/steps/G.4a.md)) | — |
 | D-0385 | 2026-09-30 | With the menu bar or tray on, the default on Windows and macOS and opt-in on Linux, closing the main window locks, ending the session as D-0313 says, and hides it; the process stays, locked, with Open, Lock and Quit on its icon, and only a quit ends it; with the tray off, closing quits ([G.4a](docs/steps/G.4a.md)) | D-0343's quit on close, where the tray is on |
 | D-0384 | 2026-09-30 | A pull request runs only the `ci.yml` and `app.yml` jobs that `verify.sh --since origin/<base> --plan` selects, `ci ok` and `app ok` fail when any job failed or was cancelled, and pushes to `main`, tags and dispatches run every job ([K.6b](docs/steps/K.6b.md)) | D-0083's removal of the CI classifier, for pull-request jobs |

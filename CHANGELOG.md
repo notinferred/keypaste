@@ -10,6 +10,8 @@ keypaste has a new brand: an icon "k." and a wordmark "keypaste." in Hepta Slab 
 
 Closing the desktop app's window on Windows or macOS now locks it and leaves it in the tray or menu bar, whose icon offers Open, Lock and Quit; on Linux that is a choice in Settings › Startup. Settings › Startup can also open keypaste at login, locked, and with no window while it stays in the tray ([G.4a](docs/steps/G.4a.md)).
 
+When KeePassXC merges a vault with another copy, it no longer drops a value keypaste saved in the same second as the save before it. Each save of an entry now takes a later second than the version it replaced, so a burst of saves can be stamped a few seconds ahead of the clock ([F.27](docs/steps/F.27.md)).
+
 `keypaste add`, `rm`, `access`, `env set`, `env rm`, `env pull` and `import` are now refused while the desktop app or `keypaste agent` holds the vault, before asking for a password, as `set` and `rotate` already were. The message names what holds it and says to make the change there or run `keypaste lock`. Scripts that saved through the CLI while the app was unlocked now stop there ([N.10](docs/steps/N.10.md)).
 
 A secret the desktop copies now also asks macOS pasteboard managers such as Maccy, and KDE's Klipper, not to keep it, as it already asked Windows' Clipboard History; a copied run command is left for them to keep ([N.12](docs/steps/N.12.md)).

@@ -8,8 +8,9 @@
 # new one protected and leaves the changed one plain, and the entry keeps its other field, tag,
 # custom data, attachment and `otp` in a file that is still KDBX 4.0. Setting three fields makes one revision.
 # `otp`, `Password` and `password` are refused and the file stays byte-identical with no backup
-# taken, and no listing carries a value. After KeePassXC merges in a newer copy of the entry,
-# keypaste reads KeePassXC's value and the entry's history holds the one keypaste wrote.
+# taken, and no listing carries a value. keypaste saves a field twice inside one second of the clock,
+# and after KeePassXC merges in a newer copy of the entry, keypaste reads KeePassXC's value and the
+# entry's history holds both values keypaste saved (F.27).
 #
 # NEGATIVE CONTROL: a corrupted expectation, a changed byte and a plain field read as protected must
 # each fail the comparison the checks here rest on.
@@ -68,6 +69,7 @@ kp_with() {
 # The export with every <History> block removed, so a value an edit dropped cannot be found in the
 # revision that edit made.
 current_xml() { kx export "$db" -f xml | awk '/<History>/{past=1} !past{print} /<\/History>/{past=0}'; }
+# Captured before it is searched: a `grep -q` that stops reading fails the pipeline under pipefail (F.27).
 history_xml() { kx export "$db" -f xml | awk '/<History>/{inside=1} inside{print} /<\/History>/{inside=0}'; }
 revisions()   { history_xml | grep -c '<Entry>' || true; }
 
@@ -80,6 +82,8 @@ protection() {
       print (index(tag, "ProtectInMemory=\"True\"") ? "protected" : "plain"); exit
     }'
 }
+
+next_second() { local s; s=$(date +%s); while [ "$(date +%s)" = "$s" ]; do sleep 0.02; done; }
 
 sentinels=(fields-login-pw fields-plain-value fields-other-secret JBSWY3DPEHPK3PXP fields-new-secret fields-plain-changed fields-three-a fields-three-b fields-three-c)
 
@@ -181,13 +185,24 @@ for value in "${sentinels[@]}"; do
   grep -qF "$value" <<<"$listed" && die "a listing printed the value ${value}"
 done
 
-step "after KeePassXC merges a newer copy, keypaste reads KeePassXC's value and history keeps its own"
-said=$(kp_with 'fields-before-merge\n' set "$entry" --field MERGED 2>&1) || die "set --field MERGED failed: ${said}"
-history_xml | grep -qF fields-before-merge && die "the value about to be merged over is already in history"
-kx export "$db" -f xml | awk -v id="$(uuid stripe)" '
+step "keypaste saves a field twice in one second; after KeePassXC merges a newer copy, keypaste reads KeePassXC's value and history keeps both"
+attempts=10
+for ((attempt = 1; ; attempt++)); do
+  first="fields-first-$attempt" saved="fields-before-merge-$attempt"
+  next_second
+  started=$(date +%s)
+  said=$(kp_with "${first}\n" set "$entry" --field MERGED 2>&1) || die "set --field MERGED failed: ${said}"
+  said=$(kp_with "${saved}\n" set "$entry" --field MERGED 2>&1) || die "set --field MERGED failed: ${said}"
+  [ "$(date +%s)" = "$started" ] && break
+  [ "$attempt" -lt "$attempts" ] || die "${attempts} attempts could not save twice inside one second"
+done
+printf 'saved twice inside one second on attempt %d of %d\n' "$attempt" "$attempts"
+history=$(history_xml)
+grep -qF "$saved" <<<"$history" && die "the value about to be merged over is already in history"
+kx export "$db" -f xml | awk -v id="$(uuid stripe)" -v saved="$saved" '
   /<History>/ { inside = 1 }
   !inside && index($0, "<UUID>" id "</UUID>") { mine = 1 }
-  mine && !inside { sub(/fields-before-merge/, "fields-after-merge"); sub(/<LastModificationTime>[^<]*</, "<LastModificationTime>2037-01-01T00:00:00Z<") }
+  mine && !inside { sub(saved, "fields-after-merge"); sub(/<LastModificationTime>[^<]*</, "<LastModificationTime>2037-01-01T00:00:00Z<") }
   /<\/History>/ { inside = 0 }
   mine && !inside && /<\/Entry>/ { mine = 0 }
   { print }' >"$dir/newer.xml"
@@ -198,7 +213,9 @@ printf '%s\n' "$pw" | "$cli" merge -q -s "$(native "$db")" "$(native "$dir/newer
   || die "keepassxc-cli could not merge the newer copy"
 got=$(kp_with '' get "$entry" --field MERGED --show 2>/dev/null) || die "keypaste cannot read the merged field"
 [ "$(tr -d '\r' <<<"$got")" = fields-after-merge ] || die "after the merge keypaste reads '${got}', not KeePassXC's value"
-history_xml | grep -qF fields-before-merge || die "after the merge the history lost the value keypaste wrote"
+history=$(history_xml)
+grep -qF "$first" <<<"$history" || die "after the merge the history lost the first of the two values saved in one second"
+grep -qF "$saved" <<<"$history" || die "after the merge the history lost the second of the two values saved in one second"
 
 step "NEGATIVE CONTROL: the comparisons must be able to fail"
 if [ "$(kx show "$db" "$entry" -a Region)" = 'fields-plain-changed-CORRUPTED' ]; then
