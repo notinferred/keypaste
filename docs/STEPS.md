@@ -14,10 +14,7 @@ Needs are build dependencies. Ships after names publication gates. External sign
 
 These rows serve every track: a development machine builds nothing, CI runs what a change can break, and the scripts, tests and binaries lose their duplicates. ROADMAP places them in 0.5.0 by founder direction of 2026-09-30.
 
-- [ ] **K.6a — Build and test a pushed branch on GitHub from a machine with no SDK.** Needs: none.
-  - `dev.yml` and `scripts/dev.sh` build and test a pushed branch; `verify.sh --since <ref> --plan` selects lanes from commits through the project graph; `require-green-gates.sh` ignores pull-request runs; the closed F.6, F.9 and F.10 probes are deleted.
-  - Verify: from a Mac with only Git and `gh`, `dev.sh --class Keypaste.Core.Tests.WorkflowRulesTests` goes green; a deliberately failing assertion on a branch is named by `gh run view`; a class that matches nothing fails with the runner's exit code 8.
-- [ ] **K.6b — Run only the jobs a pull request can break.** Needs: K.6a.
+- [ ] **K.6b — Run only the jobs a pull request can break.** Needs: none.
   - A `scope` job runs `verify.sh --since origin/<base> --plan`; each job carries its lane's `if:`, and `ci ok` and `app ok` aggregate them; `main`, tags and dispatch run everything.
   - Each OS builds once, with compat folded into its test leg; each solution gets its own NuGet cache key; `paths-ignore` widens to documents no check reads.
   - `dotnet format` shrinks to its whitespace check only after a branch experiment shows the build catches every style rule `.editorconfig` sets.
