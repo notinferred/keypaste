@@ -8,6 +8,7 @@ using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Settings;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests;
@@ -35,7 +36,7 @@ public sealed class MinimizeLockTests
     {
         Save(fixture, AppSettings.Default with { LockWhenMinimized = true });
 
-        using var app = new Armed(fixture, new ManualClock());
+        using var app = new Armed(fixture, new ManualClock(AppClock.Start));
         app.Unlock(fixture);
 
         app.Minimize();
@@ -52,7 +53,7 @@ public sealed class MinimizeLockTests
     [Fact]
     public Task Minimizing_leaves_the_vault_alone_when_the_setting_is_off() => Started(fixture =>
     {
-        var clock = new ManualClock();
+        var clock = new ManualClock(AppClock.Start);
         using var app = new Armed(fixture, clock);
         app.Unlock(fixture);
 
@@ -74,12 +75,12 @@ public sealed class MinimizeLockTests
     [Fact]
     public Task A_saved_choice_is_in_force_at_the_next_launch() => Started(fixture =>
     {
-        using (var first = new Armed(fixture, new ManualClock()))
+        using (var first = new Armed(fixture, new ManualClock(AppClock.Start)))
         {
             Screen(first, fixture).LockWhenMinimized = true;
         }
 
-        using var restarted = new Armed(fixture, new ManualClock());
+        using var restarted = new Armed(fixture, new ManualClock(AppClock.Start));
         restarted.Unlock(fixture);
 
         restarted.Minimize();
@@ -91,7 +92,7 @@ public sealed class MinimizeLockTests
     [Fact]
     public Task Turning_it_on_in_Settings_needs_no_restart() => Started(fixture =>
     {
-        using var app = new Armed(fixture, new ManualClock());
+        using var app = new Armed(fixture, new ManualClock(AppClock.Start));
         app.Unlock(fixture);
 
         app.Minimize();
@@ -110,7 +111,7 @@ public sealed class MinimizeLockTests
     {
         Save(fixture, AppSettings.Default with { LockWhenMinimized = true });
 
-        using var app = new Armed(fixture, new ManualClock());
+        using var app = new Armed(fixture, new ManualClock(AppClock.Start));
         app.Unlock(fixture);
 
         Screen(app, fixture).LockWhenMinimized = false;
@@ -129,7 +130,7 @@ public sealed class MinimizeLockTests
     {
         Save(fixture, AppSettings.Default with { LockWhenMinimized = true });
 
-        using var app = new Armed(fixture, new ManualClock());
+        using var app = new Armed(fixture, new ManualClock(AppClock.Start));
         app.Unlock(fixture);
 
         app.Minimize();
@@ -148,7 +149,7 @@ public sealed class MinimizeLockTests
     {
         Save(fixture, AppSettings.Default with { LockWhenMinimized = true });
 
-        using var app = new Armed(fixture, new ManualClock());
+        using var app = new Armed(fixture, new ManualClock(AppClock.Start));
         app.Unlock(fixture);
 
         app.MoveTo(state);
@@ -162,7 +163,7 @@ public sealed class MinimizeLockTests
     {
         Save(fixture, AppSettings.Default with { LockWhenMinimized = true });
 
-        using var app = new Armed(fixture, new ManualClock());
+        using var app = new Armed(fixture, new ManualClock(AppClock.Start));
 
         app.Minimize();
 
@@ -177,7 +178,7 @@ public sealed class MinimizeLockTests
     [Fact]
     public Task The_switch_is_offered_exactly_where_minimizing_is_observed() => Started(fixture =>
     {
-        using var app = new Armed(fixture, new ManualClock());
+        using var app = new Armed(fixture, new ManualClock(AppClock.Start));
         var screen = Screen(app, fixture);
 
         var window = new Window { Content = new SettingsView { DataContext = screen } };

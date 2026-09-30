@@ -4,6 +4,7 @@ using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
@@ -136,7 +137,7 @@ public sealed class AgentClientsTests
         internal static async Task<App> StartAsync(AttachClient? identity)
         {
             var fixture = new TempVault();
-            var clock = new ManualClock();
+            var clock = new ManualClock(AppClock.Start);
             var person = new Person();
 #pragma warning disable CA2000
             var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => person);

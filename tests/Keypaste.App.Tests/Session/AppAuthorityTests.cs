@@ -4,6 +4,7 @@ using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.Session;
@@ -56,7 +57,7 @@ public sealed class AppAuthorityTests
     public void Past_the_idle_deadline_the_status_is_not_serving_although_the_listener_is_up()
     {
         using var fixture = new TempVault();
-        var clock = new ManualClock();
+        var clock = new ManualClock(AppClock.Start);
         using var authority = Launch(fixture, clock);
         Unlock(authority.Session, fixture.Path_);
         Assert.IsType<AuthorityStatus.Serving>(authority.Status);
@@ -159,7 +160,7 @@ public sealed class AppAuthorityTests
     {
         // The authority owns the session, as it does at launch.
 #pragma warning disable CA2000
-        return new AppAuthority(new AppVaultSession(clock ?? new ManualClock(), home: fixture.Home), approverOverride, prompt ?? (() => new NobodyToAsk()));
+        return new AppAuthority(new AppVaultSession(clock ?? new ManualClock(AppClock.Start), home: fixture.Home), approverOverride, prompt ?? (() => new NobodyToAsk()));
 #pragma warning restore CA2000
     }
 

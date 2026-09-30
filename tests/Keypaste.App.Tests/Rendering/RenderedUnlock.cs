@@ -5,6 +5,7 @@ using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.Rendering;
@@ -16,7 +17,7 @@ namespace Keypaste.App.Tests.Rendering;
 internal sealed class RenderedUnlock : IDisposable
 {
     private readonly TempVault _fixture = new();
-    private readonly AppVaultSession _session = new(new ManualClock());
+    private readonly AppVaultSession _session = new(new ManualClock(AppClock.Start));
     private readonly FakeVaultFilePicker _picker = new();
 
     internal RenderedUnlock()

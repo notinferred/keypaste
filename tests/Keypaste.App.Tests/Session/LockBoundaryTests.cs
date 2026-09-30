@@ -2,6 +2,7 @@ using Keypaste.App.Session;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.Session;
@@ -24,7 +25,7 @@ public sealed class LockBoundaryTests
     public async Task A_request_waiting_for_a_person_is_denied_as_locked_by_every_kind_of_lock(string kind)
     {
         using var fixture = new TempVault();
-        var clock = new ManualClock();
+        var clock = new ManualClock(AppClock.Start);
         var prompt = new ScriptedPrompt { Hold = true };
         using var session = new AppVaultSession(clock, home: fixture.Home);
         using var host = new SessionHost(session, approverOverride: null, () => prompt);
@@ -63,7 +64,7 @@ public sealed class LockBoundaryTests
     public async Task A_request_after_sleeping_past_the_deadline_is_refused_and_locks_the_vault()
     {
         using var fixture = new TempVault();
-        var clock = new ManualClock();
+        var clock = new ManualClock(AppClock.Start);
         var prompt = new ScriptedPrompt { Answer = ApprovalAnswer.Approved };
         using var session = new AppVaultSession(clock, home: fixture.Home);
         using var host = new SessionHost(session, approverOverride: null, () => prompt);
@@ -86,7 +87,7 @@ public sealed class LockBoundaryTests
     public async Task Agent_requests_do_not_move_the_idle_deadline()
     {
         using var fixture = new TempVault();
-        var clock = new ManualClock();
+        var clock = new ManualClock(AppClock.Start);
         using var session = new AppVaultSession(clock, home: fixture.Home);
         using var host = new SessionHost(session, approverOverride: null, () => new NobodyToAsk());
         Unlock(session, fixture.Path_);
@@ -116,7 +117,7 @@ public sealed class LockBoundaryTests
     {
         using var fixture = new TempVault();
         var prompt = new ScriptedPrompt { Answer = ApprovalAnswer.Approved };
-        using var session = new AppVaultSession(new ManualClock(), home: fixture.Home);
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home);
         using var host = new SessionHost(session, approverOverride: null, () => prompt);
         Unlock(session, fixture.Path_);
 
@@ -147,7 +148,7 @@ public sealed class LockBoundaryTests
     public void A_lifetime_that_ended_cannot_reach_the_vault_a_later_unlock_opened()
     {
         using var fixture = new TempVault();
-        using var session = new AppVaultSession(new ManualClock(), home: fixture.Home);
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home);
         Unlock(session, fixture.Path_);
         var before = session.Lifetime!;
 

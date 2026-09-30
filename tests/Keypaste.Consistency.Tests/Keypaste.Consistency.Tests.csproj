@@ -22,6 +22,8 @@
     <Compile Include="../Keypaste.Cli.Tests/CliHarness.cs" Link="CliHarness.cs" />
     <Compile Include="../Keypaste.App.Tests/Clipboard/FakeClipboard.cs" Link="FakeClipboard.cs" />
     <Compile Include="../Keypaste.App.Tests/ViewModels/NewItemForm.cs" Link="NewItemForm.cs" />
+    <!-- The app suite's throwaway home, named after whichever assembly compiles it. -->
+    <Compile Include="../Keypaste.App.Tests/IsolatedHome.cs" Link="IsolatedHome.cs" />
   </ItemGroup>
 
   <!--

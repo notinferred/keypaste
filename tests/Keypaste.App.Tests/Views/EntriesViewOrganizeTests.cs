@@ -6,6 +6,7 @@ using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.Views;
@@ -152,14 +153,14 @@ public sealed class EntriesViewOrganizeTests : IDisposable
     {
         internal Context(string vaultPath)
         {
-            Session = new AppVaultSession(new ManualClock());
+            Session = new AppVaultSession(new ManualClock(AppClock.Start));
 
             using (var master = TempVault.Secret(Master))
             {
                 Assert.Equal(UnlockOutcome.Opened, Session.TryUnlock(vaultPath, master.Value));
             }
 
-            Countdown = new ClipboardCountdown(new FakeClipboard(), new ManualClock());
+            Countdown = new ClipboardCountdown(new FakeClipboard(), new ManualClock(AppClock.Start));
             Entries = new EntriesViewModel(Session, Countdown);
         }
 

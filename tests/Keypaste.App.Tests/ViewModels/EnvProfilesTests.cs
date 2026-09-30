@@ -5,6 +5,7 @@ using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Projects;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
@@ -16,7 +17,7 @@ public sealed class EnvProfilesTests : IDisposable
 
     private readonly TempVault _fixture = new();
     private readonly AppVaultSession _session;
-    private readonly ClipboardCountdown _countdown = new(new FakeClipboard(), new ManualClock());
+    private readonly ClipboardCountdown _countdown = new(new FakeClipboard(), new ManualClock(AppClock.Start));
 
     public EnvProfilesTests()
     {
@@ -29,7 +30,7 @@ public sealed class EnvProfilesTests : IDisposable
             vault.Save();
         }
 
-        _session = new AppVaultSession(new ManualClock(), home: _fixture.Home);
+        _session = new AppVaultSession(new ManualClock(AppClock.Start), home: _fixture.Home);
         using var master = TempVault.Secret(TempVault.Password);
         Assert.Equal(UnlockOutcome.Opened, _session.TryUnlock(_fixture.Path_, master.Value));
     }

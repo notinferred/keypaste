@@ -8,6 +8,7 @@ using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core.Internal;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.Views;
@@ -86,7 +87,7 @@ public sealed class ImportDialogKeyboardTests
         using var fixture = new TempVault();
         using var session = Open(fixture);
         var picker = new FakeVaultFilePicker { ExistingPath = Source(fixture) };
-        using var shell = new ShellViewModel(session, fixture.Home, null, clock: new ManualClock(), picker: picker);
+        using var shell = new ShellViewModel(session, fixture.Home, null, clock: new ManualClock(AppClock.Start), picker: picker);
         var window = new Window { Width = 1280, Height = 800, Content = new ShellView { DataContext = shell } };
         window.Show();
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
@@ -116,7 +117,7 @@ public sealed class ImportDialogKeyboardTests
 
     private static AppVaultSession Open(TempVault fixture)
     {
-        var session = new AppVaultSession(new ManualClock(), home: fixture.Home);
+        var session = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home);
         using var master = TempVault.Secret(TempVault.Password);
         Assert.Equal(UnlockOutcome.Opened, session.TryUnlock(fixture.Path_, master.Value));
         return session;

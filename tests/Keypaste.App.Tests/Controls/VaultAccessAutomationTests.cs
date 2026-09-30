@@ -7,6 +7,7 @@ using Keypaste.App.Controls;
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.Controls;
@@ -116,7 +117,7 @@ public sealed class VaultAccessAutomationTests
     private sealed class SettingsScreen : IDisposable
     {
         private readonly TempVault _fixture = new();
-        private readonly AppVaultSession _session = new(new ManualClock());
+        private readonly AppVaultSession _session = new(new ManualClock(AppClock.Start));
 
         internal SettingsScreen()
         {

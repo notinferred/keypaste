@@ -3,6 +3,7 @@ using Keypaste.App.Session;
 using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.Session;
@@ -18,7 +19,7 @@ namespace Keypaste.App.Tests.Session;
 public sealed class EnvThroughSessionTests : IDisposable
 {
     private readonly TempVault _fixture = new();
-    private readonly ManualClock _clock = new();
+    private readonly ManualClock _clock = new(AppClock.Start);
     private readonly AppVaultSession _session;
 
     public EnvThroughSessionTests()
@@ -88,7 +89,7 @@ public sealed class EnvThroughSessionTests : IDisposable
     {
         Assert.Equal("v1", (await _session.Environments.ResolveAsync("dev", null, Cancel)).Variables.Single().Value);
 
-        using (var countdown = new ClipboardCountdown(new FakeClipboard(), new ManualClock()))
+        using (var countdown = new ClipboardCountdown(new FakeClipboard(), new ManualClock(AppClock.Start)))
         using (var entries = new EntriesViewModel(_session, countdown))
         {
             entries.Selected = entries.Rows.Single(row => row.Path == "env/dev/TOKEN");

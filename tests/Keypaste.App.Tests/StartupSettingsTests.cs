@@ -4,6 +4,7 @@ using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Settings;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests;
@@ -34,7 +35,7 @@ public sealed class StartupSettingsTests
     {
         Save(fixture, AppSettings.Default with { IdleTimeoutSeconds = 60 });
 
-        using var session = Compose(fixture, new ManualClock());
+        using var session = Compose(fixture, new ManualClock(AppClock.Start));
 
         Assert.Equal(TimeSpan.FromMinutes(1), session.IdleTimeout);
     });
@@ -48,7 +49,7 @@ public sealed class StartupSettingsTests
     {
         Save(fixture, AppSettings.Default with { IdleTimeoutSeconds = 60 });
 
-        var clock = new ManualClock();
+        var clock = new ManualClock(AppClock.Start);
         using var session = Compose(fixture, clock);
 
         VaultLockReason? reason = null;
@@ -73,7 +74,7 @@ public sealed class StartupSettingsTests
     {
         Save(fixture, AppSettings.Default with { Theme = AppTheme.Dark });
 
-        using var session = Compose(fixture, new ManualClock());
+        using var session = Compose(fixture, new ManualClock(AppClock.Start));
 
         Assert.Equal(ThemeVariant.Dark, Current.RequestedThemeVariant);
     });
@@ -83,7 +84,7 @@ public sealed class StartupSettingsTests
     {
         Save(fixture, AppSettings.Default with { Theme = AppTheme.System });
 
-        using var session = Compose(fixture, new ManualClock());
+        using var session = Compose(fixture, new ManualClock(AppClock.Start));
 
         // The headless platform reports dark (PlatformTheme); ThemeFollowsSystemTests switches it.
         Assert.Equal(ThemeVariant.Dark, Current.ActualThemeVariant);
@@ -99,7 +100,7 @@ public sealed class StartupSettingsTests
     {
         var chosen = new DesktopPreferences(fixture.Home);
 
-        using (var opening = Compose(chosen, new ManualClock()))
+        using (var opening = Compose(chosen, new ManualClock(AppClock.Start)))
         {
             var screen = new SettingsViewModel(opening, fixture.Home, chosen, Current.ApplyTheme);
             screen.Idle = screen.IdleChoices.Single(c => c.Seconds == 3600);
@@ -107,7 +108,7 @@ public sealed class StartupSettingsTests
         }
 
         var restarted = new DesktopPreferences(fixture.Home);
-        using var session = Compose(restarted, new ManualClock());
+        using var session = Compose(restarted, new ManualClock(AppClock.Start));
         var after = new SettingsViewModel(session, fixture.Home, restarted, _ => { });
 
         Assert.Equal(TimeSpan.FromHours(1), session.IdleTimeout);
@@ -128,7 +129,7 @@ public sealed class StartupSettingsTests
         var original = "[[settings]]\nnot a pair\n"u8.ToArray();
         File.WriteAllBytes(path, original);
 
-        using (var session = Compose(fixture, new ManualClock()))
+        using (var session = Compose(fixture, new ManualClock(AppClock.Start)))
         {
             Assert.Equal(TimeSpan.FromSeconds(AppSettings.Default.IdleTimeoutSeconds), session.IdleTimeout);
             Assert.Equal(ThemeVariant.Dark, Current.ActualThemeVariant);
@@ -143,7 +144,7 @@ public sealed class StartupSettingsTests
         var path = KeypasteHome.SettingsPath(fixture.Home);
         Assert.False(File.Exists(path));
 
-        using var session = Compose(fixture, new ManualClock());
+        using var session = Compose(fixture, new ManualClock(AppClock.Start));
 
         Assert.Equal(TimeSpan.FromMinutes(5), session.IdleTimeout);
         Assert.False(File.Exists(path));

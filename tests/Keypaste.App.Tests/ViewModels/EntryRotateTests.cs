@@ -3,6 +3,7 @@ using Keypaste.App.Session;
 using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
@@ -13,8 +14,8 @@ public sealed class EntryRotateTests : IDisposable
     private const string _old = "ROTATE-PANE-OLD-8b1f";
 
     private readonly TempVault _fixture = new();
-    private readonly AppVaultSession _session = new(new ManualClock());
-    private readonly ClipboardCountdown _countdown = new(new FakeClipboard(), new ManualClock());
+    private readonly AppVaultSession _session = new(new ManualClock(AppClock.Start));
+    private readonly ClipboardCountdown _countdown = new(new FakeClipboard(), new ManualClock(AppClock.Start));
     private readonly EntriesViewModel _entries;
 
     public EntryRotateTests()

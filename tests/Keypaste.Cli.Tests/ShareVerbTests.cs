@@ -5,6 +5,7 @@ using Keypaste.Cli.Commands;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Sharing;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;

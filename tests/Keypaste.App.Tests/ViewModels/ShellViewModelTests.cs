@@ -2,6 +2,7 @@ using Keypaste.App.Navigation;
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
@@ -13,7 +14,7 @@ namespace Keypaste.App.Tests.ViewModels;
 public sealed class ShellViewModelTests : IDisposable
 {
     private readonly TempVault _fixture = new();
-    private readonly ManualClock _clock = new();
+    private readonly ManualClock _clock = new(AppClock.Start);
     private readonly AppVaultSession _session;
 
     public ShellViewModelTests()

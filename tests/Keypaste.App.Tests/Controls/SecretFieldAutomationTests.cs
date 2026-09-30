@@ -11,6 +11,7 @@ using Keypaste.App.Tests.ViewModels;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.Controls;
@@ -314,7 +315,7 @@ public sealed class SecretFieldAutomationTests
                 vault.Save();
             }
 
-            Session = new AppVaultSession(new ManualClock());
+            Session = new AppVaultSession(new ManualClock(AppClock.Start));
 
             using (var master = TempVault.Secret(_master))
             {
@@ -322,7 +323,7 @@ public sealed class SecretFieldAutomationTests
             }
 
             Clipboard = new FakeClipboard();
-            Countdown = new ClipboardCountdown(Clipboard, new ManualClock());
+            Countdown = new ClipboardCountdown(Clipboard, new ManualClock(AppClock.Start));
         }
 
         internal AppVaultSession Session { get; }
@@ -488,7 +489,7 @@ public sealed class SecretFieldAutomationTests
         internal UnlockScreen()
         {
             _fixture.RememberSelf();
-            _session = new AppVaultSession(new ManualClock());
+            _session = new AppVaultSession(new ManualClock(AppClock.Start));
             Model = new UnlockViewModel(_session, _fixture.Home, new FakeVaultFilePicker(), () => { });
 
             Window = new Window { Content = new UnlockView { DataContext = Model } };

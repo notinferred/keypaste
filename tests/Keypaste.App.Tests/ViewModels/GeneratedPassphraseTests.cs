@@ -3,6 +3,7 @@ using Keypaste.App.Session;
 using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
@@ -192,7 +193,7 @@ public sealed class GeneratedPassphraseTests : IDisposable
     {
         internal Context(string vaultPath)
         {
-            Session = new AppVaultSession(new ManualClock());
+            Session = new AppVaultSession(new ManualClock(AppClock.Start));
 
             using (var master = TempVault.Secret(Master))
             {
@@ -200,7 +201,7 @@ public sealed class GeneratedPassphraseTests : IDisposable
             }
 
             Clipboard = new FakeClipboard();
-            Countdown = new ClipboardCountdown(Clipboard, new ManualClock());
+            Countdown = new ClipboardCountdown(Clipboard, new ManualClock(AppClock.Start));
             Entries = new EntriesViewModel(Session, Countdown);
             EnvSets = new EnvSetsViewModel(Session, Countdown);
         }

@@ -3,6 +3,7 @@ using Keypaste.App.Session;
 using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
@@ -17,8 +18,8 @@ public sealed class NewItemTests : IDisposable
 
     private readonly string _directory = Directory.CreateTempSubdirectory("keypaste-new-item-tests-").FullName;
     private readonly string _vaultPath;
-    private readonly AppVaultSession _session = new(new ManualClock());
-    private readonly ClipboardCountdown _countdown = new(new FakeClipboard(), new ManualClock());
+    private readonly AppVaultSession _session = new(new ManualClock(AppClock.Start));
+    private readonly ClipboardCountdown _countdown = new(new FakeClipboard(), new ManualClock(AppClock.Start));
     private readonly EntriesViewModel _entries;
 
     public NewItemTests()

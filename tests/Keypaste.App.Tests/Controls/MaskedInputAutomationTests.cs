@@ -10,6 +10,7 @@ using Keypaste.App.Controls;
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
+using Keypaste.Core.Tests;
 using Xunit;
 using Xunit.Sdk;
 
@@ -494,7 +495,7 @@ public sealed class MaskedInputAutomationTests
         internal UnlockScreen()
         {
             _fixture.RememberSelf();
-            _session = new AppVaultSession(new ManualClock());
+            _session = new AppVaultSession(new ManualClock(AppClock.Start));
             Picker = new FakeVaultFilePicker();
             Model = new UnlockViewModel(_session, _fixture.Home, Picker, () => { });
 

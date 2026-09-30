@@ -5,6 +5,7 @@ using Keypaste.App.ViewModels;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
@@ -147,7 +148,7 @@ public sealed class EntryActivityRowsTests
         internal static async Task<App> StartAsync()
         {
             var fixture = new TempVault();
-            var clock = new ManualClock();
+            var clock = new ManualClock(AppClock.Start);
             var person = new Person();
 #pragma warning disable CA2000
             var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => person);
@@ -171,7 +172,7 @@ public sealed class EntryActivityRowsTests
 #pragma warning disable CA2000
             var activity = new EntryActivitySource(
                 Authority, KeypasteHome.AuditPath(Fixture.Home), Authority.Session.Identity!.Key, Clock, policyPath: policyPath);
-            var countdown = new ClipboardCountdown(new FakeClipboard(), new ManualClock());
+            var countdown = new ClipboardCountdown(new FakeClipboard(), new ManualClock(AppClock.Start));
             return new Screen(activity, countdown, new EntriesViewModel(Authority.Session, countdown, activity));
 #pragma warning restore CA2000
         }

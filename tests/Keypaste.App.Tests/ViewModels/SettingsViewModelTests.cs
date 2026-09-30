@@ -3,6 +3,7 @@ using Keypaste.App.ViewModels;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Recent;
 using Keypaste.Core.Settings;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
@@ -16,7 +17,7 @@ public sealed class SettingsViewModelTests
     public void Choosing_a_timeout_re_arms_the_session_immediately()
     {
         using var fixture = new TempVault();
-        using var session = new AppVaultSession(new ManualClock(), TimeSpan.FromHours(4));
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start), TimeSpan.FromHours(4));
         using var model = Screen(session, fixture);
 
         model.Idle = model.IdleChoices.Single(c => c.Seconds == 60);
@@ -33,7 +34,7 @@ public sealed class SettingsViewModelTests
     public void A_choice_survives_a_restart()
     {
         using var fixture = new TempVault();
-        using var first = new AppVaultSession(new ManualClock());
+        using var first = new AppVaultSession(new ManualClock(AppClock.Start));
 
         using var screen = Screen(first, fixture);
         screen.Idle = screen.IdleChoices.Single(c => c.Seconds == 900);
@@ -41,7 +42,7 @@ public sealed class SettingsViewModelTests
         screen.LockWhenMinimized = true;
 
         var restarted = new DesktopPreferences(fixture.Home);
-        using var second = new AppVaultSession(new ManualClock(), restarted.IdleTimeout);
+        using var second = new AppVaultSession(new ManualClock(AppClock.Start), restarted.IdleTimeout);
         using var after = new SettingsViewModel(second, fixture.Home, restarted, _ => { });
 
         Assert.Equal(TimeSpan.FromMinutes(15), second.IdleTimeout);
@@ -54,7 +55,7 @@ public sealed class SettingsViewModelTests
     public void Changing_the_theme_reaches_the_application()
     {
         using var fixture = new TempVault();
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
 
         AppTheme? applied = null;
         using var model = new SettingsViewModel(
@@ -97,7 +98,7 @@ public sealed class SettingsViewModelTests
         Written(fixture, seconds: 137);
 
         var preferences = new DesktopPreferences(fixture.Home);
-        using var session = new AppVaultSession(new ManualClock(), preferences.IdleTimeout);
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start), preferences.IdleTimeout);
         using var model = new SettingsViewModel(session, fixture.Home, preferences, _ => { });
 
         Assert.Equal(TimeSpan.FromSeconds(137), session.IdleTimeout);
@@ -113,7 +114,7 @@ public sealed class SettingsViewModelTests
         Written(fixture, seconds: 1800);
 
         var preferences = new DesktopPreferences(fixture.Home);
-        using var session = new AppVaultSession(new ManualClock(), preferences.IdleTimeout);
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start), preferences.IdleTimeout);
         using var model = new SettingsViewModel(session, fixture.Home, preferences, _ => { });
 
         Assert.Equal("30 minutes", model.Idle.Label);
@@ -128,7 +129,7 @@ public sealed class SettingsViewModelTests
 
         Assert.NotEmpty(RecentVaults.Load(KeypasteHome.RecentPath(fixture.Home)));
 
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
         using var model = Screen(session, fixture);
 
         model.ForgetAllCommand.Execute(null);
@@ -147,7 +148,7 @@ public sealed class SettingsViewModelTests
         using var fixture = new TempVault();
         File.WriteAllText(KeypasteHome.SettingsPath(fixture.Home), "[[settings]]\nnot a pair\n");
 
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
         using var model = Screen(session, fixture);
 
         Assert.InRange(

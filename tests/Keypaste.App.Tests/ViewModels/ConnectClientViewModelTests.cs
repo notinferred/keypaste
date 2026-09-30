@@ -5,6 +5,7 @@ using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.Core.Clients;
 using Keypaste.Core.Processes;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
@@ -30,7 +31,7 @@ public sealed class ConnectClientViewModelTests : IDisposable
 
     public ConnectClientViewModelTests()
     {
-        _session = new AppVaultSession(new ManualClock(), home: _fixture.Home);
+        _session = new AppVaultSession(new ManualClock(AppClock.Start), home: _fixture.Home);
 
         using var master = TempVault.Secret(TempVault.Password);
         Assert.Equal(UnlockOutcome.Opened, _session.TryUnlock(_fixture.Path_, master.Value));

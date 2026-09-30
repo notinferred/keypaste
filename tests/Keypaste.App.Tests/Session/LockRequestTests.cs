@@ -1,5 +1,6 @@
 using Keypaste.App.Session;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.Session;
@@ -19,7 +20,7 @@ public sealed class LockRequestTests
     {
         using var fixture = new TempVault();
 #pragma warning disable CA2000
-        var session = new AppVaultSession(new ManualClock(), home: fixture.Home);
+        var session = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home);
 #pragma warning restore CA2000
         using var authority = new AppAuthority(session, null, () => new NobodyToAsk(), AppAuthority.RequestLock(session, run => run()));
         var locked = new TaskCompletionSource<VaultLockReason>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -49,7 +50,7 @@ public sealed class LockRequestTests
     {
         using var fixture = new TempVault();
 #pragma warning disable CA2000
-        using var authority = new AppAuthority(new AppVaultSession(new ManualClock(), home: fixture.Home), null, () => new NobodyToAsk());
+        using var authority = new AppAuthority(new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home), null, () => new NobodyToAsk());
 #pragma warning restore CA2000
 
         using (var master = TempVault.Secret(TempVault.Password))

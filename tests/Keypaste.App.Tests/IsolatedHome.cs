@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using Keypaste.Core.Audit;
 
@@ -13,7 +14,10 @@ internal static class IsolatedHome
         {
             Environment.SetEnvironmentVariable(
                 KeypasteHome.EnvironmentVariable,
-                Directory.CreateTempSubdirectory("keypaste-app-tests-home-").FullName);
+                Directory.CreateTempSubdirectory(Prefix(typeof(IsolatedHome).Assembly)).FullName);
         }
     }
+
+    /// <summary>A module initializer takes no arguments, so the assembly compiling this file names its home.</summary>
+    private static string Prefix(Assembly suite) => $"{suite.GetName().Name!.Replace('.', '-').ToLowerInvariant()}-home-";
 }

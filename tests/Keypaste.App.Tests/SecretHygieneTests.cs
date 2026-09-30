@@ -6,6 +6,7 @@ using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests;
@@ -644,7 +645,7 @@ public sealed class SecretHygieneTests
         var clipboard = new FakeClipboard();
         using var shell = new ShellViewModel(
             session, fixture.Home, authority: null, applyTheme: null,
-            clipboard: clipboard, clock: new ManualClock());
+            clipboard: clipboard, clock: new ManualClock(AppClock.Start));
 
         shell.Current = Destinations.All[0];
         var entries = Assert.IsType<EntriesViewModel>(shell.Content);
@@ -748,7 +749,7 @@ public sealed class SecretHygieneTests
     public async Task The_recent_list_holds_the_path_and_no_field_value()
     {
         using var fixture = new SentinelVault();
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
         using var unlock = new UnlockViewModel(session, fixture.Home, new FakeVaultFilePicker(), () => { });
 
         Assert.True(unlock.Offer(fixture.VaultFile));
@@ -794,7 +795,7 @@ public sealed class SecretHygieneTests
             vault.Save();
         }
 
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
         using var unlock = new UnlockViewModel(session, fixture.Home, new FakeVaultFilePicker(), () => { });
 
         Assert.True(unlock.Offer(fixture.VaultFile));
@@ -841,7 +842,7 @@ public sealed class SecretHygieneTests
 
     private static AppVaultSession Unlocked(SentinelVault fixture)
     {
-        var session = new AppVaultSession(new ManualClock());
+        var session = new AppVaultSession(new ManualClock(AppClock.Start));
 
         using (var master = TempVault.Secret(Master))
         {

@@ -6,6 +6,7 @@ using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.Session;
@@ -39,7 +40,7 @@ public sealed class CurrentStateTests : IDisposable
             vault.Save();
         }
 
-        _session = new AppVaultSession(new ManualClock(), home: _fixture.Home);
+        _session = new AppVaultSession(new ManualClock(AppClock.Start), home: _fixture.Home);
         _host = new SessionHost(_session, approverOverride: null, () => _prompt);
         Unlock();
     }
@@ -224,7 +225,7 @@ public sealed class CurrentStateTests : IDisposable
     /// <summary>Does something on the entries screen, as a person would, over the held session.</summary>
     private void OnScreen(Action<EntriesViewModel> act)
     {
-        using var countdown = new ClipboardCountdown(new FakeClipboard(), new ManualClock());
+        using var countdown = new ClipboardCountdown(new FakeClipboard(), new ManualClock(AppClock.Start));
         using var entries = new EntriesViewModel(_session, countdown);
         act(entries);
     }

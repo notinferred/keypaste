@@ -7,6 +7,7 @@ using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Launch;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.Session;
@@ -35,7 +36,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
     private readonly FakeVaultFilePicker _picker = new();
     private readonly CountingLauncher _launcher = new();
     private readonly AppVaultSession _session;
-    private readonly ClipboardCountdown _countdown = new(new FakeClipboard(), new ManualClock());
+    private readonly ClipboardCountdown _countdown = new(new FakeClipboard(), new ManualClock(AppClock.Start));
 
     public EnvLaunchThroughAppTests()
     {
@@ -47,7 +48,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
             vault.Save();
         }
 
-        _session = new AppVaultSession(new ManualClock(), home: _fixture.Home);
+        _session = new AppVaultSession(new ManualClock(AppClock.Start), home: _fixture.Home);
         Unlock();
     }
 

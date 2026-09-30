@@ -4,6 +4,7 @@ using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.HardwareKeys;
 using Keypaste.Core.Recent;
+using Keypaste.Core.Tests;
 using Keypaste.Core.Tests.HardwareKeys;
 using Xunit;
 
@@ -25,7 +26,7 @@ public sealed class UnlockHardwareKeyTests : IDisposable
     private readonly FakeVaultFilePicker _picker = new();
     private int _unlockedCalls;
 
-    public UnlockHardwareKeyTests() => _session = new AppVaultSession(new ManualClock(), home: _home.Path, hardwareKeys: _device);
+    public UnlockHardwareKeyTests() => _session = new AppVaultSession(new ManualClock(AppClock.Start), home: _home.Path, hardwareKeys: _device);
 
     public void Dispose()
     {
@@ -67,7 +68,7 @@ public sealed class UnlockHardwareKeyTests : IDisposable
     public async Task Another_keys_secret_is_refused_as_the_password_and_key_together()
     {
         var path = MakeVault();
-        using var session = new AppVaultSession(new ManualClock(), home: _home.Path, hardwareKeys: new SoftwareYubiKey(new byte[20]));
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: _home.Path, hardwareKeys: new SoftwareYubiKey(new byte[20]));
         using var model = new UnlockViewModel(session, _home.Path, _picker, () => _unlockedCalls++);
         model.Offer(path);
         model.UseHardwareKeyCommand.Execute(null);
@@ -92,7 +93,7 @@ public sealed class UnlockHardwareKeyTests : IDisposable
         Assert.Equal(1, model.HardwareKeySlot);
 
         using var slotOnlyTwo = new AppVaultSession(
-            new ManualClock(), home: _home.Path, hardwareKeys: new SoftwareYubiKey(_secret) { Slots = [2] });
+            new ManualClock(AppClock.Start), home: _home.Path, hardwareKeys: new SoftwareYubiKey(_secret) { Slots = [2] });
         using var empty = new UnlockViewModel(slotOnlyTwo, _home.Path, _picker, () => _unlockedCalls++);
         empty.Offer(path);
         empty.UseHardwareKeyCommand.Execute(null);
@@ -139,7 +140,7 @@ public sealed class UnlockHardwareKeyTests : IDisposable
     [Fact]
     public void A_session_that_reaches_no_hardware_keys_offers_none()
     {
-        using var session = new AppVaultSession(new ManualClock(), home: _home.Path);
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: _home.Path);
         using var model = new UnlockViewModel(session, _home.Path, _picker, () => { });
         model.Offer(MakeVault());
 

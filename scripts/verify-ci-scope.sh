@@ -83,6 +83,8 @@ run_case "the software YubiKey" tests/Keypaste.Core.Tests/HardwareKeys/SoftwareY
   tests/Keypaste.Core.Tests tests/Keypaste.App.Tests ''
 run_case "the pool reporter" tests/Keypaste.Core.Tests/Reporter.cs ' core mcp ' "$THREE" \
   'tests/Keypaste.Core.Tests tests/Keypaste.Mcp.Tests' '' ''
+run_case "the share server fake" tests/Keypaste.Core.Tests/FakeShareServer.cs ' core cli desktop ' "$THREE" \
+  'tests/Keypaste.Core.Tests tests/Keypaste.Cli.Tests' tests/Keypaste.App.Tests ''
 run_case "the app's clipboard fake" tests/Keypaste.App.Tests/Clipboard/FakeClipboard.cs ' desktop ' '[]' \
   '' 'tests/Keypaste.App.Tests tests/Keypaste.Consistency.Tests' ''
 run_case "the pool starver" tests/Keypaste.PoolStarver/Program.cs ' mcp ' "$THREE" tests/Keypaste.Mcp.Tests '' ''

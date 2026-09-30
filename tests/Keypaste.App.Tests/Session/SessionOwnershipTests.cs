@@ -7,6 +7,7 @@ using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.Session;
@@ -25,8 +26,8 @@ public sealed class SessionOwnershipTests
     public void A_vault_another_session_holds_is_refused_before_the_password_is_tried()
     {
         using var fixture = new TempVault();
-        using var first = new AppVaultSession(new ManualClock(), home: fixture.Home);
-        using var second = new AppVaultSession(new ManualClock(), home: fixture.Home);
+        using var first = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home);
+        using var second = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home);
 
         Assert.Equal(UnlockOutcome.Opened, Unlock(first, fixture.Path_, TempVault.Password));
 
@@ -43,8 +44,8 @@ public sealed class SessionOwnershipTests
     public void Locking_gives_the_vault_up_and_the_next_unlock_is_a_new_session()
     {
         using var fixture = new TempVault();
-        using var first = new AppVaultSession(new ManualClock(), home: fixture.Home);
-        using var second = new AppVaultSession(new ManualClock(), home: fixture.Home);
+        using var first = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home);
+        using var second = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home);
 
         Unlock(first, fixture.Path_, TempVault.Password);
         var before = first.SessionId;
@@ -60,8 +61,8 @@ public sealed class SessionOwnershipTests
     public void A_wrong_password_does_not_keep_the_vault_held()
     {
         using var fixture = new TempVault();
-        using var first = new AppVaultSession(new ManualClock(), home: fixture.Home);
-        using var second = new AppVaultSession(new ManualClock(), home: fixture.Home);
+        using var first = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home);
+        using var second = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home);
 
         Assert.Equal(UnlockOutcome.WrongPassword, Unlock(first, fixture.Path_, "not-the-password"));
         Assert.Equal(UnlockOutcome.Opened, Unlock(second, fixture.Path_, TempVault.Password));
@@ -71,8 +72,8 @@ public sealed class SessionOwnershipTests
     public async Task The_unlock_screen_names_the_process_holding_the_vault()
     {
         using var fixture = new TempVault();
-        using var first = new AppVaultSession(new ManualClock(), home: fixture.Home);
-        using var second = new AppVaultSession(new ManualClock(), home: fixture.Home);
+        using var first = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home);
+        using var second = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home);
         Unlock(first, fixture.Path_, TempVault.Password);
 
         var unlocked = 0;
@@ -94,7 +95,7 @@ public sealed class SessionOwnershipTests
     public async Task The_unlocked_vault_is_served_on_its_endpoint_and_stops_being_served_on_lock()
     {
         using var fixture = new TempVault();
-        using var session = new AppVaultSession(new ManualClock(), home: fixture.Home);
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home);
         using var host = new SessionHost(session, approverOverride: null, () => new NobodyToAsk());
 
         Assert.Null(host.Endpoint);
@@ -137,7 +138,7 @@ public sealed class SessionOwnershipTests
         File.WriteAllBytes(keyfile, keyBytes);
         const string master = "a master password nobody should see on a pipe";
 
-        using var session = new AppVaultSession(new ManualClock(), home: home.Path);
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: home.Path);
         using (var password = TempVault.Secret(master))
         {
             Assert.Equal(

@@ -15,6 +15,7 @@ using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Internal;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Tests;
 using Xunit;
 using static Keypaste.App.Tests.Session.JourneyDriver;
 

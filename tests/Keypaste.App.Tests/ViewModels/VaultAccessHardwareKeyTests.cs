@@ -5,6 +5,7 @@ using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.HardwareKeys;
 using Keypaste.Core.Recent;
+using Keypaste.Core.Tests;
 using Keypaste.Core.Tests.HardwareKeys;
 using Xunit;
 
@@ -140,7 +141,7 @@ public sealed class VaultAccessHardwareKeyTests : IDisposable
 
     private AppVaultSession Unlocked(int? slot)
     {
-        var session = new AppVaultSession(new ManualClock(), home: _home, hardwareKeys: _device);
+        var session = new AppVaultSession(new ManualClock(AppClock.Start), home: _home, hardwareKeys: _device);
 
         using var master = TempVault.Secret(_master);
         Assert.Equal(UnlockOutcome.Opened, session.TryUnlock(_vaultPath, master.Value, null, slot));

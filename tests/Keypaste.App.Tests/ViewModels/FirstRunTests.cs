@@ -3,6 +3,7 @@ using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Recent;
+using Keypaste.Core.Tests;
 using Keypaste.Core.Tests.HardwareKeys;
 using Xunit;
 
@@ -19,7 +20,7 @@ public sealed class FirstRunTests : IDisposable
     private readonly AppVaultSession _session;
     private int _unlocked;
 
-    public FirstRunTests() => _session = new AppVaultSession(new ManualClock(), home: _home.Path);
+    public FirstRunTests() => _session = new AppVaultSession(new ManualClock(AppClock.Start), home: _home.Path);
 
     private string Ini => Path.Combine(_files.Path, "keepassxc.ini");
 
@@ -112,7 +113,7 @@ public sealed class FirstRunTests : IDisposable
     [Fact]
     public void A_vault_with_no_slot_keeps_the_YubiKey_under_More_options_and_one_with_a_slot_shows_it()
     {
-        using var keyed = new AppVaultSession(new ManualClock(), home: _home.Path, hardwareKeys: new SoftwareYubiKey(new byte[20]));
+        using var keyed = new AppVaultSession(new ManualClock(AppClock.Start), home: _home.Path, hardwareKeys: new SoftwareYubiKey(new byte[20]));
         var plain = MakeVault("plain.kdbx");
         var slotted = MakeVault("slotted.kdbx");
         RecentVaults.Save(

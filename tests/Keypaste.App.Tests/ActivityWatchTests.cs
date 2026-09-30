@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Keypaste.App.Session;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests;
@@ -120,7 +121,7 @@ public sealed class ActivityWatchTests
             _watch = App.Observe(Window, Session, Clock, () => Activity++);
         }
 
-        internal ManualClock Clock { get; } = new();
+        internal ManualClock Clock { get; } = new(AppClock.Start);
 
         internal AppVaultSession Session { get; }
 

@@ -5,6 +5,7 @@ using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Recent;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
@@ -28,7 +29,7 @@ namespace Keypaste.App.Tests.ViewModels;
 public sealed class UnlockCreateTests : IDisposable
 {
     private readonly TempHome _home = new();
-    private readonly AppVaultSession _session = new(new ManualClock());
+    private readonly AppVaultSession _session = new(new ManualClock(AppClock.Start));
     private readonly FakeVaultFilePicker _picker = new();
 
     private int _unlockedCalls;
@@ -52,7 +53,7 @@ public sealed class UnlockCreateTests : IDisposable
         Assert.True(File.Exists(_home.FreeVaultPath));
 
         // The screen a person actually lands on, built the way the shell builds it.
-        using var countdown = new ClipboardCountdown(new FakeClipboard(), new ManualClock());
+        using var countdown = new ClipboardCountdown(new FakeClipboard(), new ManualClock(AppClock.Start));
         using var entries = new EntriesViewModel(_session, countdown);
 
         Assert.Empty(entries.Rows);

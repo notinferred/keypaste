@@ -1,4 +1,5 @@
 using Keypaste.App.Session;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.Session;
@@ -18,7 +19,7 @@ public sealed class AppVaultSessionTests
     public void The_right_password_opens_the_vault()
     {
         using var fixture = new TempVault();
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
 
         var outcome = Unlock(session, fixture.Path_, TempVault.Password);
 
@@ -32,7 +33,7 @@ public sealed class AppVaultSessionTests
     public void The_wrong_password_leaves_it_locked()
     {
         using var fixture = new TempVault();
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
 
         var outcome = Unlock(session, fixture.Path_, "not-the-password");
 
@@ -46,7 +47,7 @@ public sealed class AppVaultSessionTests
     public void A_missing_file_is_reported_as_missing()
     {
         using var fixture = new TempVault();
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
 
         Assert.Equal(UnlockOutcome.NotFound, Unlock(session, fixture.MissingPath, TempVault.Password));
     }
@@ -59,7 +60,7 @@ public sealed class AppVaultSessionTests
     public void A_file_that_was_never_a_vault_is_reported_as_that()
     {
         using var fixture = new TempVault();
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
 
         Assert.Equal(UnlockOutcome.NotAKdbx, Unlock(session, fixture.ImposterPath, TempVault.Password));
     }
@@ -83,7 +84,7 @@ public sealed class AppVaultSessionTests
     public void The_master_password_zeroes_on_dispose_whatever_the_outcome(string scenario)
     {
         using var fixture = new TempVault();
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
 
         var (path, password, expected) = scenario switch
         {
@@ -115,7 +116,7 @@ public sealed class AppVaultSessionTests
     public void It_stays_unlocked_just_short_of_the_timeout()
     {
         using var fixture = new TempVault();
-        var clock = new ManualClock();
+        var clock = new ManualClock(AppClock.Start);
         using var session = new AppVaultSession(clock, TimeSpan.FromMinutes(5));
         Unlock(session, fixture.Path_, TempVault.Password);
 
@@ -128,7 +129,7 @@ public sealed class AppVaultSessionTests
     public void It_locks_when_the_timeout_passes()
     {
         using var fixture = new TempVault();
-        var clock = new ManualClock();
+        var clock = new ManualClock(AppClock.Start);
         using var session = new AppVaultSession(clock, TimeSpan.FromMinutes(5));
 
         VaultLockReason? reason = null;
@@ -146,7 +147,7 @@ public sealed class AppVaultSessionTests
     public void Touching_it_moves_the_deadline()
     {
         using var fixture = new TempVault();
-        var clock = new ManualClock();
+        var clock = new ManualClock(AppClock.Start);
         using var session = new AppVaultSession(clock, TimeSpan.FromMinutes(5));
         Unlock(session, fixture.Path_, TempVault.Password);
 
@@ -170,7 +171,7 @@ public sealed class AppVaultSessionTests
     public void A_suspended_machine_wakes_locked_even_though_the_timer_never_fired()
     {
         using var fixture = new TempVault();
-        var clock = new ManualClock();
+        var clock = new ManualClock(AppClock.Start);
         using var session = new AppVaultSession(clock, TimeSpan.FromMinutes(5));
         Unlock(session, fixture.Path_, TempVault.Password);
 
@@ -192,7 +193,7 @@ public sealed class AppVaultSessionTests
     public void A_touch_after_the_deadline_locks_instead_of_reviving()
     {
         using var fixture = new TempVault();
-        var clock = new ManualClock();
+        var clock = new ManualClock(AppClock.Start);
         using var session = new AppVaultSession(clock, TimeSpan.FromMinutes(5));
 
         VaultLockReason? reason = null;
@@ -211,7 +212,7 @@ public sealed class AppVaultSessionTests
     public void A_short_sleep_does_not_lock_on_wake()
     {
         using var fixture = new TempVault();
-        var clock = new ManualClock();
+        var clock = new ManualClock(AppClock.Start);
         using var session = new AppVaultSession(clock, TimeSpan.FromMinutes(5));
         Unlock(session, fixture.Path_, TempVault.Password);
 
@@ -229,7 +230,7 @@ public sealed class AppVaultSessionTests
     public void A_backwards_clock_correction_does_not_buy_more_time()
     {
         using var fixture = new TempVault();
-        var clock = new ManualClock();
+        var clock = new ManualClock(AppClock.Start);
         using var session = new AppVaultSession(clock, TimeSpan.FromMinutes(5));
         Unlock(session, fixture.Path_, TempVault.Password);
 
@@ -242,7 +243,7 @@ public sealed class AppVaultSessionTests
     public void It_warns_once_before_locking()
     {
         using var fixture = new TempVault();
-        var clock = new ManualClock();
+        var clock = new ManualClock(AppClock.Start);
         using var session = new AppVaultSession(clock, TimeSpan.FromMinutes(5));
 
         var warnings = 0;
@@ -261,7 +262,7 @@ public sealed class AppVaultSessionTests
     public void Activity_after_a_warning_earns_another_one()
     {
         using var fixture = new TempVault();
-        var clock = new ManualClock();
+        var clock = new ManualClock(AppClock.Start);
         using var session = new AppVaultSession(clock, TimeSpan.FromMinutes(5));
 
         var warnings = 0;
@@ -282,7 +283,7 @@ public sealed class AppVaultSessionTests
     public void Locking_twice_raises_the_event_once()
     {
         using var fixture = new TempVault();
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
 
         var locks = 0;
         session.Locked += (_, _) => locks++;
@@ -298,7 +299,7 @@ public sealed class AppVaultSessionTests
     [Fact]
     public void Locking_a_locked_session_raises_nothing()
     {
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
 
         var locks = 0;
         session.Locked += (_, _) => locks++;
@@ -313,7 +314,7 @@ public sealed class AppVaultSessionTests
     {
         using var first = new TempVault();
         using var second = new TempVault();
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
 
         var reasons = new List<VaultLockReason>();
         session.Locked += (_, r) => reasons.Add(r);
@@ -332,7 +333,7 @@ public sealed class AppVaultSessionTests
 
         // Disposed inside the test on purpose; the using declaration is what keeps CA2000 provable,
         // and Dispose is idempotent so the second call at the end of scope costs nothing.
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
 
         VaultLockReason? reason = null;
         session.Locked += (_, r) => reason = r;
@@ -347,7 +348,7 @@ public sealed class AppVaultSessionTests
     [Fact]
     public void Touching_a_locked_session_does_nothing()
     {
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
 
         session.Touch();
 
@@ -383,7 +384,7 @@ public sealed class AppVaultSessionTests
     public void Shortening_the_timeout_takes_effect_at_once()
     {
         using var fixture = new TempVault();
-        var clock = new ManualClock();
+        var clock = new ManualClock(AppClock.Start);
         using var session = new AppVaultSession(clock, TimeSpan.FromHours(4));
         Unlock(session, fixture.Path_, TempVault.Password);
 

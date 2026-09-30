@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.Core.Internal;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests;
@@ -28,13 +29,13 @@ public sealed class AppMenuTests
         Assert.Equal(AppMenu.ImportHeader, import.Header);
         Assert.False(import.IsEnabled, "Import is on with no vault open");
 
-        using var session = new AppVaultSession(new ManualClock(), home: fixture.Home);
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home);
         using (var master = TempVault.Secret(TempVault.Password))
         {
             Assert.Equal(UnlockOutcome.Opened, session.TryUnlock(fixture.Path_, master.Value));
         }
 
-        shell = new ShellViewModel(session, fixture.Home, null, clock: new ManualClock(), picker: new FakeVaultFilePicker { ExistingPath = foreign });
+        shell = new ShellViewModel(session, fixture.Home, null, clock: new ManualClock(AppClock.Start), picker: new FakeVaultFilePicker { ExistingPath = foreign });
 
         using (shell)
         {

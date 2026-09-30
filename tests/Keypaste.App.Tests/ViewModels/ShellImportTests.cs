@@ -8,6 +8,7 @@ using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Internal;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
@@ -31,7 +32,7 @@ public sealed class ShellImportTests : IDisposable
         _source = Path.Combine(_vault.Home, "foreign.kdbx");
         KeePassInterop.WriteForeignUnchecked(_source, Encoding.UTF8.GetBytes(_sourcePassword), _keyfile, "Argon2id", "ChaCha20");
 
-        _session = new AppVaultSession(new ManualClock(), home: _vault.Home);
+        _session = new AppVaultSession(new ManualClock(AppClock.Start), home: _vault.Home);
         using var master = TempVault.Secret(TempVault.Password);
         Assert.Equal(UnlockOutcome.Opened, _session.TryUnlock(_vault.Path_, master.Value));
     }
@@ -213,7 +214,7 @@ public sealed class ShellImportTests : IDisposable
     });
 
     private ShellViewModel NewShell() =>
-        new(_session, _vault.Home, null, clipboard: new FakeClipboard(), clock: new ManualClock(), picker: _picker,
+        new(_session, _vault.Home, null, clipboard: new FakeClipboard(), clock: new ManualClock(AppClock.Start), picker: _picker,
             openInPlace: (path, keyfile) => _opened.Add((path, keyfile)));
 
     private static async Task Unlock(KdbxImportViewModel import)

@@ -1,4 +1,5 @@
 using Keypaste.Core;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;

@@ -6,6 +6,7 @@ using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Recent;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
@@ -35,7 +36,7 @@ public sealed class RestoreBackupTests : IDisposable
     private readonly string _directory;
     private readonly string _home;
     private readonly string _vaultPath;
-    private readonly ManualClock _clock = new();
+    private readonly ManualClock _clock = new(AppClock.Start);
 
     public RestoreBackupTests()
     {
@@ -516,14 +517,14 @@ public sealed class RestoreBackupTests : IDisposable
     /// <summary>Changes the password on the Entries screen and locks, which is a real save and so a real backup.</summary>
     private void ChangeThroughTheApp(string password)
     {
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
 
         using (var master = TempVault.Secret(_master))
         {
             Assert.Equal(UnlockOutcome.Opened, session.TryUnlock(_vaultPath, master.Value));
         }
 
-        using var countdown = new ClipboardCountdown(new FakeClipboard(), new ManualClock());
+        using var countdown = new ClipboardCountdown(new FakeClipboard(), new ManualClock(AppClock.Start));
         using var entries = new EntriesViewModel(session, countdown);
 
         entries.Selected = entries.Rows.Single(row => row.Path == _entry);

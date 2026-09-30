@@ -5,29 +5,18 @@ namespace Keypaste.Core.Tests;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Hand-rolled rather than <c>Microsoft.Extensions.TimeProvider.Testing</c>'s
-/// <c>FakeTimeProvider</c>, and the reason is supply chain rather than taste: a test-only package
-/// still enters <c>packages.lock.json</c>, still restores under <c>--locked-mode</c>, and still
-/// turns CI red the day it gets a low-severity advisory under <c>NuGetAudit</c>. That is a real
-/// cost for a class with three overrides (docs/PRODUCT.md law 3.9).
+/// Hand-rolled rather than <c>FakeTimeProvider</c> because a test-only package still enters
+/// <c>packages.lock.json</c> and turns CI red on its first low-severity advisory (docs/PRODUCT.md law 3.9).
 /// </para>
 /// <para>
-/// <b>The two clocks move separately, and a grant's TTL depends on it.</b>
-/// <see cref="TimeProvider"/>'s base <see cref="GetTimestamp"/> returns
-/// <c>Stopwatch.GetTimestamp()</c>, which no amount of <see cref="Advance"/> can move — so a cache
-/// that bounds expiry on the monotonic clock would be tested against the wall clock only, and the
-/// half left untested is the half that decides whether a wall-clock rollback resurrects an expired
-/// approval. <see cref="Advance"/> moves both; <see cref="AdvanceWallOnly"/> and
-/// <see cref="AdvanceMonotonicOnly"/> move one, which is how a suspended machine and an NTP
-/// correction are told apart. The same shape as <c>ManualClock</c> in <c>Keypaste.App.Tests</c>,
-/// which needed it first for the idle policy.
+/// <see cref="GetTimestamp"/> is overridden because the base returns <c>Stopwatch.GetTimestamp()</c>,
+/// which <see cref="Advance"/> cannot move; a grant's TTL and the app's idle lock are bounded on that
+/// monotonic clock. <see cref="AdvanceWallOnly"/> and <see cref="AdvanceMonotonicOnly"/> tell a
+/// suspended machine from an NTP correction.
 /// </para>
 /// <para>
-/// <b>Callbacks fire on the thread that moves the clock.</b> Anything they complete continues
-/// inline unless it was created with
-/// <see cref="TaskCreationOptions.RunContinuationsAsynchronously"/>, so a test that advances the
-/// clock is running production continuations on its own thread. That is deliberate — it makes the
-/// ordering deterministic — but it is why nothing under test may block waiting for the test thread.
+/// Callbacks fire on the thread that moves the clock, so nothing under test may block waiting for the
+/// test thread.
 /// </para>
 /// </remarks>
 internal sealed class ManualClock : TimeProvider

@@ -6,6 +6,7 @@ using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Settings;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests;
@@ -32,7 +33,7 @@ public sealed class ThemeFollowsSystemTests
 
         try
         {
-            using var session = app.Compose(preferences, new ManualClock());
+            using var session = app.Compose(preferences, new ManualClock(AppClock.Start));
             window.Show();
 
             // The session starts on a dark system (PlatformTheme); the first frame is drawn before the switch.

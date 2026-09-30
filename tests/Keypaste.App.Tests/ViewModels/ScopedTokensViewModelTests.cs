@@ -3,6 +3,7 @@ using Keypaste.App.Session;
 using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
+using Keypaste.Core.Tests;
 using Keypaste.Core.Tokens;
 using Xunit;
 
@@ -17,7 +18,7 @@ public sealed class ScopedTokensViewModelTests : IDisposable
     private const string _master = "correct horse battery staple";
 
     private readonly string _directory = Directory.CreateTempSubdirectory("keypaste-scoped-tokens-").FullName;
-    private readonly ManualClock _clock = new();
+    private readonly ManualClock _clock = new(AppClock.Start);
     private readonly AppVaultSession _session;
 
     public ScopedTokensViewModelTests()
@@ -137,7 +138,7 @@ public sealed class ScopedTokensViewModelTests : IDisposable
         using var screen = new ScopedTokensViewModel(_session);
         Assert.True(screen.Create("ci", "read:acme-api/staging/*", TimeSpan.FromDays(30), false).Ok);
 
-        using var countdown = new ClipboardCountdown(new FakeClipboard(), new ManualClock());
+        using var countdown = new ClipboardCountdown(new FakeClipboard(), new ManualClock(AppClock.Start));
         using var entries = new EntriesViewModel(_session, countdown);
 
         Assert.DoesNotContain(entries.Rows, row => ReservedGroups.IsReserved(row.GroupPath));

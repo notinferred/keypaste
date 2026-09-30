@@ -1,5 +1,6 @@
 using System.Reflection;
 using Keypaste.App.Clipboard;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.Clipboard;
@@ -333,7 +334,7 @@ public sealed class ClipboardCountdownTests
     private static (ClipboardCountdown Countdown, FakeClipboard Clipboard, ManualClock Clock) New()
     {
         var clipboard = new FakeClipboard();
-        var clock = new ManualClock();
+        var clock = new ManualClock(AppClock.Start);
 
         // No post function: the tick runs inline, which is what a UI thread would do with it.
         return (new ClipboardCountdown(clipboard, clock), clipboard, clock);

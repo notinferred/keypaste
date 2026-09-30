@@ -2,6 +2,7 @@ using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.HardwareKeys;
+using Keypaste.Core.Tests;
 using Keypaste.Core.Tests.HardwareKeys;
 using Xunit;
 
@@ -24,7 +25,7 @@ public sealed class HardwareKeySessionTests : IDisposable
 
     public HardwareKeySessionTests()
     {
-        _session = new AppVaultSession(new ManualClock(), home: _home.Path, hardwareKeys: _device);
+        _session = new AppVaultSession(new ManualClock(AppClock.Start), home: _home.Path, hardwareKeys: _device);
         _path = Path.Combine(_home.Path, "vault.kdbx");
 
         using var key = new HardwareKey(new SoftwareYubiKey(_secret), 2);

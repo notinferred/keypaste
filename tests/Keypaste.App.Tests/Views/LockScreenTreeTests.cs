@@ -9,6 +9,7 @@ using Keypaste.App.Views;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Recent;
+using Keypaste.Core.Tests;
 using Keypaste.Core.Tests.HardwareKeys;
 using Xunit;
 
@@ -34,7 +35,7 @@ public sealed class LockScreenTreeTests
         var ini = Path.Combine(files.Path, "keepassxc.ini");
         File.WriteAllText(ini, $"[General]\nLastDatabases={vault.Replace(@"\", @"\\", StringComparison.Ordinal)}\n");
 
-        using var session = new AppVaultSession(new ManualClock(), home: home.Path);
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: home.Path);
         using var model = new UnlockViewModel(session, home.Path, new FakeVaultFilePicker(), () => { }, keePassXcConfig: ini);
         var window = Show(model);
 
@@ -52,7 +53,7 @@ public sealed class LockScreenTreeTests
         using var fixture = new TempVault();
         fixture.RememberSelf();
 
-        using var session = new AppVaultSession(new ManualClock(), home: fixture.Home, hardwareKeys: new SoftwareYubiKey(new byte[20]));
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home, hardwareKeys: new SoftwareYubiKey(new byte[20]));
         using var model = new UnlockViewModel(session, fixture.Home, new FakeVaultFilePicker(), () => { });
         var window = Show(model);
 
@@ -78,7 +79,7 @@ public sealed class LockScreenTreeTests
         using var fixture = new TempVault();
         RecentVaults.Save(KeypasteHome.RecentPath(fixture.Home), [new RecentVault(fixture.Path_, DateTimeOffset.UtcNow, HardwareKeySlot: 2)]);
 
-        using var session = new AppVaultSession(new ManualClock(), home: fixture.Home, hardwareKeys: new SoftwareYubiKey(new byte[20]));
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home, hardwareKeys: new SoftwareYubiKey(new byte[20]));
         using var model = new UnlockViewModel(session, fixture.Home, new FakeVaultFilePicker(), () => { });
         var window = Show(model);
 

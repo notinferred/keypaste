@@ -1,4 +1,5 @@
 using Keypaste.Core.Audit;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests;
@@ -35,7 +36,7 @@ internal sealed class TempAuditHome : IDisposable
     internal void Append(params string[] entries)
     {
         ArgumentNullException.ThrowIfNull(entries);
-        Assert.True(AuditLog.TryOpen(LogPath, new ManualClock(), out var log, out var error), error);
+        Assert.True(AuditLog.TryOpen(LogPath, new ManualClock(AppClock.Start), out var log, out var error), error);
 
         using (log)
         {
@@ -50,7 +51,7 @@ internal sealed class TempAuditHome : IDisposable
     internal void Write(params AuditRecord[] records)
     {
         ArgumentNullException.ThrowIfNull(records);
-        Assert.True(AuditLog.TryOpen(LogPath, new ManualClock(), out var log, out var error), error);
+        Assert.True(AuditLog.TryOpen(LogPath, new ManualClock(AppClock.Start), out var log, out var error), error);
 
         using (log)
         {

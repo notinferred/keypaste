@@ -3,6 +3,7 @@ using Keypaste.App.ViewModels;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
@@ -228,7 +229,7 @@ public sealed class AgentActivityViewModelTests
     public void Without_an_authority_nothing_is_read_and_the_screen_says_so()
     {
         using var home = new TempAuditHome();
-        using var model = new AgentActivityViewModel(null, home.Home, new ManualClock());
+        using var model = new AgentActivityViewModel(null, home.Home, new ManualClock(AppClock.Start));
 
         Assert.True(model.IsUnavailable);
         Assert.Empty(model.Waiting);
@@ -326,7 +327,7 @@ public sealed class AgentActivityViewModelTests
         internal static async Task<App> StartAsync()
         {
             var fixture = new TempVault();
-            var clock = new ManualClock();
+            var clock = new ManualClock(AppClock.Start);
             var person = new ScriptedPerson();
 #pragma warning disable CA2000
             var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => person);

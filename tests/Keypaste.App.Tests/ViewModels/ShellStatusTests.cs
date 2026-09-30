@@ -3,6 +3,7 @@ using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
@@ -21,7 +22,7 @@ public sealed class ShellStatusTests
     public void Titlebar_SaysSavedUnsavedChangedOnDisk()
     {
         using var fixture = new TempVault();
-        var clock = new ManualClock();
+        var clock = new ManualClock(AppClock.Start);
         using var session = new AppVaultSession(clock, home: fixture.Home);
 
         using (var master = TempVault.Secret(TempVault.Password))
@@ -62,7 +63,7 @@ public sealed class ShellStatusTests
     public async Task TheAgentsRow_CountsDistinctConnectedClients()
     {
         using var fixture = new TempVault();
-        var clock = new ManualClock();
+        var clock = new ManualClock(AppClock.Start);
 #pragma warning disable CA2000
         using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
 #pragma warning restore CA2000
@@ -100,7 +101,7 @@ public sealed class ShellStatusTests
     public async Task TheAgentsRow_KeepsTheClientCountWhileARequestWaits()
     {
         using var fixture = new TempVault();
-        var clock = new ManualClock();
+        var clock = new ManualClock(AppClock.Start);
 #pragma warning disable CA2000
         using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NeverAnswers());
 #pragma warning restore CA2000

@@ -4,6 +4,7 @@ using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Recent;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
@@ -21,7 +22,7 @@ public sealed class UnlockKeyfileTests : IDisposable
     private const string _master = "correct-horse-battery-staple";
 
     private readonly TempHome _home = new();
-    private readonly AppVaultSession _session = new(new ManualClock());
+    private readonly AppVaultSession _session = new(new ManualClock(AppClock.Start));
     private readonly FakeVaultFilePicker _picker = new();
     private readonly string _keyfile;
     private int _unlockedCalls;

@@ -12,6 +12,7 @@ using Keypaste.App.Tests.ViewModels;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.Rendering;
@@ -68,7 +69,7 @@ internal sealed class RenderedShell : IDisposable
         // The unlock screen this vault was opened from remembers it, so the lock screen offers it again.
         Core.Recent.RecentVaults.Save(Core.Audit.KeypasteHome.RecentPath(_directory), [new Core.Recent.RecentVault(path, DateTimeOffset.UtcNow)]);
 
-        Session = new AppVaultSession(new ManualClock());
+        Session = new AppVaultSession(new ManualClock(AppClock.Start));
 
         using (var master = TempVault.Secret(Master))
         {
@@ -76,7 +77,7 @@ internal sealed class RenderedShell : IDisposable
         }
 
         Window = new MainWindow { Height = 1000 };
-        _shell = new ShellViewModel(Session, _directory, null, clipboard: new FakeClipboard(), clock: new ManualClock());
+        _shell = new ShellViewModel(Session, _directory, null, clipboard: new FakeClipboard(), clock: new ManualClock(AppClock.Start));
         Root.Content = new ShellView { DataContext = _shell };
         _shortcuts = App.Bind(Window, Session, () => _unlock, () => _shell);
         Session.Locked += OnLocked;

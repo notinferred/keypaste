@@ -17,6 +17,7 @@ using Keypaste.Core;
 using Keypaste.Core.Activity;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.Rendering;
@@ -82,7 +83,7 @@ public sealed class ScreenRenderer
             Core.Recent.RecentVaults.Save(
                 Core.Audit.KeypasteHome.RecentPath(home), [new Core.Recent.RecentVault(path, DateTimeOffset.UtcNow, null, 2)]);
 
-            using var session = new AppVaultSession(new ManualClock(), home: home, hardwareKeys: device);
+            using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: home, hardwareKeys: device);
             using (var unlock = new UnlockViewModel(session, home, new FakeVaultFilePicker(), () => { }, action => Avalonia.Threading.Dispatcher.UIThread.Post(action)))
             {
                 var window = Show(new UnlockView { DataContext = unlock });
@@ -178,7 +179,7 @@ public sealed class ScreenRenderer
         Directory.CreateDirectory(output);
 
         using var demo = new DemoVault();
-        var clock = new ManualClock();
+        var clock = new ManualClock(AppClock.Start);
         using var authority = new AppAuthority(new AppVaultSession(clock, TimeSpan.FromHours(8), demo.Home), null, () => new Allowing());
 
         using (var master = TempVault.Secret(_master))
@@ -323,7 +324,7 @@ public sealed class ScreenRenderer
 
         // A live authority and this vault's audit lines, so the rows' dots and the Agent access card
         // are read the way the app reads them.
-        var clock = new ManualClock();
+        var clock = new ManualClock(AppClock.Start);
 #pragma warning disable CA2000 // The authority owns and disposes its session.
         using var authority = new AppAuthority(new AppVaultSession(clock, home: demo.Home), null, () => new Session.NobodyToAsk());
 #pragma warning restore CA2000
@@ -428,7 +429,7 @@ public sealed class ScreenRenderer
 
         var picker = new FakeVaultFilePicker();
 
-        using (var session = new AppVaultSession(new ManualClock()))
+        using (var session = new AppVaultSession(new ManualClock(AppClock.Start)))
         using (var unlock = new UnlockViewModel(session, demo.Home, picker, () => { }, lockedBy: VaultLockReason.Idle))
         {
             var window = Show(new UnlockView { DataContext = unlock });
@@ -469,7 +470,7 @@ public sealed class ScreenRenderer
 
         try
         {
-            using var session = new AppVaultSession(new ManualClock());
+            using var session = new AppVaultSession(new ManualClock(AppClock.Start));
             using var welcome = new UnlockViewModel(session, empty, picker, () => { });
             var window = Show(new UnlockView { DataContext = welcome });
             Save(window, output, "81-lock-welcome");
@@ -505,7 +506,7 @@ public sealed class ScreenRenderer
             foreign.Save();
         }
 
-        using (var session = new AppVaultSession(new ManualClock()))
+        using (var session = new AppVaultSession(new ManualClock(AppClock.Start)))
         {
             using (var master = TempVault.Secret(_master))
             {
@@ -513,7 +514,7 @@ public sealed class ScreenRenderer
             }
 
             picker.ExistingPath = source;
-            using var shell = new ShellViewModel(session, demo.Home, null, clipboard: new FakeClipboard(), clock: new ManualClock(), picker: picker);
+            using var shell = new ShellViewModel(session, demo.Home, null, clipboard: new FakeClipboard(), clock: new ManualClock(AppClock.Start), picker: picker);
             var window = Show(new ShellView { DataContext = shell });
 
             Wait(shell.ImportCommand.ExecuteAsync());
@@ -560,7 +561,7 @@ public sealed class ScreenRenderer
             window.Close();
         }
 
-        using (var session = new AppVaultSession(new ManualClock()))
+        using (var session = new AppVaultSession(new ManualClock(AppClock.Start)))
         using (var handOff = new UnlockViewModel(session, demo.Home, picker, () => { }))
         {
             Assert.True(handOff.Offer(source, null));
@@ -577,7 +578,7 @@ public sealed class ScreenRenderer
                 new Core.Recent.RecentVault(Path.Combine(demo.Home, "moved.kdbx"), DateTimeOffset.UtcNow.AddDays(-2)),
             ]);
 
-        using (var session = new AppVaultSession(new ManualClock()))
+        using (var session = new AppVaultSession(new ManualClock(AppClock.Start)))
         using (var unlock = new UnlockViewModel(session, demo.Home, picker, () => { }, lockedBy: VaultLockReason.Requested))
         {
             var window = Show(new UnlockView { DataContext = unlock });
@@ -681,7 +682,7 @@ public sealed class ScreenRenderer
     /// <summary>The trash with two deleted entries in it; drawn last, because it changes the demo vault.</summary>
     private static void DrawTrashWithRows(DemoVault demo, string output)
     {
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
 
         using (var master = TempVault.Secret(_master))
         {
@@ -692,7 +693,7 @@ public sealed class ScreenRenderer
         session.Unlocked.RemoveEntry(new EntryName("env/acme-web", "VERCEL_TOKEN"));
         session.Unlocked.Save();
 
-        using var shell = new ShellViewModel(session, demo.Home, null, clipboard: new FakeClipboard(), clock: new ManualClock());
+        using var shell = new ShellViewModel(session, demo.Home, null, clipboard: new FakeClipboard(), clock: new ManualClock(AppClock.Start));
         var window = new MainWindow { Width = _width, Height = _height };
         window.FindControl<ContentControl>("Root")!.Content = new ShellView { DataContext = shell };
         window.Show();
@@ -724,7 +725,7 @@ public sealed class ScreenRenderer
             Core.Audit.KeypasteHome.RecentPath(demo.Home),
             [new Core.Recent.RecentVault(demo.Path, DateTimeOffset.UtcNow)]);
 
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
         using var unlock = new UnlockViewModel(session, demo.Home, new FakeVaultFilePicker(), () => { });
         var window = new MainWindow { Width = _width, Height = _height };
         window.FindControl<ContentControl>("Root")!.Content = new UnlockView { DataContext = unlock };
@@ -735,14 +736,14 @@ public sealed class ScreenRenderer
 
     private static void DrawShell(DemoVault demo, string output)
     {
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
 
         using (var master = TempVault.Secret(_master))
         {
             Assert.Equal(UnlockOutcome.Opened, session.TryUnlock(demo.Path, master.Value));
         }
 
-        var clock = new ManualClock();
+        var clock = new ManualClock(AppClock.Start);
         using var shares = DemoShares(session.Unlocked!, clock);
         using var shell = new ShellViewModel(session, demo.Home, null, clipboard: new FakeClipboard(), clock: clock, picker: new FakeVaultFilePicker()) { ShareTransport = shares };
         var window = new MainWindow { Width = _width, Height = _height };
@@ -820,7 +821,7 @@ public sealed class ScreenRenderer
         var fresh = Directory.CreateTempSubdirectory("keypaste-screens-empty-").FullName;
         try
         {
-            DrawLogAlone(new LogViewModel(fresh, new ManualClock()), output, "04-settings-activity-log-empty");
+            DrawLogAlone(new LogViewModel(fresh, new ManualClock(AppClock.Start)), output, "04-settings-activity-log-empty");
 
             var clock = new ManualClock(new DateTimeOffset(2026, 7, 28, 8, 1, 53, TimeSpan.Zero));
             Assert.True(AuditLog.TryOpen(KeypasteHome.AuditPath(fresh), clock, out var agentsOnly, out var error), error);
@@ -838,7 +839,7 @@ public sealed class ScreenRenderer
                     out var failure), failure);
             }
 
-            var agents = new LogViewModel(fresh, new ManualClock());
+            var agents = new LogViewModel(fresh, new ManualClock(AppClock.Start));
             agents.Filter = agents.Filters.Single(option => option.Filter == LogFilter.You);
             DrawLogAlone(agents, output, "04-settings-activity-log-you-empty");
         }
@@ -860,14 +861,14 @@ public sealed class ScreenRenderer
     /// <summary>Env profiles in its own shell, with a file picker so Import and Export draw enabled.</summary>
     private static void DrawEnv(DemoVault demo, string output)
     {
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
 
         using (var master = TempVault.Secret(_master))
         {
             Assert.Equal(UnlockOutcome.Opened, session.TryUnlock(demo.Path, master.Value));
         }
 
-        using var shell = new ShellViewModel(session, demo.Home, null, clipboard: new FakeClipboard(), clock: new ManualClock(), picker: new FakeVaultFilePicker());
+        using var shell = new ShellViewModel(session, demo.Home, null, clipboard: new FakeClipboard(), clock: new ManualClock(AppClock.Start), picker: new FakeVaultFilePicker());
         var window = new MainWindow { Width = _width, Height = 1000 };
         window.FindControl<ContentControl>("Root")!.Content = new ShellView { DataContext = shell };
         window.Show();

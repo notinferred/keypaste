@@ -4,6 +4,7 @@ using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Recent;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
@@ -33,7 +34,7 @@ public sealed class VaultAccessTests : IDisposable
     private readonly string _vaultPath;
     private readonly string _keyA;
     private readonly string _keyB;
-    private readonly ManualClock _clock = new();
+    private readonly ManualClock _clock = new(AppClock.Start);
     private readonly FakeVaultFilePicker _picker = new();
 
     public VaultAccessTests()

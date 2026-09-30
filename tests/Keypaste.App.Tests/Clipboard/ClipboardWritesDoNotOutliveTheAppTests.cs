@@ -1,4 +1,5 @@
 using Keypaste.App.Clipboard;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.Clipboard;
@@ -322,7 +323,7 @@ public sealed class ClipboardWritesDoNotOutliveTheAppTests
     private static (ClipboardCountdown Countdown, HeldClipboard Clipboard, ManualClock Clock) New()
     {
         var clipboard = new HeldClipboard();
-        var clock = new ManualClock();
+        var clock = new ManualClock(AppClock.Start);
 
         return (new ClipboardCountdown(clipboard, clock), clipboard, clock);
     }

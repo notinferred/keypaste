@@ -7,6 +7,7 @@ using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.Views;
@@ -149,7 +150,7 @@ public sealed class UnlockOpenShortcutTests
 
         internal LockedScreen(TempVault fixture, FakeVaultFilePicker picker)
         {
-            Session = new AppVaultSession(new ManualClock());
+            Session = new AppVaultSession(new ManualClock(AppClock.Start));
             Model = new UnlockViewModel(Session, fixture.Home, picker, () => Landed++);
             Window = new Window { Content = new UnlockView { DataContext = Model } };
             _shortcuts = App.Bind(Window, Session, () => Model, () => null);

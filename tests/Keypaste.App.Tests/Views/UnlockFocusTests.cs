@@ -6,6 +6,7 @@ using Keypaste.App.Controls;
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.Views;
@@ -35,7 +36,7 @@ public sealed class UnlockFocusTests
         using var fixture = new TempVault();
         fixture.RememberSelf();
 
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
         using var model = new UnlockViewModel(session, fixture.Home, new FakeVaultFilePicker(), () => { });
 
         var window = Show(model);
@@ -56,7 +57,7 @@ public sealed class UnlockFocusTests
         using var fixture = new TempVault();
         fixture.RememberSelf();
 
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
         using var model = new UnlockViewModel(session, fixture.Home, new FakeVaultFilePicker(), () => { });
 
         var window = Show(model);
@@ -76,7 +77,7 @@ public sealed class UnlockFocusTests
     public Task With_no_vault_selected_the_password_field_is_disabled() => HeadlessSession.On(() =>
     {
         using var fixture = new TempVault();
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
         using var model = new UnlockViewModel(session, fixture.Home, new FakeVaultFilePicker(), () => { });
 
         var window = Show(model);
@@ -91,7 +92,7 @@ public sealed class UnlockFocusTests
         using var fixture = new TempVault();
         fixture.RememberSelf();
 
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
         using var model = new UnlockViewModel(session, fixture.Home, new FakeVaultFilePicker(), () => { });
 
         var window = Show(model);
@@ -115,7 +116,7 @@ public sealed class UnlockFocusTests
         using var fixture = new TempVault();
         fixture.RememberSelf();
 
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
         using var model = new UnlockViewModel(session, fixture.Home, new FakeVaultFilePicker(), () => { });
 
         var window = Show(model);
@@ -137,7 +138,7 @@ public sealed class UnlockFocusTests
         fixture.RememberSelf();
 
         var picker = new FakeVaultFilePicker { NewPath = Path.Combine(fixture.Home, "created.kdbx") };
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
         using var model = new UnlockViewModel(session, fixture.Home, picker, () => { });
 
         var window = Show(model);

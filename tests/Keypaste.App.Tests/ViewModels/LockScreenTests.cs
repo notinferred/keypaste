@@ -3,6 +3,7 @@ using System.Text;
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.Core.Internal;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
@@ -36,7 +37,7 @@ public sealed class LockScreenTests : IDisposable
     public void A_lock_the_screen_follows_is_described_and_a_launch_is_not()
     {
         _vault.RememberSelf();
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
 
         using (var launched = new UnlockViewModel(session, _vault.Home, new FakeVaultFilePicker(), () => { }))
         {
@@ -51,7 +52,7 @@ public sealed class LockScreenTests : IDisposable
     [Fact]
     public void The_heading_names_the_vault_or_invites_one()
     {
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
         using var model = new UnlockViewModel(session, _vault.Home, new FakeVaultFilePicker(), () => { });
 
         Assert.Equal("Open a vault", model.Heading);
@@ -63,7 +64,7 @@ public sealed class LockScreenTests : IDisposable
     public void The_recent_list_shows_only_when_it_offers_another_vault()
     {
         _vault.RememberSelf();
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
         using var model = new UnlockViewModel(session, _vault.Home, new FakeVaultFilePicker(), () => { });
 
         Assert.True(model.HasSelection);
@@ -82,7 +83,7 @@ public sealed class LockScreenTests : IDisposable
         var foreign = Path.Combine(_vault.Home, "foreign.kdbx");
         KeePassInterop.WriteForeignUnchecked(foreign, Encoding.UTF8.GetBytes("in-place"), keyfile, "Argon2id", "ChaCha20");
 
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
         using var model = new UnlockViewModel(session, _vault.Home, new FakeVaultFilePicker(), () => { });
 
         Assert.True(model.Offer(foreign, keyfile));
@@ -97,7 +98,7 @@ public sealed class LockScreenTests : IDisposable
         var foreign = Path.Combine(_vault.Home, "handed.kdbx");
         KeePassInterop.WriteForeignUnchecked(foreign, Encoding.UTF8.GetBytes("in-place"), null, "Argon2id", "ChaCha20");
 
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
         using var model = new UnlockViewModel(session, _vault.Home, new FakeVaultFilePicker(), () => { });
 
         Assert.True(model.Offer(foreign, null));
@@ -112,7 +113,7 @@ public sealed class LockScreenTests : IDisposable
     [Fact]
     public async Task A_wrong_password_is_an_error_and_a_note_is_not()
     {
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
         using var model = new UnlockViewModel(session, _vault.Home, new FakeVaultFilePicker(), () => { });
         Assert.True(model.Offer(_vault.Path_));
 
@@ -131,7 +132,7 @@ public sealed class LockScreenTests : IDisposable
     [Fact]
     public void A_file_that_is_not_a_vault_is_not_offered_with_a_keyfile()
     {
-        using var session = new AppVaultSession(new ManualClock());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
         using var model = new UnlockViewModel(session, _vault.Home, new FakeVaultFilePicker(), () => { });
 
         Assert.False(model.Offer(_vault.ImposterPath, _vault.ImposterPath));

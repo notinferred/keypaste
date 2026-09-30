@@ -12,6 +12,7 @@ using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
 using Keypaste.Core.Clipboard;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.Clipboard;
@@ -160,7 +161,7 @@ public sealed class SecretCopyParityTests
                 vault.Save();
             }
 
-            Session = new AppVaultSession(new ManualClock());
+            Session = new AppVaultSession(new ManualClock(AppClock.Start));
 
             using (var master = TempVault.Secret(_master))
             {
@@ -177,7 +178,7 @@ public sealed class SecretCopyParityTests
 
         internal AppVaultSession Session { get; }
 
-        internal ManualClock Clock { get; } = new();
+        internal ManualClock Clock { get; } = new(AppClock.Start);
 
         internal Window Window { get; }
 

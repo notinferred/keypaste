@@ -5,6 +5,7 @@ using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Sharing;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
@@ -21,7 +22,7 @@ public sealed class SharingViewModelTests : IDisposable
     private readonly TempVault _vault = new();
     private readonly FakeShareServer _server = new();
     private readonly Tests.Clipboard.FakeClipboard _clipboard = new();
-    private readonly ManualClock _clock = new();
+    private readonly ManualClock _clock = new(AppClock.Start);
     private readonly AppVaultSession _session;
     private readonly ClipboardCountdown _countdown;
     private readonly List<string> _toasts = [];

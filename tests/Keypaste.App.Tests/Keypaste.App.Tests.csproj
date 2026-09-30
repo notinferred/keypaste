@@ -25,6 +25,9 @@
     <Compile Include="../Keypaste.Core.Tests/PublisherMetadata.cs" Link="PublisherMetadata.cs" />
     <!-- The same software YubiKey the core's hardware-key tests prove against KeePassXC's vectors. -->
     <Compile Include="../Keypaste.Core.Tests/HardwareKeys/SoftwareYubiKey.cs" Link="HardwareKeys/SoftwareYubiKey.cs" />
+    <!-- The core's hand-moved clock and /api/share fake, so the app is tested against the same ones. -->
+    <Compile Include="../Keypaste.Core.Tests/ManualClock.cs" Link="ManualClock.cs" />
+    <Compile Include="../Keypaste.Core.Tests/FakeShareServer.cs" Link="FakeShareServer.cs" />
   </ItemGroup>
 
 </Project>

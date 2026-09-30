@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
@@ -173,7 +174,7 @@ public sealed class VaultExportTests
 
     private static AppVaultSession Unlocked(TempVault fixture, ManualClock? clock = null)
     {
-        var session = new AppVaultSession(clock ?? new ManualClock());
+        var session = new AppVaultSession(clock ?? new ManualClock(AppClock.Start));
 
         using var master = TempVault.Secret(TempVault.Password);
         Assert.Equal(UnlockOutcome.Opened, session.TryUnlock(fixture.Path_, master.Value));

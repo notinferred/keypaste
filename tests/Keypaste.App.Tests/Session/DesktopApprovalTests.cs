@@ -12,6 +12,7 @@ using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.Session;
@@ -132,7 +133,7 @@ public sealed class DesktopApprovalTests
     public Task A_request_withdrawn_before_its_prompt_is_drawn_never_draws_it() =>
         HeadlessSession.On(async () =>
         {
-            var channel = new WindowApprovalChannel(new ManualClock(), ApprovalLimits.Default.Window);
+            var channel = new WindowApprovalChannel(new ManualClock(AppClock.Start), ApprovalLimits.Default.Window);
             var drawn = 0;
             channel.Shown += (_, _) => drawn++;
             using var withdrawn = new CancellationTokenSource();
@@ -448,7 +449,7 @@ public sealed class DesktopApprovalTests
 #pragma warning restore CA2000
         }
 
-        internal ManualClock Clock { get; } = new();
+        internal ManualClock Clock { get; } = new(AppClock.Start);
 
         internal AppAuthority Authority { get; }
 

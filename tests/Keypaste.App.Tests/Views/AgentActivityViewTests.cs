@@ -7,6 +7,7 @@ using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core.Clients;
 using Keypaste.Core.Processes;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.Views;
@@ -21,7 +22,7 @@ public sealed class AgentActivityViewTests
     public Task The_connect_section_offers_the_clients_and_shows_the_preview_it_will_run() => HeadlessSession.On(async () =>
     {
         using var fixture = new TempVault();
-        using var authority = new AppAuthority(new AppVaultSession(new ManualClock(), home: fixture.Home), null, () => new NobodyToAsk());
+        using var authority = new AppAuthority(new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home), null, () => new NobodyToAsk());
         using (var master = TempVault.Secret(TempVault.Password))
         {
             Assert.Equal(UnlockOutcome.Opened, authority.Session.TryUnlock(fixture.Path_, master.Value));
@@ -32,7 +33,7 @@ public sealed class AgentActivityViewTests
             () => new McpServerCommand(Path.Combine(fixture.Home, "keypaste-mcp"), []),
             "nowhere",
             _ => null);
-        using var model = new AgentActivityViewModel(authority, fixture.Home, new ManualClock(), connector: connector);
+        using var model = new AgentActivityViewModel(authority, fixture.Home, new ManualClock(AppClock.Start), connector: connector);
         model.ToggleConnectCommand.Execute(null);
         var window = new Window { Content = new AgentActivityView { DataContext = model } };
         window.Show();
