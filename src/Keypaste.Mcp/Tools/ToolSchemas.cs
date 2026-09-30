@@ -50,8 +50,11 @@ internal static class ToolSchemas
             },
             "field": {
               "type": "string",
-              "enum": ["password", "username", "url", "notes"],
-              "description": "Which single field to release. Never more than one."
+              "anyOf": [
+                { "enum": ["password", "username", "url", "notes"] },
+                { "pattern": "^[A-Z][A-Z0-9_]{0,127}$" }
+              ],
+              "description": "Which single field to release: password, username, url or notes, or one custom field of the entry named like an environment variable, such as OPENAI_API_KEY. Never more than one."
             },
             "reason": {
               "type": "string",

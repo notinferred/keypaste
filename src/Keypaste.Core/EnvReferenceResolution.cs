@@ -1,4 +1,5 @@
 using System.Globalization;
+using Keypaste.Core.Approval;
 
 namespace Keypaste.Core;
 
@@ -87,7 +88,7 @@ public static class EnvReferenceResolution
                     break;
 
                 case EntryReference entry:
-                    (value, why) = Read(entries!, entry, now);
+                    (value, why) = Read(vault, entries!, entry, now);
                     break;
 
                 default:
@@ -203,7 +204,7 @@ public static class EnvReferenceResolution
             : (null, $"{env.Key} {_missing}");
     }
 
-    private static (string? Value, string? Why) Read(IReadOnlyList<VaultEntry> entries, EntryReference reference, DateTimeOffset now)
+    private static (string? Value, string? Why) Read(Vault vault, IReadOnlyList<VaultEntry> entries, EntryReference reference, DateTimeOffset now)
     {
         if (ReservedGroups.IsReserved(reference.Entry.GroupPath))
         {
@@ -224,13 +225,30 @@ public static class EnvReferenceResolution
             return (null, "expired " + expires.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss'Z'", CultureInfo.InvariantCulture));
         }
 
-        var value = reference.Field switch
+        string value;
+
+        if (CredentialFields.IsCustom(reference.Field))
         {
-            "username" => found.Username,
-            "url" => found.Url,
-            "notes" => found.Notes,
-            _ => found.Password,
-        };
+            // Read under the same saved-state check, so a file changed since the entries were read releases nothing.
+            var state = vault.ReadSavedField(reference.Entry, reference.Field, out var custom);
+
+            if (state != SavedRead.Current)
+            {
+                return (null, "cannot be read: the vault no longer matches its file");
+            }
+
+            value = custom ?? string.Empty;
+        }
+        else
+        {
+            value = reference.Field switch
+            {
+                "username" => found.Username,
+                "url" => found.Url,
+                "notes" => found.Notes,
+                _ => found.Password,
+            };
+        }
 
         return value.Length == 0 ? (null, $"has an empty {reference.Field}") : (value, null);
     }

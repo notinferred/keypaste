@@ -7,7 +7,7 @@ namespace Keypaste.Core.Sharing;
 /// <summary>One share link as the vault remembers it: what, to whom and until when, never the key.</summary>
 /// <param name="Id">The server-made id.</param>
 /// <param name="What">The shared entry's path, sanitized.</param>
-/// <param name="Field">The field or fields shared: <c>password</c>, <c>username</c>, <c>url</c>, <c>notes</c> or <c>login</c>.</param>
+/// <param name="Field">The field or fields shared: <c>password</c>, <c>username</c>, <c>url</c>, <c>notes</c>, <c>login</c> or an env-named custom field such as <c>OPENAI_API_KEY</c>.</param>
 /// <param name="Recipient">The person's own label for who it went to, or null.</param>
 /// <param name="Created">When the server's clock started.</param>
 /// <param name="Expires">When the server stops serving it.</param>

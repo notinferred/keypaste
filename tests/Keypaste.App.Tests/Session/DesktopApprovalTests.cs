@@ -29,6 +29,8 @@ public sealed class DesktopApprovalTests
     internal const string ProdEntryPath = "env/ci/prod/DEPLOY_KEY";
     internal const string TaggedEntryPath = "services/Stripe";
     internal const string Label = "ci-probe";
+    internal const string ApiKeySentinel = "SENTINEL-DESKTOP-OPENAI-7d2e4b";
+    internal const string OpenAiPath = "api/OpenAI";
 
     private static readonly TimeSpan _wait = TimeSpan.FromSeconds(10);
 
@@ -288,6 +290,41 @@ public sealed class DesktopApprovalTests
         });
 
     [Fact]
+    public Task A_custom_field_is_named_on_the_prompt_and_a_grant_for_it_serves_no_other_field() =>
+        HeadlessSession.On(async () =>
+        {
+            await using var app = await PromptedApp.StartAsync();
+            var reply = app.Ask(entry: OpenAiPath, exposure: "api/**", field: "OPENAI_API_KEY");
+            var window = await app.PromptAsync();
+
+            Assert.Equal(OpenAiPath, Text(window, "EntryText"));
+            Assert.Equal("OPENAI_API_KEY", Text(window, "FieldText"));
+            await app.ArmAsync();
+            Click(window, "AllowOnce");
+
+            var once = await reply.WaitAsync(_wait, Token);
+            Assert.Equal(ApiKeySentinel, once!.Value);
+            await PromptedApp.WithdrawnAsync(window);
+
+            var timed = app.Ask(entry: OpenAiPath, exposure: "api/**", field: "OPENAI_API_KEY");
+            var second = await app.PromptAsync(count: 2);
+            await app.ArmAsync();
+            Click(second, "Approve");
+            Assert.Equal(3600, (await timed.WaitAsync(_wait, Token))!.TtlSeconds);
+            await PromptedApp.WithdrawnAsync(second);
+
+            var password = app.Ask(entry: OpenAiPath, exposure: "api/**");
+            var third = await app.PromptAsync(count: 3);
+            Assert.Equal("password", Text(third, "FieldText"));
+            Click(third, "Deny");
+
+            var refused = await password.WaitAsync(_wait, Token);
+            Assert.Equal(AuditDecision.Denied, refused!.Decision);
+            Assert.Null(refused.Value);
+            AutomationSurface.AssertNothingExposes(third, ApiKeySentinel);
+        });
+
+    [Fact]
     public Task AllowForTheHour_Releases_AndTheNextIsServedFromTheGrant() =>
         HeadlessSession.On(async () =>
         {
@@ -470,6 +507,8 @@ public sealed class DesktopApprovalTests
                 created.AddEntry(new VaultEntry { GroupPath = "env/ci/prod", Title = "DEPLOY_KEY", Password = Sentinel });
                 created.AddEntry(new VaultEntry { GroupPath = "services", Title = "Stripe", Password = Sentinel });
                 created.AddTag(new EntryName("services", "Stripe"), "env:ci:prod");
+                created.AddEntry(new VaultEntry { GroupPath = "api", Title = "OpenAI", Password = Sentinel });
+                Assert.True(created.SetFields(new EntryName("api", "OpenAI"), [new FieldWrite("OPENAI_API_KEY", ApiKeySentinel)]));
                 created.Save();
             }
 
@@ -495,15 +534,15 @@ public sealed class DesktopApprovalTests
             return client;
         }
 
-        internal Task<CredentialReply?> Ask(CancellationToken? cancellationToken = null, string entry = EntryPath, string exposure = "env/**") =>
-            Ask(_client!, cancellationToken, entry, exposure);
+        internal Task<CredentialReply?> Ask(CancellationToken? cancellationToken = null, string entry = EntryPath, string exposure = "env/**", string field = "password") =>
+            Ask(_client!, cancellationToken, entry, exposure, field);
 
-        internal Task<CredentialReply?> Ask(ApproverClient client, CancellationToken? cancellationToken = null, string entry = EntryPath, string exposure = "env/**") =>
+        internal Task<CredentialReply?> Ask(ApproverClient client, CancellationToken? cancellationToken = null, string entry = EntryPath, string exposure = "env/**", string field = "password") =>
             client.RequestAsync(
                 new CredentialRequest
                 {
                     Entry = entry,
-                    Field = "password",
+                    Field = field,
                     Reason = "deploy the billing service",
                     TtlSeconds = 60,
                     Exposure = [exposure],

@@ -85,8 +85,9 @@ internal static class ShareCommand
 
     private static int Usage(TextWriter writer, int exit)
     {
-        writer.WriteLine("usage: keypaste share <entry> [--field password|username|url|notes|login] [--ttl 1h|24h|7d]");
-        writer.WriteLine("                      [--views 1|3|10] [--passphrase] [--to <label>] [--print] [--endpoint <url>]");
+        writer.WriteLine("usage: keypaste share <entry> [--field password|username|url|notes|login|<ENV_NAME>]");
+        writer.WriteLine("                      [--ttl 1h|24h|7d] [--views 1|3|10] [--passphrase] [--to <label>]");
+        writer.WriteLine("                      [--print] [--endpoint <url>]");
         writer.WriteLine("       keypaste share ls [--offline] [--json]");
         writer.WriteLine("       keypaste share revoke <id> | --expired");
         writer.WriteLine();
@@ -135,9 +136,9 @@ internal static class ShareCommand
             field = reference is EntryReference named ? named.Field : "password";
         }
 
-        if (!ShareService.Fields.Contains(field, StringComparer.Ordinal))
+        if (!ShareService.IsShareable(field))
         {
-            return Refuse(context, "--field is one of password, username, url, notes or login", CliApp.ExitUsageError);
+            return Refuse(context, $"--field is one of {ShareService.FieldRule}", CliApp.ExitUsageError);
         }
 
         if (line.Value("ttl") is not null && line.Value("expires") is not null)

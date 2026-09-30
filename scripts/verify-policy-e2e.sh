@@ -27,6 +27,10 @@ readonly OTHER='SENTINEL-POLICY-USERNAME-b02e4f'
 readonly OUTSIDE='SENTINEL-POLICY-OUTSIDE-c13f50'
 readonly ENTRY='env/ci/DEPLOY_KEY'
 readonly LABEL='ci-probe'
+readonly API_ENTRY='api/OpenAI'
+readonly API_PASSWORD='SENTINEL-POLICY-OPENAI-PASSWORD-d24a61'
+readonly API_KEY='SENTINEL-POLICY-OPENAI-API-KEY-e35b72'
+readonly RECOVERY='SENTINEL-POLICY-RECOVERY-CODES-f46c83'
 
 die() {
   echo "::error::$*" >&2
@@ -53,6 +57,8 @@ readonly VAULT="$WORK/vault.kdbx"
 readonly AUDIT="$WORK/audit.jsonl"
 readonly POLICY="$WORK/policy.toml"
 readonly BROKEN="$WORK/broken.toml"
+readonly FIELDS="$WORK/fields.toml"
+readonly RECOVERY_RULE="$WORK/recovery.toml"
 
 AGENT_PID=""
 AGENT_ERR=""
@@ -96,6 +102,12 @@ printf '%s\n' "$MASTER" | "$CLI" add personal/bank --password "$OUTSIDE" --vault
   || printf '%s\n%s\n' "$MASTER" "$OUTSIDE" | "$CLI" add personal/bank --vault "$VAULT" >/dev/null \
   || die "could not store the out-of-scope credential"
 
+printf '%s\n%s\n' "$MASTER" "$API_PASSWORD" | "$CLI" add "$API_ENTRY" --vault "$VAULT" >/dev/null \
+  || die "could not store the entry with custom fields"
+printf '%s\n%s\n%s\n' "$MASTER" "$API_KEY" "$RECOVERY" \
+  | "$CLI" set "$API_ENTRY" --field OPENAI_API_KEY --field 'Recovery codes' --vault "$VAULT" >/dev/null \
+  || die "could not set the entry's custom fields"
+
 # ------------------------------------------------------------------------------ the policy file
 # `entries = ["**"]` on purpose: the rule is as wide as a rule can be written, so phase C proves the
 # bridge's own --expose is the ceiling rather than proving the rule happened to be narrow.
@@ -108,6 +120,17 @@ max_ttl_seconds = 3600
 EOF
 
 printf '[[allow]]\nclientt = "%s"\n' "$LABEL" >"$BROKEN"
+
+# One env-named custom field, and a rule naming a field that never leaves (C.5a).
+for rule in "$FIELDS:OPENAI_API_KEY" "$RECOVERY_RULE:Recovery codes"; do
+  cat >"${rule%%:*}" <<EOF
+[[allow]]
+client          = "$LABEL"
+entries         = ["api/**"]
+fields          = ["${rule#*:}"]
+max_ttl_seconds = 300
+EOF
+done
 
 # ------------------------------------------------------------------------- starting an approver
 # Only the master password on stdin. Everything after it reads EOF, which ConsoleSecretPrompt
@@ -235,8 +258,45 @@ ask 7 "$ENTRY" password "$OUT" 3600 --client-label "$LABEL"
 jq -e 'select(.id == 7) | .result.structuredContent.expires_in_seconds == 30' <"$OUT" >/dev/null \
   || die "a policy rule raised the TTL ceiling the operator set with --max-ttl"
 
+# ============================================ G: a rule naming one custom field releases it alone
+start_agent "$FIELDS"
+before="$(prompts_drawn)"
+
+OUT="$WORK/field-rule.json"
+ask 8 "$API_ENTRY" OPENAI_API_KEY "$OUT" 300 --client-label "$LABEL" --expose 'api/**'
+
+jq -e --arg v "$API_KEY" 'select(.id == 8) | .result.isError == false and .result.structuredContent.value == $v' <"$OUT" >/dev/null \
+  || die "a rule naming OPENAI_API_KEY did not release exactly its value"
+[ "$(prompts_drawn)" -eq "$before" ] || die "a rule naming OPENAI_API_KEY put a prompt in front of the human"
+tail -n 1 "$AUDIT" | jq -e '.method == "policy" and .args.field == "OPENAI_API_KEY"' >/dev/null \
+  || die "the custom field's release was not audited as a policy release of that field"
+
+OUT="$WORK/field-rule-password.json"
+ask 9 "$API_ENTRY" password "$OUT" 300 --client-label "$LABEL" --expose 'api/**'
+
+[ "$(prompts_drawn)" -eq $((before + 1)) ] || die "the entry's password, outside the rule's fields, did not reach a person"
+grep -q "$API_PASSWORD" "$OUT" && die "a rule naming OPENAI_API_KEY released the entry's password"
+
+# A rule naming `Recovery codes` is not usable, so it releases nothing unprompted.
+start_agent "$RECOVERY_RULE"
+grep -q 'NOT in force' "$AGENT_ERR" || die "a rule naming 'Recovery codes' was not reported as ignored"
+before="$(prompts_drawn)"
+
+OUT="$WORK/recovery-rule.json"
+ask 10 "$API_ENTRY" OPENAI_API_KEY "$OUT" 300 --client-label "$LABEL" --expose 'api/**'
+[ "$(prompts_drawn)" -eq $((before + 1)) ] || die "with the rule ignored, OPENAI_API_KEY did not reach a person"
+grep -q "$API_KEY" "$OUT" && die "a file with a rule naming 'Recovery codes' released a field unprompted"
+
+OUT="$WORK/recovery-ask.json"
+ask 11 "$API_ENTRY" 'Recovery codes' "$OUT" 300 --client-label "$LABEL" --expose 'api/**'
+[ "$(prompts_drawn)" -eq $((before + 1)) ] || die "a request for 'Recovery codes' reached a person"
+grep -q "$RECOVERY" "$OUT" && die "a request for 'Recovery codes' released it"
+
 # ------------------------------------------------------------------------------ what was logged
 [ -f "$AUDIT" ] || die "no audit log was written"
+for value in "$API_PASSWORD" "$API_KEY" "$RECOVERY"; do
+  grep -q "$value" "$AUDIT" && die "the audit log contains a custom-field entry's value"
+done
 
 grep -q '"decision":"granted"' "$AUDIT" || die "the policy release was not recorded as granted"
 grep -q '"decision":"denied"'  "$AUDIT" || die "the refusals were not recorded as denied"

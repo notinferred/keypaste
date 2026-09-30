@@ -146,7 +146,7 @@ public sealed record CredentialRequest
     /// <summary>The <c>entry</c> argument exactly as the agent wrote it, handle or path.</summary>
     public required string Entry { get; init; }
 
-    /// <summary>Which field, already checked against <see cref="Approval.CredentialFields"/>.</summary>
+    /// <summary>Which field, already checked against <see cref="Approval.CredentialFields.IsReleasable"/>.</summary>
     public required string Field { get; init; }
 
     /// <summary>The agent's stated reason, verbatim and untrusted (THREATS.md T-2).</summary>

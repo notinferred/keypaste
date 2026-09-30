@@ -125,6 +125,39 @@ public sealed class VaultSavedStateTests : IDisposable
     }
 
     [Fact]
+    public void A_custom_field_is_read_only_while_the_vault_matches_its_file()
+    {
+        using var vault = Seeded();
+        Assert.True(vault.SetFields(_token, [new FieldWrite("API_KEY", "saved")]));
+        vault.Save();
+
+        Assert.Equal(SavedRead.Current, vault.ReadSavedField(_token, "API_KEY", out var value));
+        Assert.Equal("saved", value);
+
+        Assert.True(vault.SetFields(_token, [new FieldWrite("API_KEY", "unsaved")]));
+
+        Assert.Equal(SavedRead.Unsaved, vault.ReadSavedField(_token, "API_KEY", out value));
+        Assert.Null(value);
+    }
+
+    [Fact]
+    public void A_custom_field_another_writer_saved_is_refused()
+    {
+        using var vault = Seeded();
+        Assert.True(vault.SetFields(_token, [new FieldWrite("API_KEY", "saved")]));
+        vault.Save();
+
+        using (var writer = Vault.Open(_path, _masterPassword))
+        {
+            Assert.True(writer.SetFields(_token, [new FieldWrite("API_KEY", "external")]));
+            writer.Save();
+        }
+
+        Assert.Equal(SavedRead.ChangedOnDisk, vault.ReadSavedField(_token, "API_KEY", out var value));
+        Assert.Null(value);
+    }
+
+    [Fact]
     public void A_file_that_cannot_be_read_is_not_taken_as_unchanged()
     {
         using var vault = Seeded();

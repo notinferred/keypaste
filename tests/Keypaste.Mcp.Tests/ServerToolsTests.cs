@@ -695,24 +695,27 @@ public sealed class ServerToolsTests
     }
 
     /// <summary>
-    /// The four field names an agent is told about have to be the four the core will release. They
-    /// live in <c>CredentialFields</c>; this is what keeps the hand-written JSON schema in step with
-    /// it, because a schema that advertises a field nothing releases is a contract keypaste breaks.
+    /// The standard names an agent is told about are the four the core releases, and the custom-field
+    /// pattern admits every custom name the core releases, so the schema never refuses what the owner
+    /// would answer; the bridge and the owner refuse what the pattern lets past.
     /// </summary>
-    [Fact]
-    public void TheSchemaAndTheCoreAgreeAboutFields()
+    [Theory]
+    [InlineData("OPENAI_API_KEY", true)]
+    [InlineData("A", true)]
+    [InlineData("Recovery codes", false)]
+    [InlineData("otp", false)]
+    [InlineData("openai_api_key", false)]
+    public void TheSchemaAndTheCoreAgreeAboutFields(string custom, bool releasable)
     {
         using var schema = JsonDocument.Parse(ToolSchemas.CredentialInputJson);
+        var choices = schema.RootElement.GetProperty("properties").GetProperty("field").GetProperty("anyOf");
 
-        var advertised = schema.RootElement
-            .GetProperty("properties")
-            .GetProperty("field")
-            .GetProperty("enum")
-            .EnumerateArray()
-            .Select(value => value.GetString()!)
-            .ToArray();
+        var advertised = choices[0].GetProperty("enum").EnumerateArray().Select(value => value.GetString()!).ToArray();
+        var pattern = choices[1].GetProperty("pattern").GetString()!;
 
         Assert.Equal(CredentialFields.All, advertised);
+        Assert.Equal(releasable, CredentialFields.IsCustom(custom));
+        Assert.Equal(releasable, System.Text.RegularExpressions.Regex.IsMatch(custom, pattern));
     }
 
     /// <summary>

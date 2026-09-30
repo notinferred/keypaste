@@ -643,6 +643,49 @@ public sealed class Vault : IDisposable
         }
     }
 
+    /// <summary>One custom field's value, but only while this vault holds exactly what its file holds.</summary>
+    /// <param name="name">The entry.</param>
+    /// <param name="field">The custom field's name, matched exactly.</param>
+    /// <param name="value">The value when the answer is <see cref="SavedRead.Current"/> and the field exists, otherwise null.</param>
+    /// <returns>Whether the vault matches its file, and if not, why, as <see cref="ReadSaved(out IReadOnlyList{VaultEntry}?)"/> judges it.</returns>
+    /// <exception cref="ArgumentException"><paramref name="field"/> is a standard field.</exception>
+    /// <exception cref="VaultException">More than one entry answers to that name.</exception>
+    public SavedRead ReadSavedField(EntryName name, string field, out string? value)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(field);
+
+        value = null;
+
+        if (FieldNameRules.IsStandard(field))
+        {
+            throw new ArgumentException($"'{field}' is a standard field, not a custom one.", nameof(field));
+        }
+
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            if (_pending || _stamp is not { } stamp)
+            {
+                return SavedRead.Unsaved;
+            }
+
+            if (SourceSnapshot.Digest(Path) is not { } current)
+            {
+                return SavedRead.Unreadable;
+            }
+
+            if (!CryptographicOperations.FixedTimeEquals(stamp, current))
+            {
+                return SavedRead.ChangedOnDisk;
+            }
+
+            value = _interop.ReadCustomField(name, field);
+            return SavedRead.Current;
+        }
+    }
+
     /// <summary>
     /// Every entry whose title, group path, username or URL contains <paramref name="query"/>.
     /// </summary>

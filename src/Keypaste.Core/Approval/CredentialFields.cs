@@ -1,42 +1,48 @@
 namespace Keypaste.Core.Approval;
 
-/// <summary>The fields keypaste will release to an agent, and nothing else.</summary>
+/// <summary>The one rule for which fields leave by name: to an agent, a run's reference, a policy rule or a share.</summary>
 /// <remarks>
-/// The list lives in the core because it is a product rule, not a protocol detail: the MCP tool
-/// schema advertises it, the server re-validates against it, the approval prompt names it, and
-/// <c>keypaste log</c> renders it. docs/PRODUCT.md law 4.3 does not allow that written down four times.
-/// <para>
-/// Custom KDBX string fields are deliberately absent. They are where users keep recovery codes and
-/// notes-to-self, and widening the release surface to "whatever the entry happens to have" is a
-/// decision that needs its own argument rather than an <c>else</c> branch.
-/// </para>
+/// A custom field leaves only when it is named like an environment variable
+/// (<see cref="EnvConvention.IsEnvNamedField"/>) and is no standard name in any case, so a field such
+/// as <c>Recovery codes</c>, <c>otp</c> or <c>KP2A_URL_1</c> never does.
 /// </remarks>
 public static class CredentialFields
 {
-    /// <summary>The releasable field names, lower-case, in the order the schema lists them.</summary>
+    /// <summary>The standard releasable field names, lower-case, in the order the schema lists them.</summary>
     public static IReadOnlyList<string> All { get; } = ["password", "username", "url", "notes"];
 
+    /// <summary>What a releasable field is, completing a sentence such as "the field must be …".</summary>
+    public const string Rule = "password, username, url, notes or a custom field named like an environment variable";
+
     /// <summary>Whether a field name is one keypaste releases.</summary>
-    /// <param name="field">The <c>field</c> argument exactly as it arrived.</param>
-    /// <returns><see langword="true"/> when it is one of <see cref="All"/>.</returns>
+    /// <param name="field">The field name exactly as it arrived.</param>
+    /// <returns><see langword="true"/> for one of <see cref="All"/> or a custom field <see cref="IsCustom"/> accepts.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="field"/> is null.</exception>
-    /// <remarks>
-    /// Ordinal and case-sensitive. The schema spells these in lower case and the tool re-validates
-    /// against the same list, so accepting <c>Password</c> here would only widen what one half of
-    /// the pair believes is legal.
-    /// </remarks>
+    /// <remarks>Ordinal: <c>Password</c> and <c>URL</c> are neither a standard name as spelled here nor a custom one.</remarks>
     public static bool IsReleasable(string field)
     {
         ArgumentNullException.ThrowIfNull(field);
 
-        for (var i = 0; i < All.Count; i++)
-        {
-            if (string.Equals(All[i], field, StringComparison.Ordinal))
-            {
-                return true;
-            }
-        }
+        return IsStandard(field) || IsCustom(field);
+    }
 
-        return false;
+    /// <summary>Whether a field name is one of <see cref="All"/>, spelled exactly.</summary>
+    /// <param name="field">The field name.</param>
+    /// <returns><see langword="true"/> for <c>password</c>, <c>username</c>, <c>url</c> or <c>notes</c>.</returns>
+    public static bool IsStandard(string field)
+    {
+        ArgumentNullException.ThrowIfNull(field);
+
+        return All.Contains(field, StringComparer.Ordinal);
+    }
+
+    /// <summary>Whether a field name is a custom field keypaste releases.</summary>
+    /// <param name="field">The field name.</param>
+    /// <returns><see langword="true"/> when it is env-named and no standard name in any case.</returns>
+    public static bool IsCustom(string field)
+    {
+        ArgumentNullException.ThrowIfNull(field);
+
+        return EnvConvention.IsEnvNamedField(field) && !FieldNameRules.IsStandard(field);
     }
 }

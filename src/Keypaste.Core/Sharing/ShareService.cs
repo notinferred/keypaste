@@ -1,11 +1,12 @@
 using System.Buffers.Text;
+using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 
 namespace Keypaste.Core.Sharing;
 
 /// <summary>What to share, for how long and how many times.</summary>
 /// <param name="Entry">The entry.</param>
-/// <param name="Field">One of <see cref="ShareService.Fields"/>.</param>
+/// <param name="Field">A field <see cref="ShareService.IsShareable"/> accepts.</param>
 /// <param name="Ttl">How long the link opens for, <see cref="ShareService.MinimumTtl"/> to <see cref="ShareService.MaximumTtl"/>.</param>
 /// <param name="Views">How many times it opens, 1 to <see cref="ShareService.MaximumViews"/>.</param>
 /// <param name="Passphrase">A passphrase the recipient must also type, or null.</param>
@@ -61,8 +62,21 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
     /// <summary>The longest recipient label kept.</summary>
     public const int MaximumRecipientLength = 128;
 
-    /// <summary>What <see cref="ShareRequest.Field"/> may name.</summary>
+    /// <summary>The fields a person picks from: the standard ones and <c>login</c>, which is username, password and URL together.</summary>
     public static readonly IReadOnlyList<string> Fields = ["password", "username", "url", "notes", "login"];
+
+    /// <summary>What <see cref="ShareRequest.Field"/> may name, as the CLI's refusal says it.</summary>
+    public const string FieldRule = "password, username, url, notes, login or a custom field named like an environment variable";
+
+    /// <summary>Whether <see cref="ShareRequest.Field"/> may name this field: one of <see cref="Fields"/> or a custom field <see cref="CredentialFields.IsCustom"/> accepts.</summary>
+    /// <param name="field">The field name.</param>
+    /// <returns><see langword="true"/> when a share may seal it.</returns>
+    public static bool IsShareable(string field)
+    {
+        ArgumentNullException.ThrowIfNull(field);
+
+        return Fields.Contains(field, StringComparer.Ordinal) || CredentialFields.IsCustom(field);
+    }
 
     private const string _tool = "share";
 
@@ -108,7 +122,12 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
             return Refused(matches.Count == 0 ? $"no entry '{what}'" : $"more than one entry is called '{what}'");
         }
 
-        var fields = Select(matches[0], request.Field);
+        var fields = Select(vault, matches[0], request.Field);
+        if (fields is null)
+        {
+            return Refused("the vault changed on disk since it was opened; open it again first");
+        }
+
         if (fields.Count == 0)
         {
             return Refused($"'{what}' has no {request.Field} to share");
@@ -245,7 +264,7 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
 
     private static string? Validate(ShareRequest request)
     {
-        if (!Fields.Contains(request.Field, StringComparer.Ordinal))
+        if (!IsShareable(request.Field))
         {
             return $"'{request.Field}' is not a field that can be shared";
         }
@@ -270,8 +289,19 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
             : null;
     }
 
-    private static List<ShareField> Select(VaultEntry entry, string field)
+    /// <summary>The fields to seal, each under its name, or null when a custom field's saved read found the vault changed.</summary>
+    private static List<ShareField>? Select(Vault vault, VaultEntry entry, string field)
     {
+        if (CredentialFields.IsCustom(field))
+        {
+            if (vault.ReadSavedField(EntryName.Of(entry), field, out var custom) != SavedRead.Current)
+            {
+                return null;
+            }
+
+            return custom is { Length: > 0 } ? [new ShareField(field, custom)] : [];
+        }
+
         (string Name, string Value)[] chosen = field switch
         {
             "login" => [("username", entry.Username), ("password", entry.Password), ("url", entry.Url)],

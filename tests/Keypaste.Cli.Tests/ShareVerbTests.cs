@@ -207,6 +207,43 @@ public sealed class ShareVerbTests : IDisposable
     }
 
     [Theory]
+    [InlineData("Banking/Chase", "--field", "OPENAI_API_KEY")]
+    [InlineData("kp:///Banking/Chase#OPENAI_API_KEY")]
+    public void Share_AnEnvNamedCustomField_SealsThatOneFieldUnderItsName(params string[] args)
+    {
+        SeedCustomFields();
+
+        _cli.AssertExit(CliApp.ExitSuccess, Share([.. args, "--print"]));
+
+        Assert.True(ShareLink.TryParse(_cli.Out.Trim(), out var id, out var key));
+        Assert.True(ShareCrypto.TryOpen(_server.Shares[id].Envelope, key, ReadOnlySpan<char>.Empty, out var payload, out _));
+        var field = Assert.Single(payload.Fields);
+        Assert.Equal(("OPENAI_API_KEY", "sk-proj-SHARED-FIELD-SENTINEL"), (field.Name, field.Value));
+        Assert.DoesNotContain("RECOVERY-SENTINEL", _server.Requests[0].Body, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("Banking/Chase", "--field", "Recovery codes")]
+    [InlineData("Banking/Chase", "--field", "otp")]
+    [InlineData("kp:///Banking/Chase#Recovery%20codes")]
+    public void Share_ACustomFieldThatNeverLeaves_UploadsNothing(params string[] args)
+    {
+        SeedCustomFields();
+
+        Assert.Equal(CliApp.ExitUsageError, Share([.. args, "--print"]));
+        Assert.Empty(_server.Requests);
+    }
+
+    private void SeedCustomFields()
+    {
+        using var vault = Keypaste.Core.Vault.Open(_cli.VaultPath, _master);
+        Assert.True(vault.SetFields(
+            new Keypaste.Core.EntryName("Banking", "Chase"),
+            [new Keypaste.Core.FieldWrite("OPENAI_API_KEY", "sk-proj-SHARED-FIELD-SENTINEL"), new Keypaste.Core.FieldWrite("Recovery codes", "RECOVERY-SENTINEL")]));
+        vault.Save();
+    }
+
+    [Theory]
     [InlineData(CliApp.ExitUsageError, "kp://acme-api/dev/STRIPE_KEY", "--field", "notes")]
     [InlineData(CliApp.ExitUsageError, "kp://acme-api")]
     [InlineData(CliApp.ExitNotFound, "kp://acme-api/staging/STRIPE_KEY")]

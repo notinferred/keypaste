@@ -189,7 +189,7 @@ public sealed class PolicyRule
             {
                 error = Problem(
                     Line(table, FieldsKey),
-                    $"'{Safe(field)}' is not a field keypaste releases; use {string.Join(", ", CredentialFields.All)}");
+                    $"'{Safe(field)}' is not a field keypaste releases; use {CredentialFields.Rule}");
                 return false;
             }
         }

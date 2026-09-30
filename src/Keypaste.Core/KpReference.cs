@@ -25,7 +25,7 @@ public sealed record EnvReference(string Project, string Profile, string Key) : 
 
 /// <summary>One field of one vault entry: <c>kp:///&lt;group…&gt;/&lt;title&gt;[#field]</c>.</summary>
 /// <param name="Entry">The entry, by group and title.</param>
-/// <param name="Field">One of <see cref="CredentialFields.All"/>, <c>password</c> when the reference names none.</param>
+/// <param name="Field">A field <see cref="CredentialFields.IsReleasable"/> accepts, <c>password</c> when the reference names none.</param>
 public sealed record EntryReference(EntryName Entry, string Field) : KpReference
 {
     /// <inheritdoc/>
@@ -197,7 +197,7 @@ public static class KpReferences
 
         if (!CredentialFields.IsReleasable(field))
         {
-            error = $"'{field}' is not a field; use {string.Join(", ", CredentialFields.All)}";
+            error = $"'{field}' is not a field; use {CredentialFields.Rule}";
             return false;
         }
 

@@ -46,6 +46,12 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     internal const string SentinelUrl = "https://SENTINEL-URL-c39f5e.example";
     internal const string SentinelNotes = "SENTINEL-NOTES-d40a6f";
 
+    /// <summary>An env-named custom field of the same entry, which may leave by name (C.5a).</summary>
+    internal const string SentinelApiKey = "SENTINEL-OPENAI-API-KEY-a93d1e";
+
+    /// <summary>A custom field of the same entry that is not env-named, so it never leaves.</summary>
+    internal const string SentinelRecovery = "SENTINEL-RECOVERY-CODES-b04e2f";
+
     /// <summary>A secret in a part of the vault this server was never allowed to name.</summary>
     internal const string SentinelOutOfScope = "SENTINEL-OUT-OF-SCOPE-e51b70";
 
@@ -68,6 +74,8 @@ public sealed class SecretHygieneTests : IAsyncLifetime
         SentinelUsername,
         SentinelUrl,
         SentinelNotes,
+        SentinelApiKey,
+        SentinelRecovery,
         SentinelOutOfScope,
         SentinelOutsideTheRule,
     ];
@@ -123,6 +131,10 @@ public sealed class SecretHygieneTests : IAsyncLifetime
             Url = SentinelUrl,
             Notes = SentinelNotes,
         });
+
+        Assert.True(_vault.SetFields(
+            new EntryName("env/dev", "STRIPE_KEY"),
+            [new FieldWrite("OPENAI_API_KEY", SentinelApiKey), new FieldWrite("Recovery codes", SentinelRecovery)]));
 
         // Outside the default env/** exposure, so nothing this server can be asked should ever
         // reach it. Planted somewhere it could genuinely leak, which is the whole point.
@@ -319,6 +331,7 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     [InlineData("username", SentinelUsername)]
     [InlineData("url", SentinelUrl)]
     [InlineData("notes", SentinelNotes)]
+    [InlineData("OPENAI_API_KEY", SentinelApiKey)]
     public async Task WhicheverFieldIsAskedFor_IsTheOnlyOneReleased(string field, string expected)
     {
         _human.Answer = ApprovalAnswer.Approved;
@@ -334,6 +347,43 @@ public sealed class SecretHygieneTests : IAsyncLifetime
             foreach (var other in _everySentinel.Where(s => !string.Equals(s, expected, StringComparison.Ordinal)))
             {
                 Assert.DoesNotContain(other, text, StringComparison.Ordinal);
+            }
+        }
+    }
+
+    /// <summary>
+    /// A custom field that is not env-named, KeePassXC's own attributes and a standard name in capitals
+    /// are refused by the bridge before the owner is asked, in the words the plan fixes, and audited as
+    /// an invalid field with no value anywhere.
+    /// </summary>
+    [Theory]
+    [InlineData("Recovery codes")]
+    [InlineData("otp")]
+    [InlineData("KP2A_URL_1")]
+    [InlineData("URL")]
+    public async Task AFieldThatNeverLeaves_IsRefusedUnasked_AndAuditedAsInvalid(string field)
+    {
+        _human.Answer = ApprovalAnswer.Approved;
+
+        var (harness, client) = await StartAsync();
+
+        await using (harness)
+        {
+            var result = await client.CallToolAsync(ToolText.CredentialToolName, Ask(field: field), cancellationToken: Token);
+
+            Assert.True(result.IsError);
+            Assert.Equal(
+                "keypaste: DENIED. The \"field\" argument must be password, username, url, notes or a custom field named like an environment variable. This call was recorded in the audit log.",
+                TextOf(result));
+            Assert.Equal(0, _human.Asked);
+
+            using var line = System.Text.Json.JsonDocument.Parse(Assert.Single(harness.AuditLines()));
+            Assert.Equal("invalid", line.RootElement.GetProperty("args").GetProperty("field").GetString());
+            Assert.Equal("invalid-request", line.RootElement.GetProperty("method").GetString());
+
+            foreach (var sentinel in _everySentinel)
+            {
+                AssertNowhere(harness, sentinel, TextOf(result), field);
             }
         }
     }

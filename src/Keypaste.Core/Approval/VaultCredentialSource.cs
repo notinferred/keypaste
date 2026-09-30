@@ -143,7 +143,10 @@ public sealed class VaultCredentialSource(Func<Vault?> unlockedVault) : ICredent
             return false;
         }
 
-        var text = Select(entry, field);
+        if (!TrySelect(entry, name, field, out var text, out failure))
+        {
+            return false;
+        }
 
         if (text.Length == 0)
         {
@@ -165,14 +168,44 @@ public sealed class VaultCredentialSource(Func<Vault?> unlockedVault) : ICredent
         _ => CredentialFailure.Failed,
     };
 
-    private static string Select(VaultEntry entry, string field) => field switch
+    /// <summary>The field's text: a standard one from the entry read, a custom one from the saved file, read only now.</summary>
+    private bool TrySelect(VaultEntry entry, EntryName name, string field, out string text, out CredentialFailure failure)
     {
-        "password" => entry.Password,
-        "username" => entry.Username,
-        "url" => entry.Url,
-        "notes" => entry.Notes,
-        _ => string.Empty,
-    };
+        text = string.Empty;
+        failure = CredentialFailure.None;
+
+        if (CredentialFields.IsStandard(field))
+        {
+            text = field switch
+            {
+                "password" => entry.Password,
+                "username" => entry.Username,
+                "url" => entry.Url,
+                _ => entry.Notes,
+            };
+
+            return true;
+        }
+
+        if (_unlockedVault() is not { } vault)
+        {
+            failure = CredentialFailure.VaultLocked;
+            return false;
+        }
+
+        try
+        {
+            failure = Failure(vault.ReadSavedField(name, field, out var custom));
+            text = custom ?? string.Empty;
+        }
+        catch (Exception)
+        {
+            // As in TryReadEntries: whatever the vault throws, the answer is a refusal (law 3.7).
+            failure = CredentialFailure.Failed;
+        }
+
+        return failure == CredentialFailure.None;
+    }
 
     /// <summary>The one entry matching a predicate, or null with the reason there is not exactly one.</summary>
     private static VaultEntry? Single(

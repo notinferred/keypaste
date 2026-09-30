@@ -60,6 +60,21 @@ public sealed class PolicyVerbTests : IDisposable
     /// "any client" and must never be described as one.
     /// </summary>
     [Fact]
+    public void AnEnvNamedCustomField_IsNamed_AndAnyOtherIsRefused()
+    {
+        Assert.Equal(
+            CliApp.ExitSuccess,
+            Run(AgentPolicyTests.Valid.Replace("[\"password\"]", "[\"OPENAI_API_KEY\"]", StringComparison.Ordinal)));
+        Assert.Contains("may read the OPENAI_API_KEY of entries whose", _cli.Out, StringComparison.Ordinal);
+
+        _cli.Stdout.GetStringBuilder().Clear();
+        Assert.NotEqual(
+            CliApp.ExitSuccess,
+            Run(AgentPolicyTests.Valid.Replace("[\"password\"]", "[\"Recovery codes\"]", StringComparison.Ordinal)));
+        Assert.Contains("a custom field named like an environment variable", _cli.Err, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void AWildcardClient_IsShownAsAnyLabelledClient()
     {
         Assert.Equal(

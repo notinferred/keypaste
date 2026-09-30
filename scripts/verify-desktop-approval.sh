@@ -19,6 +19,13 @@ readonly SECRET='SENTINEL-DESKTOP-APPROVAL-8b41e6'
 readonly ENTRY='env/ci/DEPLOY_KEY'
 readonly LABEL='ci-probe'
 
+# An entry with an env-named custom field, which may leave by name, and one that never does (C.5a).
+readonly API_ENTRY='api/OpenAI'
+readonly API_PASSWORD='SENTINEL-DESKTOP-OPENAI-PASSWORD-51c7'
+readonly API_KEY='SENTINEL-DESKTOP-OPENAI-API-KEY-6d08'
+readonly RECOVERY='SENTINEL-DESKTOP-RECOVERY-CODES-7e19'
+readonly DENIAL='keypaste: DENIED. The "field" argument must be password, username, url, notes or a custom field named like an environment variable. This call was recorded in the audit log.'
+
 die() {
   echo "::error::$*" >&2
   for f in "${HOLD_OUT:-}" "${OUT:-}" "${ERR:-}"; do
@@ -83,19 +90,38 @@ process_of() { grep 'holding session' "$HOLD_OUT" | tail -1 | sed -E 's/.* as pr
 
 PROMPTS=0
 
+# Writes one request_credential call to the open bridge.
+request() {
+  local id="$1" entry="$2" field="$3"
+  jq -cn --argjson id "$id" --arg entry "$entry" --arg field "$field" \
+    '{jsonrpc:"2.0",id:$id,method:"tools/call",params:{name:"request_credential",arguments:{entry:$entry,field:$field,reason:"ci desktop approval probe",ttl_seconds:60}}}' >&"$MCP_IN"
+}
+
 # Starts a bridge whose standard input stays open, asks for the credential, and waits for the prompt.
+# The field, entry and exposure default to the password of $ENTRY under the bridge's default exposure.
 raise_prompt() {
+  local field="${2:-password}" entry="${3:-$ENTRY}" expose=()
+  [ -z "${4:-}" ] || expose=(--expose "$4")
   OUT="$WORK/$1-stdout.txt"
   ERR="$WORK/$1-stderr.txt"
   exec {MCP_IN}>&-
   # Without the driver's input, which it would otherwise inherit and hold open past quitting.
-  exec {MCP_IN}> >(exec "$MCP" --vault "$VAULT" --audit-log "$AUDIT" --client-label "$LABEL" >"$OUT" 2>"$ERR" {HOLD_IN}>&-)
+  exec {MCP_IN}> >(exec "$MCP" --vault "$VAULT" --audit-log "$AUDIT" --client-label "$LABEL" ${expose[@]+"${expose[@]}"} >"$OUT" 2>"$ERR" {HOLD_IN}>&-)
   BRIDGE_PID=$!
   printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}' >&"$MCP_IN"
   printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}' >&"$MCP_IN"
-  printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci desktop approval probe\",\"ttl_seconds\":60}}}" >&"$MCP_IN"
+  request 3 "$entry" "$field"
   PROMPTS=$((PROMPTS + 1))
   wait_for '^prompt client' "$HOLD_OUT" "$PROMPTS"
+}
+
+# Waits up to 30 seconds for the reply to call $1 on the open bridge.
+reply_to() {
+  for _ in $(seq 1 150); do
+    jq -e --argjson id "$1" 'select(.id == $id)' <"$OUT" >/dev/null 2>&1 && return 0
+    sleep 0.2
+  done
+  die "call $1 got no reply"
 }
 
 # Waits up to $1 seconds for the request's reply, then lets the bridge go.
@@ -126,6 +152,11 @@ denied_as() {
 printf '%s\n%s\n' "$MASTER" "$MASTER" | "$CLI" init "$VAULT" >/dev/null || die "could not create the vault"
 printf '%s\n' "$MASTER" | "$CLI" env set ci "DEPLOY_KEY=$SECRET" --vault "$VAULT" >/dev/null \
   || die "could not store the test credential"
+printf '%s\n%s\n' "$MASTER" "$API_PASSWORD" | "$CLI" add "$API_ENTRY" --vault "$VAULT" >/dev/null \
+  || die "could not store the entry with custom fields"
+printf '%s\n%s\n%s\n' "$MASTER" "$API_KEY" "$RECOVERY" \
+  | "$CLI" set "$API_ENTRY" --field OPENAI_API_KEY --field 'Recovery codes' --vault "$VAULT" >/dev/null \
+  || die "could not set the entry's custom fields"
 
 exec {HOLD_IN}>&-
 exec {HOLD_IN}> >(KEYPASTE_DRIVER_PASSWORD="$MASTER" "$DRV" hold "$VAULT" >"$HOLD_OUT" 2>&1)
@@ -149,6 +180,55 @@ tail -n 1 "$AUDIT" | jq -e --arg s "$FIRST" --arg l "$LABEL" \
   || die "the approval was not audited as a prompted grant in session $FIRST under label $LABEL"
 grep -q "$SECRET" "$AUDIT" && die "the credential reached the audit log"
 grep -q "$SECRET" "$HOLD_OUT" && die "the credential reached the app's output"
+
+# ------------------------------------------------------------- one custom field, by name (C.5a)
+raise_prompt field-once OPENAI_API_KEY "$API_ENTRY" 'api/**'
+grep '^prompt client' "$HOLD_OUT" | tail -1 \
+  | grep -qF "label=$LABEL entry=$API_ENTRY field=OPENAI_API_KEY for=once, or for 1 hour" \
+  || die "the prompt does not name the custom field"
+echo once >&"$HOLD_IN"
+answered 30
+withdrawn
+jq -e --arg v "$API_KEY" 'select(.id == 3) | .result.isError == false and .result.structuredContent.value == $v' <"$OUT" >/dev/null \
+  || die "Allow once did not return exactly the custom field's value"
+tail -n 1 "$AUDIT" | jq -e --arg s "$FIRST" \
+  '.decision == "granted" and .method == "prompt" and .args.field == "OPENAI_API_KEY" and .session == $s and .granted_seconds == 0' >/dev/null \
+  || die "the custom field's release was not audited with its field as allowed once"
+
+# Allowed for an hour on one connection, it serves that field alone: the password still draws a prompt,
+# and a field that never leaves is refused by the bridge with no prompt at all.
+raise_prompt field-hour OPENAI_API_KEY "$API_ENTRY" 'api/**'
+echo approve >&"$HOLD_IN"
+reply_to 3
+withdrawn
+jq -e --arg v "$API_KEY" 'select(.id == 3) | .result.structuredContent.value == $v' <"$OUT" >/dev/null \
+  || die "Allow for 1 hour did not return the custom field's value"
+request 4 "$API_ENTRY" password
+PROMPTS=$((PROMPTS + 1))
+wait_for '^prompt client' "$HOLD_OUT" "$PROMPTS"
+grep '^prompt client' "$HOLD_OUT" | tail -1 | grep -qF "entry=$API_ENTRY field=password" \
+  || die "a password request under the custom field's grant did not draw its own prompt"
+echo deny >&"$HOLD_IN"
+reply_to 4
+withdrawn
+id=5
+for field in 'Recovery codes' otp KP2A_URL_1 URL; do
+  request "$id" "$API_ENTRY" "$field"
+  reply_to "$id"
+  jq -e --arg t "$DENIAL" --argjson id "$id" 'select(.id == $id) | .result.isError == true and .result.content[0].text == $t' <"$OUT" >/dev/null \
+    || die "a request for '$field' was not refused with the fixed denial"
+  tail -n 1 "$AUDIT" | jq -e '.args.field == "invalid" and .method == "invalid-request" and .decision == "denied"' >/dev/null \
+    || die "a request for '$field' was not audited as an invalid field"
+  id=$((id + 1))
+done
+exec {MCP_IN}>&-
+[ "$(grep -c '^prompt client' "$HOLD_OUT")" -eq "$PROMPTS" ] || die "a field that never leaves drew a prompt"
+for value in "$API_PASSWORD" "$RECOVERY" "$SECRET"; do
+  grep -q "$value" "$WORK/field-once-stdout.txt" "$OUT" && die "a custom-field request returned another field's value"
+done
+for value in "$API_PASSWORD" "$API_KEY" "$RECOVERY"; do
+  grep -q "$value" "$AUDIT" "$HOLD_OUT" && die "a custom-field value reached the audit log or the app's output"
+done
 
 # ---------------------------------------------------------------- Deny and closing refuse
 raise_prompt deny

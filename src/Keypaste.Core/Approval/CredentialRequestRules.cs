@@ -35,7 +35,7 @@ public static class CredentialRequestRules
 
         if (!CredentialFields.IsReleasable(field))
         {
-            return new("field", $"must be one of: {string.Join(", ", CredentialFields.All)}");
+            return new("field", $"must be {CredentialFields.Rule}");
         }
 
         if (reason.Length is 0 or > MaximumReasonLength)

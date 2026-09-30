@@ -50,7 +50,7 @@ Check both parsed parts before enabling the rule.
 | --- | --- | --- |
 | `client` | yes | The `--client-label` the bridge was started with. `"*"` means any labelled client. |
 | `entries` | yes | Patterns, in the same syntax as `--expose`. Up to 16, each up to 128 characters. |
-| `fields` | yes | Any of `password`, `username`, `url`, `notes`. |
+| `fields` | yes | Any of `password`, `username`, `url`, `notes`, or a custom field named like an environment variable, such as `OPENAI_API_KEY`: capitals, digits and `_`, starting with a capital, not starting `KPEX_`, `KPXC_` or `KP2A_`, and no standard field's name. No other custom field can be named. |
 | `max_ttl_seconds` | yes | 1 to 3600. The agent gets the smaller of this and `--max-ttl`. |
 | `max_per_hour` | no | 1 to 1000 releases an hour through this rule. Omitted means no limit. |
 

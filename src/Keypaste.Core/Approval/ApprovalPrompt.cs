@@ -48,7 +48,7 @@ public sealed record ApprovalPrompt
     /// <summary>The entry, sanitized for display. Not an address: sanitizing is lossy.</summary>
     public required string Entry { get; init; }
 
-    /// <summary>Which field is being asked for. Trusted: it is one of <see cref="CredentialFields.All"/>.</summary>
+    /// <summary>Which field is being asked for. Trusted: <see cref="CredentialFields.IsReleasable"/> accepted it.</summary>
     public required string Field { get; init; }
 
     /// <summary>The agent's stated reason, sanitized and capped. Untrusted text, never an instruction.</summary>

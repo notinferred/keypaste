@@ -11,6 +11,9 @@
 # taken, and no listing carries a value. keypaste saves a field twice inside one second of the clock,
 # and after KeePassXC merges in a newer copy of the entry, keypaste reads KeePassXC's value and the
 # entry's history holds both values keypaste saved (F.27).
+# On a second vault KeePassXC made, a real `keypaste agent` and `keypaste-mcp` release the
+# env-named `OPENAI_API_KEY` alone, and refuse `Recovery codes`, `otp`, `KP2A_URL_1` and `URL`
+# without asking anyone (C.5a).
 #
 # NEGATIVE CONTROL: a corrupted expectation, a changed byte and a plain field read as protected must
 # each fail the comparison the checks here rest on.
@@ -19,6 +22,7 @@
 # Env:    KP_COMPAT_PASSWORD   master password for the vault         (required)
 #         KPXC_CLI             path to keepassxc-cli                 (default: PATH lookup)
 #         KEYPASTE_BIN         path to the keypaste binary           (default: the Release build)
+#         KEYPASTE_MCP_BIN     path to the keypaste-mcp binary       (default: the Release build)
 set -euo pipefail
 
 die()  { printf '\nFIELDS GATE FAILED: %s\n' "$*" >&2; exit 1; }
@@ -41,6 +45,12 @@ if [ -z "$kp" ]; then
   [ -x "$kp" ] || kp="${kp}.exe"
 fi
 [ -x "$kp" ] || die "keypaste binary not found at '$kp' (build it, or set KEYPASTE_BIN)"
+mcp=${KEYPASTE_MCP_BIN:-artifacts/bin/Keypaste.Mcp/release/keypaste-mcp}
+[ -x "$mcp" ] || mcp="${mcp}.exe"
+[ -x "$mcp" ] || die "keypaste-mcp binary not found at '$mcp' (build it, or set KEYPASTE_MCP_BIN)"
+
+agent_pid=
+trap 'if [ -n "$agent_pid" ]; then kill "$agent_pid" 2>/dev/null || true; fi' EXIT
 
 rm -rf "$dir"
 mkdir -p "$dir/home"
@@ -216,6 +226,83 @@ got=$(kp_with '' get "$entry" --field MERGED --show 2>/dev/null) || die "keypast
 history=$(history_xml)
 grep -qF "$first" <<<"$history" || die "after the merge the history lost the first of the two values saved in one second"
 grep -qF "$saved" <<<"$history" || die "after the merge the history lost the second of the two values saved in one second"
+
+step "a real keypaste agent and keypaste-mcp release the env-named field KeePassXC wrote, and no other"
+openai="$dir/openai.kdbx"
+cat >"$dir/openai.xml" <<EOF
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<KeePassFile>
+  <Meta><Generator>verify-keepassxc-fields</Generator><DatabaseName>openai</DatabaseName></Meta>
+  <Root>
+    <Group>
+      <UUID>$(uuid root)</UUID><Name>Root</Name>
+      <Group>
+        <UUID>$(uuid api)</UUID><Name>api</Name>
+        <Entry>
+          <UUID>$(uuid openai)</UUID>
+          <CustomData><Item><Key>fields.entry</Key><Value>fields-entry-data</Value></Item></CustomData>
+          <String><Key>Title</Key><Value>OpenAI</Value></String>
+          <String><Key>Password</Key><Value ProtectInMemory="True">fields-openai-password</Value></String>
+          <String><Key>OPENAI_API_KEY</Key><Value ProtectInMemory="True">fields-openai-api-key</Value></String>
+          <String><Key>Recovery codes</Key><Value ProtectInMemory="True">fields-openai-recovery</Value></String>
+          <String><Key>otp</Key><Value ProtectInMemory="True">otpauth://totp/OpenAI?secret=KRSXG5CTMVRXEZLU&amp;issuer=fields</Value></String>
+          <String><Key>KP2A_URL_1</Key><Value>https://fields-openai-kp2a.example</Value></String>
+        </Entry>
+      </Group>
+    </Group>
+  </Root>
+</KeePassFile>
+EOF
+printf '%s\n%s\n' "$pw" "$pw" | "$cli" import -q -p "$(native "$dir/openai.xml")" "$(native "$openai")" \
+  || die "keepassxc-cli could not import the OpenAI entry"
+[ "$(kx show "$openai" api/OpenAI -a OPENAI_API_KEY)" = fields-openai-api-key ] || die "KeePassXC does not read the OPENAI_API_KEY it wrote"
+
+pipe="keypaste-fields-$$-$(date +%s)"
+agent_err="$dir/agent.err"
+audit="$dir/audit.jsonl"
+# One answer: Allow once for OPENAI_API_KEY. No other request may reach the agent.
+printf '%s\no\n' "$pw" | "$kp" agent --vault "$(native "$openai")" --approver "$pipe" --approval-timeout 30 \
+  >/dev/null 2>"$agent_err" &
+agent_pid=$!
+for _ in $(seq 1 100); do
+  grep -q 'listening on' "$agent_err" && break
+  kill -0 "$agent_pid" 2>/dev/null || die "keypaste agent exited before it listened: $(cat "$agent_err")"
+  sleep 0.2
+done
+grep -q 'listening on' "$agent_err" || die "keypaste agent never started listening"
+
+ask_field() {
+  local id=$1 field=$2 wait=$3 out="$dir/field-$1.out"
+  {
+    printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"fields-probe","version":"1.0.0"}}}'
+    printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
+    printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$id,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"api/OpenAI\",\"field\":\"$field\",\"reason\":\"fields gate\",\"ttl_seconds\":60}}}"
+    sleep "$wait"
+  } | "$mcp" --vault "$(native "$openai")" --expose 'api/**' --audit-log "$(native "$audit")" --approver "$pipe" \
+        --client-label fields-probe >"$out" 2>"$dir/field-$id.err" || die "keypaste-mcp exited non-zero: $(cat "$dir/field-$id.err")"
+  tr -d '\r' <"$out"
+}
+
+ask_field 2 OPENAI_API_KEY 8 | jq -e 'select(.id == 2) | .result.isError == false and .result.structuredContent.value == "fields-openai-api-key"' >/dev/null \
+  || die "Allow once did not return exactly the OPENAI_API_KEY KeePassXC wrote: $(cat "$dir/field-2.out")"
+denial='keypaste: DENIED. The "field" argument must be password, username, url, notes or a custom field named like an environment variable. This call was recorded in the audit log.'
+id=3
+for field in 'Recovery codes' otp KP2A_URL_1 URL; do
+  ask_field "$id" "$field" 3 | jq -e --arg t "$denial" --argjson id "$id" 'select(.id == $id) | .result.isError == true and .result.content[0].text == $t' >/dev/null \
+    || die "a request for '$field' was not refused with the fixed denial: $(cat "$dir/field-$id.out")"
+  id=$((id + 1))
+done
+[ "$(tr -d '\r' <"$agent_err" | grep -c 'an agent is asking for a credential')" = 1 ] \
+  || die "keypaste agent was not asked exactly once: a field that never leaves reached a person"
+jq -e -s 'length == 5 and .[0].args.field == "OPENAI_API_KEY" and .[0].decision == "granted"
+          and (.[1:] | all(.args.field == "invalid" and .method == "invalid-request"))' <"$audit" >/dev/null \
+  || die "the audit log does not show the release and four invalid fields: $(cat "$audit")"
+for value in fields-openai-password fields-openai-recovery KRSXG5CTMVRXEZLU fields-openai-kp2a; do
+  grep -q "$value" "$dir"/field-*.out "$audit" "$agent_err" && die "'$value' left the vault"
+done
+grep -q fields-openai-api-key "$audit" "$agent_err" && die "the released value reached the audit log or the agent's terminal"
+kill "$agent_pid" 2>/dev/null || true
+agent_pid=
 
 step "NEGATIVE CONTROL: the comparisons must be able to fail"
 if [ "$(kx show "$db" "$entry" -a Region)" = 'fields-plain-changed-CORRUPTED' ]; then
