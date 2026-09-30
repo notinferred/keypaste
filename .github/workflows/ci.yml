@@ -228,6 +228,7 @@ jobs:
         env:
           ONE: artifacts/release/linux-x64
         run: |
+          export LC_ALL=C
           two="$RUNNER_TEMP/base-out"
           diagnostics() { { grep -E 'IL[0-9]{4}' "$1" || true; } | sed -E 's/ \[[^][]*\.csproj\]$//; s#^.*/(third_party|src)/#\1/#' | sort -u; }
           for log in /tmp/base-cli.log /tmp/base-mcp.log /tmp/publish-cli.log /tmp/publish-mcp.log; do
@@ -239,75 +240,8 @@ jobs:
           comm -23 <(diagnostics /tmp/base-cli.log) <(diagnostics /tmp/publish-cli.log)
           echo "== the one binary's publish log checked alone against the baseline:"
           scripts/verify-aot-trim.sh /tmp/publish-cli.log || echo "verify-aot-trim.sh failed on the one binary alone"
-          echo "== files"
           ls -l "$two" "$ONE"
-          for bin in "$two/keypaste" "$two/keypaste-mcp" "$ONE/keypaste" "$ONE/keypaste-mcp"; do
-            echo "size $bin bytes=$(stat -c %s "$bin") gzip9=$(gzip -9 -c "$bin" | wc -c) xz=$(xz -9 -c "$bin" | wc -c)"
-          done
-          ONE="$ONE" TWO="$two" python3 - <<'PY'
-          import os, statistics, subprocess, tempfile, time
-
-          one, two = os.path.abspath(os.environ["ONE"]), os.environ["TWO"]
-          work = tempfile.mkdtemp()
-          env = dict(os.environ, KEYPASTE_HOME=work)
-          bridge = ["--vault", os.path.join(work, "vault.kdbx"), "--audit-log", os.path.join(work, "audit.jsonl"), "--client-label", "b4a"]
-          initialize = b'{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"b4a","version":"1"}}}\n'
-
-          def to_exit(cmd):
-              start = time.perf_counter()
-              p = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
-              _, status, usage = os.wait4(p.pid, 0)
-              p.returncode = os.waitstatus_to_exitcode(status)
-              assert p.returncode == 0, (cmd, p.returncode)
-              return time.perf_counter() - start, usage.ru_maxrss
-
-          def to_initialize(cmd):
-              start = time.perf_counter()
-              p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, env=env)
-              p.stdin.write(initialize)
-              p.stdin.flush()
-              line = p.stdout.readline()
-              elapsed = time.perf_counter() - start
-              assert b'"id":1' in line, (cmd, line)
-              p.stdin.close()
-              p.stdout.close()
-              _, status, usage = os.wait4(p.pid, 0)
-              p.returncode = os.waitstatus_to_exitcode(status)
-              return elapsed, usage.ru_maxrss
-
-          cases = [
-              ("cli --version", "two", to_exit, [f"{two}/keypaste", "--version"]),
-              ("cli --version", "one", to_exit, [f"{one}/keypaste", "--version"]),
-              ("bridge --help", "two", to_exit, [f"{two}/keypaste-mcp", "--help"]),
-              ("bridge --help", "one", to_exit, [f"{one}/keypaste", "mcp", "--help"]),
-              ("bridge initialize", "two", to_initialize, [f"{two}/keypaste-mcp", *bridge]),
-              ("bridge initialize", "one", to_initialize, [f"{one}/keypaste", "mcp", *bridge]),
-          ]
-
-          def drop_caches():
-              subprocess.run(["sudo", "sh", "-c", "sync; echo 3 > /proc/sys/vm/drop_caches"], check=True)
-
-          def measure(label, rounds, cold):
-              samples = {i: [] for i in range(len(cases))}
-              for _ in range(rounds):
-                  for i, (_, _, how, cmd) in enumerate(cases):
-                      if cold:
-                          drop_caches()
-                      samples[i].append(how(cmd))
-              print(f"== {label}: {rounds} rounds, cases interleaved")
-              print(f"{'case':<20}{'layout':<8}{'median ms':>10}{'p10':>8}{'p90':>8}{'min':>8}{'max':>8}{'maxrss KiB':>12}")
-              for i, (name, layout, _, _) in enumerate(cases):
-                  ms = sorted(s[0] * 1000 for s in samples[i])
-                  rss = statistics.median(s[1] for s in samples[i])
-                  q = statistics.quantiles(ms, n=10)
-                  print(f"{name:<20}{layout:<8}{statistics.median(ms):>10.1f}{q[0]:>8.1f}{q[-1]:>8.1f}{ms[0]:>8.1f}{ms[-1]:>8.1f}{rss:>12.0f}")
-
-          for _ in range(3):
-              for _, _, how, cmd in cases:
-                  how(cmd)
-          measure("warm page cache", 60, cold=False)
-          measure("page cache dropped before each start", 15, cold=True)
-          PY
+          python3 scripts/b4a-measure.py "$ONE" "$two" 60 15 sudo sh -c 'sync; echo 3 > /proc/sys/vm/drop_caches'
 
       - name: 'B.4a: run the stdio and approval gates through keypaste mcp'
         if: always()
@@ -324,6 +258,14 @@ jobs:
           KEYPASTE_MCP_BIN="$wrapper" scripts/verify-mcp-stdio.sh
           KEYPASTE_MCP_BIN="$wrapper" scripts/verify-approval-e2e.sh
           KEYPASTE_MCP_BIN="$wrapper" scripts/verify-mcp-run.sh
+          KEYPASTE_MCP_BIN="$wrapper" scripts/verify-policy-e2e.sh
+          KEYPASTE_MCP_BIN="$wrapper" scripts/verify-log-chain.sh
+
+      # Run 36727509499 found it: an executable's project reference copies its runtimeconfig
+      # beside the referencing one. B.4b's library has none; removed so the later gates run.
+      - name: 'B.4a: remove the bridge runtimeconfig the CLI publish copied'
+        shell: bash
+        run: rm -v artifacts/release/linux-x64/keypaste-mcp.runtimeconfig.json
 
       - name: Verify the AOT trim diagnostics still match the baseline
         shell: bash
@@ -381,6 +323,71 @@ jobs:
           # Keyfiles reach XmlSerializer, which trimming can remove; only the AOT binary shows it.
           scripts/verify-keepassxc-xml-attach.sh artifacts/compat/aot-xml-attach
           scripts/verify-keepassxc-keyfile.sh artifacts/compat/aot-keyfile.kdbx
+
+  b4a-measure:
+    name: 'B.4a measure (${{ matrix.rid }})'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            rid: osx-arm64
+            python: python3
+          - os: windows-2025
+            rid: win-x64
+            python: python
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    env:
+      RID: ${{ matrix.rid }}
+      PYTHON: ${{ matrix.python }}
+      BASE_SHA: a432adea7aeb02ce8ce63742c7b24d33b6333836
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      - name: Publish the one binary
+        run: |
+          dotnet restore keypaste.slnx --locked-mode
+          dotnet publish src/Keypaste.Cli/Keypaste.Cli.csproj -c Release -r "$RID" \
+            --no-restore -o "$RUNNER_TEMP/one" 2>&1 | tee "$RUNNER_TEMP/one-cli.log"
+
+      - name: Publish the two binaries of the base commit
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          git worktree add --detach "$RUNNER_TEMP/base" FETCH_HEAD
+          cd "$RUNNER_TEMP/base"
+          dotnet restore keypaste.slnx --locked-mode
+          dotnet publish src/Keypaste.Cli/Keypaste.Cli.csproj -c Release -r "$RID" \
+            --no-restore -o "$RUNNER_TEMP/two" 2>&1 | tee "$RUNNER_TEMP/two-cli.log"
+          dotnet publish src/Keypaste.Mcp/Keypaste.Mcp.csproj -c Release -r "$RID" \
+            --no-restore -o "$RUNNER_TEMP/two" 2>&1 | tee "$RUNNER_TEMP/two-mcp.log"
+
+      - name: Compare trim diagnostics, size and start time
+        run: |
+          export LC_ALL=C
+          diagnostics() { { grep -E 'IL[0-9]{4}' "$1" || true; } | sed -E 's/\r$//; s/ \[[^][]*\.csproj\]$//; s#\\#/#g; s#^.*/(third_party|src)/#\1/#' | sort -u; }
+          for log in two-cli two-mcp one-cli; do
+            echo "== $log: $(diagnostics "$RUNNER_TEMP/$log.log" | wc -l) IL diagnostics"
+          done
+          echo "== IL diagnostics of the one binary that the base CLI does not emit:"
+          comm -13 <(diagnostics "$RUNNER_TEMP/two-cli.log") <(diagnostics "$RUNNER_TEMP/one-cli.log")
+          ls -l "$RUNNER_TEMP/two" "$RUNNER_TEMP/one"
+          if [ "$RUNNER_OS" = macOS ]; then
+            "$PYTHON" scripts/b4a-measure.py "$RUNNER_TEMP/one" "$RUNNER_TEMP/two" 60 15 sudo purge
+          else
+            "$PYTHON" scripts/b4a-measure.py "$RUNNER_TEMP/one" "$RUNNER_TEMP/two" 60 0
+          fi
 
   # PRODUCT law 4.6 and D-0008 require this blocking gate on all three operating systems.
   compat:
