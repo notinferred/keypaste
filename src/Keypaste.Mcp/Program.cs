@@ -30,7 +30,7 @@ internal static class Program
     internal const int ExitSuccess = 0;
     internal const int ExitRefusedToStart = 1;
 
-    private static async Task<int> Main(string[] args)
+    internal static async Task<int> Main(string[] args)
     {
         if (!ServerOptions.TryParse(
                 args,

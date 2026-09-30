@@ -33,6 +33,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Keypaste.Mcp.Tests" />
     <InternalsVisibleTo Include="Keypaste.PoolStarver" />
+    <InternalsVisibleTo Include="keypaste" />
   </ItemGroup>
 
 </Project>
