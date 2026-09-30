@@ -30,7 +30,7 @@ The tracks are PRODUCT's, and they are worked in this order:
 
 Project environments come before AI requests because what an agent may see is built on project tags. Within the current milestone, the next task is the first ready one in this order ([CLAUDE.md](CLAUDE.md#planning-and-selection)).
 
-The build infrastructure rows come first: K.6a, K.6b, F.27, B.3, B.1 and B.2 before C.1b, and B.4a and B.4b after C.4 and before C.5a, so the agent tasks are written against the single binary.
+The build infrastructure rows come first: K.6a, K.6b, F.27, F.28, B.3, B.1 and B.2 before C.1b, and B.4a and B.4b after C.4 and before C.5a, so the agent tasks are written against the single binary.
 
 ## 0.5.0: the first release of the new keypaste
 
@@ -43,8 +43,8 @@ One version publishes the Windows, macOS and Linux desktop apps, each carrying t
 | The app has four places: Items, Agents, Trash and Settings. It uses plain words, templates, a first run that finds the KeePassXC database, and the system's light or dark look, with advanced features in Settings. | N.1a, N.1b, N.2, N.4, N.5, N.6, N.7, N.12, N.14 |
 | An agent asks for one field of an entry it may see. Every common AI tool connects in one step to the vault the person chose. The app stays in the menu bar or tray, and nothing saves the vault behind its owner. | C.5a, C.5b, G.1, G.2, N.3, G.4a, N.10 |
 | A project runs from the app on macOS, and every desktop install puts the CLI on PATH. | E.1d, G.5 |
-| Development builds nothing on the founder's machine, CI runs what a change can break and stays green without retries, and one binary carries the CLI and the MCP bridge. | K.6a, K.6b, F.27, B.1, B.2, B.3, B.4a, B.4b |
-| Signed, notarized and verified packages for three platforms, with guidance a new user can follow. | F.20, F.24, F.25, 4.7a2, 3.5b, 4.7e, R.1a, 4.7c2, L.1, R.1 |
+| Development builds nothing on the founder's machine, CI runs what a change can break and stays green without retries, and one binary carries the CLI and the MCP bridge. | K.6a, K.6b, F.27, F.28, B.1, B.2, B.3, B.4a, B.4b |
+| Signed, notarized and verified packages for three platforms, with guidance a new user can follow. | F.20, F.32, F.24, F.25, 4.7a2, 3.5b, 4.7e, R.1a, 4.7c2, L.1, R.1 |
 
 Two outside inputs gate this release:
 

@@ -88,7 +88,8 @@ internal sealed class WindowApprovalChannel(TimeProvider clock, TimeSpan answerW
 
         Dispatcher.UIThread.Post(() =>
         {
-            if (request.IsAnswered)
+            // The token too: the gate withdraws with CancelAsync, which marks it before its callback runs on the pool.
+            if (request.IsAnswered || cancellationToken.IsCancellationRequested)
             {
                 return;
             }

@@ -139,9 +139,37 @@ public sealed class DesktopApprovalTests
             var prompt = ApprovalPrompt.For("claude-code", new EntryName("env/ci", "DEPLOY_KEY"), "password", "deploy", 60);
 
             var asking = channel.AskAsync(prompt, withdrawn.Token).AsTask();
-
-            // Cancelled inline: awaiting CancelAsync would free the UI thread to draw the prompt first.
             withdrawn.Cancel();
+            WindowInput.Drain();
+
+            Assert.Equal(ApprovalAnswer.Denied, await asking.WaitAsync(_wait, Token));
+            Assert.Equal(0, drawn);
+        });
+
+    /// <summary>
+    /// A withdrawal requested before the prompt is drawn stops the draw while its callback still
+    /// waits on the thread pool, where <c>CancelAsync</c>, which the gate withdraws with, runs it (F.20).
+    /// </summary>
+    [Fact]
+    public Task A_withdrawal_requested_before_the_draw_stops_it_before_its_callback_runs() =>
+        HeadlessSession.On(async () =>
+        {
+            var channel = new WindowApprovalChannel(new ManualClock(), ApprovalLimits.Default.Window);
+            var drawn = 0;
+            channel.Shown += (_, _) => drawn++;
+            using var withdrawn = new CancellationTokenSource();
+            var prompt = ApprovalPrompt.For("claude-code", new EntryName("env/ci", "DEPLOY_KEY"), "password", "deploy", 60);
+            var token = Token;
+
+            var asking = channel.AskAsync(prompt, withdrawn.Token).AsTask();
+
+            // Registered after the channel's callback, so it runs first and holds the channel's back.
+            using var held = new ManualResetEventSlim();
+            using var holding = withdrawn.Token.Register(() => held.Wait(_wait, token));
+            var cancelling = withdrawn.CancelAsync();
+            WindowInput.Drain();
+            held.Set();
+            await cancelling;
             WindowInput.Drain();
 
             Assert.Equal(ApprovalAnswer.Denied, await asking.WaitAsync(_wait, Token));
