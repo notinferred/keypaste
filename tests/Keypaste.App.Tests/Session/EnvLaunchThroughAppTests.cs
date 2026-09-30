@@ -21,7 +21,8 @@ namespace Keypaste.App.Tests.Session;
 /// The launch goes through <see cref="AppVaultSession.Environments"/> and the platform's terminal:
 /// <c>cmd.exe</c> on Windows, and on Linux a stand-in emulator script that runs its <c>-e</c> command
 /// as a real emulator would, since a runner has no display. The child is a real process that reports
-/// what its own environment holds over a pipe, so nothing is taken from the view model's word.
+/// what its own environment holds over a pipe, so nothing is taken from the view model's word. Where
+/// the app opens no terminal, macOS until E.1d, each test holds the refusal the app gives instead.
 /// </remarks>
 public sealed class EnvLaunchThroughAppTests : IDisposable
 {
@@ -72,10 +73,13 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
     [Fact]
     public async Task Run_starts_a_real_child_in_the_directory_with_the_set_in_its_environment_and_nowhere_else()
     {
-        SkipWithoutTerminal();
-
         using var screen = Screen();
         var launch = Mapped(screen, out var pipeName);
+        if (RefusedWithoutTerminal(screen, launch, run: true))
+        {
+            return;
+        }
+
         using var pipe = new NamedPipeServerStream(pipeName, PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
         var connected = pipe.WaitForConnectionAsync(Cancel);
 
@@ -122,10 +126,12 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
     [Fact]
     public async Task Open_terminal_starts_the_terminal_in_the_directory_after_confirming()
     {
-        SkipWithoutTerminal();
-
         using var screen = Screen();
         var launch = Mapped(screen, out _);
+        if (RefusedWithoutTerminal(screen, launch, run: false))
+        {
+            return;
+        }
 
         var running = launch.LaunchAsync(run: false);
         Assert.True(launch.IsConfirming);
@@ -149,6 +155,10 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
     {
         using var screen = Screen();
         var launch = Mapped(screen, out _);
+        if (RefusedWithoutTerminal(screen, launch, run: true))
+        {
+            return;
+        }
 
         var running = launch.LaunchAsync(run: true);
         launch.CancelLaunchCommand.Execute(null);
@@ -165,6 +175,10 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
     {
         using var screen = Screen();
         var launch = Mapped(screen, out _);
+        if (RefusedWithoutTerminal(screen, launch, run: true))
+        {
+            return;
+        }
 
         var running = launch.LaunchAsync(run: true);
         Assert.True(launch.IsConfirming);
@@ -182,6 +196,11 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
     {
         using var screen = Screen();
         var launch = Mapped(screen, out _);
+        if (RefusedWithoutTerminal(screen, launch, run: true))
+        {
+            return;
+        }
+
         var queue = new QueuedContext();
         var previous = SynchronizationContext.Current;
         SynchronizationContext.SetSynchronizationContext(queue);
@@ -224,6 +243,10 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
 
         using var screen = Screen();
         var launch = Mapped(screen, out _);
+        if (RefusedWithoutTerminal(screen, launch, run: true))
+        {
+            return;
+        }
 
         await launch.LaunchAsync(run: true).WaitAsync(Cancel);
 
@@ -332,8 +355,24 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
             new EnvStore(reread).Read("dev"));
     }
 
-    private static void SkipWithoutTerminal() =>
-        Assert.SkipUnless(OperatingSystem.IsWindows() || OperatingSystem.IsLinux(), "The app opens terminals on Windows and Linux only.");
+    /// <summary>
+    /// Where the app opens no terminal, a launch is refused before anyone is asked and starts nothing (D-0340).
+    /// </summary>
+    /// <returns>Whether the platform refused, which is then all the test can hold.</returns>
+    private bool RefusedWithoutTerminal(EnvSetsViewModel screen, ProjectLaunchViewModel launch, bool run)
+    {
+        if (launch.IsSupported)
+        {
+            return false;
+        }
+
+        Assert.True(launch.LaunchAsync(run).IsCompletedSuccessfully, "the refusal waited on something");
+        Assert.Equal(0, _launcher.Calls);
+        Assert.False(launch.IsConfirming);
+        Assert.Null(launch.LastStart);
+        Assert.Equal("Nothing was started: the app opens terminals on Windows and Linux only; copy the run command instead.", screen.Error);
+        return true;
+    }
 
     private static void EndTree(int processId)
     {
