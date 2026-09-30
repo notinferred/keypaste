@@ -19,18 +19,14 @@
 
 set -euo pipefail
 
-die() { printf '\nverify-run-signals: FAILED - %s\n' "$*" >&2; exit 1; }
+. "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+DIE_PREFIX='verify-run-signals: FAILED - '
 
 case "$(uname -s)" in
   MINGW*|MSYS*|CYGWIN*) die "this gate is Unix-only and must not be invoked on Windows" ;;
 esac
 
-kp=${KEYPASTE_BIN:-}
-if [ -z "$kp" ]; then
-  kp=artifacts/bin/Keypaste.Cli/release/keypaste
-  [ -x "$kp" ] || kp="${kp}.exe"
-fi
-[ -x "$kp" ] || die "keypaste binary not found at '$kp' (build it, or set KEYPASTE_BIN)"
+kp=$(keypaste_bin)
 
 # This script's own interpreter, by absolute path. See verify-run-injection.sh for why the bare
 # word `bash` is not safe to use as a child process.

@@ -19,28 +19,13 @@ readonly MASTER='ci-lifecycle-master-pw'
 readonly SECRET='SENTINEL-LIFECYCLE-PASSWORD-5c20d4'
 readonly ENTRY='env/ci/DEPLOY_KEY'
 
-die() {
-  echo "::error::$*" >&2
-  for f in "${HOLD_OUT:-}" "${OUT:-}" "${ERR:-}" "${AGENT_ERR:-}"; do
-    if [ -n "$f" ] && [ -f "$f" ]; then echo "--- $f ---" >&2; cat "$f" >&2; fi
-  done
-  exit 1
-}
+. "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+DIE_FILES='HOLD_OUT OUT ERR AGENT_ERR'
+require jq
 
-command -v jq >/dev/null 2>&1 || die "jq is required and was not found; this gate must never be skipped"
-
-resolve() {
-  local candidate="$1"
-  [ -x "$candidate" ] || candidate="${candidate}.exe"
-  [ -x "$candidate" ] || die "not found: $1 (build first)"
-  printf '%s' "$candidate"
-}
-
-native() { if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s' "$1"; fi; }
-
-CLI="$(resolve "${KEYPASTE_BIN:-artifacts/bin/Keypaste.Cli/release/keypaste}")"
-MCP="$(resolve "${KEYPASTE_MCP_BIN:-artifacts/bin/Keypaste.Mcp/release/keypaste-mcp}")"
-DRV="$(resolve "${KEYPASTE_APP_DRIVER:-artifacts/bin/Keypaste.AppDriver/release/Keypaste.AppDriver}")"
+CLI="$(keypaste_bin)"
+MCP="$(keypaste_mcp)"
+DRV="$(app_driver)"
 
 WORK="$(mktemp -d)"
 mkdir -p "$WORK/home"
@@ -66,26 +51,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
-kill_process() {
-  if command -v taskkill >/dev/null 2>&1; then
-    taskkill //F //PID "$1" >/dev/null 2>&1 || true
-  else
-    kill -9 "$1" 2>/dev/null || true
-  fi
-}
-
-wait_for() {
-  local pattern="$1" file="$2" count="${3:-1}"
-  for _ in $(seq 1 150); do
-    [ "$(grep -c -- "$pattern" "$file" 2>/dev/null || true)" -ge "$count" ] && return 0
-    sleep 0.2
-  done
-  die "timed out waiting for '$pattern' in $file"
-}
-
 # The app's current session, process and endpoint, from the latest status the driver printed.
-session_of() { grep '^status serving' "$HOLD_OUT" | tail -1 | sed -E 's/^status serving ([0-9a-f]+).*/\1/'; }
-process_of() { grep '^status serving' "$HOLD_OUT" | tail -1 | sed -E 's/.* as process ([0-9]+) .*/\1/'; }
+serving_session() { grep '^status serving' "$HOLD_OUT" | tail -1 | sed -E 's/^status serving ([0-9a-f]+).*/\1/'; }
+serving_process() { grep '^status serving' "$HOLD_OUT" | tail -1 | sed -E 's/.* as process ([0-9]+) .*/\1/'; }
 endpoint_of() { grep '^status serving' "$HOLD_OUT" | tail -1 | sed -E 's/.* on (.*)$/\1/' | tr -d '\r'; }
 last_status() { grep '^status ' "$HOLD_OUT" | tail -1 | tr -d '\r'; }
 
@@ -102,8 +70,8 @@ expect_serving() {
   local count="$1"
   wait_for '^status serving' "$HOLD_OUT" "$count"
   grep -q 'not served' "$HOLD_OUT" && die "the app unlocked and did not serve its vault"
-  SESSION="$(session_of)"
-  HOLD_PID="$(process_of)"
+  SESSION="$(serving_session)"
+  HOLD_PID="$(serving_process)"
   [ -n "$SESSION" ] || die "the app's status named no session"
 }
 

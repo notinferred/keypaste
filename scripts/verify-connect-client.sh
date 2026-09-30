@@ -23,29 +23,15 @@ readonly SECRET='SENTINEL-CONNECT-CLIENT-7a41e2'
 readonly OTHER_SECRET='SENTINEL-CONNECT-OTHER-3d90b6'
 readonly LABEL='ci-connect'
 
-die() {
-  echo "::error::$*" >&2
-  for f in "${HOLD_OUT:-}" "${CONFIG:-}"; do
-    if [ -n "$f" ] && [ -f "$f" ]; then echo "--- $f ---" >&2; cat "$f" >&2; fi
-  done
-  exit 1
-}
+. "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+DIE_FILES='HOLD_OUT CONFIG'
+WAIT_SECONDS=60
+require jq
 
-command -v jq >/dev/null 2>&1 || die "jq is required and was not found; this gate must never be skipped"
-
-resolve() {
-  local candidate="$1"
-  [ -x "$candidate" ] || candidate="${candidate}.exe"
-  [ -x "$candidate" ] || die "not found: $1 (build first)"
-  printf '%s' "$candidate"
-}
-
-native() { if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s' "$1"; fi; }
-
-CLI="$(resolve "${KEYPASTE_BIN:-artifacts/bin/Keypaste.Cli/release/keypaste}")"
-MCP="$(resolve "${KEYPASTE_MCP_BIN:-artifacts/bin/Keypaste.Mcp/release/keypaste-mcp}")"
-DRV="$(resolve "${KEYPASTE_APP_DRIVER:-artifacts/bin/Keypaste.AppDriver/release/Keypaste.AppDriver}")"
-FAKE="$(resolve "${KEYPASTE_FAKE_CLIENT:-artifacts/bin/Keypaste.FakeMcpClient/release/claude}")"
+CLI="$(keypaste_bin)"
+MCP="$(keypaste_mcp)"
+DRV="$(app_driver)"
+FAKE="$(resolve KEYPASTE_FAKE_CLIENT artifacts/bin/Keypaste.FakeMcpClient/release/claude)"
 
 WORK="$(mktemp -d)"
 mkdir -p "$WORK/home"
@@ -69,26 +55,6 @@ cleanup() {
   rm -rf "$WORK"
 }
 trap cleanup EXIT
-
-kill_process() {
-  if command -v taskkill >/dev/null 2>&1; then
-    taskkill //F //PID "$1" >/dev/null 2>&1 || true
-  else
-    kill -9 "$1" 2>/dev/null || true
-  fi
-}
-
-wait_for() {
-  local pattern="$1" file="$2" count="${3:-1}"
-  for _ in $(seq 1 300); do
-    [ "$(grep -c -- "$pattern" "$file" 2>/dev/null || true)" -ge "$count" ] && return 0
-    sleep 0.2
-  done
-  die "timed out waiting for '$pattern' in $file"
-}
-
-session_of() { grep 'holding session' "$HOLD_OUT" | tail -1 | sed -E 's/^holding session ([0-9a-f]+).*/\1/'; }
-process_of() { grep 'holding session' "$HOLD_OUT" | tail -1 | sed -E 's/.* as process ([0-9]+).*/\1/'; }
 
 SENT=0
 # Sends one line to the driver and waits for the line that ends what it prints for it.

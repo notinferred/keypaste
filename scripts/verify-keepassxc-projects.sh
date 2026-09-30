@@ -27,29 +27,15 @@
 #         KEYPASTE_MCP_BIN     path to the keypaste-mcp binary       (default: the Release build)
 set -euo pipefail
 
-die()  { printf '\nPROJECTS GATE FAILED: %s\n' "$*" >&2; exit 1; }
-step() { printf '\n--- %s\n' "$*"; }
+. "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+DIE_PREFIX='PROJECTS GATE FAILED: '
 
 dir=${1:-}
 [ -n "$dir" ] || die "usage: verify-keepassxc-projects.sh <work-directory>"
-pw=${KP_COMPAT_PASSWORD:-}
-[ -n "$pw" ] || die "KP_COMPAT_PASSWORD is not set"
-cli=${KPXC_CLI:-keepassxc-cli}
-
-# Absence of the tool is a FAILURE, never a skip — see verify-keepassxc-compat.sh (i).
-if ! command -v "$cli" >/dev/null 2>&1 && [ ! -x "$cli" ]; then
-  die "keepassxc-cli not found (KPXC_CLI='${cli}'). This gate must never be skipped or soft-passed."
-fi
-command -v jq >/dev/null 2>&1 || die "jq is required and was not found; this gate must never be skipped"
-
-binary() {
-  local candidate=$1
-  [ -x "$candidate" ] || candidate="${candidate}.exe"
-  [ -x "$candidate" ] || die "not found: $1 (build it first)"
-  printf '%s' "$candidate"
-}
-kp=$(binary "${KEYPASTE_BIN:-artifacts/bin/Keypaste.Cli/release/keypaste}")
-mcp=$(binary "${KEYPASTE_MCP_BIN:-artifacts/bin/Keypaste.Mcp/release/keypaste-mcp}")
+. "$(dirname "${BASH_SOURCE[0]}")/lib/kpxc.sh"
+require jq
+kp=$(keypaste_bin)
+mcp=$(keypaste_mcp)
 
 rm -rf "$dir"
 mkdir -p "$dir/home"
@@ -62,18 +48,11 @@ agent_pid=
 cleanup() { if [ -n "$agent_pid" ]; then kill "$agent_pid" 2>/dev/null || true; fi; }
 trap cleanup EXIT
 
-native() { if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s' "$1"; fi; }
-bytes()  { od -An -v -tx1 "$1" | tr -d ' \n'; }
-version() { od -An -v -tx1 -N12 "$1" | tr -d ' \n' | cut -c17-22; }
-kx() {
-  local sub=$1 target=$2; shift 2
-  printf '%s\n' "$pw" | "$cli" "$sub" -q "$(native "$target")" "$@" | tr -d '\r'
-}
+version() { header "$1" | cut -c17-22; }
 kp_on() {
   local db=$1; shift
   printf '%s\n' "$pw" | "$kp" "$@" --vault "$db" | tr -d '\r'
 }
-uuid() { printf '%-16.16s' "$1" | base64; }
 # One tag per line, sorted, read whole before anything matches on it.
 tags() { local listed; listed=$(kx show "$1" "$2" -a Tags) || return 1; sort <<<"${listed//,/$'\n'}"; }
 

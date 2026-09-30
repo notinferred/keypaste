@@ -73,40 +73,20 @@
 
 set -euo pipefail
 
-die()  { printf '\nKEYFILE GATE FAILED: %s\n' "$*" >&2; exit 1; }
-step() { printf '\n--- %s\n' "$*"; }
+. "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+DIE_PREFIX='KEYFILE GATE FAILED: '
 
 db=${1:-}
 [ -n "$db" ] || die "usage: verify-keepassxc-keyfile.sh <keyfile.kdbx>"
-pw=${KP_COMPAT_PASSWORD:-}
-[ -n "$pw" ] || die "KP_COMPAT_PASSWORD is not set"
-cli=${KPXC_CLI:-keepassxc-cli}
+. "$(dirname "${BASH_SOURCE[0]}")/lib/kpxc.sh"
 
-# Absence of the tool is a FAILURE, never a skip — see verify-keepassxc-compat.sh (i).
-if ! command -v "$cli" >/dev/null 2>&1 && [ ! -x "$cli" ]; then
-  die "keepassxc-cli not found (KPXC_CLI='${cli}'). This gate must never be skipped or soft-passed."
-fi
-
-kp=${KEYPASTE_BIN:-}
-if [ -z "$kp" ]; then
-  kp=artifacts/bin/Keypaste.Cli/release/keypaste
-  [ -x "$kp" ] || kp="${kp}.exe"
-fi
-[ -x "$kp" ] || die "keypaste binary not found at '$kp' (build it, or set KEYPASTE_BIN)"
+kp=$(keypaste_bin)
 
 dir=$(dirname "$db")
 stem=$(basename "$db" .kdbx)
 mkdir -p "$dir"
 
-# Windows builds of keepassxc-cli want native paths; the keypaste build under test takes either.
-native() { if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s' "$1"; fi; }
-
-# BOTH sides need \r stripped — see verify-keepassxc-writeback.sh.
-kpxc()     { printf '%s\n' "$pw" | "$cli" "$@" | tr -d '\r'; }
 kpxc_only() { "$cli" "$@" | tr -d '\r'; }   # a keyfile-only vault: --no-password, nothing to type
-
-# The whole file, so a refusal can be shown to have written nothing at all.
-bytes() { od -An -v -tx1 "$1" | tr -d ' \n'; }
 
 project=compat-keyfile
 
@@ -183,7 +163,7 @@ for form in xml raw32 hex64 any; do
 
   # The container is re-checked after the save, as the write-back and history gates do: a format
   # or KDF shift on this path would round-trip through keypaste perfectly and be invisible.
-  hdr=$(od -An -v -tx1 -N12 "$vault" | tr -d ' \n' | tr 'A-Z' 'a-z')
+  hdr=$(header "$vault")
   [ "${hdr:0:16}" = "03d9a29a67fb4bb5" ] || die "the $form vault is not a KDBX file after a keypaste save"
   [ "${hdr:20:2}" = "04" ]               || die "KDBX major version changed on the $form vault: 0x${hdr:20:2}"
 
@@ -298,7 +278,6 @@ new_pw="next-$pw"
 acc="$dir/$stem-access.kdbx"
 kpxc_as() { local secret=$1; shift; printf '%s\n' "$secret" | "$cli" "$@" | tr -d '\r'; }
 opens_in_kpxc() { kpxc_as "$1" db-info "${@:2}" >/dev/null 2>&1; }
-copies() { ls -1 "$1.backups" 2>/dev/null | wc -l | tr -d ' '; }
 
 step "KeePassXC creates a password-only vault for keypaste to change"
 printf '%s\n%s\n' "$pw" "$pw" | "$cli" db-create -q -p "$(native "$acc")" \

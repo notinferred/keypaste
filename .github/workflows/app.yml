@@ -25,6 +25,7 @@ on:
       - 'scripts/verify-run-session.sh'
       - 'scripts/verify-held-saves.sh'
       - 'scripts/verify-clipboard-markers.sh'
+      - 'scripts/lib/**'
       - 'src/Keypaste.Mcp/**'
       - 'scripts/install-keepassxc-windows.sh'
       - 'src/Keypaste.Cli/**'

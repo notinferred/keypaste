@@ -22,40 +22,13 @@
 
 set -euo pipefail
 
-die()  { printf '\nCOMPAT GATE FAILED: %s\n' "$*" >&2; exit 1; }
-step() { printf '\n--- %s\n' "$*"; }
+. "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+DIE_PREFIX='COMPAT GATE FAILED: '
 
 db=${1:-}
 [ -n "$db" ] || die "usage: verify-keepassxc-compat.sh <vault.kdbx>"
-pw=${KP_COMPAT_PASSWORD:-}
-[ -n "$pw" ] || die "KP_COMPAT_PASSWORD is not set"
-cli=${KPXC_CLI:-keepassxc-cli}
-
-# (i) Absence of the tool is a FAILURE, never a skip.
-#
-# A gate that quietly no-ops when keepassxc-cli is missing is worse than no gate at all:
-# it reports green forever. No path through this script exits 0 without having actually
-# talked to KeePassXC.
-if ! command -v "$cli" >/dev/null 2>&1 && [ ! -x "$cli" ]; then
-  die "keepassxc-cli not found (KPXC_CLI='${cli}'). This gate must never be skipped or soft-passed."
-fi
+. "$(dirname "${BASH_SOURCE[0]}")/lib/kpxc.sh"
 [ -f "$db" ] || die "vault not found: $db"
-
-# keepassxc-cli reads exactly ONE line per prompt from stdin, with no isatty check and no
-# retry, and writes the prompt to stderr — so stdout stays clean and piping is the supported
-# non-interactive path. There is no --password-file and no KEEPASSXC_PASSWORD env var.
-#
-# The password is piped rather than passed as an argument on purpose: argv is world-readable
-# via /proc on Linux.
-#
-# `tr -d '\r'` is not cosmetic. Qt writes CRLF on Windows; without stripping it, every
-# exact-value diff below fails on windows-latest and nowhere else.
-#
-# -q/--quiet is deliberately NOT passed: it suppresses the failure reason along with the
-# prompt, and stdout is already clean without it.
-kpxc() {
-  printf '%s\n' "$pw" | "$cli" "$@" | tr -d '\r'
-}
 
 step "keepassxc-cli under test"
 "$cli" --version
@@ -73,7 +46,7 @@ step "keepassxc-cli under test"
 #
 # od(1) rather than xxd: Git for Windows ships od, not xxd.
 step "container header (direct byte check)"
-hdr=$(od -An -v -tx1 -N12 "$db" | tr -d ' \n' | tr 'A-Z' 'a-z')
+hdr=$(header "$db")
 printf 'first 12 bytes: %s\n' "$hdr"
 [ "${#hdr}" -eq 24 ] || die "could not read 12 header bytes from $db"
 [ "${hdr:0:16}" = "03d9a29a67fb4bb5" ] \

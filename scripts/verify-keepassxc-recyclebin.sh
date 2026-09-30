@@ -41,43 +41,20 @@
 
 set -euo pipefail
 
-die()  { printf '\nRECYCLE BIN GATE FAILED: %s\n' "$*" >&2; exit 1; }
-step() { printf '\n--- %s\n' "$*"; }
+. "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+DIE_PREFIX='RECYCLE BIN GATE FAILED: '
 
 db=${1:-}
 [ -n "$db" ] || die "usage: verify-keepassxc-recyclebin.sh <recyclebin.kdbx>"
-pw=${KP_COMPAT_PASSWORD:-}
-[ -n "$pw" ] || die "KP_COMPAT_PASSWORD is not set"
-cli=${KPXC_CLI:-keepassxc-cli}
+. "$(dirname "${BASH_SOURCE[0]}")/lib/kpxc.sh"
 
-# Absence of the tool is a FAILURE, never a skip — see verify-keepassxc-compat.sh (i).
-if ! command -v "$cli" >/dev/null 2>&1 && [ ! -x "$cli" ]; then
-  die "keepassxc-cli not found (KPXC_CLI='${cli}'). This gate must never be skipped or soft-passed."
-fi
-
-kp=${KEYPASTE_BIN:-}
-if [ -z "$kp" ]; then
-  kp=artifacts/bin/Keypaste.Cli/release/keypaste
-  [ -x "$kp" ] || kp="${kp}.exe"
-fi
-[ -x "$kp" ] || die "keypaste binary not found at '$kp' (build it, or set KEYPASTE_BIN)"
-
-driver=${KEYPASTE_RESTORER:-}
-if [ -z "$driver" ]; then
-  driver=artifacts/bin/Keypaste.VaultRestorer/release/Keypaste.VaultRestorer
-  [ -x "$driver" ] || driver="${driver}.exe"
-fi
-[ -x "$driver" ] || die "recovery driver not found at '$driver' (build keypaste.slnx, or set KEYPASTE_RESTORER)"
+kp=$(keypaste_bin)
+driver=$(vault_restorer)
 
 export KEYPASTE_RESTORER_PASSWORD=$pw
 
-# BOTH sides need \r stripped — see verify-keepassxc-writeback.sh.
-kpxc()  { printf '%s\n' "$pw" | "$cli" "$@" | tr -d '\r'; }
 kpset() { printf '%s\n%s\n' "$pw" "$2" | "$kp" env set "$1" "$3" --vault "$db"; }
 kprm()  { printf '%s\n' "$pw" | "$kp" rm "$1" --vault "$db" --yes; }
-
-# The whole file, so a refusal can be shown to have written nothing at all.
-bytes() { od -An -v -tx1 "$db" | tr -d ' \n'; }
 
 # The identity trash-ls gives an entry, by the title it prints beside it.
 trash_id() { "$driver" trash-ls "$db" | awk -v t="$1" '$3 == t { print $1 }'; }
@@ -97,16 +74,7 @@ kpset "$project" kept-value KEPT
 kpset "$project" doomed-value GONE
 kpset compat-trash-gone orphan-value DOOMED
 
-# The last <UUID> BEFORE the first <History>, which is the entry's own rather than a revision's.
-# The seen-flag rather than `{exit}` or `head`, because leaving the stream early breaks the pipe
-# the `tr` upstream is writing into and `pipefail` then kills the gate (F.16).
-entry_uuid() {
-  kpxc export -f xml "$db" \
-    | tr -d '\t' \
-    | awk '/<History>/{seen=1} !seen && /<UUID>/{last=$0} END{print last}'
-}
-
-uuid_before=$(entry_uuid)
+uuid_before=$(entry_uuid "$db")
 [ -n "$uuid_before" ] || die "could not read the entry's UUID out of the XML export"
 
 # ---------------------------------------------------------------------------------------
@@ -120,7 +88,7 @@ grep -qF 'recycle bin' <<<"$said" \
 # The container is re-checked after the save, exactly as the write-back and history gates do:
 # a format or KDF shift on this path would round-trip through keypaste perfectly and be
 # invisible anywhere else. The minor version is the new assertion, and the load-bearing one.
-hdr=$(od -An -v -tx1 -N12 "$db" | tr -d ' \n' | tr 'A-Z' 'a-z')
+hdr=$(header "$db")
 [ "${hdr:0:16}" = "03d9a29a67fb4bb5" ] || die "not a KDBX file after a keypaste delete (signature ${hdr:0:16})"
 [ "${hdr:20:2}" = "04" ]               || die "KDBX major version changed on delete: 0x${hdr:20:2}"
 [ "${hdr:16:2}" = "01" ] \
@@ -184,7 +152,7 @@ grep -qF 'Recycle Bin/ROTATED' <<<"$tree" \
   && die "the entry is still in the recycle bin after a restore"
 
 step "the entry KeePassXC reads is the entry keypaste deleted"
-uuid_after=$(entry_uuid)
+uuid_after=$(entry_uuid "$db")
 [ "$uuid_after" = "$uuid_before" ] \
   || die "the entry's UUID changed across delete and restore: '${uuid_before}' became '${uuid_after}'"
 
@@ -261,13 +229,13 @@ fi
 
 # An identity nothing answers to must be refused, and refused without changing the file: a
 # driver that restored the nearest entry would make every assertion above vacuous.
-before_refusal=$(bytes)
+before_refusal=$(bytes "$db")
 set +e
 "$driver" trash-restore "$db" 0123456789ABCDEF0123456789ABCDEF >/dev/null 2>&1
 refused_rc=$?
 set -e
 [ "$refused_rc" -eq 1 ] || die "restoring an identity nothing answers to exited ${refused_rc}, expected 1"
-[ "$(bytes)" = "$before_refusal" ] || die "a refused restore changed the vault file"
+[ "$(bytes "$db")" = "$before_refusal" ] || die "a refused restore changed the vault file"
 
 # A restore that would produce two entries of one name is refused whole. Nothing in keypaste can
 # resolve that pair afterwards: Find refuses it, a credential release denies it as ambiguous,
@@ -279,14 +247,14 @@ kpset "$project" a-new-value ROTATED >/dev/null
 taken_id=$(trash_id ROTATED)
 [ -n "$taken_id" ] || die "the re-deleted entry is not in the trash"
 
-before_refusal=$(bytes)
+before_refusal=$(bytes "$db")
 set +e
 occupied=$("$driver" trash-restore "$db" "$taken_id" 2>&1)
 occupied_rc=$?
 set -e
 [ "$occupied_rc" -eq 1 ] \
   || die "restoring onto an occupied name exited ${occupied_rc}, expected 1. It said: ${occupied}"
-[ "$(bytes)" = "$before_refusal" ] || die "a refused restore changed the vault file"
+[ "$(bytes "$db")" = "$before_refusal" ] || die "a refused restore changed the vault file"
 
 value=$(kpxc show -a Password "$db" "$entry")
 diff -u <(printf '%s\n' 'a-new-value') <(printf '%s\n' "$value") \

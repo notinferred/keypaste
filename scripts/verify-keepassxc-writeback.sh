@@ -34,31 +34,18 @@
 
 set -euo pipefail
 
-die()  { printf '\nWRITE-BACK GATE FAILED: %s\n' "$*" >&2; exit 1; }
-step() { printf '\n--- %s\n' "$*"; }
+. "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+DIE_PREFIX='WRITE-BACK GATE FAILED: '
 
 db=${1:-}
 [ -n "$db" ] || die "usage: verify-keepassxc-writeback.sh <writeback.kdbx>"
-pw=${KP_COMPAT_PASSWORD:-}
-[ -n "$pw" ] || die "KP_COMPAT_PASSWORD is not set"
-cli=${KPXC_CLI:-keepassxc-cli}
+. "$(dirname "${BASH_SOURCE[0]}")/lib/kpxc.sh"
 
-# Absence of the tool is a FAILURE, never a skip — see verify-keepassxc-compat.sh (i).
-if ! command -v "$cli" >/dev/null 2>&1 && [ ! -x "$cli" ]; then
-  die "keepassxc-cli not found (KPXC_CLI='${cli}'). This gate must never be skipped or soft-passed."
-fi
-
-kp=${KEYPASTE_BIN:-}
-if [ -z "$kp" ]; then
-  kp=artifacts/bin/Keypaste.Cli/release/keypaste
-  [ -x "$kp" ] || kp="${kp}.exe"
-fi
-[ -x "$kp" ] || die "keypaste binary not found at '$kp' (build it, or set KEYPASTE_BIN)"
+kp=$(keypaste_bin)
 
 # BOTH sides need \r stripped. keepassxc-cli is Qt and writes CRLF on Windows; keypaste
 # writes through Console.Out, whose NewLine is also CRLF there. Stripping only one side
 # produces a diff that fails on windows-latest and nowhere else.
-kpxc()   { printf '%s\n' "$pw" | "$cli" "$@" | tr -d '\r'; }
 kp_run() { printf '%s\n' "$pw" | "$kp"  "$@" | tr -d '\r'; }
 
 project=compat-app
@@ -85,7 +72,7 @@ printf '%s\n%s\n' "$pw" 'v2-rewritten-by-keypaste' | "$kp" env set "$project" "$
 # The container is re-checked AFTER a keypaste modify-save, not only after a create. A format
 # or KDF shift on the update path would round-trip through keypaste perfectly and be invisible
 # everywhere except here.
-hdr=$(od -An -v -tx1 -N12 "$db" | tr -d ' \n' | tr 'A-Z' 'a-z')
+hdr=$(header "$db")
 [ "${hdr:0:16}" = "03d9a29a67fb4bb5" ] || die "not a KDBX file after a keypaste update (signature ${hdr:0:16})"
 [ "${hdr:20:2}" = "04" ]               || die "KDBX major version changed on update: 0x${hdr:20:2}"
 
@@ -209,7 +196,7 @@ esac
 # answer to env/<project>/nested/NESTED_KEY. A read of that path cannot pick one — whichever the
 # file lists first is a guess, and unlike a guessed removal a guessed read hands the wrong secret
 # over and says nothing. Neither the read nor the refused add may write, so the bytes say so.
-before_ambiguous=$(od -An -v -tx1 "$db" | tr -d ' \n')
+before_ambiguous=$(bytes "$db")
 
 set +e
 collide_out=$(printf '%s\n' "$pw" | "$kp" get "env/${project}/nested/NESTED_KEY" --show --vault "$db" 2>/dev/null | tr -d '\r')
@@ -224,7 +211,7 @@ collide_add_rc=$?
 set -e
 [ "$collide_add_rc" -ne 0 ] || die "keypaste add exited 0 on a path TWO entries already answer to"
 
-[ "$(od -An -v -tx1 "$db" | tr -d ' \n')" = "$before_ambiguous" ] || die "a refused read or a refused add rewrote the vault"
+[ "$(bytes "$db")" = "$before_ambiguous" ] || die "a refused read or a refused add rewrote the vault"
 printf 'ambiguous read refused (get exit %s, add exit %s, vault byte-identical)\n' "$collide_rc" "$collide_add_rc"
 
 printf '%s\n' "$pw" | "$kp" env rm "$project" 'nested/NESTED_KEY' --yes --vault "$db" >/dev/null 2>&1 \
@@ -274,14 +261,14 @@ printf '%s\n' "$pw" | "$cli" add -g -L 20 -l -U -n "$db" "env/${project}/PLACEHO
 printf '%s\n' "$pw" | "$cli" edit -t 'DUPE' "$db" "env/${project}/PLACEHOLDER2" >/dev/null \
   || die "keepassxc-cli edit --title failed - the duplicate cannot be authored"
 
-before_refusal=$(od -An -v -tx1 "$db" | tr -d ' \n')
+before_refusal=$(bytes "$db")
 
 set +e
 printf '%s\n' "$pw" | "$kp" env rm "$project" DUPE --yes --vault "$db" >/dev/null 2>&1
 dupe_rc=$?
 set -e
 [ "$dupe_rc" -ne 0 ] || die "keypaste env rm exited 0 on a name TWO entries answer to"
-[ "$(od -An -v -tx1 "$db" | tr -d ' \n')" = "$before_refusal" ] \
+[ "$(bytes "$db")" = "$before_refusal" ] \
   || die "a refused removal rewrote the vault"
 printf 'ambiguous removal refused (exit %s, vault byte-identical)\n' "$dupe_rc"
 

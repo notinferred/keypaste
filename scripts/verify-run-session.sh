@@ -20,25 +20,11 @@ readonly MASTER='ci-run-session-master-pw'
 readonly DEPLOY='SENTINEL-RUN-SESSION-DEPLOY-5e2b90'
 readonly DATABASE='SENTINEL-RUN-SESSION-DB-a17c3d'
 
-die() {
-  echo "::error::$*" >&2
-  for f in "${HOLD_OUT:-}" "${RUN_OUT:-}" "${RUN_ERR:-}" "${AGENT_ERR:-}"; do
-    if [ -n "$f" ] && [ -f "$f" ]; then echo "--- $f ---" >&2; cat "$f" >&2; fi
-  done
-  exit 1
-}
+. "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+DIE_FILES='HOLD_OUT RUN_OUT RUN_ERR AGENT_ERR'
 
-resolve() {
-  local candidate="$1"
-  [ -x "$candidate" ] || candidate="${candidate}.exe"
-  [ -x "$candidate" ] || die "not found: $1 (build first)"
-  printf '%s' "$candidate"
-}
-
-native() { if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s' "$1"; fi; }
-
-CLI="$(resolve "${KEYPASTE_BIN:-artifacts/bin/Keypaste.Cli/release/keypaste}")"
-DRV="$(resolve "${KEYPASTE_APP_DRIVER:-artifacts/bin/Keypaste.AppDriver/release/Keypaste.AppDriver}")"
+CLI="$(keypaste_bin)"
+DRV="$(app_driver)"
 CLI="$(cd "$(dirname "$CLI")" && pwd)/$(basename "$CLI")"
 
 # The child is this script's own interpreter by absolute path, as in verify-run-injection.sh.
@@ -65,25 +51,6 @@ cleanup() {
   rm -rf "$WORK"
 }
 trap cleanup EXIT
-
-kill_process() {
-  if command -v taskkill >/dev/null 2>&1; then
-    taskkill //F //PID "$1" >/dev/null 2>&1 || true
-  else
-    kill -9 "$1" 2>/dev/null || true
-  fi
-}
-
-wait_for() {
-  local pattern="$1" file="$2" count="${3:-1}"
-  for _ in $(seq 1 150); do
-    [ "$(grep -c -- "$pattern" "$file" 2>/dev/null || true)" -ge "$count" ] && return 0
-    sleep 0.2
-  done
-  die "timed out waiting for '$pattern' in $file"
-}
-
-process_of() { grep 'holding session' "$HOLD_OUT" | tail -1 | sed -E 's/.* as process ([0-9]+).*/\1/'; }
 
 # Starts `keypaste run --session <project>` in the project directory with the master password on its
 # standard input, tagging the command with $2 so no two cases share a refusal's cooldown.

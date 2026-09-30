@@ -248,7 +248,7 @@ selftests=(
 
 check_scripts() {
   local script work i code first_code=0 failed=()
-  for script in scripts/*.sh scripts/demo/*.sh; do run bash -n "$script"; done
+  for script in scripts/*.sh scripts/lib/*.sh scripts/demo/*.sh; do run bash -n "$script"; done
   if [ "$list" = true ]; then
     # shellcheck disable=SC2086
     for script in "${selftests[@]}"; do run bash $script; done
@@ -315,7 +315,8 @@ profile_workflows() {
     rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 \
     scripts/verify.sh scripts/verify-ci-scope.sh scripts/verify-clipboard-markers.sh \
     scripts/verify-desktop-candidate.sh scripts/exercise-desktop-install.sh scripts/exercise-desktop-upgrade.sh \
-    scripts/build-windows-installer.sh scripts/build-macos-app.sh scripts/build-macos-dmg.sh scripts/install-keepassxc-windows.sh scripts/fetch-pinned-asset.sh     scripts/build-upgrade-candidates.sh scripts/break-msi-cabinet.sh
+    scripts/build-windows-installer.sh scripts/build-macos-app.sh scripts/build-macos-dmg.sh scripts/install-keepassxc-windows.sh scripts/fetch-pinned-asset.sh \
+    scripts/build-upgrade-candidates.sh scripts/break-msi-cabinet.sh scripts/lib/*.sh
 }
 
 integration_script() { run "$timeout_command" --verbose --kill-after=10s 8m bash "$1"; }
@@ -395,6 +396,8 @@ path_lanes() {
     .github/workflows/ci.yml) echo core cli mcp rules pages integration compat aot scripts ;;
     .github/workflows/app.yml) echo rules scripts desktop-all appcompat markers package ;;
     .github/*) echo rules scripts ;;
+    scripts/lib/kpxc.sh) echo rules scripts compat aot appcompat ;;
+    scripts/lib/*) echo rules scripts pages integration compat aot appcompat desktop-all ;;
     scripts/verify-keepassxc-workflows.sh|scripts/verify-keepassxc-first-run.sh) echo rules scripts appcompat ;;
     scripts/install-keepassxc-windows.sh) echo rules scripts compat appcompat ;;
     scripts/fetch-pinned-asset.sh) echo rules scripts compat appcompat package ;;

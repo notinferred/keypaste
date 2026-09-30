@@ -18,43 +18,20 @@
 # NEGATIVE CONTROL: the check the welcome passes fails when KeePassXC's file is absent.
 set -euo pipefail
 
-die()  { printf '\nFIRST-RUN GATE FAILED: %s\n' "$*" >&2; exit 1; }
-step() { printf '\n--- %s\n' "$*"; }
+. "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+DIE_PREFIX='FIRST-RUN GATE FAILED: '
 
 dir=${1:-}
 [ -n "$dir" ] || die "usage: verify-keepassxc-first-run.sh <work-directory>"
-pw=${KP_COMPAT_PASSWORD:-}
-[ -n "$pw" ] || die "KP_COMPAT_PASSWORD is not set"
-cli=${KPXC_CLI:-keepassxc-cli}
-
-# Absence of the tool is a FAILURE, never a skip — see verify-keepassxc-compat.sh (i).
-if ! command -v "$cli" >/dev/null 2>&1 && [ ! -x "$cli" ]; then
-  die "keepassxc-cli not found (KPXC_CLI='${cli}'). This gate must never be skipped or soft-passed."
-fi
-
-# KeePassXC's own app sits beside its CLI in the Windows archive and the macOS bundle; apt puts it on PATH.
-gui=${KPXC_APP:-}
-if [ -z "$gui" ]; then
-  cli_dir=$(dirname "$(realpath "$(command -v "$cli" || printf '%s' "$cli")")")
-  for candidate in "$cli_dir/KeePassXC.exe" "$cli_dir/KeePassXC" "$(command -v keepassxc || true)"; do
-    if [ -n "$candidate" ] && [ -x "$candidate" ]; then gui=$candidate; break; fi
-  done
-fi
-[ -n "$gui" ] && [ -x "$gui" ] || die "KeePassXC's app not found beside '$cli' (set KPXC_APP)"
-
-drv=${KEYPASTE_APP_DRIVER:-}
-if [ -z "$drv" ]; then
-  drv=artifacts/bin/Keypaste.AppDriver/release/Keypaste.AppDriver
-  [ -x "$drv" ] || drv="${drv}.exe"
-fi
-[ -x "$drv" ] || die "app driver not found at '$drv' (build tests/Keypaste.AppDriver, or set KEYPASTE_APP_DRIVER)"
+. "$(dirname "${BASH_SOURCE[0]}")/lib/kpxc.sh"
+gui=$(keepassxc_app)
+drv=$(app_driver)
 
 rm -rf "$dir"
 mkdir -p "$dir/home" "$dir/vaults" "$dir/tmp"
 dir=$(cd "$dir" && pwd)
 export KEYPASTE_HOME="$dir/home"
 
-native() { if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s' "$1"; fi; }
 digest() { if [ -f "$1" ]; then sha256sum "$1" | cut -d' ' -f1; else echo absent; fi; }
 
 case "$(uname -s)" in

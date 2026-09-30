@@ -56,43 +56,20 @@
 
 set -euo pipefail
 
-die()  { printf '\nBACKUP GATE FAILED: %s\n' "$*" >&2; exit 1; }
-step() { printf '\n--- %s\n' "$*"; }
+. "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+DIE_PREFIX='BACKUP GATE FAILED: '
 
 db=${1:-}
 [ -n "$db" ] || die "usage: verify-keepassxc-backup.sh <backup.kdbx>"
-pw=${KP_COMPAT_PASSWORD:-}
-[ -n "$pw" ] || die "KP_COMPAT_PASSWORD is not set"
-cli=${KPXC_CLI:-keepassxc-cli}
+. "$(dirname "${BASH_SOURCE[0]}")/lib/kpxc.sh"
 
-# Absence of the tool is a FAILURE, never a skip — see verify-keepassxc-compat.sh (i).
-if ! command -v "$cli" >/dev/null 2>&1 && [ ! -x "$cli" ]; then
-  die "keepassxc-cli not found (KPXC_CLI='${cli}'). This gate must never be skipped or soft-passed."
-fi
-
-kp=${KEYPASTE_BIN:-}
-if [ -z "$kp" ]; then
-  kp=artifacts/bin/Keypaste.Cli/release/keypaste
-  [ -x "$kp" ] || kp="${kp}.exe"
-fi
-[ -x "$kp" ] || die "keypaste binary not found at '$kp' (build it, or set KEYPASTE_BIN)"
-
-restorer=${KEYPASTE_RESTORER:-}
-if [ -z "$restorer" ]; then
-  restorer=artifacts/bin/Keypaste.VaultRestorer/release/Keypaste.VaultRestorer
-  [ -x "$restorer" ] || restorer="${restorer}.exe"
-fi
-[ -x "$restorer" ] || die "restore driver not found at '$restorer' (build keypaste.slnx, or set KEYPASTE_RESTORER)"
+kp=$(keypaste_bin)
+restorer=$(vault_restorer)
 
 # The password travels in the environment, never in argv — see Keypaste.VaultRestorer.
 drive() { KEYPASTE_RESTORER_PASSWORD="$pw" "$restorer" "$@" | tr -d '\r'; }
 
-# BOTH sides need \r stripped — see verify-keepassxc-writeback.sh.
-kpxc()  { printf '%s\n' "$pw" | "$cli" "$@" | tr -d '\r'; }
 kpset() { printf '%s\n%s\n' "$pw" "$2" | "$kp" env set "$1" "$3" --vault "$db"; }
-
-# The whole file, so a refusal can be shown to have written nothing at all.
-bytes() { od -An -v -tx1 "$db" | tr -d ' \n'; }
 
 backups="${db}.backups"
 stem=$(basename "$db" .kdbx)
@@ -121,7 +98,7 @@ age() {
 # format or KDF regression round-trips invisibly through everything else.
 container() {
   local file=$1 what=$2 hdr info
-  hdr=$(od -An -v -tx1 -N12 "$file" | tr -d ' \n' | tr 'A-Z' 'a-z')
+  hdr=$(header "$file")
   [ "${hdr:0:16}" = "03d9a29a67fb4bb5" ] || die "$what is not a KDBX file (signature ${hdr:0:16})"
   [ "${hdr:20:2}" = "04" ]               || die "$what is not KDBX 4: major 0x${hdr:20:2}"
 
@@ -234,7 +211,7 @@ container "$backups/$rolled" "the backup that rolled the oldest out"
 
 # ---------------------------------------------------------------------------------------
 step "a save that cannot take a backup does not happen"
-before_refusal=$(bytes)
+before_refusal=$(bytes "$db")
 mv "$backups" "${backups}.held"
 : > "$backups"                          # a regular file where the directory has to go
 
@@ -247,7 +224,7 @@ rm -f "$backups"
 mv "${backups}.held" "$backups"
 
 [ "$refused_rc" -ne 0 ] || die "a save whose backup could not be written reported success"
-[ "$(bytes)" = "$before_refusal" ] || die "a save refused for want of a backup changed the vault"
+[ "$(bytes "$db")" = "$before_refusal" ] || die "a save refused for want of a backup changed the vault"
 [ "$(count)" -eq "$retained" ] || die "a refused save pruned backups; $(count) remain of $retained"
 
 refused=$(kpxc show -a Password "$db" "$entry") || die "keepassxc-cli show failed after the refusal"
@@ -318,7 +295,7 @@ rm -f "$export_to"
 
 # ---------------------------------------------------------------------------------------
 step "a wrong password and a backup that is not a vault restore nothing"
-before_refused_restore=$(bytes)
+before_refused_restore=$(bytes "$db")
 
 set +e
 KEYPASTE_RESTORER_PASSWORD="not-$pw" "$restorer" backup-restore "$db" "$rolled" >/dev/null 2>&1
@@ -326,7 +303,7 @@ wrong_rc=$?
 set -e
 
 [ "$wrong_rc" -ne 0 ] || die "a restore under the wrong password reported success"
-[ "$(bytes)" = "$before_refused_restore" ] || die "a restore refused for a wrong password changed the vault"
+[ "$(bytes "$db")" = "$before_refused_restore" ] || die "a restore refused for a wrong password changed the vault"
 
 planted="${stem}.20991231T235959Z.kdbx"
 printf 'not a vault' > "$backups/$planted"
@@ -339,7 +316,7 @@ set -e
 rm -f "$backups/$planted"
 
 [ "$planted_rc" -ne 0 ] || die "a backup that is not a vault was restored"
-[ "$(bytes)" = "$before_refused_restore" ] || die "a refused restore changed the vault"
+[ "$(bytes "$db")" = "$before_refused_restore" ] || die "a refused restore changed the vault"
 
 # ---------------------------------------------------------------------------------------
 # NEGATIVE CONTROL.

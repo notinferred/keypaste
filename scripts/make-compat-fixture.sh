@@ -24,19 +24,14 @@
 
 set -euo pipefail
 
-die() { printf '\nmake-compat-fixture: %s\n' "$*" >&2; exit 1; }
+. "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+DIE_PREFIX='make-compat-fixture: '
 
 db=${1:-}
 [ -n "$db" ] || die "usage: make-compat-fixture.sh <output.kdbx>"
 pw=${KP_COMPAT_PASSWORD:-}
 [ -n "$pw" ] || die "KP_COMPAT_PASSWORD is not set"
-
-kp=${KEYPASTE_BIN:-}
-if [ -z "$kp" ]; then
-  kp=artifacts/bin/Keypaste.Cli/release/keypaste
-  [ -x "$kp" ] || kp="${kp}.exe"
-fi
-[ -x "$kp" ] || die "keypaste binary not found at '$kp' (build it, or set KEYPASTE_BIN)"
+kp=$(keypaste_bin)
 
 mkdir -p "$(dirname "$db")"
 rm -f "$db"

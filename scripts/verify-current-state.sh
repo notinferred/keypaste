@@ -23,28 +23,13 @@ readonly V2='SENTINEL-CURRENT-TWO-9c03'
 readonly V3='SENTINEL-CURRENT-THREE-e7b5'
 readonly ENTRY='env/ci/DEPLOY_KEY'
 
-die() {
-  echo "::error::$*" >&2
-  for f in "${HOLD_OUT:-}" "${OUT:-}" "${ERR:-}"; do
-    if [ -n "$f" ] && [ -f "$f" ]; then echo "--- $f ---" >&2; cat "$f" >&2; fi
-  done
-  exit 1
-}
+. "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+DIE_FILES='HOLD_OUT OUT ERR'
+require jq
 
-command -v jq >/dev/null 2>&1 || die "jq is required and was not found; this gate must never be skipped"
-
-resolve() {
-  local candidate="$1"
-  [ -x "$candidate" ] || candidate="${candidate}.exe"
-  [ -x "$candidate" ] || die "not found: $1 (build first)"
-  printf '%s' "$candidate"
-}
-
-native() { if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s' "$1"; fi; }
-
-CLI="$(resolve "${KEYPASTE_BIN:-artifacts/bin/Keypaste.Cli/release/keypaste}")"
-MCP="$(resolve "${KEYPASTE_MCP_BIN:-artifacts/bin/Keypaste.Mcp/release/keypaste-mcp}")"
-DRV="$(resolve "${KEYPASTE_APP_DRIVER:-artifacts/bin/Keypaste.AppDriver/release/Keypaste.AppDriver}")"
+CLI="$(keypaste_bin)"
+MCP="$(keypaste_mcp)"
+DRV="$(app_driver)"
 
 WORK="$(mktemp -d)"
 mkdir -p "$WORK/home" "$WORK/other-home"
@@ -68,25 +53,6 @@ cleanup() {
 }
 trap cleanup EXIT
 
-kill_process() {
-  if command -v taskkill >/dev/null 2>&1; then
-    taskkill //F //PID "$1" >/dev/null 2>&1 || true
-  else
-    kill -9 "$1" 2>/dev/null || true
-  fi
-}
-
-wait_for() {
-  local pattern="$1" file="$2" count="${3:-1}"
-  for _ in $(seq 1 150); do
-    [ "$(grep -c -- "$pattern" "$file" 2>/dev/null || true)" -ge "$count" ] && return 0
-    sleep 0.2
-  done
-  die "timed out waiting for '$pattern' in $file"
-}
-
-session_of() { grep 'holding session' "$HOLD_OUT" | tail -1 | sed -E 's/^holding session ([0-9a-f]+).*/\1/'; }
-process_of() { grep 'holding session' "$HOLD_OUT" | tail -1 | sed -E 's/.* as process ([0-9]+).*/\1/'; }
 digest() { sha256sum "$WORK/vault.kdbx" | cut -d' ' -f1; }
 
 # Does one act in the held app and prints the line the driver answered it with.

@@ -17,32 +17,12 @@ readonly CORE='SENTINEL-RUN-GATE-7c31f9'
 SECRET="${CORE}\"q'x\\y\$z"$'\n'"é%40end"
 readonly SECRET
 
-die() {
-  echo "::error::$*" >&2
-  for f in "${AGENT_ERR:-}" "${OUT:-}" "${ERR:-}" "${AUDIT:-}"; do
-    if [ -n "$f" ] && [ -f "$f" ]; then echo "--- $f ---" >&2; cat "$f" >&2; fi
-  done
-  exit 1
-}
+. "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+DIE_FILES='AGENT_ERR OUT ERR AUDIT'
+require jq
 
-command -v jq >/dev/null 2>&1 || die "jq is required and was not found; this gate must never be skipped"
-
-resolve() {
-  local candidate="$1"
-  [ -x "$candidate" ] || candidate="${candidate}.exe"
-  [ -x "$candidate" ] || die "not found: $1 (build first)"
-  printf '%s' "$candidate"
-}
-
-native() {
-  case "$(uname -s)" in
-    MINGW*|MSYS*|CYGWIN*) cygpath -w "$1" ;;
-    *) printf '%s' "$1" ;;
-  esac
-}
-
-CLI="$(resolve "${KEYPASTE_BIN:-artifacts/bin/Keypaste.Cli/release/keypaste}")"
-MCP="$(resolve "${KEYPASTE_MCP_BIN:-artifacts/bin/Keypaste.Mcp/release/keypaste-mcp}")"
+CLI="$(keypaste_bin)"
+MCP="$(keypaste_mcp)"
 
 WORK="$(mktemp -d)"
 readonly VAULT="$WORK/vault.kdbx"
@@ -92,7 +72,7 @@ call() {
     '{jsonrpc:"2.0",id:$id,method:"tools/call",params:{name:"run",arguments:{command:$command,directory:$dir,project:"ci",reason:"ci run probe"}}}'
 }
 
-wait_for() {
+wait_for_reply() {
   local id="$1"
   for _ in $(seq 1 300); do
     jq -se --argjson id "$id" 'any(.[]; .id == $id)' <"$OUT" >/dev/null 2>&1 && return 0
@@ -109,14 +89,14 @@ readonly DENIED
 : >"$OUT"
 {
   printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}'
-  wait_for 1 || true
+  wait_for_reply 1 || true
   printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
   call 2 "$PRINTS"
-  wait_for 2 || true
+  wait_for_reply 2 || true
   call 3 "$PRINTS"
-  wait_for 3 || true
+  wait_for_reply 3 || true
   call 4 "$DENIED"
-  wait_for 4 || true
+  wait_for_reply 4 || true
   sleep 1
 } | "$MCP" --vault "$VAULT" --audit-log "$AUDIT" --approver "$PIPE" --client-label ci-probe --allow-run \
       >"$OUT" 2>"$ERR" || die "keypaste-mcp exited non-zero"

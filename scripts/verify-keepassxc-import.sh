@@ -17,26 +17,14 @@
 #         KEYPASTE_BIN         path to the keypaste binary           (default: the Release build)
 set -euo pipefail
 
-die()  { printf '\nIMPORT GATE FAILED: %s\n' "$*" >&2; exit 1; }
-step() { printf '\n--- %s\n' "$*"; }
+. "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+DIE_PREFIX='IMPORT GATE FAILED: '
 
 dir=${1:-}
 [ -n "$dir" ] || die "usage: verify-keepassxc-import.sh <work-directory>"
-pw=${KP_COMPAT_PASSWORD:-}
-[ -n "$pw" ] || die "KP_COMPAT_PASSWORD is not set"
-cli=${KPXC_CLI:-keepassxc-cli}
+. "$(dirname "${BASH_SOURCE[0]}")/lib/kpxc.sh"
 
-# Absence of the tool is a FAILURE, never a skip — see verify-keepassxc-compat.sh (i).
-if ! command -v "$cli" >/dev/null 2>&1 && [ ! -x "$cli" ]; then
-  die "keepassxc-cli not found (KPXC_CLI='${cli}'). This gate must never be skipped or soft-passed."
-fi
-
-kp=${KEYPASTE_BIN:-}
-if [ -z "$kp" ]; then
-  kp=artifacts/bin/Keypaste.Cli/release/keypaste
-  [ -x "$kp" ] || kp="${kp}.exe"
-fi
-[ -x "$kp" ] || die "keypaste binary not found at '$kp' (build it, or set KEYPASTE_BIN)"
+kp=$(keypaste_bin)
 
 rm -rf "$dir"
 mkdir -p "$dir/home"
@@ -45,14 +33,6 @@ unset KEYPASTE_VAULT KEYPASTE_KEYFILE
 
 src="$dir/a.kdbx"
 target="$dir/mine.kdbx"
-
-native() { if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s' "$1"; fi; }
-bytes()  { od -An -v -tx1 "$1" | tr -d ' \n'; }
-kx() {
-  local sub=$1 db=$2; shift 2
-  printf '%s\n' "$pw" | "$cli" "$sub" -q "$(native "$db")" "$@" | tr -d '\r'
-}
-uuid() { printf '%-16.16s' "$1" | base64; }
 
 step "KeePassXC makes the source: a group, a custom attribute, a revision, an attachment and a recycled entry"
 cat >"$dir/seed.xml" <<EOF

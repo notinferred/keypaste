@@ -12,6 +12,7 @@
 #   - a test project's file selects that project alone, and a file another project compiles in
 #     selects that project too;
 #   - a helper a test starts at run time selects the test that starts it;
+#   - the gates' shared library selects every lane whose gates source it;
 #   - a build input, an unknown path, an empty change list and an unreadable range select everything,
 #     and an unreadable range says git failed rather than passing for an empty one.
 #
@@ -73,6 +74,12 @@ run_case "the backend workflow" .github/workflows/ci.yml ' core cli mcp rules pa
 run_case "rules beside a test project" "$(printf '%s\n' .github/workflows/install.yml tests/Keypaste.Cli.Tests/New.cs)" \
   ' cli rules scripts ' "$THREE" 'tests/Keypaste.Core.Tests tests/Keypaste.Cli.Tests' '' ''
 
+echo "== the gates' shared library"
+run_case "the library every gate sources" scripts/lib/common.sh ' rules pages integration compat aot scripts desktop appcompat ' \
+  "$THREE" tests/Keypaste.Core.Tests all Keypaste.Core.Tests.WorkflowRulesTests
+run_case "the KeePassXC gates' library" scripts/lib/kpxc.sh ' rules compat aot scripts appcompat ' "$THREE" \
+  tests/Keypaste.Core.Tests '' Keypaste.Core.Tests.WorkflowRulesTests
+
 echo "== projects, linked files and helpers"
 run_case "a new core test" tests/Keypaste.Core.Tests/SomeNew.cs ' core ' "$THREE" tests/Keypaste.Core.Tests '' ''
 run_case "the CLI harness" tests/Keypaste.Cli.Tests/CliHarness.cs ' cli desktop ' "$THREE" \
@@ -121,10 +128,11 @@ DECLARED="$(declared_cases)"
 cat <<EOF
 ok: $cases_run cases. Documents nothing reads select no lane, pages and workflows select the Linux
     lanes that read them, a test project's file selects that project, a file another project
-    compiles or embeds selects that project too, a helper selects the test that starts it, and a
-    build input, an unknown path, no change and an unreadable range each select everything, the
-    last saying git failed. With linked files ignored the CLI harness loses desktop and the word
-    list keeps only core.
+    compiles or embeds selects that project too, a helper selects the test that starts it, the
+    gates' shared library selects every lane whose gates source it, and a build input, an
+    unknown path, no change and an unreadable range each select everything, the last saying git
+    failed. With linked files ignored the CLI harness loses desktop and the word list keeps only
+    core.
 not proved here: that the jobs a lane names run what it promises, which the workflow owns; and
     that a runtime dependency no project file or helper table records is found at all.
 EOF

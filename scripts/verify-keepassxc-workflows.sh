@@ -21,42 +21,18 @@
 # CustomData, must each fail the same check every workflow passes.
 set -euo pipefail
 
-die()  { printf '\nWORKFLOWS GATE FAILED: %s\n' "$*" >&2; exit 1; }
-step() { printf '\n--- %s\n' "$*"; }
+. "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+DIE_PREFIX='WORKFLOWS GATE FAILED: '
 
 dir=${1:-}
 [ -n "$dir" ] || die "usage: verify-keepassxc-workflows.sh <work-directory>"
-pw=${KP_COMPAT_PASSWORD:-}
-[ -n "$pw" ] || die "KP_COMPAT_PASSWORD is not set"
-cli=${KPXC_CLI:-keepassxc-cli}
-
-# Absence of the tool is a FAILURE, never a skip — see verify-keepassxc-compat.sh (i).
-if ! command -v "$cli" >/dev/null 2>&1 && [ ! -x "$cli" ]; then
-  die "keepassxc-cli not found (KPXC_CLI='${cli}'). This gate must never be skipped or soft-passed."
-fi
-
-kp=${KEYPASTE_BIN:-}
-if [ -z "$kp" ]; then
-  kp=artifacts/bin/Keypaste.Cli/release/keypaste
-  [ -x "$kp" ] || kp="${kp}.exe"
-fi
-[ -x "$kp" ] || die "keypaste binary not found at '$kp' (build it, or set KEYPASTE_BIN)"
-
-drv=${KEYPASTE_APP_DRIVER:-}
-if [ -z "$drv" ]; then
-  drv=artifacts/bin/Keypaste.AppDriver/release/Keypaste.AppDriver
-  [ -x "$drv" ] || drv="${drv}.exe"
-fi
-[ -x "$drv" ] || die "app driver not found at '$drv' (build tests/Keypaste.AppDriver, or set KEYPASTE_APP_DRIVER)"
+. "$(dirname "${BASH_SOURCE[0]}")/lib/kpxc.sh"
+kp=$(keypaste_bin)
+drv=$(app_driver)
 
 rm -rf "$dir"
 mkdir -p "$dir/home"
 export KEYPASTE_HOME="$dir/home"
-
-native() { if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s' "$1"; fi; }
-bytes()  { od -An -v -tx1 "$1" | tr -d ' \n'; }
-copies() { if [ -d "$1.backups" ]; then find "$1.backups" -maxdepth 1 -type f | wc -l | tr -d ' '; else echo 0; fi; }
-header() { od -An -v -tx1 -N12 "$1" | tr -d ' \n' | tr 'A-Z' 'a-z'; }
 
 # The factors the vault under test has now. Every reader and writer below uses them, so a change of
 # access is followed by every later step.
@@ -64,6 +40,7 @@ cur_pw=$pw
 cur_kf=
 new_pw=
 
+# Replaces kpxc.sh's kx, which opens every vault with the gate's password alone.
 kx() {
   local sub=$1 db=$2; shift 2
   local factors=(-q)
@@ -145,8 +122,6 @@ refused() {
 }
 
 did() { local what=$1; shift; "$@" >"$dir/did.out" 2>&1 || die "$what failed: $(cat "$dir/did.out")"; }
-
-uuid() { printf '%-16.16s' "$1" | base64; }
 
 # The number of revisions KeePassXC holds for the entry with the UUID $2 in the vault $1.
 # The export goes to a file first: awk stops reading once it has counted, and under pipefail the

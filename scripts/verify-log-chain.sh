@@ -14,22 +14,11 @@
 # These checks must never be skipped or soft-passed.
 set -euo pipefail
 
-readonly MCP="${KEYPASTE_MCP_BIN:-artifacts/bin/Keypaste.Mcp/release/keypaste-mcp}"
-readonly CLI="${KEYPASTE_BIN:-artifacts/bin/Keypaste.Cli/release/keypaste}"
+. "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+DIE_FILES='AUDIT'
 
-die() {
-  echo "::error::$*" >&2
-  if [ -f "${AUDIT:-}" ]; then echo "--- audit log ---" >&2; cat "$AUDIT" >&2; fi
-  exit 1
-}
-
-MCP_PATH="$MCP"
-[ -x "$MCP_PATH" ] || MCP_PATH="${MCP}.exe"
-[ -x "$MCP_PATH" ] || die "keypaste-mcp not found at $MCP (build first)"
-
-CLI_PATH="$CLI"
-[ -x "$CLI_PATH" ] || CLI_PATH="${CLI}.exe"
-[ -x "$CLI_PATH" ] || die "keypaste not found at $CLI (build first)"
+MCP_PATH="$(keypaste_mcp)"
+CLI_PATH="$(keypaste_bin)"
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT

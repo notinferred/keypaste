@@ -30,36 +30,15 @@
 
 set -euo pipefail
 
-die()  { printf '\nHISTORY GATE FAILED: %s\n' "$*" >&2; exit 1; }
-step() { printf '\n--- %s\n' "$*"; }
+. "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+DIE_PREFIX='HISTORY GATE FAILED: '
 
 db=${1:-}
 [ -n "$db" ] || die "usage: verify-keepassxc-history.sh <history.kdbx>"
-pw=${KP_COMPAT_PASSWORD:-}
-[ -n "$pw" ] || die "KP_COMPAT_PASSWORD is not set"
-cli=${KPXC_CLI:-keepassxc-cli}
+. "$(dirname "${BASH_SOURCE[0]}")/lib/kpxc.sh"
 
-# Absence of the tool is a FAILURE, never a skip — see verify-keepassxc-compat.sh (i).
-if ! command -v "$cli" >/dev/null 2>&1 && [ ! -x "$cli" ]; then
-  die "keepassxc-cli not found (KPXC_CLI='${cli}'). This gate must never be skipped or soft-passed."
-fi
-
-kp=${KEYPASTE_BIN:-}
-if [ -z "$kp" ]; then
-  kp=artifacts/bin/Keypaste.Cli/release/keypaste
-  [ -x "$kp" ] || kp="${kp}.exe"
-fi
-[ -x "$kp" ] || die "keypaste binary not found at '$kp' (build it, or set KEYPASTE_BIN)"
-
-restorer=${KEYPASTE_RESTORER:-}
-if [ -z "$restorer" ]; then
-  restorer=artifacts/bin/Keypaste.VaultRestorer/release/Keypaste.VaultRestorer
-  [ -x "$restorer" ] || restorer="${restorer}.exe"
-fi
-[ -x "$restorer" ] || die "restore driver not found at '$restorer' (build keypaste.slnx, or set KEYPASTE_RESTORER)"
-
-# BOTH sides need \r stripped — see verify-keepassxc-writeback.sh.
-kpxc() { printf '%s\n' "$pw" | "$cli" "$@" | tr -d '\r'; }
+kp=$(keypaste_bin)
+restorer=$(vault_restorer)
 
 project=compat-history
 key=ROTATED
@@ -101,7 +80,7 @@ KEYPASTE_RESTORER_PASSWORD=$pw KEYPASTE_RESTORER_ENTRY=$entry "$restorer" "$db" 
 # The container is re-checked after a restore-save, exactly as the write-back gate re-checks it
 # after an update: a format or KDF shift on this path would round-trip through keypaste perfectly
 # and be invisible anywhere else.
-hdr=$(od -An -v -tx1 -N12 "$db" | tr -d ' \n' | tr 'A-Z' 'a-z')
+hdr=$(header "$db")
 [ "${hdr:0:16}" = "03d9a29a67fb4bb5" ] || die "not a KDBX file after a keypaste restore (signature ${hdr:0:16})"
 [ "${hdr:20:2}" = "04" ]               || die "KDBX major version changed on restore: 0x${hdr:20:2}"
 
@@ -152,13 +131,13 @@ fi
 
 # A revision the entry does not have must be refused, and refused without changing the file:
 # a driver that silently restored the nearest index would make every assertion above vacuous.
-before_refusal=$(od -An -v -tx1 "$db" | tr -d ' \n')
+before_refusal=$(bytes "$db")
 set +e
 KEYPASTE_RESTORER_PASSWORD=$pw KEYPASTE_RESTORER_ENTRY=$entry "$restorer" "$db" 99 >/dev/null 2>&1
 refused_rc=$?
 set -e
 [ "$refused_rc" -eq 1 ] || die "restoring a revision that does not exist exited ${refused_rc}, expected 1"
-[ "$(od -An -v -tx1 "$db" | tr -d ' \n')" = "$before_refusal" ] \
+[ "$(bytes "$db")" = "$before_refusal" ] \
   || die "a refused restore changed the vault file"
 
 printf '\nHISTORY GATE PASSED: KeePassXC reads the restored value and every revision behind it.\n'

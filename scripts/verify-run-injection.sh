@@ -19,7 +19,8 @@
 
 set -euo pipefail
 
-die() { printf '\nverify-run-injection: FAILED - %s\n' "$*" >&2; exit 1; }
+. "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+DIE_PREFIX='verify-run-injection: FAILED - '
 
 # The child is THIS script's own interpreter, by absolute path, never the bare word `bash`. On a
 # Windows developer machine `bash` on PATH is usually C:\Windows\System32\bash.exe — the WSL
@@ -29,12 +30,7 @@ die() { printf '\nverify-run-injection: FAILED - %s\n' "$*" >&2; exit 1; }
 child=${BASH:-/bin/bash}
 [ -x "$child" ] || die "cannot locate the bash that is running this script"
 
-kp=${KEYPASTE_BIN:-}
-if [ -z "$kp" ]; then
-  kp=artifacts/bin/Keypaste.Cli/release/keypaste
-  [ -x "$kp" ] || kp="${kp}.exe"
-fi
-[ -x "$kp" ] || die "keypaste binary not found at '$kp' (build it, or set KEYPASTE_BIN)"
+kp=$(keypaste_bin)
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT

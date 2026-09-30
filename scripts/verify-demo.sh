@@ -56,25 +56,12 @@ readonly FIXTURE='scripts/demo/deploy.sh'
 # too and the diff would fail. That is why launch.md keeps one copy and its posts reference it.
 readonly TRANSCRIPT_PAGES='docs/demo.md README.md site/public/index.html docs/keepass-and-agents.md launch.md'
 
-die() {
-  echo "::error::$*" >&2
-  for f in "${AGENT_ERR:-}" "${OUT:-}" "${ERR:-}" "${DIFF:-}"; do
-    if [ -n "$f" ] && [ -f "$f" ]; then echo "--- $f ---" >&2; cat "$f" >&2; fi
-  done
-  exit 1
-}
+. "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+DIE_FILES='AGENT_ERR OUT ERR DIFF'
+require jq
 
-command -v jq >/dev/null 2>&1 || die "jq is required and was not found; this gate must never be skipped"
-
-resolve() {
-  local candidate="$1"
-  [ -x "$candidate" ] || candidate="${candidate}.exe"
-  [ -x "$candidate" ] || die "not found: $1 (build first)"
-  printf '%s' "$candidate"
-}
-
-CLI="$(resolve "${KEYPASTE_BIN:-artifacts/bin/Keypaste.Cli/release/keypaste}")"
-MCP="$(resolve "${KEYPASTE_MCP_BIN:-artifacts/bin/Keypaste.Mcp/release/keypaste-mcp}")"
+CLI="$(keypaste_bin)"
+MCP="$(keypaste_mcp)"
 
 WORK="$(mktemp -d)"
 readonly VAULT="$WORK/vault.kdbx"

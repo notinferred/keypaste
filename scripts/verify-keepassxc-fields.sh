@@ -25,29 +25,15 @@
 #         KEYPASTE_MCP_BIN     path to the keypaste-mcp binary       (default: the Release build)
 set -euo pipefail
 
-die()  { printf '\nFIELDS GATE FAILED: %s\n' "$*" >&2; exit 1; }
-step() { printf '\n--- %s\n' "$*"; }
+. "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+DIE_PREFIX='FIELDS GATE FAILED: '
 
 dir=${1:-}
 [ -n "$dir" ] || die "usage: verify-keepassxc-fields.sh <work-directory>"
-pw=${KP_COMPAT_PASSWORD:-}
-[ -n "$pw" ] || die "KP_COMPAT_PASSWORD is not set"
-cli=${KPXC_CLI:-keepassxc-cli}
+. "$(dirname "${BASH_SOURCE[0]}")/lib/kpxc.sh"
 
-# Absence of the tool is a FAILURE, never a skip — see verify-keepassxc-compat.sh (i).
-if ! command -v "$cli" >/dev/null 2>&1 && [ ! -x "$cli" ]; then
-  die "keepassxc-cli not found (KPXC_CLI='${cli}'). This gate must never be skipped or soft-passed."
-fi
-
-kp=${KEYPASTE_BIN:-}
-if [ -z "$kp" ]; then
-  kp=artifacts/bin/Keypaste.Cli/release/keypaste
-  [ -x "$kp" ] || kp="${kp}.exe"
-fi
-[ -x "$kp" ] || die "keypaste binary not found at '$kp' (build it, or set KEYPASTE_BIN)"
-mcp=${KEYPASTE_MCP_BIN:-artifacts/bin/Keypaste.Mcp/release/keypaste-mcp}
-[ -x "$mcp" ] || mcp="${mcp}.exe"
-[ -x "$mcp" ] || die "keypaste-mcp binary not found at '$mcp' (build it, or set KEYPASTE_MCP_BIN)"
+kp=$(keypaste_bin)
+mcp=$(keypaste_mcp)
 
 agent_pid=
 trap 'if [ -n "$agent_pid" ]; then kill "$agent_pid" 2>/dev/null || true; fi' EXIT
@@ -59,16 +45,6 @@ unset KEYPASTE_VAULT KEYPASTE_KEYFILE
 
 db="$dir/a.kdbx"
 entry=api/Stripe
-
-native() { if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s' "$1"; fi; }
-bytes()  { od -An -v -tx1 "$1" | tr -d ' \n'; }
-copies() { if [ -d "$1.backups" ]; then find "$1.backups" -maxdepth 1 -type f | wc -l | tr -d ' '; else echo 0; fi; }
-header() { od -An -v -tx1 -N12 "$1" | tr -d ' \n' | tr '[:upper:]' '[:lower:]'; }
-kx() {
-  local sub=$1 target=$2; shift 2
-  printf '%s\n' "$pw" | "$cli" "$sub" -q "$(native "$target")" "$@" | tr -d '\r'
-}
-uuid() { printf '%-16.16s' "$1" | base64; }
 
 # The master password, then one value per prompt, written with \n between them.
 kp_with() {

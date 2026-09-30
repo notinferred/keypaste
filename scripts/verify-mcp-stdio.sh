@@ -11,20 +11,11 @@
 # audit line each fail this script. These checks must never be skipped or soft-passed.
 set -euo pipefail
 
-readonly BIN="${KEYPASTE_MCP_BIN:-artifacts/bin/Keypaste.Mcp/release/keypaste-mcp}"
+. "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+DIE_FILES='OUT ERR'
+require jq
 
-die() {
-  echo "::error::$*" >&2
-  if [ -f "${OUT:-}" ]; then echo "--- stdout ---" >&2; cat "$OUT" >&2; fi
-  if [ -f "${ERR:-}" ]; then echo "--- stderr ---" >&2; cat "$ERR" >&2; fi
-  exit 1
-}
-
-command -v jq >/dev/null 2>&1 || die "jq is required and was not found; this gate must never be skipped"
-
-BIN_PATH="$BIN"
-[ -x "$BIN_PATH" ] || BIN_PATH="${BIN}.exe"
-[ -x "$BIN_PATH" ] || die "keypaste-mcp not found at $BIN (build first)"
+BIN_PATH="$(keypaste_mcp)"
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT

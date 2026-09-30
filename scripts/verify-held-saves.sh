@@ -21,28 +21,13 @@ readonly V1='SENTINEL-HELD-SAVES-ONE-3f91'
 readonly ENTRY='env/ci/DEPLOY_KEY'
 readonly VERBS=(add rm access env-set env-rm env-pull import)
 
-die() {
-  echo "::error::$*" >&2
-  for f in "${HOLD_OUT:-}" "${AGENT_ERR:-}" "${OUT:-}" "${ERR:-}" "${VERB_ERR:-}"; do
-    if [ -n "$f" ] && [ -f "$f" ]; then echo "--- $f ---" >&2; cat "$f" >&2; fi
-  done
-  exit 1
-}
+. "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+DIE_FILES='HOLD_OUT AGENT_ERR OUT ERR VERB_ERR'
+require jq
 
-command -v jq >/dev/null 2>&1 || die "jq is required and was not found; this gate must never be skipped"
-
-resolve() {
-  local candidate="$1"
-  [ -x "$candidate" ] || candidate="${candidate}.exe"
-  [ -x "$candidate" ] || die "not found: $1 (build first)"
-  printf '%s' "$candidate"
-}
-
-native() { if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s' "$1"; fi; }
-
-CLI="$(resolve "${KEYPASTE_BIN:-artifacts/bin/Keypaste.Cli/release/keypaste}")"
-MCP="$(resolve "${KEYPASTE_MCP_BIN:-artifacts/bin/Keypaste.Mcp/release/keypaste-mcp}")"
-DRV="$(resolve "${KEYPASTE_APP_DRIVER:-artifacts/bin/Keypaste.AppDriver/release/Keypaste.AppDriver}")"
+CLI="$(keypaste_bin)"
+MCP="$(keypaste_mcp)"
+DRV="$(app_driver)"
 
 WORK="$(mktemp -d)"
 mkdir -p "$WORK/home"
@@ -71,23 +56,6 @@ cleanup() {
   rm -rf "$WORK"
 }
 trap cleanup EXIT
-
-kill_process() {
-  if command -v taskkill >/dev/null 2>&1; then
-    taskkill //F //PID "$1" >/dev/null 2>&1 || true
-  else
-    kill -9 "$1" 2>/dev/null || true
-  fi
-}
-
-wait_for() {
-  local pattern="$1" file="$2" count="${3:-1}"
-  for _ in $(seq 1 150); do
-    [ "$(grep -c -- "$pattern" "$file" 2>/dev/null || true)" -ge "$count" ] && return 0
-    sleep 0.2
-  done
-  die "timed out waiting for '$pattern' in $file"
-}
 
 digest() { sha256sum "$WORK/vault.kdbx" | cut -d' ' -f1; }
 backups() { find "$WORK/vault.kdbx.backups" -type f 2>/dev/null | wc -l | tr -d ' '; }

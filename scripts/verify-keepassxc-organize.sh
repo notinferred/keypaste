@@ -49,56 +49,24 @@
 
 set -euo pipefail
 
-die()  { printf '\nORGANIZE GATE FAILED: %s\n' "$*" >&2; exit 1; }
-step() { printf '\n--- %s\n' "$*"; }
+. "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+DIE_PREFIX='ORGANIZE GATE FAILED: '
 
 db=${1:-}
 [ -n "$db" ] || die "usage: verify-keepassxc-organize.sh <organize.kdbx>"
-pw=${KP_COMPAT_PASSWORD:-}
-[ -n "$pw" ] || die "KP_COMPAT_PASSWORD is not set"
-cli=${KPXC_CLI:-keepassxc-cli}
+. "$(dirname "${BASH_SOURCE[0]}")/lib/kpxc.sh"
 
-# Absence of the tool is a FAILURE, never a skip — see verify-keepassxc-compat.sh (i).
-if ! command -v "$cli" >/dev/null 2>&1 && [ ! -x "$cli" ]; then
-  die "keepassxc-cli not found (KPXC_CLI='${cli}'). This gate must never be skipped or soft-passed."
-fi
-
-kp=${KEYPASTE_BIN:-}
-if [ -z "$kp" ]; then
-  kp=artifacts/bin/Keypaste.Cli/release/keypaste
-  [ -x "$kp" ] || kp="${kp}.exe"
-fi
-[ -x "$kp" ] || die "keypaste binary not found at '$kp' (build it, or set KEYPASTE_BIN)"
-
-driver=${KEYPASTE_RESTORER:-}
-if [ -z "$driver" ]; then
-  driver=artifacts/bin/Keypaste.VaultRestorer/release/Keypaste.VaultRestorer
-  [ -x "$driver" ] || driver="${driver}.exe"
-fi
-[ -x "$driver" ] || die "organize driver not found at '$driver' (build keypaste.slnx, or set KEYPASTE_RESTORER)"
+kp=$(keypaste_bin)
+driver=$(vault_restorer)
 
 export KEYPASTE_RESTORER_PASSWORD=$pw
 
-# BOTH sides need \r stripped — see verify-keepassxc-writeback.sh.
-kpxc()  { printf '%s\n' "$pw" | "$cli" "$@" | tr -d '\r'; }
 kpset() { printf '%s\n%s\n' "$pw" "$2" | "$kp" env set "$1" "$3" --vault "$db"; }
-
-# The whole file, so a refusal can be shown to have written nothing at all.
-bytes() { od -An -v -tx1 "$db" | tr -d ' \n'; }
-
-# The last <UUID> BEFORE the first <History>, which is the entry's own rather than a revision's.
-# The seen-flag rather than `{exit}` or `head`, because leaving the stream early breaks the pipe
-# the `tr` upstream is writing into and `pipefail` then kills the gate (F.16).
-entry_uuid() {
-  kpxc export -f xml "$db" \
-    | tr -d '\t' \
-    | awk '/<History>/{seen=1} !seen && /<UUID>/{last=$0} END{print last}'
-}
 
 # The KDBX container: signature, major version, and the minor version this gate exists for.
 assert_kdbx_40() {
   local hdr what=$1
-  hdr=$(od -An -v -tx1 -N12 "$db" | tr -d ' \n' | tr 'A-Z' 'a-z')
+  hdr=$(header "$db")
   [ "${hdr:0:16}" = "03d9a29a67fb4bb5" ] || die "not a KDBX file after ${what} (signature ${hdr:0:16})"
   [ "${hdr:20:2}" = "04" ]               || die "KDBX major version changed on ${what}: 0x${hdr:20:2}"
   [ "${hdr:16:2}" = "00" ] \
@@ -109,7 +77,7 @@ assert_kdbx_40() {
 refuses() {
   local expected=$1 before said rc
   shift
-  before=$(bytes)
+  before=$(bytes "$db")
   set +e
   said=$("$driver" "$@" 2>&1)
   rc=$?
@@ -117,7 +85,7 @@ refuses() {
   [ "$rc" -eq 1 ] || die "'$*' exited ${rc}, expected 1. It said: ${said}"
   grep -qF "refused: ${expected}" <<<"$said" \
     || die "'$*' was not refused as ${expected}. It said: ${said}"
-  [ "$(bytes)" = "$before" ] || die "the refused '$*' changed the vault file"
+  [ "$(bytes "$db")" = "$before" ] || die "the refused '$*' changed the vault file"
 }
 
 project=compat-organize
@@ -138,7 +106,7 @@ kpset "$project" kept-value KEPT
 kpset "$other" other-value OTHER
 printf '%s\n%s\n' "$pw" 'plain-pass' | "$kp" add "keys/spare" --vault "$db" >/dev/null
 
-uuid_before=$(entry_uuid)
+uuid_before=$(entry_uuid "$db")
 [ -n "$uuid_before" ] || die "could not read the entry's UUID out of the XML export"
 
 assert_kdbx_40 "the seed"
@@ -216,7 +184,7 @@ diff -u <(printf '%s\n' 'v4-current') <(printf '%s\n' "$moved") \
 # What the file says about the entry that was renamed and moved.
 # ---------------------------------------------------------------------------------------
 step "it is the same entry, with its history, and the file records no move and no deletion"
-uuid_after=$(entry_uuid)
+uuid_after=$(entry_uuid "$db")
 [ "$uuid_after" = "$uuid_before" ] \
   || die "the entry's UUID changed across a rename and a move, so it was re-added rather than mutated. Its attachments, custom strings and history do not survive that."
 
@@ -255,7 +223,7 @@ diff -u <(printf '%s
 ' "$relocated")   || die "the relocated entry does not hold its value"
 
 step "the combined write mutated the entry rather than replacing it"
-uuid_relocated=$(entry_uuid)
+uuid_relocated=$(entry_uuid "$db")
 [ "$uuid_relocated" = "$uuid_before" ]   || die "the entry's UUID changed across a combined rename and move, so it was re-added rather than mutated."
 
 xml=$(kpxc export -f xml "$db") || die "keepassxc-cli export -f xml failed"
@@ -295,7 +263,7 @@ step "recycling raises the same file to KDBX 4.1, which is what makes the 4.0 as
 kpset invoicing doomed-value DOOMED >/dev/null
 printf '%s\n' "$pw" | "$kp" rm env/invoicing/DOOMED --vault "$db" --yes >/dev/null
 
-hdr=$(od -An -v -tx1 -N12 "$db" | tr -d ' \n' | tr 'A-Z' 'a-z')
+hdr=$(header "$db")
 [ "${hdr:16:2}" = "01" ] \
   || die "recycling did not raise the file to KDBX 4.1 (minor 0x${hdr:16:2}). The assertions that organizing leaves it at 4.0 are then checking nothing."
 
@@ -352,9 +320,9 @@ if grep -qF '>v0-never-written<' <<<"$history"; then
 fi
 
 # The byte comparison every refusal above rests on must be able to see a change.
-before_control=$(bytes)
+before_control=$(bytes "$db")
 kpset invoicing control-value CONTROL >/dev/null
-[ "$(bytes)" != "$before_control" ] \
+[ "$(bytes "$db")" != "$before_control" ] \
   || die "the vault file did not change after a write — the byte comparison cannot detect one, so every refusal above proved nothing"
 
 # And a rename the rules allow must actually go through, or a gate whose refusals all pass because
