@@ -248,7 +248,7 @@ CI builds and packages on three operating systems; desktop tests read secret sur
 
 ## Observing minimize-lock on macOS and Linux
 
-Item 11 has been observed on Windows. macOS and Linux require native checks because headless tests cannot establish what their window managers report. `observe-desktop.yml` drives these checks on `macos-15` and on Xvfb with Openbox through [observe-minimize-lock.sh](../scripts/observe-minimize-lock.sh), and both passed. What a runner cannot observe, a person's own minimize click and, on macOS, the `Cmd+H` keystroke, still needs to be recorded on a real macOS machine and Linux desktop.
+Item 11 has been observed on Windows. macOS and Linux require native checks because headless tests cannot establish what their window managers report. F.2b2's runner observer passed on `macos-15` and on Xvfb with Openbox, and [F.2b3b](steps/F.2b3b.md) made these acts on a real Linux desktop under xfwm4. A minimize click and the `Cmd+H` keystroke on a real macOS desktop are still unobserved, and the macOS desktop app needs them observed.
 
 Download the seven-day `app-<rid>` artifact from `app.yml`, or publish locally:
 
@@ -267,4 +267,4 @@ Use a disposable vault and set an idle timeout long enough to exclude it as the 
 
 Switching windows must leave the app unlocked. On macOS, `Cmd+H` hides the app and must also leave it unlocked; `Cmd+M` minimizes it.
 
-Record the OS name, version and build; session type and desktop environment; app build or tag; and each result with the selected platform task. Linux under xfwm4 was observed in [F.2b3b](steps/F.2b3b.md); macOS observation is needed if that desktop target is selected from BACKLOG. If a window manager reports no minimize event, record that result and update `MinimizeLock.IsSupported` to omit the unsupported switch. Untested targets remain unobserved.
+Record the OS name, version and build; session type and desktop environment; app build or tag; and each result with the selected platform task. If a window manager reports no minimize event, record that result and update `MinimizeLock.IsSupported` to omit the unsupported switch. Untested targets remain unobserved.

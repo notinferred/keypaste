@@ -136,11 +136,7 @@ State: `view`, `sel` (selected secret), `reveal`, `approval`, `importOpen`, `loc
 - The profile toggle rewrites the `.env.keypaste` preview and the run command.
 
 ## Assets
-- `assets/keypaste-glyph-dark.svg` / `-light.svg` / `-mono.svg`: the icon "k." (ink `#F2F2F0` or `#111214`, amber dot; mono takes `currentColor`).
-- `assets/keypaste-wordmark-dark.svg` / `-light.svg` / `-mono.svg`: the wordmark "keypaste.", never beside the icon.
-- `assets/keypaste-app-icon.svg`: app icon; the icon on a `#1D1E22` tile, rx 15/64.
-- `assets/keypaste-favicon.svg`: for 32px and below; the same tile, rx 12/64, with a larger "k.".
-- The marks are Hepta Slab SemiBold outlines written by `scripts/outline-brand-marks.py`; the prototypes still draw the earlier monogram.
+- The marks, the icon "k." and the wordmark "keypaste.", are in [`assets/brand/`](../../assets/brand), and [BRAND](../BRAND.md) says which file serves which use. The prototypes still draw the earlier monogram.
 - Icons: **Lucide**, 1.5px stroke (the prototype uses the `lucide-static` icon font). Use `lucide-react` or equivalent. Sizes: 16px lists, 14px fields, 20px sidebar.
 - Fonts: Instrument Sans and Fragment Mono (Google Fonts, OFL). Self-host them in the app.
 
@@ -150,4 +146,3 @@ State: `view`, `sel` (selected secret), `reveal`, `approval`, `importOpen`, `loc
 - `design/keypaste Brand System.dc.html`: logo, color, type, components, voice
 - `design/support.js`: runtime needed to open the .dc.html files
 - `tokens/styles.css` (+ `tokens/tokens/*.css`): CSS custom properties, ready to drop in
-- `BRAND.md`: brand and voice guide · `SKILL.md`: Claude Code skill for keeping future work on-brand

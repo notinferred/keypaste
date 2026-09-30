@@ -7,7 +7,7 @@ beside the interface's Instrument Sans; the icon is 580 tracked -1%, so it holds
 tile and at 16 px. Each dot's side is a multiple of that weight's stem, set a fixed share of an em
 after the last letter's ink. Outlines are the source of truth, so no font is vendored: this writes
 
-    assets/brand/ and docs/design/assets/   keypaste-glyph-{dark,light,mono}.svg,
+    assets/brand/                           keypaste-glyph-{dark,light,mono}.svg,
                                              keypaste-wordmark-{dark,light,mono}.svg,
                                              keypaste-app-icon.svg, keypaste-favicon.svg
     site/public/favicon.svg                  the favicon cut
@@ -239,9 +239,8 @@ def main():
     data = recorded_font(sys.argv[1])
     glyph, wordmark = outline(data, GLYPH), outline(data, WORDMARK)
     files = marks(glyph, wordmark)
-    for folder in (ROOT / "assets" / "brand", ROOT / "docs" / "design" / "assets"):
-        for name, text in files.items():
-            (folder / name).write_text(text, encoding="utf-8", newline="\n")
+    for name, text in files.items():
+        (ROOT / "assets" / "brand" / name).write_text(text, encoding="utf-8", newline="\n")
     (ROOT / "site" / "public" / "favicon.svg").write_text(files["keypaste-favicon.svg"], encoding="utf-8", newline="\n")
     (ROOT / "src" / "Keypaste.App" / "Theme" / "BrandOutlines.axaml").write_text(axaml(glyph, wordmark), encoding="utf-8", newline="\n")
     for name in SITE_WORDMARKS:
@@ -250,7 +249,7 @@ def main():
         if count == 0:
             sys.exit(f"{name} carries no inline wordmark to replace")
         page.write_text(text, encoding="utf-8", newline="\n")
-    print(f"wrote {len(files)} marks to assets/brand and docs/design/assets, the site favicon, BrandOutlines.axaml "
+    print(f"wrote {len(files)} marks to assets/brand, the site favicon, BrandOutlines.axaml "
           f"and the inline wordmark in {len(SITE_WORDMARKS)} site files")
 
 

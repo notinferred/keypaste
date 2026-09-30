@@ -241,7 +241,6 @@ selftests=(
   'scripts/verify-windows-signature.sh --selftest'
   'scripts/fetch-pinned-asset.sh --selftest'
   'scripts/verify-linux-appimage.sh --selftest'
-  'scripts/observe-minimize-lock.sh --selftest'
   'scripts/verify-clipboard-markers.sh --selftest'
   'scripts/exercise-desktop-install.sh --selftest'
   'scripts/exercise-desktop-upgrade.sh --selftest'
@@ -314,7 +313,7 @@ profile_workflows() {
     rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 -color
   run env MSYS_NO_PATHCONV=1 docker run --rm -v "$root:/repo:ro" -w /repo --entrypoint shellcheck \
     rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 \
-    scripts/verify.sh scripts/verify-ci-scope.sh scripts/observe-minimize-lock.sh scripts/verify-clipboard-markers.sh \
+    scripts/verify.sh scripts/verify-ci-scope.sh scripts/verify-clipboard-markers.sh \
     scripts/verify-desktop-candidate.sh scripts/exercise-desktop-install.sh scripts/exercise-desktop-upgrade.sh \
     scripts/build-windows-installer.sh scripts/build-macos-app.sh scripts/build-macos-dmg.sh scripts/install-keepassxc-windows.sh scripts/fetch-pinned-asset.sh     scripts/build-upgrade-candidates.sh scripts/break-msi-cabinet.sh
 }
