@@ -138,7 +138,6 @@ Every release still needs a person's answer or a rule they wrote, and the bridge
 - [ ] **N.9 — Give each CLI concept one name.** Needs: none.
   - `approve` for the terminal approver, `rules` for `policy.toml`, and `clients` for per-client choices.
   - The old spellings stay as aliases that say so.
-- [ ] **F.31 — Say which HTTP transports the bridge's SDK carries.** Needs: none. T-9 says the bridge's dependency closure "contains no HTTP client", but `ModelContextProtocol.Core` 1.4.1's `net10.0` assembly carries `HttpClientTransport` and `StreamableHttpServerTransport` ([B.4a](steps/B.4a.md)). T-9 names them, says the bridge constructs only `StdioServerTransport`, and says their names are absent from the published `keypaste-mcp`, which suggests without proving that trimming removed them. Verify: each statement matches the locked package, the bridge's source and a name search of the published binary.
 
 ## T5 — Desktop delivery
 
