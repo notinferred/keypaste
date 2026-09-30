@@ -1,6 +1,6 @@
 # Step records
 
-Each completed [STEPS](../STEPS.md) task gets one record here, named by its ID, written when its verifier passes and not revised afterwards. A record holds what the step did: its scope as selected and any amendment, what changed for users, its evidence, the decisions that bind only its own code, and its limits and follow-ups. That detail does not go into the base documents: STEPS keeps open work, [DECISIONS](../../DECISIONS.md) keeps decisions that constrain later work, and [CHANGELOG](../../CHANGELOG.md) keeps one short entry per user-visible change linking here.
+Each completed [STEPS](../STEPS.md) task gets one record here, named by its ID, written when its verifier passes and not revised afterwards. A record holds what the step did: the amendments to its row as selected, its evidence, the decisions that bind only its own code, and its limits and follow-ups. What changed for users is CHANGELOG's. That detail does not go into the base documents: STEPS keeps open work, [DECISIONS](../../DECISIONS.md) keeps decisions that constrain later work, and [CHANGELOG](../../CHANGELOG.md) keeps one short entry per user-visible change linking here.
 
 Records begin with V.3a. Earlier steps have an evidence row below, with their history in Git and the [decision archive](../decisions-archive.md). A correction to finished work is a new STEPS row with its own record. The [rescope of 2026-09-19](rescope-2026-09-19.md) records what left the plan and how retained IDs changed meaning.
 
@@ -9,16 +9,13 @@ Records begin with V.3a. Earlier steps have an evidence row below, with their hi
 ```md
 # <ID> — <outcome>
 
-Completed <date> in `<sha>`, source only (or the published version).
+Completed <date> in `<sha>`, source only; runs <ci id>, <app id>.
 
-## Scope as selected
-The Build and Verify text as selected, and any amendment with the decision that made it.
-
-## What changed for users
-The full account; CHANGELOG carries one short entry that links here.
+## Amendments
+Changes to the row as selected, with the decision that made each; the row itself is in Git at the selecting commit.
 
 ## Evidence
-Tests and counts, gates, runs and source SHAs, matching the row below.
+Tests and gates by name, counts, runs and source SHAs.
 
 ## Decisions
 Ledger rows by ID; rows binding only this step's code in full.
@@ -26,6 +23,8 @@ Ledger rows by ID; rows binding only this step's code in full.
 ## Limits and follow-ups
 Gaps, defects found and their STEPS rows, BACKLOG options.
 ```
+
+Records from K.6a on add no row below: the directory is the index.
 
 ## Completed steps
 

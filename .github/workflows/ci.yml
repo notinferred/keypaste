@@ -67,10 +67,6 @@ jobs:
         shell: bash
         run: bash scripts/verify.sh backend --prepare-only
 
-      - name: Verify diagnostic results can be read before spending a dispatch
-        shell: bash
-        run: bash scripts/probe-results.sh --selftest
-
       - name: Verify the release destination check fails closed
         shell: bash
         run: scripts/verify-release-destination.sh --with-real-aws
@@ -83,6 +79,10 @@ jobs:
         shell: bash
         run: scripts/verify-green-gates.sh
 
+      - name: Verify the change map selects every lane a changed path can break
+        shell: bash
+        run: scripts/verify-ci-scope.sh
+
       - name: Verify one release definition answers for every target
         shell: bash
         run: scripts/verify-release-matrix.sh
@@ -91,10 +91,6 @@ jobs:
       - name: Verify the disclosure reader survives a jq that writes CRLF
         shell: bash
         run: scripts/verify-site-disclosure.sh --selftest
-
-      - name: Verify the F.9 timeline reader pairs, nests and overlaps what it claims
-        shell: bash
-        run: scripts/f9-timeline.sh --selftest
 
       - name: Verify a published release is refused unless the public bytes say it is whole
         shell: bash

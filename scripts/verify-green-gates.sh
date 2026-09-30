@@ -10,6 +10,7 @@
 # What it holds:
 #   - a commit with every required gate green is accepted, and it is the ONLY shape that is;
 #   - a missing app run, a red app run and a commit with neither run each refuse;
+#   - a green run triggered by a pull request does not count;
 #   - the required set is read from release-targets.json, so a component with its own gate is
 #     required without an edit here, and the release workflow never requires itself;
 #   - an empty or malformed reply refuses rather than counting as zero and passing something.
@@ -69,7 +70,7 @@ runs="$KEYPASTE_FIXTURE_RUNS"
 case "$url" in
   *status=success*) runs="$(printf '%s' "$runs" | jq -c '[.[] | select(.conclusion == "success")]')" ;;
 esac
-printf '%s' "$runs" | jq -c '{workflow_runs: [.[] | {name, conclusion, id, head_branch}]}'
+printf '%s' "$runs" | jq -c '{workflow_runs: [.[] | {name, conclusion, id, head_branch, event}]}'
 FAKE
 chmod +x "$SHIM/gh"
 
@@ -105,15 +106,18 @@ readonly BOTH_GREEN='[{"name":"ci","conclusion":"success","id":11,"head_branch":
 readonly APP_ABSENT='[{"name":"ci","conclusion":"success","id":11,"head_branch":"v9.9.9"}]'
 readonly APP_RED='[{"name":"ci","conclusion":"success","id":11,"head_branch":"v9.9.9"},{"name":"app","conclusion":"failure","id":22,"head_branch":"v9.9.9"}]'
 readonly BOTH_ABSENT='[]'
+readonly CI_ONLY_ON_A_PR='[{"name":"ci","conclusion":"success","id":11,"head_branch":"k6a","event":"pull_request"},{"name":"app","conclusion":"success","id":22,"head_branch":"v9.9.9","event":"push"}]'
 # Two green app runs at one commit, and one green app run that belongs to the branch rather than the tag.
 readonly APP_TWICE='[{"name":"ci","conclusion":"success","id":11,"head_branch":"v9.9.9"},{"name":"app","conclusion":"success","id":22,"head_branch":"v9.9.9"},{"name":"app","conclusion":"success","id":23,"head_branch":"v9.9.9"}]'
 readonly APP_ON_MAIN='[{"name":"ci","conclusion":"success","id":11,"head_branch":"v9.9.9"},{"name":"app","conclusion":"success","id":22,"head_branch":"main"}]'
+readonly APP_ON_A_PR_NAMED_LIKE_THE_TAG='[{"name":"ci","conclusion":"success","id":11,"head_branch":"v9.9.9"},{"name":"app","conclusion":"success","id":22,"head_branch":"v9.9.9","event":"pull_request"}]'
 
-echo "== the four shapes a tag can arrive in"
+echo "== the shapes a tag can arrive in"
 run_case "both-green"  ok "$BOTH_GREEN"  "$SUBJECT" 0 "every required gate is green"
 run_case "app-absent"  ok "$APP_ABSENT"  "$SUBJECT" 1 "no successful app run"
 run_case "app-red"     ok "$APP_RED"     "$SUBJECT" 1 "no successful app run"
 run_case "both-absent" ok "$BOTH_ABSENT" "$SUBJECT" 1 "no successful ci run"
+run_case "ci-green-only-on-a-pr" ok "$CI_ONLY_ON_A_PR" "$SUBJECT" 1 "no successful ci run"
 
 echo "== a reply that cannot be counted refuses rather than counting as zero"
 run_case "api-fails"   api-fails   "$BOTH_GREEN" "$SUBJECT" 1 "could not ask"
@@ -125,6 +129,7 @@ run_case "run-id-resolved"    ok "$BOTH_GREEN"  "$SUBJECT" 0 "run_id=22" --run-i
 run_case "run-id-absent"      ok "$APP_ABSENT"  "$SUBJECT" 1 "a release cannot take packages from a run that did not happen" --run-id app "$SHA" refs/tags/v9.9.9
 run_case "run-id-not-at-the-ref" ok "$APP_ON_MAIN" "$SUBJECT" 1 "a release cannot take packages from a run that did not happen" --run-id app "$SHA" refs/tags/v9.9.9
 run_case "run-id-ambiguous"   ok "$APP_TWICE"  "$SUBJECT" 1 "must not choose between them" --run-id app "$SHA" refs/tags/v9.9.9
+run_case "run-id-from-a-pr"   ok "$APP_ON_A_PR_NAMED_LIKE_THE_TAG" "$SUBJECT" 1 "a release cannot take packages from a run that did not happen" --run-id app "$SHA" refs/tags/v9.9.9
 
 echo "== negative control"
 WEAK="$WORK/weakened.sh"
@@ -145,11 +150,12 @@ DECLARED="$(declared_cases)"
 
 cat <<EOF
 ok: $cases_run cases. One shape was accepted by the real script - every required gate green - and a
-    missing app run, a red one, a commit with neither, a failed call, an empty reply and an
-    unparseable one all refused. Off the same reply it resolves which app run built the commit, and
-    refuses when there is none, when the only green run belongs to the branch rather than the tag,
-    and when two green runs would have to be chosen between. The pre-R.0a shape, same fixture and
-    same fake, accepts the commit whose desktop gate never ran.
+    missing app run, a red one, a commit with neither, a ci run only a pull request triggered, a
+    failed call, an empty reply and an unparseable one all refused. Off the same reply it resolves
+    which app run built the commit, and refuses when there is none, when the only green run belongs
+    to the branch rather than the tag or to a pull request whose branch carries the tag's name, and
+    when two green runs would have to be chosen between. The pre-R.0a shape, same fixture and same
+    fake, accepts the commit whose desktop gate never ran.
 not proved here: that the guard step is reached on a tag, which only a tag shows; and that GitHub
     returns runs in the shape this fake does, which R.0c's first real tag observes.
 EOF

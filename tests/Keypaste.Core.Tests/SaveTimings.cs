@@ -10,8 +10,8 @@ namespace Keypaste.Core.Tests;
 /// <remarks>
 /// Every save in this process becomes one <c>save-timing</c> line when a timeline was asked for, so a
 /// save that waited can be read beside the operation it waited behind. A test that wants its own
-/// save found among them marks <c>save-op</c> with the operation it got; <c>scripts/f9-timeline.sh
-/// --saves</c> joins the two. Only counts and durations are written.
+/// save found among them marks <c>save-op</c> with the operation it got, so a reader can join the
+/// two. Only counts and durations are written.
 /// </remarks>
 internal static class SaveTimings
 {

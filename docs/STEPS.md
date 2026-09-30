@@ -2,13 +2,33 @@
 
 This plan owns the committed tasks, grouped by product track: each task's dependencies, detail and acceptance evidence for [PRODUCT](PRODUCT.md) v1.8 (D-0367). [ROADMAP](../ROADMAP.md) owns direction, track order and which tasks each milestone needs. [FEATURES](FEATURES.md) owns the capability inventory, [RELEASE](RELEASE.md) distribution evidence, [BACKLOG](BACKLOG.md) optional work, and the [step records](steps/README.md) what each completed task did. The license remains AGPL-3.0.
 
-This file holds open work only. Finishing a task removes it from here, adds its record and evidence row under [steps](steps/README.md), and details the next task. No row is authorized by appearing here: the founder selects what is built, and an instruction to build the next task takes the first ready code row of ROADMAP's current milestone, in track order. No backlog item is automatically eligible.
+This file holds open work only. Finishing a task removes it from here and adds its record under [steps](steps/README.md). No row is authorized by appearing here: the founder selects what is built, and an instruction to build the next task takes the first ready code row of ROADMAP's current milestone, in track order. No backlog item is automatically eligible.
 
 ## Selection and evidence
 
-Only the next five tasks are detailed: C.1b, C.1c, C.3, C.4 and C.5a. Later rows name a bounded outcome and the dependencies their own implementation or verifier needs; expand a selected later task before building it. Tasks are not marked implemented from a document, reader, mock response or consuming screen. Name the producer, transport, consumer and user action exercised, and retain the source/version and limitations of the observation.
+C.1b, C.1c, C.3, C.4 and C.5a are detailed. Other rows name a bounded outcome and the dependencies their own implementation or verifier needs; a task is detailed when it is selected, against the code as it then is. Tasks are not marked implemented from a document, reader, mock response or consuming screen. Name the producer, transport, consumer and user action exercised, and retain the source/version and limitations of the observation.
 
 Needs are build dependencies. Ships after names publication gates. External signing identities are inputs, not a queue of enrollment code. A ready row does not authorize publication, account changes or messages. Preserve the secret-path tests, real KeePassXC compatibility, stale-write refusals and release integrity checks while changing product scope.
+
+## K and B — Build infrastructure
+
+These rows serve every track: a development machine builds nothing, CI runs what a change can break, and the scripts, tests and binaries lose their duplicates. ROADMAP places them in 0.5.0 by founder direction of 2026-09-30.
+
+- [ ] **K.6a — Build and test a pushed branch on GitHub from a machine with no SDK.** Needs: none.
+  - `dev.yml` and `scripts/dev.sh` build and test a pushed branch; `verify.sh --since <ref> --plan` selects lanes from commits through the project graph; `require-green-gates.sh` ignores pull-request runs; the closed F.6, F.9 and F.10 probes are deleted.
+  - Verify: from a Mac with only Git and `gh`, `dev.sh --class Keypaste.Core.Tests.WorkflowRulesTests` goes green; a deliberately failing assertion on a branch is named by `gh run view`; a class that matches nothing fails with the runner's exit code 8.
+- [ ] **K.6b — Run only the jobs a pull request can break.** Needs: K.6a.
+  - A `scope` job runs `verify.sh --since origin/<base> --plan`; each job carries its lane's `if:`, and `ci ok` and `app ok` aggregate them; `main`, tags and dispatch run everything.
+  - Each OS builds once, with compat folded into its test leg; each solution gets its own NuGet cache key; `paths-ignore` widens to documents no check reads.
+  - `dotnet format` shrinks to its whitespace check only after a branch experiment shows the build catches every style rule `.editorconfig` sets.
+  - Verify: pull requests based on the branch show a BACKLOG-only change running scope, checks and ok; a Core.Tests change running three legs of Core.Tests only; a `src/Keypaste.Core` change running everything. A push to `main` runs everything with one build per OS, and `require-green-gates.sh` accepts it.
+- [ ] **B.3 — Delete duplicated brand files and finished observers.** Needs: none. `docs/design/assets/` duplicates `assets/brand/`, `docs/design/SKILL.md` is replaced by the project skill, and `docs/design/BRAND.md`'s unique rules move into [BRAND](BRAND.md); `observe-desktop.yml` goes unless R.1a needs it.
+- [ ] **B.1 — Share one script library across the gates.** Needs: none. `scripts/lib/common.sh` and `scripts/lib/kpxc.sh` replace the helpers the KeePassXC and process gates each define; every assertion and negative control stays, and a missing KeePassXC still fails. Verify: the compat and process gates pass on three OSes, and shellcheck covers the library.
+- [ ] **B.2 — Keep one copy of each shared test helper.** Needs: none. `FakeShareServer`, `IsolatedHome`, `ManualClock` and `PoolTimelineGuardTests` keep one source each, linked as the other shared helpers are; the tests that use them keep their counts.
+- [ ] **B.4a — Measure the bridge built into the CLI.** Needs: none. A branch build with a `keypaste mcp` verb compares NativeAOT trim diagnostics with the baseline, binary size with the two binaries, and cold start; any new trim diagnostic stops B.4b.
+- [ ] **B.4b — Carry the MCP bridge in the CLI as `keypaste mcp`.** Needs: B.4a.
+  - `Keypaste.Mcp` becomes a library the CLI dispatches to before any code that opens a vault, and a source-rule test with a negative control keeps the verb from reaching `VaultLocator`, `VaultSession` or `SecretInput`.
+  - A decision row supersedes D-0019's confinement of the MCP package to the bridge process, with PRODUCT §3.9's written justification, and D-0334's separate payload binary; THREATS' scope follows, and the release definition, workflows, packaging, client catalog and gates name one binary; README's install blocks change at L.1.
 
 ## T1 — Everyday vault use and recovery
 
@@ -20,6 +40,8 @@ Custom fields and tags are ordinary KeePass data: keypaste writes them as KeePas
 - [ ] **N.13 — Search and show fields from the terminal.** Needs: V.7a.
   - `search` looks at names only (D-0278).
   - `show` masks values and prints none without `--reveal`.
+
+- [ ] **F.27 — Keep a revision KeePassXC's merge drops when two saves share a second.** Needs: none. — ci run 36711854555 at `7222d90`, `keepassxc compat (ubuntu-24.04)`: `verify-keepassxc-fields.sh:201` failed with "after the merge the history lost the value keypaste wrote", and KeePassXC's merge reported the Stripe history item at `12-04-05` as conflicting; the same gate passed on this job in run 36646739875. Hypothesis: KDBX times have one-second resolution, and when `set --field MERGED` follows the previous save within the same second, the version the merge moves into history shares its time with an existing history item and KeePassXC keeps one of them. Discovery first: a gate step that saves twice within one second and then merges reproduces the loss on every run, and one that waits past the second never does; the repair, such as each save stamping a time later than the entry's newest revision, depends on that result.
 
 ## T2 — One shared unlock session
 

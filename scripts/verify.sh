@@ -4,13 +4,20 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 usage() {
   cat <<'USAGE'
-Usage: bash scripts/verify.sh [--all] [--from <profile>] [--list]
+Usage: bash scripts/verify.sh [--all | --since <ref>] [--from <profile>] [--list]
+       bash scripts/verify.sh [--all | --since <ref>] --plan
        bash scripts/verify.sh <profile> [--list] [--prepare-only|--test-only]
+       bash scripts/verify.sh backend|desktop [--prepare-only|--test-only] --project <dir>... [--filter-class <class>]
 
 With no profile, runs what the working tree changed: git diff against HEAD plus untracked
-files, mapped to profiles. workflows always runs, a path the map does not know
+files, mapped to lanes and the lanes to profiles. --since <ref> reads the commits since <ref>
+instead (git diff <ref>...HEAD). workflows always runs, a path the map does not know
 runs everything, and every skipped profile is logged with its reason. --all (or all) runs
 everything. Hosted CI remains the full gate.
+
+--plan prints the CI selection as GITHUB_OUTPUT lines (lanes, backend_os, backend_tests,
+desktop_tests, filter) and runs nothing. With --since, no changed path or an unreadable range
+selects everything. VERIFY_CHANGED_PATHS, newline-separated, replaces the reading from git.
 
 --from <profile> resumes at that profile after a failure, in the order
 workflows, scripts, backend, integration, desktop. A failed run names every failed
@@ -29,8 +36,10 @@ compat       Prepare the backend and the app driver, and verify creation, write-
              the first run's offer of the databases KeePassXC last opened, against installed KeePassXC.
              Never selected automatically; run it by name.
 
---list prints the selection and commands without executing them. Backend/desktop accept
---prepare-only and --test-only for CI or a build already prepared by this command.
+--list prints the selection and commands without executing them. Backend, desktop and
+integration accept --prepare-only and --test-only for CI or a build already prepared by this
+command. --project narrows backend or desktop to those test projects and the helpers they start,
+and --filter-class runs one test class in each.
 Use Git Bash on Windows. A full run needs dotnet, git, jq, GNU timeout and running Docker.
 macOS can supply GNU timeout as gtimeout from coreutils. compat also needs keepassxc-cli
 (or KPXC_CLI) with KeePassXC's app beside it or on PATH (or KPXC_APP). Native AOT, packaging, other operating systems and live install checks stay in CI.
@@ -48,19 +57,38 @@ dotnet_lane=(backend integration desktop)
 profile=''
 phase=all
 list=false
+plan=false
 everything=false
 from=''
+since=''
+projects=()
+filter_class=''
 timeout_command=timeout
 if command -v gtimeout >/dev/null 2>&1; then timeout_command=gtimeout; fi
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --help|-h) usage; exit 0 ;;
     --list) list=true ;;
+    --plan) plan=true ;;
     --all) everything=true ;;
     --from)
       [ -z "$from" ] || bad_usage 'choose one --from profile'
       [ "$#" -ge 2 ] || bad_usage '--from needs a profile'
       from="$2"; shift
+      ;;
+    --since)
+      [ -z "$since" ] || bad_usage 'choose one --since ref'
+      [ -n "${2:-}" ] || bad_usage '--since needs a ref'
+      since="$2"; shift
+      ;;
+    --project)
+      [ -n "${2:-}" ] || bad_usage '--project needs a test project directory'
+      projects+=("${2%/}"); shift
+      ;;
+    --filter-class)
+      [ -z "$filter_class" ] || bad_usage 'choose one --filter-class'
+      [ -n "${2:-}" ] || bad_usage '--filter-class needs a test class'
+      filter_class="$2"; shift
       ;;
     --prepare-only|--test-only)
       [ "$phase" = all ] || bad_usage 'choose only one phase'
@@ -75,11 +103,28 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 if [ "$profile" = all ]; then profile=''; everything=true; fi
-if [ "$phase" != all ] && [ "$profile" != backend ] && [ "$profile" != desktop ]; then
-  bad_usage 'phase selection is only supported for backend and desktop'
+case "$phase:$profile" in
+  all:*|*:backend|*:desktop|*:integration) ;;
+  *) bad_usage 'phase selection is only supported for backend, desktop and integration' ;;
+esac
+if [ -n "$profile" ] && { [ "$everything" = true ] || [ -n "$from" ] || [ -n "$since" ] || [ "$plan" = true ]; }; then
+  bad_usage '--all, --since, --from and --plan select among profiles; they cannot accompany a named one'
 fi
-if [ -n "$profile" ] && { [ "$everything" = true ] || [ -n "$from" ]; }; then
-  bad_usage '--all and --from select among profiles; they cannot accompany a named one'
+if [ "$everything" = true ] && [ -n "$since" ]; then bad_usage 'choose --all or --since'; fi
+if [ "$plan" = true ] && { [ "$list" = true ] || [ -n "$from" ]; }; then
+  bad_usage '--plan prints the selection; it takes no --list or --from'
+fi
+project_file() {
+  case "$1" in *.csproj) echo "$1" ;; *) echo "$1/${1##*/}.csproj" ;; esac
+}
+if [ "${#projects[@]}" -gt 0 ]; then
+  if [ "$profile" != backend ] && [ "$profile" != desktop ]; then bad_usage '--project narrows backend or desktop'; fi
+  for dir in "${projects[@]}"; do
+    [ -f "$(project_file "$dir")" ] || bad_usage "no project at $(project_file "$dir")"
+  done
+fi
+if [ -n "$filter_class" ] && [ "${#projects[@]}" -eq 0 ]; then
+  bad_usage '--filter-class needs --project'
 fi
 if [ -n "$from" ]; then
   case " ${sequence[*]} " in
@@ -101,6 +146,64 @@ prepare() {
   run dotnet build "$1" --no-restore -c Release -warnaserror
 }
 
+# Test runner lines a failed run prints, repeated as annotations so the run's summary names them.
+annotate_failures() {
+  local escape
+  escape="$(printf '\033')"
+  sed -e "s/$escape\[[0-9;]*[A-Za-z]//g" "$1" | grep -E '^[[:space:]]*failed[[:space:]]' | head -n 10 \
+    | sed -E 's/^[[:space:]]*failed[[:space:]]+/::error::failed /; s/[[:space:]]+\([^()]*\)[[:space:]]*$//' || true
+}
+
+run_tests() {
+  local held code=0
+  printf '+ '; printf '%q ' "$@"; printf '\n'
+  [ "$list" = false ] || return 0
+  if [ "${GITHUB_ACTIONS:-}" != true ]; then "$@"; return; fi
+  held="$(mktemp)"
+  "$@" 2>&1 | tee "$held" || code=$?
+  if [ "$code" != 0 ]; then annotate_failures "$held"; fi
+  rm -f "$held"
+  return "$code"
+}
+
+# Test executables a test project starts from artifacts/bin without referencing them.
+runtime_helpers() {
+  case "$1" in
+    tests/Keypaste.Core.Tests) echo tests/Keypaste.TxfContender tests/Keypaste.VaultSaver ;;
+    tests/Keypaste.Mcp.Tests) echo tests/Keypaste.PoolStarver ;;
+    tests/Keypaste.App.Tests) echo tests/Keypaste.EnvReporter ;;
+  esac
+}
+
+# dotnet format checks only the project it is given, so every project the build compiles is named.
+prepare_projects() {
+  local dir helper project targets=()
+  for dir in "${projects[@]}"; do
+    targets+=("$dir")
+    for helper in $(runtime_helpers "$dir"); do targets+=("$helper"); done
+  done
+  read_project_graph
+  for project in "${targets[@]}"; do run dotnet restore "$(project_file "$project")" --locked-mode; done
+  for project in $(dependencies_closure "${targets[@]}"); do
+    case "$project" in third_party/*) continue ;; esac
+    run dotnet format "$(project_file "$project")" --no-restore --verify-no-changes --exclude third_party/
+  done
+  for project in "${targets[@]}"; do run dotnet build "$(project_file "$project")" --no-restore -c Release -warnaserror; done
+}
+test_projects() {
+  local dir options
+  for dir in "${projects[@]}"; do
+    options=()
+    if [ "$dir" = tests/Keypaste.App.Tests ]; then options+=(--long-running 120); fi
+    if [ -n "$filter_class" ]; then options+=(--filter-class "$filter_class"); fi
+    if [ "${#options[@]}" -gt 0 ]; then
+      run_tests dotnet test "$(project_file "$dir")" --no-build -c Release -- "${options[@]}"
+    else
+      run_tests dotnet test "$(project_file "$dir")" --no-build -c Release
+    fi
+  done
+}
+
 prepare_backend() { prepare keypaste.slnx; }
 prepare_desktop() {
   prepare keypaste.app.slnx
@@ -108,11 +211,11 @@ prepare_desktop() {
   prepare src/Keypaste.Mcp/Keypaste.Mcp.csproj
 }
 test_backend() {
-  run dotnet test keypaste.slnx --no-build -c Release
+  run_tests dotnet test keypaste.slnx --no-build -c Release
 }
 test_desktop() {
-  run dotnet test keypaste.app.slnx --no-build -c Release -- --long-running 120
-  run dotnet test tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj --no-build -c Release
+  run_tests dotnet test keypaste.app.slnx --no-build -c Release -- --long-running 120
+  run_tests dotnet test tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj --no-build -c Release
   integration_script scripts/verify-session-authority.sh
   integration_script scripts/verify-lock-boundary.sh
   integration_script scripts/verify-current-state.sh
@@ -128,6 +231,7 @@ selftests=(
   'scripts/verify-release-destination.sh'
   'scripts/verify-release-preflight.sh'
   'scripts/verify-green-gates.sh'
+  'scripts/verify-ci-scope.sh'
   'scripts/verify-release-matrix.sh'
   'scripts/verify-site-disclosure.sh --selftest'
   'scripts/verify-release-completion.sh'
@@ -137,8 +241,6 @@ selftests=(
   'scripts/verify-windows-signature.sh --selftest'
   'scripts/fetch-pinned-asset.sh --selftest'
   'scripts/verify-linux-appimage.sh --selftest'
-  'scripts/f9-timeline.sh --selftest'
-  'scripts/probe-results.sh --selftest'
   'scripts/observe-minimize-lock.sh --selftest'
   'scripts/verify-clipboard-markers.sh --selftest'
   'scripts/exercise-desktop-install.sh --selftest'
@@ -212,7 +314,7 @@ profile_workflows() {
     rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 -color
   run env MSYS_NO_PATHCONV=1 docker run --rm -v "$root:/repo:ro" -w /repo --entrypoint shellcheck \
     rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 \
-    scripts/verify.sh scripts/probe-results.sh scripts/observe-minimize-lock.sh scripts/verify-clipboard-markers.sh \
+    scripts/verify.sh scripts/verify-ci-scope.sh scripts/observe-minimize-lock.sh scripts/verify-clipboard-markers.sh \
     scripts/verify-desktop-candidate.sh scripts/exercise-desktop-install.sh scripts/exercise-desktop-upgrade.sh \
     scripts/build-windows-installer.sh scripts/build-macos-app.sh scripts/install-keepassxc-windows.sh scripts/fetch-pinned-asset.sh     scripts/build-upgrade-candidates.sh scripts/break-msi-cabinet.sh
 }
@@ -235,20 +337,29 @@ check_integration() {
 
 backend_prepared=false
 profile_backend() {
-  if [ "$phase" != test-only ]; then prepare_backend; fi
+  if [ "$phase" != test-only ]; then
+    if [ "${#projects[@]}" -gt 0 ]; then prepare_projects; else prepare_backend; fi
+  fi
   backend_prepared=true
   if [ -n "$log_dir" ]; then : > "$log_dir/backend.prepared"; fi
-  if [ "$phase" != prepare-only ]; then test_backend; fi
+  if [ "$phase" != prepare-only ]; then
+    if [ "${#projects[@]}" -gt 0 ]; then test_projects; else test_backend; fi
+  fi
 }
 profile_desktop() {
-  if [ "$phase" != test-only ]; then prepare_desktop; fi
-  if [ "$phase" != prepare-only ]; then test_desktop; fi
+  if [ "$phase" != test-only ]; then
+    if [ "${#projects[@]}" -gt 0 ]; then prepare_projects; else prepare_desktop; fi
+  fi
+  if [ "$phase" != prepare-only ]; then
+    if [ "${#projects[@]}" -gt 0 ]; then test_projects; else test_desktop; fi
+  fi
 }
 profile_integration() {
-  if [ "$backend_prepared" = false ] && { [ -z "$log_dir" ] || [ ! -e "$log_dir/backend.prepared" ]; }; then
+  if [ "$phase" != test-only ] && [ "$backend_prepared" = false ] \
+    && { [ -z "$log_dir" ] || [ ! -e "$log_dir/backend.prepared" ]; }; then
     prepare_backend
   fi
-  check_integration
+  if [ "$phase" != prepare-only ]; then check_integration; fi
 }
 profile_compat() {
   prepare_backend
@@ -271,67 +382,297 @@ profile_compat() {
   run bash scripts/verify-keepassxc-first-run.sh artifacts/compat/local-first-run
 }
 
-# Backend tests read workflows, scripts and the release definition, so those paths select backend too.
-profiles_for_path() {
+# A lane is what hosted CI runs as one job; a local run maps lanes to profiles. Tests and scripts
+# read workflows, documents and the release definition, so those paths select the lanes that read them.
+all_lanes=(core cli mcp rules pages integration compat aot scripts desktop appcompat markers package)
+
+path_lanes() {
   case "$1" in
-    src/Keypaste.App/*|tests/Keypaste.App.Tests/*|tests/Keypaste.MinimizeObserver/*|tests/Keypaste.AppDriver/*|tests/Keypaste.FakeMcpClient/*) echo desktop ;;
-    tests/Keypaste.EnvReporter/*) echo backend desktop ;;
-    tests/Keypaste.Consistency.Tests/*|keypaste.app.slnx) echo desktop ;;
-    src/Keypaste.Cli/Keypaste.Cli.csproj) echo scripts backend integration desktop ;;
-    src/*|third_party/*) echo backend integration desktop ;;
-    tests/Directory.Build.props) echo backend desktop ;;
-    tests/*) echo backend ;;
-    keypaste.slnx) echo backend integration ;;
-    scripts/verify-session-authority.sh|scripts/verify-lock-boundary.sh|scripts/verify-current-state.sh|scripts/verify-session-lifecycle.sh|scripts/verify-desktop-approval.sh|scripts/verify-agent-activity.sh|scripts/verify-connect-client.sh|scripts/verify-run-session.sh|scripts/verify-held-saves.sh) echo scripts desktop ;;
-    scripts/*) echo scripts backend integration ;;
-    .github/*|release-targets.json) echo scripts backend ;;
-    README.md|site/public/index.html|docs/PRODUCT.md) echo scripts integration ;;
-    launch.md|docs/demo.md|docs/keepass-and-agents.md) echo integration ;;
-    CHANGELOG.md|SECURITY.md|docs/RELEASE.md|docs/desktop.md|packaging/*|site/*) echo scripts ;;
-    *.md|docs/*|LICENSE|.claude/*) echo quick ;;
-    *) echo everything ;;
+    global.json|NuGet.config|.editorconfig|.gitattributes|Directory.*.props|*/Directory.*.props) echo everything ;;
+    packages.lock.json|*/packages.lock.json|keypaste.slnx|keypaste.app.slnx|scripts/verify.sh) echo everything ;;
+    src/*/*.csproj|tests/*/*.csproj|third_party/KeePassLib/*.csproj) echo scripts ;;
+    src/*|tests/*|third_party/KeePassLib/*) echo unclaimed ;;
+    third_party/eff-large-wordlist/*) echo core ;;
+    .github/workflows/ci.yml) echo core cli mcp rules pages integration compat aot scripts ;;
+    .github/workflows/app.yml) echo rules scripts desktop-all appcompat markers package ;;
+    .github/*) echo rules scripts ;;
+    scripts/verify-keepassxc-workflows.sh|scripts/verify-keepassxc-first-run.sh) echo rules scripts appcompat ;;
+    scripts/install-keepassxc-windows.sh) echo rules scripts compat appcompat ;;
+    scripts/fetch-pinned-asset.sh) echo rules scripts compat appcompat package ;;
+    scripts/make-compat-fixture.sh|scripts/verify-keepassxc-compat.sh|scripts/verify-keepassxc-writeback.sh) echo rules scripts compat aot ;;
+    scripts/verify-keepassxc-xml-attach.sh|scripts/verify-keepassxc-keyfile.sh) echo rules scripts compat aot ;;
+    scripts/verify-keepassxc-recyclebin.sh) echo core rules scripts compat ;;
+    scripts/verify-keepassxc-*.sh) echo rules scripts compat ;;
+    scripts/verify-run-injection.sh|scripts/verify-run-signals.sh|scripts/verify-mcp-stdio.sh) echo rules scripts integration aot ;;
+    scripts/verify-approval-e2e.sh|scripts/verify-log-chain.sh) echo rules scripts integration aot ;;
+    scripts/verify-demo.sh|scripts/demo/deploy.sh) echo rules scripts pages integration aot ;;
+    scripts/verify-mcp-run.sh|scripts/verify-policy-e2e.sh) echo rules scripts integration ;;
+    scripts/verify-aot-trim.sh) echo rules scripts aot ;;
+    scripts/verify.ps1) echo core rules scripts ;;
+    scripts/aot-trim-baseline.txt) echo aot ;;
+    scripts/verify-session-authority.sh|scripts/verify-lock-boundary.sh|scripts/verify-current-state.sh) echo rules scripts desktop-all ;;
+    scripts/verify-session-lifecycle.sh|scripts/verify-desktop-approval.sh|scripts/verify-agent-activity.sh) echo rules scripts desktop-all ;;
+    scripts/verify-connect-client.sh|scripts/verify-run-session.sh|scripts/verify-held-saves.sh) echo rules scripts desktop-all ;;
+    scripts/verify-clipboard-markers.sh) echo rules scripts markers ;;
+    scripts/build-*|scripts/break-msi-cabinet.sh|scripts/exercise-desktop-*|scripts/drive-desktop-*) echo rules scripts package ;;
+    scripts/publish-desktop-bridge.sh|scripts/rehearse-windows-signing.sh) echo rules scripts package ;;
+    scripts/sign-windows.sh|scripts/verify-windows-*.sh|scripts/verify-desktop-candidate.sh) echo rules scripts package ;;
+    scripts/verify-linux-appimage.sh|scripts/verify-publisher-metadata.sh) echo rules scripts package ;;
+    packaging/*|release-targets.json) echo scripts package ;;
+    LICENSE) echo package ;;
+    scripts/*) echo rules scripts ;;
+    README.md|site/public/index.html) echo pages scripts ;;
+    launch.md|docs/demo.md|docs/keepass-and-agents.md) echo pages ;;
+    CHANGELOG.md|SECURITY.md|docs/RELEASE.md|docs/desktop.md) echo scripts ;;
+    THIRD_PARTY_NOTICES.md) echo core package ;;
+    site/test/share-vector.json) echo core scripts ;;
+    site/*) echo scripts ;;
+    *.md|docs/*|.claude/*|assets/*|third_party/lucide/*) echo none ;;
+    *) echo unclaimed ;;
   esac
 }
 
-# VERIFY_CHANGED_PATHS replaces the working-tree reading for the fixtures.
+# What a project selects when it or something it depends on changes; the test projects it reaches select their own.
+project_lanes() {
+  case "$1" in
+    tests/Keypaste.Core.Tests) echo core ;;
+    tests/Keypaste.Cli.Tests) echo cli ;;
+    tests/Keypaste.Mcp.Tests) echo mcp ;;
+    tests/Keypaste.App.Tests) echo desktop-app ;;
+    tests/Keypaste.Consistency.Tests) echo desktop-consistency ;;
+    src/Keypaste.Cli) echo integration aot compat appcompat desktop-all ;;
+    src/Keypaste.Mcp) echo integration aot compat desktop-all package ;;
+    src/Keypaste.App) echo desktop-all appcompat markers package ;;
+    tests/Keypaste.AppDriver) echo appcompat desktop-all ;;
+    tests/Keypaste.FakeMcpClient) echo desktop-all ;;
+    # No test project builds these two, so only a whole solution's format and -warnaserror build checks them.
+    tests/Keypaste.MinimizeObserver) echo markers desktop-all ;;
+    tests/Keypaste.VaultRestorer) echo compat core cli mcp ;;
+  esac
+}
+
+normalize_path() {
+  local part parts kept=() joined=''
+  IFS=/ read -r -a parts <<< "$1"
+  for part in "${parts[@]}"; do
+    case "$part" in
+      ''|.) ;;
+      ..) if [ "${#kept[@]}" -gt 0 ]; then unset "kept[$((${#kept[@]} - 1))]"; fi ;;
+      *) kept+=("$part") ;;
+    esac
+  done
+  for part in ${kept[@]+"${kept[@]}"}; do joined="$joined/$part"; done
+  echo "${joined#/}"
+}
+
+# Edges are read from the project files, so a new reference or linked file needs no edit here.
+# VERIFY_SCOPE_NO_LINKS=1 ignores linked files; only verify-ci-scope.sh's negative control sets it.
+project_edges=''
+include_edges=''
+read_project_graph() {
+  local csproj dir kind include project helper
+  for csproj in src/*/*.csproj tests/*/*.csproj third_party/KeePassLib/*.csproj; do
+    [ -f "$csproj" ] || continue
+    dir="${csproj%/*}"
+    while read -r kind include; do
+      include="$(normalize_path "$dir/${include//\\//}")"
+      case "$kind" in
+        ProjectReference) project_edges="$project_edges$dir ${include%/*}"$'\n' ;;
+        *)
+          case "$include" in "$dir"/*) continue ;; esac
+          if [ "${VERIFY_SCOPE_NO_LINKS:-}" != 1 ]; then include_edges="$include_edges$dir $include"$'\n'; fi
+          ;;
+      esac
+    done < <(sed -nE 's/.*<([A-Za-z]+)[[:space:]][^>]*Include="([^"]*)".*/\1 \2/p' "$csproj")
+  done
+  for project in tests/*; do
+    for helper in $(runtime_helpers "$project"); do project_edges="$project_edges$project $helper"$'\n'; done
+  done
+}
+
+owning_project() {
+  local dir="$1" candidate
+  while [ "$dir" != "${dir%/*}" ]; do
+    dir="${dir%/*}"
+    case "$dir" in src/?*|tests/?*|third_party/KeePassLib|third_party/KeePassLib/*) ;; *) return 0 ;; esac
+    for candidate in "$dir"/*.csproj; do
+      if [ -f "$candidate" ]; then echo "$dir"; return 0; fi
+    done
+  done
+}
+
+linking_projects() {
+  local project pattern
+  while read -r project pattern; do
+    [ -n "$pattern" ] || continue
+    # shellcheck disable=SC2254
+    case "$1" in $pattern) echo "$project" ;; esac
+  done <<< "$include_edges"
+}
+
+dependents_closure() {
+  local found=" $* " grew=true dependent dependency
+  [ "$#" -gt 0 ] || return 0
+  while [ "$grew" = true ]; do
+    grew=false
+    while read -r dependent dependency; do
+      [ -n "$dependency" ] || continue
+      case "$found" in *" $dependency "*) ;; *) continue ;; esac
+      case "$found" in *" $dependent "*) continue ;; esac
+      found="$found$dependent "
+      grew=true
+    done <<< "$project_edges"
+  done
+  echo "$found"
+}
+
+dependencies_closure() {
+  local found=" $* " grew=true dependent dependency
+  while [ "$grew" = true ]; do
+    grew=false
+    while read -r dependent dependency; do
+      [ -n "$dependency" ] || continue
+      case "$found" in *" $dependent "*) ;; *) continue ;; esac
+      case "$found" in *" $dependency "*) continue ;; esac
+      found="$found$dependency "
+      grew=true
+    done <<< "$project_edges"
+  done
+  echo "$found"
+}
+
+lanes_for_path() {
+  local fixed token project found=''
+  fixed="$(path_lanes "$1")"
+  if [ "$fixed" = everything ]; then echo everything; return; fi
+  # shellcheck disable=SC2046
+  for project in $(dependents_closure $(owning_project "$1") $(linking_projects "$1")); do
+    found="$found $(project_lanes "$project")"
+  done
+  for token in $fixed; do
+    case "$token" in unclaimed|none) ;; *) found="$found $token" ;; esac
+  done
+  if [ -n "${found// /}" ]; then
+    echo "$found"
+  elif [ "$fixed" != none ]; then
+    echo everything
+  fi
+}
+
+profiles_for_lanes() {
+  local lane
+  for lane in "$@"; do
+    case "$lane" in
+      core|cli|mcp|rules) echo backend ;;
+      integration|pages) echo integration ;;
+      desktop-*) echo desktop ;;
+      scripts) echo scripts ;;
+    esac
+  done
+}
+
+# VERIFY_CHANGED_PATHS replaces the reading from git for the fixtures.
 changed_paths() {
   if [ "${VERIFY_CHANGED_PATHS+set}" = set ]; then
     printf '%s\n' "$VERIFY_CHANGED_PATHS"
+    return
+  fi
+  if [ -n "$since" ]; then
+    git -c core.quotepath=off diff --name-only --no-renames "$since...HEAD" --
     return
   fi
   git -c core.quotepath=off diff --name-only --no-renames HEAD --
   git -c core.quotepath=off ls-files --others --exclude-standard
 }
 
+selected=''
+select_everything() {
+  local p
+  selected=everything
+  for p in "${heavy[@]}"; do printf -v "why_$p" '%s' "$1"; done
+}
+
 changed_count=0
 select_profiles() {
-  local changes path mapped p var
+  local changes path mapped p var counted source='git diff against HEAD, plus untracked files'
+  if [ -n "$since" ]; then source="git diff $since...HEAD"; fi
   if [ "$everything" = true ]; then
-    for p in "${heavy[@]}"; do printf -v "why_$p" '%s' '--all'; done
+    select_everything '--all'
     echo 'verify: --all selects every profile'
     return
   fi
-  if ! changes="$(changed_paths 2>&1)"; then
-    for p in "${heavy[@]}"; do printf -v "why_$p" '%s' 'the working tree could not be read'; done
-    echo "verify: git could not list changes, so everything runs: $changes"
+  if ! changes="$(changed_paths)"; then
+    select_everything 'the changes could not be read'
+    echo 'verify: git could not list changes, so everything runs' >&2
     return
   fi
+  read_project_graph
   while IFS= read -r path; do
     [ -n "$path" ] || continue
     changed_count=$((changed_count + 1))
-    mapped="$(profiles_for_path "$path")"
-    case "$mapped" in
-      quick) continue ;;
-      everything) mapped="${heavy[*]}"; path="$path, which no profile claims" ;;
-    esac
+    mapped="$(lanes_for_path "$path")"
+    if [ "$mapped" = everything ]; then
+      selected=everything
+      mapped="${heavy[*]}"; path="$path, which selects everything"
+    else
+      if [ "$selected" != everything ]; then selected="$selected $mapped"; fi
+      # shellcheck disable=SC2086
+      mapped="$(profiles_for_lanes $mapped)"
+    fi
+    counted=' '
     for p in $mapped; do
+      case "$counted" in *" $p "*) continue ;; esac
+      counted="$counted$p "
       var="why_$p"
       if [ -z "${!var:-}" ]; then printf -v "$var" '%s' "$path"; fi
       var="hits_$p"
       printf -v "$var" '%s' "$(( ${!var:-0} + 1 ))"
     done
   done <<< "$changes"
-  echo "verify: $changed_count changed paths (git diff against HEAD, plus untracked files)"
+  if [ "$changed_count" = 0 ] && { [ -n "$since" ] || [ "$plan" = true ]; }; then
+    select_everything 'no changed path was found'
+    echo "verify: no changed paths ($source), so everything runs"
+    return
+  fi
+  echo "verify: $changed_count changed paths ($source)"
+}
+
+has_lane() {
+  case " $selected " in *" everything "*|*" $1 "*) return 0 ;; *) return 1 ;; esac
+}
+
+print_plan() {
+  local lane chosen=' ' os='[]' backend='' desktop='' filter=''
+  for lane in "${all_lanes[@]}"; do
+    if [ "$lane" = desktop ]; then
+      has_lane desktop-all || has_lane desktop-app || has_lane desktop-consistency || continue
+    else
+      has_lane "$lane" || continue
+    fi
+    chosen="$chosen$lane "
+  done
+  if has_lane core || has_lane cli || has_lane mcp || has_lane integration || has_lane compat; then
+    os='["ubuntu-24.04","windows-2025","macos-15"]'
+  elif has_lane rules || has_lane pages; then
+    os='["ubuntu-24.04"]'
+  fi
+  if has_lane core && has_lane cli && has_lane mcp; then
+    backend=all
+  else
+    if has_lane core || has_lane rules; then backend=tests/Keypaste.Core.Tests; fi
+    if has_lane cli; then backend="$backend tests/Keypaste.Cli.Tests"; fi
+    if has_lane mcp; then backend="$backend tests/Keypaste.Mcp.Tests"; fi
+    backend="${backend# }"
+    if [ "$backend" = tests/Keypaste.Core.Tests ] && ! has_lane core; then filter=Keypaste.Core.Tests.WorkflowRulesTests; fi
+  fi
+  if has_lane desktop-all; then
+    desktop=all
+  else
+    if has_lane desktop-app; then desktop=tests/Keypaste.App.Tests; fi
+    if has_lane desktop-consistency; then desktop="$desktop tests/Keypaste.Consistency.Tests"; fi
+    desktop="${desktop# }"
+  fi
+  printf 'lanes=%s\nbackend_os=%s\nbackend_tests=%s\ndesktop_tests=%s\nfilter=%s\n' "$chosen" "$os" "$backend" "$desktop" "$filter"
 }
 
 planned=()
@@ -415,6 +756,11 @@ run_lane() {
 
 run_selection() {
   local p status failed=() blocked=() first_code=0 resume start=$SECONDS
+  if [ "$plan" = true ]; then
+    select_profiles > /dev/null
+    print_plan
+    return
+  fi
   select_profiles
   plan_profiles
   if [ "${#planned[@]}" -eq 0 ]; then echo 'verify: nothing to run'; return; fi
@@ -450,6 +796,7 @@ run_selection() {
   fi
   resume='bash scripts/verify.sh'
   if [ "$everything" = true ]; then resume="$resume --all"; fi
+  if [ -n "$since" ]; then resume="$resume --since $since"; fi
   printf '\nVerification failed: %s\n' "${failed[*]}"
   if [ "${#blocked[@]}" -gt 0 ]; then printf 'Not run: %s\n' "${blocked[*]}"; fi
   printf 'Fix, then resume with: %s --from %s\n' "$resume" "${failed[0]}"
