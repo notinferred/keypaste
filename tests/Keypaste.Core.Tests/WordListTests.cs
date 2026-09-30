@@ -1,3 +1,4 @@
+// K.6b scoping probe.
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using Xunit;
