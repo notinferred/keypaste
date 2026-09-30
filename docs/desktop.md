@@ -150,12 +150,12 @@ On macOS the modifier is Cmd; everywhere else, Ctrl.
 
 ## Files it keeps, and how to delete them
 
-The app keeps machine-specific settings in `~/.keypaste`, alongside the audit log and policy. They do not travel with the vault. `KEYPASTE_HOME` changes the directory.
+The app keeps machine-specific settings in `~/.keypaste`, alongside the audit log and policy. They do not travel with the vault. `KEYPASTE_HOME` changes the directory. Open keypaste at login is kept only as your login's own entry, which switching it off in Settings removes and uninstalling the app leaves in place: the `keypaste` value under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, `~/Library/LaunchAgents/com.keypaste.app.plist`, or `~/.config/autostart/keypaste.desktop`.
 
 | | |
 |---|---|
 | `recent.toml` | The vaults you have opened here, where the keyfile each opened with is, and which YubiKey slot. Paths and slot numbers only; no entry names, secrets or key material |
-| `app.toml` | Idle timeout, theme, lock-on-minimize |
+| `app.toml` | Idle timeout, theme, lock-on-minimize, and whether closing the window leaves the app in the menu bar or tray |
 | `projects.json` | For each vault and project you saved on Env profiles, its directory and command. No variable names or values |
 | `recommendations.json` | The recommendations you dismissed, by vault, entry identifier and key name. No titles or values |
 

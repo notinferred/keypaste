@@ -76,6 +76,22 @@ public sealed class AppSettingsTests : IDisposable
         Assert.Equal(locked, AppSettings.Load(SettingsFile).LockWhenMinimized);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void The_tray_choice_round_trips_and_is_absent_until_made(bool stays)
+    {
+        AppSettings.Save(SettingsFile, AppSettings.Default);
+
+        Assert.DoesNotContain("stay_in_tray", File.ReadAllText(SettingsFile), StringComparison.Ordinal);
+        Assert.Null(AppSettings.Load(SettingsFile).StayInTray);
+
+        AppSettings.Save(SettingsFile, AppSettings.Default with { StayInTray = stays });
+
+        Assert.Contains($"stay_in_tray = {(stays ? 1 : 0)}", File.ReadAllText(SettingsFile), StringComparison.Ordinal);
+        Assert.Equal(stays, AppSettings.Load(SettingsFile).StayInTray);
+    }
+
     /// <summary>
     /// The reason the flag is a number: the reader refuses <c>true</c> and <c>false</c> so that a
     /// policy file cannot say yes in a shape keypaste had to guess at.

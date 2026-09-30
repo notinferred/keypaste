@@ -3,6 +3,7 @@ using Keypaste.App.Clipboard;
 using Keypaste.App.Navigation;
 using Keypaste.App.Session;
 using Keypaste.Core;
+using Keypaste.Core.Login;
 using Keypaste.Core.Sharing;
 
 namespace Keypaste.App.ViewModels;
@@ -736,7 +737,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             // The audit log is machine state, which is why `keypaste log` reads it without a vault.
             DestinationKind.Log => new LogViewModel(Home, _clock, Clipboard),
             DestinationKind.AgentHistory => new LogViewModel(Home, _clock, Clipboard, agentsOnly: true),
-            DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker, Recommendations, kind => Current = Destinations.Of(kind)),
+            DestinationKind.Settings => new SettingsViewModel(_session, Home, Preferences, ApplyTheme, _picker, Recommendations, kind => Current = Destinations.Of(kind)) { Login = LoginItem },
             DestinationKind.AgentActivity => Activity(),
             DestinationKind.Entries => Entries(),
             DestinationKind.EnvSets => new EnvSetsViewModel(_session, Clipboard, _picker, toast: ShowToast),
@@ -794,6 +795,9 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     /// <summary>How share links reach their server; the shell makes one when none is given.</summary>
     /// <remarks>Redirects are never followed, so an envelope reaches only the origin the link names.</remarks>
     internal HttpMessageHandler? ShareTransport { get; init; }
+
+    /// <summary>The entry that opens the app at login, which Settings turns on and off; none where the platform has no per-user one.</summary>
+    internal ILoginItem? LoginItem { get; init; }
 
     private SocketsHttpHandler? _ownShareTransport;
 

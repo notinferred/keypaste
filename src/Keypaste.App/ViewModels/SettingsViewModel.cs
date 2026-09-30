@@ -3,6 +3,7 @@ using Keypaste.App.Navigation;
 using Keypaste.App.Session;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Login;
 using Keypaste.Core.Recent;
 using Keypaste.Core.Settings;
 
@@ -33,6 +34,8 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
     private IdleChoice _idle;
     private AppTheme _theme;
     private bool _lockWhenMinimized;
+    private bool _stayInTray;
+    private bool? _openAtLogin;
     private string _message = string.Empty;
     private bool _exporting;
 
@@ -60,6 +63,7 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
         _settings = preferences.Current;
         _theme = _settings.Theme;
         _lockWhenMinimized = _settings.LockWhenMinimized;
+        _stayInTray = preferences.StaysInTray;
 
         IdleChoices = ChoicesFor(_settings.IdleTimeoutSeconds);
         _idle = IdleChoices.Single(choice => choice.Seconds == _settings.IdleTimeoutSeconds);
@@ -210,6 +214,55 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
             if (Set(ref _lockWhenMinimized, value))
             {
                 Persist(_settings with { LockWhenMinimized = value });
+            }
+        }
+    }
+
+    /// <summary>The words for where the app stays: the menu bar on macOS, the tray elsewhere.</summary>
+#pragma warning disable CA1822
+    internal string StayInTrayLabel => OperatingSystem.IsMacOS()
+        ? "Keep keypaste in the menu bar when the window closes"
+        : "Keep keypaste in the tray when the window closes";
+#pragma warning restore CA1822
+
+    /// <summary>Whether closing the window leaves the app, locked, in the menu bar or tray rather than quitting.</summary>
+    internal bool StayInTray
+    {
+        get => _stayInTray;
+        set
+        {
+            if (Set(ref _stayInTray, value))
+            {
+                Persist(_settings with { StayInTray = value });
+            }
+        }
+    }
+
+    /// <summary>The entry that opens the app at login, or null where Settings offers none.</summary>
+    internal ILoginItem? Login { get; init; }
+
+    internal bool OpenAtLoginSupported => Login is not null;
+
+    /// <summary>Whether the app opens at login; read from the platform's own entry, which is the only record of it.</summary>
+    internal bool OpenAtLogin
+    {
+        get => _openAtLogin ??= Login?.IsEnabled == true;
+        set
+        {
+            if (Login is null || value == OpenAtLogin)
+            {
+                return;
+            }
+
+            var done = value ? Login.Enable() : Login.Disable();
+            _openAtLogin = Login.IsEnabled;
+            Raise();
+
+            if (!done)
+            {
+                Message = value
+                    ? "keypaste could not add itself to what opens at login."
+                    : "keypaste could not remove itself from what opens at login.";
             }
         }
     }

@@ -12,7 +12,9 @@ using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.HardwareKeys;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Login;
 using Keypaste.Core.Recent;
 
 namespace Keypaste.App;
@@ -37,8 +39,12 @@ internal sealed partial class App : Application, IDisposable
     private UnlockViewModel? _unlock;
     private ShellViewModel? _shell;
     private IClassicDesktopStyleApplicationLifetime? _desktop;
+    private AppTray? _tray;
+    private IActivatableLifetime? _activatable;
     private (string Path, string? Keyfile)? _openNext;
+    private int _unlockScreens;
     private bool _shuttingDown;
+    private bool _quitting;
     private Core.Settings.AppTheme _theme = Core.Settings.AppTheme.System;
     private PlatformThemeVariant _platformTheme = PlatformThemeVariant.Dark;
 
@@ -50,7 +56,7 @@ internal sealed partial class App : Application, IDisposable
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            Launch(desktop);
+            Launch(desktop, LoginItems.StartsInBackground(Environment.GetCommandLineArgs()));
         }
 
         base.OnFrameworkInitializationCompleted();
@@ -61,17 +67,19 @@ internal sealed partial class App : Application, IDisposable
     /// window and what quitting does.
     /// </summary>
     /// <param name="desktop">The lifetime the app runs in.</param>
+    /// <param name="background">A start at login, which opens no window while the app stays in the menu bar or tray.</param>
     /// <exception cref="ArgumentNullException"><paramref name="desktop"/> is null.</exception>
     /// <remarks><c>internal</c> for the reason <see cref="Watch"/> is: a test runs what launch runs.</remarks>
-    internal void Launch(IClassicDesktopStyleApplicationLifetime desktop)
+    internal void Launch(IClassicDesktopStyleApplicationLifetime desktop, bool background = false)
     {
         ArgumentNullException.ThrowIfNull(desktop);
 
         var home = Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable);
 
-        _preferences = new DesktopPreferences(home);
+        _preferences = Preferences ?? new DesktopPreferences(home);
         _session = Compose(_preferences, TimeProvider.System);
         _session.Locked += OnLocked;
+        _session.Opened += (_, _) => Dispatcher.UIThread.Post(() => _tray?.Refresh());
         _authority = new AppAuthority(
             _session,
             Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable),
@@ -91,8 +99,26 @@ internal sealed partial class App : Application, IDisposable
 
         ShowUnlock(home);
 
+        _tray = new AppTray(OpenWindow, () => _session?.Lock(VaultLockReason.Manual), () => _session?.IsUnlocked == true, Quit);
+        _tray.Show(_preferences.StaysInTray);
+        _preferences.Changed += OnPreferencesChanged;
+        _window.Closing += OnMainWindowClosing;
+
         _desktop = desktop;
-        desktop.MainWindow = _window;
+
+        // macOS answers a Dock click or a second open of the app by reopening the running one.
+        _activatable = TryGetFeature(typeof(IActivatableLifetime)) as IActivatableLifetime;
+
+        if (_activatable is not null)
+        {
+            _activatable.Activated += OnActivated;
+        }
+
+        // The lifetime shows its main window when it starts, so a start at login names none until Open.
+        if (!(background && _preferences.StaysInTray))
+        {
+            desktop.MainWindow = _window;
+        }
 
         // A prompt window still open must not keep the vault served once the main window closes (F.21).
         desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
@@ -101,6 +127,92 @@ internal sealed partial class App : Application, IDisposable
 
     /// <summary>The authority <see cref="Launch"/> composed, or null before it or after quitting.</summary>
     internal AppAuthority? Authority => _authority;
+
+    /// <summary>The menu bar or tray icon <see cref="Launch"/> composed.</summary>
+    internal AppTray? Tray => _tray;
+
+    /// <summary>The main window <see cref="Launch"/> composed, shown or not.</summary>
+    internal MainWindow? Main => _window;
+
+    /// <summary>The preferences launch composes from; <c>app.toml</c> in the keypaste home unless a test gives others.</summary>
+    internal DesktopPreferences? Preferences { get; init; }
+
+    /// <summary>The entry that opens the app at login; the platform's own unless a test gives another.</summary>
+    internal Func<ILoginItem?> LoginItemFor { get; init; } = LoginItems.ForThisProcess;
+
+    /// <summary>Shows the window from the menu bar or tray.</summary>
+    internal void OpenWindow()
+    {
+        if (_window is null || _desktop is null)
+        {
+            return;
+        }
+
+        _desktop.MainWindow ??= _window;
+        _window.Show();
+
+        if (_window.WindowState == WindowState.Minimized)
+        {
+            _window.WindowState = WindowState.Normal;
+        }
+
+        _window.Activate();
+    }
+
+    /// <summary>Closes the window into the menu bar or tray; closing still ends the session, so the process stays locked and holds no secret (D-0385).</summary>
+    internal void CloseToTray()
+    {
+        if (_session is null || _window is null)
+        {
+            return;
+        }
+
+        var unlocked = _session.IsUnlocked;
+
+        // Locking also stops a hardware key waiting for its touch, so an unlock under way cannot finish with a later touch.
+        _session.Lock(VaultLockReason.Closed);
+
+        if (!unlocked)
+        {
+            // A password typed on the unlock screen is dropped with it, and an unlock it started locks again as it finishes.
+            ShowUnlock(Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable));
+        }
+
+        _window.Hide();
+    }
+
+    private void OnActivated(object? sender, ActivatedEventArgs e)
+    {
+        if (e.Kind == ActivationKind.Reopen)
+        {
+            OpenWindow();
+        }
+    }
+
+    private void OnMainWindowClosing(object? sender, WindowClosingEventArgs e)
+    {
+        if (_quitting || _preferences?.StaysInTray != true || e.CloseReason != WindowCloseReason.WindowClosing)
+        {
+            return;
+        }
+
+        e.Cancel = true;
+        CloseToTray();
+    }
+
+    private void Quit()
+    {
+        _quitting = true;
+        _ = _desktop?.TryShutdown();
+    }
+
+    private void OnPreferencesChanged(object? sender, EventArgs e)
+    {
+        if (_preferences is { } preferences)
+        {
+            _tray?.Show(preferences.StaysInTray);
+        }
+    }
 
     /// <summary>How the app asks for a file; the platform's picker unless a test gives another.</summary>
     internal Func<TopLevel, IVaultFilePicker> Pickers { get; init; } = window => new StorageProviderPicker(window);
@@ -143,8 +255,11 @@ internal sealed partial class App : Application, IDisposable
             clock,
             preferences.IdleTimeout,
             KeypasteHome.Resolve(Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable)),
-            new YubiKeyHardware());
+            HardwareKeys());
     }
+
+    /// <summary>What reaches hardware keys; the connected YubiKeys unless a test gives another.</summary>
+    internal Func<IChallengeResponseDevice> HardwareKeys { get; init; } = () => new YubiKeyHardware();
 
     /// <summary>
     /// Arms the minimize-lock setting against a window.
@@ -257,10 +372,13 @@ internal sealed partial class App : Application, IDisposable
     private void OnLocked(object? sender, VaultLockReason reason)
     {
         Dispatcher.UIThread.Post(() =>
+        {
             ShowUnlock(
                 Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable),
                 reason == VaultLockReason.AccessChanged ? AccessChangedMessage : null,
-                reason));
+                reason);
+            _tray?.Refresh();
+        });
     }
 
     /// <summary>Keeps an imported file in place: locks the open vault and puts that file on the unlock screen.</summary>
@@ -290,8 +408,10 @@ internal sealed partial class App : Application, IDisposable
         _openNext = null;
 
         _unlock?.Dispose();
+
+        var screen = ++_unlockScreens;
         _unlock = new UnlockViewModel(
-            _session, home, Pickers(_window), OnUnlocked,
+            _session, home, Pickers(_window), () => OnUnlocked(screen),
             action => Dispatcher.UIThread.Post(action),
             message,
             next is null ? reason : null,
@@ -306,10 +426,17 @@ internal sealed partial class App : Application, IDisposable
             new UnlockView { DataContext = _unlock };
     }
 
-    private void OnUnlocked()
+    private void OnUnlocked(int screen)
     {
         if (_window is null || _session is null)
         {
+            return;
+        }
+
+        // An unlock that finishes after its screen was replaced, by closing into the tray, opened a vault nobody is looking at.
+        if (screen != _unlockScreens)
+        {
+            _session.Lock(VaultLockReason.Closed);
             return;
         }
 
@@ -329,6 +456,7 @@ internal sealed partial class App : Application, IDisposable
             WebLaunchers(_window))
         {
             ShareTransport = ShareTransport,
+            LoginItem = LoginItemFor(),
         };
 
         _window.FindControl<ContentControl>("Root")!.Content =
@@ -399,6 +527,19 @@ internal sealed partial class App : Application, IDisposable
         _shell = null;
         _unlock?.Dispose();
         _unlock = null;
+        _tray?.Dispose();
+        _tray = null;
+
+        if (_activatable is not null)
+        {
+            _activatable.Activated -= OnActivated;
+            _activatable = null;
+        }
+
+        if (_preferences is not null)
+        {
+            _preferences.Changed -= OnPreferencesChanged;
+        }
 
         _authority?.Dispose();
         _authority = null;

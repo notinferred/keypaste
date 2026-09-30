@@ -8,6 +8,8 @@ Upgrade the bridge and `keypaste agent` together: they must be the same version,
 
 keypaste has a new brand: an icon "k." and a wordmark "keypaste." in Hepta Slab with an amber dot, amber on ink, Instrument Sans and Fragment Mono ([BRAND](docs/BRAND.md)). The desktop app is rebuilt on it, with restyled screens, a new lock screen and restyled prompt windows, and keypaste.com and the README use it too.
 
+Closing the desktop app's window on Windows or macOS now locks it and leaves it in the tray or menu bar, whose icon offers Open, Lock and Quit; on Linux that is a choice in Settings › Startup. Settings › Startup can also open keypaste at login, locked, and with no window while it stays in the tray ([G.4a](docs/steps/G.4a.md)).
+
 `keypaste add`, `rm`, `access`, `env set`, `env rm`, `env pull` and `import` are now refused while the desktop app or `keypaste agent` holds the vault, before asking for a password, as `set` and `rotate` already were. The message names what holds it and says to make the change there or run `keypaste lock`. Scripts that saved through the CLI while the app was unlocked now stop there ([N.10](docs/steps/N.10.md)).
 
 A secret the desktop copies now also asks macOS pasteboard managers such as Maccy, and KDE's Klipper, not to keep it, as it already asked Windows' Clipboard History; a copied run command is left for them to keep ([N.12](docs/steps/N.12.md)).
@@ -66,7 +68,7 @@ The CLI shows what needs you in amber, what is done in green and what was refuse
 
 The desktop's Secrets screen no longer overlaps with an entry open: the search box, New, Rename or move and Delete run across the list and the entry's pane, and the dividers sit between the panes instead of over them. The main window can no longer be made narrower than 960 px, the least width at which the screen fits ([F.22](docs/steps/F.22.md)).
 
-Closing the desktop's main window now quits the app even while an agent's request waits in its prompt window: the request is refused as `vault-locked` and the prompt closes. Before, the prompt kept the app running with the vault unlocked, and approving on it still released the value ([F.21](docs/steps/F.21.md)).
+Closing the desktop's main window now ends the session even while an agent's request waits in its prompt window: the request is refused as `vault-locked` and the prompt closes. Before, the prompt kept the app running with the vault unlocked, and approving on it still released the value ([F.21](docs/steps/F.21.md)).
 
 `keypaste run --session <project> -- <command>` now takes the project's variables from the desktop app or `keypaste agent` holding the vault unlocked, and asks for no password. The app shows the project, the variable names, the command and the directory in a prompt window, and `keypaste agent` shows them in its terminal. The command starts only on Allow once or Allow this command for 15 minutes (`o` or `h` in `keypaste agent`). Deny, a lock, the timeout or nothing holding the vault ends the run with a reason and starts nothing ([E.1c](docs/steps/E.1c.md)).
 

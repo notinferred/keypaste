@@ -27,4 +27,7 @@ internal enum VaultLockReason
 
     /// <summary><c>keypaste lock</c> asked, over the vault's endpoint.</summary>
     Requested = 6,
+
+    /// <summary>The window was closed into the menu bar or tray.</summary>
+    Closed = 7,
 }

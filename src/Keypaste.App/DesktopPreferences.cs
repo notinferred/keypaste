@@ -54,6 +54,13 @@ internal sealed class DesktopPreferences
     /// </remarks>
     internal bool LockWhenMinimized => Current.LockWhenMinimized;
 
+    /// <summary>Whether closing the window leaves the app, locked, in the menu bar or tray.</summary>
+    /// <remarks>A Linux desktop may show no tray at all, so there it is off until chosen.</remarks>
+    internal bool StaysInTray => Current.StayInTray ?? !OperatingSystem.IsLinux();
+
+    /// <summary>Raised after <see cref="Update"/>, so what a setting drives follows it at once.</summary>
+    internal event EventHandler? Changed;
+
     /// <summary>Takes a change and writes it.</summary>
     /// <param name="settings">The new preferences.</param>
     /// <returns><see langword="false"/> when the file could not be written.</returns>
@@ -68,6 +75,8 @@ internal sealed class DesktopPreferences
         ArgumentNullException.ThrowIfNull(settings);
 
         Current = settings;
-        return AppSettings.Save(_path, settings);
+        var saved = AppSettings.Save(_path, settings);
+        Changed?.Invoke(this, EventArgs.Empty);
+        return saved;
     }
 }

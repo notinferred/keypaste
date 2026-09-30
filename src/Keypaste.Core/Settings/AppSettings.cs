@@ -80,6 +80,9 @@ public sealed record AppSettings
     /// <inheritdoc cref="IdleTimeoutKey"/>
     internal const string LockWhenMinimizedKey = "lock_when_minimized";
 
+    /// <inheritdoc cref="IdleTimeoutKey"/>
+    internal const string StayInTrayKey = "stay_in_tray";
+
     private static readonly string[] _header =
     [
         "# keypaste's desktop app keeps its preferences here.",
@@ -123,6 +126,9 @@ public sealed record AppSettings
     /// it.
     /// </remarks>
     public required bool LockWhenMinimized { get; init; }
+
+    /// <summary>Whether closing the window leaves the app locked in the menu bar or tray; null until chosen, when the platform decides.</summary>
+    public bool? StayInTray { get; init; }
 
     /// <summary>Reads the preferences.</summary>
     /// <param name="path">The file, from <see cref="KeypasteHome.SettingsPath"/>.</param>
@@ -196,8 +202,14 @@ public sealed record AppSettings
                 $"{IdleTimeoutKey} = {settings.IdleTimeoutSeconds}"),
             $"{ThemeKey} = \"{Written(settings.Theme)}\"",
             $"{LockWhenMinimizedKey} = {(settings.LockWhenMinimized ? "1" : "0")}  # 1 or 0; this file has no booleans",
-            string.Empty,
         };
+
+        if (settings.StayInTray is { } tray)
+        {
+            lines.Add($"{StayInTrayKey} = {(tray ? "1" : "0")}");
+        }
+
+        lines.Add(string.Empty);
 
         try
         {
@@ -237,6 +249,10 @@ public sealed record AppSettings
             && minimized.Value.Kind == TomlValueKind.Number
                 ? minimized.Value.Number != 0
                 : Default.LockWhenMinimized,
+        StayInTray =
+            table.TryGet(StayInTrayKey, out var tray) && tray.Value.Kind == TomlValueKind.Number
+                ? tray.Value.Number != 0
+                : Default.StayInTray,
     };
 
     /// <summary>

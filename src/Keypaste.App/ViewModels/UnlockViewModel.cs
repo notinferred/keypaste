@@ -1070,6 +1070,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
             VaultLockReason.Idle => $"Locked at {time} after {Duration(idleTimeout)} without use",
             VaultLockReason.Manual => $"You locked it at {time}",
             VaultLockReason.Minimized => $"Locked at {time} when the window was minimized",
+            VaultLockReason.Closed => $"Locked at {time} when the window was closed",
             VaultLockReason.Requested => $"Locked at {time} by keypaste lock",
             _ => string.Empty,
         };
