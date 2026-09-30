@@ -3,10 +3,10 @@ namespace Keypaste.Core;
 /// <summary>Decides which vault file a command operates on.</summary>
 /// <remarks>
 /// <para>
-/// There is deliberately <b>no default path</b>. A credential tool that silently picks a vault when
-/// you forgot to say which one is a tool that eventually writes a secret into the wrong file, or
-/// reports "not found" against a vault you have never seen. Being explicit costs one flag and
-/// removes a whole class of confusion.
+/// There is deliberately <b>no default path</b>: <c>--vault</c>, then <c>KEYPASTE_VAULT</c>, then the
+/// vault the person chose in <c>app.toml</c>, and otherwise nothing (D-0389). Nothing falls back to
+/// whichever vault happens to be unlocked, because a tool that guesses writes a secret into the
+/// wrong file.
 /// </para>
 /// <para>
 /// The rule lives in the core rather than in the CLI because "which vault are we talking about" is
@@ -30,9 +30,10 @@ public static class VaultLocation
     /// </remarks>
     public const string KeyfileEnvironmentVariable = "KEYPASTE_KEYFILE";
 
-    /// <summary>Resolves the vault path from an explicit value and the environment.</summary>
+    /// <summary>Resolves the vault path from an explicit value, the environment and the person's choice.</summary>
     /// <param name="fromFlag">The explicit path — <c>--vault</c> on either front end. May be null.</param>
     /// <param name="fromEnvironment">The value of <see cref="EnvironmentVariable"/>. May be null.</param>
+    /// <param name="fromChoice">The vault chosen in <c>app.toml</c>, from <see cref="Settings.ChosenVault.Read"/>. May be null.</param>
     /// <param name="path">The absolute path, on success.</param>
     /// <param name="error">A message naming the problem, or empty on success.</param>
     /// <returns><see langword="false"/> when no path is available.</returns>
@@ -43,6 +44,7 @@ public static class VaultLocation
     public static bool TryResolve(
         string? fromFlag,
         string? fromEnvironment,
+        string? fromChoice,
         out string path,
         out string error)
     {
@@ -61,7 +63,13 @@ public static class VaultLocation
             return true;
         }
 
-        error = $"no vault given. Use --vault <path> or set {EnvironmentVariable}.";
+        if (!string.IsNullOrEmpty(fromChoice))
+        {
+            path = Path.GetFullPath(fromChoice);
+            return true;
+        }
+
+        error = $"no vault chosen. Open one in the keypaste app or run `keypaste use <path>`; --vault <path> or {EnvironmentVariable} names one for a single command.";
         return false;
     }
 

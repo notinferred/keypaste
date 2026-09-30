@@ -155,7 +155,7 @@ The app keeps machine-specific settings in `~/.keypaste`, alongside the audit lo
 | | |
 |---|---|
 | `recent.toml` | The vaults you have opened here, where the keyfile each opened with is, and which YubiKey slot. Paths and slot numbers only; no entry names, secrets or key material |
-| `app.toml` | Idle timeout, theme, lock-on-minimize, and whether closing the window leaves the app in the menu bar or tray |
+| `app.toml` | Idle timeout, theme, lock-on-minimize, whether closing the window leaves the app in the menu bar or tray, and the vault agents and the CLI use when nothing names one ([G.1](steps/G.1.md)) |
 | `projects.json` | For each vault and project you saved on Env profiles, its directory and command. No variable names or values |
 | `recommendations.json` | The recommendations you dismissed, by vault, entry identifier and key name. No titles or values |
 

@@ -35,7 +35,8 @@ internal sealed record ServerOptions
         audit trail. It speaks the protocol on stdin and stdout, so it is started by an MCP client
         rather than by you. See docs/mcp-setup.md.
 
-          --vault <path>        which vault to expose, or set KEYPASTE_VAULT
+          --vault <path>        which vault to expose, or set KEYPASTE_VAULT. Without either,
+                                the vault chosen in the keypaste app or with `keypaste use`
           --expose <glob>       what may be named, repeatable. Defaults to env/**
           --client-label <name> what to call this client in the audit log and in clients.toml
           --allow-run           offer the run tool: start a command you approve with secrets
@@ -86,6 +87,7 @@ internal sealed record ServerOptions
     /// <param name="vaultFromEnvironment">The value of <c>KEYPASTE_VAULT</c>, or null.</param>
     /// <param name="homeFromEnvironment">The value of <c>KEYPASTE_HOME</c>, or null.</param>
     /// <param name="approverFromEnvironment">The value of <c>KEYPASTE_APPROVER</c>, or null.</param>
+    /// <param name="chosenVault">The vault chosen in <c>app.toml</c>, or null.</param>
     /// <param name="options">The parsed options, on success.</param>
     /// <param name="error">A message naming the problem, or empty on success.</param>
     /// <returns><see langword="true"/> when the server may start.</returns>
@@ -94,6 +96,7 @@ internal sealed record ServerOptions
         string? vaultFromEnvironment,
         string? homeFromEnvironment,
         string? approverFromEnvironment,
+        string? chosenVault,
         [NotNullWhen(true)] out ServerOptions? options,
         out string error)
     {
@@ -196,7 +199,7 @@ internal sealed record ServerOptions
         // A missing vault is deliberately not fatal. Malformed configuration should stop the
         // server; absent state should not, because a server that starts and says "no vault is
         // configured" is diagnosable, and one that exits leaves the client's log as the only clue.
-        VaultLocation.TryResolve(vault, vaultFromEnvironment, out var vaultPath, out _);
+        VaultLocation.TryResolve(vault, vaultFromEnvironment, chosenVault, out var vaultPath, out _);
 
         string? pipeName;
         var identity = vaultPath.Length > 0 ? VaultIdentity.Of(KeypasteHome.Resolve(homeFromEnvironment), vaultPath) : null;

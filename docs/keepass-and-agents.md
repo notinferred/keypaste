@@ -78,7 +78,7 @@ One keystroke later the deploy runs, and the exchange is two lines you can read 
 
 `keypaste import` is in source for the next release; the published v0.3.0 does not have it.
 
-An existing KDBX file can stay where it is: `keypaste import old.kdbx` with no vault configured checks that it unlocks and remembers it, and from then on `--vault old.kdbx` or `KEYPASTE_VAULT` opens it like any other vault.
+An existing KDBX file can stay where it is: `keypaste import old.kdbx --in-place` checks that it unlocks and remembers it, and from then on `--vault old.kdbx`, `KEYPASTE_VAULT` or `keypaste use old.kdbx` opens it like any other vault. With no vault named or chosen, `--in-place` is the default.
 
 To bring it into the vault you already use, name that vault. The file is opened read-only and never written; a `<name>.keyx` or `<name>.key` beside it is used as its keyfile unless `--source-keyfile none` says otherwise.
 

@@ -3,6 +3,7 @@ using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.HardwareKeys;
 using Keypaste.Core.Recent;
+using Keypaste.Core.Settings;
 
 namespace Keypaste.App.ViewModels;
 
@@ -75,6 +76,8 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     private bool _restoreOnly;
     private int _backups;
     private RestoreBackupViewModel? _restore;
+    private string? _notice;
+    private string? _chosenNotice;
     private bool _disposed;
 
     internal UnlockViewModel(
@@ -246,10 +249,18 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     internal bool CanTypePassword => _selectedPath is not null && !_restoreOnly;
 
     /// <summary>
-    /// What the shell says once on opening: what a restore did, or that the vault's keyfile is one
-    /// edit from lost (T-28).
+    /// What the shell says once on opening: what a restore did, that the vault's keyfile is one
+    /// edit from lost (T-28), and that agents and the CLI now use this vault.
     /// </summary>
-    internal string? Notice { get; private set; }
+    internal string? Notice
+    {
+        get => _chosenNotice is null ? _notice : _notice is null ? _chosenNotice : $"{_notice} {_chosenNotice}";
+        private set => _notice = value;
+    }
+
+    /// <summary>What the shell says when the first create or unlock chose this vault for agents and the CLI (D-0389).</summary>
+    internal const string ChosenNotice =
+        "Agents and the keypaste CLI now use this vault when no --vault is given. Settings changes it.";
 
     /// <summary>Asks for a keyfile, for opening, creating or restoring alike.</summary>
     internal AsyncRelayCommand ChooseKeyfileCommand { get; }
@@ -1116,6 +1127,7 @@ internal sealed class UnlockViewModel : ObservableObject, IDisposable
     {
         _remembered = RecentVaults.Remember(_remembered, path, DateTimeOffset.UtcNow, keyfile, hardwareKeySlot);
         RecentVaults.Save(KeypasteHome.RecentPath(_home), _remembered);
+        _chosenNotice = ChosenVault.Choose(_home, path, onlyIfNone: true) == ChooseOutcome.Chosen ? ChosenNotice : null;
         Project();
     }
 

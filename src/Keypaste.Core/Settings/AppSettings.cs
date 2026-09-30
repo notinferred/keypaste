@@ -1,6 +1,7 @@
 using System.Globalization;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Policy;
+using Keypaste.Core.Recent;
 
 namespace Keypaste.Core.Settings;
 
@@ -18,7 +19,7 @@ public enum AppTheme
 }
 
 /// <summary>
-/// The desktop app's preferences, as they sit in <c>app.toml</c>.
+/// The desktop app's preferences and the chosen vault, as they sit in <c>app.toml</c>.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -82,10 +83,11 @@ public sealed record AppSettings
 
     /// <inheritdoc cref="IdleTimeoutKey"/>
     internal const string StayInTrayKey = "stay_in_tray";
+    internal const string VaultKey = "vault";
 
     private static readonly string[] _header =
     [
-        "# keypaste's desktop app keeps its preferences here.",
+        "# keypaste keeps the desktop app's preferences here, and the vault agents and the CLI use.",
         "# Delete this file to go back to the defaults.",
         "",
     ];
@@ -129,6 +131,9 @@ public sealed record AppSettings
 
     /// <summary>Whether closing the window leaves the app locked in the menu bar or tray; null until chosen, when the platform decides.</summary>
     public bool? StayInTray { get; init; }
+    /// <summary>The vault agents and the CLI use when no <c>--vault</c> or <c>KEYPASTE_VAULT</c> names one, or null.</summary>
+    /// <remarks>A full path and never anything read from the vault (D-0389).</remarks>
+    public string? Vault { get; init; }
 
     /// <summary>Reads the preferences.</summary>
     /// <param name="path">The file, from <see cref="KeypasteHome.SettingsPath"/>.</param>
@@ -141,41 +146,54 @@ public sealed record AppSettings
     /// cannot read whole takes the defaults whole, because past the first syntax error nothing in
     /// it can be trusted to mean what it looks like.
     /// </para>
-    /// <para>
-    /// Held to <see cref="TomlLimits.Policy"/> rather than <see cref="TomlLimits.Paths"/>: nothing
-    /// here is a path, and the longest string this file can legitimately hold is <c>"system"</c>.
-    /// </para>
     /// </remarks>
     public static AppSettings Load(string path)
     {
+        TryLoad(path, out var settings);
+        return settings;
+    }
+
+    /// <summary>Reads the preferences, saying whether a file that exists could not be read.</summary>
+    /// <param name="path">The file, from <see cref="KeypasteHome.SettingsPath"/>.</param>
+    /// <param name="settings">What <see cref="Load"/> returns.</param>
+    /// <returns><see langword="false"/> when the file exists and could not be read or parsed, so a writer knows it would clobber it.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="path"/> is null.</exception>
+    public static bool TryLoad(string path, out AppSettings settings)
+    {
         ArgumentNullException.ThrowIfNull(path);
 
+        settings = Default;
         byte[] bytes;
 
         try
         {
             bytes = File.ReadAllBytes(path);
         }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return true;
+        }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return Default;
+            return false;
         }
 
-        if (!Toml.TryDecode(bytes, TomlLimits.Policy, out var text, out _)
-            || !Toml.TryParse(text, TomlLimits.Policy, out var document, out _))
+        if (!Toml.TryDecode(bytes, TomlLimits.Paths, out var text, out _)
+            || !Toml.TryParse(text, TomlLimits.Paths, out var document, out _))
         {
-            return Default;
+            return false;
         }
 
         foreach (var table in document.Tables)
         {
             if (string.Equals(table.Name, SectionName, StringComparison.Ordinal))
             {
-                return Read(table);
+                settings = Read(table);
+                break;
             }
         }
 
-        return Default;
+        return true;
     }
 
     /// <summary>Writes the preferences, replacing whatever was there.</summary>
@@ -207,6 +225,11 @@ public sealed record AppSettings
         if (settings.StayInTray is { } tray)
         {
             lines.Add($"{StayInTrayKey} = {(tray ? "1" : "0")}");
+        }
+
+        if (settings.Vault is { } vault)
+        {
+            lines.Add($"{VaultKey} = \"{RecentVaults.Portable(vault)}\"  # the vault agents and the CLI use without --vault");
         }
 
         lines.Add(string.Empty);
@@ -253,6 +276,9 @@ public sealed record AppSettings
             table.TryGet(StayInTrayKey, out var tray) && tray.Value.Kind == TomlValueKind.Number
                 ? tray.Value.Number != 0
                 : Default.StayInTray,
+        Vault = table.TryGet(VaultKey, out var vault) && vault.Value.Kind == TomlValueKind.Text
+            ? ChosenVault.FullPath(vault.Value.Text)
+            : null,
     };
 
     /// <summary>

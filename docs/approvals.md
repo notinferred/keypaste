@@ -45,7 +45,7 @@ The third line reports what the policy file says before anything can use it; wit
 | `--max-ttl <seconds>` | How long `h` lets the same connection reuse an approval, whatever the agent asks for. Default 3600 (300 in `v0.3.0`). A standing rule's release is also bounded by what the agent asked for. |
 | `--approver <name>` | Which pipe to listen on. Or set `KEYPASTE_APPROVER`. You need this only if you run two. |
 
-Both processes derive the same per-user pipe name, so [MCP configuration](mcp-setup.md) usually needs no change. In source the name is derived from the vault as well, so the bridge's `--vault` must name the vault the approver holds; `v0.3.0` names the pipe `keypaste-agent-…` and prints no session.
+Both processes derive the same per-user pipe name, so [MCP configuration](mcp-setup.md) usually needs no change. In source the name is derived from the vault as well, so the vault the bridge names with `--vault`, or the chosen one it uses without it, must be the vault the approver holds; `v0.3.0` names the pipe `keypaste-agent-…` and prints no session.
 
 ## What you see
 

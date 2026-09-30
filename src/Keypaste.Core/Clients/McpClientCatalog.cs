@@ -92,7 +92,10 @@ public sealed record McpServerCommand(string Path, IReadOnlyList<string> Argumen
 /// What keypaste asks a client to launch: the bridge, and the flags that bound it.
 /// </summary>
 /// <param name="Server">How to start <c>keypaste-mcp</c>.</param>
-/// <param name="VaultPath">Absolute path to the vault. Absolute always — a client's working directory is not ours.</param>
+/// <param name="VaultPath">
+/// The absolute vault the bridge is pinned to with <c>--vault</c>, or null for none, so the bridge
+/// uses the vault the person chose (D-0389).
+/// </param>
 /// <param name="ClientLabel">What this client is called in the audit log.</param>
 /// <param name="Expose">
 /// Extra globs. Empty means the flag is omitted entirely, so <c>keypaste-mcp</c>'s own default of
@@ -101,7 +104,7 @@ public sealed record McpServerCommand(string Path, IReadOnlyList<string> Argumen
 /// </param>
 public sealed record McpServerRegistration(
     McpServerCommand Server,
-    string VaultPath,
+    string? VaultPath,
     string ClientLabel,
     IReadOnlyList<string> Expose)
 {
@@ -119,14 +122,13 @@ public sealed record McpServerRegistration(
     /// </remarks>
     public static bool TryCreate(
         McpServerCommand server,
-        string vaultPath,
+        string? vaultPath,
         string clientLabel,
         IReadOnlyList<string> expose,
         [NotNullWhen(true)] out McpServerRegistration? registration,
         out string error)
     {
         ArgumentNullException.ThrowIfNull(server);
-        ArgumentException.ThrowIfNullOrEmpty(vaultPath);
         ArgumentNullException.ThrowIfNull(clientLabel);
         ArgumentNullException.ThrowIfNull(expose);
 
@@ -145,7 +147,8 @@ public sealed record McpServerRegistration(
             return false;
         }
 
-        registration = new McpServerRegistration(server, System.IO.Path.GetFullPath(vaultPath), clientLabel, [.. expose]);
+        var pinned = string.IsNullOrEmpty(vaultPath) ? null : System.IO.Path.GetFullPath(vaultPath);
+        registration = new McpServerRegistration(server, pinned, clientLabel, [.. expose]);
         error = string.Empty;
         return true;
     }
@@ -153,7 +156,16 @@ public sealed record McpServerRegistration(
     /// <summary>The full argv a client should launch, executable first.</summary>
     public IReadOnlyList<string> CommandLine()
     {
-        List<string> line = [Server.Path, .. Server.Arguments, "--vault", VaultPath, "--client-label", ClientLabel];
+        List<string> line = [Server.Path, .. Server.Arguments];
+
+        if (VaultPath is not null)
+        {
+            line.Add("--vault");
+            line.Add(VaultPath);
+        }
+
+        line.Add("--client-label");
+        line.Add(ClientLabel);
 
         foreach (var glob in Expose)
         {

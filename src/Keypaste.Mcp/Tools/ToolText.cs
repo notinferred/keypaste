@@ -201,8 +201,8 @@ internal static class ToolText
     /// <summary>Why a call was refused when this server names no vault.</summary>
     internal const string NoVault = """
         keypaste: DENIED. This server was started without a vault to ask about, so nothing was read
-        or released. Ask the person you are working with to add `--vault <their vault>` to this
-        server's entry in the MCP client's configuration; `keypaste setup` writes it. This call was
+        or released. Ask the person you are working with to open their vault in the keypaste app or
+        run `keypaste use <their vault>`, and then to restart this MCP server. This call was
         recorded in the audit log as denied.
         """;
 

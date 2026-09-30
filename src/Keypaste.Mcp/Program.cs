@@ -2,6 +2,7 @@ using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Launch;
+using Keypaste.Core.Settings;
 using Keypaste.Mcp.Tools;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
@@ -32,11 +33,14 @@ internal static class Program
 
     private static async Task<int> Main(string[] args)
     {
+        var home = Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable);
+
         if (!ServerOptions.TryParse(
                 args,
                 Environment.GetEnvironmentVariable(VaultLocation.EnvironmentVariable),
-                Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable),
+                home,
                 Environment.GetEnvironmentVariable(ApproverEndpoint.EnvironmentVariable),
+                ChosenVault.Read(home),
                 out var options,
                 out var error))
         {

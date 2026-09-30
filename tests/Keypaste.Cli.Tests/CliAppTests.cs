@@ -132,7 +132,7 @@ public sealed class CliAppTests
             .Select(line => line.Split(' ', StringSplitOptions.RemoveEmptyEntries)[0])
             .ToList();
 
-        Assert.Equal(20, verbs.Count);
+        Assert.Equal(21, verbs.Count);
 
         foreach (var verb in verbs)
         {
@@ -171,6 +171,7 @@ public sealed class CliAppTests
             "  share     create an encrypted, expiring link",
             "  lock      lock now and pause all agents",
             "  init      create a new vault",
+            "  use       choose the vault used when no --vault is given",
             "  add       add an entry",
             "  ls        list groups and entries",
             "  rm        remove an entry",

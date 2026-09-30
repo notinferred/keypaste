@@ -19,7 +19,7 @@ public static class KeypasteHome
     /// <summary>The desktop app's list of vaults it has opened on this machine.</summary>
     public const string RecentFileName = "recent.toml";
 
-    /// <summary>The desktop app's settings.</summary>
+    /// <summary>The desktop app's settings, and the vault agents and the CLI use without <c>--vault</c>.</summary>
     public const string SettingsFileName = "app.toml";
 
     /// <summary>The desktop app's project mappings: a directory and a command for each env set.</summary>
@@ -67,8 +67,8 @@ public static class KeypasteHome
 
     /// <summary>Resolves the desktop app's settings file. The file is not created.</summary>
     /// <remarks>
-    /// Nothing in it is an authorization: the idle timeout it carries is a convenience over a default
-    /// that already locks, so a missing or unreadable file costs a preference and never costs a lock.
+    /// Nothing in it is an authorization: the idle timeout is a convenience over a default that
+    /// already locks, and the chosen vault only says which vault's owner to ask (D-0389).
     /// </remarks>
     public static string SettingsPath(string? fromEnvironment) =>
         Path.Combine(Resolve(fromEnvironment), SettingsFileName);
@@ -91,8 +91,8 @@ public static class KeypasteHome
 
     /// <summary>Resolves the per-client policy file. The file is not created.</summary>
     /// <remarks>
-    /// Not <c>policy.toml</c>, whose every table is an allow rule, and not <c>app.toml</c>, which only
-    /// the desktop reads: <c>keypaste agent</c> enforces the same file (D-0360).
+    /// Not <c>policy.toml</c>, whose every table is an allow rule, and not <c>app.toml</c>, which holds
+    /// preferences: <c>keypaste agent</c> enforces the same file (D-0360).
     /// </remarks>
     public static string ClientsPath(string? fromEnvironment) =>
         Path.Combine(Resolve(fromEnvironment), ClientsFileName);

@@ -243,6 +243,60 @@ public sealed class SetupVerbTests
     }
 
     [Fact]
+    public void Without_a_vault_named_the_client_is_given_none_and_its_bridge_uses_the_chosen_one()
+    {
+        using var harness = Wired("claude");
+        harness.SeedVault(_master, ("env/demo/KEY", "value"));
+        var home = harness.Environment[Keypaste.Core.Audit.KeypasteHome.EnvironmentVariable];
+        Keypaste.Core.Settings.ChosenVault.Choose(home, harness.VaultPath, onlyIfNone: false);
+
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("setup", "--client", "claude-code", "--server-path", ServerPath(harness)));
+
+        var call = Assert.Single(harness.ProcessRunner.RealCalls, Adds);
+        Assert.DoesNotContain("--vault", call, StringComparison.Ordinal);
+        Assert.DoesNotContain(harness.VaultPath, call, StringComparison.Ordinal);
+        Assert.Contains($"vault          {harness.VaultPath} (the chosen vault; the client's entry names none)", harness.Out, StringComparison.Ordinal);
+        Assert.EndsWith("  keypaste agent", harness.Out.TrimEnd(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void With_no_vault_chosen_it_still_wires_and_says_how_to_choose_one()
+    {
+        using var harness = Wired("claude");
+
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("setup", "--client", "claude-code", "--server-path", ServerPath(harness)));
+
+        Assert.DoesNotContain("--vault", Assert.Single(harness.ProcessRunner.RealCalls, Adds), StringComparison.Ordinal);
+        Assert.Contains("vault          none chosen yet", harness.Out, StringComparison.Ordinal);
+        Assert.Contains("keypaste use <path>", harness.Err, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_named_vault_still_pins_the_client_to_it()
+    {
+        using var harness = Wired("claude");
+        harness.Environment[VaultLocator.EnvironmentVariable] = harness.VaultPath;
+
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("setup", "--client", "claude-code", "--server-path", ServerPath(harness)));
+
+        Assert.Contains($"--vault {harness.VaultPath}", Assert.Single(harness.ProcessRunner.RealCalls, Adds), StringComparison.Ordinal);
+        Assert.EndsWith($"  keypaste agent --vault {harness.VaultPath}", harness.Out.TrimEnd(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Naming_the_chosen_vault_does_not_pin_the_client_to_it()
+    {
+        using var harness = Wired("claude");
+        Keypaste.Core.Settings.ChosenVault.Choose(harness.Environment[Keypaste.Core.Audit.KeypasteHome.EnvironmentVariable], harness.VaultPath, onlyIfNone: false);
+        harness.Environment[VaultLocator.EnvironmentVariable] = harness.VaultPath;
+
+        Assert.Equal(CliApp.ExitSuccess, harness.Run("setup", "--client", "claude-code", "--server-path", ServerPath(harness)));
+
+        Assert.DoesNotContain("--vault", Assert.Single(harness.ProcessRunner.RealCalls, Adds), StringComparison.Ordinal);
+        Assert.EndsWith("  keypaste agent", harness.Out.TrimEnd(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void The_vault_path_is_made_absolute_because_a_clients_working_directory_is_not_ours()
     {
         using var harness = Wired("claude");

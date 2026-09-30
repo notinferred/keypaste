@@ -1,4 +1,6 @@
+using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
+using Keypaste.Core.Settings;
 
 namespace Keypaste.Cli.Commands;
 
@@ -65,7 +67,7 @@ internal static class SetupCommand
         var dryRun = line.HasFlag("dry-run");
 
         McpServerCommand? server = null;
-        string vault = string.Empty;
+        string? vault = null;
         IReadOnlyList<string> expose = [];
         if (!removing)
         {
@@ -91,7 +93,7 @@ internal static class SetupCommand
 
         if (!removing)
         {
-            WriteHeader(context, targets[0].Registration!);
+            WriteHeader(context, targets[0].Registration!, ChosenVault.Read(context.Environment.Get(KeypasteHome.EnvironmentVariable)));
         }
 
         var installed = 0;
@@ -183,17 +185,19 @@ internal static class SetupCommand
         CommandLine line,
         CliContext context,
         out McpServerCommand? server,
-        out string vault,
+        out string? vault,
         out IReadOnlyList<string> expose,
         out string reason)
     {
         server = null;
         expose = [];
 
-        if (!VaultLocator.TryResolve(line, context.Environment, out vault, out reason))
-        {
-            return false;
-        }
+        // Only a vault named here and not already chosen is written into the client; otherwise its bridge uses the chosen one (D-0389).
+        vault = VaultLocator.IsNamed(line, context.Environment)
+            && VaultLocator.TryResolve(line, context.Environment, out var named, out _)
+            && !ChosenVault.Same(ChosenVault.Read(context.Environment.Get(KeypasteHome.EnvironmentVariable)), named)
+                ? named
+                : null;
 
         var beside = Path.GetDirectoryName(Environment.ProcessPath);
         server = line.Value("server-path") is { Length: > 0 } explicitPath
@@ -249,18 +253,26 @@ internal static class SetupCommand
         return true;
     }
 
-    private static void WriteHeader(CliContext context, McpServerRegistration registration)
+    private static void WriteHeader(CliContext context, McpServerRegistration registration, string? chosen)
     {
         context.Stdout.WriteLine($"keypaste-mcp   {registration.Server.Path}");
-        context.Stdout.WriteLine($"vault          {registration.VaultPath}");
+        context.Stdout.WriteLine(registration.VaultPath is { } pinned
+            ? $"vault          {pinned}"
+            : $"vault          {chosen ?? "none chosen yet"} (the chosen vault; the client's entry names none)");
         context.Stdout.WriteLine(registration.Expose.Count == 0
             ? "exposure       env/** (the default; nothing else in the vault can even be named)"
             : $"exposure       {string.Join(", ", registration.Expose)}");
 
-        if (!File.Exists(registration.VaultPath))
+        if (registration.VaultPath is null && chosen is null)
         {
             context.Stderr.WriteLine(
-                $"keypaste: there is no vault at {registration.VaultPath} yet. Wiring it anyway; "
+                "keypaste: no vault is chosen yet. Wiring it anyway; open your vault in the keypaste app "
+                + "or run `keypaste use <path>` before an agent asks.");
+        }
+        else if ((registration.VaultPath ?? chosen) is { } vault && !File.Exists(vault))
+        {
+            context.Stderr.WriteLine(
+                $"keypaste: there is no vault at {vault} yet. Wiring it anyway; "
                 + "create it with `keypaste init` before an agent asks.");
         }
 
@@ -271,9 +283,9 @@ internal static class SetupCommand
     {
         context.Stdout.WriteLine();
         context.Stdout.WriteLine("Nothing is granted yet. keypaste-mcp holds no vault and decides nothing.");
-        context.Stdout.WriteLine("Start the process that does:");
+        context.Stdout.WriteLine("Unlock the vault in the keypaste app, or start the process that decides in a terminal:");
         context.Stdout.WriteLine();
-        context.Stdout.WriteLine($"  keypaste agent --vault {registration.VaultPath}");
+        context.Stdout.WriteLine(registration.VaultPath is { } pinned ? $"  keypaste agent --vault {pinned}" : "  keypaste agent");
     }
 
     /// <summary>What the audit log will call this client: <c>--label</c>, else the client's own id.</summary>
@@ -290,7 +302,7 @@ internal static class SetupCommand
         writer.WriteLine();
         writer.WriteLine("Finds the AI clients on this machine and points them at your vault.");
         writer.WriteLine();
-        writer.WriteLine("  --vault <path>      which vault the clients should ask about");
+        writer.WriteLine("  --vault <path>      pin the clients to this vault instead of the chosen one");
         writer.WriteLine("  --client <a,b>      only these, from: " + KnownClientIds());
         writer.WriteLine("  --server-path <p>   where keypaste-mcp is, if not beside keypaste or on PATH");
         writer.WriteLine("  --label <name>      what the audit log calls the client (default: its id)");

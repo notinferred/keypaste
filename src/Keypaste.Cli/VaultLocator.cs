@@ -1,5 +1,7 @@
 using Keypaste.Cli.Prompting;
 using Keypaste.Core;
+using Keypaste.Core.Audit;
+using Keypaste.Core.Settings;
 
 namespace Keypaste.Cli;
 
@@ -18,7 +20,7 @@ internal static class VaultLocator
     /// <summary>The environment variable consulted when <c>--vault</c> is absent.</summary>
     internal const string EnvironmentVariable = VaultLocation.EnvironmentVariable;
 
-    /// <summary>Resolves the vault path from the command line and the environment.</summary>
+    /// <summary>Resolves the vault path from the command line, the environment and the chosen vault.</summary>
     /// <returns><see langword="false"/> with <paramref name="error"/> set when no path is available.</returns>
     internal static bool TryResolve(
         CommandLine line,
@@ -28,8 +30,13 @@ internal static class VaultLocator
         VaultLocation.TryResolve(
             line.Value("vault"),
             environment.Get(EnvironmentVariable),
+            ChosenVault.Read(environment.Get(KeypasteHome.EnvironmentVariable)),
             out path,
             out error);
+
+    /// <summary>Whether <c>--vault</c> or <c>KEYPASTE_VAULT</c> names a vault, as opposed to the chosen one.</summary>
+    internal static bool IsNamed(CommandLine line, IEnvironmentProbe environment) =>
+        !string.IsNullOrEmpty(line.Value("vault")) || !string.IsNullOrEmpty(environment.Get(EnvironmentVariable));
 
     /// <summary>The environment variable consulted when <c>--keyfile</c> is absent.</summary>
     internal const string KeyfileEnvironmentVariable = VaultLocation.KeyfileEnvironmentVariable;

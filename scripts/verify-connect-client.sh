@@ -6,16 +6,21 @@
 # gate reads; it is on PATH only here, so no real client's configuration is ever written. The bridge is the
 # shipped Release keypaste-mcp, found on PATH as the app finds it.
 #
-# Cancelling a preview writes nothing. Running it registers exactly the command the preview showed. The
-# check starts that command, raises the app's prompt, and after Approve the audit file holds a prompted
-# grant naming the app's session and the chosen label; with two names listed the person picks, and Deny is
-# recorded too. Removing leaves the client listing no keypaste. Its configuration never holds the master
-# password, a keyfile, the session or a credential.
+# The first unlock chooses the vault for agents and the CLI (G.1): `keypaste use` prints it and `keypaste
+# grants` reaches the app with no --vault. Cancelling a preview writes nothing. Running it registers exactly
+# the command the preview showed, which names no vault, and the check starts that command, which finds the
+# chosen vault, raises the app's prompt, and after Approve the audit file holds a prompted grant naming the
+# app's session and the chosen label. With another vault chosen, Connect pins this one with --vault, and
+# that bridge still reaches the app; with two names listed the person picks, and Deny is recorded too.
+# Removing leaves the client listing no keypaste. Its configuration never holds the master password, a
+# keyfile, the session or a credential.
 #
-# NEGATIVE CONTROL: this fails if a cancelled preview writes, if what is registered differs from what was
-# shown, if the check does not reach the app's prompt through the registered bridge, if the audit record
-# names another session or label, if removal leaves keypaste listed, or if a secret reaches the client's
-# configuration or the driver's output. These checks must never be skipped or soft-passed.
+# NEGATIVE CONTROL: this fails if the first unlock chooses nothing, if the CLI without --vault does not reach
+# the app, if a cancelled preview writes, if what is registered differs from what was shown, if the chosen
+# vault is written into the client or another vault is not, if the check does not reach the app's prompt
+# through the registered bridge, if the audit record names another session or label, if removal leaves
+# keypaste listed, or if a secret reaches the client's configuration or the driver's output. These checks
+# must never be skipped or soft-passed.
 set -euo pipefail
 
 readonly MASTER='ci-connect-master-pw'
@@ -28,6 +33,15 @@ DIE_FILES='HOLD_OUT CONFIG'
 WAIT_SECONDS=60
 require jq
 
+# Whether two paths name one file: Windows may spell a directory by its short 8.3 name.
+same_file() {
+  if command -v cygpath >/dev/null 2>&1; then
+    [ "$(cygpath -u -l "$1" | tr '[:upper:]' '[:lower:]')" = "$(cygpath -u -l "$2" | tr '[:upper:]' '[:lower:]')" ]
+  else
+    [ "$1" -ef "$2" ]
+  fi
+}
+
 CLI="$(keypaste_bin)"
 MCP="$(keypaste_mcp)"
 DRV="$(app_driver)"
@@ -38,6 +52,7 @@ mkdir -p "$WORK/home"
 KEYPASTE_HOME="$(native "$WORK/home")"
 export KEYPASTE_HOME
 VAULT="$(native "$WORK/vault.kdbx")"
+OTHER_VAULT="$(native "$WORK/other.kdbx")"
 readonly AUDIT="$WORK/home/audit.jsonl"
 readonly HOLD_OUT="$WORK/hold.txt"
 readonly CONFIG="$WORK/client.json"
@@ -103,6 +118,12 @@ grep -q 'not served' "$HOLD_OUT" && die "the app unlocked and did not serve its 
 HOLD_PID="$(process_of)"
 FIRST="$(session_of)"
 
+# ------------------------------------------ the first unlock chose the vault, and the CLI uses it unnamed
+CHOSEN="$(env -u KEYPASTE_VAULT "$CLI" use 2>&1 | tr -d '\r\357\273\277')" || die "keypaste use printed no chosen vault: [$CHOSEN]"
+same_file "$CHOSEN" "$VAULT" || die "the first unlock chose [$CHOSEN], not the vault it unlocked [$VAULT]"
+GRANTS="$(env -u KEYPASTE_VAULT "$CLI" grants 2>&1)" || die "keypaste grants with no --vault failed: $GRANTS"
+case "$GRANTS" in *"nothing holds"*) die "keypaste grants with no --vault did not reach the app holding the chosen vault: $GRANTS" ;; esac
+
 # ---------------------------------------------------------------- a cancelled preview writes nothing
 say '^preview end' connect claude-code "label=$LABEL" 'expose=env/ci/**'
 PREVIEW="$(last_preview)"
@@ -111,8 +132,9 @@ PREVIEW="$(last_preview)"
   || die "the preview does not clear an earlier entry first"
 ADD="$(printf '%s\n' "$PREVIEW" | sed -n 2p)"
 case "$ADD" in
-  "claude mcp add --scope user --transport stdio keypaste -- "*" --vault "*" --client-label $LABEL --expose env/ci/**") ;;
-  *) die "the preview does not add the bridge with the vault, the label and the exposure: [$ADD]" ;;
+  *" --vault "*) die "the preview writes the chosen vault into the client: [$ADD]" ;;
+  "claude mcp add --scope user --transport stdio keypaste -- "*" --client-label $LABEL --expose env/ci/**") ;;
+  *) die "the preview does not add the bridge with the label and the exposure: [$ADD]" ;;
 esac
 
 say '^message ' cancel
@@ -140,9 +162,12 @@ last_audit --arg s "$FIRST" --arg l "$LABEL" \
   '.tool == "request_credential" and .decision == "granted" and .method == "prompt" and .session == $s and .client.label == $l and .client.name == "keypaste-check"' \
   || die "the audit file does not hold a prompted grant naming the app's session and the chosen label"
 
-# ------------------------------------------ with two names listed the person picks, and Deny is recorded
+# ------------------------- with another vault chosen, Connect pins this one, and that bridge still reaches it
+printf '%s\n%s\n' "$MASTER" "$MASTER" | "$CLI" init "$OTHER_VAULT" >/dev/null 2>&1 || die "could not create the other vault"
+"$CLI" use "$OTHER_VAULT" >/dev/null 2>&1 || die "keypaste use did not choose the other vault"
 say '^preview end' connect claude-code "label=$LABEL" 'expose='
 case "$(last_preview)" in *--expose*) die "an empty exposure still passed --expose" ;; esac
+case "$(last_preview | sed -n 2p)" in *" --vault "*vault.kdbx" --client-label $LABEL") ;; *) die "Connect did not pin the app's vault while another is chosen: [$(last_preview)]" ;; esac
 say '^message ' confirm
 case "$(last_message)" in Connected.*) ;; *) die "reconnecting failed: $(last_message)" ;; esac
 [ "$(registered)" = "$(last_preview | sed -n 2p | sed 's/.*keypaste -- //')" ] || die "the reconnection is not what the preview showed"
@@ -177,7 +202,9 @@ exec {HOLD_IN}>&-
 wait_for '^shut down' "$HOLD_OUT"
 HOLD_PID=""
 
-echo "ok: from the unlocked app, a cancelled preview wrote nothing, Connect registered exactly the command shown,"
-echo "    the check raised the app's prompt through that bridge and the audit file holds its prompted grant under"
-echo "    the app's session and the chosen label, the picker asked for the chosen entry, and removal left the"
-echo "    client listing no keypaste, with no secret or session in its configuration"
+echo "ok: the first unlock chose the vault and the CLI reached the app without --vault; a cancelled preview wrote"
+echo "    nothing, Connect registered exactly the command shown with no vault in it, the check raised the app's"
+echo "    prompt through that bridge and the audit file holds its prompted grant under the app's session and the"
+echo "    chosen label; with another vault chosen Connect pinned this one and its bridge still reached the app,"
+echo "    the picker asked for the chosen entry, and removal left the client listing no keypaste, with no"
+echo "    secret or session in its configuration"

@@ -72,6 +72,9 @@ internal static class CliApp
             case "init":
                 return InitCommand.Execute(args, context);
 
+            case "use":
+                return UseCommand.Execute(args, context);
+
             case "add":
                 return AddCommand.Execute(args, context);
 
@@ -182,6 +185,7 @@ internal static class CliApp
             ("share", "create an encrypted, expiring link"),
             ("lock", "lock now and pause all agents"),
             ("init", "create a new vault"),
+            ("use", "choose the vault used when no --vault is given"),
             ("add", "add an entry"),
             ("ls", "list groups and entries"),
             ("rm", "remove an entry"),

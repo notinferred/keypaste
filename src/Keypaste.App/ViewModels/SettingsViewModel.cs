@@ -69,6 +69,7 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
         _idle = IdleChoices.Single(choice => choice.Seconds == _settings.IdleTimeoutSeconds);
 
         ForgetAllCommand = new RelayCommand(ForgetAll);
+        UseThisVaultCommand = new RelayCommand(UseThisVault, () => !IsThisVaultChosen && _session.VaultPath is not null);
         ExportCommand = new AsyncRelayCommand(ExportAsync, () => !_exporting && _picker is not null);
         Access = new VaultAccessViewModel(session, home, picker);
         Recommendations = recommendations;
@@ -270,6 +271,24 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
     /// <summary>Empties the recent-vaults list.</summary>
     internal RelayCommand ForgetAllCommand { get; }
 
+    /// <summary>Makes the unlocked vault the one agents and the CLI use without <c>--vault</c> (D-0389).</summary>
+    internal RelayCommand UseThisVaultCommand { get; }
+
+    /// <summary>The vault agents and the CLI use without <c>--vault</c>, read each time.</summary>
+    internal string ChosenVaultText => ChosenVault.Read(_home) is { } chosen
+        ? IsThisVaultChosen
+            ? $"Agents and the keypaste CLI use this vault, {chosen}, when no --vault is given."
+            : $"Agents and the keypaste CLI use {chosen} when no --vault is given, not this vault."
+        : "No vault is chosen for agents and the keypaste CLI, so each needs --vault.";
+
+    internal bool IsThisVaultChosen => ChosenVault.Same(ChosenVault.Read(_home), _session.VaultPath);
+
+#pragma warning disable CA1822
+    internal string ChosenVaultRule =>
+        "An agent's app that is already running keeps the vault it started with until it restarts keypaste-mcp. " +
+        "A client connected with --vault keeps that vault.";
+#pragma warning restore CA1822
+
     /// <summary>Writes an exact encrypted copy of the open vault where the person says.</summary>
     internal AsyncRelayCommand ExportCommand { get; }
 
@@ -372,6 +391,26 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
 
     private static string When(VaultBackup backup) =>
         backup.TakenAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.CurrentCulture);
+
+    private void UseThisVault()
+    {
+        if (_session.VaultPath is not { } path)
+        {
+            return;
+        }
+
+        Message = ChosenVault.Choose(_home, path, onlyIfNone: false) switch
+        {
+            ChooseOutcome.Chosen => "Agents and the keypaste CLI now use this vault when no --vault is given.",
+            ChooseOutcome.Unreadable => $"{KeypasteHome.SettingsPath(_home)} could not be read, so it was left as it is.",
+            ChooseOutcome.Unrecordable => "This vault's path holds a quote, a control character or a backslash, which app.toml cannot record. Move or rename the vault.",
+            _ => $"{KeypasteHome.SettingsPath(_home)} could not be written, so nothing changed.",
+        };
+
+        Raise(nameof(ChosenVaultText));
+        Raise(nameof(IsThisVaultChosen));
+        UseThisVaultCommand.RaiseCanExecuteChanged();
+    }
 
     private void ForgetAll()
     {

@@ -63,6 +63,22 @@ public sealed class ConnectClientViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task Connecting_the_chosen_vault_names_no_vault_so_the_client_follows_the_choice()
+    {
+        Assert.Equal(Core.Settings.ChooseOutcome.Chosen, Core.Settings.ChosenVault.Choose(_fixture.Home, _fixture.Path_, onlyIfNone: false));
+        using var model = Model();
+
+        await model.PreviewConnectCommand.ExecuteAsync();
+
+        Assert.True(McpServerRegistration.TryCreate(_server, null, "claude-code", [], out var registration, out var error), error);
+        Assert.Equal(McpClientSetup.Connect(McpClientCatalog.Find("claude-code")!, registration).Display, model.Preview);
+        Assert.DoesNotContain("--vault", model.Preview, StringComparison.Ordinal);
+
+        await model.ConfirmCommand.ExecuteAsync();
+        Assert.DoesNotContain(_runner.Changes, change => change.Contains("--vault", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task The_preview_is_the_plan_core_composed_with_the_vault_and_the_exposure()
     {
         using var model = Model();

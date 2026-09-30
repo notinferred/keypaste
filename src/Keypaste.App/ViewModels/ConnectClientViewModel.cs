@@ -1,5 +1,6 @@
 using Keypaste.App.Session;
 using Keypaste.Core.Clients;
+using Keypaste.Core.Settings;
 
 namespace Keypaste.App.ViewModels;
 
@@ -211,7 +212,10 @@ internal sealed class ConnectClientViewModel : ObservableObject, IDisposable
         }
 
         var globs = _exposure.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (!McpServerRegistration.TryCreate(server, vault, _label, globs, out var registration, out var error))
+
+        // The chosen vault is left out, so the client follows the choice; any other is pinned with --vault (D-0389).
+        var pinned = ChosenVault.Same(ChosenVault.Read(_session.Home), vault) ? null : vault;
+        if (!McpServerRegistration.TryCreate(server, pinned, _label, globs, out var registration, out var error))
         {
             Message = char.ToUpperInvariant(error[0]) + error[1..] + ".";
             return;

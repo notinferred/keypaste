@@ -15,8 +15,9 @@ namespace Keypaste.App;
 /// </para>
 /// <para>
 /// The screen and the session now hold the same object, so what is displayed is what is in force
-/// rather than a second read that happens to agree with the first. Nothing here reads the file
-/// again: an edit made by hand while the app is running takes effect at the next launch.
+/// rather than a second read that happens to agree with the first. Only the chosen vault is read
+/// again, when saving; any other edit made by hand while the app is running takes effect at the
+/// next launch.
 /// </para>
 /// <para>
 /// <b>Loading never writes.</b> <see cref="AppSettings.Load"/> answers a file it cannot parse with
@@ -68,14 +69,15 @@ internal sealed class DesktopPreferences
     /// <remarks>
     /// The in-memory copy moves whether or not the write landed: a preference that cannot reach the
     /// disk still holds for this run, and the caller says so rather than pretending it did not
-    /// happen.
+    /// happen. The chosen vault is kept as the file has it, because the first unlock and
+    /// <c>keypaste use</c> write it behind this copy (D-0389).
     /// </remarks>
     internal bool Update(AppSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
 
-        Current = settings;
-        var saved = AppSettings.Save(_path, settings);
+        Current = settings with { Vault = AppSettings.TryLoad(_path, out var onDisk) ? onDisk.Vault : Current.Vault };
+        var saved = AppSettings.Save(_path, Current);
         Changed?.Invoke(this, EventArgs.Empty);
         return saved;
     }

@@ -5,6 +5,7 @@ using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Recent;
+using Keypaste.Core.Settings;
 using Keypaste.Core.Tests;
 using Xunit;
 
@@ -114,7 +115,7 @@ public sealed class UnlockCreateTests : IDisposable
         await model.CreateAsync();
 
         Assert.NotEqual(before, _home.Snapshot());
-        Assert.Equal(2, _home.Snapshot().Count - before.Count);
+        Assert.Equal(3, _home.Snapshot().Count - before.Count);
     }
 
     [Fact]
@@ -258,6 +259,34 @@ public sealed class UnlockCreateTests : IDisposable
         Assert.Equal(0, model.ConfirmMaskedLength);
         Assert.False(File.Exists(_home.FreeVaultPath));
         Assert.Empty(Remembered());
+    }
+
+    [Fact]
+    public async Task The_first_vault_created_is_chosen_for_agents_and_the_CLI_and_says_so_once()
+    {
+        using (var first = NewModel())
+        {
+            _picker.NewPath = _home.FreeVaultPath;
+            await first.StartCreateAsync();
+            Type(first, TempHome.Password, TempHome.Password);
+            await first.CreateAsync();
+
+            Assert.Equal(UnlockViewModel.ChosenNotice, first.Notice);
+        }
+
+        Assert.Equal(_home.FreeVaultPath, ChosenVault.Read(_home.Path));
+        _session.Lock(VaultLockReason.Manual);
+
+        var another = Path.Combine(_home.Path, "another.kdbx");
+        using var model = NewModel();
+        _picker.NewPath = another;
+        await model.StartCreateAsync();
+        Type(model, TempHome.Password, TempHome.Password);
+        await model.CreateAsync();
+
+        Assert.True(File.Exists(another));
+        Assert.Null(model.Notice);
+        Assert.Equal(_home.FreeVaultPath, ChosenVault.Read(_home.Path));
     }
 
     [Fact]

@@ -324,7 +324,7 @@
                      IsVisible="{Binding ShowsHeader}"
                      Margin="18,14,18,0" />
 
-          <!-- Said once, after a restore landed here. Quiet: the restore worked, and this is what it did. -->
+          <!-- Said once on opening: what a restore did, a fragile keyfile, or that this vault was just chosen. Quiet. -->
           <Border Grid.Row="2"
                   IsVisible="{Binding HasNotice}"
                   Classes="card"

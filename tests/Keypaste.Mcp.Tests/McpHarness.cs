@@ -130,7 +130,7 @@ internal sealed class McpHarness : IAsyncDisposable
             .Concat(["--vault", VaultPath, "--audit-log", AuditPath, "--client-label", ClientLabel])
             .ToArray();
 
-        if (!ServerOptions.TryParse(arguments, null, null, _approverPipeName ?? Approver.PipeName, out var options, out var error))
+        if (!ServerOptions.TryParse(arguments, null, null, _approverPipeName ?? Approver.PipeName, null, out var options, out var error))
         {
             throw new InvalidOperationException($"the harness could not start the server: {error}");
         }

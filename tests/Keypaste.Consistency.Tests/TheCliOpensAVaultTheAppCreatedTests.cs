@@ -60,6 +60,20 @@ public sealed class TheCliOpensAVaultTheAppCreatedTests : IDisposable
     /// pass — every assertion above would hold for a vault whose master password is anything at all,
     /// as long as the harness happened to supply it.
     /// </remarks>
+    /// <summary>The app chooses the first vault it creates, and the CLI then opens it with no flag (G.1).</summary>
+    [Fact]
+    public async Task The_cli_uses_the_vault_the_app_chose_without_a_flag()
+    {
+        await CreateThroughTheApp(_cli.Environment[Core.Audit.KeypasteHome.EnvironmentVariable]);
+
+        _cli.Prompt.Interactive = false;
+        _cli.Prompt.Enqueue(_master);
+
+        _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("ls"));
+        _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("use"));
+        Assert.Equal(_cli.VaultPath, _cli.Out.Trim());
+    }
+
     [Fact]
     public async Task Another_password_does_not_open_it()
     {
@@ -96,11 +110,11 @@ public sealed class TheCliOpensAVaultTheAppCreatedTests : IDisposable
     }
 
     /// <summary>Drives the desktop Create path at the harness's vault path.</summary>
-    private async Task CreateThroughTheApp()
+    private async Task CreateThroughTheApp(string? home = null)
     {
         _picker.NewPath = _cli.VaultPath;
 
-        using var model = new UnlockViewModel(_session, _cli.Directory, _picker, () => { });
+        using var model = new UnlockViewModel(_session, home ?? _cli.Directory, _picker, () => { });
 
         await model.StartCreateAsync();
 

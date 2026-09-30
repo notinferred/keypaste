@@ -6,7 +6,7 @@ namespace Keypaste.Mcp.Tests;
 public sealed class ServerOptionsTests
 {
     private static bool Parse(out ServerOptions? options, out string error, params string[] argv) =>
-        ServerOptions.TryParse(argv, null, null, null, out options, out error);
+        ServerOptions.TryParse(argv, null, null, null, null, out options, out error);
 
     [Fact]
     public void Run_IsOffUnlessAllowed()
@@ -34,6 +34,23 @@ public sealed class ServerOptionsTests
     {
         Assert.True(Parse(out _, out _, "--client-label", new string('a', 64)));
         Assert.False(Parse(out _, out _, "--client-label", new string('a', 65)));
+    }
+
+    [Fact]
+    public void WithNoVaultNamed_TheBridgeAsksAboutTheChosenVault()
+    {
+        Assert.True(ServerOptions.TryParse([], null, null, null, "chosen.kdbx", out var chosen, out _));
+        Assert.True(ServerOptions.TryParse([], "env.kdbx", null, null, "chosen.kdbx", out var fromEnvironment, out _));
+        Assert.True(ServerOptions.TryParse(["--vault", "flag.kdbx"], "env.kdbx", null, null, "chosen.kdbx", out var fromFlag, out _));
+        Assert.True(ServerOptions.TryParse([], null, null, null, null, out var none, out _));
+
+        Assert.Equal(Path.GetFullPath("chosen.kdbx"), chosen!.VaultPath);
+        Assert.NotNull(chosen.VaultKey);
+        Assert.NotNull(chosen.ApproverName);
+        Assert.Equal(Path.GetFullPath("env.kdbx"), fromEnvironment!.VaultPath);
+        Assert.Equal(Path.GetFullPath("flag.kdbx"), fromFlag!.VaultPath);
+        Assert.Empty(none!.VaultPath);
+        Assert.Null(none.VaultKey);
     }
 
     [Fact]

@@ -41,9 +41,9 @@ internal static class InitCommand
         {
             path = Path.GetFullPath(positional);
         }
-        else if (!VaultLocator.TryResolve(line, context.Environment, out path, out var locateError))
+        else if (!VaultLocator.TryResolve(line, context.Environment, out path, out _))
         {
-            context.Stderr.WriteLine($"keypaste init: {locateError}");
+            context.Stderr.WriteLine("keypaste init: give the path of the vault to create: keypaste init <path>");
             return CliApp.ExitUsageError;
         }
 

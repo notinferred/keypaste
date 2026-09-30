@@ -52,6 +52,56 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
+    public void Use_this_vault_chooses_it_for_agents_and_the_CLI_and_a_later_preference_keeps_it()
+    {
+        using var fixture = new TempVault();
+        using var session = new AppVaultSession(new ManualClock(), home: fixture.Home);
+        using (var master = TempVault.Secret(TempVault.Password))
+        {
+            Assert.Equal(UnlockOutcome.Opened, session.TryUnlock(fixture.Path_, master.Value));
+        }
+
+        using var model = Screen(session, fixture);
+        Assert.False(model.IsThisVaultChosen);
+        Assert.Contains("each needs --vault", model.ChosenVaultText, StringComparison.Ordinal);
+
+        model.UseThisVaultCommand.Execute(null);
+        model.Theme = AppTheme.Dark;
+
+        Assert.True(model.IsThisVaultChosen);
+        Assert.False(model.UseThisVaultCommand.CanExecute(null));
+        Assert.Contains(fixture.Path_, model.ChosenVaultText, StringComparison.Ordinal);
+        Assert.Equal(fixture.Path_, ChosenVault.Read(fixture.Home));
+        Assert.Equal(AppTheme.Dark, AppSettings.Load(KeypasteHome.SettingsPath(fixture.Home)).Theme);
+    }
+
+    [Fact]
+    public void A_preference_saved_later_keeps_a_vault_chosen_behind_the_app()
+    {
+        using var fixture = new TempVault();
+        var preferences = new DesktopPreferences(fixture.Home);
+        ChosenVault.Choose(fixture.Home, fixture.Path_, onlyIfNone: false);
+
+        Assert.True(preferences.Update(preferences.Current with { IdleTimeoutSeconds = 900 }));
+
+        Assert.Equal(fixture.Path_, ChosenVault.Read(fixture.Home));
+        Assert.Equal(900, AppSettings.Load(KeypasteHome.SettingsPath(fixture.Home)).IdleTimeoutSeconds);
+    }
+
+    [Fact]
+    public void A_preference_saved_while_app_toml_cannot_be_read_keeps_the_chosen_vault()
+    {
+        using var fixture = new TempVault();
+        ChosenVault.Choose(fixture.Home, fixture.Path_, onlyIfNone: false);
+        var preferences = new DesktopPreferences(fixture.Home);
+        File.WriteAllText(KeypasteHome.SettingsPath(fixture.Home), "[[settings]]\ntheme = \"dark\nvault = ");
+
+        preferences.Update(preferences.Current with { IdleTimeoutSeconds = 900 });
+
+        Assert.Equal(fixture.Path_, ChosenVault.Read(fixture.Home));
+    }
+
+    [Fact]
     public void Changing_the_theme_reaches_the_application()
     {
         using var fixture = new TempVault();

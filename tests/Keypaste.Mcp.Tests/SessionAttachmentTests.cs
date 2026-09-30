@@ -146,6 +146,20 @@ public sealed class SessionAttachmentTests
         Assert.Empty(approver.Received);
     }
 
+    [Fact]
+    public async Task ABridgeGivenNoVault_AsksAboutTheChosenOne()
+    {
+        await using var approver = new FakeApprover();
+        approver.StartApproving();
+        var chosen = Path.Combine(Path.GetTempPath(), "chosen.kdbx");
+        Assert.True(ServerOptions.TryParse(["--expose", "env/**"], null, null, approver.PipeName, chosen, out var options, out var error), error);
+        await using var connection = new ApproverConnection(options.ApproverName, options.VaultPath);
+
+        await connection.RequestAsync(Request(), Token);
+
+        Assert.Equal(chosen, Assert.Single(approver.Received).Vault);
+    }
+
     /// <summary>
     /// A request whose reply was lost is sent again under the session it was first sent in, so an
     /// owner that locked and unlocked meanwhile refuses it instead of answering it from a later unlock.
@@ -169,7 +183,7 @@ public sealed class SessionAttachmentTests
     private static (ApproverEntryNameSource Source, ApproverConnection Connection) Source(FakeApprover approver)
     {
         var vault = Path.Combine(Path.GetTempPath(), "listing.kdbx");
-        Assert.True(ServerOptions.TryParse(["--vault", vault, "--expose", "env/**"], null, null, approver.PipeName, out var options, out var error), error);
+        Assert.True(ServerOptions.TryParse(["--vault", vault, "--expose", "env/**"], null, null, approver.PipeName, null, out var options, out var error), error);
 
         var connection = new ApproverConnection(options.ApproverName, options.VaultPath);
         return (new ApproverEntryNameSource(connection, options), connection);

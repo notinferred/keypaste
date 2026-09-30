@@ -21,11 +21,12 @@ public sealed class McpClientSetupTests : IDisposable
     private McpServerRegistration Registration(
         string label = "claude-code",
         IReadOnlyList<string>? expose = null,
-        McpServerCommand? server = null)
+        McpServerCommand? server = null,
+        bool pinned = true)
     {
         Assert.True(McpServerRegistration.TryCreate(
             server ?? new McpServerCommand(Path.Combine(_directory, "keypaste-mcp"), []),
-            Path.Combine(_directory, "vault.kdbx"),
+            pinned ? Path.Combine(_directory, "vault.kdbx") : null,
             label,
             expose ?? [],
             out var registration,
@@ -173,8 +174,20 @@ public sealed class McpClientSetupTests : IDisposable
 
         Assert.Equal(
             ["mcp", "add", "--scope", "user", "--transport", "stdio", "keypaste", "--",
-             registration.Server.Path, "--vault", registration.VaultPath, "--client-label", "claude-code", "--expose", "env/**"],
+             registration.Server.Path, "--vault", registration.VaultPath!, "--client-label", "claude-code", "--expose", "env/**"],
             add);
+    }
+
+    [Fact]
+    public void A_registration_for_the_chosen_vault_names_no_vault()
+    {
+        var registration = Registration(pinned: false);
+        var add = McpClientSetup.Connect(Claude, registration).Commands[1].Arguments;
+
+        Assert.Null(registration.VaultPath);
+        Assert.Equal([registration.Server.Path, "--client-label", "claude-code"], registration.CommandLine());
+        Assert.DoesNotContain("--vault", add);
+        Assert.DoesNotContain("--vault", string.Concat(McpClientSetup.Connect(Cursor, registration).PasteBlock!), StringComparison.Ordinal);
     }
 
     [Fact]
