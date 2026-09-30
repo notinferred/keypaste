@@ -14,11 +14,6 @@ Needs are build dependencies. Ships after names publication gates. External sign
 
 These rows serve every track: a development machine builds nothing, CI runs what a change can break, and the scripts, tests and binaries lose their duplicates. ROADMAP places them in 0.5.0 by founder direction of 2026-09-30.
 
-- [ ] **K.6b — Run only the jobs a pull request can break.** Needs: none.
-  - A `scope` job runs `verify.sh --since origin/<base> --plan`; each job carries its lane's `if:`, and `ci ok` and `app ok` aggregate them; `main`, tags and dispatch run everything.
-  - Each OS builds once, with compat folded into its test leg; each solution gets its own NuGet cache key; `paths-ignore` widens to documents no check reads.
-  - `dotnet format` shrinks to its whitespace check only after a branch experiment shows the build catches every style rule `.editorconfig` sets.
-  - Verify: pull requests based on the branch show a BACKLOG-only change running scope, checks and ok; a Core.Tests change running three legs of Core.Tests only; a `src/Keypaste.Core` change running everything. A push to `main` runs everything with one build per OS, and `require-green-gates.sh` accepts it.
 - [ ] **B.3 — Delete duplicated brand files and finished observers.** Needs: none. `docs/design/assets/` duplicates `assets/brand/`, `docs/design/SKILL.md` is replaced by the project skill, and `docs/design/BRAND.md`'s unique rules move into [BRAND](BRAND.md); `observe-desktop.yml` goes unless R.1a needs it.
 - [ ] **B.1 — Share one script library across the gates.** Needs: none. `scripts/lib/common.sh` and `scripts/lib/kpxc.sh` replace the helpers the KeePassXC and process gates each define; every assertion and negative control stays, and a missing KeePassXC still fails. Verify: the compat and process gates pass on three OSes, and shellcheck covers the library.
 - [ ] **B.2 — Keep one copy of each shared test helper.** Needs: none. `FakeShareServer`, `IsolatedHome`, `ManualClock` and `PoolTimelineGuardTests` keep one source each, linked as the other shared helpers are; the tests that use them keep their counts.
@@ -26,6 +21,7 @@ These rows serve every track: a development machine builds nothing, CI runs what
 - [ ] **B.4b — Carry the MCP bridge in the CLI as `keypaste mcp`.** Needs: B.4a.
   - `Keypaste.Mcp` becomes a library the CLI dispatches to before any code that opens a vault, and a source-rule test with a negative control keeps the verb from reaching `VaultLocator`, `VaultSession` or `SecretInput`.
   - A decision row supersedes D-0019's confinement of the MCP package to the bridge process, with PRODUCT §3.9's written justification, and D-0334's separate payload binary; THREATS' scope follows, and the release definition, workflows, packaging, client catalog and gates name one binary; README's install blocks change at L.1.
+- [ ] **F.30 — Keep a stalled apt mirror from failing a KeePassXC install.** Needs: none. — app run 36727975787 at `1952ca0`, attempt 1, `keepassxc workflows (ubuntu-24.04)`: `sudo apt-get update` got no answer from `azure.archive.ubuntu.com`, fell back to `archive.ubuntu.com`, printed `noble-security InRelease` at 14:20:46 and then nothing until the job's 20-minute limit cancelled it; the rerun passed in 154 s. `ci.yml`'s Linux install now stops after ten minutes, and the other `apt-get update` steps in `ci.yml`, `app.yml` and `dev.yml` have only their job's limit. Verify: a branch probe that points one source at an address that never answers shows the install steps retrying with a per-request timeout and finishing, or failing within two minutes, instead of waiting for the job's limit.
 
 ## T1 — Everyday vault use and recovery
 
@@ -47,6 +43,7 @@ U.1–U.3 and 4.4b gave the app, `keypaste agent` and the bridge one owner and o
 - [ ] **N.11 — Approve a terminal edit in the unlocked app.** Needs: N.10.
   - `set`, `add`, `rm` and the env writers send the change to the vault's owner, which asks in its prompt window and writes through its session.
   - No master password crosses the pipe, and `access` stays refused.
+- [ ] **F.29 — Answer a waiting request before the app's endpoint stops.** Needs: none. — app run 36728150916 (pull request 7 into `task/k6b` at `1952ca0`), `format + analyzers + tests` on `ubuntu-24.04`: `AppAuthorityTests.Quitting_answers_a_waiting_request_as_locked_before_the_endpoint_stops` failed at line 141 because the reply was null; the same test passed in app run 36727975787 on `1952ca0`. Hypothesis: `AppAuthority.Dispose` locks the session, which withdraws the held prompt and fires `Locked`, and `SessionHost`'s hosted endpoint then cancels its connections, waits at most its two-second stop grace and disposes the listener, so the locked answer can lose the race to the close and the client reads the end of the stream. Discovery first: repeating the test, and a variant that delays the prompt's cancellation, measure how often the reply is null; the repair depends on that result.
 
 ## T4 — Project environments
 

@@ -79,26 +79,33 @@ env:
   MSBUILDDISABLENODEREUSE: '1'
 
 jobs:
-  gate:
-    name: format + analyzers + tests
+  # A pull request runs the lanes its diff from the merge base can break; every other event runs all of them.
+  scope:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 5
     outputs:
+      lanes: ${{ steps.plan.outputs.lanes }}
+      desktop_tests: ${{ steps.plan.outputs.desktop_tests }}
       targets: ${{ steps.targets.outputs.targets }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+          fetch-depth: 0
 
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
-        with:
-          global-json-file: global.json
-          cache: true
-          cache-dependency-path: '**/packages.lock.json'
-
-      - name: Restore, format, build and test desktop and consistency
+      - name: Choose the lanes this change can break
+        id: plan
         shell: bash
-        run: bash scripts/verify.sh desktop
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = pull_request ]; then
+            bash scripts/verify.sh --since "origin/$BASE" --plan | tee -a "$GITHUB_OUTPUT"
+          else
+            bash scripts/verify.sh --all --plan | tee -a "$GITHUB_OUTPUT"
+          fi
 
       # GitHub reports an empty package matrix as a successful skipped job.
       - name: Resolve the desktop targets this workflow packages
@@ -115,10 +122,41 @@ jobs:
           echo "targets=$targets" >> "$GITHUB_OUTPUT"
           echo "$n targets: $targets"
 
+  gate:
+    name: format + analyzers + tests
+    needs: scope
+    if: needs.scope.outputs.desktop_tests != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      # The solution joins the key so this cache never overwrites ci.yml's.
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: |
+            **/packages.lock.json
+            keypaste.app.slnx
+
+      - name: Restore, format, build and test desktop and consistency
+        shell: bash
+        env:
+          DESKTOP_TESTS: ${{ needs.scope.outputs.desktop_tests }}
+        run: |
+          set -euo pipefail
+          set --
+          if [ "$DESKTOP_TESTS" != all ]; then for p in $DESKTOP_TESTS; do set -- "$@" --project "$p"; done; fi
+          bash scripts/verify.sh desktop "$@"
+
   # The supported workflows on vaults KeePassXC made, through the CLI and the app's screens (9.4, D-0307).
   compat:
     name: keepassxc workflows (${{ matrix.os }})
-    needs: gate
+    needs: scope
+    if: contains(format(' {0} ', needs.scope.outputs.lanes), ' appcompat ')
     strategy:
       fail-fast: false
       matrix:
@@ -137,7 +175,9 @@ jobs:
         with:
           global-json-file: global.json
           cache: true
-          cache-dependency-path: '**/packages.lock.json'
+          cache-dependency-path: |
+            **/packages.lock.json
+            keypaste.app.slnx
 
       - name: Install keepassxc-cli (Linux)
         if: runner.os == 'Linux'
@@ -168,7 +208,8 @@ jobs:
   # The first run offers the databases real KeePassXC last opened, found where KeePassXC keeps them (N.2).
   first-run:
     name: keepassxc first run (${{ matrix.os }})
-    needs: gate
+    needs: scope
+    if: contains(format(' {0} ', needs.scope.outputs.lanes), ' appcompat ')
     strategy:
       fail-fast: false
       matrix:
@@ -186,7 +227,9 @@ jobs:
         with:
           global-json-file: global.json
           cache: true
-          cache-dependency-path: '**/packages.lock.json'
+          cache-dependency-path: |
+            **/packages.lock.json
+            keypaste.app.slnx
 
       - name: Install KeePassXC (Linux)
         if: runner.os == 'Linux'
@@ -224,7 +267,8 @@ jobs:
   # the log, since nothing in this workflow uploads before the installer is signed.
   clipboard-markers:
     name: clipboard markers (${{ matrix.os }})
-    needs: gate
+    needs: scope
+    if: contains(format(' {0} ', needs.scope.outputs.lanes), ' markers ')
     strategy:
       fail-fast: false
       matrix:
@@ -240,7 +284,9 @@ jobs:
         with:
           global-json-file: global.json
           cache: true
-          cache-dependency-path: '**/packages.lock.json'
+          cache-dependency-path: |
+            **/packages.lock.json
+            keypaste.app.slnx
 
       - name: Restore (locked) and build the observer
         shell: bash
@@ -266,11 +312,12 @@ jobs:
 
   package:
     name: publish + selftest (${{ matrix.os }})
-    needs: gate
+    needs: scope
+    if: contains(format(' {0} ', needs.scope.outputs.lanes), ' package ')
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(needs.gate.outputs.targets) }}
+        include: ${{ fromJSON(needs.scope.outputs.targets) }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     permissions:
@@ -286,7 +333,10 @@ jobs:
         with:
           global-json-file: global.json
           cache: true
-          cache-dependency-path: '**/packages.lock.json'
+          cache-dependency-path: |
+            **/packages.lock.json
+            keypaste.app.slnx
+            release-targets.json
 
       - name: Restore (locked)
         run: dotnet restore keypaste.app.slnx --locked-mode
@@ -555,3 +605,23 @@ jobs:
           path: artifacts/dist/*
           if-no-files-found: error
           retention-days: 7
+
+  # The one check a pull request needs green: a skipped job passes, a failed or cancelled one does not.
+  ok:
+    name: app ok
+    if: always()
+    needs: [scope, gate, compat, first-run, clipboard-markers, package]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Fail when any job failed or was cancelled
+        shell: bash
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: |
+          set -euo pipefail
+          echo "$RESULTS"
+          if jq -e 'any(.[]; . == "failure" or . == "cancelled")' <<< "$RESULTS" > /dev/null; then
+            echo "::error::a required job failed or was cancelled"
+            exit 1
+          fi

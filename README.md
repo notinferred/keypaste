@@ -353,7 +353,7 @@ Each audit record includes its predecessor's hash. `keypaste log verify` checks 
 
 KDBX4 with Argon2d key derivation (2 iterations, 64 MiB, parallelism 2) and AES-256. keypaste never invents a format and writes no cryptography of its own (docs/PRODUCT.md §2, §3.6): the format layer is [KeePassLib](third_party/KeePassLib/UPSTREAM.md), vendored from KeePass 2.61 and reached through a single file, `src/Keypaste.Core/Internal/KeePassInterop.cs`.
 
-`scripts/verify-keepassxc-compat.sh` and `scripts/verify-keepassxc-writeback.sh` check interoperability against a real `keepassxc-cli` on Linux, macOS and Windows on qualifying pushes to `main` and every pull request. This is a permanent gate under docs/PRODUCT.md §4.6 and [D-0008 and D-0014](docs/decisions-archive.md).
+`scripts/verify-keepassxc-compat.sh` and `scripts/verify-keepassxc-writeback.sh` check interoperability against a real `keepassxc-cli` on Linux, macOS and Windows on qualifying pushes to `main` and on each pull request that changes the code that writes vaults or the gate's own scripts. This is a permanent gate under docs/PRODUCT.md §4.6 and [D-0008 and D-0014](docs/decisions-archive.md).
 
 Directories and namespaces use .NET's PascalCase convention; the kebab-case names above are the roadmap's and survive where they are user-visible, in the shipped binary names.
 

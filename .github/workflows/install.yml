@@ -65,7 +65,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
-      # fetch-depth: 0 for the same reason ci.yml's gate job has it: the release-matrix gate reads
+      # fetch-depth: 0 for the same reason ci.yml's checks job has it: the release-matrix gate reads
       # prior revisions of release-targets.json, and on a depth-1 checkout that history is absent.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:

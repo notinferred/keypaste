@@ -10,7 +10,7 @@ Use KDBX4 through the vendored library. Do not implement cryptography. Only `src
 
 Write self-documenting code with clear names and structure. Default to no comments; use one line only for a non-obvious constraint or decision the code cannot express. Do not repeat code, tests or documents. Write concise, connected prose without hard wrapping, redundant recaps or excessive formatting.
 
-`scripts/verify-demo.sh` checks README, launch, demo, KeePass/agent essay and site transcripts against the built binaries. These pages trigger backend CI on pushes to `main`; documentation pull requests run both workflows. Consult [RELEASE](docs/RELEASE.md) before changing published installation claims.
+`scripts/verify-demo.sh` checks README, launch, demo, KeePass/agent essay and site transcripts against the built binaries. These pages trigger backend CI on pushes to `main`, and a pull request that changes one runs the Linux build and the demo check. Consult [RELEASE](docs/RELEASE.md) before changing published installation claims.
 
 ## Verification and commits
 
