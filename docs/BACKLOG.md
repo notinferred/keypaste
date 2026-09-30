@@ -63,3 +63,5 @@ These observations were previously in DECISIONS. They are not completed fixes or
 | Windows saving depends on Transactional NTFS | Existing F.6/F.7/F.10/F.12 repairs retain their measured evidence. Replacing the dependency requires a new preservation experiment, not reopening repaired defects on speculation. |
 
 Generic UX-score infrastructure, a document describing document alignment, mandatory marketing per task/milestone, a second maintainer's organization before one exists, and enterprise assurance without a customer requirement are removed. They do not complete the selected user journey. Specific usability observations, release evidence and security tests remain part of each relevant track.
+
+<!-- K.6b scoping probe -->
