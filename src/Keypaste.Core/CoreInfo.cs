@@ -1,3 +1,4 @@
+// K.6b scoping probe.
 using System.Reflection;
 
 namespace Keypaste.Core;
