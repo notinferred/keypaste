@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Refuses a desktop installation candidate unless it is the package app.yml attested for its tag (4.7b).
 #
-# app.yml attests the MSI and AppImage it builds on a tag and uploads them with a .sha256 beside each,
+# app.yml attests the MSI, AppImage and DMG it builds on a tag and uploads them with a .sha256 beside each,
 # but publishes no Sigstore bundle, so `gh attestation verify` asks GitHub's attestation store and needs
 # a token (D-0138). The .sha256 comes from the same job and proves only an intact transfer; the
 # attestation is what binds the bytes to this repository's app workflow at that tag.
@@ -43,6 +43,7 @@ expected_name() {
   case "$rid" in
     win-x64) kind=msi ;;
     linux-x64) kind=appimage ;;
+    osx-arm64) kind=dmg ;;
     *) die "no installation candidate is declared for $rid" ;;
   esac
   # shellcheck disable=SC2016 # jq expands these variables, not bash.
@@ -120,10 +121,11 @@ FAKE
 
   export KEYPASTE_RELEASE_DEFINITION="$ROOT/release-targets.json"
   export KEYPASTE_FAKE_STORE="$work/store.json"
-  local msi appimage
+  local msi appimage dmg
   msi="$(expected_name "$v" win-x64)"
   appimage="$(expected_name "$v" linux-x64)"
-  [ -n "$msi" ] && [ -n "$appimage" ] || die "the definition declares no MSI or AppImage candidate"
+  dmg="$(expected_name "$v" osx-arm64)"
+  [ -n "$msi" ] && [ -n "$appimage" ] && [ -n "$dmg" ] || die "the definition declares no MSI, AppImage or DMG candidate"
 
   # stage <file> [workflow] [ref] [repo]
   stage() {
@@ -157,6 +159,8 @@ FAKE
   expect accept genuine-msi "was built by" -- bash "$SELF" "$work/dist/$msi" "$v" win-x64
   stage "$appimage"
   expect accept genuine-appimage "was built by" -- bash "$SELF" "$work/dist/$appimage" "$v" linux-x64
+  stage "$dmg"
+  expect accept genuine-dmg "was built by" -- bash "$SELF" "$work/dist/$dmg" "$v" osx-arm64
 
   stage "$msi"; printf 'the bytes Of %s\n' "$msi" > "$work/dist/$msi"
   expect refuse changed-byte "does not match its .sha256" -- bash "$SELF" "$work/dist/$msi" "$v" win-x64
@@ -194,7 +198,7 @@ FAKE
   expect accept weakened-believes-another-digest "was built by" -- env KEYPASTE_FAKE_GH=other-digest bash "$work/weak/scripts/verify-desktop-candidate.sh" "$work/dist/$msi" "$v" win-x64
 
   [ "$failures" -eq 0 ] || die "$failures of $cases desktop candidate cases failed"
-  echo "ok: $cases cases. A genuine MSI and AppImage verify. A changed byte, with or without a rewritten .sha256,"
+  echo "ok: $cases cases. A genuine MSI, AppImage and DMG verify. A changed byte, with or without a rewritten .sha256,"
   echo "    a missing .sha256, an undeclared name or version, the release workflow, another tag or repository and"
   echo "    a verifier that proves nothing all refuse; the weakened copy does not."
 }

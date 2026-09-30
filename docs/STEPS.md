@@ -146,20 +146,17 @@ Every release still needs a person's answer or a rule they wrote, and the bridge
 
 ## T5 — Desktop delivery
 
-The Windows MSI, the Linux AppImage and the macOS app bundle are internal candidates. Existing install and upgrade observations remain useful, but they are repeated for the product that [ROADMAP](../ROADMAP.md) puts in 0.5.0.
+The Windows MSI, the Linux AppImage and the macOS DMG are internal candidates. Existing install and upgrade observations remain useful, but they are repeated for the product that [ROADMAP](../ROADMAP.md) puts in 0.5.0.
 
 Package managers and agent marketplaces carry a version only after it is published. keypaste.com keeps its "no `curl | sh`" stance: the one-command routes are the package managers and the signed installers.
 
 - [ ] **F.32 — Keep a prompt a bridge hang-up withdrew off the screen.** Needs: none. — dev run 36738139311 at `ee3f820` on `task/f20-probe-repaired`, `ubuntu-24.04`: with [F.20](steps/F.20.md)'s repair, a real gate whose token descends from one cancelled with `CancelAsync`, as `ApproverListener.cs:193` withdraws when the bridge hangs up, drew the prompt in 99 of 100 iterations when the UI thread ran its queue straight after the cancel, and in 50 of 50 with that token's callbacks held until it had. The tokens linked below stay live until the pool runs those callbacks, so the show job's check passes and the prompt stays up until the posted take-down; the gate still answers the request as cancelled. Verify: through `ApproverListener`, a peer that hangs up while the show job is queued, with the UI thread running its queue as soon as the token the listener gave its handler is cancelled, draws no prompt in 100 iterations on `ubuntu-24.04`.
 - [ ] **G.5 — Carry the CLI on PATH in every desktop install.** Needs: none.
-  - Every desktop payload gains the NativeAOT `keypaste`.
+  - Every desktop payload gains the NativeAOT `keypaste`, and the macOS bundle and DMG checks require it as they require `keypaste-mcp`.
   - The MSI adds its folder to the per-user PATH and removes it on uninstall.
   - The AppImage dispatches `cli` as it does `mcp`.
   - Settings links the CLI into the terminal on Linux and macOS.
   - `install-desktop.yml` and `upgrade-desktop.yml` check `keypaste --version` in a new shell.
-- [ ] **4.7a2 — Package the internal macOS DMG.** Needs: none.
-  - It wraps the existing `keypaste.app` bundle, with its bridge and the CLI.
-  - The candidate's contents, version and `--selftest` are checked from the mounted image.
 - [ ] **3.5a — Enable the macOS signing identity (H-0015).** Human. Needs: none.
   - External Apple Developer enrollment as keypaste.
   - Repository-scoped Developer ID Application and notarization credentials.
@@ -185,6 +182,7 @@ Package managers and agent marketplaces carry a version only after it is publish
   - An unreached act leaves the row open.
 - [ ] **4.7c2 — Publish and verify the first desktop release as 0.5.0.** Needs: 4.7c1, 3.5b, 4.7a2, 4.7e, G.5. Ships after: R.1a. Inputs: a verified Microsoft Artifact Signing identity as keypaste (H-0017), or the recorded cloud-HSM fallback, and 3.5a's Apple credentials.
   - Prove Windows signing with changed-byte refusal, and macOS notarization.
+  - `osx-arm64` declares the `.app.zip` and the DMG. `require-release-assets.sh --publishable` requires every declared package offered, and `verify-desktop-candidate.sh` stages only the DMG, so either the zip stops being a declared package or the candidate check accepts each declared `osx-arm64` kind.
   - Then publish, through `release.yml`, immutable Windows, macOS and Linux desktop packages and the matching CLI/MCP archives as 0.5.0. This renames CHANGELOG's Unreleased section and sets the version.
   - Verify from anonymous downloads: public hashes, provenance, signatures and notarization, and an upgrade that keeps the vault, `~/.keypaste` and the recent list.
   - Rehearsal certificates, unpublished artifacts and source builds do not pass.

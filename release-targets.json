@@ -195,6 +195,12 @@
               "pattern": "keypaste-app-{version}-{rid}-internal-unsigned.app.zip",
               "internal": true,
               "signed": false
+            },
+            {
+              "kind": "dmg",
+              "pattern": "keypaste-app-{version}-{rid}-internal-unsigned.dmg",
+              "internal": true,
+              "signed": false
             }
           ],
           "advertised": false,

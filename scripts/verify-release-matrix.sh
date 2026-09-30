@@ -858,8 +858,8 @@ validate_packages() {
     workflow="$(jqr ".components.\"$c\".workflow" "$def")"
     [ -f "$root/$workflow" ] || continue
     code="$(package_code "$root" "$workflow")"
-    for kind in msi appimage app-bundle; do
-      case "$kind" in msi) ext=".msi" ;; appimage) ext=".AppImage" ;; app-bundle) ext=".app.zip" ;; esac
+    for kind in msi appimage app-bundle dmg; do
+      case "$kind" in msi) ext=".msi" ;; appimage) ext=".AppImage" ;; app-bundle) ext=".app.zip" ;; dmg) ext=".dmg" ;; esac
       case "$code" in *"$ext"*) ;; *) continue ;; esac
       declared="$(count_of "$def" "[.components.\"$c\".targets[]?.packages[]? | select(.kind == \"$kind\")]")"
       [ "${declared:-0}" -ge 1 ] \
@@ -1253,6 +1253,10 @@ expect_refusal "appimage-tool-unpinned" "appimagetool is not pinned by SHA-256" 
   "$(mutate appimage-tool-unpinned '(.components.app.targets[] | select(.rid == "linux-x64") | .packages[0]) |= del(.tool_sha256)')"
 expect_refusal "appimage-runtime-unpinned" "runtime is not pinned by SHA-256" \
   "$(mutate appimage-runtime-unpinned '(.components.app.targets[] | select(.rid == "linux-x64") | .packages[0].runtime_sha256) = "continuous"')"
+expect_refusal "dmg-name-drops-the-label" "is not named internal and unsigned" \
+  "$(mutate dmg-name-drops-the-label '(.components.app.targets[] | select(.rid == "osx-arm64") | .packages[] | select(.kind == "dmg") | .pattern) = "keypaste-app-{version}-{rid}.dmg"')"
+expect_refusal "dmg-recorded-public" "is not recorded internal" \
+  "$(mutate dmg-recorded-public '(.components.app.targets[] | select(.rid == "osx-arm64") | .packages[] | select(.kind == "dmg") | .internal) = false')"
 expect_refusal "installer-sdk-unpinned" "WixToolset.Sdk is not pinned by SHA-512" \
   "$(mutate installer-sdk-unpinned '(.components.app.targets[] | select(.rid == "win-x64") | .packages[0]) |= del(.tool_sha512)')"
 expect_refusal "publishes-unstated" "does not say whether it publishes archives or packages" \
@@ -1298,7 +1302,7 @@ cp site/public/index.html "$FAKE/site/public/"
 cp .github/workflows/release.yml .github/workflows/app.yml "$FAKE/.github/workflows/"
 mkdir -p "$FAKE/scripts"
 cp scripts/require-changelog-section.sh scripts/build-linux-appimage.sh scripts/build-windows-installer.sh scripts/sign-windows.sh \
-  scripts/build-macos-app.sh scripts/verify-windows-signature.sh scripts/rehearse-windows-signing.sh "$FAKE/scripts/"
+  scripts/build-macos-app.sh scripts/build-macos-dmg.sh scripts/verify-windows-signature.sh scripts/rehearse-windows-signing.sh "$FAKE/scripts/"
 DLIB_PROJECT="$(jqr '.signing.dlib.project' "$DEFINITION")"
 mkdir -p "$FAKE/$(dirname "$DLIB_PROJECT")"
 cp "$DLIB_PROJECT" "$FAKE/$DLIB_PROJECT"
@@ -1325,6 +1329,10 @@ expect_repo_refusal "appimage-undeclared" "builds an appimage package and app de
 
 expect_repo_refusal "app-bundle-undeclared" "builds an app-bundle package and app declares none" \
   "$(mutate app-bundle-undeclared '(.components.app.targets[] | select(.rid == "osx-arm64")) |= del(.packages)')" \
+  "$FAKE"
+
+expect_repo_refusal "dmg-undeclared" "builds an dmg package and app declares none" \
+  "$(mutate dmg-undeclared '(.components.app.targets[] | select(.rid == "osx-arm64") | .packages) |= map(select(.kind != "dmg"))')" \
   "$FAKE"
 
 expect_repo_refusal "installer-tool-unpinned" "and the definition pins WixToolset.Sdk/6.0.2" \
@@ -1386,6 +1394,11 @@ sed_inplace 's/| \.packages\[\] | select(\.kind == "app-bundle")/| .bundle | sel
 expect_repo_refusal "app-bundle-name-not-read-from-the-definition" "builds an app-bundle package without reading its name from the definition" \
   "$FAKE/release-targets.json" "$FAKE"
 cp scripts/build-macos-app.sh "$FAKE/scripts/build-macos-app.sh"
+
+sed_inplace 's/| \.packages\[\] | select(\.kind == "dmg")/| .image | select(.kind == "dmg")/' "$FAKE/scripts/build-macos-dmg.sh"
+expect_repo_refusal "dmg-name-not-read-from-the-definition" "builds an dmg package without reading its name from the definition" \
+  "$FAKE/release-targets.json" "$FAKE"
+cp scripts/build-macos-dmg.sh "$FAKE/scripts/build-macos-dmg.sh"
 
 printf 'readonly TOOL_SHA256=%s\n' "$(jqr '.components.app.targets[] | select(.rid == "linux-x64") | .packages[0].tool_sha256' "$DEFINITION")" \
   >> "$FAKE/scripts/build-linux-appimage.sh"

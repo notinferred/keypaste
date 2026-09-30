@@ -36,7 +36,7 @@ A desktop release is complete when every target it advertises is published and i
 | OS / CPU | RID | Public CLI/MCP | OS floor | Floor evidence | Desktop package in CI | Public desktop installer |
 |---|---|---|---|---|---|---|
 | Windows x64 | `win-x64` | ZIP; unsigned | Windows 10 1809 or later | `cited`; .NET 10 floor, no installation on the floor | Self-contained ZIP; internal unsigned per-user MSI | None; 4.7c1 built the path, which refuses an unsigned package; 4.7c2 publishes |
-| macOS ARM64 | `osx-arm64` | tar.gz; unnotarized | macOS 14 or later | `cited`; .NET 10 floor, no installation on the floor | Self-contained tar.gz; internal unsigned, unnotarized `keypaste.app` in a zip | None; 4.7a2 packages the DMG, 3.5b notarizes it and 4.7c2 publishes |
+| macOS ARM64 | `osx-arm64` | tar.gz; unnotarized | macOS 14 or later | `cited`; .NET 10 floor, no installation on the floor | Self-contained tar.gz; internal unsigned, unnotarized `keypaste.app` in a zip and in a DMG, checked from the mounted image | None; the internal DMG is Packaged (app run 36738215762); 3.5b notarizes it and 4.7c2 publishes |
 | Linux x64 | `linux-x64` | tar.gz | glibc 2.35 | `container-check`; Debian 12 runs it, Alpine refuses it | Self-contained tar.gz; internal unsigned AppImage; glibc 2.39 | None; 4.7c1 built the path, which refuses an unsigned package; 4.7c2 publishes |
 | Linux ARM64 | `linux-arm64` | tar.gz | glibc 2.35 | `unverified`; same build inputs as x64, no container check | None; RID declared but absent from package matrix | None |
 | macOS Intel / Windows ARM64 | `osx-x64` / `win-arm64` | Source route | No claim | `none` | None | None |
