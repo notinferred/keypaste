@@ -51,8 +51,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends squashfs-tools desktop-file-utils file clang zlib1g-dev
+          bash scripts/apt-install.sh --no-install-recommends squashfs-tools desktop-file-utils file clang zlib1g-dev
 
       # One commit, three versions: the lower one is installed, the higher upgrades it, and the third
       # is the install that fails partway.
@@ -137,15 +136,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libx11-6 libice6 libsm6 libfontconfig1 fuse3
+          bash scripts/apt-install.sh --no-install-recommends libx11-6 libice6 libsm6 libfontconfig1 fuse3
 
       - name: Install keepassxc-cli (Linux)
         if: runner.os == 'Linux'
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get install -y --no-install-recommends keepassxc
+          bash scripts/apt-install.sh --no-install-recommends keepassxc
 
       - name: Install keepassxc-cli (Windows)
         if: runner.os == 'Windows'

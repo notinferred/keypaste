@@ -229,8 +229,7 @@ jobs:
         if: env.COMPAT == 'true' && runner.os == 'Linux'
         timeout-minutes: 10
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends keepassxc
+          bash scripts/apt-install.sh --no-install-recommends keepassxc
 
       - name: Install keepassxc-cli (macOS)
         if: env.COMPAT == 'true' && runner.os == 'macOS'
@@ -330,7 +329,7 @@ jobs:
             keypaste.slnx
 
       - name: Install the native toolchain
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang zlib1g-dev
+        run: bash scripts/apt-install.sh --no-install-recommends clang zlib1g-dev
 
       # Adding -r here narrows the RID set and invalidates the multi-RID lock file (D-0040).
       - name: Restore (locked)
@@ -386,7 +385,7 @@ jobs:
         run: scripts/verify-demo.sh
 
       - name: Install KeePassXC
-        run: sudo apt-get install -y --no-install-recommends keepassxc
+        run: bash scripts/apt-install.sh --no-install-recommends keepassxc
 
       - name: Verify a vault written by the AOT binary opens in real KeePassXC
         shell: bash

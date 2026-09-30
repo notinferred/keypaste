@@ -195,7 +195,7 @@ jobs:
 
       - name: Install the native toolchain (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang zlib1g-dev
+        run: bash scripts/apt-install.sh --no-install-recommends clang zlib1g-dev
 
       - name: Check the native toolchain (macOS)
         if: runner.os == 'macOS'
@@ -269,7 +269,7 @@ jobs:
       # Every packaged RID must pass the real KeePassXC compatibility gate (PRODUCT law 4.6).
       - name: Install KeePassXC (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get install -y --no-install-recommends keepassxc
+        run: bash scripts/apt-install.sh --no-install-recommends keepassxc
 
       - name: Install KeePassXC (macOS)
         if: runner.os == 'macOS'

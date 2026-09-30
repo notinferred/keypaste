@@ -28,6 +28,7 @@ on:
       - 'scripts/lib/**'
       - 'src/Keypaste.Mcp/**'
       - 'scripts/install-keepassxc-windows.sh'
+      - 'scripts/apt-install.sh'
       - 'src/Keypaste.Cli/**'
       - 'tests/Keypaste.Cli.Tests/**'
       - 'src/Keypaste.Core/**'
@@ -187,8 +188,7 @@ jobs:
       - name: Install keepassxc-cli (Linux)
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends keepassxc
+          bash scripts/apt-install.sh --no-install-recommends keepassxc
 
       - name: Install keepassxc-cli (Windows)
         if: runner.os == 'Windows'
@@ -239,8 +239,7 @@ jobs:
       - name: Install KeePassXC (Linux)
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends keepassxc
+          bash scripts/apt-install.sh --no-install-recommends keepassxc
 
       - name: Install KeePassXC (macOS)
         if: runner.os == 'macOS'
@@ -305,8 +304,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y xvfb xclip libx11-6 libice6 libsm6 libfontconfig1
+          bash scripts/apt-install.sh xvfb xclip libx11-6 libice6 libsm6 libfontconfig1
           Xvfb :99 -screen 0 1280x800x24 > "$RUNNER_TEMP/xvfb.log" 2>&1 &
           echo "DISPLAY=:99" >> "$GITHUB_ENV"
           sleep 2
@@ -372,7 +370,7 @@ jobs:
 
       - name: Install the native toolchain for the bridge (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang zlib1g-dev
+        run: bash scripts/apt-install.sh --no-install-recommends clang zlib1g-dev
 
       # A client connected from the app starts this copy, so the package carries it (2.6a).
       - name: Add the NativeAOT bridge to the payload
@@ -546,8 +544,7 @@ jobs:
           REPORTED: ${{ steps.v.outputs.reported }}
         run: |
           set -euo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends squashfs-tools desktop-file-utils file
+          bash scripts/apt-install.sh --no-install-recommends squashfs-tools desktop-file-utils file
           image="$(scripts/build-linux-appimage.sh artifacts/stage "$VERSION" artifacts/dist)"
           scripts/verify-linux-appimage.sh "$image" "$VERSION" "$REPORTED" artifacts/stage
 

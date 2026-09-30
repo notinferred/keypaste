@@ -88,8 +88,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends xvfb openbox xdotool imagemagick dbus-daemon dbus-x11 \
+          bash scripts/apt-install.sh --no-install-recommends xvfb openbox xdotool imagemagick dbus-daemon dbus-x11 \
             at-spi2-core python3-gi gir1.2-atspi-2.0 libglib2.0-bin
 
       # docs/desktop.md's Linux prerequisites, and nothing else the app is given.
@@ -98,7 +97,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get install -y --no-install-recommends libx11-6 libice6 libsm6 libfontconfig1 fuse3
+          bash scripts/apt-install.sh --no-install-recommends libx11-6 libice6 libsm6 libfontconfig1 fuse3
 
       - name: Start Xvfb and openbox
         if: runner.os == 'Linux'

@@ -192,7 +192,7 @@ jobs:
       matrix:
         os: ${{ fromJSON(needs.plan.outputs.os) }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 50
     defaults:
       run:
         shell: bash
@@ -253,8 +253,7 @@ jobs:
       - name: Install keepassxc-cli (Linux)
         if: runner.os == 'Linux' && (needs.plan.outputs.gates == 'compat' || needs.plan.outputs.gates == 'both')
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends keepassxc
+          bash scripts/apt-install.sh --no-install-recommends keepassxc
 
       - name: Install keepassxc-cli (macOS)
         if: runner.os == 'macOS' && (needs.plan.outputs.gates == 'compat' || needs.plan.outputs.gates == 'both')
