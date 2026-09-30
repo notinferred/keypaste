@@ -73,7 +73,7 @@ command -v gh >/dev/null 2>&1 || die "no gh; this gate asks the API and cannot r
 # than a syntax error. A control that cannot reproduce the old behaviour proves nothing.
 required_workflows() {
   echo ci
-  jq -r --arg self "$SELF" '.components[] | select(.workflow != $self) | .workflow' "$DEFINITION" | sed 's#.*/##; s#\.ya\?ml$##' | sort -u
+  jq -r --arg self "$SELF" '.components[] | select(.workflow != $self) | .workflow' "$DEFINITION" | sed -E 's#.*/##; s#\.ya?ml$##' | sort -u
 }
 
 required="$(required_workflows | tr '\n' ' ')"
@@ -84,8 +84,9 @@ runs="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$SHA&status=succe
 
 if [ "$MODE" = run-id ]; then
   # Bound to the ref as well as the commit: a tag and the branch it points at are the same SHA, and
-  # only the tag run carries the full version in the names it built (app.yml's dryrun suffix).
-  ids="$(printf '%s' "$runs" | jq -r --arg wf "$WANT_WORKFLOW" --arg ref "$WANT_REF"     '[.workflow_runs[]? | select(.name == $wf and (.head_branch == $ref or .head_branch == ($ref | sub("^refs/tags/"; "")))) | .id] | .[]' 2>/dev/null | tr -d "$CR" || true)"
+  # only the tag run carries the full version in the names it built (app.yml's dryrun suffix). A pull
+  # request run's head_branch is its source branch, which may carry the tag's name.
+  ids="$(printf '%s' "$runs" | jq -r --arg wf "$WANT_WORKFLOW" --arg ref "$WANT_REF"     '[.workflow_runs[]? | select(.name == $wf and .event != "pull_request" and (.head_branch == $ref or .head_branch == ($ref | sub("^refs/tags/"; "")))) | .id] | .[]' 2>/dev/null | tr -d "$CR" || true)"
   n=0
   for id in $ids; do
     case "$id" in '' | *[!0-9]*) die "the API named a $WANT_WORKFLOW run that is not a run ID; refusing without a verified answer" ;; esac
@@ -102,7 +103,8 @@ for wf in $required; do
   # D-0106: the count is required to be digits. An empty or malformed reply must refuse rather than
   # arrive as "" and compare its way past -ge 1, which is how jq 1.6 let an empty answer reach an
   # upload. A refusal rests on what came back, never on how a tool chose to exit.
-  n="$(printf '%s' "$runs" | jq --arg wf "$wf" '[.workflow_runs[]? | select(.name == $wf)] | length' 2>/dev/null || true)"
+  # A pull request run may test only part of the change, and a local merge keeps its head SHA on main.
+  n="$(printf '%s' "$runs" | jq --arg wf "$wf" '[.workflow_runs[]? | select(.name == $wf and .event != "pull_request")] | length' 2>/dev/null || true)"
   case "$n" in
     '' | *[!0-9]*) die "could not count $wf runs for $SHA; refusing without a verified answer" ;;
   esac

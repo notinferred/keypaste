@@ -14,7 +14,7 @@ namespace Keypaste.Core.Tests;
 /// moved onto the vault's name inside a transaction that is not committed yet. While that is
 /// pending the name is reserved, KeePassLib's transacted move is refused, and its fallback's second
 /// hop — a plain <c>MoveFileEx</c> onto the same name — is refused too, which is the defect.
-/// <c>scripts/txf-probe.cs</c> reports that refusal as <c>Win32Exception 6800</c> on
+/// D-0119 records that refusal as <c>Win32Exception 6800</c> on
 /// Windows 10 Pro 19045; <see cref="ReproducesTheRefusal"/> asks the running machine rather than
 /// assuming it.
 /// </para>

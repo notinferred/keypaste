@@ -1841,8 +1841,8 @@ internal sealed class KeePassInterop : IDisposable
 
     /// <summary>ERROR_TRANSACTIONAL_CONFLICT.</summary>
     /// <remarks>
-    /// Observed on Windows 10 Pro 19045 by <c>scripts/txf-probe.cs</c>, on its "a non-transacted
-    /// move onto the destination name" line — which is the second hop of the fallback in
+    /// Observed on Windows 10 Pro 19045 by F.7's probe (D-0119), on a non-transacted move onto the
+    /// destination name — which is the second hop of the fallback in
     /// <c>FileTransactionEx.TxfMove</c> exactly. Observed again on <c>windows-2025</c> in ci run
     /// 34602290950, where <c>VaultSaveUnderATransactedNameTests</c> asserted this number rather
     /// than skipping — so the refusal is not particular to the Windows 10 floor after all. Both
@@ -1881,7 +1881,7 @@ internal sealed class KeePassInterop : IDisposable
     /// </remarks>
     private static bool IsATransientMoveCode(int code) => code switch
     {
-        // Windows 10 Pro 19045, scripts/txf-probe.cs. docs/STEPS.md F.7.
+        // Windows 10 Pro 19045, D-0119.
         _errorTransactionalConflict => true,
         _ => false,
     };

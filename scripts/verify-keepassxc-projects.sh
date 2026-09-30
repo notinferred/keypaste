@@ -154,12 +154,12 @@ step "env tag and env untag change the entry's own tags, and KeePassXC reads the
 said=$(kp_on "$plain" env tag billing services/Stripe -p prod 2>&1) || die "env tag failed: ${said}"
 grep -qF 'STRIPE_SECRET_KEY' <<<"$said" || die "env tag did not name the field that joins: ${said}"
 grep -qF 'Region' <<<"$said" && die "env tag named a field that is not env-named: ${said}"
-[ "$(tags "$plain" services/Stripe | paste -sd' ')" = "env:billing env:billing:prod finance" ] \
-  || die "KeePassXC reads the tags $(tags "$plain" services/Stripe | paste -sd' ')"
+[ "$(tags "$plain" services/Stripe | paste -sd' ' -)" = "env:billing env:billing:prod finance" ] \
+  || die "KeePassXC reads the tags $(tags "$plain" services/Stripe | paste -sd' ' -)"
 [ "$(version "$plain")" = 000004 ] || die "tagging raised the plain vault above KDBX 4.0: $(version "$plain")"
 said=$(kp_on "$plain" env untag billing services/Stripe 2>&1) || die "env untag failed: ${said}"
-[ "$(tags "$plain" services/Stripe | paste -sd' ')" = "env:billing:prod finance" ] \
-  || die "after untag KeePassXC reads the tags $(tags "$plain" services/Stripe | paste -sd' ')"
+[ "$(tags "$plain" services/Stripe | paste -sd' ' -)" = "env:billing:prod finance" ] \
+  || die "after untag KeePassXC reads the tags $(tags "$plain" services/Stripe | paste -sd' ' -)"
 
 said=$(kp_on "$grouped" env tag billing services/Other -p qa 2>&1) || die "env tag on the group-tagged vault failed: ${said}"
 grep -qx 'env:billing:qa' <<<"$(tags "$grouped" services/Other)" || die "KeePassXC does not read the tag keypaste added"
