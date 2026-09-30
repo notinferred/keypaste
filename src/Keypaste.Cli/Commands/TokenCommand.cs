@@ -393,6 +393,13 @@ internal static class TokenCommand
                     return resolved.Outcome is EnvOutcome.NoProject or EnvOutcome.NoProfile ? CliApp.ExitNotFound : CliApp.ExitInternalError;
                 }
 
+                if (resolved.RequiresLiveApproval)
+                {
+                    context.Stderr.WriteLine(
+                        $"keypaste token bundle: {project}/{profile} holds an entry of a protected environment; a bundle opens without asking anybody, so it cannot carry it");
+                    return CliApp.ExitInternalError;
+                }
+
                 sets.Add(new BundledSet(project, profile, resolved.Variables));
             }
 

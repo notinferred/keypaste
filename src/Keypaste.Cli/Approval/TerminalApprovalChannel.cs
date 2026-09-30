@@ -191,6 +191,12 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
 
         lines.Add($"  variables  {(request.Keys.Count == 0 ? "(none)" : string.Join(' ', request.Keys))}");
         lines.AddRange(request.FileLines.Select(line => $"  injects    {line}"));
+
+        if (request.Entries.Count > 0)
+        {
+            lines.Add($"  from       {string.Join(", ", request.Entries.Distinct(StringComparer.Ordinal))}");
+        }
+
         lines.Add($"  command    {request.Command}");
         lines.Add($"  in         {request.Directory}");
 

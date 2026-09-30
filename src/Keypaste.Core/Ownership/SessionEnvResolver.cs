@@ -8,8 +8,8 @@ namespace Keypaste.Core.Ownership;
 /// <para>
 /// A set is refused before anybody is asked about it. What a person confirms is its names; the set
 /// is read again after they answer, so an edit saved meanwhile is what leaves, a file another
-/// program saved meanwhile is refused, and a set whose names changed is refused rather than
-/// released under a confirmation that did not cover it.
+/// program saved meanwhile is refused, and a set whose names, source entries or protection changed
+/// is refused rather than released under a confirmation that did not cover it.
 /// </para>
 /// <para>
 /// A lock while the person is being asked withdraws the question, and a lock after it commits
@@ -135,7 +135,7 @@ public sealed class SessionEnvResolver
                 return resolved;
             }
 
-            if (!resolved.Preview.Keys.SequenceEqual(preview.Keys, StringComparer.Ordinal))
+            if (!resolved.Preview.SameAs(preview))
             {
                 return EnvResolved.Refused(preview.Project, EnvOutcome.ChangedWhileAsked, profile: preview.Profile);
             }

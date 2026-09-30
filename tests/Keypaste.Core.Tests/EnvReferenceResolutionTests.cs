@@ -137,7 +137,7 @@ public sealed class EnvReferenceResolutionTests : IDisposable
         Assert.Equal(EnvOutcome.Unusable, resolved.Outcome);
         var problem = Assert.Single(resolved.Problems);
         Assert.Equal("OLD", problem.Key);
-        Assert.Contains("'env/acme-api/staging' cannot be used: OLD_KEY expired", problem.Reason, StringComparison.Ordinal);
+        Assert.Contains("'acme-api/staging' cannot be used: OLD_KEY expired", problem.Reason, StringComparison.Ordinal);
         AssertNoValue(resolved);
     }
 

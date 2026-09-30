@@ -1,6 +1,7 @@
 using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.Core;
+using Keypaste.Core.Approval;
 
 namespace Keypaste.App.ViewModels;
 
@@ -33,6 +34,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     private IReadOnlyList<EnvProfileColumn> _columns = [];
     private IReadOnlyList<EnvKeyRow> _rows = [];
     private IReadOnlyList<EnvProfileInfo> _profiles = [];
+    private IReadOnlyList<string> _referenceKeys = [];
     private IReadOnlyList<string> _profileProblems = [];
     private EnvMatrix? _matrix;
     private string _selectedProfile = EnvProfileNames.Default;
@@ -246,7 +248,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>The <c>.env.keypaste</c> the selected profile exports: references only, safe to commit.</summary>
-    internal string ReferencePreview => EnvReferenceFile.Format(Name, SelectedProfile, [.. Variables.Select(row => row.Key)]);
+    internal string ReferencePreview => EnvReferenceFile.Format(Name, SelectedProfile, _referenceKeys);
 
     /// <summary>The preview a line at a time, as the terminal panel draws it.</summary>
     internal IReadOnlyList<EnvPreviewLine> ReferenceLines =>
@@ -281,11 +283,19 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
             return $"{target} already exists, so nothing was written. Replace it to overwrite it.";
         }
 
-        var variables = new EnvStore(vault).Read(Name, SelectedProfile);
+        var listing = EnvResolution.List(vault, Name, SelectedProfile);
+
+        if (listing.Sources.GroupBy(source => source.Key, StringComparer.Ordinal).FirstOrDefault(key => key.Count() > 1) is { } repeated)
+        {
+            var entries = string.Join(", ", repeated.Select(source => ApprovalPrompt.Shown(source.Entry)));
+            return $"{EntryNameSanitizer.Sanitize(repeated.Key).Text} is on more than one entry ({entries}), so nothing was written.";
+        }
+
+        var variables = listing.Variables;
 
         if (!EnvNameRules.TryCheck(variables, out var names))
         {
-            return $"{EnvProfileNames.GroupPath(Name, SelectedProfile)} {names}";
+            return $"{DisplayName}/{SelectedProfile} {names}";
         }
 
         var text = EnvReferenceFile.Format(Name, SelectedProfile, [.. variables.Select(variable => variable.Key)], Path.GetFileName(target));
@@ -452,6 +462,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         if (_session.Unlocked is not { } vault)
         {
             Variables = [];
+            _referenceKeys = [];
             Profiles = [];
             ProfileProblems = [];
             Matrix = null;
@@ -469,9 +480,11 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         }
 
         var store = new EnvStore(vault);
-        Profiles = store.Profiles(Name);
-        ProfileProblems = store.ProfileProblems(Name);
-        Matrix = EnvMatrix.Build(vault, Name, _session.Clock);
+        var matrix = EnvMatrix.Build(vault, Name, _session.Clock);
+        Matrix = matrix;
+        Profiles = matrix.Profiles;
+        ProfileProblems = matrix.Problems;
+        _referenceKeys = [.. EnvResolution.List(vault, Name, SelectedProfile).Variables.Select(variable => variable.Key).Distinct(StringComparer.Ordinal)];
 
         try
         {
@@ -539,7 +552,10 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
                 known?.Problem,
                 known?.SameValueAs ?? [],
                 variable,
-                new RelayCommand(() => Act(key, profile, state)));
+                new RelayCommand(() => Act(key, profile, state)))
+            {
+                Sources = [.. (known?.Sources ?? []).Select(ApprovalPrompt.Shown)],
+            };
         }
     }
 

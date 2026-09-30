@@ -6,7 +6,8 @@
 #
 # With the app holding the vault, the run raises the app's prompt naming the project, its variable names,
 # the command and the directory; Approve starts the child with the set, and the runner prints no value and
-# asks for no password. Deny, a lock while the prompt waits and the timeout each exit non-zero with no
+# asks for no password. A set of a tagged entry's field and a legacy variable names each source entry, and
+# because that entry is also tagged into prod it offers Allow once only (C.1b). Deny, a lock while the prompt waits and the timeout each exit non-zero with no
 # child, and a set E.1a refuses is refused before any prompt. With nothing holding the vault the run says
 # so. With `keypaste agent` holding it, o releases once and n refuses.
 #
@@ -117,6 +118,16 @@ done
 # KeePassXC can write a name keypaste refuses to create; the driver's raw-add stands in for it.
 printf '%s\n' "$DEPLOY" | KEYPASTE_DRIVER_PASSWORD="$MASTER" "$DRV" raw-add "$VAULT" env/broken BAD-NAME >/dev/null \
   || die "could not store an entry whose name cannot be exported"
+# The tagged project: a legacy DB_URL beside DEPLOY_KEY on an entry tagged into dev and prod (C.1b).
+printf '%s\n' "$MASTER" | "$CLI" env set tagged "DB_URL=$DATABASE" --vault "$VAULT" >/dev/null || die "could not store the tagged set's legacy variable"
+printf '%s\n' "deploy-login" | KEYPASTE_DRIVER_PASSWORD="$MASTER" "$DRV" raw-add "$VAULT" services Deploy >/dev/null \
+  || die "could not store the tagged entry"
+printf '%s\n%s\n' "$MASTER" "$DEPLOY" | "$CLI" set services/Deploy --field DEPLOY_KEY --vault "$VAULT" >/dev/null 2>&1 \
+  || die "could not set the tagged entry's field"
+for environment in dev prod; do
+  printf '%s\n' "$MASTER" | "$CLI" env tag tagged services/Deploy -p "$environment" --vault "$VAULT" >/dev/null 2>&1 \
+    || die "could not tag the entry into tagged/$environment"
+done
 
 # ------------------------------------------------------------------- nothing holds the vault
 start_run ci no-owner
@@ -133,13 +144,25 @@ start_run ci case-approve
 next_prompt
 PROMPT_LINE="$(grep '^env-prompt project=' "$HOLD_OUT" | tail -1)"
 case "$PROMPT_LINE" in
-  "env-prompt project=ci command="*" case-approve directory="*"project-e1c keys=DB_URL,DEPLOY_KEY") ;;
-  *) die "the prompt does not name the project, the command, the directory and the variable names: $PROMPT_LINE" ;;
+  "env-prompt project=ci command="*" case-approve directory="*"project-e1c keys=DB_URL,DEPLOY_KEY entries=env/ci/DB_URL,env/ci/DEPLOY_KEY timed=True") ;;
+  *) die "the prompt does not name the project, the command, the directory, the variable names and their entries: $PROMPT_LINE" ;;
 esac
 echo approve >&"$HOLD_IN"
 withdrawn
 released "Approve in the app"
 grep -qE "$DEPLOY|$DATABASE" "$HOLD_OUT" && die "a value reached the app's output"
+
+# ------------- a tagged field and a legacy variable: the prompt names each entry, and a prod-tagged member is once only
+start_run tagged case-tagged
+next_prompt
+PROMPT_LINE="$(grep '^env-prompt project=' "$HOLD_OUT" | tail -1)"
+case "$PROMPT_LINE" in
+  "env-prompt project=tagged command="*" case-tagged directory="*"project-e1c keys=DB_URL,DEPLOY_KEY entries=env/tagged/DB_URL,services/Deploy timed=False") ;;
+  *) die "the tagged set's prompt does not name each source entry once only: $PROMPT_LINE" ;;
+esac
+echo once >&"$HOLD_IN"
+withdrawn
+released "Allow once for the tagged set"
 
 # ------------------------------------------------------------------------------ Deny refuses
 start_run ci case-deny

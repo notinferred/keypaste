@@ -1,6 +1,7 @@
 using System.Text;
 using Keypaste.Cli.Styling;
 using Keypaste.Core;
+using Keypaste.Core.Approval;
 
 namespace Keypaste.Cli.Commands;
 
@@ -152,18 +153,18 @@ internal static class EnvExportCommand
 
         return VaultSession.Open(vaultPath, line, context, vault =>
         {
-            var store = new EnvStore(vault);
+            var listing = EnvResolution.List(vault, project, profile);
 
-            if (Missing(store, project, profile, context) is { } missing)
+            if ((Missing(listing, project, profile, context) ?? Repeated(listing, context)) is { } refused)
             {
-                return missing;
+                return refused;
             }
 
-            var variables = store.Read(project, profile);
+            var variables = listing.Variables;
 
             if (!EnvNameRules.TryCheck(variables, out var names))
             {
-                context.Stderr.WriteLine($"keypaste env export: '{EnvProfileNames.GroupPath(project, profile)}' {names}");
+                context.Stderr.WriteLine($"keypaste env export: '{project}/{profile}' {names}");
                 context.Stderr.WriteLine("Nothing was written.");
                 return CliApp.ExitInternalError;
             }
@@ -199,21 +200,47 @@ internal static class EnvExportCommand
     }
 
     /// <summary>Says a project or its profile is not there, or null when both are.</summary>
-    private static int? Missing(EnvStore store, string project, string profile, CliContext context)
+    private static int? Missing(EnvListing listing, string project, string profile, CliContext context)
     {
-        if (!store.ProjectExists(project))
+        switch (listing.Outcome)
         {
-            context.Stderr.WriteLine($"keypaste env export: no env set for '{project}'");
-            return CliApp.ExitNotFound;
+            case EnvOutcome.NoProject:
+                context.Stderr.WriteLine($"keypaste env export: no env set for '{project}'");
+                return CliApp.ExitNotFound;
+
+            case EnvOutcome.NoProfile:
+                context.Stderr.WriteLine($"keypaste env export: '{project}' has no '{profile}' profile");
+                return CliApp.ExitNotFound;
+
+            default:
+                return null;
+        }
+    }
+
+    /// <summary>Refuses a key two entries hold, naming them, or null when every key has one.</summary>
+    private static int? Repeated(EnvListing listing, CliContext context)
+    {
+        if (listing.Sources.GroupBy(source => source.Key, StringComparer.Ordinal).FirstOrDefault(key => key.Count() > 1) is not { } repeated)
+        {
+            return null;
         }
 
-        if (!store.ProfileExists(project, profile))
+        var entries = string.Join(", ", repeated.Select(source => ApprovalPrompt.Shown(source.Entry)));
+        context.Stderr.WriteLine($"keypaste env export: {EntryNameSanitizer.Sanitize(repeated.Key).Text} is on more than one entry ({entries}); nothing was written.");
+        return CliApp.ExitInternalError;
+    }
+
+    // Only --dotenv writes values; a reference to such a field is refused when it is resolved.
+    private static int? NamedLikeStandard(EnvListing listing, CliContext context)
+    {
+        if (listing.Sources.FirstOrDefault(EnvResolution.IsNamedLikeStandard) is not { } named)
         {
-            context.Stderr.WriteLine($"keypaste env export: '{project}' has no '{profile}' profile");
-            return CliApp.ExitNotFound;
+            return null;
         }
 
-        return null;
+        context.Stderr.WriteLine(
+            $"keypaste env export: {EntryNameSanitizer.Sanitize(named.Key).Text} is a custom field named like a standard one, which keypaste never releases ({ApprovalPrompt.Shown(named.Entry)}); nothing was written.");
+        return CliApp.ExitInternalError;
     }
 
     private static bool TryRefuseTheVault(string vaultPath, string targetPath, CliContext context, out int exit) =>
@@ -252,15 +279,15 @@ internal static class EnvExportCommand
         bool assumeYes,
         CliContext context)
     {
-        var store = new EnvStore(vault);
+        var listing = EnvResolution.List(vault, project, profile);
         var groupPath = EnvProfileNames.GroupPath(project, profile);
 
-        if (Missing(store, project, profile, context) is { } missing)
+        if ((Missing(listing, project, profile, context) ?? Repeated(listing, context) ?? NamedLikeStandard(listing, context)) is { } refused)
         {
-            return missing;
+            return refused;
         }
 
-        var variables = store.Read(project, profile);
+        var variables = listing.Variables;
 
         if (!DotEnvWriter.TryFormat(variables, out var file, out var formatError))
         {

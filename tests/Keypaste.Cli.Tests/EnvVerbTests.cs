@@ -488,7 +488,7 @@ public sealed class EnvVerbTests
         harness.Prompt.Enqueue(Master);
         Assert.Equal(CliApp.ExitSuccess, harness.Run("env", "ls", "acme-api", "-p", "staging", "--json", "--vault", harness.VaultPath));
         Assert.Equal(
-            """[{"key":"BAD-NAME","profile":"staging","usable":false},{"key":"DATABASE_URL","profile":"staging","usable":true}]""",
+            """[{"key":"BAD-NAME","profile":"staging","usable":false,"entries":["env/acme-api/staging/BAD-NAME"]},{"key":"DATABASE_URL","profile":"staging","usable":true,"entries":["env/acme-api/staging/DATABASE_URL"]}]""",
             harness.Out.Trim());
         Assert.DoesNotContain("staging-db", harness.Out + harness.Err, StringComparison.Ordinal);
     }

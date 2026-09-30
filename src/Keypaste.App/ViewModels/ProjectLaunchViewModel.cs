@@ -326,7 +326,7 @@ internal sealed class ProjectLaunchViewModel : ObservableObject, IDisposable
         EnvOutcome.Declined => "Nothing was started.",
         EnvOutcome.Locked => "The vault was locked, so nothing was started.",
         EnvOutcome.Unusable => Shown(
-            $"{EnvProfileNames.GroupPath(resolved.Project, resolved.Profile)} cannot be used, so nothing was started: " +
+            $"{resolved.Project}/{resolved.Profile} cannot be used, so nothing was started: " +
             string.Join("; ", resolved.Problems.Select(problem => $"{EnvResolved.Display(problem.Key)} {problem.Reason}")) +
             ". Fix or remove them, then try again."),
         _ => Shown($"Nothing was started: {resolved.Refusal}."),

@@ -47,7 +47,7 @@ public static class EnvReferenceResolution
                 profile);
         }
 
-        var state = vault.ReadSaved(out var entries, out var groupPaths);
+        var state = vault.ReadSavedEnv(out var snapshot);
 
         if (state != SavedRead.Current)
         {
@@ -67,28 +67,45 @@ public static class EnvReferenceResolution
             group => group.Key,
             group => (IReadOnlyList<string>)[.. group.Select(env => env.Key).Distinct(StringComparer.Ordinal)]);
         List<EnvVariable> variables = [];
+        List<EnvSource> sources = [];
         List<EnvProblem> problems = [];
         var withheld = false;
+        var live = false;
 
         foreach (var line in document.Lines)
         {
             string? value;
             string? why;
+            EnvSource? source = null;
 
             switch (line.Reference)
             {
                 case EnvReference env:
                     if (!sets.TryGetValue((env.Project, env.Profile), out var set))
                     {
-                        set = EnvResolution.Resolve(entries!, groupPaths!, env.Project, env.Profile, keysBySet[(env.Project, env.Profile)], now);
+                        set = EnvResolution.Resolve(snapshot!, env.Project, env.Profile, keysBySet[(env.Project, env.Profile)], now);
                         sets[(env.Project, env.Profile)] = set;
                     }
 
                     (value, why) = Pick(set, env);
+                    live |= set.RequiresLiveApproval;
+
+                    if (set.Sources.FirstOrDefault(candidate => string.Equals(candidate.Key, env.Key, StringComparison.Ordinal)) is { } origin)
+                    {
+                        source = origin with { Key = line.Name };
+                    }
+
                     break;
 
                 case EntryReference entry:
-                    (value, why) = Read(vault, entries!, entry, now);
+                    (value, why, var named) = Read(vault, snapshot!.Entries, entry, now);
+
+                    if (named is not null)
+                    {
+                        source = new EnvSource(line.Name, named.Name, entry.Field);
+                        live |= EnvResolution.RequiresLiveApproval(named);
+                    }
+
                     break;
 
                 default:
@@ -107,6 +124,11 @@ public static class EnvReferenceResolution
             else
             {
                 variables.Add(new EnvVariable(line.Name, value!));
+
+                if (source is not null)
+                {
+                    sources.Add(source);
+                }
             }
         }
 
@@ -122,7 +144,7 @@ public static class EnvReferenceResolution
 
         return problems.Count > 0
             ? EnvResolved.Refused(project, EnvOutcome.Unusable, problems, profile)
-            : EnvResolved.Released(project, variables, profile);
+            : EnvResolved.Released(project, variables, profile, sources, live);
     }
 
     /// <summary>What a file makes of a set released for its references: each value under the file's name for it, and each literal.</summary>
@@ -195,7 +217,7 @@ public static class EnvReferenceResolution
 
             return (null, own is [{ Reason: _missing }]
                 ? $"{env.Key} {_missing}"
-                : $"'{EnvProfileNames.GroupPath(env.Project, env.Profile)}' cannot be used: " +
+                : $"'{env.Project}/{env.Profile}' cannot be used: " +
                   string.Join("; ", own.Select(problem => $"{EnvResolved.Display(problem.Key)} {problem.Reason}")));
         }
 
@@ -204,25 +226,25 @@ public static class EnvReferenceResolution
             : (null, $"{env.Key} {_missing}");
     }
 
-    private static (string? Value, string? Why) Read(Vault vault, IReadOnlyList<VaultEntry> entries, EntryReference reference, DateTimeOffset now)
+    private static (string? Value, string? Why, EnvEntry? Entry) Read(Vault vault, IReadOnlyList<EnvEntry> entries, EntryReference reference, DateTimeOffset now)
     {
         if (ReservedGroups.IsReserved(reference.Entry.GroupPath))
         {
-            return (null, "is in a group keypaste keeps for itself");
+            return (null, "is in a group keypaste keeps for itself", null);
         }
 
-        var matches = entries.Where(entry => EntryName.Of(entry) == reference.Entry).ToList();
+        var matches = entries.Where(entry => entry.Name == reference.Entry).ToList();
 
         if (matches.Count != 1)
         {
-            return (null, matches.Count == 0 ? "names no entry" : "names more than one entry");
+            return (null, matches.Count == 0 ? "names no entry" : "names more than one entry", null);
         }
 
-        var found = matches[0];
+        var found = matches[0].Entry;
 
         if (found.Expires is { } expires && expires <= now)
         {
-            return (null, "expired " + expires.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss'Z'", CultureInfo.InvariantCulture));
+            return (null, "expired " + expires.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss'Z'", CultureInfo.InvariantCulture), null);
         }
 
         string value;
@@ -234,7 +256,7 @@ public static class EnvReferenceResolution
 
             if (state != SavedRead.Current)
             {
-                return (null, "cannot be read: the vault no longer matches its file");
+                return (null, "cannot be read: the vault no longer matches its file", null);
             }
 
             value = custom ?? string.Empty;
@@ -250,6 +272,6 @@ public static class EnvReferenceResolution
             };
         }
 
-        return value.Length == 0 ? (null, $"has an empty {reference.Field}") : (value, null);
+        return value.Length == 0 ? (null, $"has an empty {reference.Field}", null) : (value, null, matches[0]);
     }
 }

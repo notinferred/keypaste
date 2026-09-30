@@ -91,15 +91,15 @@ internal static class EnvListCommand
 
             if (!listing.IsLegacy)
             {
-                return Tagged(listing, line.Value(EnvCommand.ProfileOption.Name), profiles, json, context);
+                return Tagged(listing, TaggedKeys(vault, listing), line.Value(EnvCommand.ProfileOption.Name), profiles, json, context);
             }
 
             if (profiles)
             {
-                return Profiles(store, project, json, context);
+                return Profiles(store, listing, json, context);
             }
 
-            if (!store.ProfileExists(project, profile))
+            if (!listing.Environments.Any(environment => string.Equals(environment.Name, profile, StringComparison.Ordinal)))
             {
                 context.Stderr.WriteLine($"keypaste env ls: '{project}' has no '{profile}' profile");
                 return CliApp.ExitNotFound;
@@ -110,13 +110,16 @@ internal static class EnvListCommand
                 return KeysAsJson(vault, project, profile, context);
             }
 
-            Keys(store, project, profile, context);
+            if (Keys(vault, project, profile, context) is { } failed)
+            {
+                return failed;
+            }
 
             if (listing.Environments.Any(environment => environment.Members.Count > 0))
             {
                 context.Stdout.WriteLine();
                 context.Stdout.WriteLine("tagged entries");
-                Note(context, Environments(listing.Environments.Where(environment => environment.Members.Count > 0), context));
+                Note(context, Environments(listing.Environments.Where(environment => environment.Members.Count > 0), context, TaggedKeys(vault, listing)));
             }
 
             return CliApp.ExitSuccess;
@@ -139,8 +142,8 @@ internal static class EnvListCommand
         return CliApp.ExitSuccess;
     }
 
-    /// <summary>A project known only from tags: its environments and their entries, or one environment's with <c>-p</c>.</summary>
-    private static int Tagged(ProjectListing listing, string? profile, bool profiles, bool json, CliContext context)
+    /// <summary>A project known only from tags: its environments, their entries and each entry's variables, or one environment's with <c>-p</c>.</summary>
+    private static int Tagged(ProjectListing listing, ILookup<(string, EntryName), string> keys, string? profile, bool profiles, bool json, CliContext context)
     {
         var environments = listing.Environments
             .Where(environment => profile is null || string.Equals(environment.Name, profile, StringComparison.Ordinal))
@@ -175,16 +178,24 @@ internal static class EnvListCommand
 
         if (json)
         {
-            return ProjectsAsJson([listing with { Environments = environments }], context);
+            return ProjectsAsJson([listing with { Environments = environments }], context, keys);
         }
 
-        Note(context, Environments(environments, context));
+        Note(context, Environments(environments, context, keys));
         return CliApp.ExitSuccess;
     }
 
-    /// <summary>Writes each environment, indented, with its tagged entries beneath it.</summary>
+    /// <summary>The variable fields each tagged entry gives each environment of a project, by environment and entry; names only.</summary>
+    private static ILookup<(string, EntryName), string> TaggedKeys(Vault vault, ProjectListing listing) =>
+        listing.Environments
+            .SelectMany(environment => EnvResolution.List(vault, listing.Name, environment.Name).Sources
+                .Where(source => !string.Equals(source.Field, EnvSource.LegacyField, StringComparison.Ordinal))
+                .Select(source => (Place: (environment.Name, source.Entry), Name: source.Key)))
+            .ToLookup(pair => pair.Place, pair => pair.Name);
+
+    /// <summary>Writes each environment, indented, with its tagged entries beneath it and, when given, each entry's variables beneath that.</summary>
     /// <returns>Whether any drawn name is not what the vault holds.</returns>
-    private static bool Environments(IEnumerable<ProjectEnvironment> environments, CliContext context)
+    private static bool Environments(IEnumerable<ProjectEnvironment> environments, CliContext context, ILookup<(string, EntryName), string>? keys = null)
     {
         var altered = false;
 
@@ -197,13 +208,20 @@ internal static class EnvListCommand
                 var safe = EntryNameSanitizer.SanitizePath(Path(member), maximumLength: _displayLength);
                 altered |= safe.WasAltered;
                 context.Stdout.WriteLine("    " + safe.Text);
+
+                foreach (var key in keys?[(environment.Name, member)] ?? [])
+                {
+                    var safeKey = EntryNameSanitizer.Sanitize(key, _displayLength);
+                    altered |= safeKey.WasAltered;
+                    context.Stdout.WriteLine("      " + safeKey.Text);
+                }
             }
         }
 
         return altered;
     }
 
-    private static int ProjectsAsJson(IReadOnlyList<ProjectListing> projects, CliContext context)
+    private static int ProjectsAsJson(IReadOnlyList<ProjectListing> projects, CliContext context, ILookup<(string, EntryName), string>? keys = null)
     {
         CliJson.WriteArray(context.Stdout, projects, (json, project) =>
         {
@@ -224,6 +242,19 @@ internal static class EnvListCommand
                     json.WriteString("path", Path(member));
                     json.WriteString("group", member.GroupPath);
                     json.WriteString("title", member.Title);
+
+                    if (keys is not null)
+                    {
+                        json.WriteStartArray("keys");
+
+                        foreach (var key in keys[(environment.Name, member)])
+                        {
+                            json.WriteStringValue(key);
+                        }
+
+                        json.WriteEndArray();
+                    }
+
                     json.WriteEndObject();
                 }
 
@@ -250,27 +281,25 @@ internal static class EnvListCommand
 
     private static string Path(EntryName entry) => entry.GroupPath.Length == 0 ? entry.Title : entry.GroupPath + "/" + entry.Title;
 
-    private static int Profiles(EnvStore store, string project, bool json, CliContext context)
+    private static int Profiles(EnvStore store, ProjectListing listing, bool json, CliContext context)
     {
-        var profiles = store.Profiles(project);
-
         if (json)
         {
-            CliJson.WriteArray(context.Stdout, profiles, (writer, profile) =>
+            CliJson.WriteArray(context.Stdout, listing.Environments, (writer, environment) =>
             {
-                writer.WriteString("profile", profile.Name);
-                writer.WriteBoolean("protected", profile.IsProtected);
+                writer.WriteString("profile", environment.Name);
+                writer.WriteBoolean("protected", environment.IsProtected);
             });
         }
         else
         {
-            foreach (var profile in profiles)
+            foreach (var environment in listing.Environments)
             {
-                context.Stdout.WriteLine(profile.Name);
+                context.Stdout.WriteLine(environment.Name);
             }
         }
 
-        foreach (var problem in store.ProfileProblems(project))
+        foreach (var problem in store.ProfileProblems(listing.Name))
         {
             context.Stderr.WriteLine($"warning: {EntryNameSanitizer.SanitizeProse(problem, _displayLength).Text}");
         }
@@ -278,13 +307,29 @@ internal static class EnvListCommand
         return CliApp.ExitSuccess;
     }
 
-    private static void Keys(EnvStore store, string project, string profile, CliContext context)
+    /// <summary>Lists the profile's legacy variables, the untagged entries of its <c>env/</c> group, or refuses a name two of them hold.</summary>
+    /// <returns>Null once listed, or the exit code of the refusal.</returns>
+    private static int? Keys(Vault vault, string project, string profile, CliContext context)
     {
+        var keys = EnvResolution.List(vault, project, profile).Sources
+            .Where(source => string.Equals(source.Field, EnvSource.LegacyField, StringComparison.Ordinal))
+            .Select(source => source.Key)
+            .ToList();
+
+        // Two entries of one name have no single value to list (docs/PRODUCT.md law 3.7).
+        if (keys.GroupBy(key => key, StringComparer.Ordinal).FirstOrDefault(key => key.Count() > 1) is { } twice)
+        {
+            context.Stderr.WriteLine(
+                $"keypaste env ls: '{EnvProfileNames.GroupPath(project, profile)}' contains more than one entry named " +
+                $"'{EntryNameSanitizer.Sanitize(twice.Key, _displayLength).Text}'. Remove the duplicate in KeePassXC.");
+            return CliApp.ExitInternalError;
+        }
+
         var altered = false;
 
-        foreach (var variable in store.Read(project, profile))
+        foreach (var key in keys)
         {
-            var safe = EntryNameSanitizer.Sanitize(variable.Key, _displayLength);
+            var safe = EntryNameSanitizer.Sanitize(key, _displayLength);
             altered |= safe.WasAltered;
 
             context.Stdout.WriteLine(safe.Text);
@@ -292,7 +337,7 @@ internal static class EnvListCommand
             // The name is still listed: keypaste does not get to pretend the file says
             // something other than what KeePassXC shows (docs/PRODUCT.md law 4.6). But it cannot be
             // exported to a child process, and the place to say so is where it is seen.
-            if (!variable.IsUsableName)
+            if (!EnvConvention.IsValidKey(key, out _))
             {
                 context.Stderr.WriteLine(
                     $"warning: '{safe.Text}' is not a usable environment variable name");
@@ -300,6 +345,7 @@ internal static class EnvListCommand
         }
 
         Note(context, altered);
+        return null;
     }
 
     private static int KeysAsJson(Vault vault, string project, string profile, CliContext context)
@@ -313,6 +359,14 @@ internal static class EnvListCommand
             json.WriteString("key", row.Key);
             json.WriteString("profile", profile);
             json.WriteBoolean("usable", row.Cells[column].State == EnvCellState.Set);
+            json.WriteStartArray("entries");
+
+            foreach (var entry in row.Cells[column].Sources)
+            {
+                json.WriteStringValue(Path(entry));
+            }
+
+            json.WriteEndArray();
         });
 
         return CliApp.ExitSuccess;

@@ -20,6 +20,7 @@ public sealed class SessionAuthorityTokenTests : IDisposable
     private const string _database = "postgres://token-sentinel@db/app";
     private const string _apiKey = "sk_live_token_sentinel";
     private const string _prod = "postgres://prod-sentinel@db/app";
+    private const string _deploy = "deploy-token-sentinel";
     private static readonly TimeSpan _wait = TimeSpan.FromSeconds(10);
 
     private readonly string _directory = Directory.CreateTempSubdirectory("keypaste-authority-token-").FullName;
@@ -210,6 +211,44 @@ public sealed class SessionAuthorityTokenTests : IDisposable
         var denied = await authority.ReleaseTokenEnvAsync(Request(token, "prod"), _connection, Cancel);
         Assert.Equal(EnvOutcome.Declined, denied.Set.Outcome);
         Assert.Equal("the person asked said no", denied.Reason);
+    }
+
+    [Fact]
+    public async Task ASetHoldingAProdTaggedEntry_IsRefusedWithoutAllowProd_AndAskedOnceOnlyWithIt()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        var deploy = new EntryName("services", "Deploy");
+        _vault.AddEntry(new VaultEntry { GroupPath = "services", Title = "Deploy", Password = "deploy-login" });
+        Assert.True(_vault.SetFields(deploy, [new FieldWrite("DEPLOY_KEY", _deploy)]));
+        Assert.True(_vault.AddTag(deploy, "env:acme-api:staging"));
+        Assert.True(_vault.AddTag(deploy, "env:acme-api:prod"));
+        _vault.Save();
+        var plain = Mint("ci-staging", "read:acme-api/staging/*");
+        var allowed = Mint("prod-ci", "read:acme-api/staging/*", allowProd: true);
+        var authority = await AttachedAsync();
+
+        var refused = await authority.ReleaseTokenEnvAsync(Request(plain, "staging"), _connection, Cancel);
+
+        Assert.Equal(EnvOutcome.Unauthorized, refused.Set.Outcome);
+        Assert.Equal("the token's scope does not cover acme-api/staging: it holds an entry of a protected environment", refused.Reason);
+        Assert.Empty(refused.Set.Variables);
+        Assert.Equal(0, _fixture.Channel.Asked);
+
+        var asked = await authority.ReleaseTokenEnvAsync(Request(allowed, "staging"), _connection, Cancel);
+
+        Assert.Equal(EnvOutcome.Resolved, asked.Set.Outcome);
+        Assert.Equal(["API_KEY", "DATABASE_URL", "DEPLOY_KEY"], asked.Set.Variables.Select(variable => variable.Key));
+        Assert.Equal(1, _fixture.Channel.Asked);
+        var prompt = Assert.IsType<EnvReleasePrompt>(_fixture.Channel.LastEnvPrompt);
+        Assert.Equal(0, prompt.GrantSeconds);
+        Assert.Contains("services/Deploy", prompt.Entries);
+
+        var lines = Lines();
+        Assert.Equal(["denied", "granted"], lines.Select(line => line.GetProperty("decision").GetString()));
+        Assert.Equal(
+            ["env/acme-api/staging/API_KEY", "env/acme-api/staging/DATABASE_URL", "services/Deploy"],
+            lines[1].GetProperty("entries").EnumerateArray().Select(entry => entry.GetString()));
+        Assert.All(lines, line => Assert.DoesNotContain(_deploy, line.GetRawText(), StringComparison.Ordinal));
     }
 
     [Fact]

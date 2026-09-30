@@ -53,6 +53,9 @@ internal sealed record EnvProfileCell(
 {
     internal bool HasVariable => Variable is not null;
 
+    /// <summary>The entries holding the key in this profile, as a prompt shows them.</summary>
+    internal IReadOnlyList<string> Sources { get; init; } = [];
+
     internal bool ShowsLabel => Variable is null;
 
     /// <summary>Draws the hold target's cell above its row neighbours, which a held value may cover.</summary>
@@ -86,6 +89,8 @@ internal sealed record EnvProfileCell(
             {
                 null or "" => "unusable",
                 _ when first.StartsWith("expired", StringComparison.Ordinal) => "expired",
+                _ when first.StartsWith("holds the KeePass placeholder", StringComparison.Ordinal) => "placeholder",
+                _ when first.StartsWith("is on more than one entry", StringComparison.Ordinal) => "on two entries",
                 _ => DisplayTextSanitizer.Sanitize(first).Text,
             };
         }
@@ -96,7 +101,10 @@ internal sealed record EnvProfileCell(
     {
         EnvCellState.Missing => $"Not set in {Profile}. Click to add it.",
         EnvCellState.Unusable => DisplayTextSanitizer.Sanitize($"keypaste run refuses this value: {Problem}").Text,
-        _ when SameValueAs.Count > 0 => $"The {Profile} value is the same as in {string.Join(" and ", SameValueAs)}.",
-        _ => null,
+        _ when SameValueAs.Count > 0 => $"The {Profile} value is the same as in {string.Join(" and ", SameValueAs)}.{From}",
+        _ => Sources.Count > 0 ? From.TrimStart() : null,
     };
+
+    /// <summary>Where a set value lives, after what the tip says first.</summary>
+    private string From => Sources.Count > 0 ? $" From {string.Join(", ", Sources)}." : string.Empty;
 }

@@ -162,6 +162,51 @@ public sealed class SessionEnvResolverTests : IDisposable
     }
 
     [Fact]
+    public async Task A_member_tagged_into_prod_or_a_key_moved_to_another_entry_while_asked_is_refused()
+    {
+        var stripe = new EntryName("services", "Stripe");
+        var other = new EntryName("services", "Other");
+        _vault.AddEntry(new VaultEntry { GroupPath = "services", Title = "Stripe", Password = "stripe-login" });
+        _vault.AddEntry(new VaultEntry { GroupPath = "services", Title = "Other", Password = "other-login" });
+        Assert.True(_vault.SetFields(stripe, [new FieldWrite("STRIPE_KEY", "stripe-value")]));
+        Assert.True(_vault.AddTag(stripe, "env:dev"));
+        _vault.Save();
+
+        var tagged = await Resolver().ResolveAsync(
+            "dev",
+            (preview, _) =>
+            {
+                Assert.False(preview.RequiresLiveApproval);
+                Assert.True(_vault.AddTag(stripe, "env:dev:prod"));
+                _vault.Save();
+                return ValueTask.FromResult(true);
+            },
+            Cancel);
+
+        Assert.Equal(EnvOutcome.ChangedWhileAsked, tagged.Outcome);
+        Assert.Empty(tagged.Variables);
+
+        Assert.True(_vault.RemoveTags(stripe, ["env:dev:prod"]));
+        _vault.Save();
+
+        var moved = await Resolver().ResolveAsync(
+            "dev",
+            (preview, _) =>
+            {
+                Assert.Equal(["STRIPE_KEY", "TOKEN"], preview.Keys);
+                Assert.True(_vault.RemoveField(stripe, "STRIPE_KEY"));
+                Assert.True(_vault.SetFields(other, [new FieldWrite("STRIPE_KEY", "stripe-value")]));
+                Assert.True(_vault.AddTag(other, "env:dev"));
+                _vault.Save();
+                return ValueTask.FromResult(true);
+            },
+            Cancel);
+
+        Assert.Equal(EnvOutcome.ChangedWhileAsked, moved.Outcome);
+        Assert.Empty(moved.Variables);
+    }
+
+    [Fact]
     public async Task A_refused_set_is_refused_before_anybody_is_asked_and_a_no_releases_nothing()
     {
         var asked = false;

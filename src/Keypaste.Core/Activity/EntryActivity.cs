@@ -142,8 +142,7 @@ public sealed class EntryActivity
 
         foreach (var env in live.WaitingEnvs)
         {
-            activity._waiting.UnionWith(env.Prompt.Keys.Select(name =>
-                KeyOf(new EntryName(EnvProfileNames.GroupPath(env.Prompt.Project, env.Prompt.Profile), name))));
+            activity._waiting.UnionWith(env.Prompt.Entries.Select(Key));
         }
 
         return activity;

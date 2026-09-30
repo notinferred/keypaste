@@ -30,7 +30,7 @@ public sealed class EnvDiffTests : IDisposable
     public void An_unusable_key_is_named_with_why()
     {
         Assert.Contains(
-            new EnvDiffLine("JWT_SIGNING_KEY", EnvDiffKind.Unusable, "staging", "expired 2026-09-01 00:00:00Z"),
+            new EnvDiffLine("JWT_SIGNING_KEY", EnvDiffKind.Unusable, "staging", "expired 2026-09-01 00:00:00Z (env/acme-api/staging/JWT_SIGNING_KEY)"),
             Compare("dev", "staging"));
     }
 

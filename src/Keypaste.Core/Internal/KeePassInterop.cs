@@ -790,6 +790,16 @@ internal sealed class KeePassInterop : IDisposable
         return tagged;
     }
 
+    /// <summary>Every live entry with its own tags, and the variable fields of each one a project tag names, by the traversal <see cref="Collect"/> uses.</summary>
+    internal IReadOnlyList<EnvEntry> ReadEnvEntries()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        List<EnvEntry> found = [];
+        CollectEnvEntries(_database.RootGroup, string.Empty, found, Bin());
+        return found;
+    }
+
     /// <summary>Adds one tag as an edit with one history revision.</summary>
     /// <returns>0 when there is no such entry or it carries the tag already, otherwise 1.</returns>
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
@@ -2100,6 +2110,34 @@ internal sealed class KeePassInterop : IDisposable
             if (!ReferenceEquals(child, bin))
             {
                 CollectTags(child, ChildPath(groupPath, child.Name), tagged, bin);
+            }
+        }
+    }
+
+    private static void CollectEnvEntries(PwGroup group, string groupPath, List<EnvEntry> found, PwGroup? bin)
+    {
+        foreach (PwEntry entry in group.Entries)
+        {
+            List<string> tags = [.. entry.Tags];
+            List<KeyValuePair<string, string>> fields = [];
+
+            // A value is read only from an entry a project tag names, so no other entry's fields are held.
+            if (tags.Any(tag => ProjectTag.Read(tag).Kind == ProjectTagKind.Member))
+            {
+                fields.AddRange(entry.Strings
+                    .Where(field => !PwDefs.IsStandardField(field.Key) && EnvConvention.IsEnvNamedField(field.Key))
+                    .OrderBy(field => field.Key, StringComparer.Ordinal)
+                    .Select(field => new KeyValuePair<string, string>(field.Key, field.Value.ReadString())));
+            }
+
+            found.Add(new EnvEntry(Read(entry, groupPath), tags, fields));
+        }
+
+        foreach (PwGroup child in group.Groups)
+        {
+            if (!ReferenceEquals(child, bin))
+            {
+                CollectEnvEntries(child, ChildPath(groupPath, child.Name), found, bin);
             }
         }
     }

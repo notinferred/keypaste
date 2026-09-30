@@ -295,6 +295,15 @@ jobs:
         shell: bash
         run: bash scripts/verify-keepassxc-fields.sh artifacts/compat/fields
 
+      # The projects gate asks the app's own prompt window, held by the app driver.
+      - name: Restore (locked) and build the app driver
+        if: env.COMPAT == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet restore tests/Keypaste.AppDriver/Keypaste.AppDriver.csproj --locked-mode
+          dotnet build tests/Keypaste.AppDriver/Keypaste.AppDriver.csproj --no-restore -c Release
+
       - name: Verify project tags and their protection through real KeePassXC
         if: env.COMPAT == 'true'
         shell: bash

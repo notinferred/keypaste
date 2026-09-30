@@ -336,6 +336,7 @@ public sealed class TerminalApprovalChannelTests
         Assert.Contains("project    billing", shown, StringComparison.Ordinal);
         Assert.Contains("profile    dev", shown, StringComparison.Ordinal);
         Assert.Contains("variables  DATABASE_URL STRIPE_KEY", shown, StringComparison.Ordinal);
+        Assert.Contains("from       env/billing/DATABASE_URL, env/billing/STRIPE_KEY", shown, StringComparison.Ordinal);
         Assert.Contains("command    npm run deploy", shown, StringComparison.Ordinal);
         Assert.Contains("in         /home/me/billing", shown, StringComparison.Ordinal);
         Assert.DoesNotContain("scrubbed", shown, StringComparison.Ordinal);

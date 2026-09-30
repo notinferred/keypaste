@@ -253,7 +253,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         Assert.Equal(0, _launcher.Calls);
         Assert.False(launch.IsConfirming);
         Assert.NotNull(screen.Error);
-        Assert.Contains("env/dev cannot be used, so nothing was started", screen.Error, StringComparison.Ordinal);
+        Assert.Contains("dev/dev cannot be used, so nothing was started", screen.Error, StringComparison.Ordinal);
         Assert.Contains("API_KEY expired", screen.Error, StringComparison.Ordinal);
         Assert.Contains("BAD-NAME is not a valid environment variable name", screen.Error, StringComparison.Ordinal);
         AssertNoValue(screen.Error, "the refusal");

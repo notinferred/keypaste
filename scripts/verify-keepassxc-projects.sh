@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # PERMANENT COMPATIBILITY GATE: project tags KeePassXC writes are the ones keypaste reads, and the
-# ones keypaste writes are the ones KeePassXC reads (C.1a). This is the tags half; the fields that
-# tagged entries release are C.1b's.
+# ones keypaste writes are the ones KeePassXC reads (C.1a); the fields of entries KeePassXC tagged
+# are the project's variables (C.1b).
 #
 # KeePassXC imports a KeePass XML document whose entries carry the tags env:billing,
 # env:billing:prod, env:billing:Prod and finance, under a group tagged env:billing:staging. KeePassXC
@@ -17,6 +17,17 @@
 # env:billing:prod, and one KeePassXC tagged env:billing:Prod through `keepassxc-cli merge`, are
 # offered Allow once only: the hour is refused and once is honoured.
 #
+# A third vault KeePassXC makes holds billing's legacy LEGACY_TOKEN and fields on entries tagged
+# env:billing, one also tagged env:billing:staging, and a staging entry also tagged env:billing:prod.
+# `keypaste run` gives a child exactly the tagged fields and the legacy variable, `env export` writes a
+# reference for each and `env diff` compares the environments' key names. A key on two entries, a
+# legacy Api_Key beside a tagged API_KEY, an expired member, {PASSWORD} in a value and a custom
+# PASSWORD field each start nothing and name their entries. `run --session` through a real
+# `keypaste agent`, and through the app's own prompt window held by tests/Keypaste.AppDriver on an
+# untouched copy, gets the same set after a prompt naming the source entries, and the staging set is
+# asked once only. A scoped token's run of the dev set is audited with its source entries, and its
+# staging set is refused because a member is also tagged env:billing:prod.
+#
 # NEGATIVE CONTROL: a corrupted expectation must fail the comparison the listing check rests on, and
 # the hour must be honoured for an entry no tag protects.
 #
@@ -25,6 +36,7 @@
 #         KPXC_CLI             path to keepassxc-cli                 (default: PATH lookup)
 #         KEYPASTE_BIN         path to the keypaste binary           (default: the Release build)
 #         KEYPASTE_MCP_BIN     path to the keypaste-mcp binary       (default: the Release build)
+#         KEYPASTE_APP_DRIVER  path to tests/Keypaste.AppDriver      (default: the Release build)
 set -euo pipefail
 
 . "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
@@ -36,6 +48,7 @@ dir=${1:-}
 require jq
 kp=$(keypaste_bin)
 mcp=$(keypaste_mcp)
+drv=$(app_driver)
 
 rm -rf "$dir"
 mkdir -p "$dir/home"
@@ -213,6 +226,220 @@ jq -e -s 'map(select(.method == "prompt")) | length == 4
           and .[0].decision == "granted" and .[1].decision == "denied"
           and .[2].decision == "granted" and .[3].decision == "denied"' <"$audit" >/dev/null \
   || die "the audit log does not show granted, denied, granted, denied: $(cat "$audit")"
+
+step "C.1b: KeePassXC makes a vault whose billing project is tagged entries' fields beside one legacy variable"
+child=${BASH:-/bin/bash}
+probe='printf "stripe=%s db=%s legacy=%s region=%s shared=%s" "${STRIPE_SECRET_KEY-unset}" "${DATABASE_URL-unset}" "${LEGACY_TOKEN-unset}" "${Region-unset}" "${SHARED_KEY-unset}"'
+# $1: extra <Entry> elements for services; $2: the Database entry's DATABASE_URL; $3: its <Times>; $4: extra legacy entries.
+fields_seed() {
+  cat <<EOF
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<KeePassFile>
+  <Meta><Generator>verify-keepassxc-projects</Generator><DatabaseName>f</DatabaseName></Meta>
+  <Root>
+    <Group>
+      <UUID>$(uuid froot)</UUID><Name>Root</Name>
+      <Group>
+        <UUID>$(uuid fenv)</UUID><Name>env</Name>
+        <Group>
+          <UUID>$(uuid fbilling)</UUID><Name>billing</Name>
+          <Entry>
+            <UUID>$(uuid flegacy)</UUID>
+            <String><Key>Title</Key><Value>LEGACY_TOKEN</Value></String>
+            <String><Key>Password</Key><Value ProtectInMemory="True">legacy-c1b</Value></String>
+          </Entry>
+          $4
+        </Group>
+      </Group>
+      <Group>
+        <UUID>$(uuid fservices)</UUID><Name>services</Name>
+        <Entry>
+          <UUID>$(uuid fstripe)</UUID>
+          <Tags>env:billing,finance</Tags>
+          <String><Key>Title</Key><Value>Stripe</Value></String>
+          <String><Key>Password</Key><Value ProtectInMemory="True">stripe-login-c1b</Value></String>
+          <String><Key>STRIPE_SECRET_KEY</Key><Value ProtectInMemory="True">stripe-c1b</Value></String>
+          <String><Key>Region</Key><Value>eu-c1b</Value></String>
+        </Entry>
+        <Entry>
+          <UUID>$(uuid fdatabase)</UUID>
+          <Tags>env:billing</Tags>
+          $3
+          <String><Key>Title</Key><Value>Database</Value></String>
+          <String><Key>Password</Key><Value ProtectInMemory="True">database-login-c1b</Value></String>
+          <String><Key>DATABASE_URL</Key><Value ProtectInMemory="True">$2</Value></String>
+        </Entry>
+        <Entry>
+          <UUID>$(uuid fshared)</UUID>
+          <Tags>env:billing:staging,env:billing:prod</Tags>
+          <String><Key>Title</Key><Value>Shared</Value></String>
+          <String><Key>Password</Key><Value ProtectInMemory="True">shared-login-c1b</Value></String>
+          <String><Key>SHARED_KEY</Key><Value ProtectInMemory="True">shared-c1b</Value></String>
+        </Entry>
+        $1
+      </Group>
+    </Group>
+  </Root>
+</KeePassFile>
+EOF
+}
+make_fields() { # name, then fields_seed's arguments
+  local name=$1; shift
+  fields_seed "$@" >"$dir/$name.xml"
+  printf '%s\n%s\n' "$pw" "$pw" | "$cli" import -q -p "$(native "$dir/$name.xml")" "$(native "$dir/$name.kdbx")" \
+    || die "keepassxc-cli could not import the $name seed"
+}
+fields="$dir/fields.kdbx"
+make_fields fields '' 'db-c1b' '' ''
+grep -qx 'env:billing' <<<"$(tags "$fields" services/Database)" || die "KeePassXC did not keep the Database entry's tag"
+[ "$(kx show "$fields" services/Stripe -a STRIPE_SECRET_KEY)" = stripe-c1b ] || die "KeePassXC does not read the tagged field"
+# The app's half runs on this copy, which no keypaste has written.
+app_fields="$dir/fields-app.kdbx"
+cp "$fields" "$app_fields"
+
+step "C.1b: keypaste run gives the child exactly the tagged fields and the legacy variable"
+out=$(printf '%s\n' "$pw" | "$kp" run billing --vault "$fields" -- "$child" -c "$probe" 2>"$dir/run.err" | tr -d '\r') \
+  || die "keypaste run failed: $(cat "$dir/run.err")"
+[ "$out" = "stripe=stripe-c1b db=db-c1b legacy=legacy-c1b region=unset shared=unset" ] || die "the child's environment was: ${out}"
+out=$(printf '%s\n' "$pw" | "$kp" run billing -p staging --vault "$fields" -- "$child" -c "$probe" 2>"$dir/run.err" | tr -d '\r') \
+  || die "keypaste run -p staging failed: $(cat "$dir/run.err")"
+[ "$out" = "stripe=unset db=unset legacy=unset region=unset shared=shared-c1b" ] || die "the staging child's environment was: ${out}"
+
+step "C.1b: env export writes a reference for each variable, and env diff compares the tagged environments"
+exported=$(kp_on "$fields" env export billing --stdout 2>/dev/null) || die "keypaste env export failed"
+for key in DATABASE_URL LEGACY_TOKEN STRIPE_SECRET_KEY; do
+  grep -qF "kp://billing/dev/${key}" <<<"$exported" || die "env export wrote no reference for ${key}: ${exported}"
+done
+grep -qF 'Region' <<<"$exported" && die "env export wrote a field that is not env-named"
+grep -qF -- '-c1b' <<<"$exported" && die "env export wrote a value"
+diffed=$(kp_on "$fields" env diff billing dev staging 2>/dev/null) || die "keypaste env diff failed"
+grep -qE 'SHARED_KEY +missing in dev' <<<"$diffed" || die "env diff did not find SHARED_KEY missing in dev: ${diffed}"
+grep -qE 'STRIPE_SECRET_KEY +missing in staging' <<<"$diffed" || die "env diff did not find STRIPE_SECRET_KEY missing in staging: ${diffed}"
+
+step "C.1b: each refusal starts nothing and names its entries"
+refused() { # name, expected text, then fields_seed's arguments
+  local name=$1 expected=$2 status err
+  shift 2
+  make_fields "$name" "$@"
+  set +e
+  out=$(printf '%s\n' "$pw" | "$kp" run billing --vault "$dir/$name.kdbx" -- "$child" -c "$probe" 2>"$dir/$name.err")
+  status=$?
+  set -e
+  err=$(tr -d '\r' <"$dir/$name.err")
+  [ "$status" = 2 ] || die "${name}: expected exit 2, got ${status}: ${err}"
+  [ -z "$out" ] || die "${name}: a child started: ${out}"
+  grep -qF "$expected" <<<"$err" || die "${name}: the refusal does not say '${expected}': ${err}"
+  grep -qF -- '-c1b' <<<"$err" && die "${name}: a value was printed: ${err}"
+  printf '    refused, nothing started: %s\n' "$name"
+}
+twin="<Entry><UUID>$(uuid ftwin)</UUID><Tags>env:billing</Tags><String><Key>Title</Key><Value>Twin</Value></String><String><Key>DATABASE_URL</Key><Value ProtectInMemory=\"True\">twin-c1b</Value></String></Entry>"
+refused two-entries 'DATABASE_URL is on more than one entry (services/Database, services/Twin)' "$twin" 'db-c1b' '' ''
+api="<Entry><UUID>$(uuid fapi)</UUID><Tags>env:billing</Tags><String><Key>Title</Key><Value>Api</Value></String><String><Key>API_KEY</Key><Value ProtectInMemory=\"True\">tagged-api-c1b</Value></String></Entry>"
+legacy_api="<Entry><UUID>$(uuid flapi)</UUID><String><Key>Title</Key><Value>Api_Key</Value></String><String><Key>Password</Key><Value ProtectInMemory=\"True\">legacy-api-c1b</Value></String></Entry>"
+refused case-pair "Api_Key differs only in case from 'API_KEY', which Windows treats as one variable (env/billing/Api_Key, services/Api)" "$api" 'db-c1b' '' "$legacy_api"
+refused expired 'DATABASE_URL expired 2020-01-02 03:04:05Z (services/Database)' '' 'db-c1b' \
+  '<Times><Expires>True</Expires><ExpiryTime>2020-01-02T03:04:05Z</ExpiryTime></Times>' ''
+refused placeholder 'DATABASE_URL holds the KeePass placeholder {PASSWORD}, which keypaste does not resolve (services/Database)' \
+  '' 'postgres://u:{PASSWORD}@db-c1b' '' ''
+custom="<Entry><UUID>$(uuid fcustom)</UUID><Tags>env:billing</Tags><String><Key>Title</Key><Value>Custom</Value></String><String><Key>Password</Key><Value ProtectInMemory=\"True\">custom-login-c1b</Value></String><String><Key>PASSWORD</Key><Value ProtectInMemory=\"True\">custom-field-c1b</Value></String></Entry>"
+refused standard-name 'PASSWORD is a custom field named like a standard one, which keypaste never releases (services/Custom)' \
+  "$custom" 'db-c1b' '' ''
+
+step "C.1b: a token scoped to billing's dev and staging sets, made before an agent holds the vault"
+token=$(printf '%s\n' "$pw" | "$kp" token create gate-ci --scope 'read:billing/dev/*,read:billing/staging/*' --vault "$(native "$fields")" 2>"$dir/token.err" | tr -d '\r') \
+  || die "keypaste token create failed: $(cat "$dir/token.err")"
+[ -n "$token" ] || die "keypaste token create printed no token: $(cat "$dir/token.err")"
+
+step "C.1b: run --session through a real keypaste agent names the source entries, and a set holding a prod-tagged member is asked once only"
+fields_pipe="keypaste-fields-$$-$(date +%s)"
+fields_err="$dir/fields-agent.err"
+cleanup_fields() {
+  cleanup
+  if [ -n "${fields_pid:-}" ]; then kill "$fields_pid" 2>/dev/null || true; fi
+  exec 7>&- 2>/dev/null || true
+}
+trap cleanup_fields EXIT
+# The hour for the dev run, then once for the staging run, whose Shared entry is also tagged env:billing:prod.
+printf '%s\nh\no\n' "$pw" | "$kp" agent --vault "$(native "$fields")" --approver "$fields_pipe" --approval-timeout 30 \
+  >/dev/null 2>"$fields_err" &
+fields_pid=$!
+for _ in $(seq 1 100); do
+  grep -q 'listening on' "$fields_err" && break
+  kill -0 "$fields_pid" 2>/dev/null || die "keypaste agent exited before it listened: $(cat "$fields_err")"
+  sleep 0.2
+done
+grep -q 'listening on' "$fields_err" || die "keypaste agent never started listening on the fields vault"
+
+out=$("$kp" run --session billing --vault "$(native "$fields")" --approver "$fields_pipe" -- "$child" -c "$probe" 2>"$dir/session-dev.err" | tr -d '\r') \
+  || die "run --session failed: $(cat "$dir/session-dev.err") / $(cat "$fields_err")"
+[ "$out" = "stripe=stripe-c1b db=db-c1b legacy=legacy-c1b region=unset shared=unset" ] || die "the session child's environment was: ${out}"
+from=$(grep -m1 '^  from ' <<<"$(tr -d '\r' <"$fields_err")" || true)
+for entry in services/Database env/billing/LEGACY_TOKEN services/Stripe; do
+  grep -qF "$entry" <<<"$from" || die "the agent's prompt does not name ${entry}: ${from}"
+done
+
+out=$("$kp" run --session billing -p staging --vault "$(native "$fields")" --approver "$fields_pipe" -- "$child" -c "$probe" 2>"$dir/session-staging.err" | tr -d '\r') \
+  || die "run --session -p staging failed: $(cat "$dir/session-staging.err") / $(cat "$fields_err")"
+[ "$out" = "stripe=unset db=unset legacy=unset region=unset shared=shared-c1b" ] || die "the staging session child's environment was: ${out}"
+grep -qF 'services/Shared' <<<"$(tr -d '\r' <"$fields_err")" || die "the agent's prompt does not name services/Shared"
+[ "$(tr -d '\r' <"$fields_err" | grep -c 'it is asked about every time')" = 1 ] \
+  || die "the staging set holding a prod-tagged member was not asked once only: $(cat "$fields_err")"
+grep -qF -- '-c1b' "$fields_err" && die "a value reached the agent's terminal"
+
+step "C.1b: the token's dev run is audited with its source entries, and its staging set, holding a prod-tagged member, is refused"
+out=$(KEYPASTE_TOKEN="$token" "$kp" run --token env --vault "$(native "$fields")" --approver "$fields_pipe" billing -- "$child" -c "$probe" 2>"$dir/token-dev.err" | tr -d '\r') \
+  || die "run --token failed: $(cat "$dir/token-dev.err") / $(cat "$fields_err")"
+[ "$out" = "stripe=stripe-c1b db=db-c1b legacy=legacy-c1b region=unset shared=unset" ] || die "the token child's environment was: ${out}"
+set +e
+out=$(KEYPASTE_TOKEN="$token" "$kp" run --token env --vault "$(native "$fields")" --approver "$fields_pipe" billing -p staging -- "$child" -c "$probe" 2>"$dir/token-staging.err")
+status=$?
+set -e
+[ "$status" -ne 0 ] || die "a token without allow-prod ran a set holding a prod-tagged member"
+[ -z "$out" ] || die "a child started for the refused token run: ${out}"
+grep -qF 'holds an entry of a protected environment' "$dir/token-staging.err" \
+  || die "the refused token run does not say why: $(cat "$dir/token-staging.err")"
+home_audit="$dir/home/audit.jsonl"
+jq -e -s 'map(select(.method == "token")) | length == 2
+          and .[0].decision == "granted" and .[0].entries == ["services/Database", "env/billing/LEGACY_TOKEN", "services/Stripe"]
+          and .[1].decision == "denied"' <"$home_audit" >/dev/null \
+  || die "the token runs' audit lines do not name the source entries: $(cat "$home_audit")"
+grep -qF -- '-c1b' "$home_audit" && die "a value reached the audit log"
+
+step "C.1b: run --session through the app's prompt window on the untouched KeePassXC vault names the source entries, and the staging set is asked once only"
+hold_out="$dir/hold.out"
+# fd 7 is the driver's standard input: a line answers the prompt drawn, and closing it shuts the app down.
+exec 7> >(KEYPASTE_DRIVER_PASSWORD="$pw" "$drv" hold "$(native "$app_fields")" >"$hold_out" 2>&1)
+DIE_FILES=hold_out
+wait_for 'holding session' "$hold_out" 1
+grep -q 'not served' "$hold_out" && die "the app unlocked the KeePassXC vault and did not serve it"
+
+# $1 names the case, $2 the prompt it must draw, $3 the answer, $4 what the child must print; the rest are run's arguments.
+app_run() {
+  local label=$1 drawn=$2 answer=$3 expected=$4 prompts line
+  shift 4
+  prompts=$(( $(grep -c '^env-prompt project=' "$hold_out" || true) + 1 ))
+  "$kp" run --session "$@" --vault "$(native "$app_fields")" -- "$child" -c "$probe" \
+    <<<"$pw" >"$dir/app-$label.out" 2>"$dir/app-$label.err" 7>&- &
+  local run_pid=$!
+  wait_for '^env-prompt project=' "$hold_out" "$prompts"
+  line=$(grep '^env-prompt project=' "$hold_out" | tail -1 | tr -d '\r')
+  case "$line" in
+    *" $drawn") ;;
+    *) die "${label}: the app's prompt does not end '${drawn}': ${line}" ;;
+  esac
+  echo "$answer" >&7
+  wait "$run_pid" || die "${label}: run --session through the app failed: $(cat "$dir/app-$label.err")"
+  [ "$(tr -d '\r' <"$dir/app-$label.out")" = "$expected" ] || die "${label}: the child's environment was: $(cat "$dir/app-$label.out")"
+  grep -qi 'password' "$dir/app-$label.err" && die "${label}: the runner asked for a password"
+  return 0
+}
+app_run dev 'keys=DATABASE_URL,LEGACY_TOKEN,STRIPE_SECRET_KEY entries=services/Database,env/billing/LEGACY_TOKEN,services/Stripe timed=True' \
+  approve "stripe=stripe-c1b db=db-c1b legacy=legacy-c1b region=unset shared=unset" billing
+app_run staging 'keys=SHARED_KEY entries=services/Shared timed=False' \
+  once "stripe=unset db=unset legacy=unset region=unset shared=shared-c1b" billing -p staging
+grep -qF -- '-c1b' "$hold_out" && die "a value reached the app's output"
+exec 7>&-
+wait_for '^shut down' "$hold_out" 1
 
 step "NEGATIVE CONTROL: the listing comparison must be able to fail"
 [ "$listed" = "${expected}-CORRUPTED" ] && die "a deliberately corrupted expectation still matched — this gate is not gating"

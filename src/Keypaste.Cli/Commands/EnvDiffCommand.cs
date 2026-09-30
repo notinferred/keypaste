@@ -94,17 +94,20 @@ internal static class EnvDiffCommand
                 return CliApp.ExitSuccess;
             }
 
+            // dev comes first when the project has it; a project known only from tags may not.
+            var first = names[0];
+
             if (names.Count == 1)
             {
-                context.Stdout.WriteLine($"  {Done(context)} '{Shown(project)}' has only the {EnvProfileNames.Default} profile");
+                context.Stdout.WriteLine($"  {Done(context)} '{Shown(project)}' has only the {first} profile");
                 return CliApp.ExitSuccess;
             }
 
             foreach (var other in names.Skip(1))
             {
                 context.Stdout.WriteLine(context.ConsoleStyle.Paint(
-                    context.Stdout, Tone.Muted, $"  {EnvProfileNames.Default} {context.ConsoleStyle.Glyph(context.Stdout, Mark.Dot)} {other}"));
-                Write(context, matrix, EnvProfileNames.Default, other);
+                    context.Stdout, Tone.Muted, $"  {first} {context.ConsoleStyle.Glyph(context.Stdout, Mark.Dot)} {other}"));
+                Write(context, matrix, first, other);
             }
 
             return CliApp.ExitSuccess;

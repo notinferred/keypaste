@@ -131,6 +131,33 @@ public sealed class SessionAuthorityRunTests : IDisposable
     }
 
     [Fact]
+    public async Task ATaggedField_IsNamedByItsEntryAndField_AndAProdTaggedMemberIsOnceOnly()
+    {
+        var stripe = new EntryName("personal", "stripe");
+        _vault.AddEntry(new VaultEntry { GroupPath = "personal", Title = "stripe", Password = "stripe-login" });
+        Assert.True(_vault.SetFields(stripe, [new FieldWrite("STRIPE_WEBHOOK", "webhook-sentinel")]));
+        Assert.True(_vault.AddTag(stripe, "env:acme-api"));
+        Assert.True(_vault.AddTag(stripe, "env:acme-api:prod"));
+        _vault.Save();
+
+        _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
+        await using var owner = Owner.Start(this);
+        await using var client = await AttachedAsync(owner);
+
+        var reply = await client.ReleaseRunAsync(Run(), Token);
+
+        Assert.NotNull(reply);
+        Assert.Equal(EnvOutcome.Resolved, reply.Set.Outcome);
+        Assert.Equal(["DATABASE_URL", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK"], reply.Set.Variables.Select(variable => variable.Key));
+        Assert.Equal(["env/acme-api/DATABASE_URL", "env/acme-api/STRIPE_SECRET_KEY", "personal/stripe"], reply.Entries);
+
+        var prompt = Assert.IsType<RunPrompt>(_fixture.Channel.LastRunPrompt);
+        Assert.Equal(new RunPromptVariable("STRIPE_WEBHOOK", "personal/stripe", "STRIPE_WEBHOOK"), prompt.Variables[2]);
+        Assert.Equal(0, prompt.GrantSeconds);
+        Assert.Equal(OnceOnly.ProtectedProfile, prompt.OnceOnly);
+    }
+
+    [Fact]
     public async Task ThePrompt_CarriesClientToolProgramCommandDirectoryVariablesAndReason()
     {
         _fixture.Channel.Answer = ApprovalAnswer.Denied;

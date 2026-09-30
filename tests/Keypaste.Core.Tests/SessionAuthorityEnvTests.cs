@@ -77,6 +77,42 @@ public sealed class SessionAuthorityEnvTests : IDisposable
     }
 
     [Fact]
+    public async Task A_tagged_field_joins_the_set_the_prompt_names_each_source_and_a_prod_tagged_member_is_asked_once_only()
+    {
+        var stripe = new EntryName("services", "Stripe");
+        _vault.AddEntry(new VaultEntry { GroupPath = "services", Title = "Stripe", Password = "stripe-login" });
+        Assert.True(_vault.SetFields(stripe, [new FieldWrite("STRIPE_KEY", "stripe-field-sentinel")]));
+        Assert.True(_vault.AddTag(stripe, "env:dev"));
+        _vault.Save();
+
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        await using var owner = Owner.Start(this);
+        await using var client = await AttachedAsync(owner);
+
+        var reply = await client.ReleaseEnvAsync(Request("session-one"), Token);
+
+        Assert.NotNull(reply);
+        Assert.Equal(EnvOutcome.Resolved, reply.Set.Outcome);
+        Assert.Equal(["DATABASE_URL", "STRIPE_KEY", "TOKEN"], reply.Set.Variables.Select(variable => variable.Key));
+        var prompt = Assert.IsType<EnvReleasePrompt>(_fixture.Channel.LastEnvPrompt);
+        Assert.Equal(["env/dev/DATABASE_URL", "services/Stripe", "env/dev/TOKEN"], prompt.Entries);
+        Assert.True(prompt.GrantSeconds > 0);
+        Assert.DoesNotContain("stripe-field-sentinel", prompt.ToString(), StringComparison.Ordinal);
+
+        Assert.True(_vault.AddTag(stripe, "env:dev:prod"));
+        _vault.Save();
+
+        await using var again = await AttachedAsync(owner);
+        var once = await again.ReleaseEnvAsync(Request("session-one", command: ["deploy", "--again"]), Token);
+
+        Assert.NotNull(once);
+        Assert.Equal(EnvOutcome.Resolved, once.Set.Outcome);
+        var asked = Assert.IsType<EnvReleasePrompt>(_fixture.Channel.LastEnvPrompt);
+        Assert.Equal(0, asked.GrantSeconds);
+        Assert.Contains("services/Stripe", asked.Entries);
+    }
+
+    [Fact]
     public async Task Deny_releases_nothing_and_the_same_run_right_after_is_refused_unasked()
     {
         _fixture.Channel.Answer = ApprovalAnswer.Denied;
@@ -374,6 +410,30 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         Assert.Equal(0, _fixture.Channel.LastEnvPrompt!.GrantSeconds);
         Assert.Equal(2, _fixture.Channel.Asked);
         Assert.Empty(grants.InForce());
+    }
+
+    [Fact]
+    public async Task AnHourAnswer_IsNotUsed_OnceAMemberIsTaggedIntoProd()
+    {
+        var stripe = new EntryName("services", "Stripe");
+        _vault.AddEntry(new VaultEntry { GroupPath = "services", Title = "Stripe", Password = "stripe-login" });
+        Assert.True(_vault.SetFields(stripe, [new FieldWrite("STRIPE_KEY", "stripe-field-sentinel")]));
+        Assert.True(_vault.AddTag(stripe, "env:dev"));
+        _vault.Save();
+        _fixture.Channel.Answer = ApprovalAnswer.Approved;
+        using var grants = new EnvGrantCache(_fixture.Clock);
+        var authority = EnvAuthority(grants);
+
+        var first = await RunAsync(authority, Request("session-one"));
+        Assert.True(_vault.AddTag(stripe, "env:dev:prod"));
+        _vault.Save();
+        var second = await RunAsync(authority, Request("session-one"));
+
+        Assert.Equal(EnvOutcome.Resolved, first.Set.Outcome);
+        Assert.Equal(EnvOutcome.Resolved, second.Set.Outcome);
+        Assert.Equal(2, _fixture.Channel.Asked);
+        Assert.Equal(0, _fixture.Channel.LastEnvPrompt!.GrantSeconds);
+        Assert.Single(grants.InForce());
     }
 
     [Fact]

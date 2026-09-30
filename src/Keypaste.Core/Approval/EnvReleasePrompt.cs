@@ -33,6 +33,9 @@ public sealed record EnvReleasePrompt
     /// <summary>The variable names, which are already exportable names.</summary>
     public required IReadOnlyList<string> Keys { get; init; }
 
+    /// <summary>The entry each key's value lives in, in <see cref="Keys"/> order, as <see cref="ApprovalPrompt.Shown"/> writes it.</summary>
+    public IReadOnlyList<string> Entries { get; init; } = [];
+
     /// <summary>The command, one line, arguments with spaces quoted.</summary>
     public required string Command { get; init; }
 
@@ -107,6 +110,8 @@ public sealed record EnvReleasePrompt
             Project = EntryNameSanitizer.Sanitize(preview.Project).Text,
             Profile = EntryNameSanitizer.Sanitize(preview.Profile).Text,
             Keys = preview.Keys,
+            Entries = [.. preview.Keys.Select((key, i) => ApprovalPrompt.Shown(
+                i < preview.Sources.Count ? preview.Sources[i].Entry : new EntryName(EnvProfileNames.GroupPath(preview.Project, preview.Profile), key)))],
             Command = shownCommand.Text,
             CommandWasAltered = shownCommand.WasAltered,
             Directory = shownDirectory.Text,

@@ -50,7 +50,7 @@ public sealed class EnvResolutionTests : IDisposable
         Assert.Empty(resolved.Variables);
         var problem = Assert.Single(resolved.Problems);
         Assert.Equal("OLD", problem.Key);
-        Assert.Equal("expired 2026-09-24 12:00:00Z", problem.Reason);
+        Assert.Equal("expired 2026-09-24 12:00:00Z (env/dev/OLD)", problem.Reason);
         AssertNoValue(resolved, "old-secret-value", "later-secret-value", "never-secret-value");
 
         _clock.Advance(TimeSpan.FromSeconds(1));
@@ -77,11 +77,11 @@ public sealed class EnvResolutionTests : IDisposable
         Assert.Empty(resolved.Variables);
         Assert.Equal(
             [
-                ("", "has no title to be its variable name"),
-                ("BAD-NAME", "is not a valid environment variable name: '-' is not allowed"),
-                ("TOKEN", "differs only in case from 'token', which Windows treats as one variable"),
-                ("TWICE", "is the name of more than one entry"),
-                ("token", "differs only in case from 'TOKEN', which Windows treats as one variable"),
+                ("", "has no title to be its variable name (env/dev/(unnamed))"),
+                ("BAD-NAME", "is not a valid environment variable name: '-' is not allowed (env/dev/BAD-NAME)"),
+                ("TOKEN", "differs only in case from 'token', which Windows treats as one variable (env/dev/TOKEN, env/dev/token)"),
+                ("TWICE", "is on more than one entry (env/dev/TWICE, env/dev/TWICE)"),
+                ("token", "differs only in case from 'TOKEN', which Windows treats as one variable (env/dev/TOKEN, env/dev/token)"),
             ],
             resolved.Problems.Select(p => (p.Key, p.Reason)));
         AssertNoValue(resolved, "good-value", "bad-value", "twice-1", "twice-2", "lower-value", "upper-value", "untitled-value");
@@ -227,7 +227,7 @@ public sealed class EnvResolutionTests : IDisposable
     }
 
     [Fact]
-    public void UnusableNamesTheProfileGroup()
+    public void UnusableNamesTheEnvironment()
     {
         using var vault = Saved(v =>
         {
@@ -238,7 +238,7 @@ public sealed class EnvResolutionTests : IDisposable
         var resolved = EnvResolution.Resolve(vault, "acme", "staging", _clock);
 
         Assert.Equal(EnvOutcome.Unusable, resolved.Outcome);
-        Assert.StartsWith("'env/acme/staging' cannot be used: OLD expired", resolved.Refusal, StringComparison.Ordinal);
+        Assert.StartsWith("'acme/staging' cannot be used: OLD expired", resolved.Refusal, StringComparison.Ordinal);
         AssertNoValue(resolved, "old-staging-value");
     }
 

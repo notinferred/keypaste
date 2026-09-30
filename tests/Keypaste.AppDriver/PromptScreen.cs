@@ -99,7 +99,8 @@ internal sealed class PromptScreen : IDisposable
         {
             EnvApprovalWindow =>
                 $"env-prompt project={Text(window, "ProjectText")} command={Text(window, "CommandText")} " +
-                $"directory={Text(window, "DirectoryText")} keys={string.Join(',', KeyNames(window))}",
+                $"directory={Text(window, "DirectoryText")} keys={string.Join(',', Classed(window, "key"))} " +
+                $"entries={string.Join(',', Classed(window, "entry"))} timed={window.FindControl<Button>("Approve")?.IsVisible == true}",
             RunApprovalWindow =>
                 $"run-prompt title={Text(window, "TitleText")} program={Text(window, "ProgramText")} " +
                 $"command={Text(window, "CommandText")} directory={Text(window, "DirectoryText")}",
@@ -121,9 +122,9 @@ internal sealed class PromptScreen : IDisposable
 
     private static string? Text(Window window, string name) => window.FindControl<TextBlock>(name)?.Text;
 
-    private static IEnumerable<string?> KeyNames(Window window) =>
+    private static IEnumerable<string?> Classed(Window window, string className) =>
         window.FindControl<ItemsControl>("KeysList")?.GetVisualDescendants().OfType<TextBlock>()
-            .Where(block => block.Classes.Contains("key")).Select(block => block.Text) ?? [];
+            .Where(block => block.Classes.Contains(className)).Select(block => block.Text) ?? [];
 
     private static Button Button(Window window, string name) =>
         window.FindControl<Button>(name) ?? throw new DriverException($"the prompt has no {name} button");

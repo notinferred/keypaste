@@ -21,7 +21,7 @@ internal sealed class EnvApprovalViewModel : PromptViewModel
         Profile = prompt.Profile;
         Requester = prompt.Requester ?? string.Empty;
         Title = $"{(prompt.Requester is null ? "keypaste run" : "A run")} wants {prompt.Keys.Count} secret{(prompt.Keys.Count == 1 ? string.Empty : "s")}";
-        KeyNames = prompt.Keys;
+        Keys = [.. prompt.Keys.Select((key, i) => new EnvApprovalKey(key, i < prompt.Entries.Count ? prompt.Entries[i] : string.Empty))];
         FileLines = string.Join(Environment.NewLine, prompt.FileLines);
         Command = prompt.Command;
         Directory = prompt.Directory;
@@ -41,10 +41,10 @@ internal sealed class EnvApprovalViewModel : PromptViewModel
     /// <summary>Who is asking when it is not the person's own run, or empty.</summary>
     internal string Requester { get; }
 
-    /// <summary>The variable names, which the prompt draws one row each with its tag.</summary>
-    internal IReadOnlyList<string> KeyNames { get; }
+    /// <summary>The variable names with the entry each comes from, which the prompt draws one row each with its tag.</summary>
+    internal IReadOnlyList<EnvApprovalKey> Keys { get; }
 
-    internal bool HasNoKeys => KeyNames.Count == 0;
+    internal bool HasNoKeys => Keys.Count == 0;
 
     /// <summary>What a reference file makes of the set, one line each, or empty.</summary>
     internal string FileLines { get; }
@@ -67,3 +67,8 @@ internal sealed class EnvApprovalViewModel : PromptViewModel
 
     protected override int TimedSeconds { get; }
 }
+
+/// <summary>One variable in a run's prompt: its name and the entry its value lives in.</summary>
+/// <param name="Key">The variable name.</param>
+/// <param name="Entry">The entry, as the prompt shows it.</param>
+internal sealed record EnvApprovalKey(string Key, string Entry);

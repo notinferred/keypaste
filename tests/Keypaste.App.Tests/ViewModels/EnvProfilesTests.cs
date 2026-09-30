@@ -112,6 +112,46 @@ public sealed class EnvProfilesTests : IDisposable
     }
 
     [Fact]
+    public void ExportedReferences_CarryTaggedKeys_AndATagOnlyEnvironmentsKeys()
+    {
+        var vault = _session.Unlocked!;
+        var stripe = new EntryName("services", "Stripe");
+        vault.AddEntry(new VaultEntry { GroupPath = "services", Title = "Stripe", Password = "stripe-login" });
+        Assert.True(vault.SetFields(stripe, [new FieldWrite("STRIPE_KEY", "stripe-sentinel")]));
+        Assert.True(vault.AddTag(stripe, "env:acme-api"));
+        Assert.True(vault.AddTag(stripe, "env:acme-api:staging"));
+        vault.Save();
+        using var screen = new EnvSetsViewModel(_session, _countdown);
+        var project = Open(screen);
+        var path = Path.Combine(_fixture.Home, EnvReferenceFile.FileName);
+
+        Assert.EndsWith(
+            "DATABASE_URL=kp://acme-api/dev/DATABASE_URL\nSTRIPE_KEY=kp://acme-api/dev/STRIPE_KEY\n",
+            project.ReferencePreview,
+            StringComparison.Ordinal);
+        Assert.StartsWith("Wrote 2 references", project.ExportReferences(path), StringComparison.Ordinal);
+        Assert.Equal(project.ReferencePreview, File.ReadAllText(path));
+
+        project.SelectedProfile = "staging";
+        Assert.EndsWith("\nSTRIPE_KEY=kp://acme-api/staging/STRIPE_KEY\n", project.ReferencePreview, StringComparison.Ordinal);
+        Assert.StartsWith("Wrote 1 reference", project.ExportReferences(path, replace: true), StringComparison.Ordinal);
+        Assert.Equal(project.ReferencePreview, File.ReadAllText(path));
+        Assert.DoesNotContain("stripe-sentinel", File.ReadAllText(path), StringComparison.Ordinal);
+
+        var twin = new EntryName("services", "Twin");
+        vault.AddEntry(new VaultEntry { GroupPath = "services", Title = "Twin", Password = "twin-login" });
+        Assert.True(vault.SetFields(twin, [new FieldWrite("STRIPE_KEY", "twin-sentinel")]));
+        Assert.True(vault.AddTag(twin, "env:acme-api:staging"));
+        vault.Save();
+        File.Delete(path);
+
+        Assert.Equal(
+            "STRIPE_KEY is on more than one entry (services/Stripe, services/Twin), so nothing was written.",
+            project.ExportReferences(path));
+        Assert.False(File.Exists(path));
+    }
+
+    [Fact]
     public void RunCommand_NamesTheProfile()
     {
         using var screen = new EnvSetsViewModel(_session, _countdown);

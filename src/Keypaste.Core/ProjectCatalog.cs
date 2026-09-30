@@ -25,7 +25,7 @@ public sealed record ProjectTagProblem(EntryName Entry, string Tag, string Probl
 /// <remarks>
 /// Only an entry's own tags count; a group's tags are never read. Entries in the recycle bin and in
 /// keypaste's own groups belong to no project. What this lists is membership, not variables: which
-/// fields of a member leave for a child is C.1b's resolution.
+/// fields of a member leave for a child is <see cref="EnvResolution"/>'s.
 /// </remarks>
 public sealed class ProjectCatalog
 {

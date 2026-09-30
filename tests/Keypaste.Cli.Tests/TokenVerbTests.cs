@@ -306,6 +306,33 @@ public sealed class TokenVerbTests : IDisposable
     }
 
     [Fact]
+    public void Bundle_RefusesASetHoldingAnEntryTaggedIntoProd()
+    {
+        using (var vault = Vault.Open(_harness.VaultPath, Master))
+        {
+            var deploy = new EntryName("services", "Deploy");
+            vault.AddEntry(new VaultEntry { GroupPath = "services", Title = "Deploy", Password = "deploy-login" });
+            Assert.True(vault.SetFields(deploy, [new FieldWrite("DEPLOY_KEY", "deploy-bundle-sentinel")]));
+            Assert.True(vault.AddTag(deploy, "env:acme-api:staging"));
+            Assert.True(vault.AddTag(deploy, "env:acme-api:prod"));
+            vault.Save();
+        }
+
+        var token = Mint(_harness, "ci-staging", "read:acme-api/staging/*");
+        Clear();
+
+        _harness.AssertExit(CliApp.ExitInternalError, Bundle(token));
+
+        Assert.Contains(
+            "keypaste token bundle: acme-api/staging holds an entry of a protected environment; a bundle opens without asking anybody, so it cannot carry it",
+            _harness.Err,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("deploy-bundle-sentinel", _harness.Out + _harness.Err, StringComparison.Ordinal);
+        Assert.False(File.Exists(BundlePath));
+        Assert.False(File.Exists(KeypasteHome.AuditPath(_harness.Directory)));
+    }
+
+    [Fact]
     public void Bundle_AnUnusableSet_NamesTheKeyAndWritesNothing()
     {
         var token = Mint(_harness, "ci-staging", "read:acme-api/staging/MISSING");

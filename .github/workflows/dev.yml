@@ -288,5 +288,7 @@ jobs:
           bash scripts/verify-keepassxc-organize.sh artifacts/compat/organize.kdbx
           bash scripts/verify-keepassxc-import.sh artifacts/compat/import
           bash scripts/verify-keepassxc-fields.sh artifacts/compat/fields
+          dotnet restore tests/Keypaste.AppDriver/Keypaste.AppDriver.csproj --locked-mode
+          dotnet build tests/Keypaste.AppDriver/Keypaste.AppDriver.csproj --no-restore -c Release
           bash scripts/verify-keepassxc-projects.sh artifacts/compat/projects
           bash scripts/verify-keepassxc-keyfile.sh artifacts/compat/keyfile.kdbx

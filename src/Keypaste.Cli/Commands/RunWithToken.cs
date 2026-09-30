@@ -242,11 +242,11 @@ internal static class RunWithToken
 
             case EnvOutcome.Unusable:
                 context.Stderr.WriteLine(
-                    $"keypaste run: '{EnvProfileNames.GroupPath(project, profile)}' cannot be used, so nothing was started:");
+                    $"keypaste run: '{project}/{profile}' cannot be used, so nothing was started:");
 
                 foreach (var problem in reply.Set.Problems)
                 {
-                    context.Stderr.WriteLine($"  {EntryNameSanitizer.Sanitize($"{EnvResolved.Display(problem.Key)} {problem.Reason}", 512).Text}");
+                    context.Stderr.WriteLine($"  {RunCommand.ProblemLine(problem)}");
                 }
 
                 return CliApp.ExitInternalError;

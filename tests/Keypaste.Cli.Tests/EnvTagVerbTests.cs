@@ -144,7 +144,7 @@ public sealed class EnvTagVerbTests : IDisposable
         _harness.AssertExit(CliApp.ExitSuccess, Run("env", "tag", "billing", "services/Stripe"));
 
         _harness.AssertExit(CliApp.ExitSuccess, Run("env", "ls", "billing"));
-        Assert.Equal("  dev\n    services/Stripe\n  prod  protected\n    services/Database\n", Out);
+        Assert.Equal("  dev\n    services/Stripe\n      STRIPE_SECRET_KEY\n  prod  protected\n    services/Database\n", Out);
 
         _harness.AssertExit(CliApp.ExitSuccess, Run("env", "ls", "billing", "-p", "prod"));
         Assert.Equal("  prod  protected\n    services/Database\n", Out);

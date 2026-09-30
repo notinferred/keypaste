@@ -54,7 +54,8 @@ public sealed class EnvMatrixTests : IDisposable
         var jwt = matrix.Row("JWT_SIGNING_KEY")!.Cells[1];
         Assert.Equal(EnvCellState.Unusable, jwt.State);
         Assert.Equal("staging", jwt.Profile);
-        Assert.Equal("expired 2026-09-01 00:00:00Z", jwt.Problem);
+        Assert.Equal("expired 2026-09-01 00:00:00Z (env/acme-api/staging/JWT_SIGNING_KEY)", jwt.Problem);
+        Assert.Equal([new EntryName("env/acme-api/staging", "JWT_SIGNING_KEY")], jwt.Sources);
 
         Assert.Null(matrix.Row("ABSENT"));
         Assert.Empty(EnvMatrix.Build(_vault, "absent", _clock).Rows);

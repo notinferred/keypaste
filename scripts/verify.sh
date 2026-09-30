@@ -374,10 +374,10 @@ profile_compat() {
   run bash scripts/verify-keepassxc-organize.sh artifacts/compat/local-organize.kdbx
   run bash scripts/verify-keepassxc-import.sh artifacts/compat/local-import
   run bash scripts/verify-keepassxc-fields.sh artifacts/compat/local-fields
+  prepare tests/Keypaste.AppDriver/Keypaste.AppDriver.csproj
   run bash scripts/verify-keepassxc-projects.sh artifacts/compat/local-projects
   run bash scripts/verify-keepassxc-keyfile.sh artifacts/compat/local-keyfile.kdbx
   run bash scripts/verify-keepassxc-xml-attach.sh artifacts/compat/local-xml-attach
-  prepare tests/Keypaste.AppDriver/Keypaste.AppDriver.csproj
   run bash scripts/verify-keepassxc-workflows.sh artifacts/compat/local-workflows
   run bash scripts/verify-keepassxc-first-run.sh artifacts/compat/local-first-run
 }

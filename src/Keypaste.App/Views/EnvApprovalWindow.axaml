@@ -74,13 +74,15 @@
       <Border Classes="prompt-list" Height="110">
         <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
           <StackPanel>
-            <ItemsControl Name="KeysList" ItemsSource="{Binding KeyNames}">
+            <ItemsControl Name="KeysList" ItemsSource="{Binding Keys}">
               <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="sys:String">
+                <DataTemplate x:DataType="vm:EnvApprovalKey">
                   <Border Classes="prompt-row" MinHeight="36" Padding="12,6">
-                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                      <TextBlock Classes="key" Text="{Binding}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12">
+                      <TextBlock Classes="key" Text="{Binding Key}" TextWrapping="Wrap" VerticalAlignment="Center" />
                       <TextBlock Grid.Column="1" Classes="tag" Text="inject only" VerticalAlignment="Center" />
+                      <TextBlock Grid.Row="1" Classes="entry" Text="{Binding Entry}" TextWrapping="Wrap" FontSize="11.5"
+                                 IsVisible="{Binding Entry, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                     </Grid>
                   </Border>
                 </DataTemplate>

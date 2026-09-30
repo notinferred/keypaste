@@ -686,6 +686,48 @@ public sealed class Vault : IDisposable
         }
     }
 
+    /// <summary><see cref="ReadSaved(out IReadOnlyList{VaultEntry}?, out IReadOnlyList{string}?)"/>, with each entry's tags and a tagged entry's variable fields.</summary>
+    /// <param name="snapshot">What projects are resolved from when the answer is <see cref="SavedRead.Current"/>, otherwise null.</param>
+    /// <returns>Whether the vault matches its file, and if not, why.</returns>
+    internal SavedRead ReadSavedEnv(out EnvSnapshot? snapshot)
+    {
+        snapshot = null;
+
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            if (_pending || _stamp is not { } stamp)
+            {
+                return SavedRead.Unsaved;
+            }
+
+            if (SourceSnapshot.Digest(Path) is not { } current)
+            {
+                return SavedRead.Unreadable;
+            }
+
+            if (!CryptographicOperations.FixedTimeEquals(stamp, current))
+            {
+                return SavedRead.ChangedOnDisk;
+            }
+
+            snapshot = new EnvSnapshot(_interop.ReadEnvEntries(), _interop.ReadGroupPaths());
+            return SavedRead.Current;
+        }
+    }
+
+    /// <summary>What projects are resolved from, as this vault holds it now, saved or not.</summary>
+    internal EnvSnapshot ReadEnvSnapshot()
+    {
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            return new EnvSnapshot(_interop.ReadEnvEntries(), _interop.ReadGroupPaths());
+        }
+    }
+
     /// <summary>
     /// Every entry whose title, group path, username or URL contains <paramref name="query"/>.
     /// </summary>

@@ -338,10 +338,6 @@ public sealed class SessionAuthority : IApproverHandler
         var fileLines = (request.FileLines ?? []).Select(ShownLine).ToList();
         var answer = ApprovalAnswer.NoChannel;
 
-        // Every release of a protected profile is asked about live: no timed grant is offered or used.
-        var liveOnly = EnvProfileNames.IsProtected(request.Profile);
-        var grantSeconds = liveOnly ? 0 : EnvGrantCache.GrantSeconds(environments.Gate.Limits);
-
         var resolver = new SessionEnvResolver(
             () => ReferenceEquals(Live(), admitted) ? admitted : null,
             environments.VaultFor,
@@ -353,11 +349,13 @@ public sealed class SessionAuthority : IApproverHandler
             request.Keys,
             async (preview, withdrawn) =>
             {
+                // A set holding a member of a protected environment is asked about live: no timed grant is offered or used.
+                var grantSeconds = preview.RequiresLiveApproval ? 0 : EnvGrantCache.GrantSeconds(environments.Gate.Limits);
                 var prompt = EnvReleasePrompt.For(preview, request.Command, request.Directory) with { GrantSeconds = grantSeconds, FileLines = fileLines };
 
                 // Names only: the resolver reads the set again after this, so a grant releases the
                 // latest saved values, and a changed name list is asked about again.
-                if (!liveOnly && environments.Grants?.TryUse(cooldownKey, preview.Keys, out var remaining) == true)
+                if (!preview.RequiresLiveApproval && environments.Grants?.TryUse(cooldownKey, preview.Keys, out var remaining) == true)
                 {
                     environments.Narrate?.Invoke(
                         $"released {prompt.Project}/{prompt.Profile} to `{prompt.Command}` from a timed grant ({(int)remaining.TotalSeconds}s left)");
@@ -378,7 +376,7 @@ public sealed class SessionAuthority : IApproverHandler
                         prompt.Command,
                         preview.Keys,
                         TimeSpan.FromSeconds(grantSeconds),
-                        entries: [.. preview.Keys.Select(key => new EntryName(EnvProfileNames.GroupPath(request.Project, request.Profile), key))]);
+                        entries: [.. preview.Sources.Select(source => source.Entry).Distinct()]);
                 }
 
                 return answer.Releases();
@@ -495,7 +493,7 @@ public sealed class SessionAuthority : IApproverHandler
 
         async ValueTask<bool> Confirm(EnvPreview preview, CancellationToken withdrawn)
         {
-            var entries = EntriesOf(preview, document, request);
+            var entries = EntriesOf(preview);
             shown = [.. entries.Select(entry => ApprovalPrompt.Shown(entry.Name))];
 
             // Exposure first, so a set outside it is refused as out of scope whatever its size (T-4).
@@ -517,7 +515,7 @@ public sealed class SessionAuthority : IApproverHandler
                 return false;
             }
 
-            var onceOnly = entries.Any(entry => _inner.RequiresLiveApproval(entry.Name))
+            var onceOnly = preview.RequiresLiveApproval || entries.Any(entry => _inner.RequiresLiveApproval(entry.Name))
                 ? OnceOnly.ProtectedProfile
                 : policy == ClientPolicy.AskEveryTime ? OnceOnly.ClientPolicy : OnceOnly.None;
             var grantSeconds = onceOnly == OnceOnly.None ? EnvGrantCache.GrantSeconds(environments.Gate.Limits) : 0;
@@ -629,34 +627,20 @@ public sealed class SessionAuthority : IApproverHandler
         return new RunReply(resolved, outcomeMethod, reason) { Entries = shown, Session = request.Session };
     }
 
-    /// <summary>Each entry of a released set, as every prompt and audit line writes it.</summary>
+    /// <summary>Each source entry of a released set, once, as every prompt and audit line writes it.</summary>
     private static List<string> EntriesOf(EnvResolved set) =>
-        [.. set.Variables.Select(variable => ApprovalPrompt.Shown(new EntryName(EnvProfileNames.GroupPath(set.Project, set.Profile), variable.Key)))];
+        [.. set.Entries.Select(ApprovalPrompt.Shown)];
 
     /// <summary>The most bytes a run line's <c>entries</c> may take, so the line fits after the person has answered.</summary>
     public const int MaximumAuditedEntriesBytes = 2048;
 
     /// <summary>The entry and field behind each name a run would inject, in the preview's order.</summary>
-    private static List<(EntryName Name, string Field)> EntriesOf(EnvPreview preview, EnvReferenceDocument? document, RunRequest request)
-    {
-        if (document is null)
-        {
-            var group = EnvProfileNames.GroupPath(request.Project!, request.Profile);
-            return [.. preview.Keys.Select(key => (new EntryName(group, key), "password"))];
-        }
-
-        var byName = document.Lines.ToDictionary(line => line.Name, line => line.Reference, StringComparer.Ordinal);
-
-        return
-        [
-            .. preview.Keys.Select(name => byName.GetValueOrDefault(name) switch
-            {
-                EnvReference env => (new EntryName(EnvProfileNames.GroupPath(env.Project, env.Profile), env.Key), "password"),
-                EntryReference entry => (entry.Entry, entry.Field),
-                _ => (new EntryName(string.Empty, name), "password"),
-            }),
-        ];
-    }
+    private static List<(EntryName Name, string Field)> EntriesOf(EnvPreview preview) =>
+    [
+        .. preview.Keys.Select(key => preview.Sources.FirstOrDefault(source => string.Equals(source.Key, key, StringComparison.Ordinal)) is { } source
+            ? (source.Entry, source.Field)
+            : (new EntryName(string.Empty, key), EnvSource.LegacyField)),
+    ];
 
     private static int AuditedLength(IReadOnlyList<string> entries)
     {
@@ -799,9 +783,7 @@ public sealed class SessionAuthority : IApproverHandler
         SessionEnvironments environments,
         CancellationToken cancellationToken)
     {
-        var liveOnly = EnvProfileNames.IsProtected(request.Profile);
-
-        if (!info.Covers(request.Project, request.Profile) || (liveOnly && !info.AllowProd))
+        if (!info.Covers(request.Project, request.Profile) || (EnvProfileNames.IsProtected(request.Profile) && !info.AllowProd))
         {
             return Refused(
                 request.Project,
@@ -819,8 +801,22 @@ public sealed class SessionAuthority : IApproverHandler
             environments.VaultFor,
             environments.Clock);
 
+        var needsProd = false;
+
+        // A set holding a member of a protected environment, by path or tag, needs the token to allow it and then a live answer.
         async ValueTask<bool> AskLive(EnvPreview preview, CancellationToken withdrawn)
         {
+            if (!preview.RequiresLiveApproval)
+            {
+                return true;
+            }
+
+            if (!info.AllowProd)
+            {
+                needsProd = true;
+                return false;
+            }
+
             var prompt = EnvReleasePrompt.For(preview, request.Command, request.Directory) with
             {
                 Requester = $"token '{EntryNameSanitizer.Sanitize(info.Name).Text}' ({info.Prefix})",
@@ -837,8 +833,17 @@ public sealed class SessionAuthority : IApproverHandler
             request.Project,
             request.Profile,
             info.KeysFor(request.Project, request.Profile),
-            liveOnly ? AskLive : null,
+            AskLive,
             cancellationToken).ConfigureAwait(false);
+
+        if (needsProd)
+        {
+            return Refused(
+                request.Project,
+                request.Profile,
+                EnvOutcome.Unauthorized,
+                $"the token's scope does not cover {request.Project}/{request.Profile}: it holds an entry of a protected environment");
+        }
 
         return new EnvReply(resolved, resolved.Outcome == EnvOutcome.Declined ? Declined(answer) : resolved.Refusal);
     }

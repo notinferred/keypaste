@@ -524,12 +524,11 @@ internal static class RunCommand
 
             case EnvOutcome.Unusable:
                 context.Stderr.WriteLine(
-                    $"keypaste run: '{EnvProfileNames.GroupPath(set.Project, set.Profile)}' cannot be used, so nothing was started:");
+                    $"keypaste run: '{set.Project}/{set.Profile}' cannot be used, so nothing was started:");
 
                 foreach (var problem in resolved.Problems)
                 {
-                    var line = $"{EnvResolved.Display(problem.Key)} {problem.Reason}";
-                    context.Stderr.WriteLine($"  {EntryNameSanitizer.Sanitize(line, 512).Text}");
+                    context.Stderr.WriteLine($"  {ProblemLine(problem)}");
                 }
 
                 context.Stderr.WriteLine("Fix or remove them in KeePassXC or the app, then run again.");
@@ -643,6 +642,10 @@ internal static class RunCommand
 
         return place.Length > KpReferences.Scheme.Length ? place : KpReferences.Scheme + "/";
     }
+
+    /// <summary>One variable a set refuses: its name as an entry title is shown, then why, with the entry paths and a placeholder's braces kept.</summary>
+    internal static string ProblemLine(EnvProblem problem) =>
+        $"{EntryNameSanitizer.Sanitize(EnvResolved.Display(problem.Key)).Text} {DisplayTextSanitizer.Sanitize(problem.Reason.Replace('\n', '\0'), 512).Text}";
 
     /// <summary>A literal line as the child gets it.</summary>
     private static string Written(ReferenceLine line) => $"{line.Name}={line.Literal}";
