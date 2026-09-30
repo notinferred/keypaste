@@ -1,4 +1,5 @@
 name: install
+# K.6b scoping probe.
 
 # Runs the install instructions from README.md on the operating system they are written for, against
 # the real published assets. The commands are not copied into this workflow or into the script it
