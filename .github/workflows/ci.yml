@@ -3,13 +3,25 @@ name: ci
 on:
   push:
     branches: [main]
-    # Keep pages checked by verify-demo.sh out of this list; docs/** would also skip them.
+    # Documents no script or test reads. Keep the pages verify-demo.sh checks out of this list;
+    # docs/** would also skip them.
     paths-ignore:
       - 'docs/PRODUCT.md'
       - 'CLAUDE.md'
+      - 'AGENTS.md'
+      - 'ROADMAP.md'
       - 'docs/STEPS.md'
       - 'docs/steps/**'
       - 'docs/ARCHITECTURE.md'
+      - 'docs/BACKLOG.md'
+      - 'docs/BRAND.md'
+      - 'docs/FEATURES.md'
+      - 'docs/decisions-archive.md'
+      - 'docs/diagnostics.md'
+      - 'docs/ui-review.md'
+      - 'docs/design/**'
+      - 'docs/screenshots/**'
+      - 'docs/demo/**'
       - 'DECISIONS.md'
       - 'CHANGELOG.md'
       - 'THREATS.md'
@@ -22,7 +34,20 @@ on:
       - 'docs/policy.md'
       - 'docs/approvals.md'
       - 'docs/desktop.md'
+      - '.claude/**'
       - 'site/README.md'
+      - 'site/package.json'
+      - 'site/package-lock.json'
+      - 'site/schema.sql'
+      - 'site/wrangler.jsonc'
+      - 'site/src/**'
+      - 'site/test/*.mjs'
+      - 'site/public/_headers'
+      - 'site/public/brand.css'
+      - 'site/public/favicon.svg'
+      - 'site/public/fonts/**'
+      - 'site/public/demo/**'
+      - 'site/public/s/**'
       - 'site/public/thanks/**'
   pull_request:
   workflow_dispatch:
@@ -42,8 +67,38 @@ env:
   NUGET_XMLDOC_MODE: skip
 
 jobs:
-  gate:
-    name: format + analyzers
+  # A pull request runs the lanes its diff from the merge base can break; every other event runs all of them.
+  scope:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      lanes: ${{ steps.plan.outputs.lanes }}
+      backend_os: ${{ steps.plan.outputs.backend_os }}
+      backend_tests: ${{ steps.plan.outputs.backend_tests }}
+      filter: ${{ steps.plan.outputs.filter }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Choose the lanes this change can break
+        id: plan
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = pull_request ]; then
+            bash scripts/verify.sh --since "origin/$BASE" --plan | tee -a "$GITHUB_OUTPUT"
+          else
+            bash scripts/verify.sh --all --plan | tee -a "$GITHUB_OUTPUT"
+          fi
+
+  checks:
+    name: scripts + workflows
+    needs: scope
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -53,89 +108,71 @@ jobs:
           # The release matrix verifier checks published targets against repository history.
           fetch-depth: 0
 
-      - name: Verify workflows before restoring or building
+      - name: Verify workflows
         shell: bash
         run: bash scripts/verify.sh workflows
 
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
-        with:
-          global-json-file: global.json
-          cache: true
-          cache-dependency-path: '**/packages.lock.json'
-
-      - name: Restore, format and build with the local verifier
+      - name: Run the offline script fixtures
+        if: contains(format(' {0} ', needs.scope.outputs.lanes), ' scripts ')
         shell: bash
-        run: bash scripts/verify.sh backend --prepare-only
+        run: bash scripts/verify.sh scripts
 
-      - name: Verify the release destination check fails closed
+      - name: Verify the release destination check fails closed against the real aws CLI
+        if: contains(format(' {0} ', needs.scope.outputs.lanes), ' scripts ')
         shell: bash
         run: scripts/verify-release-destination.sh --with-real-aws
 
-      - name: Verify the release preflight refuses a release that is not whole
-        shell: bash
-        run: scripts/verify-release-preflight.sh
-
-      - name: Verify the green-gate check refuses a commit whose gates are not green
-        shell: bash
-        run: scripts/verify-green-gates.sh
-
-      - name: Verify the change map selects every lane a changed path can break
-        shell: bash
-        run: scripts/verify-ci-scope.sh
-
-      - name: Verify one release definition answers for every target
-        shell: bash
-        run: scripts/verify-release-matrix.sh
-
-      # Live-origin checks run separately because this workflow cannot repair the deployed site.
-      - name: Verify the disclosure reader survives a jq that writes CRLF
-        shell: bash
-        run: scripts/verify-site-disclosure.sh --selftest
-
-      - name: Verify a published release is refused unless the public bytes say it is whole
-        shell: bash
-        run: scripts/verify-release-completion.sh
-
-      - name: Verify the provenance check refuses a release this workflow did not attest
-        shell: bash
-        run: scripts/verify-provenance.sh --selftest
-
-      - name: Verify Windows signing fails closed and signs only through the pinned dlib or a rehearsal
-        shell: bash
-        run: scripts/sign-windows.sh --selftest
-
-      - name: Verify the Windows signature check refuses an untrusted, untimestamped or changed file
-        shell: bash
-        run: scripts/verify-windows-signature.sh --selftest
-
   test:
     name: test (${{ matrix.os }})
-    needs: gate
+    needs: scope
+    if: needs.scope.outputs.backend_os != '[]'
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2025, macos-15]
+        os: ${{ fromJSON(needs.scope.outputs.backend_os) }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 45
+    env:
+      BACKEND_TESTS: ${{ needs.scope.outputs.backend_tests }}
+      FILTER: ${{ needs.scope.outputs.filter }}
+      INTEGRATION: ${{ contains(format(' {0} ', needs.scope.outputs.lanes), ' integration ') }}
+      PAGES: ${{ contains(format(' {0} ', needs.scope.outputs.lanes), ' pages ') }}
+      COMPAT: ${{ contains(format(' {0} ', needs.scope.outputs.lanes), ' compat ') }}
+      # KeePassXC's Windows console encoding can alter a non-ASCII master password.
+      KP_COMPAT_PASSWORD: ci-master-pw
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
 
+      # The solution joins the key so this cache never overwrites app.yml's.
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: global.json
           cache: true
-          cache-dependency-path: '**/packages.lock.json'
+          cache-dependency-path: |
+            **/packages.lock.json
+            keypaste.slnx
 
-      - name: Restore (locked)
-        run: dotnet restore keypaste.slnx --locked-mode
-
-      - name: Build
-        run: dotnet build keypaste.slnx --no-restore -c Release
+      # The process gates start the CLI and the bridge, so they need the whole solution built.
+      - name: Restore, format and build once
+        shell: bash
+        run: |
+          set -euo pipefail
+          set --
+          if [ "$BACKEND_TESTS" != all ] && [ "$INTEGRATION$PAGES$COMPAT" = falsefalsefalse ]; then
+            for p in $BACKEND_TESTS; do set -- "$@" --project "$p"; done
+          fi
+          bash scripts/verify.sh backend --prepare-only "$@"
 
       - name: Test
-        run: dotnet test keypaste.slnx --no-build -c Release
+        if: env.BACKEND_TESTS != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          set --
+          if [ "$BACKEND_TESTS" != all ]; then for p in $BACKEND_TESTS; do set -- "$@" --project "$p"; done; fi
+          bash scripts/verify.sh backend --test-only "$@" ${FILTER:+--filter-class "$FILTER"}
 
       - name: Verify the Windows PowerShell launcher selects Git Bash
         if: runner.os == 'Windows'
@@ -143,41 +180,129 @@ jobs:
         run: ./scripts/verify.ps1 --list
 
       - name: Verify run injects a variable and writes nothing to disk
+        if: env.INTEGRATION == 'true'
         shell: bash
         run: scripts/verify-run-injection.sh
 
       # The Unix signal verifier has no Windows equivalent; SECURITY.md records that coverage gap.
       - name: Verify run forwards signals and exit codes
-        if: runner.os != 'Windows'
+        if: env.INTEGRATION == 'true' && runner.os != 'Windows'
         shell: bash
         run: scripts/verify-run-signals.sh
 
       - name: Verify keypaste-mcp speaks MCP over stdio and audits every call
+        if: env.INTEGRATION == 'true'
         shell: bash
         run: scripts/verify-mcp-stdio.sh
 
       - name: Verify a person can approve and refuse across two real processes
+        if: env.INTEGRATION == 'true'
         shell: bash
         run: scripts/verify-approval-e2e.sh
 
       # A surviving agent process can hold the step open after its assertions finish.
       - name: Verify a policy rule grants without a prompt, and only inside its pattern
+        if: env.INTEGRATION == 'true'
         shell: bash
         timeout-minutes: 8
         run: scripts/verify-policy-e2e.sh
 
       - name: Verify the audit chain catches tampering and forgives a crash
+        if: env.INTEGRATION == 'true'
         shell: bash
         run: scripts/verify-log-chain.sh
 
       - name: Verify the demo page still matches what the binaries print
+        if: env.INTEGRATION == 'true' || env.PAGES == 'true'
         shell: bash
         timeout-minutes: 8
         run: scripts/verify-demo.sh
 
+      # PRODUCT law 4.6 and D-0008 require this blocking gate on all three operating systems.
+      - name: Install keepassxc-cli (Linux)
+        if: env.COMPAT == 'true' && runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends keepassxc
+
+      - name: Install keepassxc-cli (macOS)
+        if: env.COMPAT == 'true' && runner.os == 'macOS'
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+          HOMEBREW_NO_INSTALL_CLEANUP: '1'
+        run: brew install --cask keepassxc
+
+      - name: Install keepassxc-cli (Windows)
+        if: env.COMPAT == 'true' && runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "KPXC_CLI=$(bash scripts/install-keepassxc-windows.sh)" >> "$GITHUB_ENV"
+
+      - name: Generate the fixture vault with the keypaste binary
+        if: env.COMPAT == 'true'
+        shell: bash
+        run: scripts/make-compat-fixture.sh artifacts/compat/gen.kdbx
+
+      - name: Verify it opens in real KeePassXC
+        if: env.COMPAT == 'true'
+        shell: bash
+        run: scripts/verify-keepassxc-compat.sh artifacts/compat/gen.kdbx
+
+      - name: Verify the write-back round trip through real KeePassXC
+        if: env.COMPAT == 'true'
+        shell: bash
+        run: bash scripts/verify-keepassxc-writeback.sh artifacts/compat/writeback.kdbx
+
+      - name: Verify a restored revision and its history through real KeePassXC
+        if: env.COMPAT == 'true'
+        shell: bash
+        run: bash scripts/verify-keepassxc-history.sh artifacts/compat/history.kdbx
+
+      - name: Verify reversible deletion and recovery through real KeePassXC
+        if: env.COMPAT == 'true'
+        shell: bash
+        run: bash scripts/verify-keepassxc-recyclebin.sh artifacts/compat/recyclebin.kdbx
+
+      - name: Verify run refuses an expired or misnamed entry KeePassXC made
+        if: env.COMPAT == 'true'
+        shell: bash
+        run: bash scripts/verify-keepassxc-run.sh artifacts/compat/run
+
+      - name: Verify the backup a save keeps, a restore and an export through real KeePassXC
+        if: env.COMPAT == 'true'
+        shell: bash
+        run: bash scripts/verify-keepassxc-backup.sh artifacts/compat/backup.kdbx
+
+      - name: Verify renaming and moving through real KeePassXC
+        if: env.COMPAT == 'true'
+        shell: bash
+        run: bash scripts/verify-keepassxc-organize.sh artifacts/compat/organize.kdbx
+
+      - name: Verify importing a KeePassXC vault through real KeePassXC
+        if: env.COMPAT == 'true'
+        shell: bash
+        run: bash scripts/verify-keepassxc-import.sh artifacts/compat/import
+
+      - name: Verify custom fields through real KeePassXC
+        if: env.COMPAT == 'true'
+        shell: bash
+        run: bash scripts/verify-keepassxc-fields.sh artifacts/compat/fields
+
+      - name: Verify project tags and their protection through real KeePassXC
+        if: env.COMPAT == 'true'
+        shell: bash
+        run: bash scripts/verify-keepassxc-projects.sh artifacts/compat/projects
+
+      - name: Verify opening a keyfile-protected vault through real KeePassXC
+        if: env.COMPAT == 'true'
+        shell: bash
+        run: bash scripts/verify-keepassxc-keyfile.sh artifacts/compat/keyfile.kdbx
+
   aot:
     name: aot publish (linux-x64)
-    needs: gate
+    needs: scope
+    if: contains(format(' {0} ', needs.scope.outputs.lanes), ' aot ')
     # NativeAOT inherits the build machine's glibc floor, which must match release.yml.
     runs-on: ubuntu-22.04
     timeout-minutes: 25
@@ -193,7 +318,9 @@ jobs:
         with:
           global-json-file: global.json
           cache: true
-          cache-dependency-path: '**/packages.lock.json'
+          cache-dependency-path: |
+            **/packages.lock.json
+            keypaste.slnx
 
       - name: Install the native toolchain
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang zlib1g-dev
@@ -266,101 +393,22 @@ jobs:
           scripts/verify-keepassxc-xml-attach.sh artifacts/compat/aot-xml-attach
           scripts/verify-keepassxc-keyfile.sh artifacts/compat/aot-keyfile.kdbx
 
-  # PRODUCT law 4.6 and D-0008 require this blocking gate on all three operating systems.
-  compat:
-    name: keepassxc compat (${{ matrix.os }})
-    needs: gate
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, windows-2025, macos-15]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
-    env:
-      # KeePassXC's Windows console encoding can alter a non-ASCII master password.
-      KP_COMPAT_PASSWORD: ci-master-pw
-      KDBX: artifacts/compat/gen.kdbx
+  # The one check a pull request needs green: a skipped job passes, a failed or cancelled one does not.
+  ok:
+    name: ci ok
+    if: always()
+    needs: [scope, checks, test, aot]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
-        with:
-          global-json-file: global.json
-          cache: true
-          cache-dependency-path: '**/packages.lock.json'
-
-      - name: Install keepassxc-cli (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends keepassxc
-
-      - name: Install keepassxc-cli (macOS)
-        if: runner.os == 'macOS'
-        env:
-          HOMEBREW_NO_AUTO_UPDATE: '1'
-          HOMEBREW_NO_INSTALL_CLEANUP: '1'
-        run: brew install --cask keepassxc
-
-      - name: Install keepassxc-cli (Windows)
-        if: runner.os == 'Windows'
+      - name: Fail when any job failed or was cancelled
         shell: bash
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
         run: |
           set -euo pipefail
-          echo "KPXC_CLI=$(bash scripts/install-keepassxc-windows.sh)" >> "$GITHUB_ENV"
-
-      - name: Restore (locked)
-        run: dotnet restore keypaste.slnx --locked-mode
-
-      - name: Build
-        run: dotnet build keypaste.slnx --no-restore -c Release
-
-      - name: Generate the fixture vault with the keypaste binary
-        shell: bash
-        run: scripts/make-compat-fixture.sh "${{ env.KDBX }}"
-
-      - name: Verify it opens in real KeePassXC
-        shell: bash
-        run: scripts/verify-keepassxc-compat.sh "${{ env.KDBX }}"
-
-      - name: Verify the write-back round trip through real KeePassXC
-        shell: bash
-        run: bash scripts/verify-keepassxc-writeback.sh artifacts/compat/writeback.kdbx
-
-      - name: Verify a restored revision and its history through real KeePassXC
-        shell: bash
-        run: bash scripts/verify-keepassxc-history.sh artifacts/compat/history.kdbx
-
-      - name: Verify reversible deletion and recovery through real KeePassXC
-        shell: bash
-        run: bash scripts/verify-keepassxc-recyclebin.sh artifacts/compat/recyclebin.kdbx
-
-      - name: Verify run refuses an expired or misnamed entry KeePassXC made
-        shell: bash
-        run: bash scripts/verify-keepassxc-run.sh artifacts/compat/run
-
-      - name: Verify the backup a save keeps, a restore and an export through real KeePassXC
-        shell: bash
-        run: bash scripts/verify-keepassxc-backup.sh artifacts/compat/backup.kdbx
-
-      - name: Verify renaming and moving through real KeePassXC
-        shell: bash
-        run: bash scripts/verify-keepassxc-organize.sh artifacts/compat/organize.kdbx
-
-      - name: Verify importing a KeePassXC vault through real KeePassXC
-        shell: bash
-        run: bash scripts/verify-keepassxc-import.sh artifacts/compat/import
-
-      - name: Verify custom fields through real KeePassXC
-        shell: bash
-        run: bash scripts/verify-keepassxc-fields.sh artifacts/compat/fields
-
-      - name: Verify project tags and their protection through real KeePassXC
-        shell: bash
-        run: bash scripts/verify-keepassxc-projects.sh artifacts/compat/projects
-
-      - name: Verify opening a keyfile-protected vault through real KeePassXC
-        shell: bash
-        run: bash scripts/verify-keepassxc-keyfile.sh artifacts/compat/keyfile.kdbx
+          echo "$RESULTS"
+          if jq -e 'any(.[]; . == "failure" or . == "cancelled")' <<< "$RESULTS" > /dev/null; then
+            echo "::error::a required job failed or was cancelled"
+            exit 1
+          fi

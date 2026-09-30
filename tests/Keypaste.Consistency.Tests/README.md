@@ -8,7 +8,7 @@ Putting it in `keypaste.slnx` would bring Avalonia into ordinary backend restore
 
 A measurement on 2026-07-28 found desktop restore size increased from 2091 MB to 2580 MB when the CLI joined the solution. That historical measurement explains the separation; it is not a current benchmark.
 
-`.github/workflows/app.yml` uses the shared `desktop` verification profile to restore, format, build and run this project and the desktop solution on every qualifying workflow run, including pushes that touch `Keypaste.Core`. After the gate, the workflow packages on three operating systems. Its YAML owns the exact triggers.
+`.github/workflows/app.yml` uses the shared `desktop` verification profile to restore, format, build and run this project and the desktop solution on every run whose changes can reach them, including changes to `Keypaste.Core`, and packages on three operating systems beside that gate. Its YAML owns the exact triggers.
 
 From the repository root, run the same desktop and consistency checks locally:
 

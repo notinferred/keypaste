@@ -269,7 +269,7 @@ jobs:
           set -euo pipefail
           echo "KPXC_CLI=$(bash scripts/install-keepassxc-windows.sh)" >> "$GITHUB_ENV"
 
-      # The same build and scripts as ci.yml's compat job.
+      # The same scripts as ci.yml's compat steps.
       - name: Run the KeePassXC compat gate
         if: needs.plan.outputs.gates == 'compat' || needs.plan.outputs.gates == 'both'
         env:
