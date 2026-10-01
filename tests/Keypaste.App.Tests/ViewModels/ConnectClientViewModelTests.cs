@@ -1,4 +1,3 @@
-using System.IO.Pipes;
 using System.Text;
 using System.Text.Json.Nodes;
 using Keypaste.App.Session;
@@ -257,6 +256,20 @@ public sealed class ConnectClientViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task The_scripted_bridge_answers_within_the_checks_own_call()
+    {
+        using var bridge = new ScriptedBridge(["env/ci/DEPLOY_KEY"]);
+        await using var check = bridge.Check();
+
+        var listing = check.ListAsync(Token);
+
+        Assert.True(listing.IsCompleted, "the scripted listing did not finish inside ListAsync");
+        var listed = await listing;
+        Assert.Null(listed.Problem);
+        Assert.Equal("env/ci/DEPLOY_KEY", Assert.Single(listed.Entries).Name);
+    }
+
+    [Fact]
     public async Task Closing_the_screen_while_the_check_waits_ends_its_bridge()
     {
         var model = await ConnectedAsync("env/ci/DEPLOY_KEY", "env/ci/OTHER");
@@ -313,17 +326,16 @@ public sealed class ConnectClientViewModelTests : IDisposable
         }
     }
 
-    /// <summary>A bridge that lists what it is given and approves every request, over anonymous pipes.</summary>
+    /// <summary>A bridge that lists what it is given and approves every request, inside the write that asks.</summary>
     private sealed class ScriptedBridge : IDisposable
     {
-        private readonly AnonymousPipeServerStream _toBridge = new(PipeDirection.Out);
-        private readonly AnonymousPipeServerStream _fromBridge = new(PipeDirection.In);
+        private readonly ScriptedBridgeChannels _channels = new();
         private readonly string[] _listed;
 
         internal ScriptedBridge(string[] listed)
         {
             _listed = listed;
-            Serving = Task.Run(ServeAsync);
+            Serving = ServeAsync();
         }
 
         internal Task Serving { get; }
@@ -332,14 +344,12 @@ public sealed class ConnectClientViewModelTests : IDisposable
 
         internal bool Ended { get; private set; }
 
-        internal McpConnectionCheck Check() => new(_toBridge, _fromBridge);
+        internal McpConnectionCheck Check() => _channels.Check();
 
         private async Task ServeAsync()
         {
-            using var reads = new AnonymousPipeClientStream(PipeDirection.In, _toBridge.ClientSafePipeHandle);
-            using var writes = new AnonymousPipeClientStream(PipeDirection.Out, _fromBridge.ClientSafePipeHandle);
-            using var reader = new StreamReader(reads, new UTF8Encoding(false));
-            using var writer = new StreamWriter(writes, new UTF8Encoding(false)) { AutoFlush = true };
+            using var reader = new StreamReader(_channels.BridgeReads, new UTF8Encoding(false));
+            using var writer = new StreamWriter(_channels.BridgeWrites, new UTF8Encoding(false)) { AutoFlush = true };
 
             while (await reader.ReadLineAsync() is { } line)
             {
@@ -385,9 +395,9 @@ public sealed class ConnectClientViewModelTests : IDisposable
 
         public void Dispose()
         {
-            _toBridge.Dispose();
+            _channels.ToBridge.Dispose();
             Serving.Wait(TimeSpan.FromSeconds(10));
-            _fromBridge.Dispose();
+            _channels.Dispose();
         }
     }
 }

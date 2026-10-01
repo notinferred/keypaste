@@ -11,7 +11,8 @@ namespace Keypaste.Core.Tests;
 /// What the connection check sends a bridge, and what it keeps of the answers.
 /// </summary>
 /// <remarks>
-/// A scripted bridge over real pipes. That the check speaks what the real server accepts is
+/// A scripted bridge over in-memory pipes, and a silent one over real anonymous pipes for the
+/// deadlines and an exit. That the check speaks what the real server accepts is
 /// <c>ConnectionCheckTests</c> in the bridge's own tests; these cover the order, the timeouts and
 /// what happens to a released value.
 /// </remarks>
@@ -51,8 +52,7 @@ public sealed class McpConnectionCheckTests
         await using var bridge = new ScriptedBridge();
         await using var check = bridge.Check();
 
-        var listing = await check.ListAsync(Token);
-        var answer = await check.RequestAsync(listing.Entries[0], Token);
+        var answer = await check.RequestAsync(Listed(await check.ListAsync(Token))[0], Token);
 
         Assert.Equal(McpCheckOutcome.Granted, answer.Outcome);
         Assert.DoesNotContain(_secret, answer.ToString(), StringComparison.Ordinal);
@@ -65,7 +65,7 @@ public sealed class McpConnectionCheckTests
         await using var bridge = new ScriptedBridge { Deny = true };
         await using var check = bridge.Check();
 
-        var answer = await check.RequestAsync((await check.ListAsync(Token)).Entries[0], Token);
+        var answer = await check.RequestAsync(Listed(await check.ListAsync(Token))[0], Token);
 
         Assert.Equal(McpCheckOutcome.Denied, answer.Outcome);
         Assert.Equal("keypaste: DENIED. A person refused this request.", answer.Said);
@@ -89,29 +89,42 @@ public sealed class McpConnectionCheckTests
         await using var bridge = new ScriptedBridge { ExitOnRequest = true };
         await using var check = bridge.Check();
 
-        var answer = await check.RequestAsync((await check.ListAsync(Token)).Entries[0], Token);
+        var answer = await check.RequestAsync(Listed(await check.ListAsync(Token))[0], Token);
 
         Assert.Equal(McpCheckOutcome.Failed, answer.Outcome);
         Assert.Equal("the bridge exited without answering", answer.Said);
     }
 
     [Fact]
+    public async Task A_listing_nobody_answers_fails_at_the_step_timeout_and_a_closed_pipe_is_an_exit()
+    {
+        var clock = new ManualClock();
+        using var bridge = new SilentBridge(clock, McpConnectionCheck.StepTimeout);
+        await using var check = new McpConnectionCheck(bridge.ToBridge, bridge.FromBridge, clock);
+
+        var listing = await bridge.Watch(check.ListAsync(Token));
+
+        Assert.Equal("initialize", bridge.Method);
+        Assert.True(bridge.PendingAtTheLastSecond);
+        Assert.Empty(listing.Entries);
+        Assert.Equal("the bridge did not answer within 10 seconds", listing.Problem);
+
+        bridge.Exit();
+
+        Assert.Equal("the bridge exited without answering", (await check.ListAsync(Token)).Problem);
+    }
+
+    [Fact]
     public async Task A_request_nobody_answers_fails_at_its_deadline()
     {
         var clock = new ManualClock();
-        await using var bridge = new ScriptedBridge { SilentOnRequest = true };
-        await using var check = bridge.Check(clock);
+        using var bridge = new SilentBridge(clock, McpConnectionCheck.RequestTimeout);
+        await using var check = new McpConnectionCheck(bridge.ToBridge, bridge.FromBridge, clock);
 
-        var listing = await check.ListAsync(Token);
-        var pending = check.RequestAsync(listing.Entries[0], Token);
-        await bridge.RequestArrived.Task.WaitAsync(Token);
+        var answer = await bridge.Watch(check.RequestAsync(new McpListedEntry("k1_first", "env/ci/DEPLOY_KEY"), Token));
 
-        clock.Advance(McpConnectionCheck.RequestTimeout - TimeSpan.FromSeconds(1));
-        Assert.False(pending.IsCompleted);
-
-        clock.Advance(TimeSpan.FromSeconds(1));
-        var answer = await pending.WaitAsync(Token);
-
+        Assert.Equal("tools/call", bridge.Method);
+        Assert.True(bridge.PendingAtTheLastSecond);
         Assert.Equal(McpCheckOutcome.Failed, answer.Outcome);
         Assert.Equal("no answer within 60 seconds", answer.Said);
     }
@@ -122,26 +135,37 @@ public sealed class McpConnectionCheckTests
         await using var bridge = new ScriptedBridge { NotifyFirst = true };
         await using var check = bridge.Check();
 
-        var listing = await check.ListAsync(Token);
-
-        Assert.Equal(2, listing.Entries.Count);
+        Assert.Equal(2, Listed(await check.ListAsync(Token)).Count);
     }
 
-    /// <summary>A bridge that answers from a script over a pair of anonymous pipes.</summary>
+    [Fact]
+    public async Task The_scripted_bridge_answers_within_the_checks_own_call()
+    {
+        await using var bridge = new ScriptedBridge();
+        await using var check = bridge.Check();
+
+        var listing = check.ListAsync(Token);
+
+        Assert.True(listing.IsCompleted, "the scripted listing did not finish inside ListAsync");
+        Assert.Equal(2, Listed(await listing).Count);
+    }
+
+    private static IReadOnlyList<McpListedEntry> Listed(McpCheckListing listing)
+    {
+        Assert.Null(listing.Problem);
+        return listing.Entries;
+    }
+
+    /// <summary>A bridge that answers from a script, inside the write that reaches it.</summary>
     private sealed class ScriptedBridge : IAsyncDisposable
     {
-        private readonly AnonymousPipeServerStream _toBridge = new(PipeDirection.Out);
-        private readonly AnonymousPipeServerStream _fromBridge = new(PipeDirection.In);
-        private readonly AnonymousPipeClientStream _bridgeReads;
-        private readonly AnonymousPipeClientStream _bridgeWrites;
+        private readonly ScriptedBridgeChannels _channels = new();
         private readonly StringBuilder _sent = new();
         private readonly Task _serving;
 
         internal ScriptedBridge()
         {
-            _bridgeReads = new AnonymousPipeClientStream(PipeDirection.In, _toBridge.ClientSafePipeHandle);
-            _bridgeWrites = new AnonymousPipeClientStream(PipeDirection.Out, _fromBridge.ClientSafePipeHandle);
-            _serving = Task.Run(ServeAsync);
+            _serving = ServeAsync();
         }
 
         internal bool Deny { get; init; }
@@ -149,8 +173,6 @@ public sealed class McpConnectionCheckTests
         internal bool RefuseListing { get; init; }
 
         internal bool ExitOnRequest { get; init; }
-
-        internal bool SilentOnRequest { get; init; }
 
         internal bool NotifyFirst { get; init; }
 
@@ -169,14 +191,12 @@ public sealed class McpConnectionCheckTests
             }
         }
 
-        internal TaskCompletionSource RequestArrived { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        internal McpConnectionCheck Check(TimeProvider? clock = null) => new(_toBridge, _fromBridge, clock);
+        internal McpConnectionCheck Check(TimeProvider? clock = null) => _channels.Check(clock);
 
         private async Task ServeAsync()
         {
-            using var reader = new StreamReader(_bridgeReads, new UTF8Encoding(false));
-            await using var writer = new StreamWriter(_bridgeWrites, new UTF8Encoding(false)) { AutoFlush = true };
+            using var reader = new StreamReader(_channels.BridgeReads, new UTF8Encoding(false));
+            await using var writer = new StreamWriter(_channels.BridgeWrites, new UTF8Encoding(false)) { AutoFlush = true };
 
             while (await reader.ReadLineAsync() is { } line)
             {
@@ -189,18 +209,9 @@ public sealed class McpConnectionCheckTests
                 }
 
                 var tool = (string?)message["params"]?["name"];
-                if (tool == "request_credential")
+                if (tool == "request_credential" && ExitOnRequest)
                 {
-                    RequestArrived.TrySetResult();
-                    if (ExitOnRequest)
-                    {
-                        return;
-                    }
-
-                    if (SilentOnRequest)
-                    {
-                        continue;
-                    }
+                    return;
                 }
 
                 if (NotifyFirst)
@@ -258,11 +269,83 @@ public sealed class McpConnectionCheckTests
 
         public async ValueTask DisposeAsync()
         {
-            _toBridge.Dispose();
+            _channels.ToBridge.Dispose();
             await _serving.WaitAsync(TimeSpan.FromSeconds(10));
-            _bridgeWrites.Dispose();
-            _bridgeReads.Dispose();
+            _channels.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// A bridge over real anonymous pipes that reads one request, closes its end and never answers. A
+    /// dedicated thread reads it and moves the clock across the deadline, so no step waits for a
+    /// thread-pool worker.
+    /// </summary>
+    private sealed class SilentBridge : IDisposable
+    {
+        private readonly AnonymousPipeServerStream _toBridge = new(PipeDirection.Out);
+        private readonly AnonymousPipeServerStream _fromBridge = new(PipeDirection.In);
+        private readonly ManualResetEventSlim _watched = new();
+        private readonly ManualClock _clock;
+        private readonly TimeSpan _deadline;
+        private Task? _pending;
+
+        internal SilentBridge(ManualClock clock, TimeSpan deadline)
+        {
+            _clock = clock;
+            _deadline = deadline;
+            new Thread(Answer) { IsBackground = true, Name = "silent bridge" }.Start();
+        }
+
+        internal Stream ToBridge => _toBridge;
+
+        internal Stream FromBridge => _fromBridge;
+
+        internal string? Method { get; private set; }
+
+        internal bool PendingAtTheLastSecond { get; private set; }
+
+        internal Task<T> Watch<T>(Task<T> pending)
+        {
+            _pending = pending;
+            _watched.Set();
+            return pending;
+        }
+
+        /// <summary>Closes the end the bridge would have answered on, as a bridge process that exits does.</summary>
+        internal void Exit() => _fromBridge.DisposeLocalCopyOfClientHandle();
+
+        public void Dispose()
+        {
+            _toBridge.Dispose();
             _fromBridge.Dispose();
+            _watched.Dispose();
+        }
+
+        private void Answer()
+        {
+            try
+            {
+                if (ReadRequest() is not { } line || !_watched.Wait(TimeSpan.FromSeconds(30)))
+                {
+                    return;
+                }
+
+                Method = (string?)JsonNode.Parse(line)!["method"];
+                _clock.Advance(_deadline - TimeSpan.FromSeconds(1));
+                PendingAtTheLastSecond = !_pending!.IsCompleted;
+                _clock.Advance(TimeSpan.FromSeconds(1));
+            }
+            catch (Exception ex) when (ex is IOException or ObjectDisposedException)
+            {
+                // The test ended before a request arrived.
+            }
+        }
+
+        private string? ReadRequest()
+        {
+            using var reads = new AnonymousPipeClientStream(PipeDirection.In, _toBridge.ClientSafePipeHandle);
+            using var reader = new StreamReader(reads, new UTF8Encoding(false));
+            return reader.ReadLine();
         }
     }
 }

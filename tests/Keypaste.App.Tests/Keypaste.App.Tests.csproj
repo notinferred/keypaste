@@ -28,6 +28,8 @@
     <!-- The core's hand-moved clock and /api/share fake, so the app is tested against the same ones. -->
     <Compile Include="../Keypaste.Core.Tests/ManualClock.cs" Link="ManualClock.cs" />
     <Compile Include="../Keypaste.Core.Tests/FakeShareServer.cs" Link="FakeShareServer.cs" />
+    <!-- The channels the core's scripted bridge speaks over, which need no thread-pool worker (F.41). -->
+    <Compile Include="../Keypaste.Core.Tests/ScriptedBridgeChannels.cs" Link="ScriptedBridgeChannels.cs" />
   </ItemGroup>
 
 </Project>
