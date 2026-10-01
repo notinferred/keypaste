@@ -67,6 +67,7 @@ internal sealed class WindowApprovalChannel(TimeProvider clock, TimeSpan answerW
     {
         Window? window = null;
         var started = _clock.GetTimestamp();
+        var withdrawals = Withdrawals.Current;
 
         TimeSpan Remaining() => _answerWindow - _clock.GetElapsedTime(started);
 
@@ -88,8 +89,8 @@ internal sealed class WindowApprovalChannel(TimeProvider clock, TimeSpan answerW
 
         Dispatcher.UIThread.Post(() =>
         {
-            // The token too: the gate withdraws with CancelAsync, which marks it before its callback runs on the pool.
-            if (request.IsAnswered || cancellationToken.IsCancellationRequested)
+            // Withdrawn once requested: a token is marked before its callbacks run, so before the tokens linked below it are.
+            if (request.IsAnswered || cancellationToken.IsCancellationRequested || withdrawals.Any(token => token.IsCancellationRequested))
             {
                 return;
             }

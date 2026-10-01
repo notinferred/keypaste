@@ -1,3 +1,6 @@
+using System.Collections.Concurrent;
+using System.IO.Pipes;
+using System.Security.Cryptography;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
@@ -177,6 +180,145 @@ public sealed class DesktopApprovalTests
 
             Assert.Equal(ApprovalAnswer.Denied, await asking.WaitAsync(_wait, Token));
             Assert.Equal(0, drawn);
+        });
+
+    /// <summary>
+    /// A bridge that hangs up while its prompt waits to be drawn keeps it off the screen, though the
+    /// listener's <c>CancelAsync</c> leaves the tokens linked below the exchange's live until the
+    /// thread pool runs its callbacks (F.32).
+    /// </summary>
+    [Fact]
+    public Task A_bridge_that_hangs_up_before_the_draw_keeps_the_prompt_off_the_screen() =>
+        HeadlessSession.On(async () =>
+        {
+            var clock = new ManualClock();
+            var channel = new WindowApprovalChannel(clock, ApprovalLimits.Default.Window);
+            var drawn = 0;
+            channel.Shown += (_, _) => drawn++;
+            var recorded = new HeldPrompt(channel, Token);
+            using var gate = new ApprovalGate(recorded, clock, ApprovalLimits.Default);
+            var handler = new HeldAtTheGate(gate, Token);
+            var pipe = "keypaste-tests-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
+            using var listener = new ApproverListener(pipe, handler);
+            using var stop = new CancellationTokenSource();
+            var listening = listener.RunAsync(stop.Token);
+
+            try
+            {
+                for (var i = 0; i < 100; i++)
+                {
+                    var asked = HangUpWhileTheShowJobIsQueued(pipe, handler);
+                    var gateToken = recorded.Next().Gate;
+
+                    // The UI thread runs its queue as soon as the listener withdraws, while the withdrawal is held above the gate's token.
+                    Assert.True(SpinWait.SpinUntil(() => asked.Exchange.IsCancellationRequested, _wait), "the listener never withdrew the request");
+                    WindowInput.Drain();
+                    Assert.False(gateToken.IsCancellationRequested, _holdRanLate);
+                    asked.Drained.Set();
+
+                    Assert.Equal(ApprovalAnswer.Cancelled, await asked.Answer.WaitAsync(_wait, Token));
+                    WindowInput.Drain();
+                }
+            }
+            finally
+            {
+                await stop.CancelAsync();
+                await listening;
+            }
+
+            Assert.Equal(0, drawn);
+        });
+
+    /// <summary>Sends one request and hangs up once the gate has queued its prompt, without letting the UI thread run.</summary>
+    private static HeldAtTheGate.Asked HangUpWhileTheShowJobIsQueued(string pipe, HeldAtTheGate handler)
+    {
+        var request = new CredentialRequest
+        {
+            Entry = EntryPath,
+            Field = "password",
+            Reason = "deploy the billing service",
+            TtlSeconds = 60,
+            Exposure = ["env/**"],
+            ClientName = "claude-code",
+        };
+
+        using var peer = new Peer(pipe);
+        peer.Send(ApproverProtocol.Encode(request));
+        return handler.Next();
+    }
+
+    public static TheoryData<string> PromptedKinds => new() { "credential", "env", "run" };
+
+    /// <summary>
+    /// Why a hold proved nothing: it waits only if it runs before the links below the token it holds,
+    /// which .NET runs newest first without documenting the order.
+    /// </summary>
+    private const string _holdRanLate = "the withdrawal reached the gate's token before the UI thread ran its queue, so the hold ran after the links it had to precede";
+
+    /// <summary>
+    /// The app's own composition carries a bridge's hang-up to the prompt's show job along every path
+    /// that asks a person: through <c>SessionAuthority</c> and <c>ApproverHandler</c> for a field, and
+    /// through the env resolver for an env set and an agent's run.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(PromptedKinds))]
+    public Task A_hang_up_reaches_the_prompt_along_the_path_that_asked(string kind) =>
+        HeadlessSession.On(async () =>
+        {
+            HeldPrompt? held = null;
+            await using var app = await PromptedApp.StartAsync(prompt => held = new HeldPrompt(prompt, Token));
+            var lifetime = app.Authority.Session.Lifetime!.Ended;
+            var holding = held!;
+            holding.Holding = withdrawals => withdrawals.FirstOrDefault(token => token != lifetime);
+            HeldPrompt.Asked asked;
+
+            using (var peer = app.Attach())
+            {
+                peer.Send(app.Frame(kind));
+                asked = holding.Next();
+            }
+
+            // The UI thread runs its queue as soon as the hang-up reaches what the show job reads, while it is held above the gate's token.
+            Assert.True(SpinWait.SpinUntil(() => asked.Held.IsCancellationRequested, _wait), "the show job reads nothing the hang-up cancels");
+            WindowInput.Drain();
+            Assert.False(asked.Gate.IsCancellationRequested, _holdRanLate);
+            asked.Drained.SetResult();
+
+            Assert.Equal(ApprovalAnswer.Denied, await asked.Answer.WaitAsync(_wait, Token));
+            WindowInput.Drain();
+            Assert.Empty(app.Windows);
+        });
+
+    /// <summary>
+    /// A lock that ends the lifetime off the UI thread, as the idle timer's does, keeps a prompt not
+    /// yet drawn off the screen, though the tokens linked below the lifetime's are cancelled only as
+    /// its callbacks run.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(PromptedKinds))]
+    public Task A_lock_off_the_UI_thread_keeps_a_queued_prompt_off_the_screen(string kind) =>
+        HeadlessSession.On(async () =>
+        {
+            HeldPrompt? held = null;
+            await using var app = await PromptedApp.StartAsync(prompt => held = new HeldPrompt(prompt, Token));
+            var lifetime = app.Authority.Session.Lifetime!.Ended;
+            var holding = held!;
+            holding.Holding = _ => lifetime;
+
+            var released = app.ReleasedAsync(kind);
+            var asked = holding.Next();
+            var locking = Task.Run(() => app.Authority.Session.Lock(VaultLockReason.Idle), Token);
+
+            // The UI thread runs its queue as soon as the lock ends the lifetime, while the withdrawal is held above the gate's token.
+            Assert.True(SpinWait.SpinUntil(() => lifetime.IsCancellationRequested, _wait), "the lock never ended the lifetime");
+            WindowInput.Drain();
+            Assert.False(asked.Gate.IsCancellationRequested, _holdRanLate);
+            asked.Drained.SetResult();
+
+            await locking.WaitAsync(_wait, Token);
+            Assert.False(await released.WaitAsync(_wait, Token));
+            WindowInput.Drain();
+            Assert.Empty(app.Windows);
         });
 
     [Fact]
@@ -464,13 +606,132 @@ public sealed class DesktopApprovalTests
         WindowInput.Release(window, button);
     }
 
+    /// <summary>Puts every credential request to the gate, and holds the withdrawal a hang-up starts until the test lets it go.</summary>
+    private sealed class HeldAtTheGate(ApprovalGate gate, CancellationToken testToken) : IApproverHandler
+    {
+        private readonly ConcurrentQueue<Asked> _asked = new();
+
+        internal Asked Next()
+        {
+            Asked? asked = null;
+            Assert.True(SpinWait.SpinUntil(() => _asked.TryDequeue(out asked), _wait), "the request never reached the gate");
+            return asked!;
+        }
+
+        public async ValueTask<CredentialReply> RequestAsync(CredentialRequest request, string connectionId, CancellationToken cancellationToken)
+        {
+            var prompt = ApprovalPrompt.For("claude-code", new EntryName("env/ci", "DEPLOY_KEY"), "password", "deploy", 60);
+
+            // The gate links its token to the listener's and queues the show job before this returns.
+            var answer = gate.AskAsync(connectionId, prompt, cancellationToken).AsTask();
+
+            // Registered after the gate's link, so it runs first and holds the withdrawal back from the gate's token.
+            using var drained = new ManualResetEventSlim();
+            using var holding = cancellationToken.Register(() => drained.Wait(_wait, testToken));
+            _asked.Enqueue(new Asked(drained, answer, cancellationToken));
+
+            await answer;
+            return new CredentialReply { Decision = AuditDecision.Denied, Method = AuditMethod.Cancelled, Reason = "withdrawn", TtlSeconds = 0 };
+        }
+
+        public ValueTask<AttachReply> AttachAsync(AttachRequest request, string connectionId, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(AttachReply.To("held"));
+
+        public ValueTask<NamesReply> ListAsync(NamesRequest request, string connectionId, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(new NamesReply(false, [], "not listed", true));
+
+        public ValueTask<EnvReply> ReleaseEnvAsync(EnvRequest request, string connectionId, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(new EnvReply(EnvResolved.Refused(request.Project, EnvOutcome.NoSession), "not released"));
+
+        public void Disconnected(string connectionId)
+        {
+        }
+
+        /// <summary>A request at the gate: the hold on its withdrawal, the gate's answer, and the token the listener gave the handler.</summary>
+        internal sealed record Asked(ManualResetEventSlim Drained, Task<ApprovalAnswer> Answer, CancellationToken Exchange);
+    }
+
+    /// <summary>
+    /// The app's prompt, recording the token the gate gives each request, with one of the withdrawals
+    /// its show job reads, if the test chooses one, held back from that token until the test lets it go.
+    /// </summary>
+    private sealed class HeldPrompt(IApprovalChannel prompt, CancellationToken testToken) : IApprovalChannel
+    {
+        private readonly ConcurrentQueue<Asked> _asked = new();
+
+        /// <summary>Picks the token to hold from the withdrawals the show job reads.</summary>
+        internal Func<IReadOnlyList<CancellationToken>, CancellationToken> Holding { get; set; } = _ => default;
+
+        internal Asked Next()
+        {
+            Asked? asked = null;
+            Assert.True(SpinWait.SpinUntil(() => _asked.TryDequeue(out asked), _wait), "the request never reached the prompt");
+            return asked!;
+        }
+
+        public ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt request, CancellationToken cancellationToken) =>
+            HeldAsync(prompt.AskAsync(request, cancellationToken).AsTask(), cancellationToken);
+
+        public ValueTask<ApprovalAnswer> AskAsync(EnvReleasePrompt request, CancellationToken cancellationToken) =>
+            HeldAsync(prompt.AskAsync(request, cancellationToken).AsTask(), cancellationToken);
+
+        public ValueTask<ApprovalAnswer> AskAsync(RunPrompt request, CancellationToken cancellationToken) =>
+            HeldAsync(prompt.AskAsync(request, cancellationToken).AsTask(), cancellationToken);
+
+        private async ValueTask<ApprovalAnswer> HeldAsync(Task<ApprovalAnswer> answer, CancellationToken gate)
+        {
+            // The prompt has queued its show job and every link above the gate's token is registered, so this runs before them.
+            var held = Holding(Withdrawals.Current);
+            var drained = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var holding = held.Register(() => drained.Task.Wait((int)_wait.TotalMilliseconds, testToken));
+            _asked.Enqueue(new Asked(drained, answer, held, gate));
+
+            return await answer;
+        }
+
+        /// <summary>A request at the prompt: the hold, the prompt's answer, the token held and the gate's token.</summary>
+        internal sealed record Asked(TaskCompletionSource Drained, Task<ApprovalAnswer> Answer, CancellationToken Held, CancellationToken Gate);
+    }
+
+    /// <summary>A bridge's end of a pipe, driven a frame at a time without awaiting, so the UI thread runs nothing meanwhile; disposing it hangs up.</summary>
+    internal sealed class Peer : IDisposable
+    {
+        private readonly NamedPipeClientStream _pipe;
+
+        internal Peer(string endpoint)
+        {
+            _pipe = new NamedPipeClientStream(".", endpoint, PipeDirection.InOut, PipeOptions.CurrentUserOnly);
+            _pipe.Connect((int)_wait.TotalMilliseconds);
+        }
+
+        internal void Send(byte[] message)
+        {
+            _pipe.Write([.. message, (byte)'\n']);
+            _pipe.Flush();
+        }
+
+        internal byte[] Receive()
+        {
+            var line = new List<byte>();
+
+            for (var next = _pipe.ReadByte(); next != -1 && next != '\n'; next = _pipe.ReadByte())
+            {
+                line.Add((byte)next);
+            }
+
+            return [.. line];
+        }
+
+        public void Dispose() => _pipe.Dispose();
+    }
+
     /// <summary>The app's authority, composed with its own prompt, holding a vault with one credential in it.</summary>
     internal sealed class PromptedApp : IAsyncDisposable
     {
         private readonly TempVault _fixture;
         private ApproverClient? _client;
 
-        private PromptedApp(TempVault fixture, string vault)
+        private PromptedApp(TempVault fixture, string vault, Func<IApprovalChannel, IApprovalChannel>? around)
         {
             _fixture = fixture;
             Vault = vault;
@@ -481,7 +742,7 @@ public sealed class DesktopApprovalTests
             {
                 var channel = new WindowApprovalChannel(Clock, ApprovalLimits.Default.Window);
                 channel.Shown += (_, window) => Windows.Add(window);
-                return channel;
+                return around is null ? channel : around(channel);
             });
 #pragma warning restore CA2000
         }
@@ -496,7 +757,8 @@ public sealed class DesktopApprovalTests
 
         internal List<Window> Windows { get; } = [];
 
-        internal static async Task<PromptedApp> StartAsync()
+        /// <param name="around">What the gate asks instead of the app's prompt, given that prompt.</param>
+        internal static async Task<PromptedApp> StartAsync(Func<IApprovalChannel, IApprovalChannel>? around = null)
         {
             var fixture = new TempVault();
             var vault = Path.Combine(fixture.Home, "agents.kdbx");
@@ -512,7 +774,7 @@ public sealed class DesktopApprovalTests
                 created.Save();
             }
 
-            var app = new PromptedApp(fixture, vault);
+            var app = new PromptedApp(fixture, vault, around);
 
             using (var master = TempVault.Secret(TempVault.Password))
             {
@@ -538,20 +800,20 @@ public sealed class DesktopApprovalTests
             Ask(_client!, cancellationToken, entry, exposure, field);
 
         internal Task<CredentialReply?> Ask(ApproverClient client, CancellationToken? cancellationToken = null, string entry = EntryPath, string exposure = "env/**", string field = "password") =>
-            client.RequestAsync(
-                new CredentialRequest
-                {
-                    Entry = entry,
-                    Field = field,
-                    Reason = "deploy the billing service",
-                    TtlSeconds = 60,
-                    Exposure = [exposure],
-                    ClientName = "claude-code",
-                    ClientLabel = Label,
-                    Vault = Vault,
-                    Session = SessionId,
-                },
-                cancellationToken ?? Token).AsTask();
+            client.RequestAsync(Credential(entry, exposure, field), cancellationToken ?? Token).AsTask();
+
+        internal CredentialRequest Credential(string entry = EntryPath, string exposure = "env/**", string field = "password") => new()
+        {
+            Entry = entry,
+            Field = field,
+            Reason = "deploy the billing service",
+            TtlSeconds = 60,
+            Exposure = [exposure],
+            ClientName = "claude-code",
+            ClientLabel = Label,
+            Vault = Vault,
+            Session = SessionId,
+        };
 
         /// <summary>Waits for the prompt a request raised to be on screen and drawn.</summary>
         /// <param name="count">How many prompts this app has raised once that one is up.</param>
@@ -575,27 +837,53 @@ public sealed class DesktopApprovalTests
 
         /// <summary>A <c>keypaste run --session</c> request for the <c>ci</c> project on this bridge's connection.</summary>
         internal Task<EnvReply?> AskEnv(CancellationToken? cancellationToken = null) =>
-            _client!.ReleaseEnvAsync(
-                new EnvRequest("ci", ["deploy", "--to", "staging area"], Path.Combine(_fixture.Home, "work")) { Vault = Vault, Session = SessionId },
-                cancellationToken ?? Token).AsTask();
+            _client!.ReleaseEnvAsync(Env(), cancellationToken ?? Token).AsTask();
+
+        internal EnvRequest Env() =>
+            new("ci", ["deploy", "--to", "staging area"], Path.Combine(_fixture.Home, "work")) { Vault = Vault, Session = SessionId };
 
         /// <summary>An agent's run of the <c>ci</c> set on this bridge's connection.</summary>
         internal Task<RunReply?> AskRun(CancellationToken? cancellationToken = null) =>
-            _client!.ReleaseRunAsync(
-                new RunRequest
-                {
-                    Program = OperatingSystem.IsWindows() ? @"C:\tools\deploy.exe" : "/usr/bin/deploy",
-                    Command = ["deploy", "--to", "staging"],
-                    Directory = Path.Combine(_fixture.Home, "work"),
-                    Project = "ci",
-                    Reason = "deploy the billing service",
-                    Exposure = ["env/**"],
-                    ClientName = "claude-code",
-                    ClientLabel = Label,
-                    Vault = Vault,
-                    Session = SessionId,
-                },
-                cancellationToken ?? Token).AsTask();
+            _client!.ReleaseRunAsync(Run(), cancellationToken ?? Token).AsTask();
+
+        internal RunRequest Run() => new()
+        {
+            Program = OperatingSystem.IsWindows() ? @"C:\tools\deploy.exe" : "/usr/bin/deploy",
+            Command = ["deploy", "--to", "staging"],
+            Directory = Path.Combine(_fixture.Home, "work"),
+            Project = "ci",
+            Reason = "deploy the billing service",
+            Exposure = ["env/**"],
+            ClientName = "claude-code",
+            ClientLabel = Label,
+            Vault = Vault,
+            Session = SessionId,
+        };
+
+        /// <summary>The frame a bridge sends for one kind of prompted request: <c>credential</c>, <c>env</c> or <c>run</c>.</summary>
+        internal byte[] Frame(string kind) => kind switch
+        {
+            "credential" => ApproverProtocol.Encode(Credential()),
+            "env" => ApproverProtocol.Encode(Env()),
+            _ => ApproverProtocol.Encode(Run()),
+        };
+
+        /// <summary>Asks for one kind of prompted request on the attached bridge, and says whether anything was released.</summary>
+        internal async Task<bool> ReleasedAsync(string kind) => kind switch
+        {
+            "credential" => (await Ask())?.Value is not null,
+            "env" => (await AskEnv())?.Set.Outcome == EnvOutcome.Resolved,
+            _ => (await AskRun())?.Set.Outcome == EnvOutcome.Resolved,
+        };
+
+        /// <summary>Another bridge, attached without awaiting anything, so the UI thread runs nothing meanwhile.</summary>
+        internal Peer Attach()
+        {
+            var peer = new Peer(Assert.IsType<AuthorityStatus.Serving>(Authority.Status).Endpoint);
+            peer.Send(ApproverProtocol.Encode(new AttachRequest(Vault)));
+            Assert.True(ApproverProtocol.TryDecode(peer.Receive(), out AttachReply? attached) && attached.Attached, "the peer was not attached");
+            return peer;
+        }
 
         internal async Task HangUpAsync()
         {

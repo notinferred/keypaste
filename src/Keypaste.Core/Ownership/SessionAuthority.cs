@@ -264,6 +264,7 @@ public sealed class SessionAuthority : IApproverHandler
         }
 
         using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Ended);
+        Withdrawals.Add(lifetime.Ended);
 
         var reply = await _inner.RequestAsync(request, connectionId, withdrawn.Token).ConfigureAwait(false);
 

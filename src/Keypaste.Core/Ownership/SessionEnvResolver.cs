@@ -1,3 +1,5 @@
+using Keypaste.Core.Approval;
+
 namespace Keypaste.Core.Ownership;
 
 /// <summary>
@@ -112,6 +114,7 @@ public sealed class SessionEnvResolver
         {
             var preview = resolved.Preview;
             using var withdrawn = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Ended);
+            Withdrawals.Add(lifetime.Ended);
             bool confirmed;
 
             try

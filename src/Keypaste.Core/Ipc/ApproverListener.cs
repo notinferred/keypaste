@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.IO.Pipes;
+using Keypaste.Core.Approval;
 
 namespace Keypaste.Core.Ipc;
 
@@ -185,6 +186,7 @@ public sealed class ApproverListener : IDisposable
         CancellationToken cancellationToken)
     {
         using var exchange = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        Withdrawals.Add(exchange.Token);
         var answering = AnswerAsync(frame, connectionId, exchange.Token).AsTask();
 
         if (await Task.WhenAny(answering, peer).ConfigureAwait(false) == peer
