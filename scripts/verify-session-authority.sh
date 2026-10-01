@@ -37,9 +37,10 @@ readonly HOLD_OUT="$WORK/hold.txt"
 readonly AGENT_ERR="$WORK/agent-stderr.txt"
 
 HOLD_PID=""
-exec {HOLD_IN}>/dev/null
+# Fixed descriptors, as macOS's bash 3.2 needs (D-0398): 7 is the held app's input.
+exec 7>/dev/null
 cleanup() {
-  exec {HOLD_IN}>&- 2>/dev/null || true
+  exec 7>&- 2>/dev/null || true
   if [ -n "$HOLD_PID" ]; then kill_process "$HOLD_PID"; fi
   rm -rf "$WORK"
 }
@@ -57,7 +58,7 @@ ask() {
     printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci session probe\",\"ttl_seconds\":60}}}"
     if [ -n "$prompt" ]; then
       wait_for '^prompt client' "$HOLD_OUT" "$prompt"
-      echo deny >&"$HOLD_IN"
+      echo deny >&7
     fi
     sleep 3
   } | "$MCP" --vault "$VAULT" --audit-log "$AUDIT" --client-label ci-probe >"$out" 2>"$err" \
@@ -73,8 +74,8 @@ printf '%s\n' "$MASTER" | "$CLI" env set ci "DEPLOY_KEY=$SECRET" --vault "$VAULT
   || die "could not store the test credential"
 
 # --------------------------------------------------------------------- the app unlocks and serves
-exec {HOLD_IN}>&-
-exec {HOLD_IN}> >(KEYPASTE_DRIVER_PASSWORD="$MASTER" "$DRV" hold "$VAULT" >"$HOLD_OUT" 2>&1)
+exec 7>&-
+exec 7> >(KEYPASTE_DRIVER_PASSWORD="$MASTER" exec "$DRV" hold "$VAULT" >"$HOLD_OUT" 2>&1)
 wait_for 'holding session' "$HOLD_OUT"
 grep -q 'not served' "$HOLD_OUT" && die "the app unlocked and did not serve its vault"
 HOLD_PID="$(process_of)"
@@ -117,7 +118,7 @@ printf '%s' "$second" | grep -q "already unlocked in the keypaste desktop app (p
   || die "the second app's refusal does not name the app holding the vault: $second"
 
 # ----------------------------------------------------------------------- locked means refused
-echo lock >&"$HOLD_IN"
+echo lock >&7
 wait_for '^locked' "$HOLD_OUT"
 
 OUT="$WORK/locked-stdout.txt"
@@ -130,7 +131,7 @@ last_lines | jq -e -s 'all(.decision == "denied" and (has("session") | not))' >/
   || die "the refusals while locked were not audited as denials reaching no session"
 
 # ---------------------------------------------------------- unlocking again is a new session
-echo unlock >&"$HOLD_IN"
+echo unlock >&7
 wait_for 'holding session' "$HOLD_OUT" 2
 SECOND="$(session_of)"
 [ "$SECOND" != "$FIRST" ] || die "unlocking again reused session $FIRST"
@@ -144,7 +145,7 @@ last_lines | head -1 | jq -e --arg s "$SECOND" '.decision == "granted" and .sess
 # ------------------------------------------------------------- a killed app holds nothing
 kill_process "$HOLD_PID"
 HOLD_PID=""
-exec {HOLD_IN}>&-
+exec 7>&-
 
 set +e
 after="$(KEYPASTE_DRIVER_PASSWORD="$MASTER" "$DRV" open "$VAULT" 2>&1)"

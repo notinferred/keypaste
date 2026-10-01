@@ -63,9 +63,10 @@ export KEYPASTE_FAKE_CLIENT_CONFIG
 CLIENT_PATH="$(cd "$(dirname "$FAKE")" && pwd):$(cd "$(dirname "$MCP")" && pwd):$PATH"
 
 HOLD_PID=""
-exec {HOLD_IN}>/dev/null
+# Fixed descriptors, as macOS's bash 3.2 needs (D-0398): 7 is the held app's input.
+exec 7>/dev/null
 cleanup() {
-  exec {HOLD_IN}>&- 2>/dev/null || true
+  exec 7>&- 2>/dev/null || true
   if [ -n "$HOLD_PID" ]; then kill_process "$HOLD_PID"; fi
   rm -rf "$WORK"
 }
@@ -78,7 +79,7 @@ say() {
   shift
   local before
   before="$(grep -c -- "$ending" "$HOLD_OUT" || true)"
-  echo "$*" >&"$HOLD_IN"
+  echo "$*" >&7
   wait_for "$ending" "$HOLD_OUT" $((before + 1))
   SENT=$((SENT + 1))
 }
@@ -111,8 +112,8 @@ printf '%s\n' "$MASTER" | "$CLI" env set ci "DEPLOY_KEY=$SECRET" --vault "$VAULT
 printf '%s\n' "$MASTER" | "$CLI" env set other "TOKEN=$OTHER_SECRET" --vault "$VAULT" >/dev/null \
   || die "could not store the second credential"
 
-exec {HOLD_IN}>&-
-exec {HOLD_IN}> >(PATH="$CLIENT_PATH" KEYPASTE_DRIVER_PASSWORD="$MASTER" "$DRV" hold "$VAULT" >"$HOLD_OUT" 2>&1)
+exec 7>&-
+exec 7> >(PATH="$CLIENT_PATH" KEYPASTE_DRIVER_PASSWORD="$MASTER" exec "$DRV" hold "$VAULT" >"$HOLD_OUT" 2>&1)
 wait_for 'holding session' "$HOLD_OUT"
 grep -q 'not served' "$HOLD_OUT" && die "the app unlocked and did not serve its vault"
 HOLD_PID="$(process_of)"
@@ -198,7 +199,7 @@ clean_config
 grep -qF -- "$SECRET" "$HOLD_OUT" && die "a credential reached the app's output"
 grep -qF -- "$OTHER_SECRET" "$HOLD_OUT" && die "a credential reached the app's output"
 
-exec {HOLD_IN}>&-
+exec 7>&-
 wait_for '^shut down' "$HOLD_OUT"
 HOLD_PID=""
 

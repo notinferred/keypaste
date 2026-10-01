@@ -44,13 +44,14 @@ readonly ERR="$WORK/mcp-stderr.txt"
 
 HOLD_PID=""
 AGENT_PID=""
-exec {HOLD_IN}>/dev/null
-exec {AGENT_IN}>/dev/null
-exec {MCP_IN}>/dev/null
+# Fixed descriptors, as macOS's bash 3.2 needs (D-0398): 7 is the held app's input, 8 the open bridge's and 9 keypaste agent's.
+exec 7>/dev/null
+exec 9>/dev/null
+exec 8>/dev/null
 cleanup() {
-  exec {MCP_IN}>&- 2>/dev/null || true
-  exec {HOLD_IN}>&- 2>/dev/null || true
-  exec {AGENT_IN}>&- 2>/dev/null || true
+  exec 8>&- 2>/dev/null || true
+  exec 7>&- 2>/dev/null || true
+  exec 9>&- 2>/dev/null || true
   if [ -n "$HOLD_PID" ]; then kill_process "$HOLD_PID"; fi
   if [ -n "$AGENT_PID" ]; then kill_process "$AGENT_PID"; fi
   rm -rf "$WORK"
@@ -85,11 +86,11 @@ answers() {
 
 # Runs verb $1 with stdin from $2 (a file, or /dev/null) and sets VERB_EXIT and VERB_ERR.
 attempt() {
-  local verb="$1" input="$2" tag="$3" args=()
-  mapfile -t args < <(arguments "$verb")
+  local verb="$1" input="$2" tag="$3" arg args=()
+  while IFS= read -r arg; do args+=("$arg"); done < <(arguments "$verb")
   VERB_ERR="$WORK/$verb-$tag-stderr.txt"
   set +e
-  "$CLI" "${args[@]}" --vault "$VAULT" <"$input" >/dev/null 2>"$VERB_ERR" {HOLD_IN}>&- {AGENT_IN}>&- {MCP_IN}>&-
+  "$CLI" "${args[@]}" --vault "$VAULT" <"$input" >/dev/null 2>"$VERB_ERR" 7>&- 9>&- 8>&-
   VERB_EXIT=$?
   set -e
 }
@@ -117,15 +118,15 @@ refuse_all() {
 
 # Opens a bridge labelled $1 and sets its reply files.
 bridge() {
-  exec {MCP_IN}>&-
-  exec {MCP_IN}> >("$MCP" --vault "$VAULT" --audit-log "$AUDIT" --client-label "$1" >"$OUT" 2>"$ERR" {HOLD_IN}>&- {AGENT_IN}>&-)
-  printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-held-saves","version":"1.0.0"}}}' >&"$MCP_IN"
-  printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}' >&"$MCP_IN"
+  exec 8>&-
+  exec 8> >(exec 7>&- 9>&-; exec "$MCP" --vault "$VAULT" --audit-log "$AUDIT" --client-label "$1" >"$OUT" 2>"$ERR")
+  printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-held-saves","version":"1.0.0"}}}' >&8
+  printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}' >&8
 }
 
 # Sends request $1 on the open bridge.
 request() {
-  printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$1,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci held-saves probe\",\"ttl_seconds\":60}}}" >&"$MCP_IN"
+  printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$1,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci held-saves probe\",\"ttl_seconds\":60}}}" >&8
 }
 
 # The reply to $1 released the value, and its audit line is a grant, not a vault-changed refusal.
@@ -152,8 +153,8 @@ printf '%s\n%s\n' "$SOURCE_PW" 'old-held' | "$CLI" add Imported/old --vault "$SO
 printf 'PULLED_KEY=held\n' >"$DOTENV"
 
 # ------------------------------------------------------------------------------- the app holds it
-exec {HOLD_IN}>&-
-exec {HOLD_IN}> >(KEYPASTE_DRIVER_PASSWORD="$MASTER" "$DRV" hold "$VAULT" --approving-prompt >"$HOLD_OUT" 2>&1 {AGENT_IN}>&- {MCP_IN}>&-)
+exec 7>&-
+exec 7> >(exec 9>&- 8>&-; KEYPASTE_DRIVER_PASSWORD="$MASTER" exec "$DRV" hold "$VAULT" --approving-prompt >"$HOLD_OUT" 2>&1)
 wait_for 'holding session' "$HOLD_OUT"
 grep -q 'not served' "$HOLD_OUT" && die "the app unlocked and did not serve its vault"
 HOLD_PID="$(grep 'holding session' "$HOLD_OUT" | tail -1 | sed -E 's/.* as process ([0-9]+).*/\1/')"
@@ -163,32 +164,32 @@ bridge ci-held-app
 request 2
 answered 2 "the app"
 
-"$CLI" lock --vault "$VAULT" >"$WORK/lock.txt" 2>&1 {HOLD_IN}>&- {AGENT_IN}>&- {MCP_IN}>&-   || die "keypaste lock did not lock the app: $(cat "$WORK/lock.txt")"
+"$CLI" lock --vault "$VAULT" >"$WORK/lock.txt" 2>&1 7>&- 9>&- 8>&-   || die "keypaste lock did not lock the app: $(cat "$WORK/lock.txt")"
 wait_for '^locked' "$HOLD_OUT"
-exec {HOLD_IN}>&-
+exec 7>&-
 wait_for '^shut down' "$HOLD_OUT"
 HOLD_PID=""
 
 # ----------------------------------------------------------------------------- keypaste agent holds it
-exec {AGENT_IN}>&-
-exec {AGENT_IN}> >(exec "$CLI" agent --vault "$VAULT" >/dev/null 2>"$AGENT_ERR" {HOLD_IN}>&- {MCP_IN}>&-)
+exec 9>&-
+exec 9> >(exec 7>&- 8>&-; exec "$CLI" agent --vault "$VAULT" >/dev/null 2>"$AGENT_ERR")
 AGENT_SHELL=$!
 if [ -r "/proc/$AGENT_SHELL/winpid" ]; then AGENT_PID="$(cat "/proc/$AGENT_SHELL/winpid")"; else AGENT_PID="$AGENT_SHELL"; fi
-printf '%s\n' "$MASTER" >&"$AGENT_IN"
+printf '%s\n' "$MASTER" >&9
 wait_for 'listening on' "$AGENT_ERR"
 
 refuse_all "$AGENT_PID" 'Run `keypaste lock` and try again.' "keypaste agent"
 bridge ci-held-agent
 request 3
 wait_for 'an agent is asking for a credential' "$AGENT_ERR"
-printf 'o\n' >&"$AGENT_IN"
+printf 'o\n' >&9
 answered 3 "keypaste agent"
 
-"$CLI" lock --vault "$VAULT" >"$WORK/lock.txt" 2>&1 {HOLD_IN}>&- {AGENT_IN}>&- {MCP_IN}>&-   || die "keypaste lock did not stop keypaste agent: $(cat "$WORK/lock.txt")"
+"$CLI" lock --vault "$VAULT" >"$WORK/lock.txt" 2>&1 7>&- 9>&- 8>&-   || die "keypaste lock did not stop keypaste agent: $(cat "$WORK/lock.txt")"
 wait_for 'the agent has stopped' "$AGENT_ERR"
-exec {AGENT_IN}>&-
+exec 9>&-
 AGENT_PID=""
-exec {MCP_IN}>&-
+exec 8>&-
 
 # ------------------------------------------------------------------------ nothing holds it: each saves
 # access goes last, since it changes the master password the others are given.

@@ -43,11 +43,12 @@ readonly OUT="$WORK/mcp-stdout.txt"
 readonly ERR="$WORK/mcp-stderr.txt"
 
 HOLD_PID=""
-exec {HOLD_IN}>/dev/null
-exec {MCP_IN}>/dev/null
+# Fixed descriptors, as macOS's bash 3.2 needs (D-0398): 7 is the held app's input and 8 the open bridge's.
+exec 7>/dev/null
+exec 8>/dev/null
 cleanup() {
-  exec {MCP_IN}>&- 2>/dev/null || true
-  exec {HOLD_IN}>&- 2>/dev/null || true
+  exec 8>&- 2>/dev/null || true
+  exec 7>&- 2>/dev/null || true
   if [ -n "$HOLD_PID" ]; then kill_process "$HOLD_PID"; fi
   rm -rf "$WORK"
 }
@@ -59,7 +60,7 @@ digest() { sha256sum "$WORK/vault.kdbx" | cut -d' ' -f1; }
 act() {
   local before
   before="$(wc -l <"$HOLD_OUT")"
-  echo "$1" >&"$HOLD_IN"
+  echo "$1" >&7
   for _ in $(seq 1 150); do
     [ "$(wc -l <"$HOLD_OUT")" -gt "$before" ] && { tail -n 1 "$HOLD_OUT"; return 0; }
     sleep 0.2
@@ -70,7 +71,7 @@ act() {
 # Sends one tool call on the open bridge and waits for its reply.
 call() {
   local id="$1" tool="$2" arguments="$3"
-  printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$id,\"method\":\"tools/call\",\"params\":{\"name\":\"$tool\",\"arguments\":$arguments}}" >&"$MCP_IN"
+  printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$id,\"method\":\"tools/call\",\"params\":{\"name\":\"$tool\",\"arguments\":$arguments}}" >&8
   for _ in $(seq 1 150); do
     jq -e --argjson id "$id" 'select(.id == $id)' <"$OUT" >/dev/null 2>&1 && return 0
     sleep 0.2
@@ -117,18 +118,18 @@ printf '%s\n' "$MASTER" | "$CLI" add KEEP --group personal --generate --vault "$
   || die "could not make a group outside the exposure"
 
 # --------------------------------------------------------------- the app holds it; a bridge attaches
-exec {HOLD_IN}>&-
-exec {HOLD_IN}> >(KEYPASTE_DRIVER_PASSWORD="$MASTER" KEYPASTE_DRIVER_NEW_PASSWORD="$V2" \
-  "$DRV" hold "$VAULT" --approving-prompt >"$HOLD_OUT" 2>&1)
+exec 7>&-
+exec 7> >(KEYPASTE_DRIVER_PASSWORD="$MASTER" KEYPASTE_DRIVER_NEW_PASSWORD="$V2" \
+  exec "$DRV" hold "$VAULT" --approving-prompt >"$HOLD_OUT" 2>&1)
 wait_for 'holding session' "$HOLD_OUT"
 grep -q 'not served' "$HOLD_OUT" && die "the app unlocked and did not serve its vault"
 HOLD_PID="$(process_of)"
 FIRST="$(session_of)"
 
-exec {MCP_IN}>&-
-exec {MCP_IN}> >("$MCP" --vault "$VAULT" --audit-log "$AUDIT" --client-label ci-probe >"$OUT" 2>"$ERR" {HOLD_IN}>&-)
-printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}' >&"$MCP_IN"
-printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}' >&"$MCP_IN"
+exec 8>&-
+exec 8> >(exec 7>&-; exec "$MCP" --vault "$VAULT" --audit-log "$AUDIT" --client-label ci-probe >"$OUT" 2>"$ERR")
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}' >&8
+printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}' >&8
 
 request 10 "$ENTRY"
 released 10 "$V1" prompt "the first request"
@@ -184,8 +185,8 @@ released 18 "$V3" prompt "the request after unlocking again"
 asked 4 "the request after unlocking again"
 [ "$(digest)" = "$EXTERNAL" ] || die "the vault file changed without anyone saving it"
 
-exec {MCP_IN}>&-
-exec {HOLD_IN}>&-
+exec 8>&-
+exec 7>&-
 wait_for '^shut down' "$HOLD_OUT"
 HOLD_PID=""
 

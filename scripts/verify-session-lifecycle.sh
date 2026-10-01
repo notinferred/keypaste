@@ -38,13 +38,14 @@ readonly AGENT_ERR="$WORK/agent-stderr.txt"
 
 HOLD_PID=""
 AGENT_PID=""
-exec {HOLD_IN}>/dev/null
-exec {MCP_IN}>/dev/null
-exec {AGENT_IN}>/dev/null
+# Fixed descriptors, as macOS's bash 3.2 needs (D-0398): 7 is the held app's input, 8 the open bridge's and 9 keypaste agent's.
+exec 7>/dev/null
+exec 8>/dev/null
+exec 9>/dev/null
 cleanup() {
-  exec {MCP_IN}>&- 2>/dev/null || true
-  exec {HOLD_IN}>&- 2>/dev/null || true
-  exec {AGENT_IN}>&- 2>/dev/null || true
+  exec 8>&- 2>/dev/null || true
+  exec 7>&- 2>/dev/null || true
+  exec 9>&- 2>/dev/null || true
   if [ -n "$HOLD_PID" ]; then kill_process "$HOLD_PID"; fi
   if [ -n "$AGENT_PID" ]; then kill_process "$AGENT_PID"; fi
   rm -rf "$WORK"
@@ -61,8 +62,8 @@ last_status() { grep '^status ' "$HOLD_OUT" | tail -1 | tr -d '\r'; }
 launch() {
   HOLD_OUT="$1"
   shift
-  exec {HOLD_IN}>&-
-  exec {HOLD_IN}> >(KEYPASTE_DRIVER_PASSWORD="$MASTER" "$DRV" hold "$VAULT" "$@" >"$HOLD_OUT" 2>&1)
+  exec 7>&-
+  exec 7> >(KEYPASTE_DRIVER_PASSWORD="$MASTER" exec "$DRV" hold "$VAULT" "$@" >"$HOLD_OUT" 2>&1)
 }
 
 # Waits for the app's status to say it serves, for the given time; sets SESSION and HOLD_PID.
@@ -88,7 +89,7 @@ ask() {
       printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci lifecycle probe\",\"ttl_seconds\":60}}}"
     fi
     sleep 3
-  } | "$MCP" --vault "$VAULT" --audit-log "$AUDIT" --client-label ci-probe >"$OUT" 2>"$ERR" {HOLD_IN}>&- {AGENT_IN}>&- \
+  } | "$MCP" --vault "$VAULT" --audit-log "$AUDIT" --client-label ci-probe >"$OUT" 2>"$ERR" 7>&- 9>&- \
     || die "keypaste-mcp exited non-zero"
 }
 
@@ -125,11 +126,11 @@ nobody_holds() {
 start_request() {
   OUT="$1"
   ERR="$2"
-  exec {MCP_IN}>&-
-  exec {MCP_IN}> >("$MCP" --vault "$VAULT" --audit-log "$AUDIT" --client-label ci-probe >"$OUT" 2>"$ERR" {HOLD_IN}>&- {AGENT_IN}>&-)
-  printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}' >&"$MCP_IN"
-  printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}' >&"$MCP_IN"
-  printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci lifecycle probe\",\"ttl_seconds\":60}}}" >&"$MCP_IN"
+  exec 8>&-
+  exec 8> >(exec 7>&- 9>&-; exec "$MCP" --vault "$VAULT" --audit-log "$AUDIT" --client-label ci-probe >"$OUT" 2>"$ERR")
+  printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}' >&8
+  printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}' >&8
+  printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci lifecycle probe\",\"ttl_seconds\":60}}}" >&8
 }
 
 # Waits for the waiting request's reply, which must be a denial with no value, then lets the bridge go.
@@ -143,7 +144,7 @@ finish_denied() {
   grep -q "$SECRET" "$OUT" && die "$what: a credential reached the client"
   tail -n 1 "$AUDIT" | jq -e '.tool == "request_credential" and .decision == "denied"' >/dev/null \
     || die "$what: the waiting request was not audited as a denial"
-  exec {MCP_IN}>&-
+  exec 8>&-
 }
 
 # ---------------------------------------------------------------- a vault with something in it
@@ -157,28 +158,28 @@ wait_for '^status locked' "$HOLD_OUT"
 ask "$WORK/launch-stdout.txt" "$WORK/launch-stderr.txt"
 refused_by_nobody "the app just launched"
 
-echo unlock >&"$HOLD_IN"
+echo unlock >&7
 expect_serving 1
 FIRST="$SESSION"
 ask "$WORK/first-stdout.txt" "$WORK/first-stderr.txt" --list-only
 listed_by "$FIRST" "the first unlock"
 
 # ------------------------------------------------------------- locking leaves nobody answering
-echo lock >&"$HOLD_IN"
+echo lock >&7
 wait_for '^status locked' "$HOLD_OUT" 2
 ask "$WORK/locked-stdout.txt" "$WORK/locked-stderr.txt"
 refused_by_nobody "the app locked"
 nobody_holds "after the lock"
 
 # -------------------------------------------- quitting answers what waits and leaves no owner
-echo unlock >&"$HOLD_IN"
+echo unlock >&7
 expect_serving 2
 SECOND="$SESSION"
 [ "$SECOND" != "$FIRST" ] || die "unlocking again reused session $FIRST"
 
 start_request "$WORK/quit-stdout.txt" "$WORK/quit-stderr.txt"
 wait_for '^asking' "$HOLD_OUT"
-exec {HOLD_IN}>&-
+exec 7>&-
 wait_for '^shut down' "$HOLD_OUT"
 finish_denied "quitting"
 tail -n 1 "$AUDIT" | jq -e --arg s "$SECOND" '.method == "vault-locked" and .session == $s' >/dev/null \
@@ -200,7 +201,7 @@ start_request "$WORK/crash-stdout.txt" "$WORK/crash-stderr.txt"
 wait_for '^asking' "$HOLD_OUT"
 kill_process "$HOLD_PID"
 HOLD_PID=""
-exec {HOLD_IN}>&-
+exec 7>&-
 finish_denied "the killed app"
 
 if ! command -v taskkill >/dev/null 2>&1; then
@@ -218,7 +219,7 @@ wait_for '^status locked' "$HOLD_OUT"
 ask "$WORK/relaunch-stdout.txt" "$WORK/relaunch-stderr.txt"
 refused_by_nobody "the app relaunched and not unlocked"
 
-echo unlock >&"$HOLD_IN"
+echo unlock >&7
 expect_serving 1
 FOURTH="$SESSION"
 [ "$FOURTH" != "$THIRD" ] || die "the relaunched app reused the killed app's session $THIRD"
@@ -226,14 +227,14 @@ FOURTH="$SESSION"
 ask "$WORK/relaunched-stdout.txt" "$WORK/relaunched-stderr.txt" --list-only
 listed_by "$FOURTH" "the relaunched app"
 
-exec {HOLD_IN}>&-
+exec 7>&-
 wait_for '^shut down' "$HOLD_OUT"
 HOLD_PID=""
 
 # ----------------------------------------- keypaste agent holding the vault is named, not displaced
-exec {AGENT_IN}>&-
-exec {AGENT_IN}> >("$CLI" agent --vault "$VAULT" >/dev/null 2>"$AGENT_ERR" {HOLD_IN}>&- {MCP_IN}>&-)
-printf '%s\n' "$MASTER" >&"$AGENT_IN"
+exec 9>&-
+exec 9> >(exec 7>&- 8>&-; exec "$CLI" agent --vault "$VAULT" >/dev/null 2>"$AGENT_ERR")
+printf '%s\n' "$MASTER" >&9
 wait_for 'listening on' "$AGENT_ERR"
 AGENT_SESSION="$(grep 'listening on' "$AGENT_ERR" | sed -E 's/.* for session ([0-9a-f]+),.*/\1/')"
 

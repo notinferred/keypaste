@@ -43,11 +43,12 @@ AUDIT="$(native "$WORK/audit.jsonl")"
 readonly HOLD_OUT="$WORK/hold.txt"
 
 HOLD_PID=""
-exec {HOLD_IN}>/dev/null
-exec {MCP_IN}>/dev/null
+# Fixed descriptors, as macOS's bash 3.2 needs (D-0398): 7 is the held app's input and 8 the open bridge's.
+exec 7>/dev/null
+exec 8>/dev/null
 cleanup() {
-  exec {MCP_IN}>&- 2>/dev/null || true
-  exec {HOLD_IN}>&- 2>/dev/null || true
+  exec 8>&- 2>/dev/null || true
+  exec 7>&- 2>/dev/null || true
   if [ -n "$HOLD_PID" ]; then kill_process "$HOLD_PID"; fi
   rm -rf "$WORK"
 }
@@ -59,7 +60,7 @@ PROMPTS=0
 request() {
   local id="$1" entry="$2" field="$3"
   jq -cn --argjson id "$id" --arg entry "$entry" --arg field "$field" \
-    '{jsonrpc:"2.0",id:$id,method:"tools/call",params:{name:"request_credential",arguments:{entry:$entry,field:$field,reason:"ci desktop approval probe",ttl_seconds:60}}}' >&"$MCP_IN"
+    '{jsonrpc:"2.0",id:$id,method:"tools/call",params:{name:"request_credential",arguments:{entry:$entry,field:$field,reason:"ci desktop approval probe",ttl_seconds:60}}}' >&8
 }
 
 # Starts a bridge whose standard input stays open, asks for the credential, and waits for the prompt.
@@ -69,12 +70,12 @@ raise_prompt() {
   [ -z "${4:-}" ] || expose=(--expose "$4")
   OUT="$WORK/$1-stdout.txt"
   ERR="$WORK/$1-stderr.txt"
-  exec {MCP_IN}>&-
+  exec 8>&-
   # Without the driver's input, which it would otherwise inherit and hold open past quitting.
-  exec {MCP_IN}> >(exec "$MCP" --vault "$VAULT" --audit-log "$AUDIT" --client-label "$LABEL" ${expose[@]+"${expose[@]}"} >"$OUT" 2>"$ERR" {HOLD_IN}>&-)
+  exec 8> >(exec 7>&-; exec "$MCP" --vault "$VAULT" --audit-log "$AUDIT" --client-label "$LABEL" ${expose[@]+"${expose[@]}"} >"$OUT" 2>"$ERR")
   BRIDGE_PID=$!
-  printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}' >&"$MCP_IN"
-  printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}' >&"$MCP_IN"
+  printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}' >&8
+  printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}' >&8
   request 3 "$entry" "$field"
   PROMPTS=$((PROMPTS + 1))
   wait_for '^prompt client' "$HOLD_OUT" "$PROMPTS"
@@ -97,7 +98,7 @@ answered() {
     sleep 0.2
   done
   jq -e 'select(.id == 3)' <"$OUT" >/dev/null 2>&1 || die "the request got no reply"
-  exec {MCP_IN}>&-
+  exec 8>&-
 }
 
 # The prompt that request raised has come down.
@@ -123,8 +124,8 @@ printf '%s\n%s\n%s\n' "$MASTER" "$API_KEY" "$RECOVERY" \
   | "$CLI" set "$API_ENTRY" --field OPENAI_API_KEY --field 'Recovery codes' --vault "$VAULT" >/dev/null \
   || die "could not set the entry's custom fields"
 
-exec {HOLD_IN}>&-
-exec {HOLD_IN}> >(KEYPASTE_DRIVER_PASSWORD="$MASTER" "$DRV" hold "$VAULT" >"$HOLD_OUT" 2>&1)
+exec 7>&-
+exec 7> >(KEYPASTE_DRIVER_PASSWORD="$MASTER" exec "$DRV" hold "$VAULT" >"$HOLD_OUT" 2>&1)
 wait_for 'holding session' "$HOLD_OUT"
 grep -q 'not served' "$HOLD_OUT" && die "the app unlocked and did not serve its vault"
 HOLD_PID="$(process_of)"
@@ -135,7 +136,7 @@ raise_prompt approve
 grep '^prompt client' "$HOLD_OUT" | tail -1 \
   | grep -qF "label=$LABEL entry=$ENTRY field=password for=once, or for 1 hour" \
   || die "the prompt does not show the label, entry, field and what the person can allow"
-echo approve >&"$HOLD_IN"
+echo approve >&7
 answered 30
 withdrawn
 jq -e 'select(.id == 3) | .result.isError == false' <"$OUT" >/dev/null || die "Approve did not release the credential"
@@ -151,7 +152,7 @@ raise_prompt field-once OPENAI_API_KEY "$API_ENTRY" 'api/**'
 grep '^prompt client' "$HOLD_OUT" | tail -1 \
   | grep -qF "label=$LABEL entry=$API_ENTRY field=OPENAI_API_KEY for=once, or for 1 hour" \
   || die "the prompt does not name the custom field"
-echo once >&"$HOLD_IN"
+echo once >&7
 answered 30
 withdrawn
 jq -e --arg v "$API_KEY" 'select(.id == 3) | .result.isError == false and .result.structuredContent.value == $v' <"$OUT" >/dev/null \
@@ -163,7 +164,7 @@ tail -n 1 "$AUDIT" | jq -e --arg s "$FIRST" \
 # Allowed for an hour on one connection, it serves that field alone: the password still draws a prompt,
 # and a field that never leaves is refused by the bridge with no prompt at all.
 raise_prompt field-hour OPENAI_API_KEY "$API_ENTRY" 'api/**'
-echo approve >&"$HOLD_IN"
+echo approve >&7
 reply_to 3
 withdrawn
 jq -e --arg v "$API_KEY" 'select(.id == 3) | .result.structuredContent.value == $v' <"$OUT" >/dev/null \
@@ -173,7 +174,7 @@ PROMPTS=$((PROMPTS + 1))
 wait_for '^prompt client' "$HOLD_OUT" "$PROMPTS"
 grep '^prompt client' "$HOLD_OUT" | tail -1 | grep -qF "entry=$API_ENTRY field=password" \
   || die "a password request under the custom field's grant did not draw its own prompt"
-echo deny >&"$HOLD_IN"
+echo deny >&7
 reply_to 4
 withdrawn
 id=5
@@ -186,7 +187,7 @@ for field in 'Recovery codes' otp KP2A_URL_1 URL; do
     || die "a request for '$field' was not audited as an invalid field"
   id=$((id + 1))
 done
-exec {MCP_IN}>&-
+exec 8>&-
 [ "$(grep -c '^prompt client' "$HOLD_OUT")" -eq "$PROMPTS" ] || die "a field that never leaves drew a prompt"
 for value in "$API_PASSWORD" "$RECOVERY" "$SECRET"; do
   grep -q "$value" "$WORK/field-once-stdout.txt" "$OUT" && die "a custom-field request returned another field's value"
@@ -197,22 +198,22 @@ done
 
 # ---------------------------------------------------------------- Deny and closing refuse
 raise_prompt deny
-echo deny >&"$HOLD_IN"
+echo deny >&7
 answered 30
 withdrawn
 denied_as prompt "$FIRST" "Deny"
 
 raise_prompt close
-echo close >&"$HOLD_IN"
+echo close >&7
 answered 30
 withdrawn
 denied_as prompt "$FIRST" "closing the prompt"
 
 # ------------------------------------------------ the client giving up takes the prompt down
 raise_prompt cancelled
-printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":3,"reason":"ci probe gave up"}}' >&"$MCP_IN"
+printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":3,"reason":"ci probe gave up"}}' >&8
 withdrawn
-exec {MCP_IN}>&-
+exec 8>&-
 for _ in $(seq 1 50); do
   tail -n 1 "$AUDIT" | jq -e '.method == "cancelled"' >/dev/null 2>&1 && break
   sleep 0.2
@@ -230,19 +231,19 @@ else
   kill -9 "$BRIDGE_PID"
 fi
 withdrawn
-exec {MCP_IN}>&-
+exec 8>&-
 grep -q "$SECRET" "$OUT" && die "a request whose bridge went away reached the client"
 
 # -------------------------------------------------------------------- a lock refuses and withdraws
 raise_prompt lock
-echo lock >&"$HOLD_IN"
+echo lock >&7
 wait_for '^locked' "$HOLD_OUT"
 answered 30
 withdrawn
 denied_as vault-locked "$FIRST" "the lock"
 
 # ------------------------------------------------ nobody answering is a denial when the window closes
-echo unlock >&"$HOLD_IN"
+echo unlock >&7
 wait_for 'holding session' "$HOLD_OUT" 2
 SECOND="$(session_of)"
 [ "$SECOND" != "$FIRST" ] || die "unlocking again reused session $FIRST"
@@ -252,7 +253,7 @@ answered 60
 withdrawn
 denied_as timed-out "$SECOND" "the timeout"
 
-exec {HOLD_IN}>&-
+exec 7>&-
 wait_for '^shut down' "$HOLD_OUT"
 HOLD_PID=""
 

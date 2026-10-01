@@ -42,11 +42,12 @@ readonly AGENT_ERR="$WORK/agent-stderr.txt"
 
 HOLD_PID=""
 AGENT_PID=""
-exec {HOLD_IN}>/dev/null
-exec {AGENT_IN}>/dev/null
+# Fixed descriptors, as macOS's bash 3.2 needs (D-0398): 7 is the held app's input and 9 keypaste agent's.
+exec 7>/dev/null
+exec 9>/dev/null
 cleanup() {
-  exec {HOLD_IN}>&- 2>/dev/null || true
-  exec {AGENT_IN}>&- 2>/dev/null || true
+  exec 7>&- 2>/dev/null || true
+  exec 9>&- 2>/dev/null || true
   if [ -n "$HOLD_PID" ]; then kill_process "$HOLD_PID"; fi
   if [ -n "$AGENT_PID" ]; then kill_process "$AGENT_PID"; fi
   rm -rf "$WORK"
@@ -61,9 +62,10 @@ start_run() {
   RUN_ERR="$WORK/$tag-stderr.txt"
   (
     cd "$WORK/project-e1c"
+    exec 7>&- 9>&-
     exec "$CLI" run --session --vault "$VAULT" "$project" -- "$CHILD" -c \
       'printf "deploy=%s database=%s" "${DEPLOY_KEY-unset}" "${DB_URL-unset}"' "$tag" \
-      <<<"$MASTER" >"$RUN_OUT" 2>"$RUN_ERR" {HOLD_IN}>&- {AGENT_IN}>&-
+      <<<"$MASTER" >"$RUN_OUT" 2>"$RUN_ERR"
   ) &
   RUN_PID=$!
 }
@@ -134,8 +136,8 @@ start_run ci no-owner
 refused "no owner" "nothing holds"
 
 # -------------------------------------------------------------- the app holds it: Approve releases
-exec {HOLD_IN}>&-
-exec {HOLD_IN}> >(KEYPASTE_DRIVER_PASSWORD="$MASTER" "$DRV" hold "$VAULT" >"$HOLD_OUT" 2>&1 {AGENT_IN}>&-)
+exec 7>&-
+exec 7> >(exec 9>&-; KEYPASTE_DRIVER_PASSWORD="$MASTER" exec "$DRV" hold "$VAULT" >"$HOLD_OUT" 2>&1)
 wait_for 'holding session' "$HOLD_OUT"
 grep -q 'not served' "$HOLD_OUT" && die "the app unlocked and did not serve its vault"
 HOLD_PID="$(process_of)"
@@ -147,7 +149,7 @@ case "$PROMPT_LINE" in
   "env-prompt project=ci command="*" case-approve directory="*"project-e1c keys=DB_URL,DEPLOY_KEY entries=env/ci/DB_URL,env/ci/DEPLOY_KEY timed=True") ;;
   *) die "the prompt does not name the project, the command, the directory, the variable names and their entries: $PROMPT_LINE" ;;
 esac
-echo approve >&"$HOLD_IN"
+echo approve >&7
 withdrawn
 released "Approve in the app"
 grep -qE "$DEPLOY|$DATABASE" "$HOLD_OUT" && die "a value reached the app's output"
@@ -160,14 +162,14 @@ case "$PROMPT_LINE" in
   "env-prompt project=tagged command="*" case-tagged directory="*"project-e1c keys=DB_URL,DEPLOY_KEY entries=env/tagged/DB_URL,services/Deploy timed=False") ;;
   *) die "the tagged set's prompt does not name each source entry once only: $PROMPT_LINE" ;;
 esac
-echo once >&"$HOLD_IN"
+echo once >&7
 withdrawn
 released "Allow once for the tagged set"
 
 # ------------------------------------------------------------------------------ Deny refuses
 start_run ci case-deny
 next_prompt
-echo deny >&"$HOLD_IN"
+echo deny >&7
 withdrawn
 refused "Deny in the app" "said no"
 
@@ -179,41 +181,41 @@ refused "an unusable set" "BAD-NAME"
 # ------------------------------------------------------------- a lock while the prompt waits refuses
 start_run ci case-lock
 next_prompt
-echo lock >&"$HOLD_IN"
+echo lock >&7
 wait_for '^locked' "$HOLD_OUT"
 withdrawn
 refused "a lock while asked" "locked"
 
 # -------------------------------------------------------- nobody answering refuses when the window closes
-echo unlock >&"$HOLD_IN"
+echo unlock >&7
 wait_for 'holding session' "$HOLD_OUT" 2
 start_run ci case-timeout
 next_prompt
 refused "the timeout" "in time"
 withdrawn
 
-exec {HOLD_IN}>&-
+exec 7>&-
 wait_for '^shut down' "$HOLD_OUT"
 HOLD_PID=""
 
 # ------------------------------------------------------------- keypaste agent holds it: o and n
-exec {AGENT_IN}>&-
-exec {AGENT_IN}> >(exec "$CLI" agent --vault "$VAULT" >/dev/null 2>"$AGENT_ERR" {HOLD_IN}>&-)
+exec 9>&-
+exec 9> >(exec 7>&-; exec "$CLI" agent --vault "$VAULT" >/dev/null 2>"$AGENT_ERR")
 AGENT_SHELL=$!
 if [ -r "/proc/$AGENT_SHELL/winpid" ]; then AGENT_PID="$(cat "/proc/$AGENT_SHELL/winpid")"; else AGENT_PID="$AGENT_SHELL"; fi
-printf '%s\n' "$MASTER" >&"$AGENT_IN"
+printf '%s\n' "$MASTER" >&9
 wait_for 'listening on' "$AGENT_ERR"
 
 start_run ci agent-yes
 wait_for "is asking for a project's variables" "$AGENT_ERR" 1
 grep -q 'variables  DB_URL DEPLOY_KEY' "$AGENT_ERR" || die "keypaste agent did not show the variable names"
 grep -q 'command    .* agent-yes' "$AGENT_ERR" || die "keypaste agent did not show the command"
-printf 'o\n' >&"$AGENT_IN"
+printf 'o\n' >&9
 released "o at keypaste agent"
 
 start_run ci agent-no
 wait_for "is asking for a project's variables" "$AGENT_ERR" 2
-printf 'n\n' >&"$AGENT_IN"
+printf 'n\n' >&9
 refused "n at keypaste agent" "said no"
 grep -qE "$DEPLOY|$DATABASE" "$AGENT_ERR" && die "a value reached keypaste agent's terminal"
 

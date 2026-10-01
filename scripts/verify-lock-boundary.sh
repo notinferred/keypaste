@@ -40,11 +40,12 @@ readonly AGENT_ERR="$WORK/agent-stderr.txt"
 
 HOLD_PID=""
 AGENT_PID=""
-exec {HOLD_IN}>/dev/null
-exec {MCP_IN}>/dev/null
+# Fixed descriptors, as macOS's bash 3.2 needs (D-0398): 7 is the held app's input, 8 the open bridge's and 9 keypaste agent's.
+exec 7>/dev/null
+exec 8>/dev/null
 cleanup() {
-  exec {MCP_IN}>&- 2>/dev/null || true
-  exec {HOLD_IN}>&- 2>/dev/null || true
+  exec 8>&- 2>/dev/null || true
+  exec 7>&- 2>/dev/null || true
   if [ -n "$HOLD_PID" ]; then kill_process "$HOLD_PID"; fi
   if [ -n "$AGENT_PID" ]; then kill -9 "$AGENT_PID" 2>/dev/null || true; fi
   rm -rf "$WORK"
@@ -55,12 +56,12 @@ trap cleanup EXIT
 start_request() {
   OUT="$1"
   ERR="$2"
-  exec {MCP_IN}>&-
+  exec 8>&-
   # Without the driver's input, which it would otherwise inherit and hold open past quitting.
-  exec {MCP_IN}> >("$MCP" --vault "$VAULT" --audit-log "$AUDIT" --client-label ci-probe >"$OUT" 2>"$ERR" {HOLD_IN}>&-)
-  printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}' >&"$MCP_IN"
-  printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}' >&"$MCP_IN"
-  printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci lock probe\",\"ttl_seconds\":60}}}" >&"$MCP_IN"
+  exec 8> >(exec 7>&-; exec "$MCP" --vault "$VAULT" --audit-log "$AUDIT" --client-label ci-probe >"$OUT" 2>"$ERR")
+  printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}' >&8
+  printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}' >&8
+  printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci lock probe\",\"ttl_seconds\":60}}}" >&8
 }
 
 # Waits for the request's reply, then lets the bridge go.
@@ -70,7 +71,7 @@ finish_request() {
     sleep 0.2
   done
   jq -e 'select(.id == 3)' <"$OUT" >/dev/null 2>&1 || die "the waiting request got no reply"
-  exec {MCP_IN}>&-
+  exec 8>&-
 }
 
 # The request was refused with no value, and its audit line is a vault-locked denial of $1.
@@ -89,8 +90,8 @@ printf '%s\n' "$MASTER" | "$CLI" env set ci "DEPLOY_KEY=$SECRET" --vault "$VAULT
   || die "could not store the test credential"
 
 # ---------------------------------------------------- a manual lock denies the waiting request
-exec {HOLD_IN}>&-
-exec {HOLD_IN}> >(KEYPASTE_DRIVER_PASSWORD="$MASTER" "$DRV" hold "$VAULT" --held-prompt >"$HOLD_OUT" 2>&1)
+exec 7>&-
+exec 7> >(KEYPASTE_DRIVER_PASSWORD="$MASTER" exec "$DRV" hold "$VAULT" --held-prompt >"$HOLD_OUT" 2>&1)
 wait_for 'holding session' "$HOLD_OUT"
 grep -q 'not served' "$HOLD_OUT" && die "the app unlocked and did not serve its vault"
 HOLD_PID="$(process_of)"
@@ -98,21 +99,21 @@ FIRST="$(session_of)"
 
 start_request "$WORK/manual-stdout.txt" "$WORK/manual-stderr.txt"
 wait_for '^asking' "$HOLD_OUT"
-echo lock >&"$HOLD_IN"
+echo lock >&7
 wait_for '^locked' "$HOLD_OUT"
 finish_request
 grep -q '^withdrawn' "$HOLD_OUT" || die "the manual lock did not withdraw the waiting prompt"
 denied_as_locked "$FIRST" "manual lock"
 
 # ------------------------------- a new unlock asks again, and quitting denies what is waiting
-echo unlock >&"$HOLD_IN"
+echo unlock >&7
 wait_for 'holding session' "$HOLD_OUT" 2
 SECOND="$(session_of)"
 [ "$SECOND" != "$FIRST" ] || die "unlocking again reused session $FIRST"
 
 start_request "$WORK/quit-stdout.txt" "$WORK/quit-stderr.txt"
 wait_for '^asking' "$HOLD_OUT" 2
-exec {HOLD_IN}>&-
+exec 7>&-
 wait_for '^shut down' "$HOLD_OUT"
 finish_request
 wait_for '^withdrawn' "$HOLD_OUT" 2
@@ -126,8 +127,8 @@ else
   mkfifo "$WORK/agent.in"
   "$CLI" agent --vault "$VAULT" <"$WORK/agent.in" >/dev/null 2>"$AGENT_ERR" &
   AGENT_PID=$!
-  exec {AGENT_IN}>"$WORK/agent.in"
-  printf '%s\n' "$MASTER" >&"$AGENT_IN"
+  exec 9>"$WORK/agent.in"
+  printf '%s\n' "$MASTER" >&9
   wait_for 'listening on' "$AGENT_ERR"
   AGENT_SESSION="$(grep 'listening on' "$AGENT_ERR" | sed -E 's/.* for session ([0-9a-f]+),.*/\1/')"
 
@@ -139,7 +140,7 @@ else
   agent_exit=$?
   set -e
   AGENT_PID=""
-  exec {AGENT_IN}>&-
+  exec 9>&-
   finish_request
   [ "$agent_exit" -eq 0 ] || die "keypaste agent did not stop cleanly on SIGTERM (exit $agent_exit)"
   grep -q 'withdrawn before you answered' "$AGENT_ERR" || die "SIGTERM did not withdraw the agent's prompt"

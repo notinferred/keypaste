@@ -38,11 +38,12 @@ readonly AUDIT="$WORK/home/audit.jsonl"
 readonly HOLD_OUT="$WORK/hold.txt"
 
 HOLD_PID=""
-exec {HOLD_IN}>/dev/null
-exec {MCP_IN}>/dev/null
+# Fixed descriptors, as macOS's bash 3.2 needs (D-0398): 7 is the held app's input and 8 the open bridge's.
+exec 7>/dev/null
+exec 8>/dev/null
 cleanup() {
-  exec {MCP_IN}>&- 2>/dev/null || true
-  exec {HOLD_IN}>&- 2>/dev/null || true
+  exec 8>&- 2>/dev/null || true
+  exec 7>&- 2>/dev/null || true
   if [ -n "$HOLD_PID" ]; then kill_process "$HOLD_PID"; fi
   rm -rf "$WORK"
 }
@@ -54,15 +55,15 @@ prompts() { grep -c '^prompt client' "$HOLD_OUT" || true; }
 start_bridge() {
   OUT="$WORK/$1-stdout.txt"
   ERR="$WORK/$1-stderr.txt"
-  exec {MCP_IN}>&-
+  exec 8>&-
   # Without the driver's input, which it would otherwise inherit and hold open past quitting.
-  exec {MCP_IN}> >(exec "$MCP" --vault "$VAULT" --client-label "$LABEL" >"$OUT" 2>"$ERR" {HOLD_IN}>&-)
-  printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}' >&"$MCP_IN"
-  printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}' >&"$MCP_IN"
+  exec 8> >(exec 7>&-; exec "$MCP" --vault "$VAULT" --client-label "$LABEL" >"$OUT" 2>"$ERR")
+  printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci-probe","version":"1.0.0"}}}' >&8
+  printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}' >&8
 }
 
 ask() {
-  printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$1,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci agent activity probe\",\"ttl_seconds\":60}}}" >&"$MCP_IN"
+  printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":$1,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"$ENTRY\",\"field\":\"password\",\"reason\":\"ci agent activity probe\",\"ttl_seconds\":60}}}" >&8
 }
 
 reply() {
@@ -88,7 +89,7 @@ ACTIVITIES=0
 # Asks the driver what Agent Activity shows, and keeps this reading's lines in $SHOWN.
 activity() {
   ACTIVITIES=$((ACTIVITIES + 1))
-  echo activity >&"$HOLD_IN"
+  echo activity >&7
   wait_for '^activity end' "$HOLD_OUT" "$ACTIVITIES"
   SHOWN="$WORK/activity-$ACTIVITIES.txt"
   awk -v n="$ACTIVITIES" '/^activity end/ { seen++; next } seen == n - 1 && /^(unavailable|waiting|grant|history)/' "$HOLD_OUT" >"$SHOWN"
@@ -100,7 +101,7 @@ omits() { grep -qE -- "$1" "$SHOWN" && die "Agent Activity shows: $2"; return 0;
 REVOKES=0
 revoke() {
   REVOKES=$((REVOKES + 1))
-  echo "revoke $1" >&"$HOLD_IN"
+  echo "revoke $1" >&7
   wait_for '^revoked ' "$HOLD_OUT" "$REVOKES"
 }
 
@@ -111,8 +112,8 @@ printf '%s\n%s\n' "$MASTER" "$MASTER" | "$CLI" init "$VAULT" >/dev/null || die "
 printf '%s\n' "$MASTER" | "$CLI" env set ci "DEPLOY_KEY=$SECRET" --vault "$VAULT" >/dev/null \
   || die "could not store the test credential"
 
-exec {HOLD_IN}>&-
-exec {HOLD_IN}> >(KEYPASTE_DRIVER_PASSWORD="$MASTER" "$DRV" hold "$VAULT" >"$HOLD_OUT" 2>&1)
+exec 7>&-
+exec 7> >(KEYPASTE_DRIVER_PASSWORD="$MASTER" exec "$DRV" hold "$VAULT" >"$HOLD_OUT" 2>&1)
 wait_for 'holding session' "$HOLD_OUT"
 grep -q 'not served' "$HOLD_OUT" && die "the app unlocked and did not serve its vault"
 HOLD_PID="$(process_of)"
@@ -134,7 +135,7 @@ activity
 shows "^waiting n=1 client=ci-probe label=$LABEL entry=$ENTRY field=password left=answered for you in [0-9]+ s$" "the waiting request"
 omits '^grant ' "a grant before Approve"
 
-echo approve >&"$HOLD_IN"
+echo approve >&7
 reply 3
 released 3
 grep -q "$SECRET" "$OUT" || die "the approved reply does not carry the credential"
@@ -159,7 +160,7 @@ omits '^grant ' "a grant after Revoke all"
 
 ask 5
 wait_for '^prompt client' "$HOLD_OUT" 2
-echo approve >&"$HOLD_IN"
+echo approve >&7
 reply 5
 released 5
 last_audit '.method == "prompt" and .decision == "granted"'
@@ -172,7 +173,7 @@ omits '^grant ' "a grant after Revoke"
 
 ask 6
 wait_for '^prompt client' "$HOLD_OUT" 3
-echo deny >&"$HOLD_IN"
+echo deny >&7
 reply 6
 refused 6
 activity
@@ -186,7 +187,7 @@ wait_for '^prompt client' "$HOLD_OUT" 4
 activity
 shows '^waiting n=1 ' "the request waiting before the lock"
 
-echo lock >&"$HOLD_IN"
+echo lock >&7
 wait_for '^locked' "$HOLD_OUT"
 reply 3
 refused 3
@@ -195,7 +196,7 @@ activity
 shows '^unavailable ' "a locked app as unable to read requests and grants"
 omits '^(waiting|grant) ' "a request or grant after the lock"
 
-echo unlock >&"$HOLD_IN"
+echo unlock >&7
 wait_for 'holding session' "$HOLD_OUT" 2
 SECOND="$(session_of)"
 [ "$SECOND" != "$FIRST" ] || die "unlocking again reused session $FIRST"
@@ -206,7 +207,7 @@ shows '^history-message The audit log has no records from this session yet\.' "t
 omits '^history(-heading)? ' "a record from before the lock in the new session's history"
 
 # ----------------------------------------------------------------- an unreadable log is unavailable
-exec {MCP_IN}>&-
+exec 8>&-
 for _ in $(seq 1 50); do rm -f "$AUDIT" 2>/dev/null && break; sleep 0.2; done
 [ -e "$AUDIT" ] && die "could not remove the audit log"
 mkdir "$AUDIT"
@@ -216,7 +217,7 @@ omits '^history ' "history from a log that could not be read"
 
 grep -q "$SECRET" "$HOLD_OUT" && die "a credential reached the app's output"
 
-exec {HOLD_IN}>&-
+exec 7>&-
 wait_for '^shut down' "$HOLD_OUT"
 HOLD_PID=""
 
