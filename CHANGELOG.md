@@ -36,6 +36,8 @@ Items is laid out as KeePassXC's main window: the vault's groups fold under Item
 
 Screen readers now announce the desktop's icon-and-text buttons by their labels, the three Copy buttons by what they copy, and item rows by their titles, instead of by control type names ([F.25](docs/steps/F.25.md)).
 
+A SIGTERM that reaches `keypaste run` while it is starting your command, such as `docker stop` or `timeout` right after launch, now reaches the command, or stops it from starting with 128 plus the signal's number and a line saying so. keypaste used to die of it and could leave the command running without it, most often on macOS ([F.37](docs/steps/F.37.md)).
+
 The desktop follows your system's light or dark setting unless Settings chooses one. Item titles are set in Instrument Sans, status text is darker and readable on the light palette, and every screen in both palettes keeps amber for its one main action or live signal. The icon and wordmark replace the monogram in the app, its icons, keypaste.com and the README, and `keypaste --help` opens with what keypaste is ([N.7](docs/steps/N.7.md)).
 
 Amber now marks one thing on a screen, its main action or something live such as a waiting request: selected rows and icons, links, countdown bars and an entry's "in use" dot are drawn in the ordinary colours ([N.1a2](docs/steps/N.1a2.md)).

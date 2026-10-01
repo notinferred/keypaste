@@ -37,11 +37,14 @@ public enum ChildOutcome
 
     /// <summary>The child started and is not waited for. <see cref="ChildResult.ProcessId"/> is its own.</summary>
     Started = 4,
+
+    /// <summary>A signal stopped the run before the child started. <see cref="ChildResult.ExitCode"/> is 128 plus its number.</summary>
+    Interrupted = 5,
 }
 
 /// <summary>The outcome of running a child.</summary>
 /// <param name="Outcome">How the attempt ended.</param>
-/// <param name="ExitCode">The child's exit code, meaningful only for <see cref="ChildOutcome.Exited"/>.</param>
+/// <param name="ExitCode">The child's exit code, or 128 plus the signal that stopped the run; meaningful only for <see cref="ChildOutcome.Exited"/> and <see cref="ChildOutcome.Interrupted"/>.</param>
 /// <param name="Error">What went wrong, or an empty string.</param>
 /// <param name="ProcessId">The child's process id, meaningful only for <see cref="ChildOutcome.Started"/>.</param>
 public readonly record struct ChildResult(ChildOutcome Outcome, int ExitCode, string Error, int ProcessId = 0);

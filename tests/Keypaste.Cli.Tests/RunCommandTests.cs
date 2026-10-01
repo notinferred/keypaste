@@ -298,6 +298,18 @@ public sealed class RunCommandTests
         Assert.Equal(code, harness.Run("run", "dev", "--vault", harness.VaultPath, "--", "node"));
     }
 
+    [Fact]
+    public void A_run_a_signal_stopped_before_its_child_started_exits_128_plus_the_signal_and_says_so()
+    {
+        using var harness = Seeded(("A", "value-5e2a"));
+        harness.ProcessLauncher.Result = new ChildResult(ChildOutcome.Interrupted, 143, "received SIGTERM");
+
+        harness.Prompt.Enqueue(Master);
+        Assert.Equal(143, harness.Run("run", "dev", "--vault", harness.VaultPath, "--", "node"));
+        Assert.Contains("keypaste run: received SIGTERM, so nothing was started", harness.Err, StringComparison.Ordinal);
+        Assert.DoesNotContain("value-5e2a", harness.Err + harness.Out, StringComparison.Ordinal);
+    }
+
     /// <summary>
     /// One fact rather than a theory: <see cref="ChildOutcome"/> is internal, and a public test
     /// method cannot take it as a parameter without leaking the type out of the CLI.

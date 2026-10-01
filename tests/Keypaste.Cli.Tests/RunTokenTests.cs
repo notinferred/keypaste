@@ -4,6 +4,7 @@ using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Launch;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Policy;
 using Keypaste.Core.Tokens;
@@ -58,6 +59,19 @@ public sealed class RunTokenTests : IDisposable
         Assert.DoesNotContain(child.Values, value => value.Contains(token[13..], StringComparison.Ordinal));
         Assert.Equal("deploy", _harness.ProcessLauncher.Started[^1].FileName);
         Assert.Empty(_harness.Prompt.PromptsSeen);
+        Assert.DoesNotContain(TokenVerbTests.Value, _harness.Out + _harness.Err, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Bundle_StoppedBeforeItsChildStarted_ExitsWithTheSignalsCodeAndSaysSo()
+    {
+        _harness.Environment[RunWithToken.EnvironmentVariable] = Bundled("read:acme-api/staging/*");
+        _harness.Environment.Remove(VaultLocator.EnvironmentVariable);
+        _harness.ProcessLauncher.Result = new ChildResult(ChildOutcome.Interrupted, 143, "received SIGTERM");
+
+        _harness.AssertExit(143, _harness.Run("run", "--bundle", BundlePath, "--", "deploy"));
+
+        Assert.Contains("keypaste run: received SIGTERM, so nothing was started", _harness.Err, StringComparison.Ordinal);
         Assert.DoesNotContain(TokenVerbTests.Value, _harness.Out + _harness.Err, StringComparison.Ordinal);
     }
 

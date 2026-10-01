@@ -66,13 +66,28 @@ wait "$wrapper"
 status=$?
 set -e
 
-grep -q GOT_TERM "$log" || die "the child never received SIGTERM; keypaste did not relay it"
-
-# 143 is 128+15: keypaste itself died of the signal instead of suppressing it, waiting, and
-# reporting what the child said. That is the exact regression removing `context.Cancel = true`
-# would cause, so the number is named here rather than left to be worked out.
+# 143 is 128+15: keypaste died of the signal instead of waiting and reporting what the child said,
+# which removing `context.Cancel = true` causes. It is checked first because such a keypaste
+# relays before it dies, so the child's output may not be written yet.
 [ "$status" = "42" ] || die "expected the child's 42, got $status (143 means keypaste died instead of relaying)"
+grep -q GOT_TERM "$log" || die "the child never received SIGTERM; keypaste did not relay it"
 echo "ok: SIGTERM was relayed, and the child's exit code came back"
+
+echo "--- SIGTERM sent to keypaste as its child starts must reach the child too"
+
+# The child signals keypaste as its first act, while keypaste may still be starting it; each run
+# is one draw of that race, so it is drawn many times.
+runs=50
+for i in $(seq 1 "$runs"); do
+  set +e
+  printf '%s\n' "$pw" | "$kp" run gate --vault "$db" -- \
+    "$child" -c 'trap "exit 42" TERM; kill -TERM $PPID; n=0; while [ $n -lt 25 ]; do sleep 0.2; n=$((n + 1)); done; exit 3' \
+    >"$log" 2>&1
+  status=$?
+  set -e
+  [ "$status" = "42" ] || die "run $i of $runs: expected the child's 42, got $status (143 means keypaste died before it relayed, 3 that the child never got it)"
+done
+echo "ok: a SIGTERM sent as the child started was relayed in $runs of $runs runs"
 
 echo "--- NEGATIVE CONTROL: the wait must be able to observe a different code"
 

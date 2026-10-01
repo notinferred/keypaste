@@ -583,6 +583,10 @@ internal static class RunCommand
             case ChildOutcome.Exited:
                 return result.ExitCode;
 
+            case ChildOutcome.Interrupted:
+                context.Stderr.WriteLine($"keypaste run: {result.Error}, so nothing was started");
+                return result.ExitCode;
+
             case ChildOutcome.NotFound:
                 context.Stderr.WriteLine($"keypaste run: {result.Error}");
                 return CliApp.ExitCommandNotFound;

@@ -62,7 +62,10 @@ internal static class NativeSignals
         }
     }
 
-    private static int? Number(PosixSignal signal) => signal switch
+    /// <summary>The Unix number of <paramref name="signal"/>, or null for one keypaste never relays.</summary>
+    /// <param name="signal">The signal.</param>
+    /// <returns>Its number.</returns>
+    internal static int? Number(PosixSignal signal) => signal switch
     {
         PosixSignal.SIGHUP => SigHup,
         PosixSignal.SIGINT => SigInt,
