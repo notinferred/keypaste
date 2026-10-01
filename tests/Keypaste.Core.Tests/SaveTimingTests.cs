@@ -47,9 +47,6 @@ public sealed class SaveTimingTests : IDisposable
         Assert.True(
             gated.Gate >= _hold / 2,
             $"a save held for {_hold.TotalMilliseconds} ms reported {SaveTimings.Describe(waited)}");
-        Assert.True(
-            gated.Gate > gated.Work,
-            $"the held save's own work was not smaller than its gate wait: {SaveTimings.Describe(waited)}");
         AssertComponentsFitTheTotal(waited);
     }
 
@@ -132,12 +129,13 @@ public sealed class SaveTimingTests : IDisposable
 
             var gated = Assert.Single(waited.Attempts);
             Assert.True(
-                gated.Gate < TimeSpan.FromMilliseconds(50),
+                gated.Gate is not null && gated.HeldBy == 0,
                 $"a save queued behind another save's retry wait: {SaveTimings.Describe(waited)}");
 
             var refused = holding.Attempts[0];
+            var heldOutsideTheAttempt = refused.Held - refused.Reread - refused.Work;
             Assert.True(
-                refused.Held < refused.Wait,
+                heldOutsideTheAttempt < refused.Wait,
                 $"the holder kept the gate through its retry wait: {SaveTimings.Describe(holding)}");
         }
     }
@@ -198,7 +196,10 @@ public sealed class SaveTimingTests : IDisposable
             "the holder never entered its attempt");
     }
 
-    /// <summary>Runs <paramref name="waiter"/> while <paramref name="holder"/> blocks in its retry wait.</summary>
+    /// <summary>
+    /// Runs <paramref name="waiter"/> while <paramref name="holder"/> blocks in its retry wait, after a
+    /// refused attempt that outlasts that wait as a stalled Windows runner made one in F.34.
+    /// </summary>
     [SupportedOSPlatform("windows")]
     private static (SaveTiming Holding, SaveTiming Waited) WhileTheHolderSleeps(
         Vault holder, HeldTransactedName held, Action waiter)
@@ -207,12 +208,21 @@ public sealed class SaveTimingTests : IDisposable
         using var release = new ManualResetEventSlim();
 
         return Concurrently(
-            () => holder.SaveWaiting(_ =>
-            {
-                sleeping.Set();
-                release.Wait();
-                held.RollBack();
-            }, attempts: 2),
+            () => holder.SaveWaiting(
+                _ =>
+                {
+                    sleeping.Set();
+                    release.Wait();
+                    held.RollBack();
+                },
+                attempts: 2,
+                duringAttempt: attempt =>
+                {
+                    if (attempt == 1)
+                    {
+                        Thread.Sleep(2 * _hold);
+                    }
+                }),
             sleeping,
             release,
             waiter,

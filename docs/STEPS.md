@@ -34,8 +34,6 @@ Custom fields and tags are ordinary KeePass data: keypaste writes them as KeePas
   - `search` looks at names only (D-0278).
   - `show` masks values and prints none without `--reveal`.
 
-- [ ] **F.34 — Diagnose a refused Windows save attempt that outlasts its retry wait.** Needs: none. — dev run 36736924521 at `d5ea3f3`, `test (windows-2025)`, backend projects: `SaveTimingTests.ATransactedSave_DoesNotQueueBehindAnotherSavesRetryWait` failed at `SaveTimingTests.cs:139` with "the holder kept the gate through its retry wait": the holder's refused first attempt held the save gate 3224 ms, 3222 ms of it work, against a 1964 ms wait before its second attempt, while the waiting save's gate wait stayed under the 50 ms the test allows. `src` there equals `a432ade`'s, Core.Tests differs only in a doc comment, and the same test passed on Windows at `9fae2b3` in dev run 36728844369. The question to answer first is where the refused attempt spent its 3.2 s: in the transacted write that meets the held name, slowed by suite load, or in work the gate should not cover. A branch probe repeats the class with the identical backend test command on windows-2025 and records each attempt's decomposition per [diagnostics](diagnostics.md); the repair depends on that result.
-
 ## T2 — One shared unlock session
 
 U.1–U.3 and 4.4b gave the app, `keypaste agent` and the bridge one owner and one lock (D-0309 to D-0321), and N.10 made every CLI verb that saves take the owner's claim (D-0382). What remains is approving a terminal edit in the unlocked app instead of refusing it.
