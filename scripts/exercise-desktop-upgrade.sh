@@ -43,6 +43,7 @@ readonly VARIABLE='UPGRADE_TOKEN'
 readonly VALUES=(first-value second-value third-value)
 readonly HISTORY_TITLES=3
 readonly DOWNGRADE_MESSAGE='A newer keypaste is already installed.'
+readonly INSTALL_FAILED='Action ended.*InstallFinalize. Return value 3|Action ended.*InstallFiles. Return value 3'
 readonly CR=$'\r'
 
 usage() {
@@ -252,7 +253,7 @@ fixture() {
   done
 
   printf '[[vault]]\npath = "%s"\nopened_at = "%s"\n' "$VAULT_NATIVE" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$HOME_DIR/recent.toml"
-  printf 'idle_timeout_seconds = 28800\n' > "$HOME_DIR/app.toml"
+  printf '[[settings]]\nidle_timeout_seconds = 28800\n' > "$HOME_DIR/app.toml"
   printf '[[allow]]\nclient = "upgrade-check"\nentries = ["env/%s/**"]\nfields = ["password"]\nmax_ttl_seconds = 60\n' \
     "$PROJECT" > "$HOME_DIR/policy.toml"
   "$KP" policy ls >/dev/null || { echo 'keypaste policy ls refused the policy file'; return 1; }
@@ -337,10 +338,9 @@ upgrade_code() {
   printf '{%s}' "${code^^}"
 }
 
-# An MSI verbose log is UTF-16, which no grep of ours was reading: the interrupt never saw InstallFiles
-# and the refused downgrade never saw its message (run 35263524309, D-0209).
+# An MSI verbose log is UTF-16 (D-0209); grep reads it to the end, as a grep -q stopping at the match kills tr and pipefail then reads no match (F.43).
 msi_log_says() { # msi_log_says <log> <extended-regexp>
-  [ -f "$1" ] && tr -d '\0' < "$1" | grep -qiE "$2"
+  [ -f "$1" ] && tr -d '\0' < "$1" | grep -iE "$2" > /dev/null
 }
 
 app_version() {
@@ -427,7 +427,7 @@ interrupt() {
       sleep 1
     done
 
-    if msi_log_says "$log" 'Action ended.*InstallFinalize. Return value 3|Action ended.*InstallFiles. Return value 3'; then
+    if msi_log_says "$log" "$INSTALL_FAILED"; then
       fact interrupted_failed yes
       fact interrupted_where 'the transaction failed while the install was running'
     else
@@ -690,6 +690,31 @@ selftest() {
   expect no-read-back interrupted unreached
   expect unfinished install-lower harness-failure
   expect unfinished uninstall harness-failure
+
+  utf16() { local s="$1" i; for ((i = 0; i < ${#s}; i++)); do printf '%s\0' "${s:i:1}"; done; }
+  # Two megabytes after the line read for, so a reader that stops at the match leaves its producer writing (F.43).
+  utf16 $'MSI (s) (D0:2C) [15:21:46:444]: Note: 1: 2205 2:  3: Error\n' > "$work/filler"
+  for _ in $(seq 1 14); do cat "$work/filler" "$work/filler" > "$work/t" && mv "$work/t" "$work/filler"; done
+  expect_log() { # expect_log <name> <line> <extended-regexp> <yes|no>
+    local actual=no
+    cases=$((cases + 1))
+    { utf16 "=== Verbose logging started ==="$'\n'"$2"$'\n'; cat "$work/filler"; } > "$work/$1.log"
+    if msi_log_says "$work/$1.log" "$3"; then actual=yes; fi
+    if [ "$actual" != "$4" ]; then
+      echo "::error::selftest $1: the log read $actual, expected $4" >&2
+      failures=$((failures + 1))
+    fi
+  }
+  expect_log install-failed 'Action ended 15:21:46: InstallFinalize. Return value 3.' "$INSTALL_FAILED" yes
+  expect_log files-failed 'Action ended 15:21:45: InstallFiles. Return value 3.' "$INSTALL_FAILED" yes
+  expect_log install-succeeded 'Action ended 15:21:46: InstallFinalize. Return value 1.' "$INSTALL_FAILED" no
+  expect_log downgrade-refused "MSI (s) (D0:2C) [15:21:46:444]: Product: keypaste -- $DOWNGRADE_MESSAGE" "$DOWNGRADE_MESSAGE" yes
+  expect_log downgrade-silent 'MSI (s) (D0:2C) [15:21:46:444]: Product: keypaste -- Installation failed.' "$DOWNGRADE_MESSAGE" no
+  cases=$((cases + 1))
+  if msi_log_says "$work/no-such.log" "$INSTALL_FAILED"; then
+    echo '::error::selftest no-log: a missing log read as naming the failure' >&2
+    failures=$((failures + 1))
+  fi
 
   if [ "$failures" -gt 0 ]; then
     die "exercise-desktop-upgrade selftest: $failures of $cases cases failed"

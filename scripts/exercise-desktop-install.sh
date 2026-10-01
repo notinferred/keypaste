@@ -196,7 +196,7 @@ fixture() {
     || { echo 'keypaste env set failed'; return 1; }
 
   printf '[[vault]]\npath = "%s"\nopened_at = "%s"\n' "$VAULT_NATIVE" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$HOME_DIR/recent.toml"
-  printf 'idle_timeout_seconds = 28800\n' > "$HOME_DIR/app.toml"
+  printf '[[settings]]\nidle_timeout_seconds = 28800\n' > "$HOME_DIR/app.toml"
   echo "vault $VAULT_NATIVE with $ENTRY_GROUP/$ENTRY_TITLE and env/$PROJECT, made by $("$KP" --version | tr -d '\r')"
 }
 
