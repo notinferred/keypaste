@@ -31,8 +31,6 @@ namespace Keypaste.App.Session;
 /// </remarks>
 internal sealed class SessionHost : IDisposable
 {
-    private static readonly TimeSpan _stopGrace = TimeSpan.FromSeconds(2);
-
     private readonly AppVaultSession _session;
     private readonly string? _approverOverride;
     private readonly Func<IApprovalChannel> _approvals;
@@ -387,7 +385,8 @@ internal sealed class SessionHost : IDisposable
 
             try
             {
-                _run.Wait(_stopGrace);
+                // No time limit (D-0392): reads end on the stop token, each delivery is bounded (D-0315), and every handler must finish once withdrawn or stopped.
+                _run.Wait();
             }
             catch (AggregateException)
             {

@@ -1,3 +1,4 @@
+using System.IO.Pipes;
 using Keypaste.App.Session;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
@@ -14,6 +15,7 @@ namespace Keypaste.App.Tests.Session;
 public sealed class LockBoundaryTests
 {
     private static readonly TimeSpan _connect = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan _absent = TimeSpan.FromMilliseconds(300);
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
@@ -57,6 +59,62 @@ public sealed class LockBoundaryTests
         Assert.Equal(AuditMethod.VaultLocked, reply.Method);
         Assert.Equal(attached.Session, reply.Session);
         Assert.Null(reply.Value);
+        Assert.True(prompt.Withdrawn);
+    }
+
+    [Fact]
+    public async Task A_lock_answers_a_request_whose_prompt_comes_down_late_before_the_endpoint_stops()
+    {
+        using var fixture = new TempVault();
+        var prompt = new ScriptedPrompt { Hold = true, ComesDownAfter = TimeSpan.FromSeconds(3) };
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home);
+        using var host = new SessionHost(session, approverOverride: null, () => prompt);
+        Unlock(session, fixture.Path_);
+        var endpoint = host.Endpoint!;
+
+        await using var client = await ConnectAsync(host);
+        var attached = await client.AttachAsync(new AttachRequest(fixture.Path_), Token);
+        var pending = client.RequestAsync(Request(fixture.Path_, attached!.Session!), Token).AsTask();
+        await prompt.Waiting.WaitAsync(_connect, Token);
+
+        session.Lock(VaultLockReason.Manual);
+        await using var afterLock = await ApproverClient.TryConnectAsync(endpoint, _absent, Token);
+        var reply = await pending.WaitAsync(_connect, Token);
+
+        Assert.Null(afterLock);
+        Assert.NotNull(reply);
+        Assert.Equal(AuditMethod.VaultLocked, reply.Method);
+        Assert.True(prompt.Withdrawn);
+    }
+
+    [Fact]
+    public async Task A_lock_does_not_wait_for_a_client_that_neither_reads_nor_hangs_up()
+    {
+        using var fixture = new TempVault();
+        var prompt = new ScriptedPrompt { Hold = true };
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home);
+#pragma warning disable CA2000 // Disposed only once the lock has returned, because disposing waits for a lock still running.
+        var host = new SessionHost(session, approverOverride: null, () => prompt);
+#pragma warning restore CA2000
+        Unlock(session, fixture.Path_);
+        var endpoint = host.Endpoint!;
+
+        await using var pipe = new NamedPipeClientStream(
+            ".", endpoint, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+        await pipe.ConnectAsync(_connect, Token);
+        using var framer = new MessageFramer(pipe, ownsStream: false);
+        await framer.WriteAsync(ApproverProtocol.Encode(new AttachRequest(fixture.Path_)), Token);
+        Assert.NotNull(await framer.ReadAsync(Token));
+        await framer.WriteAsync(ApproverProtocol.Encode(Request(fixture.Path_, session.SessionId!)), Token);
+        await prompt.Waiting.WaitAsync(_connect, Token);
+
+        var locking = Task.Run(() => session.Lock(VaultLockReason.Manual), Token);
+        Assert.Same(locking, await Task.WhenAny(locking, Task.Delay(_connect, Token)));
+        await locking;
+        host.Dispose();
+        await using var afterLock = await ApproverClient.TryConnectAsync(endpoint, _absent, Token);
+
+        Assert.Null(afterLock);
         Assert.True(prompt.Withdrawn);
     }
 
@@ -205,6 +263,8 @@ public sealed class LockBoundaryTests
 
         internal bool Hold { get; init; }
 
+        internal TimeSpan ComesDownAfter { get; init; }
+
         internal int Asked { get; private set; }
 
         internal bool Withdrawn { get; private set; }
@@ -231,6 +291,7 @@ public sealed class LockBoundaryTests
                 Withdrawn = true;
             }
 
+            await Task.Delay(ComesDownAfter, Token).ConfigureAwait(false);
             return ApprovalAnswer.Denied;
         }
     }
