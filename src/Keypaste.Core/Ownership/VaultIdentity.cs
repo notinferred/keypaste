@@ -50,6 +50,6 @@ public sealed class VaultIdentity
         !string.IsNullOrEmpty(vaultPath)
         && string.Equals(PathIdentity.Canonical(vaultPath), Path, PathIdentity.Comparison);
 
-    private static string Folded(string path) =>
+    internal static string Folded(string path) =>
         PathIdentity.Comparison == StringComparison.Ordinal ? path : path.ToUpperInvariant();
 }

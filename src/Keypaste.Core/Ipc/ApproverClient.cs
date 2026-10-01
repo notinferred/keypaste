@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO.Pipes;
+using System.Security.Principal;
 
 namespace Keypaste.Core.Ipc;
 
@@ -74,11 +75,13 @@ public sealed class ApproverClient : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(pipeName);
 
+        // Identification only, so on Windows whoever made the pipe can tell who connected but cannot act as them.
         var pipe = new NamedPipeClientStream(
             ".",
             pipeName,
             PipeDirection.InOut,
-            PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+            PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly,
+            TokenImpersonationLevel.Identification);
 
         var asked = Stopwatch.GetTimestamp();
 

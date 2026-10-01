@@ -1,5 +1,8 @@
 using Avalonia;
 using Keypaste.Core;
+using Keypaste.Core.Audit;
+using Keypaste.Core.Login;
+using Keypaste.Core.Ownership;
 
 namespace Keypaste.App;
 
@@ -27,6 +30,9 @@ internal static class Program
     /// <summary>The flag that prints the version and exits, so a release can be checked against its tag.</summary>
     internal const string VersionFlag = "--version";
 
+    /// <summary>How long a second start waits for the running app to answer, since it may still be starting.</summary>
+    internal static readonly TimeSpan ReopenWait = TimeSpan.FromSeconds(10);
+
     [STAThread]
     private static int Main(string[] args)
     {
@@ -37,7 +43,64 @@ internal static class Program
             return exitCode;
         }
 
-        return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        var home = KeypasteHome.Resolve(Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable));
+
+        return Run(
+            args,
+            home,
+            claim => Configured(() => new App { Claim = claim }).StartWithClassicDesktopLifetime(args),
+            Console.Error,
+            ReopenWait);
+    }
+
+    /// <summary>
+    /// Runs the app as the one process for this user and home, or hands a start to the process that already is (D-0397).
+    /// </summary>
+    /// <param name="args">The process's arguments, where <c>--background</c> marks a start at login.</param>
+    /// <param name="home">keypaste's home.</param>
+    /// <param name="start">Runs the app under its claim and returns its exit code.</param>
+    /// <param name="stderr">Where a start the running app never answered says so.</param>
+    /// <param name="wait">How long to wait for the running app to answer.</param>
+    /// <returns>The app's exit code, 0 when the running app showed its window, or 1 when it never answered.</returns>
+    internal static int Run(string[] args, string home, Func<AppClaim, int> start, TextWriter stderr, TimeSpan wait)
+    {
+        ArgumentNullException.ThrowIfNull(start);
+        ArgumentNullException.ThrowIfNull(stderr);
+
+        AppClaim? claim = null;
+
+        try
+        {
+            if (!AppClaim.TryAcquire(home, out claim))
+            {
+                if (LoginItems.StartsInBackground(args))
+                {
+                    return 0;
+                }
+
+                if (OperatingSystem.IsWindows())
+                {
+                    WindowsForeground.LetAnyProcessTakeIt();
+                }
+
+                if (AppClaim.AskToShow(home, wait, out claim))
+                {
+                    return 0;
+                }
+
+                if (claim is null)
+                {
+                    stderr.WriteLine("keypaste is already running and did not answer; open it from its menu bar or tray icon.");
+                    return 1;
+                }
+            }
+
+            return start(claim);
+        }
+        finally
+        {
+            claim?.Dispose();
+        }
     }
 
     /// <summary>
@@ -68,8 +131,10 @@ internal static class Program
     }
 
     /// <summary>The Avalonia configuration, also used by the previewer and by headless tests.</summary>
-    internal static AppBuilder BuildAvaloniaApp() =>
-        AppBuilder.Configure<App>()
+    internal static AppBuilder BuildAvaloniaApp() => Configured(() => new App());
+
+    private static AppBuilder Configured(Func<App> app) =>
+        AppBuilder.Configure(app)
             .UsePlatformDetect()
             .WithInterFont();
 }

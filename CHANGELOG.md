@@ -12,6 +12,8 @@ keypaste has a new brand: an icon "k." and a wordmark "keypaste." in Hepta Slab 
 
 Closing the desktop app's window on Windows or macOS now locks it and leaves it in the tray or menu bar, whose icon offers Open, Lock and Quit; on Linux that is a choice in Settings › Startup. Settings › Startup can also open keypaste at login, locked, and with no window while it stays in the tray ([G.4a](docs/steps/G.4a.md)).
 
+Opening keypaste while it is already running, from the Start menu, a shortcut or a launcher, now shows the running app's window instead of starting a second copy with its own tray icon, and a start at login while it runs does nothing. One app runs for each user and `KEYPASTE_HOME` ([F.38](docs/steps/F.38.md)).
+
 When KeePassXC merges a vault with another copy, it no longer drops a value keypaste saved in the same second as the save before it. Each save of an entry now takes a later second than the version it replaced, so a burst of saves can be stamped a few seconds ahead of the clock ([F.27](docs/steps/F.27.md)).
 
 Agents and the CLI now use the vault you chose when nothing names one: the app chooses the first vault you create or unlock and says so, Settings › Agents and the CLI changes it, and `keypaste use <path>` does the same from a terminal. `--vault` and `KEYPASTE_VAULT` still win, `keypaste setup` and the app's Connect no longer write `--vault` for the chosen vault, and an existing client entry keeps the vault it names. With a vault chosen and none named, `keypaste import <file>` copies into it; `--in-place` keeps the file where it is ([G.1](docs/steps/G.1.md)).

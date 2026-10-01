@@ -15,6 +15,7 @@ using Keypaste.Core.Audit;
 using Keypaste.Core.HardwareKeys;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Login;
+using Keypaste.Core.Ownership;
 using Keypaste.Core.Recent;
 
 namespace Keypaste.App;
@@ -41,6 +42,7 @@ internal sealed partial class App : Application, IDisposable
     private IClassicDesktopStyleApplicationLifetime? _desktop;
     private AppTray? _tray;
     private IActivatableLifetime? _activatable;
+    private IDisposable? _reopen;
     private (string Path, string? Keyfile)? _openNext;
     private int _unlockScreens;
     private bool _shuttingDown;
@@ -114,6 +116,11 @@ internal sealed partial class App : Application, IDisposable
             _activatable.Activated += OnActivated;
         }
 
+        // A second start of this user's app in this home asks it to show the window instead (D-0397).
+        _reopen = Claim?.Listen(
+            () => Dispatcher.UIThread.InvokeAsync(OpenWindow).GetTask(),
+            reason => Console.Error.WriteLine($"keypaste: another start of keypaste cannot reach this one: {reason}"));
+
         // The lifetime shows its main window when it starts, so a start at login names none until Open.
         if (!(background && _preferences.StaysInTray))
         {
@@ -136,6 +143,9 @@ internal sealed partial class App : Application, IDisposable
 
     /// <summary>The preferences launch composes from; <c>app.toml</c> in the keypaste home unless a test gives others.</summary>
     internal DesktopPreferences? Preferences { get; init; }
+
+    /// <summary>This process's claim on its user's home, which <c>Program.Run</c> took; none unless it gives one.</summary>
+    internal AppClaim? Claim { get; init; }
 
     /// <summary>The entry that opens the app at login; the platform's own unless a test gives another.</summary>
     internal Func<ILoginItem?> LoginItemFor { get; init; } = LoginItems.ForThisProcess;
@@ -203,7 +213,15 @@ internal sealed partial class App : Application, IDisposable
     private void Quit()
     {
         _quitting = true;
+        StopAnsweringStarts();
         _ = _desktop?.TryShutdown();
+    }
+
+    // A quitting app no longer tells a second start it showed its window; that start waits to take the home instead.
+    private void StopAnsweringStarts()
+    {
+        _reopen?.Dispose();
+        _reopen = null;
     }
 
     private void OnPreferencesChanged(object? sender, EventArgs e)
@@ -349,6 +367,8 @@ internal sealed partial class App : Application, IDisposable
     private void OnShutdownRequested(object? sender, ShutdownRequestedEventArgs e)
     {
         ArgumentNullException.ThrowIfNull(e);
+
+        StopAnsweringStarts();
 
         if (_shuttingDown || _shell is null)
         {
@@ -535,6 +555,8 @@ internal sealed partial class App : Application, IDisposable
             _activatable.Activated -= OnActivated;
             _activatable = null;
         }
+
+        StopAnsweringStarts();
 
         if (_preferences is not null)
         {

@@ -9,9 +9,10 @@ namespace Keypaste.Core.Ipc;
 /// <para>
 /// A .NET named pipe, on both platforms, and the reason is that the runtime does the access check
 /// for us. <see cref="System.IO.Pipes.PipeOptions.CurrentUserOnly"/> restricts the pipe's ACL to
-/// the current user on Windows, and on Unix — where .NET implements named pipes over a Unix domain
-/// socket — it creates the socket owner-only and verifies on connect that the peer's socket is
-/// owned by the same user. That is one code path, no
+/// the current user on Windows. On Unix, where .NET implements named pipes over a Unix domain
+/// socket and leaves its file mode to the umask, the listener refuses a peer running as another user
+/// when it accepts it and a client refuses a listener running as another user when it connects.
+/// That is one code path, no
 /// <c>System.IO.Pipes.AccessControl</c> dependency, no hand-rolled <c>PipeSecurity</c>, and no
 /// <c>sun_path</c> length problem to discover on somebody's long home directory (docs/PRODUCT.md law 3.9).
 /// </para>
@@ -23,7 +24,7 @@ namespace Keypaste.Core.Ipc;
 /// <para>
 /// <b>Residual, for THREATS.md T-10.</b> That path is predictable, so another local user can
 /// pre-create it and stop your approver binding — a denial of service. What they cannot do is be
-/// connected to, because the ownership check refuses. Denial of service against the approver means
+/// connected to, because the client's peer check refuses. Denial of service against the approver means
 /// keypaste denies every request, which is the direction law 3.7 asks for.
 /// </para>
 /// </remarks>

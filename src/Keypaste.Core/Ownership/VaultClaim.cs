@@ -197,7 +197,7 @@ public sealed class VaultClaim : IDisposable
         }
     }
 
-    private static FileStreamOptions Options(FileMode mode, FileAccess access, FileShare share)
+    internal static FileStreamOptions Options(FileMode mode, FileAccess access, FileShare share)
     {
         var options = new FileStreamOptions { Mode = mode, Access = access, Share = share };
 
@@ -209,7 +209,7 @@ public sealed class VaultClaim : IDisposable
         return options;
     }
 
-    private static void CreateDirectory(string directory)
+    internal static void CreateDirectory(string directory)
     {
         if (OperatingSystem.IsWindows())
         {

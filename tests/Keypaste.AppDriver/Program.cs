@@ -46,6 +46,9 @@ namespace Keypaste.AppDriver;
 /// the display's hit-testing or close it, so <c>scripts/verify-desktop-approval.sh</c> can answer a
 /// real request as a person would (4.4).
 /// </para>
+/// <para>
+/// <c>launch</c> starts the app itself through <c>keypaste-app</c>'s own start, as <see cref="AppLaunch"/> says.
+/// </para>
 /// </remarks>
 internal static class Program
 {
@@ -79,6 +82,8 @@ internal static class Program
         "             relocate <entry-path> <destination-group-path> <new-title>, and with the app's own\n" +
         "             prompt: approve, once, deny, close; connect <client> [label=<l>] [expose=<g,g>],\n" +
         "             connect-remove <client>, confirm, cancel, check, pick <n>)\n" +
+        "       launch [--background]\n" +
+        "            (runs the app as keypaste-app does, on a headless display, until standard input closes)\n" +
         "KEYPASTE_HOME must be set. KEYPASTE_DRIVER_PASSWORD is the password typed (empty for none),\n" +
         "KEYPASTE_DRIVER_KEYFILE the keyfile chosen, KEYPASTE_DRIVER_NEW_PASSWORD a new password, entry password or field value.";
 
@@ -127,6 +132,8 @@ internal static class Program
                 ["notes-restore", var vault, var entry, var key] => await driver.ReviewNoteKeyAgainAsync(vault, entry, key).ConfigureAwait(true),
                 ["raw-add", var vault, var group, var title] => RawAdd(vault, group, title),
                 ["hold", var vault, .. var options] => await HoldAsync(driver, vault, options).ConfigureAwait(true),
+                ["launch"] => AppLaunch.Run(KeypasteHome.Resolve(home), []),
+                ["launch", "--background"] => AppLaunch.Run(KeypasteHome.Resolve(home), ["--background"]),
                 _ => Usage(),
             };
         }

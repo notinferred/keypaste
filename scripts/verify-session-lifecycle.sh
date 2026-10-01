@@ -10,9 +10,16 @@
 # a new session on the same endpoint. With keypaste agent holding the vault first, the app's unlock is
 # refused naming it, the status names it as the owner, and the agent keeps answering.
 #
+# One app runs per user and home (F.38): with the tray on and the app started at login through the
+# driver's launch, which runs keypaste-app's own start on a headless display, a second start of the
+# shipped keypaste-app at login exits showing nothing, a person's second start exits once the first has
+# shown its window, and the first is still running. A killed app leaves the home, and on Linux its socket
+# file, to the next start at login, which a second start then reaches.
+#
 # NEGATIVE CONTROL: this fails if a request is answered by a locked, quit or killed app, if a status
 # says serving without the session that answers, if anything still holds the vault after a lock or a
-# quit, or if the app displaces keypaste agent. These checks must never be skipped or soft-passed.
+# quit, if the app displaces keypaste agent, or if a second start runs beside the first, shows its
+# window at login or not for a person. These checks must never be skipped or soft-passed.
 set -euo pipefail
 
 readonly MASTER='ci-lifecycle-master-pw'
@@ -20,12 +27,13 @@ readonly SECRET='SENTINEL-LIFECYCLE-PASSWORD-5c20d4'
 readonly ENTRY='env/ci/DEPLOY_KEY'
 
 . "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
-DIE_FILES='HOLD_OUT OUT ERR AGENT_ERR'
+DIE_FILES='HOLD_OUT OUT ERR AGENT_ERR APP_OUT START_OUT'
 require jq
 
 CLI="$(keypaste_bin)"
 MCP="$(keypaste_mcp)"
 DRV="$(app_driver)"
+APP="$(resolve KEYPASTE_APP artifacts/bin/Keypaste.App/release/keypaste-app)"
 
 WORK="$(mktemp -d)"
 mkdir -p "$WORK/home"
@@ -38,7 +46,9 @@ readonly AGENT_ERR="$WORK/agent-stderr.txt"
 
 HOLD_PID=""
 AGENT_PID=""
-# Fixed descriptors, as macOS's bash 3.2 needs (D-0398): 7 is the held app's input, 8 the open bridge's and 9 keypaste agent's.
+APP_PID=""
+# Fixed descriptors, as macOS's bash 3.2 needs (D-0398): 6 is the started app's input, 7 the held app's, 8 the open bridge's and 9 keypaste agent's.
+exec 6>/dev/null
 exec 7>/dev/null
 exec 8>/dev/null
 exec 9>/dev/null
@@ -46,8 +56,10 @@ cleanup() {
   exec 8>&- 2>/dev/null || true
   exec 7>&- 2>/dev/null || true
   exec 9>&- 2>/dev/null || true
+  exec 6>&- 2>/dev/null || true
   if [ -n "$HOLD_PID" ]; then kill_process "$HOLD_PID"; fi
   if [ -n "$AGENT_PID" ]; then kill_process "$AGENT_PID"; fi
+  if [ -n "$APP_PID" ]; then kill_process "$APP_PID"; fi
   rm -rf "$WORK"
 }
 trap cleanup EXIT
@@ -255,6 +267,78 @@ grep -q '^status serving' "$HOLD_OUT" && die "the app served a vault keypaste ag
 ask "$WORK/agent-stdout.txt" "$WORK/agent-mcp-stderr.txt" --list-only
 listed_by "$AGENT_SESSION" "keypaste agent after the app's refusal"
 
+# ------------------------------------------- one app per user and home, which a second start shows
+APP_HOME="$WORK/app-home"
+mkdir -p "$APP_HOME"
+APP_HOME_NATIVE="$(native "$APP_HOME")"
+printf '[[settings]]\nstay_in_tray = 1\n' >"$APP_HOME/app.toml"
+
+# Starts the app as keypaste-app does, through the driver, with its input held open; sets APP_PID.
+start_app() {
+  APP_OUT="$1"
+  shift
+  exec 6>&-
+  exec 6> >(exec 7>&- 8>&- 9>&-; KEYPASTE_HOME="$APP_HOME_NATIVE" exec "$DRV" launch "$@" >"$APP_OUT" 2>&1)
+  wait_for '^running as process' "$APP_OUT"
+  APP_PID="$(sed -nE 's/^running as process ([0-9]+) .*/\1/p' "$APP_OUT" | tr -d '\r')"
+}
+
+# Starts the shipped keypaste-app again in the app's home, which must exit by itself; sets START_CODE.
+start_again() {
+  START_OUT="$1"
+  shift
+  set +e
+  KEYPASTE_HOME="$APP_HOME_NATIVE" timeout 60 "$APP" "$@" >"$START_OUT" 2>&1 </dev/null \
+    6>&- 7>&- 8>&- 9>&-
+  START_CODE=$?
+  set -e
+}
+
+alive() {
+  if command -v tasklist >/dev/null 2>&1; then
+    tasklist //FI "PID eq $1" //NH 2>/dev/null | grep -qw "$1"
+  else
+    kill -0 "$1" 2>/dev/null
+  fi
+}
+
+# A person's start of the shipped keypaste-app, which exits only once the running app has shown its window.
+reopen() {
+  start_again "$1"
+  [ "$START_CODE" -eq 0 ] || die "a second start exited $START_CODE rather than handing its start to the running app"
+  grep -q '^window shown' "$APP_OUT" || die "a second start exited before the running app showed its window"
+  alive "$APP_PID" || die "the running app ended when a second start reached it"
+}
+
+start_app "$WORK/app-1.txt" --background
+wait_for '^window hidden' "$APP_OUT"
+
+start_again "$WORK/again-login.txt" --background
+[ "$START_CODE" -eq 0 ] || die "a second start at login exited $START_CODE beside the running app"
+sleep 2
+grep -q '^window shown' "$APP_OUT" && die "a second start at login showed the running app's window"
+
+reopen "$WORK/again-open.txt"
+
+APP_ENDPOINT="$(sed -nE 's/^running as process [0-9]+ on (.*)$/\1/p' "$APP_OUT" | tr -d '\r')"
+kill_process "$APP_PID"
+for _ in $(seq 1 50); do alive "$APP_PID" || break; sleep 0.2; done
+alive "$APP_PID" && die "the killed app is still running"
+if ! command -v taskkill >/dev/null 2>&1; then
+  STALE="${TMPDIR:-/tmp}"
+  STALE="${STALE%/}/CoreFxPipe_$APP_ENDPOINT"
+  [ -S "$STALE" ] || die "the killed app left no socket at $STALE, so the next start's takeover would prove nothing"
+fi
+
+start_app "$WORK/app-2.txt" --background
+wait_for '^window hidden' "$APP_OUT"
+reopen "$WORK/again-after-kill.txt"
+exec 6>&-
+wait_for '^shut down' "$APP_OUT"
+APP_PID=""
+
 echo "ok: launched locked and refusing, the app served a real keypaste-mcp once unlocked; lock and quit each left"
 echo "    nobody answering or holding the vault; a killed app answered nothing and a relaunch refused until it"
-echo "    unlocked a new session on the same endpoint; and keypaste agent holding the vault was named and kept answering"
+echo "    unlocked a new session on the same endpoint; keypaste agent holding the vault was named and kept answering;"
+echo "    and in one home a second keypaste-app at login showed nothing, a second one exited once the running app showed"
+echo "    its window, and a killed app left the home and its endpoint to the next start, which a second start reached"
