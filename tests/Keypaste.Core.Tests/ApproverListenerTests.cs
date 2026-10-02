@@ -325,6 +325,9 @@ public sealed class ApproverListenerTests
         await handler.Withdrawn.Task.WaitAsync(_connectTimeout, Token);
         var buffer = new byte[1];
         Assert.Equal(0, await rude.ReadAsync(buffer, Token));
+
+        // The listener closes the pipe before it records the disconnection, so the end of the stream can arrive first.
+        await handler.Gone.Task.WaitAsync(_connectTimeout, Token);
         Assert.Single(handler.Disconnections);
     }
 
