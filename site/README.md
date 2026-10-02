@@ -132,14 +132,21 @@ The share database was provisioned on 2026-09-25: the `share` table and its inde
 
 A cron trigger every 30 minutes deletes expired and spent rows.
 
-For local development without a database, put `SHARE_ENABLED=1` and `SHARE_DEV_MEMORY=1` in `site/.dev.vars` (ignored by version control) and point the CLI at the server with `KEYPASTE_SHARE_URL=http://127.0.0.1:8787`:
+For local development without a database, run the Worker from a copy of `wrangler.jsonc` without its two Hyperdrive bindings and with `SHARE_DEV_MEMORY` set, then point the CLI at it with `KEYPASTE_SHARE_URL=http://127.0.0.1:8787`. From `site/`, after `npm ci`:
 
 ```sh
-CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE="postgresql://unused:unused@127.0.0.1:1/unused" \
-  npx wrangler dev --port 8787 --ip 127.0.0.1 --local-upstream 127.0.0.1:8787
+node -e 'const fs = require("node:fs"), path = require("node:path");
+  const config = JSON.parse(fs.readFileSync("wrangler.jsonc", "utf8").replace(/^\s*\/\/.*$/gm, ""));
+  delete config.hyperdrive;
+  config.main = path.resolve(config.main);
+  config.assets.directory = path.resolve(config.assets.directory);
+  config.vars = { ...config.vars, SHARE_DEV_MEMORY: "1" };
+  fs.mkdirSync(".wrangler", { recursive: true });
+  fs.writeFileSync(".wrangler/wrangler.json", JSON.stringify(config, null, 2));'
+npx wrangler dev --config .wrangler/wrangler.json --ip 127.0.0.1 --port 8787 --local-upstream 127.0.0.1:8787
 ```
 
-The signup binding needs some connection string to start, and the share routes never use it. `--local-upstream` keeps the request URL on `127.0.0.1`; without it Wrangler rewrites it to the routed `keypaste.com`, and the memory store, which is refused for any host other than `localhost` and `127.0.0.1`, answers 503. With a local Postgres, set `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_SHARE_DB` once the binding exists.
+The share routes use `SHARE_DB` whenever it is bound, so the memory store is reached only without it, and only for `localhost` and `127.0.0.1`; `--local-upstream` keeps the request URL on `127.0.0.1` instead of the routed `keypaste.com`. [verify-keepassxc-fields.sh](../scripts/verify-keepassxc-fields.sh) runs the Worker this way in CI. With a local Postgres, run `npx wrangler dev` on `wrangler.jsonc` itself, with `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_SHARE_DB` and `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` set.
 
 `npm test` runs the share API and cryptography tests on Node 20 or later; `test/share-vector.json` holds vectors the .NET core sealed, which the viewer's code must open.
 

@@ -32,7 +32,8 @@ backend      Locked restore, format, Release build and backend tests.
 integration  Prepare the backend and exercise real CLI/MCP processes and the demo pages.
 desktop      The desktop solution AND the separate CLI/desktop consistency project.
 compat       Prepare the backend and the app driver, and verify creation, write-back, history, recovery, organization,
-             keyfiles, custom fields, project tags and every workflow on vaults KeePassXC made, through the CLI and the app, and
+             keyfiles, custom fields, project tags and every workflow on vaults KeePassXC made, through the CLI, the app and
+             the site's Worker on loopback, and
              the first run's offer of the databases KeePassXC last opened, against installed KeePassXC.
              Never selected automatically; run it by name.
 
@@ -42,7 +43,8 @@ command. --project narrows backend or desktop to those test projects and the hel
 and --filter-class runs one test class in each.
 Use Git Bash on Windows. A full run needs dotnet, git, jq, GNU timeout and running Docker.
 macOS can supply GNU timeout as gtimeout from coreutils. compat also needs keepassxc-cli
-(or KPXC_CLI) with KeePassXC's app beside it or on PATH (or KPXC_APP). Native AOT, packaging, other operating systems and live install checks stay in CI.
+(or KPXC_CLI) with KeePassXC's app beside it or on PATH (or KPXC_APP), and Node 22 with npm and
+curl for the site's Worker. Native AOT, packaging, other operating systems and live install checks stay in CI.
 USAGE
 }
 
@@ -373,8 +375,9 @@ profile_compat() {
   run bash scripts/verify-keepassxc-backup.sh artifacts/compat/local-backup.kdbx
   run bash scripts/verify-keepassxc-organize.sh artifacts/compat/local-organize.kdbx
   run bash scripts/verify-keepassxc-import.sh artifacts/compat/local-import
-  run bash scripts/verify-keepassxc-fields.sh artifacts/compat/local-fields
   prepare tests/Keypaste.AppDriver/Keypaste.AppDriver.csproj
+  run npm ci --prefix site --no-audit --no-fund
+  run bash scripts/verify-keepassxc-fields.sh artifacts/compat/local-fields
   run bash scripts/verify-keepassxc-projects.sh artifacts/compat/local-projects
   run bash scripts/verify-keepassxc-keyfile.sh artifacts/compat/local-keyfile.kdbx
   run bash scripts/verify-keepassxc-xml-attach.sh artifacts/compat/local-xml-attach
@@ -428,6 +431,7 @@ path_lanes() {
     CHANGELOG.md|SECURITY.md|docs/RELEASE.md|docs/desktop.md) echo scripts ;;
     THIRD_PARTY_NOTICES.md) echo core package ;;
     site/test/share-vector.json) echo core scripts ;;
+    site/src/*|site/wrangler.jsonc|site/package.json|site/package-lock.json|site/public/s/share-crypto.js) echo scripts compat ;;
     site/*) echo scripts ;;
     *.md|docs/*|.claude/*|assets/*|third_party/lucide/*) echo none ;;
     *) echo unclaimed ;;

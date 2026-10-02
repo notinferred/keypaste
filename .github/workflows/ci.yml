@@ -35,18 +35,13 @@ on:
       - 'docs/desktop.md'
       - '.claude/**'
       - 'site/README.md'
-      - 'site/package.json'
-      - 'site/package-lock.json'
       - 'site/schema.sql'
-      - 'site/wrangler.jsonc'
-      - 'site/src/**'
       - 'site/test/*.mjs'
       - 'site/public/_headers'
       - 'site/public/brand.css'
       - 'site/public/favicon.svg'
       - 'site/public/fonts/**'
       - 'site/public/demo/**'
-      - 'site/public/s/**'
       - 'site/public/thanks/**'
   pull_request:
   workflow_dispatch:
@@ -290,12 +285,7 @@ jobs:
         shell: bash
         run: bash scripts/verify-keepassxc-import.sh artifacts/compat/import
 
-      - name: Verify custom fields through real KeePassXC
-        if: env.COMPAT == 'true'
-        shell: bash
-        run: bash scripts/verify-keepassxc-fields.sh artifacts/compat/fields
-
-      # The projects gate asks the app's own prompt window, held by the app driver.
+      # The fields and projects gates ask the app's own prompt window, held by the app driver.
       - name: Restore (locked) and build the app driver
         if: env.COMPAT == 'true'
         shell: bash
@@ -303,6 +293,18 @@ jobs:
           set -euo pipefail
           dotnet restore tests/Keypaste.AppDriver/Keypaste.AppDriver.csproj --locked-mode
           dotnet build tests/Keypaste.AppDriver/Keypaste.AppDriver.csproj --no-restore -c Release
+
+      # The fields gate shares through the site's Worker, run on loopback by wrangler.
+      - name: Install the site's locked packages
+        if: env.COMPAT == 'true'
+        shell: bash
+        timeout-minutes: 10
+        run: npm ci --prefix site --no-audit --no-fund
+
+      - name: Verify custom fields through real KeePassXC
+        if: env.COMPAT == 'true'
+        shell: bash
+        run: bash scripts/verify-keepassxc-fields.sh artifacts/compat/fields
 
       - name: Verify project tags and their protection through real KeePassXC
         if: env.COMPAT == 'true'
