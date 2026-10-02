@@ -35,11 +35,13 @@ Custom fields and tags are ordinary KeePass data: keypaste writes them as KeePas
 
 ## T2 — One shared unlock session
 
-U.1–U.3 and 4.4b gave the app, `keypaste agent` and the bridge one owner and one lock (D-0309 to D-0321), and N.10 made every CLI verb that saves take the owner's claim (D-0382). What remains is approving a terminal edit in the unlocked app instead of refusing it.
+U.1–U.3 and 4.4b gave the app, `keypaste agent` and the bridge one owner and one lock (D-0309 to D-0321), and N.10 made every CLI verb that saves take the owner's claim (D-0382). What remains is approving a terminal edit in the unlocked app instead of refusing it, and saying at once when another program saved the vault.
 
 - [ ] **N.11 — Approve a terminal edit in the unlocked app.** Needs: N.10.
   - `set`, `add`, `rm` and the env writers send the change to the vault's owner, which asks in its prompt window and writes through its session.
   - No master password crosses the pipe, and `access` stays refused.
+- [ ] **N.16 — Tell the person when another program saved the vault.** Needs: none.
+  - As soon as the open vault stops matching its file, the app shows a notice with Reload, instead of learning it only when its own save is refused; agents keep getting `vault-changed` until a person reloads (D-0317).
 
 ## T4 — Project environments
 
@@ -73,6 +75,8 @@ The `env/<project>` layout that v0.3.0 wrote stays readable indefinitely; no new
 - [ ] **P.3b1 — Resolve same-entry placeholders in released values.** Needs: C.1b.
   - `{TITLE}`, `{USERNAME}`, `{PASSWORD}`, `{URL}`, `{NOTES}` and `{S:<field>}` resolve within the entry the person approved, to KeePassXC's depth of 10. So `OPENAI_API_KEY={PASSWORD}` needs no copy.
   - `{REF:…}` stays refused; it is P.3b2 in BACKLOG.
+- [ ] **V.11 — Flag an entry that lost its project tag.** Needs: none.
+  - Recommendations lists an entry whose history holds an `env:` tag its current version lacks, since another app, such as a phone's, can drop the tag and move the entry out of its project without a word; nothing changes until the person restores or dismisses it.
 
 ## T3 — AI requests in the app
 
@@ -139,7 +143,7 @@ Package managers and agent marketplaces carry a version only after it is publish
 - [ ] **4.7e — Install and preserve the macOS desktop candidate.** Needs: 4.7a2, E.1d.
   - These are the macOS legs of `install-desktop.yml` and `upgrade-desktop.yml`: install, first run, vault acts, a project run, and an upgrade that keeps the vault and settings.
   - Publication moves into 4.7c2, and the Homebrew cask into 3.7a.
-- [ ] **R.1a — Exercise the integrated desktop candidate.** Needs: 9.4, 4.6, F.15, U.2, U.3, 4.4b, 4.3b, 2.6a, E.1b, E.1c, F.2b3a, F.2b3b, V.7a, V.7b, C.2, N.1a, N.1b, N.2, N.3, N.4, N.5, N.6, N.7, N.10, N.12, C.1a, C.1b, C.1c, C.3, C.4, E.1d, C.5a, C.5b, G.1, G.2, G.4a, G.5, G.8, G.9, 4.7a2.
+- [ ] **R.1a — Exercise the integrated desktop candidate.** Needs: 9.4, 4.6, F.15, U.2, U.3, 4.4b, 4.3b, 2.6a, E.1b, E.1c, F.2b3a, F.2b3b, V.7a, V.7b, C.2, N.1a, N.1b, N.2, N.3, N.4, N.5, N.6, N.7, N.10, N.12, C.1a, C.1b, C.1c, C.3, C.4, E.1d, C.5a, C.5b, G.1, G.2, G.4a, G.5, G.8, G.9, N.16, V.11, 4.7a2.
   - Install the internal Windows MSI, macOS DMG and Linux AppImage built at a named commit.
   - In each installed app, complete T1–T4 with a disposable vault, a real MCP client and a real child process. The acts:
     1. Open a KeePassXC database from the first run.
@@ -158,11 +162,17 @@ Package managers and agent marketplaces carry a version only after it is publish
   - Then publish, through `release.yml`, immutable Windows, macOS and Linux desktop packages and the matching CLI/MCP archives as 0.5.0. This renames CHANGELOG's Unreleased section and sets the version.
   - Verify from anonymous downloads: public hashes, provenance, signatures and notarization, and an upgrade that keeps the vault, `~/.keypaste` and the recent list.
   - Rehearsal certificates, unpublished artifacts and source builds do not pass.
-- [ ] **L.1 — Make the released app understandable and reachable.** Needs: 4.7c2.
+- [ ] **L.3 — Write the safe-agent guide.** Needs: none.
+  - How to run Claude Code, Codex and Cursor so the agent cannot write `~/.keypaste` or its own MCP configuration and cannot read other processes, on each system, and what keypaste still cannot stop (T-14, T-35, T-36).
+- [ ] **R.1b — Round-trip a tagged entry through the phone apps (H-0024).** Human. Needs: none.
+  - Tag an entry and give it a protected env field in keypaste, edit that entry in KeePassium, Strongbox and KeePassDX, and confirm keypaste still reads the tag, the field and its protection; record each app's version.
+- [ ] **L.1 — Make the released app understandable and reachable.** Needs: 4.7c2, L.3.
   - README, keypaste.com and the guides lead with the v1.8 positioning and name 0.5.0.
   - They link its three desktop downloads, hashes and verification steps.
   - They take a new user from the download to a working vault, a project run and a connected agent, as that version behaves.
   - They give the issue route and the private security-reporting route.
+  - The launch copy says what keypaste adds over Varlock's KeePass plugin, Strongbox MCP and 1Password Environments, and links the safe-agent guide (L.3).
+  - The guides name only the phone apps R.1b's round-trip passed.
   - Published claims are checked against the published binaries (D-0036).
   - No announcement, message or signup mail is authorized by this row.
 - [ ] **R.1 — Accept the installed local product.** Needs: 4.7c2, L.1.
@@ -254,7 +264,7 @@ PRODUCT v1.9 (D-0400) adds T7–T10 after the first desktop release, and v1.10 (
   - Accounts and a person's encrypted vault, the relay's first client, and one store per team that the app keeps, never inside the personal vault (D-0406).
   - Reviewed against §3 and §4.3 before any relay code.
 - [ ] **X.3 — Run the relay.** Needs: X.2.
-  - A relay on keypaste.com, and one a team runs itself, storing only ciphertext and wrapped keys.
+  - A relay on keypaste.com, and one a team runs itself, storing only ciphertext and wrapped keys: one C# service on .NET, which X.10 and X.13 extend (D-0409).
 - [ ] **X.10 — Sync a person's vault through the relay.** Needs: X.3, 1.4b.
   - At first run everyone is offered an account and a cloud vault as the default choice: the KDBX encrypted on the device under the master password and a key file that is never uploaded, and merged across devices (D-0408).
   - Keeping the vault local stays one choice away and needs no account.
@@ -283,7 +293,7 @@ PRODUCT v1.9 (D-0400) adds T7–T10 after the first desktop release, and v1.10 (
 ## T11 — Server access by choice
 
 - [ ] **X.13 — Let a team project opt into server access.** Needs: X.4.
-  - Once a team opts a project in, keypaste's server or the team's own holds its key; members see which projects a server can read, and the server's records reach each member's local log (§3.3).
+  - Once a team opts a project in, the relay's .NET service on keypaste.com or the team's own holds its key (D-0409); members see which projects a server can read, and the server's records reach each member's local log (§3.3).
   - Reviewed against §3 and §4.3 before any code.
 - [ ] **X.14 — Proxy agents running in the cloud.** Needs: X.13, X.1.
 - [ ] **X.15 — Let CI sign in with OIDC and store no secret.** Needs: X.13.
@@ -305,7 +315,7 @@ Open IDs that changed meaning under v1.8:
 - 3.5a/b, 3.7a–c, 4.10a/b, 8.1, 8.3a, 1.4a/b, 9.1a–f, 9.2a/b and V.9 return from BACKLOG with their original meaning.
 - P.1 moves from "Later vault features" to T6.
 
-Under v1.9, X.1–X.9 and L.2 are new IDs; L.2 split into L.2a, completed, and L.2b. The 5.x and 7.x IDs of the earlier sync, hosting and organization ideas stay retired. Under v1.10, X.10–X.16 and T11 are new.
+Under v1.9, X.1–X.9 and L.2 are new IDs; L.2 split into L.2a, completed, and L.2b. The 5.x and 7.x IDs of the earlier sync, hosting and organization ideas stay retired. Under v1.10, X.10–X.16 and T11 are new, and N.16, V.11, L.3 and R.1b were added on 2026-10-02.
 
 The [rescope record](steps/rescope-2026-09-19.md) keeps the v1.7 continuity notes.
 

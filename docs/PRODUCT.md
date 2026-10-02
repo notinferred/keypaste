@@ -75,7 +75,7 @@ Under v1.8, share links, scoped tokens and `--allow-run` remain in scope as adva
 
 1. Local vault workflows work without a network or account. File ownership and export preserve portability.
 2. Vault, environment, policy and credential-release behavior lives in `Keypaste.Core`; CLI, desktop and integration surfaces are thin adapters. Guides and the feature inventory name differences in surface coverage.
-3. CLI, GUI and MCP share one core implementation. A shared library alone does not establish a shared live session. Another secret-handling implementation requires an architecture and security review before entering the plan.
+3. CLI, GUI and MCP share one core implementation. A shared library alone does not establish a shared live session. Another secret-handling implementation requires an architecture and security review before any of its code is written (D-0410).
 4. Every advertised platform must satisfy [RELEASE](RELEASE.md). Build success, source compatibility and a package's presence do not establish installation support.
 5. Tests are mandatory for code touching encryption, injection, sync or the agent bridge.
 6. Every KDBX file keypaste writes must open correctly in KeePassXC, verified in CI against real KeePassXC.
