@@ -36,7 +36,7 @@ The tracks are PRODUCT's, and they are worked in this order:
 
 Project environments come before AI requests because what an agent may see is built on project tags. After the first desktop release, T6 is worked alongside T7–T11. T7 comes first among those because it serves one person on one machine and needs no service. T8 starts the relay with a person's own cloud vault and then shares projects with members; T9 and T11 build on shared projects, and T10 on all of them. Within the current milestone, the next task is the first ready one in this order ([CLAUDE.md](CLAUDE.md#planning-and-selection)).
 
-The build infrastructure rows come first: K.6a, K.6b, F.27, F.28, B.3, F.35, F.36, F.37, B.1 and B.2 before C.1b, and B.4a and B.4b after C.4 and before C.5a, so the agent tasks are written against the single binary.
+The build infrastructure rows come first: K.6a, K.6b, F.27, F.28, B.3, F.35, F.36, F.37, B.1 and B.2 before C.1b, and B.4b after C.4 and before C.5b, so the agent tasks are written against the single binary.
 
 ## 0.5.0: the first release of the new keypaste
 
