@@ -5,8 +5,13 @@
   // Required by the Postgres driver. The compatibility_date above already exceeds 2024-09-23, the
   // point at which this flag started meaning what v2 used to mean, so it does not need bumping.
   "compatibility_flags": ["nodejs_compat"],
+  // The content pages are an Astro project in web/ that builds into dist/, copying public/ in as it
+  // is (D-0402). Wrangler runs this before deploy, versions upload and dev.
+  "build": {
+    "command": "npm ci --prefix web --no-audit --no-fund && npm run build --prefix web"
+  },
   "assets": {
-    "directory": "./public",
+    "directory": "./dist",
     // The share viewer is served through the Worker so it answers 404 until SHARE_ENABLED is set.
     "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",

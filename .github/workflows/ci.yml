@@ -44,6 +44,8 @@ on:
       - 'site/public/fonts/**'
       - 'site/public/demo/**'
       - 'site/public/thanks/**'
+      - 'site/web/**'
+      - 'site/.node-version'
   pull_request:
   workflow_dispatch:
 

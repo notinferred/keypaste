@@ -1,0 +1,68 @@
+[
+  {
+    "slug": "cli",
+    "name": "keypaste CLI",
+    "status": "beta",
+    "summary": "The vault, project environments and agent approvals from your terminal."
+  },
+  {
+    "slug": "agent-approvals",
+    "name": "Agent approvals",
+    "status": "beta",
+    "summary": "An AI agent asks for one field of one entry, and you decide each time."
+  },
+  {
+    "slug": "project-environments",
+    "name": "Project environments",
+    "status": "beta",
+    "summary": "A project's variables live in your vault and reach a program's environment, never a .env file."
+  },
+  {
+    "slug": "desktop-app",
+    "name": "Desktop app",
+    "status": "building",
+    "summary": "Your KeePass file in a simple app for Windows, macOS and Linux, with approvals and project runs under one unlock."
+  },
+  {
+    "slug": "share-links",
+    "name": "Share links",
+    "status": "building",
+    "summary": "One field or one login, sealed on your machine and opened a set number of times."
+  },
+  {
+    "slug": "ci-tokens",
+    "name": "Scoped CI tokens",
+    "status": "building",
+    "summary": "A token that releases one project's environment to a CI job, with a scope and an expiry."
+  },
+  {
+    "slug": "daily-driver",
+    "name": "Daily driver",
+    "status": "planned",
+    "summary": "Touch ID and Windows Hello, TOTP codes, browser fill, merging a synced file and importers."
+  },
+  {
+    "slug": "agents-without-values",
+    "name": "Agents without values",
+    "status": "planned",
+    "summary": "An agent calls an API with a credential it never holds."
+  },
+  {
+    "slug": "team-projects",
+    "name": "Team projects",
+    "status": "planned",
+    "summary": "A project's secrets shared with your team through a relay that stores only ciphertext."
+  },
+  {
+    "slug": "ci-and-deploys",
+    "name": "CI and deploys",
+    "status": "planned",
+    "summary": "Identities for CI jobs and deploy targets, and syncs pushed from your own machine."
+  },
+  {
+    "slug": "organizations",
+    "name": "Organizations",
+    "status": "planned",
+    "summary": "Single sign-on, SCIM, approval for production changes and audit export."
+  }
+]

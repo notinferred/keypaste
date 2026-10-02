@@ -73,7 +73,7 @@ These follow the publication of 0.5.0.
 | A notice when a locked app is asked; what each agent may see and run, set in the app | G.4b, G.8 |
 | Terminal status, one name per CLI concept, terminal edits approved in the app, and field search | N.8, N.9, N.11, N.13 |
 | Same-entry placeholders such as `{PASSWORD}` in released values | P.3b1 |
-| keypaste.com's how it works, products, comparisons, vision and guides, rebuilt on Astro (D-0401) | L.2 |
+| The guides moved onto keypaste.com's Astro pages, with a content security policy (D-0401) | L.2b |
 
 keypaste.com keeps its "no `curl | sh`" stance: the one-command routes are the package managers and the signed installers.
 

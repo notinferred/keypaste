@@ -1,0 +1,21 @@
+---
+title: Products
+description: Everything keypaste offers and is building, with the state of each.
+---
+
+import ProductTable from '../../../components/ProductTable.astro';
+
+keypaste is one product built in pieces around one idea: your secrets stay in the KeePass file you already own, and nothing gets a value without your answer. Each page below explains what a piece does, how it works and where it stands.
+
+**Beta** means a published download, pre-1.0. **Building** means it is in the source and not downloadable yet. **Planned** means it is committed in the [roadmap](https://github.com/notinferred/keypaste/blob/main/ROADMAP.md), which owns the order of the work. Labels change when a release ships.
+
+<ProductTable />
+
+## What stays out
+
+- A server that can read your secrets. Team features use a relay that stores only ciphertext.
+- Syncing your whole vault through keypaste. Your own file sync and the KeePass apps you already use carry it.
+- Phone and web vault apps. KeePassium, Strongbox and KeePassDX already open the same file.
+- PKI, KMS, privileged-access management and dynamic secrets, which all need a server that can decrypt.
+
+The [vision](/vision/) explains where these pieces lead.

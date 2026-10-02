@@ -1,0 +1,39 @@
+---
+title: Where keypaste is going
+description: From one person's KeePass file to teams, without a server that can read a secret.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+keypaste starts with one person and the KeePass file they already have: logins and project secrets in one vault, programs run with their variables, and AI agents that have to ask. After the first desktop release it grows in two directions. An agent gets to use a credential without ever holding it. And a team shares a project's secrets through a relay that stores only ciphertext, with identities for CI and deploys and single sign-on for organizations.
+
+Two things never change on the way. No keypaste server will ever be able to read a secret, and local use will never need an account or a network.
+
+## The path
+
+```mermaid
+flowchart LR
+  one["Your vault, on your machine"] --> desk["The desktop app"]
+  desk --> daily["Daily driver"]
+  desk --> proxy["Agents without values"]
+  proxy --> team["Team projects"]
+  team --> ci["CI and deploys"]
+  team --> org["Organizations"]
+```
+
+<CardGrid>
+  <LinkCard title="Desktop app" href="/products/desktop-app/" description="Your KeePass file in a simple app, with approvals and project runs under one unlock." />
+  <LinkCard title="Daily driver" href="/products/daily-driver/" description="Touch ID, TOTP, browser fill, merging a synced file and importers." />
+  <LinkCard title="Agents without values" href="/products/agents-without-values/" description="An agent calls an API with a credential it never holds." />
+  <LinkCard title="Team projects" href="/products/team-projects/" description="A project's secrets shared through a relay that stores only ciphertext." />
+  <LinkCard title="CI and deploys" href="/products/ci-and-deploys/" description="Identities for CI and deploys, and syncs pushed from your own machine." />
+  <LinkCard title="Organizations" href="/products/organizations/" description="Single sign-on, SCIM, approval for production changes and audit export." />
+</CardGrid>
+
+## What stays out
+
+- A server that can read your secrets, and everything that needs one: PKI, KMS, privileged-access management and dynamic secrets.
+- Syncing your whole vault through keypaste. Your own file sync and the KeePass apps you already use carry it.
+- Phone and web vault apps.
+
+The [roadmap](https://github.com/notinferred/keypaste/blob/main/ROADMAP.md) owns the order of this work, and [PRODUCT.md](https://github.com/notinferred/keypaste/blob/main/docs/PRODUCT.md) owns the commitments behind it.

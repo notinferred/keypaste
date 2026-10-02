@@ -7,6 +7,9 @@ TestResults/
 # Tooling
 .wrangler/
 node_modules/
+# keypaste.com's content build (site/web builds into site/dist)
+site/dist/
+site/web/.astro/
 .vs/
 .idea/
 *.user

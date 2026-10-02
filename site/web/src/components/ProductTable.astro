@@ -1,0 +1,25 @@
+---
+import { Badge } from '@astrojs/starlight/components';
+import products from '../data/products.json';
+import { statuses } from '../data/status.js';
+---
+
+<table>
+  <thead>
+    <tr><th>Product</th><th>State</th><th>What it does</th></tr>
+  </thead>
+  <tbody>
+    {
+      products.map((product) => {
+        const status = statuses[product.status as keyof typeof statuses];
+        return (
+          <tr>
+            <td><a href={`/products/${product.slug}/`}>{product.name}</a></td>
+            <td><Badge text={status.label} variant={status.variant} /></td>
+            <td>{product.summary}</td>
+          </tr>
+        );
+      })
+    }
+  </tbody>
+</table>

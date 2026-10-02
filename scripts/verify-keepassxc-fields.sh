@@ -500,15 +500,17 @@ step "share --field OPENAI_API_KEY and its reference form, through the site's Wo
 origin=http://127.0.0.1:8787
 worker_log="$dir/worker.log"
 DIE_FILES='worker_log'
-# The site's own Worker and configuration without its database bindings, so SHARE_DEV_MEMORY keeps shares in memory.
+# The site's own Worker and configuration without its database bindings, so SHARE_DEV_MEMORY keeps shares in memory,
+# and without the content build, whose pages the Worker never serves here: public/ holds the share viewer.
 node -e '
   const fs = require("node:fs");
   const path = require("node:path");
   const [site, out] = process.argv.slice(1);
   const config = JSON.parse(fs.readFileSync(path.join(site, "wrangler.jsonc"), "utf8").replace(/^\s*\/\/.*$/gm, ""));
   delete config.hyperdrive;
+  delete config.build;
   config.main = path.resolve(site, config.main);
-  config.assets.directory = path.resolve(site, config.assets.directory);
+  config.assets.directory = path.resolve(site, "public");
   config.vars = { ...config.vars, SHARE_DEV_MEMORY: "1" };
   fs.writeFileSync(out, JSON.stringify(config, null, 2));
 ' "$(native "$site")" "$(native "$dir/wrangler.json")" || die "could not derive the Worker's loopback configuration from site/wrangler.jsonc"

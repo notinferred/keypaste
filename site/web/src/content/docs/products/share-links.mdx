@@ -1,0 +1,39 @@
+---
+title: Share links
+description: One field or one login, sealed on your machine and opened a set number of times.
+---
+
+import Status from '../../../components/Status.astro';
+
+<Status id="share-links" />
+
+`keypaste share` gives someone one secret without a chat message or an email holding it forever. It seals one field, or an entry's username, password and URL together, on your machine, and keypaste.com keeps only ciphertext it cannot open. The link opens a set number of times, once by default and at most ten, and expires after a time you choose, from five minutes to seven days.
+
+## How it works
+
+```mermaid
+sequenceDiagram
+  participant Y as You
+  participant K as keypaste on your machine
+  participant S as keypaste.com
+  participant R as The recipient's browser
+  Y->>K: share one field or a login
+  K->>K: seal it with a new key
+  K->>S: ciphertext only
+  K-->>Y: a link carrying the key in its fragment
+  Y->>R: send the link
+  R->>S: open it, which spends one view
+  S-->>R: the ciphertext
+  R->>R: decrypt with the key from the link
+```
+
+The key travels in the part of the link after `#`, which browsers never send to a server. An optional passphrase adds a second factor the link alone does not carry. You can list your links and revoke one before it is used. A spent, expired or revoked link answers the same "gone" as one that never existed.
+
+## Limits
+
+Whoever holds the link can open it until its views or time run out, and a chat app that previews links can reach it first. The recipient keeps whatever they read.
+
+## Read more
+
+- [The security model](/how-it-works/security/)
+- [Team projects](/products/team-projects/), for sharing a whole project with a team

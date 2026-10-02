@@ -34,6 +34,7 @@ Documents fall into four layers that change at different rates. A base document 
 | Public | [RELEASE](docs/RELEASE.md) | Distribution matrix, publication and installation verification | Release work |
 | Public | [CHANGELOG](CHANGELOG.md) | One short entry per user-visible change, separating Unreleased work from published versions | Each user-visible change |
 | Public | Guides: [desktop](docs/desktop.md), [mcp-setup](docs/mcp-setup.md), [policy](docs/policy.md), [approvals](docs/approvals.md), [replace-dotenv](docs/replace-dotenv.md), [demo](docs/demo.md), [keepass-and-agents](docs/keepass-and-agents.md), [launch](launch.md), [ui-review](docs/ui-review.md), [diagnostics](docs/diagnostics.md) | How to use, present or diagnose one surface | The behavior they describe changes |
+| Public | [keypaste.com's pages](site/web/src/content/docs/) | How keypaste works, each product and its label, design-level comparisons, the vision and the docs hub; labels live in `site/web/src/data/products.json` | A release changes a label, or a page's design changes |
 
 ### What a step writes
 
@@ -85,7 +86,7 @@ Probes run the identical backend test command used by CI. Narrowing the suite ch
 
 `README.md`, `launch.md`, `docs/demo.md`, `docs/keepass-and-agents.md` and `site/public/index.html` must trigger `ci.yml`: `scripts/verify-demo.sh` checks their claims against the built binaries. Never add `docs/**` to `paths-ignore`. New documentation paths trigger backend CI unless explicitly ignored.
 
-keypaste.com deploys through Cloudflare's Git integration on pushes to `main`, watching `site/`, with root directory `site`, no build command and deploy command `npm run deploy` (D-0127). GitHub workflows do not query the live origin. Run [verify-site-disclosure.sh](scripts/verify-site-disclosure.sh) after a site deploy; [verify-site-endpoint.sh](scripts/verify-site-endpoint.sh) is also manual. Only the offline disclosure self-test runs in CI. `site/README.md` changes trigger a site deployment while skipping both GitHub workflows.
+keypaste.com deploys through Cloudflare's Git integration on pushes to `main`, watching `site/`, with root directory `site`, no build command in the dashboard and deploy command `npm run deploy`, whose wrangler build step builds the content pages in `site/web` (D-0127, D-0402). GitHub workflows do not query the live origin. Run [verify-site-disclosure.sh](scripts/verify-site-disclosure.sh) after a site deploy; [verify-site-endpoint.sh](scripts/verify-site-endpoint.sh) is also manual. Only the offline disclosure self-test runs in CI. `site/README.md` changes trigger a site deployment while skipping both GitHub workflows.
 
 ## Releases
 

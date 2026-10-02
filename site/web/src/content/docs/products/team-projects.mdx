@@ -1,0 +1,30 @@
+---
+title: Team projects
+description: A project's secrets shared with your team through a relay that stores only ciphertext.
+---
+
+import Status from '../../../components/Status.astro';
+
+<Status id="team-projects" />
+
+Teams will share a project's secrets through keypaste without any server being able to read them. Each member keeps their own vault as a local file. Only a project key travels, wrapped separately for each member, through a relay that stores ciphertext. The relay runs on keypaste.com, or on your own server.
+
+## How it works
+
+```mermaid
+flowchart LR
+  you["Your keypaste, with your key pair"] <-->|sealed on your machine| relay["Relay: ciphertext and a project key wrapped for each member"]
+  relay <-->|opened on theirs| mate["A teammate's keypaste, with theirs"]
+  relay <--> ci["A CI job, with its own identity"]
+```
+
+Removing someone re-wraps the project key for everyone who stays and reminds you to rotate the values that person could read. Roles separate reading, writing and production. The relay keeps a record of who fetched what.
+
+## What stays the same
+
+Your own vault never leaves your machine, and local use never needs an account or a network. The relay's protocol is reviewed against keypaste's security laws before any of its code is written.
+
+## Read more
+
+- [CI and deploys](/products/ci-and-deploys/) and [organizations](/products/organizations/), the next steps
+- [The vision](/vision/)

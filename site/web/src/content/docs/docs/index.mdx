@@ -1,0 +1,35 @@
+---
+title: Documentation
+description: Where to start, the guides for each task, and the reference documents behind them.
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+The step-by-step guides live in keypaste's repository, next to the code they describe, so they change in the same commit as the behavior. They move onto this site when the desktop app ships.
+
+## Start
+
+<CardGrid>
+  <LinkCard title="Install" href="/#install" description="Download, check and install the CLI." />
+  <LinkCard title="How keypaste works" href="/how-it-works/" description="The vault, the process that holds it, and how an agent's request is decided." />
+</CardGrid>
+
+## Guides
+
+<CardGrid>
+  <LinkCard title="Replace your .env in five minutes" href="https://github.com/notinferred/keypaste/blob/main/docs/replace-dotenv.md" description="Import, run, CI use, sync and export." />
+  <LinkCard title="Connect keypaste to Claude" href="https://github.com/notinferred/keypaste/blob/main/docs/mcp-setup.md" description="Set up an AI tool, and read the audit log." />
+  <LinkCard title="How to read an approval" href="https://github.com/notinferred/keypaste/blob/main/docs/approvals.md" description="What the prompt shows and what each answer does." />
+  <LinkCard title="Standing rules" href="https://github.com/notinferred/keypaste/blob/main/docs/policy.md" description="Pre-approving narrow, repeated agent requests." />
+  <LinkCard title="The desktop app" href="https://github.com/notinferred/keypaste/blob/main/docs/desktop.md" description="Running the app from source while it has no download." />
+  <LinkCard title="KeePass and agents" href="https://github.com/notinferred/keypaste/blob/main/docs/keepass-and-agents.md" description="Why approval lives next to a KeePass file." />
+</CardGrid>
+
+## Reference
+
+<CardGrid>
+  <LinkCard title="Security" href="https://github.com/notinferred/keypaste/blob/main/SECURITY.md" description="Guarantees, known limits and how to report a problem." />
+  <LinkCard title="Threat model" href="https://github.com/notinferred/keypaste/blob/main/THREATS.md" description="Each threat to the agent bridge, its mitigations and its evidence." />
+  <LinkCard title="Features" href="https://github.com/notinferred/keypaste/blob/main/docs/FEATURES.md" description="What works today, surface by surface, and the gaps." />
+  <LinkCard title="Releases" href="https://github.com/notinferred/keypaste/blob/main/docs/RELEASE.md" description="What is published, for which systems, and how it was verified." />
+</CardGrid>

@@ -1,0 +1,77 @@
+/* keypaste's brand (docs/BRAND.md) on Starlight's variables. The fonts are the files site/public/fonts serves. */
+@font-face {
+  font-family: "Instrument Sans";
+  src: url("/fonts/InstrumentSans-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Instrument Sans";
+  src: url("/fonts/InstrumentSans-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Instrument Sans";
+  src: url("/fonts/InstrumentSans-SemiBold.woff2") format("woff2");
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Fragment Mono";
+  src: url("/fonts/FragmentMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+
+:root {
+  --sl-font: "Instrument Sans", system-ui, sans-serif;
+  --sl-font-mono: "Fragment Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sl-color-accent-low: #3a2d12;
+  --sl-color-accent: #f2b544;
+  --sl-color-accent-high: #f7c566;
+  --sl-color-white: #f2f2f0;
+  --sl-color-gray-1: #e4e4e1;
+  --sl-color-gray-2: #c9cacd;
+  --sl-color-gray-3: #8e9096;
+  --sl-color-gray-4: #55575c;
+  --sl-color-gray-5: #2c2e33;
+  --sl-color-gray-6: #18191c;
+  --sl-color-black: #111214;
+}
+
+:root[data-theme="light"] {
+  --sl-color-accent-low: #f6e5c2;
+  --sl-color-accent: #d99d2e;
+  --sl-color-accent-high: #8a5a00;
+  --sl-color-white: #111214;
+  --sl-color-gray-1: #1d1e22;
+  --sl-color-gray-2: #3a3c40;
+  --sl-color-gray-3: #6b6d72;
+  --sl-color-gray-4: #a3a5a9;
+  --sl-color-gray-5: #dcdcd7;
+  --sl-color-gray-6: #efefec;
+  --sl-color-gray-7: #f7f7f5;
+  --sl-color-black: #ffffff;
+}
+
+.kp-status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  color: var(--sl-color-gray-3);
+  font-size: var(--sl-text-sm);
+}
+
+.mermaid {
+  display: flex;
+  justify-content: center;
+  background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mermaid svg * {
+    animation: none !important;
+  }
+}

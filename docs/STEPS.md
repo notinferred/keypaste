@@ -191,10 +191,9 @@ Package managers and agent marketplaces carry a version only after it is publish
 - [ ] **G.7 — Publish a one-prompt setup page.** Needs: G.3, G.6e. Ships after: 4.7c2.
   - A keypaste.com page with one prompt an agent can follow: install through a verified channel, run `keypaste setup` and `keypaste doctor`, and never ask for a pasted secret.
   - `verify-demo.sh` checks its commands.
-- [ ] **L.2 — Rebuild keypaste.com's content on Astro.** Needs: L.1.
-  - Astro with Starlight builds the content pages in Cloudflare's build, and the existing Worker serves them as static assets (D-0401). The home page, signup, share viewer and fonts in `public/` copy through unchanged, and the home page stays free of JavaScript.
-  - How it works, with Mermaid written in Markdown; one page per product, its Beta, Building, Planned or Not planned label read from one file edited at releases; a design-level comparison table and one page per competitor that links to the competitor's own docs; the vision; and the guides L.1 rewrites, which move to the site as their only home.
-  - Every page carries a content security policy, and a page without a diagram loads no diagram script.
+- [ ] **L.2b — Move the guides onto keypaste.com.** Needs: L.1.
+  - The guides L.1 rewrites move into `site/web` as their only home, and the repository keeps links to them; the checks that read `docs/demo.md` and the other transcript pages follow them.
+  - The content pages gain a content security policy, checked in a browser against search and the diagrams.
 
 ## T6 — Daily driver
 
@@ -285,7 +284,7 @@ Open IDs that changed meaning under v1.8:
 - 3.5a/b, 3.7a–c, 4.10a/b, 8.1, 8.3a, 1.4a/b, 9.1a–f, 9.2a/b and V.9 return from BACKLOG with their original meaning.
 - P.1 moves from "Later vault features" to T6.
 
-Under v1.9, X.1–X.9 and L.2 are new IDs. The 5.x and 7.x IDs of the earlier sync, hosting and organization ideas stay retired.
+Under v1.9, X.1–X.9 and L.2 are new IDs; L.2 split into L.2a, completed, and L.2b. The 5.x and 7.x IDs of the earlier sync, hosting and organization ideas stay retired.
 
 The [rescope record](steps/rescope-2026-09-19.md) keeps the v1.7 continuity notes.
 

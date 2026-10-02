@@ -1,0 +1,27 @@
+---
+title: Organizations
+description: Single sign-on, SCIM, approval for production changes and audit export.
+---
+
+import Status from '../../../components/Status.astro';
+
+<Status id="organizations" />
+
+For organizations, keypaste adds what a security team asks for, without a server that can read secrets. Members join through single sign-on and leave through SCIM provisioning. A production change waits for a second member's approval. The relay's records export to the organization's log store, and the relay ships as a package to run on your own infrastructure.
+
+## How it works
+
+```mermaid
+flowchart LR
+  idp["Your identity provider"] -->|SSO and SCIM| relay["Relay: members and ciphertext"]
+  change["A change to production"] --> approve["A second member approves"]
+  approve e1@--> relay
+  relay e2@--> logs["Your log store"]
+  e1@{ animate: true }
+  e2@{ animate: true }
+```
+
+## Read more
+
+- [Team projects](/products/team-projects/)
+- [The vision](/vision/)

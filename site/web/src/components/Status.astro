@@ -1,0 +1,18 @@
+---
+import { Badge } from '@astrojs/starlight/components';
+import products from '../data/products.json';
+import { statuses } from '../data/status.js';
+
+interface Props {
+  id: string;
+}
+
+const product = products.find((candidate) => candidate.slug === Astro.props.id);
+if (!product) throw new Error(`src/data/products.json has no product "${Astro.props.id}"`);
+const status = statuses[product.status as keyof typeof statuses];
+---
+
+<p class="kp-status">
+  <Badge text={status.label} variant={status.variant} size="medium" />
+  <span>{status.meaning} Labels change when a release ships.</span>
+</p>

@@ -1,6 +1,6 @@
 # keypaste.com
 
-The waitlist site has two static pages, one form endpoint and the share-link routes. Cloudflare's Git integration deploys `site/` on pushes to `main`. `public/` contains the pages; `src/worker.js` handles `/subscribe`, hands `/api/share*` and `/s/*` to `src/share.js`, and returns 404 for unmatched routes. The home and thanks pages use a plain form and load no scripts or cookies; that promise covers those pages, and the share viewer at `/s/` is a separate page that needs JavaScript to decrypt.
+keypaste.com is a static home page, the content pages, one form endpoint and the share-link routes. Cloudflare's Git integration deploys `site/` on pushes to `main`. `public/` holds the home and thanks pages, the share viewer, the fonts and `brand.css`; `web/` is the Astro and Starlight project whose Markdown pages build into `dist/` together with an unchanged copy of `public/` ([Content pages](#content-pages), D-0402). `src/worker.js` handles `/subscribe`, hands `/api/share*` and `/s/*` to `src/share.js`, and returns 404 for unmatched routes. The home and thanks pages use a plain form and load no scripts or cookies; that promise covers those pages. The content pages run Starlight's scripts and draw their diagrams in the browser, and the share viewer at `/s/` is a separate page that needs JavaScript to decrypt.
 
 Database permissions were last verified on 2026-07-28 (D-0037). Page deployment and endpoint checks were repeated on 2026-09-12 (D-0127). Those checks do not establish current database grants. The product is local first. Team projects over an end-to-end relay are planned for after the first desktop release ([ROADMAP](../ROADMAP.md)), and hosted sync of a whole vault stays in [BACKLOG](../docs/BACKLOG.md).
 
@@ -68,9 +68,17 @@ A credential update was observed to clear the `mtls` configuration. After update
 
 The recorded follow-up is migration to a managed role without inherited roles. Check the active role and subscriber state, verify replacement grants, update Hyperdrive including TLS settings, repeat permission and submission checks, then retire the old credential. Until then, rotation requires SQL administration and a Hyperdrive update.
 
+## Content pages
+
+`web/` builds the pages under `/products/`, `/how-it-works/`, `/compare/`, `/vision/` and `/docs/` with Astro and Starlight (D-0401). Each page is Markdown in `web/src/content/docs/`, and a diagram is a fenced `mermaid` block that astro-mermaid draws in the browser; Astro's default Markdown processor runs no remark plugins, so `astro.config.mjs` selects the unified one. `astro.config.mjs` also builds the sidebar.
+
+Each product's Beta, Building or Planned label lives in `web/src/data/products.json`, which drives the sidebar, the products table and each product page; `web/src/data/status.js` says what a label means. The home page's "Where keypaste is going" list repeats the labels, so a release that changes one changes both. The comparison overview carries the month its facts were last checked.
+
+The build needs Node 22.12 or later (`.node-version` names 22 for Cloudflare) and runs from `site/` with `npm ci --prefix web && npm run build --prefix web`; it writes `dist/`, which git ignores. Cloudflare's build of each commit is the check that the pages build: a failed build deploys nothing and shows on the commit.
+
 ## Deploying
 
-Cloudflare's Git integration owns deployment (D-0127). Configure Worker `keypaste-site` with root directory `site`, no build command, deploy command `npm run deploy`, production branch `main` and non-production builds disabled. `assets.directory` is `./public` relative to that root. The build watch path must include nested files under `site/public/`.
+Cloudflare's Git integration owns deployment (D-0127). Configure Worker `keypaste-site` with root directory `site`, no build command in the dashboard, deploy command `npm run deploy` and production branch `main`. `wrangler.jsonc`'s `build` step installs and builds `web/` before every `wrangler deploy`, `wrangler versions upload` and `wrangler dev`, and `assets.directory` is `./dist`. The build watch path must include nested files under `site/`. Branch pushes that touch `site/` also build (seen on 2026-10-02), so the dashboard's non-production deploy command must upload a version, never deploy one.
 
 For a manual deployment:
 
@@ -132,14 +140,15 @@ The share database was provisioned on 2026-09-25: the `share` table and its inde
 
 A cron trigger every 30 minutes deletes expired and spent rows.
 
-For local development without a database, run the Worker from a copy of `wrangler.jsonc` without its two Hyperdrive bindings and with `SHARE_DEV_MEMORY` set, then point the CLI at it with `KEYPASTE_SHARE_URL=http://127.0.0.1:8787`. From `site/`, after `npm ci`:
+For local development without a database, run the Worker from a copy of `wrangler.jsonc` without its two Hyperdrive bindings or its content build, serving `public/`, and with `SHARE_DEV_MEMORY` set, then point the CLI at it with `KEYPASTE_SHARE_URL=http://127.0.0.1:8787`. From `site/`, after `npm ci`:
 
 ```sh
 node -e 'const fs = require("node:fs"), path = require("node:path");
   const config = JSON.parse(fs.readFileSync("wrangler.jsonc", "utf8").replace(/^\s*\/\/.*$/gm, ""));
   delete config.hyperdrive;
+  delete config.build;
   config.main = path.resolve(config.main);
-  config.assets.directory = path.resolve(config.assets.directory);
+  config.assets.directory = path.resolve("public");
   config.vars = { ...config.vars, SHARE_DEV_MEMORY: "1" };
   fs.mkdirSync(".wrangler", { recursive: true });
   fs.writeFileSync(".wrangler/wrangler.json", JSON.stringify(config, null, 2));'
