@@ -20,7 +20,7 @@ flowchart LR
   end
 ```
 
-Phase and keypaste share the principle that no server should read your secrets. keypaste's planned team projects use the same end-to-end design. The difference today is the agent: Phase's skill acts with your login, while keypaste asks you about each request.
+Phase and keypaste share the principle that a server should not read your secrets by default. keypaste's planned team projects use the same end-to-end design, and a team will also be able to choose server access for a project. The difference today is the agent: Phase's skill acts with your login, while keypaste asks you about each request.
 
 ## Pick Phase if
 

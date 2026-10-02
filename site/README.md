@@ -2,7 +2,7 @@
 
 keypaste.com is a static home page, the content pages, one form endpoint and the share-link routes. Cloudflare's Git integration deploys `site/` on pushes to `main`. `public/` holds the home and thanks pages, the share viewer, the fonts and `brand.css`; `web/` is the Astro and Starlight project whose Markdown pages build into `dist/` together with an unchanged copy of `public/` ([Content pages](#content-pages), D-0402). `src/worker.js` handles `/subscribe`, hands `/api/share*` and `/s/*` to `src/share.js`, and returns 404 for unmatched routes. The home and thanks pages use a plain form and load no scripts or cookies; that promise covers those pages. The content pages run Starlight's scripts and draw their diagrams in the browser, and the share viewer at `/s/` is a separate page that needs JavaScript to decrypt.
 
-Database permissions were last verified on 2026-07-28 (D-0037). Page deployment and endpoint checks were repeated on 2026-09-12 (D-0127). Those checks do not establish current database grants. The product is local first. Team projects over an end-to-end relay are planned for after the first desktop release ([ROADMAP](../ROADMAP.md)), and hosted sync of a whole vault stays in [BACKLOG](../docs/BACKLOG.md).
+Database permissions were last verified on 2026-07-28 (D-0037). Page deployment and endpoint checks were repeated on 2026-09-12 (D-0127). Those checks do not establish current database grants. The product is local first. A free cloud vault keypaste cannot read, team projects over an end-to-end relay and server access a team project chooses are planned for after the first desktop release ([ROADMAP](../ROADMAP.md)).
 
 ## Database connection
 

@@ -22,7 +22,7 @@ flowchart LR
   end
 ```
 
-keypaste's planned [agents without values](/products/agents-without-values/) does Agent Vault's job from the unlocked app on your machine, with no server. Its planned [team projects](/products/team-projects/) share secrets through a relay that stores only ciphertext, where Infisical's server can decrypt.
+keypaste's planned [agents without values](/products/agents-without-values/) does Agent Vault's job from the unlocked app on your machine, with no server; for agents running in the cloud, a team project that opts into server access will get the same from keypaste's server or the team's own. Its planned [team projects](/products/team-projects/) share secrets through a relay that stores only ciphertext unless the team chooses server access, where Infisical's server can always decrypt.
 
 ## Pick Infisical if
 
