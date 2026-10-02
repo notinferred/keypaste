@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.IO.Pipes;
+using System.Runtime.InteropServices;
 using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.App.Tests.Clipboard;
@@ -8,6 +10,7 @@ using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Launch;
 using Keypaste.Core.Tests;
+using Microsoft.Win32.SafeHandles;
 using Xunit;
 
 namespace Keypaste.App.Tests.Session;
@@ -29,6 +32,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
     private const string _apiKey = "sk_live_e1b_api_4d9a";
     private const string _dbUrl = "postgres://e1b:db_71c2@localhost/app";
     private const string _imported = "imported_e1b_value_b83f";
+    private const int _releaseSeconds = 3;
 
     private readonly DateTime _startedUtc = DateTime.UtcNow.AddSeconds(-1);
     private readonly TempVault _fixture = new();
@@ -57,16 +61,16 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
 
     public void Dispose()
     {
-        // A failed assertion must not leave a terminal holding the test run's console open.
-        foreach (var started in _launcher.Results.Where(result => result.Outcome == ChildOutcome.Started))
+        // On Windows a process that has not finished exiting still holds the project directory it runs in.
+        foreach (var terminal in _launcher.Terminals)
         {
-            EndTree(started.ProcessId);
+            End(terminal, grace: TimeSpan.Zero);
         }
 
         _session.Dispose();
         _countdown.Dispose();
         _fixture.Dispose();
-        Directory.Delete(_project, recursive: true);
+        DeleteOnceReleased(_project);
         Directory.Delete(_stubs, recursive: true);
     }
 
@@ -80,7 +84,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
             return;
         }
 
-        using var pipe = new NamedPipeServerStream(pipeName, PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+        using var pipe = Listen(pipeName);
         var connected = pipe.WaitForConnectionAsync(Cancel);
 
         var running = launch.LaunchAsync(run: true);
@@ -97,30 +101,52 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         var started = Assert.IsType<ChildResult>(launch.LastStart);
         Assert.Equal(ChildOutcome.Started, started.Outcome);
 
-        try
-        {
-            await connected.WaitAsync(TimeSpan.FromSeconds(60), Cancel);
-            using var reader = new StreamReader(pipe);
-            var report = (await reader.ReadToEndAsync(Cancel)).Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        var report = await ReportAsync(pipe, connected);
 
-            Assert.Equal("end", report[^1]);
-            Assert.Contains($"API_KEY={_apiKey}", report);
-            Assert.Contains($"DB_URL={_dbUrl}", report);
-            Assert.True(
-                PathIdentity.SameFile(_project, report.Single(line => line.StartsWith("cwd=", StringComparison.Ordinal))[4..]),
-                "the child did not start in the chosen directory");
+        Assert.Equal("end", report[^1]);
+        Assert.Contains($"API_KEY={_apiKey}", report);
+        Assert.Contains($"DB_URL={_dbUrl}", report);
+        AssertStartedIn(report);
 
-            var commandLine = report.Single(line => line.StartsWith("cmdline=", StringComparison.Ordinal));
-            AssertNoValue(commandLine, "the child's command line");
-        }
-        finally
-        {
-            EndTree(started.ProcessId);
-        }
+        var commandLine = report.Single(line => line.StartsWith("cmdline=", StringComparison.Ordinal));
+        AssertNoValue(commandLine, "the child's command line");
 
         AssertNoValue(File.ReadAllText(KeypasteHome.ProjectsPath(_fixture.Home)), "projects.json");
         AssertNoValue(string.Join("\n", screen.Notice, screen.Error, launch.ConfirmTitle, launch.ConfirmStarts, launch.ConfirmKeys), "the screen");
         AssertNoFileHoldsAValue();
+    }
+
+    /// <summary>
+    /// A command sent to the background still runs in the directory with the set, though the
+    /// terminal's own command has returned (PRODUCT §2).
+    /// </summary>
+    /// <remarks>
+    /// The child outlives its terminal and, after the test hangs up, lingers longer than disposal
+    /// retries the delete, so the project directory can be removed only once the test has waited for
+    /// the child itself (F.42).
+    /// </remarks>
+    [Fact]
+    public async Task A_command_run_in_the_background_has_the_set_in_the_directory_after_its_terminal_returns()
+    {
+        using var screen = Screen();
+        var launch = Mapped(screen, out var pipeName, background: true);
+        if (RefusedWithoutTerminal(screen, launch, run: true))
+        {
+            return;
+        }
+
+        using var pipe = Listen(pipeName);
+        var connected = pipe.WaitForConnectionAsync(Cancel);
+
+        var running = launch.LaunchAsync(run: true);
+        launch.ConfirmLaunchCommand.Execute(null);
+        await running.WaitAsync(Cancel);
+
+        var report = await ReportAsync(pipe, connected);
+
+        Assert.Contains($"API_KEY={_apiKey}", report);
+        Assert.Contains($"DB_URL={_dbUrl}", report);
+        AssertStartedIn(report);
     }
 
     [Fact]
@@ -141,8 +167,6 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         await running.WaitAsync(Cancel);
 
         var started = Assert.IsType<ChildResult>(launch.LastStart);
-        EndTree(started.ProcessId);
-
         Assert.Equal(ChildOutcome.Started, started.Outcome);
         var start = Assert.Single(_launcher.Started);
         Assert.Equal(_project, start.WorkingDirectory);
@@ -374,19 +398,145 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         return true;
     }
 
-    private static void EndTree(int processId)
+    /// <summary>
+    /// The process, held by a handle so that its id cannot pass to another while the test waits on
+    /// it; null if it has gone.
+    /// </summary>
+    private static Process? Held(int processId)
+    {
+        Process? process = null;
+
+        try
+        {
+            process = Process.GetProcessById(processId);
+            _ = process.SafeHandle;
+            return process;
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            process?.Dispose();
+            return null;
+        }
+    }
+
+    /// <summary>Gives the process <paramref name="grace"/> to exit, ends its tree if it has not, and waits until it has.</summary>
+    private static void End(Process process, TimeSpan grace)
+    {
+        using (process)
+        {
+            if (!process.WaitForExit(grace))
+            {
+                try
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+                catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or AggregateException)
+                {
+                    // It, or something it started, was already exiting.
+                }
+            }
+
+            Assert.True(process.WaitForExit(TimeSpan.FromSeconds(30)), $"process {process.Id} did not exit");
+        }
+    }
+
+    /// <summary>
+    /// Deletes the directory, giving a process the test could not hold, such as a terminal that had
+    /// finished before the launcher returned, a few seconds to finish exiting from it.
+    /// </summary>
+    private static void DeleteOnceReleased(string directory)
+    {
+        var waited = Stopwatch.StartNew();
+
+        while (true)
+        {
+            try
+            {
+                Directory.Delete(directory, recursive: true);
+                return;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                if (waited.Elapsed > TimeSpan.FromSeconds(_releaseSeconds))
+                {
+                    throw new IOException($"{directory} is still held by: {Holders(directory)}", ex);
+                }
+
+                Thread.Sleep(50);
+            }
+        }
+    }
+
+    /// <summary>The processes Windows says have the directory open, by name and id.</summary>
+    private static string Holders(string directory)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return "unknown on this platform";
+        }
+
+        using var handle = Native.CreateFileW(directory, Native.ReadAttributes, Native.ShareAll, IntPtr.Zero, Native.OpenExisting, Native.BackupSemantics, IntPtr.Zero);
+        var ids = new byte[8 + (8 * 64)];
+        if (handle.IsInvalid || Native.NtQueryInformationFile(handle, new byte[16], ids, ids.Length, Native.ProcessIdsUsingFile) != 0)
+        {
+            return "unknown";
+        }
+
+        return string.Join(", ", Enumerable.Range(0, BitConverter.ToInt32(ids, 0))
+            .Select(i => (int)BitConverter.ToInt64(ids, 8 + (8 * i)))
+            .Where(id => id != Environment.ProcessId)
+            .Select(Named));
+    }
+
+    private static string Named(int processId)
     {
         try
         {
             using var process = Process.GetProcessById(processId);
-            process.Kill(entireProcessTree: true);
-            process.WaitForExit(10_000);
+            return $"{process.ProcessName} {processId}";
         }
-        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        catch (ArgumentException)
         {
-            // It has already exited.
+            return $"exiting process {processId}";
         }
     }
+
+    private static NamedPipeServerStream Listen(string pipeName) =>
+        new(pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+
+    /// <summary>Reads the child's report, then hangs up and waits for the child to exit.</summary>
+    /// <remarks>
+    /// On Windows the child holds the project directory until it has exited; disposal's retry covers
+    /// only a process the test could not hold.
+    /// </remarks>
+    private static async Task<List<string>> ReportAsync(NamedPipeServerStream pipe, Task connected)
+    {
+        await connected.WaitAsync(TimeSpan.FromSeconds(60), Cancel);
+
+        List<string> report = [];
+        using (var reader = new StreamReader(pipe, leaveOpen: true))
+        {
+            while (await reader.ReadLineAsync(Cancel) is { } line)
+            {
+                report.Add(line);
+                if (line == "end")
+                {
+                    break;
+                }
+            }
+        }
+
+        var id = int.Parse(report.Single(line => line.StartsWith("pid=", StringComparison.Ordinal))[4..], CultureInfo.InvariantCulture);
+        var child = Held(id) ?? throw new InvalidOperationException($"the child {id} exited before the test hung up");
+        pipe.Dispose();
+        End(child, grace: TimeSpan.FromSeconds(30));
+        return report;
+    }
+
+    private void AssertStartedIn(List<string> report) =>
+        Assert.True(
+            PathIdentity.SameFile(_project, report.Single(line => line.StartsWith("cwd=", StringComparison.Ordinal))[4..]),
+            "the child did not start in the chosen directory");
 
     private static void AssertNoValue(string? text, string where)
     {
@@ -420,8 +570,10 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
             {
                 try
                 {
+                    // An empty file holds no value, and a FIFO, such as a running .NET process's debugger
+                    // pipe on Linux, reports no length and would block the read.
                     var info = new FileInfo(path);
-                    if (info.LastWriteTimeUtc < _startedUtc || info.Length > 16 * 1024 * 1024 || path.EndsWith(".kdbx", StringComparison.OrdinalIgnoreCase))
+                    if (info.LastWriteTimeUtc < _startedUtc || info.Length is 0 or > 16 * 1024 * 1024 || path.EndsWith(".kdbx", StringComparison.OrdinalIgnoreCase))
                     {
                         continue;
                     }
@@ -458,7 +610,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         return new TerminalLaunch(TerminalPlatform.Linux, "unused", name => name == "x-terminal-emulator" ? stub : null);
     }
 
-    private ProjectLaunchViewModel Mapped(EnvSetsViewModel screen, out string pipeName)
+    private ProjectLaunchViewModel Mapped(EnvSetsViewModel screen, out string pipeName, bool background = false)
     {
         pipeName = "kp-e1b-" + Guid.NewGuid().ToString("N");
         var reporter = Helper("Keypaste.EnvReporter");
@@ -467,16 +619,23 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         screen.OpenCommand.Execute("dev");
         var launch = screen.OpenProject!.Launch;
         launch.Directory = _project;
-        launch.Command = OperatingSystem.IsWindows()
-            ? $"\"{reporter}\" {pipeName} API_KEY DB_URL"
-            : $"'{reporter}' {pipeName} API_KEY DB_URL";
+        launch.Command = (OperatingSystem.IsWindows(), background) switch
+        {
+            (true, false) => $"\"{reporter}\" {pipeName} API_KEY DB_URL",
+            (true, true) => $"start \"\" /b \"{reporter}\" {pipeName} --linger {_releaseSeconds * 2} API_KEY DB_URL",
+            (false, false) => $"'{reporter}' {pipeName} API_KEY DB_URL",
+            (false, true) => $"'{reporter}' {pipeName} --linger {_releaseSeconds * 2} API_KEY DB_URL &",
+        };
         launch.SaveCommand.Execute(null);
 
         Assert.True(launch.IsMapped, screen.Error);
         return launch;
     }
 
-    /// <summary>The real launcher, counted, so a refusal can be shown to have started nothing.</summary>
+    /// <summary>
+    /// The real launcher, counted, so a refusal can be shown to have started nothing, and holding
+    /// each terminal it starts so the test can wait for it.
+    /// </summary>
     private sealed class CountingLauncher : IProcessLauncher
     {
         private readonly DetachedProcessLauncher _real = new();
@@ -485,15 +644,36 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
 
         internal List<ChildStart> Started { get; } = [];
 
-        internal List<ChildResult> Results { get; } = [];
+        internal List<Process> Terminals { get; } = [];
 
         public ChildResult Run(ChildStart start)
         {
             Started.Add(start);
             var result = _real.Run(start);
-            Results.Add(result);
+
+            if (result.Outcome == ChildOutcome.Started && Held(result.ProcessId) is { } terminal)
+            {
+                Terminals.Add(terminal);
+            }
+
             return result;
         }
+    }
+
+    /// <summary>Asks Windows which processes have a file open.</summary>
+    private static class Native
+    {
+        internal const uint ReadAttributes = 0x80;
+        internal const uint ShareAll = 0x7;
+        internal const uint OpenExisting = 3;
+        internal const uint BackupSemantics = 0x02000000;
+        internal const int ProcessIdsUsingFile = 47;
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        internal static extern SafeFileHandle CreateFileW(string name, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
+
+        [DllImport("ntdll.dll")]
+        internal static extern int NtQueryInformationFile(SafeFileHandle file, byte[] status, byte[] information, int length, int informationClass);
     }
 
     /// <summary>Holds every continuation until the test runs the queue, so a lock can be placed between two of them.</summary>

@@ -8,14 +8,16 @@ using System.Text.Json;
 namespace Keypaste.EnvReporter;
 
 /// <summary>
-/// Reports its working directory, its own command line and the named variables of its own
-/// environment over the named pipe it is given, then exits. Or, started with flags, it is the child
-/// an agent's run starts in the capture tests: it prints what it is told to, in the forms it is
-/// told to, and exits as it is told to.
+/// Reports its process id, its working directory, its own command line and the named variables of
+/// its own environment over the named pipe it is given, waits for the test to hang up, lingers if
+/// told to, then exits. Or, started with flags, it is the child an agent's run starts in the capture
+/// tests: it prints what it is told to, in the forms it is told to, and exits as it is told to.
 /// </summary>
 /// <remarks>
 /// The app's Run starts it in a terminal in V-E.1b. It reports over a pipe so the test reads what the
-/// child received without the child writing a file, which the same test checks nothing did.
+/// child received without the child writing a file, which the same test checks nothing did. It stays
+/// until the test hangs up so the test can hold it while it is certainly running and then wait for
+/// it to exit (F.42).
 /// </remarks>
 internal static class Program
 {
@@ -23,7 +25,7 @@ internal static class Program
     {
         if (args.Length < 1)
         {
-            Console.Error.WriteLine("usage: Keypaste.EnvReporter <pipe> [NAME...] | --<step> ...");
+            Console.Error.WriteLine("usage: Keypaste.EnvReporter <pipe> [--linger SECONDS] [NAME...] | --<step> ...");
             return 2;
         }
 
@@ -32,19 +34,37 @@ internal static class Program
 
     private static int Report(string[] args)
     {
-        using var pipe = new NamedPipeClientStream(".", args[0], PipeDirection.Out);
+        var lingers = args.Length > 2 && args[1] == "--linger";
+        var linger = lingers ? TimeSpan.FromSeconds(double.Parse(args[2], CultureInfo.InvariantCulture)) : TimeSpan.Zero;
+
+        using var pipe = new NamedPipeClientStream(".", args[0], PipeDirection.InOut);
         pipe.Connect(TimeSpan.FromSeconds(30));
 
-        using var writer = new StreamWriter(pipe, new UTF8Encoding(false)) { NewLine = "\n" };
-        writer.WriteLine($"cwd={Environment.CurrentDirectory}");
-        writer.WriteLine($"cmdline={Environment.CommandLine}");
-
-        foreach (var name in args.Skip(1))
+        using (var writer = new StreamWriter(pipe, new UTF8Encoding(false), leaveOpen: true) { NewLine = "\n" })
         {
-            writer.WriteLine(Environment.GetEnvironmentVariable(name) is { } value ? $"{name}={value}" : $"{name} unset");
+            writer.WriteLine($"pid={Environment.ProcessId}");
+            writer.WriteLine($"cwd={Environment.CurrentDirectory}");
+            writer.WriteLine($"cmdline={Environment.CommandLine}");
+
+            foreach (var name in args.Skip(lingers ? 3 : 1))
+            {
+                writer.WriteLine(Environment.GetEnvironmentVariable(name) is { } value ? $"{name}={value}" : $"{name} unset");
+            }
+
+            writer.WriteLine("end");
         }
 
-        writer.WriteLine("end");
+        // The test never writes: this returns when it hangs up, having taken hold of this process.
+        try
+        {
+            _ = pipe.ReadByte();
+        }
+        catch (IOException)
+        {
+            // It hung up without draining the pipe.
+        }
+
+        Thread.Sleep(linger);
         return 0;
     }
 
