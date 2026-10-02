@@ -28,6 +28,7 @@ Documents fall into four layers that change at different rates. A base document 
 | Plan | [STEPS](docs/STEPS.md) | Open tasks by product track: dependencies, detail and acceptance | A task is selected, finished or re-planned |
 | Plan | [BACKLOG](docs/BACKLOG.md) | Optional ideas, investigation candidates and conditions for reconsideration; no delivery commitments | An idea is added, selected or dropped |
 | Record | [steps](docs/steps/README.md) | One record per completed task, and the completed-steps evidence index | Once, when a task completes; never revised |
+| Record | [research](docs/research/) | Dated evidence about other products and the market, one file per review | Once, when a review is made; never revised |
 | Public | [README](README.md) | Introduction, published installation instructions and navigation | A release or published claim changes |
 | Public | [FEATURES](docs/FEATURES.md) | Dated capabilities by surface, implementation evidence and gaps; no parity promise | A capability or gap changes |
 | Public | [RELEASE](docs/RELEASE.md) | Distribution matrix, publication and installation verification | Release work |

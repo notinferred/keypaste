@@ -1,6 +1,6 @@
 # Build plan
 
-This plan owns the committed tasks, grouped by product track: each task's dependencies, detail and acceptance evidence for [PRODUCT](PRODUCT.md) v1.8 (D-0367). [ROADMAP](../ROADMAP.md) owns direction, track order and which tasks each milestone needs. [FEATURES](FEATURES.md) owns the capability inventory, [RELEASE](RELEASE.md) distribution evidence, [BACKLOG](BACKLOG.md) optional work, and the [step records](steps/README.md) what each completed task did. The license remains AGPL-3.0.
+This plan owns the committed tasks, grouped by product track: each task's dependencies, detail and acceptance evidence for [PRODUCT](PRODUCT.md) v1.9 (D-0400). [ROADMAP](../ROADMAP.md) owns direction, track order and which tasks each milestone needs. [FEATURES](FEATURES.md) owns the capability inventory, [RELEASE](RELEASE.md) distribution evidence, [BACKLOG](BACKLOG.md) optional work, and the [step records](steps/README.md) what each completed task did. The license remains AGPL-3.0.
 
 This file holds open work only. Finishing a task removes it from here and adds its record under [steps](steps/README.md). No row is authorized by appearing here: the founder selects what is built, and an instruction to build the next task takes the first ready code row of ROADMAP's current milestone, in track order. No backlog item is automatically eligible.
 
@@ -191,6 +191,10 @@ Package managers and agent marketplaces carry a version only after it is publish
 - [ ] **G.7 — Publish a one-prompt setup page.** Needs: G.3, G.6e. Ships after: 4.7c2.
   - A keypaste.com page with one prompt an agent can follow: install through a verified channel, run `keypaste setup` and `keypaste doctor`, and never ask for a pasted secret.
   - `verify-demo.sh` checks its commands.
+- [ ] **L.2 — Rebuild keypaste.com's content on Astro.** Needs: L.1.
+  - Astro with Starlight builds the content pages in Cloudflare's build, and the existing Worker serves them as static assets (D-0401). The home page, signup, share viewer and fonts in `public/` copy through unchanged, and the home page stays free of JavaScript.
+  - How it works, with Mermaid written in Markdown; one page per product, its Beta, Building, Planned or Not planned label read from one file edited at releases; a design-level comparison table and one page per competitor that links to the competitor's own docs; the vision; and the guides L.1 rewrites, which move to the site as their only home.
+  - Every page carries a content security policy, and a page without a diagram loads no diagram script.
 
 ## T6 — Daily driver
 
@@ -232,9 +236,42 @@ Each row keeps its historical meaning and is expanded when selected.
     - documented spare-key and lost-key limits.
   - OS quick unlock and browser passkeys are separate features.
 
+## T7 — Agents without values
+
+PRODUCT v1.9 (D-0400) adds T7–T10 after the first desktop release. Each row carries its purpose until it is selected and detailed.
+
+- [ ] **X.1 — Attach approved credentials on the wire.** Needs: none.
+  - The process holding the vault proxies an agent's HTTPS requests to the hosts an entry names and attaches the entry's credential under a grant the person approved; the agent holds only a placeholder (PRODUCT §2, §3.2).
+  - The owner writes the audit record of every request it serves.
+
+## T8 — Team projects
+
+- [ ] **X.2 — Specify the end-to-end sharing protocol.** Needs: none.
+  - Member key pairs, a project key wrapped for each member, roles, and removal by re-wrapping and rotation, built from mature audited libraries (§3.6).
+  - Reviewed against §3 and §4.3 before any relay code.
+- [ ] **X.3 — Run the relay.** Needs: X.2.
+  - A relay on keypaste.com, and one a team runs itself, storing only ciphertext and wrapped keys.
+- [ ] **X.4 — Share a project with members.** Needs: X.3.
+  - Invite, roles for reading, writing and production, and removal with rotation reminders, in the app and the CLI.
+  - A record of who fetched what.
+
+## T9 — CI and deploys
+
+- [ ] **X.5 — Verify machine identities at the relay.** Needs: X.3.
+  - A CI job or deploy target fetches a project's values under an identity the relay verifies, never a member's key.
+- [ ] **X.6 — Offer a GitHub Action.** Needs: X.5.
+- [ ] **X.7 — Push syncs from a member's machine.** Needs: X.4.
+  - Hosting platforms such as GitHub, Vercel and Cloudflare receive values from an approved member's machine, so the relay never decrypts.
+
+## T10 — Organizations
+
+- [ ] **X.8 — Sign in with SSO and provision with SCIM.** Needs: X.4.
+- [ ] **X.9 — Approve production changes, export the audit and package the relay.** Needs: X.4.
+  - A production change waits for a second member's approval, the relay's records export to an organization's log store, and the self-hosted relay ships as a package.
+
 ## Completion
 
-A finished task has its bounded behavior, an executed verifier and evidence naming the tested source/version. Implemented, Packaged, Published and Installation-verified stay separate. Reader-only fixtures prove a reader; they cannot prove a writer, running producer, native interaction or public release. Completed rows in [steps](steps/README.md) are historical evidence at their original scope, not blanket acceptance of the six tracks.
+A finished task has its bounded behavior, an executed verifier and evidence naming the tested source/version. Implemented, Packaged, Published and Installation-verified stay separate. Reader-only fixtures prove a reader; they cannot prove a writer, running producer, native interaction or public release. Completed rows in [steps](steps/README.md) are historical evidence at their original scope, not blanket acceptance of the product's tracks.
 
 The source of prior plans is Git. No completed row is extended to cover new requirements. Publication, service operation, customer contact and optional work require explicit task selection and applicable authorization.
 
@@ -247,6 +284,8 @@ Open IDs that changed meaning under v1.8:
 - P.3b splits into P.3b1 (same-entry placeholders) and P.3b2 (cross-entry references, in BACKLOG).
 - 3.5a/b, 3.7a–c, 4.10a/b, 8.1, 8.3a, 1.4a/b, 9.1a–f, 9.2a/b and V.9 return from BACKLOG with their original meaning.
 - P.1 moves from "Later vault features" to T6.
+
+Under v1.9, X.1–X.9 and L.2 are new IDs. The 5.x and 7.x IDs of the earlier sync, hosting and organization ideas stay retired.
 
 The [rescope record](steps/rescope-2026-09-19.md) keeps the v1.7 continuity notes.
 

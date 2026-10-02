@@ -1,6 +1,6 @@
 # Product rules
 
-Last ratified: 2026-09-28 (v1.8, D-0367): keypaste is refocused on people who already keep their passwords in KeePass and write software, a project's variables become fields on ordinary entries, simplicity and one-step setup join the committed tracks, and macOS joins the first desktop release. Earlier versions remain in Git. Scope changes update this document, ROADMAP, STEPS and the decision record together. The security laws in §3 remain fixed.
+Last ratified: 2026-10-02 (v1.9, D-0400): after the first desktop release, keypaste's end state grows past one person's vault: an agent can use a credential it never holds, and teams share project secrets, CI identities and organization controls through an end-to-end relay that never reads a secret. v1.8's KeePass-first product and its track order still come first (D-0367). Earlier versions remain in Git. Scope changes update this document, ROADMAP, STEPS and the decision record together. The security laws in §3 remain fixed.
 
 ## 1. Product
 
@@ -12,9 +12,11 @@ The intended everyday journey is one unlock of the vault the person already has,
 
 Credentials live in an ordinary KDBX file the person owns. Local use is free, open source and works without an account, network or subscription. Opening an existing supported KDBX is the migration path for KeePass users. “Like KeePassXC” describes familiar vault use and interoperability; it does not commit keypaste to every KeePassXC feature.
 
-Against hosted managers such as 1Password and LastPass, keypaste offers ownership of an ordinary file without an account or subscription; against Infisical and 1Password Environments, project secrets that are free, unlimited and local; and before any agent receives a value, a person's answer recorded in a local audit.
+The end state extends the same model past one person. A local credential proxy lets an agent call an API with a credential it never holds. A team shares a project's secrets through a relay, on keypaste.com or the team's own server, that stores only ciphertext: each member's vault stays a local file, and only a project key travels, wrapped for each member. CI and deploy targets get identities the relay verifies, and syncs to hosting platforms are pushed from a member's machine, so no server decrypts. Organizations add single sign-on, provisioning, approval for production changes and audit export. None of this is required for local use.
 
-The product commits to six tracks. [ROADMAP](../ROADMAP.md) orders them into milestones and [STEPS](STEPS.md) holds their tasks:
+Against hosted managers such as 1Password and LastPass, keypaste offers ownership of an ordinary file without an account or subscription; against Infisical and 1Password Environments, project secrets that are free, unlimited and local, and for a team a relay that cannot read what it stores; and before any agent receives a value, a person's answer recorded in a local audit.
+
+The product commits to ten tracks. [ROADMAP](../ROADMAP.md) orders them into milestones and [STEPS](STEPS.md) holds their tasks:
 
 - **T1 Everyday vault use and recovery:** credentials with custom fields and tags, organization, generation, search, copy/reveal, safe deletion, encrypted backups and vault access settings; keys left in notes flagged for review; a first run and main screens a KeePass user understands without learning keypaste's terms.
 - **T2 One shared unlock session:** the app, MCP and environment launches use the same live vault state and lock boundary, and every process that saves the vault respects the one holding it.
@@ -22,6 +24,10 @@ The product commits to six tracks. [ROADMAP](../ROADMAP.md) orders them into mil
 - **T3 AI requests in the app:** connect every common client in one step to the vault the person chose, see and answer a bounded request, and inspect the resulting audit record.
 - **T5 Desktop delivery:** straightforward onboarding, signed Windows, macOS and Linux packages that include the CLI, installed-product verification, upgrade/recovery and a working feedback route, then package managers and agent marketplaces once a version is published.
 - **T6 Daily driver**, after the first desktop release: quick unlock, TOTP, browser fill, merging a synced file's changes, importers from other password managers and local password health.
+- **T7 Agents without values**, after the first desktop release: the process holding the vault attaches an approved credential to an agent's requests for the hosts its entry names, the agent holds only a placeholder, and the owner writes the audit record.
+- **T8 Team projects:** a project's secrets shared through an end-to-end relay on keypaste.com or self-hosted; members identified by their own key pairs; roles for reading, writing and production; removing a member re-wraps the project key and prompts rotation; a record of who fetched what.
+- **T9 CI and deploys:** machine identities the relay verifies, a GitHub Action, and syncs to hosting platforms pushed from a member's machine.
+- **T10 Organizations:** single sign-on, SCIM provisioning, approval for production changes, audit export and a packaged self-hosted relay.
 
 No track is complete merely because a screen, reader, protocol or package exists. The action that produces the result and the user's path to it must work together.
 
@@ -37,15 +43,15 @@ One unlocked session governs new secret releases in the desktop-led workflow. Ma
 
 Unlocking does not itself run a command or approve an AI request. An environment launch is a user action for a named project and command. Values go into that child process's environment without creating a plaintext `.env` file or changing the machine's global environment. A terminal started this way exposes the values to programs it starts. Locking stops future releases; it cannot erase values already delivered to a process or MCP client, end their authenticated sessions, or revoke a credential at its issuer. TTL limits approval reuse, not retained copies. Stopping programs on lock is not part of the initial contract.
 
-MCP remains bounded credential access: exposed names and one approved field, not arbitrary shell execution, bulk vault export or model-controlled vault administration. The master password is entered only in a user-initiated local unlock flow. The bridge remains vault-free. Existing user-written policies stay explicit, scoped and subordinate to the session lock.
+MCP remains bounded credential access: exposed names and one approved field, not arbitrary shell execution, bulk vault export or model-controlled vault administration. The master password is entered only in a user-initiated local unlock flow. The bridge remains vault-free. Existing user-written policies stay explicit, scoped and subordinate to the session lock. With T7, the owner may also attach one approved credential to an agent's HTTPS requests for the hosts its entry names, under a grant with the scope and lifetime the person approved (§3.2); the agent receives a placeholder, never the value.
 
 The first desktop release targets Windows x64, macOS arm64 and Linux x64 while retaining the four published CLI/MCP targets, and it ships together with the next CLI/MCP release (D-0368). Every desktop package carries the CLI. Additional desktop platforms and channels require their own installation evidence and selection from [BACKLOG](BACKLOG.md).
 
 Hardware-key vault unlocking is part of the product. The desktop unlocks such a vault in source (D-0366); creating one, the CLI and a run on a physical key remain for T6. It must use a KeePassXC-compatible approach, with supported devices/platforms and backup or lost-key limits verified before support is advertised. It is distinct from OS-assisted quick unlock such as Windows Hello or Touch ID, which T6 also commits.
 
-Encrypted file sharing, hosted services and managed sync, accounts and billing, team administration, phone and web clients, SSH and complete KeePassXC parity are not committed delivery tracks. Phones and sync are served by KeePass-compatible apps and ordinary file sync. Quick unlock, TOTP, browser fill, merging a synced file's changes and importers are committed to T6, after the first desktop release. BACKLOG retains the other options and the conditions for reconsidering them. There is no paid-release or enterprise milestone, promised service pricing, or obligation to implement the backlog.
+Team projects over an end-to-end relay, machine identities and organization administration are committed to T8–T10, after the first desktop release. The relay is a new secret-handling implementation, so its protocol passes the architecture and security review of §4.3 before any of its code. Still uncommitted: syncing a person's whole vault through keypaste, sharing whole vault files, billing, phone and web vault clients, SSH, complete KeePassXC parity, and any service that could read a secret, such as server-side decryption, PKI, KMS, privileged-access management or dynamic secrets. Phones and the sync of a person's own vault are served by KeePass-compatible apps and ordinary file sync. Quick unlock, TOTP, browser fill, merging a synced file's changes and importers are committed to T6, after the first desktop release. BACKLOG retains the other options and the conditions for reconsidering them. Whether the hosted relay is paid is an open decision under §5.4; there is no promised service pricing or obligation to implement the backlog.
 
-Amendment of 2026-09-25 (D-0357): share links that open a limited number of times and scoped tokens are in scope. `keypaste share` encrypts one field or an entry's login locally and keypaste.com holds only ciphertext it cannot open, serving it once `SHARE_ENABLED` is set; a scoped token is a pre-approval the person creates for `keypaste run`, with a scope and an expiry, verified and audited by the vault's owner. Merge, sync, accounts and the other exclusions above are unchanged, and §3 applies to both.
+Amendment of 2026-09-25 (D-0357): share links that open a limited number of times and scoped tokens are in scope. `keypaste share` encrypts one field or an entry's login locally and keypaste.com holds only ciphertext it cannot open, serving it once `SHARE_ENABLED` is set; a scoped token is a pre-approval the person creates for `keypaste run`, with a scope and an expiry, verified and audited by the vault's owner. §3 applies to both.
 
 Amendment of 2026-09-25 (D-0365): with `keypaste-mcp --allow-run`, MCP may also start one command the person approves, with the values in its environment and each value replaced in the output it returns (D-0358). This is not arbitrary shell execution: no shell starts it, and the person approves the exact program, arguments, directory, variable names and reason, or a grant of at most 15 minutes for that command line. Nothing enables `--allow-run` by default, and a command the agent can edit can still reveal a value (T-35).
 
@@ -82,7 +88,7 @@ Under v1.8, share links, scoped tokens and `--allow-run` remain in scope as adva
 3. Public claims follow verified releases and name their limitations. Provide downloads, usage instructions and a route for defects and security reports. An announcement campaign, GitHub Release mirror or package-manager submission is not a condition of product correctness or every task's completion; publication and sending messages require their own authorization.
 4. Local functions and their security are free. No security feature, encryption or signature is a paid upgrade. A commercial service requires a new product decision rather than inheriting the previous tier plan.
 5. ROADMAP owns the order and milestones of committed work, STEPS its tasks and acceptance, and BACKLOG optional ideas without delivery dates or automatic promotion. A document edit or ready dependency is not authorization to start implementation.
-6. The product is usable as a local desktop password manager without enabling MCP or creating a project environment. Each integration is opt-in and explains what receives the secret.
+6. The product is usable as a local desktop password manager without enabling MCP, creating a project environment or joining a team. Each integration is opt-in and explains what receives the secret.
 7. Recovery requirements distinguish an earlier entry value, a deleted entry, a damaged vault file and a lost unlock secret. Prove each supported path separately; entry history is not a whole-vault backup.
 8. Defaults over settings. A new user reaches a working vault, a project run and a connected agent without editing a configuration file or learning keypaste's internal terms. Advanced controls and security recommendations stay out of the main screens.
 
@@ -91,7 +97,7 @@ Under v1.8, share links, scoped tokens and `--allow-run` remain in scope as adva
 Apply these in order:
 
 1. Reject work that risks user trust.
-2. Prefer the shortest complete daily-use journey in the six product tracks. The founder selects what is built next; ordering does not authorize execution.
+2. Prefer the shortest complete daily-use journey in the ten product tracks. The founder selects what is built next; ordering does not authorize execution.
 3. Split work that one person cannot build and verify within two weeks into bounded children, preserving the parent's acceptance requirements.
 4. Prefer demonstrable, tested outcomes with recovery from ordinary mistakes.
 5. Prefer established approaches and focused, shippable work over novelty, perfection or breadth. An optional idea needs a concrete unmet need before becoming a commitment.

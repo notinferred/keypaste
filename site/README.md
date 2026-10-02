@@ -2,7 +2,7 @@
 
 The waitlist site has two static pages, one form endpoint and the share-link routes. Cloudflare's Git integration deploys `site/` on pushes to `main`. `public/` contains the pages; `src/worker.js` handles `/subscribe`, hands `/api/share*` and `/s/*` to `src/share.js`, and returns 404 for unmatched routes. The home and thanks pages use a plain form and load no scripts or cookies; that promise covers those pages, and the share viewer at `/s/` is a separate page that needs JavaScript to decrypt.
 
-Database permissions were last verified on 2026-07-28 (D-0037). Page deployment and endpoint checks were repeated on 2026-09-12 (D-0127). Those checks do not establish current database grants. The focused product is local. Hosted vault services and other expansion ideas are deferred to [BACKLOG](../docs/BACKLOG.md).
+Database permissions were last verified on 2026-07-28 (D-0037). Page deployment and endpoint checks were repeated on 2026-09-12 (D-0127). Those checks do not establish current database grants. The product is local first. Team projects over an end-to-end relay are planned for after the first desktop release ([ROADMAP](../ROADMAP.md)), and hosted sync of a whole vault stays in [BACKLOG](../docs/BACKLOG.md).
 
 ## Database connection
 

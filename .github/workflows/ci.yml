@@ -11,6 +11,7 @@ on:
       - 'ROADMAP.md'
       - 'docs/STEPS.md'
       - 'docs/steps/**'
+      - 'docs/research/**'
       - 'docs/ARCHITECTURE.md'
       - 'docs/BACKLOG.md'
       - 'docs/BRAND.md'

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>keypaste — a local password manager for projects and AI</title>
-<meta name="description" content="A local KeePass-compatible password manager with project environments and approved AI access. CLI/MCP downloads are available; the shared desktop unlock session is planned.">
+<meta name="description" content="A local KeePass-compatible password manager with project environments and approved AI access. The CLI and MCP bridge are in beta; the desktop app is being built.">
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#111214" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#f7f7f5" media="(prefers-color-scheme: light)">
@@ -99,6 +99,21 @@
   }
   .status b { color: var(--text-primary); font-weight: 600; }
 
+  .stages { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 12px; }
+  .stage { padding: 20px; border: 1px solid var(--border-subtle); border-radius: 10px; }
+  .stage p { margin: 12px 0 0; color: var(--text-muted); font-size: 13px; }
+  .stage ul { margin: 12px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+  .stage li { color: var(--text-secondary); font-size: 14px; text-wrap: pretty; }
+  .label {
+    display: inline-block; padding: 4px 7px; border: 1px solid var(--border-default); border-radius: 4px;
+    font: 400 11px/1 var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap;
+  }
+  .label.beta { color: var(--status-ok); border-color: currentColor; }
+  .label.building { color: var(--text-primary); border-color: var(--border-strong); }
+  .label.planned { color: var(--text-secondary); border-style: dashed; }
+  .label.out { color: var(--text-muted); }
+  .stages + .caption { margin: 16px 0 0; }
+
   .demo img { display: block; width: 100%; height: auto; border: 1px solid var(--border-subtle); border-radius: 10px; }
 
   .table-wrap { overflow-x: auto; margin: 0 0 16px; border: 1px solid var(--border-default); border-radius: 10px; }
@@ -148,6 +163,7 @@
       </a>
       <nav aria-label="Sections">
         <a class="optional" href="#agents">agents</a>
+        <a class="optional" href="#roadmap">roadmap</a>
         <a href="#install">install</a>
         <a href="https://github.com/notinferred/keypaste">source</a>
       </nav>
@@ -255,13 +271,65 @@ keypaste run dev -- npm start</pre>
         </div>
       </div>
 
-      <p class="status"><b>Published: CLI/MCP v0.3.0.</b> Local vaults, environment injection and terminal approval are available on four native targets. The binaries are unsigned and there is no public desktop download. In source, the desktop and <code>keypaste agent</code> share one owner per vault, <code>keypaste lock</code> locks whichever holds it, and the Env profiles screen launches a project's command or a terminal from the unlocked session; none of this is published.</p>
+      <p class="status"><b>Published: CLI/MCP v0.3.0.</b> Local vaults, environment injection and terminal approval are available on four native targets. The binaries are unsigned and there is no public desktop download. <a href="#roadmap">Where keypaste is going</a> labels everything else.</p>
+    </div>
+  </section>
+
+  <section id="roadmap">
+    <div class="wrap">
+      <div class="section-head"><span class="num">04</span><h2>Where keypaste is going</h2></div>
+      <p class="intro">keypaste starts with one person and the KeePass file they already have: logins and project secrets in one vault, programs run with their variables, and agents that have to ask. After the first desktop release it grows in two directions. An agent gets to use a credential without ever holding it, because the unlocked app attaches it to the request for the site it belongs to. And a team shares a project's secrets through a relay that stores only ciphertext, on keypaste.com or its own server, with identities for CI and deploys and single sign-on for organizations. No keypaste server will be able to read a secret, and local use never needs an account.</p>
+
+      <div class="stages">
+        <div class="stage">
+          <span class="label beta">Beta</span>
+          <p>A published download, pre-1.0.</p>
+          <ul>
+            <li>The keypaste CLI: vault, logins and generator</li>
+            <li>Agent approvals in the terminal, over MCP</li>
+            <li>Project environments and <code>keypaste run</code></li>
+          </ul>
+        </div>
+        <div class="stage">
+          <span class="label building">Building</span>
+          <p>In the source, not downloadable yet.</p>
+          <ul>
+            <li>The desktop app for Windows, macOS and Linux</li>
+            <li>Project tags on ordinary entries</li>
+            <li>Approvals in the app, once or for an hour</li>
+            <li>Share links and scoped CI tokens</li>
+            <li>Connecting every AI tool in one step</li>
+          </ul>
+        </div>
+        <div class="stage">
+          <span class="label planned">Planned</span>
+          <p>Committed in the roadmap.</p>
+          <ul>
+            <li>Touch ID and Windows Hello, TOTP, browser fill, merging a synced file, importers</li>
+            <li>Agents that use a credential without holding it</li>
+            <li>Team projects, end-to-end encrypted</li>
+            <li>Identities for CI and deploys, and syncs pushed from your own machine</li>
+            <li>Organizations with single sign-on and SCIM</li>
+          </ul>
+        </div>
+        <div class="stage">
+          <span class="label out">Not planned</span>
+          <p>Out of scope.</p>
+          <ul>
+            <li>A server that can read your secrets</li>
+            <li>Syncing your whole vault through keypaste</li>
+            <li>Phone and web vault apps; KeePass apps already open the file</li>
+            <li>PKI, KMS, privileged-access management and dynamic secrets</li>
+          </ul>
+        </div>
+      </div>
+      <p class="caption">Labels change when a release ships. The order, and the work behind each label, is in the <a href="https://github.com/notinferred/keypaste/blob/main/ROADMAP.md">roadmap</a>.</p>
     </div>
   </section>
 
   <section id="install">
     <div class="wrap prose">
-      <div class="section-head"><span class="num">04</span><h2>Install</h2></div>
+      <div class="section-head"><span class="num">05</span><h2>Install</h2></div>
       <p class="intro">Five lines, and the third one is the reason the other four are worth typing: it checks the archive against a hash published beside it and stops if they disagree. Each binary is a single native file, so nothing needs .NET on your machine.</p>
 
       <div class="terminal">
@@ -307,7 +375,7 @@ keypaste run dev -- npm start    # injected into the child process, nothing on d
 
   <section id="agents">
     <div class="wrap prose">
-      <div class="section-head"><span class="num">05</span><h2>Connect an MCP client</h2></div>
+      <div class="section-head"><span class="num">06</span><h2>Connect an MCP client</h2></div>
       <p class="intro">The current CLI workflow uses two processes. <code>keypaste-mcp</code> is started by your MCP client and forwards requests without opening the vault. <code>keypaste agent</code> is started by you, holds the vault, and asks you the question at the top of this page.</p>
 
       <div class="terminal">
@@ -336,7 +404,7 @@ keypaste run dev -- npm start    # injected into the child process, nothing on d
 
   <section id="upgrade">
     <div class="wrap prose">
-      <div class="section-head"><span class="num">06</span><h2>Running an older version?</h2></div>
+      <div class="section-head"><span class="num">07</span><h2>Running an older version?</h2></div>
       <p class="intro">Published versions are never rewritten here, so the old archives are still served and still broken. Replacing the binary is the fix. Full detail is in the <a href="https://github.com/notinferred/keypaste/blob/main/CHANGELOG.md">changelog</a>.</p>
 
       <div class="table-wrap">
@@ -361,8 +429,8 @@ keypaste run dev -- npm start    # injected into the child process, nothing on d
 
   <section id="desktop">
     <div class="wrap prose">
-      <div class="section-head"><span class="num">07</span><h2>The desktop app</h2></div>
-      <p class="intro">The next release focuses on daily vault use and recovery, one unlock session, native MCP approvals that allow a request once or for an hour, and launching a project with its env set. Locking will stop new session-backed secret releases and launches. Values already delivered to an agent or child process remain outside that control. Share links that open once by default (up to 10 times) come with the CLI; keypaste.com serves them once sharing is switched on. Hosted sync, accounts, teams and complete KeePassXC parity stay out.</p>
+      <div class="section-head"><span class="num">08</span><h2>The desktop app</h2></div>
+      <p class="intro">The next release focuses on daily vault use and recovery, one unlock session, native MCP approvals that allow a request once or for an hour, and launching a project with its env set. Locking will stop new session-backed secret releases and launches. Values already delivered to an agent or child process remain outside that control. Share links that open once by default (up to 10 times) come with the CLI in the same release. Teams come later, through a relay that stores only ciphertext; your own vault stays a file you sync yourself, and complete KeePassXC parity stays out.</p>
 
       <p><strong>Tell me when the app ships.</strong> The CLI/MCP is available above. The intended desktop app uses one unlock session for credentials, native approvals and project launches; it has no public download yet. You can register interest in one installation announcement. Confirmation mail is not implemented, so signups remain unconfirmed and no messages are sent. Any future message requires confirmation first.</p>
 
@@ -380,7 +448,7 @@ keypaste run dev -- npm start    # injected into the child process, nothing on d
 
   <section id="contact">
     <div class="wrap prose">
-      <div class="section-head"><span class="num">08</span><h2>Found something wrong?</h2></div>
+      <div class="section-head"><span class="num">09</span><h2>Found something wrong?</h2></div>
       <p class="intro">Bugs, missing features and "this made no sense to me" all go to the <a href="https://github.com/notinferred/keypaste/issues">issue tracker</a>, and are read by the person who wrote it. Anything that looks like a security problem goes to <a href="mailto:security@keypaste.com">security@keypaste.com</a> instead of the tracker; <a href="https://github.com/notinferred/keypaste/blob/main/SECURITY.md">SECURITY.md</a> says what happens next and how fast.</p>
       <div class="actions">
         <a class="button" href="https://github.com/notinferred/keypaste">Read the source on GitHub</a>
