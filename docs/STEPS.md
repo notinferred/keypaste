@@ -107,6 +107,9 @@ Every release still needs a person's answer or a rule they wrote, and the bridge
 - [ ] **G.8 — Set in the app what each agent can see and run.** Needs: G.1, C.5b.
   - Each connected app's row says what the app can see and whether it may run commands.
   - The owner applies the intersection with the bridge's flags, so a flag an agent edits into its own configuration can only narrow access.
+- [ ] **G.9 — Have the owner write the audit line of every request.** Needs: none.
+  - The app and `keypaste agent` write the audit line for every listing, credential, run and token request they answer before they reply, and refuse one they cannot record, so a request made straight to the pipe is recorded too (D-0407, T-14).
+  - The bridge's line stays as a second witness.
 - [ ] **N.8 — Make `keypaste` alone show where things stand.** Needs: G.1.
   - On a terminal it shows the version, the chosen vault and who holds it, the connected tools and one next step.
   - It asks for no password.
@@ -136,7 +139,7 @@ Package managers and agent marketplaces carry a version only after it is publish
 - [ ] **4.7e — Install and preserve the macOS desktop candidate.** Needs: 4.7a2, E.1d.
   - These are the macOS legs of `install-desktop.yml` and `upgrade-desktop.yml`: install, first run, vault acts, a project run, and an upgrade that keeps the vault and settings.
   - Publication moves into 4.7c2, and the Homebrew cask into 3.7a.
-- [ ] **R.1a — Exercise the integrated desktop candidate.** Needs: 9.4, 4.6, F.15, U.2, U.3, 4.4b, 4.3b, 2.6a, E.1b, E.1c, F.2b3a, F.2b3b, V.7a, V.7b, C.2, N.1a, N.1b, N.2, N.3, N.4, N.5, N.6, N.7, N.10, N.12, C.1a, C.1b, C.1c, C.3, C.4, E.1d, C.5a, C.5b, G.1, G.2, G.4a, G.5, G.8, 4.7a2.
+- [ ] **R.1a — Exercise the integrated desktop candidate.** Needs: 9.4, 4.6, F.15, U.2, U.3, 4.4b, 4.3b, 2.6a, E.1b, E.1c, F.2b3a, F.2b3b, V.7a, V.7b, C.2, N.1a, N.1b, N.2, N.3, N.4, N.5, N.6, N.7, N.10, N.12, C.1a, C.1b, C.1c, C.3, C.4, E.1d, C.5a, C.5b, G.1, G.2, G.4a, G.5, G.8, G.9, 4.7a2.
   - Install the internal Windows MSI, macOS DMG and Linux AppImage built at a named commit.
   - In each installed app, complete T1–T4 with a disposable vault, a real MCP client and a real child process. The acts:
     1. Open a KeePassXC database from the first run.
@@ -237,19 +240,28 @@ Each row keeps its historical meaning and is expanded when selected.
 
 ## T7 — Agents without values
 
-PRODUCT v1.9 (D-0400) adds T7–T10 after the first desktop release. Each row carries its purpose until it is selected and detailed.
+PRODUCT v1.9 (D-0400) adds T7–T10 after the first desktop release, and v1.10 (D-0408) adds the cloud vault to T8 and adds T11. Each row carries its purpose until it is selected and detailed.
 
 - [ ] **X.1 — Attach approved credentials on the wire.** Needs: none.
   - The process holding the vault proxies an agent's HTTPS requests to the hosts an entry names and attaches the entry's credential under a grant the person approved; the agent holds only a placeholder (PRODUCT §2, §3.2).
+  - The agent asks by host; the owner matches it to an entry's service, the person picks a personal or team entry, and the agent learns only that service, its scope and its grant (D-0405).
   - The owner writes the audit record of every request it serves.
 
-## T8 — Team projects
+## T8 — Cloud vault and team projects
 
 - [ ] **X.2 — Specify the end-to-end sharing protocol.** Needs: none.
   - Member key pairs, a project key wrapped for each member, roles, and removal by re-wrapping and rotation, built from mature audited libraries (§3.6).
+  - Accounts and a person's encrypted vault, the relay's first client, and one store per team that the app keeps, never inside the personal vault (D-0406).
   - Reviewed against §3 and §4.3 before any relay code.
 - [ ] **X.3 — Run the relay.** Needs: X.2.
   - A relay on keypaste.com, and one a team runs itself, storing only ciphertext and wrapped keys.
+- [ ] **X.10 — Sync a person's vault through the relay.** Needs: X.3, 1.4b.
+  - At first run everyone is offered an account and a cloud vault as the default choice: the KDBX encrypted on the device under the master password and a key file that is never uploaded, and merged across devices (D-0408).
+  - Keeping the vault local stays one choice away and needs no account.
+- [ ] **X.11 — Recover a cloud vault with a kit or a signed-in device.** Needs: X.10.
+  - The recovery kit holds the key file as a QR code, the account address and a space for the master password; a device still signed in can set a new password. No copy of the key exists anywhere else (§3.1).
+- [ ] **X.12 — Charge for the cloud past its free tier.** Needs: X.10.
+  - Free up to a size limit, premium for more storage and features, and business use paid as it is used; no security feature is paid (§5.4).
 - [ ] **X.4 — Share a project with members.** Needs: X.3.
   - Invite, roles for reading, writing and production, and removal with rotation reminders, in the app and the CLI.
   - A record of who fetched what.
@@ -268,6 +280,15 @@ PRODUCT v1.9 (D-0400) adds T7–T10 after the first desktop release. Each row ca
 - [ ] **X.9 — Approve production changes, export the audit and package the relay.** Needs: X.4.
   - A production change waits for a second member's approval, the relay's records export to an organization's log store, and the self-hosted relay ships as a package.
 
+## T11 — Server access by choice
+
+- [ ] **X.13 — Let a team project opt into server access.** Needs: X.4.
+  - Once a team opts a project in, keypaste's server or the team's own holds its key; members see which projects a server can read, and the server's records reach each member's local log (§3.3).
+  - Reviewed against §3 and §4.3 before any code.
+- [ ] **X.14 — Proxy agents running in the cloud.** Needs: X.13, X.1.
+- [ ] **X.15 — Let CI sign in with OIDC and store no secret.** Needs: X.13.
+- [ ] **X.16 — Sync opted-in projects to hosting platforms from the server.** Needs: X.13.
+
 ## Completion
 
 A finished task has its bounded behavior, an executed verifier and evidence naming the tested source/version. Implemented, Packaged, Published and Installation-verified stay separate. Reader-only fixtures prove a reader; they cannot prove a writer, running producer, native interaction or public release. Completed rows in [steps](steps/README.md) are historical evidence at their original scope, not blanket acceptance of the product's tracks.
@@ -284,7 +305,7 @@ Open IDs that changed meaning under v1.8:
 - 3.5a/b, 3.7a–c, 4.10a/b, 8.1, 8.3a, 1.4a/b, 9.1a–f, 9.2a/b and V.9 return from BACKLOG with their original meaning.
 - P.1 moves from "Later vault features" to T6.
 
-Under v1.9, X.1–X.9 and L.2 are new IDs; L.2 split into L.2a, completed, and L.2b. The 5.x and 7.x IDs of the earlier sync, hosting and organization ideas stay retired.
+Under v1.9, X.1–X.9 and L.2 are new IDs; L.2 split into L.2a, completed, and L.2b. The 5.x and 7.x IDs of the earlier sync, hosting and organization ideas stay retired. Under v1.10, X.10–X.16 and T11 are new.
 
 The [rescope record](steps/rescope-2026-09-19.md) keeps the v1.7 continuity notes.
 

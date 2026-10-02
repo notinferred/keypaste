@@ -173,7 +173,7 @@ If you cannot recover access, rotate each credential at its provider.
 
 ### How do I sync it between machines?
 
-keypaste has no built-in sync. You can copy or synchronize the encrypted `.kdbx` with an existing file-sync service or a USB drive; keep the master password separate. Hosted sync and relays are optional ideas in [BACKLOG](BACKLOG.md), with no committed delivery.
+keypaste has no built-in sync. You can copy or synchronize the encrypted `.kdbx` with an existing file-sync service or a USB drive; keep the master password separate. A cloud vault synced end to end and a relay for team projects are planned ([ROADMAP](../ROADMAP.md)) and not yet built.
 
 One caveat: keypaste does not merge concurrent vault edits today. If two machines edit offline, the sync tool may leave conflicting copies or overwrite one version. KDBX itself does not prohibit merging; the missing feature is in keypaste. Keep every conflicting copy, edit in one place at a time, and let synchronization finish before switching machines.
 

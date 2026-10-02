@@ -17,7 +17,7 @@ The unpublished changes are listed under Unreleased in [CHANGELOG](CHANGELOG.md)
 - the app gets simpler;
 - connecting an agent takes one step.
 
-[PRODUCT](docs/PRODUCT.md) v1.9 (D-0400) adds the end state that follows the first desktop release: agents that use credentials they never hold (T7), then team projects, CI identities and organizations over an end-to-end relay that never reads a secret (T8–T10).
+[PRODUCT](docs/PRODUCT.md) v1.9 (D-0400) adds the end state that follows the first desktop release: agents that use credentials they never hold (T7), then team projects, CI identities and organizations over an end-to-end relay (T8–T10). v1.10 (D-0408) makes the relay's first job a person's own cloud vault, free and unreadable by keypaste, and lets a team project choose server access once team projects work (T11).
 
 ## Track order
 
@@ -30,11 +30,11 @@ The tracks are PRODUCT's, and they are worked in this order:
 5. T5 desktop delivery;
 6. T6 daily driver;
 7. T7 agents without values;
-8. T8 team projects;
-9. T9 CI and deploys;
+8. T8 cloud vault and team projects;
+9. T9 CI and deploys, with T11 server access by choice alongside;
 10. T10 organizations.
 
-Project environments come before AI requests because what an agent may see is built on project tags. After the first desktop release, T6 is worked alongside T7–T10. T7 comes first among those because it serves one person on one machine and its owner-written audit is reused by everything after it; each of T8–T10 builds on the relay the one before it delivers. Within the current milestone, the next task is the first ready one in this order ([CLAUDE.md](CLAUDE.md#planning-and-selection)).
+Project environments come before AI requests because what an agent may see is built on project tags. After the first desktop release, T6 is worked alongside T7–T11. T7 comes first among those because it serves one person on one machine and needs no service. T8 starts the relay with a person's own cloud vault and then shares projects with members; T9 and T11 build on shared projects, and T10 on all of them. Within the current milestone, the next task is the first ready one in this order ([CLAUDE.md](CLAUDE.md#planning-and-selection)).
 
 The build infrastructure rows come first: K.6a, K.6b, F.27, F.28, B.3, F.35, F.36, F.37, B.1 and B.2 before C.1b, and B.4a and B.4b after C.4 and before C.5a, so the agent tasks are written against the single binary.
 
@@ -47,7 +47,7 @@ One version publishes the Windows, macOS and Linux desktop apps, each carrying t
 | Keys live as fields on the entries they belong to. Keys left in notes are flagged for review in Recommendations. | V.7a, V.7b, C.2 |
 | A tag such as `env:billing` or `env:billing:prod` puts an entry's fields into a project. Projects in the old `env/` layout keep working and can be moved. | C.1a, C.1b, C.1c, C.3, C.4 |
 | The app has four places: Items, Agents, Trash and Settings. It uses plain words, templates, a first run that finds the KeePassXC database, and the system's light or dark look, with advanced features in Settings. | N.1a, N.1b, N.2, N.4, N.5, N.6, N.7, N.12, N.14 |
-| An agent asks for one field of an entry it may see. Every common AI tool connects in one step to the vault the person chose, and the app, not the agent's own configuration, sets what each agent may see and run. The app stays in the menu bar or tray, and nothing saves the vault behind its owner. | C.5a, C.5b, G.1, G.2, N.3, G.4a, G.8, N.10 |
+| An agent asks for one field of an entry it may see. Every common AI tool connects in one step to the vault the person chose, and the app, not the agent's own configuration, sets what each agent may see and run, and the owner records every request itself. The app stays in the menu bar or tray, and nothing saves the vault behind its owner. | C.5a, C.5b, G.1, G.2, N.3, G.4a, G.8, G.9, N.10 |
 | A project runs from the app on macOS, and every desktop install puts the CLI on PATH. | E.1d, G.5 |
 | Development builds nothing on the founder's machine, CI runs what a change can break and stays green without retries, and one binary carries the CLI and the MCP bridge. | K.6a, K.6b, F.27, F.28, B.1, B.2, B.3, F.35, F.36, F.37, B.4a, B.4b |
 | Signed, notarized and verified packages for three platforms, with guidance a new user can follow. | F.20, F.32, F.24, F.25, 4.7a2, 3.5b, 4.7e, R.1a, 4.7c2, L.1, R.1 |
@@ -104,33 +104,35 @@ This follows the first desktop release and serves one person on one machine.
 |---|---|
 | An agent calls an API with a credential it never holds: the unlocked app attaches it for the hosts its entry names, under a grant the person approved, and writes the audit record | X.1 |
 
-## T8–T10: teams
+## T8–T11: cloud vault and teams
 
-These follow T7. Local use keeps working without an account or network (PRODUCT §4.1), and no server can read a secret.
+These follow T7. Local use keeps working without an account or network (PRODUCT §4.1), and no server ever reads a personal vault.
 
 | Outcome | Tasks |
 |---|---|
-| An end-to-end sharing protocol, reviewed against PRODUCT §3 before any relay code | X.2 |
+| An end-to-end protocol for accounts, a person's vault and shared projects, reviewed against PRODUCT §3 before any relay code | X.2 |
 | A relay on keypaste.com, and one a team runs itself, that stores only ciphertext and wrapped keys | X.3 |
+| Everyone is offered a free cloud vault that keypaste cannot read, recovered with a kit the person keeps or a signed-in device, with premium and business tiers | X.10, X.11, X.12 |
 | A project shared with members, with roles for reading, writing and production, and removal that re-wraps its key | X.4 |
 | CI and deploy targets with identities the relay verifies, a GitHub Action, and syncs pushed from a member's machine | X.5, X.6, X.7 |
+| A team project that opts in lets keypaste's server or the team's own hold its key: agents running in the cloud use it through a proxy, CI signs in with OIDC, and the server syncs to hosting platforms | X.13, X.14, X.15, X.16 |
 | Organizations with single sign-on, SCIM, approval for production changes and audit export | X.8, X.9 |
 
-Whether the hosted relay is paid is an open decision under PRODUCT §5.4.
+The cloud's tiers follow PRODUCT §5.4: free up to a size limit, premium for more storage and features, and business use paid as it is used.
 
 ## Not planned
 
 None of these has a milestone:
 
-- syncing a person's whole vault through keypaste;
 - sharing whole vault files;
-- billing;
-- phone and web vault clients;
+- phone and web vault clients, though a keypaste phone app for cloud vaults is a BACKLOG option;
 - SSH;
 - complete KeePassXC parity;
-- any service that could read a secret: server-side decryption, PKI, KMS, privileged-access management and dynamic secrets.
+- an AI that organizes the vault;
+- any server that could read a personal vault;
+- PKI, KMS, privileged-access management and dynamic secrets.
 
-KeePass-compatible apps and ordinary file sync serve phones and the sync of a person's own vault. [BACKLOG](docs/BACKLOG.md) keeps these and other ideas, each with the condition that would justify it.
+KeePass-compatible apps and ordinary file sync serve phones for a local vault. [BACKLOG](docs/BACKLOG.md) keeps these and other ideas, each with the condition that would justify it.
 
 ## How this changes
 

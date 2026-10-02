@@ -6,7 +6,7 @@
 
 Keep the lowercase keypaste wordmark, a clear vault identity and an obvious locked or unlocked state. Opening the app should lead to creating or opening a vault, then finding, adding, editing or copying a credential. Search, Add and the selected item's details must remain usable in a small window. Notes should have enough room to read and edit without forcing every item into a large editor. The main screens keep to that everyday work in plain words; advanced controls and security recommendations stay in Settings (PRODUCT §5.8), and the look follows [BRAND](BRAND.md).
 
-Recovery belongs beside the action it reverses. Entry history and deletion recovery are implemented in source: a deletion states where the entry went and offers to put it back, and Trash holds what is still recoverable. Preserve familiar KeePass groups and ordinary KDBX data. Item templates (N.4) and browser fill (8.1, 8.3a) are planned in [ROADMAP](../ROADMAP.md); shared ownership and organization administration are optional ideas in [BACKLOG](BACKLOG.md).
+Recovery belongs beside the action it reverses. Entry history and deletion recovery are implemented in source: a deletion states where the entry went and offers to put it back, and Trash holds what is still recoverable. Preserve familiar KeePass groups and ordinary KDBX data. Item templates (N.4), browser fill (8.1, 8.3a), team projects and organization administration (T8–T10) are planned in [ROADMAP](../ROADMAP.md).
 
 ## One session for credentials, agents and projects
 

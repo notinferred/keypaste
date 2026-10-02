@@ -281,7 +281,7 @@ keypaste run dev -- npm start</pre>
   <section id="roadmap">
     <div class="wrap">
       <div class="section-head"><span class="num">04</span><h2>Where keypaste is going</h2></div>
-      <p class="intro">keypaste starts with one person and the KeePass file they already have: logins and project secrets in one vault, programs run with their variables, and agents that have to ask. After the first desktop release it grows in two directions. An agent gets to use a credential without ever holding it, because the unlocked app attaches it to the request for the site it belongs to. And a team shares a project's secrets through a relay that stores only ciphertext, on keypaste.com or its own server, with identities for CI and deploys and single sign-on for organizations. No keypaste server will be able to read a secret, and local use never needs an account.</p>
+      <p class="intro">keypaste starts with one person and the KeePass file they already have: logins and project secrets in one vault, programs run with their variables, and agents that have to ask. After the first desktop release it grows in three directions. An agent gets to use a credential without ever holding it, because the unlocked app attaches it to the request for the site it belongs to. Your vault can sync free through keypaste's cloud, encrypted on your device so keypaste can never read it. And a team shares a project's secrets through a relay that stores only ciphertext, on keypaste.com or its own server, with identities for CI and deploys and single sign-on for organizations; a team that wants a server to hold a project's key can choose that. No server will ever read your personal vault, and local use never needs an account.</p>
 
       <div class="stages">
         <div class="stage">
@@ -310,8 +310,10 @@ keypaste run dev -- npm start</pre>
           <ul>
             <li><a href="/products/daily-driver/">Touch ID and Windows Hello, TOTP, browser fill, merging a synced file, importers</a></li>
             <li><a href="/products/agents-without-values/">Agents that use a credential without holding it</a></li>
+            <li>A free cloud vault keypaste can't read; keeping it local stays an option</li>
             <li><a href="/products/team-projects/">Team projects</a>, end-to-end encrypted</li>
             <li><a href="/products/ci-and-deploys/">Identities for CI and deploys</a>, and syncs pushed from your own machine</li>
+            <li>Server access a team project can choose</li>
             <li><a href="/products/organizations/">Organizations</a> with single sign-on and SCIM</li>
           </ul>
         </div>
@@ -319,9 +321,8 @@ keypaste run dev -- npm start</pre>
           <span class="label out">Not planned</span>
           <p>Out of scope.</p>
           <ul>
-            <li>A server that can read your secrets</li>
-            <li>Syncing your whole vault through keypaste</li>
-            <li>Phone and web vault apps; KeePass apps already open the file</li>
+            <li>A server that can read your personal vault</li>
+            <li>Phone and web vault apps; KeePass apps open a local vault</li>
             <li>PKI, KMS, privileged-access management and dynamic secrets</li>
           </ul>
         </div>
@@ -433,7 +434,7 @@ keypaste run dev -- npm start    # injected into the child process, nothing on d
   <section id="desktop">
     <div class="wrap prose">
       <div class="section-head"><span class="num">08</span><h2>The desktop app</h2></div>
-      <p class="intro">The next release focuses on daily vault use and recovery, one unlock session, native MCP approvals that allow a request once or for an hour, and launching a project with its env set. Locking will stop new session-backed secret releases and launches. Values already delivered to an agent or child process remain outside that control. Share links that open once by default (up to 10 times) come with the CLI in the same release. Teams come later, through a relay that stores only ciphertext; your own vault stays a file you sync yourself, and complete KeePassXC parity stays out.</p>
+      <p class="intro">The next release focuses on daily vault use and recovery, one unlock session, native MCP approvals that allow a request once or for an hour, and launching a project with its env set. Locking will stop new session-backed secret releases and launches. Values already delivered to an agent or child process remain outside that control. Share links that open once by default (up to 10 times) come with the CLI in the same release. Later, your vault can sync free through keypaste's cloud, which can't read it, and teams share projects through a relay that stores only ciphertext; complete KeePassXC parity stays out.</p>
 
       <p><strong>Tell me when the app ships.</strong> The CLI/MCP is available above. The intended desktop app uses one unlock session for credentials, native approvals and project launches; it has no public download yet. You can register interest in one installation announcement. Confirmation mail is not implemented, so signups remain unconfirmed and no messages are sent. Any future message requires confirmation first.</p>
 
