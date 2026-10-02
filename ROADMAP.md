@@ -47,7 +47,7 @@ One version publishes the Windows, macOS and Linux desktop apps, each carrying t
 | Keys live as fields on the entries they belong to. Keys left in notes are flagged for review in Recommendations. | V.7a, V.7b, C.2 |
 | A tag such as `env:billing` or `env:billing:prod` puts an entry's fields into a project. Projects in the old `env/` layout keep working and can be moved. | C.1a, C.1b, C.1c, C.3, C.4 |
 | The app has four places: Items, Agents, Trash and Settings. It uses plain words, templates, a first run that finds the KeePassXC database, and the system's light or dark look, with advanced features in Settings. | N.1a, N.1b, N.2, N.4, N.5, N.6, N.7, N.12, N.14 |
-| An agent asks for one field of an entry it may see. Every common AI tool connects in one step to the vault the person chose. The app stays in the menu bar or tray, and nothing saves the vault behind its owner. | C.5a, C.5b, G.1, G.2, N.3, G.4a, N.10 |
+| An agent asks for one field of an entry it may see. Every common AI tool connects in one step to the vault the person chose, and the app, not the agent's own configuration, sets what each agent may see and run. The app stays in the menu bar or tray, and nothing saves the vault behind its owner. | C.5a, C.5b, G.1, G.2, N.3, G.4a, G.8, N.10 |
 | A project runs from the app on macOS, and every desktop install puts the CLI on PATH. | E.1d, G.5 |
 | Development builds nothing on the founder's machine, CI runs what a change can break and stays green without retries, and one binary carries the CLI and the MCP bridge. | K.6a, K.6b, F.27, F.28, B.1, B.2, B.3, F.35, F.36, F.37, B.4a, B.4b |
 | Signed, notarized and verified packages for three platforms, with guidance a new user can follow. | F.20, F.32, F.24, F.25, 4.7a2, 3.5b, 4.7e, R.1a, 4.7c2, L.1, R.1 |
@@ -70,7 +70,7 @@ These follow the publication of 0.5.0.
 | Install with Homebrew, Scoop or winget | 3.7a, 3.7b, 3.7c |
 | A Claude Code plugin, a Claude Desktop extension, an MCP Registry listing, a Gemini CLI extension, and Cursor and VS Code install links | G.6a, G.6b, G.6c, G.6d, G.6e |
 | A one-prompt setup page on keypaste.com, and `keypaste doctor` | G.7, G.3 |
-| A notice when a locked app is asked; what each agent may see and run, set in the app | G.4b, G.8 |
+| A notice when a locked app is asked | G.4b |
 | Terminal status, one name per CLI concept, terminal edits approved in the app, and field search | N.8, N.9, N.11, N.13 |
 | Same-entry placeholders such as `{PASSWORD}` in released values | P.3b1 |
 | The guides moved onto keypaste.com's Astro pages, with a content security policy (D-0401) | L.2b |
