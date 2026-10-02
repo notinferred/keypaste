@@ -2,14 +2,16 @@
 # Prints the runner:lane pairs a trusted earlier CI run already passed on inputs this commit shares,
 # for verify.sh's VERIFY_SATISFIED (D-0404).
 #
-# A CI job that passes leaves an artifact named pass--<runner>--<lane>+<lane>... on its run. A lane
-# counts as passed here when such a marker names it, the run that left it is trusted, and the tree of
-# the marker's commit differs from this commit's only in paths verify.sh maps to other lanes. Git's
-# trees are content hashes, so unchanged inputs are the very same objects.
+# A CI job that passes leaves an artifact named pass--<runner>--<mark>+<mark>... on its run, where a
+# mark is a lane, or a lane and the job that ran part of it, such as appcompat.firstrun. A mark counts
+# as passed here when the run that left it is trusted and the tree of the marker's commit differs from
+# this commit's only in paths verify.sh maps to other lanes. Git's trees are content hashes, so
+# unchanged inputs are the very same objects.
 #
 # TRUSTED means this repository's own runs that only someone with write access can start: dev.yml
-# dispatches, and ci.yml dispatches, schedules and pushes to main. A pull request can name an
-# artifact anything it likes, a fork's above all, so its markers are never read.
+# dispatches, ci.yml dispatches, schedules and pushes to main, and app.yml dispatches and pushes to
+# main. A pull request can name an artifact anything it likes, a fork's above all, so its markers are
+# never read.
 #
 # Any failure prints nothing, and nothing printed means every lane the plan selects runs.
 #
@@ -43,7 +45,8 @@ for run in $(printf '%s' "$markers" | awk 'NF { print $1 }' | sort -u); do
   [ "$from" = "$repo" ] || continue
   case "$path:$event" in
     .github/workflows/dev.yml:workflow_dispatch | .github/workflows/ci.yml:workflow_dispatch | .github/workflows/ci.yml:schedule) ;;
-    .github/workflows/ci.yml:push) [ "$branch" = main ] || continue ;;
+    .github/workflows/app.yml:workflow_dispatch) ;;
+    .github/workflows/ci.yml:push | .github/workflows/app.yml:push) [ "$branch" = main ] || continue ;;
     *) continue ;;
   esac
   trusted="$trusted$run "
@@ -63,8 +66,8 @@ for sha in $(printf '%s' "$markers" | awk -v t="$trusted" 'NF && index(t, " " $1
     case "$trusted" in *" $run "*) ;; *) continue ;; esac
     rest="${name#pass--}"
     runner="${rest%%--*}"
-    for lane in $(printf '%s' "${rest#*--}" | tr '+' ' '); do
-      case " $moved " in *" $lane "*) ;; *) echo "$runner:$lane" ;; esac
+    for mark in $(printf '%s' "${rest#*--}" | tr '+' ' '); do
+      case " $moved " in *" ${mark%%.*} "*) ;; *) echo "$runner:$mark" ;; esac
     done
   done
 done | sort -u

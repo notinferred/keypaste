@@ -652,23 +652,36 @@ has_lane() {
   case " $selected " in *" everything "*|*" $1 "*) return 0 ;; *) return 1 ;; esac
 }
 
-# The runners a lane's CI job runs on, and whether an earlier trusted run already passed it there on
-# inputs this commit shares: VERIFY_SATISFIED holds runner:lane pairs from lane-cache.sh (D-0404).
+# The runners each CI job marks a pass on, and whether an earlier trusted run already passed it there
+# on inputs this commit shares: VERIFY_SATISFIED holds runner:mark pairs from lane-cache.sh (D-0404,
+# D-0411). A mark is its lane's name, or the lane and the job for a lane app.yml splits into jobs.
 lane_runners() {
   case "$1" in
     core|cli|mcp|integration|compat) echo ubuntu-24.04 windows-2025 macos-15 ;;
-    rules|pages|scripts) echo ubuntu-24.04 ;;
+    rules|pages|scripts|desktop) echo ubuntu-24.04 ;;
     aot) echo ubuntu-22.04 ;;
+    appcompat.workflows) echo ubuntu-24.04 windows-2025 ;;
+    appcompat.firstrun) echo ubuntu-24.04 windows-2025 macos-15 ;;
+    markers) echo ubuntu-24.04 macos-15 ;;
+    package) { jq -r '.components.app.targets[].runner' release-targets.json 2>/dev/null || true; } | tr -d '\r' | tr '\n' ' ' ;;
+  esac
+}
+lane_marks() {
+  case "$1" in
+    appcompat) echo appcompat.workflows appcompat.firstrun ;;
+    *) echo "$1" ;;
   esac
 }
 is_satisfied() {
   case " ${VERIFY_SATISFIED:-} " in *" $1:$2 "*) return 0 ;; *) return 1 ;; esac
 }
 still_needed() {
-  local runner runners
-  runners="$(lane_runners "$1")"
-  [ -n "$runners" ] || return 0
-  for runner in $runners; do is_satisfied "$runner" "$1" || return 0; done
+  local mark runner runners
+  for mark in $(lane_marks "$1"); do
+    runners="$(lane_runners "$mark")"
+    [ -n "$runners" ] || return 0
+    for runner in $runners; do is_satisfied "$runner" "$mark" || return 0; done
+  done
   return 1
 }
 
@@ -735,8 +748,31 @@ print_plan() {
     if has_lane desktop-consistency; then desktop="$desktop tests/Keypaste.Consistency.Tests"; fi
     desktop="${desktop# }"
   fi
+  lane_in desktop "$chosen" || desktop=''
   printf 'lanes=%s\nbackend_os=%s\nbackend_tests=%s\ndesktop_tests=%s\nfilter=%s\n' "$chosen" "$os" "$backend" "$desktop" "$filter"
   print_test_matrix
+  print_app_matrix
+}
+
+# The runners each app.yml job still needs. A package list jq could not read is "all", so a missing
+# tool never skips a release target.
+print_app_matrix() {
+  local job mark runner runners list
+  for job in compat:appcompat.workflows firstrun:appcompat.firstrun markers:markers package:package; do
+    mark="${job#*:}"
+    list=''
+    if has_lane "${mark%%.*}"; then
+      runners="$(lane_runners "$mark")"
+      if [ -z "${runners// /}" ]; then
+        printf 'app_%s_os=all\n' "${job%%:*}"
+        continue
+      fi
+      for runner in $runners; do
+        is_satisfied "$runner" "$mark" || list="$list,\"$runner\""
+      done
+    fi
+    printf 'app_%s_os=[%s]\n' "${job%%:*}" "${list#,}"
+  done
 }
 
 planned=()

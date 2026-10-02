@@ -14,7 +14,9 @@
 #   - a helper a test starts at run time selects the test that starts it;
 #   - the gates' shared library selects every lane whose gates source it;
 #   - a build input, an unknown path, an empty change list and an unreadable range select everything,
-#     and an unreadable range says git failed rather than passing for an empty one.
+#     and an unreadable range says git failed rather than passing for an empty one;
+#   - each test runner, and each app.yml job, keeps only the runners an earlier trusted run has not
+#     already passed, and a desktop lane already passed leaves no desktop tests.
 #
 # Usage:
 #   verify-ci-scope.sh
@@ -29,7 +31,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 readonly SELF="scripts/verify-ci-scope.sh"
 declared_cases() {
   local n
-  n="$(grep -cE '^[[:space:]]*run_(matrix_)?case ' "$SELF" || true)"
+  n="$(grep -cE '^[[:space:]]*run_(matrix_|app_)?case ' "$SELF" || true)"
   case "$n" in "" | 0 | *[!0-9]*) echo "" ;; *) echo "$n" ;; esac
 }
 
@@ -53,9 +55,9 @@ run_case() {
   shift 7
   cases_run=$((cases_run + 1))
   if [ "$paths" = -git ]; then
-    got="$(unset VERIFY_CHANGED_PATHS; bash "$SUBJECT" --plan "$@" 2>"$ERR" | sed '/^test_matrix=/d')" || die "$name: the planner failed"
+    got="$(unset VERIFY_CHANGED_PATHS; bash "$SUBJECT" --plan "$@" 2>"$ERR" | sed '/^test_matrix=/d; /^app_[a-z]*_os=/d')" || die "$name: the planner failed"
   else
-    got="$(VERIFY_CHANGED_PATHS="$paths" bash "$SUBJECT" --plan "$@" 2>"$ERR" | sed '/^test_matrix=/d')" || die "$name: the planner failed"
+    got="$(VERIFY_CHANGED_PATHS="$paths" bash "$SUBJECT" --plan "$@" 2>"$ERR" | sed '/^test_matrix=/d; /^app_[a-z]*_os=/d')" || die "$name: the planner failed"
   fi
   if [ "$got" != "$want" ]; then
     printf 'expected:\n%s\ngot:\n%s\n' "$want" "$got" >&2
@@ -71,6 +73,22 @@ run_matrix_case() {
   cases_run=$((cases_run + 1))
   got="$(VERIFY_CHANGED_PATHS="$paths" VERIFY_SATISFIED="$satisfied" bash "$SUBJECT" --plan 2>"$ERR" \
     | sed -n '/^lanes=/p; /^test_matrix=/p')" || die "$name: the planner failed"
+  if [ "$got" != "$want" ]; then
+    printf 'expected:\n%s\ngot:\n%s\n' "$want" "$got" >&2
+    die "$name: the plan differs"
+  fi
+  printf '  %-34s%s\n' "$name" "$(printf '%s\n' "$got" | sed -n 1p)"
+}
+
+# run_app_case <name> <changed paths> <runner:mark pairs already passed> <lanes> <desktop_tests>
+#   <compat runners> <first-run runners> <clipboard runners> <package runners>
+run_app_case() {
+  local name="$1" paths="$2" satisfied="$3" want got
+  want="$(printf 'lanes=%s\ndesktop_tests=%s\napp_compat_os=%s\napp_firstrun_os=%s\napp_markers_os=%s\napp_package_os=%s' \
+    "$4" "$5" "$6" "$7" "$8" "$9")"
+  cases_run=$((cases_run + 1))
+  got="$(VERIFY_CHANGED_PATHS="$paths" VERIFY_SATISFIED="$satisfied" bash "$SUBJECT" --plan 2>"$ERR" \
+    | sed -n '/^lanes=/p; /^desktop_tests=/p; /^app_[a-z]*_os=/p')" || die "$name: the planner failed"
   if [ "$got" != "$want" ]; then
     printf 'expected:\n%s\ngot:\n%s\n' "$want" "$got" >&2
     die "$name: the plan differs"
@@ -137,6 +155,20 @@ run_matrix_case "rules beside the CLI, unfiltered" "$(printf '%s\n' .github/work
 run_matrix_case "rules alone keep their filter" .github/workflows/install.yml '' ' rules scripts ' \
   '[{"os":"ubuntu-24.04","lanes":" rules ","backend_tests":"tests/Keypaste.Core.Tests","filter":"Keypaste.Core.Tests.WorkflowRulesTests"}]'
 
+echo "== each app job's runners, less what an earlier run already passed"
+readonly APP_LANES=' desktop appcompat markers package '
+readonly TWO='["ubuntu-24.04","windows-2025"]'
+readonly CLIPBOARD='["ubuntu-24.04","macos-15"]'
+readonly TARGETS='["ubuntu-24.04","macos-15","windows-2025"]'
+readonly EVERY_APP_JOB='ubuntu-24.04:desktop ubuntu-24.04:appcompat.workflows windows-2025:appcompat.workflows ubuntu-24.04:appcompat.firstrun windows-2025:appcompat.firstrun macos-15:appcompat.firstrun ubuntu-24.04:markers macos-15:markers ubuntu-24.04:package macos-15:package windows-2025:package'
+run_app_case "the app, nothing passed" src/Keypaste.App/App.axaml.cs '' "$APP_LANES" all \
+  "$TWO" "$THREE" "$CLIPBOARD" "$TARGETS"
+run_app_case "the app, Linux's first run passed" src/Keypaste.App/App.axaml.cs 'ubuntu-24.04:appcompat.firstrun' "$APP_LANES" all \
+  "$TWO" '["windows-2025","macos-15"]' "$CLIPBOARD" "$TARGETS"
+run_app_case "the app, every job passed" src/Keypaste.App/App.axaml.cs "$EVERY_APP_JOB" ' ' '' '[]' '[]' '[]' '[]'
+run_app_case "a desktop edit already passed" tests/Keypaste.App.Tests/Clipboard/FakeClipboard.cs 'ubuntu-24.04:desktop' \
+  ' ' '' '[]' '[]' '[]' '[]'
+
 echo "== negative control"
 export VERIFY_SCOPE_NO_LINKS=1
 run_case "the CLI harness, links ignored" tests/Keypaste.Cli.Tests/CliHarness.cs ' cli ' "$THREE" \
@@ -157,7 +189,8 @@ ok: $cases_run cases. Documents nothing reads select no lane, pages and workflow
     compiles or embeds selects that project too, a helper selects the test that starts it, the
     gates' shared library selects every lane whose gates source it, and a build input, an
     unknown path, no change and an unreadable range each select everything, the last saying git
-    failed. With linked files ignored the CLI harness loses desktop and the word list keeps only
+    failed. Each runner, and each app.yml job, keeps only the runners an earlier run has not
+    passed. With linked files ignored the CLI harness loses desktop and the word list keeps only
     core.
 not proved here: that the jobs a lane names run what it promises, which the workflow owns; and
     that a runtime dependency no project file or helper table records is found at all.

@@ -11,7 +11,9 @@
 #     the lanes those paths leave alone, and only those;
 #   - a path no lane claims satisfies nothing;
 #   - markers from a pull request, a fork, a push to another branch or an expired artifact are never
-#     read, and a failed call prints nothing, which runs everything.
+#     read, and a failed call prints nothing, which runs everything;
+#   - app.yml's dispatches and pushes to main are trusted, and a job's mark such as
+#     appcompat.workflows falls when the diff moves its lane, while another mark on that commit stands.
 #
 # Usage:
 #   verify-lane-cache.sh
@@ -47,7 +49,11 @@ run() { printf '{"event":"%s","path":".github/workflows/%s","head_branch":"%s","
   marker 106 ffff 'pass--macos-15--compat' false; printf ','
   marker 107 gggg 'pass--ubuntu-22.04--aot' false; printf ','
   marker 108 hhhh 'pass--ubuntu-24.04--scripts' true; printf ','
-  marker 109 iiii 'packages-linux-x64' false
+  marker 109 iiii 'packages-linux-x64' false; printf ','
+  marker 110 jjjj 'pass--macos-15--appcompat.firstrun' false; printf ','
+  marker 111 kkkk 'pass--ubuntu-24.04--appcompat.workflows' false; printf ','
+  marker 111 kkkk 'pass--ubuntu-24.04--markers' false; printf ','
+  marker 112 llll 'pass--ubuntu-24.04--desktop' false
   printf ']}'
 } > "$WORK/artifacts.json"
 
@@ -59,6 +65,9 @@ run 105 workflow_dispatch dev.yml main 'someone/keypaste'
 run 106 push ci.yml feature "$REPO"
 run 107 schedule ci.yml main "$REPO"
 run 108 workflow_dispatch dev.yml ci-cache "$REPO"
+run 110 workflow_dispatch app.yml app-cache "$REPO"
+run 111 push app.yml main "$REPO"
+run 112 pull_request app.yml app-cache "$REPO"
 
 # What each marker's commit differs from the commit under test by.
 : > "$WORK/diffs/aaaa"
@@ -69,6 +78,9 @@ printf 'tests/Keypaste.Cli.Tests/New.cs\n' > "$WORK/diffs/cccc"
 : > "$WORK/diffs/ffff"
 printf 'tools/new.cs\n' > "$WORK/diffs/gggg"
 : > "$WORK/diffs/hhhh"
+: > "$WORK/diffs/jjjj"
+printf 'scripts/verify-keepassxc-first-run.sh\n' > "$WORK/diffs/kkkk"
+: > "$WORK/diffs/llll"
 
 cat > "$WORK/shim/gh" <<'FAKE'
 #!/usr/bin/env bash
@@ -120,7 +132,7 @@ expect() {
   printf '  ok  %s\n' "$name"
 }
 
-want="$(printf '%s\n' macos-15:core ubuntu-24.04:cli ubuntu-24.04:core ubuntu-24.04:integration windows-2025:core)"
+want="$(printf '%s\n' macos-15:appcompat.firstrun macos-15:core ubuntu-24.04:cli ubuntu-24.04:core ubuntu-24.04:integration ubuntu-24.04:markers windows-2025:core)"
 expect "trusted markers on unchanged inputs, and nothing else" "$(ask "$SUBJECT" ok)" "$want"
 expect "a failed call prints nothing" "$(ask "$SUBJECT" api-fails)" ''
 expect "no repository prints nothing" "$(ask "$SUBJECT" ok '')" ''
@@ -133,4 +145,4 @@ grep -qx 'ubuntu-24.04:compat' <<<"$(ask "$WEAK" ok)" \
 cases=$((cases + 1))
 echo "  ok  the copy trusting every event honours the pull request's marker"
 
-echo "ok: $cases cases. Trusted markers on unchanged inputs satisfy their lanes; changed inputs, an unclaimed path, a pull request, a fork, another branch's push, an expired artifact and a failed call satisfy nothing."
+echo "ok: $cases cases. Trusted markers on unchanged inputs satisfy their lanes, app.yml's included; changed inputs, an app job whose lane moved, an unclaimed path, a pull request, a fork, another branch's push, an expired artifact and a failed call satisfy nothing."
