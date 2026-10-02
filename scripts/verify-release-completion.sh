@@ -112,7 +112,7 @@ expect_refusal() { # $1 name, $2 want-in-output, then the command
     printf '%s\n' "$out" | sed 's/^/::error::    /'
     failures=$((failures + 1)); return
   fi
-  if ! printf '%s' "$out" | grep -qF -- "$want"; then
+  if ! grep -qF -- "$want" <<<"$out"; then
     echo "::error::fixture '$name' refused for the wrong reason; wanted '$want'"
     printf '%s\n' "$out" | sed 's/^/::error::    /'
     failures=$((failures + 1)); return

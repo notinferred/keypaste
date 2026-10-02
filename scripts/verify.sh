@@ -426,12 +426,16 @@ path_lanes() {
     packaging/*|release-targets.json) echo scripts package ;;
     LICENSE) echo package ;;
     scripts/*) echo rules scripts ;;
-    README.md|site/public/index.html) echo pages scripts ;;
+    README.md) echo pages scripts ;;
+    # The home page's install blocks, floors and disclosures are checked by the scripts lane; its transcripts
+    # are checked whenever the pages lane runs: for the CLI, README and the demo pages, and in every full run (D-0403).
+    site/public/index.html) echo scripts ;;
     launch.md|docs/demo.md|docs/keepass-and-agents.md) echo pages ;;
     CHANGELOG.md|SECURITY.md|docs/RELEASE.md|docs/desktop.md) echo scripts ;;
     THIRD_PARTY_NOTICES.md) echo core package ;;
     site/test/share-vector.json) echo core scripts ;;
-    site/src/*|site/wrangler.jsonc|site/package.json|site/package-lock.json|site/public/s/share-crypto.js) echo scripts compat ;;
+    # The fields gate runs the share Worker from site/wrangler.jsonc; a deploy-config edit waits for a full run (D-0403).
+    site/src/*|site/package.json|site/package-lock.json|site/public/s/share-crypto.js) echo scripts compat ;;
     site/*) echo scripts ;;
     *.md|docs/*|.claude/*|assets/*|third_party/lucide/*) echo none ;;
     *) echo unclaimed ;;

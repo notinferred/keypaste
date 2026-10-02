@@ -10,7 +10,8 @@
 # What it holds:
 #   - a commit with every required gate green is accepted, and it is the ONLY shape that is;
 #   - a missing app run, a red app run and a commit with neither run each refuse;
-#   - a green run triggered by a pull request does not count;
+#   - a green run triggered by a pull request does not count, nor does a push to main, which runs
+#     only the lanes its commits select (D-0403);
 #   - the required set is read from release-targets.json, so a component with its own gate is
 #     required without an edit here, and the release workflow never requires itself;
 #   - an empty or malformed reply refuses rather than counting as zero and passing something.
@@ -102,22 +103,26 @@ run_case() {
   printf '  %-14s %-16s exit %s\n' "$( [ "$rc" -eq 0 ] && echo accepted || echo refused )" "$name" "$rc"
 }
 
-readonly BOTH_GREEN='[{"name":"ci","conclusion":"success","id":11,"head_branch":"v9.9.9"},{"name":"app","conclusion":"success","id":22,"head_branch":"v9.9.9"}]'
-readonly APP_ABSENT='[{"name":"ci","conclusion":"success","id":11,"head_branch":"v9.9.9"}]'
-readonly APP_RED='[{"name":"ci","conclusion":"success","id":11,"head_branch":"v9.9.9"},{"name":"app","conclusion":"failure","id":22,"head_branch":"v9.9.9"}]'
+# ci is dispatched at the commit and app runs on the tag: the two full runs a release starts from.
+readonly CI_FULL='{"name":"ci","conclusion":"success","id":11,"head_branch":"main","event":"workflow_dispatch"}'
+readonly BOTH_GREEN="[$CI_FULL"',{"name":"app","conclusion":"success","id":22,"head_branch":"v9.9.9","event":"push"}]'
+readonly APP_ABSENT="[$CI_FULL]"
+readonly APP_RED="[$CI_FULL"',{"name":"app","conclusion":"failure","id":22,"head_branch":"v9.9.9","event":"push"}]'
 readonly BOTH_ABSENT='[]'
 readonly CI_ONLY_ON_A_PR='[{"name":"ci","conclusion":"success","id":11,"head_branch":"k6a","event":"pull_request"},{"name":"app","conclusion":"success","id":22,"head_branch":"v9.9.9","event":"push"}]'
+readonly CI_ONLY_ON_A_MAIN_PUSH='[{"name":"ci","conclusion":"success","id":11,"head_branch":"main","event":"push"},{"name":"app","conclusion":"success","id":22,"head_branch":"v9.9.9","event":"push"}]'
 # Two green app runs at one commit, and one green app run that belongs to the branch rather than the tag.
-readonly APP_TWICE='[{"name":"ci","conclusion":"success","id":11,"head_branch":"v9.9.9"},{"name":"app","conclusion":"success","id":22,"head_branch":"v9.9.9"},{"name":"app","conclusion":"success","id":23,"head_branch":"v9.9.9"}]'
-readonly APP_ON_MAIN='[{"name":"ci","conclusion":"success","id":11,"head_branch":"v9.9.9"},{"name":"app","conclusion":"success","id":22,"head_branch":"main"}]'
-readonly APP_ON_A_PR_NAMED_LIKE_THE_TAG='[{"name":"ci","conclusion":"success","id":11,"head_branch":"v9.9.9"},{"name":"app","conclusion":"success","id":22,"head_branch":"v9.9.9","event":"pull_request"}]'
+readonly APP_TWICE="[$CI_FULL"',{"name":"app","conclusion":"success","id":22,"head_branch":"v9.9.9","event":"push"},{"name":"app","conclusion":"success","id":23,"head_branch":"v9.9.9","event":"push"}]'
+readonly APP_ON_MAIN="[$CI_FULL"',{"name":"app","conclusion":"success","id":22,"head_branch":"main","event":"push"}]'
+readonly APP_ON_A_PR_NAMED_LIKE_THE_TAG="[$CI_FULL"',{"name":"app","conclusion":"success","id":22,"head_branch":"v9.9.9","event":"pull_request"}]'
 
 echo "== the shapes a tag can arrive in"
 run_case "both-green"  ok "$BOTH_GREEN"  "$SUBJECT" 0 "every required gate is green"
-run_case "app-absent"  ok "$APP_ABSENT"  "$SUBJECT" 1 "no successful app run"
-run_case "app-red"     ok "$APP_RED"     "$SUBJECT" 1 "no successful app run"
-run_case "both-absent" ok "$BOTH_ABSENT" "$SUBJECT" 1 "no successful ci run"
-run_case "ci-green-only-on-a-pr" ok "$CI_ONLY_ON_A_PR" "$SUBJECT" 1 "no successful ci run"
+run_case "app-absent"  ok "$APP_ABSENT"  "$SUBJECT" 1 "no full successful app run"
+run_case "app-red"     ok "$APP_RED"     "$SUBJECT" 1 "no full successful app run"
+run_case "both-absent" ok "$BOTH_ABSENT" "$SUBJECT" 1 "no full successful ci run"
+run_case "ci-green-only-on-a-pr" ok "$CI_ONLY_ON_A_PR" "$SUBJECT" 1 "no full successful ci run"
+run_case "ci-green-only-on-a-main-push" ok "$CI_ONLY_ON_A_MAIN_PUSH" "$SUBJECT" 1 "no full successful ci run"
 
 echo "== a reply that cannot be counted refuses rather than counting as zero"
 run_case "api-fails"   api-fails   "$BOTH_GREEN" "$SUBJECT" 1 "could not ask"
@@ -149,9 +154,9 @@ DECLARED="$(declared_cases)"
   || die "$accepted cases were accepted, expected exactly 3 (both-green, the resolved run id, and the weakened control)"
 
 cat <<EOF
-ok: $cases_run cases. One shape was accepted by the real script - every required gate green - and a
-    missing app run, a red one, a commit with neither, a ci run only a pull request triggered, a
-    failed call, an empty reply and an unparseable one all refused. Off the same reply it resolves
+ok: $cases_run cases. One shape was accepted by the real script - every required gate green in a
+    full run - and a missing app run, a red one, a commit with neither, a ci run only a pull request
+    or a push to main triggered, a failed call, an empty reply and an unparseable one all refused. Off the same reply it resolves
     which app run built the commit, and refuses when there is none, when the only green run belongs
     to the branch rather than the tag or to a pull request whose branch carries the tag's name, and
     when two green runs would have to be chosen between. The pre-R.0a shape, same fixture and same

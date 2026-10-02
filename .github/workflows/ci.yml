@@ -48,6 +48,9 @@ on:
       - 'site/.node-version'
   pull_request:
   workflow_dispatch:
+  # The weekly full run, beside dispatches: pushes to main run only what their commits select.
+  schedule:
+    - cron: '17 4 * * 1'
 
 permissions:
   contents: read
@@ -64,7 +67,9 @@ env:
   NUGET_XMLDOC_MODE: skip
 
 jobs:
-  # A pull request runs the lanes its diff from the merge base can break; every other event runs all of them.
+  # A pull request runs the lanes its diff from the merge base can break, and a push to main the lanes
+  # its own commits can (D-0403). A dispatch and the schedule run every lane, and only those, or a
+  # tag's own run, count toward a release.
   scope:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -85,10 +90,13 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           BASE: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
         run: |
           set -euo pipefail
           if [ "$EVENT" = pull_request ]; then
             bash scripts/verify.sh --since "origin/$BASE" --plan | tee -a "$GITHUB_OUTPUT"
+          elif [ "$EVENT" = push ] && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            bash scripts/verify.sh --since "$BEFORE" --plan | tee -a "$GITHUB_OUTPUT"
           else
             bash scripts/verify.sh --all --plan | tee -a "$GITHUB_OUTPUT"
           fi

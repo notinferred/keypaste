@@ -242,7 +242,7 @@ FIXDEF
       failures=$((failures + 1))
       return
     fi
-    if [ -n "$want" ] && ! printf '%s' "$out" | grep -qF -- "$want"; then
+    if [ -n "$want" ] && ! grep -qF -- "$want" <<<"$out"; then
       echo "::error::fixture '$name' did not say '$want'"
       echo "$out" | sed 's/^/::error::    /'
       failures=$((failures + 1))

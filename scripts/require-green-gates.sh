@@ -24,6 +24,10 @@
 # of its paths, so the commit has no app run at all. That fails the tag on purpose - dispatch
 # app.yml at the commit, let it go green, then tag.
 #
+# ONLY A FULL RUN COUNTS. A push to main runs only the lanes its commits select (D-0403), so its
+# green proves nothing about the rest. A dispatch, the weekly schedule and a tag's own push run every
+# lane; those are the runs this accepts, and cutting a release starts with dispatching ci.yml.
+#
 # Usage:
 #   require-green-gates.sh <sha>
 #   require-green-gates.sh --run-id <workflow> <sha> <ref>   # prints run_id=<n> for that workflow
@@ -103,16 +107,17 @@ for wf in $required; do
   # D-0106: the count is required to be digits. An empty or malformed reply must refuse rather than
   # arrive as "" and compare its way past -ge 1, which is how jq 1.6 let an empty answer reach an
   # upload. A refusal rests on what came back, never on how a tool chose to exit.
-  # A pull request run may test only part of the change, and a local merge keeps its head SHA on main.
-  n="$(printf '%s' "$runs" | jq --arg wf "$wf" '[.workflow_runs[]? | select(.name == $wf and .event != "pull_request")] | length' 2>/dev/null || true)"
+  # Only a run of every lane counts: a dispatch, the schedule, or a tag's own push. A pull request and a
+  # push to main run the lanes their change selects (D-0403), and a local merge keeps its head SHA on main.
+  n="$(printf '%s' "$runs" | jq --arg wf "$wf" '[.workflow_runs[]? | select(.name == $wf and (.event == "workflow_dispatch" or .event == "schedule" or (.event == "push" and .head_branch != "main")))] | length' 2>/dev/null || true)"
   case "$n" in
     '' | *[!0-9]*) die "could not count $wf runs for $SHA; refusing without a verified answer" ;;
   esac
   if [ "$n" -ge 1 ]; then
-    echo "  ok  $wf: $n successful run(s) for $SHA"
+    echo "  ok  $wf: $n full successful run(s) for $SHA"
   else
-    echo "::error::no successful $wf run for $SHA - a tag must not ship a commit its gates have not passed" >&2
-    echo "::error::a red run and a skipped one look the same here; if $wf's paths filter skipped this commit, dispatch $wf at it and re-tag once it is green" >&2
+    echo "::error::no full successful $wf run for $SHA - a tag must not ship a commit its gates have not passed" >&2
+    echo "::error::a red run, a skipped one and a push that ran only some lanes look the same here; dispatch $wf at this commit and re-tag once it is green" >&2
     missing=1
   fi
 done

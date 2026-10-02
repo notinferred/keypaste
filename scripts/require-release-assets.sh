@@ -224,7 +224,7 @@ for f in *; do
       continue
       ;;
   esac
-  if printf '%s\n' "$expected" | grep -qxF -- "$f"; then
+  if grep -qxF -- "$f" <<<"$expected"; then
     built=$((built + 1))
   else
     echo "::error::$f is not a release asset and must not be published" >&2
