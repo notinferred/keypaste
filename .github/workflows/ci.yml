@@ -72,12 +72,17 @@ jobs:
   # tag's own run, count toward a release.
   scope:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
+    # Reads the pass markers earlier runs left (D-0404).
+    permissions:
+      contents: read
+      actions: read
     outputs:
       lanes: ${{ steps.plan.outputs.lanes }}
       backend_os: ${{ steps.plan.outputs.backend_os }}
       backend_tests: ${{ steps.plan.outputs.backend_tests }}
       filter: ${{ steps.plan.outputs.filter }}
+      test_matrix: ${{ steps.plan.outputs.test_matrix }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -91,15 +96,23 @@ jobs:
           EVENT: ${{ github.event_name }}
           BASE: ${{ github.base_ref }}
           BEFORE: ${{ github.event.before }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          since=''
           if [ "$EVENT" = pull_request ]; then
-            bash scripts/verify.sh --since "origin/$BASE" --plan | tee -a "$GITHUB_OUTPUT"
+            since="origin/$BASE"
           elif [ "$EVENT" = push ] && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
-            bash scripts/verify.sh --since "$BEFORE" --plan | tee -a "$GITHUB_OUTPUT"
-          else
-            bash scripts/verify.sh --all --plan | tee -a "$GITHUB_OUTPUT"
+            since="$BEFORE"
           fi
+          if [ -z "$since" ]; then
+            bash scripts/verify.sh --all --plan | tee -a "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # A lane a trusted run already passed on these exact inputs is not run again; a dispatch or the schedule never skips.
+          passed="$(bash scripts/lane-cache.sh | tr '\n' ' ')"
+          echo "already passed on these inputs: ${passed:-nothing}"
+          VERIFY_SATISFIED="$passed" bash scripts/verify.sh --since "$since" --plan | tee -a "$GITHUB_OUTPUT"
 
   checks:
     name: scripts + workflows
@@ -127,22 +140,36 @@ jobs:
         shell: bash
         run: scripts/verify-release-destination.sh --with-real-aws
 
+      - name: Mark the script fixtures passed on these inputs
+        if: success() && contains(format(' {0} ', needs.scope.outputs.lanes), ' scripts ')
+        shell: bash
+        run: printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/pass.txt"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: success() && contains(format(' {0} ', needs.scope.outputs.lanes), ' scripts ')
+        with:
+          name: pass--ubuntu-24.04--scripts
+          path: ${{ runner.temp }}/pass.txt
+          retention-days: 30
+
   test:
     name: test (${{ matrix.os }})
     needs: scope
-    if: needs.scope.outputs.backend_os != '[]'
+    if: needs.scope.outputs.test_matrix != '[]'
     strategy:
       fail-fast: false
+      # Each runner carries its own lanes, less those an earlier run already passed there (D-0404).
       matrix:
-        os: ${{ fromJSON(needs.scope.outputs.backend_os) }}
+        include: ${{ fromJSON(needs.scope.outputs.test_matrix) }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     env:
-      BACKEND_TESTS: ${{ needs.scope.outputs.backend_tests }}
-      FILTER: ${{ needs.scope.outputs.filter }}
-      INTEGRATION: ${{ contains(format(' {0} ', needs.scope.outputs.lanes), ' integration ') }}
-      PAGES: ${{ contains(format(' {0} ', needs.scope.outputs.lanes), ' pages ') }}
-      COMPAT: ${{ contains(format(' {0} ', needs.scope.outputs.lanes), ' compat ') }}
+      LANES: ${{ matrix.lanes }}
+      BACKEND_TESTS: ${{ matrix.backend_tests }}
+      FILTER: ${{ matrix.filter }}
+      INTEGRATION: ${{ contains(matrix.lanes, ' integration ') }}
+      PAGES: ${{ contains(matrix.lanes, ' pages ') }}
+      COMPAT: ${{ contains(matrix.lanes, ' compat ') }}
       # KeePassXC's Windows console encoding can alter a non-ASCII master password.
       KP_COMPAT_PASSWORD: ci-master-pw
     steps:
@@ -327,6 +354,25 @@ jobs:
         shell: bash
         run: bash scripts/verify-keepassxc-keyfile.sh artifacts/compat/keyfile.kdbx
 
+      - name: Mark this runner's lanes passed on these inputs
+        id: pass
+        if: success()
+        shell: bash
+        env:
+          RUNNER_LABEL: ${{ matrix.os }}
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/pass.txt"
+          read -r -a ran <<< "$LANES"
+          echo "name=pass--$RUNNER_LABEL--$(IFS=+; echo "${ran[*]}")" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: success()
+        with:
+          name: ${{ steps.pass.outputs.name }}
+          path: ${{ runner.temp }}/pass.txt
+          retention-days: 30
+
   aot:
     name: aot publish (linux-x64)
     needs: scope
@@ -420,6 +466,18 @@ jobs:
           # Keyfiles reach XmlSerializer, which trimming can remove; only the AOT binary shows it.
           scripts/verify-keepassxc-xml-attach.sh artifacts/compat/aot-xml-attach
           scripts/verify-keepassxc-keyfile.sh artifacts/compat/aot-keyfile.kdbx
+
+      - name: Mark the AOT lane passed on these inputs
+        if: success()
+        shell: bash
+        run: printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/pass.txt"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: success()
+        with:
+          name: pass--ubuntu-22.04--aot
+          path: ${{ runner.temp }}/pass.txt
+          retention-days: 30
 
   # The one check a pull request needs green: a skipped job passes, a failed or cancelled one does not.
   ok:

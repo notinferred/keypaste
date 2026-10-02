@@ -182,6 +182,21 @@ jobs:
         run: |
           set -euo pipefail
           for check in $CHECKS; do bash scripts/verify.sh "$check"; done
+          # ci.yml's scripts lane runs this too, so a marker from here vouches for the same checks.
+          case " $CHECKS " in *" scripts "*) scripts/verify-release-destination.sh --with-real-aws ;; esac
+
+      # ci.yml's pushes skip a lane this run passed on the same inputs (D-0404).
+      - name: Mark the script fixtures passed on these inputs
+        if: success() && contains(format(' {0} ', env.CHECKS), ' scripts ')
+        shell: bash
+        run: printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/pass.txt"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: success() && contains(format(' {0} ', env.CHECKS), ' scripts ')
+        with:
+          name: pass--ubuntu-24.04--scripts
+          path: ${{ runner.temp }}/pass.txt
+          retention-days: 30
 
   test:
     name: test (${{ matrix.os }})
@@ -293,3 +308,40 @@ jobs:
           bash scripts/verify-keepassxc-fields.sh artifacts/compat/fields
           bash scripts/verify-keepassxc-projects.sh artifacts/compat/projects
           bash scripts/verify-keepassxc-keyfile.sh artifacts/compat/keyfile.kdbx
+
+      # The ci.yml lanes this runner ran in full, for ci.yml's pushes to skip on the same inputs (D-0404).
+      - name: Mark the lanes this runner passed on these inputs
+        id: pass
+        if: success() && needs.plan.outputs.tests == 'true'
+        env:
+          RUNNER_LABEL: ${{ matrix.os }}
+          FILTER: ${{ needs.plan.outputs.backend_filter }}
+          GATES: ${{ needs.plan.outputs.gates }}
+        run: |
+          set -euo pipefail
+          lanes=()
+          if [ "$BACKEND" = all ] && [ -z "$FILTER" ]; then
+            lanes+=(core cli mcp rules)
+          else
+            for project in $BACKEND; do
+              case "$project:$FILTER" in
+                tests/Keypaste.Core.Tests:) lanes+=(core rules) ;;
+                tests/Keypaste.Core.Tests:Keypaste.Core.Tests.WorkflowRulesTests) lanes+=(rules) ;;
+                tests/Keypaste.Cli.Tests:) lanes+=(cli) ;;
+                tests/Keypaste.Mcp.Tests:) lanes+=(mcp) ;;
+              esac
+            done
+          fi
+          case "$GATES" in integration | both) lanes+=(integration pages) ;; esac
+          case "$GATES" in compat | both) lanes+=(compat) ;; esac
+          printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/pass.txt"
+          if [ "${#lanes[@]}" -gt 0 ]; then
+            echo "name=pass--$RUNNER_LABEL--$(IFS=+; echo "${lanes[*]}")" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: success() && steps.pass.outputs.name != ''
+        with:
+          name: ${{ steps.pass.outputs.name }}
+          path: ${{ runner.temp }}/pass.txt
+          retention-days: 30

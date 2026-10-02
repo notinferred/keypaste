@@ -234,6 +234,7 @@ selftests=(
   'scripts/verify-release-preflight.sh'
   'scripts/verify-green-gates.sh'
   'scripts/verify-ci-scope.sh'
+  'scripts/verify-lane-cache.sh'
   'scripts/verify-release-matrix.sh'
   'scripts/verify-site-disclosure.sh --selftest'
   'scripts/verify-release-completion.sh'
@@ -651,6 +652,57 @@ has_lane() {
   case " $selected " in *" everything "*|*" $1 "*) return 0 ;; *) return 1 ;; esac
 }
 
+# The runners a lane's CI job runs on, and whether an earlier trusted run already passed it there on
+# inputs this commit shares: VERIFY_SATISFIED holds runner:lane pairs from lane-cache.sh (D-0404).
+lane_runners() {
+  case "$1" in
+    core|cli|mcp|integration|compat) echo ubuntu-24.04 windows-2025 macos-15 ;;
+    rules|pages|scripts) echo ubuntu-24.04 ;;
+    aot) echo ubuntu-22.04 ;;
+  esac
+}
+is_satisfied() {
+  case " ${VERIFY_SATISFIED:-} " in *" $1:$2 "*) return 0 ;; *) return 1 ;; esac
+}
+still_needed() {
+  local runner runners
+  runners="$(lane_runners "$1")"
+  [ -n "$runners" ] || return 0
+  for runner in $runners; do is_satisfied "$runner" "$1" || return 0; done
+  return 1
+}
+
+lane_in() {
+  case " $2 " in *" $1 "*) return 0 ;; *) return 1 ;; esac
+}
+
+# One entry per runner the test job still needs, with that runner's own lanes and test projects.
+print_test_matrix() {
+  local runner lane lanes backend filter entries=''
+  for runner in ubuntu-24.04 windows-2025 macos-15; do
+    lanes=''
+    for lane in core cli mcp rules pages integration compat; do
+      has_lane "$lane" || continue
+      case " $(lane_runners "$lane") " in *" $runner "*) ;; *) continue ;; esac
+      is_satisfied "$runner" "$lane" && continue
+      lanes="$lanes $lane"
+    done
+    [ -n "$lanes" ] || continue
+    backend='' filter=''
+    if lane_in core "$lanes" && lane_in cli "$lanes" && lane_in mcp "$lanes"; then
+      backend=all
+    else
+      if lane_in core "$lanes" || lane_in rules "$lanes"; then backend=tests/Keypaste.Core.Tests; fi
+      if lane_in cli "$lanes"; then backend="$backend tests/Keypaste.Cli.Tests"; fi
+      if lane_in mcp "$lanes"; then backend="$backend tests/Keypaste.Mcp.Tests"; fi
+      backend="${backend# }"
+      if [ "$backend" = tests/Keypaste.Core.Tests ] && ! lane_in core "$lanes"; then filter=Keypaste.Core.Tests.WorkflowRulesTests; fi
+    fi
+    entries="$entries,{\"os\":\"$runner\",\"lanes\":\"$lanes \",\"backend_tests\":\"$backend\",\"filter\":\"$filter\"}"
+  done
+  printf 'test_matrix=[%s]\n' "${entries#,}"
+}
+
 print_plan() {
   local lane chosen=' ' os='[]' backend='' desktop='' filter=''
   for lane in "${all_lanes[@]}"; do
@@ -659,6 +711,7 @@ print_plan() {
     else
       has_lane "$lane" || continue
     fi
+    still_needed "$lane" || continue
     chosen="$chosen$lane "
   done
   if has_lane core || has_lane cli || has_lane mcp || has_lane integration || has_lane compat; then
@@ -683,6 +736,7 @@ print_plan() {
     desktop="${desktop# }"
   fi
   printf 'lanes=%s\nbackend_os=%s\nbackend_tests=%s\ndesktop_tests=%s\nfilter=%s\n' "$chosen" "$os" "$backend" "$desktop" "$filter"
+  print_test_matrix
 }
 
 planned=()

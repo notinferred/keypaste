@@ -29,7 +29,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 readonly SELF="scripts/verify-ci-scope.sh"
 declared_cases() {
   local n
-  n="$(grep -cE '^[[:space:]]*run_case ' "$SELF" || true)"
+  n="$(grep -cE '^[[:space:]]*run_(matrix_)?case ' "$SELF" || true)"
   case "$n" in "" | 0 | *[!0-9]*) echo "" ;; *) echo "$n" ;; esac
 }
 
@@ -53,10 +53,24 @@ run_case() {
   shift 7
   cases_run=$((cases_run + 1))
   if [ "$paths" = -git ]; then
-    got="$(unset VERIFY_CHANGED_PATHS; bash "$SUBJECT" --plan "$@" 2>"$ERR")" || die "$name: the planner failed"
+    got="$(unset VERIFY_CHANGED_PATHS; bash "$SUBJECT" --plan "$@" 2>"$ERR" | sed '/^test_matrix=/d')" || die "$name: the planner failed"
   else
-    got="$(VERIFY_CHANGED_PATHS="$paths" bash "$SUBJECT" --plan "$@" 2>"$ERR")" || die "$name: the planner failed"
+    got="$(VERIFY_CHANGED_PATHS="$paths" bash "$SUBJECT" --plan "$@" 2>"$ERR" | sed '/^test_matrix=/d')" || die "$name: the planner failed"
   fi
+  if [ "$got" != "$want" ]; then
+    printf 'expected:\n%s\ngot:\n%s\n' "$want" "$got" >&2
+    die "$name: the plan differs"
+  fi
+  printf '  %-34s%s\n' "$name" "$(printf '%s\n' "$got" | sed -n 1p)"
+}
+
+# run_matrix_case <name> <changed paths> <runner:lane pairs already passed> <lanes> <test_matrix>
+run_matrix_case() {
+  local name="$1" paths="$2" satisfied="$3" want got
+  want="$(printf 'lanes=%s\ntest_matrix=%s' "$4" "$5")"
+  cases_run=$((cases_run + 1))
+  got="$(VERIFY_CHANGED_PATHS="$paths" VERIFY_SATISFIED="$satisfied" bash "$SUBJECT" --plan 2>"$ERR" \
+    | sed -n '/^lanes=/p; /^test_matrix=/p')" || die "$name: the planner failed"
   if [ "$got" != "$want" ]; then
     printf 'expected:\n%s\ngot:\n%s\n' "$want" "$got" >&2
     die "$name: the plan differs"
@@ -110,6 +124,18 @@ run_case "no changed path" '' "$EVERY" "$THREE" all all ''
 run_case "a range git cannot read" -git "$EVERY" "$THREE" all all '' --since no-such-ref
 grep -qF 'git could not list changes' "$ERR" || die "a range git cannot read: everything was selected without saying git failed"
 run_case "--all" -git "$EVERY" "$THREE" all all '' --all
+
+echo "== each runner's lanes, less what an earlier run already passed"
+readonly CORE_LANES=' core cli mcp integration compat aot desktop appcompat markers package '
+run_matrix_case "a core change, nothing passed" src/Keypaste.Core/Vault.cs '' "$CORE_LANES" \
+  '[{"os":"ubuntu-24.04","lanes":" core cli mcp integration compat ","backend_tests":"all","filter":""},{"os":"windows-2025","lanes":" core cli mcp integration compat ","backend_tests":"all","filter":""},{"os":"macos-15","lanes":" core cli mcp integration compat ","backend_tests":"all","filter":""}]'
+run_matrix_case "a core change Linux already passed" src/Keypaste.Core/Vault.cs 'ubuntu-24.04:core ubuntu-24.04:cli ubuntu-24.04:mcp ubuntu-24.04:integration ubuntu-24.04:compat' "$CORE_LANES" \
+  '[{"os":"windows-2025","lanes":" core cli mcp integration compat ","backend_tests":"all","filter":""},{"os":"macos-15","lanes":" core cli mcp integration compat ","backend_tests":"all","filter":""}]'
+run_matrix_case "a page edit already passed" README.md 'ubuntu-24.04:pages ubuntu-24.04:scripts' ' ' '[]'
+run_matrix_case "rules beside the CLI, unfiltered" "$(printf '%s\n' .github/workflows/install.yml tests/Keypaste.Cli.Tests/New.cs)" '' \
+  ' cli rules scripts ' '[{"os":"ubuntu-24.04","lanes":" cli rules ","backend_tests":"tests/Keypaste.Core.Tests tests/Keypaste.Cli.Tests","filter":""},{"os":"windows-2025","lanes":" cli ","backend_tests":"tests/Keypaste.Cli.Tests","filter":""},{"os":"macos-15","lanes":" cli ","backend_tests":"tests/Keypaste.Cli.Tests","filter":""}]'
+run_matrix_case "rules alone keep their filter" .github/workflows/install.yml '' ' rules scripts ' \
+  '[{"os":"ubuntu-24.04","lanes":" rules ","backend_tests":"tests/Keypaste.Core.Tests","filter":"Keypaste.Core.Tests.WorkflowRulesTests"}]'
 
 echo "== negative control"
 export VERIFY_SCOPE_NO_LINKS=1
