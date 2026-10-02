@@ -48,6 +48,12 @@
     "summary": "An agent calls an API with a credential it never holds."
   },
   {
+    "slug": "cloud-vault",
+    "name": "Cloud vault",
+    "status": "planned",
+    "summary": "Your vault synced free across your devices, encrypted on each one so keypaste can never read it."
+  },
+  {
     "slug": "team-projects",
     "name": "Team projects",
     "status": "planned",
@@ -58,6 +64,12 @@
     "name": "CI and deploys",
     "status": "planned",
     "summary": "Identities for CI jobs and deploy targets, and syncs pushed from your own machine."
+  },
+  {
+    "slug": "server-access",
+    "name": "Server access",
+    "status": "planned",
+    "summary": "A team project can let a server hold its key, for agents in the cloud, CI without a stored secret and syncs."
   },
   {
     "slug": "organizations",

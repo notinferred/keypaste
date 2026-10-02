@@ -26,7 +26,7 @@ flowchart TB
 
 | Product | Where secrets live | Account | Opens your KeePass file | Project variables | AI agents |
 |---|---|---|---|---|---|
-| **keypaste** | A file on your disk | No | Yes | Yes | You answer each request |
+| **keypaste** | A file on your disk; a [cloud copy](/products/cloud-vault/) keypaste cannot read is planned | No; the planned cloud vault uses one | Yes | Yes | You answer each request |
 | [KeePassXC](/compare/keepassxc/) | A file on your disk | No | Yes | No | No agent access |
 | [KeePassium](/compare/keepassium/) | A file you sync | No | Yes | No | No agent access |
 | [Strongbox](/compare/strongbox/) | A file you sync | No | Yes | No | An MCP server |
@@ -46,7 +46,7 @@ flowchart TB
 
 | Product | Logins and autofill | Team sharing | Self-hosting | Open source | Who could read your secrets |
 |---|---|---|---|---|---|
-| **keypaste** | Logins; autofill planned | Planned, end-to-end | Planned, for the team relay | Yes | Only you; a shared project, only your team unless it chooses server access |
+| **keypaste** | Logins; autofill planned | Planned, end-to-end | Planned, for the team relay and server access | Yes | Only you; a shared project, only your team unless it chooses server access |
 | KeePassXC | Yes | Through a shared file | Not needed | Yes | Only you |
 | KeePassium | Yes | No | Not needed | Yes | Only you |
 | Strongbox | Yes | No | Not needed | Source available | Only you |
