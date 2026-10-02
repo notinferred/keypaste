@@ -7,14 +7,15 @@
 # is the next value released and is asked about again; an entry moved out of the exposure is refused,
 # and moving it back asks again rather than serving the old grant. A save by another program between
 # two requests makes the second refuse as vault-changed, the listing too, the file keeps that program's
-# bytes even when the app then tries to save, and nothing is released until the app is unlocked again.
+# bytes even when the app then tries to save, the app's shell says so with Reload, and nothing is released
+# until a person reloads, which answers in the same session and asks again (N.16, D-0412).
 # The other program is the CLI under another KEYPASTE_HOME, which does not see this home's claim (T-29):
 # under this home, a verb that saves is refused while the app holds the vault (N.10).
 # Deletes, group renames and access changes run over a real pipe in CurrentStateTests.
 #
 # NEGATIVE CONTROL: this fails if an old value is released after an edit, a grant outlives the change
-# to its entry, anything is released or listed after an external save before a re-unlock, or the app
-# writes over the external save. These checks must never be skipped or soft-passed.
+# to its entry, anything is released or listed after an external save before a reload, the app writes
+# over the external save, shows no notice of it, or reloads into another session or without asking again. These checks must never be skipped or soft-passed.
 set -euo pipefail
 
 readonly MASTER='ci-current-master-pw'
@@ -155,7 +156,7 @@ request 14 "$ENTRY"
 released 14 "$V2" prompt "the request after the entry moved back"
 asked 3 "the request after the entry moved back"
 
-# ------------------- another program saves: refused, the file kept, and nothing until a re-unlock
+# ---------------------- another program saves: refused, the file kept, and nothing until a reload
 printf '%s\n' "$MASTER" | KEYPASTE_HOME="$OTHER_HOME" "$CLI" env set ci "DEPLOY_KEY=$V3" --vault "$VAULT" >/dev/null \
   || die "another program could not save the vault the app holds"
 EXTERNAL="$(digest)"
@@ -175,14 +176,18 @@ request 17 "$ENTRY"
 denied 17 vault-changed "the request after the app's refused save"
 asked 3 "the requests after another program saved"
 
-act lock >/dev/null
-act unlock >/dev/null
-wait_for 'holding session' "$HOLD_OUT" 2
-[ "$(session_of)" != "$FIRST" ] || die "unlocking again reused session $FIRST"
+line="$(act notice)"
+case "$line" in "notice Another program saved"*) ;; *) die "the app showed no notice of the other program's save: $line" ;; esac
+case "$line" in *"was not saved, and reloading discards it."*) ;; *) die "the notice did not say the refused edit is discarded: $line" ;; esac
+
+line="$(act reload)"
+[ "$line" = "reloaded" ] || die "the app did not reload: $line"
+[ "$(act notice)" = "notice none" ] || die "the notice outlived the reload"
 
 request 18 "$ENTRY"
-released 18 "$V3" prompt "the request after unlocking again"
-asked 4 "the request after unlocking again"
+released 18 "$V3" prompt "the request after reloading"
+tail -n 1 "$AUDIT" | jq -e --arg s "$FIRST" '.session == $s' >/dev/null || die "reloading did not keep session $FIRST"
+asked 4 "the request after reloading"
 [ "$(digest)" = "$EXTERNAL" ] || die "the vault file changed without anyone saving it"
 
 exec 8>&-
@@ -191,4 +196,4 @@ wait_for '^shut down' "$HOLD_OUT"
 HOLD_PID=""
 
 echo "ok: an edit in the app was the next value released and was asked about again, a moved entry's grant"
-echo "    was gone, and another program's save was refused as vault-changed with its bytes kept until the app unlocked again"
+echo "    was gone, and another program's save was refused as vault-changed with its bytes kept until the app reloaded it"

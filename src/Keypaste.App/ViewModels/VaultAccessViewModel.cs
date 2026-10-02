@@ -336,7 +336,7 @@ internal sealed class VaultAccessViewModel : ObservableObject, IDisposable
         }
         catch (VaultChangedOnDiskException)
         {
-            message = "The vault file changed since it was unlocked, so nothing was changed. Lock and unlock to see what changed it, then try again.";
+            message = "The vault file changed since it was unlocked, so nothing was changed. Reload to see what changed it, then try again.";
         }
         catch (VaultException e)
         {

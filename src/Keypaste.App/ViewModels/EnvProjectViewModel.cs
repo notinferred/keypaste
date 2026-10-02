@@ -772,7 +772,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         }
         catch (VaultChangedOnDiskException)
         {
-            _report("Something else changed this vault since you opened it. Lock and unlock to see it, then add this again.");
+            _report("Something else changed this vault since you opened it. Reload to see it, then add this again.");
             return;
         }
         catch (VaultException e)
@@ -835,7 +835,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         }
         catch (VaultChangedOnDiskException)
         {
-            _report("Something else changed this vault since you opened it. Lock and unlock to see it, then replace this again.");
+            _report("Something else changed this vault since you opened it. Reload to see it, then replace this again.");
             return;
         }
         catch (VaultException e)
@@ -889,7 +889,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         }
         catch (VaultChangedOnDiskException)
         {
-            _report("Something else changed this vault since you opened it. Lock and unlock to see it, then remove this again.");
+            _report("Something else changed this vault since you opened it. Reload to see it, then remove this again.");
             return;
         }
         catch (VaultException e)

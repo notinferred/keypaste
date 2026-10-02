@@ -18,16 +18,22 @@ public sealed class Vault : IDisposable
     private byte[]? _stamp;
     private DateTimeOffset? _savedAt;
     private bool _pending;
+    private bool _writing;
     private bool _disposed;
     private bool _backedUp;
     private bool _rekeyed;
     private VaultBackup? _lastKept;
 
     private Vault(KeePassInterop interop, string path, bool stamp)
+        : this(interop, path, stamp ? SourceSnapshot.Digest(path) : null)
+    {
+    }
+
+    private Vault(KeePassInterop interop, string path, byte[]? stamp)
     {
         _interop = interop;
         Path = path;
-        _stamp = stamp ? SourceSnapshot.Digest(path) : null;
+        _stamp = stamp;
         _savedAt = _stamp is null ? null : WrittenAt(path);
     }
 
@@ -68,10 +74,10 @@ public sealed class Vault : IDisposable
 
     /// <summary>Whether the file holds what this vault holds, and when it was last written.</summary>
     /// <returns>
-    /// <see cref="VaultSaveStatus.Unsaved"/> while a change is not saved or nothing was ever read from
-    /// the file; <see cref="VaultSaveStatus.Unreadable"/> when the file cannot be read;
-    /// <see cref="VaultSaveStatus.ChangedOnDisk"/> when something else wrote it; otherwise
-    /// <see cref="VaultSaveStatus.Saved"/>.
+    /// <see cref="VaultSaveStatus.ChangedOnDisk"/> when something else wrote it, whether or not a change
+    /// made here is waiting too; <see cref="VaultSaveStatus.Unsaved"/> while a change is not saved, a
+    /// save is writing or nothing was ever read from the file; <see cref="VaultSaveStatus.Unreadable"/>
+    /// when the file cannot be read; otherwise <see cref="VaultSaveStatus.Saved"/>.
     /// </returns>
     /// <remarks>Hashes the whole file, as <see cref="ReadSaved(out IReadOnlyList{VaultEntry}?)"/> does, so a caller polls it sparingly.</remarks>
     public VaultSaveState SaveState()
@@ -80,20 +86,68 @@ public sealed class Vault : IDisposable
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
 
-            if (_pending || _stamp is not { } stamp)
+            var status = Compare() switch
             {
-                return new VaultSaveState(VaultSaveStatus.Unsaved, _savedAt);
-            }
+                SavedRead.Current => VaultSaveStatus.Saved,
+                SavedRead.Unsaved => VaultSaveStatus.Unsaved,
+                SavedRead.ChangedOnDisk => VaultSaveStatus.ChangedOnDisk,
+                _ => VaultSaveStatus.Unreadable,
+            };
 
-            if (SourceSnapshot.Digest(Path) is not { } current)
-            {
-                return new VaultSaveState(VaultSaveStatus.Unreadable, _savedAt);
-            }
-
-            return new VaultSaveState(
-                CryptographicOperations.FixedTimeEquals(stamp, current) ? VaultSaveStatus.Saved : VaultSaveStatus.ChangedOnDisk,
-                _savedAt);
+            return new VaultSaveState(status, _savedAt, Unwritten: status == VaultSaveStatus.ChangedOnDisk && _pending);
         }
+    }
+
+    /// <summary>Whether this vault holds what its file holds. Called under <see cref="_state"/>.</summary>
+    /// <remarks>
+    /// The file is compared while a change is pending too, so another program's save is reported over
+    /// a change of this vault's that no save has written, or one was refused for (D-0412). Only while
+    /// this vault is writing is a different file its own save in progress.
+    /// </remarks>
+    private SavedRead Compare()
+    {
+        if (_writing || _stamp is not { } stamp)
+        {
+            return SavedRead.Unsaved;
+        }
+
+        if (SourceSnapshot.Digest(Path) is not { } current)
+        {
+            return SavedRead.Unreadable;
+        }
+
+        if (!CryptographicOperations.FixedTimeEquals(stamp, current))
+        {
+            return SavedRead.ChangedOnDisk;
+        }
+
+        return _pending ? SavedRead.Unsaved : SavedRead.Current;
+    }
+
+    /// <summary>Opens what the file holds now with the factors this vault was opened with.</summary>
+    /// <returns>A new vault over <see cref="Path"/>. This one is left as it was, for the caller to dispose.</returns>
+    /// <exception cref="InvalidMasterPasswordException">Those factors no longer open the file: another program changed them.</exception>
+    /// <exception cref="HardwareKeyException">The hardware key did not answer.</exception>
+    /// <exception cref="VaultException">The file could not be read or opened, or this vault's access was changed.</exception>
+    /// <remarks>
+    /// For a person reloading after another program saved, as KeePassXC reloads (D-0412). The key is
+    /// the one this vault already holds, so no password is asked again; a hardware key is, because
+    /// its answer depends on the file. The digest is taken before the file is read, so a write landing
+    /// between the two leaves the new vault changed on disk rather than stamped over what it missed.
+    /// </remarks>
+    public Vault Reload()
+    {
+        KeePassInterop.KeyCopy key;
+
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            ThrowIfRekeyed();
+            key = _interop.CopyKey();
+        }
+
+        var stamp = SourceSnapshot.Digest(Path) ?? throw new VaultException($"Could not read '{Path}'.");
+        return new Vault(KeePassInterop.Reopen(Path, key), Path, stamp);
     }
 
     /// <summary>When the entry with this name was created and last modified.</summary>
@@ -622,19 +676,10 @@ public sealed class Vault : IDisposable
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
 
-            if (_pending || _stamp is not { } stamp)
+            var read = Compare();
+            if (read != SavedRead.Current)
             {
-                return SavedRead.Unsaved;
-            }
-
-            if (SourceSnapshot.Digest(Path) is not { } current)
-            {
-                return SavedRead.Unreadable;
-            }
-
-            if (!CryptographicOperations.FixedTimeEquals(stamp, current))
-            {
-                return SavedRead.ChangedOnDisk;
+                return read;
             }
 
             entries = _interop.ReadEntries();
@@ -666,19 +711,10 @@ public sealed class Vault : IDisposable
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
 
-            if (_pending || _stamp is not { } stamp)
+            var read = Compare();
+            if (read != SavedRead.Current)
             {
-                return SavedRead.Unsaved;
-            }
-
-            if (SourceSnapshot.Digest(Path) is not { } current)
-            {
-                return SavedRead.Unreadable;
-            }
-
-            if (!CryptographicOperations.FixedTimeEquals(stamp, current))
-            {
-                return SavedRead.ChangedOnDisk;
+                return read;
             }
 
             value = _interop.ReadCustomField(name, field);
@@ -697,19 +733,10 @@ public sealed class Vault : IDisposable
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
 
-            if (_pending || _stamp is not { } stamp)
+            var read = Compare();
+            if (read != SavedRead.Current)
             {
-                return SavedRead.Unsaved;
-            }
-
-            if (SourceSnapshot.Digest(Path) is not { } current)
-            {
-                return SavedRead.Unreadable;
-            }
-
-            if (!CryptographicOperations.FixedTimeEquals(stamp, current))
-            {
-                return SavedRead.ChangedOnDisk;
+                return read;
             }
 
             snapshot = new EnvSnapshot(_interop.ReadEnvEntries(), _interop.ReadGroupPaths());
@@ -1691,6 +1718,11 @@ public sealed class Vault : IDisposable
                 throw new VaultChangedOnDiskException();
             }
 
+            lock (_state)
+            {
+                _writing = true;
+            }
+
             _interop.Save(
                 hasChangedOnDisk, waitBetweenAttempts, clock, attempts, duringAttempt,
                 backUp ? path => PreserveBefore(path, applyFloor) : null,
@@ -1702,12 +1734,21 @@ public sealed class Vault : IDisposable
                 _stamp = stamp;
                 _savedAt = WrittenAt(Path);
                 _pending = false;
+                _writing = false;
             }
 
             succeeded = true;
         }
         finally
         {
+            if (!succeeded)
+            {
+                lock (_state)
+                {
+                    _writing = false;
+                }
+            }
+
             clock.Publish(succeeded);
         }
 

@@ -32,6 +32,29 @@ public sealed class HardwareKeyVaultTests : IDisposable
     }
 
     [Fact]
+    public void A_reload_asks_the_key_about_the_file_another_writer_saved()
+    {
+        var device = new SoftwareYubiKey(_secret);
+        var path = HardwareKeyVault("vault.kdbx", device);
+        using var key = new HardwareKey(device, 2);
+        using var vault = Vault.Open(path, _master, null, key);
+
+        using (var writerKey = new HardwareKey(device, 2))
+        using (var writer = Vault.Open(path, _master, null, writerKey))
+        {
+            writer.UpdateEntry(new VaultEntry { Title = "TOKEN", Password = "external", GroupPath = "env/demo" });
+            writer.Save();
+        }
+
+        var asked = device.Challenges.Count;
+
+        using var reloaded = vault.Reload();
+
+        Assert.True(device.Challenges.Count > asked);
+        Assert.Equal("external", Assert.Single(reloaded.ReadEntries()).Password);
+    }
+
+    [Fact]
     public void Another_keys_secret_is_refused()
     {
         var path = HardwareKeyVault("vault.kdbx", new SoftwareYubiKey(_secret));

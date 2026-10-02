@@ -141,7 +141,7 @@ internal sealed class RecommendationsViewModel : ObservableObject, IDisposable
         }
         catch (VaultChangedOnDiskException)
         {
-            Message = "Something else changed this vault since you opened it. Lock and unlock to see it, then move the keys again.";
+            Message = "Something else changed this vault since you opened it. Reload to see it, then move the keys again.";
             return;
         }
         catch (VaultException e)

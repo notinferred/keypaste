@@ -970,7 +970,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         }
         catch (VaultChangedOnDiskException)
         {
-            Error = "Something else changed this vault since you opened it. Lock and unlock to see it, then delete this again.";
+            Error = "Something else changed this vault since you opened it. Reload to see it, then delete this again.";
             return;
         }
         catch (VaultException e)
@@ -1018,7 +1018,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         }
         catch (VaultChangedOnDiskException)
         {
-            Error = "Something else changed this vault since you opened it. Lock and unlock to see it, then restore this from Trash.";
+            Error = "Something else changed this vault since you opened it. Reload to see it, then restore this from Trash.";
             return;
         }
         catch (VaultException e)
@@ -1131,7 +1131,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         }
         catch (VaultChangedOnDiskException)
         {
-            Error = "Something else changed this vault since you opened it. Lock and unlock to see it, then make your change again.";
+            Error = "Something else changed this vault since you opened it. Reload to see it, then make your change again.";
             return;
         }
         catch (VaultException e)
@@ -1279,7 +1279,7 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         }
         catch (VaultChangedOnDiskException)
         {
-            Error = "Something else changed this vault since you opened it. Lock and unlock to see it, then make your change again.";
+            Error = "Something else changed this vault since you opened it. Reload to see it, then make your change again.";
             return;
         }
         catch (VaultException e)

@@ -125,7 +125,7 @@ public sealed class KdbxImportViewModelTests : IDisposable
 
         Assert.False(import.CanConfirm);
         Assert.False(import.IsDecrypted);
-        Assert.Contains(_announced, line => line.Contains("Lock and unlock", StringComparison.Ordinal));
+        Assert.Contains(_announced, line => line.Contains("Reload to see it", StringComparison.Ordinal));
         Assert.Single(_session.Unlocked!.Search(string.Empty), match => match.Name == new EntryName("foreign/Banking", "Checking"));
     }
 

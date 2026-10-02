@@ -954,7 +954,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         }
         catch (VaultChangedOnDiskException)
         {
-            Report("Something else changed this vault since you opened it. Lock and unlock to see it, then make your change again.");
+            Report("Something else changed this vault since you opened it. Reload to see it, then make your change again.");
             return;
         }
         catch (VaultException e)
@@ -1011,7 +1011,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         }
         catch (VaultChangedOnDiskException)
         {
-            Report("Something else changed this vault since you opened it. Lock and unlock to see it, then make your change again.");
+            Report("Something else changed this vault since you opened it. Reload to see it, then make your change again.");
             return false;
         }
         catch (VaultException e)
@@ -1162,7 +1162,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         }
         catch (VaultChangedOnDiskException)
         {
-            Report("Something else changed this vault since you opened it. Lock and unlock to see it, then make your change again.");
+            Report("Something else changed this vault since you opened it. Reload to see it, then make your change again.");
             return;
         }
         catch (VaultException e)

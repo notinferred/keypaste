@@ -356,7 +356,7 @@ internal sealed class ScopedTokensViewModel : ObservableObject, IDisposable
         }
         catch (VaultChangedOnDiskException)
         {
-            error = "Something else changed this vault since you opened it. Lock and unlock to see it, then try again.";
+            error = "Something else changed this vault since you opened it. Reload to see it, then try again.";
             return false;
         }
         catch (VaultException e)

@@ -30,4 +30,7 @@ internal enum VaultLockReason
 
     /// <summary>The window was closed into the menu bar or tray.</summary>
     Closed = 7,
+
+    /// <summary>A reload found that another program changed what unlocks the vault.</summary>
+    ReloadRefused = 8,
 }

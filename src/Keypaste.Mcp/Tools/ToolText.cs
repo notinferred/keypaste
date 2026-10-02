@@ -194,8 +194,8 @@ internal static class ToolText
         saved. Nothing was read or released.
 
         If a change was being saved, try once more. Otherwise ask the person you are working with to
-        reload the vault, by locking and unlocking it in the keypaste desktop app or restarting
-        `keypaste agent`, and then try again. This call was recorded in the audit log as denied.
+        reload the vault, with Reload in the keypaste desktop app or by restarting `keypaste agent`,
+        and then try again. This call was recorded in the audit log as denied.
         """;
 
     /// <summary>Why a call was refused when this server names no vault.</summary>

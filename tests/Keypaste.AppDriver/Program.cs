@@ -730,6 +730,13 @@ internal sealed class Driver(string home)
         return act(entries);
     }
 
+    /// <summary>Does something through the app's shell over the held session, as launch composes it.</summary>
+    private void OnShell(AppVaultSession session, AppAuthority authority, Action<ShellViewModel> act)
+    {
+        using var shell = new ShellViewModel(session, home, authority);
+        act(shell);
+    }
+
     private static void Post(SynchronizationContext? context, Action action)
     {
         if (context is null)
@@ -799,6 +806,19 @@ internal sealed class Driver(string home)
 
                 case ["relocate", var entry, var group, var title]:
                     OnEntries(session, entries => Relocate(entries, entry, group, title));
+                    break;
+
+                case ["notice"]:
+                    OnShell(session, authority, shell =>
+                        Console.Out.WriteLine(shell.HasVaultChanged ? $"notice {shell.VaultChanged}" : "notice none"));
+                    break;
+
+                case ["reload"]:
+                    OnShell(session, authority, shell =>
+                    {
+                        shell.ReloadCommand.Execute(null);
+                        Console.Out.WriteLine(shell.HasVaultChanged ? $"not reloaded: {shell.VaultChanged}" : "reloaded");
+                    });
                     break;
 
                 case ["activity"]:

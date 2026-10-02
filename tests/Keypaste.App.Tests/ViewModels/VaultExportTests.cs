@@ -136,7 +136,7 @@ public sealed class VaultExportTests
         await model.ExportAsync();
 
         Assert.False(File.Exists(destination));
-        Assert.Contains("Lock and unlock", model.Message, StringComparison.Ordinal);
+        Assert.Contains("Reload to see it", model.Message, StringComparison.Ordinal);
     }
 
     [Fact]

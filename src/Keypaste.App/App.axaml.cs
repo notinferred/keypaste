@@ -395,7 +395,12 @@ internal sealed partial class App : Application, IDisposable
         {
             ShowUnlock(
                 Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable),
-                reason == VaultLockReason.AccessChanged ? AccessChangedMessage : null,
+                reason switch
+                {
+                    VaultLockReason.AccessChanged => AccessChangedMessage,
+                    VaultLockReason.ReloadRefused => ReloadRefusedMessage,
+                    _ => null,
+                },
                 reason);
             _tray?.Refresh();
         });
@@ -411,6 +416,10 @@ internal sealed partial class App : Application, IDisposable
     /// <summary>What the unlock screen says when an access change could not carry on with the vault open.</summary>
     internal const string AccessChangedMessage =
         "The vault's password or keyfile was changed, and it locked rather than open again. Unlock it with the new ones.";
+
+    /// <summary>What the unlock screen says when a reload found that another program changed what unlocks the vault.</summary>
+    internal const string ReloadRefusedMessage =
+        "Another program changed this vault's password or keyfile, so it locked instead of reloading. Unlock it with the new ones.";
 
     private void ShowUnlock(string? home, string? message = null, VaultLockReason? reason = null)
     {

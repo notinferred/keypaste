@@ -307,7 +307,7 @@ internal sealed class EntryHistoryViewModel : ObservableObject, IDisposable
         }
         catch (VaultChangedOnDiskException)
         {
-            _owner.Report("Something else changed this vault since you opened it. Lock and unlock to see it, then restore this again.");
+            _owner.Report("Something else changed this vault since you opened it. Reload to see it, then restore this again.");
             return;
         }
         catch (VaultException e)

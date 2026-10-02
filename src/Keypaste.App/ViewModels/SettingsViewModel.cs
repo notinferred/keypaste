@@ -369,7 +369,7 @@ internal sealed class SettingsViewModel : ObservableObject, IDisposable
         }
         catch (VaultChangedOnDiskException)
         {
-            Message = "The vault file changed since it was unlocked. Lock and unlock to see it, then export.";
+            Message = "The vault file changed since it was unlocked. Reload to see it, then export.";
         }
         catch (VaultException e)
         {

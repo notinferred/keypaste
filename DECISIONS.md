@@ -6,6 +6,7 @@
 
 | id | date | decision | supersedes |
 |---|---|---|---|
+| D-0412 | 2026-10-02 | An open vault reports another program's save over a change of its own not yet written, and the app offers Reload: the file reopened with the key the unlock holds, in the same session, every grant withdrawn first and an unwritten change discarded; a key that no longer opens the file locks the app ([N.16](docs/steps/N.16.md)) | D-0317's reload only by locking and unlocking |
 | D-0411 | 2026-10-02 | app.yml's jobs leave a pass marker per runner and job, its dispatches and pushes to main are trusted like ci.yml's, and its pushes to main and pull requests skip a job a trusted run passed on a commit differing only in other lanes' paths; dispatches and tags never skip, so a release still rests on a full run | D-0403's every job on app.yml's pushes, and D-0404's cache for ci.yml alone |
 | D-0410 | 2026-10-02 | PRODUCT §4.3's architecture and security review of another secret-handling implementation comes before any of its code is written, so a design row such as X.2 or X.13 may enter the plan first, as v1.9 and v1.10 did | §4.3's review before the implementation entered the plan |
 | D-0409 | 2026-10-02 | The relay (X.3), the cloud vault's sync (X.10) and the server for server access (X.13) are one C# service on .NET, sharing Keypaste.Core's protocol, access decision and proxy with the clients and running hosted or self-hosted; keypaste.com's Worker stays JavaScript for the site, signups and share links | — |

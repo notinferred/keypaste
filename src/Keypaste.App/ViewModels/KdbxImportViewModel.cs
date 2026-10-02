@@ -425,7 +425,7 @@ internal sealed class KdbxImportViewModel : ObservableObject, ISecretSink, IDisp
         }
         catch (VaultChangedOnDiskException)
         {
-            const string changed = "Something else changed this vault since you opened it. Lock and unlock to see it, then import again.";
+            const string changed = "Something else changed this vault since you opened it. Reload to see it, then import again.";
 
             if (applied is null)
             {

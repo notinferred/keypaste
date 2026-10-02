@@ -35,13 +35,11 @@ Custom fields and tags are ordinary KeePass data: keypaste writes them as KeePas
 
 ## T2 — One shared unlock session
 
-U.1–U.3 and 4.4b gave the app, `keypaste agent` and the bridge one owner and one lock (D-0309 to D-0321), and N.10 made every CLI verb that saves take the owner's claim (D-0382). What remains is approving a terminal edit in the unlocked app instead of refusing it, and saying at once when another program saved the vault.
+U.1–U.3 and 4.4b gave the app, `keypaste agent` and the bridge one owner and one lock (D-0309 to D-0321), and N.10 made every CLI verb that saves take the owner's claim (D-0382). N.16 made the app say when another program saved the vault and reload it in the same session (D-0412). What remains is approving a terminal edit in the unlocked app instead of refusing it.
 
 - [ ] **N.11 — Approve a terminal edit in the unlocked app.** Needs: N.10.
   - `set`, `add`, `rm` and the env writers send the change to the vault's owner, which asks in its prompt window and writes through its session.
   - No master password crosses the pipe, and `access` stays refused.
-- [ ] **N.16 — Tell the person when another program saved the vault.** Needs: none.
-  - As soon as the open vault stops matching its file, the app shows a notice with Reload, instead of learning it only when its own save is refused; agents keep getting `vault-changed` until a person reloads (D-0317).
 
 ## T4 — Project environments
 

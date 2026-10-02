@@ -237,7 +237,7 @@ internal sealed class EnvImportViewModel : ObservableObject, IDisposable
         }
         catch (VaultChangedOnDiskException)
         {
-            _report("Something else changed this vault since you opened it. Lock and unlock to see it, then import again.");
+            _report("Something else changed this vault since you opened it. Reload to see it, then import again.");
             return;
         }
         catch (VaultException e)

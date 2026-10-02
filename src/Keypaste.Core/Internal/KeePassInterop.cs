@@ -86,13 +86,47 @@ internal sealed class KeePassInterop : IDisposable
     internal static KeePassInterop OpenReadOnly(string path, byte[] utf8Password, string? keyfilePath) =>
         new(OpenDatabase(path, utf8Password, keyfilePath)) { _readOnly = true };
 
+    /// <summary>The factors this vault was opened with, for <see cref="Reopen"/>.</summary>
+    internal KeyCopy CopyKey()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        // A new container over the same components: closing this vault drops its reference to the
+        // key and touches none of them.
+        CompositeKey key = new();
+        foreach (var component in _database.MasterKey.UserKeys)
+        {
+            key.AddUserKey(component);
+        }
+
+        return new KeyCopy(key, KeyfilePath is not null, HardwareKey is not null);
+    }
+
+    /// <summary>Opens the vault at <paramref name="path"/> again with a key another instance copied.</summary>
+    /// <exception cref="InvalidMasterPasswordException">The key no longer opens the vault.</exception>
+    /// <exception cref="HardwareKeyException">The hardware key did not answer.</exception>
+    /// <exception cref="VaultException">The vault could not be read.</exception>
+    internal static KeePassInterop Reopen(string path, KeyCopy key)
+    {
+        var database = OpenDatabase(path, () => key.Key, key.HasKeyfile, key.HasHardwareKey);
+        ApplyWriteSafety(database);
+        return new KeePassInterop(database);
+    }
+
     private static PwDatabase OpenDatabase(
-        string path, byte[] utf8Password, string? keyfilePath, HardwareKey? hardwareKey = null)
+        string path, byte[] utf8Password, string? keyfilePath, HardwareKey? hardwareKey = null) =>
+        OpenDatabase(
+            path,
+            () => BuildKey(utf8Password, keyfilePath, hardwareKey),
+            !string.IsNullOrEmpty(keyfilePath),
+            hardwareKey is not null);
+
+    private static PwDatabase OpenDatabase(string path, Func<CompositeKey> key, bool hasKeyfile, bool hasHardwareKey)
     {
         PwDatabase database = new();
         try
         {
-            database.Open(IOConnectionInfo.FromPath(path), BuildKey(utf8Password, keyfilePath, hardwareKey), null);
+            database.Open(IOConnectionInfo.FromPath(path), key(), null);
         }
         catch (InvalidCompositeKeyException ex)
         {
@@ -102,7 +136,7 @@ internal sealed class KeePassInterop : IDisposable
             // which factors were OFFERED is, and a message naming only the password sends somebody
             // with a good password and the wrong keyfile to retype the one thing that was right.
             throw new InvalidMasterPasswordException(
-                (string.IsNullOrEmpty(keyfilePath), hardwareKey is null) switch
+                (!hasKeyfile, !hasHardwareKey) switch
                 {
                     (true, true) => "The master password is incorrect, or the vault is not a readable KDBX file.",
                     (false, true) => "The master password or the keyfile is incorrect, or the vault is not a readable KDBX file.",
@@ -2956,5 +2990,22 @@ internal sealed class KeePassInterop : IDisposable
 
         /// <summary>Whether the vault file has been replaced by bytes under the new key.</summary>
         internal bool Committed { get; set; }
+    }
+
+    /// <summary>An open vault's key, with the keyfile material it was opened with rather than the file's current bytes.</summary>
+    internal sealed class KeyCopy
+    {
+        internal KeyCopy(CompositeKey key, bool hasKeyfile, bool hasHardwareKey)
+        {
+            Key = key;
+            HasKeyfile = hasKeyfile;
+            HasHardwareKey = hasHardwareKey;
+        }
+
+        internal CompositeKey Key { get; }
+
+        internal bool HasKeyfile { get; }
+
+        internal bool HasHardwareKey { get; }
     }
 }

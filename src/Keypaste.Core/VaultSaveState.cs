@@ -19,7 +19,8 @@ public enum VaultSaveStatus
 /// <summary>An open vault's save state and when its file was last written by it.</summary>
 /// <param name="Status">Whether the file holds what is open.</param>
 /// <param name="SavedAt">The file's write time when this vault last opened or saved it, or null.</param>
-public sealed record VaultSaveState(VaultSaveStatus Status, DateTimeOffset? SavedAt);
+/// <param name="Unwritten">Whether, the file having changed, this vault also holds a change of its own that no save wrote.</param>
+public sealed record VaultSaveState(VaultSaveStatus Status, DateTimeOffset? SavedAt, bool Unwritten = false);
 
 /// <summary>When an entry was created and last modified.</summary>
 /// <param name="Created">When it was created.</param>

@@ -60,6 +60,68 @@ public sealed class ShellStatusTests
     }
 
     [Fact]
+    public void AnotherProgramsSave_OffersReload_WhichLoadsTheFileAndDiscardsWhatWasNotWritten()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+        using var session = new AppVaultSession(clock, home: fixture.Home);
+        Unlock(session, fixture);
+        using var shell = new ShellViewModel(session, fixture.Home, authority: null, clock: clock);
+        var name = Path.GetFileName(fixture.Path_);
+        Assert.False(shell.HasVaultChanged);
+
+        SaveElsewhere(fixture, "ELSEWHERE");
+
+        for (var tick = 0; tick < 5; tick++)
+        {
+            clock.Advance(TimeSpan.FromSeconds(1));
+        }
+
+        Assert.Equal($"Another program saved {name}. Agents are refused until you reload it.", shell.VaultChanged);
+
+        session.Unlocked!.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "MINE", Password = "z" });
+        Assert.Throws<VaultChangedOnDiskException>(session.Unlocked.Save);
+
+        Assert.Equal($"{name} · changed on disk", shell.VaultStatus);
+        Assert.EndsWith(" Your last change here was not saved, and reloading discards it.", shell.VaultChanged, StringComparison.Ordinal);
+
+        var before = shell.Content;
+        shell.ReloadCommand.Execute(null);
+
+        Assert.False(shell.HasVaultChanged);
+        Assert.Equal($"{name} · saved", shell.VaultStatus);
+        Assert.NotSame(before, shell.Content);
+        var titles = session.Unlocked!.ReadEntries().Select(entry => entry.Title).ToList();
+        Assert.Contains("ELSEWHERE", titles);
+        Assert.DoesNotContain("MINE", titles);
+    }
+
+    [Fact]
+    public void AReload_AfterAnotherProgramChangedThePassword_LocksSoTheNewOneIsAsked()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+        using var session = new AppVaultSession(clock, home: fixture.Home);
+        Unlock(session, fixture);
+        using var shell = new ShellViewModel(session, fixture.Home, authority: null, clock: clock);
+        var locked = new List<VaultLockReason>();
+        session.Locked += (_, reason) => locked.Add(reason);
+
+        using (var other = Vault.Open(fixture.Path_, TempVault.Password))
+        {
+            const string next = "a different horse battery staple";
+            Assert.Equal(
+                VaultAccessOutcome.Changed,
+                other.ChangeAccess(new VaultAccessChange(true, AccessKeyfileChange.Keep), next, next).Outcome);
+        }
+
+        shell.ReloadCommand.Execute(null);
+
+        Assert.Equal([VaultLockReason.ReloadRefused], locked);
+        Assert.False(session.IsUnlocked);
+    }
+
+    [Fact]
     public async Task TheAgentsRow_CountsDistinctConnectedClients()
     {
         using var fixture = new TempVault();
@@ -158,6 +220,19 @@ public sealed class ShellStatusTests
         {
             await client.DisposeAsync();
         }
+    }
+
+    private static void Unlock(AppVaultSession session, TempVault fixture)
+    {
+        using var master = TempVault.Secret(TempVault.Password);
+        Assert.Equal(UnlockOutcome.Opened, session.TryUnlock(fixture.Path_, master.Value));
+    }
+
+    private static void SaveElsewhere(TempVault fixture, string title)
+    {
+        using var other = Vault.Open(fixture.Path_, TempVault.Password);
+        other.AddEntry(new VaultEntry { GroupPath = "env/app", Title = title, Password = "y" });
+        other.Save();
     }
 
     private sealed class NeverAnswers : IApprovalChannel

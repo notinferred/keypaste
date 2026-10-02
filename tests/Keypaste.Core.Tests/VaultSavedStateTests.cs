@@ -119,9 +119,100 @@ public sealed class VaultSavedStateTests : IDisposable
         vault.UpdateEntry(new VaultEntry { GroupPath = _token.GroupPath, Title = _token.Title, Password = "unsaved" });
         Assert.Throws<VaultChangedOnDiskException>(vault.Save);
 
-        Assert.Equal(SavedRead.Unsaved, vault.ReadSaved(out var entries));
+        Assert.Equal(SavedRead.ChangedOnDisk, vault.ReadSaved(out var entries));
         Assert.Null(entries);
         Assert.Equal(external, File.ReadAllBytes(_path));
+    }
+
+    [Fact]
+    public void A_reload_reads_what_another_writer_saved_and_saves_on_from_it()
+    {
+        using var vault = Seeded();
+        ExternalSave(_token, "external");
+
+        using var reloaded = vault.Reload();
+
+        Assert.Equal(SavedRead.ChangedOnDisk, vault.ReadSaved(out _));
+        Assert.Equal(SavedRead.Current, reloaded.ReadSaved(out var entries));
+        Assert.Equal("external", Password(entries!, _token), StringComparer.Ordinal);
+
+        reloaded.UpdateEntry(new VaultEntry { GroupPath = _other.GroupPath, Title = _other.Title, Password = "o2" });
+        reloaded.Save();
+
+        using var reopened = Vault.Open(_path, _masterPassword);
+        Assert.Equal(SavedRead.Current, reopened.ReadSaved(out entries));
+        Assert.Equal("external", Password(entries!, _token), StringComparer.Ordinal);
+        Assert.Equal("o2", Password(entries!, _other), StringComparer.Ordinal);
+    }
+
+    [Fact]
+    public void A_reload_discards_a_change_whose_save_was_refused()
+    {
+        using var vault = Seeded();
+        ExternalSave(_other, "external");
+        vault.UpdateEntry(new VaultEntry { GroupPath = _token.GroupPath, Title = _token.Title, Password = "unwritten" });
+        Assert.Throws<VaultChangedOnDiskException>(vault.Save);
+
+        using var reloaded = vault.Reload();
+
+        Assert.Equal(SavedRead.Current, reloaded.ReadSaved(out var entries));
+        Assert.Equal("v1", Password(entries!, _token), StringComparer.Ordinal);
+        Assert.Equal("external", Password(entries!, _other), StringComparer.Ordinal);
+    }
+
+    [Fact]
+    public void A_reload_after_another_writer_changed_the_password_is_refused_and_changes_nothing()
+    {
+        using var vault = Seeded();
+        using (var writer = Vault.Open(_path, _masterPassword))
+        {
+            const string next = "a different horse battery staple";
+            Assert.Equal(
+                VaultAccessOutcome.Changed,
+                writer.ChangeAccess(new VaultAccessChange(true, AccessKeyfileChange.Keep), next, next).Outcome);
+        }
+
+        var bytes = File.ReadAllBytes(_path);
+
+        Assert.Throws<InvalidMasterPasswordException>(() => vault.Reload().Dispose());
+        Assert.Equal(SavedRead.ChangedOnDisk, vault.ReadSaved(out _));
+        Assert.Equal(bytes, File.ReadAllBytes(_path));
+    }
+
+    [Fact]
+    public void A_reload_of_a_keyfile_vault_uses_the_keyfile_it_was_opened_with()
+    {
+        var keyfile = Path.Combine(_directory, "vault.key");
+        File.WriteAllBytes(keyfile, [.. Enumerable.Range(1, 32).Select(i => (byte)i)]);
+        using (var created = Vault.CreateWith(_path, _masterPassword, keyfile))
+        {
+            created.AddEntry(new VaultEntry { GroupPath = _token.GroupPath, Title = _token.Title, Password = "v1" });
+            created.Save();
+        }
+
+        using var vault = Vault.Open(_path, _masterPassword, keyfile);
+        using (var writer = Vault.Open(_path, _masterPassword, keyfile))
+        {
+            writer.UpdateEntry(new VaultEntry { GroupPath = _token.GroupPath, Title = _token.Title, Password = "external" });
+            writer.Save();
+        }
+
+        File.WriteAllBytes(keyfile, [.. Enumerable.Range(101, 32).Select(i => (byte)i)]);
+
+        using var reloaded = vault.Reload();
+
+        Assert.Equal(SavedRead.Current, reloaded.ReadSaved(out var entries));
+        Assert.Equal("external", Password(entries!, _token), StringComparer.Ordinal);
+    }
+
+    [Fact]
+    public void A_reload_of_a_deleted_file_fails_and_leaves_the_vault_as_it_was()
+    {
+        using var vault = Seeded();
+        File.Delete(_path);
+
+        Assert.Throws<VaultException>(() => vault.Reload().Dispose());
+        Assert.Equal(SavedRead.Unreadable, vault.ReadSaved(out _));
     }
 
     [Fact]
@@ -250,6 +341,13 @@ public sealed class VaultSavedStateTests : IDisposable
         vault.AddEntry(new VaultEntry { GroupPath = _other.GroupPath, Title = _other.Title, Password = "o1" });
         vault.Save();
         return vault;
+    }
+
+    private void ExternalSave(EntryName name, string password)
+    {
+        using var writer = Vault.Open(_path, _masterPassword);
+        writer.UpdateEntry(new VaultEntry { GroupPath = name.GroupPath, Title = name.Title, Password = password });
+        writer.Save();
     }
 
     private static List<VaultEdit> Watch(Vault vault)

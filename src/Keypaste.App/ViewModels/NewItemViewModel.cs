@@ -320,7 +320,7 @@ internal sealed class NewItemViewModel : ObservableObject, IDisposable
         }
         catch (VaultChangedOnDiskException)
         {
-            Error = "Something else changed this vault since you opened it. Lock and unlock to see it, then add this again.";
+            Error = "Something else changed this vault since you opened it. Reload to see it, then add this again.";
             return null;
         }
         catch (VaultException e)

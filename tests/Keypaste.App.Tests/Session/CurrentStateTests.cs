@@ -14,7 +14,7 @@ namespace Keypaste.App.Tests.Session;
 /// <summary>
 /// The app's session answers agents from the vault as last saved: an edit made on a screen is the next
 /// value released, what it touched is asked about again, and a file another program saved is refused
-/// until a person unlocks it again (U.3, D-0317, D-0318).
+/// until a person reloads it or unlocks it again (U.3, N.16, D-0317, D-0318, D-0412).
 /// </summary>
 /// <remarks>
 /// Each act goes through the screen a person uses, and each request through the app's real endpoint,
@@ -214,6 +214,31 @@ public sealed class CurrentStateTests : IDisposable
 
         await using var after = await Agent.AttachAsync(this);
         Assert.Equal((AuditMethod.Prompt, "external"), await after.RequestAsync(_token));
+    }
+
+    [Fact]
+    public async Task Reload_serves_what_another_program_saved_in_the_same_session_and_asks_again()
+    {
+        await using var agent = await Agent.AttachAsync(this);
+        Assert.Equal((AuditMethod.Prompt, "v1"), await agent.RequestAsync(_token));
+        Assert.Equal((AuditMethod.GrantCache, "v1"), await agent.RequestAsync(_token));
+        var session = _session.SessionId;
+
+        using (var writer = Vault.Open(_fixture.Path_, TempVault.Password))
+        {
+            writer.UpdateEntry(new VaultEntry { GroupPath = "env/dev", Title = "TOKEN", Password = "external" });
+            writer.Save();
+        }
+
+        using var shell = new ShellViewModel(_session, _fixture.Home, authority: null, clock: new ManualClock(AppClock.Start));
+        Assert.True(shell.HasVaultChanged);
+
+        shell.ReloadCommand.Execute(null);
+
+        Assert.False(shell.HasVaultChanged);
+        Assert.Equal(session, _session.SessionId);
+        Assert.Equal((AuditMethod.Prompt, "external"), await agent.RequestAsync(_token));
+        Assert.Equal(2, _prompt.Asked);
     }
 
     private void Unlock()

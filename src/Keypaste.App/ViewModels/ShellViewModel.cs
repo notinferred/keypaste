@@ -73,6 +73,8 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     private string _vaultStatus = string.Empty;
     private StatusTone _vaultStatusTone;
     private string _vaultStatusDetail = string.Empty;
+    private string? _vaultChanged;
+    private string? _reloadFailure;
     private int _ticks;
     private readonly Action<string, string?>? _openInPlace;
     private KdbxImportViewModel? _import;
@@ -117,6 +119,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
 
         LockCommand = new RelayCommand(() => _session.Lock(VaultLockReason.Manual));
         DismissNoticeCommand = new RelayCommand(() => Notice = null);
+        ReloadCommand = new RelayCommand(Reload);
         DismissToastCommand = new RelayCommand(() => Toast = null);
         OpenProjectCommand = new RelayCommand<string>(OpenProject);
         BackCommand = new RelayCommand(() => Current = Destinations.PlaceOf(Current), () => HasBack);
@@ -184,6 +187,24 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     internal bool HasNotice => _notice is not null;
 
     internal RelayCommand DismissNoticeCommand { get; }
+
+    /// <summary>What the notice says while the file holds another program's save, or null.</summary>
+    internal string? VaultChanged
+    {
+        get => _vaultChanged;
+        private set
+        {
+            if (Set(ref _vaultChanged, value))
+            {
+                Raise(nameof(HasVaultChanged));
+            }
+        }
+    }
+
+    internal bool HasVaultChanged => _vaultChanged is not null;
+
+    /// <summary>Opens what the file holds now in place of the open copy (D-0412).</summary>
+    internal RelayCommand ReloadCommand { get; }
 
     /// <summary>Whether a save is waiting for the vault's YubiKey to be touched.</summary>
     internal bool IsWaitingForTouch
@@ -1104,6 +1125,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             VaultStatus = string.Empty;
             VaultStatusDetail = string.Empty;
             VaultStatusTone = StatusTone.Ok;
+            VaultChanged = null;
             return;
         }
 
@@ -1129,6 +1151,40 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         VaultStatusDetail = state.SavedAt is { } saved
             ? $"Saved {saved.ToLocalTime().ToString("HH:mm:ss", CultureInfo.InvariantCulture)} · {VaultPath}"
             : VaultPath;
+
+        if (state.Status != VaultSaveStatus.ChangedOnDisk)
+        {
+            _reloadFailure = null;
+            VaultChanged = null;
+            return;
+        }
+
+        VaultChanged = string.Concat(
+            $"Another program saved {VaultName}. Agents are refused until you reload it.",
+            state.Unwritten ? " Your last change here was not saved, and reloading discards it." : string.Empty,
+            _reloadFailure is { } failure ? $" Reloading failed: {failure}" : string.Empty);
+    }
+
+    private void Reload()
+    {
+        var result = _session.Reload();
+
+        if (_disposed || result.Outcome == ReloadOutcome.Locked)
+        {
+            return;
+        }
+
+        if (result.Outcome == ReloadOutcome.Failed)
+        {
+            _reloadFailure = result.Reason;
+            ReadVaultStatus();
+            return;
+        }
+
+        _reloadFailure = null;
+        Show(_current);
+        Recommendations.Check();
+        ReadVaultStatus();
     }
 
     private void OnSaved(object? sender, EventArgs e) => Post(() =>

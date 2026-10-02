@@ -64,7 +64,35 @@ public sealed class VaultSaveStateTests : IDisposable
             other.Save();
         }
 
-        Assert.Equal(VaultSaveStatus.ChangedOnDisk, vault.SaveState().Status);
+        var state = vault.SaveState();
+        Assert.Equal(VaultSaveStatus.ChangedOnDisk, state.Status);
+        Assert.False(state.Unwritten);
+    }
+
+    [Fact]
+    public void AnEditAfterAnotherWriter_ChangedOnDisk_WithTheChangeUnwritten_UntilASaveSucceeds()
+    {
+        using var vault = Vault.Open(VaultPath, VaultHistoryTests.MasterPassword);
+
+        using (var other = Vault.Open(VaultPath, VaultHistoryTests.MasterPassword))
+        {
+            other.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "ELSEWHERE", Password = "x" });
+            other.Save();
+        }
+
+        vault.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "OTHER", Password = "x" });
+
+        var pending = vault.SaveState();
+        Assert.Equal(VaultSaveStatus.ChangedOnDisk, pending.Status);
+        Assert.True(pending.Unwritten);
+
+        Assert.Throws<VaultChangedOnDiskException>(vault.Save);
+        Assert.Equal(pending, vault.SaveState());
+
+        vault.SaveOverwriting();
+
+        Assert.Equal(VaultSaveStatus.Saved, vault.SaveState().Status);
+        Assert.False(vault.SaveState().Unwritten);
     }
 
     [Fact]

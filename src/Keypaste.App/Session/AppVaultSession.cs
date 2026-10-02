@@ -746,6 +746,67 @@ internal sealed class AppVaultSession : IDisposable
         return new AccessChangeResult(AccessChangeOutcome.Changed, result);
     }
 
+    /// <summary>Puts what the vault's file holds now in place of the open copy, keeping the session.</summary>
+    /// <returns>What happened.</returns>
+    /// <remarks>
+    /// <para>
+    /// For a person told that another program saved the vault (D-0412). The file is opened with the
+    /// key this unlock holds, so nothing is asked again except a hardware key's touch. The lifetime
+    /// stays, so connected agents are not cut off, and every grant they hold is withdrawn, as after an
+    /// access change (D-0318). A change the open copy holds that no save wrote is discarded; nothing
+    /// is merged.
+    /// </para>
+    /// <para>
+    /// When the key no longer opens the file, another program changed what unlocks it, and the
+    /// session locks with <see cref="VaultLockReason.ReloadRefused"/>.
+    /// </para>
+    /// </remarks>
+    internal ReloadResult Reload()
+    {
+        Vault? vault;
+        HardwareKey? hardwareKey;
+
+        lock (_gate)
+        {
+            vault = _vault;
+            hardwareKey = _hardwareKey;
+        }
+
+        if (vault is null)
+        {
+            return new ReloadResult(ReloadOutcome.Locked);
+        }
+
+        Vault reloaded;
+        try
+        {
+            // Owned by the session once swapped in; Swap disposes it when it is not.
+#pragma warning disable CA2000
+            reloaded = vault.Reload();
+#pragma warning restore CA2000
+        }
+        catch (InvalidMasterPasswordException)
+        {
+            Lock(VaultLockReason.ReloadRefused);
+            return new ReloadResult(ReloadOutcome.Locked);
+        }
+        catch (VaultException e)
+        {
+            return new ReloadResult(ReloadOutcome.Failed, e.Message);
+        }
+        catch (ObjectDisposedException)
+        {
+            return new ReloadResult(ReloadOutcome.Locked);
+        }
+
+        // Before the swap, so no grant holding a value from the stale copy outlives it.
+        Edited?.Invoke(this, VaultEdit.Everything);
+
+        return Swap(vault, reloaded, hardwareKey)
+            ? new ReloadResult(ReloadOutcome.Reloaded)
+            : new ReloadResult(ReloadOutcome.Locked);
+    }
+
     /// <summary>Puts <paramref name="reopened"/> in the place of <paramref name="expected"/>, keeping the idle countdown.</summary>
     /// <returns>False, having disposed <paramref name="reopened"/>, when the session locked or moved on meanwhile.</returns>
     private bool Swap(Vault expected, Vault reopened, HardwareKey? hardwareKey)

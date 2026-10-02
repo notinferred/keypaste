@@ -253,7 +253,7 @@ internal sealed class TrashViewModel : ObservableObject, IDisposable
         }
         catch (VaultChangedOnDiskException)
         {
-            Report(null, "Something else changed this vault since you opened it. Lock and unlock to see it, then restore this again.");
+            Report(null, "Something else changed this vault since you opened it. Reload to see it, then restore this again.");
             return;
         }
         catch (VaultException e)
@@ -313,7 +313,7 @@ internal sealed class TrashViewModel : ObservableObject, IDisposable
         }
         catch (VaultChangedOnDiskException)
         {
-            Report(null, "Something else changed this vault since you opened it. Lock and unlock to see it, then delete this for good again.");
+            Report(null, "Something else changed this vault since you opened it. Reload to see it, then delete this for good again.");
             return;
         }
         catch (VaultException e)
