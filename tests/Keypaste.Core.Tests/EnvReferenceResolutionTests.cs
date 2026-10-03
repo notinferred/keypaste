@@ -19,9 +19,9 @@ public sealed class EnvReferenceResolutionTests : IDisposable
     {
         using (var created = Vault.Create(VaultPath, EnvStoreTests.MasterPassword))
         {
-            LegacyVariables.Set(created, "acme-api", "DATABASE_URL", _devDb);
-            LegacyVariables.Set(created, "acme-api", "staging", "DATABASE_URL", _stagingDb);
-            LegacyVariables.Set(created, "acme-api", "staging", "STRIPE_KEY", "sk_staging_sentinel");
+            ProjectVariables.Set(created, "acme-api", "DATABASE_URL", _devDb);
+            ProjectVariables.Set(created, "acme-api", "staging", "DATABASE_URL", _stagingDb);
+            ProjectVariables.Set(created, "acme-api", "staging", "STRIPE_KEY", "sk_staging_sentinel");
             created.AddEntry(new VaultEntry { GroupPath = "work", Title = "aws", Username = _awsUser, Password = "aws-password-sentinel" });
             created.AddEntry(new VaultEntry { GroupPath = ReservedGroups.Tokens, Title = "t1", Password = _tokenVerifier });
             created.Save();
@@ -89,7 +89,7 @@ public sealed class EnvReferenceResolutionTests : IDisposable
     {
         using (var other = Vault.Open(VaultPath, EnvStoreTests.MasterPassword))
         {
-            LegacyVariables.Set(other, "acme-api", "staging", "DATABASE_URL", "elsewhere");
+            ProjectVariables.Set(other, "acme-api", "staging", "DATABASE_URL", "elsewhere");
             other.Save();
         }
 
@@ -111,10 +111,7 @@ public sealed class EnvReferenceResolutionTests : IDisposable
     [Fact]
     public void An_unusable_key_the_file_never_names_refuses_nothing_as_on_the_session_path()
     {
-        _vault.AddEntry(new VaultEntry { GroupPath = "env/acme-api/staging", Title = "bad-name", Password = "x" });
-        _vault.AddEntry(new VaultEntry { GroupPath = "env/acme-api/staging", Title = "OLD_KEY", Password = "x" });
-        _vault.SetExpiryUnchecked(new EntryName("env/acme-api/staging", "OLD_KEY"), _clock.GetUtcNow().AddDays(-1));
-        _vault.Save();
+        AddExpiredStagingKey();
         var document = Document("S=kp://acme-api/staging/STRIPE_KEY\n");
 
         var direct = EnvReferenceResolution.Resolve(_vault, document, _clock);
@@ -127,9 +124,7 @@ public sealed class EnvReferenceResolutionTests : IDisposable
     [Fact]
     public void An_unusable_referenced_key_refuses_the_file_on_its_own_line()
     {
-        _vault.AddEntry(new VaultEntry { GroupPath = "env/acme-api/staging", Title = "OLD_KEY", Password = "x" });
-        _vault.SetExpiryUnchecked(new EntryName("env/acme-api/staging", "OLD_KEY"), _clock.GetUtcNow().AddDays(-1));
-        _vault.Save();
+        AddExpiredStagingKey();
 
         var resolved = Resolve("DB=kp://acme-api/staging/DATABASE_URL\nOLD=kp://acme-api/staging/OLD_KEY\n");
 
@@ -153,6 +148,17 @@ public sealed class EnvReferenceResolutionTests : IDisposable
 
         var otherProfile = EnvResolution.Resolve(_vault, "acme-api", "dev", ["DATABASE_URL"], _clock);
         Assert.Equal(EnvOutcome.Unusable, EnvReferenceResolution.Apply(document, otherProfile).Outcome);
+    }
+
+    /// <summary>Adds staging's <c>OLD_KEY</c> on an entry of its own that expired yesterday, and saves.</summary>
+    private void AddExpiredStagingKey()
+    {
+        var old = new EntryName("services", "Old");
+        _vault.AddEntry(new VaultEntry { GroupPath = old.GroupPath, Title = old.Title });
+        Assert.True(_vault.SetFields(old, [new FieldWrite("OLD_KEY", "x")]));
+        Assert.True(_vault.AddTag(old, "env:acme-api:staging"));
+        _vault.SetExpiryUnchecked(old, _clock.GetUtcNow().AddDays(-1));
+        _vault.Save();
     }
 
     private EnvResolved Resolve(string text) => EnvReferenceResolution.Resolve(_vault, Document(text), _clock);

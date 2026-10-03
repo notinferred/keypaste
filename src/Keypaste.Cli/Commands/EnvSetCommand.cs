@@ -152,7 +152,6 @@ internal static class EnvSetCommand
             {
                 { Change: EnvWriteChange.New } when plan.CreatesHome => $"Set {key} on {where}, created and tagged {ProjectTagFor(project, profile)}{generated}",
                 { Change: EnvWriteChange.New } => $"Set {key} on {where}{generated}",
-                { IsLegacy: true } => $"Updated {where} (previous value kept in entry history){generated}",
                 _ => $"Updated {key} on {where} (previous value kept in entry history){generated}",
             });
 

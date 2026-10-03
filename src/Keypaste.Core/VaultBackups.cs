@@ -299,7 +299,7 @@ public static class VaultBackups
             using var vault = Vault.Open(listed.Path, password, keyfilePath, hardwareKey);
             entries = vault.ReadEntries().Count;
             groups = vault.ReadGroupPaths().Count;
-            projects = new EnvStore(vault).Projects().Count;
+            projects = ProjectCatalog.Read(vault).Projects.Count;
         }
         catch (VaultException ex) when (ex is not UnreadableKeyfileException and not HardwareKeys.HardwareKeyException)
         {
@@ -837,10 +837,10 @@ public sealed class VaultBackupSummary
     /// <summary>How many entries it holds.</summary>
     public int Entries { get; }
 
-    /// <summary>How many groups it holds, the <c>env</c> group and its projects among them.</summary>
+    /// <summary>How many groups it holds.</summary>
     public int Groups { get; }
 
-    /// <summary>How many env projects it holds.</summary>
+    /// <summary>How many projects its entries' tags make (<see cref="ProjectCatalog"/>).</summary>
     public int EnvProjects { get; }
 
     /// <summary>The file a restore would replace, or null when none is there.</summary>

@@ -3,21 +3,9 @@ using Keypaste.Core.Approval;
 namespace Keypaste.Core;
 
 /// <summary>One environment variable read out of a vault.</summary>
-/// <param name="Key">The variable's name: a tagged entry's field name, or a legacy entry's title.</param>
+/// <param name="Key">The variable's name, which is its field's.</param>
 /// <param name="Value">The variable's value.</param>
-public sealed record EnvVariable(string Key, string Value)
-{
-    /// <summary>
-    /// Whether <see cref="Key"/> is a name that can actually be exported to a child process.
-    /// </summary>
-    /// <remarks>
-    /// False only for variables written by something other than keypaste, since
-    /// <see cref="EnvStore.Plan"/> refuses to create one. Reading them anyway is deliberate:
-    /// hiding a variable that KeePassXC displays would make the two tools disagree about the
-    /// contents of one file (docs/PRODUCT.md law 4.6).
-    /// </remarks>
-    public bool IsUsableName => EnvConvention.IsValidKey(Key, out _);
-}
+public sealed record EnvVariable(string Key, string Value);
 
 /// <summary>One profile of a project, as a listing shows it.</summary>
 /// <param name="Name">The profile's name.</param>
@@ -25,18 +13,14 @@ public sealed record EnvVariable(string Key, string Value)
 public sealed record EnvProfileInfo(string Name, bool IsProtected);
 
 /// <summary>
-/// Reads and writes environment-variable sets in a <see cref="Vault"/>, following
-/// <see cref="EnvConvention"/>.
+/// Writes and removes a project's keys as fields of the entries tagged into its environments, and
+/// creates an environment's home entry (D-0413).
 /// </summary>
 /// <remarks>
 /// <para>
-/// The convention lives here rather than in the CLI because the MCP bridge and the GUI will store
-/// env sets in exactly the same shape, and docs/PRODUCT.md law 4.3 does not allow that rule to be written
-/// down three times. Nothing above this type should know that the group is called <c>env</c>.
-/// </para>
-/// <para>
-/// The governing rule throughout is <b>permissive on read, strict on write</b>. Anything KeePassXC
-/// can put in the file is listed; only what keypaste itself creates is validated.
+/// The writes live here rather than in a front end because the CLI and the desktop write projects
+/// in exactly the same shape, and docs/PRODUCT.md law 4.2 does not allow that rule to be written
+/// down twice. Reading a project is <see cref="EnvResolution"/>'s and <see cref="ProjectCatalog"/>'s.
 /// </para>
 /// <para>
 /// Deliberately not <see cref="IDisposable"/>: it borrows a vault rather than owning one, so it
@@ -47,120 +31,6 @@ public sealed record EnvProfileInfo(string Name, bool IsProtected);
 public sealed class EnvStore(Vault vault)
 {
     private readonly Vault _vault = vault ?? throw new ArgumentNullException(nameof(vault));
-
-    /// <summary>Lists the projects that have an <c>env/&lt;project&gt;</c> group, ordinal-sorted.</summary>
-    /// <returns>The project names.</returns>
-    /// <exception cref="ObjectDisposedException">The vault has been disposed.</exception>
-    /// <remarks>
-    /// Only the immediate children of the <c>env</c> group count as projects. A group nested more
-    /// deeply is not reported, because no environment reads its entries either.
-    /// </remarks>
-    public IReadOnlyList<string> Projects()
-    {
-        string prefix = EnvConvention.RootGroup + "/";
-        List<string> projects = [];
-
-        foreach (string groupPath in _vault.ReadGroupPaths())
-        {
-            if (!groupPath.StartsWith(prefix, StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            string name = groupPath[prefix.Length..];
-            if (name.Length > 0 && !name.Contains('/'))
-            {
-                projects.Add(name);
-            }
-        }
-
-        projects.Sort(StringComparer.Ordinal);
-        return projects;
-    }
-
-    /// <summary>Whether the given project has a group, even an empty one.</summary>
-    /// <param name="project">The project name.</param>
-    /// <returns><see langword="true"/> if the group exists.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="project"/> is null.</exception>
-    /// <exception cref="ObjectDisposedException">The vault has been disposed.</exception>
-    /// <remarks>
-    /// Distinguishes "this project has no variables" from "there is no such project", which are
-    /// different answers to <c>keypaste env ls</c> and deserve different exit codes.
-    /// </remarks>
-    public bool ProjectExists(string project)
-    {
-        string groupPath = EnvConvention.GroupPath(project);
-
-        foreach (string candidate in _vault.ReadGroupPaths())
-        {
-            if (string.Equals(candidate, groupPath, StringComparison.Ordinal))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /// <summary>The profiles a project has: <c>dev</c> first, then the others ordinal-sorted, protected ones last.</summary>
-    /// <param name="project">The project name.</param>
-    /// <returns>The profiles, empty when the project does not exist.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="project"/> is null.</exception>
-    /// <exception cref="ObjectDisposedException">The vault has been disposed.</exception>
-    /// <remarks>
-    /// A subgroup keypaste would not resolve is left out here and named by <see cref="ProfileProblems"/>,
-    /// so a listing never offers a profile that <c>run</c> would refuse.
-    /// </remarks>
-    public IReadOnlyList<EnvProfileInfo> Profiles(string project)
-    {
-        if (!ProjectExists(project))
-        {
-            return [];
-        }
-
-        var others = Subgroups(project)
-            .Where(name => !string.Equals(name, EnvProfileNames.Default, StringComparison.Ordinal) && EnvProfileNames.IsValid(name, out _))
-            .Select(name => new EnvProfileInfo(name, EnvProfileNames.IsProtected(name)))
-            .OrderBy(profile => profile.IsProtected)
-            .ThenBy(profile => profile.Name, StringComparer.Ordinal);
-
-        return [new EnvProfileInfo(EnvProfileNames.Default, false), .. others];
-    }
-
-    /// <summary>The subgroups of a project that are never read, each with why, in keypaste's words.</summary>
-    /// <param name="project">The project name.</param>
-    /// <returns>One sentence per ignored subgroup, ordinal by name.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="project"/> is null.</exception>
-    /// <exception cref="ObjectDisposedException">The vault has been disposed.</exception>
-    public IReadOnlyList<string> ProfileProblems(string project)
-    {
-        List<string> problems = [];
-
-        foreach (var name in Subgroups(project).Order(StringComparer.Ordinal))
-        {
-            var group = EnvConvention.GroupPath(project) + "/" + name;
-
-            if (string.Equals(name, EnvProfileNames.Default, StringComparison.Ordinal))
-            {
-                problems.Add($"'{group}' is ignored: the {EnvProfileNames.Default} profile is the project group itself; move its entries up");
-            }
-            else if (!EnvProfileNames.IsValid(name, out var invalid))
-            {
-                problems.Add($"'{group}' is ignored: {invalid}");
-            }
-        }
-
-        return problems;
-    }
-
-    /// <summary>Whether a project has a profile keypaste resolves, even an empty one.</summary>
-    /// <param name="project">The project name.</param>
-    /// <param name="profile">The profile name.</param>
-    /// <returns><see langword="true"/> if the profile's group exists and its name is one keypaste reads.</returns>
-    /// <exception cref="ArgumentNullException">Any argument is null.</exception>
-    /// <exception cref="ObjectDisposedException">The vault has been disposed.</exception>
-    public bool ProfileExists(string project, string profile) =>
-        GroupOf(project, profile) is { } group && _vault.ReadGroupPaths().Contains(group, StringComparer.Ordinal);
 
     /// <summary>The title of the <c>dev</c> environment's home entry.</summary>
     public const string HomeTitle = ".env";
@@ -188,8 +58,7 @@ public sealed class EnvStore(Vault vault)
     /// <param name="entry">The entry a new key goes on, which must be tagged into the environment, and the one written when several hold a key; null for the home entry.</param>
     /// <returns>What writing would do, or why it cannot, naming each key and entry concerned.</returns>
     /// <remarks>
-    /// An existing key is written where it lives: on the tagged entry holding it, or in place as a
-    /// legacy variable. A new key must be a field a project releases (<see cref="EnvConvention.IsEnvNamedField"/>,
+    /// An existing key is written where it lives, on the tagged entry holding it. A new key must be a field a project releases (<see cref="EnvConvention.IsEnvNamedField"/>,
     /// and no standard name), and goes on <paramref name="entry"/> or the home entry, which is created
     /// tagged when missing. A key several entries hold, unless <paramref name="entry"/> is one of them,
     /// and a key differing from another only in case, are refused.
@@ -247,7 +116,7 @@ public sealed class EnvStore(Vault vault)
             {
                 var member = holding[0];
 
-                if (!string.Equals(member.Field, EnvSource.LegacyField, StringComparison.Ordinal) && !FieldNameRules.IsWritable(key, out var unwritable))
+                if (!FieldNameRules.IsWritable(key, out var unwritable))
                 {
                     refusals.Add($"{unwritable} ({Where([member])})");
                     continue;
@@ -306,7 +175,7 @@ public sealed class EnvStore(Vault vault)
     /// <remarks>
     /// The fields an entry gains or changes are written together, so the entry's history gains one
     /// item for the whole plan, and a created home entry gains none. Every value is written protected
-    /// (D-0413). A legacy variable is updated in place, its title being the key.
+    /// (D-0413).
     /// </remarks>
     /// <exception cref="ObjectDisposedException">The vault has been disposed.</exception>
     public bool TryApply(EnvWritePlan plan, out string rejection)
@@ -321,20 +190,6 @@ public sealed class EnvStore(Vault vault)
 
         foreach (var writes in plan.ToWrite)
         {
-            if (writes.All(write => write.IsLegacy))
-            {
-                foreach (var write in writes)
-                {
-                    if (_vault.Find(write.Entry) is not { } current || !_vault.UpdateEntry(current with { Password = plan.Value(write.Key) }))
-                    {
-                        rejection = $"{ApprovalPrompt.Shown(write.Entry)} could not be found to update";
-                        return false;
-                    }
-                }
-
-                continue;
-            }
-
             List<FieldWrite> fields = [.. writes.Select(write => new FieldWrite(write.Key, plan.Value(write.Key), Protect: true))];
 
             if (plan.CreatesHome && writes.Key == plan.Home)
@@ -380,10 +235,7 @@ public sealed class EnvStore(Vault vault)
     /// <param name="entry">The entry to remove it from, when several hold it; null for the one that does.</param>
     /// <returns>What happened and where.</returns>
     /// <remarks>
-    /// A field leaves its entry as an edit, so the entry's history keeps the value; a legacy variable's
-    /// entry goes to the recycle bin as before. The name is not validated: a variable KeePassXC wrote
-    /// under a name keypaste would refuse still has to be removable. A legacy variable is addressed by
-    /// group and title, never by the two joined.
+    /// A field leaves its entry as an edit, so the entry's history keeps the value.
     /// </remarks>
     /// <exception cref="ObjectDisposedException">The vault has been disposed.</exception>
     public EnvRemoval Remove(string project, string environment, string key, EntryName? entry = null)
@@ -412,16 +264,6 @@ public sealed class EnvStore(Vault vault)
         }
 
         var source = holding[0].Source;
-
-        if (string.Equals(source.Field, EnvSource.LegacyField, StringComparison.Ordinal))
-        {
-            return _vault.RemoveEntry(source.Entry) switch
-            {
-                DeletionOutcome.Recycled => new EnvRemoval(EnvRemoveOutcome.Recycled, source, string.Empty),
-                DeletionOutcome.NothingMatched => new EnvRemoval(EnvRemoveOutcome.NothingMatched, null, string.Empty),
-                _ => new EnvRemoval(EnvRemoveOutcome.Deleted, source, string.Empty),
-            };
-        }
 
         if (!FieldNameRules.IsWritable(key, out var unwritable))
         {
@@ -490,23 +332,4 @@ public sealed class EnvStore(Vault vault)
     /// <summary>The entries holding some members, as a prompt shows them, in ordinal order.</summary>
     private static string Where(IEnumerable<EnvMember> members) =>
         string.Join(", ", members.Select(member => ApprovalPrompt.Shown(member.Entry.Name)).Order(StringComparer.Ordinal));
-
-    /// <summary>The group a profile lives in, or null for a name keypaste never reads.</summary>
-    private static string? GroupOf(string project, string profile)
-    {
-        ArgumentNullException.ThrowIfNull(project);
-
-        return EnvProfileNames.IsValid(profile, out _) ? EnvProfileNames.GroupPath(project, profile) : null;
-    }
-
-    /// <summary>The names of a project's direct subgroups, whatever they are called.</summary>
-    private IEnumerable<string> Subgroups(string project)
-    {
-        var prefix = EnvConvention.GroupPath(project) + "/";
-
-        return _vault.ReadGroupPaths()
-            .Where(path => path.StartsWith(prefix, StringComparison.Ordinal))
-            .Select(path => path[prefix.Length..])
-            .Where(name => name.Length > 0 && !name.Contains('/'));
-    }
 }

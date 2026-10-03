@@ -218,7 +218,7 @@ public static class EnvReferenceResolution
             return (null, own is [{ Reason: _missing }]
                 ? $"{env.Key} {_missing}"
                 : $"'{env.Project}/{env.Profile}' cannot be used: " +
-                  string.Join("; ", own.Select(problem => $"{EnvResolved.Display(problem.Key)} {problem.Reason}")));
+                  string.Join("; ", own.Select(problem => $"{problem.Key} {problem.Reason}")));
         }
 
         return set.Variables.FirstOrDefault(variable => string.Equals(variable.Key, env.Key, StringComparison.Ordinal)) is { } found

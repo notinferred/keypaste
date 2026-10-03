@@ -23,8 +23,8 @@
   -->
   <ItemGroup>
     <Compile Include="../Keypaste.Core.Tests/PublisherMetadata.cs" Link="PublisherMetadata.cs" />
-    <!-- The env/<project> layout of earlier releases, which no keypaste writer creates since D-0413. -->
-    <Compile Include="../Keypaste.Core.Tests/LegacyVariables.cs" Link="LegacyVariables.cs" />
+    <!-- A project's variables written as env set writes them, for fixtures. -->
+    <Compile Include="../Keypaste.Core.Tests/ProjectVariables.cs" Link="ProjectVariables.cs" />
   </ItemGroup>
 
   <!--

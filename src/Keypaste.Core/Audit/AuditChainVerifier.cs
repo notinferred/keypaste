@@ -44,20 +44,6 @@ public enum AuditChainFault
     /// <summary>The line's position number does not follow the one before it. A warning, not a break.</summary>
     SequenceGap = 5,
 
-    /// <summary>
-    /// A record predating the chain, sitting where the chain had already started.
-    /// </summary>
-    /// <remarks>
-    /// keypaste never writes a v1 record after a v2 one, so this is not a log that grew across an
-    /// upgrade — it is a record inserted where an unverifiable record could pass for a real one.
-    /// A break. The same shape <em>before</em> the chain starts is <see cref="Predates"/>, and is
-    /// exactly what an upgraded log looks like.
-    /// </remarks>
-    Backdated = 6,
-
-    /// <summary>A record written before the chain existed. Not checked, and not condemned.</summary>
-    Predates = 7,
-
     /// <summary>A record from a newer schema. Nothing here can check it, so nothing here vouches for it.</summary>
     Unverifiable = 8,
 }
@@ -72,15 +58,14 @@ public sealed record AuditChainFinding(int Line, AuditChainFault Fault, long Seq
     /// <summary>Whether this finding is a break in the chain rather than an observation about it.</summary>
     /// <remarks>
     /// The ones that are not breaks are the ones an ordinary machine produces on its own: a write
-    /// cut short, a position number that restarted, records from before the chain existed, and
-    /// records from a schema this version cannot check. None of them can hide an <em>edit</em>,
+    /// cut short, a position number that restarted, and records from a schema this version cannot
+    /// check. None of them can hide an <em>edit</em>,
     /// because every chained record is pinned by the chained record after it. What they can do is
     /// sit in a table looking like records, which is why every one of them is still a finding and
     /// every one of them is marked in the rendering.
     /// </remarks>
     public bool IsBreak => Fault is not (AuditChainFault.SequenceGap
         or AuditChainFault.Torn
-        or AuditChainFault.Predates
         or AuditChainFault.Unverifiable);
 }
 
@@ -95,9 +80,6 @@ public sealed record AuditChainReport
 
     /// <summary>How many chained records were verified.</summary>
     public int Records { get; init; }
-
-    /// <summary>How many records predate the chain and therefore cannot be checked.</summary>
-    public int Legacy { get; init; }
 
     /// <summary>How many records were written by a schema this version does not know.</summary>
     public int Newer { get; init; }
@@ -301,7 +283,6 @@ public static class AuditChainVerifier
         private readonly List<AuditChainFinding> _findings = [];
         private int _number;
         private int _records;
-        private int _legacy;
         private int _newer;
         private bool _chained;
         private bool _unfinished;
@@ -345,15 +326,6 @@ public static class AuditChainVerifier
 
             switch (inspected.Kind)
             {
-                // Records from before the chain existed. They sit at the front of a log that was
-                // upgraded, and they are marked rather than merely counted: an unverifiable record
-                // in the middle of a table looks exactly like a verified one, which is what makes
-                // one a place to put something that never happened.
-                case AuditLineKind.Legacy:
-                    _legacy++;
-                    Found(_chained ? AuditChainFault.Backdated : AuditChainFault.Predates, inspected);
-                    return;
-
                 case AuditLineKind.Newer:
                     _newer++;
                     Found(AuditChainFault.Unverifiable, inspected);
@@ -379,7 +351,7 @@ public static class AuditChainVerifier
 
             var verdict = broken
                 ? AuditChainVerdict.Broken
-                : _records == 0 && _legacy == 0 && _newer == 0
+                : _records == 0 && _newer == 0
                     ? AuditChainVerdict.Empty
                     : AuditChainVerdict.Intact;
 
@@ -388,7 +360,6 @@ public static class AuditChainVerifier
                 Verdict = verdict,
                 Path = path,
                 Records = _records,
-                Legacy = _legacy,
                 Newer = _newer,
                 LatestSequence = _sequence,
                 LatestHash = _hash,

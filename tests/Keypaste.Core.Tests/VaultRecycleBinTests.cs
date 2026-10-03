@@ -248,14 +248,14 @@ public sealed class VaultRecycleBinTests : IDisposable
     public void ARecycledVariable_IsAbsentFromItsProject()
     {
         using var vault = Seeded(out _);
-        var store = new EnvStore(vault);
+        ProjectVariables.Set(vault, "billing", "TOKEN", "v3");
 
         Assert.Single(EnvResolution.List(vault, "billing", "dev").Variables);
 
-        Assert.Equal(DeletionOutcome.Recycled, vault.RemoveEntry(_token));
+        Assert.Equal(DeletionOutcome.Recycled, vault.RemoveEntry(ProjectVariables.Home("billing")));
 
-        Assert.Empty(EnvResolution.List(vault, "billing", "dev").Variables);
-        Assert.DoesNotContain(store.Projects(), project => project.Contains("Recycle", StringComparison.Ordinal));
+        Assert.Equal(EnvOutcome.NoProject, EnvResolution.List(vault, "billing", "dev").Outcome);
+        Assert.Empty(ProjectCatalog.Read(vault).Projects);
     }
 
     /// <summary>
@@ -353,12 +353,11 @@ public sealed class VaultRecycleBinTests : IDisposable
 
         Assert.Equal("v3", vault.Find(_token)?.Password, StringComparer.Ordinal);
         Assert.Empty(vault.ReadRecycled());
-        Assert.Single(EnvResolution.List(vault, "billing", "dev").Variables);
     }
 
     /// <summary>
-    /// Two entries of one title in two groups is the ordinary case for an env variable, and the
-    /// case a trash addressed by name could not answer at all.
+    /// Two entries of one title in two groups is an ordinary case, and the case a trash addressed by
+    /// name could not answer at all.
     /// </summary>
     [Fact]
     public void TwoEntriesSharingATitle_GoBackToTheirOwnGroups()
@@ -623,7 +622,7 @@ public sealed class VaultRecycleBinTests : IDisposable
 
     // ---------------------------------------------------------------- fixtures
 
-    /// <summary>One variable with three earlier values behind it, which is what a recovery has to
+    /// <summary>One entry with three earlier values behind it, which is what a recovery has to
     /// bring back whole.</summary>
     private Vault Seeded(out string path, string? at = null)
     {

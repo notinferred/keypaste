@@ -19,8 +19,8 @@ namespace Keypaste.App.ViewModels;
 /// and go with it.
 /// </para>
 /// <para>
-/// <b>The sidebar reads names and counts, never values.</b> A count comes from the same entry list
-/// the Secrets screen reads, and is dropped the moment it is counted.
+/// <b>The sidebar reads names and counts, never values.</b> A count comes from the entry list the
+/// Secrets screen reads or from the project catalog, and is dropped the moment it is counted.
 /// </para>
 /// </remarks>
 /// <summary>How a status dot is drawn.</summary>
@@ -353,7 +353,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>The vault's env projects, by name, with their variable counts.</summary>
+    /// <summary>The vault's projects, by name, with how many entries each holds.</summary>
     internal IReadOnlyList<ProjectRow> Projects
     {
         get => _projects;
@@ -427,7 +427,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
     /// <summary>Items' "+" menu: New project, on Env profiles.</summary>
     internal RelayCommand NewProjectCommand { get; }
 
-    /// <summary>Items' "+" menu: Import .env, into the project in view or the first one.</summary>
+    /// <summary>Items' "+" menu: Import .env, into the first project.</summary>
     internal RelayCommand ImportEnvCommand { get; }
 
     /// <summary>An item's ⋯ menu: Share…, as a dialog over the screen.</summary>
@@ -879,21 +879,16 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>Import .env, from Items' "+" menu: into the project in view, else the first; with none, create one first.</summary>
+    /// <summary>Import .env, from Items' "+" menu: into the first project; with none, create one first.</summary>
     private void ImportEnv()
     {
-        var inView = (Content as EntriesViewModel)?.SelectedGroup is { IsEverything: false } group
-            ? EnvPlace.OfGroup(group.Path)?.Project
-            : null;
-        var project = inView ?? (_projects.Count > 0 ? _projects[0].Name : null);
-
-        if (project is null)
+        if (_projects.Count == 0)
         {
             NewProject();
             return;
         }
 
-        OpenProject(project);
+        OpenProject(_projects[0].Name);
 
         if ((Content as EnvSetsViewModel)?.OpenProject is { } open)
         {
@@ -1006,7 +1001,7 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         Raise(nameof(SelectedSidebarRow));
     }
 
-    /// <summary>Counts entries and env projects for the sidebar, reading names only.</summary>
+    /// <summary>Counts entries and projects for the sidebar.</summary>
     private void Count()
     {
         if (_disposed || _session.Unlocked is not { } vault)
@@ -1017,26 +1012,15 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
             return;
         }
 
-        IReadOnlyList<string> names;
+        IReadOnlyList<ProjectListing> projects;
         IReadOnlyList<GroupNode> groups;
-        Dictionary<string, int> perGroup = new(StringComparer.Ordinal);
         int total;
 
         try
         {
             // keypaste's own records, share links among them, are not secrets the Secrets list shows.
-            var entries = vault.ReadEntries().Where(entry => !ReservedGroups.IsReserved(entry.GroupPath)).ToList();
-            total = entries.Count;
-
-            foreach (var entry in entries)
-            {
-                if (entry.Title.Length > 0)
-                {
-                    perGroup[entry.GroupPath] = perGroup.GetValueOrDefault(entry.GroupPath) + 1;
-                }
-            }
-
-            names = new EnvStore(vault).Projects();
+            total = vault.ReadEntries().Count(entry => !ReservedGroups.IsReserved(entry.GroupPath));
+            projects = ProjectCatalog.Read(vault).Projects;
             groups = GroupNode.Flatten(vault.ReadGroupPaths());
         }
         catch (ObjectDisposedException)
@@ -1045,7 +1029,12 @@ internal sealed class ShellViewModel : ObservableObject, IDisposable
         }
 
         _groups = groups;
-        Projects = [.. names.Select(name => new ProjectRow(name, perGroup.GetValueOrDefault(EnvConvention.GroupPath(name))))];
+        Projects =
+        [
+            .. projects.Select(project => new ProjectRow(
+                project.Name,
+                project.Environments.SelectMany(environment => environment.Members).Distinct().Count())),
+        ];
         RebuildSidebar();
         SetCount(DestinationKind.Entries, total);
     }

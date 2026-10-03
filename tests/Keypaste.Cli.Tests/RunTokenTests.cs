@@ -7,6 +7,7 @@ using Keypaste.Core.Ipc;
 using Keypaste.Core.Launch;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Policy;
+using Keypaste.Core.Tests;
 using Keypaste.Core.Tokens;
 using Xunit;
 
@@ -28,11 +29,16 @@ public sealed class RunTokenTests : IDisposable
     {
         _harness.Environment[KeypasteHome.EnvironmentVariable] = _harness.Directory;
         _harness.Environment[ApproverEndpoint.EnvironmentVariable] = _pipe;
-        _harness.SeedVault(
-            _master,
-            ("env/acme-api/staging/DATABASE_URL", TokenVerbTests.Value),
-            ("env/acme-api/prod/DATABASE_URL", TokenVerbTests.ProdValue),
-            ("env/web/staging/KEY", "web-key"));
+        _harness.SeedVault(_master);
+
+        using (var vault = Vault.Open(_harness.VaultPath, _master))
+        {
+            ProjectVariables.Set(vault, "acme-api", "staging", "DATABASE_URL", TokenVerbTests.Value);
+            ProjectVariables.Set(vault, "acme-api", "prod", "DATABASE_URL", TokenVerbTests.ProdValue);
+            ProjectVariables.Set(vault, "web", "staging", "KEY", "web-key");
+            vault.Save();
+        }
+
         _harness.Prompt.PromptsSeen.Clear();
     }
 

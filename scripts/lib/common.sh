@@ -31,14 +31,16 @@ keypaste_mcp() { resolve KEYPASTE_MCP_BIN artifacts/bin/Keypaste.Mcp/release/key
 app_driver() { resolve KEYPASTE_APP_DRIVER artifacts/bin/Keypaste.AppDriver/release/Keypaste.AppDriver; }
 vault_restorer() { resolve KEYPASTE_RESTORER artifacts/bin/Keypaste.VaultRestorer/release/Keypaste.VaultRestorer; }
 
-# Writes a variable in the env/<project> layout of earlier releases, one entry per key, which
-# `env set` no longer creates (D-0413), for a gate that needs one as its fixture. `add` asks no
-# username, URL or notes without a terminal, so the master password and the value are its input.
-#   legacy_var <keypaste> <vault> <master> <project>[/<profile>] <KEY> <value> [keypaste options...]
-legacy_var() {
-  local cli=$1 vault=$2 master=$3 project=$4 key=$5 value=$6
+# A project variable as `env set` writes it: a protected field of the environment's home entry,
+# env/<project>/.env or .env.<environment>, created tagged.
+#   project_var <keypaste> <vault> <master> <project>[/<environment>] <KEY> <value> [keypaste options...]
+project_var() {
+  local cli=$1 vault=$2 master=$3 project=${4%%/*} key=$5 value=$6 environment=dev
+  case "$4" in */*) environment=${4#*/} ;; esac
   shift 6
-  printf '%s\n%s\n' "$master" "$value" | "$cli" add "env/$project/$key" --vault "$vault" "$@" >/dev/null
+  local said
+  said=$(printf '%s\n%s\n' "$master" "$value" | "$cli" env set "$project" "$key" -p "$environment" --vault "$vault" "$@" 2>&1 >/dev/null) \
+    || { printf '%s\n' "$said" >&2; return 1; }
 }
 
 # A path as a Windows program must be given it from Git Bash; unchanged elsewhere.

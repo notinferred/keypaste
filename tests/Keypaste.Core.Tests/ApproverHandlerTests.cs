@@ -629,16 +629,15 @@ public sealed class ApproverHandlerTests
     }
 
     [Fact]
-    public async Task WithoutAPredicate_AProdEntryIsStillLiveOnly()
+    public async Task WithoutAPredicate_AnEntryTheSourceProtectsIsStillLiveOnly()
     {
-        using var fixture = new ApproverFixture(ApproverHandlerPolicyTests.Policy(entries: "[\"env/**\"]"));
+        using var fixture = new ApproverFixture(ApproverHandlerPolicyTests.Policy());
         fixture.Channel.Answer = ApprovalAnswer.Approved;
-        var prod = new ProdSource();
-        var handler = new ApproverHandler(prod, prod, fixture.Gate, fixture.Grants, fixture.Policy);
-        var request = Request(ProdSource.Address) with { ClientLabel = "billing-bot" };
+        fixture.Source.Protected.Add(new EntryName("env/dev", "STRIPE_KEY"));
+        var request = Request() with { ClientLabel = "billing-bot" };
 
-        var first = await handler.RequestAsync(request, "conn-1", Token);
-        var second = await handler.RequestAsync(request, "conn-1", Token);
+        var first = await fixture.Handler.RequestAsync(request, "conn-1", Token);
+        var second = await fixture.Handler.RequestAsync(request, "conn-1", Token);
 
         Assert.Equal(AuditMethod.Prompt, first.Method);
         Assert.Equal(AuditMethod.Prompt, second.Method);
@@ -665,36 +664,6 @@ public sealed class ApproverHandlerTests
 
     private static ApproverHandler LiveOnly(ApproverFixture fixture) =>
         new(fixture.Source, fixture.Source, fixture.Gate, fixture.Grants, fixture.Policy, fixture.Narration.Add, _ => true);
-
-    /// <summary>A vault holding one entry in a protected profile.</summary>
-    private sealed class ProdSource : ICredentialSource, IEntryNameLister
-    {
-        internal const string Address = "env/acme/prod/API_KEY";
-
-        private static readonly EntryName _entry = new("env/acme/prod", "API_KEY");
-
-        public bool TryResolve(string entryArgument, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out EntryName? name, out CredentialFailure failure)
-        {
-            var found = entryArgument == Address || entryArgument == EntryHandle.For(_entry);
-            name = found ? _entry : null;
-            failure = found ? CredentialFailure.None : CredentialFailure.NotFound;
-            return found;
-        }
-
-        public bool TryRead(EntryName name, string field, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out ReleasedField? value, out CredentialFailure failure)
-        {
-            value = new ReleasedField(field, Sentinel);
-            failure = CredentialFailure.None;
-            return true;
-        }
-
-        public bool TryList(EntryExposure exposure, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out IReadOnlyList<EntryName>? names, out CredentialFailure failure)
-        {
-            names = [_entry];
-            failure = CredentialFailure.None;
-            return true;
-        }
-    }
 
     [Fact]
     public void TheHandlerRejectsNulls()

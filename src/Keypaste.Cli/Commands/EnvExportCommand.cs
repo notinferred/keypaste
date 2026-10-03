@@ -280,7 +280,7 @@ internal static class EnvExportCommand
         CliContext context)
     {
         var listing = EnvResolution.List(vault, project, profile);
-        var groupPath = EnvProfileNames.GroupPath(project, profile);
+        var setName = EnvProfileNames.SetName(project, profile);
 
         if ((Missing(listing, project, profile, context) ?? Repeated(listing, context) ?? NamedLikeStandard(listing, context)) is { } refused)
         {
@@ -291,7 +291,7 @@ internal static class EnvExportCommand
 
         if (!DotEnvWriter.TryFormat(variables, out var file, out var formatError))
         {
-            context.Stderr.WriteLine($"keypaste env export: '{groupPath}' {formatError}");
+            context.Stderr.WriteLine($"keypaste env export: '{setName}' {formatError}");
             context.Stderr.WriteLine("Nothing was written.");
             return CliApp.ExitInternalError;
         }
@@ -302,17 +302,17 @@ internal static class EnvExportCommand
         }
 
         return targetPath is null
-            ? ToStdout(file, variables.Count, groupPath, context)
-            : ToFile(file, variables.Count, groupPath, vaultPath, targetPath, force, assumeYes, context);
+            ? ToStdout(file, variables.Count, setName, context)
+            : ToFile(file, variables.Count, setName, vaultPath, targetPath, force, assumeYes, context);
     }
 
-    private static int ToStdout(DotEnvText file, int count, string groupPath, CliContext context)
+    private static int ToStdout(DotEnvText file, int count, string setName, CliContext context)
     {
         if (count > 0)
         {
             context.ConsoleStyle.Alarm(context.Stderr, "! plaintext secrets are going to stdout");
             context.Stderr.WriteLine(
-                $"  {groupPath} has {Count(count, "value")}, and they are about to leave the vault in the");
+                $"  {setName} has {Count(count, "value")}, and they are about to leave the vault in the");
             context.Stderr.WriteLine("  clear. Whatever you pipe them into now owns a copy.");
         }
 
@@ -323,7 +323,7 @@ internal static class EnvExportCommand
     private static int ToFile(
         DotEnvText file,
         int count,
-        string groupPath,
+        string setName,
         string vaultPath,
         string targetPath,
         bool force,
@@ -335,7 +335,7 @@ internal static class EnvExportCommand
         {
             context.ConsoleStyle.Alarm(context.Stderr, "! plaintext secrets are about to be written to disk");
             context.Stderr.WriteLine(
-                $"  {targetPath} will hold {Count(count, "value")} from {groupPath} in the clear. Anything");
+                $"  {targetPath} will hold {Count(count, "value")} from {setName} in the clear. Anything");
             context.Stderr.WriteLine(
                 "  that can read the file can read them, including your editor's swap file and");
             context.Stderr.WriteLine(
@@ -371,7 +371,7 @@ internal static class EnvExportCommand
             return CliApp.ExitInternalError;
         }
 
-        context.Stderr.WriteLine($"Wrote {Count(count, "value")} from {groupPath} to {targetPath}.");
+        context.Stderr.WriteLine($"Wrote {Count(count, "value")} from {setName} to {targetPath}.");
 
         if (count > 0)
         {

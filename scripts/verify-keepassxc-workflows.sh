@@ -216,8 +216,9 @@ $kept_notes</Value></String>
           <UUID>$(uuid kp94)</UUID><Name>kp94</Name>
           <Entry>
             <UUID>$(uuid token)</UUID>
-            <String><Key>Title</Key><Value>TOKEN</Value></String>
-            <String><Key>Password</Key><Value ProtectInMemory="True">t-1</Value></String>
+            <Tags>env:kp94</Tags>
+            <String><Key>Title</Key><Value>deploy</Value></String>
+            <String><Key>TOKEN</Key><Value ProtectInMemory="True">t-1</Value></String>
           </Entry>
         </Group>
       </Group>
@@ -299,7 +300,7 @@ exercise() {
 
   step "[$kind] edit: the CLI updates a variable KeePassXC made, and keeps KeePassXC's bytes as the first backup"
   did "keypaste env set" kp_cli "$db" env set kp94 TOKEN=t-2
-  expect "$db" env/kp94/TOKEN Password t-2
+  expect "$db" env/kp94/deploy TOKEN t-2
   first=$(ls -1 "$db.backups")
   [ "$(copies "$db")" = 1 ] || die "the first save kept $(copies "$db") backups, not one"
   cmp -s "$db.backups/$first" "$original" || die "the first backup is not the vault KeePassXC wrote"

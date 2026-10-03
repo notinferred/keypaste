@@ -495,7 +495,8 @@ public sealed class SessionAuthority : IApproverHandler
         async ValueTask<bool> Confirm(EnvPreview preview, CancellationToken withdrawn)
         {
             var entries = EntriesOf(preview);
-            shown = [.. entries.Select(entry => ApprovalPrompt.Shown(entry.Name))];
+            var perKey = entries.Select(entry => ApprovalPrompt.Shown(entry.Name)).ToList();
+            shown = [.. perKey.Distinct(StringComparer.Ordinal)];
 
             // Exposure first, so a set outside it is refused as out of scope whatever its size (T-4).
             if (entries.Any(entry => !exposure.Allows(entry.Name)))
@@ -534,7 +535,7 @@ public sealed class SessionAuthority : IApproverHandler
                 request,
                 preview.Project,
                 preview.Profile,
-                [.. preview.Keys.Select((name, i) => new RunPromptVariable(name, shown[i], entries[i].Field))],
+                [.. preview.Keys.Select((name, i) => new RunPromptVariable(name, perKey[i], entries[i].Field))],
                 grantSeconds,
                 onceOnly);
 
@@ -640,7 +641,7 @@ public sealed class SessionAuthority : IApproverHandler
     [
         .. preview.Keys.Select(key => preview.Sources.FirstOrDefault(source => string.Equals(source.Key, key, StringComparison.Ordinal)) is { } source
             ? (source.Entry, source.Field)
-            : (new EntryName(string.Empty, key), EnvSource.LegacyField)),
+            : (new EntryName(string.Empty, key), key)),
     ];
 
     private static int AuditedLength(IReadOnlyList<string> entries)
@@ -804,7 +805,7 @@ public sealed class SessionAuthority : IApproverHandler
 
         var needsProd = false;
 
-        // A set holding a member of a protected environment, by path or tag, needs the token to allow it and then a live answer.
+        // A set holding a member of a protected environment, by tag, needs the token to allow it and then a live answer.
         async ValueTask<bool> AskLive(EnvPreview preview, CancellationToken withdrawn)
         {
             if (!preview.RequiresLiveApproval)

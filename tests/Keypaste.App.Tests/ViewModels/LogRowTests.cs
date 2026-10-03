@@ -38,7 +38,7 @@ public sealed class LogRowTests
         Assert.Equal(LogTone.Ok, row.Tone);
         Assert.Equal("Requested", row.Action);
         Assert.Equal("DATABASE_URL", row.Secrets);
-        Assert.Equal("acme-api · dev", row.Where);
+        Assert.Equal("env/acme-api/dev", row.Where);
         Assert.Equal("claude-code", row.Actor);
         Assert.False(row.ByYou);
     }

@@ -299,8 +299,7 @@ public sealed class Vault : IDisposable
     /// <remarks>
     /// Every check runs before anything is written: the title and field names by
     /// <see cref="VaultNameRules"/> and <see cref="FieldNameRules"/>, the tags by <see cref="TagRules"/>,
-    /// and the group is neither keypaste's own nor the <c>env</c> layout, where no new variable is
-    /// written (D-0367). The entry's own name may not be taken in its group.
+    /// and the group is not keypaste's own. The entry's own name may not be taken in its group.
     /// </remarks>
     /// <exception cref="VaultException">Any of those is refused, or the group does not exist or names more than one. Nothing is changed.</exception>
     public void CreateEntry(VaultEntry entry, IReadOnlyList<FieldWrite> fields, IReadOnlyList<string> tags)
@@ -318,11 +317,6 @@ public sealed class Vault : IDisposable
         if (ReservedGroups.IsReserved(entry.GroupPath))
         {
             throw new VaultException("keypaste keeps that group for itself. Choose another.");
-        }
-
-        if (IsBeneath(entry.GroupPath, EnvConvention.RootGroup))
-        {
-            throw new VaultException("The env group holds projects from before tags. Choose another group, and tag the item into a project instead.");
         }
 
         CheckNew(fields, tags);

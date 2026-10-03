@@ -174,12 +174,14 @@ public sealed class AgentPolicyTests : IDisposable
         Assert.Equal("[d] deny  [o] once  45s › ", Assert.Single(prompt.PromptsSeen));
     }
 
-    /// <summary>One entry in a protected profile.</summary>
+    /// <summary>One entry tagged into a protected profile.</summary>
     private sealed class ProdEntry : ICredentialSource, IEntryNameLister
     {
         internal const string Path = "env/acme/prod/API_KEY";
 
         private static readonly EntryName _name = new("env/acme/prod", "API_KEY");
+
+        private static readonly string[] _tags = ["env:acme:prod"];
 
         public bool TryResolve(string entryArgument, [NotNullWhen(true)] out EntryName? name, out CredentialFailure failure)
         {
@@ -201,6 +203,8 @@ public sealed class AgentPolicyTests : IDisposable
             failure = CredentialFailure.None;
             return true;
         }
+
+        public bool RequiresLiveApproval(EntryName name) => EnvProfileNames.RequiresLiveApproval(_tags);
     }
 
     // internal, not private: .editorconfig applies the _camelCase field rule to private consts too.

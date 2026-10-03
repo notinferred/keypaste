@@ -48,7 +48,7 @@ public sealed class ExistingSecretTests : IDisposable
 
         using var vault = Vault.Create(_vaultPath, _master);
         vault.AddEntry(new VaultEntry { Title = "github", Username = "me", Password = "the-old-one" });
-        vault.AddEntry(new VaultEntry { Title = "STRIPE_KEY", Password = "the-old-value", GroupPath = "env/billing" });
+        ProjectVariables.Set(vault, "billing", "STRIPE_KEY", "the-old-value");
         vault.Save();
     }
 
@@ -338,7 +338,7 @@ public sealed class ExistingSecretTests : IDisposable
             Assert.False(project.IsReplacing);
         }
 
-        Assert.Equal(_typed, Reread("env/billing/STRIPE_KEY"));
+        Assert.Equal(_typed, RereadHomeField("STRIPE_KEY"));
     }
 
     /// <summary>
@@ -409,10 +409,9 @@ public sealed class ExistingSecretTests : IDisposable
         Enter(project.ReplacementValue, _typed);
         project.ConfirmReplaceCommand.Execute(null);
 
-        Assert.Equal("STRIPE_KEY is no longer on env/billing/STRIPE_KEY, so nothing was written.", context.EnvSets.Error);
+        Assert.Equal("STRIPE_KEY is no longer on env/billing/.env, so nothing was written.", context.EnvSets.Error);
         Assert.False(project.IsReplacing);
         Assert.DoesNotContain(project.Variables, variable => variable.Key == "STRIPE_KEY");
-        Assert.Null(Reread("env/billing/STRIPE_KEY"));
         Assert.Null(RereadHomeField("STRIPE_KEY"));
     }
 

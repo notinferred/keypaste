@@ -33,10 +33,11 @@ internal static class ToolText
         literal and escaped forms replaced by [keypaste:NAME]. The command itself can read the values, so
         ask only for a command the person would run themselves.
         Name the variables one of two ways. project (and optionally profile, default dev, and keys) injects
-        that env set: env/<project>/<KEY> is profile dev, env/<project>/<profile>/<KEY> another profile. Or
-        env maps each variable name to a kp:// reference: kp://<project>/<profile>/<KEY>, or
-        kp:///<group>/<title>#field. No shell is used: command is the program followed by its arguments,
-        and the person sees it exactly. A bare program name is looked up on PATH only.
+        that env set: the custom fields named like environment variables of the entries tagged
+        env:<project> for profile dev, or env:<project>:<profile> for another. Or env maps each variable
+        name to a kp:// reference: kp://<project>/<profile>/<KEY>, or kp:///<group>/<title>#field. No
+        shell is used: command is the program followed by its arguments, and the person sees it exactly.
+        A bare program name is looked up on PATH only.
         """;
 
     /// <summary>Why a run was refused because another is still going on this connection.</summary>

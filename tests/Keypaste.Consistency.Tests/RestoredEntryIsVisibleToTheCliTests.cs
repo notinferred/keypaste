@@ -70,7 +70,7 @@ public sealed class RestoredEntryIsVisibleToTheCliTests
         using var fixture = new VaultFixture(("seed", "seed-password"));
 
         Assert.Equal(CliApp.ExitSuccess, fixture.RunAnswering(["v1-first"], "add", "env/billing/ROTATED"));
-        Assert.Equal(CliApp.ExitSuccess, fixture.RunAnswering(["v2-current"], "env", "set", "billing", "ROTATED"));
+        Assert.Equal(CliApp.ExitSuccess, fixture.RunAnswering(["v2-current"], "set", "env/billing/ROTATED"));
 
         using var screen = Entries(fixture);
 
@@ -99,35 +99,23 @@ public sealed class RestoredEntryIsVisibleToTheCliTests
     }
 
     /// <summary>
-    /// A variable removed on the Env Sets card and restored from the trash is injected again by
-    /// the shipped runner, at the project it came from.
+    /// An entry tagged into a project, deleted in the app and restored from the trash, is injected
+    /// again by the shipped runner, in the project its tag names.
     /// </summary>
     [Fact]
-    public void A_variable_restored_from_the_trash_is_injected_by_the_cli_runner()
+    public void A_tagged_entry_restored_from_the_trash_is_injected_by_the_cli_runner()
     {
-        using var fixture = new VaultFixture(("seed", "seed-password"));
+        using var fixture = new VaultFixture(("seed", "seed-password"), ("services/Stripe", "stripe-login"));
 
-        // A variable of the env/ layout, whose removal is its entry going to the trash; a field's
-        // removal stays in its entry's history instead (D-0413).
-        Assert.Equal(
-            CliApp.ExitSuccess,
-            fixture.RunAnswering(["sk-live"], "add", "env/billing/STRIPE_KEY"));
+        Assert.Equal(CliApp.ExitSuccess, fixture.RunAnswering(["sk-live"], "set", "services/Stripe", "--field", "STRIPE_KEY"));
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("env", "tag", "billing", "services/Stripe", "--yes"));
 
-        Assert.Equal(UnlockOutcome.Opened, fixture.Unlock());
-
-        using (var env = Env(fixture))
+        using (var screen = Entries(fixture))
         {
-            env.Model.OpenCommand.Execute("billing");
-
-            var project = env.Model.OpenProject!;
-            project.Variables.Single(row => row.Key == "STRIPE_KEY").RemoveCommand.Execute(null);
-            project.ConfirmRemoveCommand.Execute(null);
-
-            Assert.Contains("trash", env.Model.Notice!, StringComparison.Ordinal);
+            Delete(screen, "Stripe");
         }
 
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("run", "billing", "--", "deploy"));
-        Assert.DoesNotContain("STRIPE_KEY", fixture.Cli.ProcessLauncher.Environment.Keys, StringComparer.Ordinal);
+        Assert.Equal(CliApp.ExitNotFound, fixture.Run("run", "billing", "--", "deploy"));
 
         using var trash = Trash(fixture);
         trash.Model.Selected = Assert.Single(trash.Model.Rows);
@@ -191,8 +179,6 @@ public sealed class RestoredEntryIsVisibleToTheCliTests
         return Screen.For(fixture);
     }
 
-    private static EnvScreen Env(VaultFixture fixture) => EnvScreen.For(fixture);
-
     private static TrashScreen Trash(VaultFixture fixture) => new(fixture);
 
     /// <summary>The Entries screen, over a clipboard nothing here reads.</summary>
@@ -215,41 +201,6 @@ public sealed class RestoredEntryIsVisibleToTheCliTests
             try
             {
                 return new Screen(countdown, new EntriesViewModel(fixture.Session, countdown));
-            }
-            catch
-            {
-                countdown.Dispose();
-                throw;
-            }
-        }
-
-        public void Dispose()
-        {
-            Model.Dispose();
-            _countdown.Dispose();
-        }
-    }
-
-    /// <summary>The Env Sets screen, over a clipboard nothing here reads.</summary>
-    private sealed class EnvScreen : IDisposable
-    {
-        private readonly ClipboardCountdown _countdown;
-
-        private EnvScreen(ClipboardCountdown countdown, EnvSetsViewModel model)
-        {
-            _countdown = countdown;
-            Model = model;
-        }
-
-        internal EnvSetsViewModel Model { get; }
-
-        internal static EnvScreen For(VaultFixture fixture)
-        {
-            var countdown = new ClipboardCountdown(new FakeClipboard(), TimeProvider.System);
-
-            try
-            {
-                return new EnvScreen(countdown, new EnvSetsViewModel(fixture.Session, countdown));
             }
             catch
             {

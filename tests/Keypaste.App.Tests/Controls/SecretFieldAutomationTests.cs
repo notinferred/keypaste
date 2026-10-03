@@ -311,7 +311,7 @@ public sealed class SecretFieldAutomationTests
             {
                 vault.AddEntry(new VaultEntry { Title = "github", Username = "me", Password = "gh" });
                 vault.SetFields(new EntryName(string.Empty, "github"), [new FieldWrite("API_TOKEN", "tok")]);
-                vault.AddEntry(new VaultEntry { Title = "STRIPE_KEY", Password = "sk", GroupPath = "env/billing" });
+                ProjectVariables.Set(vault, "billing", "STRIPE_KEY", "sk");
                 vault.Save();
             }
 

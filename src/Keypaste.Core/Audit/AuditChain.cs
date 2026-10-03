@@ -11,9 +11,6 @@ internal enum AuditLineKind
     /// <summary>Not a keypaste record at all. Something else wrote this.</summary>
     Foreign = 0,
 
-    /// <summary>A schema v1 record. Written before the chain existed, and never checked against it.</summary>
-    Legacy = 1,
-
     /// <summary>A schema v2 record carrying both chain fields in the shape this version writes them.</summary>
     Chained = 2,
 
@@ -153,9 +150,11 @@ internal static class AuditChain
             return Plain(AuditLineKind.Torn);
         }
 
+        // Schema 1 predates the chain and no release of keypaste wrote it (D-0416), so a line that
+        // claims it was written by something else.
         if (version == 1)
         {
-            return Plain(AuditLineKind.Legacy);
+            return Plain(AuditLineKind.Foreign);
         }
 
         if (version < 1)

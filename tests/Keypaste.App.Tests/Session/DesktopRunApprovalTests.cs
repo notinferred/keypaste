@@ -89,7 +89,7 @@ public sealed class DesktopRunApprovalTests
             Assert.Equal("run", Assert.Single(app.Authority.Grants()).Kind);
 
             var vault = app.Authority.Session.Unlocked!;
-            vault.UpdateEntry(vault.Find(new EntryName("env/ci", "DEPLOY_KEY"))! with { Password = "rotated" });
+            Assert.True(vault.SetFields(new EntryName("env/ci", "DEPLOY_KEY"), [new FieldWrite("DEPLOY_KEY", "rotated")]));
 
             Assert.Empty(app.Authority.Activity.EnvGrants);
         });
@@ -141,7 +141,7 @@ public sealed class DesktopRunApprovalTests
         Directory = directory,
         Project = "ci",
         Profile = "dev",
-        Variables = [new("DEPLOY_KEY", EntryPath, "password")],
+        Variables = [new("DEPLOY_KEY", EntryPath, "DEPLOY_KEY")],
         GrantSeconds = 900,
     };
 

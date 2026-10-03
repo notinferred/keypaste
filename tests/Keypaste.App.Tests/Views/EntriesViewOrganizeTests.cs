@@ -131,7 +131,7 @@ public sealed class EntriesViewOrganizeTests : IDisposable
 
         Assert.True(Named<TextBox>(window, "RenameGroupName")!.IsEffectivelyVisible);
 
-        // An ordinary group is not a project, so the line about `keypaste run` stays off.
+        // An ordinary group holds no project home, so the line about new keys stays off.
         Assert.False(Named<TextBlock>(window, "ProjectRenameNote")!.IsEffectivelyVisible);
     });
 

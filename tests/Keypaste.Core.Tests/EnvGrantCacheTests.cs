@@ -15,7 +15,7 @@ public sealed class EnvGrantCacheTests
     private static readonly string[] _names = ["DATABASE_URL", "STRIPE_KEY"];
 
     private static void Store(EnvGrantCache cache, string key = _key, TimeSpan? ttl = null) =>
-        cache.Store(key, "billing", "dev", "npm run deploy", _names, ttl ?? _ttl);
+        cache.Store(key, "billing", "dev", "npm run deploy", _names, ttl ?? _ttl, entries: [ProjectVariables.Home("billing")]);
 
     [Fact]
     public void AGrant_AnswersOnlyTheSameKeyAndNames()
@@ -136,7 +136,7 @@ public sealed class EnvGrantCacheTests
 
         Assert.Equal(["short", "long"], listed.Select(grant => grant.Key));
         Assert.Equal(
-            new EnvGrantInForce("short", "billing", "dev", "npm run deploy", TimeSpan.FromMinutes(5)) { Entries = ["env/billing/DATABASE_URL", "env/billing/STRIPE_KEY"] },
+            new EnvGrantInForce("short", "billing", "dev", "npm run deploy", TimeSpan.FromMinutes(5)) { Entries = ["env/billing/.env"] },
             listed[0]);
     }
 
@@ -197,7 +197,7 @@ public sealed class EnvGrantCacheTests
 
         Assert.Equal(("Claude Code", "claude-code"), (run.Client, run.Label));
         Assert.Equal(["personal/github"], run.Entries);
-        Assert.Equal(["env/billing/DATABASE_URL", "env/billing/STRIPE_KEY"], env.Entries);
+        Assert.Equal(["env/billing/.env"], env.Entries);
         Assert.Null(env.Client);
     }
 
@@ -208,7 +208,7 @@ public sealed class EnvGrantCacheTests
         Store(cache, "env-set");
         cache.Store("run", "p", "dev", "npm test", ["GH"], _ttl, "Claude Code", "claude-code", [new EntryName("personal", "github")]);
 
-        cache.RevokeEntries(VaultEdit.Of(new EntryName("env/billing", "STRIPE_KEY")));
+        cache.RevokeEntries(VaultEdit.Of(ProjectVariables.Home("billing")));
         Assert.Equal(["run"], cache.InForce().Select(grant => grant.Key));
 
         cache.RevokeEntries(VaultEdit.Everything);

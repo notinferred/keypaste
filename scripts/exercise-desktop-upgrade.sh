@@ -246,9 +246,9 @@ fixture() {
   printf '%s\n' "$MASTER" | "$KP" add "$ENTRY" --username seeded --url https://example.test \
     --notes 'made by the CLI before the upgrade' --generate --vault "$VAULT_NATIVE" >/dev/null \
     || { echo 'keypaste add failed'; return 1; }
-  # Three values, so the entry carries two history revisions the upgrade must not lose (D-0014). The
-  # first is written as an entry of the env/ layout, which only `add` creates since D-0413, and
-  # `env set` updates it in place in every version.
+  # Three values, so the entry carries two history revisions the upgrade must not lose. The published
+  # CLI's `env set` updates the entry `add` made in place up to 0.3.0; from 0.5.0 it writes a field of
+  # env/<project>/.env instead (D-0416).
   printf '%s\n%s\n' "$MASTER" "${VALUES[0]}" | "$KP" add "env/$PROJECT/$VARIABLE" --username upgrade --url https://example.test --notes 'a variable made before the upgrade' \
     --vault "$VAULT_NATIVE" >/dev/null \
     || { echo "keypaste add ${VALUES[0]} failed"; return 1; }

@@ -25,9 +25,9 @@ namespace Keypaste.Consistency.Tests;
 /// <list type="number">
 /// <item>Dropping a <c>vault.Save()</c> from an edit command, so the GUI mutates its in-memory tree
 /// and defers the write. The likeliest real bug, and why the CLI is asked before the session ends.</item>
-/// <item>Writing environment variables under <c>envs/&lt;project&gt;/</c> rather than
-/// <c>env/&lt;project&gt;/</c>. This round-trips through <c>Vault.Open</c> perfectly and only
-/// <c>keypaste env ls</c> comes back empty — the mutation that justifies this project existing.</item>
+/// <item>Writing a variable on an entry not tagged <c>env:&lt;project&gt;</c>. This round-trips
+/// through <c>Vault.Open</c> perfectly and only <c>keypaste env ls</c> comes back empty — the
+/// mutation that justifies this project existing.</item>
 /// <item>Letting the GUI create a variable name <c>EnvConvention</c> rejects, so the app makes
 /// variables <c>keypaste run</c> cannot inject.</item>
 /// <item>Generating a password the GUI displays but does not store, or storing a truncated one.</item>
@@ -164,9 +164,9 @@ public sealed class GuiEditIsVisibleToTheCliTests
     /// A variable set in the GUI is listed by <c>keypaste env ls</c> under its project.
     /// </summary>
     /// <remarks>
-    /// The test the whole project exists for. A GUI writing to <c>envs/&lt;project&gt;/</c> instead
-    /// of <c>env/&lt;project&gt;/</c> would satisfy every assertion made through <c>Vault.Open</c>
-    /// and fail only here.
+    /// The test the whole project exists for. A GUI writing the variable on an entry it does not tag
+    /// into the project would satisfy every assertion made through <c>Vault.Open</c> and fail only
+    /// here.
     /// </remarks>
     [Fact]
     public void A_variable_set_in_the_gui_is_listed_by_keypaste_env_ls()
@@ -249,37 +249,6 @@ public sealed class GuiEditIsVisibleToTheCliTests
 
         fixture.Run("env", "ls", "billing");
         Assert.DoesNotContain("STRIPE_KEY", fixture.Cli.Out, StringComparison.Ordinal);
-    }
-
-    /// <summary>
-    /// A title containing a separator and a group of that name produce one path between them, so
-    /// the GUI has to remove the row a person picked rather than the entry that path resolves to.
-    /// Only KeePassXC authors the first of those, which is why the fixture is written through core.
-    /// </summary>
-    [Fact]
-    public void Removing_a_variable_in_the_gui_leaves_a_nested_entry_sharing_its_path()
-    {
-        using var fixture = new VaultFixture(("seed", "seed-password"));
-
-        using (var vault = Vault.Open(fixture.VaultPath, VaultFixture.Master))
-        {
-            vault.AddEntry(new VaultEntry { Title = "nested/TOKEN", Password = "slashed", GroupPath = "env/dev" });
-            vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "nested", GroupPath = "env/dev/nested" });
-            vault.Save();
-        }
-
-        using var screen = EnvSets(fixture);
-        screen.Model.OpenCommand.Execute("dev");
-        var project = screen.Model.OpenProject!;
-
-        project.BeginRemove(project.Variables.Single(row => row.Key == "nested/TOKEN"));
-        project.ConfirmRemoveCommand.Execute(null);
-
-        Assert.Null(screen.Model.Error);
-
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "env/dev/nested/TOKEN", "--show"));
-        Assert.Contains("nested", fixture.Cli.Out, StringComparison.Ordinal);
-        Assert.DoesNotContain("slashed", fixture.Cli.Out, StringComparison.Ordinal);
     }
 
     /// <summary>

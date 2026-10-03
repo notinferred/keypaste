@@ -61,7 +61,7 @@ public sealed class ApproverHandler
     /// <param name="requiresLiveApproval">
     /// Which entries are asked about every time, with no grant and no policy release; null means the
     /// source's own answer (<see cref="ICredentialSource.RequiresLiveApproval"/>), so a host that
-    /// forgets it still asks live about a protected environment, by path or by tag.
+    /// forgets it still asks live about a protected environment, by tag.
     /// </param>
     /// <param name="clients">
     /// The per-client policies in <c>clients.toml</c>, or null to hold every client to

@@ -18,7 +18,7 @@ public enum ApproverMessageKind
     /// <summary>Binds a connection to the session holding a named vault.</summary>
     Attach = 3,
 
-    /// <summary>A project's env set for <c>keypaste run --session</c>, subject to a human saying yes.</summary>
+    /// <summary>The reply carrying a project's env set; no request has this kind (D-0416).</summary>
     Env = 4,
 
     /// <summary>The grants the owner's current session holds, as a list shows them.</summary>
@@ -27,7 +27,7 @@ public enum ApproverMessageKind
     RevokeGrants = 6,
     /// <summary>Asks the owner to lock now.</summary>
     Lock = 7,
-    /// <summary>An env request naming a profile other than the default, or a subset of keys.</summary>
+    /// <summary>A request for one profile of a project's env set, or a subset of its keys, for <c>keypaste run --session</c>, subject to a human saying yes.</summary>
     EnvProfile = 8,
     /// <summary>An env request authorized by a scoped token instead of a prompt.</summary>
     TokenEnv = 9,

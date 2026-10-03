@@ -90,6 +90,11 @@ internal sealed class FakeSource : ICredentialSource, IEntryNameLister
     /// <summary>What a read returns. Settable so a test can hand over a field no frame can carry.</summary>
     internal string Value { get; set; } = ApproverFixture.Sentinel;
 
+    /// <summary>The entries asked about live every time, as a protecting tag would make them.</summary>
+    internal HashSet<EntryName> Protected { get; } = [];
+
+    public bool RequiresLiveApproval(EntryName name) => Protected.Contains(name);
+
     public bool TryResolve(string entryArgument, [NotNullWhen(true)] out EntryName? name, out CredentialFailure failure)
     {
         name = null;

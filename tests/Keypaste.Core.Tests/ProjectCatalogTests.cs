@@ -2,7 +2,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>Projects are the tag projects together with the legacy <c>env/</c> groups.</summary>
+/// <summary>Projects come from their entries' own tags alone; no group makes one (D-0416).</summary>
 public sealed class ProjectCatalogTests : IDisposable
 {
     private const string _master = "correct horse battery staple";
@@ -24,7 +24,6 @@ public sealed class ProjectCatalogTests : IDisposable
 
         var billing = Assert.Single(catalog.Projects);
         Assert.Equal("billing", billing.Name);
-        Assert.False(billing.IsLegacy);
         Assert.Equal(
             [
                 new ProjectEnvironment("dev", false, [new EntryName("services", "Stripe")]),
@@ -39,52 +38,57 @@ public sealed class ProjectCatalogTests : IDisposable
     }
 
     [Fact]
-    public void A_legacy_group_is_a_project_marked_legacy_and_shares_its_name_with_tags()
+    public void Untagged_entries_under_env_make_no_project_and_no_environment()
     {
         using var vault = Vault.Create(Path.Combine(_directory, "v.kdbx"), _master);
-        vault.AddEntry(new VaultEntry { GroupPath = "env/acme", Title = "TOKEN", Password = "t" });
-        vault.AddEntry(new VaultEntry { GroupPath = "env/acme/staging", Title = "TOKEN", Password = "t" });
-        vault.AddEntry(new VaultEntry { GroupPath = "env/billing", Title = "KEY", Password = "k" });
+        vault.AddEntry(new VaultEntry { GroupPath = "env/acme", Title = "OLD_KEY", Password = "o" });
+        vault.AddEntry(new VaultEntry { GroupPath = "env/acme/prod", Title = "DB", Password = "d" });
+        vault.AddEntry(new VaultEntry { GroupPath = "env/billing/staging", Title = "KEY", Password = "k" });
         Add(vault, "services", "Stripe", "env:billing:prod");
 
-        var catalog = ProjectCatalog.Read(vault);
+        var billing = Assert.Single(ProjectCatalog.Read(vault).Projects);
 
-        Assert.Equal(["acme", "billing"], catalog.Projects.Select(project => project.Name));
-        Assert.All(catalog.Projects, project => Assert.True(project.IsLegacy));
-        Assert.Equal(["dev", "staging"], catalog.Projects[0].Environments.Select(environment => environment.Name));
-        Assert.All(catalog.Projects[0].Environments, environment => Assert.Empty(environment.Members));
-        Assert.Equal(["dev", "prod"], catalog.Projects[1].Environments.Select(environment => environment.Name));
-        Assert.Equal([new EntryName("services", "Stripe")], catalog.Projects[1].Environments[1].Members);
+        Assert.Equal("billing", billing.Name);
+        Assert.Equal(
+            [new ProjectEnvironment("prod", true, [new EntryName("services", "Stripe")])],
+            billing.Environments,
+            new EnvironmentComparer());
     }
 
-    /// <summary>
-    /// An <c>env/</c> group is legacy while it holds the one-entry-per-variable layout. One holding
-    /// only tagged entries, such as the home entries keypaste writes, is a project of tags (D-0414).
-    /// </summary>
     [Fact]
-    public void A_group_holding_only_tagged_entries_is_not_legacy_and_an_untagged_entry_or_a_subgroup_makes_one()
+    public void Home_entries_make_their_environments_and_an_untagged_entry_or_a_subgroup_beside_them_adds_none()
     {
         using var vault = Vault.Create(Path.Combine(_directory, "v.kdbx"), _master);
-        var store = new EnvStore(vault);
-        Assert.Null(store.Set("home", "dev", "TOKEN", "t").Refusal);
-        Assert.Null(store.Set("home", "staging", "TOKEN", "s").Refusal);
-        Assert.Null(store.Set("mixed", "dev", "TOKEN", "t").Refusal);
-        vault.AddEntry(new VaultEntry { GroupPath = "env/mixed", Title = "OLD", Password = "o" });
-        Assert.Null(store.Set("nested", "dev", "TOKEN", "t").Refusal);
-        vault.AddEntry(new VaultEntry { GroupPath = "env/nested/qa", Title = "OLD", Password = "o" });
+        ProjectVariables.Set(vault, "home", "TOKEN", "t");
+        ProjectVariables.Set(vault, "home", "staging", "TOKEN", "s");
+        vault.AddEntry(new VaultEntry { GroupPath = "env/home", Title = "OLD", Password = "o" });
+        vault.AddEntry(new VaultEntry { GroupPath = "env/home/qa", Title = "OLD", Password = "o" });
 
-        var catalog = ProjectCatalog.Read(vault);
+        var home = Assert.Single(ProjectCatalog.Read(vault).Projects);
 
-        Assert.Equal(
-            [("home", false), ("mixed", true), ("nested", true)],
-            catalog.Projects.Select(project => (project.Name, project.IsLegacy)));
+        Assert.Equal("home", home.Name);
         Assert.Equal(
             [
-                new ProjectEnvironment("dev", false, [new EntryName("env/home", ".env")]),
-                new ProjectEnvironment("staging", false, [new EntryName("env/home", ".env.staging")]),
+                new ProjectEnvironment("dev", false, [ProjectVariables.Home("home")]),
+                new ProjectEnvironment("staging", false, [ProjectVariables.Home("home", "staging")]),
             ],
-            catalog.Projects[0].Environments,
+            home.Environments,
             new EnvironmentComparer());
+    }
+
+    [Fact]
+    public void Environments_come_dev_first_then_by_name_and_protected_last()
+    {
+        using var vault = Vault.Create(Path.Combine(_directory, "v.kdbx"), _master);
+
+        foreach (var environment in new[] { "prod", "staging", "production-eu", "alpha", "dev" })
+        {
+            ProjectVariables.Set(vault, "acme-api", environment, "A", "v");
+        }
+
+        Assert.Equal(
+            [("dev", false), ("alpha", false), ("staging", false), ("prod", true), ("production-eu", true)],
+            Assert.Single(ProjectCatalog.Read(vault).Projects).Environments.Select(environment => (environment.Name, environment.IsProtected)));
     }
 
     [Fact]

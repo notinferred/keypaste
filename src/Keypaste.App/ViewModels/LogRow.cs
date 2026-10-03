@@ -154,12 +154,23 @@ internal sealed record LogRow
 
     private static (string Secrets, string Where) Place(AuditEntry entry)
     {
+        // A run or a token names the sets it asked about, which are labels rather than groups (D-0416).
+        string[] sets = Is(entry.Tool, "run") || Is(entry.Tool, "token bundle")
+            ? entry.Entry.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            : [];
+        var set = sets.Length switch
+        {
+            0 => null,
+            1 => SetLabel(sets[0]),
+            _ => $"{sets.Length} sets",
+        };
+
         if (entry.Entries.Count > 0)
         {
             var titles = entry.Entries.Select(Title).ToList();
             var groups = entry.Entries.Select(Group).Distinct(StringComparer.Ordinal).ToList();
             var secrets = titles.Count <= 3 ? string.Join(", ", titles) : $"{titles.Count} secrets";
-            var where = groups.Count == 1 ? Readable(groups[0]) : $"{groups.Count} groups";
+            var where = set ?? (groups.Count == 1 ? Readable(groups[0]) : $"{groups.Count} groups");
 
             return (secrets, where);
         }
@@ -169,16 +180,14 @@ internal sealed record LogRow
             return ("names only", _none);
         }
 
+        if (set is not null)
+        {
+            return (_none, set);
+        }
+
         if (entry.Entry.Length == 0)
         {
             return (_none, _none);
-        }
-
-        // A run or a token names the set it asked about, a group rather than an entry.
-        if (Is(entry.Tool, "run") || Is(entry.Tool, "token bundle"))
-        {
-            var sets = entry.Entry.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            return (_none, sets.Length == 1 ? Readable(sets[0]) : $"{sets.Length} sets");
         }
 
         var title = Title(entry.Entry);
@@ -277,18 +286,16 @@ internal sealed record LogRow
         return slash < 0 ? string.Empty : path[..slash];
     }
 
-    /// <summary>A group as a place: <c>env/acme-api/dev</c> reads <c>acme-api · dev</c>, a login group reads as itself.</summary>
-    private static string Readable(string group)
-    {
-        if (group.Length == 0)
-        {
-            return _none;
-        }
+    /// <summary>A group as a place: itself, or a dash at the root.</summary>
+    private static string Readable(string group) => group.Length == 0 ? _none : group;
 
+    /// <summary>A set as a place: <c>env/acme-api/dev</c> reads <c>acme-api · dev</c>.</summary>
+    private static string SetLabel(string set)
+    {
         var root = EnvConvention.RootGroup + "/";
-        return group.StartsWith(root, StringComparison.Ordinal)
-            ? group[root.Length..].Replace("/", " · ", StringComparison.Ordinal)
-            : group;
+        return set.StartsWith(root, StringComparison.Ordinal)
+            ? set[root.Length..].Replace("/", " · ", StringComparison.Ordinal)
+            : set;
     }
 
     private static bool Is(string text, string wanted) => string.Equals(text, wanted, StringComparison.Ordinal);

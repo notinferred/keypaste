@@ -17,10 +17,11 @@ public sealed class ApproverEnvProtocolTests
     {
         var sent = new EnvRequest("billing", ["npm", "run", "a b", "\"quoted\""], "/home/me/billing") { Vault = "/v.kdbx", Session = "s1" };
 
-        Assert.Equal(ApproverMessageKind.Env, ApproverProtocol.KindOf(ApproverProtocol.Encode(sent)));
+        Assert.Equal(ApproverMessageKind.EnvProfile, ApproverProtocol.KindOf(ApproverProtocol.Encode(sent)));
         Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(sent), out EnvRequest? request));
 
         Assert.Equal("billing", request.Project);
+        Assert.Equal("dev", request.Profile);
         Assert.Equal(sent.Command, request.Command);
         Assert.Equal("/home/me/billing", request.Directory);
         Assert.Equal("/v.kdbx", request.Vault);
@@ -84,9 +85,9 @@ public sealed class ApproverEnvProtocolTests
     }
 
     [Theory]
-    [InlineData("""{"v":2,"kind":"env","vault":"/v","session":"s","project":"p","command":"npm start","directory":"/d"}""")]
-    [InlineData("""{"v":2,"kind":"env","vault":"/v","project":"p","command":["npm"],"directory":"/d"}""")]
-    [InlineData("""{"v":2,"kind":"env","vault":"/v","session":"s","project":"p","command":["npm",1],"directory":"/d"}""")]
+    [InlineData("""{"v":2,"kind":"env-profile","vault":"/v","session":"s","project":"p","command":"npm start","directory":"/d","profile":"dev"}""")]
+    [InlineData("""{"v":2,"kind":"env-profile","vault":"/v","project":"p","command":["npm"],"directory":"/d","profile":"dev"}""")]
+    [InlineData("""{"v":2,"kind":"env-profile","vault":"/v","session":"s","project":"p","command":["npm",1],"directory":"/d","profile":"dev"}""")]
     public void A_malformed_request_is_refused(string frame)
     {
         Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out EnvRequest? request));
@@ -94,14 +95,13 @@ public sealed class ApproverEnvProtocolTests
     }
 
     [Fact]
-    public void ADevWholeSetRequest_IsTheOldBytes()
+    public void ADevWholeSetRequest_IsEnvProfileNamingDev()
     {
         var request = new EnvRequest("billing", ["npm", "start"], "/d") { Vault = "/v", Session = "s" };
 
         Assert.Equal(
-            """{"v":2,"kind":"env","vault":"/v","session":"s","project":"billing","command":["npm","start"],"directory":"/d"}""",
+            """{"v":2,"kind":"env-profile","vault":"/v","session":"s","project":"billing","command":["npm","start"],"directory":"/d","profile":"dev"}""",
             Encoding.UTF8.GetString(ApproverProtocol.Encode(request)));
-        Assert.Equal(ApproverMessageKind.Env, ApproverProtocol.KindOf(ApproverProtocol.Encode(request with { Profile = "dev" })));
     }
 
     [Fact]
@@ -137,15 +137,14 @@ public sealed class ApproverEnvProtocolTests
         Assert.Equal(["DB ← B", "PROXY=http://p"], request.FileLines);
     }
 
-    [Fact]
-    public void AnEnvFrame_DecodesAsDev()
+    /// <summary>The reply's kind is no request: an owner answers a request only as <c>env-profile</c> (D-0416).</summary>
+    [Theory]
+    [InlineData("""{"v":2,"kind":"env","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d"}""")]
+    [InlineData("""{"v":2,"kind":"env","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d","profile":"dev"}""")]
+    public void AnEnvFrame_IsNoRequest(string frame)
     {
-        var frame = """{"v":2,"kind":"env","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d","profile":"prod","keys":["A"]}""";
-
-        Assert.True(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out EnvRequest? request));
-        Assert.Equal("dev", request.Profile);
-        Assert.Null(request.Keys);
-        Assert.Null(request.FileLines);
+        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out EnvRequest? request));
+        Assert.Null(request);
     }
 
     [Theory]

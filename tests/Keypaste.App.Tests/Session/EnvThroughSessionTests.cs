@@ -26,7 +26,7 @@ public sealed class EnvThroughSessionTests : IDisposable
     {
         using (var vault = Vault.Open(_fixture.Path_, TempVault.Password))
         {
-            vault.AddEntry(new VaultEntry { GroupPath = "env/dev", Title = "TOKEN", Password = "v1" });
+            ProjectVariables.Set(vault, "dev", "TOKEN", "v1");
             vault.Save();
         }
 
@@ -70,7 +70,7 @@ public sealed class EnvThroughSessionTests : IDisposable
     {
         using (var writer = Vault.Open(_fixture.Path_, TempVault.Password))
         {
-            writer.UpdateEntry(new VaultEntry { GroupPath = "env/dev", Title = "TOKEN", Password = "external" });
+            ProjectVariables.Set(writer, "dev", "TOKEN", "external");
             writer.Save();
         }
 
@@ -92,17 +92,17 @@ public sealed class EnvThroughSessionTests : IDisposable
         using (var countdown = new ClipboardCountdown(new FakeClipboard(), new ManualClock(AppClock.Start)))
         using (var entries = new EntriesViewModel(_session, countdown))
         {
-            entries.Selected = entries.Rows.Single(row => row.Path == "env/dev/TOKEN");
+            entries.Selected = entries.Rows.Single(row => row.Name == ProjectVariables.Home("dev"));
             var detail = entries.Detail!;
-            detail.EditCommand.Execute(null);
+            detail.Fields.Single(field => field.Name == "TOKEN").ReplaceCommand.Execute(null);
 
             foreach (var c in "v2")
             {
-                detail.NewPassword.Type(c);
+                detail.ReplacementFieldValue.Type(c);
             }
 
-            detail.SaveCommand.Execute(null);
-            Assert.False(detail.IsEditing, entries.Error);
+            detail.ConfirmReplaceFieldCommand.Execute(null);
+            Assert.False(detail.IsReplacingField, entries.Error);
         }
 
         var resolved = await _session.Environments.ResolveAsync("dev", null, Cancel);

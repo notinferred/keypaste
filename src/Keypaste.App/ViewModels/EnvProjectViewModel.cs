@@ -37,7 +37,6 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     private IReadOnlyList<EnvKeyRow> _rows = [];
     private IReadOnlyList<EnvProfileInfo> _profiles = [];
     private IReadOnlyList<string> _referenceKeys = [];
-    private IReadOnlyList<string> _profileProblems = [];
     private EnvMatrix? _matrix;
     private string _selectedProfile = EnvProfileNames.Default;
     private EnvVariableRow? _revealed;
@@ -100,8 +99,8 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
     /// <summary>The name as the card draws it.</summary>
     /// <remarks>
     /// <see cref="RunCommand"/> deliberately keeps <see cref="Name"/> instead: it is a line somebody
-    /// pastes into a shell, and a scrubbed one would not run. A group whose name needs scrubbing can
-    /// only have been made outside keypaste, and the card above the command shows the drawn form.
+    /// pastes into a shell, and a scrubbed one would not run. A project whose name needs scrubbing can
+    /// only have been tagged outside keypaste, and the card above the command shows the drawn form.
     /// </remarks>
     internal string DisplayName => EntryNameSanitizer.Sanitize(Name).Text;
 
@@ -207,13 +206,6 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
 
     /// <summary>Asks where to save <see cref="ReferencePreview"/> and writes it there.</summary>
     internal AsyncRelayCommand ExportReferencesCommand { get; }
-
-    /// <summary>The subgroups that are never read, in keypaste's words.</summary>
-    internal IReadOnlyList<string> ProfileProblems
-    {
-        get => _profileProblems;
-        private set => Set(ref _profileProblems, value);
-    }
 
     /// <summary>Every key against every profile. Holds no value.</summary>
     internal EnvMatrix? Matrix
@@ -405,30 +397,10 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         _report(null);
     }
 
-    /// <summary>What the confirmation asks, and whether the variable can come back.</summary>
-    /// <remarks>
-    /// The vault's recycle-bin setting decides, not this screen: the same question has two honest
-    /// answers depending on the file. A recycled variable is recovered on the Trash screen.
-    /// </remarks>
-    internal string RemovePrompt
-    {
-        get
-        {
-            if (_removing is not { } row)
-            {
-                return string.Empty;
-            }
-
-            if (!row.IsLegacy)
-            {
-                return $"Remove {row.DisplayKey} from {ApprovalPrompt.Shown(row.Source.Entry)}? Its value stays in the entry's history.";
-            }
-
-            return _session.Unlocked?.RecyclesDeletedEntries == true
-                ? $"Remove {row.DisplayKey} from {DisplayName}? It goes to the vault's recycle bin."
-                : $"Remove {row.DisplayKey} from {DisplayName}? There is no undo.";
-        }
-    }
+    /// <summary>What the confirmation asks.</summary>
+    internal string RemovePrompt => _removing is { } row
+        ? $"Remove {row.DisplayKey} from {ApprovalPrompt.Shown(row.Source.Entry)}? Its value stays in the entry's history."
+        : string.Empty;
 
     internal bool IsAdding
     {
@@ -487,7 +459,6 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
             NewEntry = null;
             _referenceKeys = [];
             Profiles = [];
-            ProfileProblems = [];
             Matrix = null;
             Columns = [];
             Rows = [];
@@ -505,7 +476,6 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         var matrix = EnvMatrix.Build(vault, Name, _session.Clock);
         Matrix = matrix;
         Profiles = matrix.Profiles;
-        ProfileProblems = matrix.Problems;
 
         var listing = EnvResolution.List(vault, Name, SelectedProfile);
         _referenceKeys = [.. listing.Variables.Select(variable => variable.Key).Distinct(StringComparer.Ordinal)];
@@ -522,7 +492,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
             .. listing.Variables
                 .Zip(listing.Sources)
                 .Where(pair => single.Contains(pair.Second.Key))
-                .Select(pair => new EnvVariableRow(this, pair.Second, pair.First.Value.Length, pair.First.IsUsableName)),
+                .Select(pair => new EnvVariableRow(this, pair.Second, pair.First.Value.Length)),
         ];
 
         var home = EnvStore.HomeEntry(Name, SelectedProfile);
@@ -697,7 +667,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
 
         try
         {
-            return row.IsLegacy ? vault.Find(row.Source.Entry)?.Password : vault.ReadField(row.Source.Entry, row.Source.Field);
+            return vault.ReadField(row.Source.Entry, row.Source.Field);
         }
         catch (VaultException e)
         {
@@ -718,7 +688,6 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
         _revealed = null;
         Variables = [];
         Profiles = [];
-        ProfileProblems = [];
         Matrix = null;
         Columns = [];
         Rows = [];
@@ -914,11 +883,9 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
             return;
         }
 
-        EnvRemoval removal;
-
         try
         {
-            removal = new EnvStore(vault).Remove(Name, SelectedProfile, row.Key, row.Source.Entry);
+            var removal = new EnvStore(vault).Remove(Name, SelectedProfile, row.Key, row.Source.Entry);
 
             if (removal.Outcome == EnvRemoveOutcome.NothingMatched)
             {
@@ -949,14 +916,7 @@ internal sealed class EnvProjectViewModel : ObservableObject, IDisposable
 
         Removing = null;
         _report(null);
-
-        // Reported after the act, from the outcome core returned, as the CLI reports it.
-        _announce(removal.Outcome switch
-        {
-            EnvRemoveOutcome.FieldRemoved => $"Removed {row.DisplayKey} from {ApprovalPrompt.Shown(row.Source.Entry)}. Its value stays in the entry's history.",
-            EnvRemoveOutcome.Recycled => $"Moved {row.DisplayKey} to the trash. Restore it there.",
-            _ => $"Removed {row.DisplayKey}. This vault has no recycle bin, so nothing can put it back.",
-        });
+        _announce($"Removed {row.DisplayKey} from {ApprovalPrompt.Shown(row.Source.Entry)}. Its value stays in the entry's history.");
 
         Reload();
     }

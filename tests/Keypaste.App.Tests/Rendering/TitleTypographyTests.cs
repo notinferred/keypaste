@@ -34,17 +34,6 @@ public sealed class TitleTypographyTests
         Assert.False(frame.Shows("API_TOKEN", new TextStyle(new Typeface(Sans), 12.5), frame.Everywhere), "a field's key is drawn in sans");
     });
 
-    [Fact]
-    public Task A_variable_is_titled_by_its_key_in_mono() => HeadlessSession.On(() =>
-    {
-        using var shell = Open("STRIPE_KEY");
-        var frame = shell.Frame();
-        var title = frame.Of(shell.Named<TextBlock>("EntryTitle"), shell.Window);
-
-        Assert.True(frame.Shows("STRIPE_KEY", new TextStyle(new Typeface(Mono), 22, -0.22), title), "the variable's key is not drawn in mono");
-        Assert.False(frame.Shows("STRIPE_KEY", Heading(Sans), title), "the variable's key is drawn in sans");
-    });
-
     private static FontFamily Sans => (FontFamily)Avalonia.Application.Current!.FindResource("KpSans")!;
 
     private static FontFamily Mono => (FontFamily)Avalonia.Application.Current!.FindResource("KpMono")!;

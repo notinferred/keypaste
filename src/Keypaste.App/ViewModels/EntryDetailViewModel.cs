@@ -91,8 +91,6 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         VaultName = session.VaultPath is { } vaultPath ? System.IO.Path.GetFileName(vaultPath) : string.Empty;
 
         Reference = KpReferences.ForEntry(Name);
-        Profiles = ProfilesOf(session, Reference);
-        ProfileStates = Profiles is { } row ? [.. row.Cells.Select(ProfileState.Of)] : [];
 
         NewPassword = new SecretField(clipboard);
         NewFieldValue = new SecretField(clipboard);
@@ -391,12 +389,11 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         }
     }
 
-    /// <summary>What the confirm row asks. A variable's names the profile whose apps get the new value.</summary>
+    /// <summary>What the confirm row asks; an instance property because a binding needs one.</summary>
+#pragma warning disable CA1822
     internal string RotatePrompt =>
-        EnvPlace.Of(_groupPath, _title) is { } place
-            ? $"Replace {DisplayTitle} in {place.Project} · {place.Profile} with a new random {PasswordGenerator.DefaultLength}-character value? "
-                + $"Every app that injects this key in {place.Profile} gets it on its next run, so a connection string or URL here stops working. The old value stays in history."
-            : $"Replace the saved password with a new {PasswordGenerator.DefaultLength}-character one? keypaste only changes its copy: set the new password on the site or service too, or you will need the old one from history to sign in.";
+        $"Replace the saved password with a new {PasswordGenerator.DefaultLength}-character one? keypaste only changes its copy: set the new password on the site or service too, or you will need the old one from history to sign in.";
+#pragma warning restore CA1822
 
     /// <summary>When the entry was created, as the metadata row shows it.</summary>
     internal string Created
@@ -498,30 +495,11 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
             {
                 Raise(nameof(KindLabel));
                 Raise(nameof(Location));
-                Raise(nameof(IsVariable));
-                Raise(nameof(ValueLabel));
-                Raise(nameof(ShowsUsername));
-                Raise(nameof(ShowsUrl));
-                Raise(nameof(ReplacementPlaceholder));
-                Raise(nameof(ReplacementCaption));
             }
         }
     }
 
-    /// <summary>The edit form's secret field, named for what it replaces.</summary>
-    internal string ReplacementPlaceholder => IsVariable ? "New value" : "New password";
-
-    internal string ReplacementCaption => IsVariable
-        ? "Leave this empty to keep the current value. A replacement keeps the old one in this entry's history."
-        : "Leave this empty to keep the current password. A replacement keeps the old one in this entry's history.";
-
     internal string KindLabel => EntryKinds.Label(_kind);
-
-    /// <summary>Whether this entry is a key of an env project, which has profiles rather than a username and a URL.</summary>
-    internal bool IsVariable => _kind == EntryKind.Variable;
-
-    /// <summary>The secret field's label: a variable holds a value, anything else a password.</summary>
-    internal string ValueLabel => IsVariable ? "Value" : "Password";
 
     /// <summary>The vault's file name.</summary>
     internal string VaultName { get; }
@@ -545,12 +523,6 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         ? $"uuid {uuid[..4].ToLowerInvariant()}…{uuid[^4..].ToLowerInvariant()} · field Password"
         : $"{DisplayPath} · field Password";
 
-    /// <summary>A login always shows its username; anything else only when it has one.</summary>
-    internal bool ShowsUsername => !IsVariable || Username.Length > 0;
-
-    /// <summary>A login always shows its URL; anything else only when it has one.</summary>
-    internal bool ShowsUrl => !IsVariable || Url.Length > 0;
-
     /// <summary>Whether the URL is a link that opens in the browser: http or https, or a bare address as https (D-0378).</summary>
     internal bool OpensUrl => WebAddress.TryOpenable(Url, out _);
 
@@ -566,11 +538,6 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     internal bool ShowsNotes => Notes.Length > 0;
 
     internal bool HasReference => Reference is not null;
-
-    /// <summary>The Profiles card's rows, one per profile of the variable's project; empty for any other entry.</summary>
-    internal IReadOnlyList<ProfileState> ProfileStates { get; private set; }
-
-    internal bool HasProfiles => ProfileStates.Count > 0;
 
     /// <summary>Copies <see cref="Reference"/>, which names the entry and holds no value.</summary>
     internal AsyncRelayCommand CopyReferenceCommand { get; }
@@ -595,12 +562,7 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
     internal EntryName Name => new(_groupPath, _title);
 
     /// <summary>The <c>kp://</c> reference that names this entry, or null for one no reference resolves.</summary>
-    /// <remarks>A variable keypaste resolves gets its env form, <c>kp://&lt;project&gt;/&lt;profile&gt;/&lt;KEY&gt;</c>; any other entry its entry form.</remarks>
     internal string? Reference { get; private set; }
-
-    /// <summary>For a variable, its key in every profile of its project, as the Profiles card shows it; null for any other entry.</summary>
-    /// <remarks>A cell's profile is protected when <see cref="EnvProfileNames.IsProtected"/> says so, which the card shows as approval required.</remarks>
-    internal EnvMatrixRow? Profiles { get; private set; }
 
     /// <summary>The entry's path, for the header and for the CLI hint.</summary>
     /// <remarks>A label, not an identity: joining is lossy, so nothing here looks an entry up by
@@ -651,7 +613,6 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
             if (Set(ref _username, value))
             {
                 Raise(nameof(DisplayUsername));
-                Raise(nameof(ShowsUsername));
                 CopyUsernameCommand.RaiseCanExecuteChanged();
             }
         }
@@ -665,7 +626,6 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
             if (Set(ref _url, value))
             {
                 Raise(nameof(DisplayUrl));
-                Raise(nameof(ShowsUrl));
                 Raise(nameof(OpensUrl));
                 Raise(nameof(ShowsUrlNote));
                 OpenUrlCommand.RaiseCanExecuteChanged();
@@ -844,8 +804,6 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
         PasswordLength = 0;
         _uuid = null;
         Reference = null;
-        Profiles = null;
-        ProfileStates = [];
         AgentLines = [];
         Fields = [];
         Tags = [];
@@ -860,9 +818,6 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
 
         Raise(nameof(Reference));
         Raise(nameof(HasReference));
-        Raise(nameof(Profiles));
-        Raise(nameof(ProfileStates));
-        Raise(nameof(HasProfiles));
         Raise(nameof(Location));
         Raise(nameof(KdbxEntry));
         Raise(nameof(Title));
@@ -888,14 +843,6 @@ internal sealed class EntryDetailViewModel : ObservableObject, IRevealSource, ID
 
         _restored(name);
     }
-
-    private static EnvMatrixRow? ProfilesOf(AppVaultSession session, string? reference) =>
-        reference is not null
-        && KpReferences.TryParse(reference, out var parsed, out _)
-        && parsed is EnvReference env
-        && session.Unlocked is { } vault
-            ? EnvMatrix.Build(vault, env.Project, session.Clock).Row(env.Key)
-            : null;
 
     private async Task CopyPasswordAsync()
     {

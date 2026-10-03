@@ -94,7 +94,7 @@ internal static class EnvDiffCommand
                 return CliApp.ExitSuccess;
             }
 
-            // dev comes first when the project has it; a project known only from tags may not.
+            // dev comes first when the project has it, which it need not.
             var first = names[0];
 
             if (names.Count == 1)

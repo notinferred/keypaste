@@ -140,17 +140,9 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     /// <summary>The vault's file name, which the pane's location line starts from.</summary>
     internal string VaultName => _session.VaultPath is { } path ? System.IO.Path.GetFileName(path) : string.Empty;
 
-    /// <summary>What the list header names: the env project or group showing, or the vault when it is all of it.</summary>
+    /// <summary>What the list header names: the group showing, or the vault when it is all of it.</summary>
     internal string ListTitle =>
-        SelectedGroup is { IsEverything: false } group
-            ? EnvPlace.OfGroup(group.Path) is { } env ? env.Project : EntryNameSanitizer.SanitizePath(group.Path).Text
-            : VaultName;
-
-    /// <summary>The profile badge beside <see cref="ListTitle"/> when the group showing is an env profile, else null.</summary>
-    internal string? ListProfile =>
-        SelectedGroup is { IsEverything: false } group ? EnvPlace.OfGroup(group.Path)?.Profile : null;
-
-    internal bool HasListProfile => ListProfile is not null;
+        SelectedGroup is { IsEverything: false } group ? EntryNameSanitizer.SanitizePath(group.Path).Text : VaultName;
 
     /// <summary>The group the titlebar search is limited to, as the list header names it, or null for every item.</summary>
     internal string? SearchScope => SelectedGroup is { IsEverything: false } ? ListTitle : null;
@@ -560,11 +552,11 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         "Policy rules and agent exposures match paths, so this can stop one applying to these " +
         "entries and start another.";
 
-    /// <summary>Whether the group being renamed is an env project.</summary>
+    /// <summary>Whether the group being renamed is where keypaste puts a project's new keys.</summary>
     internal bool ShowsProjectRenameNote =>
-        IsRenamingGroup && SelectedGroup is { IsEverything: false } group && IsProject(group.Path);
+        IsRenamingGroup && SelectedGroup is { IsEverything: false } group && IsProjectHome(group.Path);
 
-    /// <summary>What renaming this particular group also renames.</summary>
+    /// <summary>What renaming this group changes about where keypaste puts new keys.</summary>
     internal string ProjectRenameNote
     {
         get
@@ -576,9 +568,8 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
 
             var project = EntryNameSanitizer.Sanitize(group.Name).Text;
 
-            return $"This is a project. `keypaste run {project}` will stop finding it, and any rule "
-                + $"or exposure written for {EnvConvention.RootGroup}/{project} stops matching "
-                + "these entries while one written for the new name starts matching them.";
+            return $"New keys for {project} go to entries in {EnvConvention.RootGroup}/{project}, which keypaste "
+                + "creates again after this rename. Moved entries keep their tags, and with them their projects.";
         }
     }
 
@@ -674,8 +665,6 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
     private void RaiseHeader()
     {
         Raise(nameof(ListTitle));
-        Raise(nameof(ListProfile));
-        Raise(nameof(HasListProfile));
         Raise(nameof(SearchScope));
     }
 
@@ -815,17 +804,8 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
         Rows = rows;
     }
 
-    /// <summary>Whether an entry in <paramref name="groupPath"/> is listed while <paramref name="group"/> is selected.</summary>
-    /// <remarks>
-    /// A folder lists its children's entries too, except an env project: its own group is its
-    /// default profile, as the header's badge and the sidebar's count say, and each profile below
-    /// it is a row of the tree to select.
-    /// </remarks>
-    private static bool Shows(GroupNode? group, string groupPath) =>
-        group is null
-        || (EnvPlace.OfGroup(group.Path) is null
-            ? group.Contains(groupPath)
-            : string.Equals(group.Path, groupPath, StringComparison.Ordinal));
+    /// <summary>Whether an entry in <paramref name="groupPath"/> is listed while <paramref name="group"/> is selected: a folder lists its children's entries too.</summary>
+    private static bool Shows(GroupNode? group, string groupPath) => group is null || group.Contains(groupPath);
 
     /// <summary>Asks core which entries the query is in, unless it already answered this one.</summary>
     private void Match(string query)
@@ -1352,16 +1332,6 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
                 VaultNameRules.IsValidTitle(target.Title, out var why);
                 return $"keypaste will not use that title: {why}.";
 
-            case OrganizeOutcome.EnvNameRefused
-                when string.Equals(target.GroupPath, EnvConvention.RootGroup, StringComparison.Ordinal):
-                return "A variable belongs to a project, so pick a group inside env.";
-
-            case OrganizeOutcome.EnvNameRefused:
-                return "Under env a name has to be one an environment could export: capitals, digits and underscores, not starting with a digit.";
-
-            case OrganizeOutcome.EnvNameCollides:
-                return "That project already has a variable whose name differs from this one only in case. Linux would see two and Windows one.";
-
             default:
                 return "That change could not be made.";
         }
@@ -1392,16 +1362,13 @@ internal sealed class EntriesViewModel : ObservableObject, IDisposable
             case GroupOutcome.NameReserved:
                 return "env at the top level and the recycle bin are names keypaste assigns. A group cannot be created as one, renamed to one, or renamed away from one.";
 
-            case GroupOutcome.EnvNameRefused:
-                return "Under env a group is a project, so its name has to be one keypaste could resolve.";
-
             default:
                 return "That change could not be made.";
         }
     }
 
-    /// <summary>Whether this group path is an env project rather than an ordinary group.</summary>
-    private static bool IsProject(string groupPath)
+    /// <summary>Whether this group is one level under the env root, where keypaste puts a project's new keys.</summary>
+    private static bool IsProjectHome(string groupPath)
     {
         var slash = groupPath.IndexOf('/', StringComparison.Ordinal);
 

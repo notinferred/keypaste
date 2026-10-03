@@ -13,6 +13,7 @@ using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Clients;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Tests;
 using Keypaste.Core.Tokens;
 using Xunit;
 using static Keypaste.App.Tests.Session.JourneyDriver;
@@ -47,7 +48,7 @@ public sealed class OneHomeJourneyTests
 
             using (var created = Vault.Create(vault, TempVault.Password))
             {
-                created.AddEntry(new VaultEntry { GroupPath = "env/billing", Title = "STRIPE_KEY", Password = "sk-one-home" });
+                ProjectVariables.Set(created, "billing", "STRIPE_KEY", "sk-one-home");
                 created.Save();
             }
 

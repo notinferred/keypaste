@@ -9,7 +9,7 @@ public enum EnvOutcome
     /// <summary>Every entry is usable, and the set may be released.</summary>
     Resolved = 0,
 
-    /// <summary>The vault has no such project: no <c>env/&lt;project&gt;</c> group and no entry tagged for it.</summary>
+    /// <summary>The vault has no such project: no entry is tagged into it.</summary>
     NoProject = 1,
 
     /// <summary>At least one entry cannot be released; <see cref="EnvResolved.Problems"/> names each.</summary>
@@ -42,7 +42,7 @@ public enum EnvOutcome
     /// <summary>The request itself could not be asked about, such as a command too long to show whole.</summary>
     Invalid = 11,
 
-    /// <summary>The project exists but has neither a group nor a tagged entry for the environment asked for.</summary>
+    /// <summary>The project exists but no entry is tagged into the environment asked for.</summary>
     NoProfile = 12,
 
     /// <summary>The token that authorized the request does not cover this set.</summary>
@@ -57,12 +57,8 @@ public sealed record EnvProblem(string Key, string Reason);
 /// <summary>Where one variable released from the vault lives. Holds no value.</summary>
 /// <param name="Key">The variable's name as the child gets it.</param>
 /// <param name="Entry">The entry holding its value.</param>
-/// <param name="Field">The field holding it: <see cref="LegacyField"/> for a variable of the <c>env/&lt;project&gt;</c> layout, else the custom field's own name.</param>
-public sealed record EnvSource(string Key, EntryName Entry, string Field)
-{
-    /// <summary>The field a legacy variable's value is in: the entry's password, its title being the name.</summary>
-    public const string LegacyField = "password";
-}
+/// <param name="Field">The custom field holding it, named as the key.</param>
+public sealed record EnvSource(string Key, EntryName Entry, string Field);
 
 /// <summary>What a person is asked about before a set is released: names, never values.</summary>
 /// <param name="Project">The project.</param>
@@ -75,7 +71,7 @@ public sealed record EnvPreview(string Project, IReadOnlyList<string> Keys)
     /// <summary>Where each variable's value lives, in <see cref="Keys"/> order, a literal having none; empty for a preview made without a vault.</summary>
     public IReadOnlyList<EnvSource> Sources { get; init; } = [];
 
-    /// <summary>Whether an entry of the set belongs to a protected environment, by its path or any of its own tags, so its release is asked live with Allow once only (D-0348, D-0371).</summary>
+    /// <summary>Whether an entry of the set belongs to a protected environment by any of its own tags, so its release is asked live with Allow once only (D-0348, D-0371).</summary>
     public bool RequiresLiveApproval { get; init; }
 
     /// <summary>Whether another preview names the same keys, from the same entries, under the same protection.</summary>
@@ -130,7 +126,7 @@ public sealed class EnvResolved
     /// <summary>Where each variable released from the vault lives, in <see cref="Variables"/> order, a literal having none; empty for a set that came over the owner's endpoint or out of a bundle.</summary>
     public IReadOnlyList<EnvSource> Sources { get; }
 
-    /// <summary>Whether a source entry belongs to a protected environment, by its path or any of its own tags (D-0348, D-0371).</summary>
+    /// <summary>Whether a source entry belongs to a protected environment by any of its own tags (D-0348, D-0371).</summary>
     public bool RequiresLiveApproval { get; }
 
     /// <summary>The source entries, each once, in the order their first variable comes out.</summary>
@@ -151,7 +147,7 @@ public sealed class EnvResolved
         EnvOutcome.NoProject => $"no env set for '{Project}'",
         EnvOutcome.NoProfile => $"'{Project}' has no '{Profile}' profile",
         EnvOutcome.Unusable => $"'{Project}/{Profile}' cannot be used: " +
-            string.Join("; ", Problems.Select(problem => $"{Display(problem.Key)} {problem.Reason}")),
+            string.Join("; ", Problems.Select(problem => $"{problem.Key} {problem.Reason}")),
         EnvOutcome.Unsaved => "the vault holds a change that has not been saved",
         EnvOutcome.ChangedOnDisk => "another program saved the vault file; reload it before using it",
         EnvOutcome.Unreadable => "the vault file could not be read to confirm it is unchanged",
@@ -163,9 +159,6 @@ public sealed class EnvResolved
         EnvOutcome.Unauthorized => "the token does not authorize this set",
         _ => "the request could not be asked about",
     };
-
-    /// <summary>A key as a refusal shows it, including one with no title.</summary>
-    public static string Display(string key) => key.Length == 0 ? "(untitled entry)" : key;
 
     internal static EnvResolved Released(
         string project,
@@ -182,12 +175,12 @@ public sealed class EnvResolved
 
 /// <summary>One environment's variables as a listing reads them, unjudged.</summary>
 /// <param name="Outcome"><see cref="EnvOutcome.Resolved"/>, or <see cref="EnvOutcome.NoProject"/> or <see cref="EnvOutcome.NoProfile"/> when it is not there.</param>
-/// <param name="Variables">Its variables, ordinal by key; an untitled legacy entry is left out and a key two entries hold is listed twice.</param>
+/// <param name="Variables">Its variables, ordinal by key; a key two entries hold is listed twice.</param>
 /// <param name="Sources">Where each lives, in <see cref="Variables"/> order.</param>
 public sealed record EnvListing(EnvOutcome Outcome, IReadOnlyList<EnvVariable> Variables, IReadOnlyList<EnvSource> Sources);
 
 /// <summary>One variable an environment holds before anything is judged, with the entry it came from.</summary>
-/// <param name="Key">The variable's name: a tagged entry's field name, or a legacy entry's title.</param>
+/// <param name="Key">The variable's name, which is its field's.</param>
 /// <param name="Value">Its value.</param>
 /// <param name="Entry">The entry holding it.</param>
 /// <param name="Field">The field holding it (<see cref="EnvSource.Field"/>).</param>
@@ -202,9 +195,9 @@ internal sealed record EnvMember(string Key, string Value, EnvEntry Entry, strin
 }
 
 /// <summary>
-/// Resolves a project's environment for release, whole or not at all. The set is two things: the
-/// variable fields of every entry whose own tag puts it in the environment (D-0370), and the
-/// untagged entries of its legacy <c>env/&lt;project&gt;</c> group (D-0347).
+/// Resolves a project's environment for release, whole or not at all. The set is the variable
+/// fields of every entry whose own tag puts it in the environment (D-0370); no entry belongs to a
+/// project by its group (D-0416).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -215,9 +208,9 @@ internal sealed record EnvMember(string Key, string Value, EnvEntry Entry, strin
 /// </para>
 /// <para>
 /// A refusal names each variable, why and the entries concerned, never a value: a key on two
-/// entries, two keys differing only in case, an expired entry, a legacy title that is no variable
-/// name, a custom field named like a standard one in another case, and a value holding a KeePass
-/// placeholder (<see cref="KeePassPlaceholders"/>).
+/// entries, an expired entry, a custom field named like a standard one in another case, and a value
+/// holding a KeePass placeholder (<see cref="KeePassPlaceholders"/>). Two keys cannot differ only in
+/// case, since a variable's field is named in capitals (<see cref="EnvConvention.IsEnvNamedField"/>).
 /// </para>
 /// </remarks>
 public static class EnvResolution
@@ -344,7 +337,6 @@ public static class EnvResolution
         }
 
         members = [.. members
-            .Where(member => member.Key.Length > 0)
             .OrderBy(member => member.Key, StringComparer.Ordinal)
             .ThenBy(member => ApprovalPrompt.Shown(member.Entry.Name), StringComparer.Ordinal)];
 
@@ -358,44 +350,31 @@ public static class EnvResolution
     /// <param name="snapshot">The vault's entries, tags and group paths.</param>
     /// <param name="project">The project name.</param>
     /// <param name="profile">The environment's name.</param>
-    /// <param name="exists">Whether its legacy group exists or an entry is tagged into it, even with no variables.</param>
-    /// <returns>Each tagged entry's variable fields and each untagged legacy entry, in the vault's order.</returns>
+    /// <param name="exists">Whether an entry is tagged into it, even with no variables.</param>
+    /// <returns>Each tagged entry's variable fields, in the vault's order.</returns>
     internal static List<EnvMember> Members(EnvSnapshot snapshot, string project, string profile, out bool exists)
     {
-        var group = EnvProfileNames.GroupPath(project, profile);
-        exists = snapshot.GroupPaths.Contains(group, StringComparer.Ordinal);
-        List<EnvMember> members = [];
+        var tagged = snapshot.Entries
+            .Where(entry => !ReservedGroups.IsReserved(entry.Entry.GroupPath) && entry.IsTaggedInto(project, profile))
+            .ToList();
 
-        foreach (var entry in snapshot.Entries.Where(entry => !ReservedGroups.IsReserved(entry.Entry.GroupPath)))
-        {
-            if (entry.IsTaggedInto(project, profile))
-            {
-                exists = true;
-                members.AddRange(entry.Fields.Select(field => new EnvMember(field.Key, field.Value, entry, field.Key)));
-            }
-            else if (string.Equals(entry.Entry.GroupPath, group, StringComparison.Ordinal) && !entry.IsTagged)
-            {
-                members.Add(new EnvMember(entry.Entry.Title, entry.Entry.Password, entry, EnvSource.LegacyField));
-            }
-        }
-
-        return members;
+        exists = tagged.Count > 0;
+        return [.. tagged.SelectMany(entry => entry.Fields.Select(field => new EnvMember(field.Key, field.Value, entry, field.Key)))];
     }
 
-    /// <summary>Whether a vault holds a project: its <c>env/&lt;project&gt;</c> group, or an entry tagged into any of its environments.</summary>
+    /// <summary>Whether a vault holds a project: an entry tagged into any of its environments.</summary>
     internal static bool ProjectExists(EnvSnapshot snapshot, string project) =>
-        snapshot.GroupPaths.Contains(EnvConvention.GroupPath(project), StringComparer.Ordinal)
-        || snapshot.Entries.Any(entry => !ReservedGroups.IsReserved(entry.Entry.GroupPath)
+        snapshot.Entries.Any(entry => !ReservedGroups.IsReserved(entry.Entry.GroupPath)
             && entry.Tags.Select(ProjectTag.Read).Any(tag => tag.Kind == ProjectTagKind.Member && string.Equals(tag.Project, project, StringComparison.Ordinal)));
 
     /// <summary>Whether a variable is a custom field named like a standard one in another case, which keypaste never releases (D-0388).</summary>
     /// <param name="source">Where the variable lives.</param>
-    /// <returns><see langword="true"/> for such a field; a legacy variable is never one.</returns>
+    /// <returns><see langword="true"/> for such a field.</returns>
     public static bool IsNamedLikeStandard(EnvSource source)
     {
         ArgumentNullException.ThrowIfNull(source);
 
-        return !string.Equals(source.Field, EnvSource.LegacyField, StringComparison.Ordinal) && FieldNameRules.IsStandard(source.Key);
+        return FieldNameRules.IsStandard(source.Key);
     }
 
     /// <summary>Every reason each variable cannot be released, naming the entries concerned.</summary>
@@ -405,19 +384,7 @@ public static class EnvResolution
         {
             var at = Where([member]);
 
-            if (string.Equals(member.Field, EnvSource.LegacyField, StringComparison.Ordinal))
-            {
-                if (member.Key.Length == 0)
-                {
-                    yield return new EnvProblem(member.Key, $"has no title to be its variable name ({at})");
-                }
-                else if (!EnvConvention.IsValidKey(member.Key, out var invalid))
-                {
-                    var quoted = $"'{member.Key}' ";
-                    yield return new EnvProblem(member.Key, $"{(invalid.StartsWith(quoted, StringComparison.Ordinal) ? invalid[quoted.Length..] : invalid)} ({at})");
-                }
-            }
-            else if (IsNamedLikeStandard(member.Source))
+            if (IsNamedLikeStandard(member.Source))
             {
                 yield return new EnvProblem(member.Key, $"is a custom field named like a standard one, which keypaste never releases ({at})");
             }
@@ -439,22 +406,10 @@ public static class EnvResolution
         {
             yield return new EnvProblem(same.Key, $"is on more than one entry ({Where([.. same])})");
         }
-
-        foreach (var alike in members.GroupBy(member => member.Key, StringComparer.OrdinalIgnoreCase)
-            .Where(group => group.Select(member => member.Key).Distinct(StringComparer.Ordinal).Count() > 1))
-        {
-            var spellings = alike.Select(member => member.Key).Distinct(StringComparer.Ordinal).ToList();
-
-            foreach (var key in spellings)
-            {
-                var others = string.Join(", ", spellings.Where(other => !string.Equals(other, key, StringComparison.Ordinal)).Select(other => $"'{other}'"));
-                yield return new EnvProblem(key, $"differs only in case from {others}, which Windows treats as one variable ({Where([.. alike])})");
-            }
-        }
     }
 
-    /// <summary>Whether releasing a member's value must be asked about live, by its entry's path or any of its own tags.</summary>
-    internal static bool RequiresLiveApproval(EnvEntry entry) => EnvProfileNames.RequiresLiveApproval(entry.Name, entry.Tags);
+    /// <summary>Whether releasing a member's value must be asked about live, by any of its entry's own tags.</summary>
+    internal static bool RequiresLiveApproval(EnvEntry entry) => EnvProfileNames.RequiresLiveApproval(entry.Tags);
 
     /// <summary>The entries holding some members, as a prompt shows them, in ordinal order; two entries sharing a path are both named.</summary>
     private static string Where(IReadOnlyList<EnvMember> members) =>

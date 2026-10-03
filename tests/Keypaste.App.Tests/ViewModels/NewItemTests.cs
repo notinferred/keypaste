@@ -51,11 +51,11 @@ public sealed class NewItemTests : IDisposable
     }
 
     [Fact]
-    public void The_folder_is_chosen_from_the_vaults_groups_and_never_the_env_layout()
+    public void The_folder_is_chosen_from_the_vaults_groups_env_among_them()
     {
         var form = NewItemForm.Open(_entries);
 
-        Assert.Equal(["", "Work", "Work/Archive"], form.Folders.Select(folder => folder.Path));
+        Assert.Equal(["", "Work", "Work/Archive", "env", "env/billing"], form.Folders.Select(folder => folder.Path));
         Assert.Equal("Top level", form.Folders[0].Label);
         Assert.Equal(ItemTemplate.Login, form.Template);
     }

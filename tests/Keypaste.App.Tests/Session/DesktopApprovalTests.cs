@@ -516,7 +516,7 @@ public sealed class DesktopApprovalTests
         HeadlessSession.On(async () =>
         {
             await using var app = await PromptedApp.StartAsync();
-            var reply = app.Ask(entry: ProdEntryPath);
+            var reply = app.Ask(entry: TaggedEntryPath, exposure: "services/**");
             var window = await app.PromptAsync();
 
             Assert.False(window.FindControl<Button>("Approve")!.IsVisible);
@@ -531,23 +531,24 @@ public sealed class DesktopApprovalTests
             Assert.Equal(0, answered.TtlSeconds);
         });
 
+    /// <summary>An entry under <c>env/…/prod</c> with no protecting tag of its own is an ordinary entry, offered the timed allow (D-0416).</summary>
     [Fact]
-    public Task An_entry_tagged_into_a_protected_environment_is_offered_once_only() =>
+    public Task An_untagged_entry_under_a_prod_path_is_offered_the_timed_allow() =>
         HeadlessSession.On(async () =>
         {
             await using var app = await PromptedApp.StartAsync();
-            var reply = app.Ask(entry: TaggedEntryPath, exposure: "services/**");
+            var reply = app.Ask(entry: ProdEntryPath);
             var window = await app.PromptAsync();
 
-            Assert.False(window.FindControl<Button>("Approve")!.IsVisible);
-            Assert.True(window.FindControl<Button>("AllowOnce")!.IsVisible);
+            Assert.True(window.FindControl<Button>("Approve")!.IsVisible);
+            Assert.Equal("once, or for 1 hour", Text(window, "LifetimeText"));
 
             await app.ArmAsync();
-            Click(window, "AllowOnce");
+            Click(window, "Approve");
             var answered = await reply.WaitAsync(_wait, Token);
 
             Assert.Equal(AuditDecision.Granted, answered!.Decision);
-            Assert.Equal(0, answered.TtlSeconds);
+            Assert.Equal(3600, answered.TtlSeconds);
         });
 
     [Fact]
@@ -766,6 +767,8 @@ public sealed class DesktopApprovalTests
             using (var created = Core.Vault.Create(vault, TempVault.Password))
             {
                 created.AddEntry(new VaultEntry { GroupPath = "env/ci", Title = "DEPLOY_KEY", Password = Sentinel });
+                Assert.True(created.SetFields(new EntryName("env/ci", "DEPLOY_KEY"), [new FieldWrite("DEPLOY_KEY", Sentinel)]));
+                created.AddTag(new EntryName("env/ci", "DEPLOY_KEY"), "env:ci");
                 created.AddEntry(new VaultEntry { GroupPath = "env/ci/prod", Title = "DEPLOY_KEY", Password = Sentinel });
                 created.AddEntry(new VaultEntry { GroupPath = "services", Title = "Stripe", Password = Sentinel });
                 created.AddTag(new EntryName("services", "Stripe"), "env:ci:prod");

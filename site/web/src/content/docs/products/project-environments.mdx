@@ -21,7 +21,7 @@ flowchart LR
 
 A set is injected whole or not at all. An expired entry, a repeated name or a name that cannot be an environment variable stops the run, and the error names each entry and why, never a value.
 
-In the release being built, a variable becomes a named field on an ordinary entry, and a KeePass tag such as `env:billing` or `env:billing:prod` puts the entry into a project, so one value can serve several environments. Each project gets a value for dev, staging and prod, and prod always needs a live answer from you. The repository can commit a `.env.keypaste` file of `kp://` references instead of values. Projects kept the earlier way, one entry per variable, keep working and can be moved.
+In the release being built, a variable becomes a named field on an ordinary entry, and a KeePass tag such as `env:billing` or `env:billing:prod` puts the entry into a project, so one value can serve several environments. Each project gets a value for dev, staging and prod, and prod always needs a live answer from you. The repository can commit a `.env.keypaste` file of `kp://` references instead of values. Entries kept the earlier way, one per variable under `env/<project>`, stay ordinary entries and are no longer read as variables.
 
 ## What it does
 

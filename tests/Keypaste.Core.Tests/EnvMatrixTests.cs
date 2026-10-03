@@ -8,6 +8,9 @@ public sealed class EnvMatrixTests : IDisposable
 {
     internal const string Shared = "shared-value-sentinel";
 
+    /// <summary>The entry of its own holding staging's JWT_SIGNING_KEY, so its expiry spares staging's other keys.</summary>
+    internal static readonly EntryName Signing = new("services", "Signing");
+
     private readonly string _directory = Directory.CreateTempSubdirectory("keypaste-env-matrix-").FullName;
     private readonly ManualClock _clock = new(new DateTimeOffset(2026, 9, 25, 12, 0, 0, TimeSpan.Zero));
     private readonly Vault _vault;
@@ -16,20 +19,22 @@ public sealed class EnvMatrixTests : IDisposable
 
     /// <summary>
     /// <c>acme-api</c> with dev, staging and prod: SENTRY_DSN only in prod, STRIPE_KEY the same in dev
-    /// and prod, and staging's JWT_SIGNING_KEY expired on 2026-09-01.
+    /// and prod, and staging's JWT_SIGNING_KEY on <see cref="Signing"/>, which expired on 2026-09-01.
     /// </summary>
     internal static Vault Seeded(string directory)
     {
         var vault = Vault.Create(Path.Combine(directory, "vault.kdbx"), EnvStoreTests.MasterPassword);
 
-        LegacyVariables.Set(vault, "acme-api", "DATABASE_URL", "dev-db");
-        LegacyVariables.Set(vault, "acme-api", "STRIPE_KEY", Shared);
-        LegacyVariables.Set(vault, "acme-api", "prod", "DATABASE_URL", "prod-db");
-        LegacyVariables.Set(vault, "acme-api", "prod", "STRIPE_KEY", Shared);
-        LegacyVariables.Set(vault, "acme-api", "prod", "SENTRY_DSN", "prod-sentry");
-        LegacyVariables.Set(vault, "acme-api", "staging", "DATABASE_URL", "staging-db");
-        LegacyVariables.Set(vault, "acme-api", "staging", "JWT_SIGNING_KEY", "staging-jwt");
-        vault.SetExpiryUnchecked(new EntryName("env/acme-api/staging", "JWT_SIGNING_KEY"), new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero));
+        ProjectVariables.Set(vault, "acme-api", "DATABASE_URL", "dev-db");
+        ProjectVariables.Set(vault, "acme-api", "STRIPE_KEY", Shared);
+        ProjectVariables.Set(vault, "acme-api", "prod", "DATABASE_URL", "prod-db");
+        ProjectVariables.Set(vault, "acme-api", "prod", "STRIPE_KEY", Shared);
+        ProjectVariables.Set(vault, "acme-api", "prod", "SENTRY_DSN", "prod-sentry");
+        ProjectVariables.Set(vault, "acme-api", "staging", "DATABASE_URL", "staging-db");
+        vault.AddEntry(new VaultEntry { GroupPath = Signing.GroupPath, Title = Signing.Title });
+        vault.SetFields(Signing, [new FieldWrite("JWT_SIGNING_KEY", "staging-jwt")]);
+        vault.AddTag(Signing, "env:acme-api:staging");
+        vault.SetExpiryUnchecked(Signing, new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero));
 
         return vault;
     }
@@ -53,8 +58,8 @@ public sealed class EnvMatrixTests : IDisposable
         var jwt = matrix.Row("JWT_SIGNING_KEY")!.Cells[1];
         Assert.Equal(EnvCellState.Unusable, jwt.State);
         Assert.Equal("staging", jwt.Profile);
-        Assert.Equal("expired 2026-09-01 00:00:00Z (env/acme-api/staging/JWT_SIGNING_KEY)", jwt.Problem);
-        Assert.Equal([new EntryName("env/acme-api/staging", "JWT_SIGNING_KEY")], jwt.Sources);
+        Assert.Equal("expired 2026-09-01 00:00:00Z (services/Signing)", jwt.Problem);
+        Assert.Equal([Signing], jwt.Sources);
 
         Assert.Null(matrix.Row("ABSENT"));
         Assert.Empty(EnvMatrix.Build(_vault, "absent", _clock).Rows);

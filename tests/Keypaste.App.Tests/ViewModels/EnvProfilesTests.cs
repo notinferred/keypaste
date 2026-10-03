@@ -23,9 +23,9 @@ public sealed class EnvProfilesTests : IDisposable
     {
         using (var vault = Vault.Open(_fixture.Path_, TempVault.Password))
         {
-            LegacyVariables.Set(vault, "acme-api", "DATABASE_URL", "dev-db");
-            LegacyVariables.Set(vault, "acme-api", "prod", "DATABASE_URL", _prodValue);
-            LegacyVariables.Set(vault, "acme-api", "prod", "SENTRY_DSN", "prod-sentry");
+            ProjectVariables.Set(vault, "acme-api", "DATABASE_URL", "dev-db");
+            ProjectVariables.Set(vault, "acme-api", "prod", "DATABASE_URL", _prodValue);
+            ProjectVariables.Set(vault, "acme-api", "prod", "SENTRY_DSN", "prod-sentry");
             vault.Save();
         }
 
@@ -51,7 +51,6 @@ public sealed class EnvProfilesTests : IDisposable
         var matrix = Assert.IsType<EnvMatrix>(project.Matrix);
         Assert.Equal(["DATABASE_URL", "SENTRY_DSN"], matrix.Rows.Select(row => row.Key));
         Assert.Equal([EnvCellState.Missing, EnvCellState.Set], matrix.Row("SENTRY_DSN")!.Cells.Select(cell => cell.State));
-        Assert.Empty(project.ProfileProblems);
     }
 
     [Fact]
@@ -84,8 +83,8 @@ public sealed class EnvProfilesTests : IDisposable
         Assert.NotNull(vault.ReadField(staging, "STAGING_ONLY"));
         Assert.Equal(["env:acme-api:staging"], vault.Tags(staging));
         Assert.Null(vault.Find(new EntryName("env/acme-api/staging", "STAGING_ONLY")));
-        Assert.Null(vault.Find(new EntryName("env/acme-api/prod", "SENTRY_DSN")));
-        Assert.Equal("dev-db", vault.Find(new EntryName("env/acme-api", "DATABASE_URL"))?.Password);
+        Assert.Null(vault.ReadField(ProjectVariables.Home("acme-api", "prod"), "SENTRY_DSN"));
+        Assert.Equal("dev-db", vault.ReadField(ProjectVariables.Home("acme-api"), "DATABASE_URL"));
     }
 
     [Fact]
@@ -125,14 +124,15 @@ public sealed class EnvProfilesTests : IDisposable
     [Fact]
     public void Add_OffersTheHomeEntryAndTheTaggedEntries_AndWritesOnTheOneChosen()
     {
-        var stripe = TaggedStripe();
-        var home = new EntryName("env/acme-api", ".env");
+        var stripe = TaggedStripe("env:acme-api:staging");
+        var home = new EntryName("env/acme-api", ".env.staging");
         using var screen = new EnvSetsViewModel(_session, _countdown);
         var project = Open(screen);
+        project.SelectedProfile = "staging";
 
         project.BeginAddCommand.Execute(null);
         Assert.Equal(
-            [new EnvEntryChoice(null, "env/acme-api/.env, created on first use"), new EnvEntryChoice(stripe, "services/Stripe")],
+            [new EnvEntryChoice(null, "env/acme-api/.env.staging, created on first use"), new EnvEntryChoice(stripe, "services/Stripe")],
             project.EntryChoices);
         Assert.Equal(project.EntryChoices[0], project.NewEntry);
 
@@ -147,9 +147,9 @@ public sealed class EnvProfilesTests : IDisposable
         project.NewKey = "HOME_KEY";
         project.ConfirmAddCommand.Execute(null);
         Assert.Null(screen.Error);
-        Assert.Equal(["env:acme-api"], _session.Unlocked.Tags(home));
+        Assert.Equal(["env:acme-api:staging"], _session.Unlocked.Tags(home));
         Assert.True(Assert.Single(_session.Unlocked.Fields(home)!).IsProtected);
-        Assert.Equal(new EnvEntryChoice(home, "env/acme-api/.env"), project.EntryChoices[0]);
+        Assert.Equal(new EnvEntryChoice(home, "env/acme-api/.env.staging"), project.EntryChoices[0]);
 
         project.BeginAddCommand.Execute(null);
         project.NewKey = "lower_case";
@@ -253,21 +253,15 @@ public sealed class EnvProfilesTests : IDisposable
     }
 
     [Fact]
-    public void EntryDetail_ShowsItsReference()
+    public void EntryDetail_ShowsItsEntryReference_UnderEnvToo()
     {
         using var entries = new EntriesViewModel(_session, _countdown);
 
-        entries.Selected = entries.Rows.Single(row => row.GroupPath == "env/acme-api/prod" && row.Title == "DATABASE_URL");
-        var detail = entries.Detail!;
-
-        Assert.Equal("kp://acme-api/prod/DATABASE_URL", detail.Reference);
-        var profiles = Assert.IsType<EnvMatrixRow>(detail.Profiles);
-        Assert.Equal(["dev", "prod"], profiles.Cells.Select(cell => cell.Profile));
-        Assert.True(EnvProfileNames.IsProtected(profiles.Cells[1].Profile));
+        entries.Selected = entries.Rows.Single(row => row.GroupPath == "env/acme-api" && row.Title == ".env.prod");
+        Assert.Equal("kp:///env/acme-api/.env.prod", entries.Detail!.Reference);
 
         entries.Selected = entries.Rows.Single(row => row.Title == "example");
         Assert.Equal("kp:///example", entries.Detail!.Reference);
-        Assert.Null(entries.Detail.Profiles);
     }
 
     [Fact]
@@ -342,14 +336,14 @@ public sealed class EnvProfilesTests : IDisposable
         Assert.Contains("is a vault", screen.Error, StringComparison.Ordinal);
     }
 
-    /// <summary>An ordinary entry tagged into acme-api's dev, holding STRIPE_KEY as a field, saved.</summary>
-    private EntryName TaggedStripe()
+    /// <summary>An ordinary entry tagged into one of acme-api's environments, dev unless named, holding STRIPE_KEY as a field, saved.</summary>
+    private EntryName TaggedStripe(string tag = "env:acme-api")
     {
         var vault = _session.Unlocked!;
         var stripe = new EntryName("services", "Stripe");
         vault.AddEntry(new VaultEntry { GroupPath = "services", Title = "Stripe", Password = "stripe-login" });
         Assert.True(vault.SetFields(stripe, [new FieldWrite("STRIPE_KEY", "stripe-sentinel")]));
-        Assert.True(vault.AddTag(stripe, "env:acme-api"));
+        Assert.True(vault.AddTag(stripe, tag));
         vault.Save();
         return stripe;
     }

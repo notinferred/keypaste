@@ -30,7 +30,7 @@ public sealed class EnvDiffTests : IDisposable
     public void An_unusable_key_is_named_with_why()
     {
         Assert.Contains(
-            new EnvDiffLine("JWT_SIGNING_KEY", EnvDiffKind.Unusable, "staging", "expired 2026-09-01 00:00:00Z (env/acme-api/staging/JWT_SIGNING_KEY)"),
+            new EnvDiffLine("JWT_SIGNING_KEY", EnvDiffKind.Unusable, "staging", "expired 2026-09-01 00:00:00Z (services/Signing)"),
             Compare("dev", "staging"));
     }
 
@@ -48,8 +48,8 @@ public sealed class EnvDiffTests : IDisposable
     [Fact]
     public void Two_profiles_with_the_same_usable_keys_have_no_difference()
     {
-        LegacyVariables.Set(_vault, "acme-api", "qa", "DATABASE_URL", "qa-db");
-        LegacyVariables.Set(_vault, "acme-api", "qa2", "DATABASE_URL", "qa2-db");
+        ProjectVariables.Set(_vault, "acme-api", "qa", "DATABASE_URL", "qa-db");
+        ProjectVariables.Set(_vault, "acme-api", "qa2", "DATABASE_URL", "qa2-db");
 
         Assert.Empty(Compare("qa", "qa2"));
         Assert.Throws<ArgumentException>(() => Compare("dev", "absent"));

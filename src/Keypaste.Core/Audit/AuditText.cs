@@ -69,7 +69,7 @@ public static class AuditText
     /// <exception cref="ArgumentNullException"><paramref name="entries"/> is null.</exception>
     /// <remarks>
     /// <b>Marking the unverified rows is not decoration.</b> A line the chain cannot check — one
-    /// predating it, one from a newer schema, one somebody inserted — parses as a record and renders
+    /// from a newer schema, one somebody inserted — parses as a record and renders
     /// as a record, so an unmarked table is a place where something that never happened can be made
     /// to look exactly like something that did. The chain's answer is per record, and so is this.
     /// </remarks>
@@ -297,18 +297,11 @@ public static class AuditText
 
     private static IEnumerable<string> Forgiven(AuditChainReport report)
     {
-        if (report.Legacy > 0)
-        {
-            yield return $"{Count(report.Legacy, "record")} predate the hash chain and cannot be checked.";
-            yield return "That is not a sign of tampering; it is what a log written before 2.4 looks";
-            yield return $"like. `keypaste log` marks them {UnverifiedMark}, because an unverifiable record";
-            yield return "reads exactly like a verified one.";
-        }
-
         if (report.Newer > 0)
         {
             yield return $"{Count(report.Newer, "record")} were written by a newer keypaste, so nothing here";
-            yield return $"can vouch for them. `keypaste log` marks them {UnverifiedMark} too.";
+            yield return $"can vouch for them. `keypaste log` marks them {UnverifiedMark}, because an";
+            yield return "unverifiable record reads exactly like a verified one.";
         }
 
         if (report.Unfinished)
@@ -354,8 +347,6 @@ public static class AuditText
         AuditChainFault.Altered => "its own bytes have changed since it was written.",
         AuditChainFault.Unlinked => "it does not follow the record before it. One was removed or inserted.",
         AuditChainFault.Restarted => "the chain starts again here. The records before it were cut off.",
-        AuditChainFault.Backdated => "a record from before the chain existed, sitting after records that"
-            + " carry it. keypaste never writes one there.",
         _ => "it is not a record keypaste wrote. Something else wrote into the log.",
     };
 

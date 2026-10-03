@@ -238,12 +238,11 @@ public sealed class SecretHygieneTests
         // First, that the list actually listed something. Without this the sweep below passes for a
         // screen that renders nothing at all, which is the shape 4.1 already had.
         //
-        // Four rows, not two: an environment variable is an ordinary entry under env/<project>, so
-        // `keypaste ls` lists it and so does this. The screens differ in what they do with it, not
-        // in whether they can see it (D-0014).
+        // Four rows, not two: a project's variables are fields of its home entry env/<project>/.env,
+        // an ordinary entry `keypaste ls` lists too.
         Assert.Equal(4, entries.Rows.Count);
         Assert.Contains(entries.Rows, row => row.Title == SentinelTitle);
-        Assert.Contains(entries.Rows, row => row.Title == SentinelEnvKey);
+        Assert.Contains(entries.Rows, row => row.GroupPath == "env/" + SentinelProject && row.Title == EnvStore.HomeTitle);
         Assert.Contains(entries.Rows, row => row.Title == SentinelUnselectedTitle);
         Assert.Contains(entries.Groups, group => group.Name == SentinelGroup);
 
@@ -372,7 +371,7 @@ public sealed class SecretHygieneTests
 
         Assert.Equal(
             DeletionOutcome.Recycled,
-            vault.RemoveEntry(new EntryName("env/" + SentinelProject, SentinelEnvKey)));
+            vault.RemoveEntry(ProjectVariables.Home(SentinelProject)));
 
         var rows = vault.ReadRecycled();
 
@@ -1015,10 +1014,10 @@ public sealed class SecretHygieneTests
                 GroupPath = SentinelGroup,
             });
 
-            LegacyVariables.Set(vault, SentinelProject, SentinelEnvKey, SentinelEnvValue);
+            ProjectVariables.Set(vault, SentinelProject, SentinelEnvKey, SentinelEnvValue);
 
             // A second project, whose card is drawn and whose table is never opened.
-            LegacyVariables.Set(vault, SentinelOtherProject, "OTHER_KEY", SentinelOtherEnvValue);
+            ProjectVariables.Set(vault, SentinelOtherProject, "OTHER_KEY", SentinelOtherEnvValue);
 
             vault.Save();
         }

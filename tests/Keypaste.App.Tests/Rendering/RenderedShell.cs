@@ -61,7 +61,7 @@ internal sealed class RenderedShell : IDisposable
             vault.AddEntry(new VaultEntry { Title = "github", Username = "me", Password = Superseded, Url = "https://github.com/login" });
             vault.SetFields(new EntryName(string.Empty, "github"), [new FieldWrite("API_TOKEN", FieldValue), new FieldWrite("Region", PlainFieldValue, Protect: false)]);
             vault.UpdateEntry(new VaultEntry { Title = "github", Username = "me", Password = Current, Url = "https://github.com/login" });
-            vault.AddEntry(new VaultEntry { Title = "STRIPE_KEY", Password = EnvValue, GroupPath = "env/billing" });
+            ProjectVariables.Set(vault, "billing", "STRIPE_KEY", EnvValue);
             seed?.Invoke(vault);
             vault.Save();
         }

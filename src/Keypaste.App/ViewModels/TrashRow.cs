@@ -16,7 +16,7 @@ namespace Keypaste.App.ViewModels;
 /// </para>
 /// <para>
 /// <see cref="Id"/> is the address (DECISIONS.md D-0250). Two entries called <c>TOKEN</c> deleted
-/// from two projects land in one bin, so neither the title nor the row's position can say which
+/// from two groups land in one bin, so neither the title nor the row's position can say which
 /// one a person picked.
 /// </para>
 /// </remarks>

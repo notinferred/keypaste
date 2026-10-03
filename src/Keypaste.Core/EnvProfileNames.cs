@@ -1,13 +1,12 @@
 namespace Keypaste.Core;
 
 /// <summary>
-/// Where a project's profiles live. The default profile is the project group itself,
-/// <c>env/&lt;project&gt;</c>, exactly as every vault before profiles held it; any other profile is a
-/// subgroup, <c>env/&lt;project&gt;/&lt;profile&gt;</c>.
+/// A project's profiles, which its entries' tags name (D-0370): which names keypaste resolves, which
+/// are protected, and how a set is named in audit lines and grants.
 /// </summary>
 public static class EnvProfileNames
 {
-    /// <summary>The profile a command uses when none is named, stored flat in the project group.</summary>
+    /// <summary>The profile a command uses when none is named, the one the tag <c>env:&lt;project&gt;</c> names.</summary>
     public const string Default = "dev";
 
     /// <summary>The longest profile name keypaste creates.</summary>
@@ -49,8 +48,8 @@ public static class EnvProfileNames
             || name.StartsWith("production-", StringComparison.Ordinal);
     }
 
-    /// <summary>The group holding one profile of one project.</summary>
-    public static string GroupPath(string project, string profile)
+    /// <summary>How audit lines and grants name one profile's set: <c>env/&lt;project&gt;</c> for <c>dev</c>, else <c>env/&lt;project&gt;/&lt;profile&gt;</c>; it names no group (D-0416).</summary>
+    public static string SetName(string project, string profile)
     {
         ArgumentNullException.ThrowIfNull(profile);
 
@@ -59,30 +58,13 @@ public static class EnvProfileNames
             : EnvConvention.GroupPath(project) + "/" + profile;
     }
 
-    /// <summary>Whether releasing this entry to an agent must be asked about live every time.</summary>
-    /// <remarks>Any group segment below the project that names a protected profile counts, in any case, so a subgroup KeePassXC created as <c>Prod</c> is not a way around it.</remarks>
-    public static bool RequiresLiveApproval(EntryName entry)
-    {
-        ArgumentNullException.ThrowIfNull(entry);
-
-        var prefix = EnvConvention.RootGroup + "/";
-        if (!entry.GroupPath.StartsWith(prefix, StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        var segments = entry.GroupPath[prefix.Length..].Split('/');
-        return segments.Skip(1).Any(IsProtected);
-    }
-
-    /// <summary>Whether releasing this entry must be asked about live every time, by its path or by any of its own tags.</summary>
-    /// <param name="entry">The entry.</param>
+    /// <summary>Whether releasing an entry must be asked about live every time, by any of its own tags (D-0371, D-0416).</summary>
     /// <param name="tags">The entry's own tags; a group's are never passed.</param>
-    /// <returns><see langword="true"/> when the path or a tag names a protected environment (<see cref="ProjectTag.Protects"/>).</returns>
-    public static bool RequiresLiveApproval(EntryName entry, IEnumerable<string> tags)
+    /// <returns><see langword="true"/> when a tag names a protected environment (<see cref="ProjectTag.Protects"/>).</returns>
+    public static bool RequiresLiveApproval(IEnumerable<string> tags)
     {
         ArgumentNullException.ThrowIfNull(tags);
 
-        return RequiresLiveApproval(entry) || tags.Any(tag => ProjectTag.Read(tag).Protects);
+        return tags.Any(tag => ProjectTag.Read(tag).Protects);
     }
 }

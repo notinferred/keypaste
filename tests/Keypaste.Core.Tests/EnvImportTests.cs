@@ -21,8 +21,8 @@ public sealed class EnvImportTests : IDisposable
     {
         using var vault = Opened(created =>
         {
-            LegacyVariables.Set(created, "dev", "SAME", "same-value");
-            LegacyVariables.Set(created, "dev", "OLD", "old-value");
+            ProjectVariables.Set(created, "dev", "SAME", "same-value");
+            ProjectVariables.Set(created, "dev", "OLD", "old-value");
             TaggedStripe(created);
         });
 
@@ -32,15 +32,15 @@ public sealed class EnvImportTests : IDisposable
         Assert.Equal(
             [
                 new EnvKeyWrite("FRESH", EnvWriteChange.New, _home, "FRESH"),
-                new EnvKeyWrite("OLD", EnvWriteChange.Replaces, new EntryName("env/dev", "OLD"), EnvSource.LegacyField),
-                new EnvKeyWrite("SAME", EnvWriteChange.Unchanged, new EntryName("env/dev", "SAME"), EnvSource.LegacyField),
+                new EnvKeyWrite("OLD", EnvWriteChange.Replaces, _home, "OLD"),
+                new EnvKeyWrite("SAME", EnvWriteChange.Unchanged, _home, "SAME"),
                 new EnvKeyWrite("STRIPE_KEY", EnvWriteChange.Replaces, _stripe, "STRIPE_KEY"),
             ],
             plan.Keys);
         Assert.Equal(["FRESH"], plan.Created);
         Assert.Equal(["OLD", "STRIPE_KEY"], plan.Updated);
         Assert.Equal(1, plan.Unchanged);
-        Assert.True(plan.CreatesHome);
+        Assert.False(plan.CreatesHome);
         Assert.True(plan.WritesAnything);
     }
 
@@ -49,14 +49,13 @@ public sealed class EnvImportTests : IDisposable
     {
         using var vault = Opened(created =>
         {
-            LegacyVariables.Set(created, "dev", "SAME", "same-value");
-            LegacyVariables.Set(created, "dev", "OLD", "old-value");
+            ProjectVariables.Set(created, "dev", "SAME", "same-value");
             TaggedStripe(created);
         });
         var store = new EnvStore(vault);
-        var same = vault.ReadHistory(new EntryName("env/dev", "SAME"))!.Count;
+        var home = vault.ReadHistory(_home)!.Count;
         var stripe = vault.ReadHistory(_stripe)!.Count;
-        var plan = EnvImport.Plan(store, "dev", "dev", Parsed("SAME=same-value\nOLD=new-value\nSTRIPE_KEY=sk-new\nSTRIPE_WEBHOOK=whsec-new\nFRESH=fresh-value\n"), _stripe);
+        var plan = EnvImport.Plan(store, "dev", "dev", Parsed("SAME=same-value\nSTRIPE_KEY=sk-new\nSTRIPE_WEBHOOK=whsec-new\nFRESH=fresh-value\n"), _stripe);
 
         Assert.True(store.TryApply(plan, out var rejection), rejection);
         vault.Save();
@@ -64,33 +63,31 @@ public sealed class EnvImportTests : IDisposable
         Assert.Equal(
             [
                 new EnvVariable("FRESH", "fresh-value"),
-                new EnvVariable("OLD", "new-value"),
                 new EnvVariable("SAME", "same-value"),
                 new EnvVariable("STRIPE_KEY", "sk-new"),
                 new EnvVariable("STRIPE_WEBHOOK", "whsec-new"),
             ],
             EnvResolution.Resolve(vault, "dev", TimeProvider.System).Variables);
-        Assert.Equal(same, vault.ReadHistory(new EntryName("env/dev", "SAME"))!.Count);
+        Assert.Equal(home, vault.ReadHistory(_home)!.Count);
         Assert.Equal(stripe + 1, vault.ReadHistory(_stripe)!.Count);
-        Assert.Contains(vault.ReadHistory(new EntryName("env/dev", "OLD"))!, revision => revision.Fields.Password == "old-value");
         Assert.Equal(["FRESH", "STRIPE_KEY", "STRIPE_WEBHOOK"], vault.Fields(_stripe)!.Select(field => field.Name));
-        Assert.Null(vault.Find(_home));
+        Assert.Equal(["SAME"], vault.Fields(_home)!.Select(field => field.Name));
     }
 
     [Fact]
     public void Names_that_differ_only_in_case_refuse_the_whole_import_before_anything_is_written()
     {
-        using var vault = Opened(created => LegacyVariables.Set(created, "dev", "Token", "stored"));
+        using var vault = Opened(created => ProjectVariables.Set(created, "dev", "TOKEN", "stored"));
         var store = new EnvStore(vault);
 
         var inFile = EnvImport.Plan(store, "dev", Parsed("KEY=a\nkey=b\n"));
-        var againstVault = EnvImport.Plan(store, "dev", Parsed("NEW=a\nTOKEN=b\n"));
+        var againstVault = EnvImport.Plan(store, "dev", Parsed("NEW=a\nToken=b\n"));
 
         Assert.Equal("the file sets both 'KEY' and 'key', which differ only in case", inFile.Refusal);
-        Assert.Equal("'dev/dev' already has 'Token', which differs from 'TOKEN' only in case (env/dev/Token)", againstVault.Refusal);
+        Assert.Equal("'dev/dev' already has 'TOKEN', which differs from 'Token' only in case (env/dev/.env)", againstVault.Refusal);
         Assert.False(againstVault.WritesAnything);
         Assert.False(store.TryApply(againstVault, out _));
-        Assert.Equal([new EnvVariable("Token", "stored")], EnvResolution.List(vault, "dev", "dev").Variables);
+        Assert.Equal([new EnvVariable("TOKEN", "stored")], EnvResolution.List(vault, "dev", "dev").Variables);
     }
 
     [Fact]
@@ -111,8 +108,8 @@ public sealed class EnvImportTests : IDisposable
     {
         using var vault = Opened(created =>
         {
-            LegacyVariables.Set(created, "dev", "API_KEY", "real-key");
-            LegacyVariables.Set(created, "dev", "DATABASE_URL", "postgres://real");
+            ProjectVariables.Set(created, "dev", "API_KEY", "real-key");
+            ProjectVariables.Set(created, "dev", "DATABASE_URL", "postgres://real");
         });
         var store = new EnvStore(vault);
         var exported = EnvReferenceFile.Format("dev", EnvProfileNames.Default, ["API_KEY", "DATABASE_URL"]);

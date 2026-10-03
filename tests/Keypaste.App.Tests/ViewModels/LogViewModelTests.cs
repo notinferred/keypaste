@@ -33,7 +33,7 @@ public sealed class LogViewModelTests : IDisposable
 
         Assert.Equal(entries.Reverse(), model.Rows.Select(row => row.Source));
         Assert.Equal("GITHUB_TOKEN", model.Rows[0].Secrets);
-        Assert.Equal("prod", model.Rows[0].Where);
+        Assert.Equal("env/prod", model.Rows[0].Where);
         Assert.All(model.Rows, row => Assert.True(row.Verified));
         Assert.Equal("2 records", model.Summary);
         Assert.Equal(_home.LogPath, model.LogPath);

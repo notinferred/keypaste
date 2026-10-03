@@ -59,7 +59,7 @@ public sealed class FourPlacesJourneyTests
             using (var created = Vault.Create(vault, TempVault.Password))
             {
                 created.AddEntry(new VaultEntry { GroupPath = "Work", Title = "github", Username = "me", Password = "gh-journey" });
-                created.AddEntry(new VaultEntry { GroupPath = "env/billing", Title = "STRIPE_KEY", Password = "sk-journey" });
+                ProjectVariables.Set(created, "billing", "STRIPE_KEY", "sk-journey");
                 created.Save();
             }
 

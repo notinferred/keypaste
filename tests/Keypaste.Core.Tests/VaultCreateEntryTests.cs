@@ -61,13 +61,30 @@ public sealed class VaultCreateEntryTests : IDisposable
         Assert.Empty(reopened.ReadHistory(new EntryName("Work", "github"))!);
     }
 
+    /// <summary>A group under <c>env</c> is an ordinary group, and an item made there joins no project by being there (D-0416).</summary>
+    [Fact]
+    public void An_item_is_created_in_a_group_under_env_like_any_other()
+    {
+        var path = NewVaultPath();
+        var token = new EntryName("env/acme", "OPENAI_API_KEY");
+
+        using (var vault = Seeded(path))
+        {
+            vault.AddEntry(new VaultEntry { Title = "OLD_KEY", GroupPath = "env/acme", Password = "old" });
+            vault.CreateEntry(new VaultEntry { Title = token.Title, GroupPath = token.GroupPath, Password = "sk-proj-1" }, [], []);
+            vault.Save();
+        }
+
+        using var reopened = Vault.Open(path, _master);
+        Assert.Equal("sk-proj-1", reopened.Find(token)?.Password);
+        Assert.Empty(ProjectCatalog.Read(reopened).Projects);
+    }
+
     [Theory]
     [InlineData("Work", "Stripe", "", "", "is already in that group")]
     [InlineData("Work", "", "", "", "")]
     [InlineData("Work", "a/b", "", "", "")]
     [InlineData("Nowhere", "OpenAI", "", "", "There is no group 'Nowhere'")]
-    [InlineData("env/acme", "OPENAI_API_KEY", "", "", "The env group")]
-    [InlineData("env", "OpenAI", "", "", "The env group")]
     [InlineData(".keypaste", "OpenAI", "", "", "keeps that group for itself")]
     [InlineData("Work", "OpenAI", "otp", "", "")]
     [InlineData("Work", "OpenAI", "Password", "", "")]

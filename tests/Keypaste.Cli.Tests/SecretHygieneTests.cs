@@ -358,6 +358,16 @@ public sealed class SecretHygieneTests
         Assert.DoesNotContain(key, server.Transcript, StringComparison.Ordinal);
     }
 
+    /// <summary>Adds <c>services/&lt;title&gt;</c>, expired, tagged <paramref name="tag"/> and holding <paramref name="key"/> with the notes sentinel.</summary>
+    private static void ExpiredHolder(Vault vault, string title, string tag, string key)
+    {
+        var name = new EntryName("services", title);
+        vault.AddEntry(new VaultEntry { GroupPath = name.GroupPath, Title = title, Password = "login" });
+        Assert.True(vault.SetFields(name, [new FieldWrite(key, SentinelNotes)]));
+        Assert.True(vault.AddTag(name, tag));
+        vault.SetExpiryUnchecked(name, new DateTimeOffset(2020, 1, 1, 0, 0, 0, TimeSpan.Zero));
+    }
+
     private static void Seed(CliHarness harness)
     {
         harness.Prompt.Interactive = false;
@@ -411,9 +421,8 @@ public sealed class SecretHygieneTests
 
         using (var vault = Vault.Open(harness.VaultPath, Master))
         {
-            LegacyVariables.Set(vault, "hygiene", "prod", "API_KEY", SentinelPassword);
-            LegacyVariables.Set(vault, "hygiene", "prod", "OTHER", SentinelNotes);
-            vault.SetExpiryUnchecked(new EntryName("env/hygiene/prod", "OTHER"), new DateTimeOffset(2020, 1, 1, 0, 0, 0, TimeSpan.Zero));
+            ProjectVariables.Set(vault, "hygiene", "prod", "API_KEY", SentinelPassword);
+            ExpiredHolder(vault, "Other", "env:hygiene:prod", "OTHER");
             vault.Save();
         }
 
@@ -437,7 +446,7 @@ public sealed class SecretHygieneTests
 
         using (var vault = Vault.Open(harness.VaultPath, Master))
         {
-            vault.AddEntry(new VaultEntry { GroupPath = "env/hygiene", Title = "BAD-NAME", Password = SentinelNotes });
+            ExpiredHolder(vault, "Stale", "env:hygiene", "STALE_KEY");
             vault.Save();
         }
 
@@ -448,7 +457,7 @@ public sealed class SecretHygieneTests
         Assert.Equal(CliApp.ExitInternalError, harness.Run("run", "--env-file", file, "--vault", harness.VaultPath, "--", "node"));
 
         Assert.Contains("NOPE", harness.Err, StringComparison.Ordinal);
-        Assert.DoesNotContain("BAD-NAME", harness.Err, StringComparison.Ordinal);
+        Assert.DoesNotContain("STALE_KEY", harness.Err, StringComparison.Ordinal);
         Assert.Empty(harness.ProcessLauncher.Started);
         foreach (var sentinel in new[] { SentinelPassword, SentinelUsername, SentinelNotes })
         {

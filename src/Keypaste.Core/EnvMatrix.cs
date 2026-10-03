@@ -20,7 +20,7 @@ public enum EnvCellState
 /// <param name="SameValueAs">The other profiles holding an identical value, for a set key.</param>
 public sealed record EnvCell(string Profile, EnvCellState State, string? Problem, IReadOnlyList<string> SameValueAs)
 {
-    /// <summary>The entries holding the key in this profile, a tagged entry's field or a legacy variable; more than one is a refusal.</summary>
+    /// <summary>The entries holding the key as a field in this profile; more than one is a refusal.</summary>
     public IReadOnlyList<EntryName> Sources { get; init; } = [];
 }
 
@@ -37,10 +37,9 @@ public sealed record EnvMatrixRow(string Key, IReadOnlyList<EnvCell> Cells);
 /// hold one, so a matrix can be bound, logged or printed without that question arising.
 /// </remarks>
 /// <param name="Project">The project.</param>
-/// <param name="Profiles">Its environments, legacy groups and tags together, as <see cref="ProjectCatalog"/> orders them.</param>
+/// <param name="Profiles">Its environments, as <see cref="ProjectCatalog"/> orders them.</param>
 /// <param name="Rows">One row per key any profile holds, ordinal by key.</param>
-/// <param name="Problems">The subgroups that are never read, as <see cref="EnvStore.ProfileProblems"/> words them.</param>
-public sealed record EnvMatrix(string Project, IReadOnlyList<EnvProfileInfo> Profiles, IReadOnlyList<EnvMatrixRow> Rows, IReadOnlyList<string> Problems)
+public sealed record EnvMatrix(string Project, IReadOnlyList<EnvProfileInfo> Profiles, IReadOnlyList<EnvMatrixRow> Rows)
 {
     /// <summary>Builds the matrix from the open vault as it is now.</summary>
     /// <param name="vault">The open vault.</param>
@@ -69,7 +68,7 @@ public sealed record EnvMatrix(string Project, IReadOnlyList<EnvProfileInfo> Pro
             var resolved = EnvResolution.Resolve(snapshot, project, profile.Name, keys: null, now);
             var values = new Dictionary<string, string>(StringComparer.Ordinal);
 
-            foreach (var member in EnvResolution.Members(snapshot, project, profile.Name, out _).Where(member => member.Key.Length > 0))
+            foreach (var member in EnvResolution.Members(snapshot, project, profile.Name, out _))
             {
                 values[member.Key] = member.Value;
 
@@ -97,7 +96,7 @@ public sealed record EnvMatrix(string Project, IReadOnlyList<EnvProfileInfo> Pro
             .Select(key => new EnvMatrixRow(key, [.. profiles.Select(profile => Cell(profile.Name, key))]))
             .ToList();
 
-        return new EnvMatrix(project, profiles, rows, new EnvStore(vault).ProfileProblems(project));
+        return new EnvMatrix(project, profiles, rows);
 
         EnvCell Cell(string profile, string key)
         {

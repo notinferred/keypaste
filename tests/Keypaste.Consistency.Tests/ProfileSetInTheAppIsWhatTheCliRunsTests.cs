@@ -9,12 +9,12 @@ namespace Keypaste.Consistency.Tests;
 
 /// <summary>
 /// A variable added to a profile on the Env Sets screen is what <c>keypaste run -p</c> injects, and
-/// a profile the CLI writes is the one the screen shows (D-0347).
+/// a profile the CLI writes is the one the screen shows (D-0413, D-0416).
 /// </summary>
 /// <remarks>
-/// The mutations this must catch: the screen writing a profile under another group than the CLI
-/// resolves, the default profile moving out of the project group, and an edit landing in the
-/// profile that was selected before.
+/// The mutations this must catch: the screen writing a profile's key on an entry not tagged into
+/// it, a key landing on another profile's home entry, and an edit landing in the profile that was
+/// selected before.
 /// </remarks>
 public sealed class ProfileSetInTheAppIsWhatTheCliRunsTests
 {

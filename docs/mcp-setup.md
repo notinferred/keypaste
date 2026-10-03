@@ -260,7 +260,7 @@ keypaste log verify --expect 651f0392457b29f80f3168584758418c71734077577a9c100e8
 
 `--expect` requires a record whose bytes still hash to the supplied value. keypaste does not store the anchor beside the log because a writer could replace both. [THREATS.md](../THREATS.md) T-5 covers these limits.
 
-Older `v:1` records lack a chain and are reported as predating it. `keypaste log` marks these and other unverifiable rows with `?`:
+No release of keypaste wrote a `v:1` record, so in source one is reported as a line something else wrote (D-0416). `keypaste log` marks it and other unverifiable rows with `?`:
 
 ```
   time (UTC)           client       entry                decision  method

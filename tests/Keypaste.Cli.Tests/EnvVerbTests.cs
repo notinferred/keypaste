@@ -135,11 +135,6 @@ public sealed class EnvVerbTests
     {
         using var harness = new CliHarness();
         SeedVault(harness);
-        using (var vault = Vault.Open(harness.VaultPath, Master))
-        {
-            LegacyVariables.Set(vault, "billing", "LEGACY_TOKEN", "legacy-first");
-            vault.Save();
-        }
 
         harness.Prompt.Enqueue(Master, "first");
         harness.Run("env", "set", "billing", "TOKEN", "--vault", harness.VaultPath);
@@ -153,18 +148,12 @@ public sealed class EnvVerbTests
         Assert.Contains("Updated TOKEN on env/billing/.env (previous value kept in entry history)", harness.Err, StringComparison.Ordinal);
 
         harness.Stderr.GetStringBuilder().Clear();
-        harness.Prompt.Enqueue(Master, "legacy-second");
-        harness.Run("env", "set", "billing", "LEGACY_TOKEN", "--vault", harness.VaultPath);
-        Assert.Contains("Updated env/billing/LEGACY_TOKEN (previous value kept in entry history)", harness.Err, StringComparison.Ordinal);
-
-        harness.Stderr.GetStringBuilder().Clear();
         harness.Prompt.Enqueue(Master, "second");
         harness.Run("env", "set", "billing", "TOKEN", "--vault", harness.VaultPath);
         Assert.Contains("env/billing/.env already holds that value for TOKEN; nothing was written", harness.Err, StringComparison.Ordinal);
 
         using var opened = Vault.Open(harness.VaultPath, Master);
         Assert.Equal("second", opened.ReadField(_home, "TOKEN"), StringComparer.Ordinal);
-        Assert.Equal("legacy-second", opened.Find(new EntryName("env/billing", "LEGACY_TOKEN"))?.Password, StringComparer.Ordinal);
         Assert.Single(opened.ReadHistory(_home)!);
     }
 
@@ -225,18 +214,7 @@ public sealed class EnvVerbTests
     {
         using var harness = new CliHarness();
         SeedVault(harness);
-        using (var vault = Vault.Open(harness.VaultPath, Master))
-        {
-            foreach (var title in new[] { "Stripe", "Twin" })
-            {
-                var name = new EntryName("services", title);
-                vault.AddEntry(new VaultEntry { GroupPath = "services", Title = title, Password = "login" });
-                Assert.True(vault.SetFields(name, [new FieldWrite("STRIPE_KEY", "old-" + title)]));
-                Assert.True(vault.AddTag(name, "env:billing"));
-            }
-
-            vault.Save();
-        }
+        TagTwoHolders(harness, "STRIPE_KEY");
 
         var before = Digest(harness.VaultPath);
         harness.Prompt.Enqueue(Master);
@@ -271,57 +249,36 @@ public sealed class EnvVerbTests
         Assert.Equal("1", vault.ReadField(_home, "A"), StringComparer.Ordinal);
     }
 
+    /// <summary>An untagged entry under <c>env/</c> is no variable (D-0416), so <c>env rm</c> cannot reach it.</summary>
     [Fact]
-    public void Rm_ALegacyVariable_MovesItsEntryToTheRecycleBin()
+    public void Rm_LeavesAnUntaggedEntryUnderEnvAlone()
     {
         using var harness = new CliHarness();
         SeedVault(harness);
-        Author(harness, ("env/billing", "A", "1"), ("env/billing", "B", "2"));
+        Author(harness, ("env/billing", "A", "1"));
 
         harness.Prompt.Enqueue(Master);
         var exit = harness.Run("env", "rm", "billing", "A", "--yes", "--vault", harness.VaultPath);
 
-        Assert.Equal(CliApp.ExitSuccess, exit);
-        Assert.Contains("Moved env/billing/A to the recycle bin", harness.Err, StringComparison.Ordinal);
+        Assert.Equal(CliApp.ExitNotFound, exit);
+        Assert.Contains("no env set for 'billing'", harness.Err, StringComparison.Ordinal);
 
         using var vault = Vault.Open(harness.VaultPath, Master);
-        Assert.Null(vault.Find("env/billing/A"));
-        Assert.NotNull(vault.Find("env/billing/B"));
+        Assert.Equal("1", vault.Find("env/billing/A")?.Password, StringComparer.Ordinal);
     }
 
     /// <summary>
-    /// The entry titled <c>nested/TOKEN</c> is one KeePassXC authored: it shares its path with
-    /// <c>env/dev/nested/TOKEN</c>, and removing it must not take that neighbour instead.
-    /// </summary>
-    [Fact]
-    public void Rm_RemovesTheNamedVariable_WhenANestedGroupSharesItsPath()
-    {
-        using var harness = new CliHarness();
-        SeedVault(harness);
-        Author(harness, ("env/dev", "nested/TOKEN", "slashed"), ("env/dev/nested", "TOKEN", "nested"));
-
-        harness.Prompt.Enqueue(Master);
-        var exit = harness.Run("env", "rm", "dev", "nested/TOKEN", "--yes", "--vault", harness.VaultPath);
-
-        Assert.Equal(CliApp.ExitSuccess, exit);
-
-        using var vault = Vault.Open(harness.VaultPath, Master);
-        var survivor = Assert.Single(vault.ReadEntries());
-        Assert.Equal("nested", survivor.Password, StringComparer.Ordinal);
-    }
-
-    /// <summary>
-    /// Two entries in one project answering to one name. Removing either would be a guess, so the
+    /// Two entries in one project holding one key. Removing either would be a guess, so the
     /// command refuses, exits nonzero and leaves the file exactly as it found it — which is why
     /// this asserts on the bytes: <see cref="Vault.Save"/> re-randomises salt and nonces, so an
     /// unchanged digest proves no save happened rather than that the contents matched.
     /// </summary>
     [Fact]
-    public void Rm_ADuplicatedVariableName_IsRefused_AndTheVaultIsNotWritten()
+    public void Rm_AKeyTwoEntriesHold_IsRefused_AndTheVaultIsNotWritten()
     {
         using var harness = new CliHarness();
         SeedVault(harness);
-        Author(harness, ("env/billing", "TOKEN", "first"), ("env/billing", "TOKEN", "second"));
+        TagTwoHolders(harness, "TOKEN");
 
         var before = Digest(harness.VaultPath);
 
@@ -329,10 +286,8 @@ public sealed class EnvVerbTests
         var exit = harness.Run("env", "rm", "billing", "TOKEN", "--yes", "--vault", harness.VaultPath);
 
         Assert.NotEqual(CliApp.ExitSuccess, exit);
+        Assert.Contains("TOKEN is on more than one entry (services/Stripe, services/Twin)", harness.Err, StringComparison.Ordinal);
         Assert.Equal(before, Digest(harness.VaultPath), StringComparer.Ordinal);
-
-        using var vault = Vault.Open(harness.VaultPath, Master);
-        Assert.Equal(2, vault.ReadEntries().Count);
     }
 
     [Fact]
@@ -401,57 +356,6 @@ public sealed class EnvVerbTests
 
         Assert.Equal(CliApp.ExitSuccess, exit);
         Assert.Empty(harness.Out);
-    }
-
-    /// <summary>
-    /// A variable KeePassXC created under a name keypaste would refuse is still listed — hiding it
-    /// would make the two tools disagree about one file (docs/PRODUCT.md law 4.6) — but the warning that
-    /// it cannot be exported goes to stderr, leaving stdout machine-readable.
-    /// </summary>
-    [Fact]
-    public void Ls_ListsAnUnusableName_AndWarnsOnStderrOnly()
-    {
-        using var harness = new CliHarness();
-        SeedVault(harness);
-
-        Author(harness, ("env/billing", "FINE", "1"), ("env/billing", "not a key", "v"));
-
-        harness.Stdout.GetStringBuilder().Clear();
-        harness.Stderr.GetStringBuilder().Clear();
-        harness.Prompt.Enqueue(Master);
-        var exit = harness.Run("env", "ls", "billing", "--vault", harness.VaultPath);
-
-        Assert.Equal(CliApp.ExitSuccess, exit);
-
-        var lines = harness.Out.ReplaceLineEndings("\n").TrimEnd().Split('\n');
-        Assert.Equal(["FINE", "not a key"], lines);
-        Assert.Contains("not a key", harness.Err, StringComparison.Ordinal);
-        Assert.Contains("warning", harness.Err, StringComparison.Ordinal);
-    }
-
-    /// <summary>
-    /// Two entries with one name is legal KDBX and KeePassXC will create it. There is no correct
-    /// value to report, so it fails rather than silently picking one (docs/PRODUCT.md law 3.7).
-    /// </summary>
-    [Fact]
-    public void Ls_FailsLoudly_WhenKeePassXcLeftTwoEntriesWithOneName()
-    {
-        using var harness = new CliHarness();
-        SeedVault(harness);
-
-        using (var vault = Vault.Open(harness.VaultPath, Master))
-        {
-            vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "one", GroupPath = "env/billing" });
-            vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "two", GroupPath = "env/billing" });
-            vault.Save();
-        }
-
-        harness.Prompt.Enqueue(Master);
-        var exit = harness.Run("env", "ls", "billing", "--vault", harness.VaultPath);
-
-        Assert.Equal(CliApp.ExitInternalError, exit);
-        Assert.Contains("TOKEN", harness.Err, StringComparison.Ordinal);
-        Assert.DoesNotContain("one", harness.Out, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -570,23 +474,19 @@ public sealed class EnvVerbTests
     {
         using var harness = new CliHarness();
         SeedProfiles(harness);
-        using (var vault = Vault.Open(harness.VaultPath, Master))
-        {
-            vault.AddEntry(new VaultEntry { Title = "BAD-NAME", Password = "x", GroupPath = "env/acme-api/staging" });
-            vault.Save();
-        }
+        Author(harness, ("env/acme-api/staging", "OLD_KEY", "x"));
 
         harness.Prompt.Enqueue(Master);
         Assert.Equal(CliApp.ExitSuccess, harness.Run("env", "ls", "--json", "--vault", harness.VaultPath));
         Assert.Equal(
-            """[{"project":"acme-api","legacy":true,"environments":[{"name":"dev","protected":false,"members":[]},{"name":"staging","protected":false,"members":[]},{"name":"prod","protected":true,"members":[]}]}]""",
+            """[{"project":"acme-api","environments":[{"name":"dev","protected":false,"members":[{"path":"env/acme-api/.env","group":"env/acme-api","title":".env"}]},{"name":"staging","protected":false,"members":[{"path":"env/acme-api/.env.staging","group":"env/acme-api","title":".env.staging"}]},{"name":"prod","protected":true,"members":[{"path":"env/acme-api/.env.prod","group":"env/acme-api","title":".env.prod"}]}]}]""",
             harness.Out.Trim());
 
         harness.Stdout.GetStringBuilder().Clear();
         harness.Prompt.Enqueue(Master);
         Assert.Equal(CliApp.ExitSuccess, harness.Run("env", "ls", "acme-api", "-p", "staging", "--json", "--vault", harness.VaultPath));
         Assert.Equal(
-            """[{"key":"BAD-NAME","profile":"staging","usable":false,"entries":["env/acme-api/staging/BAD-NAME"]},{"key":"DATABASE_URL","profile":"staging","usable":true,"entries":["env/acme-api/staging/DATABASE_URL"]}]""",
+            """[{"project":"acme-api","environments":[{"name":"staging","protected":false,"members":[{"path":"env/acme-api/.env.staging","group":"env/acme-api","title":".env.staging","keys":["DATABASE_URL"]}]}]}]""",
             harness.Out.Trim());
         Assert.DoesNotContain("staging-db", harness.Out + harness.Err, StringComparison.Ordinal);
     }
@@ -596,17 +496,16 @@ public sealed class EnvVerbTests
     {
         using var harness = new CliHarness();
         SeedProfiles(harness);
-        Author(harness, ("env/acme-api/dev", "LOST", "x"));
+        Author(harness, ("env/acme-api/qa", "LOST", "x"));
 
         harness.Prompt.Enqueue(Master);
         Assert.Equal(CliApp.ExitSuccess, harness.Run("env", "ls", "acme-api", "--profiles", "--vault", harness.VaultPath));
         Assert.Equal(["dev", "staging", "prod"], Lines(harness.Out));
-        Assert.Contains("'env/acme-api/dev' is ignored", harness.Err, StringComparison.Ordinal);
+        Assert.Empty(harness.Err);
 
-        harness.Stderr.GetStringBuilder().Clear();
         harness.Prompt.Enqueue(Master);
         Assert.Equal(CliApp.ExitNotFound, harness.Run("env", "ls", "acme-api", "-p", "qa", "--vault", harness.VaultPath));
-        Assert.Equal("keypaste env ls: 'acme-api' has no 'qa' profile", harness.Err.Trim());
+        Assert.Equal("keypaste env ls: 'acme-api' has no 'qa' environment", harness.Err.Trim());
     }
 
     [Fact]
@@ -693,12 +592,12 @@ public sealed class EnvVerbTests
         SeedVault(harness);
 
         using var vault = Vault.Open(harness.VaultPath, Master);
-        LegacyVariables.Set(vault, "acme-api", "DATABASE_URL", "dev-db");
-        LegacyVariables.Set(vault, "acme-api", "STRIPE_KEY", "shared-stripe");
-        LegacyVariables.Set(vault, "acme-api", "staging", "DATABASE_URL", "staging-db");
-        LegacyVariables.Set(vault, "acme-api", "prod", "JWT_SIGNING_KEY", "prod-jwt");
-        LegacyVariables.Set(vault, "acme-api", "prod", "SENTRY_DSN", "prod-sentry");
-        LegacyVariables.Set(vault, "acme-api", "prod", "STRIPE_KEY", "shared-stripe");
+        ProjectVariables.Set(vault, "acme-api", "DATABASE_URL", "dev-db");
+        ProjectVariables.Set(vault, "acme-api", "STRIPE_KEY", "shared-stripe");
+        ProjectVariables.Set(vault, "acme-api", "staging", "DATABASE_URL", "staging-db");
+        ProjectVariables.Set(vault, "acme-api", "prod", "JWT_SIGNING_KEY", "prod-jwt");
+        ProjectVariables.Set(vault, "acme-api", "prod", "SENTRY_DSN", "prod-sentry");
+        ProjectVariables.Set(vault, "acme-api", "prod", "STRIPE_KEY", "shared-stripe");
         vault.Save();
     }
 
@@ -713,11 +612,7 @@ public sealed class EnvVerbTests
     private static List<string> Lines(string text) =>
         [.. text.ReplaceLineEndings("\n").Split('\n', StringSplitOptions.RemoveEmptyEntries)];
 
-    /// <summary>
-    /// Writes entries the CLI itself refuses to create, the way KeePassXC would. Takes the vault
-    /// through the core directly, because <c>env set</c> rejects a key containing a separator and
-    /// <c>add</c> would read the same separator as a group.
-    /// </summary>
+    /// <summary>Writes untagged entries through the core directly, the way KeePassXC would.</summary>
     private static void Author(CliHarness harness, params (string GroupPath, string Title, string Password)[] entries)
     {
         using var vault = Vault.Open(harness.VaultPath, Master);
@@ -730,6 +625,22 @@ public sealed class EnvVerbTests
                 Password = entry.Password,
                 GroupPath = entry.GroupPath,
             });
+        }
+
+        vault.Save();
+    }
+
+    /// <summary>Tags <c>services/Stripe</c> and <c>services/Twin</c> into billing, each holding <paramref name="key"/>.</summary>
+    private static void TagTwoHolders(CliHarness harness, string key)
+    {
+        using var vault = Vault.Open(harness.VaultPath, Master);
+
+        foreach (var title in new[] { "Stripe", "Twin" })
+        {
+            var name = new EntryName("services", title);
+            vault.AddEntry(new VaultEntry { GroupPath = "services", Title = title, Password = "login" });
+            Assert.True(vault.SetFields(name, [new FieldWrite(key, "old-" + title)]));
+            Assert.True(vault.AddTag(name, "env:billing"));
         }
 
         vault.Save();

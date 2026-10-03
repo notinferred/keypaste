@@ -109,13 +109,11 @@ public sealed class ProjectTagTests
     }
 
     [Fact]
-    public void An_entry_is_live_only_by_its_path_or_by_any_tag_that_protects()
+    public void An_entry_is_live_only_by_a_tag_that_protects()
     {
-        var plain = new EntryName("services", "Stripe");
-
-        Assert.False(EnvProfileNames.RequiresLiveApproval(plain, ["finance", "env:billing", "env:billing:staging"]));
-        Assert.True(EnvProfileNames.RequiresLiveApproval(plain, ["finance", "env:billing:prod"]));
-        Assert.True(EnvProfileNames.RequiresLiveApproval(plain, ["env:billing:Prod"]));
-        Assert.True(EnvProfileNames.RequiresLiveApproval(new EntryName("env/billing/prod", "KEY"), []));
+        Assert.False(EnvProfileNames.RequiresLiveApproval(["finance", "env:billing", "env:billing:staging"]));
+        Assert.True(EnvProfileNames.RequiresLiveApproval(["finance", "env:billing:prod"]));
+        Assert.True(EnvProfileNames.RequiresLiveApproval(["env:billing:Prod"]));
+        Assert.False(EnvProfileNames.RequiresLiveApproval([]));
     }
 }

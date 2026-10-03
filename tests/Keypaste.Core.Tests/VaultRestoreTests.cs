@@ -64,6 +64,7 @@ public sealed class VaultRestoreTests : IDisposable
         {
             vault.AddEntry(new VaultEntry { Title = "kept", Password = "k", GroupPath = "servers" });
             vault.AddEntry(new VaultEntry { Title = "binned", Password = "b", GroupPath = "servers" });
+            Assert.True(vault.AddTag(new EntryName("servers", "kept"), "env:billing"));
             vault.Save();
         }
 

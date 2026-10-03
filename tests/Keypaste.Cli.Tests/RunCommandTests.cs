@@ -23,13 +23,11 @@ public sealed class RunCommandTests
         var harness = new CliHarness();
         harness.SeedVault(Master);
 
-        // The env/dev layout of earlier releases, beside which the refusals below add entries the
-        // way KeePassXC would.
         using (var vault = Core.Vault.Open(harness.VaultPath, Master))
         {
             foreach (var (key, value) in variables)
             {
-                LegacyVariables.Set(vault, "dev", key, value);
+                ProjectVariables.Set(vault, "dev", key, value);
             }
 
             vault.Save();
@@ -209,69 +207,18 @@ public sealed class RunCommandTests
 
     // ---- fail closed -------------------------------------------------------------------
 
-    /// <summary>
-    /// Skipping these with a warning was the alternative. A child booted with a silently
-    /// incomplete environment does not fail here — it fails later, elsewhere, as "connected to the
-    /// wrong database". Every offending name is listed so one repair pass in KeePassXC is enough.
-    /// </summary>
-    [Fact]
-    public void ANameThatCannotBeExported_StopsTheRun_AndNamesEveryOne()
-    {
-        using var harness = Seeded(("GOOD", "v"));
-
-        // Written the way KeePassXC would write them: keypaste's own `env set` refuses these.
-        using (var vault = Core.Vault.Open(harness.VaultPath, Master))
-        {
-            vault.AddEntry(new Core.VaultEntry { Title = "not-a-name", Password = "x", GroupPath = "env/dev" });
-            vault.AddEntry(new Core.VaultEntry { Title = "also bad", Password = "y", GroupPath = "env/dev" });
-            vault.Save();
-        }
-
-        harness.Prompt.Enqueue(Master);
-        var exit = harness.Run("run", "dev", "--vault", harness.VaultPath, "--", "node");
-
-        Assert.Equal(CliApp.ExitInternalError, exit);
-        Assert.Contains("not-a-name", harness.Err, StringComparison.Ordinal);
-        Assert.Contains("also bad", harness.Err, StringComparison.Ordinal);
-        Assert.Empty(harness.ProcessLauncher.Started);
-    }
-
-    /// <summary>
-    /// The second half of DECISIONS.md O-0009, answered here. Two such names are two variables on
-    /// Linux and one on Windows, so there is no injection that means the same thing everywhere.
-    /// The check is deliberately <em>not</em> platform-conditional: a vault that runs on Linux and
-    /// refuses on Windows is a failure a teammate cannot reproduce.
-    /// </summary>
-    [Fact]
-    public void TwoNamesDifferingOnlyInCase_StopTheRun_OnEveryPlatform()
-    {
-        using var harness = Seeded(("TOKEN", "v"));
-
-        using (var vault = Core.Vault.Open(harness.VaultPath, Master))
-        {
-            vault.AddEntry(new Core.VaultEntry { Title = "Token", Password = "other", GroupPath = "env/dev" });
-            vault.Save();
-        }
-
-        harness.Prompt.Enqueue(Master);
-        var exit = harness.Run("run", "dev", "--vault", harness.VaultPath, "--", "node");
-
-        Assert.Equal(CliApp.ExitInternalError, exit);
-        Assert.Contains("only in case", harness.Err, StringComparison.Ordinal);
-        Assert.Contains("TOKEN", harness.Err, StringComparison.Ordinal);
-        Assert.Contains("Token", harness.Err, StringComparison.Ordinal);
-        Assert.Empty(harness.ProcessLauncher.Started);
-    }
-
     [Fact]
     public void AnExpiredEntry_StopsTheRun_NamingItAndWhy_WithoutAnyValue()
     {
-        using var harness = Seeded(("GOOD", "good-value-7c1e"), ("OLD", "old-value-7c1e"));
+        using var harness = Seeded(("GOOD", "good-value-7c1e"));
+        var old = new Core.EntryName("services", "Old");
 
         using (var vault = Core.Vault.Open(harness.VaultPath, Master))
         {
-            vault.SetExpiryUnchecked(new Core.EntryName("env/dev", "OLD"), new DateTimeOffset(2020, 1, 2, 3, 4, 5, TimeSpan.Zero));
-            vault.AddEntry(new Core.VaultEntry { Title = "BAD-NAME", Password = "bad-value-7c1e", GroupPath = "env/dev" });
+            vault.AddEntry(new Core.VaultEntry { GroupPath = "services", Title = "Old", Password = "login-7c1e" });
+            Assert.True(vault.SetFields(old, [new Core.FieldWrite("OLD", "old-value-7c1e")]));
+            Assert.True(vault.AddTag(old, "env:dev"));
+            vault.SetExpiryUnchecked(old, new DateTimeOffset(2020, 1, 2, 3, 4, 5, TimeSpan.Zero));
             vault.Save();
         }
 
@@ -279,9 +226,8 @@ public sealed class RunCommandTests
         var exit = harness.Run("run", "dev", "--vault", harness.VaultPath, "--", "node");
 
         Assert.Equal(CliApp.ExitInternalError, exit);
-        Assert.Contains("OLD expired 2020-01-02 03:04:05Z", harness.Err, StringComparison.Ordinal);
-        Assert.Contains("BAD-NAME is not a valid environment variable name", harness.Err, StringComparison.Ordinal);
-        Assert.DoesNotContain("value-7c1e", harness.Err + harness.Out, StringComparison.Ordinal);
+        Assert.Contains("OLD expired 2020-01-02 03:04:05Z (services/Old)", harness.Err, StringComparison.Ordinal);
+        Assert.DoesNotContain("7c1e", harness.Err + harness.Out, StringComparison.Ordinal);
         Assert.Empty(harness.ProcessLauncher.Started);
     }
 
@@ -644,9 +590,9 @@ public sealed class RunCommandTests
 
         using (var vault = Core.Vault.Open(harness.VaultPath, Master))
         {
-            LegacyVariables.Set(vault, "acme-api", "DATABASE_URL", "dev-db");
-            LegacyVariables.Set(vault, "acme-api", "STRIPE_KEY", "sk_dev");
-            LegacyVariables.Set(vault, "acme-api", "staging", "DATABASE_URL", "staging-db");
+            ProjectVariables.Set(vault, "acme-api", "DATABASE_URL", "dev-db");
+            ProjectVariables.Set(vault, "acme-api", "STRIPE_KEY", "sk_dev");
+            ProjectVariables.Set(vault, "acme-api", "staging", "DATABASE_URL", "staging-db");
             vault.AddEntry(new Core.VaultEntry { GroupPath = "work", Title = "github", Username = "octocat", Password = "gh-password" });
             vault.Save();
         }

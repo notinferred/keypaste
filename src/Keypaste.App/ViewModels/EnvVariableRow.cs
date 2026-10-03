@@ -6,25 +6,18 @@ namespace Keypaste.App.ViewModels;
 /// One row of a project's variable table: a name, a mask, and a way to see the value briefly.
 /// </summary>
 /// <remarks>
-/// <para>
 /// <b>The value is not a property of this object.</b> <see cref="Reveal"/> reads it out of the open
 /// vault at the moment of the press and hands it to the control that draws it, which keeps it in a
 /// private field until the finger comes up. A row that carried its value would put every variable's
 /// value in memory, in a view model, for as long as the screen is open — the thing
 /// <c>SecretHygieneTests</c> exists to catch.
-/// </para>
-/// <para>
-/// <see cref="IsUsableName"/> comes from core rather than from a rule written here.
-/// <c>keypaste run</c> cannot export a name outside the POSIX set, and a table that quietly showed
-/// such a variable as ordinary would be the GUI disagreeing with the CLI about the same file.
-/// </para>
 /// </remarks>
 internal sealed class EnvVariableRow : ObservableObject, IRevealSource
 {
     private readonly EnvProjectViewModel _owner;
     private int _maskedLength;
 
-    internal EnvVariableRow(EnvProjectViewModel owner, EnvSource source, int length, bool isUsableName)
+    internal EnvVariableRow(EnvProjectViewModel owner, EnvSource source, int length)
     {
         ArgumentNullException.ThrowIfNull(owner);
         ArgumentNullException.ThrowIfNull(source);
@@ -32,7 +25,6 @@ internal sealed class EnvVariableRow : ObservableObject, IRevealSource
         _owner = owner;
         Source = source;
         _maskedLength = length;
-        IsUsableName = isUsableName;
 
         CopyValueCommand = new AsyncRelayCommand(CopyAsync);
         RemoveCommand = new RelayCommand(() => _owner.BeginRemove(this));
@@ -45,22 +37,11 @@ internal sealed class EnvVariableRow : ObservableObject, IRevealSource
     /// <summary>The entry and field holding the value, which a copy, hold, replace or removal addresses.</summary>
     internal EnvSource Source { get; }
 
-    /// <summary>Whether the value is a legacy variable's password rather than a field.</summary>
-    internal bool IsLegacy => string.Equals(Source.Field, EnvSource.LegacyField, StringComparison.Ordinal);
-
     /// <summary>The name as the table draws it.</summary>
     internal string DisplayKey => EntryNameSanitizer.Sanitize(Key).Text;
 
     /// <summary>How long its value is, for the mask.</summary>
     public int MaskedLength => _maskedLength;
-
-    /// <summary>Whether <c>keypaste run</c> could export this name.</summary>
-    internal bool IsUsableName { get; }
-
-    /// <summary>The sentence shown beside a name core would refuse to create.</summary>
-    internal string Warning => IsUsableName
-        ? string.Empty
-        : "keypaste run cannot export this name.";
 
     /// <summary>What a screen reader is told the reveal button does. Names the key, never the value.</summary>
     internal string RevealLabel => $"Hold to reveal {DisplayKey}";

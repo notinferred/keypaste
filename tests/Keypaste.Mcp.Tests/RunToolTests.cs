@@ -147,7 +147,7 @@ public sealed class RunToolTests : IDisposable
         using var parsed = JsonDocument.Parse(line);
         var root = parsed.RootElement;
         Assert.Equal("granted", root.GetProperty("decision").GetString());
-        Assert.Equal(["env/acme-api/DATABASE_URL", "env/acme-api/TOKEN"], root.GetProperty("entries").EnumerateArray().Select(entry => entry.GetString()));
+        Assert.Equal(["env/acme-api/.env", "env/acme-api/TOKEN"], root.GetProperty("entries").EnumerateArray().Select(entry => entry.GetString()));
         Assert.StartsWith(Reporter.Path, root.GetProperty("command").GetString(), StringComparison.Ordinal);
         Assert.Equal(64, root.GetProperty("command_sha256").GetString()!.Length);
         Assert.Equal(VaultIdentity.Of(KeypasteHome.Resolve(null), VaultPath).Key, root.GetProperty("vault").GetString());
@@ -521,8 +521,11 @@ public sealed class RunToolTests : IDisposable
         {
             _answer = answer;
             _vault = Vault.Create(test.VaultPath, "correct horse battery staple");
-            LegacyVariables.Set(_vault, "acme-api", "DATABASE_URL", _value);
-            LegacyVariables.Set(_vault, "acme-api", "TOKEN", "tok-" + _core);
+            ProjectVariables.Set(_vault, "acme-api", "DATABASE_URL", _value);
+            var token = new EntryName("env/acme-api", "TOKEN");
+            _vault.AddEntry(new VaultEntry { GroupPath = token.GroupPath, Title = token.Title, Password = "tok-" + _core });
+            _vault.SetFields(token, [new FieldWrite("TOKEN", "tok-" + _core)]);
+            _vault.AddTag(token, "env:acme-api");
             _vault.AddEntry(new VaultEntry { GroupPath = "personal", Title = "bank", Password = "bank-" + _core });
             _vault.Save();
 

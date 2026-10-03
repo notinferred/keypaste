@@ -68,24 +68,20 @@ public sealed class SetVerbTests : IDisposable
         Assert.Contains(vault.ReadHistory(new EntryName("Banking", "Chase"))!, revision => revision.Fields.Password == "old-value");
     }
 
+    /// <summary>An entry under <c>env</c> is an ordinary entry and no variable (D-0416), so no variable-name rule applies there.</summary>
     [Fact]
-    public void Set_RefusesANewEnvNameThatWouldMakeTheProfileUnusable()
+    public void Set_UnderEnv_WritesAnOrdinaryEntry()
     {
-        _harness.Prompt.Enqueue(_master, _value);
-        _harness.AssertExit(CliApp.ExitSuccess, Set("env/acme-api/staging/STRIPE"));
-
-        foreach (var name in new[] { "env/acme-api/staging/bad-name", "env/acme-api/staging/stripe", "env/acme-api/Staging/KEY", "env/KEY", "env/acme-api/dev/KEY", "env/acme-api/staging/sub/KEY" })
+        foreach (var name in new[] { "env/acme-api/staging/bad-name", "env/KEY" })
         {
-            _harness.Stderr.GetStringBuilder().Clear();
-            _harness.Prompt.Enqueue(_master);
-            _harness.AssertExit(CliApp.ExitUsageError, Set(name));
-            Assert.Contains("Nothing was written.", _harness.Err, StringComparison.Ordinal);
+            _harness.Prompt.Enqueue(_master, _value);
+            _harness.AssertExit(CliApp.ExitSuccess, Set(name));
         }
 
-        Assert.Contains("'env/acme-api/staging/sub' is never read: a set is env/PROJECT or env/PROJECT/PROFILE", _harness.Err, StringComparison.Ordinal);
-
         using var vault = Vault.Open(_harness.VaultPath, _master);
-        Assert.Equal(["STRIPE"], vault.ReadEntries().Where(entry => entry.GroupPath.StartsWith("env", StringComparison.Ordinal)).Select(entry => entry.Title));
+        Assert.Equal(_value, vault.Find("env/acme-api/staging/bad-name")?.Password);
+        Assert.Equal(_value, vault.Find("env/KEY")?.Password);
+        Assert.Empty(ProjectCatalog.Read(vault).Projects);
     }
 
     [Fact]
@@ -199,17 +195,15 @@ public sealed class SetVerbTests : IDisposable
     }
 
     [Theory]
-    [InlineData("KEY", "env/acme-api/dev", "the dev profile is env/acme-api itself")]
-    [InlineData("KEY", "env/acme-api/staging/sub", "'env/acme-api/staging/sub' is never read: a set is env/PROJECT or env/PROJECT/PROFILE")]
-    [InlineData("KEY", "env", "an entry directly in 'env' belongs to no project; name it env/PROJECT/KEY")]
-    public void Add_WhereNoProfileReads_IsRefused(string title, string group, string reason)
+    [InlineData("env/acme-api/dev")]
+    [InlineData("env/acme-api/staging/sub")]
+    [InlineData("env")]
+    public void Add_UnderEnv_WritesAnOrdinaryEntry(string group)
     {
-        _harness.Prompt.Enqueue(_master);
-        _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("add", title, "--group", group, "--vault", _harness.VaultPath));
+        _harness.Prompt.Enqueue(_master, _value);
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("add", "bad-key", "--group", group, "--vault", _harness.VaultPath));
 
-        Assert.Contains(reason, _harness.Err, StringComparison.Ordinal);
-        using var vault = Vault.Open(_harness.VaultPath, _master);
-        Assert.DoesNotContain(vault.ReadEntries(), entry => entry.GroupPath.StartsWith("env", StringComparison.Ordinal));
+        Assert.Equal(_value, Read(group, "bad-key")?.Password);
     }
 
     [Fact]

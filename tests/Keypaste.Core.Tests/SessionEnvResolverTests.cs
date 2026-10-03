@@ -20,7 +20,7 @@ public sealed class SessionEnvResolverTests : IDisposable
 
         using (var created = Vault.Create(_path, EnvStoreTests.MasterPassword))
         {
-            LegacyVariables.Set(created, "dev", "TOKEN", "v1");
+            ProjectVariables.Set(created, "dev", "TOKEN", "v1");
             created.Save();
         }
 
@@ -122,7 +122,7 @@ public sealed class SessionEnvResolverTests : IDisposable
             (_, _) =>
             {
                 using var other = Vault.Open(_path, EnvStoreTests.MasterPassword);
-                LegacyVariables.Set(other, "dev", "TOKEN", "elsewhere");
+                ProjectVariables.Set(other, "dev", "TOKEN", "elsewhere");
                 other.Save();
                 return ValueTask.FromResult(true);
             },
@@ -139,7 +139,7 @@ public sealed class SessionEnvResolverTests : IDisposable
             "dev",
             (_, _) =>
             {
-                LegacyVariables.Set(_vault, "dev", "TOKEN", "v2");
+                ProjectVariables.Set(_vault, "dev", "TOKEN", "v2");
                 _vault.Save();
                 return ValueTask.FromResult(true);
             },
@@ -151,7 +151,7 @@ public sealed class SessionEnvResolverTests : IDisposable
             "dev",
             (_, _) =>
             {
-                LegacyVariables.Set(_vault, "dev", "EXTRA", "x");
+                ProjectVariables.Set(_vault, "dev", "EXTRA", "x");
                 _vault.Save();
                 return ValueTask.FromResult(true);
             },
@@ -210,7 +210,7 @@ public sealed class SessionEnvResolverTests : IDisposable
     public async Task A_refused_set_is_refused_before_anybody_is_asked_and_a_no_releases_nothing()
     {
         var asked = false;
-        _vault.AddEntry(new VaultEntry { GroupPath = "env/dev", Title = "BAD-NAME", Password = "x" });
+        _vault.SetExpiryUnchecked(ProjectVariables.Home("dev"), DateTimeOffset.UtcNow.AddDays(-1));
         _vault.Save();
 
         var refused = await Resolver().ResolveAsync(
@@ -225,7 +225,7 @@ public sealed class SessionEnvResolverTests : IDisposable
         Assert.Equal(EnvOutcome.Unusable, refused.Outcome);
         Assert.False(asked);
 
-        _vault.RemoveEntry(new EntryName("env/dev", "BAD-NAME"));
+        _vault.SetExpiryUnchecked(ProjectVariables.Home("dev"), null);
         _vault.Save();
 
         var declined = await Resolver().ResolveAsync("dev", (_, _) => ValueTask.FromResult(false), Cancel);
@@ -293,17 +293,19 @@ public sealed class SessionEnvResolverTests : IDisposable
     [Fact]
     public async Task AKeysSubset_IgnoresAnUnusableUnrequestedKey()
     {
-        AddToStaging(("A", "a1"), ("OLD", "old"));
-        _vault.AddEntry(new VaultEntry { GroupPath = "env/dev/staging", Title = "BAD-NAME", Password = "x" });
-        _vault.SetExpiryUnchecked(new EntryName("env/dev/staging", "OLD"), DateTimeOffset.UtcNow.AddDays(-1));
-        _vault.Save();
+        var old = new EntryName("services", "Old");
+        _vault.AddEntry(new VaultEntry { GroupPath = old.GroupPath, Title = old.Title });
+        Assert.True(_vault.SetFields(old, [new FieldWrite("OLD", "old")]));
+        Assert.True(_vault.AddTag(old, "env:dev:staging"));
+        _vault.SetExpiryUnchecked(old, DateTimeOffset.UtcNow.AddDays(-1));
+        AddToStaging(("A", "a1"), ("REF", "{S:other}"));
 
         var subset = await Resolver().ResolveAsync("dev", "staging", ["A"], null, Cancel);
         var whole = await Resolver().ResolveAsync("dev", "staging", null, null, Cancel);
 
         Assert.Equal([new EnvVariable("A", "a1")], subset.Variables);
         Assert.Equal(EnvOutcome.Unusable, whole.Outcome);
-        Assert.Equal(["BAD-NAME", "OLD"], whole.Problems.Select(problem => problem.Key));
+        Assert.Equal(["OLD", "REF"], whole.Problems.Select(problem => problem.Key));
     }
 
     [Fact]
@@ -319,7 +321,7 @@ public sealed class SessionEnvResolverTests : IDisposable
             null,
             (_, _) =>
             {
-                LegacyVariables.Set(_vault, "dev", "staging", "EXTRA", "x");
+                ProjectVariables.Set(_vault, "dev", "staging", "EXTRA", "x");
                 _vault.Save();
                 return ValueTask.FromResult(true);
             },
@@ -351,7 +353,7 @@ public sealed class SessionEnvResolverTests : IDisposable
     {
         foreach (var (key, value) in variables)
         {
-            LegacyVariables.Set(_vault, "dev", "staging", key, value);
+            ProjectVariables.Set(_vault, "dev", "staging", key, value);
         }
 
         _vault.Save();

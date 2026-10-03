@@ -228,10 +228,6 @@ public sealed class ApproverListener : IDisposable
                 return ApproverProtocol.Encode(
                     await _handler.RequestAsync(credential, connectionId, cancellationToken).ConfigureAwait(false));
 
-            case ApproverMessageKind.Env when ApproverProtocol.TryDecode(frame, out EnvRequest? env):
-                return ApproverProtocol.Encode(
-                    await _handler.ReleaseEnvAsync(env, connectionId, cancellationToken).ConfigureAwait(false));
-
             case ApproverMessageKind.EnvProfile when ApproverProtocol.TryDecode(frame, out EnvRequest? envProfile):
                 return ApproverProtocol.Encode(
                     await _handler.ReleaseEnvAsync(envProfile, connectionId, cancellationToken).ConfigureAwait(false));

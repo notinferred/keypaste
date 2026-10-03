@@ -1,13 +1,11 @@
 using Keypaste.Core;
-using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
 
 /// <summary>
-/// <c>env tag</c>, <c>env untag</c> and the project listing <c>env ls</c> builds from tags and
-/// legacy groups. Tags are checked through the core, and against KeePassXC by
-/// <c>verify-keepassxc-projects.sh</c>.
+/// <c>env tag</c>, <c>env untag</c> and the project listing <c>env ls</c> builds from tags alone.
+/// Tags are checked through the core, and against KeePassXC by <c>verify-keepassxc-projects.sh</c>.
 /// </summary>
 public sealed class EnvTagVerbTests : IDisposable
 {
@@ -169,7 +167,7 @@ public sealed class EnvTagVerbTests : IDisposable
         _harness.AssertExit(CliApp.ExitSuccess, Run("env", "ls", "--json"));
 
         Assert.Equal(
-            """[{"project":"billing","legacy":false,"environments":[{"name":"prod","protected":true,"members":[{"path":"services/Database","group":"services","title":"Database"}]}]}]""" + "\n",
+            """[{"project":"billing","environments":[{"name":"prod","protected":true,"members":[{"path":"services/Database","group":"services","title":"Database"}]}]}]""" + "\n",
             Out);
     }
 
@@ -190,20 +188,24 @@ public sealed class EnvTagVerbTests : IDisposable
         _harness.AssertExit(CliApp.ExitNotFound, Run("env", "ls", "billing", "-p", "staging"));
     }
 
+    /// <summary>An untagged entry under <c>env/</c>, as 0.3.0 wrote a variable, makes no project and joins none (D-0416).</summary>
     [Fact]
-    public void Ls_of_a_legacy_project_lists_its_variables_as_before_then_its_tagged_entries()
+    public void Ls_reads_no_project_from_an_untagged_entry_under_env()
     {
         using (var vault = Vault.Open(_harness.VaultPath, _master))
         {
-            LegacyVariables.Set(vault, "billing", "TOKEN", "legacy-token");
+            vault.AddEntry(new VaultEntry { GroupPath = "env/billing", Title = "TOKEN", Password = "old-token" });
+            vault.AddEntry(new VaultEntry { GroupPath = "env/acme", Title = "OLD_KEY", Password = "old-key" });
             vault.Save();
         }
 
-        _harness.AssertExit(CliApp.ExitSuccess, Run("env", "ls", "billing"));
-
-        Assert.Equal("TOKEN\n\ntagged entries\n  prod  protected\n    services/Database\n", Out);
-
         _harness.AssertExit(CliApp.ExitSuccess, Run("env", "ls"));
-        Assert.Equal("billing  legacy\n  dev\n  prod  protected\n    services/Database\n", Out);
+        Assert.Equal("billing\n  prod  protected\n    services/Database\n", Out);
+
+        _harness.AssertExit(CliApp.ExitSuccess, Run("env", "ls", "billing"));
+        Assert.Equal("  prod  protected\n    services/Database\n", Out);
+
+        _harness.AssertExit(CliApp.ExitNotFound, Run("env", "ls", "acme"));
+        Assert.Contains("no env set for 'acme'", _harness.Err, StringComparison.Ordinal);
     }
 }

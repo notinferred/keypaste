@@ -6,8 +6,9 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// D-0348's protection follows an entry's own tag: through a real vault, a tagged entry is asked
-/// about live every time, and anything the source cannot answer counts as protected.
+/// D-0348's protection follows an entry's own tag and never its path (D-0416): through a real vault,
+/// a tagged entry is asked about live every time, and anything the source cannot answer counts as
+/// protected.
 /// </summary>
 public sealed class TagProtectionTests : IDisposable
 {
@@ -24,9 +25,10 @@ public sealed class TagProtectionTests : IDisposable
     [InlineData("services", "Database", true)]
     [InlineData("services", "Odd", true)]
     [InlineData("services", "Plain", false)]
-    [InlineData("env/acme/prod", "KEY", true)]
+    [InlineData("env/acme/prod", "DB", false)]
+    [InlineData("services", "Db", true)]
     [InlineData("services", "Nobody", true)]
-    public void The_vault_source_answers_from_the_path_and_the_entrys_own_tags(string group, string title, bool live)
+    public void The_vault_source_answers_from_the_entrys_own_tags_and_never_its_path(string group, string title, bool live)
     {
         using var vault = Seeded();
         var source = new VaultCredentialSource(() => vault);
@@ -76,7 +78,8 @@ public sealed class TagProtectionTests : IDisposable
         Add(vault, "services", "Database", "env:billing:prod");
         Add(vault, "services", "Odd", "env:billing:Prod");
         Add(vault, "services", "Plain");
-        Add(vault, "env/acme/prod", "KEY");
+        Add(vault, "env/acme/prod", "DB");
+        Add(vault, "services", "Db", "env:acme:prod");
         vault.Save();
         return vault;
     }

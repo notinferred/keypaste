@@ -3,6 +3,7 @@ using Keypaste.Cli.Commands;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ownership;
+using Keypaste.Core.Tests;
 using Keypaste.Core.Tokens;
 using Xunit;
 
@@ -23,11 +24,16 @@ public sealed class TokenVerbTests : IDisposable
     public TokenVerbTests()
     {
         _harness.Environment[KeypasteHome.EnvironmentVariable] = _harness.Directory;
-        _harness.SeedVault(
-            Master,
-            ("env/acme-api/staging/DATABASE_URL", Value),
-            ("env/acme-api/staging/API_KEY", "sk_token_verb_sentinel"),
-            ("env/acme-api/prod/DATABASE_URL", ProdValue));
+        _harness.SeedVault(Master);
+
+        using (var vault = Vault.Open(_harness.VaultPath, Master))
+        {
+            ProjectVariables.Set(vault, "acme-api", "staging", "DATABASE_URL", Value);
+            ProjectVariables.Set(vault, "acme-api", "staging", "API_KEY", "sk_token_verb_sentinel");
+            ProjectVariables.Set(vault, "acme-api", "prod", "DATABASE_URL", ProdValue);
+            vault.Save();
+        }
+
         _harness.Prompt.PromptsSeen.Clear();
     }
 

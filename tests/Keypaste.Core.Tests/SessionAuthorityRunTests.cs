@@ -35,23 +35,27 @@ public sealed class SessionAuthorityRunTests : IDisposable
     {
         using (var created = Vault.Create(VaultPath, EnvStoreTests.MasterPassword))
         {
-            LegacyVariables.Set(created, "acme-api", "DATABASE_URL", _database);
-            LegacyVariables.Set(created, "acme-api", "STRIPE_SECRET_KEY", _stripe);
-            created.AddEntry(new VaultEntry { GroupPath = "env/acme-api/prod", Title = "DATABASE_URL", Password = _prod });
-            created.AddEntry(new VaultEntry { GroupPath = "env/hijack", Title = "PATH", Password = "/tmp/evil" });
-            created.AddEntry(new VaultEntry { GroupPath = "env/billing", Title = "TOKEN", Password = "billing-token" });
+            ProjectVariables.Set(created, "acme-api", "DATABASE_URL", _database);
+            ProjectVariables.Set(created, "acme-api", "STRIPE_SECRET_KEY", _stripe);
+            ProjectVariables.Set(created, "acme-api", "prod", "DATABASE_URL", _prod);
+            ProjectVariables.Set(created, "hijack", "PATH", "/tmp/evil");
+            ProjectVariables.Set(created, "billing", "TOKEN", "billing-token");
             created.AddEntry(new VaultEntry { GroupPath = "personal", Title = "github", Username = _github, Password = "gh-password" });
             created.AddEntry(new VaultEntry { GroupPath = ".keypaste/tokens", Title = "t1", Password = "verifier" });
 
             foreach (var i in Enumerable.Range(0, 33))
             {
-                created.AddEntry(new VaultEntry { GroupPath = "env/big", Title = $"KEY_{i}", Password = $"v{i}" });
-                created.AddEntry(new VaultEntry { GroupPath = "env/outside-big", Title = $"KEY_{i}", Password = $"v{i}" });
+                ProjectVariables.Set(created, "big", $"KEY_{i}", $"v{i}");
+                ProjectVariables.Set(created, "outside-big", $"KEY_{i}", $"v{i}");
             }
 
+            // An entry each, so the run names thirty long paths.
             foreach (var i in Enumerable.Range(0, 30))
             {
-                created.AddEntry(new VaultEntry { GroupPath = "env/wide", Title = $"KEY_{i}_" + new string('W', 70), Password = $"w{i}" });
+                var wide = new EntryName("env/wide", $"KEY_{i}_" + new string('W', 70));
+                created.AddEntry(new VaultEntry { GroupPath = wide.GroupPath, Title = wide.Title });
+                Assert.True(created.SetFields(wide, [new FieldWrite(wide.Title, $"w{i}")]));
+                Assert.True(created.AddTag(wide, "env:wide"));
             }
 
             created.Save();
@@ -123,7 +127,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
         Assert.NotNull(reply);
         Assert.Equal(EnvOutcome.Resolved, reply.Set.Outcome);
         Assert.Equal([new EnvVariable("DATABASE_URL", _database), new EnvVariable("STRIPE_SECRET_KEY", _stripe)], reply.Set.Variables);
-        Assert.Equal(["env/acme-api/DATABASE_URL", "env/acme-api/STRIPE_SECRET_KEY"], reply.Entries);
+        Assert.Equal(["env/acme-api/.env"], reply.Entries);
         Assert.Equal(AuditMethod.Prompt, reply.Method);
         Assert.Equal(0, reply.GrantedSeconds);
         Assert.Equal("session-one", reply.Session);
@@ -148,7 +152,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
         Assert.NotNull(reply);
         Assert.Equal(EnvOutcome.Resolved, reply.Set.Outcome);
         Assert.Equal(["DATABASE_URL", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK"], reply.Set.Variables.Select(variable => variable.Key));
-        Assert.Equal(["env/acme-api/DATABASE_URL", "env/acme-api/STRIPE_SECRET_KEY", "personal/stripe"], reply.Entries);
+        Assert.Equal(["env/acme-api/.env", "personal/stripe"], reply.Entries);
 
         var prompt = Assert.IsType<RunPrompt>(_fixture.Channel.LastRunPrompt);
         Assert.Equal(new RunPromptVariable("STRIPE_WEBHOOK", "personal/stripe", "STRIPE_WEBHOOK"), prompt.Variables[2]);
@@ -174,7 +178,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
         Assert.Equal("acme-api", prompt.Project);
         Assert.Equal("dev", prompt.Profile);
         Assert.Equal(
-            [new RunPromptVariable("DATABASE_URL", "env/acme-api/DATABASE_URL", "password"), new RunPromptVariable("STRIPE_SECRET_KEY", "env/acme-api/STRIPE_SECRET_KEY", "password")],
+            [new RunPromptVariable("DATABASE_URL", "env/acme-api/.env", "DATABASE_URL"), new RunPromptVariable("STRIPE_SECRET_KEY", "env/acme-api/.env", "STRIPE_SECRET_KEY")],
             prompt.Variables);
         Assert.Equal("run the pending migration", prompt.Reason);
         Assert.Equal(EnvGrantCache.CeilingSeconds, prompt.GrantSeconds);
@@ -191,7 +195,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
         var first = await client.ReleaseRunAsync(Run(), Token);
         Assert.Equal(EnvGrantCache.CeilingSeconds, first!.GrantedSeconds);
 
-        LegacyVariables.Set(_vault, "acme-api", "DATABASE_URL", "postgres://rotated");
+        ProjectVariables.Set(_vault, "acme-api", "DATABASE_URL", "postgres://rotated");
         _vault.Save();
         _fixture.Channel.Answer = ApprovalAnswer.Denied;
 
@@ -286,7 +290,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
 
         Assert.Equal([new EnvVariable("DB", _prod), new EnvVariable("GH", _github)], reply!.Set.Variables);
         Assert.Equal(OnceOnly.ProtectedProfile, _fixture.Channel.LastRunPrompt!.OnceOnly);
-        Assert.Equal(["env/acme-api/prod/DATABASE_URL", "personal/github"], reply.Entries);
+        Assert.Equal(["env/acme-api/.env.prod", "personal/github"], reply.Entries);
         Assert.Empty(owner.Authority.Activity.EnvGrants);
     }
 
@@ -313,7 +317,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
         await using var owner = Owner.Start(this);
         await using var client = await AttachedAsync(owner);
 
-        var narrow = Run() with { Exposure = ["env/acme-api/DATABASE_URL"] };
+        var narrow = Run() with { Exposure = ["env/acme-api/.env.prod"] };
         var replies = new[]
         {
             await client.ReleaseRunAsync(Run(project: "billing"), Token),
@@ -490,7 +494,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
 
         using (var other = Vault.Open(VaultPath, EnvStoreTests.MasterPassword))
         {
-            LegacyVariables.Set(other, "acme-api", "NEW_KEY", "x");
+            ProjectVariables.Set(other, "acme-api", "NEW_KEY", "x");
             other.Save();
         }
 
@@ -511,7 +515,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
         await client.ReleaseRunAsync(References(("GH", "kp:///personal/github#username")), Token);
         Assert.Equal(2, owner.Authority.Activity.EnvGrants.Count);
 
-        _grants.RevokeEntries(VaultEdit.Of(new EntryName("env/acme-api", "STRIPE_SECRET_KEY")));
+        _grants.RevokeEntries(VaultEdit.Of(ProjectVariables.Home("acme-api")));
 
         var left = Assert.Single(owner.Authority.Activity.EnvGrants);
         Assert.Equal(["personal/github"], left.Entries);
@@ -624,7 +628,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
         await client.ReleaseRunAsync(Run(), Token);
 
         var released = owner.Authority.Released;
-        Assert.Equal(["env/acme-api/STRIPE_SECRET_KEY", "env/acme-api/DATABASE_URL"], released.Select(seen => seen.Entry));
+        Assert.Equal(["env/acme-api/.env"], released.Select(seen => seen.Entry));
         Assert.All(released, seen => Assert.Equal(("claude-code", "run"), (seen.Client, seen.How)));
 
         _lifetime!.End();

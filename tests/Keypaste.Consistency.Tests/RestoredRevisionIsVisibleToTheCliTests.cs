@@ -97,9 +97,9 @@ public sealed class RestoredRevisionIsVisibleToTheCliTests
     /// Revisions the shipped CLI wrote are the ones the app restores, and the CLI injects the result.
     /// </summary>
     /// <remarks>
-    /// The one test here whose earlier values were not produced by the code under test: <c>add</c> and
-    /// three <c>env set</c> calls write them, which is the shape <c>verify-keepassxc-history.sh</c>
-    /// builds its own fixture in. A restore that only understood its own writes would pass everything above
+    /// The one test here whose earlier values were not produced by the code under test: four
+    /// <c>env set</c> calls write them, the first creating the project's home entry and each later one
+    /// a revision of it. A restore that only understood its own writes would pass everything above
     /// and fail here.
     /// </remarks>
     [Fact]
@@ -107,11 +107,7 @@ public sealed class RestoredRevisionIsVisibleToTheCliTests
     {
         using var fixture = new VaultFixture(("seed", "seed-password"));
 
-        // The first value makes the env/ layout's entry, which only `add` creates since D-0413, and
-        // `env set` then updates it in place.
-        Assert.Equal(CliApp.ExitSuccess, fixture.RunAnswering(["v1-first"], "add", "env/billing/ROTATED"));
-
-        foreach (var value in new[] { "v2-second", "v3-third", "v4-current" })
+        foreach (var value in new[] { "v1-first", "v2-second", "v3-third", "v4-current" })
         {
             Assert.Equal(
                 CliApp.ExitSuccess,
@@ -119,14 +115,14 @@ public sealed class RestoredRevisionIsVisibleToTheCliTests
         }
 
         using var screen = Entries(fixture);
-        var detail = Select(screen, "ROTATED");
+        var detail = Select(screen, ".env");
 
         Assert.Equal(3, detail.History.Rows.Count);
 
         Restore(detail, oldest: true);
 
         Assert.Null(screen.Model.Error);
-        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "env/billing/ROTATED", "--show"));
+        Assert.Equal(CliApp.ExitSuccess, fixture.Run("get", "env/billing/.env", "--field", "ROTATED", "--show"));
         Assert.Equal("v1-first", fixture.Cli.Out.Trim());
 
         Assert.Equal(CliApp.ExitSuccess, fixture.Run("run", "billing", "--", "deploy"));

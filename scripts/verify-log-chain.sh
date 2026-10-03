@@ -131,16 +131,16 @@ verify 5 "a line something else wrote"
 grep -q 'not a record keypaste wrote' "$WORK/out.txt" || die "a foreign line was not named as one"
 restore
 
-# A forged record claiming to predate the chain, spliced into the middle. It breaks no link -
-# nothing before or after it changed - so the only thing standing between it and a rewritten history
-# is that keypaste never writes a v1 record after a v2 one.
+# A forged record in the schema from before the chain, spliced into the middle. It breaks no link -
+# nothing before or after it changed - so what stands between it and a rewritten history is that no
+# release of keypaste wrote that schema, which makes it a line something else wrote (D-0416).
 {
   head -n 1 "$GOOD"
   printf '%s\n' '{"v":1,"ts":"2026-07-26T14:10:00.000Z","seq":9,"pid":1,"client":{"label":"ci-probe"},"tool":"request_credential","args":{"entry":"env/prod/PAYROLL_DB"},"decision":"granted","method":"prompt"}'
   tail -n +2 "$GOOD"
 } >"$AUDIT"
 verify 5 "a forged record spliced into the middle"
-grep -q 'keypaste never writes one there' "$WORK/out.txt" || die "an inserted unverifiable record was not named"
+grep -q 'not a record keypaste wrote' "$WORK/out.txt" || die "an inserted record from before the chain was not named as foreign"
 
 # And the table must not present it as a record the chain stands behind.
 expect 5 "listing a log with a forged record" "$CLI_PATH" log --audit-log "$AUDIT"
